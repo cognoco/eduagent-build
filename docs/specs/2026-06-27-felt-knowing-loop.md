@@ -6,10 +6,12 @@
 - [Memory Task — Review Continuity, Retrieval Log & Unified Relearn Queue](../_archive/specs/Done/2026-06-08-memory-task-review-continuity.md) — Tier 1 is shipped; the unbuilt `evidence_links` + `LearnerSource` substrate is now owned by **WI-1704 (verified-artifact evidence links)**.
 - [Journal Redesign — 5-Button Landing, Reuse-First](./2026-06-27-journal-redesign.md) — shipped read/browse surface (`268347274`, PR #1542).
 
-> **Implementation disposition.** Flow 1 note authoring is wired at
-> `apps/mobile/src/app/(app)/subject-hub/[subjectId]/index.tsx`; Flow 2 freeform
-> keep/bookmark is wired through `SessionFooter.tsx` and `use-bookmark-handler`.
-> Flow 3 remains unbuilt (`evidence_links` / `LearnerSource` have no source hits):
+> **Implementation disposition.** Flow 1's focused topic-sheet add path is wired at
+> `apps/mobile/src/app/(app)/subject-hub/[subjectId]/index.tsx`, but the top-level
+> notes overview still lacks add/edit/delete wiring and remains open without a
+> current owning WI. Flow 2 freeform keep/bookmark is wired through
+> `SessionFooter.tsx` and `use-bookmark-handler`. Flow 3 remains unbuilt
+> (`evidence_links` / `LearnerSource` have no source hits):
 > **WI-1452 (felt-knowing citation substrate)** is superseded/folded into WI-1704 by
 > `docs/plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md`. Current orientation and
 > verification-state rules live in

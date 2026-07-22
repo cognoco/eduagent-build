@@ -7,9 +7,11 @@
 `41eaf6c9b`, PR #2001). Challenge→SM-2 next-review scheduling is shipped in
 `apps/api/src/services/session/session-exchange.ts`; `evidence_links` /
 `LearnerSource` remain absent and are owned by
-**WI-1704 (verified-artifact evidence links)**. **WI-1465 (low-stakes per-concept
-re-prove)** is Closed/Done; current remaining second-wave scope includes
-**WI-1454 (concept-targeted review for weak concepts)**. Use
+**WI-1704 (verified-artifact evidence links)**. The design-only **WI-1465
+(low-stakes per-concept re-prove)** is Closed/Done after producing proposed
+`MMT-ADR-0034`; its learner-facing implementation remains unbuilt, and the ADR's
+API, mobile, and test follow-ups are not yet captured. Current remaining
+second-wave scope includes **WI-1454 (concept-targeted review for weak concepts)**. Use
 `docs/plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md` for launch disposition.
 **Relates:**
 

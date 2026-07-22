@@ -23,9 +23,12 @@ relates:
 > (`apps/api/src/services/session/session-exchange.ts`). Current decision and execution
 > ownership moved to `2026-07-06-verified-learning-loop.md`, accepted
 > `MMT-ADR-0031` / `MMT-ADR-0032`, and the MVP definition.
-> **WI-1465 (low-stakes per-concept re-prove)** is Closed/Done; remaining named work
-> includes **WI-1454 (concept-targeted review for weak concepts)**. Challenge runtime still
-> defaults off. The RR-N body remains the original findings record, not a live queue.
+> The design-only **WI-1465 (low-stakes per-concept re-prove)** is Closed/Done
+> after producing proposed `MMT-ADR-0034`; the learner-facing implementation is
+> still unbuilt, and the ADR's API, mobile, and test follow-ups are not yet captured.
+> Other remaining named work includes **WI-1454 (concept-targeted review for weak
+> concepts)**. Challenge runtime still defaults off. The RR-N body remains the
+> original findings record, not a live queue.
 
 ## Purpose
 
