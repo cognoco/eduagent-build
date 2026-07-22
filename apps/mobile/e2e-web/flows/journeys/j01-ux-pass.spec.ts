@@ -50,7 +50,10 @@ test('single learner UX screenshot crawl', async ({ page }) => {
   await installSeededProfileBootstrap(page);
   let profileBootstrapRequests = 0;
   page.on('request', (request) => {
-    if (new URL(request.url()).pathname === '/v1/profiles') {
+    if (
+      request.method() === 'GET' &&
+      new URL(request.url()).pathname === '/v1/profiles'
+    ) {
       profileBootstrapRequests += 1;
     }
   });
@@ -67,8 +70,7 @@ test('single learner UX screenshot crawl', async ({ page }) => {
   await capture(page, '03-study-new-click');
 
   await gotoScreen(page, '/library', `shelf-row-header-${subjectId}`);
-  // Wait for the subjects query + /library/retention to settle before asserting.
-  // Without this, the shelf-row testID poll can race the first paint on slow CI.
+  // Wait for /library/retention to settle before taking the screenshot.
   await page.waitForLoadState('networkidle');
   await capture(page, '04-library');
 
