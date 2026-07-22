@@ -68,7 +68,7 @@ tags:
 # names is exercised against the already-seeded pending contract below, not
 # resubmitted here (a second initiateLink call for the same pair would just
 # mint an unrelated, unused second edge).
-- openLink: "mentomate:///link/initiate?supporteePersonId=${SUPPORTEE_PERSON_ID}&relation=other"
+- openLink: 'mentomate:///link/initiate?supporteePersonId=${SUPPORTEE_PERSON_ID}&relation=other'
 - extendedWaitUntil:
     visible:
       id: 'visibility-link-initiate-screen'
@@ -80,7 +80,7 @@ tags:
 # stays 'pending' until the supportee also accepts (linking-ceremony.ts's
 # acceptLink flips status only once BOTH supporterAcceptedAt/
 # supporteeAcceptedAt are set).
-- openLink: "mentomate:///link/${CONTRACT_ID}"
+- openLink: 'mentomate:///link/${CONTRACT_ID}'
 - extendedWaitUntil:
     visible:
       id: 'visibility-link-screen'
@@ -112,7 +112,7 @@ tags:
       EMAIL: ${SUPPORTEE_EMAIL}
       PASSWORD: ${SUPPORTEE_PASSWORD}
 
-- openLink: "mentomate:///link/${CONTRACT_ID}"
+- openLink: 'mentomate:///link/${CONTRACT_ID}'
 - extendedWaitUntil:
     visible:
       id: 'visibility-link-screen'
@@ -139,13 +139,13 @@ tags:
 - runFlow:
     file: ../_setup/sign-in-only-returning.yaml
 
-- openLink: "mentomate:///link/${CONTRACT_ID}"
+- openLink: 'mentomate:///link/${CONTRACT_ID}'
 - extendedWaitUntil:
     visible:
       id: 'visibility-link-review'
     timeout: 15000
 
-- openLink: "mentomate:///mentor"
+- openLink: 'mentomate:///mentor'
 - extendedWaitUntil:
     visible:
       id: 'support-hub-mentor-tab'
