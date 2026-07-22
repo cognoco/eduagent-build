@@ -60,6 +60,7 @@
     "check:adr-provenance": "tsx scripts/check-adr-provenance.ts",
     "check:decision-adr-link": "tsx scripts/check-decision-adr-link.ts",
     "check:migration-immutability": "tsx scripts/check-migration-immutability.ts",
+    "check:maestro-main-health": "tsx scripts/check-maestro-main-health.ts",
     "check:no-gemini-runtime": "tsx scripts/check-no-gemini-runtime.ts",
     "check:mode-nav-flag-combo": "tsx scripts/check-mode-nav-flag-combo.ts",
     "check:flow-inventory-cite-rot": "tsx scripts/check-flow-inventory-cite-rot.ts"
