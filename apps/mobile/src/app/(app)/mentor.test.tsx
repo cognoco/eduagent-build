@@ -1160,6 +1160,49 @@ describe('MentorScreen', () => {
     screen.getByTestId('now-card-mentor_notice');
   });
 
+  // [WI-2504 bounce 3 / AC-2] Class-closing coverage for the LAST open
+  // stale-feed leak layer: `useTransitionBoundFeed`. A warm notice feed
+  // (enabled epoch) is rendered on the mentor tab; then the server flips the
+  // policy off and a `refetchOnWindowFocus` re-key delivers the disabled-epoch
+  // feed (no notice) WITHOUT a nav refocus — so `useFocusEffect` does NOT fire
+  // (mockFocusCallback is left uncalled). On the pre-fix code the snapshot is
+  // keyed only on profileId, so it pins the stale enabled-epoch NOTICE feed and
+  // the card renders indefinitely after observed-disabled — an AC-2 violation
+  // ("no mentor-notice Now card may render after observed-disabled") even
+  // though the bounce-2 handleContinue guard already blocks the stale
+  // navigation. The epoch-change branch in the snapshot effect closes it.
+  it('[WI-2504 bounce 3 / AC-2] drops the mentor-notice card when a window-focus refetch re-keys to a disabled epoch without a nav refocus', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+      observedEpoch: 'epoch-enabled',
+    };
+
+    const rendered = renderMentorScreen();
+
+    // The enabled-epoch feed renders the notice card.
+    screen.getByTestId('now-card-mentor_notice');
+    screen.getByText('Check it now');
+
+    // Server flips the policy off: the now-feed query re-keys to the disabled
+    // epoch and the fetch delivers a notice-free feed. This is a
+    // refetchOnWindowFocus re-key WHILE ALREADY ON THE TAB — no navigation
+    // refocus — so `useFocusEffect` is deliberately NOT triggered here.
+    await act(async () => {
+      mockNowFeed = {
+        ...mockNowFeed,
+        data: feed([card()]),
+        observedEpoch: 'epoch-disabled',
+      };
+      rendered.result.rerender(<MentorScreen />);
+    });
+
+    // AC-2: no mentor-notice Now card, and no actionable notice affordance,
+    // may survive observed-disabled.
+    expect(screen.queryByTestId('now-card-mentor_notice')).toBeNull();
+    expect(screen.queryByText('Check it now')).toBeNull();
+  });
+
   // [WI-2499 AC-3] On a rejected/failed defer, no success state may appear —
   // the card stays exactly as it was, and the generic light-practice success
   // affordance never shows.
