@@ -1731,6 +1731,251 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     ]);
   });
 
+  it('[WI-2618] keeps Subjects active across supporter person and Me scope switches', () => {
+    const selfLearningFlow = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/v2/v2-supporter-self-learning-doorway.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(selfLearningFlow)[1]?.toJS() as unknown;
+
+    expect(Array.isArray(commands)).toBe(true);
+    if (!Array.isArray(commands)) {
+      throw new Error(
+        'supporter self-learning Maestro commands must be a YAML list',
+      );
+    }
+
+    const personScopeSwitch = {
+      tapOn: { id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}' },
+    };
+    const meScopeSwitch = { tapOn: { id: 'scope-chip-option-me' } };
+    const personScopeSubjects = {
+      extendedWaitUntil: {
+        visible: { id: 'person-scope-structural-subjects' },
+        timeout: 15000,
+      },
+    };
+    const personScopeSubjectsEmpty = {
+      extendedWaitUntil: {
+        visible: { id: 'person-scope-subjects-empty-state' },
+        timeout: 15000,
+      },
+    };
+    const meScopeSubjects = {
+      extendedWaitUntil: {
+        visible: { id: 'subjects-screen' },
+        timeout: 15000,
+      },
+    };
+    const ownSubjectAbsentInPersonScope = {
+      assertNotVisible: {
+        id: 'person-scope-subject-${OWN_SUBJECT_ID}',
+      },
+    };
+    const ownSubjectTextAbsentInPersonScope = {
+      assertNotVisible: { text: 'Supporter Own Subject' },
+    };
+    const ownSubjectVisibleInMeScope = {
+      assertVisible: {
+        id: 'subjects-browse-row-${OWN_SUBJECT_ID}',
+      },
+    };
+    const privateMarkerAbsent = { assertNotVisible: { text: 'PRIVATE' } };
+    const personScopeMentorWait = {
+      extendedWaitUntil: {
+        visible: { id: 'person-scope-mentor-tab' },
+        timeout: 15000,
+      },
+    };
+    const personScopeMentorTap = {
+      tapOn: { id: 'person-scope-mentor-tab' },
+    };
+    const subjectsTabTap = {
+      tapOn: { id: 'tab-subjects', retryTapIfNoChange: true },
+    };
+    const seedAndSignInSetup = {
+      runFlow: {
+        file: '../_setup/seed-and-sign-in.yaml',
+        env: {
+          SEED_SCENARIO: 'v2-supporter-self-learning-active',
+          API_URL: '${API_URL}',
+        },
+      },
+    };
+    const wrongSeedSetup = {
+      runFlow: {
+        file: '../_setup/seed-and-sign-in.yaml',
+        env: {
+          SEED_SCENARIO: 'v2-supporter-cold-start',
+          API_URL: '${API_URL}',
+        },
+      },
+    };
+    const expectedSwitchSequence = [
+      personScopeSwitch,
+      personScopeSubjects,
+      personScopeSubjectsEmpty,
+      ownSubjectAbsentInPersonScope,
+      ownSubjectTextAbsentInPersonScope,
+      privateMarkerAbsent,
+      meScopeSwitch,
+      meScopeSubjects,
+      ownSubjectVisibleInMeScope,
+      privateMarkerAbsent,
+    ];
+    const satisfiesSubjectsScopeContract = (values: unknown[]): boolean => {
+      const personSwitchIndex = values.findIndex((command) =>
+        isDeepStrictEqual(command, personScopeSwitch),
+      );
+      return (
+        isDeepStrictEqual(values[0], seedAndSignInSetup) &&
+        personSwitchIndex >= 0 &&
+        personSwitchIndex + expectedSwitchSequence.length === values.length &&
+        isDeepStrictEqual(
+          values.slice(
+            personSwitchIndex,
+            personSwitchIndex + expectedSwitchSequence.length,
+          ),
+          expectedSwitchSequence,
+        )
+      );
+    };
+    const remove = (values: unknown[], target: unknown): unknown[] => {
+      const index = values.findIndex((command) =>
+        isDeepStrictEqual(command, target),
+      );
+      return removeAt(values, index);
+    };
+    const removeAt = (values: unknown[], index: number): unknown[] =>
+      values.filter((_, candidateIndex) => candidateIndex !== index);
+    const swapAt = (
+      values: unknown[],
+      leftIndex: number,
+      rightIndex: number,
+    ): unknown[] => {
+      const copy = [...values];
+      [copy[leftIndex], copy[rightIndex]] = [copy[rightIndex], copy[leftIndex]];
+      return copy;
+    };
+    const optionalAt = (values: unknown[], index: number): unknown[] =>
+      values.map((command, commandIndex) => {
+        if (
+          commandIndex !== index ||
+          typeof command !== 'object' ||
+          command === null
+        ) {
+          return command;
+        }
+        if ('assertNotVisible' in command) {
+          return {
+            assertNotVisible: {
+              ...(command as { assertNotVisible: Record<string, unknown> })
+                .assertNotVisible,
+              optional: true,
+            },
+          };
+        }
+        if ('assertVisible' in command) {
+          return {
+            assertVisible: {
+              ...(command as { assertVisible: Record<string, unknown> })
+                .assertVisible,
+              optional: true,
+            },
+          };
+        }
+        return command;
+      });
+
+    expect(satisfiesSubjectsScopeContract(commands)).toBe(true);
+
+    const personSwitchIndex = commands.findIndex((command) =>
+      isDeepStrictEqual(command, personScopeSwitch),
+    );
+    const meSwitchIndex = commands.findIndex(
+      (command, index) =>
+        index > personSwitchIndex && isDeepStrictEqual(command, meScopeSwitch),
+    );
+    const personPrivateMarkerIndex = commands.findIndex(
+      (command, index) =>
+        index > personSwitchIndex &&
+        index < meSwitchIndex &&
+        isDeepStrictEqual(command, privateMarkerAbsent),
+    );
+    const mePrivateMarkerIndex = commands.findIndex(
+      (command, index) =>
+        index > meSwitchIndex &&
+        isDeepStrictEqual(command, privateMarkerAbsent),
+    );
+    const personSubjectsEmptyIndex = commands.findIndex(
+      (command, index) =>
+        index > personSwitchIndex &&
+        index < meSwitchIndex &&
+        isDeepStrictEqual(command, personScopeSubjectsEmpty),
+    );
+    const ownSubjectTextAbsentIndex = commands.findIndex(
+      (command, index) =>
+        index > personSwitchIndex &&
+        index < meSwitchIndex &&
+        isDeepStrictEqual(command, ownSubjectTextAbsentInPersonScope),
+    );
+    const ownSubjectVisibleInMeScopeIndex = commands.findIndex(
+      (command, index) =>
+        index > meSwitchIndex &&
+        isDeepStrictEqual(command, ownSubjectVisibleInMeScope),
+    );
+    const ownSubjectAbsentInPersonScopeIndex = commands.findIndex(
+      (command, index) =>
+        index > personSwitchIndex &&
+        index < meSwitchIndex &&
+        isDeepStrictEqual(command, ownSubjectAbsentInPersonScope),
+    );
+    for (const mutation of [
+      [
+        ...commands.slice(0, personSwitchIndex + 1),
+        personScopeMentorWait,
+        ...commands.slice(personSwitchIndex + 1),
+      ],
+      [
+        ...commands.slice(0, personSwitchIndex + 1),
+        personScopeMentorTap,
+        ...commands.slice(personSwitchIndex + 1),
+      ],
+      [
+        ...commands.slice(0, personSwitchIndex + 1),
+        subjectsTabTap,
+        ...commands.slice(personSwitchIndex + 1),
+      ],
+      [
+        ...commands.slice(0, meSwitchIndex + 1),
+        subjectsTabTap,
+        ...commands.slice(meSwitchIndex + 1),
+      ],
+      commands.map((command, index) =>
+        index === 0 ? wrongSeedSetup : command,
+      ),
+      [...commands, subjectsTabTap],
+      [...commands, personScopeMentorWait],
+      remove(commands, personScopeSwitch),
+      swapAt(commands, personSwitchIndex, meSwitchIndex),
+      removeAt(commands, personSubjectsEmptyIndex),
+      remove(commands, ownSubjectAbsentInPersonScope),
+      removeAt(commands, ownSubjectTextAbsentIndex),
+      removeAt(commands, personPrivateMarkerIndex),
+      removeAt(commands, mePrivateMarkerIndex),
+      optionalAt(commands, ownSubjectAbsentInPersonScopeIndex),
+      optionalAt(commands, ownSubjectTextAbsentIndex),
+      optionalAt(commands, personPrivateMarkerIndex),
+      optionalAt(commands, mePrivateMarkerIndex),
+      optionalAt(commands, ownSubjectVisibleInMeScopeIndex),
+    ]) {
+      expect(satisfiesSubjectsScopeContract(mutation)).toBe(false);
+    }
+  });
+
   it('keeps the generated Android APK free of the duplicate OSGI manifest', () => {
     const appConfig = JSON.parse(
       readFileSync(join(repoRoot, 'apps/mobile/app.json'), 'utf8'),
