@@ -5,15 +5,17 @@ import { PROFILES } from '../fixtures/profiles';
 import { homeworkNoticeFlow } from './homework-notice';
 
 describe('homeworkNoticeFlow', () => {
-  it('covers genuine slips across every session type plus a clean-answer branch', () => {
+  it('covers genuine slips across every in-scope session type plus a clean-answer branch', () => {
     const profile = PROFILES[0];
     if (!profile) throw new Error('Expected at least one eval profile');
     const scenarios = homeworkNoticeFlow.enumerateScenarios?.(profile);
 
+    // [WI-2500] No interleaved scenario: interleaved notice targeting is out
+    // of MVP scope (clause 6) — the prompt never offers a notice there at
+    // all, so there is nothing session-neutral to assert for that type.
     expect(scenarios?.map((scenario) => scenario.scenarioId)).toEqual([
       'genuine-homework-slip',
       'genuine-learning-slip',
-      'genuine-interleaved-slip',
       'clean-learning',
     ]);
     for (const scenario of scenarios ?? []) {
@@ -41,17 +43,6 @@ describe('homeworkNoticeFlow', () => {
     const homeworkPrompt = homeworkNoticeFlow.buildPrompt(homework!.input);
     expect(homeworkPrompt.system).toContain('id="homework_problem"');
     expect(homeworkPrompt.system).toContain('Solve x - 3 = 5');
-
-    const interleaved = scenarios?.find(
-      (scenario) => scenario.scenarioId === 'genuine-interleaved-slip',
-    );
-    expect(interleaved).toBeDefined();
-    const interleavedPrompt = homeworkNoticeFlow.buildPrompt(
-      interleaved!.input,
-    ).system;
-    expect(interleavedPrompt).toContain('INTERLEAVED NOTICE TARGETS');
-    expect(interleavedPrompt).toContain('1. Solving linear equations');
-    expect(interleavedPrompt).toContain('2. Order of operations');
   });
 
   it('rejects a fabricated quote at the server evidence boundary', async () => {

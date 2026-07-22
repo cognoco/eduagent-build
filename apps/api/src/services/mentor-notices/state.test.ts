@@ -1,4 +1,5 @@
-import type { Database } from '@eduagent/database';
+import { mentorNotices, type Database } from '@eduagent/database';
+import { sql } from 'drizzle-orm';
 
 import { acceptMentorNotice, prepareMentorNoticeCopy } from './state';
 
@@ -7,6 +8,7 @@ const input = {
   subjectId: '00000000-0000-4000-8000-000000000002',
   topicId: null,
   sourceSessionId: '00000000-0000-4000-8000-000000000003',
+  answerEventId: '00000000-0000-4000-8000-000000000005',
   concept: 'Sign changes when moving terms',
   correctionHint: 'Reverse the operation across the equals sign.',
 };
@@ -43,10 +45,26 @@ describe('mentor notice creation state', () => {
     ).toEqual({ concept: input.concept, correctionHint: null });
   });
 
-  it('returns null when another concurrent writer already accepted the session notice', async () => {
+  it('returns null when another concurrent writer already accepted the same evidence', async () => {
     const { db, onConflictDoNothing } = makeInsertDb([]);
     await expect(acceptMentorNotice(db, input)).resolves.toBeNull();
     expect(onConflictDoNothing).toHaveBeenCalledTimes(1);
+  });
+
+  it('targets the evidence-backed partial unique index, not the retired session-only one', async () => {
+    const { db, onConflictDoNothing } = makeInsertDb([]);
+    await acceptMentorNotice(db, input);
+    // [WI-2500] A stale/mismatched target here would silently no-op post
+    // migration instead of erroring — this pins both the column pair AND the
+    // partial-index predicate, since Postgres requires an exact match on
+    // both to infer the conflict target.
+    expect(onConflictDoNothing).toHaveBeenCalledWith({
+      target: expect.arrayContaining([
+        expect.objectContaining({ name: 'source_session_id' }),
+        expect.objectContaining({ name: 'answer_event_id' }),
+      ]),
+      where: sql`${mentorNotices.answerEventId} IS NOT NULL`,
+    });
   });
 
   it('returns the server-owned accepted notice projection', async () => {

@@ -40,7 +40,7 @@
     "pretest:e2e:smoke": "node -e \"if (process.env.SKIP_E2E_GUARD) { process.exit(0); } console.error('\\n❌ pnpm test:e2e:smoke is broken: bare maestro resolves via PATH to a Unicode-broken install.\\nUse C:/Tools/maestro/bin/maestro.bat directly. See docs/E2Edocs/e2e-runbook.md\\nSet SKIP_E2E_GUARD=1 in CI to bypass this guard.\\n'); process.exit(1)\"",
     "test:e2e:smoke": "maestro test apps/mobile/e2e/ --include-tags=smoke",
     "test:e2e:web": "pnpm exec playwright test -c apps/mobile/playwright.config.ts",
-    "test:e2e:web:smoke": "pnpm exec playwright test -c apps/mobile/playwright.config.ts --project=smoke-auth --project=smoke-learner --project=smoke-parent --project=smoke-accessibility --project=smoke-transport-recovery",
+    "test:e2e:web:smoke": "node tools/quarantine/run-smoke-projects.cjs",
     "test:e2e:web:v2": "pnpm exec playwright test -c apps/mobile/playwright.config.ts --project=v2-release",
     "pretest:e2e:record": "node -e \"if (process.env.SKIP_E2E_GUARD) { process.exit(0); } console.error('\\n❌ pnpm test:e2e:record is broken: bare maestro resolves via PATH to a Unicode-broken install.\\nUse C:/Tools/maestro/bin/maestro.bat directly. See docs/E2Edocs/e2e-runbook.md\\nSet SKIP_E2E_GUARD=1 in CI to bypass this guard.\\n'); process.exit(1)\"",
     "test:e2e:record": "maestro record apps/mobile/e2e/flows/",
@@ -60,6 +60,7 @@
     "check:adr-provenance": "tsx scripts/check-adr-provenance.ts",
     "check:decision-adr-link": "tsx scripts/check-decision-adr-link.ts",
     "check:migration-immutability": "tsx scripts/check-migration-immutability.ts",
+    "check:maestro-main-health": "tsx scripts/check-maestro-main-health.ts",
     "check:no-gemini-runtime": "tsx scripts/check-no-gemini-runtime.ts",
     "check:mode-nav-flag-combo": "tsx scripts/check-mode-nav-flag-combo.ts",
     "check:flow-inventory-cite-rot": "tsx scripts/check-flow-inventory-cite-rot.ts"

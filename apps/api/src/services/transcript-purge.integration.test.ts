@@ -26,6 +26,7 @@ import {
   createDatabase,
   generateUUIDv7,
   learningSessions,
+  mentorNotices,
   organization,
   person,
   sessionEmbeddings,
@@ -34,6 +35,7 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
+import { purgeSessionTranscript } from './transcript-purge';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -202,6 +204,193 @@ describeIfDb(
         .from(sessionEmbeddings)
         .where(eq(sessionEmbeddings.profileId, profileId));
       expect(embeddingsAfter).toEqual([]);
+    });
+  },
+);
+
+describeIfDb(
+  'purgeSessionTranscript with multiple evidence-backed mentor notices (WI-2500 regression)',
+  () => {
+    // [WI-2500] Reproduces the purge-transaction abort found by CodeRabbit on
+    // PR #2475: a session with 2+ evidence-present mentor_notices (distinct
+    // answer_event_id each) used to collapse both rows to
+    // (source_session_id, NULL) when `purgeSessionTranscript` deleted the
+    // session's events under the old `answer_event_id` ON DELETE SET NULL
+    // FK — colliding on `mentor_notices_source_session_null_evidence_uq` and
+    // aborting the purge. The fix (ON DELETE CASCADE) lets each notice
+    // cascade away with its evidence event instead, so the purge succeeds.
+    let db: Database;
+    let orgId: string;
+    let profileId: string;
+    let subjectId: string;
+    let sessionId: string;
+    let summaryId: string;
+    let firstEventId: string;
+    let secondEventId: string;
+    let originalFetch: typeof globalThis.fetch;
+
+    beforeAll(async () => {
+      db = createDatabase(process.env.DATABASE_URL!);
+
+      // Stub the Voyage embeddings HTTP boundary (purge regenerates the
+      // summary embedding). Integration tests mock at the HTTP boundary, not
+      // via jest.mock of the internal ./embeddings module — enforced by
+      // integration-mock-guard.test.ts. Any other URL falls through.
+      originalFetch = globalThis.fetch;
+      globalThis.fetch = async (
+        input: RequestInfo | URL,
+        init?: RequestInit,
+      ): Promise<Response> => {
+        const url = typeof input === 'string' ? input : input.toString();
+        // Exact hostname match (not startsWith) so the boundary can't be
+        // fooled by e.g. `api.voyageai.com.evil.example` — CodeQL flags
+        // substring URL checks as incomplete sanitization.
+        let host = '';
+        try {
+          host = new URL(url).hostname;
+        } catch {
+          host = '';
+        }
+        if (host === 'api.voyageai.com') {
+          return new Response(
+            JSON.stringify({
+              data: [{ embedding: Array.from({ length: 1024 }, () => 0) }],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          );
+        }
+        return originalFetch(input, init);
+      };
+
+      const [org] = await db
+        .insert(organization)
+        .values({ name: `Purge Notices Org ${RUN_ID}` })
+        .returning({ id: organization.id });
+      orgId = org!.id;
+
+      const [profile] = await db
+        .insert(person)
+        .values({
+          displayName: 'Purge Notices User',
+          birthDate: '2012-01-01',
+          residenceJurisdiction: 'EU',
+        })
+        .returning({ id: person.id });
+      profileId = profile!.id;
+
+      const [subject] = await db
+        .insert(subjects)
+        .values({
+          profileId,
+          name: 'Purge Notices Subject',
+          status: 'active',
+          pedagogyMode: 'socratic',
+        })
+        .returning({ id: subjects.id });
+      subjectId = subject!.id;
+
+      const [session] = await db
+        .insert(learningSessions)
+        .values({
+          profileId,
+          subjectId,
+          status: 'completed',
+        })
+        .returning({ id: learningSessions.id });
+      sessionId = session!.id;
+
+      const [summary] = await db
+        .insert(sessionSummaries)
+        .values({
+          sessionId,
+          profileId,
+          status: 'accepted',
+          learnerRecap: 'Today we covered two distinct evidenced notices.',
+          llmSummary: {
+            narrative: 'Worked on verifying multi-notice purge cascade.',
+            topicsCovered: ['purge cascade'],
+            sessionState: 'completed',
+            reEntryRecommendation: 'Pick up by re-running the purge test.',
+          },
+          summaryGeneratedAt: new Date(),
+        })
+        .returning({ id: sessionSummaries.id });
+      summaryId = summary!.id;
+
+      const [firstEvent] = await db
+        .insert(sessionEvents)
+        .values({
+          sessionId,
+          profileId,
+          subjectId,
+          eventType: 'user_message',
+          content: 'first evidenced answer',
+        })
+        .returning({ id: sessionEvents.id });
+      firstEventId = firstEvent!.id;
+
+      const [secondEvent] = await db
+        .insert(sessionEvents)
+        .values({
+          sessionId,
+          profileId,
+          subjectId,
+          eventType: 'user_message',
+          content: 'second evidenced answer',
+        })
+        .returning({ id: sessionEvents.id });
+      secondEventId = secondEvent!.id;
+
+      // Two evidence-backed notices in the same session, each keyed to a
+      // DISTINCT answer_event_id — permitted by
+      // mentor_notices_source_session_answer_event_uq, forbidden only for
+      // the (session, NULL) shape both would collapse to under the old FK.
+      await db.insert(mentorNotices).values([
+        {
+          profileId,
+          subjectId,
+          sourceSessionId: sessionId,
+          answerEventId: firstEventId,
+          concept: 'first concept',
+        },
+        {
+          profileId,
+          subjectId,
+          sourceSessionId: sessionId,
+          answerEventId: secondEventId,
+          concept: 'second concept',
+        },
+      ]);
+    });
+
+    afterAll(async () => {
+      if (originalFetch) {
+        globalThis.fetch = originalFetch;
+      }
+      // Belt-and-braces cleanup in case the test failed mid-flight.
+      if (profileId) {
+        await db.delete(person).where(eq(person.id, profileId));
+      }
+      if (orgId) {
+        await db.delete(organization).where(eq(organization.id, orgId));
+      }
+    });
+
+    it('purges the session and cascades both evidence-backed notices instead of aborting on the null-evidence unique index', async () => {
+      const result = await purgeSessionTranscript(
+        db,
+        profileId,
+        summaryId,
+        'fake-voyage-api-key',
+      );
+
+      expect(result.status).toBe('purged');
+
+      const noticesAfter = await db
+        .select({ id: mentorNotices.id })
+        .from(mentorNotices)
+        .where(eq(mentorNotices.sourceSessionId, sessionId));
+      expect(noticesAfter).toEqual([]);
     });
   },
 );
