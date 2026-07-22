@@ -242,7 +242,16 @@ describeIfDb(
         init?: RequestInit,
       ): Promise<Response> => {
         const url = typeof input === 'string' ? input : input.toString();
-        if (url.startsWith('https://api.voyageai.com')) {
+        // Exact hostname match (not startsWith) so the boundary can't be
+        // fooled by e.g. `api.voyageai.com.evil.example` — CodeQL flags
+        // substring URL checks as incomplete sanitization.
+        let host = '';
+        try {
+          host = new URL(url).hostname;
+        } catch {
+          host = '';
+        }
+        if (host === 'api.voyageai.com') {
           return new Response(
             JSON.stringify({
               data: [{ embedding: Array.from({ length: 1024 }, () => 0) }],
