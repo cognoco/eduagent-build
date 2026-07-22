@@ -32,9 +32,10 @@ red-detection is load-bearing, not vacuous.
 
 The regression guard is the pure classifier `classifyMaestroHealth` in
 `scripts/check-maestro-main-health.ts`, exercised by
-`scripts/check-maestro-main-health.test.ts` (9 cases: green / red / red-behind-a
+`scripts/check-maestro-main-health.test.ts` (12 cases: green / red / red-behind-a
 change-class-skipped-run / stale-no-execution / stale-too-old / fresh / non-main
-filtered, plus the `isMaestroJob` / `runExecutedMaestro` helpers).
+filtered / ad-hoc-v2-dispatch ignored / dispatch-only-is-stale, plus the
+`isMaestroJob` / `runExecutedMaestro` / `isHealthSuiteRun` helpers).
 
 Command (Node 22 on PATH; see toolchain note):
 `pnpm exec jest --config scripts/jest.config.cjs scripts/check-maestro-main-health.test.ts --no-coverage --verbose`
@@ -42,43 +43,42 @@ Command (Node 22 on PATH; see toolchain note):
 1. **GREEN (guard present)** — full suite green:
 
    ```
-   Tests:       9 passed, 9 total
+   Tests:       12 passed, 12 total
    ```
 
 2. **RED (revert the fix)** — `failingMaestroShards()` neutralised to `return []`
-   (red detection disabled), guard test re-run. Exactly the two red-detection
-   cases fail; stale/green/filter cases stay green:
+   (red detection disabled), guard test re-run. Exactly the three red-detection
+   cases fail; stale/green/filter/dispatch cases stay green:
 
    ```
      classifyMaestroHealth
        ✓ GREEN when the most recent executed run passed every shard (1 ms)
        ✕ RED when the most recent executed run has a failing shard (3 ms)
        ✕ ignores change-class-skipped runs and reads the most recent EXECUTED run (1 ms)
-       ✓ STALE when no fetched run executed Maestro at all (1 ms)
-       ✓ STALE when the last executed run is older than the freshness window (2 ms)
+       ✓ STALE when no fetched run executed Maestro at all
+       ✓ STALE when the last executed run is older than the freshness window (1 ms)
        ✓ does not go stale when the last executed run is within the window
        ✓ filters out runs whose head branch is not main (1 ms)
+       ✕ ignores an ad-hoc workflow_dispatch (single-shard v2) so it cannot mask a red health suite (1 ms)
+       ✓ is STALE when only a non-health-suite dispatch has executed Maestro
 
      ● classifyMaestroHealth › RED when the most recent executed run has a failing shard
-
-       expect(received).toBe(expected) // Object.is equality
-
        Expected: "red"
        Received: "green"
-
-       > 83 |     expect(result.verdict).toBe('red');
+       > 88 |     expect(result.verdict).toBe('red');
 
      ● classifyMaestroHealth › ignores change-class-skipped runs and reads the most recent EXECUTED run
-
-       expect(received).toBe(expected) // Object.is equality
-
        Expected: "red"
        Received: "green"
+       > 112 |     expect(result.verdict).toBe('red');
 
-       > 107 |     expect(result.verdict).toBe('red');
+     ● classifyMaestroHealth › ignores an ad-hoc workflow_dispatch (single-shard v2) so it cannot mask a red health suite
+       Expected: "red"
+       Received: "green"
+       > 186 |     expect(result.verdict).toBe('red');
 
    Test Suites: 1 failed, 1 total
-   Tests:       2 failed, 7 passed, 9 total
+   Tests:       3 failed, 9 passed, 12 total
    ```
 
 3. **RESTORE + GREEN** — `failingMaestroShards()` restored to its real body; full
@@ -87,7 +87,7 @@ Command (Node 22 on PATH; see toolchain note):
    ```
    PASS scripts/check-maestro-main-health.test.ts
    Test Suites: 1 passed, 1 total
-   Tests:       9 passed, 9 total
+   Tests:       12 passed, 12 total
    ```
 
 ## Quarantine verification (AC-2)

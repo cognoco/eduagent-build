@@ -1,5 +1,6 @@
 import {
   classifyMaestroHealth,
+  isHealthSuiteRun,
   isMaestroJob,
   runExecutedMaestro,
   type WorkflowJob,
@@ -160,5 +161,52 @@ describe('classifyMaestroHealth', () => {
     // The red non-main run is ignored; the green main run wins.
     expect(result.verdict).toBe('green');
     expect(result.lastExecutedRun?.id).toBe(601);
+  });
+
+  it('ignores an ad-hoc workflow_dispatch (single-shard v2) so it cannot mask a red health suite', () => {
+    // A passing manual v2 dispatch (1 shard) is the newest executed run, but must
+    // NOT be trusted — the classifier must read the older real pr/nightly run.
+    const result = classifyMaestroHealth(
+      [
+        run({
+          id: 701,
+          event: 'workflow_dispatch',
+          createdAt: '2026-07-22T11:00:00Z',
+          jobs: maestroShards('success'),
+        }),
+        run({
+          id: 700,
+          event: 'workflow_run',
+          createdAt: '2026-07-22T08:00:00Z',
+          jobs: maestroShards('success', 'failure', 'success', 'success'),
+        }),
+      ],
+      { now: NOW },
+    );
+    expect(result.verdict).toBe('red');
+    expect(result.lastExecutedRun?.id).toBe(700);
+  });
+
+  it('is STALE when only a non-health-suite dispatch has executed Maestro', () => {
+    const result = classifyMaestroHealth(
+      [
+        run({
+          id: 702,
+          event: 'workflow_dispatch',
+          jobs: maestroShards('success'),
+        }),
+      ],
+      { now: NOW },
+    );
+    expect(result.verdict).toBe('stale');
+    expect(result.lastExecutedRun).toBeUndefined();
+  });
+});
+
+describe('isHealthSuiteRun', () => {
+  it('treats only schedule and workflow_run as health-suite runs', () => {
+    expect(isHealthSuiteRun(run({ event: 'schedule' }))).toBe(true);
+    expect(isHealthSuiteRun(run({ event: 'workflow_run' }))).toBe(true);
+    expect(isHealthSuiteRun(run({ event: 'workflow_dispatch' }))).toBe(false);
   });
 });

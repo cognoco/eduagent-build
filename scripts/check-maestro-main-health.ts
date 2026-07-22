@@ -72,6 +72,19 @@ export function runExecutedMaestro(run: WorkflowRun): boolean {
   );
 }
 
+/**
+ * Only the automatic pr/nightly suites represent Maestro-on-main HEALTH:
+ * `schedule` runs the 8-shard nightly suite and `workflow_run` runs the 4-shard
+ * pr suite after CI. A manual `workflow_dispatch` can instead be an ad-hoc `v2`
+ * publish-readiness run — a SINGLE shard under the same "Mobile Maestro E2E Tests"
+ * job name and a different flow set — so trusting it would let a passing v2 dispatch
+ * mask a red pr/nightly main suite. Exclude dispatches; the daily schedule and the
+ * per-mobile-push workflow_run give continuous, unambiguous signal without them.
+ */
+export function isHealthSuiteRun(run: WorkflowRun): boolean {
+  return run.event === 'schedule' || run.event === 'workflow_run';
+}
+
 function failingMaestroShards(run: WorkflowRun): string[] {
   return run.jobs
     .filter((job) => isMaestroJob(job) && job.conclusion === 'failure')
@@ -98,7 +111,7 @@ export function classifyMaestroHealth(
   const now = options.now ?? new Date();
 
   const mainRuns = runs
-    .filter((run) => run.headBranch === 'main')
+    .filter((run) => run.headBranch === 'main' && isHealthSuiteRun(run))
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 
   const lastExecutedRun = mainRuns.find(runExecutedMaestro);
@@ -222,9 +235,11 @@ export function fetchMaestroRuns(
       })),
     };
     resolved.push(run);
-    // Short-circuit: once we've found the most recent executed run, later (older)
-    // runs are irrelevant to the classifier, so stop resolving jobs.
-    if (runExecutedMaestro(run)) break;
+    // Short-circuit: once we've resolved the most recent HEALTH-suite executed run,
+    // later (older) runs are irrelevant to the classifier. Keep resolving past
+    // non-health-suite runs (e.g. an ad-hoc v2 dispatch) so they can't hide an
+    // older real pr/nightly run from the classifier.
+    if (isHealthSuiteRun(run) && runExecutedMaestro(run)) break;
   }
   return resolved;
 }
