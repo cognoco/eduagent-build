@@ -56,6 +56,10 @@
       "scenario": "v2-supporter-managed"
     },
     {
+      "flow": "flows/v2/v2-supporter-link-ceremony.yaml",
+      "scenario": "v2-supporter-pending-link"
+    },
+    {
       "flow": "flows/v2/v2-supporter-self-learning-doorway.yaml",
       "scenario": "v2-supporter-self-learning-active"
     }
