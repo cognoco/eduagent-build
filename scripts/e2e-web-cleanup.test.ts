@@ -78,11 +78,10 @@ describe('[BUG-979] e2e-web cleanup wiring', () => {
       expect(run).toMatch(/::error::/);
     });
 
-    it('reset step runs before the legacy Playwright artifact upload', () => {
-      const reset = findStep('Reset seeded staging accounts')!;
-      const upload = findStep('Upload legacy Playwright artifacts')!;
-      expect(steps.indexOf(reset)).toBeLessThan(steps.indexOf(upload));
-    });
+    // WI-2594: the "Upload legacy Playwright artifacts" step this test
+    // ordered against was removed (it published fill-step values, e.g.
+    // seeded login credentials, in clear text — see WI-2593). No successor
+    // step exists to order the reset step against.
 
     it('reset step does not fail the job on a non-2xx response (nightly cleanup is the safety net)', () => {
       const step = findStep('Reset seeded staging accounts')!;
