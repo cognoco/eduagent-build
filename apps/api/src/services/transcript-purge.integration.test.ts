@@ -19,19 +19,6 @@
  * pgvector column on session_embeddings.
  */
 
-const mockGenerateEmbedding = jest.fn();
-
-// [WI-2500] `generateEmbedding` calls the Voyage embedding API — a true
-// external boundary — so it is mocked here per the "no internal mocks in
-// integration tests" rule; everything else in this file drives the real DB.
-jest.mock('./embeddings', () => {
-  const actual = jest.requireActual('./embeddings') as Record<string, unknown>;
-  return {
-    ...actual,
-    generateEmbedding: (...args: unknown[]) => mockGenerateEmbedding(...args),
-  };
-});
-
 import { resolve } from 'path';
 import { eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
@@ -240,9 +227,31 @@ describeIfDb(
     let summaryId: string;
     let firstEventId: string;
     let secondEventId: string;
+    let originalFetch: typeof globalThis.fetch;
 
     beforeAll(async () => {
       db = createDatabase(process.env.DATABASE_URL!);
+
+      // Stub the Voyage embeddings HTTP boundary (purge regenerates the
+      // summary embedding). Integration tests mock at the HTTP boundary, not
+      // via jest.mock of the internal ./embeddings module — enforced by
+      // integration-mock-guard.test.ts. Any other URL falls through.
+      originalFetch = globalThis.fetch;
+      globalThis.fetch = async (
+        input: RequestInfo | URL,
+        init?: RequestInit,
+      ): Promise<Response> => {
+        const url = typeof input === 'string' ? input : input.toString();
+        if (url.startsWith('https://api.voyageai.com')) {
+          return new Response(
+            JSON.stringify({
+              data: [{ embedding: Array.from({ length: 1024 }, () => 0) }],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          );
+        }
+        return originalFetch(input, init);
+      };
 
       const [org] = await db
         .insert(organization)
@@ -343,13 +352,12 @@ describeIfDb(
           concept: 'second concept',
         },
       ]);
-
-      mockGenerateEmbedding.mockResolvedValue({
-        vector: Array.from({ length: 1024 }, () => 0),
-      });
     });
 
     afterAll(async () => {
+      if (originalFetch) {
+        globalThis.fetch = originalFetch;
+      }
       // Belt-and-braces cleanup in case the test failed mid-flight.
       if (profileId) {
         await db.delete(person).where(eq(person.id, profileId));
