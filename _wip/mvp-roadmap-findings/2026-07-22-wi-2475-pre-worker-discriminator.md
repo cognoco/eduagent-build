@@ -125,7 +125,8 @@ the public `/v1/health` route and records a sanitized JSONL allowlist:
 - DNS result/address/family and lookup timing;
 - TCP connect and TLS secure-connect timing/protocol/authorization;
 - HTTP status, CF-Ray, colo, `cf-mitigated`, and Cloudflare server marker;
-- Worker correlation: valid health JSON plus deployed SHA; and
+- Worker correlation: a request-specific probe ID echoed only by the Worker,
+  with valid health JSON plus deployed SHA as additional success-path proof; and
 - a bounded error code, never request/response headers or response content.
 
 The stop step prints each incident's first/last failure and recovery sample
@@ -133,11 +134,14 @@ into the permanent Actions log. The same UTC/probe window is then usable for
 the account Worker and zone HTTP/WAF queries. The classifier is signal-driven
 and has no Playwright project or test name list.
 
-Checked fixtures cover DNS, runner network, Cloudflare edge/security,
-Worker-reached health, and unresolved evidence. Workflow structure is also
-checked so the probe spans both Playwright lanes, the summary runs under
-`always()`, and a probe-only change triggers real smoke instead of the
-pass-through check.
+Checked fixtures cover DNS, runner network, decisive Cloudflare
+challenge/security evidence, correlated Worker success and error responses,
+and unresolved evidence. A bare 403/429 plus CF-Ray is deliberately unresolved:
+Cloudflare adds CF-Ray to Worker-originated responses too, so the status is not
+boundary proof without either the Worker echo or an external zone event.
+Workflow structure is also checked so the probe spans both Playwright lanes,
+the summary runs under `always()`, and a probe-only change triggers real smoke
+instead of the pass-through check.
 
 Live verification on 2026-07-22 produced a healthy sample with DNS success,
 TCP and TLS 1.3 connection, HTTP 200, CF-Ray colo ARN, and Worker deploy SHA
@@ -145,11 +149,15 @@ TCP and TLS 1.3 connection, HTTP 200, CF-Ray colo ARN, and Worker deploy SHA
 
 PR run `29912608850` then exercised the probe across the complete real-smoke
 job while the fault was active. The required V2 gate passed, but the legacy
-lane reached its five-minute timeout. The summary recorded 13 Cloudflare-edge
-incidents: DNS, TCP, and TLS 1.3 succeeded; Cloudflare returned HTTP 429 with
-LAX Ray IDs; Worker health proof was absent; and recovery samples returned
-HTTP 200 with a deploy SHA. The sustained windows measured 8.6–10.3 seconds,
-directly confirming the previously inferred 9–12-second envelope.
+lane reached its five-minute timeout. The original classifier labelled 13
+incidents Cloudflare-edge because DNS, TCP, and TLS 1.3 succeeded, Cloudflare
+returned HTTP 429 with LAX Ray IDs, Worker health proof was absent, and recovery
+samples returned HTTP 200 with a deploy SHA. Review later established that the
+label was too strong: a Worker-originated 429 also carries CF-Ray. The raw
+signals and 8.6–10.3-second sustained windows remain valid, and the independent
+Zone Analytics events classify those incidents as edge rate-limit blocks. The
+corrected local classifier leaves a bare 429 unresolved until that external
+edge evidence is correlated.
 
 That first CI exercise also exposed observer load: the original 500ms cadence
 made 849 health requests during the job. It cannot be left to consume a
@@ -160,6 +168,93 @@ roughly one tenth of the request rate while still sampling the observed
 mechanism.
 
 ## 4. Mutation-sensitive evidence
+
+### Review rework: Worker response boundary
+
+The Worker now echoes a syntactically valid request probe UUID in the dedicated
+response header `x-mentomate-worker-probe-id`. Mutating the implementing header
+expression in `apps/api/src/index.ts` from:
+
+```ts
+c.header('x-mentomate-worker-probe-id', probeId);
+```
+
+to a different header name made the named API contract red:
+
+```text
+GET /v1/health
+  ✕ echoes a valid phase-probe ID as Worker-boundary proof
+
+Expected: "d7685283-3f99-4acd-b84b-f5b62bf41648"
+Received: null
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 skipped, 2 total
+```
+
+The probe accepts that proof only when the response value matches the request:
+
+```js
+correlationId === probeId
+```
+
+Mutating it to `Boolean(correlationId)` made the mismatch case red:
+
+```text
+[WI-2475] Worker response correlation
+  ✕ requires the echoed Worker probe ID to match the request probe ID
+
+Expected: { "correlationId": "another-probe", "reached": false }
+Received: { "correlationId": "another-probe", "reached": true }
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 11 skipped, 12 total
+```
+
+### Review rework: Worker error classification
+
+Once the marker proves Worker entry, every HTTP status is Worker-reached. The
+implementing expression is:
+
+```js
+if (sample.worker?.reached === true)
+```
+
+Restoring the rejected 2xx status restriction made the Worker-originated 429
+fixture red:
+
+```text
+[WI-2475] classifyProbeSample
+  ✕ identifies a correlated Worker response even when its status is 429
+
+Expected: "worker-reached"
+Received: "unresolved"
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 11 skipped, 12 total
+```
+
+### Review rework: ambiguous edge statuses stay unresolved
+
+The direct classifier's decisive edge expression is now only:
+
+```js
+sample.http?.cfMitigated === 'challenge'
+```
+
+Mutating it to also accept `[403, 429].includes(sample.http?.status)` recreated
+the review defect and made the ambiguity guard red:
+
+```text
+[WI-2475] classifyProbeSample
+  ✕ stays unresolved when a 403 and CF-Ray lack decisive edge or Worker proof
+
+Expected: "unresolved"
+Received: "cloudflare-edge-security"
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 11 skipped, 12 total
+```
 
 ### Cloudflare edge signal
 
