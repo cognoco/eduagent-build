@@ -1,9 +1,17 @@
 # Warm Chat Greeting — First Session Tier A
 
-**Status:** Draft
+**Status:** Core shipped; rotation/recency expansion superseded · last verified 2026-07-22
 **Author:** Product (brainstorm) + Claude
 **Date:** 2026-05-27
 **Estimated effort:** 1-2 days, mobile-only
+
+> **Implementation disposition.** Personalized first-session greeting fallbacks are
+> implemented and tested in `apps/mobile/src/components/session/FirstSessionGreeting.tsx`
+> and `FirstSessionGreeting.test.tsx` (landed in `af91a3e18`, PR #1543); the simple
+> returning-session sibling is in `ReturningSessionGreeting.tsx` and its test. The
+> later ≥7-message rotation/recency pool is explicitly OUT in
+> `docs/plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md`; no unfinished build is
+> authorized by this historical spec.
 
 ## Problem
 

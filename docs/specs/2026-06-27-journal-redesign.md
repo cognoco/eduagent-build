@@ -1,7 +1,13 @@
 # Journal Redesign — 5-Button Landing, Reuse-First
 
-> Status: **Draft / paper-only.** No code until greenlit. Author: design dialogue 2026-06-27.
-> Scope: the Journal sub-screen (`JournalTabView.tsx`), reached from V2 bottom nav (Mentor / Subjects / Journal).
+> **STATUS (last verified 2026-07-22): SHIPPED.** The five-button landing,
+> notes/bookmark filters, session/report/memory sections, and paginated practice
+> activity history are implemented and tested in
+> `apps/mobile/src/components/journal/JournalTabView.tsx`,
+> `apps/mobile/src/components/journal/JournalTabView.test.tsx`, and
+> `apps/api/src/services/practice-activity-history.integration.test.ts`. Landed in
+> `268347274` (PR #1542). This document is the preserved design record; it has no
+> remaining implementation scope.
 
 ## Problem
 

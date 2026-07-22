@@ -1,12 +1,20 @@
 # Felt-Knowing Loop — Writable Notes, Freeform Binding & Evidence Citation
 
-**Status:** Draft / paper-only · 2026-06-27 · **Branch:** `main` (baseline for all citations)
+**Status:** Partially shipped; remaining citation substrate re-owned · last verified 2026-07-22
 **Parent vision:** [The Forever Notebook](./2026-06-08-forever-notebook-north-star.md) — "the mentor remembers, and what you keep is the proof."
 **Sibling specs (this spec sequences on them; it does NOT re-own their segments):**
-- [Memory Task — Review Continuity, Retrieval Log & Unified Relearn Queue](./2026-06-08-memory-task-review-continuity.md) — owns the review opener, `retrieval_events`, **`evidence_links` + `LearnerSource` (slice 2a, R6)**, the `taskType` catalog (slice 2b, R7), and the relearn queue. Tier 1 is **in active implementation** (worktrees `review-continuity-opener` / `review-continuity-buildables`); slice 2a (`evidence_links`) is **decided, not built**.
-- [Journal Redesign — 5-Button Landing, Reuse-First](./2026-06-27-journal-redesign.md) — owns the V2 Journal-tab **read/browse** surface: the merged notes+bookmarks list with filter chips (`JournalNotesArchive`), sessions, practice history, reports, memory.
+- [Memory Task — Review Continuity, Retrieval Log & Unified Relearn Queue](../_archive/specs/Done/2026-06-08-memory-task-review-continuity.md) — Tier 1 is shipped; the unbuilt `evidence_links` + `LearnerSource` substrate is now owned by **WI-1704 (verified-artifact evidence links)**.
+- [Journal Redesign — 5-Button Landing, Reuse-First](./2026-06-27-journal-redesign.md) — shipped read/browse surface (`268347274`, PR #1542).
 
-**Orientation:** [`docs/plans/v2-plan/00-STATE-OF-PLAY.md`](../plans/v2-plan/00-STATE-OF-PLAY.md) §5–§6.
+> **Implementation disposition.** Flow 1 note authoring is wired at
+> `apps/mobile/src/app/(app)/subject-hub/[subjectId]/index.tsx`; Flow 2 freeform
+> keep/bookmark is wired through `SessionFooter.tsx` and `use-bookmark-handler`.
+> Flow 3 remains unbuilt (`evidence_links` / `LearnerSource` have no source hits):
+> **WI-1452 (felt-knowing citation substrate)** is superseded/folded into WI-1704 by
+> `docs/plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md`. Current orientation and
+> verification-state rules live in
+> [`2026-07-06-verified-learning-loop.md`](./2026-07-06-verified-learning-loop.md)
+> and accepted `MMT-ADR-0032`.
 
 ---
 
