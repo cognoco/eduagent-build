@@ -583,6 +583,18 @@ describe('[WI-2228/WI-2458] e2e-web.yml gates V2 and stable legacy smoke', () =>
       'ci-maestro-plan.mjs --suite v2 --all --format json',
     );
   });
+
+  it('[WI-2604] uses rendered shelf readiness instead of global network idle', () => {
+    const learnerCrawl = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e-web/flows/journeys/j01-ux-pass.spec.ts'),
+      'utf8',
+    );
+
+    expect(learnerCrawl).toContain(
+      "await gotoScreen(page, '/library', `shelf-row-header-${subjectId}`);",
+    );
+    expect(learnerCrawl).not.toContain("waitForLoadState('networkidle')");
+  });
 });
 
 describe('[WI-1651] e2e-ci.yml propagates Maestro failures', () => {

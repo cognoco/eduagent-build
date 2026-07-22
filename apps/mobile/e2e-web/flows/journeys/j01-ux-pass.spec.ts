@@ -70,8 +70,6 @@ test('single learner UX screenshot crawl', async ({ page }) => {
   await capture(page, '03-study-new-click');
 
   await gotoScreen(page, '/library', `shelf-row-header-${subjectId}`);
-  // Wait for /library/retention to settle before taking the screenshot.
-  await page.waitForLoadState('networkidle');
   await capture(page, '04-library');
 
   await gotoScreen(page, `/shelf/${subjectId}`, 'shelf-screen');
