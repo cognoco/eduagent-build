@@ -12,7 +12,11 @@ import {
 import { DeskLampAnimation } from '../../../components/common';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { useFetchRound, useGenerateRound } from '../../../hooks/use-quiz';
-import { homeHrefForReturnTo } from '../../../lib/navigation';
+import {
+  homeHrefForReturnTo,
+  PRACTICE_HREF,
+  PRACTICE_RETURN_TO,
+} from '../../../lib/navigation';
 import { resolveLoadingMotionPreset } from '../../../lib/motion-presets';
 import { useThemeColors } from '../../../lib/theme';
 import {
@@ -77,12 +81,14 @@ export default function QuizLaunchScreen(): React.ReactElement {
     subjectId: routeSubjectIdParam,
     languageName: routeLanguageNameParam,
     returnTo: routeReturnToParam,
+    practiceReturnTo: routePracticeReturnToParam,
     roundId: routeRoundIdParam,
   } = useLocalSearchParams<{
     activityType?: string | string[];
     subjectId?: string | string[];
     languageName?: string | string[];
     returnTo?: string | string[];
+    practiceReturnTo?: string | string[];
     roundId?: string | string[];
   }>();
   const insets = useSafeAreaInsets();
@@ -105,6 +111,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
   const routeSubjectId = firstRouteParam(routeSubjectIdParam);
   const routeLanguageName = firstRouteParam(routeLanguageNameParam);
   const routeReturnTo = firstRouteParam(routeReturnToParam);
+  const routePracticeReturnTo = firstRouteParam(routePracticeReturnToParam);
   // [WI-1864] Seeded active rounds are a native-E2E fixture entry path only.
   // Production builds ignore a hostile or accidental roundId query param and
   // continue through the normal POST /quiz/rounds generation path.
@@ -124,6 +131,20 @@ export default function QuizLaunchScreen(): React.ReactElement {
   const exitHref = effectiveReturnTo
     ? homeHrefForReturnTo(effectiveReturnTo)
     : ('/(app)/quiz' as Href);
+  const handleExit = useCallback(() => {
+    if (effectiveReturnTo === PRACTICE_RETURN_TO) {
+      if (routePracticeReturnTo) {
+        router.navigate({
+          pathname: PRACTICE_HREF,
+          params: { returnTo: routePracticeReturnTo },
+        } as Href);
+        return;
+      }
+      router.navigate(PRACTICE_HREF as Href);
+      return;
+    }
+    router.replace(exitHref as Href);
+  }, [effectiveReturnTo, exitHref, routePracticeReturnTo, router]);
   const generateRound = useGenerateRound();
   const seededRound = useFetchRound(e2eRoundId);
   const seededRoundData = seededRound.data;
@@ -334,7 +355,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
           }}
           secondaryAction={{
             label: t('common.goBack'),
-            onPress: () => router.replace(exitHref as Href),
+            onPress: handleExit,
             testID: 'quiz-launch-back',
           }}
           testID="quiz-launch-error-fallback"
@@ -388,7 +409,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
           }
           secondaryAction={{
             label: t('common.goBack'),
-            onPress: () => router.replace(exitHref as Href),
+            onPress: handleExit,
             testID: 'quiz-launch-back',
           }}
           testID="quiz-launch-error-fallback"
@@ -428,7 +449,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
         </Text>
       ) : null}
       <Pressable
-        onPress={() => router.replace(exitHref as Href)}
+        onPress={handleExit}
         className="mt-10 min-h-[44px] items-center justify-center rounded-button px-6 py-3"
         testID="quiz-launch-cancel"
         accessibilityRole="button"

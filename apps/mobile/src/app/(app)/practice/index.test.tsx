@@ -508,6 +508,19 @@ describe('PracticeScreen', () => {
     });
   });
 
+  it('[WI-1864] forwards the Practice upstream return destination into Quiz History', async () => {
+    mockSearchParams = { returnTo: 'journal' };
+    mount();
+    await waitFor(() => screen.getByTestId('practice-quiz-history'));
+
+    fireEvent.press(screen.getByTestId('practice-quiz-history'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/quiz/history',
+      params: { returnTo: 'practice', practiceReturnTo: 'journal' },
+    });
+  });
+
   it('renders and routes a vocabulary quiz for every active language subject', async () => {
     mount({
       subjects: [

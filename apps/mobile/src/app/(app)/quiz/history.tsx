@@ -1,13 +1,29 @@
 import { useCallback } from 'react';
-import { View, Text, Pressable, FlatList } from 'react-native';
+import {
+  BackHandler,
+  FlatList,
+  Platform,
+  Pressable,
+  Text,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+  type Href,
+} from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { TimeoutLoader } from '../../../components/common/TimeoutLoader';
 import { useRecentRounds } from '../../../hooks/use-quiz';
 import { extractLanguageFromTheme } from '../../../lib/extract-vocabulary-language';
-import { goBackOrReplace } from '../../../lib/navigation';
+import {
+  goBackOrReplace,
+  PRACTICE_HREF,
+  PRACTICE_RETURN_TO,
+} from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { useScreenTopInset } from '../../../lib/use-screen-top-inset';
 import { useRelativeDate } from '../../../hooks/use-time-format';
@@ -17,16 +33,64 @@ export default function QuizHistoryScreen() {
   const { t } = useTranslation();
   const relativeDate = useRelativeDate();
   const router = useRouter();
-  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const { returnTo, practiceReturnTo } = useLocalSearchParams<{
+    returnTo?: string | string[];
+    practiceReturnTo?: string | string[];
+  }>();
+  const returnToken = Array.isArray(returnTo) ? returnTo[0] : returnTo;
+  const practiceReturnToken = Array.isArray(practiceReturnTo)
+    ? practiceReturnTo[0]
+    : practiceReturnTo;
   const colors = useThemeColors();
   // [BUG-933] On web, useSafeAreaInsets returns top:0 — useScreenTopInset
   // applies a 24px minimum so the header doesn't sit flush against the
   // browser URL bar. Native devices pass through unchanged.
   const insets = useScreenTopInset();
   const { data: rounds, isLoading, isError, refetch } = useRecentRounds();
-  const isPracticeReturn = returnTo === 'practice';
-  const backHref = isPracticeReturn ? '/(app)/practice' : '/(app)/quiz';
-  const returnParams = isPracticeReturn ? { returnTo } : {};
+  const isPracticeReturn = returnToken === PRACTICE_RETURN_TO;
+  const backHref = isPracticeReturn ? PRACTICE_HREF : '/(app)/quiz';
+  const returnParams = isPracticeReturn
+    ? {
+        returnTo: returnToken,
+        ...(practiceReturnToken
+          ? { practiceReturnTo: practiceReturnToken }
+          : {}),
+      }
+    : {};
+
+  const handleBack = useCallback(() => {
+    if (isPracticeReturn) {
+      if (practiceReturnToken) {
+        router.navigate({
+          pathname: PRACTICE_HREF,
+          params: { returnTo: practiceReturnToken },
+        } as Href);
+        return;
+      }
+      router.navigate(PRACTICE_HREF as Href);
+      return;
+    }
+    goBackOrReplace(router, backHref as Href);
+  }, [backHref, isPracticeReturn, practiceReturnToken, router]);
+
+  // History is a Quiz-stack child reached from the sibling Practice tab.
+  // Without a focused handler, Android hardware Back follows the synthesized
+  // native stack to Home instead of honoring the same route-aware contract as
+  // the visible Back control.
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS === 'web' || !isPracticeReturn) return undefined;
+
+      const subscription = BackHandler.addEventListener(
+        'hardwareBackPress',
+        () => {
+          handleBack();
+          return true;
+        },
+      );
+      return () => subscription.remove();
+    }, [handleBack, isPracticeReturn]),
+  );
 
   const keyExtractor = useCallback(
     (section: { date: string }) => section.date,
@@ -115,7 +179,7 @@ export default function QuizHistoryScreen() {
         >
           <Pressable
             testID="quiz-history-loading-back"
-            onPress={() => router.replace(backHref as Href)}
+            onPress={handleBack}
             className="min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel={t('quiz.history.goBack')}
@@ -139,7 +203,7 @@ export default function QuizHistoryScreen() {
           }}
           secondaryAction={{
             label: t('common.goBack'),
-            onPress: () => router.replace(backHref as Href),
+            onPress: handleBack,
             testID: 'quiz-history-timeout-go-back',
           }}
         />
@@ -161,7 +225,7 @@ export default function QuizHistoryScreen() {
         }}
         secondaryAction={{
           label: t('common.goBack'),
-          onPress: () => router.replace(backHref as Href),
+          onPress: handleBack,
           testID: 'quiz-history-go-back',
         }}
         testID="quiz-history-error"
@@ -171,30 +235,49 @@ export default function QuizHistoryScreen() {
 
   if (!rounds || rounds.length === 0) {
     return (
-      <View
-        testID="quiz-history-empty"
-        className="flex-1 items-center justify-center p-6"
-      >
-        <Text className="text-on-surface text-lg font-semibold">
-          {t('quiz.history.emptyTitle')}
-        </Text>
-        <Text className="text-on-surface-muted mt-2 text-center">
-          {t('quiz.history.emptyMessage')}
-        </Text>
-        <Pressable
-          testID="quiz-history-try-quiz"
-          className="bg-primary mt-4 rounded-xl px-6 py-3"
-          onPress={() =>
-            router.push({
-              pathname: '/(app)/quiz',
-              params: returnParams,
-            } as Href)
-          }
+      <View testID="quiz-history-screen" className="flex-1">
+        <View
+          className="flex-row items-center px-4 pb-4"
+          style={{ paddingTop: insets.top + 16 }}
         >
-          <Text className="text-on-primary font-semibold">
-            {t('quiz.history.tryQuiz')}
+          <Pressable
+            testID="quiz-history-back"
+            onPress={handleBack}
+            className="min-h-[44px] min-w-[44px] items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel={t('quiz.history.goBack')}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+          </Pressable>
+          <Text className="text-on-surface ml-4 text-xl font-bold">
+            {t('quiz.history.title')}
           </Text>
-        </Pressable>
+        </View>
+        <View
+          testID="quiz-history-empty"
+          className="flex-1 items-center justify-center p-6"
+        >
+          <Text className="text-on-surface text-lg font-semibold">
+            {t('quiz.history.emptyTitle')}
+          </Text>
+          <Text className="text-on-surface-muted mt-2 text-center">
+            {t('quiz.history.emptyMessage')}
+          </Text>
+          <Pressable
+            testID="quiz-history-try-quiz"
+            className="bg-primary mt-4 rounded-xl px-6 py-3"
+            onPress={() =>
+              router.push({
+                pathname: '/(app)/quiz',
+                params: returnParams,
+              } as Href)
+            }
+          >
+            <Text className="text-on-primary font-semibold">
+              {t('quiz.history.tryQuiz')}
+            </Text>
+          </Pressable>
+        </View>
       </View>
     );
   }
@@ -223,7 +306,7 @@ export default function QuizHistoryScreen() {
           // [QUIZ-09] Honor the same backHref that loading/empty/error states use.
           // Hardcoding '/(app)/quiz' was ignoring returnTo=practice from Practice.
           testID="quiz-history-back"
-          onPress={() => goBackOrReplace(router, backHref as Href)}
+          onPress={handleBack}
           className="min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('quiz.history.goBack')}

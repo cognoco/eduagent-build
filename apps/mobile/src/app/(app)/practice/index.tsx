@@ -400,7 +400,7 @@ export default function PracticeScreen(): React.ReactElement {
       ? t('practiceHub.history.roundsPlayed', { count: totalRoundsPlayed })
       : t('practiceHub.history.noRoundsYet');
   const practiceReturnParams = { returnTo: PRACTICE_RETURN_TO } as const;
-  const dictationReturnParams = returnTo
+  const practiceChildReturnParams = returnTo
     ? { ...practiceReturnParams, practiceReturnTo: returnTo }
     : practiceReturnParams;
 
@@ -916,7 +916,7 @@ export default function PracticeScreen(): React.ReactElement {
                 onPress={() =>
                   router.push({
                     pathname: '/(app)/dictation',
-                    params: dictationReturnParams,
+                    params: practiceChildReturnParams,
                   } as Href)
                 }
                 accessibilityRole="button"
@@ -1008,7 +1008,7 @@ export default function PracticeScreen(): React.ReactElement {
               onPress={() =>
                 router.push({
                   pathname: '/(app)/quiz/history',
-                  params: practiceReturnParams,
+                  params: practiceChildReturnParams,
                 } as Href)
               }
               accessibilityRole="button"

@@ -21,11 +21,20 @@ import * as localDateModule from '../../../lib/local-date';
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+const mockNavigate = jest.fn();
 const mockGoBackOrReplace = jest.fn();
 let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush, replace: mockReplace }),
+  useFocusEffect: (callback: () => void | (() => void)) => {
+    const ReactReq = jest.requireActual<typeof import('react')>('react');
+    ReactReq.useEffect(() => callback(), [callback]);
+  },
+  useRouter: () => ({
+    push: mockPush,
+    replace: mockReplace,
+    navigate: mockNavigate,
+  }),
   useLocalSearchParams: () => mockSearchParams,
 }));
 
@@ -33,6 +42,8 @@ jest.mock(
   '../../../lib/navigation' /* gc1-allow: imports expo-router Router type */,
   () => ({
     goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+    PRACTICE_HREF: '/(app)/practice',
+    PRACTICE_RETURN_TO: 'practice',
   }),
 );
 
@@ -129,24 +140,49 @@ describe('QuizHistoryScreen', () => {
     );
   });
 
-  it('[QUIZ-09] honors returnTo=practice: loaded-list back button routes to /(app)/practice', async () => {
-    // Break test: before the fix, the loaded-list back button hardcoded '/(app)/quiz'
-    // ignoring the returnTo param that loading/empty/error states already honored.
+  it('[WI-1864] switches from loaded history to the sibling Practice tab', async () => {
     mockSearchParams = { returnTo: 'practice' };
     mount();
     await waitFor(() => {
       screen.getByTestId(`quiz-history-row-${ROUND_GUESS_ID}`);
     });
     fireEvent.press(screen.getByTestId('quiz-history-back'));
-    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
-      expect.objectContaining({ push: mockPush }),
-      '/(app)/practice',
-    );
-    // Must not fall back to the hardcoded quiz route.
-    expect(mockGoBackOrReplace).not.toHaveBeenCalledWith(
-      expect.anything(),
-      '/(app)/quiz',
-    );
+    expect(mockNavigate).toHaveBeenCalledWith('/(app)/practice');
+    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
+  });
+
+  it('[WI-1864] consumes Android hardware Back and restores the upstream Practice destination', async () => {
+    const { BackHandler } = jest.requireActual(
+      'react-native',
+    ) as typeof import('react-native');
+    const remove = jest.fn();
+    const listenerSpy = jest
+      .spyOn(BackHandler, 'addEventListener')
+      .mockReturnValue({ remove });
+    mockSearchParams = {
+      returnTo: 'practice',
+      practiceReturnTo: 'journal',
+    };
+
+    mount();
+    await waitFor(() => {
+      screen.getByTestId(`quiz-history-row-${ROUND_GUESS_ID}`);
+    });
+
+    const handler = listenerSpy.mock.calls.find(
+      ([event]) => event === 'hardwareBackPress',
+    )?.[1] as (() => boolean) | undefined;
+    expect(handler).toBeDefined();
+    expect(handler!()).toBe(true);
+    expect(mockNavigate).toHaveBeenCalledWith({
+      pathname: '/(app)/practice',
+      params: { returnTo: 'journal' },
+    });
+
+    active?.cleanup();
+    active = null;
+    expect(remove).toHaveBeenCalled();
+    listenerSpy.mockRestore();
   });
 
   it('navigates to round detail on row press', async () => {
@@ -222,7 +258,10 @@ describe('QuizHistoryScreen', () => {
     });
 
     fireEvent.press(screen.getByTestId('quiz-history-timeout-go-back'));
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.objectContaining({ replace: mockReplace }),
+      '/(app)/quiz',
+    );
   });
 
   it('shows empty state with try-quiz CTA', async () => {
@@ -235,6 +274,60 @@ describe('QuizHistoryScreen', () => {
       pathname: '/(app)/quiz',
       params: {},
     });
+  });
+
+  it('[WI-1864] forwards the upstream Practice destination through the empty-history CTA', async () => {
+    mockSearchParams = {
+      returnTo: 'practice',
+      practiceReturnTo: 'journal',
+    };
+    mount({ [RECENT_ROUNDS_ROUTE]: [] });
+    await waitFor(() => {
+      screen.getByTestId('quiz-history-empty');
+    });
+
+    fireEvent.press(screen.getByTestId('quiz-history-try-quiz'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/quiz',
+      params: { returnTo: 'practice', practiceReturnTo: 'journal' },
+    });
+  });
+
+  it('[WI-1864] keeps route-aware Back navigation available when history is empty', async () => {
+    mockSearchParams = {
+      returnTo: 'practice',
+      practiceReturnTo: 'journal',
+    };
+    mount({ [RECENT_ROUNDS_ROUTE]: [] });
+    await waitFor(() => {
+      screen.getByTestId('quiz-history-empty');
+    });
+
+    screen.getByTestId('quiz-history-screen');
+    fireEvent.press(screen.getByTestId('quiz-history-back'));
+
+    expect(mockNavigate).toHaveBeenCalledWith({
+      pathname: '/(app)/practice',
+      params: { returnTo: 'journal' },
+    });
+    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
+  });
+
+  it('[WI-1864] uses the same Practice-tab Back contract while history loads', () => {
+    mockSearchParams = {
+      returnTo: 'practice',
+      practiceReturnTo: 'journal',
+    };
+    mount({ [RECENT_ROUNDS_ROUTE]: () => new Promise<never>(() => undefined) });
+
+    fireEvent.press(screen.getByTestId('quiz-history-loading-back'));
+
+    expect(mockNavigate).toHaveBeenCalledWith({
+      pathname: '/(app)/practice',
+      params: { returnTo: 'journal' },
+    });
+    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 
   it('[F-178] groups rounds by local date, not UTC date (midnight boundary)', async () => {
@@ -320,7 +413,10 @@ describe('QuizHistoryScreen', () => {
       screen.getByTestId('quiz-history-error');
 
       fireEvent.press(screen.getByTestId('quiz-history-go-back'));
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
+      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+        expect.objectContaining({ replace: mockReplace }),
+        '/(app)/quiz',
+      );
 
       const attemptsBefore = attempts;
       fireEvent.press(screen.getByTestId('quiz-history-retry'));

@@ -145,13 +145,10 @@ tags:
 - tapOn:
     id: 'nudge-template-you_got_this'
 
-# 5. Wait for the inline rate-limit error copy inside the sheet
-#    en.json nudge.error.rateLimit: "You've sent enough encouragement for now -
-#    {{childName}} will see it next time they open the app."
-#    (apps/mobile/src/i18n/locales/en.json:2253)
+# 5. Wait for the stable inline rate-limit receipt inside the sheet.
 - extendedWaitUntil:
     visible:
-      text: 'enough encouragement for now'
+      id: 'nudge-inline-error-rate'
     timeout: 5000
 
 # 6. Screenshot: inline rate-limit error visible in sheet

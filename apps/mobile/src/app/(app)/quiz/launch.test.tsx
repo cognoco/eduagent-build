@@ -70,6 +70,7 @@ jest.mock(
 );
 
 const mockReplace = jest.fn();
+const mockNavigate = jest.fn();
 const mockGoBackOrReplace = jest.fn();
 const mockSetRound = jest.fn();
 const mockSetActivityType = jest.fn();
@@ -140,7 +141,7 @@ let mockFetchRound = {
 };
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ replace: mockReplace }),
+  useRouter: () => ({ replace: mockReplace, navigate: mockNavigate }),
   useLocalSearchParams: () => mockSearchParams,
 }));
 
@@ -165,6 +166,8 @@ jest.mock(
   '../../../lib/navigation' /* gc1-allow: navigation helper mock keeps screen unit-scoped */,
   () => ({
     goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+    PRACTICE_HREF: '/(app)/practice',
+    PRACTICE_RETURN_TO: 'practice',
     homeHrefForReturnTo: (returnTo: string) =>
       returnTo === 'practice'
         ? '/(app)/practice'
@@ -380,7 +383,57 @@ describe('QuizLaunchScreen', () => {
     render(<QuizLaunchScreen />);
 
     fireEvent.press(screen.getByTestId('quiz-launch-cancel'));
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
+    expect(mockNavigate).toHaveBeenCalledWith('/(app)/practice');
+  });
+
+  it('[WI-1864] restores the upstream Practice destination on launch cancel', () => {
+    mockGenerateRound = {
+      mutate: mockMutate,
+      isPending: true,
+      isError: false,
+      error: null,
+    };
+    mockSearchParams = {
+      activityType: 'capitals',
+      returnTo: 'practice',
+      practiceReturnTo: 'journal',
+    };
+    mockMutate.mockImplementation(() => {
+      // Keep launch on the loading screen.
+    });
+
+    render(<QuizLaunchScreen />);
+
+    fireEvent.press(screen.getByTestId('quiz-launch-cancel'));
+    expect(mockNavigate).toHaveBeenCalledWith({
+      pathname: '/(app)/practice',
+      params: { returnTo: 'journal' },
+    });
+    expect(mockReplace).not.toHaveBeenCalledWith('/(app)/practice');
+  });
+
+  it('[WI-1864] restores the upstream Practice destination from a launch error', () => {
+    mockGenerateRound = {
+      mutate: mockMutate,
+      isPending: false,
+      isError: true,
+      error: new Error('network unavailable'),
+    };
+    mockSearchParams = {
+      activityType: 'capitals',
+      returnTo: 'practice',
+      practiceReturnTo: 'journal',
+    };
+    mockMutate.mockImplementation(() => undefined);
+
+    render(<QuizLaunchScreen />);
+
+    fireEvent.press(screen.getByTestId('quiz-launch-back'));
+    expect(mockNavigate).toHaveBeenCalledWith({
+      pathname: '/(app)/practice',
+      params: { returnTo: 'journal' },
+    });
+    expect(mockReplace).not.toHaveBeenCalledWith('/(app)/practice');
   });
 
   // [BUG-UX-QUIZ-TIMEOUT] 30s hard UI-level timeout on round generation.

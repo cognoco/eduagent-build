@@ -1354,6 +1354,36 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(helperSource).not.toMatch(/text:\s*['"]Recent sessions['"]/);
   });
 
+  it('[WI-1864] accepts the mentor-memory footer control above the fixed tab bar', () => {
+    for (const flow of [
+      'child-mentor-memory.yaml',
+      'child-mentor-memory-populated.yaml',
+    ]) {
+      const source = readFileSync(
+        join(repoRoot, 'apps/mobile/e2e/flows/parent', flow),
+        'utf8',
+      );
+      const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+        scrollUntilVisible?: {
+          element?: { id?: string };
+          visibilityPercentage?: number;
+          centerElement?: boolean;
+          optional?: boolean;
+        };
+      }>;
+      const footerScroll = commands.find(
+        ({ scrollUntilVisible }) =>
+          scrollUntilVisible?.element?.id === 'something-wrong-button',
+      )?.scrollUntilVisible;
+
+      expect(footerScroll).toMatchObject({
+        visibilityPercentage: 90,
+        centerElement: true,
+        optional: false,
+      });
+    }
+  });
+
   it('[WI-1864] bakes the non-secret OpenAI custom-provider slug into the E2E bundle', () => {
     const step = mobileMaestro.steps?.find(
       (candidate) => candidate.name === 'Load release E2E build environment',
@@ -3230,6 +3260,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     );
     const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
       inputText?: string;
+      pressKey?: string;
       tapOn?: { id?: string } | string;
     }>;
     const email = commands.findIndex(
@@ -3245,11 +3276,239 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         typeof tapOn === 'object' &&
         tapOn.id === 'send-reset-code-button',
     );
+    const passwordInput = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > submit &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'reset-new-password',
+    );
+    const passwordValue = commands.findIndex(
+      ({ inputText }, index) =>
+        index > passwordInput && inputText === 'E2eTest_2026xK!',
+    );
+    const keyboardDismiss = commands.findIndex(
+      ({ pressKey }, index) => index > passwordValue && pressKey === 'Back',
+    );
+    const reset = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > keyboardDismiss &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'reset-password-button',
+    );
+    const ambiguousSubmit = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > passwordValue && index < reset && tapOn === 'Reset password',
+    );
 
     expect(email).toBeGreaterThan(-1);
     expect(injectedIdentity).toBeGreaterThan(email);
     expect(submit).toBeGreaterThan(injectedIdentity);
+    expect(passwordInput).toBeGreaterThan(submit);
+    expect(passwordValue).toBeGreaterThan(passwordInput);
+    expect(keyboardDismiss).toBeGreaterThan(passwordValue);
+    expect(reset).toBeGreaterThan(keyboardDismiss);
+    expect(ambiguousSubmit).toBe(-1);
     expect(source).not.toContain('test-e2e+clerk_test@example.com');
+  });
+
+  it('[WI-1864] waits for the stable inline nudge rate-limit receipt', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/parent/nudge-rate-limit.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      extendedWaitUntil?: {
+        visible?: { id?: string } | string;
+        optional?: boolean;
+      };
+      tapOn?: { id?: string; optional?: boolean } | string;
+    }>;
+    const opener = 'parent-home-send-nudge-${CHILD_PROFILE_ID}';
+    const templates = [
+      'nudge-template-you_got_this',
+      'nudge-template-proud_of_you',
+      'nudge-template-quick_session',
+      'nudge-template-thinking_of_you',
+      'nudge-template-you_got_this',
+    ];
+    const journey: number[] = [];
+    let cursor = -1;
+    for (const [attempt, template] of templates.entries()) {
+      const openSheet = commands.findIndex(
+        ({ tapOn }, index) =>
+          index > cursor &&
+          typeof tapOn === 'object' &&
+          tapOn.id === opener &&
+          tapOn.optional !== true,
+      );
+      const templateReady = commands.findIndex(
+        ({ extendedWaitUntil }, index) =>
+          index > openSheet &&
+          typeof extendedWaitUntil?.visible === 'object' &&
+          extendedWaitUntil.visible.id === template &&
+          extendedWaitUntil.optional !== true,
+      );
+      const templateTap = commands.findIndex(
+        ({ tapOn }, index) =>
+          index > templateReady &&
+          typeof tapOn === 'object' &&
+          tapOn.id === template &&
+          tapOn.optional !== true,
+      );
+      journey.push(openSheet, templateReady, templateTap);
+
+      if (attempt < templates.length - 1) {
+        const returnedHome = commands.findIndex(
+          ({ extendedWaitUntil }, index) =>
+            index > templateTap &&
+            typeof extendedWaitUntil?.visible === 'object' &&
+            extendedWaitUntil.visible.id === 'parent-home-screen' &&
+            extendedWaitUntil.optional !== true,
+        );
+        journey.push(returnedHome);
+        cursor = returnedHome;
+      } else {
+        cursor = templateTap;
+      }
+    }
+    const rateLimitReceipt = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > cursor &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'nudge-inline-error-rate' &&
+        extendedWaitUntil.optional !== true,
+    );
+    journey.push(rateLimitReceipt);
+
+    expect(journey).toEqual(journey.toSorted((left, right) => left - right));
+    expect(journey[0]).toBeGreaterThan(-1);
+  });
+
+  it('[WI-1864] exercises the seeded fourth-failure remediation before relearn', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/retention/failed-recall.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      runFlow?: {
+        file?: string;
+        env?: Record<string, string>;
+      };
+      openLink?: string;
+      assertVisible?:
+        | {
+            id?: string;
+            text?: string;
+            optional?: boolean;
+          }
+        | string;
+      assertNotVisible?: { text?: string; optional?: boolean } | string;
+      extendedWaitUntil?: {
+        visible?: { id?: string } | string;
+        optional?: boolean;
+      };
+      tapOn?: { id?: string; optional?: boolean } | string;
+    }>;
+    const seeded = commands.findIndex(
+      ({ runFlow }) =>
+        runFlow?.file === '../_setup/seed-and-sign-in.yaml' &&
+        runFlow.env?.SEED_SCENARIO === 'failed-recall-3x',
+    );
+    const learner = commands.findIndex(
+      ({ extendedWaitUntil }) =>
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'learner-screen',
+    );
+    const recallDeepLink = commands.findIndex(
+      ({ openLink }, index) =>
+        index > learner &&
+        openLink ===
+          'mentomate:///topic/recall-test?topicId=${TOPIC_ID}&subjectId=${SUBJECT_ID}',
+    );
+    const recallScreen = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > recallDeepLink &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'recall-test-screen' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const failedAttempt = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > recallScreen &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'recall-dont-remember-button' &&
+        tapOn.optional !== true,
+    );
+    const remediation = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > failedAttempt &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'remediation-card' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const reviewAction = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > remediation &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'review-retest-button' &&
+        assertVisible.optional !== true,
+    );
+    const relearnAction = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > reviewAction &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'relearn-topic-button' &&
+        assertVisible.optional !== true,
+    );
+    const relearnTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > relearnAction &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'relearn-topic-button' &&
+        tapOn.optional !== true,
+    );
+    const methodPhase = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > relearnTap &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'relearn-method-phase' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const method = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > methodPhase &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'relearn-method-step_by_step' &&
+        tapOn.optional !== true,
+    );
+    const session = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > method &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'chat-input' &&
+        extendedWaitUntil.optional !== true,
+    );
+
+    const remediationJourney = [
+      seeded,
+      learner,
+      recallDeepLink,
+      recallScreen,
+      failedAttempt,
+      remediation,
+      reviewAction,
+      relearnAction,
+      relearnTap,
+      methodPhase,
+      method,
+      session,
+    ];
+    expect(remediationJourney).toEqual(
+      remediationJourney.toSorted((left, right) => left - right),
+    );
+    expect(seeded).toBeGreaterThan(-1);
+    expect(source).not.toContain('home-subject-carousel');
+    expect(source).not.toContain('home-coach-band-continue');
   });
 
   it('[WI-1864] scrolls the first parent nudge action fully into the small viewport', () => {
@@ -4077,7 +4336,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     const shelf = commands.findIndex(
       ({ tapOn }) =>
         typeof tapOn === 'object' &&
-        tapOn.id === 'shelf-row-header-${SUBJECT_ID}',
+        tapOn.id === 'shelf-row-header-${SUBJECT_ID}' &&
+        tapOn.optional !== true,
     );
     const cardWait = commands.findIndex(
       ({ extendedWaitUntil }, index) =>
@@ -4286,6 +4546,177 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(bookScreen).toContain("state = 'continue-now'");
     expect(progressSource).toContain("resumeKind: 'next_topic'");
     expect(retentionSeed).toContain('topicId: firstTopicId');
+  });
+
+  it('[WI-1864] opens topic-detail through the seeded shelf, book, and resume row', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/retention/topic-detail.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      tapOn?: { id?: string; optional?: boolean } | string;
+      assertVisible?: { id?: string; optional?: boolean } | string;
+      extendedWaitUntil?: {
+        visible?: { id?: string } | string;
+        optional?: boolean;
+      };
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+        visibilityPercentage?: number;
+        centerElement?: boolean;
+        optional?: boolean;
+      };
+    }>;
+    const shelf = commands.findIndex(
+      ({ tapOn }) =>
+        typeof tapOn === 'object' &&
+        tapOn.id === 'shelf-row-header-${SUBJECT_ID}' &&
+        tapOn.optional !== true,
+    );
+    const shelfScreen = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > shelf &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'shelf-screen' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const bookCard = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > shelfScreen &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'book-card-${BOOK_ID}' &&
+        tapOn.optional !== true,
+    );
+    const bookScreen = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > bookCard &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'book-screen' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const topicScroll = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > bookScreen &&
+        scrollUntilVisible?.element?.id === 'continue-now-row-${TOPIC_ID}' &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        scrollUntilVisible.optional !== true,
+    );
+    const topicTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > topicScroll &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'continue-now-row-${TOPIC_ID}' &&
+        tapOn.optional !== true,
+    );
+    const detail = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > topicTap &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'topic-detail-scroll' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const elapsed = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > detail &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'retention-pill-elapsed' &&
+        assertVisible.optional !== true,
+    );
+    const strongReviews = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > elapsed &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'topic-strong-reviews' &&
+        assertVisible.optional !== true,
+    );
+    const studyCta = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > strongReviews &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'study-cta' &&
+        assertVisible.optional !== true,
+    );
+    const startStudying = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > studyCta &&
+        typeof assertVisible === 'object' &&
+        assertVisible.text === 'Start studying' &&
+        assertVisible.optional !== true,
+    );
+    const noReview = commands.findIndex(
+      ({ assertNotVisible }, index) =>
+        index > startStudying &&
+        typeof assertNotVisible === 'object' &&
+        assertNotVisible.text === 'Review this topic' &&
+        assertNotVisible.optional !== true,
+    );
+    const noPracticeAgain = commands.findIndex(
+      ({ assertNotVisible }, index) =>
+        index > noReview &&
+        typeof assertNotVisible === 'object' &&
+        assertNotVisible.text === 'Practice again' &&
+        assertNotVisible.optional !== true,
+    );
+    const back = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > noPracticeAgain &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'topic-detail-back' &&
+        tapOn.optional !== true,
+    );
+    const returnedBook = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > back &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'book-screen' &&
+        extendedWaitUntil.optional !== true,
+    );
+
+    const journey = [
+      shelf,
+      shelfScreen,
+      bookCard,
+      bookScreen,
+      topicScroll,
+      topicTap,
+      detail,
+      elapsed,
+      strongReviews,
+      studyCta,
+      startStudying,
+      noReview,
+      noPracticeAgain,
+      back,
+      returnedBook,
+    ];
+    expect(journey).toEqual(journey.toSorted((left, right) => left - right));
+    expect(shelf).toBeGreaterThan(-1);
+    expect(commands[topicScroll]?.scrollUntilVisible).toMatchObject({
+      visibilityPercentage: 100,
+      centerElement: true,
+    });
+    expect(source).not.toContain('Biology Topic 1');
+    expect(source).not.toContain('topic-retention-card');
+    const collectTextSelectors = (value: unknown): string[] => {
+      if (Array.isArray(value)) return value.flatMap(collectTextSelectors);
+      if (!value || typeof value !== 'object') return [];
+      return Object.entries(value as Record<string, unknown>).flatMap(
+        ([key, child]) =>
+          key === 'text' && typeof child === 'string'
+            ? [child]
+            : collectTextSelectors(child),
+      );
+    };
+    const selectorTexts = collectTextSelectors(commands);
+    for (const staleCopy of [
+      'Memory strength',
+      'Progress',
+      'Interval',
+      'Reviews',
+    ]) {
+      expect(selectorTexts).not.toContain(staleCopy);
+    }
   });
 
   it('[WI-1864] dismisses the library search keyboard before pressing the empty-state clear control', () => {
