@@ -1,8 +1,20 @@
 # Mentor-Is-The-App — Shell Redesign Spec
 
-> **STATUS (2026-06-27):** S0-S3 landed behind MODE_NAV_V2_ENABLED (backend primitives, retention gate, Mentor home, Subjects hub, Journal+avatar). S4 (scope-chip/Support hub) + S5 (visibility contract) are PARTIAL — S4 missing supporter-co-learning + cold-start components, S5 missing the `app/(app)/link/*` ceremony screens. S6 (cutover/deletions) is TODO, gated on a product V0-retirement ruling. Production is still V0 (eas.json). Per-stage detail: `docs/plans/v2-plan/` stage plans.
+> **STATUS (last verified 2026-07-22): PARTIALLY SHIPPED THROUGH S5; S4
+> CO-LEARNING DEFERRED; S6 NOT CLEARED.** Supporter cold-start (`e00baa7be`, PR
+> #2400), supporter self-learning / Me-scope coexistence (`a394d68ae`, PR #2448),
+> and the linking ceremony (`eccae5a9f`, PR #2080) are landed with code and tests.
+> `a394d68ae` does not implement contextual supporter co-learning: **WI-1136 (S4:
+> build supporter-co-learning service + CoLearningDoorway (T19))** remains
+> Ready/Parked and is OUT/fast-follow in the MVP definition. This header does not
+> decide whether that post-MVP deferral clears an S6 heir-completeness gate. S6
+> remains explicitly OUT/deferred: `ModeSwitcher.tsx`,
+> `legacy-navigation-contract.ts`, and V0/V1/V2 flag plumbing still exist, and no
+> status correction authorizes their deletion. The live successor is
+> `docs/plans/v2-plan/2026-06-10-s6-cutover-deletions.md`, whose product-ruling and
+> explicit-human-confirmation gates remain mandatory.
 
-**Status:** Draft · 2026-06-09 (adversarial-review amendments 2026-06-10, see Annex B; end-user-lens amendments 2026-06-10, see Annex C; cold-start / motivation / interaction-law rulings folded in 2026-06-10, see §2.1, §3.1–3.2, §15.14–19, Annex D; no-surprises dossier proposal fold-in 2026-06-13, see §3.1 and §11/§13.6) · **Branch:** `new-llm` · **Profile:** design
+**Status:** Partially shipped through S5; S4 co-learning deferred; S6 not cleared · original design 2026-06-09 · last verified 2026-07-22 · **Profile:** design
 **Problem source:** ~90 screens exist; most users never discover more than ~10. This is a **discovery problem, not a navigation problem** — the goal is to serve users what they don't know exists, at the right time. **Evidence caveat:** the "<10 screens" figure is inferred from the [codebase atlas](../audit/2026-06-09-codebase-atlas/INDEX.md) (a code inventory), **not** from production usage telemetry — the app is pre-launch. The discovery thesis is a hypothesis to validate, not a measured fact; §11 treats S1–S2 as the bet that *buys* the evidence (S2→S3 evidence gate).
 **Inputs:** [30-agent codebase atlas](../audit/2026-06-09-codebase-atlas/INDEX.md) · the one-screen second opinion and the interim DIRECTION-one-surface record (both fully dissolved into this spec — §2/§2.1/§3.1/§3.2/Annex D — and deleted 2026-06-10; the second opinion is recoverable from git history, the DIRECTION record was never committed and lives on only here) · ratified identity model (`_wip/identity-foundation/`, person-based, edge-scoped mentor) · [audience matrix](../audience-matrix.md)
 **What this spec is:** the converged product direction from the 2026-06-09 brainstorm — vision, shell, scope model, privacy contract, backend primitives, strangle sequencing. It is **not** an implementation plan; each phase in §11 gets its own plan under `docs/plans/` before build.

@@ -3,17 +3,34 @@ title: Review & Re-learn — Findings + High-Impact Learning To-Dos
 date: 2026-06-03
 profile: code
 spec: this document (findings capture from a verified code read, 2026-06-03)
-status: findings — awaiting prioritization go-ahead (no build approved)
+status: historical findings register — superseded by verified-learning slice map
 relates:
   - docs/_archive/plans/done/app evolution plan/2026-05-06-learning-product-evolution-audit.md (STALE — see Appendix B)
-  - docs/plans/2026-05-30-topic-mastery-three-states.md (three-state model — SHIPPED)
+  - docs/_archive/plans/done/2026-05-30-topic-mastery-three-states.md (three-state model — SHIPPED)
   - memory: project_review_is_mentoring_backbone.md (ratified strategy)
   - memory: project_deadends_triage_and_subject_review.md (open per-subject-review fork)
 ---
 
 # Review & Re-learn — Findings + High-Impact Learning To-Dos
 
-> **STATUS (2026-06-27):** Since 2026-06-03: simulated learner harness (RR-2 pre-screen), grader service + judge routing (#1538), dead persistence.ts deleted (RR-14 partial). **RR-1 + RR-13 minimal thread SHIPPED flag-dark** (branch `rr1-rr13-warm-review-callback`, `REVIEW_CALLBACK_OPENER_ENABLED` default false; spec archived at `docs/_archive/specs/Done/2026-06-27-rr1-rr13-warm-review-callback.md`). RR-14 still partial — dual cooldown source + relearn bypassing startSession unresolved. 11 of 15 items not started. CHALLENGE_ROUND_RUNTIME_ENABLED still defaults false. NEXT: enable + RR-2 staging dogfood → CORRECT chain (RR-6,-7,-9,-10,-11) → RR-14 cleanup → RR-12 prod flip last.
+> **STATUS (last verified 2026-07-22): HISTORICAL FINDINGS REGISTER;
+> PRIORITIZATION SUPERSEDED.** The review-continuity opener and `retrieval_events`
+> are built but remain default-dark (`apps/api/src/services/review-continuity/opener.ts`,
+> `packages/database/src/schema/retrieval-events.ts`, `apps/api/src/config.ts`). Later
+> slices also landed: per-turn answer evaluation (`3adb80d19`, PR #2418), pending
+> weak-concept promotion (`apps/api/src/inngest/functions/session-completed.ts`), and
+> Challenge→SM-2 next-review scheduling
+> (`apps/api/src/services/session/session-exchange.ts`). Current decision and execution
+> ownership moved to `2026-07-06-verified-learning-loop.md`, accepted
+> `MMT-ADR-0031` / `MMT-ADR-0032`, and the MVP definition.
+> The design-only **WI-1465 (low-stakes per-concept re-prove)** is Closed/Done
+> after producing proposed `MMT-ADR-0034`; the learner-facing implementation is
+> still unbuilt, and the ADR's API, mobile, and test follow-ups are not yet captured.
+> Concept-targeted due-topic review for **WI-1454 (concept-targeted review for
+> weak concepts)** is implemented and tested in `3b0fa9337` (PR #2223), though
+> its live Cosmo record remains Backlog/Active and needs lifecycle reconciliation,
+> not duplicate implementation. Challenge runtime still defaults off. The RR-N
+> body remains the original findings record, not a live queue.
 
 ## Purpose
 
