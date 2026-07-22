@@ -130,14 +130,14 @@ the public `/v1/health` route and records a sanitized JSONL allowlist:
 
 The stop step prints each incident's first/last failure and recovery sample
 into the permanent Actions log. The same UTC/probe window is then usable for
-the account Worker query and, once permission exists, the zone HTTP/WAF
-query. The classifier is signal-driven and has no Playwright project or test
-name list.
+the account Worker and zone HTTP/WAF queries. The classifier is signal-driven
+and has no Playwright project or test name list.
 
 Checked fixtures cover DNS, runner network, Cloudflare edge/security,
 Worker-reached health, and unresolved evidence. Workflow structure is also
-checked so the probe spans both Playwright lanes and the summary runs under
-`always()`.
+checked so the probe spans both Playwright lanes, the summary runs under
+`always()`, and a probe-only change triggers real smoke instead of the
+pass-through check.
 
 Live verification on 2026-07-22 produced a healthy sample with DNS success,
 TCP and TLS 1.3 connection, HTTP 200, CF-Ray colo ARN, and Worker deploy SHA
@@ -145,7 +145,9 @@ TCP and TLS 1.3 connection, HTTP 200, CF-Ray colo ARN, and Worker deploy SHA
 
 ## 4. Mutation-sensitive evidence
 
-The decisive Cloudflare expression is:
+### Cloudflare edge signal
+
+The decisive expression is:
 
 ```js
 Boolean(sample.http?.cfRay)
@@ -166,6 +168,55 @@ Test Suites: 1 failed, 1 total
 Tests:       1 failed, 7 skipped, 8 total
 ```
 
-The exact expression was restored and the focused suite returned 8/8 green.
-The full red record is retained in
-`.workitem-artifacts/WI-2475/mutation-red.txt` for lifecycle evidence.
+The exact expression was restored.
+
+### Production-shaped runner-network signal
+
+The implementing expression is:
+
+```js
+sample.tcp?.ok !== true
+```
+
+Changing it back to `sample.tcp?.ok === false` made the production-shaped
+fixture (`tcp: null`, matching a socket that never emits `connect`) go red:
+
+```text
+FAIL scripts/playwright-edge-probe.test.ts
+  [WI-2475] classifyProbeSample
+    ✕ identifies a runner network path failure after successful DNS
+
+Expected: "runner-network"
+Received: "unresolved"
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 9 skipped, 10 total
+```
+
+The exact expression was restored.
+
+### Probe change surface
+
+The workflow case arm is:
+
+```text
+|scripts/playwright-edge-probe*
+```
+
+Removing that exact arm made the named contract red:
+
+```text
+FAIL scripts/playwright-edge-probe.test.ts
+  [WI-2475] run-smoke workflow probe contract
+    ✕ runs real smoke when the probe implementation or contract changes
+
+Expected substring: "scripts/playwright-edge-probe*"
+Received string:    <change-surface case without the probe arm>
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 9 skipped, 10 total
+```
+
+The arm was restored and the focused suite returned 10/10 green. Full red
+records are retained in `.workitem-artifacts/WI-2475/` for lifecycle
+evidence.

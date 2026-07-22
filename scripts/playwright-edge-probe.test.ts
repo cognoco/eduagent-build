@@ -57,7 +57,8 @@ describe('[WI-2475] classifyProbeSample', () => {
   it('identifies a runner network path failure after successful DNS', () => {
     const sample = {
       ...healthySample('2026-07-22T10:00:00.000Z'),
-      tcp: { ok: false },
+      // probeOnce leaves this null when the socket never reaches 'connect'.
+      tcp: null,
       tls: { ok: false },
       http: { status: null, cfRay: null, colo: null },
       worker: { reached: false },
@@ -74,6 +75,23 @@ describe('[WI-2475] classifyProbeSample', () => {
         status: 403,
         durationMs: 90,
         cfRay: 'blocked123-SJC',
+        colo: 'SJC',
+        cfMitigated: null,
+      },
+      worker: { reached: false },
+      errorCode: null,
+    };
+
+    expect(classifyProbeSample(sample)).toBe('cloudflare-edge-security');
+  });
+
+  it('identifies a Cloudflare challenge independently of the HTTP status', () => {
+    const sample = {
+      ...healthySample('2026-07-22T10:00:00.000Z'),
+      http: {
+        status: 200,
+        durationMs: 90,
+        cfRay: 'challenged123-SJC',
         colo: 'SJC',
         cfMitigated: 'challenge',
       },
@@ -200,5 +218,13 @@ describe('[WI-2475] run-smoke workflow probe contract', () => {
     expect(summarize?.run).toContain('playwright-edge-probe.cjs --summarize');
     expect(startIndex).toBeLessThan(v2Index);
     expect(summarizeIndex).toBeGreaterThan(legacyIndex);
+  });
+
+  it('runs real smoke when the probe implementation or contract changes', () => {
+    const changeDecision = workflow.jobs.changes.steps?.find(
+      (step) => step.name === 'Decide whether to run the real smoke suite',
+    );
+
+    expect(changeDecision?.run).toContain('scripts/playwright-edge-probe*');
   });
 });

@@ -98,7 +98,7 @@ function classifyProbeSample(sample) {
 
   if (
     sample.dns?.ok === true &&
-    sample.tcp?.ok === false &&
+    sample.tcp?.ok !== true &&
     RUNNER_NETWORK_ERROR_CODES.has(sample.errorCode)
   ) {
     return 'runner-network';
@@ -325,8 +325,9 @@ function probeOnce(targetValue, { timeoutMs = 3_000 } = {}) {
         response.on('data', (chunk) => {
           if (capturedBytes >= 32_768) return;
           const buffer = Buffer.from(chunk);
-          chunks.push(buffer.subarray(0, 32_768 - capturedBytes));
-          capturedBytes += buffer.length;
+          const accepted = buffer.subarray(0, 32_768 - capturedBytes);
+          chunks.push(accepted);
+          capturedBytes += accepted.length;
         });
         response.on('end', () => {
           try {
