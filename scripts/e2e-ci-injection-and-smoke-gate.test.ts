@@ -525,6 +525,7 @@ describe('[WI-2228/WI-2458] e2e-web.yml gates V2 and stable legacy smoke', () =>
       'process.stdout.write(JSON.stringify({',
       'globalRetries: config.retries,',
       'learnerRetries: learner?.retries,',
+      'parentExists: parent !== undefined,',
       "parentHasRetryOverride: Object.hasOwn(parent ?? {}, 'retries'),",
       '}));',
     ].join(' ');
@@ -538,6 +539,7 @@ describe('[WI-2228/WI-2458] e2e-web.yml gates V2 and stable legacy smoke', () =>
     expect(JSON.parse(inspect.stdout.trim().split('\n').at(-1)!)).toEqual({
       globalRetries: 1,
       learnerRetries: 0,
+      parentExists: true,
       parentHasRetryOverride: false,
     });
   });
