@@ -7,6 +7,8 @@
 ## Shepherding & Cosmo Workflow
 
 - **Quartet mechanics** → `_quartet/_quartet-wip/quartet-findings.md` (2026-07-01). **Cosmo WI finalization** → `_wip/umbrella-program/cosmo-finalization-guide.md` (2026-06-20).
+- [feedback_quartet_pr_authority.md](feedback_quartet_pr_authority.md) — Combined Orchestrator + Shepherd mandate covers ordinary PR open/CI/review/merge; never file OQ approval for routine engineering mechanics.
+- [project_batch1_shepherd_lessons.md](project_batch1_shepherd_lessons.md) — Batch-1 lessons: Doppler→Worker sync is deploy-time only; cd-chain worktree cosmo cmds; no-code WI evidence verbatim on the WI page; stale test-merge needs update-branch not rerun; ops-WI ACs are literal (flip must happen).
 - [project_cosmo_wi_project_relation_misfiling.md](project_cosmo_wi_project_relation_misfiling.md) — Nexus-context captures inherit the Nexus Project; VERIFY genuine misfiling before repointing — estate-machinery items are often correctly Nexus; never repoint to defeat the guard.
 - [project_prg14_agent_instructions_lane.md](project_prg14_agent_instructions_lane.md) — Repo CI/merge gotchas: docs-PR `paths-ignore` blocks the required `main` check; merge-on-UNSTABLE ok for advisory-red; `session/index.test.tsx` ambient flake.
 - [feedback_bg_while_true_watcher_is_write_only.md](feedback_bg_while_true_watcher_is_write_only.md) — bg while-true poll loops never wake you (notify only on EXIT); use Monitor or an until-loop; Monitor lags — direct-read at decision boundaries.
@@ -16,6 +18,7 @@
 - [feedback_concurrent_cosmo_prep_collision_guard.md](feedback_concurrent_cosmo_prep_collision_guard.md) — Cosmo snapshots stale in minutes under parallel sessions; fan-out briefs that write Cosmo need a pre-write collision guard (Modified + live claim; skip-and-report).
 - [feedback_rtk_zsh_heredoc_python_mangling.md](feedback_rtk_zsh_heredoc_python_mangling.md) — Quote-dense inline python via `rtk bash -lc` heredoc breaks at parse time; Write script to scratchpad + `rtk python3 <file>` instead.
 - [project_mentomate_program_roadmap.md](project_mentomate_program_roadmap.md) — Program-manager role + PGM-1 roadmap page in Cosmo (swimlanes, gates, rulings queue).
+- [project_batch3_gotchas.md](project_batch3_gotchas.md) — Batch-3 shepherd gotchas: doppler double-wrap overrides outer env; enduser gate all-minor fixtures can't A/B flag states; reviewer `revision_missing` on descriptive Fixed In = infra not finding; prod deploy human gate (jojorgen/crowka); AC restatement must precede re-finalize after scope deferral.
 
 ## Identity Foundation & V2 Shell
 
@@ -73,12 +76,15 @@
 - [project_playwright_e2e_setup.md](project_playwright_e2e_setup.md) — Playwright E2E: `doppler run -c stg`, seed secret, baseline 23m/48% (2026-05-14).
 - [project_enduser_session_pass.md](project_enduser_session_pass.md) — Live API-level LLM quality gates incl. premium routing + source-audit checks.
 - [project_book_generation_pass.md](project_book_generation_pass.md) — Live book/topic-map generation quality gate.
+- [project_eval_llm_live_snapshot_pollution.md](project_eval_llm_live_snapshot_pollution.md) — `eval:llm --live` pollutes ~295 snapshots; `git restore` snapshots before pushing.
+- [project_enduser_gate_carveout_turn_allowlist.md](project_enduser_gate_carveout_turn_allowlist.md) — source_audit exemptions key on turn identity, not reply-content regex (reviewer treadmill; WI-1823).
 
 ## Deployment & Secrets
 
 - [feedback_doppler_secrets.md](feedback_doppler_secrets.md) — All secrets via Doppler. EXPO_PUBLIC vars via `pnpm env:sync`.
 - [doppler-secrets.md](doppler-secrets.md) — Secret resolution: project `mentomate`, configs `dev/stg/prd`; wrap patterns.
 - [project_inngest_staging.md](project_inngest_staging.md) — Inngest sync URL is `/v1/inngest` (not `/inngest`).
+- [reference_agent_observability_access.md](reference_agent_observability_access.md) — Agent→Sentry (Infisical SENTRY_AUTH_TOKEN, de.sentry.io) + Inngest REST (Doppler INNGEST_SIGNING_KEY) access; Team-plan gating.
 - [project_revenuecat_setup.md](project_revenuecat_setup.md) — RevenueCat project exists; store product/connection/webhook setup remains.
 
 ## Brand & UX Decisions
