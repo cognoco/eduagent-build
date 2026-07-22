@@ -226,19 +226,18 @@ export async function applyMentorNoticeOutcome(
       : null;
   }
 
-  const terminal =
-    input.outcome === 'locked_in' || input.outcome === 'dismissed';
-  const nextStatus =
-    input.outcome === 'locked_in'
-      ? 'locked_in'
-      : input.outcome === 'dismissed'
-        ? 'dismissed'
-        : 'open';
+  // [WI-2501] 'deferred' returned above; every remaining outcome
+  // (locked_in, dismissed, not_yet) is itself a terminal, non-open status —
+  // a completed not_yet re-check must stop being open-offer/Now-feed/
+  // re-check-context eligible exactly like locked_in/dismissed do, so it
+  // gets its own canonical terminal status rather than falling back to
+  // 'open'.
+  const nextStatus = input.outcome;
   const [updated] = await db
     .update(mentorNotices)
     .set({
       status: nextStatus,
-      resolvedAt: terminal ? occurredAt : null,
+      resolvedAt: occurredAt,
       firstRecheckAt: sql`coalesce(${mentorNotices.firstRecheckAt}, ${occurredAt})`,
       lastRecheckAt: occurredAt,
       lastRecheckOutcome: input.outcome,

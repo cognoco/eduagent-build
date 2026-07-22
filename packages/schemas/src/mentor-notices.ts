@@ -7,6 +7,8 @@ export const mentorNoticeStatusSchema = z.enum([
   'locked_in',
   'dismissed',
   'faded',
+  // [WI-2501] Terminal status for a completed 'not_yet' re-check.
+  'not_yet',
 ]);
 export type MentorNoticeStatus = z.infer<typeof mentorNoticeStatusSchema>;
 

@@ -22,9 +22,11 @@ import {
   getProfileTimeZone,
   reserveMentorNoticeNudge,
   resolveMentorNoticeRecheckContext,
+  stampMentorNoticeOffer,
   startMentorNoticeRecheck,
 } from '../../apps/api/src/services/mentor-notices';
 import { isMentorNoticePushPostMvpEnabled } from '../../apps/api/src/config';
+import { buildNowFeed } from '../../apps/api/src/services/now-feed';
 import { createIntegrationDb } from './helpers';
 import { clearFetchCalls } from './fetch-interceptor';
 import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
@@ -286,6 +288,162 @@ describe('mentor notice lifecycle — real database', () => {
     expect(JSON.stringify(events)).not.toMatch(
       /Changing signs|correctionHint|learnerQuote|message/i,
     );
+  });
+
+  // [WI-2501] Root cause: applyMentorNoticeOutcome recorded 'not_yet' but
+  // mapped the row back to status='open', so every open-notice reader
+  // (offer, Now-feed, re-check-context) remained eligible to re-offer a
+  // completed record. A completed not_yet re-check must move to its own
+  // canonical terminal status — never 'open', never mistaken for
+  // 'locked_in'/'dismissed' mastery or dismissal — atomically and
+  // idempotently, exactly like the locked_in/dismissed transition above.
+  it('terminalizes a completed not_yet re-check atomically, hides it from every open reader, and stays idempotent', async () => {
+    const fixture = await seedFixture('not-yet-terminal');
+    const sourceSessionId = await seedSourceSession(fixture);
+    const notice = await acceptMentorNotice(db, {
+      ...fixture,
+      topicId: null,
+      sourceSessionId,
+      concept: 'Not-yet terminalization concept',
+      correctionHint: null,
+    });
+    if (!notice) throw new Error('notice insert failed');
+
+    // Genuinely offer the notice into a real re-check session BEFORE
+    // terminalizing it, so the existing-id offer-context assertion below is
+    // non-vacuous: lastOfferedSessionId must actually match this session, or
+    // that branch would return null regardless of status and prove nothing.
+    const recheckSessionId = await seedSourceSession(fixture);
+    const stamped = await stampMentorNoticeOffer(db, {
+      profileId: fixture.profileId,
+      noticeId: notice.id,
+      sessionId: recheckSessionId,
+    });
+    expect(stamped).not.toBeNull();
+
+    const occurredAt = new Date();
+    const resolved = await applyMentorNoticeOutcome(db, {
+      profileId: fixture.profileId,
+      noticeId: notice.id,
+      outcome: 'not_yet',
+      occurredAt,
+    });
+    expect(resolved).toMatchObject({
+      status: 'not_yet',
+      lastRecheckOutcome: 'not_yet',
+      recheckAttemptCount: 1,
+    });
+    expect(resolved!.resolvedAt?.getTime()).toBe(occurredAt.getTime());
+
+    // Clause 3 — no open-offer / re-check-context query returns the
+    // now-terminal record. Neither offer path (no existing metadata → the
+    // natural-resurfacing branch; the real offer stamped above → the
+    // existing-id branch) can find it, because both filter on status='open'.
+    await expect(
+      resolveMentorNoticeRecheckContext(db, fixture.profileId, {
+        id: generateUUIDv7(),
+        subjectId: fixture.subjectId,
+        exchangeCount: 5,
+        metadata: null,
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      resolveMentorNoticeRecheckContext(db, fixture.profileId, {
+        id: recheckSessionId,
+        subjectId: fixture.subjectId,
+        exchangeCount: 1,
+        metadata: { recheckNoticeId: notice.id },
+      }),
+    ).resolves.toBeNull();
+
+    // Clause 3 — no Now-feed query returns it either: neither the open
+    // mentor_notice offer card nor the locked_in celebration moment (the
+    // not_yet record is neither open nor locked_in).
+    const feed = await buildNowFeed(db, fixture.profileId, 'self', {
+      mentorNoticeEnabled: true,
+    });
+    expect(
+      feed.cards.some(
+        (card) =>
+          card.kind === 'mentor_notice' ||
+          (card.kind === 'ledger_moment' &&
+            (card.params as { ledgerKind?: string } | undefined)?.ledgerKind ===
+              'notice_locked_in'),
+      ),
+    ).toBe(false);
+
+    // Clause 2 — idempotent retry: the winning transition already moved the
+    // row off status='open', so a same-outcome retry finds no open row to
+    // update and must not double-increment the attempt count or re-emit the
+    // lifecycle event.
+    await expect(
+      applyMentorNoticeOutcome(db, {
+        profileId: fixture.profileId,
+        noticeId: notice.id,
+        outcome: 'not_yet',
+        occurredAt: new Date(occurredAt.getTime() + 1_000),
+      }),
+    ).resolves.toBeNull();
+    const [afterRetry] = await db
+      .select()
+      .from(mentorNotices)
+      .where(eq(mentorNotices.id, notice.id));
+    expect(afterRetry).toMatchObject({
+      status: 'not_yet',
+      recheckAttemptCount: 1,
+    });
+    expect(afterRetry!.resolvedAt?.getTime()).toBe(occurredAt.getTime());
+    const outcomeEvents = getCapturedInngestEvents().filter(
+      (event) => event.name === 'app/notice.recheck_outcome',
+    );
+    expect(outcomeEvents).toHaveLength(1);
+
+    // Clause 2 — competing/concurrent terminal submissions on a SEPARATE
+    // fresh notice cannot double-increment, emit twice, or overwrite the
+    // winner: exactly one of a racing locked_in/not_yet pair survives.
+    const raceSourceSessionId = await seedSourceSession(fixture);
+    const raceNotice = await acceptMentorNotice(db, {
+      ...fixture,
+      topicId: null,
+      sourceSessionId: raceSourceSessionId,
+      concept: 'Not-yet terminalization race concept',
+      correctionHint: null,
+    });
+    if (!raceNotice) throw new Error('race notice insert failed');
+
+    const raced = await Promise.all([
+      applyMentorNoticeOutcome(db, {
+        profileId: fixture.profileId,
+        noticeId: raceNotice.id,
+        outcome: 'not_yet',
+      }),
+      applyMentorNoticeOutcome(db, {
+        profileId: fixture.profileId,
+        noticeId: raceNotice.id,
+        outcome: 'locked_in',
+      }),
+    ]);
+    const winners = raced.filter((r) => r !== null);
+    expect(winners).toHaveLength(1);
+    const winner = winners[0]!;
+    expect(['not_yet', 'locked_in']).toContain(winner.status);
+
+    const [afterRace] = await db
+      .select()
+      .from(mentorNotices)
+      .where(eq(mentorNotices.id, raceNotice.id));
+    expect(afterRace).toMatchObject({
+      status: winner.status,
+      lastRecheckOutcome: winner.status,
+      recheckAttemptCount: 1,
+    });
+    expect(
+      getCapturedInngestEvents().filter(
+        (event) =>
+          event.name === 'app/notice.recheck_outcome' &&
+          (event.data as { noticeId?: string }).noticeId === raceNotice.id,
+      ),
+    ).toHaveLength(1);
   });
 
   it('atomically reserves one review-family slot and suppresses stale notices', async () => {
