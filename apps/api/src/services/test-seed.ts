@@ -55,6 +55,7 @@ import { sleep } from './sleep';
 import {
   seedV2SupporterAccepted,
   seedV2SupporterManaged,
+  seedV2SupporterPendingLink,
   seedV2SupporterSelfLearning,
   seedV2SupporterSelfLearningActive,
 } from './test-seed-v2-supporter';
@@ -178,7 +179,10 @@ export type SeedScenario =
   // [WI-2243] Self-learning doorway + Me-scope persistence fixtures —
   // apps/api/src/services/test-seed-v2-supporter.ts.
   | 'v2-supporter-self-learning'
-  | 'v2-supporter-self-learning-active';
+  | 'v2-supporter-self-learning-active'
+  // [WI-2242] Pending (pre-acceptance) visibility contract — the link-
+  // ceremony fixture — apps/api/src/services/test-seed-v2-supporter.ts.
+  | 'v2-supporter-pending-link';
 
 /** Environment bindings needed by the seed service */
 export interface SeedEnv {
@@ -6150,6 +6154,7 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'v2-account-non-owner-child': seedV2AccountNonOwnerChild,
   'v2-supporter-self-learning': seedV2SupporterSelfLearning,
   'v2-supporter-self-learning-active': seedV2SupporterSelfLearningActive,
+  'v2-supporter-pending-link': seedV2SupporterPendingLink,
 };
 
 export const VALID_SCENARIOS = Object.keys(SCENARIO_MAP) as SeedScenario[];

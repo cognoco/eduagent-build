@@ -4260,7 +4260,18 @@
       "placeholder": "Zapytaj, wklej lub opisz, czego chcesz się nauczyć.",
       "micLabel": "Mikrofon",
       "homeworkChip": "Praca domowa",
-      "title": "Pytaj o wszystko"
+      "title": "Pytaj o wszystko",
+      "micIdleLabel": "Zacznij mówić",
+      "micRequestingLabel": "Proszenie o dostęp do mikrofonu",
+      "micListeningLabel": "Zatrzymaj dyktowanie",
+      "micProcessingLabel": "Kończenie wprowadzania głosowego",
+      "micErrorLabel": "Spróbuj ponownie mówić",
+      "micDisabledLabel": "Wprowadzanie głosowe niedostępne",
+      "listening": "Słucham…",
+      "voiceError": "Wprowadzanie głosowe nie zadziałało. Nadal możesz pisać.",
+      "voicePermissionError": "Dostęp do mikrofonu jest wyłączony. Nadal możesz pisać.",
+      "voiceAllow": "Zezwól na mikrofon",
+      "voiceRetry": "Spróbuj ponownie głosem"
     },
     "onTrack": {
       "label": "Na bieżąco",

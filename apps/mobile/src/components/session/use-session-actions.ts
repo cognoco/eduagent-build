@@ -53,6 +53,7 @@ export interface UseSessionActionsOptions {
   setShowWrongSubjectChip: React.Dispatch<React.SetStateAction<boolean>>;
   setShowTopicSwitcher: React.Dispatch<React.SetStateAction<boolean>>;
   setShowParkingLot: React.Dispatch<React.SetStateAction<boolean>>;
+  setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   setConsumedQuickChipMessageId: React.Dispatch<
     React.SetStateAction<string | null>
   >;
@@ -133,6 +134,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     setShowWrongSubjectChip,
     setShowTopicSwitcher,
     setShowParkingLot,
+    setMessages,
     filing,
     setConsumedQuickChipMessageId,
     setMessageFeedback,
@@ -358,6 +360,9 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
           text: i18next.t('session.endPrompt.confirm'),
           onPress: async () => {
             sessionEndedRef.current = true;
+            setMessages((prev) =>
+              prev.filter((message) => message.id !== 'silence-prompt'),
+            );
             if (silenceTimerRef.current) {
               clearTimeout(silenceTimerRef.current);
               silenceTimerRef.current = null;
@@ -483,6 +488,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     returnTo,
     router,
     setIsClosing,
+    setMessages,
     closedSessionRef,
     sessionEndedRef,
     silenceTimerRef,

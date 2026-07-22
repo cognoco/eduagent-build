@@ -311,6 +311,12 @@ const raw: readonly KeepPattern[] = [
       'apps/mobile/src/components/mentor/MentorCelebration.tsx:30',
   },
   {
+    pattern: 'mentorHome.bar.mic*Label',
+    reason:
+      'selected via MIC_LABEL_KEYS[micState] at ' +
+      'apps/mobile/src/components/mentor/MentorInputBar.tsx:271',
+  },
+  {
     pattern: 'subjectHub.nextUp.*',
     reason:
       'selected via NEXT_UP_ACTION_KEY[nextUp.kind] at ' +

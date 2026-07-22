@@ -1,5 +1,6 @@
 const mockGetStepDatabase = jest.fn();
 const mockGetStepMentorNoticeEnabled = jest.fn();
+const mockGetStepMentorNoticePushPostMvpEnabled = jest.fn();
 const mockReserve = jest.fn();
 const mockSend = jest.fn();
 
@@ -9,6 +10,8 @@ jest.mock(
     ...jest.requireActual('../helpers'),
     getStepDatabase: () => mockGetStepDatabase(),
     getStepMentorNoticeEnabled: () => mockGetStepMentorNoticeEnabled(),
+    getStepMentorNoticePushPostMvpEnabled: () =>
+      mockGetStepMentorNoticePushPostMvpEnabled(),
   }),
 );
 
@@ -42,6 +45,26 @@ describe('mentorNoticeNudgeSend', () => {
     jest.clearAllMocks();
     mockGetStepDatabase.mockReturnValue({ marker: 'db' });
     mockGetStepMentorNoticeEnabled.mockResolvedValue(true);
+    // [WI-2573] These cases describe the delivery path, which only exists with
+    // the post-MVP push boundary open. The MVP default (contained) is asserted
+    // separately below and end-to-end in
+    // tests/integration/mentor-notice-push-containment.integration.test.ts.
+    mockGetStepMentorNoticePushPostMvpEnabled.mockResolvedValue(true);
+  });
+
+  it('[WI-2573] reserves nothing and sends nothing while the post-MVP push boundary is closed', async () => {
+    mockGetStepMentorNoticePushPostMvpEnabled.mockResolvedValue(false);
+    mockReserve.mockResolvedValue(true);
+    mockSend.mockResolvedValue({ sent: true, ticketId: 'ticket-1' });
+
+    await expect(execute()).resolves.toEqual({
+      status: 'skipped',
+      reason: 'push_post_mvp',
+    });
+    expect(mockGetStepMentorNoticeEnabled).not.toHaveBeenCalled();
+    expect(mockGetStepDatabase).not.toHaveBeenCalled();
+    expect(mockReserve).not.toHaveBeenCalled();
+    expect(mockSend).not.toHaveBeenCalled();
   });
 
   it('is once-per-event with no provider retry', () => {

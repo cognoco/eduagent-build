@@ -4094,7 +4094,18 @@
       "placeholder": "Spør, lim inn eller beskriv hva du vil lære.",
       "micLabel": "Mikrofon",
       "homeworkChip": "Lekser",
-      "title": "Spør om hva som helst"
+      "title": "Spør om hva som helst",
+      "micIdleLabel": "Start stemmeinndata",
+      "micRequestingLabel": "Ber om mikrofontilgang",
+      "micListeningLabel": "Stopp stemmeinndata",
+      "micProcessingLabel": "Fullfører stemmeinndata",
+      "micErrorLabel": "Prøv taleinndata igjen",
+      "micDisabledLabel": "Stemmeinndata utilgjengelig",
+      "listening": "Lytter …",
+      "voiceError": "Stemmeinndata fungerte ikke. Du kan fortsatt skrive.",
+      "voicePermissionError": "Mikrofontilgang er av. Du kan fortsatt skrive.",
+      "voiceAllow": "Tillat mikrofon",
+      "voiceRetry": "Prøv stemme igjen"
     },
     "onTrack": {
       "label": "I rute",

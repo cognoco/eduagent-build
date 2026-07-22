@@ -4094,7 +4094,18 @@
       "placeholder": "学習したいことを質問、貼り付け、または入力してください。",
       "micLabel": "マイク",
       "homeworkChip": "宿題",
-      "title": "何でも質問"
+      "title": "何でも質問",
+      "micIdleLabel": "音声入力を開始",
+      "micRequestingLabel": "マイクへのアクセスをリクエスト中",
+      "micListeningLabel": "音声入力を停止",
+      "micProcessingLabel": "音声入力を終了中",
+      "micErrorLabel": "もう一度音声入力を試す",
+      "micDisabledLabel": "音声入力は利用できません",
+      "listening": "聞き取り中…",
+      "voiceError": "音声入力ができませんでした。キーボード入力は可能です。",
+      "voicePermissionError": "マイクへのアクセスがオフです。キーボード入力は可能です。",
+      "voiceAllow": "マイクを許可",
+      "voiceRetry": "もう一度音声入力"
     },
     "onTrack": {
       "label": "順調",

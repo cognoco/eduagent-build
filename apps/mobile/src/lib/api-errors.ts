@@ -183,6 +183,7 @@ export function shouldRetryApiError(
   failureCount: number,
   error: Error,
 ): boolean {
+  if (error instanceof NetworkError) return false;
   const status = (error as { status?: number }).status;
   if (status !== undefined && status >= 400 && status < 500) return false;
   return failureCount < MAX_API_ERROR_RETRIES;

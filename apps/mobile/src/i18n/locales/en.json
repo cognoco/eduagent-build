@@ -3174,6 +3174,17 @@
       "cameraLabel": "Camera",
       "placeholder": "Ask, paste, or describe what you want to learn.",
       "micLabel": "Mic",
+      "micIdleLabel": "Start voice input",
+      "micRequestingLabel": "Asking for microphone access",
+      "micListeningLabel": "Stop voice input",
+      "micProcessingLabel": "Finishing voice input",
+      "micErrorLabel": "Try voice input again",
+      "micDisabledLabel": "Voice input unavailable",
+      "listening": "Listening…",
+      "voiceError": "Voice input didn't work. You can still type.",
+      "voicePermissionError": "Microphone access is off. You can still type.",
+      "voiceAllow": "Allow microphone",
+      "voiceRetry": "Try voice again",
       "homeworkChip": "Homework"
     },
     "onTrack": {
