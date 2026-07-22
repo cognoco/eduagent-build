@@ -35,6 +35,17 @@ Query by trigger instead of an unfiltered list: always resolve the latest few `s
 (nightly) runs — the reliable signal — plus scan recent `workflow_run` runs only until one
 that actually executed Maestro is found. Classifier unchanged.
 
+**Review hardening (Codex P2, this PR).** The `workflow_run` fetch initially filtered
+`head_branch === 'main'` *client-side*, after `per_page` had already been applied. Because
+`workflow_run` fires for PR-origin runs too, a busy first page of non-main/skipped runs could
+bury a fresh main mobile-landing execution outside the window — and if that buried run were RED
+while an older in-window main run was GREEN, the scan would break on the green and report GREEN,
+missing the very red the surfacer exists to catch. Fixed by filtering `branch=main` and
+`status=completed` **server-side** (before `per_page`), so the window counts only completed main
+runs; the client-side re-check is retained as a cheap defensive backstop. Re-running the same
+live check after this refinement is byte-identical to the block below (still RED, run
+`29894742910`) — the RED comes from the unchanged schedule path, so the output did not shift.
+
 ## GREEN — after the fix (same live run)
 
 ```

@@ -194,13 +194,25 @@ function listMainRunsByEvent(
     `repos/${repo}/actions/workflows/${WORKFLOW_FILE}/runs`,
     '-f',
     `event=${event}`,
+    // Filter to completed main runs SERVER-SIDE, before `per_page` is applied.
+    // `workflow_run` fires for PR-origin runs too, so a client-only filter would
+    // let a busy first page of non-main/skipped runs bury a fresh main execution
+    // outside the window (the surfacer would then classify off the older nightly).
+    '-f',
+    'branch=main',
+    '-f',
+    'status=completed',
     '-F',
     `per_page=${perPage}`,
   ]);
   const parsed = JSON.parse(raw) as { workflow_runs?: RunMeta[] };
-  return (parsed.workflow_runs ?? [])
-    .filter((r) => r.head_branch === 'main' && r.status === 'completed')
-    .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+  return (
+    (parsed.workflow_runs ?? [])
+      // Defensive backstop: the server-side branch/status filters above are the
+      // primary guard; this re-check costs nothing and guards against API quirks.
+      .filter((r) => r.head_branch === 'main' && r.status === 'completed')
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+  );
 }
 
 /** Resolve one run's jobs into a WorkflowRun. */
@@ -259,11 +271,8 @@ export function fetchMaestroRuns(
   const seen = new Set<number>();
 
   // 1. Reliable signal: always resolve the latest few nightly (schedule) runs.
-  for (const meta of listMainRunsByEvent(
-    repo,
-    'schedule',
-    scheduleResolve,
-  ).slice(0, scheduleResolve)) {
+  //    `scheduleResolve` is passed as `per_page`, so the list is already bounded.
+  for (const meta of listMainRunsByEvent(repo, 'schedule', scheduleResolve)) {
     if (seen.has(meta.id)) continue;
     seen.add(meta.id);
     resolved.push(resolveRun(repo, meta));
