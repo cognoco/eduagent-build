@@ -26,13 +26,14 @@ const path = require('path');
 const REGISTRY_PATH = path.join(__dirname, 'run-smoke-quarantine.json');
 
 // The full legacy project set. The package runner and workflow consume this
-// declaration; neither repeats the four-project list. The Playwright config is
+// declaration; neither repeats the project list. The Playwright config is
 // the source of truth for what each named project matches.
 const DECLARED_CORE_PROJECTS = Object.freeze([
   'smoke-auth',
   'smoke-learner',
   'smoke-parent',
   'smoke-accessibility',
+  'smoke-transport-recovery',
 ]);
 
 const WI_RE = /^WI-\d+$/;

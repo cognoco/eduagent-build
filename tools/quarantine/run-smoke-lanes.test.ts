@@ -5,7 +5,7 @@
 // mutes), and the registry validator catches malformed entries before they
 // can gate CI silently.
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
@@ -23,6 +23,23 @@ const FUTURE = '2026-08-01T00:00:00.000Z';
 const PAST = '2026-07-01T00:00:00.000Z';
 
 describe('[WI-2452] resolveLanes', () => {
+  it('catalogs every Playwright smoke project exactly once', () => {
+    const config = readFileSync(
+      join(process.cwd(), 'apps/mobile/playwright.config.ts'),
+      'utf8',
+    );
+    const configuredProjects = [
+      ...config.matchAll(/name:\s*'(smoke-[^']+)'/g),
+    ].map((match) => match[1]);
+
+    expect(new Set(DECLARED_CORE_PROJECTS).size).toBe(
+      DECLARED_CORE_PROJECTS.length,
+    );
+    expect([...DECLARED_CORE_PROJECTS].sort()).toEqual(
+      configuredProjects.sort(),
+    );
+  });
+
   it('puts every declared project in core when the registry is empty', () => {
     const { core, advisory } = resolveLanes(NOW);
     expect(core).toEqual([...DECLARED_CORE_PROJECTS]);
