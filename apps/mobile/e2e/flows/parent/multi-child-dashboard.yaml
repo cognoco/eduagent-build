@@ -94,9 +94,9 @@ tags:
 
 - takeScreenshot: multi-child-03-emma-detail
 
-# Navigate back to parent home
-# Use pressKey:back only — tapOn back-button + pressKey = double-back exits home
-- pressKey: back
+# Navigate back to parent home through the screen-owned, history-independent route.
+- tapOn:
+    id: 'back-button'
 
 # Wait for parent home to reload
 - extendedWaitUntil:
@@ -125,9 +125,9 @@ tags:
 
 - takeScreenshot: multi-child-04-lucas-detail
 
-# Navigate back
-# Use pressKey:back only — tapOn back-button + pressKey = double-back exits home
-- pressKey: back
+# Navigate back through the screen-owned route.
+- tapOn:
+    id: 'back-button'
 
 - extendedWaitUntil:
     visible:
@@ -155,9 +155,9 @@ tags:
 
 - takeScreenshot: multi-child-05-sofia-detail
 
-# Navigate back
-# Use pressKey:back only — tapOn back-button + pressKey = double-back exits home
-- pressKey: back
+# Navigate back through the screen-owned route.
+- tapOn:
+    id: 'back-button'
 
 - extendedWaitUntil:
     visible:

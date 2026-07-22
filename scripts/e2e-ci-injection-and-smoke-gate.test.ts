@@ -3173,6 +3173,147 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     ).toBe(false);
   });
 
+  it('[WI-1864] verifies recitation readiness through separate bubble and text receipts', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/practice/recitation-session.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      tapOn?: { id?: string; optional?: boolean } | string;
+      inputText?: string;
+      extendedWaitUntil?: {
+        visible?: { id?: string; text?: string } | string;
+        timeout?: number;
+        optional?: boolean;
+      };
+      assertVisible?:
+        | { id?: string; text?: string; optional?: boolean }
+        | string;
+      assertNotVisible?:
+        | { id?: string; text?: string; optional?: boolean }
+        | string;
+    }>;
+    const title = commands.findIndex(
+      ({ inputText }) => inputText === 'Ozymandias',
+    );
+    const submit = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > title &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'send-button' &&
+        tapOn.optional !== true,
+    );
+    const bubbleReceipt = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > submit &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'message-bubble-assistant-2' &&
+        extendedWaitUntil.visible.text === undefined &&
+        (extendedWaitUntil.timeout ?? 0) >= 60000 &&
+        extendedWaitUntil.optional !== true,
+    );
+    const readinessText = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > bubbleReceipt &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === undefined &&
+        assertVisible.text ===
+          '(?i)^ready when you are.*begin your recitation from memory[.]?$' &&
+        assertVisible.optional !== true,
+    );
+    const refusalAbsent = commands.findIndex(
+      ({ assertNotVisible }, index) =>
+        index > readinessText &&
+        typeof assertNotVisible === 'object' &&
+        assertNotVisible.id === undefined &&
+        assertNotVisible.text ===
+          '(?i)^I don.t have reliable source material.*' &&
+        assertNotVisible.optional !== true,
+    );
+
+    expect(title).toBeGreaterThan(-1);
+    expect(submit).toBeGreaterThan(title);
+    expect(bubbleReceipt).toBeGreaterThan(submit);
+    expect(readinessText).toBeGreaterThan(bubbleReceipt);
+    expect(refusalAbsent).toBeGreaterThan(readinessText);
+  });
+
+  it('[WI-1864] follows automatic quiz completion to every below-fold result control', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/quiz/quiz-full-flow.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      repeat?: { times?: number };
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+        optional?: boolean;
+      };
+      tapOn?: { id?: string; optional?: boolean } | string;
+      extendedWaitUntil?: {
+        visible?: { id?: string } | string;
+        optional?: boolean;
+      };
+      assertVisible?: { id?: string; optional?: boolean } | string;
+    }>;
+    const roundLoop = commands.findIndex(({ repeat }) => repeat?.times === 12);
+    const resultsScreen = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > roundLoop &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'quiz-results-screen' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const doneScroll = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > resultsScreen &&
+        scrollUntilVisible?.element?.id === 'quiz-results-done' &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        scrollUntilVisible.optional !== true,
+    );
+    const doneAssert = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > doneScroll &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'quiz-results-done' &&
+        assertVisible.optional !== true,
+    );
+    const historyScroll = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > doneAssert &&
+        scrollUntilVisible?.element?.id === 'quiz-results-history' &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        scrollUntilVisible.optional !== true,
+    );
+    const historyAssert = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > historyScroll &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'quiz-results-history' &&
+        assertVisible.optional !== true,
+    );
+    const historyTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > historyAssert &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'quiz-results-history' &&
+        tapOn.optional !== true,
+    );
+    const finalCtaReferences = JSON.stringify(commands).match(
+      /quiz-final-see-results/g,
+    );
+
+    expect(roundLoop).toBeGreaterThan(-1);
+    expect(resultsScreen).toBeGreaterThan(roundLoop);
+    expect(doneScroll).toBeGreaterThan(resultsScreen);
+    expect(doneAssert).toBeGreaterThan(doneScroll);
+    expect(historyScroll).toBeGreaterThan(doneAssert);
+    expect(historyAssert).toBeGreaterThan(historyScroll);
+    expect(historyTap).toBeGreaterThan(historyAssert);
+    expect(finalCtaReferences).toBeNull();
+  });
+
   it('[WI-1864] opens the seeded parent topic through its stable card id', () => {
     const source = readFileSync(
       join(repoRoot, 'apps/mobile/e2e/flows/parent/child-drill-down.yaml'),
@@ -4423,6 +4564,63 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(summaryAssert).toBeGreaterThan(summaryScroll);
     expect(child1Return).toBeGreaterThan(summaryAssert);
     expect(prematureSummaryAssert).toBe(-1);
+  });
+
+  it('[WI-1864] returns from every multi-child detail through the route-aware app back control', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/parent/multi-child-dashboard.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      tapOn?: { id?: string; optional?: boolean } | string;
+      pressKey?: string;
+      extendedWaitUntil?: {
+        visible?: { id?: string; text?: string } | string;
+        optional?: boolean;
+      };
+    }>;
+    const hardwareBacks = commands.filter(
+      ({ pressKey }) => pressKey?.toLowerCase() === 'back',
+    );
+    const routeAwareBacks = commands.filter(
+      ({ tapOn }) =>
+        typeof tapOn === 'object' &&
+        tapOn.id === 'back-button' &&
+        tapOn.optional !== true,
+    );
+
+    let cursor = -1;
+    for (const childName of ['Emma', 'Lucas', 'Sofia']) {
+      const detail = commands.findIndex(
+        ({ extendedWaitUntil }, index) =>
+          index > cursor &&
+          typeof extendedWaitUntil?.visible === 'object' &&
+          extendedWaitUntil.visible.text === childName &&
+          extendedWaitUntil.optional !== true,
+      );
+      const appBack = commands.findIndex(
+        ({ tapOn }, index) =>
+          index > detail &&
+          typeof tapOn === 'object' &&
+          tapOn.id === 'back-button' &&
+          tapOn.optional !== true,
+      );
+      const parentHome = commands.findIndex(
+        ({ extendedWaitUntil }, index) =>
+          index > appBack &&
+          typeof extendedWaitUntil?.visible === 'object' &&
+          extendedWaitUntil.visible.id === 'parent-home-screen' &&
+          extendedWaitUntil.optional !== true,
+      );
+
+      expect(detail).toBeGreaterThan(cursor);
+      expect(appBack).toBeGreaterThan(detail);
+      expect(parentHome).toBeGreaterThan(appBack);
+      cursor = parentHome;
+    }
+
+    expect(routeAwareBacks).toHaveLength(3);
+    expect(hardwareBacks).toHaveLength(0);
   });
 
   it('[WI-1864] waits for the Google SSO browser before cancelling it', () => {
