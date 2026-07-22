@@ -1214,6 +1214,174 @@ describe('MentorScreen', () => {
     );
   });
 
+  // [WI-2499 AC-3/AC-6 rework] The three remaining failure modes the AC names
+  // for "Not now" beyond the 403 case above: server-authoritative conflict,
+  // a transport failure before any response arrives, and a schema-malformed
+  // 200. All three must land in the same place as the 403 case — card stays,
+  // no light-practice success — because removal is only ever driven by the
+  // defer mutation's onSuccess invalidate.
+  it('[WI-2499 AC-3/AC-6] keeps the mentor-notice card on screen and shows no light-practice success when the defer mutation conflicts (409)', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+    };
+
+    renderMentorScreen(
+      {},
+      {
+        '/mentor-notices/notice-1/defer': () =>
+          new Response(
+            JSON.stringify({ code: 'CONFLICT', message: 'Already resolved' }),
+            { status: 409, headers: { 'Content-Type': 'application/json' } },
+          ),
+      },
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Not now'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    screen.getByTestId('now-card-mentor_notice');
+    expect(screen.queryByTestId('light-practice-capitals')).toBeNull();
+  });
+
+  it('[WI-2499 AC-3/AC-6] keeps the mentor-notice card on screen and shows no light-practice success when the defer mutation fails at the transport layer', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+    };
+
+    renderMentorScreen(
+      {},
+      {
+        '/mentor-notices/notice-1/defer': () => {
+          throw new TypeError('Network request failed');
+        },
+      },
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Not now'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    screen.getByTestId('now-card-mentor_notice');
+    expect(screen.queryByTestId('light-practice-capitals')).toBeNull();
+  });
+
+  it('[WI-2499 AC-3/AC-6] keeps the mentor-notice card on screen and shows no light-practice success when the defer response is schema-malformed', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+    };
+
+    renderMentorScreen(
+      {},
+      {
+        // Missing the required `deferredAt`, so `mentorNoticeDeferResponseSchema`
+        // rejects it even though the HTTP layer reports 200.
+        '/mentor-notices/notice-1/defer': { noticeId: 'notice-1' },
+      },
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Not now'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    screen.getByTestId('now-card-mentor_notice');
+    expect(screen.queryByTestId('light-practice-capitals')).toBeNull();
+  });
+
+  // [WI-2499 AC-3/AC-6 rework] Same three failure modes on "Continue" —
+  // navigation may only ever follow a schema-valid server success.
+  it('[WI-2499 AC-3/AC-6] does not navigate and keeps the mentor-notice card when the recheck mutation conflicts (409)', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+    };
+
+    renderMentorScreen(
+      {},
+      {
+        '/mentor-notices/notice-1/recheck': () =>
+          new Response(
+            JSON.stringify({ code: 'CONFLICT', message: 'Already resolved' }),
+            { status: 409, headers: { 'Content-Type': 'application/json' } },
+          ),
+      },
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Check it now'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    screen.getByTestId('now-card-mentor_notice');
+    expect(mockPush).not.toHaveBeenCalledWith(
+      expect.stringContaining('/(app)/session?sessionId='),
+    );
+  });
+
+  it('[WI-2499 AC-3/AC-6] does not navigate and keeps the mentor-notice card when the recheck mutation fails at the transport layer', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+    };
+
+    renderMentorScreen(
+      {},
+      {
+        '/mentor-notices/notice-1/recheck': () => {
+          throw new TypeError('Network request failed');
+        },
+      },
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Check it now'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    screen.getByTestId('now-card-mentor_notice');
+    expect(mockPush).not.toHaveBeenCalledWith(
+      expect.stringContaining('/(app)/session?sessionId='),
+    );
+  });
+
+  it('[WI-2499 AC-3/AC-6] does not navigate and keeps the mentor-notice card when the recheck response is schema-malformed', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+    };
+
+    renderMentorScreen(
+      {},
+      {
+        // Not a valid UUID, so `mentorNoticeRecheckResponseSchema` rejects it
+        // even though the HTTP layer reports 200.
+        '/mentor-notices/notice-1/recheck': { sessionId: 'not-a-uuid' },
+      },
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Check it now'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    screen.getByTestId('now-card-mentor_notice');
+    expect(mockPush).not.toHaveBeenCalledWith(
+      expect.stringContaining('/(app)/session?sessionId='),
+    );
+  });
+
   // WI-1393: the V2 shell previously had zero forward navigation to
   // /(app)/link/initiate — this proves the cold-start empty-state anchor (A1)
   // actually reaches it with a supporteePersonId, so the missing-param
