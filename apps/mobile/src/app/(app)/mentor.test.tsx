@@ -1084,6 +1084,35 @@ describe('MentorScreen', () => {
     expect(screen.queryByTestId('light-practice-capitals')).toBeNull();
   });
 
+  // [WI-2499 AC-3] Navigation may only happen after a schema-valid server
+  // success — the counterpart to the rejected-recheck test below. A
+  // successful recheck must navigate to the returned session.
+  it('[WI-2499 AC-3] navigates to the returned session when the recheck mutation succeeds', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+    };
+
+    renderMentorScreen(
+      {},
+      {
+        '/mentor-notices/notice-1/recheck': {
+          sessionId: '550e8400-e29b-41d4-a716-446655440001',
+        },
+      },
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Check it now'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockPush).toHaveBeenCalledWith(
+      '/(app)/session?sessionId=550e8400-e29b-41d4-a716-446655440001',
+    );
+  });
+
   // [WI-2499 AC-3] On a rejected/failed defer, no success state may appear —
   // the card stays exactly as it was, and the generic light-practice success
   // affordance never shows.
