@@ -171,6 +171,8 @@ jest.mock(
           sessionId: null,
           content:
             'Linear equations stay balanced when you do the same thing to both sides.',
+          artifactSource: 'learner_authored_note',
+          verificationState: 'unverified',
           createdAt: FIXTURE_TIMESTAMP,
           updatedAt: FIXTURE_TIMESTAMP,
         },
