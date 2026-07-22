@@ -1452,9 +1452,12 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       if (record.optional === true || payload.optional === true) return '';
       const selector = (payload.visible ?? payload) as Command;
       if (selector.optional === true) return '';
-      const selectorSignature = selector.id
-        ? `id:${selector.id}`
-        : `text:${selector.text}`;
+      const selectorSignatures = [
+        typeof selector.id === 'string' ? `id:${selector.id}` : '',
+        typeof selector.text === 'string' ? `text:${selector.text}` : '',
+      ].filter(Boolean);
+      if (selectorSignatures.length === 0) return '';
+      const selectorSignature = selectorSignatures.join(':');
       const descendants = selector.containsDescendants;
       if (descendants === undefined) return `${kind}:${selectorSignature}`;
       if (!Array.isArray(descendants)) return '';
@@ -1538,8 +1541,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           isHardResolveLoadingAppearance(command.assertVisible),
       );
     const exactSubjectRowId = '^subjects-browse-row-.*$';
-    const exactSubjectRowText = '^Photosynthesis$';
-    const exactSubjectRowSignature = `id:${exactSubjectRowId}:containsDescendants:text:${exactSubjectRowText}`;
+    const exactSubjectRowLabel = '^Open Photosynthesis$';
+    const exactSubjectRowSignature = `id:${exactSubjectRowId}:text:${exactSubjectRowLabel}`;
     const exactSubjectRowWaitSignature = `extendedWaitUntil:${exactSubjectRowSignature}`;
     const exactSubjectRowAssertSignature = `assertVisible:${exactSubjectRowSignature}`;
     const exactCaseSequence = [
@@ -1561,7 +1564,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     const withOptionalCommand = (
       commands: unknown[],
       index: number,
-      placement: 'root' | 'payload' | 'selector' | 'descendant',
+      placement: 'root' | 'payload' | 'selector',
     ): unknown[] => {
       expect(index).toBeGreaterThanOrEqual(0);
       return commands.map((command, commandIndex) => {
@@ -1585,25 +1588,6 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         const selector = (
           selectorKey ? payload[selectorKey] : payload
         ) as Command;
-        if (placement === 'descendant') {
-          const descendants = selector.containsDescendants;
-          expect(Array.isArray(descendants)).toBe(true);
-          const mutatedSelector = {
-            ...selector,
-            containsDescendants: (descendants as Command[]).map(
-              (descendant, descendantIndex) =>
-                descendantIndex === 0
-                  ? { ...descendant, optional: true }
-                  : descendant,
-            ),
-          };
-          return {
-            ...record,
-            [kind!]: selectorKey
-              ? { ...payload, [selectorKey]: mutatedSelector }
-              : mutatedSelector,
-          };
-        }
         return {
           ...record,
           [kind!]: selectorKey
@@ -1615,11 +1599,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     const withRowSelectorMutation = (
       commands: unknown[],
       index: number,
-      mutation:
-        | 'remove-id'
-        | 'change-id'
-        | 'remove-descendant-text'
-        | 'change-descendant-text',
+      mutation: 'remove-id' | 'change-id' | 'remove-label' | 'change-label',
     ): unknown[] => {
       expect(index).toBeGreaterThanOrEqual(0);
       return commands.map((command, commandIndex) => {
@@ -1640,13 +1620,11 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           mutatedSelector = withoutId;
         } else if (mutation === 'change-id') {
           mutatedSelector = { ...selector, id: '^adjacent-row-.*$' };
-        } else if (mutation === 'remove-descendant-text') {
-          mutatedSelector = { ...selector, containsDescendants: [{}] };
+        } else if (mutation === 'remove-label') {
+          const { text: _removedText, ...withoutText } = selector;
+          mutatedSelector = withoutText;
         } else {
-          mutatedSelector = {
-            ...selector,
-            containsDescendants: [{ text: '^Adjacent subject$' }],
-          };
+          mutatedSelector = { ...selector, text: '^Open Adjacent subject$' };
         }
         return {
           ...record,
@@ -1756,16 +1734,11 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       const exactCaseOffset = exactCaseSequence.indexOf(signature);
       expect(exactCaseOffset).toBeGreaterThanOrEqual(0);
       const commandIndex = exactCaseStart + exactCaseOffset;
-      expect(
-        satisfiesExactCaseContract(
-          withOptionalCommand(subjectCreate, commandIndex, 'descendant'),
-        ),
-      ).toBe(false);
       for (const mutation of [
         'remove-id',
         'change-id',
-        'remove-descendant-text',
-        'change-descendant-text',
+        'remove-label',
+        'change-label',
       ] as const) {
         expect(
           satisfiesExactCaseContract(

@@ -174,10 +174,8 @@ tags:
 - extendedWaitUntil:
     visible:
       id: '^subjects-browse-row-.*$'
-      containsDescendants:
-        - text: '^Photosynthesis$'
+      text: '^Open Photosynthesis$'
     timeout: 15000
 - assertVisible:
     id: '^subjects-browse-row-.*$'
-    containsDescendants:
-      - text: '^Photosynthesis$'
+    text: '^Open Photosynthesis$'
