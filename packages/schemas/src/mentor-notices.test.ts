@@ -21,6 +21,7 @@ describe('mentor notice schemas', () => {
       'locked_in',
       'dismissed',
       'faded',
+      'not_yet',
     ]);
     expect(mentorNoticeNudgeStatusSchema.options).toEqual([
       'pending',

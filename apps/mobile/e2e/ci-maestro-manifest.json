@@ -1,9 +1,5 @@
 {
   "pr": [
-    {
-      "flow": "flows/account/more-tab-navigation.yaml",
-      "scenario": "onboarding-complete"
-    },
     { "flow": "flows/app-launch.yaml", "scenario": null },
     {
       "flow": "flows/auth/deep-link-redirect-signed-in.yaml",
@@ -29,10 +25,6 @@
       "scenario": "learning-active"
     },
     { "flow": "flows/retention/library.yaml", "scenario": "retention-due" },
-    {
-      "flow": "flows/subjects/multi-subject.yaml",
-      "scenario": "multi-subject"
-    },
     {
       "flow": "flows/subjects/practice-subject-picker.yaml",
       "scenario": "multi-subject"

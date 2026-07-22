@@ -898,8 +898,11 @@ describe('mentor notice envelope fields', () => {
     expect(parsed.signals?.noticed_gap?.answerEventId).toBe(answerEventId);
   });
 
-  it('preserves an optional interleaved topic target on a grounded proposal', () => {
-    const topicId = '00000000-0000-4000-8000-000000000003';
+  // [WI-2500] clause 1 — the MVP proposal carries no topicId (interleaved
+  // notice targeting is out of MVP scope per clause 6). A stray topicId from
+  // an un-upgraded prompt must not surface anywhere downstream, so this
+  // asserts it is silently stripped rather than merely absent from the type.
+  it('strips a stray topicId from a noticed_gap proposal', () => {
     const parsed = llmResponseEnvelopeSchema.parse({
       reply: 'Let us straighten out that distinction.',
       signals: {
@@ -908,12 +911,12 @@ describe('mentor notice envelope fields', () => {
           correctionHint: 'Mitosis keeps the chromosome count unchanged.',
           answerEventId,
           learnerQuote: 'meiosis makes identical cells',
-          topicId,
+          topicId: '00000000-0000-4000-8000-000000000003',
         },
       },
     });
 
-    expect(parsed.signals?.noticed_gap?.topicId).toBe(topicId);
+    expect(parsed.signals?.noticed_gap).not.toHaveProperty('topicId');
   });
 
   it('accepts an explicit null noticed_gap when no gap was observed', () => {

@@ -1,0 +1,101 @@
+name: Maestro main-health
+
+# WI-2596 (AC-3): surface Maestro-on-main breakage INDEPENDENT of change-class
+# routing. The "E2E Tests" workflow only executes the emulator Maestro job on
+# mobile-touching commits or the nightly schedule, so a genuine main-red can sit
+# invisible until the next mobile lane inherits a landing check that is not theirs.
+# This scheduled job reads the last-known Maestro-on-main status from run history
+# and goes visibly RED (and opens a single tracking issue) when it is red or
+# stale — no emulator run, so it adds negligible CI cost (AC-5).
+
+on:
+  schedule:
+    # Four times a day, offset off the hour to avoid the top-of-hour stampede.
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      stale_hours:
+        description: Hours without an executed Maestro-on-main run before STALE
+        required: false
+        default: '30'
+        type: string
+
+# Only ever one health run at a time; a newer one supersedes.
+concurrency:
+  group: maestro-main-health
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+jobs:
+  health:
+    name: Maestro-on-main health
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          filter: tree:0
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+        with:
+          standalone: true
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          cache: 'pnpm'
+          package-manager-cache: false
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check Maestro-on-main health
+        id: health
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          # Route the workflow_dispatch input through an env var, never inline in
+          # the run: script — an inline ${{ }} expression is evaluated before the
+          # shell parses the command and a crafted input could inject shell code.
+          STALE_HOURS: ${{ github.event.inputs.stale_hours || '30' }}
+        run: |
+          set -o pipefail
+          pnpm exec tsx scripts/check-maestro-main-health.ts \
+            --repo "$GITHUB_REPOSITORY" \
+            --stale-hours "$STALE_HOURS" \
+            | tee "$RUNNER_TEMP/health.txt"
+          {
+            echo '## Maestro main-health'
+            echo '```'
+            cat "$RUNNER_TEMP/health.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Best-effort amplifier — the failing job above is the primary signal; this
+      # opens ONE open tracking issue so the breakage is visible without watching
+      # the Actions tab. Idempotent: it does nothing if an open issue already exists.
+      - name: Open tracking issue when unhealthy
+        if: failure() && steps.health.outcome == 'failure'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_RUN_ID: ${{ github.run_id }}
+        run: |
+          TITLE='🔴 Maestro main-health: main is red or stale'
+          # Fail SAFE: if the list query fails (rate limit / transient auth), treat it
+          # as "cannot confirm zero" and skip create, so a transient error never spawns
+          # a duplicate tracking issue. Only an actual count of 0 opens a new issue.
+          EXISTING=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "in:title \"Maestro main-health\"" --json number --jq 'length' 2>/dev/null) || EXISTING="unknown"
+          RUN_URL="https://github.com/$GITHUB_REPOSITORY/actions/runs/$GH_RUN_ID"
+          if [ "$EXISTING" = "0" ]; then
+            BODY=$(printf 'The scheduled Maestro main-health check found `main` red or stale.\n\n```\n%s\n```\n\nRun: %s\n\nThis was opened by `.github/workflows/maestro-main-health.yml` (WI-2596). Close it once Maestro-on-main is green again.' "$(cat "$RUNNER_TEMP/health.txt")" "$RUN_URL")
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body "$BODY"
+          else
+            echo "Not creating a tracking issue (open-issue count: $EXISTING; 'unknown' = list unavailable)."
+          fi

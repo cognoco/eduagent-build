@@ -252,36 +252,63 @@ jobs:
             FAILURE_CLASS=\$(cut -d= -f2 \"\${CLASSIFY_STATE_FILE}\"); \
             node scripts/playwright-staging-gate.cjs --decide \"\${PRE_STATE}\" \"\${POST_STATE}\" \"\${FAILURE_CLASS}\" \"\${SUITE_STATUS}\""
 
-      - name: Upload V2 Playwright artifacts
-        if: always()
-        continue-on-error: true
-        timeout-minutes: 2
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: playwright-web-v2-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            apps/mobile/e2e-web/playwright-report
-            apps/mobile/e2e-web/test-results
-          retention-days: 14
-
-      - name: Run legacy Playwright smoke (advisory)
-        id: legacy-smoke
+      # WI-2594: the V2 artifact-upload step was removed here. It published
+      # playwright-report/ and test-results/, both of which record Playwright
+      # fill-step values (including seeded login credentials) in clear text —
+      # see WI-2593. Do not re-add an upload-artifact step for these paths;
+      # scripts/e2e-web-artifact-upload-guard.test.ts guards against it.
+      - name: Validate and resolve legacy Playwright lanes
+        id: legacy-lanes
         if: ${{ always() && !cancelled() }}
-        continue-on-error: true
+        run: |
+          node tools/quarantine/run-smoke-lanes.cjs validate
+          CORE_FLAGS="$(node tools/quarantine/run-smoke-lanes.cjs core)"
+          ADVISORY_FLAGS="$(node tools/quarantine/run-smoke-lanes.cjs advisory)"
+          echo "core=${CORE_FLAGS}" >> "${GITHUB_OUTPUT}"
+          echo "advisory=${ADVISORY_FLAGS}" >> "${GITHUB_OUTPUT}"
+          if [ -z "${CORE_FLAGS}" ]; then
+            echo "::notice title=Legacy core lane empty::No required-stable legacy projects are selected."
+          fi
+          if [ -z "${ADVISORY_FLAGS}" ]; then
+            echo "::notice title=Legacy advisory lane empty::No legacy projects are quarantined."
+          fi
+
+      - name: Run required-stable legacy Playwright smoke
+        id: legacy-core
+        if: ${{ always() && !cancelled() && steps.legacy-lanes.outcome == 'success' && steps.legacy-lanes.outputs.core != '' }}
         timeout-minutes: 5
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
         run: |
           if [ -z "${DOPPLER_TOKEN:-}" ]; then
-            echo "::error title=Doppler token missing::DOPPLER_TOKEN_STG is not set; legacy Playwright smoke cannot use the staging seed contract."
+            echo "::error title=Doppler token missing::DOPPLER_TOKEN_STG is not set; required-stable legacy Playwright smoke cannot use the staging seed contract."
             exit 1
           fi
           doppler run -p mentomate -c stg --command "\
             export PLAYWRIGHT_TEST_SEED_SECRET=\"\$TEST_SEED_SECRET\"; \
             export CLERK_SECRET_KEY=\"\$CLERK_SECRET_KEY\"; \
             export PLAYWRIGHT_API_URL=\"${PLAYWRIGHT_API_URL}\"; \
-            export PLAYWRIGHT_ARTIFACT_LANE=legacy; \
-            pnpm run test:e2e:web:smoke"
+            export PLAYWRIGHT_ARTIFACT_LANE=legacy-core; \
+            pnpm run test:e2e:web:smoke -- core"
+
+      - name: Run advisory legacy Playwright smoke
+        id: legacy-advisory
+        if: ${{ always() && !cancelled() && steps.legacy-lanes.outcome == 'success' && steps.legacy-lanes.outputs.advisory != '' }}
+        continue-on-error: true
+        timeout-minutes: 5
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
+        run: |
+          if [ -z "${DOPPLER_TOKEN:-}" ]; then
+            echo "::error title=Doppler token missing::DOPPLER_TOKEN_STG is not set; advisory legacy Playwright smoke cannot use the staging seed contract."
+            exit 1
+          fi
+          doppler run -p mentomate -c stg --command "\
+            export PLAYWRIGHT_TEST_SEED_SECRET=\"\$TEST_SEED_SECRET\"; \
+            export CLERK_SECRET_KEY=\"\$CLERK_SECRET_KEY\"; \
+            export PLAYWRIGHT_API_URL=\"${PLAYWRIGHT_API_URL}\"; \
+            export PLAYWRIGHT_ARTIFACT_LANE=legacy-advisory; \
+            pnpm run test:e2e:web:smoke -- advisory"
 
       - name: Stop and summarize runner-to-edge phase probe
         if: always()
@@ -342,22 +369,15 @@ jobs:
             "${PLAYWRIGHT_API_URL}/v1/__test/reset?prefix=${PREFIX}" \
             || echo "::warning::seed reset returned non-2xx; nightly cleanup will sweep"
 
-      - name: Upload legacy Playwright artifacts
-        if: ${{ always() && (steps.legacy-smoke.outcome == 'success' || steps.legacy-smoke.outcome == 'failure') }}
-        continue-on-error: true
-        timeout-minutes: 2
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: playwright-web-legacy-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            apps/mobile/e2e-web/playwright-report-legacy
-            apps/mobile/e2e-web/test-results-legacy
-          retention-days: 14
+      # WI-2594: the legacy artifact-upload steps were removed here for the
+      # same reason as the V2 upload step above: Playwright report and result
+      # trees can record fill-step values in clear text.
 
   # Required branch-protection check. Trusted surface changes and manual
   # dispatches hard-gate on the isolated v2-release result. Fork/untrusted PRs
   # and trusted PRs with no web/mobile surface remain explicit pass-throughs.
-  # Legacy smoke is advisory inside run-smoke and cannot alter its job result.
+  # Required-stable legacy smoke contributes to run-smoke; the advisory lane
+  # remains visible without altering its job result.
   smoke:
     name: Playwright web smoke
     if: always()

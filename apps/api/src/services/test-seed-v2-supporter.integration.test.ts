@@ -28,6 +28,7 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   createDatabase,
   login,
+  membership,
   person,
   supportVisibilityContracts,
   supportership,
@@ -329,13 +330,69 @@ function createIntegrationDb(): Database {
       expect(seeded.ids.managedChildEdgeId).toBeTruthy();
     });
 
-    it('[WI-2584 route boundary] authenticated GET /v1/profiles returns the schema-valid supporter owner and same-org Managed Child', async () => {
-      const supporterLogin = await db.query.login.findFirst({
-        where: eq(login.personId, seeded.ids.supporterPersonId),
-        columns: { clerkUserId: true },
-      });
+    it('[WI-2584 route boundary] authenticated GET /v1/profiles returns the schema-valid supporter and Managed Child with no child Login, learner-only membership, and a fully accepted edge', async () => {
+      const [
+        supporterLogin,
+        managedChildLogin,
+        managedChildMembership,
+        managedChildEdge,
+        managedChildContract,
+      ] = await Promise.all([
+        db.query.login.findFirst({
+          where: eq(login.personId, seeded.ids.supporterPersonId),
+          columns: { clerkUserId: true },
+        }),
+        db.query.login.findFirst({
+          where: eq(login.personId, seeded.ids.managedChildPersonId),
+          columns: { id: true },
+        }),
+        db.query.membership.findFirst({
+          where: eq(membership.personId, seeded.ids.managedChildPersonId),
+          columns: { organizationId: true, roles: true },
+        }),
+        db.query.supportership.findFirst({
+          where: eq(supportership.id, seeded.ids.managedChildEdgeId),
+          columns: {
+            id: true,
+            supporterPersonId: true,
+            supporteePersonId: true,
+            revokedAt: true,
+          },
+        }),
+        db.query.supportVisibilityContracts.findFirst({
+          where: eq(
+            supportVisibilityContracts.supportershipId,
+            seeded.ids.managedChildEdgeId,
+          ),
+          columns: {
+            id: true,
+            supportershipId: true,
+            status: true,
+            supporterAcceptedAt: true,
+            supporteeAcceptedAt: true,
+          },
+        }),
+      ]);
 
       expect(supporterLogin).toBeDefined();
+      expect(managedChildLogin).toBeUndefined();
+      expect(managedChildMembership).toEqual({
+        organizationId: seeded.ids.supporterOrganizationId,
+        roles: ['learner'],
+      });
+      expect(managedChildEdge).toEqual({
+        id: seeded.ids.managedChildEdgeId,
+        supporterPersonId: seeded.ids.supporterPersonId,
+        supporteePersonId: seeded.ids.managedChildPersonId,
+        revokedAt: null,
+      });
+      expect(managedChildContract).toEqual({
+        id: seeded.ids.managedChildContractId,
+        supportershipId: seeded.ids.managedChildEdgeId,
+        status: 'accepted',
+        supporterAcceptedAt: expect.any(Date),
+        supporteeAcceptedAt: expect.any(Date),
+      });
 
       clearJWKSCache();
       const response = await app.request(

@@ -337,8 +337,6 @@ export const noticedGapSignalSchema = z.object({
   correctionHint: z.string().min(1).max(500).optional(),
   answerEventId: z.string().uuid(),
   learnerQuote: z.string().min(1).max(500),
-  /** Required by the server for interleaved retrieval; omitted elsewhere. */
-  topicId: z.string().uuid().optional(),
 });
 export type NoticedGapSignal = z.infer<typeof noticedGapSignalSchema>;
 
