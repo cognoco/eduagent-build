@@ -519,7 +519,6 @@ function LearnerMentorScreen(): React.ReactElement {
             onSubmitText={handleSubmitText}
             onOpenCamera={() => pushMentorHomeworkCamera(router)}
             onOpenHomework={() => pushMentorHomework(router, homeworkSubject)}
-            onTranscript={handleSubmitText}
             voiceLocale={getVoiceLocaleForLanguage(
               activeProfile?.conversationLanguage,
             )}
