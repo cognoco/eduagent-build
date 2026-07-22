@@ -16,6 +16,15 @@ export type SpeechRecognitionStatus =
 export interface UseSpeechRecognitionResult {
   status: SpeechRecognitionStatus;
   transcript: string;
+  /**
+   * Whether `transcript` is the engine's final result for the utterance
+   * (`isFinal` on the native result event) rather than an interim guess.
+   * Interim results keep arriving while the learner speaks and are safe to
+   * display, but a consumer that commits text somewhere durable must wait for
+   * this: stopping does not finalise, the true final arrives afterwards, and
+   * committing the last interim inserts the half-heard phrase instead.
+   */
+  isFinalTranscript: boolean;
   error: string | null;
   isListening: boolean;
   startListening: () => Promise<void>;
@@ -51,7 +60,7 @@ type SpeechRecognitionModule = {
   }) => void;
   stop: () => void;
   addListener?: (
-    eventName: 'result' | 'error',
+    eventName: 'result' | 'error' | 'end',
     listener: (event: unknown) => void,
   ) => { remove: () => void };
 };
@@ -61,6 +70,14 @@ type SpeechRecognitionModuleLoader =
 
 interface UseSpeechRecognitionOptions {
   lang?: string;
+  /**
+   * Native continuous recognition. Default `true` keeps a session listening
+   * across pauses (long dictation surfaces), where a native `isFinal` result
+   * marks the end of a speech *segment*, not the whole capture. Pass `false`
+   * for a single-utterance capture: the engine finalises once and stops, so an
+   * `isFinal` result is the definitive end of the capture.
+   */
+  continuous?: boolean;
 }
 
 /**
@@ -95,8 +112,10 @@ export function useSpeechRecognition(
     typeof optionsOrLoadModule === 'function'
       ? optionsOrLoadModule
       : (maybeLoadModule ?? loadSpeechModule);
+  const continuous = options?.continuous ?? true;
   const [status, setStatus] = useState<SpeechRecognitionStatus>('idle');
   const [transcript, setTranscript] = useState('');
+  const [isFinalTranscript, setIsFinalTranscript] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mountedRef = useRef(true);
 
@@ -111,6 +130,7 @@ export function useSpeechRecognition(
     let cancelled = false;
     let resultSubscription: { remove: () => void } | undefined;
     let errorSubscription: { remove: () => void } | undefined;
+    let endSubscription: { remove: () => void } | undefined;
 
     void (async () => {
       const speechModule = await loadModule();
@@ -127,6 +147,7 @@ export function useSpeechRecognition(
 
         const resultEvent = event as {
           results?: Array<{ transcript?: string }>;
+          isFinal?: boolean;
         };
         if (!Array.isArray(resultEvent.results)) {
           console.warn('[SpeechRecognition] Malformed result event:', event);
@@ -142,8 +163,26 @@ export function useSpeechRecognition(
           console.warn('[SpeechRecognition] Empty transcript event:', event);
           return;
         }
+        const isFinal = resultEvent.isFinal === true;
         setTranscript(nextTranscript);
+        setIsFinalTranscript(isFinal);
         setError(null);
+        // Only a single-utterance (non-continuous) session ends on isFinal —
+        // there the engine finalises once and stops, so the capture is over
+        // even if the learner never pressed stop, and even if stop already
+        // moved us to processing while waiting for exactly this. In a
+        // continuous session isFinal is only a segment boundary; the recognizer
+        // keeps running, so going idle here would hide the listening state
+        // mid-dictation and let a consumer commit the first segment early. The
+        // continuous session ends on stop → the terminal `end` event instead.
+        if (isFinal && !continuous) setStatus('idle');
+      });
+
+      // Terminal cleanup: the session ended without a final result (no speech,
+      // engine gave up). Without this, a stop would sit in processing forever.
+      endSubscription = speechModule.addListener('end', () => {
+        if (!mountedRef.current) return;
+        setStatus((current) => (current === 'error' ? current : 'idle'));
       });
 
       errorSubscription = speechModule.addListener('error', (event) => {
@@ -159,8 +198,9 @@ export function useSpeechRecognition(
       cancelled = true;
       resultSubscription?.remove();
       errorSubscription?.remove();
+      endSubscription?.remove();
     };
-  }, [loadModule]);
+  }, [loadModule, continuous]);
 
   const startListening = useCallback(async () => {
     try {
@@ -189,11 +229,12 @@ export function useSpeechRecognition(
 
       if (!mountedRef.current) return;
       setTranscript('');
+      setIsFinalTranscript(false);
       setStatus('listening');
       speechModule.start({
         lang: options?.lang ?? 'en-US',
         interimResults: true,
-        continuous: true,
+        continuous,
       });
     } catch (err) {
       if (mountedRef.current) {
@@ -203,7 +244,7 @@ export function useSpeechRecognition(
         setStatus('error');
       }
     }
-  }, [loadModule, options?.lang]);
+  }, [loadModule, options?.lang, continuous]);
 
   const stopListening = useCallback(async () => {
     try {
@@ -214,7 +255,15 @@ export function useSpeechRecognition(
       }
 
       if (mountedRef.current) {
-        setStatus('idle');
+        // Stopping does not finalise: the engine still owes us the final
+        // result, which arrives after this call. Sitting in processing until
+        // the result or end event lands is what keeps a consumer from
+        // committing the last interim guess. (Any state but error, which is
+        // terminal and must not be masked.) With no module there is no engine
+        // to owe us anything and no end event will ever arrive, so waiting
+        // would strand the caller in processing forever — settle immediately.
+        const settled = speechModule ? 'processing' : 'idle';
+        setStatus((current) => (current === 'error' ? current : settled));
       }
     } catch (err) {
       console.warn('[Speech] Stop listening failed:', err);
@@ -226,6 +275,7 @@ export function useSpeechRecognition(
 
   const clearTranscript = useCallback(() => {
     setTranscript('');
+    setIsFinalTranscript(false);
     setError(null);
     setStatus('idle');
   }, []);
@@ -258,6 +308,7 @@ export function useSpeechRecognition(
   return {
     status,
     transcript,
+    isFinalTranscript,
     error,
     isListening: status === 'listening',
     startListening,

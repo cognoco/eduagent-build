@@ -6,7 +6,9 @@
 // Playwright artifacts" and "Upload legacy Playwright artifacts" steps
 // that used to publish them were removed outright; this test fails if
 // either comes back, or if a new upload-artifact step republishes either
-// tree under a different step name.
+// tree under a different step name or through a parent/glob path. No
+// redaction or secret-scan proof exists today, so the safe structural policy
+// is stricter: this workflow may not contain an upload-artifact action at all.
 //
 // Style matches the sibling workflow-structure tests in this directory
 // (e2e-web-cleanup.test.ts, e2e-ci-injection-and-smoke-gate.test.ts):
@@ -38,26 +40,14 @@ function loadWorkflow(name: string): { jobs: Record<string, Job> } {
   };
 }
 
-// The two trees that record Playwright fill-step values (screenshots,
-// traces, videos, and the HTML report's embedded base64 payload) in clear
-// text. Matched by path-segment prefix so `test-results-legacy` and
-// `playwright-report-legacy` are caught alongside the base names.
-const FORBIDDEN_BASENAME_PREFIXES = ['playwright-report', 'test-results'];
-
-function isForbiddenPath(pathLine: string): boolean {
-  const basename = pathLine.trim().split(/[\\/]/).pop() ?? '';
-  return FORBIDDEN_BASENAME_PREFIXES.some((prefix) =>
-    basename.startsWith(prefix),
-  );
-}
-
 function uploadArtifactSteps(
   jobs: Record<string, Job>,
 ): Array<{ jobName: string; step: Step }> {
   const found: Array<{ jobName: string; step: Step }> = [];
   for (const [jobName, job] of Object.entries(jobs)) {
     for (const step of job.steps ?? []) {
-      if (String(step.uses ?? '').startsWith('actions/upload-artifact@')) {
+      const action = String(step.uses ?? '').trim();
+      if (action.toLowerCase().includes('upload-artifact')) {
         found.push({ jobName, step });
       }
     }
@@ -69,34 +59,56 @@ describe('[WI-2594] e2e-web.yml never republishes credential-bearing Playwright 
   const workflow = loadWorkflow(WORKFLOW_FILE);
   const jobs = workflow.jobs;
 
-  it('declares no Upload Playwright artifacts step at all', () => {
-    // WI-2594 removed both "Upload V2 Playwright artifacts" and "Upload
-    // legacy Playwright artifacts" outright — the simplest correct fix,
-    // since neither tree has a values-free form today. If this assertion
-    // ever fails, some upload-artifact step for Playwright output came
-    // back; the path check below decides whether it is safe.
-    const playwrightUploadSteps = uploadArtifactSteps(jobs).filter(({ step }) =>
-      String(step.name ?? '')
-        .toLowerCase()
-        .includes('playwright'),
-    );
-    expect(playwrightUploadSteps).toHaveLength(0);
+  it('recognizes upload-artifact actions despite casing, wrappers, parent paths, or globs', () => {
+    const syntheticJobs: Record<string, Job> = {
+      probe: {
+        steps: [
+          {
+            name: 'parent directory',
+            uses: 'actions/upload-artifact@v4',
+            with: { path: 'apps/mobile/e2e-web' },
+          },
+          {
+            name: 'case-variant glob',
+            uses: 'Actions/Upload-Artifact@v4',
+            with: { path: 'apps/mobile/e2e-web/playwright-*' },
+          },
+          {
+            name: 'local wrapper brace glob',
+            uses: './.github/actions/upload-artifact',
+            with: {
+              path: 'apps/mobile/e2e-web/{playwright-report,test-results}',
+            },
+          },
+          {
+            name: 'wrapper suffix',
+            uses: './.github/actions/upload-artifact-wrapper',
+            with: { path: 'apps/mobile/e2e-web/*' },
+          },
+          {
+            name: 'wrapper trailing slash',
+            uses: './.github/actions/upload-artifact/',
+            with: { path: 'apps/mobile/e2e-web' },
+          },
+        ],
+      },
+    };
+
+    expect(
+      uploadArtifactSteps(syntheticJobs).map(({ step }) => step.name),
+    ).toEqual([
+      'parent directory',
+      'case-variant glob',
+      'local wrapper brace glob',
+      'wrapper suffix',
+      'wrapper trailing slash',
+    ]);
   });
 
-  it('no upload-artifact step in any job publishes a playwright-report* or test-results* path', () => {
-    const offenders: string[] = [];
-    for (const { jobName, step } of uploadArtifactSteps(jobs)) {
-      const rawPath = String(step.with?.path ?? '');
-      const lines = rawPath
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean);
-      for (const line of lines) {
-        if (isForbiddenPath(line)) {
-          offenders.push(`job "${jobName}" step "${step.name}": ${line}`);
-        }
-      }
-    }
+  it('declares no upload-artifact action while no redaction or secret-scan proof exists', () => {
+    const offenders = uploadArtifactSteps(jobs).map(
+      ({ jobName, step }) => `job "${jobName}" step "${step.name}"`,
+    );
     expect(offenders).toEqual([]);
   });
 });

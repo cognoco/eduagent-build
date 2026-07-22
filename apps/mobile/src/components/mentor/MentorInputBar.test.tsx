@@ -7,6 +7,7 @@ import type { SpeechRecognitionStatus } from '../../hooks/use-speech-recognition
 interface MockSpeech {
   status: SpeechRecognitionStatus;
   transcript: string;
+  isFinalTranscript: boolean;
   error: string | null;
   isListening: boolean;
   startListening: jest.Mock;
@@ -40,12 +41,37 @@ async function flushEffects(): Promise<void> {
 
 /** Move the mocked hook into its listening state, the way a real start does. */
 function speechListening(): void {
-  setSpeech({ status: 'listening', isListening: true, transcript: '' });
+  setSpeech({
+    status: 'listening',
+    isListening: true,
+    transcript: '',
+    isFinalTranscript: false,
+  });
 }
 
-/** Settle the mocked hook with a final transcript, the way a real stop does. */
+/** An interim result: displayed while speaking, never committed. */
+function speechInterim(transcript: string): void {
+  setSpeech({
+    status: 'listening',
+    isListening: true,
+    transcript,
+    isFinalTranscript: false,
+  });
+}
+
+/** Manual stop: the engine still owes us the final result. */
+function speechStopped(): void {
+  setSpeech({ status: 'processing', isListening: false });
+}
+
+/** The engine's final result for the utterance. */
 function speechFinal(transcript: string): void {
-  setSpeech({ status: 'idle', isListening: false, transcript });
+  setSpeech({
+    status: 'idle',
+    isListening: false,
+    transcript,
+    isFinalTranscript: true,
+  });
 }
 
 const baseProps = {
@@ -59,13 +85,19 @@ beforeEach(() => {
   mockSpeech = {
     status: 'idle',
     transcript: '',
+    isFinalTranscript: false,
     error: null,
     isListening: false,
     startListening: jest.fn().mockResolvedValue(undefined),
     stopListening: jest.fn().mockResolvedValue(undefined),
     // Faithful to the hook: clearing really does drop the held transcript.
     clearTranscript: jest.fn(() => {
-      setSpeech({ transcript: '', error: null, status: 'idle' });
+      setSpeech({
+        transcript: '',
+        isFinalTranscript: false,
+        error: null,
+        status: 'idle',
+      });
     }),
     requestMicrophonePermission: jest.fn().mockResolvedValue(true),
     getMicrophonePermissionStatus: jest.fn().mockResolvedValue(null),
@@ -332,6 +364,69 @@ describe('MentorInputBar', () => {
     expect(onSubmitText).toHaveBeenCalledWith('explain photosynthesis simply');
   });
 
+  it('commits the final result, never the interim guess that preceded the stop', async () => {
+    const { getByTestId, rerender } = render(<MentorInputBar {...baseProps} />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('mentor-bar-mic'));
+    });
+    speechListening();
+    rerender(<MentorInputBar {...baseProps} />);
+
+    // Interim result while the learner is still speaking.
+    speechInterim('close to a Quaker');
+    await act(async () => {
+      rerender(<MentorInputBar {...baseProps} />);
+    });
+    expect(getByTestId('mentor-bar-input').props.value).toBe('');
+
+    // Learner stops. The engine has not finalised yet — nothing may be
+    // committed here, and the mic stays unpressable while it settles.
+    await act(async () => {
+      fireEvent.press(getByTestId('mentor-bar-mic'));
+    });
+    speechStopped();
+    await act(async () => {
+      rerender(<MentorInputBar {...baseProps} />);
+    });
+    expect(getByTestId('mentor-bar-input').props.value).toBe('');
+    expect(getByTestId('mentor-bar-mic').props.accessibilityValue.text).toBe(
+      'processing',
+    );
+
+    // The true final result arrives afterwards.
+    speechFinal('close to equator');
+    await act(async () => {
+      rerender(<MentorInputBar {...baseProps} />);
+    });
+
+    expect(getByTestId('mentor-bar-input').props.value).toBe(
+      'close to equator',
+    );
+  });
+
+  it('ignores an interim result that never finalises', async () => {
+    const { getByTestId, rerender } = render(<MentorInputBar {...baseProps} />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('mentor-bar-mic'));
+    });
+    speechListening();
+    rerender(<MentorInputBar {...baseProps} />);
+
+    speechInterim('half heard');
+    await act(async () => {
+      rerender(<MentorInputBar {...baseProps} />);
+    });
+    // The session ends with no final result at all (no speech / engine gave up).
+    setSpeech({ status: 'idle', isListening: false });
+    await act(async () => {
+      rerender(<MentorInputBar {...baseProps} />);
+    });
+
+    expect(getByTestId('mentor-bar-input').props.value).toBe('');
+  });
+
   it('populates the draft once per capture even if the transcript is re-delivered', async () => {
     const { getByTestId, rerender } = render(<MentorInputBar {...baseProps} />);
 
@@ -427,7 +522,10 @@ describe('MentorInputBar', () => {
   it('recognizes in the learner voice locale the screen resolves', () => {
     render(<MentorInputBar {...baseProps} voiceLocale="de-DE" />);
 
-    expect(mockUseSpeechRecognition).toHaveBeenCalledWith({ lang: 'de-DE' });
+    expect(mockUseSpeechRecognition).toHaveBeenCalledWith({
+      lang: 'de-DE',
+      continuous: false,
+    });
   });
 
   it('drops a late transcript when the Mentor action becomes unavailable', async () => {
