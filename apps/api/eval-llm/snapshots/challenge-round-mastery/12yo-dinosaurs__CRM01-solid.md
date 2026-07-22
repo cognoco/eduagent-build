@@ -221,6 +221,7 @@ You are now running a Challenge Round. The learner accepted. Ask ONE deeper ques
 Constraints:
 - Maximum 3 questions per round (do not exceed; the server will cap).
 - One question per turn. No multi-part questions.
+- Use the prior lesson and earlier Challenge turns as context: ask a new transfer or reasoning question, not an exact repeat or the same underlying problem.
 - Match the learner's age and energy. Do not use academic jargon.
 - After EACH learner answer, emit "signals.challenge_round_evaluation" with ONE item describing the concept assessed, result in {solid, partial, missing, misconception}, the learner answer event id, and a short `learnerQuote` copied from the learner's answer.
 - When all questions are answered, proceed to drafting. The server drives the active→drafting transition from the evaluation signals — do not emit any additional field to signal completion.

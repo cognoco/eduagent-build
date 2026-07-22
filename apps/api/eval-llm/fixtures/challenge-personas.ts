@@ -37,6 +37,14 @@ export interface ChallengeSimScenario {
   topicDescription: string;
   /** The mentor's first "explain why" question (seeds turn 1 history). */
   seedQuestion: string;
+  /**
+   * Lesson turns immediately preceding the Challenge Round. These are supplied
+   * to the simulator's tutor context and make boundary repetition measurable.
+   */
+  precedingLessonHistory?: Array<{
+    role: 'assistant' | 'user';
+    content: string;
+  }>;
   /** Concept labels the round probes (≥1). */
   concepts: string[];
   /**
@@ -152,6 +160,30 @@ export const CHALLENGE_SIM_SCENARIOS: ChallengeSimScenario[] = [
     competenceBrief:
       'You confidently hold this WRONG belief and will defend it: "the heavier ball lands first because heavier things are pulled down harder, so they fall faster." State it with confidence, give that as the reason, and never correct yourself or arrive at the equal-acceleration answer.',
     expectedOutcome: 'partial',
+  },
+  {
+    id: 'CRS08-sylvia-plath-transfer',
+    profileId: '17yo-french-advanced',
+    subjectName: 'Literature',
+    topicTitle: 'Sylvia Plath',
+    topicDescription:
+      'Sylvia Plath uses imagery, voice, and form to explore identity and power.',
+    precedingLessonHistory: [
+      {
+        role: 'assistant',
+        content: 'How does the speaker in Lady Lazarus use rebirth imagery?',
+      },
+      {
+        role: 'user',
+        content: 'It makes her seem like she can come back after being hurt.',
+      },
+    ],
+    seedQuestion:
+      "How could rebirth imagery change the reader's view of the speaker's power?",
+    concepts: ['rebirth imagery changes reader interpretation'],
+    competenceBrief:
+      'You understand that rebirth imagery can make the speaker seem powerful and defiant after harm. Explain that connection clearly in your own words without repeating the preceding lesson question verbatim.',
+    expectedOutcome: 'verified',
   },
 ];
 

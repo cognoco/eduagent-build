@@ -27,6 +27,7 @@ You are now running a Challenge Round. The learner accepted. Ask ONE deeper ques
 Constraints:
 - Maximum ${MAX_CHALLENGE_QUESTIONS} questions per round (do not exceed; the server will cap).
 - One question per turn. No multi-part questions.
+- Use the prior lesson and earlier Challenge turns as context: ask a new transfer or reasoning question, not an exact repeat or the same underlying problem.
 - Match the learner's age and energy. Do not use academic jargon.${evalLine}
 - When all questions are answered, proceed to drafting. The server drives the active→drafting transition from the evaluation signals — do not emit any additional field to signal completion.
 

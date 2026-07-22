@@ -83,6 +83,16 @@ export interface SimMetrics {
   signalEmissionRate: number;
   /** …and per GRADER model (the gpt-oss-drop indicator). */
   signalEmissionRateByGrader: Record<string, number>;
+  /** Share of generated tutor turns that failed envelope parsing. */
+  tutorParseFailureRate: number;
+  /** Exact-repeat rate among model-authored tutor questions only. */
+  modelAuthoredQuestionRepeatRate: number;
+  /** Exact-repeat rate across seed and model-authored questions; degraded turns excluded. */
+  questionRepeatRate: number;
+  /** Exact-repeat rate among degraded fallback turns, reported separately. */
+  degradedQuestionRepeatRate: number;
+  /** Exact distinct labels only; semantic concept equivalence is product-gated. */
+  distinctAssessedConceptCount: number;
   /** Wilson 95% CIs + denominators for the four headline rates. */
   ci: {
     masteryVerified: RateCI;
@@ -90,6 +100,27 @@ export interface SimMetrics {
     underCredit: RateCI;
     signalEmission: RateCI;
   };
+}
+
+/** Simulator-only diagnostic lines for the deterministic and live CLI reports. */
+export function formatSimulatorDiagnosticMetrics(
+  metrics: Pick<
+    SimMetrics,
+    | 'tutorParseFailureRate'
+    | 'modelAuthoredQuestionRepeatRate'
+    | 'questionRepeatRate'
+    | 'degradedQuestionRepeatRate'
+    | 'distinctAssessedConceptCount'
+  >,
+): string[] {
+  const pct = (value: number): string => `${(value * 100).toFixed(1)}%`;
+  return [
+    `tutor parse failures: ${pct(metrics.tutorParseFailureRate)}`,
+    `model question repeats: ${pct(metrics.modelAuthoredQuestionRepeatRate)}`,
+    `measured question repeats: ${pct(metrics.questionRepeatRate)}`,
+    `degraded question repeats: ${pct(metrics.degradedQuestionRepeatRate)}`,
+    `distinct assessed concepts: ${metrics.distinctAssessedConceptCount}`,
+  ];
 }
 
 export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
@@ -113,6 +144,15 @@ export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
   const overCreditScenarioIds: string[] = [];
   let underCredit = 0;
   let signalEmittedTotal = 0;
+  let tutorTurnTotal = 0;
+  let tutorParseFailures = 0;
+  let modelAuthoredQuestionTotal = 0;
+  let modelAuthoredQuestionRepeats = 0;
+  let measuredQuestionTotal = 0;
+  let measuredQuestionRepeats = 0;
+  let degradedQuestionTotal = 0;
+  let degradedQuestionRepeats = 0;
+  const assessedConcepts = new Set<string>();
   const graderTotals: Record<string, { emitted: number; total: number }> = {};
 
   for (const r of results) {
@@ -121,6 +161,28 @@ export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
 
     for (const e of r.evaluations) {
       conceptResultCounts[e.result as ConceptResult] += 1;
+      assessedConcepts.add(e.concept);
+    }
+
+    for (const turn of r.tutorTurns) {
+      tutorTurnTotal += 1;
+      if (turn.source === 'degraded') {
+        degradedQuestionTotal += 1;
+        tutorParseFailures += 1;
+      } else {
+        modelAuthoredQuestionTotal += 1;
+      }
+    }
+    for (const diagnostic of r.questionDiagnostics) {
+      if (diagnostic.source !== 'degraded') {
+        measuredQuestionTotal += 1;
+        if (diagnostic.repeatsPriorQuestion) measuredQuestionRepeats += 1;
+      }
+      if (diagnostic.source === 'model') {
+        if (diagnostic.repeatsPriorQuestion) modelAuthoredQuestionRepeats += 1;
+      } else if (diagnostic.source === 'degraded') {
+        if (diagnostic.repeatsPriorQuestion) degradedQuestionRepeats += 1;
+      }
     }
 
     // Over-credit (the dangerous direction): gate said `verified` but ground
@@ -172,6 +234,21 @@ export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
     underCreditRate: rate(underCredit),
     signalEmissionRate: rate(signalEmittedTotal),
     signalEmissionRateByGrader,
+    tutorParseFailureRate:
+      tutorTurnTotal === 0 ? 0 : tutorParseFailures / tutorTurnTotal,
+    modelAuthoredQuestionRepeatRate:
+      modelAuthoredQuestionTotal === 0
+        ? 0
+        : modelAuthoredQuestionRepeats / modelAuthoredQuestionTotal,
+    questionRepeatRate:
+      measuredQuestionTotal === 0
+        ? 0
+        : measuredQuestionRepeats / measuredQuestionTotal,
+    degradedQuestionRepeatRate:
+      degradedQuestionTotal === 0
+        ? 0
+        : degradedQuestionRepeats / degradedQuestionTotal,
+    distinctAssessedConceptCount: assessedConcepts.size,
     ci: {
       masteryVerified: wilsonCI(masteryVerified, total),
       overCredit: wilsonCI(overCredit, total),

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import {
   aggregate,
   compareSimulationBaseline,
+  formatSimulatorDiagnosticMetrics,
   toBaseline,
   validateBaselineStructure,
   writeCorpus,
@@ -60,6 +61,8 @@ function makeResult(p: {
     graderModel: p.graderModel,
     learnerModel: 'anthropic/claude-3.5-sonnet',
     transcript: [],
+    tutorTurns: [],
+    questionDiagnostics: [],
     evaluations: p.evaluations ?? [],
     decision: decision(p.outcome, p.marked),
     expectedOutcome: p.expected,
@@ -68,6 +71,46 @@ function makeResult(p: {
 }
 
 describe('aggregate', () => {
+  it('reports tutor parse failures, model-authored repeat rate, and exact distinct assessed-concept coverage', () => {
+    const result = makeResult({
+      outcome: 'verified',
+      marked: true,
+      expected: 'verified',
+      signalEmitted: true,
+      graderModel: 'gpt-oss-120b',
+      evaluations: [
+        evalItem('solid'),
+        { ...evalItem('solid'), concept: 'c' },
+        { ...evalItem('partial'), concept: 'second concept' },
+      ],
+    });
+    result.tutorTurns = [
+      { source: 'model', question: 'Repeat?' },
+      {
+        source: 'degraded',
+        question: 'Fallback?',
+        failure: 'envelope_parse',
+        rawOutput: 'invalid envelope',
+      },
+    ];
+    result.questionDiagnostics = [
+      { source: 'model', question: 'Repeat?', repeatsPriorQuestion: true },
+      {
+        source: 'degraded',
+        question: 'Fallback?',
+        repeatsPriorQuestion: true,
+        failure: 'envelope_parse',
+      },
+    ];
+
+    const metrics = aggregate([result]);
+    expect(metrics.tutorParseFailureRate).toBe(0.5);
+    expect(metrics.modelAuthoredQuestionRepeatRate).toBe(1);
+    expect(metrics.questionRepeatRate).toBe(1);
+    expect(metrics.degradedQuestionRepeatRate).toBe(1);
+    expect(metrics.distinctAssessedConceptCount).toBe(2);
+  });
+
   it('computes overCreditRate, underCreditRate and signalEmissionRate', () => {
     const results: SimulatedRoundResult[] = [
       // over-credited: gate verified, ground truth was partial
@@ -258,6 +301,28 @@ describe('aggregate', () => {
   });
 });
 
+describe('formatSimulatorDiagnosticMetrics', () => {
+  it('renders tutor parse, repeat, and concept metrics for the simulator console', () => {
+    expect(
+      formatSimulatorDiagnosticMetrics(
+        makeMetrics({
+          tutorParseFailureRate: 0.25,
+          modelAuthoredQuestionRepeatRate: 0.5,
+          questionRepeatRate: 1 / 3,
+          degradedQuestionRepeatRate: 1,
+          distinctAssessedConceptCount: 3,
+        }),
+      ),
+    ).toEqual([
+      'tutor parse failures: 25.0%',
+      'model question repeats: 50.0%',
+      'measured question repeats: 33.3%',
+      'degraded question repeats: 100.0%',
+      'distinct assessed concepts: 3',
+    ]);
+  });
+});
+
 describe('writeCorpus', () => {
   it('writes one JSON per round plus a STAMPED metrics.json summary', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'sim-corpus-'));
@@ -329,6 +394,11 @@ function makeMetrics(over: Partial<SimMetrics> = {}): SimMetrics {
     underCreditRate: 0.1,
     signalEmissionRate: 0.9,
     signalEmissionRateByGrader: { 'production-routing': 0.9 },
+    tutorParseFailureRate: 0,
+    modelAuthoredQuestionRepeatRate: 0,
+    questionRepeatRate: 0,
+    degradedQuestionRepeatRate: 0,
+    distinctAssessedConceptCount: 0,
     ci: {
       masteryVerified: { n: 10, total: 20, rate: 0.5, low: 0, high: 1 },
       overCredit: { n: 0, total: 20, rate: 0, low: 0, high: 0 },

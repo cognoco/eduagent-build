@@ -67,6 +67,88 @@ function gradedOverrides(
 }
 
 describe('runSimulatedRound — conversation loop', () => {
+  it('records Sylvia Plath lesson-to-Challenge and intra-round exact repeats separately from model-authored questions', async () => {
+    const fixtureScenario = CHALLENGE_SIM_SCENARIOS.find(
+      (s) => s.id === 'CRS08-sylvia-plath-transfer',
+    )!;
+    const literatureScenario = {
+      ...fixtureScenario,
+      precedingLessonHistory: [
+        {
+          role: 'assistant' as const,
+          content: fixtureScenario.seedQuestion,
+        },
+      ],
+    };
+    const literatureProfile = PROFILES.find(
+      (p) => p.id === literatureScenario.profileId,
+    )!;
+    const result = await runSimulatedRound(
+      {
+        scenario: literatureScenario,
+        profile: literatureProfile,
+        learnerModel: LEARNER,
+        graderModel: GRADER,
+      },
+      {
+        learnerTurn: async () =>
+          'The rebirth image makes the speaker seem powerful after harm.',
+        tutorTurn: async (_ctx, _answer) =>
+          'How does Plath make the speaker seem powerful after the rebirth?',
+        graderTurn: async () => gradedItems('solid'),
+      },
+    );
+
+    expect(result.questionDiagnostics).toEqual([
+      expect.objectContaining({ source: 'seed', repeatsPriorQuestion: true }),
+      expect.objectContaining({ source: 'model', repeatsPriorQuestion: false }),
+      expect.objectContaining({ source: 'model', repeatsPriorQuestion: true }),
+    ]);
+  });
+
+  it('marks photosynthesis parse fallbacks as degraded, retaining raw output without counting them as model-authored repeats', async () => {
+    const photosynthesisScenario = CHALLENGE_SIM_SCENARIOS.find(
+      (s) => s.id === 'CRS06-photosynthesis-verified',
+    )!;
+    const photosynthesisProfile = PROFILES.find(
+      (p) => p.id === photosynthesisScenario.profileId,
+    )!;
+    const rawFailure = 'I cannot comply with the required response envelope.';
+    const result = await runSimulatedRound(
+      {
+        scenario: photosynthesisScenario,
+        profile: photosynthesisProfile,
+        learnerModel: LEARNER,
+        graderModel: GRADER,
+      },
+      {
+        learnerTurn: async () =>
+          'Sunlight gives the plant energy to make sugar from water and carbon dioxide.',
+        tutorTurn: async () => ({
+          source: 'degraded',
+          question:
+            'Can you explain a bit more about why that is — what makes it work?',
+          failure: 'envelope_parse',
+          rawOutput: rawFailure,
+        }),
+        graderTurn: async () => gradedItems('solid'),
+      },
+    );
+
+    expect(result.tutorTurns).toEqual([
+      expect.objectContaining({
+        source: 'degraded',
+        failure: 'envelope_parse',
+        rawOutput: rawFailure,
+      }),
+      expect.objectContaining({
+        source: 'degraded',
+        failure: 'envelope_parse',
+        rawOutput: rawFailure,
+      }),
+    ]);
+  });
+
   it('runs exactly MAX_CHALLENGE_QUESTIONS graded turns then stops (start-seeded totalQuestions drives termination)', async () => {
     const { overrides, graderCalls } = gradedOverrides('misconception');
     const result = await runSimulatedRound(
