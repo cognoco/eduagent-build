@@ -112,13 +112,23 @@ The case additionally proves (not assumes) the `me`-scope caveat carried over fr
 
 ## 4. AC-3 — recorded artifacts and protected-main configuration
 
+> **⚠ SUPERSESSION NOTICE — added under WI-2595, appended not rewritten.** The CI artifacts cited in
+> this section are **pending purge under WI-2593** (Playwright HTML reports embed reusable seeded
+> staging credentials). Once purged, the artifact ids below will no longer resolve. The **durable
+> record of this evidence** is [`wi2524-playwright-report-record.md`](wi2524-playwright-report-record.md),
+> which is committed in-repo and carries the run/head identifiers, report totals, named-case identity
+> and outcome, the post-Back assertions, and the original artifact names/ids/sha256 digests.
+> **Follow that file for the AC-3 record.** The original citations are retained below unchanged, as
+> provenance — they are deliberately not deleted, and nothing in this closed record has been altered.
+
 These fields record the **strengthened case on an exact-main commit** — run `29862030418`, head
 `79f22774a`. That is the single run satisfying AC-1, AC-2 and AC-3 together; the other two runs are
 retained below only for provenance.
 
 - **Named case result:** `5 passed (2.2m)`, case listed as `[5/5]` at `nav-shell.spec.ts:60:5`,
   from run `29862030418` on head `79f22774a` (§3).
-- **Playwright artifact:** `playwright-web-v2-29862030418-1` (id `8507767965`, 205,255 bytes, unexpired).
+- **Playwright artifact:** `playwright-web-v2-29862030418-1` (id `8507767965`, 205,255 bytes, unexpired
+  at record creation on 2026-07-21; pending purge under WI-2593, after which it no longer resolves).
 - **Exact `Playwright web smoke` check-run URL for that staging run:**
   <https://github.com/cognoco/eduagent-build/actions/runs/29862030418/job/88742989182>
   — `conclusion=success`, started `2026-07-21T19:42:28Z`, on head `79f22774a`.
