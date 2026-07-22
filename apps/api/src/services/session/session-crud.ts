@@ -844,19 +844,16 @@ export async function closeSession(
     // winning the row lock, then remove only server-authored silence nudges
     // that the learner never answered. Earlier nudges followed by a learner
     // message remain part of the session history.
-    const trailingEvents = await txDb.query.sessionEvents.findMany({
-      where: and(
+    const trailingEvents = await createScopedRepository(
+      txDb,
+      profileId,
+    ).sessionEvents.findMany(
+      and(
         eq(sessionEvents.sessionId, sessionId),
-        eq(sessionEvents.profileId, profileId),
         inArray(sessionEvents.eventType, ['user_message', 'system_prompt']),
       ),
-      columns: {
-        id: true,
-        eventType: true,
-        metadata: true,
-      },
-      orderBy: [desc(sessionEvents.createdAt), desc(sessionEvents.id)],
-    });
+      [desc(sessionEvents.createdAt), desc(sessionEvents.id)],
+    );
     const unansweredSilencePromptIds: string[] = [];
     for (const event of trailingEvents) {
       if (event.eventType === 'user_message') break;
