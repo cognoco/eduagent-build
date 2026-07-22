@@ -1,9 +1,13 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { NowOverflowResponse, NowResponse } from '@eduagent/schemas';
+import {
+  ApiResponseShapeError,
+  type NowOverflowResponse,
+  type NowResponse,
+} from '@eduagent/schemas';
 
 import { createHookWrapper } from '../test-utils/app-hook-test-utils';
-import { setActiveProfileId } from '../lib/api-client';
+import { NetworkError, setActiveProfileId } from '../lib/api-client';
 import { buildNowFeedCacheKey, readCachedNowFeed } from '../lib/now-feed-cache';
 
 import {
@@ -780,6 +784,151 @@ describe('useMentorNoticeActions', () => {
     expect(String(mockFetch.mock.calls[0]?.[0])).toContain(
       '/mentor-notices/550e8400-e29b-41d4-a716-446655440002/defer',
     );
+
+    queryClient.clear();
+  });
+
+  // [WI-2499 AC-3/AC-6 rework] The success cases above only prove the happy
+  // path. The evidence gate (defer/recheck can only ever succeed on a
+  // schema-valid server confirmation) is enforced by these three failure
+  // modes rejecting rather than resolving. `mentor.tsx`'s catch block only
+  // treats a `status === 409` error as authoritative-refetch-worthy, so the
+  // conflict case must surface that status.
+  it('rejects a notice re-check with a typed ConflictError on a 409 response', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({ code: 'CONFLICT', message: 'Already resolved' }),
+        { status: 409, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    const { queryClient, wrapper } = createHookWrapper();
+    const rendered = renderHook(() => useMentorNoticeActions(), { wrapper });
+
+    await expect(
+      rendered.result.current.recheck.mutateAsync(
+        '550e8400-e29b-41d4-a716-446655440002',
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+    });
+    await waitFor(() =>
+      expect(rendered.result.current.recheck.isError).toBe(true),
+    );
+    expect(rendered.result.current.recheck.isSuccess).toBe(false);
+
+    queryClient.clear();
+  });
+
+  it('rejects a notice re-check when the request fails at the transport layer', async () => {
+    mockFetch.mockRejectedValue(new TypeError('Network request failed'));
+    const { queryClient, wrapper } = createHookWrapper();
+    const rendered = renderHook(() => useMentorNoticeActions(), { wrapper });
+
+    await expect(
+      rendered.result.current.recheck.mutateAsync(
+        '550e8400-e29b-41d4-a716-446655440002',
+      ),
+    ).rejects.toBeInstanceOf(NetworkError);
+    await waitFor(() =>
+      expect(rendered.result.current.recheck.isError).toBe(true),
+    );
+    expect(rendered.result.current.recheck.isSuccess).toBe(false);
+
+    queryClient.clear();
+  });
+
+  it('rejects a notice re-check with ApiResponseShapeError when the response is schema-malformed', async () => {
+    // A 200 whose body fails `mentorNoticeRecheckResponseSchema` (sessionId
+    // must be a UUID) — the HTTP layer reports success but the body is not
+    // trustworthy.
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ sessionId: 'not-a-uuid' }), {
+        status: 200,
+      }),
+    );
+    const { queryClient, wrapper } = createHookWrapper();
+    const rendered = renderHook(() => useMentorNoticeActions(), { wrapper });
+
+    await expect(
+      rendered.result.current.recheck.mutateAsync(
+        '550e8400-e29b-41d4-a716-446655440002',
+      ),
+    ).rejects.toBeInstanceOf(ApiResponseShapeError);
+    await waitFor(() =>
+      expect(rendered.result.current.recheck.isError).toBe(true),
+    );
+    expect(rendered.result.current.recheck.isSuccess).toBe(false);
+
+    queryClient.clear();
+  });
+
+  it('rejects a notice defer with a typed ConflictError on a 409 response', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({ code: 'CONFLICT', message: 'Already resolved' }),
+        { status: 409, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    const { queryClient, wrapper } = createHookWrapper();
+    const rendered = renderHook(() => useMentorNoticeActions(), { wrapper });
+
+    await expect(
+      rendered.result.current.defer.mutateAsync(
+        '550e8400-e29b-41d4-a716-446655440002',
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+    });
+    await waitFor(() =>
+      expect(rendered.result.current.defer.isError).toBe(true),
+    );
+    expect(rendered.result.current.defer.isSuccess).toBe(false);
+
+    queryClient.clear();
+  });
+
+  it('rejects a notice defer when the request fails at the transport layer', async () => {
+    mockFetch.mockRejectedValue(new TypeError('Network request failed'));
+    const { queryClient, wrapper } = createHookWrapper();
+    const rendered = renderHook(() => useMentorNoticeActions(), { wrapper });
+
+    await expect(
+      rendered.result.current.defer.mutateAsync(
+        '550e8400-e29b-41d4-a716-446655440002',
+      ),
+    ).rejects.toBeInstanceOf(NetworkError);
+    await waitFor(() =>
+      expect(rendered.result.current.defer.isError).toBe(true),
+    );
+    expect(rendered.result.current.defer.isSuccess).toBe(false);
+
+    queryClient.clear();
+  });
+
+  it('rejects a notice defer with ApiResponseShapeError when the response is schema-malformed', async () => {
+    // A 200 whose body fails `mentorNoticeDeferResponseSchema` (missing the
+    // required `deferredAt`) — the HTTP layer reports success but the body
+    // is not trustworthy.
+    mockFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          noticeId: '550e8400-e29b-41d4-a716-446655440002',
+        }),
+        { status: 200 },
+      ),
+    );
+    const { queryClient, wrapper } = createHookWrapper();
+    const rendered = renderHook(() => useMentorNoticeActions(), { wrapper });
+
+    await expect(
+      rendered.result.current.defer.mutateAsync(
+        '550e8400-e29b-41d4-a716-446655440002',
+      ),
+    ).rejects.toBeInstanceOf(ApiResponseShapeError);
+    await waitFor(() =>
+      expect(rendered.result.current.defer.isError).toBe(true),
+    );
+    expect(rendered.result.current.defer.isSuccess).toBe(false);
 
     queryClient.clear();
   });
