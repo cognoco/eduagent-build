@@ -72,10 +72,17 @@ tags:
 - tapOn:
     id: 'something-wrong-button'
 
-- extendedWaitUntil:
-    visible:
+- scrollUntilVisible:
+    element:
       id: 'correction-input'
+    direction: DOWN
     timeout: 5000
+    visibilityPercentage: 50
+    centerElement: false
+    optional: false
+
+- assertVisible:
+    id: 'correction-input'
 
 - takeScreenshot: 03-correction-open
 

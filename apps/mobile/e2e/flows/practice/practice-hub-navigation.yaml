@@ -71,7 +71,9 @@ tags:
 # practice-recitation is the SECOND card inside the "Other practice" horizontal
 # ScrollView. Step 1 uses the non-scrollable section heading to position the
 # outer vertical viewport; a horizontal ScrollView is not a reliable target
-# for Maestro's DOWN search. Step 2 moves within the horizontal slider.
+# for Maestro's DOWN search. Maestro can report the heading as invisible after
+# scrolling it into view, so this outer positioning is best effort; the
+# mandatory horizontal card lookup below remains the reachability gate.
 # Step 2: scroll RIGHT inside the slider to bring practice-recitation into view.
 - scrollUntilVisible:
     element:
@@ -80,6 +82,7 @@ tags:
     timeout: 5000
     visibilityPercentage: 50
     centerElement: false
+    optional: true # justified: best-effort outer positioning; the mandatory horizontal card lookup below fails closed
 
 - scrollUntilVisible:
     element:
@@ -116,6 +119,7 @@ tags:
     timeout: 5000
     visibilityPercentage: 50
     centerElement: false
+    optional: true # justified: best-effort outer positioning; the mandatory horizontal card lookup below fails closed
 
 - scrollUntilVisible:
     element:

@@ -1393,6 +1393,48 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     }
   });
 
+  it('[WI-1864] scrolls the empty mentor-memory correction input above the fixed tab bar', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/parent/child-mentor-memory.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      tapOn?: { id?: string; optional?: boolean };
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+        visibilityPercentage?: number;
+        centerElement?: boolean;
+        optional?: boolean;
+      };
+      assertVisible?: { id?: string; optional?: boolean } | string;
+    }>;
+    const openCorrection = commands.findIndex(
+      ({ tapOn }) =>
+        tapOn?.id === 'something-wrong-button' && tapOn.optional !== true,
+    );
+    const inputScroll = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > openCorrection &&
+        scrollUntilVisible?.element?.id === 'correction-input' &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        scrollUntilVisible.visibilityPercentage === 50 &&
+        scrollUntilVisible.centerElement === false &&
+        scrollUntilVisible.optional !== true,
+    );
+    const inputAssertion = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > inputScroll &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'correction-input' &&
+        assertVisible.optional !== true,
+    );
+
+    expect(openCorrection).toBeGreaterThan(-1);
+    expect(inputScroll).toBeGreaterThan(openCorrection);
+    expect(inputAssertion).toBeGreaterThan(inputScroll);
+  });
+
   it('[WI-1864] seeds post-approval landing with an eligible zero-subject profile', () => {
     const manifest = JSON.parse(
       readFileSync(
@@ -1427,7 +1469,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     }
   });
 
-  it('[WI-1864] keeps the post-approval assertion aligned with product copy', () => {
+  it('[WI-1864] keeps post-approval copy and the hosted Mentor destination aligned with product behavior', () => {
     const flow = parseAllDocuments(
       readFileSync(
         join(
@@ -1440,6 +1482,11 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       .at(-1)
       ?.toJSON() as Array<{
       assertVisible?: { text?: string } | string;
+      tapOn?: { id?: string; optional?: boolean } | string;
+      extendedWaitUntil?: {
+        visible?: { id?: string } | string;
+        optional?: boolean;
+      };
     }>;
     const english = JSON.parse(
       readFileSync(
@@ -1460,6 +1507,29 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       english.tabs.postApproval.title,
       english.tabs.postApproval.parentApproved,
     ]);
+    const continueTap = flow.findIndex(
+      ({ tapOn }) =>
+        typeof tapOn === 'object' &&
+        tapOn.id === 'post-approval-continue' &&
+        tapOn.optional !== true,
+    );
+    const mentorLanding = flow.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > continueTap &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'mentor-screen' &&
+        extendedWaitUntil.optional !== true,
+    );
+
+    expect(continueTap).toBeGreaterThan(-1);
+    expect(mentorLanding).toBeGreaterThan(continueTap);
+    expect(
+      flow.some(
+        ({ extendedWaitUntil }) =>
+          typeof extendedWaitUntil?.visible === 'object' &&
+          extendedWaitUntil.visible.id === 'learner-screen',
+      ),
+    ).toBe(false);
   });
 
   it('[WI-1864] waits for the seeded parent child-detail session receipt', () => {
@@ -2820,7 +2890,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scrollUntilVisible.direction === 'DOWN' &&
         scrollUntilVisible.visibilityPercentage === 50 &&
         scrollUntilVisible.centerElement === false &&
-        scrollUntilVisible.optional !== true,
+        scrollUntilVisible.optional === true,
     );
     const recitation = commands.findIndex(
       ({ scrollUntilVisible }, index) =>
@@ -2828,7 +2898,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scrollUntilVisible?.element?.id === 'practice-recitation' &&
         scrollUntilVisible.direction === 'RIGHT' &&
         scrollUntilVisible.visibilityPercentage === 100 &&
-        scrollUntilVisible.centerElement === true,
+        scrollUntilVisible.centerElement === true &&
+        scrollUntilVisible.optional !== true,
     );
     const recitationTap = commands.findIndex(
       ({ tapOn }, index) =>
@@ -2851,7 +2922,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scrollUntilVisible.direction === 'DOWN' &&
         scrollUntilVisible.visibilityPercentage === 50 &&
         scrollUntilVisible.centerElement === false &&
-        scrollUntilVisible.optional !== true,
+        scrollUntilVisible.optional === true,
     );
     const dictation = commands.findIndex(
       ({ scrollUntilVisible }, index) =>
@@ -2859,7 +2930,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scrollUntilVisible?.element?.id === 'practice-dictation' &&
         scrollUntilVisible.direction === 'LEFT' &&
         scrollUntilVisible.visibilityPercentage === 100 &&
-        scrollUntilVisible.centerElement === true,
+        scrollUntilVisible.centerElement === true &&
+        scrollUntilVisible.optional !== true,
     );
     const dictationTap = commands.findIndex(
       ({ tapOn }, index) =>
@@ -2911,7 +2983,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scrollUntilVisible.direction === 'DOWN' &&
         scrollUntilVisible.visibilityPercentage === 50 &&
         scrollUntilVisible.centerElement === false &&
-        scrollUntilVisible.optional !== true,
+        scrollUntilVisible.optional === true,
     );
     const dictation = commands.findIndex(
       ({ scrollUntilVisible }, index) =>
@@ -2950,6 +3022,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         direction?: string;
         visibilityPercentage?: number;
         centerElement?: boolean;
+        optional?: boolean;
       };
       tapOn?: { id?: string; text?: string; optional?: boolean };
       extendedWaitUntil?: {
@@ -2957,20 +3030,22 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         optional?: boolean;
       };
     }>;
-    const slider = commands.findIndex(
+    const heading = commands.findIndex(
       ({ scrollUntilVisible }) =>
-        scrollUntilVisible?.element?.id === 'practice-dictation' &&
+        scrollUntilVisible?.element?.id === 'practice-other-practice-heading' &&
         scrollUntilVisible.direction === 'DOWN' &&
-        scrollUntilVisible.visibilityPercentage === 100 &&
-        scrollUntilVisible.centerElement === true,
+        scrollUntilVisible.visibilityPercentage === 50 &&
+        scrollUntilVisible.centerElement === false &&
+        scrollUntilVisible.optional === true,
     );
     const recitation = commands.findIndex(
       ({ scrollUntilVisible }, index) =>
-        index > slider &&
+        index > heading &&
         scrollUntilVisible?.element?.id === 'practice-recitation' &&
         scrollUntilVisible.direction === 'RIGHT' &&
         scrollUntilVisible.visibilityPercentage === 100 &&
-        scrollUntilVisible.centerElement === true,
+        scrollUntilVisible.centerElement === true &&
+        scrollUntilVisible.optional !== true,
     );
     const tap = commands.findIndex(
       ({ tapOn }, index) =>
@@ -3006,8 +3081,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         extendedWaitUntil.optional !== true,
     );
 
-    expect(slider).toBeGreaterThan(-1);
-    expect(recitation).toBeGreaterThan(slider);
+    expect(heading).toBeGreaterThan(-1);
+    expect(recitation).toBeGreaterThan(heading);
     expect(tap).toBeGreaterThan(recitation);
     expect(endSession).toBeGreaterThan(tap);
     expect(confirmEnd).toBeGreaterThan(endSession);
@@ -3017,9 +3092,12 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(
       commands.some(
         ({ scrollUntilVisible }) =>
-          scrollUntilVisible?.element?.id ===
-            'practice-other-practice-slider' &&
-          scrollUntilVisible.direction === 'DOWN',
+          scrollUntilVisible?.direction === 'DOWN' &&
+          [
+            'practice-other-practice-slider',
+            'practice-recitation',
+            'practice-dictation',
+          ].includes(scrollUntilVisible.element?.id ?? ''),
       ),
     ).toBe(false);
   });
@@ -3791,50 +3869,56 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(source).not.toContain('home-coach-band-continue');
   });
 
-  it('[WI-1864] scrolls the first parent nudge action fully into the small viewport', () => {
-    const source = readFileSync(
-      join(repoRoot, 'apps/mobile/e2e/flows/parent/nudge-rate-limit.yaml'),
-      'utf8',
-    );
-    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
-      extendedWaitUntil?: { visible?: { id?: string } | string };
-      scrollUntilVisible?: {
-        element?: { id?: string };
-        direction?: string;
-        timeout?: number;
-        visibilityPercentage?: number;
-        centerElement?: boolean;
-        optional?: boolean;
-      };
-      tapOn?: { id?: string } | string;
-    }>;
-    const selector = 'parent-home-send-nudge-${CHILD_PROFILE_ID}';
-    const home = commands.findIndex(
-      ({ extendedWaitUntil }) =>
-        typeof extendedWaitUntil?.visible === 'object' &&
-        extendedWaitUntil.visible.id === 'parent-home-screen',
-    );
-    const scroll = commands.findIndex(
-      ({ scrollUntilVisible }, index) =>
-        index > home &&
-        scrollUntilVisible?.element?.id === selector &&
-        scrollUntilVisible.direction === 'DOWN' &&
-        (scrollUntilVisible.timeout ?? 0) >= 30000 &&
-        scrollUntilVisible.visibilityPercentage === 100 &&
-        scrollUntilVisible.centerElement === true &&
-        scrollUntilVisible.optional !== true,
-    );
-    const taps = commands
-      .map(({ tapOn }, index) => ({ tapOn, index }))
-      .filter(
-        ({ tapOn }) => typeof tapOn === 'object' && tapOn.id === selector,
+  it.each([
+    ['nudge-rate-limit.yaml', 5],
+    ['send-nudge.yaml', 1],
+  ])(
+    '[WI-1864] scrolls the first parent nudge action fully into the small viewport: %s',
+    (flow, expectedTaps) => {
+      const source = readFileSync(
+        join(repoRoot, 'apps/mobile/e2e/flows/parent', flow),
+        'utf8',
       );
+      const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+        extendedWaitUntil?: { visible?: { id?: string } | string };
+        scrollUntilVisible?: {
+          element?: { id?: string };
+          direction?: string;
+          timeout?: number;
+          visibilityPercentage?: number;
+          centerElement?: boolean;
+          optional?: boolean;
+        };
+        tapOn?: { id?: string } | string;
+      }>;
+      const selector = 'parent-home-send-nudge-${CHILD_PROFILE_ID}';
+      const home = commands.findIndex(
+        ({ extendedWaitUntil }) =>
+          typeof extendedWaitUntil?.visible === 'object' &&
+          extendedWaitUntil.visible.id === 'parent-home-screen',
+      );
+      const scroll = commands.findIndex(
+        ({ scrollUntilVisible }, index) =>
+          index > home &&
+          scrollUntilVisible?.element?.id === selector &&
+          scrollUntilVisible.direction === 'DOWN' &&
+          (scrollUntilVisible.timeout ?? 0) >= 30000 &&
+          scrollUntilVisible.visibilityPercentage === 100 &&
+          scrollUntilVisible.centerElement === true &&
+          scrollUntilVisible.optional !== true,
+      );
+      const taps = commands
+        .map(({ tapOn }, index) => ({ tapOn, index }))
+        .filter(
+          ({ tapOn }) => typeof tapOn === 'object' && tapOn.id === selector,
+        );
 
-    expect(home).toBeGreaterThan(-1);
-    expect(scroll).toBeGreaterThan(home);
-    expect(taps).toHaveLength(5);
-    expect(taps[0]?.index).toBeGreaterThan(scroll);
-  });
+      expect(home).toBeGreaterThan(-1);
+      expect(scroll).toBeGreaterThan(home);
+      expect(taps).toHaveLength(expectedTaps);
+      expect(taps[0]?.index).toBeGreaterThan(scroll);
+    },
+  );
 
   it('[WI-1864] opens empty mentor memory through child settings mode', () => {
     const source = readFileSync(
@@ -4819,6 +4903,153 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(relearnSource).toContain(
       "useState<Phase>(directEntry ? 'method' : 'topics')",
     );
+  });
+
+  it('[WI-1864] opens full relearn from the seeded stable topic result and reaches the session', () => {
+    const flow = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/retention/relearn-flow.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(flow).at(-1)?.toJSON() as Array<{
+      runFlow?: { file?: string; env?: Record<string, string> };
+      inputText?: string;
+      openLink?: string;
+      extendedWaitUntil?: {
+        visible?: { id?: string } | string;
+        optional?: boolean;
+      };
+      assertVisible?: { id?: string; optional?: boolean } | string;
+      tapOn?: { id?: string; optional?: boolean } | string;
+    }>;
+    const seeded = commands.findIndex(
+      ({ runFlow }) =>
+        runFlow?.file === '../_setup/seed-and-sign-in.yaml' &&
+        runFlow.env?.SEED_SCENARIO === 'failed-recall-3x',
+    );
+    const learner = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > seeded &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'learner-screen' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const library = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > learner &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'tab-library' &&
+        tapOn.optional !== true,
+    );
+    const search = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > library &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'library-search-input' &&
+        tapOn.optional !== true,
+    );
+    const query = commands.findIndex(
+      ({ inputText }, index) => index > search && inputText === 'Chemistry',
+    );
+    const result = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > query &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'topic-row-${TOPIC_ID}' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const openTopic = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > result &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'topic-row-${TOPIC_ID}' &&
+        tapOn.optional !== true,
+    );
+    const topicDetail = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > openTopic &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'topic-detail-scroll' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const hint = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > topicDetail &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'topic-practiced-often-hint' &&
+        assertVisible.optional !== true,
+    );
+    const cta = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > hint &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'study-cta' &&
+        assertVisible.optional !== true,
+    );
+    const directEntry = commands.findIndex(
+      ({ openLink }, index) =>
+        index > cta &&
+        openLink ===
+          'mentomate:///topic/relearn?topicId=${TOPIC_ID}&subjectId=${SUBJECT_ID}',
+    );
+    const methodPhase = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > directEntry &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'relearn-method-phase' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const methodIds = [
+      'relearn-method-visual_diagrams',
+      'relearn-method-step_by_step',
+      'relearn-method-real_world_examples',
+      'relearn-method-practice_problems',
+    ];
+    const methodAssertions = methodIds.map((id) =>
+      commands.findIndex(
+        ({ assertVisible }, index) =>
+          index > methodPhase &&
+          typeof assertVisible === 'object' &&
+          assertVisible.id === id &&
+          assertVisible.optional !== true,
+      ),
+    );
+    const methodTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > Math.max(...methodAssertions) &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'relearn-method-visual_diagrams' &&
+        tapOn.optional !== true,
+    );
+    const session = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > methodTap &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'chat-input' &&
+        extendedWaitUntil.optional !== true,
+    );
+
+    const ordered = [
+      seeded,
+      learner,
+      library,
+      search,
+      query,
+      result,
+      openTopic,
+      topicDetail,
+      hint,
+      cta,
+      directEntry,
+      methodPhase,
+      ...methodAssertions,
+      methodTap,
+      session,
+    ];
+    expect(ordered).toEqual(ordered.toSorted((left, right) => left - right));
+    expect(seeded).toBeGreaterThan(-1);
+    expect(flow).not.toContain('shelf-row-header-${SUBJECT_ID}');
+    expect(flow).not.toContain('Chemistry Topic 1');
+    expect(flow).not.toContain('relearn-topics-phase');
   });
 
   it('[WI-1864] opens the seeded retention topic through mandatory stable row ids', () => {

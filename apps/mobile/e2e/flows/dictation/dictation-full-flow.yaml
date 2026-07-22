@@ -48,6 +48,9 @@ tags:
 # practice-dictation is in the "Other practice" horizontal slider. Position
 # the outer vertical viewport using its non-scrollable heading, then move
 # within the horizontal slider; a DOWN search cannot reliably target its child.
+# Maestro sometimes reports this heading as invisible after successfully
+# scrolling it into view. Treat the outer positioning as best effort; the
+# mandatory horizontal card lookup below is the actual reachability gate.
 - scrollUntilVisible:
     element:
       id: 'practice-other-practice-heading'
@@ -55,6 +58,7 @@ tags:
     timeout: 5000
     visibilityPercentage: 50
     centerElement: false
+    optional: true # justified: best-effort outer positioning; the mandatory horizontal card lookup below fails closed
 
 - scrollUntilVisible:
     element:

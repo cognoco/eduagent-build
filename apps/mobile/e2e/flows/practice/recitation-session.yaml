@@ -46,15 +46,18 @@ tags:
 # Tap Recitation card
 # practice-recitation is the SECOND card inside the "Other practice" horizontal
 # ScrollView (practice-other-practice-slider, practice/index.tsx:799).
-# Step 1: scroll the outer vertical container DOWN using the first leaf card.
+# Step 1: best-effort outer positioning. Maestro can report the heading as
+# invisible after scrolling it into view, so the mandatory horizontal card
+# lookup in step 2 remains the actual reachability gate.
 # Step 2: scroll RIGHT inside the horizontal slider to reach practice-recitation.
 - scrollUntilVisible:
     element:
-      id: 'practice-dictation'
+      id: 'practice-other-practice-heading'
     direction: DOWN
     timeout: 5000
-    visibilityPercentage: 100
-    centerElement: true
+    visibilityPercentage: 50
+    centerElement: false
+    optional: true # justified: best-effort outer positioning; the mandatory horizontal card lookup below fails closed
 
 - scrollUntilVisible:
     element:

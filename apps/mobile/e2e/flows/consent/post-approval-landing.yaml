@@ -79,11 +79,11 @@ tags:
 - tapOn:
     id: 'post-approval-continue'
 
-# 11. Wait for home screen — loads after dismissal
+# 11. Wait for the hosted sign-in route exposed after dismissal.
 - extendedWaitUntil:
     visible:
-      id: 'learner-screen'
+      id: 'mentor-screen'
     timeout: 15000
 
-# 12. Final screenshot — home screen after post-approval
+# 12. Final screenshot — Mentor route after post-approval
 - takeScreenshot: post-approval-landing-dismissed
