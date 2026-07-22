@@ -288,7 +288,6 @@ function probeOnce(targetValue, { timeoutMs = 3_000 } = {}) {
 
   return new Promise((resolve) => {
     let settled = false;
-    let timeoutHandle;
     const finish = () => {
       if (settled) return;
       settled = true;
@@ -386,7 +385,7 @@ function probeOnce(targetValue, { timeoutMs = 3_000 } = {}) {
       });
     });
 
-    timeoutHandle = setTimeout(() => {
+    const timeoutHandle = setTimeout(() => {
       request.destroy(errorWithCode('phase probe timed out', 'ETIMEDOUT'));
     }, timeoutMs);
     request.on('error', (error) => {
