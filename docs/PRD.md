@@ -1116,10 +1116,13 @@ Mentor notices are the learner-only, low-stakes loop defined by [`MMT-ADR-0036`]
 
 - The capability applies to learners of every age under the same age-neutral rules. Interleaved sessions are excluded from the MVP.
 - The learner sees at most one actionable notice at a time and never a queue of shortcomings. Guardians, supporters, payers, and proxy views receive no notice details or projections.
-- `Continue` starts or resumes a re-check capped at three learner responses. Only validated learner evidence may produce a `locked_in` result; `not_yet` ends the current offer without claiming mastery, and explicit dismissal is terminal.
-- `Not now` defers for the current learning day. An inactive open notice fades after 21 days.
+- `Continue` starts or resumes a re-check capped at three learner responses. The tutor guides but never grades its own re-check; an independent server-side judge produces the only transition the client may render. Only validated learner evidence may produce a `locked_in` result; `not_yet` ends the current offer without claiming mastery, and explicit dismissal is terminal.
+- `Not now` defers for the current learning day, which begins at local 04:00 in the learner's IANA time zone. An inactive open notice fades after 21 days, including while the feature is off.
 - MVP delivery is in-app only: no notice push, primer, scheduled nudge, or notification-family budget. Rollout is internal QA followed by all friendly-user MVP testers.
-- Flag-off removes all observed in-app and cached behavior without deleting notice rows; ordinary retention and deletion rules still apply.
+- Rollout observations carry a monotonic server revision: lower revisions are ignored, disabled wins at the same revision, and re-enable requires a higher revision. Missing or malformed policy is fail-closed.
+- Flag-off removes all observed in-app and cached behavior without deleting notice rows; ordinary retention and deletion rules still apply. This work does not authorize production activation, percentage rollout, OTA, release, deployment, or push delivery.
+- The durable notice keeps an immutable `answerEventId` scalar after transcript purge, without a foreign key to the purged event. The server validates the event at creation; optional `learnerQuote` is transient validation input and is never stored.
+- All persisted learning text passes one shared multilingual clinical-safety gate. Person-attributed clinical inference is blocked, and ambiguity fails closed unless an independent judge strictly identifies LLM-authored text as an educational reference.
 
 ### Learning Verification
 
