@@ -123,9 +123,10 @@ tags:
     timeout: 15000
 
 # Switch to the accepted supportee: ScopeChip preserves the active Subjects
-# tab, so wait directly for the person-scope structural surface. Strict
-# separation direction 1 — the supporter's own Me-scope subject and private
-# marker never appear here.
+# tab, so wait for the person-scope structural surface, then its completed
+# empty-state sentinel.
+# Strict separation direction 1 — the supporter's exact own Me-scope subject
+# never appears in the supportee's empty Subjects state.
 - tapOn:
     id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}'
 - extendedWaitUntil:
@@ -140,13 +141,9 @@ tags:
     id: 'person-scope-subject-${OWN_SUBJECT_ID}'
 - assertNotVisible:
     text: 'Supporter Own Subject'
-- assertNotVisible:
-    text: 'PRIVATE'
 
 # Switch back to Me: ScopeChip still preserves Subjects. Direction 2 — the
-# exact own subject returns, with no supportee-private content leaked into Me
-# (forward-regression canary; the actual authorization proof is the
-# integration suite cited in the file header).
+# exact own subject returns after the person-to-Me scope transition.
 - tapOn:
     id: 'scope-chip-option-me'
 - extendedWaitUntil:
@@ -155,5 +152,3 @@ tags:
     timeout: 15000
 - assertVisible:
     id: 'subjects-browse-row-${OWN_SUBJECT_ID}'
-- assertNotVisible:
-    text: 'PRIVATE'

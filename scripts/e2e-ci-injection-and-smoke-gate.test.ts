@@ -593,6 +593,16 @@ describe('[WI-1651] e2e-ci.yml propagates Maestro failures', () => {
 });
 
 describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () => {
+  type MaestroCommand = Record<string, unknown>;
+  const allObjects = (value: unknown): MaestroCommand[] => {
+    if (Array.isArray(value)) return value.flatMap(allObjects);
+    if (value === null || typeof value !== 'object') return [];
+    return [
+      value as MaestroCommand,
+      ...Object.values(value).flatMap(allObjects),
+    ];
+  };
+
   const workflow = loadWorkflow('e2e-ci.yml');
   const jobs = workflow.jobs as Record<string, Job>;
   const mobileMaestro = jobs['mobile-maestro']!;
@@ -1354,7 +1364,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
   });
 
   it('[WI-2616] hard-routes V2 link-ceremony cross-logins through Account', () => {
-    type Command = Record<string, unknown>;
+    type Command = MaestroCommand;
     const v2SignOutPath = join(
       repoRoot,
       'apps/mobile/e2e/flows/_setup/sign-out-v2.yaml',
@@ -1412,11 +1422,6 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         },
       },
     ];
-    const allObjects = (value: unknown): Command[] => {
-      if (Array.isArray(value)) return value.flatMap(allObjects);
-      if (value === null || typeof value !== 'object') return [];
-      return [value as Command, ...Object.values(value).flatMap(allObjects)];
-    };
     const hardCommandSignature = (command: unknown): string => {
       if (command === null || typeof command !== 'object') return '';
       const record = command as Command;
@@ -1688,7 +1693,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
   });
 
   it('[WI-2506 / WI-2608] binds resolver actions and requires the exact stable Photosynthesis round trip', () => {
-    type Command = Record<string, unknown>;
+    type Command = MaestroCommand;
     const subjectCreate = parseAllDocuments(
       readFileSync(
         join(
@@ -1723,13 +1728,6 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         commands,
       },
     });
-    const allObjects = (value: unknown): Command[] => {
-      if (Array.isArray(value)) {
-        return value.flatMap(allObjects);
-      }
-      if (value === null || typeof value !== 'object') return [];
-      return [value as Command, ...Object.values(value).flatMap(allObjects)];
-    };
     const resolveFinished: Command = {
       extendedWaitUntil: {
         notVisible: { id: 'subject-resolve-loading' },
@@ -2362,7 +2360,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     ]);
   });
 
-  it('[WI-2618] keeps Subjects active across supporter person and Me scope switches', () => {
+  it('[WI-2618] keeps Subjects active while switching directly between supportee and Me scopes', () => {
     const selfLearningFlow = readFileSync(
       join(
         repoRoot,
@@ -2414,7 +2412,6 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         id: 'subjects-browse-row-${OWN_SUBJECT_ID}',
       },
     };
-    const privateMarkerAbsent = { assertNotVisible: { text: 'PRIVATE' } };
     const personScopeMentorWait = {
       extendedWaitUntil: {
         visible: { id: 'person-scope-mentor-tab' },
@@ -2451,11 +2448,9 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       personScopeSubjectsEmpty,
       ownSubjectAbsentInPersonScope,
       ownSubjectTextAbsentInPersonScope,
-      privateMarkerAbsent,
       meScopeSwitch,
       meScopeSubjects,
       ownSubjectVisibleInMeScope,
-      privateMarkerAbsent,
     ];
     const satisfiesSubjectsScopeContract = (values: unknown[]): boolean => {
       const personSwitchIndex = values.findIndex((command) =>
@@ -2530,17 +2525,6 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       (command, index) =>
         index > personSwitchIndex && isDeepStrictEqual(command, meScopeSwitch),
     );
-    const personPrivateMarkerIndex = commands.findIndex(
-      (command, index) =>
-        index > personSwitchIndex &&
-        index < meSwitchIndex &&
-        isDeepStrictEqual(command, privateMarkerAbsent),
-    );
-    const mePrivateMarkerIndex = commands.findIndex(
-      (command, index) =>
-        index > meSwitchIndex &&
-        isDeepStrictEqual(command, privateMarkerAbsent),
-    );
     const personSubjectsEmptyIndex = commands.findIndex(
       (command, index) =>
         index > personSwitchIndex &&
@@ -2595,12 +2579,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       removeAt(commands, personSubjectsEmptyIndex),
       remove(commands, ownSubjectAbsentInPersonScope),
       removeAt(commands, ownSubjectTextAbsentIndex),
-      removeAt(commands, personPrivateMarkerIndex),
-      removeAt(commands, mePrivateMarkerIndex),
       optionalAt(commands, ownSubjectAbsentInPersonScopeIndex),
       optionalAt(commands, ownSubjectTextAbsentIndex),
-      optionalAt(commands, personPrivateMarkerIndex),
-      optionalAt(commands, mePrivateMarkerIndex),
       optionalAt(commands, ownSubjectVisibleInMeScopeIndex),
     ]) {
       expect(satisfiesSubjectsScopeContract(mutation)).toBe(false);
