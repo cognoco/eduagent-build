@@ -3,13 +3,13 @@
 **Work Item:** WI-2475 (Discriminate DNS vs Cloudflare edge vs GitHub
 Actions runner cause of the pre-Worker connectivity gap)
 
-**Result:** The historical incidents are confirmed at the pre-Worker
-boundary, but the retained telemetry cannot honestly select DNS, Cloudflare
-edge/security, or the GitHub-hosted runner network as the final cause. The
-missing discriminator is Cloudflare Zone Analytics (`Zone Analytics Read`)
-or contemporaneous DNS/TCP/TLS phase data from the runner. This is the
-documented-gap outcome allowed by AC-3, not a claim that the three candidates
-are equivalent.
+**Result:** Cloudflare's rate limiter is the root cause. Zone Analytics records
+`action=block`, `source=ratelimit`, and rule ID
+`4bf51dbfc2ad4c17a77099e5db854212` at the exact browser-failure timestamps in
+every required incident. The events identify Microsoft ASN 8075 and the same
+Linux HeadlessChrome user agent as the GitHub Actions jobs. A Cloudflare Ray
+and rate-limit decision prove that DNS resolution and the runner path reached
+Cloudflare; the block occurred at the edge before the Worker ran.
 
 A phase-aware probe now runs across both Playwright lanes in `run-smoke` and
 records the missing signals for the next incident. No retry cap, TanStack
@@ -24,12 +24,12 @@ HTTP response (`status=-1`, `net::ERR_FAILED`, no server IP), and no matching
 request is observable at the Worker/application boundary. The failed UI
 locator is downstream evidence only; it is not part of the definition.
 
-| Run | Browser evidence | Worker/application evidence | GitHub-hosted runner |
+| Run | Browser evidence | Cloudflare Zone Analytics evidence | GitHub-hosted runner |
 |---|---|---|---|
-| `29688502157` | All-route terminal burst `13:21:22.416–13:21:28.866Z` (6.450s). | Sentry stream stops after `13:21:18Z`; zero matching error events. Workers Adaptive Invocations has no row `13:21:19–13:21:32Z` (14s), colo SEA. | job `88196967102`; `GitHub Actions 1000041931`; `ubuntu-latest` |
-| `29671898435` | All-route terminal burst `03:38:34.600–03:38:40.182Z` (5.582s). | Last matching Sentry profile transaction `03:38:31Z`; zero matching errors. Last Worker row `03:38:32Z`, none through query end `03:38:50Z` (at least 18s observed), colo SJC. | job `88152392894`; `GitHub Actions 1000041496`; `ubuntu-latest` |
-| `29826201916` | Quiz-results absent on first attempt and retry, then learner/parent retries; required-stable step timed out at five minutes. The retained log establishes the failure family but contains no DNS/TCP/TLS or CF-Ray data. | No request-level edge correlation was retained. Aggregate Sentry/Workers rows cannot be assigned to one failed request while other flows run concurrently. | job `88620058287`; `GitHub Actions 1000002933`; `ubuntu-latest` |
-| `29827835935` (exact main) | Quiz first attempt: four `net::ERR_FAILED` requests over `11:58:18.014–11:58:21.177Z` (3.163s). Retry: 20 failures across eight routes over `11:58:53.279–11:59:07.190Z` (13.911s). Learner and parent traces have 11 and 12 `net::ERR_FAILED` requests respectively. All four snapshots show the same profile/server-unreachable boundary. | The first interval has no Worker row or Sentry profile transaction during the failed seconds. The retry overlaps aggregate successful rows from other concurrent flows, and the historical data has no Ray/probe identifier with which to separate them. The zone WAF/HTTP query is permission-denied. | job `88625219282`; `GitHub Actions 1000003045`; `ubuntu-latest` |
+| `29688502157` | All-route terminal burst `13:21:22.416–13:21:28.866Z` (6.450s). | 9 rate-limit blocks from `13:21:22–13:21:32Z`; the first event is in the same second as the first browser failure. Blocked routes include `/v1/activation-events` and `/v1/profiles`. | job `88196967102`; `GitHub Actions 1000041931`; `ubuntu-latest`; ASN 8075 |
+| `29671898435` | All-route terminal burst `03:38:34.600–03:38:40.182Z` (5.582s). | 7 rate-limit blocks from `03:38:32–03:38:40Z`; events cover the entire browser-failure interval. Blocked routes include `/v1/now`, `/v1/profiles`, and `/v1/activation-events`. | job `88152392894`; `GitHub Actions 1000041496`; `ubuntu-latest`; ASN 8075 |
+| `29826201916` | Quiz-results absent on first attempt and retry, then learner/parent retries; required-stable step timed out at five minutes. | 33 rate-limit blocks from `11:33:34–11:36:45Z`, in bursts matching the first attempt, retry, later learner/parent attempts, and reset call. | job `88620058287`; `GitHub Actions 1000002933`; `ubuntu-latest`; ASN 8075 |
+| `29827835935` (exact main) | Quiz first attempt: four `net::ERR_FAILED` requests over `11:58:18.014–11:58:21.177Z` (3.163s). Retry: 20 failures across eight routes over `11:58:53.279–11:59:07.190Z` (13.911s). Learner and parent traces have 11 and 12 `net::ERR_FAILED` requests respectively. | 38 rate-limit blocks from `11:58:13–12:00:58Z`. `/v1/profiles` and `/v1/activation-events` blocks begin at `11:58:17Z`; the retry burst covers report, profile, now, and activation routes through `11:59:10Z`. | job `88625219282`; `GitHub Actions 1000003045`; `ubuntu-latest`; ASN 8075 |
 
 The two July 19 incidents and raw queries are preserved in
 `2026-07-19-run-smoke-failure-taxonomy-and-staging-root-cause.md`. The July
@@ -38,12 +38,11 @@ Playwright artifacts were removed; this investigation did not download or
 republish them again.
 
 An additional clean-current-main reproduction, run `29829373808`, provides a
-same-day independent boundary check. Its quiz first/retry snapshots were
-byte-identical profile/server-unreachable pages. The first terminal burst was
-`12:27:47.390–12:27:50.523Z`; the retry burst was
-`12:28:59.107–12:29:02.150Z`. Workers Adaptive Invocations has no row after
-`12:27:41Z` through the first burst. For the retry, the last preceding rows
-are at `12:28:57Z` and there is no row during the failed seconds.
+same-day independent check. Its quiz first/retry snapshots were byte-identical
+profile/server-unreachable pages. The browser bursts were
+`12:27:47.390–12:27:50.523Z` and `12:28:59.107–12:29:02.150Z`. Zone Analytics
+records 17 blocks by the same rate-limit rule from `12:27:45–12:29:01Z`,
+including `/v1/profiles` and `/v1/activation-events` during both bursts.
 
 ### Duration distribution
 
@@ -64,53 +63,57 @@ cannot be represented as the infrastructure cure for the observed 9–12s+
 members of **I** without widening the cap or adding another retry owner.
 Both are prohibited here, so no such widening was made.
 
-## 2. What was queried and why the final candidate remains unresolved
+## 2. Zone Analytics resolves the candidate
 
 ### Available data
 
 - GitHub Actions jobs API: job/run times, conclusion, runner name/ID/group,
-  image label. It retains no historical DNS lookup, socket-connect, TLS, or
-  runner-network trace for these jobs.
-- Sentry Discover/Errors: exact UTC windows around each trace. This proves
-  absence at the application boundary only when a failed request can be
-  correlated; concurrent flows produce unrelated aggregate rows.
+  and image label.
+- Sentry Discover/Errors: exact UTC windows around each trace. The absence of
+  matching application activity is consistent with an edge block.
 - Cloudflare account-level `workersInvocationsAdaptive`: script
-  `mentomate-api-stg`, UTC second, status and colo. It proves the pre-Worker
-  layer for the two clean gaps, but has no URL, DNS phase, runner identity,
-  or request identifier with which to choose the residual candidate.
+  `mentomate-api-stg`, UTC second, status and colo. It independently confirms
+  that the blocked requests did not invoke the Worker.
 - Cloudflare zone-level `firewallEventsAdaptive`: queried for
-  `api-stg.mentomate.com` over the July 21 incident windows, selecting only
-  UTC time, action, source and Ray ID. The API returned:
+  `api-stg.mentomate.com` over every incident window. Each result supplies
+  UTC time, action, source, rule ID, Ray ID, route, user agent, client ASN,
+  and country. All returned incident events have:
 
   ```text
-  Actor <redacted-token> does not have permission
-  'com.cloudflare.api.account.zone.analytics.read' for zone
-  65eeb0ef4b0726b82aa2a64d393be362
+  action:  block
+  source:  ratelimit
+  ruleId:  4bf51dbfc2ad4c17a77099e5db854212
+  client:  ASN 8075 (Microsoft), US, Linux HeadlessChrome
   ```
 
-Cloudflare's official GraphQL examples place firewall-event investigation in
-Zone Analytics and document Analytics Read as the required permission:
-[firewall-event query](https://developers.cloudflare.com/analytics/graphql-api/tutorials/querying-firewall-events/),
-[GraphQL errors](https://developers.cloudflare.com/analytics/graphql-api/errors/).
+The token initially lacked Zone Analytics Read. After the operator added that
+read-only permission on 2026-07-22, the same historical queries returned the
+events above. Cloudflare's official GraphQL example documents the dataset and
+fields used by this investigation:
+[firewall-event query](https://developers.cloudflare.com/analytics/graphql-api/tutorials/querying-firewall-events/).
 
 ### Candidate decision table
 
-| Candidate | Decisive signal | Historical state |
+| Candidate | Decisive signal | Decision |
 |---|---|---|
-| DNS | Explicit resolver failure such as `EAI_AGAIN`/`ENOTFOUND`, before TCP. | Not recorded. Remains possible. |
-| GitHub Actions runner network | DNS succeeds, then TCP never connects with a runner-path error such as `ENETUNREACH`/`ETIMEDOUT`. | Not recorded. Remains possible. |
-| Cloudflare edge/WAF/bot management | TLS reaches Cloudflare and an edge response carries CF-Ray plus a challenge/403/429, while the exact public health route does not produce Worker health proof. | Zone event query is permission-denied. Remains possible. |
+| DNS | Explicit resolver failure before TCP, with no edge receipt. | Ruled out: Cloudflare assigned Ray IDs and evaluated the requests. |
+| GitHub Actions runner network | Failure before the request reaches Cloudflare. | Ruled out as the failure mechanism: ASN 8075 identifies the source, but Cloudflare received and blocked its requests. |
+| Cloudflare edge/security | A zone event for the same host, route, client, and UTC interval, with an edge action before Worker invocation. | Confirmed: all five queried runs contain blocks from the same rate-limit rule. |
 
-No row supports selecting one of those candidates over the others. Naming a
-specific cause would be fabrication. The supported conclusion is narrower:
-the failure occurs before Worker invocation and is colo-agnostic; Worker
-cold-start, Worker application code, and Neon are not candidates.
+The repository currently describes the custom staging domain as
+"non-rate-limited" and therefore runs four Playwright workers. The zone
+configuration contradicts that assumption. This is a Cloudflare edge-policy
+fault, not a Worker cold start, Worker application error, Neon failure, or
+unexplained ambient network flake.
 
-**Owner/action needed:** the operator or Cloudflare credential owner must
-grant read-only Zone Analytics access to the diagnostic token, or run and
-return the equivalent zone HTTP/WAF query for the incident UTC windows.
-Historical retention may prevent backfill even after access is granted; the
-new probe prevents that from reopening this Work Item indefinitely.
+**Cure owner/action:** inspect Cloudflare rule
+`4bf51dbfc2ad4c17a77099e5db854212` and change its staging-host behavior so the
+expected parallel smoke workload is not blocked. Preserve production
+protection and avoid a blanket bypass for all GitHub-hosted traffic. The
+diagnostic token can read Analytics but cannot read the zone Rulesets API, so
+this report does not invent the rule's threshold or expression. The durable
+configuration change needs its own mutation-sensitive verification; client
+retry/timeout widening is not a cure.
 
 ## 3. Repeatable next-incident discriminator
 
