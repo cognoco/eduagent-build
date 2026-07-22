@@ -15,11 +15,18 @@ red-detection is load-bearing, not vacuous.
 - Both failing assertions confirmed red in real CI: run `29859762770` over
   `ba6c01b28` (2026-07-21) — shard 2 `Assert id: more-row-subscription is visible
   ... FAILED`; shard 3 `Assert id: progress-subject-back is visible ... FAILED`.
-  Shards 1 and 4 green. (Full attribution in the completion summary / AC-1.)
+  Shards 1 and 4 green. (Full, git-bisected attribution in the completion summary /
+  AC-1 and each flow header.)
 - The two testIDs still exist in source (`more/account.tsx:137`,
-  `progress/[subjectId]/index.tsx:381`) — the app is behaving correctly; the
-  seed/fixtures drifted under the V2 supportership-aware seed. The assertions are
-  therefore left intact (AC-5) and the flows are quarantined (AC-2), not weakened.
+  `progress/[subjectId]/index.tsx:381`) — the app is behaving correctly. Flow A
+  (more-row-subscription) is a flow/layout drift: `WI-2187` grew the Account security
+  section above the row, pushing it below the fold while the step asserts without a
+  scroll (bracket: green `e9a6b960` → red `ad5f9b96`, 2026-07-18). Flow B
+  (progress-subject-back) was false-green — masked by a shard-runner stdin-drain bug
+  fixed by `WI-2215` (`42554029a`) until its first genuine run on 2026-07-19 failed;
+  underlying cause needs device confirmation. Either way the assertions are left intact
+  (AC-5) and the flows are quarantined (AC-2), not weakened. This guard/RGR is
+  root-cause-independent.
 
 ## Cycle executed
 

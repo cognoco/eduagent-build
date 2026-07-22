@@ -3,17 +3,22 @@
 #
 # BLOCKED (WI-2596): quarantined from the pr-blocking gate 2026-07-22.
 #   Reason: the `assertVisible: id: more-row-subscription` step (Account sub-screen)
-#     fails on main because that row is owner-gated (navigationContract.gates.showBilling,
-#     apps/mobile/src/app/(app)/more/account.tsx) and the V2 supportership-aware seed
-#     (WI-2241, #2288/#2470) no longer provisions the `onboarding-complete` scenario user
-#     as an account owner — so the row is correctly hidden and the (unchanged, correct)
-#     assertion fails. Seed/fixture drift, not an app regression; the assertion is left
-#     intact (WI-2596 AC-5). Confirmed red: CI run 29859762770, shard 2, ba6c01b28 (2026-07-21).
-#   Owner (restore + device-verify): WI-2600.
+#     fails on main. Attribution (git-bisected against real CI runs): the flow went red
+#     2026-07-18 when WI-2187 (88c7a3957, "disambiguate Account setting targets") grew
+#     the Account security section (account-security.tsx) that renders ABOVE this row in
+#     the more-account-scroll ScrollView, pushing more-row-subscription below the fold —
+#     and this step asserts it with a plain assertVisible and NO preceding scroll (unlike
+#     the other below-fold rows in this flow, which use scrollUntilVisible). The row still
+#     renders for the seed (onboarding-complete is an account owner → showBilling true), so
+#     this is flow/layout drift, not an app regression; the assertion is left intact
+#     (WI-2596 AC-5). Green→red bracket: run 29630076794 (green, e9a6b960) → run
+#     29633855121 (red, ad5f9b96); WI-2187 landed 06:02Z between them. (An earlier writeup
+#     blamed WI-2241 seed drift; timing falsifies that — WI-2241 landed a day later.)
+#   Owner (fix + device-verify): WI-2600.
 #   Expires: 2026-08-19 — re-triage if still quarantined.
-#   Unblock: restore owner provisioning for `onboarding-complete` (or repoint at an owner
-#     scenario), re-verify green on an emulator, then restore the `pr-blocking` tag and
-#     re-add this flow to apps/mobile/e2e/ci-maestro-manifest.json.
+#   Unblock: add a `scrollUntilVisible` for more-row-subscription before the assertVisible
+#     (mirroring this flow's other below-fold rows), re-verify green on an emulator, then
+#     restore the `pr-blocking` tag and re-add this flow to apps/mobile/e2e/ci-maestro-manifest.json.
 appId: com.mentomate.app
 tags:
   - blocked
