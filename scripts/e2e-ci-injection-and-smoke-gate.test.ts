@@ -1341,6 +1341,274 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     }
   });
 
+  it('[WI-2616] hard-routes V2 link-ceremony cross-logins through Account', () => {
+    type Command = Record<string, unknown>;
+    const v2SignOutPath = join(
+      repoRoot,
+      'apps/mobile/e2e/flows/_setup/sign-out-v2.yaml',
+    );
+
+    expect(existsSync(v2SignOutPath)).toBe(true);
+
+    const v2SignOut = parseAllDocuments(
+      readFileSync(v2SignOutPath, 'utf8'),
+    )[1]?.toJS() as unknown;
+    const ceremony = parseAllDocuments(
+      readFileSync(
+        join(
+          repoRoot,
+          'apps/mobile/e2e/flows/v2/v2-supporter-link-ceremony.yaml',
+        ),
+        'utf8',
+      ),
+    )[1]?.toJS() as unknown;
+
+    expect(Array.isArray(v2SignOut)).toBe(true);
+    expect(Array.isArray(ceremony)).toBe(true);
+    if (!Array.isArray(v2SignOut) || !Array.isArray(ceremony)) {
+      throw new Error('WI-2616 Maestro commands must be YAML lists');
+    }
+
+    const expectedV2SignOut: Command[] = [
+      { openLink: 'mentomate:///mentor' },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'account-avatar-button' },
+          timeout: 15000,
+        },
+      },
+      { tapOn: { id: 'account-avatar-button' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'account-screen' },
+          timeout: 15000,
+        },
+      },
+      {
+        scrollUntilVisible: {
+          element: { id: 'account-admin-sign-out' },
+          direction: 'DOWN',
+          timeout: 15000,
+        },
+      },
+      { assertVisible: { id: 'account-admin-sign-out' } },
+      { tapOn: { id: 'account-admin-sign-out' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'sign-in-button' },
+          timeout: 15000,
+        },
+      },
+    ];
+    const allObjects = (value: unknown): Command[] => {
+      if (Array.isArray(value)) return value.flatMap(allObjects);
+      if (value === null || typeof value !== 'object') return [];
+      return [value as Command, ...Object.values(value).flatMap(allObjects)];
+    };
+    const hardCommandSignature = (command: unknown): string => {
+      if (command === null || typeof command !== 'object') return '';
+      const record = command as Command;
+      if (record.optional === true) return '';
+      if (typeof record.openLink === 'string') {
+        return `openLink:${record.openLink}`;
+      }
+      const kind = [
+        'extendedWaitUntil',
+        'scrollUntilVisible',
+        'assertVisible',
+        'tapOn',
+      ].find((candidate) => candidate in record);
+      if (!kind) return '';
+      const payload = record[kind];
+      if (payload === null || typeof payload !== 'object') return '';
+      const payloadRecord = payload as Command;
+      if (payloadRecord.optional === true) return '';
+      const selector = (payloadRecord.visible ??
+        payloadRecord.element ??
+        payloadRecord) as Command;
+      if (selector.optional === true || typeof selector.id !== 'string') {
+        return '';
+      }
+      return `${kind}:id:${selector.id}`;
+    };
+    const expectedV2SignOutSequence =
+      expectedV2SignOut.map(hardCommandSignature);
+    const hasSequence = (
+      commands: unknown[],
+      expectedSequence: unknown[],
+    ): boolean =>
+      commands.some((_, start) =>
+        expectedSequence.every((expected, offset) =>
+          isDeepStrictEqual(commands[start + offset], expected),
+        ),
+      );
+    const satisfiesV2SignOutContract = (commands: unknown[]): boolean =>
+      hasSequence(
+        commands.map(hardCommandSignature),
+        expectedV2SignOutSequence,
+      ) &&
+      !allObjects(commands).some((value) => value.optional === true) &&
+      !allObjects(commands).some((value) => typeof value.text === 'string') &&
+      !JSON.stringify(commands).includes('"More"') &&
+      !JSON.stringify(commands).includes('sign-out-button');
+    const replaceAt = <T>(values: T[], index: number, value: T): T[] => {
+      const copy = [...values];
+      copy[index] = value;
+      return copy;
+    };
+    const withPayloadOptional = (command: Command): Command => {
+      const entry = Object.entries(command)[0];
+      if (!entry) return { optional: true };
+      const [kind, payload] = entry;
+      return payload !== null && typeof payload === 'object'
+        ? { [kind]: { ...(payload as Command), optional: true } }
+        : { ...command, optional: true };
+    };
+    const expectSequenceMutationsRejected = (
+      commands: unknown[],
+      start: number,
+      length: number,
+      satisfies: (candidate: unknown[]) => boolean,
+    ): void => {
+      for (let offset = 0; offset < length; offset += 1) {
+        const index = start + offset;
+        expect(
+          satisfies(
+            commands.filter((_, commandIndex) => commandIndex !== index),
+          ),
+        ).toBe(false);
+        expect(
+          satisfies(
+            replaceAt(commands, index, {
+              assertVisible: { id: `adjacent-sequence-step-${offset}` },
+            }),
+          ),
+        ).toBe(false);
+        expect(
+          satisfies(
+            replaceAt(
+              commands,
+              index,
+              withPayloadOptional(commands[index] as Command),
+            ),
+          ),
+        ).toBe(false);
+
+        if (offset < length - 1) {
+          const reordered = [...commands];
+          [reordered[index], reordered[index + 1]] = [
+            reordered[index + 1],
+            reordered[index],
+          ];
+          expect(satisfies(reordered)).toBe(false);
+        }
+      }
+    };
+
+    expect(satisfiesV2SignOutContract(v2SignOut)).toBe(true);
+    expectSequenceMutationsRejected(
+      expectedV2SignOut,
+      0,
+      expectedV2SignOut.length,
+      satisfiesV2SignOutContract,
+    );
+    expect(
+      satisfiesV2SignOutContract([
+        { tapOn: { text: 'More' } },
+        { tapOn: { id: 'sign-out-button' } },
+      ]),
+    ).toBe(false);
+    expect(
+      satisfiesV2SignOutContract([
+        ...expectedV2SignOut,
+        { tapOn: { text: 'Sign out' } },
+      ]),
+    ).toBe(false);
+    expect(
+      satisfiesV2SignOutContract([
+        ...expectedV2SignOut,
+        { tapOn: { id: 'account-avatar-button', optional: true } },
+      ]),
+    ).toBe(false);
+
+    const v2SignOutCall: Command = {
+      runFlow: { file: '../_setup/sign-out-v2.yaml' },
+    };
+    const legacySignOutCall: Command = {
+      runFlow: { file: '../_setup/sign-out.yaml' },
+    };
+    const firstAcceptanceSequence: Command[] = [
+      { tapOn: { id: 'visibility-contract-accept' } },
+      {
+        extendedWaitUntil: {
+          notVisible: { id: 'visibility-contract-accept' },
+          timeout: 15000,
+        },
+      },
+      { assertNotVisible: { id: 'visibility-link-review' } },
+      v2SignOutCall,
+    ];
+    const secondAcceptanceSequence: Command[] = [
+      { tapOn: { id: 'visibility-contract-accept' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'visibility-link-review' },
+          timeout: 15000,
+        },
+      },
+      { assertVisible: { id: 'visibility-contract-revoke' } },
+      v2SignOutCall,
+    ];
+    const callCount = (commands: unknown[], expected: Command): number =>
+      commands.filter((command) => isDeepStrictEqual(command, expected)).length;
+    const satisfiesCeremonyContract = (commands: unknown[]): boolean =>
+      callCount(commands, v2SignOutCall) === 2 &&
+      callCount(commands, legacySignOutCall) === 0 &&
+      hasSequence(commands, firstAcceptanceSequence) &&
+      hasSequence(commands, secondAcceptanceSequence);
+
+    expect(satisfiesCeremonyContract(ceremony)).toBe(true);
+    const firstAcceptanceStart = ceremony.findIndex((_, start) =>
+      firstAcceptanceSequence.every((expected, offset) =>
+        isDeepStrictEqual(ceremony[start + offset], expected),
+      ),
+    );
+    const secondAcceptanceStart = ceremony.findIndex((_, start) =>
+      secondAcceptanceSequence.every((expected, offset) =>
+        isDeepStrictEqual(ceremony[start + offset], expected),
+      ),
+    );
+    expect(firstAcceptanceStart).toBeGreaterThanOrEqual(0);
+    expect(secondAcceptanceStart).toBeGreaterThanOrEqual(0);
+    if (firstAcceptanceStart < 0 || secondAcceptanceStart < 0) {
+      throw new Error('WI-2616 acceptance sequences must both be present');
+    }
+    expectSequenceMutationsRejected(
+      ceremony,
+      firstAcceptanceStart,
+      firstAcceptanceSequence.length,
+      satisfiesCeremonyContract,
+    );
+    expectSequenceMutationsRejected(
+      ceremony,
+      secondAcceptanceStart,
+      secondAcceptanceSequence.length,
+      satisfiesCeremonyContract,
+    );
+
+    const signOutIndices = ceremony.flatMap((command, index) =>
+      isDeepStrictEqual(command, v2SignOutCall) ? [index] : [],
+    );
+    expect(signOutIndices).toHaveLength(2);
+    for (const signOutIndex of signOutIndices) {
+      expect(
+        satisfiesCeremonyContract(
+          replaceAt(ceremony, signOutIndex, legacySignOutCall),
+        ),
+      ).toBe(false);
+    }
+  });
+
   it('[WI-2506] binds each subject resolver result to its owned action and fails ambiguous results closed', () => {
     type Command = Record<string, unknown>;
     const subjectCreate = parseAllDocuments(

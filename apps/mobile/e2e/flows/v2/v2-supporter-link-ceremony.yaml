@@ -87,18 +87,25 @@ tags:
     timeout: 15000
 - tapOn:
     id: 'visibility-contract-accept'
+# The review card is absent before either side accepts, so its absence cannot
+# prove this mutation completed. The current side's Accept control disappears
+# only after the accepted contract is written back into the owned query state.
+- extendedWaitUntil:
+    notVisible:
+      id: 'visibility-contract-accept'
+    timeout: 15000
 - assertNotVisible:
     id: 'visibility-link-review'
 
 # Cross-login: sign out and sign back in as the supportee (env override,
 # same EMAIL/PASSWORD variables sign-in-only-returning.yaml reads) to accept
 # the other side. Uses the RETURNING-USER sign-in (no welcome-chooser walk) —
-# sign-out.yaml leaves the app directly on the sign-in screen, never on
+# sign-out-v2.yaml leaves the app directly on the sign-in screen, never on
 # welcome-chooser, so sign-in-only.yaml's unconditional
 # nav-welcome-to-sign-in.yaml call would hang its full 120s waiting for a
 # screen that never appears.
 - runFlow:
-    file: ../_setup/sign-out.yaml
+    file: ../_setup/sign-out-v2.yaml
 - runFlow:
     file: ../_setup/sign-in-only-returning.yaml
     env:
@@ -128,7 +135,7 @@ tags:
 # only), so the Journal renders the SAME honest empty state that flow
 # asserts for its own empty-record supportee.
 - runFlow:
-    file: ../_setup/sign-out.yaml
+    file: ../_setup/sign-out-v2.yaml
 - runFlow:
     file: ../_setup/sign-in-only-returning.yaml
 
