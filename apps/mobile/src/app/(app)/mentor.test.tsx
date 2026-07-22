@@ -55,6 +55,9 @@ let mockNowFeed: {
   isFetching: boolean;
   isSlowFallback: boolean;
   refetch: jest.Mock;
+  // [WI-2504 bounce 2] Only set by tests exercising the epoch-bound
+  // post-mutation navigation guard; other tests leave it undefined.
+  observedEpoch?: string;
 };
 let mockSubjects: Array<{
   subjectId: string;
@@ -1111,6 +1114,50 @@ describe('MentorScreen', () => {
     expect(mockPush).toHaveBeenCalledWith(
       '/(app)/session?sessionId=550e8400-e29b-41d4-a716-446655440001',
     );
+  });
+
+  // [WI-2504 bounce 2] The recheck mutation is async — the observed policy
+  // epoch can flip (e.g. a sibling surface observes a disabled epoch) while
+  // it is still in flight. A result that resolves AFTER that flip must not
+  // navigate into a surface the client has since suppressed.
+  it('[WI-2504 bounce 2] does not navigate when the observed policy epoch changes while the recheck mutation is in flight', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+      observedEpoch: 'epoch-enabled',
+    };
+
+    let resolveRecheck: ((body: unknown) => void) | undefined;
+    const recheckPending = new Promise((resolve) => {
+      resolveRecheck = resolve;
+    });
+
+    const rendered = renderMentorScreen(
+      {},
+      { '/mentor-notices/notice-1/recheck': () => recheckPending },
+    );
+
+    fireEvent.press(screen.getByText('Check it now'));
+
+    // The epoch flips while the recheck request is still pending.
+    await act(async () => {
+      mockNowFeed = { ...mockNowFeed, observedEpoch: 'epoch-disabled' };
+      rendered.result.rerender(<MentorScreen />);
+    });
+
+    await act(async () => {
+      resolveRecheck?.({
+        sessionId: '550e8400-e29b-41d4-a716-446655440001',
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockPush).not.toHaveBeenCalledWith(
+      expect.stringContaining('/(app)/session?sessionId='),
+    );
+    screen.getByTestId('now-card-mentor_notice');
   });
 
   // [WI-2499 AC-3] On a rejected/failed defer, no success state may appear —

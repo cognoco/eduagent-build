@@ -4,7 +4,6 @@ import {
   useMutation,
   useQueryClient,
   type UseQueryResult,
-  keepPreviousData,
 } from '@tanstack/react-query';
 import {
   nowOverflowResponseSchema,
@@ -38,6 +37,12 @@ const NOW_FEED_SLOW_FALLBACK_MS = 2_000;
 export type NowFeedQueryResult = UseQueryResult<NowResponse> & {
   fallbackFeed: NowResponse | null;
   isSlowFallback: boolean;
+  // [WI-2504 bounce 2] The policy epoch THIS hook observed as of its latest
+  // render, so a consumer that starts an async action (e.g. a mentor-notice
+  // recheck) can compare it against the epoch observed once that action
+  // resolves, and refuse to act on a result that outlived the epoch it
+  // started under.
+  observedEpoch: string;
 };
 
 /**
@@ -213,7 +218,19 @@ export function useNowFeed(): NowFeedQueryResult {
     // carries the right key — otherwise every cold start would fetch twice.
     enabled: !!profileId && epochHydrated,
     staleTime: NOW_FEED_STALE_TIME_MS,
-    placeholderData: keepPreviousData,
+    // [WI-2504 bounce 2] `keepPreviousData` must not carry a query's data
+    // across an epoch re-key. `observedEpoch` can change between renders —
+    // from this hook's own fetch observing a new epoch, or from any other
+    // consumer sharing the same observation (see `useObservedPolicyEpoch`
+    // above) — re-keying THIS query while a settled query for the OLD epoch
+    // still holds its (possibly notice-bearing) data. Plain
+    // `keepPreviousData` would paint that old query's data for the whole
+    // window the re-keyed query's own fetch is pending. Only reuse the
+    // placeholder when the previous query was fetched under the SAME
+    // observed epoch as now; otherwise expose no data until the new epoch's
+    // fetch resolves.
+    placeholderData: (previousData, previousQuery) =>
+      previousQuery?.queryKey[3] === observedEpoch ? previousData : undefined,
     refetchOnWindowFocus: true,
   });
 
@@ -253,6 +270,7 @@ export function useNowFeed(): NowFeedQueryResult {
     ...query,
     fallbackFeed,
     isSlowFallback,
+    observedEpoch,
   };
 }
 

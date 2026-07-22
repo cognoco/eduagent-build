@@ -368,6 +368,24 @@ describe('useNowFeed + useNowOverflow — shared observed epoch across concurren
     });
   }
 
+  function noticeNowResponse(epoch: string): NowResponse {
+    return feed({
+      cards: [
+        {
+          kind: 'mentor_notice',
+          templateKey: 'now.mentor_notice.default',
+          params: {
+            noticeId: '33333333-3333-4333-8333-333333333333',
+            concept: 'sign flip',
+          },
+          deepLink: { route: 'notice.recheck', params: {}, chain: [] },
+          scope: 'self',
+        },
+      ] as NowResponse['cards'],
+      mentorNoticePolicyEpoch: epoch,
+    });
+  }
+
   beforeEach(async () => {
     originalFetch = globalThis.fetch;
     setActiveProfileId(CACHE_BINDING.profileId);
@@ -443,6 +461,88 @@ describe('useNowFeed + useNowOverflow — shared observed epoch across concurren
           (item) => item.kind === 'mentor_notice',
         ),
       ).toBe(false),
+    );
+
+    queryClient.clear();
+  });
+
+  // [WI-2504 bounce 2] `useNowFeed` only ever observes epoch changes from ITS
+  // OWN fetch (the sole writer of the shared observation — see
+  // `useObservedPolicyEpoch` above), so the leak this reproduces is a
+  // SECOND fetch of an ALREADY-SETTLED query that observes a new epoch: the
+  // settled query keeps its OLD (notice-bearing) `data` visible while that
+  // very fetch is in flight (ordinary React Query refetch behavior) — and
+  // when it resolves, `observe()` fires and re-keys the query BEFORE this
+  // fetch's own new (non-notice) data commits to the OLD key. The freshly
+  // mounted re-keyed query has no data of its own yet, so
+  // `placeholderData: keepPreviousData` would paint the OLD key's
+  // still-notice-bearing `data` for the whole window the re-keyed query's
+  // own fetch is pending, even though nothing has told the client the
+  // notice is still valid under the new (disabled) epoch.
+  it("does not expose a stale ENABLED-epoch notice card while the re-keyed query's own fetch is pending after a later same-hook fetch observes a disabled epoch", async () => {
+    let nowCallCount = 0;
+    let resolveFourthCall: (() => void) | undefined;
+    globalThis.fetch = jest.fn(async () => {
+      nowCallCount += 1;
+      if (nowCallCount === 1 || nowCallCount === 2) {
+        // Call 1 (bootstrap key) observes ENABLED_EPOCH and re-keys to it;
+        // call 2 (now under the ENABLED_EPOCH key) settles that query with
+        // notice-bearing data — this is the warm, stable state before
+        // anything observes a disable.
+        return new Response(JSON.stringify(noticeNowResponse(ENABLED_EPOCH)), {
+          status: 200,
+        });
+      }
+      if (nowCallCount === 3) {
+        // A later refetch of the SAME (still ENABLED_EPOCH-keyed) query
+        // that now observes the disabled epoch and re-keys again.
+        return new Response(
+          JSON.stringify({
+            ...feed(),
+            mentorNoticePolicyEpoch: DISABLED_EPOCH,
+          }),
+          { status: 200 },
+        );
+      }
+      // The re-keyed (DISABLED_EPOCH) query's own fetch. Held pending so
+      // the assertion below runs during the exact window a leaking
+      // placeholder would expose the ENABLED_EPOCH key's stale notice card.
+      return new Promise<Response>((resolve) => {
+        resolveFourthCall = () =>
+          resolve(new Response(JSON.stringify(feed()), { status: 200 }));
+      });
+    }) as unknown as typeof globalThis.fetch;
+
+    const { queryClient, wrapper } = createHookWrapper();
+    const nowFeedHook = renderHook(() => useNowFeed(), { wrapper });
+
+    // The warm, settled state: 2 calls in, notice-bearing, under ENABLED_EPOCH.
+    await waitFor(() =>
+      expect(nowFeedHook.result.current.isSuccess).toBe(true),
+    );
+    expect(nowCallCount).toBe(2);
+    expect(nowFeedHook.result.current.data?.cards.map((c) => c.kind)).toEqual([
+      'mentor_notice',
+    ]);
+
+    // Force the 3rd fetch — the one that observes the disabled epoch.
+    act(() => {
+      void nowFeedHook.result.current.refetch();
+    });
+    await waitFor(() => expect(nowCallCount).toBe(4));
+
+    // Consumer-visible outcome: while the re-keyed (DISABLED_EPOCH) query's
+    // own fetch is pending, the hook must not still paint the notice card
+    // from the now-superseded ENABLED_EPOCH key.
+    expect(
+      nowFeedHook.result.current.data?.cards.some(
+        (c) => c.kind === 'mentor_notice',
+      ),
+    ).not.toBe(true);
+
+    resolveFourthCall?.();
+    await waitFor(() =>
+      expect(nowFeedHook.result.current.isSuccess).toBe(true),
     );
 
     queryClient.clear();
