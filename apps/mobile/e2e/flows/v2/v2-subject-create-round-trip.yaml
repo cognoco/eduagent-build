@@ -95,10 +95,6 @@ tags:
 - tapOn:
     id: 'create-subject-submit'
 - extendedWaitUntil:
-    visible:
-      id: 'subject-resolve-loading'
-    timeout: 15000
-- extendedWaitUntil:
     notVisible:
       id: 'subject-resolve-loading'
     timeout: 60000
@@ -147,6 +143,12 @@ tags:
     visible:
       id: 'ready-screen'
     timeout: 60000
+- extendedWaitUntil:
+    visible:
+      text: '^Starting with Photosynthesis$'
+    timeout: 10000
+- assertVisible:
+    text: '^Starting with Photosynthesis$'
 - assertVisible:
     id: 'ready-start'
 - tapOn:

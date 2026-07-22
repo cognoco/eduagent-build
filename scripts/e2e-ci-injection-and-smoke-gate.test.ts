@@ -1341,7 +1341,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     }
   });
 
-  it('[WI-2506] binds each subject resolver result to its owned action and fails ambiguous results closed', () => {
+  it('[WI-2506 / WI-2608] binds resolver actions and requires the exact stable Photosynthesis round trip', () => {
     type Command = Record<string, unknown>;
     const subjectCreate = parseAllDocuments(
       readFileSync(
@@ -1486,21 +1486,74 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         ownedCorrectiveTapSignatures(commands),
         expectedOwnedCorrectiveTaps,
       );
+    const isHardResolveLoadingAppearance = (payload: unknown): boolean => {
+      if (payload === null || typeof payload !== 'object') return false;
+      const record = payload as Command;
+      const selector = record.visible ?? record;
+      if (selector === null || typeof selector !== 'object') return false;
+      const selectorRecord = selector as Command;
+      return (
+        selectorRecord.id === 'subject-resolve-loading' &&
+        record.optional !== true &&
+        selectorRecord.optional !== true
+      );
+    };
+    const requiresTransientResolveLoadingAppearance = (
+      commands: unknown[],
+    ): boolean =>
+      allObjects(commands).some(
+        (command) =>
+          isHardResolveLoadingAppearance(command.extendedWaitUntil) ||
+          isHardResolveLoadingAppearance(command.assertVisible),
+      );
+    const exactCaseSequence = [
+      'extendedWaitUntil:id:ready-screen',
+      'extendedWaitUntil:text:^Starting with Photosynthesis$',
+      'assertVisible:text:^Starting with Photosynthesis$',
+      'assertVisible:id:ready-start',
+      'tapOn:id:ready-start',
+      'extendedWaitUntil:id:session-screen',
+      'assertVisible:id:chat-shell-back',
+      'tapOn:id:chat-shell-back',
+      'extendedWaitUntil:id:subjects-screen',
+      'extendedWaitUntil:text:Photosynthesis',
+      'assertVisible:text:Photosynthesis',
+    ];
+    const satisfiesExactCaseContract = (commands: unknown[]): boolean =>
+      !requiresTransientResolveLoadingAppearance(commands) &&
+      hasSequence(commands.map(hardCommandSignature), exactCaseSequence);
 
     expect(satisfiesOutcomeContract(subjectCreate)).toBe(true);
+    expect(satisfiesExactCaseContract(subjectCreate)).toBe(true);
+
+    const exactReadyWaitIndex = subjectCreate.findIndex(
+      (command) =>
+        hardCommandSignature(command) ===
+        'extendedWaitUntil:text:^Starting with Photosynthesis$',
+    );
+    expect(exactReadyWaitIndex).toBeGreaterThanOrEqual(0);
     expect(
-      hasSequence(subjectCreate.map(hardCommandSignature), [
-        'extendedWaitUntil:id:ready-screen',
-        'assertVisible:id:ready-start',
-        'tapOn:id:ready-start',
-        'extendedWaitUntil:id:session-screen',
-        'assertVisible:id:chat-shell-back',
-        'tapOn:id:chat-shell-back',
-        'extendedWaitUntil:id:subjects-screen',
-        'extendedWaitUntil:text:Photosynthesis',
-        'assertVisible:text:Photosynthesis',
+      satisfiesExactCaseContract(
+        subjectCreate.filter((_, index) => index !== exactReadyWaitIndex),
+      ),
+    ).toBe(false);
+    expect(
+      satisfiesExactCaseContract([
+        ...subjectCreate,
+        {
+          extendedWaitUntil: {
+            visible: { id: 'subject-resolve-loading' },
+            timeout: 15000,
+          },
+        },
       ]),
-    ).toBe(true);
+    ).toBe(false);
+    expect(
+      satisfiesExactCaseContract([
+        ...subjectCreate,
+        { assertVisible: { id: 'subject-resolve-loading' } },
+      ]),
+    ).toBe(false);
 
     const noMatchCommands = ownedBranch(
       'subject-no-match-card',
