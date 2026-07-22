@@ -1353,7 +1353,341 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     }
   });
 
-  it('[WI-2506] binds each subject resolver result to its owned action and fails ambiguous results closed', () => {
+  it('[WI-2616] hard-routes V2 link-ceremony cross-logins through Account', () => {
+    type Command = Record<string, unknown>;
+    const v2SignOutPath = join(
+      repoRoot,
+      'apps/mobile/e2e/flows/_setup/sign-out-v2.yaml',
+    );
+
+    expect(existsSync(v2SignOutPath)).toBe(true);
+
+    const v2SignOut = parseAllDocuments(
+      readFileSync(v2SignOutPath, 'utf8'),
+    )[1]?.toJS() as unknown;
+    const ceremony = parseAllDocuments(
+      readFileSync(
+        join(
+          repoRoot,
+          'apps/mobile/e2e/flows/v2/v2-supporter-link-ceremony.yaml',
+        ),
+        'utf8',
+      ),
+    )[1]?.toJS() as unknown;
+
+    expect(Array.isArray(v2SignOut)).toBe(true);
+    expect(Array.isArray(ceremony)).toBe(true);
+    if (!Array.isArray(v2SignOut) || !Array.isArray(ceremony)) {
+      throw new Error('WI-2616 Maestro commands must be YAML lists');
+    }
+
+    const expectedV2SignOut: Command[] = [
+      { openLink: 'mentomate:///mentor' },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'account-avatar-button' },
+          timeout: 15000,
+        },
+      },
+      { tapOn: { id: 'account-avatar-button' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'account-screen' },
+          timeout: 15000,
+        },
+      },
+      {
+        scrollUntilVisible: {
+          element: { id: 'account-admin-sign-out' },
+          direction: 'DOWN',
+          timeout: 15000,
+        },
+      },
+      { assertVisible: { id: 'account-admin-sign-out' } },
+      { tapOn: { id: 'account-admin-sign-out' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'sign-in-button' },
+          timeout: 15000,
+        },
+      },
+    ];
+    const allObjects = (value: unknown): Command[] => {
+      if (Array.isArray(value)) return value.flatMap(allObjects);
+      if (value === null || typeof value !== 'object') return [];
+      return [value as Command, ...Object.values(value).flatMap(allObjects)];
+    };
+    const hardCommandSignature = (command: unknown): string => {
+      if (command === null || typeof command !== 'object') return '';
+      const record = command as Command;
+      if (record.optional === true) return '';
+      if (typeof record.openLink === 'string') {
+        return `openLink:${record.openLink}`;
+      }
+      const kind = [
+        'extendedWaitUntil',
+        'scrollUntilVisible',
+        'assertVisible',
+        'tapOn',
+      ].find((candidate) => candidate in record);
+      if (!kind) return '';
+      const payload = record[kind];
+      if (payload === null || typeof payload !== 'object') return '';
+      const payloadRecord = payload as Command;
+      if (payloadRecord.optional === true) return '';
+      const selector = (payloadRecord.visible ??
+        payloadRecord.element ??
+        payloadRecord) as Command;
+      if (selector.optional === true || typeof selector.id !== 'string') {
+        return '';
+      }
+      return `${kind}:id:${selector.id}`;
+    };
+    const expectedV2SignOutSequence =
+      expectedV2SignOut.map(hardCommandSignature);
+    const hasSequence = (
+      commands: unknown[],
+      expectedSequence: unknown[],
+    ): boolean =>
+      commands.some((_, start) =>
+        expectedSequence.every((expected, offset) =>
+          isDeepStrictEqual(commands[start + offset], expected),
+        ),
+      );
+    const satisfiesV2SignOutContract = (commands: unknown[]): boolean =>
+      hasSequence(
+        commands.map(hardCommandSignature),
+        expectedV2SignOutSequence,
+      ) &&
+      !allObjects(commands).some((value) => value.optional === true) &&
+      !allObjects(commands).some((value) => typeof value.text === 'string') &&
+      !JSON.stringify(commands).includes('"More"') &&
+      !JSON.stringify(commands).includes('sign-out-button');
+    const replaceAt = <T>(values: T[], index: number, value: T): T[] => {
+      const copy = [...values];
+      copy[index] = value;
+      return copy;
+    };
+    const withPayloadOptional = (command: Command): Command => {
+      const entry = Object.entries(command)[0];
+      if (!entry) return { optional: true };
+      const [kind, payload] = entry;
+      return payload !== null && typeof payload === 'object'
+        ? { [kind]: { ...(payload as Command), optional: true } }
+        : { ...command, optional: true };
+    };
+    const expectSequenceMutationsRejected = (
+      commands: unknown[],
+      start: number,
+      length: number,
+      satisfies: (candidate: unknown[]) => boolean,
+    ): void => {
+      for (let offset = 0; offset < length; offset += 1) {
+        const index = start + offset;
+        expect(
+          satisfies(
+            commands.filter((_, commandIndex) => commandIndex !== index),
+          ),
+        ).toBe(false);
+        expect(
+          satisfies(
+            replaceAt(commands, index, {
+              assertVisible: { id: `adjacent-sequence-step-${offset}` },
+            }),
+          ),
+        ).toBe(false);
+        expect(
+          satisfies(
+            replaceAt(
+              commands,
+              index,
+              withPayloadOptional(commands[index] as Command),
+            ),
+          ),
+        ).toBe(false);
+
+        if (offset < length - 1) {
+          const reordered = [...commands];
+          [reordered[index], reordered[index + 1]] = [
+            reordered[index + 1],
+            reordered[index],
+          ];
+          expect(satisfies(reordered)).toBe(false);
+        }
+      }
+    };
+
+    expect(satisfiesV2SignOutContract(v2SignOut)).toBe(true);
+    expectSequenceMutationsRejected(
+      expectedV2SignOut,
+      0,
+      expectedV2SignOut.length,
+      satisfiesV2SignOutContract,
+    );
+    expect(
+      satisfiesV2SignOutContract([
+        { tapOn: { text: 'More' } },
+        { tapOn: { id: 'sign-out-button' } },
+      ]),
+    ).toBe(false);
+    expect(
+      satisfiesV2SignOutContract([
+        ...expectedV2SignOut,
+        { tapOn: { text: 'Sign out' } },
+      ]),
+    ).toBe(false);
+    expect(
+      satisfiesV2SignOutContract([
+        ...expectedV2SignOut,
+        { tapOn: { id: 'account-avatar-button', optional: true } },
+      ]),
+    ).toBe(false);
+
+    const v2SignOutCall: Command = {
+      runFlow: { file: '../_setup/sign-out-v2.yaml' },
+    };
+    const legacySignOutCall: Command = {
+      runFlow: { file: '../_setup/sign-out.yaml' },
+    };
+    const supporteeSignInCall: Command = {
+      runFlow: {
+        file: '../_setup/sign-in-only-returning.yaml',
+        env: {
+          EMAIL: '${SUPPORTEE_EMAIL}',
+          PASSWORD: '${SUPPORTEE_PASSWORD}',
+        },
+      },
+    };
+    const supporterSignInCall: Command = {
+      runFlow: { file: '../_setup/sign-in-only-returning.yaml' },
+    };
+    const firstAcceptanceSequence: Command[] = [
+      { tapOn: { id: 'visibility-contract-accept' } },
+      {
+        extendedWaitUntil: {
+          notVisible: { id: 'visibility-contract-accept' },
+          timeout: 15000,
+        },
+      },
+      { assertNotVisible: { id: 'visibility-link-review' } },
+      v2SignOutCall,
+      supporteeSignInCall,
+    ];
+    const secondAcceptanceSequence: Command[] = [
+      { tapOn: { id: 'visibility-contract-accept' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'visibility-link-review' },
+          timeout: 15000,
+        },
+      },
+      { assertVisible: { id: 'visibility-contract-revoke' } },
+      v2SignOutCall,
+      supporterSignInCall,
+    ];
+    const callCount = (commands: unknown[], expected: Command): number =>
+      commands.filter((command) => isDeepStrictEqual(command, expected)).length;
+    const sequenceStart = (
+      commands: unknown[],
+      expectedSequence: Command[],
+    ): number =>
+      commands.findIndex((_, start) =>
+        expectedSequence.every((expected, offset) =>
+          isDeepStrictEqual(commands[start + offset], expected),
+        ),
+      );
+    const satisfiesCeremonyContract = (commands: unknown[]): boolean => {
+      const firstAcceptanceStart = sequenceStart(
+        commands,
+        firstAcceptanceSequence,
+      );
+      const secondAcceptanceStart = sequenceStart(
+        commands,
+        secondAcceptanceSequence,
+      );
+      return (
+        callCount(commands, v2SignOutCall) === 2 &&
+        callCount(commands, legacySignOutCall) === 0 &&
+        callCount(commands, supporteeSignInCall) === 1 &&
+        callCount(commands, supporterSignInCall) === 1 &&
+        commands.filter((command) => {
+          if (command === null || typeof command !== 'object') return false;
+          const runFlow = (command as Command).runFlow;
+          return (
+            runFlow !== null &&
+            typeof runFlow === 'object' &&
+            (runFlow as Command).file ===
+              '../_setup/sign-in-only-returning.yaml'
+          );
+        }).length === 2 &&
+        firstAcceptanceStart >= 0 &&
+        secondAcceptanceStart >= 0 &&
+        firstAcceptanceStart < secondAcceptanceStart
+      );
+    };
+
+    expect(satisfiesCeremonyContract(ceremony)).toBe(true);
+    const firstAcceptanceStart = sequenceStart(
+      ceremony,
+      firstAcceptanceSequence,
+    );
+    const secondAcceptanceStart = sequenceStart(
+      ceremony,
+      secondAcceptanceSequence,
+    );
+    expect(firstAcceptanceStart).toBeGreaterThanOrEqual(0);
+    expect(secondAcceptanceStart).toBeGreaterThanOrEqual(0);
+    expect(firstAcceptanceStart).toBeLessThan(secondAcceptanceStart);
+    if (firstAcceptanceStart < 0 || secondAcceptanceStart < 0) {
+      throw new Error('WI-2616 acceptance sequences must both be present');
+    }
+    expect(
+      satisfiesCeremonyContract([
+        ...ceremony.slice(0, firstAcceptanceStart),
+        ...ceremony.slice(
+          secondAcceptanceStart,
+          secondAcceptanceStart + secondAcceptanceSequence.length,
+        ),
+        ...ceremony.slice(
+          firstAcceptanceStart + firstAcceptanceSequence.length,
+          secondAcceptanceStart,
+        ),
+        ...ceremony.slice(
+          firstAcceptanceStart,
+          firstAcceptanceStart + firstAcceptanceSequence.length,
+        ),
+        ...ceremony.slice(
+          secondAcceptanceStart + secondAcceptanceSequence.length,
+        ),
+      ]),
+    ).toBe(false);
+    expectSequenceMutationsRejected(
+      ceremony,
+      firstAcceptanceStart,
+      firstAcceptanceSequence.length,
+      satisfiesCeremonyContract,
+    );
+    expectSequenceMutationsRejected(
+      ceremony,
+      secondAcceptanceStart,
+      secondAcceptanceSequence.length,
+      satisfiesCeremonyContract,
+    );
+
+    const signOutIndices = ceremony.flatMap((command, index) =>
+      isDeepStrictEqual(command, v2SignOutCall) ? [index] : [],
+    );
+    expect(signOutIndices).toHaveLength(2);
+    for (const signOutIndex of signOutIndices) {
+      expect(
+        satisfiesCeremonyContract(
+          replaceAt(ceremony, signOutIndex, legacySignOutCall),
+        ),
+      ).toBe(false);
+    }
+  });
+
+  it('[WI-2506 / WI-2608] binds resolver actions and requires the exact stable Photosynthesis round trip', () => {
     type Command = Record<string, unknown>;
     const subjectCreate = parseAllDocuments(
       readFileSync(
@@ -1380,7 +1714,6 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       {
         tapOn: {
           id: actionId,
-          childOf: { id: ownerId },
         },
       },
     ];
@@ -1403,6 +1736,14 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         timeout: 60000,
       },
     };
+    const stableOutcome: Command = {
+      extendedWaitUntil: {
+        visible: {
+          id: '^(ready-screen|subject-confident-card|subject-single-suggestion-card|subject-no-match-card|subject-suggestion-card)$',
+        },
+        timeout: 60000,
+      },
+    };
     const failClosed: Command = {
       assertNotVisible: { id: 'subject-suggestion-card' },
     };
@@ -1417,6 +1758,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       },
     };
     const outcomeSequence: Command[] = [
+      stableOutcome,
       resolveFinished,
       failClosed,
       branch(
@@ -1449,10 +1791,35 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         (candidate) => candidate in record,
       );
       if (!kind) return '';
-      const payload = record[kind] as Command;
+      const payloadValue = record[kind];
+      if (payloadValue === null || typeof payloadValue !== 'object') return '';
+      const payload = payloadValue as Command;
+      if (record.optional === true || payload.optional === true) return '';
       const selector = (payload.visible ?? payload) as Command;
       if (selector.optional === true) return '';
-      return `${kind}:${selector.id ? `id:${selector.id}` : `text:${selector.text}`}`;
+      const selectorSignatures = [
+        typeof selector.id === 'string' ? `id:${selector.id}` : '',
+        typeof selector.text === 'string' ? `text:${selector.text}` : '',
+      ].filter(Boolean);
+      if (selectorSignatures.length === 0) return '';
+      const selectorSignature = selectorSignatures.join(':');
+      const descendants = selector.containsDescendants;
+      if (descendants === undefined) return `${kind}:${selectorSignature}`;
+      if (!Array.isArray(descendants)) return '';
+      const descendantSignatures = descendants.map((descendant) => {
+        if (descendant === null || typeof descendant !== 'object') return '';
+        const descendantSelector = descendant as Command;
+        if (descendantSelector.optional === true) return '';
+        if (typeof descendantSelector.id === 'string') {
+          return `id:${descendantSelector.id}`;
+        }
+        if (typeof descendantSelector.text === 'string') {
+          return `text:${descendantSelector.text}`;
+        }
+        return '';
+      });
+      if (descendantSignatures.some((signature) => signature === '')) return '';
+      return `${kind}:${selectorSignature}:containsDescendants:${descendantSignatures.join(',')}`;
     };
     const hasArbitraryAmbiguousTap = (commands: unknown[]): boolean =>
       allObjects(commands).some((command) => {
@@ -1467,12 +1834,12 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       'subject-suggestion-accept',
       'subject-use-my-words',
     ]);
-    const expectedOwnedCorrectiveTaps = [
-      'subject-suggestion-accept|subject-confident-card',
-      'subject-suggestion-accept|subject-single-suggestion-card',
-      'subject-use-my-words|subject-no-match-card',
+    const expectedCorrectiveTaps = [
+      'subject-suggestion-accept|',
+      'subject-suggestion-accept|',
+      'subject-use-my-words|',
     ].sort();
-    const ownedCorrectiveTapSignatures = (commands: unknown[]): string[] =>
+    const correctiveTapSignatures = (commands: unknown[]): string[] =>
       allObjects(commands)
         .flatMap((command) => {
           const tapOn = command.tapOn;
@@ -1495,24 +1862,265 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       hasSequence(commands, outcomeSequence) &&
       !hasArbitraryAmbiguousTap(commands) &&
       isDeepStrictEqual(
-        ownedCorrectiveTapSignatures(commands),
-        expectedOwnedCorrectiveTaps,
+        correctiveTapSignatures(commands),
+        expectedCorrectiveTaps,
       );
+    const isHardResolveLoadingAppearance = (payload: unknown): boolean => {
+      if (payload === null || typeof payload !== 'object') return false;
+      const record = payload as Command;
+      const selector = record.visible ?? record;
+      if (selector === null || typeof selector !== 'object') return false;
+      const selectorRecord = selector as Command;
+      return (
+        selectorRecord.id === 'subject-resolve-loading' &&
+        record.optional !== true &&
+        selectorRecord.optional !== true
+      );
+    };
+    const requiresTransientResolveLoadingAppearance = (
+      commands: unknown[],
+    ): boolean =>
+      allObjects(commands).some(
+        (command) =>
+          isHardResolveLoadingAppearance(command.extendedWaitUntil) ||
+          isHardResolveLoadingAppearance(command.assertVisible),
+      );
+    const exactSubjectRowId = '^subjects-browse-row-.*$';
+    const exactSubjectRowLabel = 'Open Photosynthesis';
+    const exactSubjectRowSignature = `id:${exactSubjectRowId}:text:${exactSubjectRowLabel}`;
+    const exactSubjectRowWaitSignature = `extendedWaitUntil:${exactSubjectRowSignature}`;
+    const exactSubjectRowAssertSignature = `assertVisible:${exactSubjectRowSignature}`;
+    const exactCaseSequence = [
+      'extendedWaitUntil:id:ready-screen',
+      'extendedWaitUntil:text:Starting with Photosynthesis',
+      'assertVisible:text:Starting with Photosynthesis',
+      'assertVisible:id:ready-start',
+      'tapOn:id:ready-start',
+      'extendedWaitUntil:id:session-screen',
+      'assertVisible:id:chat-shell-back',
+      'tapOn:id:chat-shell-back',
+      'extendedWaitUntil:id:subjects-screen',
+      exactSubjectRowWaitSignature,
+      exactSubjectRowAssertSignature,
+    ];
+    const satisfiesExactCaseContract = (commands: unknown[]): boolean => {
+      // This is intentionally an ordered hard-property subsequence: extra
+      // diagnostics may surround it without turning a correct case red.
+      return (
+        !requiresTransientResolveLoadingAppearance(commands) &&
+        hasSequence(commands.map(hardCommandSignature), exactCaseSequence)
+      );
+    };
+    const withOptionalCommand = (
+      commands: unknown[],
+      index: number,
+      placement: 'root' | 'payload' | 'selector',
+    ): unknown[] => {
+      expect(index).toBeGreaterThanOrEqual(0);
+      return commands.map((command, commandIndex) => {
+        if (commandIndex !== index) return command;
+        const record = command as Command;
+        if (placement === 'root') {
+          return { ...record, optional: true };
+        }
+        const kind = ['extendedWaitUntil', 'assertVisible'].find(
+          (candidate) => candidate in record,
+        );
+        expect(kind).toBeDefined();
+        const payload = record[kind!] as Command;
+        if (placement === 'payload') {
+          return {
+            ...record,
+            [kind!]: { ...payload, optional: true },
+          };
+        }
+        const selectorKey = 'visible' in payload ? 'visible' : undefined;
+        const selector = (
+          selectorKey ? payload[selectorKey] : payload
+        ) as Command;
+        return {
+          ...record,
+          [kind!]: selectorKey
+            ? { ...payload, [selectorKey]: { ...selector, optional: true } }
+            : { ...selector, optional: true },
+        };
+      });
+    };
+    const withRowSelectorMutation = (
+      commands: unknown[],
+      index: number,
+      mutation: 'remove-id' | 'change-id' | 'remove-label' | 'change-label',
+    ): unknown[] => {
+      expect(index).toBeGreaterThanOrEqual(0);
+      return commands.map((command, commandIndex) => {
+        if (commandIndex !== index) return command;
+        const record = command as Command;
+        const kind = ['extendedWaitUntil', 'assertVisible'].find(
+          (candidate) => candidate in record,
+        );
+        expect(kind).toBeDefined();
+        const payload = record[kind!] as Command;
+        const selectorKey = 'visible' in payload ? 'visible' : undefined;
+        const selector = (
+          selectorKey ? payload[selectorKey] : payload
+        ) as Command;
+        let mutatedSelector: Command;
+        if (mutation === 'remove-id') {
+          const { id: _removedId, ...withoutId } = selector;
+          mutatedSelector = withoutId;
+        } else if (mutation === 'change-id') {
+          mutatedSelector = { ...selector, id: '^adjacent-row-.*$' };
+        } else if (mutation === 'remove-label') {
+          const { text: _removedText, ...withoutText } = selector;
+          mutatedSelector = withoutText;
+        } else {
+          mutatedSelector = { ...selector, text: '^Open Adjacent subject$' };
+        }
+        return {
+          ...record,
+          [kind!]: selectorKey
+            ? { ...payload, [selectorKey]: mutatedSelector }
+            : mutatedSelector,
+        };
+      });
+    };
 
     expect(satisfiesOutcomeContract(subjectCreate)).toBe(true);
+    expect(satisfiesExactCaseContract(subjectCreate)).toBe(true);
+
+    const stableOutcomeSignature =
+      'extendedWaitUntil:id:^(ready-screen|subject-confident-card|subject-single-suggestion-card|subject-no-match-card|subject-suggestion-card)$';
+    const stableOutcomeIndex = subjectCreate.findIndex(
+      (command) => hardCommandSignature(command) === stableOutcomeSignature,
+    );
+    expect(stableOutcomeIndex).toBeGreaterThanOrEqual(0);
     expect(
-      hasSequence(subjectCreate.map(hardCommandSignature), [
-        'extendedWaitUntil:id:ready-screen',
-        'assertVisible:id:ready-start',
-        'tapOn:id:ready-start',
-        'extendedWaitUntil:id:session-screen',
-        'assertVisible:id:chat-shell-back',
-        'tapOn:id:chat-shell-back',
-        'extendedWaitUntil:id:subjects-screen',
-        'extendedWaitUntil:text:Photosynthesis',
-        'assertVisible:text:Photosynthesis',
+      satisfiesOutcomeContract(
+        subjectCreate.filter(
+          (command) => !isDeepStrictEqual(command, stableOutcome),
+        ),
+      ),
+    ).toBe(false);
+    expect(
+      satisfiesOutcomeContract(
+        withOptionalCommand(subjectCreate, stableOutcomeIndex, 'payload'),
+      ),
+    ).toBe(false);
+    expect(
+      satisfiesOutcomeContract(
+        withOptionalCommand(subjectCreate, stableOutcomeIndex, 'selector'),
+      ),
+    ).toBe(false);
+    expect(
+      satisfiesOutcomeContract(
+        withOptionalCommand(subjectCreate, stableOutcomeIndex, 'root'),
+      ),
+    ).toBe(false);
+
+    const exactReadyWaitIndex = subjectCreate.findIndex(
+      (command) =>
+        hardCommandSignature(command) ===
+        'extendedWaitUntil:text:Starting with Photosynthesis',
+    );
+    expect(exactReadyWaitIndex).toBeGreaterThanOrEqual(0);
+    expect(
+      satisfiesExactCaseContract(
+        subjectCreate.filter((_, index) => index !== exactReadyWaitIndex),
+      ),
+    ).toBe(false);
+    const exactCaseStart = subjectCreate
+      .map(hardCommandSignature)
+      .findIndex((_, start, signatures) =>
+        exactCaseSequence.every(
+          (expected, offset) => signatures[start + offset] === expected,
+        ),
+      );
+    expect(exactCaseStart).toBeGreaterThanOrEqual(0);
+    expect(
+      satisfiesExactCaseContract([
+        ...subjectCreate.slice(0, exactCaseStart),
+        subjectCreate[exactCaseStart]!,
+        ...subjectCreate.slice(exactCaseStart),
       ]),
     ).toBe(true);
+    for (const signature of [
+      'extendedWaitUntil:id:ready-screen',
+      'extendedWaitUntil:text:Starting with Photosynthesis',
+      'assertVisible:text:Starting with Photosynthesis',
+      'assertVisible:id:ready-start',
+      'extendedWaitUntil:id:session-screen',
+      'assertVisible:id:chat-shell-back',
+      'extendedWaitUntil:id:subjects-screen',
+      exactSubjectRowWaitSignature,
+      exactSubjectRowAssertSignature,
+    ]) {
+      const exactCaseOffset = exactCaseSequence.indexOf(signature);
+      expect(exactCaseOffset).toBeGreaterThanOrEqual(0);
+      expect(
+        satisfiesExactCaseContract(
+          withOptionalCommand(
+            subjectCreate,
+            exactCaseStart + exactCaseOffset,
+            'payload',
+          ),
+        ),
+      ).toBe(false);
+      expect(
+        satisfiesExactCaseContract(
+          withOptionalCommand(
+            subjectCreate,
+            exactCaseStart + exactCaseOffset,
+            'selector',
+          ),
+        ),
+      ).toBe(false);
+      expect(
+        satisfiesExactCaseContract(
+          withOptionalCommand(
+            subjectCreate,
+            exactCaseStart + exactCaseOffset,
+            'root',
+          ),
+        ),
+      ).toBe(false);
+    }
+    for (const signature of [
+      exactSubjectRowWaitSignature,
+      exactSubjectRowAssertSignature,
+    ]) {
+      const exactCaseOffset = exactCaseSequence.indexOf(signature);
+      expect(exactCaseOffset).toBeGreaterThanOrEqual(0);
+      const commandIndex = exactCaseStart + exactCaseOffset;
+      for (const mutation of [
+        'remove-id',
+        'change-id',
+        'remove-label',
+        'change-label',
+      ] as const) {
+        expect(
+          satisfiesExactCaseContract(
+            withRowSelectorMutation(subjectCreate, commandIndex, mutation),
+          ),
+        ).toBe(false);
+      }
+    }
+    expect(
+      satisfiesExactCaseContract([
+        ...subjectCreate,
+        {
+          extendedWaitUntil: {
+            visible: { id: 'subject-resolve-loading' },
+            timeout: 15000,
+          },
+        },
+      ]),
+    ).toBe(false);
+    expect(
+      satisfiesExactCaseContract([
+        ...subjectCreate,
+        { assertVisible: { id: 'subject-resolve-loading' } },
+      ]),
+    ).toBe(false);
 
     const noMatchCommands = ownedBranch(
       'subject-no-match-card',
@@ -1527,13 +2135,36 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       copy[index] = value;
       return copy;
     };
+    for (const [branchIndex, ownerId, actionId] of [
+      [3, 'subject-confident-card', 'subject-suggestion-accept'],
+      [4, 'subject-single-suggestion-card', 'subject-suggestion-accept'],
+      [5, 'subject-no-match-card', 'subject-use-my-words'],
+    ] as const) {
+      expect(
+        satisfiesOutcomeContract(
+          replaceAt(
+            outcomeSequence,
+            branchIndex,
+            branch(ownerId, [
+              {
+                assertVisible: {
+                  id: ownerId,
+                  containsDescendants: [{ id: actionId }],
+                },
+              },
+              { tapOn: { id: actionId, childOf: { id: ownerId } } },
+            ]),
+          ),
+        ),
+      ).toBe(false);
+    }
     for (const mutation of [
       // Removal: the branch cannot act without first proving its owner/action.
-      outcomeSequence.filter((_, index) => index !== 4),
+      outcomeSequence.filter((_, index) => index !== 5),
       // Global proof: sibling assertions do not bind the action to its card.
       replaceAt(
         outcomeSequence,
-        4,
+        5,
         branch('subject-no-match-card', [
           { assertVisible: { id: 'subject-no-match-card' } },
           { assertVisible: { id: 'subject-use-my-words' } },
@@ -1543,7 +2174,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       // Adjacent case: the correct action under the wrong result owner.
       replaceAt(
         outcomeSequence,
-        4,
+        5,
         branch(
           'subject-no-match-card',
           ownedBranch('subject-suggestion-card', 'subject-use-my-words'),
@@ -1552,7 +2183,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       // Wrong action: accepting a suggestion does not exercise no-match.
       replaceAt(
         outcomeSequence,
-        4,
+        5,
         branch(
           'subject-no-match-card',
           ownedBranch('subject-no-match-card', 'subject-suggestion-accept'),
@@ -1561,7 +2192,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       // Optional assertions do not establish evidence.
       replaceAt(
         outcomeSequence,
-        4,
+        5,
         branch(
           'subject-no-match-card',
           replaceAt(noMatchCommands, 0, {
@@ -1576,20 +2207,20 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       // An action before its assertion can mutate away the evidence.
       replaceAt(
         outcomeSequence,
-        4,
+        5,
         branch('subject-no-match-card', [
           noMatchCommands[1]!,
           noMatchCommands[0]!,
         ]),
       ),
       // The ambiguous-card assertion is hard and precedes every outcome.
-      replaceAt(outcomeSequence, 1, {
+      replaceAt(outcomeSequence, 2, {
         assertNotVisible: {
           id: 'subject-suggestion-card',
           optional: true,
         },
       }),
-      [resolveFinished, ...outcomeSequence.slice(2), failClosed],
+      [stableOutcome, resolveFinished, ...outcomeSequence.slice(3), failClosed],
       // Even a complete positive sequence is void if it chooses an option.
       [...outcomeSequence, { tapOn: { id: 'subject-suggestion-option-0' } }],
       // A second, global corrective tap is not owned by the proven card.
