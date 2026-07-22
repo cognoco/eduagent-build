@@ -254,21 +254,8 @@ describe('useUpdateProfileAppContext', () => {
     });
   });
 
-  it('retries once on a transient network failure before surfacing error', async () => {
-    const updatedProfile = createPublicProfile({
-      displayName: 'Owner',
-      birthYear: 1980,
-      defaultAppContext: 'family',
-      hasFamilyLinks: true,
-    });
-
-    mockFetch
-      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ profile: updatedProfile }), {
-          status: 200,
-        }),
-      );
+  it('does not query-level replay an unkeyed PATCH after a network failure', async () => {
+    mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
 
     const wrapper = createWrapper();
     const { result } = renderHook(() => useUpdateProfileAppContext(), {
@@ -280,13 +267,10 @@ describe('useUpdateProfileAppContext', () => {
       defaultAppContext: 'family',
     });
 
-    await waitFor(
-      () => {
-        expect(result.current.isSuccess).toBe(true);
-      },
-      { timeout: 3_000 },
-    );
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true);
+    });
 
-    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });

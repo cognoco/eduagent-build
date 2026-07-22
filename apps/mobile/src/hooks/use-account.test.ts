@@ -5,7 +5,7 @@ import {
   createHookWrapper,
   createTestProfile,
 } from '../test-utils/app-hook-test-utils';
-import { setActiveProfileId } from '../lib/api-client';
+import { NetworkError, setActiveProfileId } from '../lib/api-client';
 import {
   useDeleteAccount,
   useCancelDeletion,
@@ -261,6 +261,27 @@ describe('useDeletionStatus', () => {
       'Unable to load deletion status',
     );
     expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not restart bounded transport replay after terminal NetworkError', async () => {
+    jest.useFakeTimers();
+    try {
+      mockFetch.mockRejectedValue(new Error('Network request failed'));
+
+      const { result } = renderHook(() => useDeletionStatus(), {
+        wrapper: createWrapper(),
+      });
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(7_500);
+      });
+
+      expect(result.current.isError).toBe(true);
+      expect(result.current.error).toBeInstanceOf(NetworkError);
+      expect(mockFetch).toHaveBeenCalledTimes(5);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 

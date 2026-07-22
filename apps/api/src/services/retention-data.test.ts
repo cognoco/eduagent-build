@@ -54,7 +54,11 @@ import {
   xpLedger,
 } from '@eduagent/database';
 import { UpstreamLlmError } from '../errors';
-import { processRecallResult, getRetentionStatus } from './retention';
+import {
+  processRecallResult,
+  getRetentionStatus,
+  canRetestTopic,
+} from './retention';
 import {
   canExitNeedsDeepening,
   checkNeedsDeepeningCapacity,
@@ -1011,6 +1015,183 @@ describe('processRecallTest', () => {
       gaps: 'You did not mention that Ariel was published after her death.',
       nextStep: 'Next, note when Ariel appeared and why that timing matters.',
     });
+  });
+
+  // [WI-2114 / AC-7] The graded answer's feedback is persisted to the retention
+  // card so a later cooldown-blocked follow-up can echo it — but the learner's
+  // RAW answer text must never be written (ropa.md row 7 / MMT-ADR-0036 line 43).
+  // Reverting the persist line (the `lastRecallFeedback` write) makes the first
+  // assertion fail.
+  it('[WI-2114 / AC-7] persists structured feedback to the card, never the raw answer', async () => {
+    registerJsonGrader(
+      JSON.stringify({
+        quality: 2,
+        verdict: 'partial',
+        rationale: 'Recalled the novel but missed the poetry.',
+        misconception: null,
+        feedback: {
+          strengths:
+            'You correctly recalled that The Bell Jar is her only novel.',
+          gaps: 'You did not mention that Ariel was published after her death.',
+          nextStep:
+            'Next, note when Ariel appeared and why that timing matters.',
+        },
+      }),
+    );
+    setupScopedRepo({ retentionCardFindFirst: mockRetentionCardRow() });
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: false,
+      newState: {
+        topicId,
+        easeFactor: 2.3,
+        intervalDays: 1,
+        repetitions: 0,
+        failureCount: 1,
+        consecutiveSuccesses: 0,
+        xpStatus: 'decayed',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'decayed',
+      failureAction: 'feedback_only',
+    });
+
+    // A verbose raw answer we can search for across every card write.
+    const rawAnswer =
+      'The Bell Jar is her only novel and I really enjoyed reading it last year.';
+    const db = createMockDb();
+    await processRecallTest(db, profileId, { topicId, answer: rawAnswer });
+
+    // createMockDb returns one shared `set` mock across every db.update(...), so
+    // ALL update payloads live in that single fn's calls.
+    const setFn = (db.update as jest.Mock).mock.results[0]?.value
+      ?.set as jest.Mock;
+    const cardWrites = (setFn?.mock.calls ?? [])
+      .map((call) => call[0])
+      .filter(
+        (payload): payload is Record<string, unknown> =>
+          payload != null && typeof payload === 'object',
+      );
+
+    // The post-grade write carries exactly the grader's structured feedback.
+    const withFeedback = cardWrites.find((w) => 'lastRecallFeedback' in w);
+    expect(withFeedback).toBeDefined();
+    expect(withFeedback?.lastRecallFeedback).toEqual({
+      strengths: 'You correctly recalled that The Bell Jar is her only novel.',
+      gaps: 'You did not mention that Ariel was published after her death.',
+      nextStep: 'Next, note when Ariel appeared and why that timing matters.',
+    });
+    // AC-7: no card write may contain the learner's raw answer text.
+    expect(JSON.stringify(cardWrites)).not.toContain(rawAnswer);
+  });
+
+  // [WI-2114 / AC-2 / AC-6 / AC-9] The full Sylvia Plath exchange as ONE flow:
+  // submission 1 (a real graded answer) persists its feedback; submission 2
+  // ("what is wrong with what I said?") arrives inside the 24h anti-cramming
+  // cooldown, is NEVER re-graded, and — pre-fix — fell through to the generic
+  // "Good effort" copy. This proves the two halves are CONNECTED: the value the
+  // cooldown-blocked follow-up echoes is the exact object submission 1 wrote to
+  // the card (reference identity), not a hand-duplicated literal. Reverting the
+  // persist line breaks the capture; reverting the cooldown-branch line drops
+  // the echo — either revert turns this red.
+  //
+  // AC-9 permits faking ONLY the LLM-router boundary. The file-level
+  // jest.mock('./retention') stays in place for the other ~113 tests in this
+  // file (25 of them depend on its deterministic processRecallResult output
+  // for SM-2/XP scenarios — removing it wholesale would reshape the whole
+  // suite, not fix this guard). Inside THIS test only, both canRetestTopic
+  // AND processRecallResult are overridden per-call to their REAL
+  // implementations via mockImplementationOnce — submission 2's card carries
+  // a genuine recent lastReviewedAt so the real 24h cooldown check is what
+  // blocks re-grading, and submission 1's SM-2 transition is computed for
+  // real from the real card state, not a fabricated fixture. routeAndCall
+  // (the LLM-router external boundary, via registerJsonGrader) is the only
+  // remaining fake.
+  it('[WI-2114 / AC-9] two-submission round-trip: the follow-up echoes the feedback the graded answer persisted', async () => {
+    const {
+      canRetestTopic: actualCanRetestTopic,
+      processRecallResult: actualProcessRecallResult,
+    } = jest.requireActual('./retention') as typeof import('./retention');
+    const graderFeedback = {
+      strengths: 'You correctly recalled that The Bell Jar is her only novel.',
+      gaps: 'You did not mention that Ariel was published after her death.',
+      nextStep: 'Next, note when Ariel appeared and why that timing matters.',
+    };
+    registerJsonGrader(
+      JSON.stringify({
+        quality: 2,
+        verdict: 'partial',
+        rationale: 'Recalled the novel but missed the poetry.',
+        misconception: null,
+        feedback: graderFeedback,
+      }),
+    );
+    setupScopedRepo({ retentionCardFindFirst: mockRetentionCardRow() });
+
+    // --- Submission 1: the real grading path persists its feedback. ---
+    (canRetestTopic as jest.Mock).mockImplementationOnce(actualCanRetestTopic);
+    (processRecallResult as jest.Mock).mockImplementationOnce(
+      actualProcessRecallResult,
+    );
+    const db1 = createMockDb();
+    const graded = await processRecallTest(db1, profileId, {
+      topicId,
+      answer: 'The Bell Jar is her only novel.',
+    });
+    expect(graded.feedback).toEqual(graderFeedback);
+
+    // Capture exactly what submission 1 wrote to the card (not a re-typed copy).
+    const setFn1 = (db1.update as jest.Mock).mock.results[0]?.value
+      ?.set as jest.Mock;
+    const persistedWrite = (setFn1?.mock.calls ?? [])
+      .map((call) => call[0])
+      .find(
+        (w) => w != null && typeof w === 'object' && 'lastRecallFeedback' in w,
+      );
+    expect(persistedWrite).toBeDefined();
+    const persistedFeedback = (persistedWrite as Record<string, unknown>)
+      .lastRecallFeedback;
+
+    // --- Submission 2: that persisted value now lives on the card. The
+    // follow-up is inside cooldown, so it is never re-graded. lastReviewedAt
+    // is set to a genuinely recent timestamp (1h ago, real wall clock) so the
+    // REAL canRetestTopic computes cooldown-active — not a forced mock return.
+    const cardAfterSub1 = {
+      ...mockRetentionCardRow(),
+      lastReviewedAt: new Date(Date.now() - 60 * 60 * 1000),
+      lastRecallFeedback: persistedFeedback,
+    };
+    (canRetestTopic as jest.Mock).mockImplementationOnce(actualCanRetestTopic);
+    const followUp = await processRecallTest(
+      createMockDb({ retentionCardFindFirstQuery: cardAfterSub1 }),
+      profileId,
+      { topicId, answer: 'What is wrong with what I said?' },
+    );
+
+    expect(followUp.cooldownActive).toBe(true);
+    // The meta-question is never graded → no fresh feedback of its own...
+    expect(followUp.feedback).toBeUndefined();
+    // ...but it echoes the SAME object submission 1 persisted (reference
+    // identity — proves the read is connected to the write, not a coincidence).
+    expect(followUp.priorFeedback).toBe(persistedFeedback);
+  });
+
+  // [WI-2114 / AC-5] A cooldown-blocked follow-up on a card with NO stored
+  // feedback stays honest — no fabricated priorFeedback, client keeps generic
+  // copy.
+  it('[WI-2114 / AC-5] cooldown with no stored feedback surfaces no priorFeedback', async () => {
+    const card = mockRetentionCardRow(); // lastRecallFeedback absent
+    setupScopedRepo({ retentionCardFindFirst: card });
+    (canRetestTopic as jest.Mock).mockReturnValueOnce(false);
+
+    const result = await processRecallTest(
+      createMockDb({ retentionCardFindFirstQuery: card }),
+      profileId,
+      { topicId, answer: 'What is wrong with what I said?' },
+    );
+
+    expect(result.cooldownActive).toBe(true);
+    expect(result.priorFeedback).toBeUndefined();
   });
 
   // [WI-2114 / AC-5] dont_remember is a deterministic learner signal, not a

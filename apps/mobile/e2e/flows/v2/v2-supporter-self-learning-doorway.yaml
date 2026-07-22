@@ -22,14 +22,15 @@
 # instead proves the state those unit tests can't reach: real device
 # navigation, a real app relaunch, and the scope-isolation walls, end to end.
 #
-# Persistence-after-relaunch note (same posture as
-# v2-supporter-scope-journey.yaml's own relaunch step): SecureStore scope
-# persistence is fire-and-forget, so a cold launch's FIRST render may not
-# yet reflect the hydrated persisted scope. Rather than assert continuity
-# immediately post-relaunch (flaky), this flow deliberately re-enters Me via
-# the scope chip after relaunch and asserts the own subject is still there —
-# proving persistence of the underlying DATA/scope-list state, not a
-# same-frame render race.
+# Persistence-after-relaunch note: SecureStore scope persistence is
+# fire-and-forget, so a cold launch's very FIRST frame may not yet reflect
+# the hydrated persisted scope — the wait below is generous (30s) to absorb
+# that hydration lag. Critically, this flow does NOT tap the scope chip
+# after relaunch — asserting the restored screen only after a fresh
+# re-selection would prove "the own subject is available once Me is
+# reselected," not that the persisted key restored Me across a real cold
+# start (AC-3/AC-6). The mentor-screen wait below must be satisfied by the
+# app's own restored state alone.
 #
 # [Disclosure] No Android emulator or staging DB is reachable in this build
 # environment, so the actual Maestro walk (this file's tapOn/assertVisible
@@ -98,20 +99,16 @@ tags:
     direction: DOWN
     timeout: 15000
 
-# Relaunch — see the persistence note in the file header.
+# Relaunch — see the persistence note in the file header. NO scope-chip tap
+# here: mentor-screen must appear on its own, restored from the persisted
+# scope key, before any interaction proves it.
 - stopApp
 - launchApp:
     clearState: false
 - extendedWaitUntil:
     visible:
-      id: 'scope-chip'
-    timeout: 30000
-- tapOn:
-    id: 'scope-chip-option-me'
-- extendedWaitUntil:
-    visible:
       id: 'mentor-screen'
-    timeout: 15000
+    timeout: 30000
 - tapOn:
     id: 'tab-subjects'
     retryTapIfNoChange: true

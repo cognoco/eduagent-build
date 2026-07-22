@@ -29,6 +29,7 @@
 //                 requestSelfUnlink write path (same producer as WI-2237's
 //                 [revoked] RGR variant), for the fail-closed assertion.
 // ---------------------------------------------------------------------------
+import { createHash } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import {
   bookmarks,
@@ -41,7 +42,7 @@ import {
   topicNotes,
   type Database,
 } from '@eduagent/database';
-import type { RenderAudience } from '@eduagent/schemas';
+import { PROFILE_MINIMUM_AGE, type RenderAudience } from '@eduagent/schemas';
 
 import { acceptLink, initiateLink } from './linking-ceremony';
 import { requestSelfUnlink } from './supportership-revocation';
@@ -57,6 +58,15 @@ import {
   type SeedResult,
 } from './test-seed';
 
+// RFC 5321 caps an email local-part at 64 characters. Playwright's
+// runId-derived aliases (buildSeedEmail, apps/mobile/e2e-web/helpers/
+// runtime.ts) can already sit close to that cap on their own, so blindly
+// appending `+${tag}` can push the result past 64 — Clerk then rejects the
+// whole seed with a 422 "is invalid" (reproduced live via `later-phases` ->
+// j32-supporter-self-learning-doorway.spec.ts, WI-2243 web-executability
+// probe). See the truncation branch below.
+const MAX_EMAIL_LOCAL_PART_LENGTH = 64;
+
 /**
  * Derives a stable, unique email for a satellite identity from the request
  * email. The request `email` param is the ONLY value seedScenario's generic
@@ -71,7 +81,24 @@ function deriveEmail(baseEmail: string, tag: string): string {
   const local = atIndex === -1 ? baseEmail : baseEmail.slice(0, atIndex);
   const domain = atIndex === -1 ? 'example.com' : baseEmail.slice(atIndex + 1);
   const bareLocal = local.split('+')[0] || 'seed';
-  return `${bareLocal}+${tag}@${domain}`;
+  const candidate = `${bareLocal}+${tag}`;
+  if (candidate.length <= MAX_EMAIL_LOCAL_PART_LENGTH) {
+    return `${candidate}@${domain}`;
+  }
+  // Truncate the base and append a short deterministic hash of the
+  // untruncated candidate — stays under the RFC cap, stays unique, and
+  // stays deterministic across repeated reseeds of the same slot (same
+  // input always hashes to the same output).
+  const hashSuffix = createHash('sha256')
+    .update(candidate)
+    .digest('hex')
+    .slice(0, 8);
+  const suffix = `-${hashSuffix}+${tag}`;
+  const maxBareLength = Math.max(
+    MAX_EMAIL_LOCAL_PART_LENGTH - suffix.length,
+    1,
+  );
+  return `${bareLocal.slice(0, maxBareLength)}${suffix}@${domain}`;
 }
 
 interface SeededOwnerV2 {
@@ -400,7 +427,7 @@ export async function seedV2SupporterManaged(
   const { personId: managedChildPersonId } = await seedChildIdentityV2(db, {
     organizationId: supporter.organizationId,
     displayName: 'Managed Child',
-    birthYear: 2015,
+    birthYear: new Date().getFullYear() - PROFILE_MINIMUM_AGE,
   });
 
   const managedEdge = await seedAcceptedEdge(db, {
@@ -542,4 +569,74 @@ export async function seedV2SupporterSelfLearningActive(
   return seedV2SupporterSelfLearningBase(db, email, env, {
     ownLearning: true,
   });
+}
+
+// ---------------------------------------------------------------------------
+// [WI-2242] `v2-supporter-pending-link` — a PENDING visibility contract,
+// stopped after `initiateLink` alone (no `acceptLink` call for either
+// audience). Every scenario above reaches 'accepted' via `seedAcceptedEdge`;
+// this one is the pre-acceptance fixture the link-ceremony integration matrix
+// needs — status='pending', both supporter/supporteeAcceptedAt null — so the
+// NO-EARLY-AUTH boundary (acceptedVisibilityCondition, linking-ceremony.ts)
+// can be proven BEFORE either side accepts, and the pending -> accepted
+// transition can be driven inline through the real acceptLink write path
+// (the same production code the UI's accept button calls).
+//
+// Same independent-v2-owner-identity supportee shape as
+// `seedV2SupporterSelfLearningBase` above (its own organization — a
+// supporter/supportee link is not the guardianship same-org model) — NOT
+// `seedV2SupporterAccepted`'s 3-supportee accepted shape, since this fixture
+// needs exactly one supportee with a contract stopped at 'pending'.
+// ---------------------------------------------------------------------------
+
+export async function seedV2SupporterPendingLink(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const supporter = await reseedOwnerIdentityV2(db, email, env, {
+    displayName: 'Test Supporter',
+    birthYear: 1985,
+  });
+
+  const supporteeEmail = deriveEmail(email, 'pending-supportee');
+  const supportee = await reseedOwnerIdentityV2(db, supporteeEmail, env, {
+    displayName: 'Test Supportee',
+    birthYear: 2012,
+  });
+
+  // Invite issuance IS initiateLink (linking-ceremony.ts) — there is no
+  // separate invite table; the visibility-contract id doubles as the invite
+  // id the accept route takes as :id. Stopping here (no acceptLink call)
+  // leaves status='pending' and both acceptedAt columns null.
+  const contract = await initiateLink(db, {
+    supporterPersonId: supporter.personId,
+    supporteePersonId: supportee.personId,
+    relation: 'other',
+    managedTier: false,
+    managedTierActive: false,
+  });
+
+  return {
+    scenario: 'v2-supporter-pending-link',
+    accountId: supporter.organizationId,
+    profileId: supporter.personId,
+    email,
+    password: supporter.password,
+    ids: {
+      supporterPersonId: supporter.personId,
+      supporterOrganizationId: supporter.organizationId,
+
+      supporteeEmail,
+      supporteePassword: supportee.password,
+      supporteePersonId: supportee.personId,
+      supporteeOrganizationId: supportee.organizationId,
+
+      edgeId: contract.supportershipId,
+      contractId: contract.id,
+      contractVersion: String(contract.contractVersion),
+      visibilityStatus: contract.status,
+      relation: contract.relation,
+    },
+  };
 }

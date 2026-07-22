@@ -1451,6 +1451,7 @@ function SessionScreenInner() {
     setShowWrongSubjectChip,
     setShowTopicSwitcher,
     setShowParkingLot,
+    setMessages,
     filing,
     setConsumedQuickChipMessageId,
     setMessageFeedback,

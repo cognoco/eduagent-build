@@ -42,6 +42,7 @@ import {
 import { useSubjectsIndex } from '../../hooks/use-subjects-index';
 import { matchBarIntent } from '../../lib/bar-intent-match';
 import { hasFirstRealState } from '../../lib/first-real-state';
+import { getVoiceLocaleForLanguage } from '../../lib/language-locales';
 import { useProfile } from '../../lib/profile';
 import {
   pushAddChildForSupport,
@@ -519,6 +520,9 @@ function LearnerMentorScreen(): React.ReactElement {
             onOpenCamera={() => pushMentorHomeworkCamera(router)}
             onOpenHomework={() => pushMentorHomework(router, homeworkSubject)}
             onTranscript={handleSubmitText}
+            voiceLocale={getVoiceLocaleForLanguage(
+              activeProfile?.conversationLanguage,
+            )}
           />
 
           {barClarification ? (

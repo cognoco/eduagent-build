@@ -48,6 +48,7 @@ function createMockOpts(overrides: Record<string, unknown> = {}) {
     setShowWrongSubjectChip: jest.fn(),
     setShowTopicSwitcher: jest.fn(),
     setShowParkingLot: jest.fn(),
+    setMessages: jest.fn(),
     filing: { mutate: jest.fn(), mutateAsync: jest.fn(), isPending: false },
     setConsumedQuickChipMessageId: jest.fn(),
     setMessageFeedback: jest.fn(),
@@ -127,6 +128,51 @@ describe('useSessionActions', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it('[WI-2103 AC-2] retracts a rendered silence prompt before close persistence settles', async () => {
+    let resolveClose!: (value: {
+      sessionId: string;
+      wallClockSeconds: number;
+      summaryStatus: string;
+    }) => void;
+    const closeRequest = new Promise<{
+      sessionId: string;
+      wallClockSeconds: number;
+      summaryStatus: string;
+    }>((resolve) => {
+      resolveClose = resolve;
+    });
+    const opts = createMockOpts({
+      closeSession: { mutateAsync: jest.fn(() => closeRequest) },
+    });
+    const { result } = renderHook(() => useSessionActions(opts as any));
+
+    await act(async () => {
+      await result.current.handleEndSession();
+    });
+
+    let closeCompletion!: Promise<void>;
+    act(() => {
+      closeCompletion = confirmEndSession();
+    });
+
+    expect(opts.setMessages).toHaveBeenCalledTimes(1);
+    const retract = opts.setMessages.mock.calls[0]?.[0] as (
+      messages: Array<{ id: string }>,
+    ) => Array<{ id: string }>;
+    expect(
+      retract([{ id: 'learner-message' }, { id: 'silence-prompt' }]),
+    ).toEqual([{ id: 'learner-message' }]);
+
+    resolveClose({
+      sessionId: 'session-1',
+      wallClockSeconds: 120,
+      summaryStatus: 'pending',
+    });
+    await act(async () => {
+      await closeCompletion;
+    });
   });
 
   it('navigates to summary for freeform sessions after close without filing prompt', async () => {
