@@ -184,6 +184,21 @@ else
 
     JEST_FAILED=0
 
+    # jest defaults maxWorkers to (CPU count - 1) — 9 worker processes on a 10-core
+    # box. On a memory-constrained host running several agent sessions at once,
+    # concurrent pre-push hooks each spawn that many workers and exhaust RAM. Export
+    # JEST_MAX_WORKERS on such a host to cap it. Unset — the default on every other
+    # host and in CI — expands to nothing, leaving the command line unchanged.
+    #
+    # jest does NOT read JEST_MAX_WORKERS natively; it is passed through explicitly
+    # at both call sites below. Do not drop the passthrough on the assumption that
+    # jest picks the variable up on its own — it does not.
+    #
+    # Set it in ~/.zshenv, NOT ~/.zshrc: husky hooks run under a non-interactive
+    # `zsh -c`, which never sources zshrc. The value is forwarded verbatim, so both
+    # forms jest accepts work — an integer (2) or a percentage (50%).
+    JEST_MAX_WORKERS_FLAG="${JEST_MAX_WORKERS:+--maxWorkers=$JEST_MAX_WORKERS}"
+
     run_jest() {
       local project_dir="$1"
       shift
@@ -201,7 +216,7 @@ else
       echo ""
       echo "── jest [${project_dir}] ──────────────────────────────────────"
       # shellcheck disable=SC2086
-      if ! (cd "$WORKSPACE_ROOT/$project_dir" && IDENTITY_V2_ENABLED=false node "$WORKSPACE_ROOT/node_modules/jest/bin/jest.js" --findRelatedTests $abs_files --no-coverage --bail --passWithNoTests --forceExit --testPathIgnorePatterns='\.integration\.test\.'); then
+      if ! (cd "$WORKSPACE_ROOT/$project_dir" && IDENTITY_V2_ENABLED=false node "$WORKSPACE_ROOT/node_modules/jest/bin/jest.js" --findRelatedTests $abs_files --no-coverage --bail --passWithNoTests --forceExit --testPathIgnorePatterns='\.integration\.test\.' $JEST_MAX_WORKERS_FLAG); then
         JEST_FAILED=1
       fi
     }
@@ -230,7 +245,7 @@ else
       echo ""
       echo "── jest [apps/mobile] ─────────────────────────────────────────"
       # shellcheck disable=SC2086
-      if ! (cd "$WORKSPACE_ROOT/apps/mobile" && NODE_OPTIONS='--max-old-space-size=6144' node "$WORKSPACE_ROOT/node_modules/jest/bin/jest.js" --findRelatedTests $mobile_files_for_jest --no-coverage --bail --passWithNoTests --forceExit --testPathIgnorePatterns='\.integration\.test\.'); then
+      if ! (cd "$WORKSPACE_ROOT/apps/mobile" && NODE_OPTIONS='--max-old-space-size=6144' node "$WORKSPACE_ROOT/node_modules/jest/bin/jest.js" --findRelatedTests $mobile_files_for_jest --no-coverage --bail --passWithNoTests --forceExit --testPathIgnorePatterns='\.integration\.test\.' $JEST_MAX_WORKERS_FLAG); then
         JEST_FAILED=1
       fi
     fi
