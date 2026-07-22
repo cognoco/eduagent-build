@@ -97,11 +97,14 @@ describe('[WI-2571] selected Playwright seed-scenario collector', () => {
       fixtureRoot,
       'e2e/v2.spec.ts',
       `
-        import { seedAndSignIn } from './helpers/seed-and-sign-in';
-        void seedAndSignIn({ scenario: 'v2-account-non-owner-child' });
-        void seedAndSignIn({ scenario: 'v2-returning-learner' });
-        void seedAndSignIn({ scenario: 'v2-journal-paper-trail' });
-        void seedAndSignIn({ scenario: 'v2-account-non-owner-child' });
+        import { seedAndSignIn as establishSession } from './helpers/seed-and-sign-in';
+        import { seedScenario as mySeed } from './helpers/test-seed';
+        void establishSession({ scenario: 'v2-account-non-owner-child' });
+        void establishSession({ scenario: 'v2-returning-learner' });
+        void establishSession({ scenario: 'v2-journal-paper-trail' });
+        void establishSession({ scenario: 'v2-account-non-owner-child' });
+        void establishSession({ scenario: 'aliased-selected-scenario' });
+        void mySeed({ scenario: 'direct-aliased-scenario' });
       `,
     );
     writeFixture(
@@ -136,6 +139,8 @@ describe('[WI-2571] selected Playwright seed-scenario collector', () => {
         selectedProjects: ['v2-release'],
       }),
     ).toEqual([
+      'aliased-selected-scenario',
+      'direct-aliased-scenario',
       'onboarding-complete',
       'parent-multi-child',
       'v2-account-non-owner-child',

@@ -29,6 +29,16 @@ interface CoverageInput {
 
 type RequestedExports = Set<string> | null;
 
+interface SelectedRoot {
+  node: ts.Node;
+  localToImportedExport: ReadonlyMap<string, string>;
+}
+
+interface FunctionDefinition {
+  node: ts.Node;
+  localToImportedExport: ReadonlyMap<string, string>;
+}
+
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
 
 function asPatterns(pattern: MatchPattern | undefined): RegExp[] {
@@ -144,6 +154,24 @@ function importedExports(importDeclaration: ts.ImportDeclaration): Set<string> {
   return requested;
 }
 
+function localToImportedExports(
+  sourceFile: ts.SourceFile,
+): Map<string, string> {
+  const bindings = new Map<string, string>();
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement)) continue;
+    const namedBindings = statement.importClause?.namedBindings;
+    if (!namedBindings || !ts.isNamedImports(namedBindings)) continue;
+    for (const element of namedBindings.elements) {
+      bindings.set(
+        element.name.text,
+        element.propertyName?.text ?? element.name.text,
+      );
+    }
+  }
+  return bindings;
+}
+
 function mergeRequestedExports(
   selections: Map<string, RequestedExports>,
   filePath: string,
@@ -218,18 +246,25 @@ function declarationName(node: ts.Node): string | null {
 function selectedRoots(
   sourceFile: ts.SourceFile,
   requested: RequestedExports,
-): ts.Node[] {
-  if (requested === null || requested.has('*')) return [sourceFile];
-  const roots: ts.Node[] = [];
+): SelectedRoot[] {
+  const localToImportedExport = localToImportedExports(sourceFile);
+  if (requested === null || requested.has('*')) {
+    return [{ node: sourceFile, localToImportedExport }];
+  }
+  const roots: SelectedRoot[] = [];
   for (const statement of sourceFile.statements) {
     if (ts.isVariableStatement(statement)) {
       for (const declaration of statement.declarationList.declarations) {
         const name = declarationName(declaration);
-        if (name && requested.has(name)) roots.push(declaration);
+        if (name && requested.has(name)) {
+          roots.push({ node: declaration, localToImportedExport });
+        }
       }
     } else {
       const name = declarationName(statement);
-      if (name && requested.has(name)) roots.push(statement);
+      if (name && requested.has(name)) {
+        roots.push({ node: statement, localToImportedExport });
+      }
     }
   }
   return roots;
@@ -246,12 +281,17 @@ function calleeName(expression: ts.Expression): string | null {
   return null;
 }
 
-function collectFunctionDefinitions(roots: ts.Node[]): Map<string, ts.Node> {
-  const definitions = new Map<string, ts.Node>();
+function collectFunctionDefinitions(
+  roots: SelectedRoot[],
+): Map<string, FunctionDefinition> {
+  const definitions = new Map<string, FunctionDefinition>();
   for (const root of roots) {
-    walk(root, (node) => {
+    walk(root.node, (node) => {
       if (ts.isFunctionDeclaration(node) && node.name) {
-        definitions.set(node.name.text, node);
+        definitions.set(node.name.text, {
+          node,
+          localToImportedExport: root.localToImportedExport,
+        });
       } else if (
         ts.isVariableDeclaration(node) &&
         ts.isIdentifier(node.name) &&
@@ -259,18 +299,36 @@ function collectFunctionDefinitions(roots: ts.Node[]): Map<string, ts.Node> {
         (ts.isArrowFunction(node.initializer) ||
           ts.isFunctionExpression(node.initializer))
       ) {
-        definitions.set(node.name.text, node.initializer);
+        definitions.set(node.name.text, {
+          node: node.initializer,
+          localToImportedExport: root.localToImportedExport,
+        });
       }
     });
   }
   return definitions;
 }
 
-function containsCallTo(node: ts.Node, names: Set<string>): boolean {
+function normalizedCalleeName(
+  expression: ts.Expression,
+  localToImportedExport: ReadonlyMap<string, string>,
+): string | null {
+  const name = calleeName(expression);
+  return name ? (localToImportedExport.get(name) ?? name) : null;
+}
+
+function containsCallTo(
+  node: ts.Node,
+  names: Set<string>,
+  localToImportedExport: ReadonlyMap<string, string>,
+): boolean {
   let found = false;
   walk(node, (candidate) => {
     if (!ts.isCallExpression(candidate)) return;
-    const name = calleeName(candidate.expression);
+    const name = normalizedCalleeName(
+      candidate.expression,
+      localToImportedExport,
+    );
     if (name && names.has(name)) found = true;
   });
   return found;
@@ -324,7 +382,11 @@ export function collectSelectedPlaywrightSeedScenarios(
     for (const [name, definition] of definitions) {
       if (
         !seedFunctions.has(name) &&
-        containsCallTo(definition, seedFunctions)
+        containsCallTo(
+          definition.node,
+          seedFunctions,
+          definition.localToImportedExport,
+        )
       ) {
         seedFunctions.add(name);
         changed = true;
@@ -334,7 +396,7 @@ export function collectSelectedPlaywrightSeedScenarios(
 
   const scenarios = new Set<string>();
   for (const root of roots) {
-    walk(root, (node) => {
+    walk(root.node, (node) => {
       if (
         ts.isPropertyAssignment(node) &&
         propertyName(node) === 'seedScenario'
@@ -343,7 +405,10 @@ export function collectSelectedPlaywrightSeedScenarios(
         if (value) scenarios.add(value);
       }
       if (!ts.isCallExpression(node)) return;
-      const name = calleeName(node.expression);
+      const name = normalizedCalleeName(
+        node.expression,
+        root.localToImportedExport,
+      );
       if (name && seedFunctions.has(name)) collectCallLiterals(node, scenarios);
     });
   }
