@@ -28,11 +28,12 @@ describe('isLlmExchangeConsentAllowed', () => {
 
   it('denies when adult llm_disclosure consent is WITHDRAWN (platform_use CONSENTED)', async () => {
     const db = createMockDb() as unknown as Database;
-    // Call sequence: [0] gdpr basis (no parental row), [1] platform_use
-    // art6_1_a (CONSENTED), [2] llm_disclosure art6_1_a (WITHDRAWN).
+    // Call sequence: [0..1] complete GDPR set (no parental rows), then
+    // [2] platform_use art6_1_a (CONSENTED), [3] llm_disclosure art6_1_a
+    // (WITHDRAWN).
     seedConsentState(db as unknown as Record<string, unknown>, {
       personId: TEST_PROFILE_ID,
-      state: [null, 'CONSENTED', 'WITHDRAWN'],
+      state: [null, null, 'CONSENTED', 'WITHDRAWN'],
     });
 
     await expect(
@@ -42,11 +43,12 @@ describe('isLlmExchangeConsentAllowed', () => {
 
   it('denies when adult platform_use consent is WITHDRAWN', async () => {
     const db = createMockDb() as unknown as Database;
-    // Call sequence: [0] gdpr basis (no parental row), [1] platform_use
-    // art6_1_a (WITHDRAWN) — short-circuits before llm_disclosure.
+    // Call sequence: [0..1] complete GDPR set (no parental rows), then
+    // [2] platform_use art6_1_a (WITHDRAWN) — short-circuits before
+    // llm_disclosure.
     seedConsentState(db as unknown as Record<string, unknown>, {
       personId: TEST_PROFILE_ID,
-      state: [null, 'WITHDRAWN'],
+      state: [null, null, 'WITHDRAWN'],
     });
 
     await expect(
@@ -58,7 +60,7 @@ describe('isLlmExchangeConsentAllowed', () => {
     const db = createMockDb() as unknown as Database;
     seedConsentState(db as unknown as Record<string, unknown>, {
       personId: TEST_PROFILE_ID,
-      state: [null, 'CONSENTED', 'CONSENTED'],
+      state: [null, null, 'CONSENTED', 'CONSENTED'],
     });
 
     await expect(
@@ -70,7 +72,7 @@ describe('isLlmExchangeConsentAllowed', () => {
     const db = createMockDb() as unknown as Database;
     seedConsentState(db as unknown as Record<string, unknown>, {
       personId: TEST_PROFILE_ID,
-      state: ['CONSENTED', null, null],
+      state: ['CONSENTED', 'CONSENTED', null, null],
     });
 
     await expect(

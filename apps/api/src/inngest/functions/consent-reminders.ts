@@ -8,13 +8,14 @@ import {
   getStepEmailFrom,
   getStepAppUrl,
 } from '../helpers';
-import { and, eq, gte, lt } from 'drizzle-orm';
+import { and, eq, gte, inArray, lt } from 'drizzle-orm';
 import { consentRequest } from '@eduagent/database';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import {
   refreshConsentTokenForRequestV2,
   type RefreshedConsentTokenForRequestV2,
 } from '../../services/identity-v2/consent-v2';
-import { resolveConsentStatus } from '../../services/identity-v2/consent-status-v2';
+import { resolveConsentSetStatus } from '../../services/identity-v2/consent-status-v2';
 import { resolveOrgIdForPerson } from '../../services/identity-v2/family-v2';
 import {
   sendEmail,
@@ -54,6 +55,7 @@ export const consentReminder = inngest.createFunction(
       return and(
         eq(consentRequest.chargePersonId, profileId),
         eq(consentRequest.requestedBasis, 'gdpr_parental_consent'),
+        inArray(consentRequest.purpose, [...CONSENT_PURPOSES]),
         gte(consentRequest.requestedAt, requestedAtDate),
         lt(consentRequest.requestedAt, requestedAtUpperBound),
       );
@@ -88,13 +90,20 @@ export const consentReminder = inngest.createFunction(
       const db = getStepDatabase();
       const where = currentConsentRequestWhereV2();
       if (!where) return { parentEmail: null, consentToken: null };
-      const row = await db.query.consentRequest.findFirst({
+      const rows = await db.query.consentRequest.findMany({
         where,
         columns: { guardianEmail: true, token: true },
       });
+      if (
+        rows.length !== CONSENT_PURPOSES.length ||
+        new Set(rows.map((row) => row.guardianEmail)).size !== 1 ||
+        new Set(rows.map((row) => row.token)).size !== 1
+      ) {
+        return { parentEmail: null, consentToken: null };
+      }
       return {
-        parentEmail: row?.guardianEmail ?? null,
-        consentToken: row?.token ?? null,
+        parentEmail: rows[0]?.guardianEmail ?? null,
+        consentToken: rows[0]?.token ?? null,
       };
     }
 
@@ -105,11 +114,10 @@ export const consentReminder = inngest.createFunction(
       // GDPR-pinned, so a basis-blind read is wrong here.
       const organizationId = await resolveOrgIdForPerson(db, profileId);
       if (!organizationId) return null;
-      return resolveConsentStatus(
+      return resolveConsentSetStatus(
         db,
         profileId,
         organizationId,
-        'platform_use',
         'gdpr_parental_consent',
       );
     }

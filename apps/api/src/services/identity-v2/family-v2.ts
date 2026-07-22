@@ -25,11 +25,10 @@ import {
   person,
   type Database,
 } from '@eduagent/database';
-import type { ConsentStatus } from '@eduagent/schemas';
+import { CONSENT_PURPOSES, type ConsentStatus } from '@eduagent/schemas';
 import {
-  DEFAULT_CONSENT_PURPOSE,
-  resolveConsentStatusAndWithdrawnAt,
-  resolveConsentStatusesForBasis,
+  resolveConsentSetStatusAndWithdrawnAt,
+  resolveConsentSetStatusesForBasis,
 } from './consent-status-v2';
 import { getChargePersonIds, isGuardianOf } from './guardianship';
 import { findOwnerPersonId } from './helpers';
@@ -113,11 +112,10 @@ export async function getChildGdprConsentStatusV2(
 ): Promise<{ status: ConsentStatus; withdrawnAt: Date | null } | null> {
   const organizationId = await resolveOrgId(db, childPersonId);
   if (!organizationId) return null;
-  return resolveConsentStatusAndWithdrawnAt(
+  return resolveConsentSetStatusAndWithdrawnAt(
     db,
     childPersonId,
     organizationId,
-    DEFAULT_CONSENT_PURPOSE,
     GDPR_BASIS,
   );
 }
@@ -136,11 +134,10 @@ export async function getChildrenGdprConsentStatusesV2(
   childPersonIds: readonly string[],
   _proof: FamilyV2ChildReadProof,
 ): Promise<Map<string, { status: ConsentStatus; withdrawnAt: Date | null }>> {
-  return resolveConsentStatusesForBasis(
+  return resolveConsentSetStatusesForBasis(
     db,
     childPersonIds,
     organizationId,
-    DEFAULT_CONSENT_PURPOSE,
     GDPR_BASIS,
   );
 }
@@ -185,14 +182,16 @@ export async function getChildConsentForParentV2(
     const grant = await db.query.consentGrant.findFirst({
       where: and(
         eq(consentGrant.chargePersonId, childPersonId),
-        eq(consentGrant.purpose, DEFAULT_CONSENT_PURPOSE),
+        inArray(consentGrant.purpose, [...CONSENT_PURPOSES]),
         eq(consentGrant.lawfulBasis, GDPR_BASIS),
       ),
       orderBy: (g, { desc }) => [desc(g.grantedAt), desc(g.id)],
       columns: { grantedAt: true, withdrawnAt: true },
     });
-    if (grant) {
-      respondedAt = (grant.withdrawnAt ?? grant.grantedAt).toISOString();
+    if (consentRow.withdrawnAt) {
+      respondedAt = consentRow.withdrawnAt.toISOString();
+    } else if (grant) {
+      respondedAt = grant.grantedAt.toISOString();
     }
   }
   return { status, respondedAt, consentType: 'GDPR' };

@@ -478,15 +478,17 @@ describe('freeformFilingRetry', () => {
 
     it('[WI-550/F-019] skips transcript and filing work when GDPR consent is withdrawn between Inngest steps', async () => {
       // WI-867: source reads isGdprProcessingAllowedV2 (v2, IDENTITY_V2_ENABLED=true).
-      // [WI-2396] Now reads isLlmExchangeConsentAllowed, which fires up to 3
-      // resolveConsentStatus calls per gate invocation (1 gdpr_parental_consent +
-      // up to 2 art6_1_a purposes, short-circuiting on the first WITHDRAWN). The
-      // first gate call (check-gdpr-consent step) must fully pass (3 CONSENTED
-      // entries) before the second gate call (retry-filing step) sees WITHDRAWN
-      // on its first (gdpr) check — otherwise the sequence is consumed within the
-      // first gate call and the test never reaches the second step.
+      // [WI-2396/WI-2386] Each gate reads the two-purpose parental set and then
+      // the two adult self-consent purposes. The first gate must fully pass
+      // (four CONSENTED entries) before retry-filing sees WITHDRAWN.
       seedConsentState(mockDb as unknown as Record<string, unknown>, {
-        state: ['CONSENTED', 'CONSENTED', 'CONSENTED', 'WITHDRAWN'],
+        state: [
+          'CONSENTED',
+          'CONSENTED',
+          'CONSENTED',
+          'CONSENTED',
+          'WITHDRAWN',
+        ],
       });
       mockGetSessionTranscript.mockResolvedValue({
         session: { sessionId: 'session-001' },
@@ -518,13 +520,14 @@ describe('freeformFilingRetry', () => {
     // [WI-2396] Basis-inclusive gate: switched from isGdprProcessingAllowedV2
     // (parental basis only) to isLlmExchangeConsentAllowed, which ALSO honors
     // an adult's independently-withdrawable self-consent (art6_1_a). Sequence
-    // is [gdpr_parental_consent, art6_1_a-platform_use] — CONSENTED then
-    // WITHDRAWN, within the FIRST (check-gdpr-consent) gate call — proving
+    // is [gdpr platform_use, gdpr llm_disclosure,
+    // art6_1_a-platform_use] — CONSENTED, CONSENTED, then WITHDRAWN within
+    // the FIRST (check-gdpr-consent) gate call — proving
     // the adult leg alone (parental leg passes) now blocks before retry-filing
     // even runs, which isGdprProcessingAllowedV2 alone would have missed.
     it('[WI-2396] skips filing and LLM work when GDPR consent is granted but adult self-consent (art6_1_a) is withdrawn', async () => {
       seedConsentState(mockDb as unknown as Record<string, unknown>, {
-        state: ['CONSENTED', 'WITHDRAWN'],
+        state: ['CONSENTED', 'CONSENTED', 'WITHDRAWN'],
       });
       mockGetSessionTranscript.mockResolvedValue({
         session: { sessionId: 'session-001' },

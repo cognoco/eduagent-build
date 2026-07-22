@@ -5,12 +5,38 @@
  * change-recipient shape keeps a required email.
  */
 import {
+  CONSENT_PURPOSES,
+  consentPurposeSchema,
   consentResendSchema,
   consentRequestSchema,
+  selfConsentWithdrawRequestSchema,
+  type ConsentPurpose,
   type ConsentResendRequest,
 } from './consent.js';
 
 const CHILD_ID = '550e8400-e29b-41d4-a716-446655440000';
+
+describe('consent purpose contract [WI-2386]', () => {
+  it('owns the complete workflow-neutral purpose set in one typed contract', () => {
+    expect(CONSENT_PURPOSES).toEqual(['platform_use', 'llm_disclosure']);
+    expect(consentPurposeSchema.options).toEqual(CONSENT_PURPOSES);
+
+    const purpose: ConsentPurpose = CONSENT_PURPOSES[1];
+    expect(purpose).toBe('llm_disclosure');
+  });
+
+  it('reuses the shared purpose schema for adult single-purpose withdrawal', () => {
+    for (const purpose of CONSENT_PURPOSES) {
+      expect(selfConsentWithdrawRequestSchema.parse({ purpose })).toEqual({
+        purpose,
+      });
+    }
+    expect(
+      selfConsentWithdrawRequestSchema.safeParse({ purpose: 'analytics' })
+        .success,
+    ).toBe(false);
+  });
+});
 
 describe('consentResendSchema [WI-374]', () => {
   it('accepts a childProfileId + consentType with no email', () => {

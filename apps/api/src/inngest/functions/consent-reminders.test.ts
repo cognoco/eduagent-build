@@ -1,5 +1,5 @@
 // [WI-867] flag collapsed — consent-reminders now uses v2 paths unconditionally.
-// resolveOrgIdForPerson + resolveConsentStatus drive status (SEEDED via the real
+// resolveOrgIdForPerson + resolveConsentSetStatus drive status (SEEDED via the real
 // services reading the seeded consent chain — see seedConsentState below);
 // refreshConsentTokenForRequestV2 mints tokens (WRITE → mocked);
 // deletePersonIfNoConsentV2 handles the day-30 delete (WRITE → mocked).
@@ -20,8 +20,8 @@ const mockFormatConsentReminderEmail = jest.fn(
 
 // Shared seeded DB — getStepDatabase returns this; seedConsentState patches its
 // db.query so the REAL resolveOrgIdForPerson (membership.findFirst) +
-// resolveConsentStatus (consentGrant + consentRequest STATUS) run unmocked.
-// The DETAILS read (lookupConsentDetails → consentRequest.findFirst with
+// resolveConsentSetStatus (consentGrant + consentRequest STATUS) run unmocked.
+// The DETAILS read (lookupConsentDetails → consentRequest.findMany with
 // guardianEmail columns) is layered on top of the seeder's consentRequest handle
 // so the requestedAt-window suppression remains test-controllable.
 const mockGetStepDatabase = jest.fn();
@@ -82,6 +82,7 @@ jest.mock(
 );
 
 import { NonRetriableError } from 'inngest';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import {
   seedConsentState,
@@ -159,17 +160,11 @@ function extractSqlTextAndValues(
   return values;
 }
 
-// The seeder's consentRequest handle (via mockConsentFindFirst) receives BOTH
-// STATUS and DETAILS reads. The WHERE-window assertions care only about the
-// DETAILS read (guardianEmail columns) — isolate it.
+// The WHERE-window assertions care only about the DETAILS findMany read.
 function firstDetailsCall(): { where?: unknown } | undefined {
-  for (const call of mockConsentFindFirst.mock.calls) {
-    const arg = call[0] as
-      | { where?: unknown; columns?: Record<string, boolean> }
-      | undefined;
-    if (arg?.columns && 'guardianEmail' in arg.columns) return arg;
-  }
-  return undefined;
+  return mockConsentFindMany.mock.calls[0]?.[0] as
+    | { where?: unknown }
+    | undefined;
 }
 
 async function executeHandler(
@@ -198,39 +193,37 @@ async function executeHandler(
       : (profileState?.requestedAt ?? null);
 
   // [WI-867] SEED the v2 consent chain — the real resolveOrgIdForPerson
-  // (membership.findFirst) and resolveConsentStatus (consentGrant +
+  // (membership.findFirst) and resolveConsentSetStatus (consentGrant +
   // consentRequest STATUS) now run against these rows, one statusSequence
   // entry consumed per status-check step (day-7/14/25/30).
   const handles = seedConsentState(sharedDb, {
     personId: 'profile-1',
     organizationId: 'test-org-id',
     state: statusSequence.map(toSeedState),
+    purposesPerState: CONSENT_PURPOSES.length,
   });
 
-  // The DETAILS read (lookupConsentDetails → consentRequest.findFirst with
-  // guardianEmail columns) is layered on the seeder's consentRequest handle:
-  // STATUS calls delegate to the real seeder reduction; DETAILS calls apply the
-  // requestedAt-window suppression (null when the event generation is stale).
+  // STATUS calls delegate to the real seeder reduction. DETAILS reads use
+  // findMany and return the complete purpose set only for the current request
+  // generation.
   const seededConsentRequest = handles.consentRequestFindFirst;
   const seededImpl = seededConsentRequest.getMockImplementation();
   mockConsentFindFirst.mockImplementation(async (query: unknown) => {
-    const columns = (query as { columns?: Record<string, boolean> }).columns;
-    if (columns && 'guardianEmail' in columns) {
-      // DETAILS — honor the requestedAt window (production WHERE guard).
-      const currentRequestMatches =
-        eventRequestedAt && stateRequestedAt === eventRequestedAt;
-      if (!currentRequestMatches) return null;
-      return profileState?.parentEmail
-        ? {
-            guardianEmail: profileState.parentEmail,
-            token: 'test-token-abc123',
-          }
-        : null;
-    }
     // STATUS — delegate to the real seeder reduction (advances state index).
     return seededImpl ? seededImpl(query) : null;
   });
   seededConsentRequest.mockImplementation(mockConsentFindFirst);
+  mockConsentFindMany.mockImplementation(async () => {
+    const currentRequestMatches =
+      eventRequestedAt && stateRequestedAt === eventRequestedAt;
+    if (!currentRequestMatches || !profileState?.parentEmail) return [];
+    return CONSENT_PURPOSES.map(() => ({
+      guardianEmail: profileState.parentEmail,
+      token: 'test-token-abc123',
+    }));
+  });
+  const query = sharedDb.query as Record<string, Record<string, unknown>>;
+  query.consentRequest!.findMany = mockConsentFindMany;
 
   // refreshConsentTokenForRequestV2 (WRITE → mocked): return v2 shape
   // {guardianEmail, freshToken}. When the event requestedAt doesn't match the
@@ -273,12 +266,8 @@ async function executeHandler(
   return { stepReturns };
 }
 
-// mockConsentFindFirst: captures the DETAILS read (consentRequest.findFirst with
-// guardianEmail columns) so WHERE-clause assertions can inspect it; the seeder's
-// own handle delegates here. STATUS calls also flow through it (delegated to the
-// real seeder reduction) — filter by `'guardianEmail' in columns` to isolate
-// DETAILS calls in assertions.
 const mockConsentFindFirst = jest.fn();
+const mockConsentFindMany = jest.fn();
 let sharedDb: Record<string, unknown>;
 
 beforeEach(() => {
