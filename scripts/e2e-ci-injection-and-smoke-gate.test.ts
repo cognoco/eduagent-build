@@ -285,7 +285,6 @@ describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => 
     const runSmoke = jobs['run-smoke'];
     expect(runSmoke).toBeDefined();
     const v2Step = stepNamed(runSmoke, 'Run V2 release Playwright gate');
-    const uploadV2 = stepNamed(runSmoke, 'Upload V2 Playwright artifacts');
     const legacyStep = stepNamed(
       runSmoke,
       'Run legacy Playwright smoke (advisory)',
@@ -293,10 +292,6 @@ describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => 
     const resetStep = stepNamed(
       runSmoke,
       'Reset seeded staging accounts (always)',
-    );
-    const uploadLegacy = stepNamed(
-      runSmoke,
-      'Upload legacy Playwright artifacts',
     );
     const stepNames = (runSmoke.steps ?? []).map((step) => step.name);
     const allWorkflowSteps = Object.values(jobs).flatMap(
@@ -316,12 +311,6 @@ describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => 
     expect(classifyCommand).toBeDefined();
     expect(classifyCommand).toContain('${PLAYWRIGHT_API_URL}');
 
-    expect(uploadV2?.if).toBe('always()');
-    expect(uploadV2?.['continue-on-error']).toBe(true);
-    expect(Number(uploadV2?.['timeout-minutes'])).toBeGreaterThan(0);
-    expect(String((uploadV2?.with as Record<string, unknown>)?.name)).toContain(
-      'playwright-web-v2-${{ github.run_id }}-${{ github.run_attempt }}',
-    );
     expect(legacyStep?.['continue-on-error']).toBe(true);
     expect(Number(legacyStep?.['timeout-minutes'])).toBeGreaterThan(0);
     expect(
@@ -343,45 +332,17 @@ describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => 
     }
     expect(legacyScript).toContain('PLAYWRIGHT_ARTIFACT_LANE=legacy');
     expect(legacyScript).toContain('pnpm run test:e2e:web:smoke');
-    for (const legacyOnlyStep of [legacyStep, uploadLegacy]) {
-      expect(legacyOnlyStep?.['continue-on-error']).toBe(true);
-      expect(Number(legacyOnlyStep?.['timeout-minutes'])).toBeGreaterThan(0);
-    }
-    expect(String(uploadLegacy?.if)).toContain(
-      "steps.legacy-smoke.outcome == 'success'",
-    );
-    expect(String(uploadLegacy?.if)).toContain(
-      "steps.legacy-smoke.outcome == 'failure'",
-    );
-    expect(
-      String((uploadLegacy?.with as Record<string, unknown>)?.name),
-    ).toContain(
-      'playwright-web-legacy-${{ github.run_id }}-${{ github.run_attempt }}',
-    );
-    const v2ArtifactPaths = String(
-      (uploadV2?.with as Record<string, unknown>)?.path,
-    );
-    const legacyArtifactPaths = String(
-      (uploadLegacy?.with as Record<string, unknown>)?.path,
-    );
-    expect(v2ArtifactPaths).toContain('playwright-report');
-    expect(v2ArtifactPaths).toContain('test-results');
-    expect(v2ArtifactPaths).not.toContain('playwright-report-legacy');
-    expect(v2ArtifactPaths).not.toContain('test-results-legacy');
-    expect(legacyArtifactPaths).toContain('playwright-report-legacy');
-    expect(legacyArtifactPaths).toContain('test-results-legacy');
 
-    expect(stepNames.indexOf(uploadV2?.name)).toBe(
-      stepNames.indexOf(v2Step?.name) + 1,
-    );
-    expect(stepNames.indexOf(uploadV2?.name)).toBeLessThan(
+    // WI-2594: the "Upload V2/legacy Playwright artifacts" steps were
+    // removed (both trees record fill-step values, e.g. seeded login
+    // credentials, in clear text — see WI-2593). The non-vacuity guard
+    // against reintroducing them lives in
+    // scripts/e2e-web-artifact-upload-guard.test.ts.
+    expect(stepNames.indexOf(v2Step?.name)).toBeLessThan(
       stepNames.indexOf(legacyStep?.name),
     );
     expect(stepNames.indexOf(legacyStep?.name)).toBeLessThan(
       stepNames.indexOf(resetStep?.name),
-    );
-    expect(stepNames.indexOf(resetStep?.name)).toBeLessThan(
-      stepNames.indexOf(uploadLegacy?.name),
     );
     expect(
       allWorkflowSteps.filter(
@@ -412,12 +373,15 @@ describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => 
     );
   });
 
-  it('routes only the validated legacy lane to distinct Playwright artifact paths', () => {
+  it('routes only the validated legacy lane to a distinct Playwright test-results path', () => {
+    // WI-2594: the 'html' reporter (and its per-lane reportDir) was removed
+    // from apps/mobile/playwright.config.ts — it embedded fill-step values,
+    // e.g. seeded login credentials, in clear text (WI-2593). This test now
+    // only inspects outputDir (the local-only test-results directory the
+    // staging-gate classifier still reads on the runner).
     const inspectSource = [
       "import config from './apps/mobile/playwright.config.ts';",
-      'const reporters = config.reporter as unknown as Array<[string, Record<string, string>?]>;',
-      "const html = reporters.find(([name]) => name === 'html');",
-      'process.stdout.write(JSON.stringify({ outputDir: config.outputDir, reportDir: html?.[1]?.outputFolder }));',
+      'process.stdout.write(JSON.stringify({ outputDir: config.outputDir }));',
     ].join(' ');
     const inspect = (lane?: string) => {
       const env = { ...process.env };
@@ -434,35 +398,19 @@ describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => 
     expect(defaultResult.status).toBe(0);
     const defaultArtifacts = JSON.parse(
       defaultResult.stdout.trim().split('\n').at(-1)!,
-    ) as { outputDir: string; reportDir: string };
-    expect(
-      Object.fromEntries(
-        Object.entries(defaultArtifacts).map(([key, value]) => [
-          key,
-          value.replaceAll('\\', '/'),
-        ]),
-      ),
-    ).toMatchObject({
-      outputDir: expect.stringMatching(/e2e-web\/test-results$/),
-      reportDir: expect.stringMatching(/e2e-web\/playwright-report$/),
-    });
+    ) as { outputDir: string };
+    expect(defaultArtifacts.outputDir.replaceAll('\\', '/')).toMatch(
+      /e2e-web\/test-results$/,
+    );
 
     const legacyResult = inspect('legacy');
     expect(legacyResult.status).toBe(0);
     const legacyArtifacts = JSON.parse(
       legacyResult.stdout.trim().split('\n').at(-1)!,
-    ) as { outputDir: string; reportDir: string };
-    expect(
-      Object.fromEntries(
-        Object.entries(legacyArtifacts).map(([key, value]) => [
-          key,
-          value.replaceAll('\\', '/'),
-        ]),
-      ),
-    ).toMatchObject({
-      outputDir: expect.stringMatching(/e2e-web\/test-results-legacy$/),
-      reportDir: expect.stringMatching(/e2e-web\/playwright-report-legacy$/),
-    });
+    ) as { outputDir: string };
+    expect(legacyArtifacts.outputDir.replaceAll('\\', '/')).toMatch(
+      /e2e-web\/test-results-legacy$/,
+    );
 
     const invalidResult = inspect('not-a-lane');
     expect(invalidResult.status).not.toBe(0);

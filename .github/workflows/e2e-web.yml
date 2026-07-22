@@ -227,18 +227,11 @@ jobs:
             FAILURE_CLASS=\$(cut -d= -f2 \"\${CLASSIFY_STATE_FILE}\"); \
             node scripts/playwright-staging-gate.cjs --decide \"\${PRE_STATE}\" \"\${POST_STATE}\" \"\${FAILURE_CLASS}\" \"\${SUITE_STATUS}\""
 
-      - name: Upload V2 Playwright artifacts
-        if: always()
-        continue-on-error: true
-        timeout-minutes: 2
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: playwright-web-v2-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            apps/mobile/e2e-web/playwright-report
-            apps/mobile/e2e-web/test-results
-          retention-days: 14
-
+      # WI-2594: the V2 artifact-upload step was removed here. It published
+      # playwright-report/ and test-results/, both of which record Playwright
+      # fill-step values (including seeded login credentials) in clear text —
+      # see WI-2593. Do not re-add an upload-artifact step for these paths;
+      # scripts/e2e-web-artifact-upload-guard.test.ts guards against it.
       - name: Run legacy Playwright smoke (advisory)
         id: legacy-smoke
         if: ${{ always() && !cancelled() }}
@@ -299,17 +292,9 @@ jobs:
             "${PLAYWRIGHT_API_URL}/v1/__test/reset?prefix=${PREFIX}" \
             || echo "::warning::seed reset returned non-2xx; nightly cleanup will sweep"
 
-      - name: Upload legacy Playwright artifacts
-        if: ${{ always() && (steps.legacy-smoke.outcome == 'success' || steps.legacy-smoke.outcome == 'failure') }}
-        continue-on-error: true
-        timeout-minutes: 2
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: playwright-web-legacy-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            apps/mobile/e2e-web/playwright-report-legacy
-            apps/mobile/e2e-web/test-results-legacy
-          retention-days: 14
+      # WI-2594: the legacy artifact-upload step was removed here for the
+      # same reason as the V2 upload step above (playwright-report-legacy/
+      # and test-results-legacy/ both record fill-step values in clear text).
 
   # Required branch-protection check. Trusted surface changes and manual
   # dispatches hard-gate on the isolated v2-release result. Fork/untrusted PRs
