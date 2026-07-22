@@ -1,6 +1,6 @@
-# Flow TRACK-5: Resume via Subject Detail — Progress-Subject Resume Button
-# Validates: a user can navigate into the subject detail screen and tap the
-#            per-subject "Resume" button to re-enter the active chat session.
+# Flow TRACK-5: Resume via Subject Progress Deep Link
+# Validates: the supported subject-progress route exposes its per-subject
+#            "Resume" button and re-enters the active chat session.
 # Tags: nightly, progress
 #
 # Journey: UX Journey 2 (Daily Learning Loop — resume via subject detail)
@@ -10,17 +10,12 @@
 #               true, which renders progress-subject-resume as "Resume" (not
 #               "Choose next").
 #
-# Architecture note (from progress-analytics.yaml):
-#   Solo learners no longer have a subject list on the progress tab index.
-#   The subject detail page (progress/[subjectId]) is reached via the
-#   home-screen subject tile (home-subject-card-${SUBJECT_ID} in
-#   LearnerScreen.tsx:638 → router.push progress/[subjectId]).
-#   This flow lands on the home screen first, reaches subject detail via the
-#   home carousel tile, then exercises the progress-subject-resume button.
+# Architecture note:
+#   Home subject tiles now open shelf/[subjectId]. The retained
+#   progress/[subjectId] route supports direct/deep-link entry, so this flow
+#   enters it through the app scheme before exercising its Resume action.
 #
 # testID mapping:
-#   LearnerScreen.tsx:638:
-#     - home-subject-card-${SUBJECT_ID}   -> subject carousel tile on home screen
 #   progress/[subjectId]/index.tsx:306:
 #     - progress-subject-back             -> back button (confirms subject-detail screen)
 #   progress/[subjectId]/index.tsx:334:
@@ -48,22 +43,8 @@ tags:
 
 - takeScreenshot: resume-progress-subject-01-home-reached
 
-# ── Navigate to subject detail via home subject carousel ─────────────────────
-# The seed's SUBJECT_ID is the only (Geography) subject, so the single tile sits
-# at the start of the horizontal carousel — no horizontal scroll is needed. The
-# carousel (home-subject-carousel) renders below the coach band / learning
-# actions on the vertically-scrolling home page, so scroll DOWN to bring it into
-# view, then tap the tile to push progress/[subjectId].
-- scrollUntilVisible:
-    element:
-      id: "home-subject-card-${SUBJECT_ID}"
-    direction: DOWN
-    timeout: 10000
-
-- takeScreenshot: resume-progress-subject-02-subject-tile-visible
-
-- tapOn:
-    id: "home-subject-card-${SUBJECT_ID}"
+# ── Enter the supported subject-progress route ───────────────────────────────
+- openLink: 'mentomate:///progress/${SUBJECT_ID}'
 
 # ── Subject detail screen ─────────────────────────────────────────────────────
 # progress-subject-back is the back chevron at the top of progress/[subjectId]/index.tsx.
@@ -73,12 +54,20 @@ tags:
       id: 'progress-subject-back'
     timeout: 10000
 
-- takeScreenshot: resume-progress-subject-03-subject-detail
+- takeScreenshot: resume-progress-subject-02-subject-detail
 
 # ── Resume button ─────────────────────────────────────────────────────────────
 # progress-subject-resume renders as "Resume" (not "Choose next") when
 # canResumeSubject is true. The seed's active in-progress session for this
-# subject guarantees canResumeSubject === true.
+# subject guarantees canResumeSubject === true, but that query resolves after
+# the shell can render. Wait for the state-specific label before tapping the
+# shared control so a slow response cannot send the flow to Shelf.
+- extendedWaitUntil:
+    visible:
+      id: 'progress-subject-resume'
+      text: 'Resume'
+    timeout: 15000
+
 - tapOn:
     id: 'progress-subject-resume'
 
@@ -91,4 +80,4 @@ tags:
 - assertVisible:
     id: 'chat-input'
 
-- takeScreenshot: resume-progress-subject-04-chat-resumed
+- takeScreenshot: resume-progress-subject-03-chat-resumed

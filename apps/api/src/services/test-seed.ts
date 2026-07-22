@@ -4279,6 +4279,17 @@ async function seedQuizAnswerCheckFails(
     topicId: null,
     freeTextEligible: false,
   };
+  const secondQuestion = {
+    type: 'capitals',
+    country: 'France',
+    correctAnswer: 'Paris',
+    acceptedAliases: ['Paris'],
+    distractors: ['Lyon', 'Marseille', 'Toulouse'],
+    funFact: 'Paris has been the capital of France for more than a millennium.',
+    isLibraryItem: false,
+    topicId: null,
+    freeTextEligible: false,
+  };
 
   const roundId = generateUUIDv7();
   await db.insert(quizRounds).values({
@@ -4286,10 +4297,10 @@ async function seedQuizAnswerCheckFails(
     profileId,
     activityType: 'capitals',
     theme: 'European Capitals',
-    questions: [question],
+    questions: [question, secondQuestion],
     results: [],
     score: 1,
-    total: 1,
+    total: 2,
     status: 'completed',
     completedAt: new Date(),
     libraryQuestionIndices: [],

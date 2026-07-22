@@ -3169,6 +3169,337 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     },
   );
 
+  it('[WI-1864] reaches every populated child-report section on a small viewport', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/parent/child-report-detail.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      assertVisible?: { id?: string; optional?: boolean } | string;
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+        optional?: boolean;
+      };
+    }>;
+    const requiredScroll = (id: string, after: number) =>
+      commands.findIndex(
+        ({ scrollUntilVisible }, index) =>
+          index > after &&
+          scrollUntilVisible?.element?.id === id &&
+          scrollUntilVisible.direction === 'DOWN' &&
+          scrollUntilVisible.optional !== true,
+      );
+    const requiredAssertion = (id: string, after: number) =>
+      commands.findIndex(
+        ({ assertVisible }, index) =>
+          index > after &&
+          typeof assertVisible === 'object' &&
+          assertVisible.id === id &&
+          assertVisible.optional !== true,
+      );
+
+    const highlightsScroll = requiredScroll('child-report-highlights', -1);
+    const highlights = requiredAssertion(
+      'child-report-highlights',
+      highlightsScroll,
+    );
+    const nextStepsScroll = requiredScroll(
+      'child-report-next-steps',
+      highlights,
+    );
+    const nextSteps = requiredAssertion(
+      'child-report-next-steps',
+      nextStepsScroll,
+    );
+    const subjectsScroll = requiredScroll('child-report-subjects', nextSteps);
+    const subjects = requiredAssertion('child-report-subjects', subjectsScroll);
+
+    expect(highlightsScroll).toBeGreaterThan(-1);
+    expect(highlights).toBeGreaterThan(highlightsScroll);
+    expect(nextStepsScroll).toBeGreaterThan(highlights);
+    expect(nextSteps).toBeGreaterThan(nextStepsScroll);
+    expect(subjectsScroll).toBeGreaterThan(nextSteps);
+    expect(subjects).toBeGreaterThan(subjectsScroll);
+  });
+
+  it('[WI-1864] submits password recovery for the runner-injected shard identity', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/auth/forgot-password.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      inputText?: string;
+      tapOn?: { id?: string } | string;
+    }>;
+    const email = commands.findIndex(
+      ({ tapOn }) =>
+        typeof tapOn === 'object' && tapOn.id === 'forgot-password-email',
+    );
+    const injectedIdentity = commands.findIndex(
+      ({ inputText }, index) => index > email && inputText === '${EMAIL}',
+    );
+    const submit = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > injectedIdentity &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'send-reset-code-button',
+    );
+
+    expect(email).toBeGreaterThan(-1);
+    expect(injectedIdentity).toBeGreaterThan(email);
+    expect(submit).toBeGreaterThan(injectedIdentity);
+    expect(source).not.toContain('test-e2e+clerk_test@example.com');
+  });
+
+  it('[WI-1864] scrolls the first parent nudge action fully into the small viewport', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/parent/nudge-rate-limit.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      extendedWaitUntil?: { visible?: { id?: string } | string };
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+        timeout?: number;
+        visibilityPercentage?: number;
+        centerElement?: boolean;
+        optional?: boolean;
+      };
+      tapOn?: { id?: string } | string;
+    }>;
+    const selector = 'parent-home-send-nudge-${CHILD_PROFILE_ID}';
+    const home = commands.findIndex(
+      ({ extendedWaitUntil }) =>
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'parent-home-screen',
+    );
+    const scroll = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > home &&
+        scrollUntilVisible?.element?.id === selector &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        (scrollUntilVisible.timeout ?? 0) >= 30000 &&
+        scrollUntilVisible.visibilityPercentage === 100 &&
+        scrollUntilVisible.centerElement === true &&
+        scrollUntilVisible.optional !== true,
+    );
+    const taps = commands
+      .map(({ tapOn }, index) => ({ tapOn, index }))
+      .filter(
+        ({ tapOn }) => typeof tapOn === 'object' && tapOn.id === selector,
+      );
+
+    expect(home).toBeGreaterThan(-1);
+    expect(scroll).toBeGreaterThan(home);
+    expect(taps).toHaveLength(5);
+    expect(taps[0]?.index).toBeGreaterThan(scroll);
+  });
+
+  it('[WI-1864] opens empty mentor memory through child settings mode', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/parent/child-mentor-memory.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      tapOn?: { id?: string } | string;
+      extendedWaitUntil?: { visible?: { id?: string } | string };
+    }>;
+    const settings = commands.findIndex(
+      ({ tapOn }) =>
+        typeof tapOn === 'object' &&
+        tapOn.id === 'parent-home-child-profile-${CHILD1_PROFILE_ID}',
+    );
+    const detail = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > settings &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'child-detail-scroll',
+    );
+
+    expect(settings).toBeGreaterThan(-1);
+    expect(detail).toBeGreaterThan(settings);
+    expect(source).not.toContain(
+      'parent-home-check-child-${CHILD1_PROFILE_ID}',
+    );
+  });
+
+  it('[WI-1864] deep-links to the supported subject-progress resume route', () => {
+    const source = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/progress/resume-progress-subject.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      openLink?: string;
+      extendedWaitUntil?: {
+        visible?: { id?: string; text?: string } | string;
+        optional?: boolean;
+      };
+      tapOn?: { id?: string } | string;
+    }>;
+    const deepLink = commands.findIndex(
+      ({ openLink }) => openLink === 'mentomate:///progress/${SUBJECT_ID}',
+    );
+    const detail = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > deepLink &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'progress-subject-back',
+    );
+    const ready = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > detail &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'progress-subject-resume' &&
+        extendedWaitUntil.visible.text === 'Resume' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const resume = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > ready &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'progress-subject-resume',
+    );
+
+    expect(deepLink).toBeGreaterThan(-1);
+    expect(detail).toBeGreaterThan(deepLink);
+    expect(ready).toBeGreaterThan(detail);
+    expect(resume).toBeGreaterThan(ready);
+    expect(source).not.toContain('home-subject-card-${SUBJECT_ID}');
+  });
+
+  it('[WI-1864] keeps home subject analytics on the current shelf route', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/progress/progress-analytics.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      tapOn?: { id?: string } | string;
+      extendedWaitUntil?: {
+        visible?: { id?: string } | string;
+        optional?: boolean;
+      };
+    }>;
+    const subject = commands.findIndex(
+      ({ tapOn }) =>
+        typeof tapOn === 'object' &&
+        tapOn.id === 'home-subject-card-${SUBJECT_ID}',
+    );
+    const shelf = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > subject &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'shelf-screen',
+    );
+    const back = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > shelf && typeof tapOn === 'object' && tapOn.id === 'shelf-back',
+    );
+    const library = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > back &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'library-screen' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const progressTab = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > library &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'tab-progress',
+    );
+    const progress = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > progressTab &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'progress-screen' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const expand = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > progress &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'progress-show-all-sessions',
+    );
+    const recent = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > expand &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'recent-sessions-list' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const seededSession = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > recent &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'session-card-${SESSION_ID}' &&
+        extendedWaitUntil.optional !== true,
+    );
+
+    expect(subject).toBeGreaterThan(-1);
+    expect(shelf).toBeGreaterThan(subject);
+    expect(back).toBeGreaterThan(shelf);
+    expect(library).toBeGreaterThan(back);
+    expect(progressTab).toBeGreaterThan(library);
+    expect(progress).toBeGreaterThan(progressTab);
+    expect(expand).toBeGreaterThan(progress);
+    expect(recent).toBeGreaterThan(expand);
+    expect(seededSession).toBeGreaterThan(recent);
+    expect(source).not.toContain('progress-subject-back');
+  });
+
+  it('[WI-1864] exercises the seeded answer-check failure before continuing the round', () => {
+    const source = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/quiz/quiz-answer-check-failure.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      openLink?: string;
+      tapOn?: { id?: string } | string;
+      extendedWaitUntil?: {
+        visible?: { id?: string } | string;
+        optional?: boolean;
+      };
+    }>;
+    const seededRound = commands.findIndex(
+      ({ openLink }) =>
+        openLink ===
+        'mentomate:///quiz/launch?activityType=capitals&subjectId=${SUBJECT_ID}&roundId=${ROUND_ID}',
+    );
+    const answer = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > seededRound &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'quiz-option-0',
+    );
+    const failure = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > answer &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'quiz-answer-check-failed' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const resolved = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > failure &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'quiz-next-question-footer' &&
+        extendedWaitUntil.optional !== true,
+    );
+
+    expect(seededRound).toBeGreaterThan(-1);
+    expect(answer).toBeGreaterThan(-1);
+    expect(failure).toBeGreaterThan(answer);
+    expect(resolved).toBeGreaterThan(failure);
+  });
+
   it('[WI-1864] keeps parent child drill-down on its reachable parent-native journey', () => {
     const source = readFileSync(
       join(repoRoot, 'apps/mobile/e2e/flows/parent/child-drill-down.yaml'),

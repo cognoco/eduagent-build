@@ -56,6 +56,14 @@ tags:
 - assertVisible:
     id: 'child-report-metric-minutes'
 
+- scrollUntilVisible:
+    element:
+      id: 'child-report-highlights'
+    direction: DOWN
+    timeout: 10000
+    visibilityPercentage: 100
+    centerElement: true
+
 - assertVisible:
     id: 'child-report-highlights'
 

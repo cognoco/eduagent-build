@@ -7,6 +7,7 @@ import {
   person,
   login,
   membership,
+  quizRounds,
   usageEvents,
   type Database,
 } from '@eduagent/database';
@@ -1108,6 +1109,36 @@ describe('new Stage-0 scenarios return required IDs', () => {
       expect(mockDb.insert).toHaveBeenCalled();
     },
   );
+
+  it('[WI-1864] keeps the answer-check-failure fixture completed but non-final', async () => {
+    const mockDb = createMockDb();
+
+    await seedScenario(mockDb, 'quiz-answer-check-fails', 'test@example.com');
+
+    const insertMock = mockDb.insert as unknown as jest.Mock;
+    const insertedRound = insertMock.mock.calls
+      .flatMap(([table], index) => {
+        if (table !== quizRounds) return [];
+        const valuesMock = insertMock.mock.results[index]?.value
+          .values as jest.Mock;
+        return valuesMock.mock.calls.map(([value]) => value);
+      })
+      .find(
+        (value) =>
+          value?.status === 'completed' && value?.theme === 'European Capitals',
+      ) as
+      | {
+          questions: unknown[];
+          status: string;
+          total: number;
+        }
+      | undefined;
+
+    expect(insertedRound).toBeDefined();
+    expect(insertedRound?.status).toBe('completed');
+    expect(insertedRound?.total).toBe(2);
+    expect(insertedRound?.questions).toHaveLength(2);
+  });
 
   it('[WI-1864] seeds a non-final dispute round with stable wrong and correct answer text', async () => {
     const mockDb = createMockDb();

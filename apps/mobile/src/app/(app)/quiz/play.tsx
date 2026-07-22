@@ -863,7 +863,10 @@ export default function QuizPlayScreen(): React.ReactElement {
           continues with the result assumed wrong; this banner lets the user
           know so they don't think their connection is fine. */}
         {answerCheckFailed ? (
-          <Text className="text-caption text-warning text-center mb-2 px-5">
+          <Text
+            className="text-caption text-warning text-center mb-2 px-5"
+            testID="quiz-answer-check-failed"
+          >
             {t('quiz.play.answerCheckFailed')}
           </Text>
         ) : null}

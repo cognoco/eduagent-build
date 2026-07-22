@@ -495,6 +495,19 @@ describe('PracticeScreen', () => {
     });
   });
 
+  it('[WI-1864] forwards the Practice upstream return destination into Dictation', async () => {
+    mockSearchParams = { returnTo: 'journal' };
+    mount();
+    await waitFor(() => screen.getByTestId('practice-dictation'));
+
+    fireEvent.press(screen.getByTestId('practice-dictation'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/dictation',
+      params: { returnTo: 'practice', practiceReturnTo: 'journal' },
+    });
+  });
+
   it('renders and routes a vocabulary quiz for every active language subject', async () => {
     mount({
       subjects: [
