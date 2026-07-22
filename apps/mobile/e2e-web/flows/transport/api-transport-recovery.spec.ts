@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 
+import { installSeededProfileBootstrap } from '../../helpers/profile-bootstrap';
 import { apiBaseUrl, authStateDir } from '../../helpers/runtime';
 
 const TRANSPORT_GAP_MS = 6_500;
@@ -21,7 +22,7 @@ async function installApiTransportGap(page: Page): Promise<{
     }
 
     continuedRequests += 1;
-    await route.continue();
+    await route.fallback();
   });
 
   return {
@@ -39,6 +40,7 @@ test.describe('safe request recovery after an api-stg transport gap', () => {
     test('reaches the intended learner-home assertion after net::ERR_FAILED', async ({
       page,
     }) => {
+      await installSeededProfileBootstrap(page);
       const fault = await installApiTransportGap(page);
 
       await page.goto('/mentor', { waitUntil: 'commit' });
@@ -60,7 +62,13 @@ test.describe('safe request recovery after an api-stg transport gap', () => {
         await route.abort('failed');
       });
 
+      const firstProfileRequest = page.waitForRequest(
+        (request) =>
+          request.method() === 'GET' &&
+          new URL(request.url()).pathname === '/v1/profiles',
+      );
       await page.goto('/mentor', { waitUntil: 'commit' });
+      await firstProfileRequest;
 
       await expect(page.getByTestId('profile-load-error')).toBeVisible({
         timeout: 11_000,
@@ -77,6 +85,7 @@ test.describe('safe request recovery after an api-stg transport gap', () => {
     test('reaches the intended parent-shell assertion after net::ERR_FAILED', async ({
       page,
     }) => {
+      await installSeededProfileBootstrap(page, 'owner-with-children');
       const fault = await installApiTransportGap(page);
 
       await page.goto('/mentor', { waitUntil: 'commit' });
@@ -98,6 +107,7 @@ test.describe('safe request recovery after an api-stg transport gap', () => {
     test('reaches the intended quiz-results assertion after net::ERR_FAILED', async ({
       page,
     }) => {
+      await installSeededProfileBootstrap(page);
       const fault = await installApiTransportGap(page);
 
       await page.goto('/quiz/dev-only/results?freeze=true', {
