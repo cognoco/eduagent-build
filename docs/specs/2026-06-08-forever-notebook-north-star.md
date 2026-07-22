@@ -3,8 +3,10 @@
 > **STATUS (last verified 2026-07-22): ACTIVE VISION; SLICE 1 CORE SHIPPED.**
 > Concept capture is implemented and enabled (`apps/api/src/services/concept-capture.ts`,
 > `apps/api/src/services/concept-capture.integration.test.ts`; activation
-> `2fedbd627`, PR #1828). Slice 1's remaining concept-targeted review is
-> **WI-1454 (concept-targeted review for weak concepts)**. Slices 2–5 and the
+> `2fedbd627`, PR #1828). Slice 1's concept-targeted due-topic review for
+> **WI-1454 (concept-targeted review for weak concepts)** is also implemented and
+> tested (`3b0fa9337`, PR #2223); its live Cosmo record remains Backlog/Active and
+> needs lifecycle reconciliation, not duplicate implementation. Slices 2–5 and the
 > explicitly parked rows remain roadmap, not committed scope. The original roadmap
 > table and grounding prose are retained as historical design context; use the
 > concept-capture spec's current header for slice-1 implementation state.

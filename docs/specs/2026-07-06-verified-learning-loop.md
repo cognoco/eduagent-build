@@ -10,8 +10,10 @@
 **WI-1704 (verified-artifact evidence links)**. The design-only **WI-1465
 (low-stakes per-concept re-prove)** is Closed/Done after producing proposed
 `MMT-ADR-0034`; its learner-facing implementation remains unbuilt, and the ADR's
-API, mobile, and test follow-ups are not yet captured. Current remaining
-second-wave scope includes **WI-1454 (concept-targeted review for weak concepts)**. Use
+API, mobile, and test follow-ups are not yet captured. Concept-targeted due-topic
+review for **WI-1454 (concept-targeted review for weak concepts)** is implemented
+and tested in `3b0fa9337` (PR #2223), though its live Cosmo record remains
+Backlog/Active and needs lifecycle reconciliation rather than duplicate execution. Use
 `docs/plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md` for launch disposition.
 **Relates:**
 

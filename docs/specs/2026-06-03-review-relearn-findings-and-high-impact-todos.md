@@ -26,9 +26,11 @@ relates:
 > The design-only **WI-1465 (low-stakes per-concept re-prove)** is Closed/Done
 > after producing proposed `MMT-ADR-0034`; the learner-facing implementation is
 > still unbuilt, and the ADR's API, mobile, and test follow-ups are not yet captured.
-> Other remaining named work includes **WI-1454 (concept-targeted review for weak
-> concepts)**. Challenge runtime still defaults off. The RR-N body remains the
-> original findings record, not a live queue.
+> Concept-targeted due-topic review for **WI-1454 (concept-targeted review for
+> weak concepts)** is implemented and tested in `3b0fa9337` (PR #2223), though
+> its live Cosmo record remains Backlog/Active and needs lifecycle reconciliation,
+> not duplicate implementation. Challenge runtime still defaults off. The RR-N
+> body remains the original findings record, not a live queue.
 
 ## Purpose
 

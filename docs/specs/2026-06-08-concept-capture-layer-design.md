@@ -8,10 +8,11 @@
 > `apps/api/src/services/concept-capture.integration.test.ts`,
 > `apps/api/src/routes/notes.ts`, `apps/mobile/src/hooks/use-notes.ts`). Activation
 > landed in `2fedbd627` (PR #1828), and `CONCEPT_CAPTURE_ENABLED` is now `true`.
-> Remaining scope is explicit: concept-targeted review is
-> **WI-1454 (concept-targeted review for weak concepts)**; the broad note-correctness
-> umbrella **WI-1491 (note-correctness grading and nudges)** was cancelled/superseded
-> by the current MVP disposition in
+> Concept-targeted due-topic review for **WI-1454 (concept-targeted review for weak
+> concepts)** is implemented and tested in `3b0fa9337` (PR #2223); its live Cosmo
+> record remains Backlog/Active and needs lifecycle reconciliation, not duplicate
+> implementation. The broad note-correctness umbrella **WI-1491 (note-correctness
+> grading and nudges)** was cancelled/superseded by the current MVP disposition in
 > `docs/plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md`. The design body below is
 > preserved as the original proposal, not as a current implementation tracker.
 
