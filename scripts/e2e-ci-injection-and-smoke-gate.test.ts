@@ -1711,7 +1711,10 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     for (const signature of [
       'extendedWaitUntil:id:ready-screen',
       'extendedWaitUntil:text:^Starting with Photosynthesis$',
+      'assertVisible:text:^Starting with Photosynthesis$',
+      'assertVisible:id:ready-start',
       'extendedWaitUntil:id:session-screen',
+      'assertVisible:id:chat-shell-back',
       'extendedWaitUntil:id:subjects-screen',
       exactSubjectRowWaitSignature,
       exactSubjectRowAssertSignature,
