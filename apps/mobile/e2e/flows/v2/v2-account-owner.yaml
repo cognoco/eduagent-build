@@ -38,6 +38,11 @@ tags:
     timeout: 15000
 - assertVisible:
     id: 'account-admin-profile'
+- scrollUntilVisible:
+    element:
+      id: 'account-admin-notifications'
+    direction: DOWN
+    timeout: 15000
 - assertVisible:
     id: 'account-admin-notifications'
 - assertVisible:

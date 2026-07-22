@@ -1,6 +1,7 @@
-import { Stack } from 'expo-router';
+import { Redirect, Stack } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../../lib/theme';
+import { useParentProxy } from '../../../hooks/use-parent-proxy';
 
 export const unstable_settings = {
   initialRouteName: 'index',
@@ -11,6 +12,11 @@ export const ACCOUNT_PRESENTATION = 'modal' as const;
 export default function AccountLayout(): React.ReactElement {
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const { isParentProxy } = useParentProxy();
+
+  if (isParentProxy) {
+    return <Redirect href="/(app)/home" />;
+  }
 
   return (
     <Stack

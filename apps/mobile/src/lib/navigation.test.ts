@@ -195,6 +195,12 @@ describe('V2 account return contract [WI-2240]', () => {
     ['/mentor', 'mentor'],
     ['/subjects', 'subjects'],
     ['/subjects/subject-1', 'subjects'],
+    ['/subject/subject-1', 'subjects'],
+    ['/subject-hub/subject-1', 'subjects'],
+    ['/topic/topic-1', 'subjects'],
+    ['/pick-book/subject-1', 'subjects'],
+    ['/vocabulary/subject-1', 'subjects'],
+    ['/shelf/subject-1/book/book-1', 'subjects'],
     ['/journal', 'journal'],
     ['/journal/practice', 'journal'],
   ] as const)('maps %s to the initiating V2 tab token', (pathname, token) => {

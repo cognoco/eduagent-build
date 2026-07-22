@@ -56,7 +56,22 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 export function accountReturnTokenForPathname(
   pathname: string,
 ): V2AccountReturnToken {
-  if (pathname === '/subjects' || pathname.startsWith('/subjects/')) {
+  if (
+    pathname === '/subjects' ||
+    pathname.startsWith('/subjects/') ||
+    pathname === '/subject' ||
+    pathname.startsWith('/subject/') ||
+    pathname === '/subject-hub' ||
+    pathname.startsWith('/subject-hub/') ||
+    pathname === '/topic' ||
+    pathname.startsWith('/topic/') ||
+    pathname === '/pick-book' ||
+    pathname.startsWith('/pick-book/') ||
+    pathname === '/vocabulary' ||
+    pathname.startsWith('/vocabulary/') ||
+    pathname === '/shelf' ||
+    pathname.startsWith('/shelf/')
+  ) {
     return 'subjects';
   }
   if (pathname === '/journal' || pathname.startsWith('/journal/')) {

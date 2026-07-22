@@ -569,11 +569,19 @@ describe('[WI-2240] V2 Account manifest and Maestro YAML contract validation', (
   ): Record<string, unknown> | null {
     if (typeof value !== 'object' || value === null) return null;
     const commandRoot = value as Record<string, unknown>;
-    if (command !== 'extendedWaitUntil') return commandRoot;
-    const visibleRoot = commandRoot.visible;
-    return typeof visibleRoot === 'object' && visibleRoot !== null
-      ? (visibleRoot as Record<string, unknown>)
-      : null;
+    if (command === 'extendedWaitUntil') {
+      const visibleRoot = commandRoot.visible;
+      return typeof visibleRoot === 'object' && visibleRoot !== null
+        ? (visibleRoot as Record<string, unknown>)
+        : null;
+    }
+    if (command === 'scrollUntilVisible') {
+      const elementRoot = commandRoot.element;
+      return typeof elementRoot === 'object' && elementRoot !== null
+        ? (elementRoot as Record<string, unknown>)
+        : null;
+    }
+    return commandRoot;
   }
 
   function matchesMaestroCommand(
@@ -648,6 +656,10 @@ describe('[WI-2240] V2 Account manifest and Maestro YAML contract validation', (
   });
   const waitVisible = (id: string): MaestroExpectation => ({
     command: 'extendedWaitUntil',
+    id,
+  });
+  const scrollVisible = (id: string): MaestroExpectation => ({
+    command: 'scrollUntilVisible',
     id,
   });
   const visibleWithDescendant = (
@@ -778,6 +790,7 @@ describe('[WI-2240] V2 Account manifest and Maestro YAML contract validation', (
         tap('account-avatar-button'),
         waitVisible('account-screen'),
         visible('account-admin-profile'),
+        scrollVisible('account-admin-notifications'),
         visible('account-admin-notifications'),
         ...ownerOnlyRows.map((row) => visible(row)),
         tap('account-back'),
