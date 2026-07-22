@@ -1042,12 +1042,17 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
 
   it('keeps every pr-blocking flow in the explicit PR plan', () => {
     const plan = loadPlan('pr');
+    const flows = plan.map(({ flow }) => flow);
 
-    expect(plan).toHaveLength(13);
-    expect(plan.map(({ flow }) => flow)).toContain(
-      'flows/account/more-tab-navigation.yaml',
-    );
-    expect(new Set(plan.map(({ flow }) => flow)).size).toBe(plan.length);
+    // WI-2596: more-tab-navigation.yaml and multi-subject.yaml were quarantined
+    // (pr-blocking -> blocked, removed from the manifest) because their assertions
+    // are red on main after the WI-2241 seed drift — the app is correct, the seed
+    // drifted. They must NOT appear in the pr plan; the assertions are left intact.
+    expect(plan).toHaveLength(11);
+    expect(flows).toContain('flows/app-launch.yaml');
+    expect(flows).not.toContain('flows/account/more-tab-navigation.yaml');
+    expect(flows).not.toContain('flows/subjects/multi-subject.yaml');
+    expect(new Set(flows).size).toBe(plan.length);
   });
 
   it('discovers the full scheduled tag set, including parent subdirectories', () => {
