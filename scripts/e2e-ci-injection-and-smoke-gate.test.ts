@@ -1391,6 +1391,14 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         timeout: 60000,
       },
     };
+    const stableOutcome: Command = {
+      extendedWaitUntil: {
+        visible: {
+          id: '^(ready-screen|subject-confident-card|subject-single-suggestion-card|subject-no-match-card|subject-suggestion-card)$',
+        },
+        timeout: 60000,
+      },
+    };
     const failClosed: Command = {
       assertNotVisible: { id: 'subject-suggestion-card' },
     };
@@ -1405,6 +1413,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       },
     };
     const outcomeSequence: Command[] = [
+      stableOutcome,
       resolveFinished,
       failClosed,
       branch(
@@ -1437,10 +1446,32 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         (candidate) => candidate in record,
       );
       if (!kind) return '';
-      const payload = record[kind] as Command;
+      const payloadValue = record[kind];
+      if (payloadValue === null || typeof payloadValue !== 'object') return '';
+      const payload = payloadValue as Command;
+      if (record.optional === true || payload.optional === true) return '';
       const selector = (payload.visible ?? payload) as Command;
       if (selector.optional === true) return '';
-      return `${kind}:${selector.id ? `id:${selector.id}` : `text:${selector.text}`}`;
+      const selectorSignature = selector.id
+        ? `id:${selector.id}`
+        : `text:${selector.text}`;
+      const descendants = selector.containsDescendants;
+      if (descendants === undefined) return `${kind}:${selectorSignature}`;
+      if (!Array.isArray(descendants)) return '';
+      const descendantSignatures = descendants.map((descendant) => {
+        if (descendant === null || typeof descendant !== 'object') return '';
+        const descendantSelector = descendant as Command;
+        if (descendantSelector.optional === true) return '';
+        if (typeof descendantSelector.id === 'string') {
+          return `id:${descendantSelector.id}`;
+        }
+        if (typeof descendantSelector.text === 'string') {
+          return `text:${descendantSelector.text}`;
+        }
+        return '';
+      });
+      if (descendantSignatures.some((signature) => signature === '')) return '';
+      return `${kind}:${selectorSignature}:containsDescendants:${descendantSignatures.join(',')}`;
     };
     const hasArbitraryAmbiguousTap = (commands: unknown[]): boolean =>
       allObjects(commands).some((command) => {
@@ -1506,6 +1537,11 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           isHardResolveLoadingAppearance(command.extendedWaitUntil) ||
           isHardResolveLoadingAppearance(command.assertVisible),
       );
+    const exactSubjectRowId = '^subjects-browse-row-.*$';
+    const exactSubjectRowText = '^Photosynthesis$';
+    const exactSubjectRowSignature = `id:${exactSubjectRowId}:containsDescendants:text:${exactSubjectRowText}`;
+    const exactSubjectRowWaitSignature = `extendedWaitUntil:${exactSubjectRowSignature}`;
+    const exactSubjectRowAssertSignature = `assertVisible:${exactSubjectRowSignature}`;
     const exactCaseSequence = [
       'extendedWaitUntil:id:ready-screen',
       'extendedWaitUntil:text:^Starting with Photosynthesis$',
@@ -1516,15 +1552,142 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       'assertVisible:id:chat-shell-back',
       'tapOn:id:chat-shell-back',
       'extendedWaitUntil:id:subjects-screen',
-      'extendedWaitUntil:text:Photosynthesis',
-      'assertVisible:text:Photosynthesis',
+      exactSubjectRowWaitSignature,
+      exactSubjectRowAssertSignature,
     ];
     const satisfiesExactCaseContract = (commands: unknown[]): boolean =>
       !requiresTransientResolveLoadingAppearance(commands) &&
       hasSequence(commands.map(hardCommandSignature), exactCaseSequence);
+    const withOptionalCommand = (
+      commands: unknown[],
+      index: number,
+      placement: 'root' | 'payload' | 'selector' | 'descendant',
+    ): unknown[] => {
+      expect(index).toBeGreaterThanOrEqual(0);
+      return commands.map((command, commandIndex) => {
+        if (commandIndex !== index) return command;
+        const record = command as Command;
+        if (placement === 'root') {
+          return { ...record, optional: true };
+        }
+        const kind = ['extendedWaitUntil', 'assertVisible'].find(
+          (candidate) => candidate in record,
+        );
+        expect(kind).toBeDefined();
+        const payload = record[kind!] as Command;
+        if (placement === 'payload') {
+          return {
+            ...record,
+            [kind!]: { ...payload, optional: true },
+          };
+        }
+        const selectorKey = 'visible' in payload ? 'visible' : undefined;
+        const selector = (
+          selectorKey ? payload[selectorKey] : payload
+        ) as Command;
+        if (placement === 'descendant') {
+          const descendants = selector.containsDescendants;
+          expect(Array.isArray(descendants)).toBe(true);
+          const mutatedSelector = {
+            ...selector,
+            containsDescendants: (descendants as Command[]).map(
+              (descendant, descendantIndex) =>
+                descendantIndex === 0
+                  ? { ...descendant, optional: true }
+                  : descendant,
+            ),
+          };
+          return {
+            ...record,
+            [kind!]: selectorKey
+              ? { ...payload, [selectorKey]: mutatedSelector }
+              : mutatedSelector,
+          };
+        }
+        return {
+          ...record,
+          [kind!]: selectorKey
+            ? { ...payload, [selectorKey]: { ...selector, optional: true } }
+            : { ...selector, optional: true },
+        };
+      });
+    };
+    const withRowSelectorMutation = (
+      commands: unknown[],
+      index: number,
+      mutation:
+        | 'remove-id'
+        | 'change-id'
+        | 'remove-descendant-text'
+        | 'change-descendant-text',
+    ): unknown[] => {
+      expect(index).toBeGreaterThanOrEqual(0);
+      return commands.map((command, commandIndex) => {
+        if (commandIndex !== index) return command;
+        const record = command as Command;
+        const kind = ['extendedWaitUntil', 'assertVisible'].find(
+          (candidate) => candidate in record,
+        );
+        expect(kind).toBeDefined();
+        const payload = record[kind!] as Command;
+        const selectorKey = 'visible' in payload ? 'visible' : undefined;
+        const selector = (
+          selectorKey ? payload[selectorKey] : payload
+        ) as Command;
+        let mutatedSelector: Command;
+        if (mutation === 'remove-id') {
+          const { id: _removedId, ...withoutId } = selector;
+          mutatedSelector = withoutId;
+        } else if (mutation === 'change-id') {
+          mutatedSelector = { ...selector, id: '^adjacent-row-.*$' };
+        } else if (mutation === 'remove-descendant-text') {
+          mutatedSelector = { ...selector, containsDescendants: [{}] };
+        } else {
+          mutatedSelector = {
+            ...selector,
+            containsDescendants: [{ text: '^Adjacent subject$' }],
+          };
+        }
+        return {
+          ...record,
+          [kind!]: selectorKey
+            ? { ...payload, [selectorKey]: mutatedSelector }
+            : mutatedSelector,
+        };
+      });
+    };
 
     expect(satisfiesOutcomeContract(subjectCreate)).toBe(true);
     expect(satisfiesExactCaseContract(subjectCreate)).toBe(true);
+
+    const stableOutcomeSignature =
+      'extendedWaitUntil:id:^(ready-screen|subject-confident-card|subject-single-suggestion-card|subject-no-match-card|subject-suggestion-card)$';
+    const stableOutcomeIndex = subjectCreate.findIndex(
+      (command) => hardCommandSignature(command) === stableOutcomeSignature,
+    );
+    expect(stableOutcomeIndex).toBeGreaterThanOrEqual(0);
+    expect(
+      satisfiesOutcomeContract(
+        subjectCreate.filter(
+          (command) => !isDeepStrictEqual(command, stableOutcome),
+        ),
+      ),
+    ).toBe(false);
+    expect(
+      satisfiesOutcomeContract(
+        withOptionalCommand(subjectCreate, stableOutcomeIndex, 'payload'),
+      ),
+    ).toBe(false);
+    expect(
+      satisfiesOutcomeContract(
+        withOptionalCommand(subjectCreate, stableOutcomeIndex, 'selector'),
+      ),
+    ).toBe(false);
+    expect(
+      satisfiesOutcomeContract(
+        withOptionalCommand(subjectCreate, stableOutcomeIndex, 'root'),
+      ),
+    ).toBe(false);
 
     const exactReadyWaitIndex = subjectCreate.findIndex(
       (command) =>
@@ -1537,6 +1700,77 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         subjectCreate.filter((_, index) => index !== exactReadyWaitIndex),
       ),
     ).toBe(false);
+    const exactCaseStart = subjectCreate
+      .map(hardCommandSignature)
+      .findIndex((_, start, signatures) =>
+        exactCaseSequence.every(
+          (expected, offset) => signatures[start + offset] === expected,
+        ),
+      );
+    expect(exactCaseStart).toBeGreaterThanOrEqual(0);
+    for (const signature of [
+      'extendedWaitUntil:id:ready-screen',
+      'extendedWaitUntil:text:^Starting with Photosynthesis$',
+      'extendedWaitUntil:id:session-screen',
+      'extendedWaitUntil:id:subjects-screen',
+      exactSubjectRowWaitSignature,
+      exactSubjectRowAssertSignature,
+    ]) {
+      const exactCaseOffset = exactCaseSequence.indexOf(signature);
+      expect(exactCaseOffset).toBeGreaterThanOrEqual(0);
+      expect(
+        satisfiesExactCaseContract(
+          withOptionalCommand(
+            subjectCreate,
+            exactCaseStart + exactCaseOffset,
+            'payload',
+          ),
+        ),
+      ).toBe(false);
+      expect(
+        satisfiesExactCaseContract(
+          withOptionalCommand(
+            subjectCreate,
+            exactCaseStart + exactCaseOffset,
+            'selector',
+          ),
+        ),
+      ).toBe(false);
+      expect(
+        satisfiesExactCaseContract(
+          withOptionalCommand(
+            subjectCreate,
+            exactCaseStart + exactCaseOffset,
+            'root',
+          ),
+        ),
+      ).toBe(false);
+    }
+    for (const signature of [
+      exactSubjectRowWaitSignature,
+      exactSubjectRowAssertSignature,
+    ]) {
+      const exactCaseOffset = exactCaseSequence.indexOf(signature);
+      expect(exactCaseOffset).toBeGreaterThanOrEqual(0);
+      const commandIndex = exactCaseStart + exactCaseOffset;
+      expect(
+        satisfiesExactCaseContract(
+          withOptionalCommand(subjectCreate, commandIndex, 'descendant'),
+        ),
+      ).toBe(false);
+      for (const mutation of [
+        'remove-id',
+        'change-id',
+        'remove-descendant-text',
+        'change-descendant-text',
+      ] as const) {
+        expect(
+          satisfiesExactCaseContract(
+            withRowSelectorMutation(subjectCreate, commandIndex, mutation),
+          ),
+        ).toBe(false);
+      }
+    }
     expect(
       satisfiesExactCaseContract([
         ...subjectCreate,
@@ -1570,11 +1804,11 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     };
     for (const mutation of [
       // Removal: the branch cannot act without first proving its owner/action.
-      outcomeSequence.filter((_, index) => index !== 4),
+      outcomeSequence.filter((_, index) => index !== 5),
       // Global proof: sibling assertions do not bind the action to its card.
       replaceAt(
         outcomeSequence,
-        4,
+        5,
         branch('subject-no-match-card', [
           { assertVisible: { id: 'subject-no-match-card' } },
           { assertVisible: { id: 'subject-use-my-words' } },
@@ -1584,7 +1818,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       // Adjacent case: the correct action under the wrong result owner.
       replaceAt(
         outcomeSequence,
-        4,
+        5,
         branch(
           'subject-no-match-card',
           ownedBranch('subject-suggestion-card', 'subject-use-my-words'),
@@ -1593,7 +1827,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       // Wrong action: accepting a suggestion does not exercise no-match.
       replaceAt(
         outcomeSequence,
-        4,
+        5,
         branch(
           'subject-no-match-card',
           ownedBranch('subject-no-match-card', 'subject-suggestion-accept'),
@@ -1602,7 +1836,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       // Optional assertions do not establish evidence.
       replaceAt(
         outcomeSequence,
-        4,
+        5,
         branch(
           'subject-no-match-card',
           replaceAt(noMatchCommands, 0, {
@@ -1617,20 +1851,20 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       // An action before its assertion can mutate away the evidence.
       replaceAt(
         outcomeSequence,
-        4,
+        5,
         branch('subject-no-match-card', [
           noMatchCommands[1]!,
           noMatchCommands[0]!,
         ]),
       ),
       // The ambiguous-card assertion is hard and precedes every outcome.
-      replaceAt(outcomeSequence, 1, {
+      replaceAt(outcomeSequence, 2, {
         assertNotVisible: {
           id: 'subject-suggestion-card',
           optional: true,
         },
       }),
-      [resolveFinished, ...outcomeSequence.slice(2), failClosed],
+      [stableOutcome, resolveFinished, ...outcomeSequence.slice(3), failClosed],
       // Even a complete positive sequence is void if it chooses an option.
       [...outcomeSequence, { tapOn: { id: 'subject-suggestion-option-0' } }],
       // A second, global corrective tap is not owned by the proven card.

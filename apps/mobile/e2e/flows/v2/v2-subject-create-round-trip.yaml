@@ -94,6 +94,12 @@ tags:
     timeout: 5000
 - tapOn:
     id: 'create-subject-submit'
+# Wait for a durable resolver outcome before evaluating one-shot branches.
+# The generic suggestion card is the ambiguous result and fails closed below.
+- extendedWaitUntil:
+    visible:
+      id: '^(ready-screen|subject-confident-card|subject-single-suggestion-card|subject-no-match-card|subject-suggestion-card)$'
+    timeout: 60000
 - extendedWaitUntil:
     notVisible:
       id: 'subject-resolve-loading'
@@ -167,7 +173,11 @@ tags:
     timeout: 15000
 - extendedWaitUntil:
     visible:
-      text: 'Photosynthesis'
+      id: '^subjects-browse-row-.*$'
+      containsDescendants:
+        - text: '^Photosynthesis$'
     timeout: 15000
 - assertVisible:
-    text: 'Photosynthesis'
+    id: '^subjects-browse-row-.*$'
+    containsDescendants:
+      - text: '^Photosynthesis$'
