@@ -188,6 +188,30 @@ jobs:
             exit 1
           fi
 
+      - name: Start runner-to-edge phase probe
+        run: |
+          PROBE_OUTPUT="${RUNNER_TEMP}/playwright-edge-probe.jsonl"
+          PROBE_PID_FILE="${RUNNER_TEMP}/playwright-edge-probe.pid"
+          PROBE_PROCESS_LOG="${RUNNER_TEMP}/playwright-edge-probe-process.log"
+          nohup node scripts/playwright-edge-probe.cjs \
+            --watch "${PLAYWRIGHT_API_URL}/v1/health" "${PROBE_OUTPUT}" \
+            >"${PROBE_PROCESS_LOG}" 2>&1 &
+          PROBE_PID=$!
+          echo "${PROBE_PID}" >"${PROBE_PID_FILE}"
+          for _attempt in $(seq 1 20); do
+            if [ -s "${PROBE_OUTPUT}" ]; then
+              exit 0
+            fi
+            if ! kill -0 "${PROBE_PID}" 2>/dev/null; then
+              cat "${PROBE_PROCESS_LOG}"
+              echo "::error title=Runner-to-edge probe failed::Probe exited before its first phase sample."
+              exit 1
+            fi
+            sleep 0.25
+          done
+          echo "::error title=Runner-to-edge probe failed::No phase sample was recorded within 5 seconds."
+          exit 1
+
       - name: Run V2 release Playwright gate
         # The classifier artifact root below mirrors `outputDir` in
         # apps/mobile/playwright.config.ts; update both locations together.
@@ -257,6 +281,24 @@ jobs:
             export PLAYWRIGHT_API_URL=\"${PLAYWRIGHT_API_URL}\"; \
             export PLAYWRIGHT_ARTIFACT_LANE=legacy; \
             pnpm run test:e2e:web:smoke"
+
+      - name: Stop and summarize runner-to-edge phase probe
+        if: always()
+        run: |
+          PROBE_OUTPUT="${RUNNER_TEMP}/playwright-edge-probe.jsonl"
+          PROBE_PID_FILE="${RUNNER_TEMP}/playwright-edge-probe.pid"
+          if [ -s "${PROBE_PID_FILE}" ]; then
+            PROBE_PID=$(cat "${PROBE_PID_FILE}")
+            kill -INT "${PROBE_PID}" 2>/dev/null || true
+            for _attempt in $(seq 1 20); do
+              if ! kill -0 "${PROBE_PID}" 2>/dev/null; then
+                break
+              fi
+              sleep 0.25
+            done
+            kill -TERM "${PROBE_PID}" 2>/dev/null || true
+          fi
+          node scripts/playwright-edge-probe.cjs --summarize "${PROBE_OUTPUT}"
 
       # [BUG-979 / CCR-PR123-M-3] Reset seeded staging accounts independently
       # of Playwright's globalTeardown. Reason: this workflow uses
