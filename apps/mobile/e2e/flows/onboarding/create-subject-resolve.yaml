@@ -24,14 +24,12 @@ tags:
       id: "learner-screen"
     timeout: 15000
 
-# 3. Navigate to create-subject via Learn intent card (replaced add-subject-button)
-# scrollUntilVisible acts as a combined scroll + wait-for-tree-commit guard —
-# create-subject.yaml uses the same pattern to avoid the race where learner-screen
-# is visible but action chips are not yet in the native accessibility tree.
+# 3. Navigate to create-subject via the fourth intent card below the fold.
+# Starting at the top of Home requires DOWN; the scroll is also the tree-commit guard.
 - scrollUntilVisible:
     element:
       id: "home-action-study-new"
-    direction: UP
+    direction: DOWN
     timeout: 10000
     speed: 70
     visibilityPercentage: 50

@@ -201,6 +201,19 @@ function resolveMaestroChat(
   );
 }
 
+function recitationEnvelopeReply(reply: string): LlmFixtureContent {
+  return {
+    reply,
+    signals: {},
+    private_sources: {
+      relied_on: ['recitation_text'],
+      insufficient: false,
+      reason:
+        'Deterministic hosted Maestro recitation fixture uses only learner-provided recitation text.',
+    },
+  };
+}
+
 function resolveMaestroStream(
   messages: ChatMessage[],
 ): LlmFixtureContent | undefined {
@@ -208,12 +221,12 @@ function resolveMaestroStream(
   const instructions = systemPrompt ? getTextContent(systemPrompt.content) : '';
 
   if (instructions.includes('SERVER-OWNED SETUP ACTION: INVITE TO BEGIN')) {
-    return llmEnvelopeReply(
+    return recitationEnvelopeReply(
       'Ready when you are — begin your recitation from memory.',
     );
   }
   if (instructions.includes('SERVER-OWNED SETUP ACTION: COACH RECITATION')) {
-    return llmEnvelopeReply(
+    return recitationEnvelopeReply(
       'Good recall. Keep the wording steady and continue when you are ready.',
     );
   }

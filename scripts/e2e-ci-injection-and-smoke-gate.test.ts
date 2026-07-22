@@ -4243,7 +4243,6 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         visible?: { id?: string } | string;
         optional?: boolean;
       };
-      pressKey?: string;
     }>;
     const subject = commands.findIndex(
       ({ tapOn }) =>
@@ -4258,11 +4257,23 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         extendedWaitUntil.optional !== true,
     );
     const back = commands.findIndex(
-      ({ pressKey }, index) => index > shelf && pressKey === 'Back',
+      ({ tapOn }, index) =>
+        index > shelf && typeof tapOn === 'object' && tapOn.id === 'shelf-back',
+    );
+    const library = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > back &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'shelves-list' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const homeTab = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > library && typeof tapOn === 'object' && tapOn.id === 'tab-home',
     );
     const home = commands.findIndex(
       ({ extendedWaitUntil }, index) =>
-        index > back &&
+        index > homeTab &&
         typeof extendedWaitUntil?.visible === 'object' &&
         extendedWaitUntil.visible.id === 'learner-screen' &&
         extendedWaitUntil.optional !== true,
@@ -4276,8 +4287,162 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(subject).toBeGreaterThan(-1);
     expect(shelf).toBeGreaterThan(subject);
     expect(back).toBeGreaterThan(shelf);
-    expect(home).toBeGreaterThan(back);
+    expect(library).toBeGreaterThan(back);
+    expect(homeTab).toBeGreaterThan(library);
+    expect(home).toBeGreaterThan(homeTab);
     expect(staleProgressWait).toBe(-1);
+  });
+
+  it('[WI-1864] scrolls through every off-screen populated recap control before using it', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/parent/child-session-recap.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+        optional?: boolean;
+      };
+      assertVisible?: { id?: string; optional?: boolean } | string;
+      tapOn?: { id?: string; optional?: boolean } | string;
+    }>;
+    const mandatoryScrollAfter = (id: string, after: number) =>
+      commands.findIndex(
+        ({ scrollUntilVisible }, index) =>
+          index > after &&
+          scrollUntilVisible?.element?.id === id &&
+          scrollUntilVisible.direction === 'DOWN' &&
+          scrollUntilVisible.optional !== true,
+      );
+    const mandatoryAssertAfter = (id: string, after: number) =>
+      commands.findIndex(
+        ({ assertVisible }, index) =>
+          index > after &&
+          typeof assertVisible === 'object' &&
+          assertVisible.id === id &&
+          assertVisible.optional !== true,
+      );
+    const mandatoryTapAfter = (id: string, after: number) =>
+      commands.findIndex(
+        ({ tapOn }, index) =>
+          index > after &&
+          typeof tapOn === 'object' &&
+          tapOn.id === id &&
+          tapOn.optional !== true,
+      );
+
+    const engagementScroll = mandatoryScrollAfter(
+      'engagement-chip-curious',
+      -1,
+    );
+    const engagement = mandatoryAssertAfter(
+      'engagement-chip-curious',
+      engagementScroll,
+    );
+    const promptScroll = mandatoryScrollAfter(
+      'session-recap-conversation-prompt',
+      engagement,
+    );
+    const prompt = mandatoryAssertAfter(
+      'session-recap-conversation-prompt',
+      promptScroll,
+    );
+    const copyScroll = mandatoryScrollAfter(
+      'session-recap-copy-prompt',
+      prompt,
+    );
+    const copy = mandatoryTapAfter('session-recap-copy-prompt', copyScroll);
+    const backScroll = mandatoryScrollAfter(
+      'session-detail-back-to-child',
+      copy,
+    );
+    const back = mandatoryTapAfter('session-detail-back-to-child', backScroll);
+
+    expect(engagementScroll).toBeGreaterThan(-1);
+    expect(engagement).toBeGreaterThan(engagementScroll);
+    expect(promptScroll).toBeGreaterThan(engagement);
+    expect(prompt).toBeGreaterThan(promptScroll);
+    expect(copyScroll).toBeGreaterThan(prompt);
+    expect(copy).toBeGreaterThan(copyScroll);
+    expect(backScroll).toBeGreaterThan(copy);
+    expect(back).toBeGreaterThan(backScroll);
+  });
+
+  it('[WI-1864] waits for the Google SSO browser before cancelling it', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/auth/sso-user-cancel.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      tapOn?: { id?: string; optional?: boolean } | string;
+      extendedWaitUntil?: {
+        visible?: string | { id?: string };
+        timeout?: number;
+        optional?: boolean;
+      };
+      pressKey?: string;
+    }>;
+    const googleTap = commands.findIndex(
+      ({ tapOn }) =>
+        typeof tapOn === 'object' &&
+        tapOn.id === 'google-sso-button' &&
+        tapOn.optional !== true,
+    );
+    const browserWait = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > googleTap &&
+        typeof extendedWaitUntil?.visible === 'string' &&
+        new RegExp(extendedWaitUntil.visible).test(
+          'https://accounts.google.com/o/oauth2/auth',
+        ) &&
+        !new RegExp(extendedWaitUntil.visible).test('Welcome to MentoMate') &&
+        !new RegExp(extendedWaitUntil.visible).test('Continue with Google') &&
+        !new RegExp(extendedWaitUntil.visible).test('') &&
+        (extendedWaitUntil.timeout ?? 0) >= 15000 &&
+        extendedWaitUntil.optional !== true,
+    );
+    const firstBackAfterTap = commands.findIndex(
+      ({ pressKey }, index) => index > googleTap && pressKey === 'back',
+    );
+
+    expect(googleTap).toBeGreaterThan(-1);
+    expect(browserWait).toBeGreaterThan(googleTap);
+    expect(firstBackAfterTap).toBeGreaterThan(browserWait);
+  });
+
+  it('[WI-1864] scrolls down from the top of Home to open subject resolution', () => {
+    const source = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/onboarding/create-subject-resolve.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+        optional?: boolean;
+      };
+      tapOn?: { id?: string; optional?: boolean } | string;
+    }>;
+    const studyAction = commands.findIndex(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id === 'home-action-study-new' &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        scrollUntilVisible.optional !== true,
+    );
+    const open = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > studyAction &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'home-action-study-new' &&
+        tapOn.optional !== true,
+    );
+
+    expect(studyAction).toBeGreaterThan(-1);
+    expect(open).toBeGreaterThan(studyAction);
   });
 
   it('[WI-1864] exercises the seeded answer-check failure before continuing the round', () => {

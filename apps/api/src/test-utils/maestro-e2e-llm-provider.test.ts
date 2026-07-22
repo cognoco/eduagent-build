@@ -2,7 +2,13 @@ import { resetLlmMiddleware } from '../middleware/llm';
 import { detectSubjectType } from '../services/book-generation';
 import { prepareHomework } from '../services/dictation/prepare-homework';
 import { reviewDictation } from '../services/dictation/review';
-import { streamExchange } from '../services/exchanges';
+import {
+  applySourceAuditSafetyFallback,
+  auditExchangeSources,
+  classifyExchangeOutcome,
+  inferObviousReliableSourceForAudit,
+  streamExchange,
+} from '../services/exchanges';
 import { _resetCircuits } from '../services/llm';
 import { resolveSubjectName } from '../services/subject-resolve';
 import { evaluateSummary } from '../services/summaries';
@@ -60,6 +66,30 @@ describe('hosted Maestro LLM provider', () => {
     expect(visibleReply).toBe(
       'Ready when you are — begin your recitation from memory.',
     );
+
+    const rawResponse = await exchange.rawResponsePromise;
+    const outcome = classifyExchangeOutcome(rawResponse, {
+      sessionId: 'maestro-recitation-session',
+      profileId: 'maestro-profile',
+      flow: 'hosted-maestro-test',
+    });
+    const privateSources = inferObviousReliableSourceForAudit(
+      outcome.parsed.privateSources,
+      exchange.sourceEvidence,
+      outcome.parsed.cleanResponse,
+    );
+    const sourceAudit = auditExchangeSources(
+      privateSources,
+      exchange.sourceEvidence,
+      { envelopeParseFailed: outcome.parsed.envelopeParseFailed },
+    );
+    const sourceSafe = applySourceAuditSafetyFallback(
+      outcome.parsed.cleanResponse,
+      sourceAudit,
+    );
+
+    expect(sourceAudit.status).toBe('ok');
+    expect(sourceSafe.response).toBe(visibleReply);
   });
 
   it('[WI-1864] returns deterministic feedback for the release recitation turn', async () => {
@@ -87,6 +117,30 @@ describe('hosted Maestro LLM provider', () => {
     expect(visibleReply).toBe(
       'Good recall. Keep the wording steady and continue when you are ready.',
     );
+
+    const rawResponse = await exchange.rawResponsePromise;
+    const outcome = classifyExchangeOutcome(rawResponse, {
+      sessionId: 'maestro-recitation-feedback',
+      profileId: 'maestro-profile',
+      flow: 'hosted-maestro-test',
+    });
+    const privateSources = inferObviousReliableSourceForAudit(
+      outcome.parsed.privateSources,
+      exchange.sourceEvidence,
+      outcome.parsed.cleanResponse,
+    );
+    const sourceAudit = auditExchangeSources(
+      privateSources,
+      exchange.sourceEvidence,
+      { envelopeParseFailed: outcome.parsed.envelopeParseFailed },
+    );
+    const sourceSafe = applySourceAuditSafetyFallback(
+      outcome.parsed.cleanResponse,
+      sourceAudit,
+    );
+
+    expect(sourceAudit.status).toBe('ok');
+    expect(sourceSafe.response).toBe(visibleReply);
   });
 
   it('[WI-1864] returns available feedback for the planned session-summary flow', async () => {

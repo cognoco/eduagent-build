@@ -109,8 +109,17 @@ tags:
       id: "shelf-screen"
     timeout: 10000
 
-# 13. Navigate back to home screen (Android hardware Back key)
-- pressKey: Back
+# 13. Return through the shelf's supported navigation, then select Home.
+- tapOn:
+    id: "shelf-back"
+
+- extendedWaitUntil:
+    visible:
+      id: "shelves-list"
+    timeout: 10000
+
+- tapOn:
+    id: "tab-home"
 
 # 14. Verify back on home screen after curriculum round-trip
 - extendedWaitUntil:
