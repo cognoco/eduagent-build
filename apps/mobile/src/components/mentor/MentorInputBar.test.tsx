@@ -522,7 +522,10 @@ describe('MentorInputBar', () => {
   it('recognizes in the learner voice locale the screen resolves', () => {
     render(<MentorInputBar {...baseProps} voiceLocale="de-DE" />);
 
-    expect(mockUseSpeechRecognition).toHaveBeenCalledWith({ lang: 'de-DE' });
+    expect(mockUseSpeechRecognition).toHaveBeenCalledWith({
+      lang: 'de-DE',
+      continuous: false,
+    });
   });
 
   it('drops a late transcript when the Mentor action becomes unavailable', async () => {

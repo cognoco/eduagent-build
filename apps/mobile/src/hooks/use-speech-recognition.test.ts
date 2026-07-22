@@ -1,7 +1,9 @@
 import { renderHook, act } from '@testing-library/react-native';
 import { useSpeechRecognition } from './use-speech-recognition';
 
-const listeners: Partial<Record<'result' | 'error', (event: unknown) => void>> =
+type SpeechEventName = 'result' | 'error' | 'end';
+
+const listeners: Partial<Record<SpeechEventName, (event: unknown) => void>> =
   {};
 
 const mockGetPermissionsAsync = jest.fn();
@@ -10,7 +12,7 @@ const mockStart = jest.fn();
 const mockStop = jest.fn();
 const mockLoadSpeechModule = jest.fn();
 const mockAddListener = jest.fn(
-  (eventName: 'result' | 'error', listener: (event: unknown) => void) => {
+  (eventName: SpeechEventName, listener: (event: unknown) => void) => {
     listeners[eventName] = listener;
     return {
       remove: jest.fn(() => {
@@ -31,6 +33,7 @@ describe('useSpeechRecognition', () => {
   beforeEach(() => {
     delete listeners.result;
     delete listeners.error;
+    delete listeners.end;
     jest.clearAllMocks();
     mockGetPermissionsAsync.mockResolvedValue({
       granted: true,
@@ -194,6 +197,73 @@ describe('useSpeechRecognition', () => {
     expect(result.current.transcript).toBe(
       'maybe that they are close to equator',
     );
+  });
+
+  it('forwards continuous:false and ends the capture on a final result', async () => {
+    mockLoadSpeechModule.mockResolvedValue({
+      requestPermissionsAsync: mockRequestPermissionsAsync,
+      start: mockStart,
+      stop: mockStop,
+      addListener: mockAddListener,
+    });
+    const { result } = renderHook(() =>
+      useSpeechRecognition({ continuous: false }, mockLoadSpeechModule),
+    );
+    await flushEffects();
+
+    await act(async () => {
+      await result.current.startListening();
+    });
+    expect(mockStart).toHaveBeenCalledWith({
+      lang: 'en-US',
+      interimResults: true,
+      continuous: false,
+    });
+    expect(result.current.status).toBe('listening');
+
+    // In a single-utterance session a final result is the end of the capture.
+    act(() => {
+      listeners.result?.({ isFinal: true, results: [{ transcript: 'done' }] });
+    });
+    expect(result.current.isFinalTranscript).toBe(true);
+    expect(result.current.status).toBe('idle');
+  });
+
+  it('keeps listening on a segment-final result in a continuous session', async () => {
+    mockLoadSpeechModule.mockResolvedValue({
+      requestPermissionsAsync: mockRequestPermissionsAsync,
+      start: mockStart,
+      stop: mockStop,
+      addListener: mockAddListener,
+    });
+    // Default options → continuous:true.
+    const { result } = renderHook(() =>
+      useSpeechRecognition(mockLoadSpeechModule),
+    );
+    await flushEffects();
+
+    await act(async () => {
+      await result.current.startListening();
+    });
+    expect(result.current.status).toBe('listening');
+
+    // A native isFinal here is only a segment boundary; the recognizer is
+    // still running, so the hook must not hide the listening state.
+    act(() => {
+      listeners.result?.({
+        isFinal: true,
+        results: [{ transcript: 'first segment' }],
+      });
+    });
+    expect(result.current.transcript).toBe('first segment');
+    expect(result.current.isFinalTranscript).toBe(true);
+    expect(result.current.status).toBe('listening');
+
+    // The continuous session ends on the terminal end event.
+    act(() => {
+      listeners.end?.(undefined);
+    });
+    expect(result.current.status).toBe('idle');
   });
 
   it('captures native error events', async () => {

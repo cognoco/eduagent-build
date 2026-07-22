@@ -70,6 +70,14 @@ type SpeechRecognitionModuleLoader =
 
 interface UseSpeechRecognitionOptions {
   lang?: string;
+  /**
+   * Native continuous recognition. Default `true` keeps a session listening
+   * across pauses (long dictation surfaces), where a native `isFinal` result
+   * marks the end of a speech *segment*, not the whole capture. Pass `false`
+   * for a single-utterance capture: the engine finalises once and stops, so an
+   * `isFinal` result is the definitive end of the capture.
+   */
+  continuous?: boolean;
 }
 
 /**
@@ -104,6 +112,7 @@ export function useSpeechRecognition(
     typeof optionsOrLoadModule === 'function'
       ? optionsOrLoadModule
       : (maybeLoadModule ?? loadSpeechModule);
+  const continuous = options?.continuous ?? true;
   const [status, setStatus] = useState<SpeechRecognitionStatus>('idle');
   const [transcript, setTranscript] = useState('');
   const [isFinalTranscript, setIsFinalTranscript] = useState(false);
@@ -158,10 +167,15 @@ export function useSpeechRecognition(
         setTranscript(nextTranscript);
         setIsFinalTranscript(isFinal);
         setError(null);
-        // The engine finalised the utterance: the capture is over even if the
-        // learner never pressed stop, and even if stop already moved us to
-        // processing while waiting for exactly this.
-        if (isFinal) setStatus('idle');
+        // Only a single-utterance (non-continuous) session ends on isFinal —
+        // there the engine finalises once and stops, so the capture is over
+        // even if the learner never pressed stop, and even if stop already
+        // moved us to processing while waiting for exactly this. In a
+        // continuous session isFinal is only a segment boundary; the recognizer
+        // keeps running, so going idle here would hide the listening state
+        // mid-dictation and let a consumer commit the first segment early. The
+        // continuous session ends on stop → the terminal `end` event instead.
+        if (isFinal && !continuous) setStatus('idle');
       });
 
       // Terminal cleanup: the session ended without a final result (no speech,
@@ -186,7 +200,7 @@ export function useSpeechRecognition(
       errorSubscription?.remove();
       endSubscription?.remove();
     };
-  }, [loadModule]);
+  }, [loadModule, continuous]);
 
   const startListening = useCallback(async () => {
     try {
@@ -220,7 +234,7 @@ export function useSpeechRecognition(
       speechModule.start({
         lang: options?.lang ?? 'en-US',
         interimResults: true,
-        continuous: true,
+        continuous,
       });
     } catch (err) {
       if (mountedRef.current) {
@@ -230,7 +244,7 @@ export function useSpeechRecognition(
         setStatus('error');
       }
     }
-  }, [loadModule, options?.lang]);
+  }, [loadModule, options?.lang, continuous]);
 
   const stopListening = useCallback(async () => {
     try {

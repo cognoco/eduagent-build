@@ -66,7 +66,11 @@ export function MentorInputBar({
     clearTranscript,
     requestMicrophonePermission,
     getMicrophonePermissionStatus,
-  } = useSpeechRecognition({ lang: voiceLocale });
+    // Single-utterance capture: the learner taps to ask one thing, so the
+    // engine should finalise once and stop rather than run continuously. This
+    // makes a final result the definitive end of the capture — there is no
+    // later segment to drop, and the mic never shows idle mid-capture.
+  } = useSpeechRecognition({ lang: voiceLocale, continuous: false });
 
   // Capture ownership. A transcript can resolve after the learner has moved on
   // — they emptied the draft, the Mentor went unavailable, or they started a
