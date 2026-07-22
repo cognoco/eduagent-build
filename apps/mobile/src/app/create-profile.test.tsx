@@ -4,6 +4,7 @@ import {
   fireEvent,
   waitFor,
   act,
+  renderHook,
 } from '@testing-library/react-native';
 import React from 'react';
 import { Alert } from 'react-native';
@@ -22,6 +23,10 @@ import {
   resolveNavigationContract,
   type NavigationProfile,
 } from '../lib/navigation-contract';
+import { AppContextProvider } from '../lib/app-context';
+import { FEATURE_FLAGS } from '../lib/feature-flags';
+import { ProfileContext, type ProfileContextValue } from '../lib/profile';
+import { useNavigationContract as usePreviewNavigationContract } from '../hooks/use-navigation-contract';
 
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
@@ -91,11 +96,18 @@ jest.mock('../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'reac
 
 // BUG-301: Made per-test overridable so isParentAddingChild can be tested.
 const mockUseProfile = jest.fn();
+// The screen suite keeps its narrow hook stubs. WI-2123 flips this only after
+// the creation surface unmounts so its shell leg traverses the real
+// ProfileContext -> AppContextProvider -> navigation-hook chain.
+let mockUseProductionShellHooks = false;
 jest.mock(
   '../lib/profile' /* gc1-allow: pattern-a conversion; useProfile depends on ProfileContext; pattern-a spy controls active-profile shape per-test */,
   () => ({
     ...jest.requireActual('../lib/profile'),
-    useProfile: () => mockUseProfile(),
+    useProfile: () =>
+      mockUseProductionShellHooks
+        ? jest.requireActual('../lib/profile').useProfile()
+        : mockUseProfile(),
   }),
 );
 
@@ -105,7 +117,12 @@ let mockActiveProfileRole: 'owner' | 'child' | 'impersonated-child' | null =
 jest.mock(
   '../hooks/use-active-profile-role', // gc1-allow: hooks depend on ProfileProvider + useParentProxy which require SecureStore; mocking the final hook is cleaner than reconstructing the full context chain
   () => ({
-    useActiveProfileRole: () => mockActiveProfileRole,
+    useActiveProfileRole: () =>
+      mockUseProductionShellHooks
+        ? jest
+            .requireActual('../hooks/use-active-profile-role')
+            .useActiveProfileRole()
+        : mockActiveProfileRole,
   }),
 );
 
@@ -114,10 +131,15 @@ let mockIsParentProxy = false;
 jest.mock(
   '../hooks/use-navigation-contract' /* gc1-allow: pins isParentProxy for proxy access-gate tests */,
   () => ({
-    useNavigationContract: () => ({
-      isParentProxy: mockIsParentProxy,
-      gates: {},
-    }),
+    useNavigationContract: () =>
+      mockUseProductionShellHooks
+        ? jest
+            .requireActual('../hooks/use-navigation-contract')
+            .useNavigationContract()
+        : {
+            isParentProxy: mockIsParentProxy,
+            gates: {},
+          },
   }),
 );
 
@@ -211,6 +233,7 @@ describe('CreateProfileScreen', () => {
     datePickerOnChange = null;
     mockCanGoBack.mockReturnValue(true);
     mockIsParentProxy = false;
+    mockUseProductionShellHooks = false;
     mockAudience = 'learner';
     // Default: non-parent flow (first-time user / child self-registering)
     mockUseProfile.mockReturnValue({
@@ -1499,9 +1522,15 @@ describe('CreateProfileScreen', () => {
         ['profiles', 'clerk-user-test'],
         [parentProfile],
       );
-      const nativeAlertDismissed = jest.fn();
+      let nativeAlertVisible = false;
+      let dismissNativeAlert: (() => void) | null = null;
       (Alert.alert as jest.Mock).mockImplementationOnce(() => {
-        nativeAlertDismissed();
+        nativeAlertVisible = true;
+        // Model the user closing the native modal as a separate action; merely
+        // presenting Alert.alert is not evidence that dismissal occurred.
+        dismissNativeAlert = () => {
+          nativeAlertVisible = false;
+        };
       });
       mockFetch
         .mockResolvedValueOnce(
@@ -1515,7 +1544,7 @@ describe('CreateProfileScreen', () => {
           }),
         );
 
-      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      const creation = render(<CreateProfileScreen />, { wrapper: Wrapper });
 
       fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Lily');
       fireEvent.press(screen.getByTestId('create-profile-birthdate'));
@@ -1535,7 +1564,8 @@ describe('CreateProfileScreen', () => {
           undefined,
         );
       });
-      expect(nativeAlertDismissed).toHaveBeenCalledTimes(1);
+      expect(nativeAlertVisible).toBe(true);
+      expect(dismissNativeAlert).not.toBeNull();
 
       const refreshedProfiles = queryClient.getQueryData<NavigationProfile[]>([
         'profiles',
@@ -1555,49 +1585,145 @@ describe('CreateProfileScreen', () => {
         }),
       ]);
 
-      const resolvePreviewContract = (
-        profiles: ReadonlyArray<NavigationProfile>,
-      ) =>
-        resolveNavigationContract({
-          activeProfile: profiles[0] ?? null,
-          appContext: 'family',
-          flags: previewV1NavigationFlags,
-          isParentProxy: false,
+      const makePreviewShellWrapper = (
+        client: QueryClient,
+        profiles: NavigationProfile[],
+      ) => {
+        const profileValue: ProfileContextValue = {
           profiles,
-          role: 'owner',
-          subscription: {
-            status: 'ready',
+          activeProfile: profiles[0] ?? null,
+          isExplicitProxyMode: false,
+          switchProfile: async () => ({ success: true }),
+          isLoading: false,
+          profileLoadError: null,
+          profileWasRemoved: false,
+          acknowledgeProfileRemoval: () => undefined,
+        };
+        return function PreviewShellWrapper({
+          children,
+        }: {
+          children: React.ReactNode;
+        }) {
+          return (
+            <QueryClientProvider client={client}>
+              <ProfileContext.Provider value={profileValue}>
+                <AppContextProvider>{children}</AppContextProvider>
+              </ProfileContext.Provider>
+            </QueryClientProvider>
+          );
+        };
+      };
+
+      const mutableFlags = FEATURE_FLAGS as unknown as {
+        MODE_NAV_V0_ENABLED: boolean;
+        MODE_NAV_V1_ENABLED: boolean;
+        MODE_NAV_V2_ENABLED: boolean;
+      };
+      const originalFlags = {
+        v0: mutableFlags.MODE_NAV_V0_ENABLED,
+        v1: mutableFlags.MODE_NAV_V1_ENABLED,
+        v2: mutableFlags.MODE_NAV_V2_ENABLED,
+      };
+      let unmountPostDismissalShell: (() => void) | undefined;
+      let unmountColdRelaunchShell: (() => void) | undefined;
+      const coldRelaunchClient = new QueryClient({
+        defaultOptions: { queries: { retry: false, gcTime: 0 } },
+      });
+
+      try {
+        act(() => {
+          dismissNativeAlert?.();
+        });
+        expect(nativeAlertVisible).toBe(false);
+        creation.unmount();
+
+        mutableFlags.MODE_NAV_V0_ENABLED = true;
+        mutableFlags.MODE_NAV_V1_ENABLED = true;
+        mutableFlags.MODE_NAV_V2_ENABLED = false;
+        mockUseProductionShellHooks = true;
+        queryClient.setQueryData(['subscription-status', PROFILE_IDS.parent], {
+          tier: 'family',
+          effectiveAccessTier: 'family',
+          billingAccess: null,
+        });
+
+        const postDismissalShell = renderHook(
+          () => usePreviewNavigationContract(),
+          {
+            wrapper: makePreviewShellWrapper(
+              queryClient,
+              refreshedProfiles ?? [],
+            ),
+          },
+        );
+        unmountPostDismissalShell = postDismissalShell.unmount;
+        await waitFor(() => {
+          expect(postDismissalShell.result.current.home.screen).toBe(
+            'FamilyHome',
+          );
+        });
+        expect(postDismissalShell.result.current.isFamilyCapable).toBe(true);
+        expect(postDismissalShell.result.current.effectiveAppContext).toBe(
+          'family',
+        );
+        expect(refreshedProfiles?.[0]?.id).toBe(PROFILE_IDS.parent);
+        expect(
+          postDismissalShell.result.current.canEnter('child/[profileId]', {
+            profileId: PROFILE_IDS.childNew,
+          }),
+        ).toBe(true);
+        postDismissalShell.unmount();
+        unmountPostDismissalShell = undefined;
+
+        const coldServerResponse: { profiles: NavigationProfile[] } = {
+          profiles: [
+            {
+              ...parentProfile,
+              defaultAppContext: 'family',
+              hasFamilyLinks: true,
+            },
+            { ...childProfile },
+          ],
+        };
+        coldRelaunchClient.setQueryData(
+          ['subscription-status', PROFILE_IDS.parent],
+          {
             tier: 'family',
             effectiveAccessTier: 'family',
             billingAccess: null,
           },
+        );
+        const mutationsBeforeRelaunch = mockFetch.mock.calls.length;
+        const coldRelaunchShell = renderHook(
+          () => usePreviewNavigationContract(),
+          {
+            wrapper: makePreviewShellWrapper(
+              coldRelaunchClient,
+              coldServerResponse.profiles,
+            ),
+          },
+        );
+        unmountColdRelaunchShell = coldRelaunchShell.unmount;
+        await waitFor(() => {
+          expect(coldRelaunchShell.result.current.home.screen).toBe(
+            'FamilyHome',
+          );
         });
-
-      const postDismissalContract = resolvePreviewContract(
-        refreshedProfiles ?? [],
-      );
-      expect(postDismissalContract.home.screen).toBe('FamilyHome');
-      expect(postDismissalContract.isFamilyCapable).toBe(true);
-      expect(postDismissalContract.effectiveAppContext).toBe('family');
-      expect(refreshedProfiles?.[0]?.id).toBe(PROFILE_IDS.parent);
-      expect(
-        postDismissalContract.canEnter('child/[profileId]', {
-          profileId: PROFILE_IDS.childNew,
-        }),
-      ).toBe(true);
-
-      const mutationsBeforeRelaunch = mockFetch.mock.calls.length;
-      const relaunchedProfiles = JSON.parse(
-        JSON.stringify(refreshedProfiles),
-      ) as NavigationProfile[];
-      const coldRelaunchContract = resolvePreviewContract(relaunchedProfiles);
-      expect(coldRelaunchContract.home.screen).toBe('FamilyHome');
-      expect(
-        coldRelaunchContract.canEnter('child/[profileId]', {
-          profileId: PROFILE_IDS.childNew,
-        }),
-      ).toBe(true);
-      expect(mockFetch).toHaveBeenCalledTimes(mutationsBeforeRelaunch);
+        expect(
+          coldRelaunchShell.result.current.canEnter('child/[profileId]', {
+            profileId: PROFILE_IDS.childNew,
+          }),
+        ).toBe(true);
+        expect(mockFetch).toHaveBeenCalledTimes(mutationsBeforeRelaunch);
+      } finally {
+        unmountPostDismissalShell?.();
+        unmountColdRelaunchShell?.();
+        coldRelaunchClient.clear();
+        mockUseProductionShellHooks = false;
+        mutableFlags.MODE_NAV_V0_ENABLED = originalFlags.v0;
+        mutableFlags.MODE_NAV_V1_ENABLED = originalFlags.v1;
+        mutableFlags.MODE_NAV_V2_ENABLED = originalFlags.v2;
+      }
     });
 
     it('[WI-2123 AC-4 / WI-1611] keeps the family shell when the owner adds a second child', async () => {
