@@ -1110,6 +1110,34 @@ describe('MentorScreen', () => {
     expect(screen.queryByTestId('light-practice-capitals')).toBeNull();
   });
 
+  // [WI-2499 AC-3] Continue starts/resumes the server re-check; navigation
+  // may only happen after a schema-valid server success. On a rejected
+  // recheck, the card must stay put with no navigation and no success state.
+  it('[WI-2499 AC-3] does not navigate and keeps the mentor-notice card when the recheck mutation is rejected', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+    };
+
+    renderMentorScreen(
+      {},
+      {
+        '/mentor-notices/notice-1/recheck': () => ERROR_RESPONSES.forbidden(),
+      },
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Check it now'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    screen.getByTestId('now-card-mentor_notice');
+    expect(mockPush).not.toHaveBeenCalledWith(
+      expect.stringContaining('/(app)/session?sessionId='),
+    );
+  });
+
   // WI-1393: the V2 shell previously had zero forward navigation to
   // /(app)/link/initiate — this proves the cold-start empty-state anchor (A1)
   // actually reaches it with a supporteePersonId, so the missing-param
