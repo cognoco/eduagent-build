@@ -1046,8 +1046,13 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
 
     // WI-2596: more-tab-navigation.yaml and multi-subject.yaml were quarantined
     // (pr-blocking -> blocked, removed from the manifest) because their assertions
-    // are red on main after the WI-2241 seed drift — the app is correct, the seed
-    // drifted. They must NOT appear in the pr plan; the assertions are left intact.
+    // are red on main — the app is correct, the flows/fixtures drifted. Git-bisected
+    // attribution (see each flow header + docs/evidence/wi2596-rgr-maestro-main-health.md):
+    // more-tab-navigation = WI-2187 layout/scroll drift (row pushed below the fold,
+    // asserted without a scroll); multi-subject = WI-2215 false-green unmasked (its
+    // first genuine run failed; underlying cause needs device/DB confirmation). NOT the
+    // WI-2241 seed drift an earlier writeup blamed. They must NOT appear in the pr plan;
+    // the assertions are left intact.
     expect(plan).toHaveLength(11);
     expect(flows).toContain('flows/app-launch.yaml');
     expect(flows).not.toContain('flows/account/more-tab-navigation.yaml');

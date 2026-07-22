@@ -84,14 +84,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_RUN_ID: ${{ github.run_id }}
         run: |
           TITLE='🔴 Maestro main-health: main is red or stale'
+          # Fail SAFE: if the list query fails (rate limit / transient auth), treat it
+          # as "cannot confirm zero" and skip create, so a transient error never spawns
+          # a duplicate tracking issue. Only an actual count of 0 opens a new issue.
           EXISTING=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
-            --search "in:title \"Maestro main-health\"" --json number --jq 'length')
-          RUN_URL="https://github.com/$GITHUB_REPOSITORY/actions/runs/${{ github.run_id }}"
-          if [ "${EXISTING:-0}" = "0" ]; then
+            --search "in:title \"Maestro main-health\"" --json number --jq 'length' 2>/dev/null) || EXISTING="unknown"
+          RUN_URL="https://github.com/$GITHUB_REPOSITORY/actions/runs/$GH_RUN_ID"
+          if [ "$EXISTING" = "0" ]; then
             BODY=$(printf 'The scheduled Maestro main-health check found `main` red or stale.\n\n```\n%s\n```\n\nRun: %s\n\nThis was opened by `.github/workflows/maestro-main-health.yml` (WI-2596). Close it once Maestro-on-main is green again.' "$(cat "$RUNNER_TEMP/health.txt")" "$RUN_URL")
             gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body "$BODY"
           else
-            echo "An open Maestro main-health issue already exists; not duplicating."
+            echo "Not creating a tracking issue (open-issue count: $EXISTING; 'unknown' = list unavailable)."
           fi
