@@ -1,7 +1,12 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import type { ProfileListResponse } from '@eduagent/schemas';
+
+import { readSeedData } from '../../helpers/seed-data';
 
 const HOST_PATH = '/quiz/dev-only/results';
 const NAVIGATION_LOG_KEY = 'e2e:quiz-results:navigation-log';
+const PROFILE_BOOTSTRAP_GLOB = '**/v1/profiles**';
+const PROFILE_FIXTURE_ISO = '2026-07-22T00:00:00.000Z';
 
 type ActivationMethod = 'Enter' | 'Space' | 'pointer';
 
@@ -101,9 +106,73 @@ async function readNavigationCalls(page: Page): Promise<NavigationCall[]> {
   );
 }
 
+async function installSeededProfileBootstrap(page: Page): Promise<void> {
+  // This spec exercises the quiz-results contract, not profile transport.
+  // Keep its repeated cold boots deterministic while preserving the seeded
+  // profile id that the authenticated storage state already owns.
+  const seed = await readSeedData('solo-learner');
+  const response = {
+    profiles: [
+      {
+        id: seed.profileId,
+        displayName: 'Quiz Results E2E Learner',
+        avatarUrl: null,
+        birthYear: 1990,
+        birthMonth: null,
+        birthDay: null,
+        location: null,
+        isOwner: true,
+        hasPremiumLlm: false,
+        defaultAppContext: null,
+        hasFamilyLinks: false,
+        conversationLanguage: 'en',
+        pronouns: null,
+        consentStatus: null,
+        linkCreatedAt: null,
+        createdAt: PROFILE_FIXTURE_ISO,
+        updatedAt: PROFILE_FIXTURE_ISO,
+      },
+    ],
+    needsAdultConsent: false,
+  } satisfies ProfileListResponse;
+
+  await page.route(PROFILE_BOOTSTRAP_GLOB, async (route) => {
+    const request = route.request();
+    if (
+      request.method() !== 'GET' ||
+      new URL(request.url()).pathname !== '/v1/profiles'
+    ) {
+      await route.fallback();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(response),
+    });
+  });
+}
+
+test('quiz-results host is isolated from unavailable upstream profile bootstrap', async ({
+  page,
+}) => {
+  // Matching routes run newest-first. If the seeded fixture is removed or
+  // falls through, this upstream sentinel makes the regression fail closed.
+  await page.route(PROFILE_BOOTSTRAP_GLOB, (route) => route.abort('failed'));
+  await installSeededProfileBootstrap(page);
+
+  await page.goto(`${HOST_PATH}?freeze=true`, { waitUntil: 'commit' });
+
+  await expect(page.getByTestId('quiz-results-screen')).toBeVisible({
+    timeout: 15_000,
+  });
+});
+
 test('quiz-results exits are real named buttons with exact-once web activation', async ({
   page,
 }) => {
+  await installSeededProfileBootstrap(page);
   await openHost(page, true);
 
   const screen = page.getByTestId('quiz-results-screen');
