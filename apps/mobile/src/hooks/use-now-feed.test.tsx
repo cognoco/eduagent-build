@@ -549,6 +549,133 @@ describe('useNowFeed + useNowOverflow — shared observed epoch across concurren
   });
 });
 
+// ---------------------------------------------------------------------------
+// [WI-2504 bounce 2] The `placeholderData` epoch gate above (Finding 1) makes
+// `query.data` come back undefined immediately after a re-key — but the
+// slow-fallback effect's OTHER piece of exposed state, `fallbackFeed`, was
+// never epoch-gated. If a fallback had already been populated from an OLDER
+// epoch's cache entry, `data ?? fallbackFeed` (the pattern every consumer
+// uses — see mentor.tsx's `useTransitionBoundFeed`) would keep exposing that
+// stale, possibly notice-bearing feed for the whole window until — or
+// unless — the re-keyed query's own cache read lands.
+// ---------------------------------------------------------------------------
+describe('useNowFeed — fallbackFeed must not survive an epoch re-key', () => {
+  const DISABLED_EPOCH = 'notice-policy-v1:off';
+
+  let originalFetch: typeof globalThis.fetch;
+
+  function noticeFallback(): NowResponse {
+    return feed({
+      generatedAt: '2999-06-14T07:59:00.000Z',
+      cards: [
+        {
+          kind: 'mentor_notice',
+          templateKey: 'now.mentor_notice.default',
+          params: {
+            noticeId: '44444444-4444-4444-8444-444444444444',
+            concept: 'sign flip',
+          },
+          deepLink: { route: 'notice.recheck', params: {}, chain: [] },
+          scope: 'self',
+        },
+      ] as NowResponse['cards'],
+    });
+  }
+
+  beforeEach(async () => {
+    originalFetch = globalThis.fetch;
+    setActiveProfileId(CACHE_BINDING.profileId);
+    await AsyncStorage.clear();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    setActiveProfileId(undefined);
+  });
+
+  it('clears a stale bootstrap-epoch fallback once the re-keyed (disabled-epoch) query starts its own pending fetch', async () => {
+    jest.useFakeTimers();
+    try {
+      // Seeded under the BOOTSTRAP epoch (no policyEpoch override) — the key
+      // the first, un-observed fetch's slow-fallback read will use.
+      await AsyncStorage.setItem(
+        buildNowFeedCacheKey(CACHE_BINDING),
+        JSON.stringify(noticeFallback()),
+      );
+
+      let nowCallCount = 0;
+      let resolveFirstCall: (() => void) | undefined;
+      globalThis.fetch = jest.fn(async () => {
+        nowCallCount += 1;
+        if (nowCallCount === 1) {
+          // Held pending long enough to trigger the slow-fallback read,
+          // then resolved later (by the test) with a body that observes a
+          // DIFFERENT epoch — the trigger for the re-key.
+          return new Promise<Response>((resolve) => {
+            resolveFirstCall = () =>
+              resolve(
+                new Response(
+                  JSON.stringify({
+                    ...feed(),
+                    mentorNoticePolicyEpoch: DISABLED_EPOCH,
+                  }),
+                  { status: 200 },
+                ),
+              );
+          });
+        }
+        // The re-keyed (DISABLED_EPOCH) query's own fetch — left pending so
+        // the assertion below runs before it could supply real data.
+        return new Promise<Response>(() => undefined);
+      }) as unknown as typeof globalThis.fetch;
+
+      const { queryClient, wrapper } = createHookWrapper();
+      const nowFeedHook = renderHook(() => useNowFeed(), { wrapper });
+
+      await waitFor(() =>
+        expect(nowFeedHook.result.current.isFetching).toBe(true),
+      );
+      await act(async () => {
+        jest.advanceTimersByTime(2_001);
+        await Promise.resolve();
+      });
+
+      // Precondition: the stale-fallback source is real, not a no-op.
+      await waitFor(() =>
+        expect(nowFeedHook.result.current.isSlowFallback).toBe(true),
+      );
+      expect(
+        nowFeedHook.result.current.fallbackFeed?.cards.some(
+          (c) => c.kind === 'mentor_notice',
+        ),
+      ).toBe(true);
+
+      // Resolve the first fetch — its response observes DISABLED_EPOCH,
+      // re-keying the query to a brand-new, dataless, pending query.
+      await act(async () => {
+        resolveFirstCall?.();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      // Consumer-visible outcome (`data ?? fallbackFeed`): the re-keyed query
+      // has no data of its own yet, and the fallback populated for the
+      // now-superseded bootstrap epoch must not still be exposed.
+      expect(nowFeedHook.result.current.data).toBeUndefined();
+      expect(
+        (nowFeedHook.result.current.fallbackFeed?.cards ?? []).some(
+          (c) => c.kind === 'mentor_notice',
+        ),
+      ).toBe(false);
+
+      queryClient.clear();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
+
 describe('useNowOverflow', () => {
   let originalFetch: typeof globalThis.fetch;
   let mockFetch: jest.Mock;

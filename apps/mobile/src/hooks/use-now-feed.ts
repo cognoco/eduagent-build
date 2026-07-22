@@ -172,6 +172,10 @@ export function useNowFeed(): NowFeedQueryResult {
   const noticesVisible = !navigationContract.isParentProxy;
   const [fallbackFeed, setFallbackFeed] = useState<NowResponse | null>(null);
   const [isSlowFallback, setIsSlowFallback] = useState(false);
+  // [WI-2504 bounce 2] The epoch `fallbackFeed` was last populated (or
+  // cleared) for — lets the effect below tell "still the same pending fetch"
+  // from "the query key's epoch just changed out from under it".
+  const fallbackEpochRef = useRef<string | null>(null);
 
   const query = useQuery({
     // [WI-2498] Keyed by actor AND subject: the in-memory cache must not be
@@ -240,7 +244,22 @@ export function useNowFeed(): NowFeedQueryResult {
       if (!query.isError) {
         setFallbackFeed(null);
       }
+      fallbackEpochRef.current = null;
       return undefined;
+    }
+
+    // [WI-2504 bounce 2] A fallback populated for a PREVIOUS epoch must not
+    // survive into a re-keyed query's pending window: this branch runs
+    // whenever `query.data` is absent, which is now also true immediately
+    // after an epoch re-key (the freshly mounted query has no data of its
+    // own yet — see the `placeholderData` epoch gate above). Without this,
+    // `data ?? fallbackFeed` could keep exposing the OLD epoch's (possibly
+    // notice-bearing) cached feed until — or unless — this fetch's own cache
+    // read lands.
+    if (fallbackEpochRef.current !== cacheBinding.policyEpoch) {
+      setFallbackFeed(null);
+      setIsSlowFallback(false);
+      fallbackEpochRef.current = cacheBinding.policyEpoch ?? null;
     }
 
     let cancelled = false;
