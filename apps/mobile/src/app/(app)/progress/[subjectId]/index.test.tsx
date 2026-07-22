@@ -600,8 +600,16 @@ describe('ProgressSubjectScreen', () => {
     });
 
     it('shows connection message for non-API errors', async () => {
-      mount({ inventoryError: 'network' });
-      await screen.findByText('Check your connection and try again.');
+      jest.useFakeTimers();
+      try {
+        mount({ inventoryError: 'network' });
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(7_500);
+        });
+        screen.getByText('Check your connection and try again.');
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('shows server error message when error is a server fault', async () => {

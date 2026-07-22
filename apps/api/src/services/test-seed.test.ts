@@ -192,6 +192,8 @@ describe('VALID_SCENARIOS', () => {
       // [WI-2243] Self-learning doorway + Me-scope persistence fixtures.
       'v2-supporter-self-learning',
       'v2-supporter-self-learning-active',
+      // [WI-2242] Pending (pre-acceptance) visibility-contract fixture.
+      'v2-supporter-pending-link',
     ]);
   });
 
@@ -330,6 +332,9 @@ describe('seedScenario', () => {
     // test-seed-v2-supporter.integration.test.ts.
     'v2-supporter-self-learning',
     'v2-supporter-self-learning-active',
+    // [WI-2242] Same DB_TRANSACTION_SCENARIOS reasoning above —
+    // seedV2SupporterPendingLink calls initiateLink (db.transaction) directly.
+    'v2-supporter-pending-link',
   ];
   const MOCK_DISPATCHABLE_SCENARIOS = (
     VALID_SCENARIOS as SeedScenario[]

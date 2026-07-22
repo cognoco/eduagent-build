@@ -3888,6 +3888,15 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scenario: 'v2-supporter-managed',
         shard: 1,
       },
+      // [WI-2242] Supporter <-> supportee link ceremony — deep-link
+      // reachability of the initiate screen, supporter accept, cross-login
+      // supportee accept, and a chain into the WI-2241 post-acceptance
+      // Support hub / person scope / Journal shape.
+      {
+        flow: 'flows/v2/v2-supporter-link-ceremony.yaml',
+        scenario: 'v2-supporter-pending-link',
+        shard: 1,
+      },
       // [WI-2241] Supporter scope journey — Support hub -> person scope ->
       // Mentor -> Subjects -> Journal -> Support hub, structural/negative
       // walls, empty-record honest-empty-state, revoked-edge affordance

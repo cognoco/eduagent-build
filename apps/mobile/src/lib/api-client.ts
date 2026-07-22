@@ -26,6 +26,7 @@ import {
   ConflictError,
   ConsentRequiredError,
   ForbiddenError,
+  NetworkError,
   NotFoundError,
   RateLimitedError,
   ResourceGoneError,
@@ -62,6 +63,62 @@ type AuthExpiredCallback = () => void;
 
 let _onAuthExpired: AuthExpiredCallback | null = null;
 let _authExpiredFiring = false;
+
+/**
+ * Retry schedule for pre-response transport failures. The 7.5-second total
+ * spans the longest 6.5-second api-stg gap measured by WI-2450 while keeping
+ * both the attempt count and total wait fixed.
+ */
+export const NETWORK_RETRY_DELAYS_MS = [500, 1_000, 2_000, 4_000] as const;
+
+function requestMethod(
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+): string {
+  if (init?.method) return init.method.toUpperCase();
+  if (typeof Request !== 'undefined' && input instanceof Request) {
+    return input.method.toUpperCase();
+  }
+  return 'GET';
+}
+
+function requestHeaders(
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+): Headers {
+  const headers =
+    typeof Request !== 'undefined' && input instanceof Request
+      ? new Headers(input.headers)
+      : new Headers();
+  new Headers(init?.headers).forEach((value, key) => headers.set(key, value));
+  return headers;
+}
+
+function hasAbortErrorCause(error: NetworkError): boolean {
+  return (
+    typeof error.cause === 'object' &&
+    error.cause !== null &&
+    'name' in error.cause &&
+    (error.cause as { name?: unknown }).name === 'AbortError'
+  );
+}
+
+/** True only for a pre-response failure whose request is safe to replay. */
+export function shouldRetryTransportFailure(
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+  error: Error,
+): boolean {
+  if (!(error instanceof NetworkError) || hasAbortErrorCause(error)) {
+    return false;
+  }
+
+  const method = requestMethod(input, init);
+  const idempotencyKey = requestHeaders(input, init).get('Idempotency-Key');
+  return (
+    method === 'GET' || method === 'HEAD' || Boolean(idempotencyKey?.trim())
+  );
+}
 
 function requestSignal(
   input: RequestInfo | URL,
@@ -208,6 +265,7 @@ export function useApiClient(): ApiClient {
       // whether a token was actually sent (session-expired vs. token-not-ready),
       // so it must reflect the FINAL attempt after any stale-token retry.
       let lastToken: string | null = null;
+      let transportRetryIndex = 0;
 
       // One fetch attempt with a freshly-resolved Clerk token. `forceFreshToken`
       // passes `skipCache` so Clerk bypasses its in-memory token cache and mints
@@ -219,7 +277,7 @@ export function useApiClient(): ApiClient {
           forceFreshToken ? { skipCache: true } : undefined,
         );
         lastToken = token;
-        const headers = new Headers(init?.headers);
+        const headers = requestHeaders(input, init);
         if (token) headers.set('Authorization', `Bearer ${token}`);
         if (snapshotProfileId && !headers.has('X-Profile-Id'))
           headers.set('X-Profile-Id', snapshotProfileId);
@@ -227,10 +285,27 @@ export function useApiClient(): ApiClient {
 
         // Wrap the underlying fetch in try/catch so network-layer rejections
         // (no response received) become typed NetworkError, not raw TypeError.
-        try {
-          return await globalThis.fetch(input, { ...init, headers, signal });
-        } catch (fetchErr) {
-          throw classifyFetchRejection(fetchErr, signal);
+        while (true) {
+          try {
+            return await globalThis.fetch(input, { ...init, headers, signal });
+          } catch (fetchErr) {
+            const classified = classifyFetchRejection(fetchErr, signal);
+            if (
+              !shouldRetryTransportFailure(input, init, classified) ||
+              transportRetryIndex >= NETWORK_RETRY_DELAYS_MS.length
+            ) {
+              throw classified;
+            }
+
+            const delayMs = NETWORK_RETRY_DELAYS_MS[transportRetryIndex++];
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+            if (signal?.aborted) {
+              throw classifyFetchRejection(
+                Object.assign(new Error('Aborted'), { name: 'AbortError' }),
+                signal,
+              );
+            }
+          }
         }
       };
 

@@ -29,12 +29,11 @@ import { assertOk } from '../lib/assert-ok';
 import { NetworkError } from '../lib/api-errors';
 import { parseJson } from '../lib/parse-json';
 
-const BOOK_DETAIL_NETWORK_RETRY_LIMIT = 4;
 const BOOK_DETAIL_DEFAULT_RETRY_LIMIT = 2;
 
 function retryBookDetailRead(failureCount: number, error: unknown): boolean {
   if (error instanceof NetworkError) {
-    return failureCount < BOOK_DETAIL_NETWORK_RETRY_LIMIT;
+    return false;
   }
 
   return failureCount < BOOK_DETAIL_DEFAULT_RETRY_LIMIT;

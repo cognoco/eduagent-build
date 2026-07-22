@@ -304,28 +304,35 @@ describe('QuizHistoryScreen', () => {
   });
 
   it('shows error state with retry and go-back actions', async () => {
-    // A throwing route handler makes the real query enter its error state.
-    let attempts = 0;
-    const view = mount({
-      [RECENT_ROUNDS_ROUTE]: () => {
-        attempts += 1;
-        throw new TypeError('Network request failed');
-      },
-    });
-    await waitFor(() => {
+    jest.useFakeTimers();
+    try {
+      // A throwing route handler makes the real query enter its error state.
+      let attempts = 0;
+      const view = mount({
+        [RECENT_ROUNDS_ROUTE]: () => {
+          attempts += 1;
+          throw new TypeError('Network request failed');
+        },
+      });
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(7_500);
+      });
       screen.getByTestId('quiz-history-error');
-    });
 
-    const attemptsBefore = attempts;
-    fireEvent.press(screen.getByTestId('quiz-history-retry'));
-    await waitFor(() => {
+      fireEvent.press(screen.getByTestId('quiz-history-go-back'));
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
+
+      const attemptsBefore = attempts;
+      fireEvent.press(screen.getByTestId('quiz-history-retry'));
+      await act(async () => {
+        await Promise.resolve();
+      });
       expect(
         fetchCallsMatching(view.routedFetch, RECENT_ROUNDS_ROUTE).length,
-      ).toBeGreaterThan(0);
-    });
-    expect(attempts).toBeGreaterThan(attemptsBefore);
-
-    fireEvent.press(screen.getByTestId('quiz-history-go-back'));
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
+      ).toBeGreaterThan(attemptsBefore);
+      expect(attempts).toBeGreaterThan(attemptsBefore);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
