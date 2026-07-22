@@ -172,75 +172,129 @@ function gh(args: string[]): string {
   });
 }
 
-/**
- * Fetch the most recent "E2E Tests" runs on main and resolve each run's jobs.
- * Iterates newest→oldest and stops as soon as it resolves the most recent EXECUTED
- * run — the newer runs above it are already resolved, and older runs below it are
- * irrelevant to the classifier — bounding the number of jobs API calls.
- */
-export function fetchMaestroRuns(
-  repo: string,
-  options: { listSize?: number; maxJobFetches?: number } = {},
-): WorkflowRun[] {
-  const listSize = options.listSize ?? 40;
-  const maxJobFetches = options.maxJobFetches ?? 20;
+interface RunMeta {
+  id: number;
+  head_sha: string;
+  head_branch: string;
+  event: string;
+  created_at: string;
+  status: string;
+}
 
-  const listRaw = gh([
+/** List completed main-branch "E2E Tests" runs for one trigger event, newest-first. */
+function listMainRunsByEvent(
+  repo: string,
+  event: string,
+  perPage: number,
+): RunMeta[] {
+  const raw = gh([
     'api',
     '-X',
     'GET',
     `repos/${repo}/actions/workflows/${WORKFLOW_FILE}/runs`,
     '-f',
+    `event=${event}`,
+    // Filter to completed main runs SERVER-SIDE, before `per_page` is applied.
+    // `workflow_run` fires for PR-origin runs too, so a client-only filter would
+    // let a busy first page of non-main/skipped runs bury a fresh main execution
+    // outside the window (the surfacer would then classify off the older nightly).
+    '-f',
     'branch=main',
+    '-f',
+    'status=completed',
     '-F',
-    `per_page=${listSize}`,
+    `per_page=${perPage}`,
   ]);
-  const listed = JSON.parse(listRaw) as {
-    workflow_runs?: Array<{
-      id: number;
-      head_sha: string;
-      head_branch: string;
-      event: string;
-      created_at: string;
-      status: string;
-    }>;
+  const parsed = JSON.parse(raw) as { workflow_runs?: RunMeta[] };
+  return (
+    (parsed.workflow_runs ?? [])
+      // Defensive backstop: the server-side branch/status filters above are the
+      // primary guard; this re-check costs nothing and guards against API quirks.
+      .filter((r) => r.head_branch === 'main' && r.status === 'completed')
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+  );
+}
+
+/** Resolve one run's jobs into a WorkflowRun. */
+function resolveRun(repo: string, meta: RunMeta): WorkflowRun {
+  const jobsRaw = gh([
+    'api',
+    '-X',
+    'GET',
+    `repos/${repo}/actions/runs/${meta.id}/jobs`,
+    '-F',
+    'per_page=50',
+  ]);
+  const jobsParsed = JSON.parse(jobsRaw) as {
+    jobs?: Array<{ name: string; conclusion: string | null }>;
   };
-  const runsMeta = (listed.workflow_runs ?? [])
-    .filter((r) => r.head_branch === 'main' && r.status === 'completed')
-    .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+  return {
+    id: meta.id,
+    headSha: meta.head_sha,
+    headBranch: meta.head_branch,
+    event: meta.event,
+    createdAt: meta.created_at,
+    jobs: (jobsParsed.jobs ?? []).map((j) => ({
+      name: j.name,
+      conclusion: j.conclusion,
+    })),
+  };
+}
+
+/**
+ * Fetch the runs the classifier needs, with jobs resolved.
+ *
+ * The `event` type matters here. On a busy `main`, EVERY CI completion triggers a
+ * `workflow_run` E2E run — dozens per day — and most change-class-skip Maestro. An
+ * unfiltered "recent runs" list is therefore ~all Maestro-skipped `workflow_run`
+ * runs and would never surface the nightly, making the checker report STALE forever.
+ * Instead we query by trigger:
+ *   - `schedule` (the nightly): unconditionally executes the full 8-shard suite on
+ *     main, so it is the RELIABLE health signal — always resolve the latest few.
+ *   - `workflow_run` (post-CI pr suite): adds FRESHER signal only when a mobile commit
+ *     landed; scan newest→oldest only until one that actually executed Maestro is found.
+ * The classifier then picks the most recent EXECUTED health-suite run across both.
+ */
+export function fetchMaestroRuns(
+  repo: string,
+  options: {
+    scheduleResolve?: number;
+    workflowRunPerPage?: number;
+    workflowRunScan?: number;
+  } = {},
+): WorkflowRun[] {
+  const scheduleResolve = options.scheduleResolve ?? 3;
+  const workflowRunPerPage = options.workflowRunPerPage ?? 30;
+  const workflowRunScan = options.workflowRunScan ?? 15;
 
   const resolved: WorkflowRun[] = [];
-  for (const meta of runsMeta) {
-    if (resolved.length >= maxJobFetches) break;
-    const jobsRaw = gh([
-      'api',
-      '-X',
-      'GET',
-      `repos/${repo}/actions/runs/${meta.id}/jobs`,
-      '-F',
-      'per_page=50',
-    ]);
-    const jobsParsed = JSON.parse(jobsRaw) as {
-      jobs?: Array<{ name: string; conclusion: string | null }>;
-    };
-    const run: WorkflowRun = {
-      id: meta.id,
-      headSha: meta.head_sha,
-      headBranch: meta.head_branch,
-      event: meta.event,
-      createdAt: meta.created_at,
-      jobs: (jobsParsed.jobs ?? []).map((j) => ({
-        name: j.name,
-        conclusion: j.conclusion,
-      })),
-    };
-    resolved.push(run);
-    // Short-circuit: once we've resolved the most recent HEALTH-suite executed run,
-    // later (older) runs are irrelevant to the classifier. Keep resolving past
-    // non-health-suite runs (e.g. an ad-hoc v2 dispatch) so they can't hide an
-    // older real pr/nightly run from the classifier.
-    if (isHealthSuiteRun(run) && runExecutedMaestro(run)) break;
+  const seen = new Set<number>();
+
+  // 1. Reliable signal: always resolve the latest few nightly (schedule) runs.
+  //    `scheduleResolve` is passed as `per_page`, so the list is already bounded.
+  for (const meta of listMainRunsByEvent(repo, 'schedule', scheduleResolve)) {
+    if (seen.has(meta.id)) continue;
+    seen.add(meta.id);
+    resolved.push(resolveRun(repo, meta));
   }
+
+  // 2. Fresher signal: scan recent workflow_run (pr) runs only until one that
+  //    actually executed Maestro (a mobile landing) is found, bounded by the scan cap.
+  let scanned = 0;
+  for (const meta of listMainRunsByEvent(
+    repo,
+    'workflow_run',
+    workflowRunPerPage,
+  )) {
+    if (scanned >= workflowRunScan) break;
+    if (seen.has(meta.id)) continue;
+    seen.add(meta.id);
+    scanned += 1;
+    const run = resolveRun(repo, meta);
+    resolved.push(run);
+    if (runExecutedMaestro(run)) break;
+  }
+
   return resolved;
 }
 
