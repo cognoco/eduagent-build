@@ -142,6 +142,131 @@ describe('ProfileProvider', () => {
     expect(result.current.activeProfile?.displayName).toBe('Alex');
   });
 
+  it('[WI-2240] keeps navigation loading until persisted parent-proxy state resolves for a restored child', async () => {
+    let resolveProxyRestore!: (value: string | null) => void;
+    const proxyRestore = new Promise<string | null>((resolve) => {
+      resolveProxyRestore = resolve;
+    });
+    jest
+      .mocked(ExpoSecureStore.getItemAsync)
+      .mockImplementation((key: string) => {
+        if (key === 'mentomate_active_profile_id') {
+          return Promise.resolve(CHILD_PROFILE_ID);
+        }
+        if (key === 'parent-proxy-active') {
+          return proxyRestore;
+        }
+        return Promise.resolve(null);
+      });
+
+    const { result } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeProfile?.id).toBe(CHILD_PROFILE_ID);
+    });
+    expect(result.current.isExplicitProxyMode).toBe(false);
+    expect(result.current.isLoading).toBe(true);
+
+    await act(async () => {
+      resolveProxyRestore('true');
+      await proxyRestore;
+    });
+
+    await waitFor(() => {
+      expect(result.current.isExplicitProxyMode).toBe(true);
+      expect(result.current.isLoading).toBe(false);
+    });
+  });
+
+  it('[WI-2240] keeps a restored child fail-closed when persisted parent-proxy state is rejected', async () => {
+    jest
+      .mocked(ExpoSecureStore.getItemAsync)
+      .mockImplementation((key: string) => {
+        if (key === 'mentomate_active_profile_id') {
+          return Promise.resolve(CHILD_PROFILE_ID);
+        }
+        if (key === 'parent-proxy-active') {
+          return Promise.reject(new Error('SecureStore unavailable'));
+        }
+        return Promise.resolve(null);
+      });
+
+    const { result } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeProfile?.id).toBe(CHILD_PROFILE_ID);
+    });
+    expect(result.current.isExplicitProxyMode).toBe(false);
+    expect(result.current.isLoading).toBe(true);
+    expect(setProxyMode).not.toHaveBeenCalledWith(true);
+  });
+
+  it('[WI-2240] keeps a restored child fail-closed while persisted parent-proxy state never settles', async () => {
+    const neverSettles = new Promise<string | null>(() => {
+      /* deliberately never resolves */
+    });
+    jest
+      .mocked(ExpoSecureStore.getItemAsync)
+      .mockImplementation((key: string) => {
+        if (key === 'mentomate_active_profile_id') {
+          return Promise.resolve(CHILD_PROFILE_ID);
+        }
+        if (key === 'parent-proxy-active') {
+          return neverSettles;
+        }
+        return Promise.resolve(null);
+      });
+
+    const { result } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeProfile?.id).toBe(CHILD_PROFILE_ID);
+    });
+    expect(result.current.isExplicitProxyMode).toBe(false);
+    expect(result.current.isLoading).toBe(true);
+    expect(setProxyMode).not.toHaveBeenCalledWith(true);
+  });
+
+  it('[WI-2240] ignores a late persisted proxy result after the provider unmounts', async () => {
+    let resolveProxyRestore!: (value: string | null) => void;
+    const proxyRestore = new Promise<string | null>((resolve) => {
+      resolveProxyRestore = resolve;
+    });
+    jest
+      .mocked(ExpoSecureStore.getItemAsync)
+      .mockImplementation((key: string) => {
+        if (key === 'mentomate_active_profile_id') {
+          return Promise.resolve(CHILD_PROFILE_ID);
+        }
+        if (key === 'parent-proxy-active') {
+          return proxyRestore;
+        }
+        return Promise.resolve(null);
+      });
+
+    const { result, unmount } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeProfile?.id).toBe(CHILD_PROFILE_ID);
+    });
+    unmount();
+
+    await act(async () => {
+      resolveProxyRestore('true');
+      await proxyRestore;
+    });
+
+    expect(setProxyMode).not.toHaveBeenCalledWith(true);
+  });
+
   it('falls back to owner when saved ID is stale', async () => {
     jest.mocked(ExpoSecureStore.getItemAsync).mockResolvedValue('deleted-id');
     const { result } = renderHook(() => useProfile(), {

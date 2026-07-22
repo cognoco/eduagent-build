@@ -724,6 +724,39 @@ describe('AppLayout', () => {
     expect(screen.queryByTestId('redirect')).toBeNull();
   });
 
+  it('[WI-2240] does not render Account navigation while a restored child proxy state is unresolved', () => {
+    mockUsePathname.mockReturnValue('/account/privacy');
+    mockUseProfile.mockReturnValue({
+      profiles: [
+        {
+          id: 'c1',
+          displayName: 'Child',
+          isOwner: false,
+          consentStatus: null,
+          birthYear: 2014,
+        },
+      ],
+      activeProfile: {
+        id: 'c1',
+        displayName: 'Child',
+        isOwner: false,
+        consentStatus: null,
+        birthYear: 2014,
+      },
+      isExplicitProxyMode: false,
+      isLoading: true,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+
+    renderLayout();
+
+    screen.getByTestId('profile-loading');
+    expect(screen.queryByTestId('tabs')).toBeNull();
+    expect(screen.queryByTestId('redirect')).toBeNull();
+  });
+
   it('[WI-1849] exposes retry and sign-out recovery after profile loading times out', async () => {
     jest.useFakeTimers();
     mockUseProfile.mockReturnValue({
