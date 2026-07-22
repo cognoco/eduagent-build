@@ -195,6 +195,7 @@ jobs:
           PROBE_PROCESS_LOG="${RUNNER_TEMP}/playwright-edge-probe-process.log"
           nohup node scripts/playwright-edge-probe.cjs \
             --watch "${PLAYWRIGHT_API_URL}/v1/health" "${PROBE_OUTPUT}" \
+            --interval-ms 5000 \
             >"${PROBE_PROCESS_LOG}" 2>&1 &
           PROBE_PID=$!
           echo "${PROBE_PID}" >"${PROBE_PID_FILE}"

@@ -412,7 +412,7 @@ function delay(ms) {
 async function watch(
   target,
   outputPath,
-  { intervalMs = 500, timeoutMs = 3_000 } = {},
+  { intervalMs = 5_000, timeoutMs = 3_000 } = {},
 ) {
   let stopping = false;
   const stop = () => {
@@ -495,7 +495,7 @@ if (require.main === module) {
           throw new Error('usage: --watch <health-url> <jsonl-output>');
         }
         await watch(target, outputPath, {
-          intervalMs: numberOption(args, '--interval-ms', 500),
+          intervalMs: numberOption(args, '--interval-ms', 5_000),
           timeoutMs: numberOption(args, '--timeout-ms', 3_000),
         });
         return;

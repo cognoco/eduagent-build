@@ -143,6 +143,22 @@ Live verification on 2026-07-22 produced a healthy sample with DNS success,
 TCP and TLS 1.3 connection, HTTP 200, CF-Ray colo ARN, and Worker deploy SHA
 `fed38fab`. A three-second watch produced two samples and no incident.
 
+PR run `29912608850` then exercised the probe across the complete real-smoke
+job while the fault was active. The required V2 gate passed, but the legacy
+lane reached its five-minute timeout. The summary recorded 13 Cloudflare-edge
+incidents: DNS, TCP, and TLS 1.3 succeeded; Cloudflare returned HTTP 429 with
+LAX Ray IDs; Worker health proof was absent; and recovery samples returned
+HTTP 200 with a deploy SHA. The sustained windows measured 8.6–10.3 seconds,
+directly confirming the previously inferred 9–12-second envelope.
+
+That first CI exercise also exposed observer load: the original 500ms cadence
+made 849 health requests during the job. It cannot be left to consume a
+material share of the rate budget or potentially amplify the fault it observes.
+The checked workflow cadence is now 5 seconds (and the script default matches),
+roughly one tenth of the request rate while still sampling the observed
+9–12-second windows. This is diagnostic sampling, not a retry or tolerance
+mechanism.
+
 ## 4. Mutation-sensitive evidence
 
 ### Cloudflare edge signal
@@ -220,3 +236,28 @@ Tests:       1 failed, 9 skipped, 10 total
 The arm was restored and the focused suite returned 10/10 green. Full red
 records are retained in `.workitem-artifacts/WI-2475/` for lifecycle
 evidence.
+
+### Non-amplifying probe cadence
+
+The workflow expression is:
+
+```text
+--interval-ms 5000
+```
+
+Mutating it back to the live-run value `--interval-ms 500` made the span
+contract red:
+
+```text
+FAIL scripts/playwright-edge-probe.test.ts
+  [WI-2475] run-smoke workflow probe contract
+    ✕ probes continuously across both Playwright lanes and always emits a summary
+
+Expected substring: "--interval-ms 5000"
+Received string:    <probe command with --interval-ms 500>
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 9 skipped, 10 total
+```
+
+The five-second expression was restored before green verification.

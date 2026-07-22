@@ -214,6 +214,7 @@ describe('[WI-2475] run-smoke workflow probe contract', () => {
 
     expect(start?.run).toContain('playwright-edge-probe.cjs');
     expect(start?.run).toContain('--watch');
+    expect(start?.run).toContain('--interval-ms 5000');
     expect(summarize?.if).toBe('always()');
     expect(summarize?.run).toContain('playwright-edge-probe.cjs --summarize');
     expect(startIndex).toBeLessThan(v2Index);
