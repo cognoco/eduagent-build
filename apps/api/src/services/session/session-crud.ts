@@ -839,6 +839,51 @@ export async function closeSession(
 
     if (!row) return null;
 
+    // WI-2103: A silence-prompt transaction may have acquired this session
+    // row first and committed its event while close was waiting. Re-read after
+    // winning the row lock, then remove only server-authored silence nudges
+    // that the learner never answered. Earlier nudges followed by a learner
+    // message remain part of the session history.
+    const trailingEvents = await txDb.query.sessionEvents.findMany({
+      where: and(
+        eq(sessionEvents.sessionId, sessionId),
+        eq(sessionEvents.profileId, profileId),
+        inArray(sessionEvents.eventType, ['user_message', 'system_prompt']),
+      ),
+      columns: {
+        id: true,
+        eventType: true,
+        metadata: true,
+      },
+      orderBy: [desc(sessionEvents.createdAt), desc(sessionEvents.id)],
+    });
+    const unansweredSilencePromptIds: string[] = [];
+    for (const event of trailingEvents) {
+      if (event.eventType === 'user_message') break;
+      const metadata = event.metadata as {
+        source?: unknown;
+        intent?: { kind?: unknown };
+      } | null;
+      if (
+        event.eventType === 'system_prompt' &&
+        metadata?.source === 'server' &&
+        metadata.intent?.kind === 'silence_nudge'
+      ) {
+        unansweredSilencePromptIds.push(event.id);
+      }
+    }
+    if (unansweredSilencePromptIds.length > 0) {
+      await txDb
+        .delete(sessionEvents)
+        .where(
+          and(
+            eq(sessionEvents.sessionId, sessionId),
+            eq(sessionEvents.profileId, profileId),
+            inArray(sessionEvents.id, unansweredSilencePromptIds),
+          ),
+        );
+    }
+
     await createPendingSessionSummary(
       txDb,
       sessionId,
