@@ -1378,4 +1378,118 @@ describeIfDb('session exchange production-path integration', () => {
       expect(await readLastDeferredAt(noticeId)).toEqual(NOTICE_SANTIAGO_NOW);
     });
   });
+
+  // [WI-2500] Exchange-level mentor-notice CREATION — proves each call site
+  // (processMessage, streamMessage) actually PRODUCES an accepted notice, not
+  // merely that they are wired to the same function. `creation.test.ts`'s
+  // "shared creation boundary" test already proves the latter; this is the
+  // former, one named case per path.
+  describe('mentor-notice creation (WI-2500)', () => {
+    const CREATION_LEARNER_SLIP =
+      'I moved minus three to the other side and kept it negative, so x equals two.';
+
+    function tutorEnvelopeObservingGap(answerEventId: string): string {
+      return JSON.stringify({
+        reply: 'Watch the sign when you move a term across the equals sign.',
+        signals: {
+          partial_progress: false,
+          needs_deepening: false,
+          understanding_check: false,
+          noticed_gap: {
+            observed: true,
+            concept: 'Sign changes when moving terms',
+            correctionHint: 'Reverse the operation across the equals sign.',
+            answerEventId,
+            learnerQuote: CREATION_LEARNER_SLIP,
+          },
+        },
+        ui_hints: {
+          note_prompt: { show: false, post_session: false },
+        },
+        private_sources: {
+          relied_on: ['conversation_history'],
+          insufficient: false,
+          reason: 'test envelope',
+        },
+      });
+    }
+
+    // The evidence event is seeded directly (mirrors the defer describe
+    // block's `answerEvent` pattern above) rather than relied on being the
+    // CURRENT turn's persisted message — evidence.ts validates the CITED
+    // event against the session, not that it is the latest one.
+    async function seedMentorNoticeCreationTurn() {
+      const { profileId, subjectId } = await seedProfileAndSubject(db);
+      const topicId = await seedCurriculumTopic(db, subjectId);
+      const session = await seedOrdinarySession(
+        db,
+        profileId,
+        subjectId,
+        topicId,
+      );
+
+      const [answerEvent] = await db
+        .insert(sessionEvents)
+        .values({
+          profileId,
+          subjectId,
+          sessionId: session.id,
+          topicId,
+          eventType: 'user_message',
+          content: CREATION_LEARNER_SLIP,
+          metadata: {},
+        })
+        .returning({ id: sessionEvents.id });
+      if (!answerEvent) throw new Error('answer event insert failed');
+
+      llm.setTutorResponse(tutorEnvelopeObservingGap(answerEvent.id));
+      return { profileId, session, answerEventId: answerEvent.id };
+    }
+
+    async function readMentorNoticeForSession(sessionId: string) {
+      const [row] = await db
+        .select()
+        .from(mentorNotices)
+        .where(eq(mentorNotices.sourceSessionId, sessionId));
+      return row ?? null;
+    }
+
+    it('processMessage produces an accepted mentor notice from a genuine slip', async () => {
+      const { profileId, session, answerEventId } =
+        await seedMentorNoticeCreationTurn();
+
+      await processMessage(
+        db,
+        profileId,
+        session.id,
+        { message: 'ok, next question' },
+        { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+      );
+
+      const notice = await readMentorNoticeForSession(session.id);
+      expect(notice).not.toBeNull();
+      expect(notice?.concept).toBe('Sign changes when moving terms');
+      expect(notice?.answerEventId).toBe(answerEventId);
+    });
+
+    it('streamMessage produces an accepted mentor notice from a genuine slip', async () => {
+      const { profileId, session, answerEventId } =
+        await seedMentorNoticeCreationTurn();
+
+      const result = await streamMessage(
+        db,
+        profileId,
+        session.id,
+        { message: 'ok, next question' },
+        { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+      );
+      for await (const chunk of result.stream) void chunk;
+      await result.onComplete();
+
+      const notice = await readMentorNoticeForSession(session.id);
+      expect(notice).not.toBeNull();
+      expect(notice?.concept).toBe('Sign changes when moving terms');
+      expect(notice?.answerEventId).toBe(answerEventId);
+    });
+  });
 });

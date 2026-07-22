@@ -430,6 +430,16 @@ const routes = api
 // The mobile client sets the base URL to include `/v1`.
 // ---------------------------------------------------------------------------
 const app = new Hono<Env>().basePath('/v1');
+const PHASE_PROBE_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+app.use('*', async (c, next) => {
+  const probeId = c.req.header('x-mentomate-probe-id');
+  if (probeId && PHASE_PROBE_ID_PATTERN.test(probeId)) {
+    c.header('x-mentomate-worker-probe-id', probeId);
+  }
+  await next();
+});
 app.route('/', routes);
 
 // Global error handler — catches unhandled exceptions and returns ApiErrorSchema envelope

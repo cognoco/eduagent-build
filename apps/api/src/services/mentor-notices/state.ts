@@ -21,6 +21,13 @@ interface AcceptMentorNoticeInput extends MentorNoticeCopyInput {
   subjectId: string;
   topicId: string | null;
   sourceSessionId: string;
+  /** [WI-2500] The validated learner-answer event this notice's evidence is
+   *  anchored to. `evidence.ts`'s exchange-boundary path never returns
+   *  without one, but callers that predate WI-2500 (e.g. the pre-existing
+   *  concurrency test in `tests/integration/mentor-notice-lifecycle.integration.test.ts`)
+   *  still insert with no evidence, so this stays nullable and both
+   *  partial unique indexes below must be targeted, not just one. */
+  answerEventId: string | null;
 }
 
 export function prepareMentorNoticeCopy(
@@ -50,10 +57,31 @@ export async function acceptMentorNotice(
       subjectId: input.subjectId,
       topicId: input.topicId,
       sourceSessionId: input.sourceSessionId,
+      answerEventId: input.answerEventId,
       concept: copy.concept,
       correctionHint: copy.correctionHint,
     })
-    .onConflictDoNothing({ target: mentorNotices.sourceSessionId })
+    // [WI-2500] Target must match whichever partial index this row would
+    // violate: evidence-present rows collide on the (source_session_id,
+    // answer_event_id) index, evidence-absent rows on the source_session_id-only
+    // index. Postgres requires an EXACT target/predicate match to infer a
+    // conflict against a partial index — a mismatched target doesn't
+    // silently no-op, it raises the raw duplicate-key error (caught in CI by
+    // the pre-existing null-evidence concurrency test).
+    .onConflictDoNothing(
+      input.answerEventId
+        ? {
+            target: [
+              mentorNotices.sourceSessionId,
+              mentorNotices.answerEventId,
+            ],
+            where: sql`${mentorNotices.answerEventId} IS NOT NULL`,
+          }
+        : {
+            target: [mentorNotices.sourceSessionId],
+            where: sql`${mentorNotices.answerEventId} IS NULL`,
+          },
+    )
     .returning({
       id: mentorNotices.id,
       concept: mentorNotices.concept,
