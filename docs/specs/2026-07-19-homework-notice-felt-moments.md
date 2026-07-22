@@ -36,13 +36,13 @@ The MVP succeeds when friendly users can experience the complete in-app loop—n
 - `Continue` starts or resumes one focused re-check session for the notice.
 - The re-check is capped at three learner responses. It never injects another notice-detection prompt.
 - The tutor guides the re-check but never grades its own work. After each persisted learner response, one shared server evaluator routes an independent judge that excludes the tutor's producer vendor. It accepts only exact outcome/reason pairs: `locked_in/demonstrated`, `not_yet/insufficient`, `dismissed/explicit_stop`, `deferred/explicit_not_now`, or `continue/unclear`.
-- `continue` commits no lifecycle transition. An unavailable or malformed judge also commits no transition before the response cap; on the third learner response, the safe deterministic terminal is `not_yet/insufficient`.
+- Before the response cap, `continue` and unavailable or malformed judging commit no lifecycle transition. On the third learner response, any evaluation that does not commit `locked_in`, `not_yet`, `dismissed`, or `deferred`—including a valid `continue` or unavailable or malformed judging—deterministically terminalizes as `not_yet/insufficient`.
 - A valid evidence-backed result applies one bounded state-machine action:
   - `locked_in` terminalizes the offer, requires explicit server-validated learner evidence, and may produce a brief learner-only success projection.
   - `not_yet` terminalizes the current offer without claiming mastery. A later notice requires new eligible evidence; the completed row is not silently reused as an open offer.
   - `dismissed` requires an explicit learner request to stop bringing the matter back and is terminal.
   - `deferred` records the current learning-day deferral without terminalizing the notice.
-- `Not now` is a separate deterministic action. It records `deferred/explicit_not_now` for the current learning day and makes no claim about understanding. The learning day starts at local 04:00 in the learner's stored IANA time zone; before 04:00 belongs to the preceding civil date.
+- `Not now` is a separate deterministic action. It records `deferred/explicit_not_now` for the current learning day and makes no claim about understanding. The learning day starts at local 04:00 in the learner's stored IANA time zone; before 04:00 belongs to the preceding civil date. If the zone is invalid or unavailable, the server applies the same 04:00 boundary and derives the civil date in UTC.
 - An eligible notice may resurface quietly in-app on a later learning day. It never opens a session or interrupts learning without the learner choosing `Continue`.
 - An open notice with no activity for 21 days becomes `faded` and disappears quietly. Fresh evidence can support a later notice.
 
@@ -142,7 +142,7 @@ The following is a forward disposition of code already merged in PRs #2293 and #
 | WI-2557 — Correct mentor-notice learning-day boundaries across IANA time zones | **Retain the in-app boundary.** Current-learning-day deferral and later resurfacing need correct IANA-zone behavior; push scheduling does not. |
 | WI-2623 — Amend mentor-notice authority, rollback, safety, evidence-retention, and learning-day canon | **Execute first.** It is the authority for the corrective sequence below. |
 | WI-2624 — Enforce explicit producer-vendor exclusion in judge routing | **Execute before judge consumers.** It establishes independent routing for re-check and clinical judging. |
-| WI-2625 — Make mentor-notice re-check outcomes independently server-judged | **Execute after WI-2501 and WI-2624.** Remove tutor verdicts and converge both transports. |
+| WI-2625 — Make mentor-notice re-check outcomes independently server-judged | **Execute after WI-2623, WI-2500, WI-2501, and WI-2624.** Remove tutor verdicts and converge both transports. |
 | WI-2627 — Make mentor-notice rollback observations monotonic across deployments | **Execute after WI-2504.** Extend cache eviction into an ordered cross-deployment policy. |
 | WI-2628 — Fail closed on multilingual clinical inferences in persisted learning text | **Execute after WI-2624.** Apply the shared gate to every persistence boundary. |
 | WI-2629 — Retain mentor-notice evidence identity after transcript purge | **Execute after WI-2500.** Forward-repair the FK without rewriting landed migrations. |
