@@ -17,8 +17,6 @@ const RUNNER_NETWORK_ERROR_CODES = new Set([
   'ENETUNREACH',
   'ETIMEDOUT',
 ]);
-const EDGE_SECURITY_STATUSES = new Set([403, 429]);
-
 function headerValue(value) {
   if (Array.isArray(value)) return value[0] ?? null;
   return typeof value === 'string' ? value : null;
@@ -28,6 +26,13 @@ function coloFromCfRay(cfRay) {
   if (!cfRay) return null;
   const separator = cfRay.lastIndexOf('-');
   return separator === -1 ? null : cfRay.slice(separator + 1) || null;
+}
+
+function resolveWorkerCorrelation(probeId, responseHeaders) {
+  const correlationId = headerValue(
+    responseHeaders['x-mentomate-worker-probe-id'],
+  );
+  return { reached: correlationId === probeId, correlationId };
 }
 
 function sanitizeProbeSample(sample) {
@@ -76,6 +81,7 @@ function sanitizeProbeSample(sample) {
     },
     worker: {
       reached: sample.worker?.reached ?? false,
+      correlationId: sample.worker?.correlationId ?? null,
       deploySha: sample.worker?.deploySha ?? null,
     },
     errorCode: sample.errorCode ?? null,
@@ -83,11 +89,7 @@ function sanitizeProbeSample(sample) {
 }
 
 function classifyProbeSample(sample) {
-  if (
-    sample.worker?.reached === true &&
-    sample.http?.status >= 200 &&
-    sample.http?.status < 300
-  ) {
+  if (sample.worker?.reached === true) {
     return 'worker-reached';
   }
 
@@ -108,8 +110,7 @@ function classifyProbeSample(sample) {
     sample.tls?.ok === true &&
     sample.worker?.reached === false &&
     Boolean(sample.http?.cfRay) &&
-    (sample.http?.cfMitigated === 'challenge' ||
-      EDGE_SECURITY_STATUSES.has(sample.http?.status))
+    sample.http?.cfMitigated === 'challenge'
   ) {
     return 'cloudflare-edge-security';
   }
@@ -282,7 +283,7 @@ function probeOnce(targetValue, { timeoutMs = 3_000 } = {}) {
     tcp: null,
     tls: null,
     http: null,
-    worker: { reached: false, deploySha: null },
+    worker: { reached: false, correlationId: null, deploySha: null },
     errorCode: null,
   };
 
@@ -311,6 +312,10 @@ function probeOnce(targetValue, { timeoutMs = 3_000 } = {}) {
       },
       (response) => {
         const cfRay = headerValue(response.headers['cf-ray']);
+        const workerCorrelation = resolveWorkerCorrelation(
+          probeId,
+          response.headers,
+        );
         sample.http = {
           status: response.statusCode ?? null,
           durationMs: Date.now() - startedAtMs,
@@ -319,6 +324,7 @@ function probeOnce(targetValue, { timeoutMs = 3_000 } = {}) {
           cfMitigated: headerValue(response.headers['cf-mitigated']),
           server: headerValue(response.headers.server),
         };
+        sample.worker = { ...workerCorrelation, deploySha: null };
 
         const chunks = [];
         let capturedBytes = 0;
@@ -339,6 +345,7 @@ function probeOnce(targetValue, { timeoutMs = 3_000 } = {}) {
             ) {
               sample.worker = {
                 reached: true,
+                correlationId: workerCorrelation.correlationId,
                 deploySha:
                   typeof body.deploySha === 'string' ? body.deploySha : null,
               };
@@ -465,6 +472,7 @@ module.exports = {
   formatIncidentSummary,
   probeOnce,
   readSamples,
+  resolveWorkerCorrelation,
   sanitizeProbeSample,
   summarizeSamples,
   watch,

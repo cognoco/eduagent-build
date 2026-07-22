@@ -4,6 +4,7 @@ import { parse as parseYaml } from 'yaml';
 import {
   classifyProbeSample,
   formatIncidentSummary,
+  resolveWorkerCorrelation,
   sanitizeProbeSample,
   summarizeSamples,
 } from './playwright-edge-probe.cjs';
@@ -68,7 +69,7 @@ describe('[WI-2475] classifyProbeSample', () => {
     expect(classifyProbeSample(sample)).toBe('runner-network');
   });
 
-  it('identifies a Cloudflare edge/security response that never reached the Worker', () => {
+  it('stays unresolved when a 403 and CF-Ray lack decisive edge or Worker proof', () => {
     const sample = {
       ...healthySample('2026-07-22T10:00:00.000Z'),
       http: {
@@ -82,7 +83,7 @@ describe('[WI-2475] classifyProbeSample', () => {
       errorCode: null,
     };
 
-    expect(classifyProbeSample(sample)).toBe('cloudflare-edge-security');
+    expect(classifyProbeSample(sample)).toBe('unresolved');
   });
 
   it('identifies a Cloudflare challenge independently of the HTTP status', () => {
@@ -123,6 +124,43 @@ describe('[WI-2475] classifyProbeSample', () => {
     expect(classifyProbeSample(healthySample('2026-07-22T10:00:00.000Z'))).toBe(
       'worker-reached',
     );
+  });
+
+  it('identifies a correlated Worker response even when its status is 429', () => {
+    const sample = {
+      ...healthySample('2026-07-22T10:00:00.000Z'),
+      http: {
+        status: 429,
+        durationMs: 90,
+        cfRay: 'worker429-SJC',
+        colo: 'SJC',
+        cfMitigated: null,
+      },
+      worker: {
+        reached: true,
+        correlationId: 'probe-healthy',
+        deploySha: null,
+      },
+      errorCode: null,
+    };
+
+    expect(classifyProbeSample(sample)).toBe('worker-reached');
+  });
+});
+
+describe('[WI-2475] Worker response correlation', () => {
+  it('requires the echoed Worker probe ID to match the request probe ID', () => {
+    expect(
+      resolveWorkerCorrelation('probe-request', {
+        'x-mentomate-worker-probe-id': 'probe-request',
+      }),
+    ).toEqual({ reached: true, correlationId: 'probe-request' });
+
+    expect(
+      resolveWorkerCorrelation('probe-request', {
+        'x-mentomate-worker-probe-id': 'another-probe',
+      }),
+    ).toEqual({ reached: false, correlationId: 'another-probe' });
   });
 });
 
