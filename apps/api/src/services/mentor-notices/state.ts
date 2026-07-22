@@ -94,15 +94,7 @@ export async function acceptMentorNotice(
       inngest.send({
         // orphan-allow: observability-only lifecycle marker; no in-process handler.
         name: 'app/notice.created',
-        // [WI-2500 review F1] Payload canon requires profileId + timestamp
-        // (project_context.md). Fixed at this touched site; the two sibling
-        // notice.recheck_outcome sends share the pre-existing omission and are
-        // swept separately (see follow-up WI) to keep this PR surgical.
-        data: {
-          noticeId: accepted.id,
-          profileId: input.profileId,
-          timestamp: new Date().toISOString(),
-        },
+        data: { noticeId: accepted.id, profileId: input.profileId },
       }),
     'notice.created',
     { profileId: input.profileId, noticeId: accepted.id },
