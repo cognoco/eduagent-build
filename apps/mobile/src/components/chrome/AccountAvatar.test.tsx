@@ -119,6 +119,10 @@ describe('AccountAvatar', () => {
   it.each([
     ['/mentor', 'mentor'],
     ['/subjects', 'subjects'],
+    ['/child/child-1/curriculum', 'subjects'],
+    ['/child/child-1/subjects/subject-1', 'subjects'],
+    ['/child/child-1/topic/topic-1', 'subjects'],
+    ['/child/child-1', 'mentor'],
     ['/journal', 'journal'],
   ] as const)(
     'routes from %s to Account with the initiating-tab return token',

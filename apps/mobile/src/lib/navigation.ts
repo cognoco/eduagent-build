@@ -56,7 +56,13 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 export function accountReturnTokenForPathname(
   pathname: string,
 ): V2AccountReturnToken {
+  const isChildSubjectsRoute =
+    /^\/child\/[^/]+\/(?:curriculum|(?:subjects|topic)\/[^/]+)\/?$/.test(
+      pathname,
+    );
+
   if (
+    isChildSubjectsRoute ||
     pathname === '/subjects' ||
     pathname.startsWith('/subjects/') ||
     pathname === '/subject' ||

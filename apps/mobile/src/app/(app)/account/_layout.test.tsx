@@ -1,7 +1,7 @@
 import { render } from '@testing-library/react-native';
 import { ThemeContext } from '../../../lib/theme';
 import { tokens } from '../../../lib/design-tokens';
-import * as parentProxyModule from '../../../hooks/use-parent-proxy';
+import * as navigationContractModule from '../../../hooks/use-navigation-contract';
 import AccountLayout, {
   unstable_settings,
   ACCOUNT_PRESENTATION,
@@ -61,11 +61,14 @@ describe('account nested layout', () => {
     mockIsParentProxy = false;
     mockRedirect.mockReset();
     mockStackScreens.clear();
-    jest.spyOn(parentProxyModule, 'useParentProxy').mockImplementation(() => ({
-      isParentProxy: mockIsParentProxy,
-      childProfile: null,
-      parentProfile: null,
-    }));
+    jest
+      .spyOn(navigationContractModule, 'useNavigationContract')
+      .mockImplementation(
+        () =>
+          ({ isParentProxy: mockIsParentProxy }) as ReturnType<
+            typeof navigationContractModule.useNavigationContract
+          >,
+      );
   });
 
   afterEach(() => jest.restoreAllMocks());

@@ -201,6 +201,9 @@ describe('V2 account return contract [WI-2240]', () => {
     ['/pick-book/subject-1', 'subjects'],
     ['/vocabulary/subject-1', 'subjects'],
     ['/shelf/subject-1/book/book-1', 'subjects'],
+    ['/child/child-1/curriculum', 'subjects'],
+    ['/child/child-1/subjects/subject-1', 'subjects'],
+    ['/child/child-1/topic/topic-1', 'subjects'],
     ['/journal', 'journal'],
     ['/journal/practice', 'journal'],
   ] as const)('maps %s to the initiating V2 tab token', (pathname, token) => {
@@ -209,6 +212,19 @@ describe('V2 account return contract [WI-2240]', () => {
 
   it('uses Mentor as the strict V2 fallback for an unknown initiating path', () => {
     expect(accountReturnTokenForPathname('/unexpected')).toBe('mentor');
+    expect(accountReturnTokenForPathname('/child/child-1')).toBe('mentor');
+    expect(accountReturnTokenForPathname('/child/child-1/reports')).toBe(
+      'mentor',
+    );
+    expect(
+      accountReturnTokenForPathname('/child/child-1/session/session-1'),
+    ).toBe('mentor');
+    expect(accountReturnTokenForPathname('/child/child-1/subjects')).toBe(
+      'mentor',
+    );
+    expect(
+      accountReturnTokenForPathname('/child/child-1/subject/subject-1'),
+    ).toBe('mentor');
     expect(accountReturnHref(undefined, true)).toBe('/(app)/mentor');
     expect(accountReturnHref('unexpected', true)).toBe('/(app)/mentor');
   });
