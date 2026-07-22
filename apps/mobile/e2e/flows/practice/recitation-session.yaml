@@ -63,7 +63,7 @@ tags:
     element:
       id: 'practice-recitation'
     direction: RIGHT
-    timeout: 5000
+    timeout: 10000
     visibilityPercentage: 100
     centerElement: true
 

@@ -72,7 +72,9 @@ tags:
     timeout: 10000
     visibilityPercentage: 50
     centerElement: false
-    optional: false
+    # Maestro can report 0% after landing this fully above the fixed tab bar.
+    # The mandatory assertion below remains the reachability gate.
+    optional: true
 
 - assertVisible:
     id: 'something-wrong-button'

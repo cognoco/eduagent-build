@@ -103,20 +103,20 @@ tags:
 - tapOn:
     id: "home-subject-card-${ACTIVE_SUBJECT_ID}"
 
-# 12. Wait for the subject progress screen (navigated from home tap).
+# 12. Wait for the subject shelf opened by the home card.
 - extendedWaitUntil:
     visible:
-      id: "progress-subject-back"
+      id: "shelf-screen"
     timeout: 10000
 
-# 14. Navigate back to home screen (Android hardware Back key)
+# 13. Navigate back to home screen (Android hardware Back key)
 - pressKey: Back
 
-# 15. Verify back on home screen after curriculum round-trip
+# 14. Verify back on home screen after curriculum round-trip
 - extendedWaitUntil:
     visible:
       id: "learner-screen"
     timeout: 10000
 
-# 16. Final screenshot
+# 15. Final screenshot
 - takeScreenshot: multi-subject-03-back-home

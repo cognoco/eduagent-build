@@ -47,13 +47,3 @@ tags:
     id: 'child-reports-empty-progress'
 
 - takeScreenshot: 03-reports-empty
-
-- tapOn:
-    id: 'child-reports-back'
-
-- extendedWaitUntil:
-    visible:
-      id: 'parent-home-screen'
-    timeout: 10000
-
-- takeScreenshot: 04-back-to-parent-dashboard

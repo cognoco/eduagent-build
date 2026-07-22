@@ -1355,10 +1355,10 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
   });
 
   it('[WI-1864] accepts the mentor-memory footer control above the fixed tab bar', () => {
-    for (const flow of [
-      'child-mentor-memory.yaml',
-      'child-mentor-memory-populated.yaml',
-    ]) {
+    for (const [flow, positioningOptional] of [
+      ['child-mentor-memory.yaml', false],
+      ['child-mentor-memory-populated.yaml', true],
+    ] as const) {
       const source = readFileSync(
         join(repoRoot, 'apps/mobile/e2e/flows/parent', flow),
         'utf8',
@@ -1387,7 +1387,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       expect(commands[footerScroll]?.scrollUntilVisible).toMatchObject({
         visibilityPercentage: 50,
         centerElement: false,
-        optional: false,
+        optional: positioningOptional,
       });
       expect(footerAssertion).toBeGreaterThan(footerScroll);
     }
@@ -2080,6 +2080,45 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(greeting).toBeGreaterThan(chatInput);
     expect(commands[greeting]?.extendedWaitUntil?.timeout).toBe(30000);
     expect(source).not.toContain('Your mate is here');
+  });
+
+  it('[WI-1864] waits for the standalone create-profile form by stable control', () => {
+    const source = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/onboarding/create-profile-standalone.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      tapOn?: { id?: string } | string;
+      extendedWaitUntil?: {
+        visible?: { id?: string } | { text?: string } | string;
+        optional?: boolean;
+      };
+    }>;
+    const add = commands.findIndex(
+      ({ tapOn }) =>
+        typeof tapOn === 'object' && tapOn.id === 'profiles-add-button',
+    );
+    const form = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > add &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        'id' in extendedWaitUntil.visible &&
+        extendedWaitUntil.visible.id === 'create-profile-name' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const staleCopyWait = commands.findIndex(
+      ({ extendedWaitUntil }) =>
+        typeof extendedWaitUntil?.visible === 'object' &&
+        'text' in extendedWaitUntil.visible &&
+        extendedWaitUntil.visible.text === 'New profile',
+    );
+
+    expect(add).toBeGreaterThan(-1);
+    expect(form).toBeGreaterThan(add);
+    expect(staleCopyWait).toBe(-1);
   });
 
   it('[WI-1864] follows the pending gate before native consent handoff', () => {
@@ -2877,12 +2916,16 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       scrollUntilVisible?: {
         element?: { id?: string };
         direction?: string;
+        timeout?: number;
         visibilityPercentage?: number;
         centerElement?: boolean;
         optional?: boolean;
       };
-      tapOn?: { id?: string };
-      extendedWaitUntil?: { visible?: { id?: string } | string };
+      tapOn?: { id?: string; optional?: boolean };
+      extendedWaitUntil?: {
+        visible?: { id?: string } | string;
+        optional?: boolean;
+      };
     }>;
     const heading = commands.findIndex(
       ({ scrollUntilVisible }) =>
@@ -2897,17 +2940,29 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         index > heading &&
         scrollUntilVisible?.element?.id === 'practice-recitation' &&
         scrollUntilVisible.direction === 'RIGHT' &&
+        scrollUntilVisible.timeout === 10000 &&
         scrollUntilVisible.visibilityPercentage === 100 &&
         scrollUntilVisible.centerElement === true &&
         scrollUntilVisible.optional !== true,
     );
     const recitationTap = commands.findIndex(
       ({ tapOn }, index) =>
-        index > recitation && tapOn?.id === 'practice-recitation',
+        index > recitation &&
+        tapOn?.id === 'practice-recitation' &&
+        tapOn.optional !== true,
+    );
+    const session = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > recitationTap &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'chat-input' &&
+        extendedWaitUntil.optional !== true,
     );
     const chatBack = commands.findIndex(
       ({ tapOn }, index) =>
-        index > recitationTap && tapOn?.id === 'chat-shell-back',
+        index > session &&
+        tapOn?.id === 'chat-shell-back' &&
+        tapOn.optional !== true,
     );
     const practiceReturn = commands.findIndex(
       ({ extendedWaitUntil }, index) =>
@@ -2941,7 +2996,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(heading).toBeGreaterThan(-1);
     expect(recitation).toBeGreaterThan(heading);
     expect(recitationTap).toBeGreaterThan(recitation);
-    expect(chatBack).toBeGreaterThan(recitationTap);
+    expect(session).toBeGreaterThan(recitationTap);
+    expect(chatBack).toBeGreaterThan(session);
     expect(practiceReturn).toBeGreaterThan(chatBack);
     expect(secondHeading).toBeGreaterThan(practiceReturn);
     expect(dictation).toBeGreaterThan(secondHeading);
@@ -3020,6 +3076,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       scrollUntilVisible?: {
         element?: { id?: string };
         direction?: string;
+        timeout?: number;
         visibilityPercentage?: number;
         centerElement?: boolean;
         optional?: boolean;
@@ -3043,16 +3100,29 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         index > heading &&
         scrollUntilVisible?.element?.id === 'practice-recitation' &&
         scrollUntilVisible.direction === 'RIGHT' &&
+        scrollUntilVisible.timeout === 10000 &&
         scrollUntilVisible.visibilityPercentage === 100 &&
         scrollUntilVisible.centerElement === true &&
         scrollUntilVisible.optional !== true,
     );
     const tap = commands.findIndex(
       ({ tapOn }, index) =>
-        index > recitation && tapOn?.id === 'practice-recitation',
+        index > recitation &&
+        tapOn?.id === 'practice-recitation' &&
+        tapOn.optional !== true,
+    );
+    const session = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > tap &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'chat-input' &&
+        extendedWaitUntil.optional !== true,
     );
     const endSession = commands.findIndex(
-      ({ tapOn }, index) => index > tap && tapOn?.id === 'end-session-button',
+      ({ tapOn }, index) =>
+        index > session &&
+        tapOn?.id === 'end-session-button' &&
+        tapOn.optional !== true,
     );
     const confirmEnd = commands.findIndex(
       ({ tapOn }, index) =>
@@ -3084,7 +3154,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(heading).toBeGreaterThan(-1);
     expect(recitation).toBeGreaterThan(heading);
     expect(tap).toBeGreaterThan(recitation);
-    expect(endSession).toBeGreaterThan(tap);
+    expect(session).toBeGreaterThan(tap);
+    expect(endSession).toBeGreaterThan(session);
     expect(confirmEnd).toBeGreaterThan(endSession);
     expect(summaryReady).toBeGreaterThan(confirmEnd);
     expect(closeSummary).toBeGreaterThan(summaryReady);
@@ -3537,6 +3608,47 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       expect(reportTap).toBeGreaterThan(reportScroll);
     },
   );
+
+  it('[WI-1864] ends the empty child-report journey at its proven empty-state receipt', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/parent/child-reports-empty.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      assertVisible?: { id?: string; optional?: boolean } | string;
+      takeScreenshot?: string;
+    }>;
+    const empty = commands.findIndex(
+      ({ assertVisible }) =>
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'child-reports-empty' &&
+        assertVisible.optional !== true,
+    );
+    const context = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > empty &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'child-reports-empty-time-context' &&
+        assertVisible.optional !== true,
+    );
+    const progress = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > context &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'child-reports-empty-progress' &&
+        assertVisible.optional !== true,
+    );
+    const receipt = commands.findIndex(
+      ({ takeScreenshot }, index) =>
+        index > progress && takeScreenshot === '03-reports-empty',
+    );
+
+    expect(empty).toBeGreaterThan(-1);
+    expect(context).toBeGreaterThan(empty);
+    expect(progress).toBeGreaterThan(context);
+    expect(receipt).toBeGreaterThan(progress);
+    expect(commands.slice(receipt + 1)).toEqual([]);
+  });
 
   it('[WI-1864] reaches every populated child-report section on a small viewport', () => {
     const source = readFileSync(
@@ -4117,6 +4229,49 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(expand).toBeGreaterThan(progress);
     expect(recent).toBeGreaterThan(expand);
     expect(seededSession).toBeGreaterThan(recent);
+    expect(source).not.toContain('progress-subject-back');
+  });
+
+  it('[WI-1864] opens a multi-subject home card on its shelf before returning home', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/subjects/multi-subject.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      tapOn?: { id?: string } | string;
+      extendedWaitUntil?: {
+        visible?: { id?: string } | string;
+        optional?: boolean;
+      };
+      pressKey?: string;
+    }>;
+    const subject = commands.findIndex(
+      ({ tapOn }) =>
+        typeof tapOn === 'object' &&
+        tapOn.id === 'home-subject-card-${ACTIVE_SUBJECT_ID}',
+    );
+    const shelf = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > subject &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'shelf-screen' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const back = commands.findIndex(
+      ({ pressKey }, index) => index > shelf && pressKey === 'Back',
+    );
+    const home = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > back &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'learner-screen' &&
+        extendedWaitUntil.optional !== true,
+    );
+
+    expect(subject).toBeGreaterThan(-1);
+    expect(shelf).toBeGreaterThan(subject);
+    expect(back).toBeGreaterThan(shelf);
+    expect(home).toBeGreaterThan(back);
     expect(source).not.toContain('progress-subject-back');
   });
 
