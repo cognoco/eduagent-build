@@ -4267,12 +4267,17 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         extendedWaitUntil.visible.id === 'learner-screen' &&
         extendedWaitUntil.optional !== true,
     );
+    const staleProgressWait = commands.findIndex(
+      ({ extendedWaitUntil }) =>
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'progress-subject-back',
+    );
 
     expect(subject).toBeGreaterThan(-1);
     expect(shelf).toBeGreaterThan(subject);
     expect(back).toBeGreaterThan(shelf);
     expect(home).toBeGreaterThan(back);
-    expect(source).not.toContain('progress-subject-back');
+    expect(staleProgressWait).toBe(-1);
   });
 
   it('[WI-1864] exercises the seeded answer-check failure before continuing the round', () => {
