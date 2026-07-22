@@ -41,12 +41,14 @@ const e2eWebDir = path.join(process.cwd(), 'apps', 'mobile', 'e2e-web');
 const mobileDir = path.join(process.cwd(), 'apps', 'mobile');
 const shouldStartLocalApi = process.env.PLAYWRIGHT_SKIP_LOCAL_API !== '1';
 const artifactLane = process.env.PLAYWRIGHT_ARTIFACT_LANE;
-if (artifactLane && artifactLane !== 'legacy') {
+const legacyArtifactLanes = new Set(['legacy-core', 'legacy-advisory']);
+if (artifactLane && !legacyArtifactLanes.has(artifactLane)) {
   throw new Error(
-    `PLAYWRIGHT_ARTIFACT_LANE must be "legacy" when set; received ${JSON.stringify(artifactLane)}`,
+    'PLAYWRIGHT_ARTIFACT_LANE must be "legacy-core" or "legacy-advisory" when set; received ' +
+      JSON.stringify(artifactLane),
   );
 }
-const artifactSuffix = artifactLane === 'legacy' ? '-legacy' : '';
+const artifactSuffix = artifactLane ? '-' + artifactLane : '';
 
 // [BUG-325] Worker-count discriminator. We previously inferred "is this the
 // shared *.workers.dev staging API?" by substring-matching the API URL —

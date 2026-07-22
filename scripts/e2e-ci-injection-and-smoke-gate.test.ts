@@ -13,9 +13,10 @@
 //           silently reported success on every PR. WI-2228 promotes the isolated
 //           v2-release project to the hard signal for trusted surface changes,
 //           while forks, untrusted PRs, and no-surface changes remain explicit
-//           pass-throughs. Legacy smoke stays visible but advisory in the same
-//           setup job. These tests execute the required gate's shell matrix and
-//           assert that legacy coverage cannot mask the V2 result.
+//           pass-throughs. Legacy projects are partitioned into an expiry-
+//           bearing required-stable lane and an advisory lane in the same setup
+//           job. These tests execute the required gate's shell matrix and assert
+//           that advisory coverage cannot mask either hard-gated result.
 //
 // Style + harness match the sibling workflow-structure tests in this directory
 // (e.g. e2e-web-cleanup.test.ts): parse the committed YAML with the `yaml`
@@ -197,7 +198,7 @@ describe('[F-151] e2e-ci.yml has no workflow_run.pull_requests injection sink', 
   });
 });
 
-describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => {
+describe('[WI-2228/WI-2458] e2e-web.yml gates V2 and stable legacy smoke', () => {
   const workflow = loadWorkflow('e2e-web.yml');
   const jobs = workflow.jobs as Record<string, Job>;
   const REQUIRED_CHECK_NAME = 'Playwright web smoke';
@@ -281,13 +282,21 @@ describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => 
     expect(result.status).toBe(expected);
   });
 
-  it('runs the V2 release gate first and keeps legacy smoke advisory in one setup job', () => {
+  it('runs V2 first and partitions legacy smoke into required and advisory lanes', () => {
     const runSmoke = jobs['run-smoke'];
     expect(runSmoke).toBeDefined();
     const v2Step = stepNamed(runSmoke, 'Run V2 release Playwright gate');
-    const legacyStep = stepNamed(
+    const resolveStep = stepNamed(
       runSmoke,
-      'Run legacy Playwright smoke (advisory)',
+      'Validate and resolve legacy Playwright lanes',
+    );
+    const coreStep = stepNamed(
+      runSmoke,
+      'Run required-stable legacy Playwright smoke',
+    );
+    const advisoryStep = stepNamed(
+      runSmoke,
+      'Run advisory legacy Playwright smoke',
     );
     const resetStep = stepNamed(
       runSmoke,
@@ -298,7 +307,9 @@ describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => 
       (job) => job.steps ?? [],
     );
     const v2Script = String(v2Step?.run ?? '');
-    const legacyScript = String(legacyStep?.run ?? '');
+    const resolveScript = String(resolveStep?.run ?? '');
+    const coreScript = String(coreStep?.run ?? '');
+    const advisoryScript = String(advisoryStep?.run ?? '');
     const classifyCommand = v2Script
       .split('\n')
       .find((line) => line.includes('--classify'));
@@ -311,27 +322,45 @@ describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => 
     expect(classifyCommand).toBeDefined();
     expect(classifyCommand).toContain('${PLAYWRIGHT_API_URL}');
 
-    expect(legacyStep?.['continue-on-error']).toBe(true);
-    expect(Number(legacyStep?.['timeout-minutes'])).toBeGreaterThan(0);
+    expect(resolveStep?.['continue-on-error']).not.toBe(true);
+    expect(resolveScript).toContain('run-smoke-lanes.cjs validate');
+    expect(resolveScript).toContain('run-smoke-lanes.cjs core');
+    expect(resolveScript).toContain('run-smoke-lanes.cjs advisory');
+    expect(coreStep?.['continue-on-error']).not.toBe(true);
+    expect(advisoryStep?.['continue-on-error']).toBe(true);
+    expect(Number(coreStep?.['timeout-minutes'])).toBeGreaterThan(0);
+    expect(Number(advisoryStep?.['timeout-minutes'])).toBeGreaterThan(0);
     expect(
       Number(runSmoke['timeout-minutes']) -
-        Number(legacyStep?.['timeout-minutes']),
+        Number(coreStep?.['timeout-minutes']) -
+        Number(advisoryStep?.['timeout-minutes']),
     ).toBeGreaterThanOrEqual(20);
-    expect(String(legacyStep?.if).replace(/\s+/g, '')).toContain(
+    expect(String(coreStep?.if).replace(/\s+/g, '')).toContain(
+      "steps.legacy-lanes.outputs.core!=''",
+    );
+    expect(String(advisoryStep?.if).replace(/\s+/g, '')).toContain(
       'always()&&!cancelled()',
     );
-    expect(legacyStep?.env?.DOPPLER_TOKEN).toBe(v2Step?.env?.DOPPLER_TOKEN);
-    expect(legacyScript).toContain('doppler run -p mentomate -c stg');
+    expect(String(advisoryStep?.if).replace(/\s+/g, '')).toContain(
+      "steps.legacy-lanes.outputs.advisory!=''",
+    );
+    expect(coreStep?.env?.DOPPLER_TOKEN).toBe(v2Step?.env?.DOPPLER_TOKEN);
+    expect(advisoryStep?.env?.DOPPLER_TOKEN).toBe(v2Step?.env?.DOPPLER_TOKEN);
     for (const mapping of [
       'PLAYWRIGHT_TEST_SEED_SECRET',
       'CLERK_SECRET_KEY',
       'PLAYWRIGHT_API_URL',
     ]) {
       expect(v2Script).toContain(mapping);
-      expect(legacyScript).toContain(mapping);
+      expect(coreScript).toContain(mapping);
+      expect(advisoryScript).toContain(mapping);
     }
-    expect(legacyScript).toContain('PLAYWRIGHT_ARTIFACT_LANE=legacy');
-    expect(legacyScript).toContain('pnpm run test:e2e:web:smoke');
+    expect(coreScript).toContain('PLAYWRIGHT_ARTIFACT_LANE=legacy-core');
+    expect(coreScript).toContain('pnpm run test:e2e:web:smoke -- core');
+    expect(advisoryScript).toContain(
+      'PLAYWRIGHT_ARTIFACT_LANE=legacy-advisory',
+    );
+    expect(advisoryScript).toContain('pnpm run test:e2e:web:smoke -- advisory');
 
     // WI-2594: the "Upload V2/legacy Playwright artifacts" steps were
     // removed (both trees record fill-step values, e.g. seeded login
@@ -339,9 +368,15 @@ describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => 
     // against reintroducing them lives in
     // scripts/e2e-web-artifact-upload-guard.test.ts.
     expect(stepNames.indexOf(v2Step?.name)).toBeLessThan(
-      stepNames.indexOf(legacyStep?.name),
+      stepNames.indexOf(resolveStep?.name),
     );
-    expect(stepNames.indexOf(legacyStep?.name)).toBeLessThan(
+    expect(stepNames.indexOf(resolveStep?.name)).toBeLessThan(
+      stepNames.indexOf(coreStep?.name),
+    );
+    expect(stepNames.indexOf(coreStep?.name)).toBeLessThan(
+      stepNames.indexOf(advisoryStep?.name),
+    );
+    expect(stepNames.indexOf(advisoryStep?.name)).toBeLessThan(
       stepNames.indexOf(resetStep?.name),
     );
     expect(
@@ -360,6 +395,18 @@ describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => 
       ),
     ).toHaveLength(1);
     expect(runSmoke.name).not.toBe(REQUIRED_CHECK_NAME);
+  });
+
+  it('runs the quarantine resolver tests in CI', () => {
+    const ci = loadWorkflow('ci.yml');
+    const ciJobs = ci.jobs as Record<string, Job>;
+    const main = ciJobs['main'];
+    const quarantineTests = stepNamed(main, 'tools/quarantine/* tests');
+
+    expect(quarantineTests).toBeDefined();
+    expect(String(quarantineTests?.run)).toContain(
+      'jest --config tools/quarantine/jest.config.cjs',
+    );
   });
 
   it('treats root package.json as a trusted E2E surface change', () => {
@@ -403,14 +450,16 @@ describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => 
       /e2e-web\/test-results$/,
     );
 
-    const legacyResult = inspect('legacy');
-    expect(legacyResult.status).toBe(0);
-    const legacyArtifacts = JSON.parse(
-      legacyResult.stdout.trim().split('\n').at(-1)!,
-    ) as { outputDir: string };
-    expect(legacyArtifacts.outputDir.replaceAll('\\', '/')).toMatch(
-      /e2e-web\/test-results-legacy$/,
-    );
+    for (const lane of ['legacy-core', 'legacy-advisory']) {
+      const legacyResult = inspect(lane);
+      expect(legacyResult.status).toBe(0);
+      const legacyArtifacts = JSON.parse(
+        legacyResult.stdout.trim().split('\n').at(-1)!,
+      ) as { outputDir: string };
+      expect(legacyArtifacts.outputDir.replaceAll('\\', '/')).toMatch(
+        new RegExp('e2e-web/test-results-' + lane + '$'),
+      );
+    }
 
     const invalidResult = inspect('not-a-lane');
     expect(invalidResult.status).not.toBe(0);
@@ -436,6 +485,9 @@ describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => 
     expect(packageJson.scripts['test:e2e:web:v2']).toContain(
       '--project=v2-release',
     );
+    expect(packageJson.scripts['test:e2e:web:smoke']).toBe(
+      'node tools/quarantine/run-smoke-projects.cjs',
+    );
     expect(playwrightConfig).toContain("name: 'v2-release'");
     expect(docsOn).toHaveProperty('workflow_dispatch');
     for (const event of ['push', 'pull_request']) {
@@ -451,6 +503,18 @@ describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => 
     expect(maestroScripts).toContain(
       'ci-maestro-plan.mjs --suite v2 --all --format json',
     );
+  });
+
+  it('[WI-2604] uses rendered shelf readiness instead of global network idle', () => {
+    const learnerCrawl = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e-web/flows/journeys/j01-ux-pass.spec.ts'),
+      'utf8',
+    );
+
+    expect(learnerCrawl).toContain(
+      "await gotoScreen(page, '/library', `shelf-row-header-${subjectId}`);",
+    );
+    expect(learnerCrawl).not.toContain("waitForLoadState('networkidle')");
   });
 });
 
