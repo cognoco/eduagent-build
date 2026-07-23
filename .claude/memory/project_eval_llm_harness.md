@@ -29,6 +29,6 @@ Snapshots land in `apps/api/eval-llm/snapshots/<flow-id>/<profile-id>.md`.
 
 See `apps/api/eval-llm/README.md` — usage, directory layout, `FlowDefinition` anatomy, and how to add/register a flow.
 
-## Fixture profiles (all 11-17 per product constraint)
+## Fixture profiles (historical 11–17 coverage; launch product floor is now 13)
 
 `11yo-czech-animals`, `12yo-dinosaurs`, `13yo-spanish-beginner`, `15yo-football-gaming`, `17yo-french-advanced`. Each carries `conversationLanguage`, `interests: Array<{label, context: 'free_time'|'school'|'both'}>`, optional `pronouns`, struggles, strengths, recentQuizAnswers, learningMode, preferredExplanations.

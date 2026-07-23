@@ -12,9 +12,9 @@ Detailed flow pages live under [`master-directory/`](master-directory/README.md)
 
 ## Related documents
 
-- [`docs/specs/2026-05-21-navigation-contract.md`](../specs/2026-05-21-navigation-contract.md) — target navigation contract (`resolveNavigationContract`, `study` / `family` shapes). Flow pages cite it when their audience access depends on the contract.
-- [`docs/specs/2026-05-23-freeform-library-filing.md`](../specs/2026-05-23-freeform-library-filing.md) and [`docs/plans/2026-05-23-freeform-library-filing-plan.md`](../plans/2026-05-23-freeform-library-filing-plan.md) — freeform session history vs Library filing contract. Flow pages must not claim upstream Ask First / Unsorted auto-subject is delivered until that separate work lands.
-- [`docs/audience-matrix.md`](../audience-matrix.md) — current-state inventory of scattered gating (F1–F14). Flow pages that touch gated surfaces (home, more, account, privacy, progress) should cite the matrix.
+- [`docs/_archive/specs/Done/2026-05-21-navigation-contract.md`](../_archive/specs/Done/2026-05-21-navigation-contract.md) — archived target navigation contract (`resolveNavigationContract`, `study` / `family` shapes).
+- [`docs/_archive/specs/Done/2026-05-23-freeform-library-filing.md`](../_archive/specs/Done/2026-05-23-freeform-library-filing.md) and [`docs/_archive/plans/done/2026-05-23-freeform-library-filing-plan.md`](../_archive/plans/done/2026-05-23-freeform-library-filing-plan.md) — archived freeform session history vs Library filing contract.
+- [`docs/compliance/audience-matrix.md`](../compliance/audience-matrix.md) — reconstructed historical inventory of scattered gating (F1–F14); verify against current code. Flow pages that touch gated surfaces may cite it as provenance.
 - [`master-directory/README.md`](master-directory/README.md) — schema and grouping for the per-flow detail pages.
 - `CLAUDE.md` — authoritative for **current** profile shapes and `isOwner` gating rules.
 

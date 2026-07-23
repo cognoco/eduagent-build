@@ -5,7 +5,7 @@
 **Date:** 2026-06-07
 **Trigger:** Compliance question — "the mentor remembers what the student has learned, and chat transcripts are kept for 30 days. Is the surviving learning memory a GDPR problem?"
 **Method:** Source-of-truth code audit (DB schema FK behaviour + deletion flows + purge cron), not policy-doc reading. All claims carry `file:line`.
-**Status:** Findings recorded. Documentation items folded into `docs/meetings/minors-compliance-requirements.md` → A24. Of the engineering/verification items: **R1 (Clerk erasure), R2 (purge flag), and A24-a (privacy-policy rewrite) are RESOLVED 2026-06-08** (commits `9137c7961` + docs). **R3 (orphaned org row / BYOK email) and A24-b (verbatim age-out) remain open.**
+**Status:** Historical code-verified audit retained for compliance provenance. Documentation items folded into `2026-06-07-minors-compliance-requirements.md` → A24. Of the engineering/verification items: **R1 (Clerk erasure), R2 (purge flag), and A24-a (privacy-policy rewrite) are RESOLVED 2026-06-08** (commits `9137c7961` + docs). **R3 (orphaned org row / BYOK email) and A24-b (verbatim age-out) remain open.** Re-verify every live-code claim before using it as current evidence.
 **Feeds:** the DPIA (`E5` launch gate — the GDPR Art 35 risk assessment that must exist before first child use) and the ROPA (A3).
 
 ---
@@ -95,9 +95,9 @@ The cron short-circuits unless `RETENTION_PURGE_ENABLED === 'true'` (`apps/api/s
 
 ## 5. Privacy-notice mismatches (RESOLVED 2026-06-08 — A5 privacy-policy rewrite done)
 
-> **Resolved 2026-06-08.** `docs/privacy-policy.html` rewritten (now dated June 2026). Every mismatch below is fixed; the remaining unknowns (DPO name, registered address, EU/UK Art 27 representative, final age-floor confirmation) are flagged in an HTML `PRE-PUBLISH TODO` comment in the file so the doc cannot ship to production with them unresolved. The list below is retained as the record of what was wrong.
+> **Resolved 2026-06-08.** `docs/compliance/privacy-policy.html` rewritten (now dated June 2026). Every mismatch below is fixed; the remaining unknowns (DPO name, registered address, EU/UK Art 27 representative, final age-floor confirmation) are flagged in an HTML `PRE-PUBLISH TODO` comment in the file so the doc cannot ship to production with them unresolved. The list below is retained as the record of what was wrong.
 
-The old `docs/privacy-policy.html` (dated March 2026) was stale against the code:
+The old `docs/compliance/privacy-policy.html` (dated March 2026) was stale against the code:
 
 - **§7 said account-deletion grace is "30-day"; the code sleeps 7 days** (`account-deletion.ts`). Notice over-promised a longer cancellation window than exists. (§4's "7-day" consent-withdrawal grace *did* match the code.) → **fixed**: now states 7 days.
 - Said "children aged **11–15**" — wrong on both ends. → **fixed**: removed; now age-neutral with a min-age-13 statement and jurisdictional consent bands.
@@ -116,8 +116,8 @@ The authoritative retention design lives in `docs/_archive/specs/Done/2026-05-05
 | ~~**R2**~~ | ~~Verify `RETENTION_PURGE_ENABLED=true` in production~~ — **RESOLVED 2026-06-08** (confirmed set in prod Doppler; purge runs). Residual (commit the flag to config docs so it can't regress) **also DONE 2026-06-08** — added to `.env.example` with a "required true in prod" note. | eng/ops | ~~HIGH~~ → done | No (resolved) |
 | ~~**R3**~~ → **R3a** | ~~Erase `byok_waitlist` email on account deletion~~ — **RESOLVED (legacy) 2026-06-08**: erasure wired into `executeDeletion` (captures the deleted account's email atomically via `DELETE ... RETURNING`, then erases the matching `byok_waitlist` row). Real-DB red→green break test added to `deletion.integration.test.ts`. **NOTE (2026-06-08):** launch runs on the new identity architecture, which rewrites the delete flow — this fix is **interim**; the *requirement* (erase the out-of-model `byok_waitlist` email on person-delete) must carry into the new delete flow. | eng | ~~MEDIUM~~ → done (interim) | No |
 | ~~**R3b**~~ | ~~Erase/drop the orphaned `organizations` row.~~ **MOOT 2026-06-08** — launch is on the new identity architecture (user decision); the ratified target schema **drops `organizations`/`memberships`** in the baseline reset (`data-model.md` §4.3/§5.2), so the legacy display-name-in-`organizations.name` PID gap disappears with the table. No erasure code to write. | eng | — | No (moot) |
-| ~~**A24-a**~~ | ~~Make the privacy notice accurate about retained quotes (and fix §7 7-vs-30-day, age range, transcript-purge mention)~~ — **RESOLVED 2026-06-08**: `docs/privacy-policy.html` rewritten (June 2026). Adds learning-memory retention + purpose-fence + transcript-purge disclosure, fixes §8 grace 30→7 days, removes "ages 11–15" (now age-neutral, min-age 13), adds international-transfers section, names controller + DPO contact. Pre-publish TODO comment flags the DPO name, registered address, EU/UK Art 27 rep, and final age-floor confirmation. | DPO + eng | — | Part of A5 |
+| ~~**A24-a**~~ | ~~Make the privacy notice accurate about retained quotes (and fix §7 7-vs-30-day, age range, transcript-purge mention)~~ — **RESOLVED 2026-06-08**: `docs/compliance/privacy-policy.html` rewritten (June 2026). Adds learning-memory retention + purpose-fence + transcript-purge disclosure, fixes §8 grace 30→7 days, removes "ages 11–15" (now age-neutral, min-age 13), adds international-transfers section, names controller + DPO contact. Pre-publish TODO comment flags the DPO name, registered address, EU/UK Art 27 rep, and final age-floor confirmation. | DPO + eng | — | Part of A5 |
 | **A24-b** | Age-out / abstract verbatim fields on the 30-day clock (fast-follow) | eng | — | No (post-launch tightening) |
 | — | Add learning-memory retention period + proportionality + purpose-fence to the DPIA | DPO | — | Yes (A1 content) |
 
-See `docs/meetings/minors-compliance-requirements.md` → **A24** for the GDPR analysis (storage limitation, proportionality, purpose limitation) these items implement.
+See `docs/compliance/history/2026-06-07-minors-compliance-requirements.md` → **A24** for the historical GDPR analysis (storage limitation, proportionality, purpose limitation) these items implement.

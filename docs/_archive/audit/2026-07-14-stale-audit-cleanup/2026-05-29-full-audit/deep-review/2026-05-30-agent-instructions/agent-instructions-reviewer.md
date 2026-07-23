@@ -230,12 +230,12 @@ AGENTS.md divergence below are judged against that hand-maintained model.
 - **Category:** Structure / Maintainability
 - **Issue:** The file is well-sectioned but carries a lot of detail (full audience
   matrix prose, language-enum tables, Handy Commands) that duplicates canonical docs
-  it also points to (`docs/audience-matrix.md`, `docs/architecture.md`). Every token
+  it also points to (`docs/compliance/audience-matrix.md`, `docs/architecture.md`). Every token
   here is paid on each interaction, and the duplicated matrix is a second place to
   keep in sync (the file even admits the audience matrix is the canonical source).
 - **Recommendation:** Consider trimming the inline audience-matrix prose to the
   short version + pointer (it already says the canonical home is
-  `docs/audience-matrix.md`), and moving the Handy-Commands block to a referenced doc,
+  `docs/compliance/audience-matrix.md`), and moving the Handy-Commands block to a referenced doc,
   keeping CLAUDE.md focused on rules and precedence.
 
 ### L3. Sync semantics allow silent staleness of Claude-only / removed-master files
@@ -260,8 +260,8 @@ AGENTS.md divergence below are judged against that hand-maintained model.
   identical; `code-review` synced including `adr-gate.md`). No master/generated body
   drift found beyond the documented `commit` SKIP exception.
 - All file/script/doc paths cited in CLAUDE.md that I spot-checked exist
-  (`docs/project_context.md`, `docs/architecture.md`, `docs/audience-matrix.md`,
-  `docs/specs/2026-05-21-navigation-contract.md`, `docs/change-classes.md`,
+  (`docs/project_context.md`, `docs/architecture.md`, `docs/compliance/audience-matrix.md`,
+  `docs/_archive/specs/Done/2026-05-21-navigation-contract.md`, `docs/change-classes.md`,
   `scripts/check-change-class.sh`, `apps/mobile/src/lib/navigation-contract.ts`,
   `persona-fossil-guard.test.ts`, `worktree-setup/SKILL.md`).
 - `settings.json` permission/hook config is minimal and reasonable; the only

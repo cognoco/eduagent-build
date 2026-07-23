@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-04
 **Subject:** Minimum age floor for launch — what it costs, and the decision
-**Status:** Decided (minutes). May be promoted to an `MMT-ADR` if/when cemented.
+**Status:** Historical counsel-session record. The 13+ floor remains decided; country recommendations and launch controls are superseded by the 2026-07-23 [`13+ EEA launch-country ruling`](../2026-07-23-13-plus-eea-launch-country-ruling.md).
 **Context:** Follow-up to the 2026-06-03 compliance session. Product = a parent-mediated AI homework tutor on the *substitute* model (the kid self-serves; the parent buys and oversees, rather than co-uses). The floor sets the entire under-13 compliance surface, so it was settled first.
 
 ---

@@ -1,8 +1,8 @@
 # Launch Posture Decision Brief — The Four Dials
 
 **Date:** 2026-06-05
-**Status:** Decision-support. **Nothing in here is decided.** When the dials are ruled, this brief becomes the body of an `MMT-ADR`, and the stale "Strictly 11+" constraint in `CLAUDE.md` gets reconciled in the same change-set.
-**Sources:** `2026-06-04-age-floor-decision-minutes.md` (evidence, country matrix, implementation audit) · `minors-compliance-requirements.md` (the priced checklist with Where/Who scope tags).
+**Status:** Historical decision-support. **Superseded for age bands, countries, and launch controls by the 2026-07-23 [`13+ EEA launch-country ruling`](../2026-07-23-13-plus-eea-launch-country-ruling.md).** The locale-derived country proposal below is not launch authority.
+**Sources:** `2026-06-04-age-floor-decision-minutes.md` (historical evidence, country matrix, and implementation audit) · `2026-06-07-minors-compliance-requirements.md` (historical requirements catalogue).
 
 ---
 
