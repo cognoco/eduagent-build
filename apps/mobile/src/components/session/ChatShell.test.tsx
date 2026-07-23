@@ -6,7 +6,8 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import { AccessibilityInfo, Alert, AppState, Linking } from 'react-native';
-import { ChatShell, type ChatMessage } from './ChatShell';
+import { ChatShell } from './ChatShell';
+import type { ChatMessage } from './session-types';
 
 // ---------------------------------------------------------------------------
 // Mocks

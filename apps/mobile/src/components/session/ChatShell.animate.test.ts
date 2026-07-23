@@ -10,7 +10,8 @@
 // shim — but since jsdom can resolve react-native fine in this repo, we just
 // import the function directly.
 
-import { animateResponse, type ChatMessage } from './ChatShell';
+import { animateResponse } from './ChatShell';
+import type { ChatMessage } from './session-types';
 
 jest.useFakeTimers();
 

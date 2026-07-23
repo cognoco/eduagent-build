@@ -42,7 +42,7 @@ import {
   llmEnvelopeReply,
   registerLlmProviderFixture,
 } from '../../apps/api/src/test-utils/llm-provider-fixtures';
-import type { ChatMessage } from '../../apps/mobile/src/components/session/ChatShell';
+import type { ChatMessage } from '../../apps/mobile/src/components/session';
 import {
   mentorOpenerIdempotencyKey,
   useSessionStreaming,
