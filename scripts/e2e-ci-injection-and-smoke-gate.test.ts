@@ -54,6 +54,7 @@ type ElementSelector = {
   text?: string;
   enabled?: boolean;
   below?: ElementSelector;
+  childOf?: ElementSelector;
   containsDescendants?: ElementSelector[];
 };
 
@@ -7956,8 +7957,10 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     );
     const seededTranscriptAssertion = {
       assertVisible: {
-        id: 'message-bubble-assistant-.*',
         text: '^They connected cities, trade, armies, and new ideas\\.$',
+        childOf: {
+          id: 'message-bubble-assistant-.*',
+        },
       },
     };
     const transcriptIndex = commands.findIndex((command) =>
