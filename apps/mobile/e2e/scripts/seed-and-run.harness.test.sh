@@ -313,6 +313,13 @@ else
   _tfail "seed-and-run-release.sh must accept welcome-chooser before Maestro walks to sign-in"
 fi
 
+if grep -q 'command -v cygpath' "$SEED_RELEASE_SH" &&
+   grep -q 'SEED_ENV_HELPER' "$SEED_RELEASE_SH"; then
+  _tpass "seed-and-run-release.sh normalizes the Node helper path under MSYS"
+else
+  _tfail "seed-and-run-release.sh must normalize its Node helper path when MSYS_NO_PATHCONV=1"
+fi
+
 echo ""
 echo "─── Summary ────────────────────────────────────────────────────────────"
 echo "  PASS: $PASS"

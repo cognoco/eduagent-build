@@ -180,9 +180,13 @@ if [ -z "$SEED_RESPONSE" ]; then
   exit 1
 fi
 
-SEED_ENV_VALUES=$(node \
-  "${SCRIPT_DIR}/seed-response-to-maestro-env.mjs" \
-  "$SEED_RESPONSE")
+SEED_ENV_HELPER="${SCRIPT_DIR}/seed-response-to-maestro-env.mjs"
+if command -v cygpath >/dev/null 2>&1; then
+  # MSYS_NO_PATHCONV protects ADB/port arguments, but it also suppresses the
+  # automatic /c/... → C:\... conversion required by the Windows Node binary.
+  SEED_ENV_HELPER="$(cygpath -w "$SEED_ENV_HELPER")"
+fi
+SEED_ENV_VALUES=$(node "$SEED_ENV_HELPER" "$SEED_RESPONSE")
 SEED_EMAIL=""
 MAESTRO_ENV_ARGS=(
   -e "SCENARIO=${SCENARIO}"
