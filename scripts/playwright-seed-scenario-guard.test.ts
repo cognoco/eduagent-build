@@ -245,6 +245,53 @@ describe('[WI-2571] selected Playwright seed-scenario collector', () => {
     ]);
   });
 
+  it('includes top-level seed side effects from value-imported and re-exported modules', () => {
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/value-import-runtime.ts',
+      `
+        import { seedScenario } from './test-seed';
+        void seedScenario({ scenario: 'value-import-top-level-scenario' });
+        export async function valueImportWrapper(input: { scenario: string }) {
+          return seedScenario(input);
+        }
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/re-export-runtime.ts',
+      `
+        import { seedScenario } from './test-seed';
+        void seedScenario({ scenario: 're-export-top-level-scenario' });
+        export async function reExportWrapper(input: { scenario: string }) {
+          return seedScenario(input);
+        }
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/runtime-barrel.ts',
+      `export { reExportWrapper } from './re-export-runtime';`,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/shape.spec.ts',
+      `
+        import { valueImportWrapper } from './helpers/value-import-runtime';
+        import { reExportWrapper } from './helpers/runtime-barrel';
+        void valueImportWrapper({ scenario: 'value-import-selected-scenario' });
+        void reExportWrapper({ scenario: 're-export-selected-scenario' });
+      `,
+    );
+
+    expect(collectShapeScenarios(fixtureRoot)).toEqual([
+      're-export-selected-scenario',
+      're-export-top-level-scenario',
+      'value-import-selected-scenario',
+      'value-import-top-level-scenario',
+    ]);
+  });
+
   it('preserves side-effect static import closure', () => {
     writeFixture(
       fixtureRoot,
@@ -266,6 +313,180 @@ describe('[WI-2571] selected Playwright seed-scenario collector', () => {
     expect(collectShapeScenarios(fixtureRoot)).toEqual([
       'side-effect-call-scenario',
       'side-effect-record-scenario',
+    ]);
+  });
+
+  it('excludes seed calls inside unused exports of side-effect-imported modules', () => {
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/side-effect-runtime-only.ts',
+      `
+        import { seedScenario } from './test-seed';
+        void seedScenario({ scenario: 'side-effect-runtime-scenario' });
+        export async function unusedSeedWrapper() {
+          return seedScenario({ scenario: 'unused-export-body-scenario' });
+        }
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/shape.spec.ts',
+      `import './helpers/side-effect-runtime-only';`,
+    );
+
+    expect(collectShapeScenarios(fixtureRoot)).toEqual([
+      'side-effect-runtime-scenario',
+    ]);
+  });
+
+  it('excludes wrappers that are imported or referenced but never called', () => {
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/unused-runtime-wrapper.ts',
+      `
+        import { seedScenario } from './test-seed';
+        export async function unusedRuntimeWrapper() {
+          return seedScenario({ scenario: 'unused-runtime-reference-scenario' });
+        }
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/runtime-reference-only.ts',
+      `
+        import { seedScenario } from './test-seed';
+        import { unusedRuntimeWrapper } from './unused-runtime-wrapper';
+        void seedScenario({ scenario: 'runtime-reference-control-scenario' });
+        const unused = unusedRuntimeWrapper;
+        void unused;
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/unused-selected-import-wrapper.ts',
+      `
+        import { seedScenario } from './test-seed';
+        export async function unusedSelectedImportWrapper() {
+          return seedScenario({ scenario: 'unused-selected-import-scenario' });
+        }
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/shape.spec.ts',
+      `
+        import './helpers/runtime-reference-only';
+        import { unusedSelectedImportWrapper } from './helpers/unused-selected-import-wrapper';
+        void unusedSelectedImportWrapper;
+      `,
+    );
+
+    expect(collectShapeScenarios(fixtureRoot)).toEqual([
+      'runtime-reference-control-scenario',
+    ]);
+  });
+
+  it('excludes runtime closure reachable only through type-only import and re-export edges', () => {
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/type-import-register.ts',
+      `
+        import { seedScenario } from './test-seed';
+        void seedScenario({ scenario: 'type-import-erased-scenario' });
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/type-import-source.ts',
+      `
+        import './type-import-register';
+        export interface ImportedShape { scenario: string }
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/named-type-import-register.ts',
+      `
+        import { seedScenario } from './test-seed';
+        void seedScenario({ scenario: 'named-type-import-erased-scenario' });
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/named-type-import-source.ts',
+      `
+        import './named-type-import-register';
+        export interface NamedImportedShape { scenario: string }
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/type-export-register.ts',
+      `
+        import { seedScenario } from './test-seed';
+        void seedScenario({ scenario: 'type-re-export-erased-scenario' });
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/type-export-source.ts',
+      `
+        import './type-export-register';
+        export interface ReExportedShape { scenario: string }
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/named-type-export-register.ts',
+      `
+        import { seedScenario } from './test-seed';
+        void seedScenario({ scenario: 'named-type-re-export-erased-scenario' });
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/named-type-export-source.ts',
+      `
+        import './named-type-export-register';
+        export interface NamedReExportedShape { scenario: string }
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/type-edge-runtime-wrapper.ts',
+      `
+        import { seedScenario } from './test-seed';
+        export async function runtimeWrapper(input: { scenario: string }) {
+          return seedScenario(input);
+        }
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/type-edge-barrel.ts',
+      `
+        export { runtimeWrapper } from './type-edge-runtime-wrapper';
+        export type { ReExportedShape } from './type-export-source';
+        export { type NamedReExportedShape } from './named-type-export-source';
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/shape.spec.ts',
+      `
+        import type { ImportedShape } from './helpers/type-import-source';
+        import { type NamedImportedShape } from './helpers/named-type-import-source';
+        import { runtimeWrapper } from './helpers/type-edge-barrel';
+        const imported: ImportedShape | null = null;
+        const namedImported: NamedImportedShape | null = null;
+        void imported;
+        void namedImported;
+        void runtimeWrapper({ scenario: 'runtime-value-edge-scenario' });
+      `,
+    );
+
+    expect(collectShapeScenarios(fixtureRoot)).toEqual([
+      'runtime-value-edge-scenario',
     ]);
   });
 
@@ -537,6 +758,107 @@ describe('[WI-2571] selected Playwright seed-scenario collector', () => {
     );
 
     expect(collectShapeScenarios(fixtureRoot)).toEqual(['multi-hop-scenario']);
+  });
+
+  it('resolves local callable aliases and parenthesized default identifier exports', () => {
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/local-import-alias-wrapper.ts',
+      `
+        import { seedScenario } from './test-seed';
+        export async function importedAliasWrapper(input: { scenario: string }) {
+          return seedScenario(input);
+        }
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/local-seed-alias-wrapper.ts',
+      `
+        import { seedScenario } from './test-seed';
+        const localSeedAlias = seedScenario;
+        export async function localSeedAliasWrapper(input: { scenario: string }) {
+          return localSeedAlias(input);
+        }
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/local-namespace-alias-wrapper.ts',
+      `
+        import { seedScenario } from './test-seed';
+        export async function namespaceAliasWrapper(input: { scenario: string }) {
+          return seedScenario(input);
+        }
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/parenthesized-default-identifier.ts',
+      `
+        import { seedScenario } from './test-seed';
+        const defaultIdentifierWrapper = async (input: { scenario: string }) =>
+          seedScenario(input);
+        export default (defaultIdentifierWrapper);
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/shape.spec.ts',
+      `
+        import { importedAliasWrapper } from './helpers/local-import-alias-wrapper';
+        import { localSeedAliasWrapper } from './helpers/local-seed-alias-wrapper';
+        import * as namespaceHelpers from './helpers/local-namespace-alias-wrapper';
+        import defaultIdentifierWrapper from './helpers/parenthesized-default-identifier';
+        const localImportedAlias = importedAliasWrapper;
+        const localNamespaceAlias = namespaceHelpers['namespaceAliasWrapper'];
+        void localImportedAlias({ scenario: 'local-import-alias-scenario' });
+        void localSeedAliasWrapper({ scenario: 'local-seed-alias-scenario' });
+        void localNamespaceAlias({ scenario: 'local-namespace-alias-scenario' });
+        void defaultIdentifierWrapper({
+          scenario: 'parenthesized-default-identifier-scenario',
+        });
+      `,
+    );
+
+    expect(collectShapeScenarios(fixtureRoot)).toEqual([
+      'local-import-alias-scenario',
+      'local-namespace-alias-scenario',
+      'local-seed-alias-scenario',
+      'parenthesized-default-identifier-scenario',
+    ]);
+  });
+
+  it('resolves callable members through local namespace alias chains', () => {
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/namespace-alias-chain-wrapper.ts',
+      `
+        import { seedScenario } from './test-seed';
+        export async function namespaceAliasChainWrapper(input: { scenario: string }) {
+          return seedScenario(input);
+        }
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/shape.spec.ts',
+      `
+        import * as namespaceHelpers from './helpers/namespace-alias-chain-wrapper';
+        const dotNamespaceAlias = namespaceHelpers;
+        const dotWrapper = dotNamespaceAlias.namespaceAliasChainWrapper;
+        const bracketNamespaceAlias = namespaceHelpers;
+        const bracketWrapper =
+          bracketNamespaceAlias['namespaceAliasChainWrapper'];
+        void dotWrapper({ scenario: 'namespace-alias-dot-scenario' });
+        void bracketWrapper({ scenario: 'namespace-alias-bracket-scenario' });
+      `,
+    );
+
+    expect(collectShapeScenarios(fixtureRoot)).toEqual([
+      'namespace-alias-bracket-scenario',
+      'namespace-alias-dot-scenario',
+    ]);
   });
 });
 

@@ -29,6 +29,7 @@ interface CoverageInput {
 
 interface SelectedRoot {
   node: ts.Node;
+  traversal: 'full' | 'runtime' | 'runtime-records';
 }
 
 interface FunctionDefinition {
@@ -97,6 +98,30 @@ function walk(node: ts.Node, visit: (candidate: ts.Node) => void): void {
   node.forEachChild((child) => walk(child, visit));
 }
 
+function walkRuntime(node: ts.Node, visit: (candidate: ts.Node) => void): void {
+  visit(node);
+  node.forEachChild((child) => {
+    if (
+      ts.isImportDeclaration(child) ||
+      ts.isExportDeclaration(child) ||
+      ts.isFunctionLike(child) ||
+      ts.isClassDeclaration(child) ||
+      ts.isClassExpression(child)
+    ) {
+      return;
+    }
+    walkRuntime(child, visit);
+  });
+}
+
+function walkSelectedRoot(
+  root: SelectedRoot,
+  visit: (candidate: ts.Node) => void,
+): void {
+  if (root.traversal !== 'full') walkRuntime(root.node, visit);
+  else walk(root.node, visit);
+}
+
 function isWithinDirectory(filePath: string, directory: string): boolean {
   const relative = path.relative(directory, filePath);
   return (
@@ -135,14 +160,35 @@ function namespaceMemberSymbol(
   namespaceExpression: ts.Expression,
   memberName: string,
 ): ts.Symbol | null {
-  const namespaceAlias = checker.getSymbolAtLocation(namespaceExpression);
-  if (!namespaceAlias) return null;
-  const namespace = resolvedAliasSymbol(checker, namespaceAlias);
-  if ((namespace.flags & ts.SymbolFlags.Module) === 0) return null;
+  const namespace = namespaceSymbol(checker, namespaceExpression);
+  if (!namespace) return null;
   const member = checker
     .getExportsOfModule(namespace)
     .find((candidate) => candidate.getName() === memberName);
   return member ? resolvedAliasSymbol(checker, member) : null;
+}
+
+function namespaceSymbol(
+  checker: ts.TypeChecker,
+  expression: ts.Expression,
+  seen: Set<ts.Symbol> = new Set(),
+): ts.Symbol | null {
+  const namespaceAlias = checker.getSymbolAtLocation(
+    unwrapParenthesizedExpression(expression),
+  );
+  if (!namespaceAlias) return null;
+  const namespace = resolvedAliasSymbol(checker, namespaceAlias);
+  if ((namespace.flags & ts.SymbolFlags.Module) !== 0) return namespace;
+  if (seen.has(namespace)) return null;
+  seen.add(namespace);
+
+  for (const declaration of namespace.declarations ?? []) {
+    if (ts.isVariableDeclaration(declaration) && declaration.initializer) {
+      const aliased = namespaceSymbol(checker, declaration.initializer, seen);
+      if (aliased) return aliased;
+    }
+  }
+  return null;
 }
 
 function bindingElementPropertyName(node: ts.BindingElement): string | null {
@@ -180,32 +226,48 @@ function destructuredNamespaceMemberSymbol(
 function staticReferenceSymbol(
   checker: ts.TypeChecker,
   node: ts.Node,
+  seen: Set<ts.Symbol> = new Set(),
 ): ts.Symbol | null {
+  let symbol: ts.Symbol | null;
   if (ts.isPropertyAccessExpression(node)) {
-    return (
+    symbol =
       namespaceMemberSymbol(checker, node.expression, node.name.text) ??
-      resolvedSymbol(checker, node.name)
-    );
-  }
-  if (
+      resolvedSymbol(checker, node.name);
+  } else if (
     ts.isElementAccessExpression(node) &&
     node.argumentExpression &&
     (ts.isStringLiteral(node.argumentExpression) ||
       ts.isNoSubstitutionTemplateLiteral(node.argumentExpression))
   ) {
-    return namespaceMemberSymbol(
+    symbol = namespaceMemberSymbol(
       checker,
       node.expression,
       node.argumentExpression.text,
     );
+  } else if (ts.isIdentifier(node)) {
+    const identifierSymbol = checker.getSymbolAtLocation(node);
+    symbol = identifierSymbol
+      ? (destructuredNamespaceMemberSymbol(checker, identifierSymbol) ??
+        resolvedAliasSymbol(checker, identifierSymbol))
+      : null;
+  } else {
+    return null;
   }
-  if (!ts.isIdentifier(node)) return null;
-  const symbol = checker.getSymbolAtLocation(node);
-  if (!symbol) return null;
-  return (
-    destructuredNamespaceMemberSymbol(checker, symbol) ??
-    resolvedAliasSymbol(checker, symbol)
-  );
+  if (!symbol || seen.has(symbol)) return symbol;
+  seen.add(symbol);
+
+  for (const declaration of symbol.declarations ?? []) {
+    let target: ts.Expression | null = null;
+    if (ts.isVariableDeclaration(declaration) && declaration.initializer) {
+      target = unwrapParenthesizedExpression(declaration.initializer);
+    } else if (ts.isExportAssignment(declaration)) {
+      target = unwrapParenthesizedExpression(declaration.expression);
+    }
+    if (!target) continue;
+    const targetSymbol = staticReferenceSymbol(checker, target, seen);
+    if (targetSymbol) return targetSymbol;
+  }
+  return symbol;
 }
 
 function declarationRoot(node: ts.Declaration): ts.Node | null {
@@ -223,6 +285,52 @@ function declarationRoot(node: ts.Declaration): ts.Node | null {
   return null;
 }
 
+function runtimeModuleTraversal(
+  statement: ts.ImportDeclaration | ts.ExportDeclaration,
+): SelectedRoot['traversal'] | null {
+  if (ts.isImportDeclaration(statement)) {
+    const clause = statement.importClause;
+    if (!clause) return 'runtime-records';
+    if (clause.isTypeOnly) return null;
+    if (clause.name || !clause.namedBindings) return 'runtime';
+    if (ts.isNamespaceImport(clause.namedBindings)) return 'runtime';
+    return clause.namedBindings.elements.length === 0 ||
+      clause.namedBindings.elements.some((specifier) => !specifier.isTypeOnly)
+      ? 'runtime'
+      : null;
+  }
+
+  if (statement.isTypeOnly) return null;
+  if (!statement.exportClause || ts.isNamespaceExport(statement.exportClause)) {
+    return 'runtime';
+  }
+  return statement.exportClause.elements.length === 0 ||
+    statement.exportClause.elements.some((specifier) => !specifier.isTypeOnly)
+    ? 'runtime'
+    : null;
+}
+
+function isDeclarationBinding(node: ts.Node): boolean {
+  if (!ts.isIdentifier(node)) return false;
+  const parent = node.parent;
+  return (
+    (ts.isVariableDeclaration(parent) && parent.name === node) ||
+    (ts.isBindingElement(parent) && parent.name === node) ||
+    (ts.isEnumDeclaration(parent) && parent.name === node) ||
+    (ts.isPropertyAssignment(parent) && parent.name === node)
+  );
+}
+
+function isStaticCallTarget(node: ts.Node): boolean {
+  let target = node;
+  while (ts.isParenthesizedExpression(target.parent)) {
+    target = target.parent;
+  }
+  return (
+    ts.isCallExpression(target.parent) && target.parent.expression === target
+  );
+}
+
 function collectSelectedRoots(
   entries: string[],
   testDir: string,
@@ -230,14 +338,15 @@ function collectSelectedRoots(
   checker: ts.TypeChecker,
 ): SelectedRoot[] {
   const roots = new Map<string, SelectedRoot>();
-  const queue: ts.Node[] = [];
+  const queue: SelectedRoot[] = [];
   const scannedModuleSources = new Set<string>();
-  const add = (node: ts.Node): void => {
+  const add = (node: ts.Node, traversal: SelectedRoot['traversal']): void => {
     const sourceFile = node.getSourceFile();
-    const key = `${sourceFile.fileName}:${node.pos}:${node.end}`;
+    const key = `${sourceFile.fileName}:${node.pos}:${node.end}:${traversal}`;
     if (roots.has(key)) return;
-    roots.set(key, { node });
-    queue.push(node);
+    const root = { node, traversal };
+    roots.set(key, root);
+    queue.push(root);
   };
   const scanModuleSource = (sourceFile: ts.SourceFile): void => {
     if (scannedModuleSources.has(sourceFile.fileName)) return;
@@ -256,24 +365,25 @@ function collectSelectedRoots(
         ) {
           continue;
         }
+        const traversal = runtimeModuleTraversal(statement);
+        if (!traversal) continue;
         scanModuleSource(declaration);
-        if (ts.isImportDeclaration(statement) && !statement.importClause) {
-          add(declaration);
-        }
+        add(declaration, traversal);
       }
     }
   };
 
   for (const entry of entries) {
     const sourceFile = program.getSourceFile(entry);
-    if (sourceFile) add(sourceFile);
+    if (sourceFile) add(sourceFile, 'full');
   }
 
   while (queue.length > 0) {
     const root = queue.shift();
     if (!root) break;
-    scanModuleSource(root.getSourceFile());
-    walk(root, (node) => {
+    scanModuleSource(root.node.getSourceFile());
+    walkSelectedRoot(root, (node) => {
+      if (root.traversal !== 'full' && isDeclarationBinding(node)) return;
       if (
         ts.isIdentifier(node) &&
         ts.isPropertyAccessExpression(node.parent) &&
@@ -286,7 +396,12 @@ function collectSelectedRoots(
         const sourceFile = declaration.getSourceFile();
         if (!isWithinDirectory(sourceFile.fileName, testDir)) continue;
         const selected = declarationRoot(declaration);
-        if (selected) add(selected);
+        if (
+          selected &&
+          (!functionDefinition(selected) || isStaticCallTarget(node))
+        ) {
+          add(selected, 'full');
+        }
       }
     });
   }
@@ -354,7 +469,7 @@ function collectFunctionDefinitions(
 ): Map<string, FunctionDefinition> {
   const definitions = new Map<string, FunctionDefinition>();
   for (const root of roots) {
-    walk(root.node, (node) => {
+    walkSelectedRoot(root, (node) => {
       const definition = functionDefinition(node);
       if (!definition) return;
       definitions.set(functionKey(definition), {
@@ -507,10 +622,11 @@ export function collectSelectedPlaywrightSeedScenarios(
 
   const scenarios = new Set<string>();
   for (const root of roots) {
-    walk(root.node, (node) => {
+    walkSelectedRoot(root, (node) => {
       if (
         ts.isPropertyAssignment(node) &&
-        propertyName(node) === 'seedScenario'
+        propertyName(node) === 'seedScenario' &&
+        root.traversal !== 'runtime'
       ) {
         const value = stringValue(node.initializer);
         if (value) scenarios.add(value);
