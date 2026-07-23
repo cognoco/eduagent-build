@@ -7,14 +7,16 @@
 // fn override so every other export stays real.
 // ---------------------------------------------------------------------------
 
-// gc1-allow: LLM boundary — routeAndCall cannot be exercised without a provider registration (pattern-a conversion)
-jest.mock('../llm', () => {
-  const actual = jest.requireActual('../llm') as typeof import('../llm');
-  return {
-    ...actual,
-    routeAndCall: jest.fn(),
-  };
-});
+jest.mock(
+  '../llm' /* gc1-allow: mocks the routeAndCall LLM boundary — routeAndCall cannot be exercised without a provider registration; real-router re-flip coverage lives in router.judge-independence.test.ts */,
+  () => {
+    const actual = jest.requireActual('../llm') as typeof import('../llm');
+    return {
+      ...actual,
+      routeAndCall: jest.fn(),
+    };
+  },
+);
 
 import type { RouteResult } from '../llm';
 import { routeAndCall } from '../llm';
