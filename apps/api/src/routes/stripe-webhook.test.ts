@@ -1,13 +1,13 @@
 // ---------------------------------------------------------------------------
 // Stripe Webhook Route — Tests
 //
-// [WI-1239 / 779-strip] This file now covers ONLY what the route itself owns
+// [WI-1239 / 779-strip / WI-2619] This file covers ONLY what the route itself owns
 // (see stripe-webhook.ts header): signature verification, test-mode-in-prod
 // guard, stale-event guard, checkout.session.completed idempotency claim,
 // event-type dispatch, and the sustained-signature-failure escalator. It no
-// longer forces dispatch to the legacy handler bundle — `billing-v2/dispatch`
-// is mocked to return plain jest.fn() handlers so route-level behavior is
-// verifiable without simulating v2 billing business logic. Handler business
+// exercises the real billing-v2 selector while replacing downstream handler
+// behavior so route-level behavior is verifiable without simulating v2 billing
+// business logic. Handler business
 // logic (status mapping, WI-85 price verification, #441 unmapped-status,
 // KV-refresh conditions, quota updates, payment/invoice mapping,
 // checkout.session.completed metadata validation) now lives in
@@ -15,16 +15,27 @@
 // from this file's former legacy-handler-backed assertions.
 // ---------------------------------------------------------------------------
 
-const mockGetStripeWebhookHandlers = jest.fn();
+const mockStripeHandlers = {
+  handleSubscriptionEvent: jest.fn().mockResolvedValue(undefined),
+  handleSubscriptionDeleted: jest.fn().mockResolvedValue(undefined),
+  handleCheckoutCompleted: jest.fn().mockResolvedValue(undefined),
+  handlePaymentFailed: jest.fn().mockResolvedValue(undefined),
+  handlePaymentSucceeded: jest.fn().mockResolvedValue(undefined),
+};
 
-jest.mock(
-  // gc1-allow: intentional full replacement, not a passthrough gap — the whole point of this mock is to isolate route-level dispatch behavior (which handler gets called for which event type) from v2 handler business logic, which is covered separately in stripe-webhook-handler-v2.test.ts
-  '../services/billing/billing-v2/dispatch',
-  () => ({
-    getStripeWebhookHandlers: (...args: unknown[]) =>
-      mockGetStripeWebhookHandlers(...args),
-  }),
-);
+jest.mock('../services/billing/billing-v2', () => {
+  const actual = jest.requireActual(
+    '../services/billing/billing-v2',
+  ) as typeof import('../services/billing/billing-v2');
+  return {
+    ...actual,
+    handleSubscriptionEventV2: mockStripeHandlers.handleSubscriptionEvent,
+    handleSubscriptionDeletedV2: mockStripeHandlers.handleSubscriptionDeleted,
+    handleCheckoutCompletedV2: mockStripeHandlers.handleCheckoutCompleted,
+    handlePaymentFailedV2: mockStripeHandlers.handlePaymentFailed,
+    handlePaymentSucceededV2: mockStripeHandlers.handlePaymentSucceeded,
+  };
+});
 
 jest.mock(
   '../services/webhook-idempotency' /* gc1-allow: service boundary — claimWebhookId makes a live DB call; the real DB is not wired in this unit test. Integration tests (resend-webhook.test.ts) cover the real DB path. */,
@@ -146,22 +157,13 @@ function makeCheckoutSession(
   };
 }
 
-function makeHandlers() {
-  return {
-    handleSubscriptionEvent: jest.fn().mockResolvedValue(undefined),
-    handleSubscriptionDeleted: jest.fn().mockResolvedValue(undefined),
-    handleCheckoutCompleted: jest.fn().mockResolvedValue(undefined),
-    handlePaymentFailed: jest.fn().mockResolvedValue(undefined),
-    handlePaymentSucceeded: jest.fn().mockResolvedValue(undefined),
-  };
-}
-
-let handlers: ReturnType<typeof makeHandlers>;
+const handlers = mockStripeHandlers;
 
 beforeEach(() => {
   jest.clearAllMocks();
-  handlers = makeHandlers();
-  mockGetStripeWebhookHandlers.mockReturnValue(handlers);
+  for (const handler of Object.values(handlers)) {
+    handler.mockResolvedValue(undefined);
+  }
   (claimWebhookId as jest.Mock).mockResolvedValue('claimed');
 });
 
