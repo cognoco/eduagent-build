@@ -1068,6 +1068,7 @@ describe('SessionScreen homework flow', () => {
     } as never);
 
     const testScreen = renderSessionScreen();
+    expect(mockConsumeHubToSessionTransition).toHaveBeenCalledWith(SUBJECT_ID);
     mockReplace.mockClear();
 
     const goHomeActions = testScreen.getAllByTestId('session-expired-go-home');

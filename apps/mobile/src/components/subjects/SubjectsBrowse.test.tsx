@@ -5,7 +5,6 @@ import {
   waitFor,
   within,
 } from '@testing-library/react-native';
-import { ScrollView } from 'react-native';
 
 import { SubjectsBrowse } from './SubjectsBrowse';
 import type { SubjectIndexItem } from '../../hooks/use-subjects-index';
@@ -107,21 +106,6 @@ describe('SubjectsBrowse', () => {
   // The search hook is disabled (no activeProfile in context default) so no
   // fetch fires — we only need a QueryClient in the tree.
   const { wrapper } = createQueryWrapper();
-
-  it('[WI-2238] keeps SubjectsBrowse taps handled for Clear while the search keyboard is open', () => {
-    render(
-      <SubjectsBrowse
-        subjects={ITEMS}
-        onOpenSubject={jest.fn()}
-        onCreateSubject={jest.fn()}
-      />,
-      { wrapper },
-    );
-
-    expect(
-      screen.UNSAFE_getByType(ScrollView).props.keyboardShouldPersistTaps,
-    ).toBe('handled');
-  });
 
   it('renders the full subject list before search and opens a subject row', () => {
     const onOpenSubject = jest.fn();

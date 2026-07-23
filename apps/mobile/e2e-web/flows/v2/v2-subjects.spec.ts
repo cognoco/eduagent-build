@@ -14,10 +14,12 @@ import {
   PHOTOSYNTHESIS_SESSION_ID,
   PHOTOSYNTHESIS_SUBJECT_ID,
   PHOTOSYNTHESIS_TOPIC_ID,
+  V2_SUBJECTS_CASES,
+  V2_SUBJECTS_EMPTY_STORAGE_STATE,
   photosynthesisSession,
 } from './v2-subjects-fixtures';
 
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({ storageState: V2_SUBJECTS_EMPTY_STORAGE_STATE });
 
 async function fulfillJson(
   route: Route,
@@ -281,10 +283,8 @@ async function mockFocusedFirstSubjectCreation(
 test('WI-2238 multi-subject case: exact status rows, Physics search/no-result clear, and browser Back preserve Physics + Me identity', async ({
   page,
 }) => {
-  const seed = await seedAndOpenSubjects(page, {
-    scenario: 'multi-subject',
-    alias: 'v2-subjects-multi',
-  });
+  const { seed: seedCase, expected } = V2_SUBJECTS_CASES.multiSubject;
+  const seed = await seedAndOpenSubjects(page, seedCase);
   const activeSubjectId = seed.ids.activeSubjectId;
   const pausedSubjectId = seed.ids.pausedSubjectId;
   const archivedSubjectId = seed.ids.archivedSubjectId;
@@ -295,40 +295,40 @@ test('WI-2238 multi-subject case: exact status rows, Physics search/no-result cl
   }
 
   const expectedRows = {
-    active: [{ id: activeSubjectId, name: 'Physics' }],
-    paused: [{ id: pausedSubjectId, name: 'Literature' }],
-    archived: [{ id: archivedSubjectId, name: 'Art History' }],
+    active: [{ id: activeSubjectId, name: expected.subjectNames.active }],
+    paused: [{ id: pausedSubjectId, name: expected.subjectNames.paused }],
+    archived: [{ id: archivedSubjectId, name: expected.subjectNames.archived }],
   } as const;
   await expectExactSubjectBrowseRows(page, expectedRows);
 
   const search = page.getByTestId('subjects-browse-search');
-  await fillTextInput(search, 'Physics');
+  await fillTextInput(search, expected.subjectNames.active);
   const physicsResult = page.getByTestId(
     `search-subject-row-${activeSubjectId}`,
   );
-  await expect(physicsResult.getByText('Physics', { exact: true })).toBeVisible(
-    { timeout: 60_000 },
-  );
+  await expect(
+    physicsResult.getByText(expected.subjectNames.active, { exact: true }),
+  ).toBeVisible({ timeout: 60_000 });
   await pressableClick(physicsResult);
-  await expectSubjectHub(page, activeSubjectId, 'Physics');
+  await expectSubjectHub(page, activeSubjectId, expected.subjectNames.active);
 
   await page.goBack();
   await expectSubjectsPath(page);
   await expect(
     page
       .getByTestId(`search-subject-row-${activeSubjectId}`)
-      .getByText('Physics', { exact: true }),
+      .getByText(expected.subjectNames.active, { exact: true }),
   ).toBeVisible({ timeout: 60_000 });
-  await expectMeIdentity(page, 'Multi-Subject Learner', seed.profileId);
+  await expectMeIdentity(page, expected.profileName, seed.profileId);
 
-  await fillTextInput(search, 'impossible-wi-2238-subject');
+  await fillTextInput(search, expected.missingQuery);
   await expect(page.getByTestId('library-search-empty')).toBeVisible({
     timeout: 60_000,
   });
   await expect(
     page
       .getByTestId('search-results-empty')
-      .getByText('No results for "impossible-wi-2238-subject"', {
+      .getByText(`No results for "${expected.missingQuery}"`, {
         exact: true,
       }),
   ).toBeVisible();
@@ -340,10 +340,8 @@ test('WI-2238 multi-subject case: exact status rows, Physics search/no-result cl
 test('WI-2238 learning-active case: exact World History resume IDs and visible session Back restore Subjects + Active Learner Me identity', async ({
   page,
 }) => {
-  const seed = await seedAndOpenSubjects(page, {
-    scenario: 'learning-active',
-    alias: 'v2-subjects-resume',
-  });
+  const { seed: seedCase, expected } = V2_SUBJECTS_CASES.learningActive;
+  const seed = await seedAndOpenSubjects(page, seedCase);
   const subjectId = seed.ids.subjectId;
   const topicId = seed.ids.topicId;
   const sessionId = seed.ids.sessionId;
@@ -353,15 +351,15 @@ test('WI-2238 learning-active case: exact World History resume IDs and visible s
     );
   }
 
-  await expectSubjectRow(page, subjectId, 'World History');
+  await expectSubjectRow(page, subjectId, expected.subjectName);
   await pressableClick(page.getByTestId(`subjects-browse-row-${subjectId}`));
-  await expectSubjectHub(page, subjectId, 'World History');
+  await expectSubjectHub(page, subjectId, expected.subjectName);
   const nextUp = page.getByTestId('subject-hub-next-up');
   await expect(
-    nextUp.getByText('World History Topic 1', { exact: true }),
+    nextUp.getByText(expected.topicName, { exact: true }),
   ).toBeVisible();
   await expect(page.getByTestId('subject-hub-next-up-primary')).toHaveText(
-    'Resume',
+    expected.nextAction,
   );
 
   await pressableClick(page.getByTestId('subject-hub-next-up-action'));
@@ -369,38 +367,36 @@ test('WI-2238 learning-active case: exact World History resume IDs and visible s
   await pressableClick(page.getByTestId('chat-shell-back'));
 
   await expectSubjectsPath(page);
-  await expectSubjectRow(page, subjectId, 'World History');
-  await expectMeIdentity(page, 'Active Learner', seed.profileId);
+  await expectSubjectRow(page, subjectId, expected.subjectName);
+  await expectMeIdentity(page, expected.profileName, seed.profileId);
 });
 
 test('WI-2238 retention-due case: exact Biology Topic 1 review and visible Back controls restore Biology Hub, Subjects, and Review Learner Me identity', async ({
   page,
 }) => {
-  const seed = await seedAndOpenSubjects(page, {
-    scenario: 'retention-due',
-    alias: 'v2-subjects-review',
-  });
+  const { seed: seedCase, expected } = V2_SUBJECTS_CASES.retentionDue;
+  const seed = await seedAndOpenSubjects(page, seedCase);
   const subjectId = seed.ids.subjectId;
   const topicId = seed.ids.topicId;
   if (!subjectId || !topicId) {
     throw new Error('retention-due seed did not return subjectId and topicId');
   }
 
-  await expectSubjectRow(page, subjectId, 'Biology');
+  await expectSubjectRow(page, subjectId, expected.subjectName);
   await pressableClick(page.getByTestId(`subjects-browse-row-${subjectId}`));
-  await expectSubjectHub(page, subjectId, 'Biology');
+  await expectSubjectHub(page, subjectId, expected.subjectName);
   const nextUp = page.getByTestId('subject-hub-next-up');
   await expect(
-    nextUp.getByText('Biology Topic 1', { exact: true }),
+    nextUp.getByText(expected.topicName, { exact: true }),
   ).toBeVisible();
   await expect(page.getByTestId('subject-hub-next-up-primary')).toHaveText(
-    'Review',
+    expected.nextAction,
   );
 
   const biologyTopicRow = page.getByTestId(`subject-hub-topic-${topicId}`);
   await expect(biologyTopicRow).toBeVisible();
   await expect(
-    biologyTopicRow.getByText('Biology Topic 1', { exact: true }),
+    biologyTopicRow.getByText(expected.topicName, { exact: true }),
   ).toBeVisible();
 
   await pressableClick(page.getByTestId('subject-hub-next-up-action'));
@@ -418,15 +414,15 @@ test('WI-2238 retention-due case: exact Biology Topic 1 review and visible Back 
     .toEqual({ pathname: `/topic/${topicId}`, subjectId });
 
   await pressableClick(page.getByTestId('topic-detail-back'));
-  await expectSubjectHub(page, subjectId, 'Biology');
+  await expectSubjectHub(page, subjectId, expected.subjectName);
   await pressableClick(page.getByTestId('subject-hub-back'));
   await expectSubjectsPath(page);
-  await expectSubjectRow(page, subjectId, 'Biology');
+  await expectSubjectRow(page, subjectId, expected.subjectName);
   await page.goBack();
   await expect(page).not.toHaveURL(
     new RegExp(`/subject-hub/${subjectId}(?:\\?.*)?$`),
   );
-  await expectMeIdentity(page, 'Review Learner', seed.profileId, {
+  await expectMeIdentity(page, expected.profileName, seed.profileId, {
     expectSubjectsReturn: false,
   });
 });
@@ -434,6 +430,7 @@ test('WI-2238 retention-due case: exact Biology Topic 1 review and visible Back 
 test('WI-2238 Subjects API recovery case: a visible failure stays recoverable and Retry restores the exact seeded World History row', async ({
   page,
 }) => {
+  const { seed: seedCase, expected } = V2_SUBJECTS_CASES.apiRecovery;
   let allowSubjects = false;
   await page.route(/\/v1\/subjects(?:\?.*)?$/, async (route) => {
     const request = route.request();
@@ -446,17 +443,10 @@ test('WI-2238 Subjects API recovery case: a visible failure stays recoverable an
       await route.continue();
       return;
     }
-    await fulfillJson(
-      route,
-      { message: 'Synthetic WI-2238 Subjects read failure' },
-      503,
-    );
+    await fulfillJson(route, { message: expected.failureMessage }, 503);
   });
 
-  const seed = await seedAndOpenSubjects(page, {
-    scenario: 'learning-active',
-    alias: 'v2-subjects-retry',
-  });
+  const seed = await seedAndOpenSubjects(page, seedCase);
   const subjectId = seed.ids.subjectId;
   if (!subjectId) {
     throw new Error('learning-active seed did not return subjectId');
@@ -468,21 +458,19 @@ test('WI-2238 Subjects API recovery case: a visible failure stays recoverable an
   await expect(page.getByTestId('subjects-browse-retry')).toBeVisible();
   allowSubjects = true;
   await pressableClick(page.getByTestId('subjects-browse-retry'));
-  await expectSubjectRow(page, subjectId, 'World History');
+  await expectSubjectRow(page, subjectId, expected.subjectName);
 });
 
 test('WI-2238 curriculum-preparing case: exact World History empty Hub and visible Back restore the same Subjects row', async ({
   page,
 }) => {
-  const seed = await seedAndOpenSubjects(page, {
-    scenario: 'learning-active',
-    alias: 'v2-subjects-preparing',
-  });
+  const { seed: seedCase, expected } = V2_SUBJECTS_CASES.curriculumPreparing;
+  const seed = await seedAndOpenSubjects(page, seedCase);
   const subjectId = seed.ids.subjectId;
   if (!subjectId) {
     throw new Error('learning-active seed did not return subjectId');
   }
-  await expectSubjectRow(page, subjectId, 'World History');
+  await expectSubjectRow(page, subjectId, expected.subjectName);
 
   await page.route(/\/v1\/subjects(?:\?.*)?$/, async (route) => {
     const request = route.request();
@@ -516,27 +504,25 @@ test('WI-2238 curriculum-preparing case: exact World History empty Hub and visib
   const preparing = page.getByTestId('subject-hub-preparing');
   await expect(preparing).toBeVisible({ timeout: 60_000 });
   await expect(
-    preparing.getByText('Building your World History curriculum…', {
+    preparing.getByText(expected.preparingMessage, {
       exact: true,
     }),
   ).toBeVisible();
   await pressableClick(page.getByTestId('subject-hub-preparing-back'));
   await expectSubjectsPath(page);
-  await expectSubjectRow(page, subjectId, 'World History');
+  await expectSubjectRow(page, subjectId, expected.subjectName);
 });
 
 test('WI-2238 onboarding-no-subject case: Add creates exact Photosynthesis first session and visible exit returns only to V2 Subjects', async ({
   page,
 }) => {
-  const seed = await seedAndOpenSubjects(page, {
-    scenario: 'onboarding-no-subject',
-    alias: 'v2-subjects-first',
-  });
+  const { seed: seedCase, expected } = V2_SUBJECTS_CASES.firstSubject;
+  const seed = await seedAndOpenSubjects(page, seedCase);
   await mockFocusedFirstSubjectCreation(page, seed.profileId);
 
   const emptyState = page.getByTestId('subjects-browse-empty');
   await expect(
-    emptyState.getByText('No subjects yet', { exact: true }),
+    emptyState.getByText(expected.emptyTitle, { exact: true }),
   ).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId(/^subjects-browse-row-/)).toHaveCount(0);
   await expect(page.getByTestId('subjects-browse-create')).toBeVisible({
@@ -550,7 +536,7 @@ test('WI-2238 onboarding-no-subject case: Add creates exact Photosynthesis first
 
   await fillTextInput(
     page.getByTestId('create-subject-name'),
-    'Photosynthesis',
+    expected.subjectName,
   );
   await pressableClick(page.getByTestId('create-subject-submit'));
   await expect(page.getByTestId('ready-screen')).toBeVisible({
@@ -559,7 +545,7 @@ test('WI-2238 onboarding-no-subject case: Add creates exact Photosynthesis first
   await expect(
     page
       .getByTestId('ready-row-subject')
-      .getByText('Starting with Photosynthesis', { exact: true }),
+      .getByText(expected.readyTitle, { exact: true }),
   ).toBeVisible();
   await expect(page.url()).not.toMatch(/\/(?:home|library)(?:\?|$)/);
 
@@ -571,11 +557,11 @@ test('WI-2238 onboarding-no-subject case: Add creates exact Photosynthesis first
   });
   await expect
     .poll(() => new URL(page.url()).searchParams.get('returnTo'))
-    .toBe('subjects');
+    .toBe(expected.returnTo);
   await pressableClick(page.getByTestId('chat-shell-back'));
 
   await expectSubjectsPath(page);
-  await expectSubjectRow(page, PHOTOSYNTHESIS_SUBJECT_ID, 'Photosynthesis');
+  await expectSubjectRow(page, PHOTOSYNTHESIS_SUBJECT_ID, expected.subjectName);
   await expect(page.url()).not.toMatch(/\/(?:home|library)(?:\?|$)/);
-  await expectMeIdentity(page, 'Test Learner', seed.profileId);
+  await expectMeIdentity(page, expected.profileName, seed.profileId);
 });

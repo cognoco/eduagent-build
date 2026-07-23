@@ -27,6 +27,33 @@ describe('navigation transition provenance', () => {
     expect(consumeHubToTopicTransition('subject-1', 'topic-1')).toBe(false);
   });
 
+  it.each([
+    {
+      transition: 'Subjects-to-Hub',
+      mark: () => markSubjectsToHubTransition('subject-1'),
+      consume: (subjectId: string) => consumeSubjectsToHubTransition(subjectId),
+    },
+    {
+      transition: 'Hub-to-Topic',
+      mark: () => markHubToTopicTransition('subject-1', 'topic-1'),
+      consume: (subjectId: string) =>
+        consumeHubToTopicTransition(subjectId, 'topic-1'),
+    },
+    {
+      transition: 'Hub-to-Session',
+      mark: () => markHubToSessionTransition('subject-1'),
+      consume: (subjectId: string) => consumeHubToSessionTransition(subjectId),
+    },
+  ])(
+    'rejects a mismatched $transition subject and clears the pending proof',
+    ({ mark, consume }) => {
+      mark();
+
+      expect(consume('subject-2')).toBe(false);
+      expect(consume('subject-1')).toBe(false);
+    },
+  );
+
   it('keeps only the latest actual transition', () => {
     markSubjectsToHubTransition('subject-1');
     markHubToSessionTransition('subject-1');
