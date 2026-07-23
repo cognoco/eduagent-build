@@ -2853,6 +2853,42 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(commands.some(({ tapOn }) => tapOn?.text === 'Photos')).toBe(false);
   });
 
+  it('[WI-1655] requires a supported terminal state after gallery OCR processing', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/homework/gallery-picker.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      extendedWaitUntil?: {
+        visible?: { id?: string } | string;
+        optional?: boolean;
+      };
+      takeScreenshot?: string;
+    }>;
+    const processing = commands.findIndex(
+      ({ extendedWaitUntil }) =>
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'camera-cancel-ocr',
+    );
+    const terminalState = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > processing &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id ===
+          '^(?:result-text-input|try-camera-again-button)$' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const receipt = commands.findIndex(
+      ({ takeScreenshot }, index) =>
+        index > terminalState &&
+        takeScreenshot === 'homework-gallery-05-ocr-outcome',
+    );
+
+    expect(processing).toBeGreaterThan(-1);
+    expect(terminalState).toBeGreaterThan(processing);
+    expect(receipt).toBeGreaterThan(terminalState);
+  });
+
   it('[WI-1864] exercises the seeded wrong-answer dispute and correct-answer suppression paths', () => {
     const source = readFileSync(
       join(repoRoot, 'apps/mobile/e2e/flows/quiz/quiz-dispute.yaml'),
