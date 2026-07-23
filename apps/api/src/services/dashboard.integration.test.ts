@@ -1,5 +1,6 @@
 import { resolve } from 'path';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import {
   assessments,
   consentGrant,
@@ -603,25 +604,34 @@ async function seedConsentState(input: {
     input.status === 'PENDING' ||
     input.status === 'PARENTAL_CONSENT_REQUESTED'
   ) {
-    await db.insert(consentRequest).values({
-      chargePersonId: input.profileId,
-      organizationId: input.orgId,
-      purpose: 'platform_use',
-      requestedBasis: 'gdpr_parental_consent',
-      status: input.status === 'PENDING' ? 'pending' : 'requested',
-      requestedAt: new Date(),
-    });
+    const requestedAt = new Date();
+    await db.insert(consentRequest).values(
+      CONSENT_PURPOSES.map((purpose) => ({
+        chargePersonId: input.profileId,
+        organizationId: input.orgId,
+        purpose,
+        requestedBasis: 'gdpr_parental_consent' as const,
+        status:
+          input.status === 'PENDING'
+            ? ('pending' as const)
+            : ('requested' as const),
+        requestedAt,
+      })),
+    );
     return;
   }
-  await db.insert(consentGrant).values({
-    chargePersonId: input.profileId,
-    organizationId: input.orgId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: input.status === 'CONSENTED',
-    grantedAt: new Date(),
-    withdrawnAt: input.status === 'WITHDRAWN' ? new Date() : undefined,
-  });
+  const grantedAt = new Date();
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      chargePersonId: input.profileId,
+      organizationId: input.orgId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent' as const,
+      granted: input.status === 'CONSENTED',
+      grantedAt,
+      withdrawnAt: input.status === 'WITHDRAWN' ? grantedAt : undefined,
+    })),
+  );
 }
 
 async function seedConsentStateWithType(input: {
@@ -635,32 +645,42 @@ async function seedConsentStateWithType(input: {
     input.status === 'PENDING' ||
     input.status === 'PARENTAL_CONSENT_REQUESTED'
   ) {
-    await db.insert(consentRequest).values({
-      chargePersonId: input.profileId,
-      organizationId: input.orgId,
-      purpose: 'platform_use',
-      requestedBasis:
-        input.consentType === 'GDPR'
-          ? 'gdpr_parental_consent'
-          : 'coppa_parental_consent',
-      status: input.status === 'PENDING' ? 'pending' : 'requested',
-      requestedAt: new Date(),
-    });
+    const requestedAt = new Date();
+    const requestedBasis =
+      input.consentType === 'GDPR'
+        ? ('gdpr_parental_consent' as const)
+        : ('coppa_parental_consent' as const);
+    await db.insert(consentRequest).values(
+      CONSENT_PURPOSES.map((purpose) => ({
+        chargePersonId: input.profileId,
+        organizationId: input.orgId,
+        purpose,
+        requestedBasis,
+        status:
+          input.status === 'PENDING'
+            ? ('pending' as const)
+            : ('requested' as const),
+        requestedAt,
+      })),
+    );
     return;
   }
   const lawfulBasis =
     input.consentType === 'GDPR'
       ? 'gdpr_parental_consent'
       : 'coppa_parental_consent';
-  await db.insert(consentGrant).values({
-    chargePersonId: input.profileId,
-    organizationId: input.orgId,
-    purpose: 'platform_use',
-    lawfulBasis,
-    granted: input.status === 'CONSENTED',
-    grantedAt: new Date(),
-    withdrawnAt: input.status === 'WITHDRAWN' ? new Date() : undefined,
-  });
+  const grantedAt = new Date();
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      chargePersonId: input.profileId,
+      organizationId: input.orgId,
+      purpose,
+      lawfulBasis,
+      granted: input.status === 'CONSENTED',
+      grantedAt,
+      withdrawnAt: input.status === 'WITHDRAWN' ? grantedAt : undefined,
+    })),
+  );
 }
 
 beforeAll(async () => {

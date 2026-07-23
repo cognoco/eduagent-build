@@ -53,6 +53,7 @@ import {
   withdrawAdultSelfConsentV2,
   getProfileConsentStateV2,
   getOrgMemberDisplayNameV2,
+  ConsentReconsentRequiredError,
 } from '../services/identity-v2/consent-v2';
 import { getChildConsentForParentV2 } from '../services/identity-v2/family-v2';
 import { getConsentAccountabilityV2 } from '../services/identity-v2/consent-status-v2';
@@ -441,6 +442,9 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
           return notFound(c, error.message);
         }
         if (error instanceof ConsentAlreadyProcessedError) {
+          return apiError(c, 409, ERROR_CODES.CONFLICT, error.message);
+        }
+        if (error instanceof ConsentReconsentRequiredError) {
           return apiError(c, 409, ERROR_CODES.CONFLICT, error.message);
         }
         if (error instanceof ConsentTokenExpiredError) {

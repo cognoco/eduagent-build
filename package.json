@@ -62,6 +62,7 @@
     "check:migration-immutability": "tsx scripts/check-migration-immutability.ts",
     "check:maestro-main-health": "tsx scripts/check-maestro-main-health.ts",
     "check:no-gemini-runtime": "tsx scripts/check-no-gemini-runtime.ts",
+    "check:consent-purpose-contract": "jest --config scripts/jest.config.cjs scripts/check-consent-purpose-contract.test.ts --runInBand --no-coverage && tsx scripts/check-consent-purpose-contract.ts",
     "check:mode-nav-flag-combo": "tsx scripts/check-mode-nav-flag-combo.ts",
     "check:flow-inventory-cite-rot": "tsx scripts/check-flow-inventory-cite-rot.ts"
   },

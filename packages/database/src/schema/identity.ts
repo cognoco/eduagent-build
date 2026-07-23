@@ -839,7 +839,7 @@ export const consentRequest = pgTable(
     organizationId: uuid('organization_id')
       .notNull()
       .references(() => organization.id, { onDelete: 'cascade' }),
-    purpose: text('purpose').notNull().default('platform_use'),
+    purpose: text('purpose').notNull(),
     requestedBasis: text('requested_basis').notNull(),
     /**
      * Nullable: in the child-self-signup flow the responding parent exists only
