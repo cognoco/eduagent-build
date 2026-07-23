@@ -869,6 +869,61 @@ describe('[WI-2571] selected Playwright seed-scenario collector', () => {
     ]);
   });
 
+  it('keeps execution and own-property alias boundaries explicit', () => {
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/alias-boundaries.ts',
+      `
+        import { seedScenario } from './test-seed';
+        export function wrapper(input: { scenario: string }) {
+          const neverCalled = () => seedScenario({ scenario: 'nested-never-called' });
+          return seedScenario(input);
+        }
+        export function own(input: { scenario: string }) {
+          return seedScenario(input);
+        }
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/shape.spec.ts',
+      `
+        import { own, wrapper } from './helpers/alias-boundaries';
+        const aliases = { wrapper, own };
+        const source = { run: wrapper };
+        const spread = { ...source };
+        void aliases.own({ scenario: 'shorthand-own-scenario' });
+        void spread.run({ scenario: 'spread-out-scenario' });
+        void aliases.wrapper({ scenario: 'called-wrapper-scenario' });
+      `,
+    );
+
+    expect(collectShapeScenarios(fixtureRoot)).toEqual([
+      'called-wrapper-scenario',
+      'shorthand-own-scenario',
+    ]);
+  });
+
+  it('excludes computed static class keys while retaining static initializers', () => {
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/computed-static.ts',
+      `
+        import { seedScenario } from './test-seed';
+        export class Computed {
+          static [seedScenario({ scenario: 'computed-key-out' })] = seedScenario({ scenario: 'computed-value-in' });
+        }
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/shape.spec.ts',
+      `import { Computed } from './helpers/computed-static'; void Computed;`,
+    );
+
+    expect(collectShapeScenarios(fixtureRoot)).toEqual(['computed-value-in']);
+  });
+
   it('resolves bracket and destructured members of an exported namespace', () => {
     writeFixture(
       fixtureRoot,

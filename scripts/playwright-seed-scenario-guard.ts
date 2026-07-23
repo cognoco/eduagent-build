@@ -132,7 +132,15 @@ function walkRuntimeClass(
       ts.isPropertyDeclaration(member) &&
       isStaticClassMember(member)
     ) {
-      walkRuntime(member, visit);
+      if (
+        member.initializer &&
+        !(
+          ts.isFunctionLike(member.initializer) &&
+          !isImmediatelyInvokedFunction(member.initializer)
+        )
+      ) {
+        walkRuntime(member.initializer, visit);
+      }
     }
   }
 }
@@ -159,7 +167,8 @@ function walkSelectedRoot(
   root: SelectedRoot,
   visit: (candidate: ts.Node) => void,
 ): void {
-  if (root.traversal !== 'full') walkRuntime(root.node, visit);
+  if (root.traversal !== 'full' || ts.isFunctionLike(root.node))
+    walkRuntime(root.node, visit);
   else walk(root.node, visit);
 }
 
@@ -207,6 +216,74 @@ function namespaceMemberSymbol(
     .getExportsOfModule(namespace)
     .find((candidate) => candidate.getName() === memberName);
   return member ? resolvedAliasSymbol(checker, member) : null;
+}
+
+function ownObjectMemberSymbol(
+  checker: ts.TypeChecker,
+  expression: ts.Expression,
+  memberName: string,
+): ts.Symbol | null {
+  const target = unwrapParenthesizedExpression(expression);
+  let object: ts.ObjectLiteralExpression | null = null;
+  if (ts.isObjectLiteralExpression(target)) object = target;
+  else if (ts.isIdentifier(target)) {
+    const declaration = checker
+      .getSymbolAtLocation(target)
+      ?.declarations?.find((candidate): candidate is ts.VariableDeclaration =>
+        ts.isVariableDeclaration(candidate),
+      );
+    if (
+      declaration &&
+      ts.isVariableDeclaration(declaration) &&
+      declaration.initializer
+    ) {
+      const initializer = unwrapParenthesizedExpression(
+        declaration.initializer,
+      );
+      if (ts.isObjectLiteralExpression(initializer)) object = initializer;
+    }
+  }
+  if (!object) return null;
+  for (const property of object.properties) {
+    if (
+      ts.isPropertyAssignment(property) &&
+      propertyName(property) === memberName
+    ) {
+      return staticReferenceSymbol(checker, property.initializer);
+    }
+    if (
+      ts.isShorthandPropertyAssignment(property) &&
+      property.name.text === memberName
+    ) {
+      const symbol =
+        checker.getShorthandAssignmentValueSymbol(property) ??
+        checker.getSymbolAtLocation(property.name);
+      return symbol ? resolvedAliasSymbol(checker, symbol) : null;
+    }
+  }
+  return null;
+}
+
+function isLocalObjectExpression(
+  checker: ts.TypeChecker,
+  expression: ts.Expression,
+): boolean {
+  const target = unwrapParenthesizedExpression(expression);
+  if (ts.isObjectLiteralExpression(target)) return true;
+  if (!ts.isIdentifier(target)) return false;
+  const declaration = checker
+    .getSymbolAtLocation(target)
+    ?.declarations?.find((candidate): candidate is ts.VariableDeclaration =>
+      ts.isVariableDeclaration(candidate),
+    );
+  return !!(
+    declaration &&
+    ts.isVariableDeclaration(declaration) &&
+    declaration.initializer &&
+    ts.isObjectLiteralExpression(
+      unwrapParenthesizedExpression(declaration.initializer),
+    )
+  );
 }
 
 function namespaceSymbol(
@@ -273,7 +350,10 @@ function staticReferenceSymbol(
   if (ts.isPropertyAccessExpression(node)) {
     symbol =
       namespaceMemberSymbol(checker, node.expression, node.name.text) ??
-      resolvedSymbol(checker, node.name);
+      ownObjectMemberSymbol(checker, node.expression, node.name.text) ??
+      (isLocalObjectExpression(checker, node.expression)
+        ? null
+        : resolvedSymbol(checker, node.name));
   } else if (
     ts.isElementAccessExpression(node) &&
     node.argumentExpression &&
@@ -285,7 +365,15 @@ function staticReferenceSymbol(
         checker,
         node.expression,
         node.argumentExpression.text,
-      ) ?? resolvedSymbol(checker, node.argumentExpression);
+      ) ??
+      ownObjectMemberSymbol(
+        checker,
+        node.expression,
+        node.argumentExpression.text,
+      ) ??
+      (isLocalObjectExpression(checker, node.expression)
+        ? null
+        : resolvedSymbol(checker, node.argumentExpression));
   } else if (ts.isIdentifier(node)) {
     const identifierSymbol = checker.getSymbolAtLocation(node);
     symbol = identifierSymbol
@@ -599,7 +687,7 @@ function containsCallTo(
   functionKeys: Set<string>,
 ): boolean {
   let found = false;
-  walk(node, (candidate) => {
+  walkRuntime(node, (candidate) => {
     if (!ts.isCallExpression(candidate)) return;
     if (calleeName(checker, candidate.expression) === 'seedScenario') {
       found = true;
