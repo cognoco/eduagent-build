@@ -631,7 +631,7 @@ export async function updateNote(
       and(
         eq(topicNotes.id, noteId),
         eq(topicNotes.profileId, profileId),
-        eq(topicNotes.artifactSource, 'learner_authored_note'),
+        learnerVisibleNoteSourcePredicate(),
         eq(topicNotes.verificationState, 'unverified'),
       ),
     )
@@ -661,7 +661,7 @@ export async function deleteNoteById(
       and(
         eq(topicNotes.id, noteId),
         eq(topicNotes.profileId, profileId),
-        eq(topicNotes.artifactSource, 'learner_authored_note'),
+        learnerVisibleNoteSourcePredicate(),
         eq(topicNotes.verificationState, 'unverified'),
       ),
     )

@@ -21,6 +21,7 @@ END $$;--> statement-breakpoint
 -- whole fleet writes non-NULL artifact sources.
 ALTER TABLE "topic_notes" ALTER COLUMN "artifact_source" SET DEFAULT 'learner_authored_note';--> statement-breakpoint
 UPDATE "topic_notes" SET "artifact_source" = 'learner_authored_note' WHERE "artifact_source" IS NULL;--> statement-breakpoint
+ALTER TABLE "topic_notes" ADD COLUMN "artifact_concept_key" text;--> statement-breakpoint
 ALTER TABLE "bookmarks" ADD COLUMN "artifact_source" text DEFAULT 'freeform_keep' NOT NULL;--> statement-breakpoint
 ALTER TABLE "bookmarks" ADD COLUMN "verification_state" text DEFAULT 'unverified' NOT NULL;--> statement-breakpoint
 ALTER TABLE "topic_notes" ADD COLUMN "verification_state" text DEFAULT 'unverified' NOT NULL;--> statement-breakpoint
@@ -30,6 +31,7 @@ CREATE INDEX "evidence_links_profile_from_idx" ON "evidence_links" USING btree (
 CREATE INDEX "evidence_links_profile_to_idx" ON "evidence_links" USING btree ("profile_id","to_kind","to_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "evidence_links_profile_endpoints_unique" ON "evidence_links" USING btree ("profile_id","from_kind","from_id","to_kind","to_id");--> statement-breakpoint
 ALTER TABLE "topic_notes" ADD CONSTRAINT "topic_notes_artifact_source_check" CHECK ("artifact_source" IN ('challenge_solid_quote', 'challenge_drafted_note', 'learner_authored_note'));--> statement-breakpoint
+ALTER TABLE "topic_notes" ADD CONSTRAINT "topic_notes_solid_quote_concept_check" CHECK ("artifact_source" <> 'challenge_solid_quote' OR "artifact_concept_key" IS NOT NULL);--> statement-breakpoint
 ALTER TABLE "topic_notes" ADD CONSTRAINT "topic_notes_verification_state_check" CHECK ("verification_state" IN ('unverified', 'verified'));--> statement-breakpoint
 ALTER TABLE "bookmarks" ADD CONSTRAINT "bookmarks_artifact_source_check" CHECK ("artifact_source" = 'freeform_keep');--> statement-breakpoint
 ALTER TABLE "bookmarks" ADD CONSTRAINT "bookmarks_verification_state_check" CHECK ("verification_state" = 'unverified');--> statement-breakpoint

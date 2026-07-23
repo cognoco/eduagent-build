@@ -48,6 +48,19 @@ export function createSessionRepository(
           .limit(1);
         return row;
       },
+      async findIdAndMetadata(
+        extraWhere?: SQL,
+      ): Promise<{ id: string; metadata: unknown } | undefined> {
+        const [row] = await db
+          .select({
+            id: learningSessions.id,
+            metadata: learningSessions.metadata,
+          })
+          .from(learningSessions)
+          .where(scopedWhere(learningSessions, extraWhere))
+          .limit(1);
+        return row;
+      },
       /**
        * Return topicIds this profile has *meaningfully completed* in a
        * learning session. Used by `resolveNextTopic` to skip topics the

@@ -3,6 +3,7 @@ import {
   createNoteInputSchema,
   updateNoteInputSchema,
   noteOriginSchema,
+  artifactSourceSchema,
   noteArtifactSourceSchema,
   noteResponseSchema,
   bookNotesResponseSchema,
@@ -188,14 +189,16 @@ describe('noteResponseSchema', () => {
     expect(noteResponseSchema.parse(valid).origin).toBe('self');
   });
 
-  it('rejects missing artifactSource', () => {
+  it('defaults missing artifactSource for expand-phase API compatibility', () => {
     const { artifactSource: _, ...rest } = valid;
-    expect(noteResponseSchema.safeParse(rest).success).toBe(false);
+    expect(noteResponseSchema.parse(rest).artifactSource).toBe(
+      'learner_authored_note',
+    );
   });
 
-  it('rejects missing verificationState', () => {
+  it('defaults missing verificationState for expand-phase API compatibility', () => {
     const { verificationState: _, ...rest } = valid;
-    expect(noteResponseSchema.safeParse(rest).success).toBe(false);
+    expect(noteResponseSchema.parse(rest).verificationState).toBe('unverified');
   });
 
   it('exports the additive note origin enum', () => {
@@ -236,13 +239,21 @@ describe('noteResponseSchema', () => {
     });
   });
 
-  it('exports every accepted artifact source', () => {
-    expect(noteArtifactSourceSchema.options).toEqual([
+  it('exports only sources accepted by topic_notes', () => {
+    expect(artifactSourceSchema.options).toEqual([
       'challenge_solid_quote',
       'challenge_drafted_note',
       'learner_authored_note',
       'freeform_keep',
     ]);
+    expect(noteArtifactSourceSchema.options).toEqual([
+      'challenge_solid_quote',
+      'challenge_drafted_note',
+      'learner_authored_note',
+    ]);
+    expect(noteArtifactSourceSchema.safeParse('freeform_keep').success).toBe(
+      false,
+    );
   });
 });
 
@@ -466,14 +477,16 @@ describe('allNoteSchema', () => {
     }
   });
 
-  it('rejects missing artifactSource', () => {
+  it('defaults missing artifactSource for expand-phase API compatibility', () => {
     const { artifactSource: _, ...rest } = validAllNote;
-    expect(allNoteSchema.safeParse(rest).success).toBe(false);
+    expect(allNoteSchema.parse(rest).artifactSource).toBe(
+      'learner_authored_note',
+    );
   });
 
-  it('rejects missing verificationState', () => {
+  it('defaults missing verificationState for expand-phase API compatibility', () => {
     const { verificationState: _, ...rest } = validAllNote;
-    expect(allNoteSchema.safeParse(rest).success).toBe(false);
+    expect(allNoteSchema.parse(rest).verificationState).toBe('unverified');
   });
 
   it('rejects invalid datetime for createdAt', () => {

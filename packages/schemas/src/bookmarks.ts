@@ -10,8 +10,8 @@ export const bookmarkSchema = z.object({
   subjectName: z.string(),
   topicTitle: z.string().nullable(),
   content: z.string(),
-  artifactSource: z.literal('freeform_keep'),
-  verificationState: z.literal('unverified'),
+  artifactSource: z.literal('freeform_keep').default('freeform_keep'),
+  verificationState: z.literal('unverified').default('unverified'),
   createdAt: isoDateField,
 });
 export type Bookmark = z.infer<typeof bookmarkSchema>;

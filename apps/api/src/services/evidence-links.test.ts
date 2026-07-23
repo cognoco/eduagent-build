@@ -43,6 +43,7 @@ type SourceRow = {
   id: string;
   profileId: string;
   content: string;
+  metadata?: unknown;
 };
 
 function boundStringValues(expression: unknown): string[] {
@@ -135,7 +136,10 @@ function createEvidenceReadDb(state: {
                   (row) => values.has(row.id) && values.has(row.profileId),
                 )
                 .slice(0, limit)
-                .map((row) => ({ id: row.id }));
+                .map((row) => ({
+                  id: row.id,
+                  ...(selection.metadata ? { metadata: row.metadata } : {}),
+                }));
             },
           }),
         };
@@ -233,15 +237,25 @@ describe('verified Challenge artifact persistence', () => {
     async (artifactSource) => {
       const transaction = jest.fn();
       const db = { transaction } as unknown as Database;
+      const artifact =
+        artifactSource === 'challenge_solid_quote'
+          ? {
+              artifactSource,
+              conceptKey: 'The learner has ADHD.',
+              sourceEventIds: [EVENT_ID],
+            }
+          : {
+              artifactSource,
+              content: 'The learner has ADHD.',
+              sourceEventIds: [EVENT_ID],
+            };
 
       await expect(
         persistVerifiedChallengeArtifact(db, {
           profileId: PROFILE_ID,
           topicId: TOPIC_ID,
           sessionId: SESSION_ID,
-          content: 'The learner has ADHD.',
-          artifactSource,
-          sourceEventIds: [EVENT_ID],
+          ...artifact,
         }),
       ).rejects.toBeInstanceOf(BadRequestError);
       expect(transaction).not.toHaveBeenCalled();
@@ -255,15 +269,16 @@ describe('verified Challenge artifact persistence', () => {
       profileId: PROFILE_ID,
       topicId: TOPIC_ID,
       sessionId: SESSION_ID,
-      content: 'Plants convert light into chemical energy.',
       artifactSource: 'challenge_solid_quote',
+      conceptKey: 'photosynthesis',
       sourceEventIds: [EVENT_ID],
     });
 
     expect(artifacts).toEqual([
       expect.objectContaining({
         profileId: PROFILE_ID,
-        content: 'Plants convert light into chemical energy.',
+        content: 'photosynthesis',
+        artifactConceptKey: 'photosynthesis',
         artifactSource: 'challenge_solid_quote',
         verificationState: 'verified',
       }),
@@ -310,13 +325,13 @@ describe('verified Challenge artifact persistence', () => {
         sessionId: SESSION_ID,
         artifacts: [
           {
-            content: 'Plants absorb light energy.',
             artifactSource: 'challenge_solid_quote',
+            conceptKey: 'light absorption',
             sourceEventIds: [EVENT_ID],
           },
           {
-            content: 'That energy helps produce glucose.',
             artifactSource: 'challenge_solid_quote',
+            conceptKey: 'glucose production',
             sourceEventIds: ['30000000-0000-4000-8000-000000000002'],
           },
         ],
@@ -360,7 +375,6 @@ describe('evidence-link availability reads', () => {
   it.each([
     ['note', 'notes'],
     ['bookmark', 'bookmarks'],
-    ['homework_ocr', 'sessions'],
   ] as const)(
     'resolves an available %s target without selecting its content',
     async (toKind, stateKey) => {
@@ -388,6 +402,76 @@ describe('evidence-link availability reads', () => {
         availability: 'available',
       });
       expect(selectedSourceFields).toEqual([['id']]);
+    },
+  );
+
+  it.each([
+    ['absent', undefined, 'source_unavailable'],
+    [
+      'invalid',
+      {
+        homework: {
+          problemCount: 0,
+          currentProblemIndex: 0,
+          problems: [],
+          ocrText: 42,
+        },
+      },
+      'source_unavailable',
+    ],
+    [
+      'empty',
+      {
+        homework: {
+          problemCount: 0,
+          currentProblemIndex: 0,
+          problems: [],
+          ocrText: '   ',
+        },
+      },
+      'source_unavailable',
+    ],
+    [
+      'valid',
+      {
+        homework: {
+          problemCount: 0,
+          currentProblemIndex: 0,
+          problems: [],
+          ocrText: 'worksheet text',
+        },
+      },
+      'available',
+    ],
+  ] as const)(
+    'reports homework OCR with %s metadata as %s without returning OCR text',
+    async (_case, metadata, availability) => {
+      const link = evidenceRow({ toKind: 'homework_ocr' });
+      const { db, selectedSourceFields } = createEvidenceReadDb({
+        links: [link],
+        events: [],
+        sessions: [
+          {
+            id: EVENT_ID,
+            profileId: PROFILE_ID,
+            content: 'must not leave the target store',
+            metadata,
+          },
+        ],
+      });
+
+      const resolution = await resolveEvidenceLink(db, {
+        ...link,
+        createdAt: CREATED_AT.toISOString(),
+      });
+
+      expect(resolution).toEqual({
+        evidenceLinkId: LINK_ID,
+        toKind: 'homework_ocr',
+        availability,
+      });
+      expect(resolution).not.toHaveProperty('content');
+      expect(selectedSourceFields).toEqual([['id', 'metadata']]);
     },
   );
 
@@ -453,5 +537,38 @@ describe('evidence-link availability reads', () => {
     await expect(
       getArtifactEvidenceAvailability(db, OTHER_PROFILE_ID, ARTIFACT_ID),
     ).resolves.toBe('source_unavailable');
+  });
+
+  it("does not resolve another profile's valid homework OCR metadata", async () => {
+    const link = evidenceRow({
+      profileId: OTHER_PROFILE_ID,
+      toKind: 'homework_ocr',
+    });
+    const { db } = createEvidenceReadDb({
+      links: [link],
+      events: [],
+      sessions: [
+        {
+          id: EVENT_ID,
+          profileId: PROFILE_ID,
+          content: 'must remain unavailable',
+          metadata: {
+            homework: {
+              problemCount: 0,
+              currentProblemIndex: 0,
+              problems: [],
+              ocrText: 'worksheet text',
+            },
+          },
+        },
+      ],
+    });
+
+    await expect(
+      resolveEvidenceLink(db, {
+        ...link,
+        createdAt: CREATED_AT.toISOString(),
+      }),
+    ).resolves.toMatchObject({ availability: 'source_unavailable' });
   });
 });

@@ -567,7 +567,7 @@ describe('updateNote — profile isolation', () => {
     expect(result.content).toBe('updated content');
   });
 
-  it('refuses to update server-owned or verified artifacts', async () => {
+  it('allows rollout-era null learner notes while refusing server-owned or verified artifacts', async () => {
     let capturedWhere: unknown;
     const db = makeDbStub({
       updateReturning: [[]],
@@ -581,6 +581,7 @@ describe('updateNote — profile isolation', () => {
     ).rejects.toThrow('Note not found');
 
     const rendered = new PgDialect().sqlToQuery(capturedWhere as never);
+    expect(rendered.sql).toMatch(/"artifact_source"\s+is\s+null/);
     expect(rendered.sql).toMatch(/"artifact_source"\s*=\s*\$\d+/);
     expect(rendered.sql).toMatch(/"verification_state"\s*=\s*\$\d+/);
     expect(rendered.params).toEqual(
@@ -635,7 +636,7 @@ describe('deleteNoteById — profile isolation', () => {
     expect(deleted).toBe(true);
   });
 
-  it('refuses to delete server-owned or verified artifacts', async () => {
+  it('allows rollout-era null learner notes while refusing server-owned or verified artifacts', async () => {
     let capturedWhere: unknown;
     const db = makeDbStub({
       deleteReturning: [[]],
@@ -649,6 +650,7 @@ describe('deleteNoteById — profile isolation', () => {
     );
 
     const rendered = new PgDialect().sqlToQuery(capturedWhere as never);
+    expect(rendered.sql).toMatch(/"artifact_source"\s+is\s+null/);
     expect(rendered.sql).toMatch(/"artifact_source"\s*=\s*\$\d+/);
     expect(rendered.sql).toMatch(/"verification_state"\s*=\s*\$\d+/);
     expect(rendered.params).toEqual(

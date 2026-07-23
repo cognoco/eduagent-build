@@ -1511,7 +1511,9 @@ describe('finalizeChallengeRoundIfReady — verified-proof persistence', () => {
     );
     expect(state.artifactRows).toMatchObject([
       {
+        artifactConceptKey: 'photosynthesis',
         artifactSource: 'challenge_solid_quote',
+        content: 'photosynthesis',
         verificationState: 'verified',
       },
       {
@@ -1568,11 +1570,74 @@ describe('finalizeChallengeRoundIfReady — verified-proof persistence', () => {
     );
     expect(state.artifactRows).toMatchObject([
       {
+        artifactConceptKey: 'photosynthesis',
         artifactSource: 'challenge_solid_quote',
+        content: 'photosynthesis',
         verificationState: 'verified',
       },
     ]);
     expect(state.evidenceLinkRows).toHaveLength(1);
+  });
+
+  it('persists distinct concept-grained pointers for multiple solid concepts from one answer event', async () => {
+    const sameEventSolidEvaluations: ChallengeRoundEvaluationItem[] = [
+      {
+        concept: 'Light Absorption',
+        result: 'solid',
+        evidence: 'Correctly described chlorophyll absorbing light.',
+        answerEventId: ANSWER_EVENT_ID,
+        learnerQuote:
+          'Chlorophyll absorbs light and the plant uses that energy to make glucose.',
+      },
+      {
+        concept: 'Glucose Production',
+        result: 'solid',
+        evidence: 'Correctly connected light energy to glucose production.',
+        answerEventId: ANSWER_EVENT_ID,
+        learnerQuote:
+          'Chlorophyll absorbs light and the plant uses that energy to make glucose.',
+      },
+    ];
+    const challengeRound = draftingState(sameEventSolidEvaluations);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+      sessionEventRows: [
+        {
+          id: ANSWER_EVENT_ID,
+          profileId: PROFILE_ID,
+          sessionId: SESSION_ID,
+          eventType: 'user_message',
+          content:
+            'Chlorophyll absorbs light and the plant uses that energy to make glucose.',
+        },
+      ],
+    };
+
+    await finalizeChallengeRoundIfReady(
+      makeFakeDb(state),
+      PROFILE_ID,
+      makeSession(state.sessionMetadata),
+      challengeRound,
+      null,
+    );
+
+    expect(state.artifactRows).toMatchObject([
+      {
+        artifactConceptKey: 'light absorption',
+        artifactSource: 'challenge_solid_quote',
+        content: 'light absorption',
+      },
+      {
+        artifactConceptKey: 'glucose production',
+        artifactSource: 'challenge_solid_quote',
+        content: 'glucose production',
+      },
+    ]);
+    expect(state.artifactRows).toHaveLength(2);
+    expect(state.evidenceLinkRows).toHaveLength(2);
   });
 
   it('does not verify a whole answer event that also carries a misconception', async () => {
@@ -1679,7 +1744,7 @@ describe('finalizeChallengeRoundIfReady — verified-proof persistence', () => {
     expect(mockCaptureException).toHaveBeenCalled();
   });
 
-  it('does not persist clinical inference from either verified artifact path', async () => {
+  it('keeps a clinical transcript pointer-only and rejects a clinical drafted note', async () => {
     const clinicalText = 'The learner has ADHD.';
     const evaluation: ChallengeRoundEvaluationItem = {
       concept: 'attention',
@@ -1719,14 +1784,20 @@ describe('finalizeChallengeRoundIfReady — verified-proof persistence', () => {
     );
 
     expect(outcome?.challengeRound?.state).toBe('complete');
-    expect(state.artifactRows ?? []).toEqual([]);
-    expect(state.evidenceLinkRows ?? []).toEqual([]);
+    expect(state.artifactRows ?? []).toMatchObject([
+      {
+        artifactConceptKey: 'attention',
+        artifactSource: 'challenge_solid_quote',
+        content: 'attention',
+      },
+    ]);
+    expect(state.evidenceLinkRows ?? []).toHaveLength(1);
     const clinicalGuardCaptures = mockCaptureException.mock.calls.filter(
       ([error]) =>
         error instanceof Error &&
         error.message.includes('health or disability characterisation'),
     );
-    expect(clinicalGuardCaptures).toHaveLength(2);
+    expect(clinicalGuardCaptures).toHaveLength(1);
   });
 });
 

@@ -181,6 +181,7 @@ import {
 import {
   CONCEPT_CAPTURE_ENABLED,
   captureConceptMastery,
+  conceptKeyForLabel,
 } from '../concept-capture';
 import { MAX_CHALLENGE_QUESTIONS } from '../challenge-round/caps';
 import {
@@ -1400,12 +1401,12 @@ export async function finalizeChallengeRoundIfReady(
           topicId,
           sessionId: session.id,
           artifacts: solidItems.flatMap((item, index) => {
-            const content = verifiedSolidContents[index];
-            return content
+            const eventContent = verifiedSolidContents[index];
+            return eventContent
               ? [
                   {
-                    content,
                     artifactSource: 'challenge_solid_quote' as const,
+                    conceptKey: conceptKeyForLabel(item.concept),
                     sourceEventIds: [item.answerEventId],
                   },
                 ]

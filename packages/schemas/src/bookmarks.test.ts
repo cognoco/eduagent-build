@@ -85,14 +85,14 @@ describe('bookmarkSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects missing artifactSource', () => {
+  it('defaults missing artifactSource for expand-phase API compatibility', () => {
     const { artifactSource: _, ...rest } = validBookmark;
-    expect(bookmarkSchema.safeParse(rest).success).toBe(false);
+    expect(bookmarkSchema.parse(rest).artifactSource).toBe('freeform_keep');
   });
 
-  it('rejects missing verificationState', () => {
+  it('defaults missing verificationState for expand-phase API compatibility', () => {
     const { verificationState: _, ...rest } = validBookmark;
-    expect(bookmarkSchema.safeParse(rest).success).toBe(false);
+    expect(bookmarkSchema.parse(rest).verificationState).toBe('unverified');
   });
 });
 

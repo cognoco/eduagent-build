@@ -9676,6 +9676,12 @@
           "notNull": false,
           "default": "'learner_authored_note'"
         },
+        "artifact_concept_key": {
+          "name": "artifact_concept_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "verification_state": {
           "name": "verification_state",
           "type": "text",

@@ -8,7 +8,11 @@ import {
   topicNotes,
   type Database,
 } from '@eduagent/database';
-import type { EvidenceLinkResolution, EvidenceLink } from '@eduagent/schemas';
+import {
+  sessionMetadataSchema,
+  type EvidenceLinkResolution,
+  type EvidenceLink,
+} from '@eduagent/schemas';
 import * as learningTextGuard from './persisted-learning-text-guard';
 
 /** Record transcript-safe provenance for an artifact without copying text. */
@@ -33,11 +37,23 @@ export async function recordArtifactEvidenceLinks(
     .onConflictDoNothing();
 }
 
-type VerifiedChallengeArtifactInput = {
-  content: string;
-  artifactSource: 'challenge_solid_quote' | 'challenge_drafted_note';
-  sourceEventIds: string[];
-};
+type VerifiedChallengeArtifactInput =
+  | {
+      artifactSource: 'challenge_solid_quote';
+      conceptKey: string;
+      sourceEventIds: string[];
+    }
+  | {
+      artifactSource: 'challenge_drafted_note';
+      content: string;
+      sourceEventIds: string[];
+    };
+
+function storedArtifactContent(input: VerifiedChallengeArtifactInput): string {
+  return input.artifactSource === 'challenge_solid_quote'
+    ? input.conceptKey
+    : input.content;
+}
 
 /** Persist a server-owned Challenge artifact set and opaque provenance atomically. */
 export async function persistVerifiedChallengeArtifacts(
@@ -52,7 +68,7 @@ export async function persistVerifiedChallengeArtifacts(
   if (params.artifacts.length === 0) return;
   for (const artifact of params.artifacts) {
     learningTextGuard.assertNoClinicalInferenceInLearningRecord(
-      artifact.content,
+      storedArtifactContent(artifact),
     );
     if (new Set(artifact.sourceEventIds).size === 0) {
       throw new Error('Verified Challenge artifact requires provenance');
@@ -67,8 +83,12 @@ export async function persistVerifiedChallengeArtifacts(
           profileId: params.profileId,
           topicId: params.topicId,
           sessionId: params.sessionId,
-          content: input.content,
+          content: storedArtifactContent(input),
           artifactSource: input.artifactSource,
+          artifactConceptKey:
+            input.artifactSource === 'challenge_solid_quote'
+              ? input.conceptKey
+              : null,
           verificationState: 'verified',
         })
         .returning({ id: topicNotes.id });
@@ -98,11 +118,17 @@ export async function persistVerifiedChallengeArtifact(
     topicId: params.topicId,
     sessionId: params.sessionId,
     artifacts: [
-      {
-        content: params.content,
-        artifactSource: params.artifactSource,
-        sourceEventIds: params.sourceEventIds,
-      },
+      params.artifactSource === 'challenge_solid_quote'
+        ? {
+            artifactSource: params.artifactSource,
+            conceptKey: params.conceptKey,
+            sourceEventIds: params.sourceEventIds,
+          }
+        : {
+            artifactSource: params.artifactSource,
+            content: params.content,
+            sourceEventIds: params.sourceEventIds,
+          },
     ],
   });
 }
@@ -152,7 +178,7 @@ export async function resolveEvidenceLink(
       : link.toKind === 'bookmark'
         ? await repo.bookmarks.findId(eq(bookmarks.id, link.toId))
         : link.toKind === 'homework_ocr'
-          ? await repo.sessions.findId(eq(learningSessions.id, link.toId))
+          ? await resolveHomeworkOcrTarget(repo, link.toId)
           : await repo.sessionEvents.findId(eq(sessionEvents.id, link.toId));
 
   return {
@@ -160,4 +186,22 @@ export async function resolveEvidenceLink(
     toKind: link.toKind,
     availability: target ? 'available' : 'source_unavailable',
   };
+}
+
+async function resolveHomeworkOcrTarget(
+  repo: ReturnType<typeof createScopedRepository>,
+  sessionId: string,
+): Promise<{ id: string } | undefined> {
+  const target = await repo.sessions.findIdAndMetadata(
+    eq(learningSessions.id, sessionId),
+  );
+  if (!target) return undefined;
+
+  const metadata = sessionMetadataSchema.safeParse(target.metadata ?? {});
+  const ocrText = metadata.success
+    ? metadata.data.homework?.ocrText
+    : undefined;
+  return typeof ocrText === 'string' && ocrText.trim().length > 0
+    ? { id: target.id }
+    : undefined;
 }

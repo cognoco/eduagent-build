@@ -25,6 +25,9 @@ export const topicNotes = pgTable(
     // deployed Worker explicitly writes NULL. The default covers new writers;
     // readers normalize legacy/null rows until a later contraction migration.
     artifactSource: text('artifact_source').default('learner_authored_note'),
+    // Pointer-only solid-answer artifacts bind to this canonical concept key;
+    // their transcript text remains only in the retention-bound event row.
+    artifactConceptKey: text('artifact_concept_key'),
     verificationState: text('verification_state')
       .notNull()
       .default('unverified'),

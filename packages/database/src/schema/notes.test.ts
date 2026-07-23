@@ -31,4 +31,12 @@ describe('topicNotes rollout compatibility', () => {
       `"to_kind" IN ('note', 'bookmark', 'transcript_excerpt', 'homework_ocr')`,
     );
   });
+
+  it('binds solid-answer artifacts to a concept without storing transcript text', () => {
+    expect(topicNotes.artifactConceptKey.notNull).toBe(false);
+    expect(migration).toContain('ADD COLUMN "artifact_concept_key" text');
+    expect(migration).toContain(
+      `"artifact_source" <> 'challenge_solid_quote' OR "artifact_concept_key" IS NOT NULL`,
+    );
+  });
 });
