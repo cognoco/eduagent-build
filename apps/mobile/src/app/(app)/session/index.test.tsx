@@ -1,6 +1,6 @@
 import type { InputMode } from '@eduagent/schemas';
 import React from 'react';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { fireEvent, waitFor, act, within } from '@testing-library/react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { QuotaExceededError } from '../../../lib/api-client';
@@ -818,6 +818,41 @@ describe('SessionScreen homework flow', () => {
     expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects');
     expect(mockCanGoBack).not.toHaveBeenCalled();
     expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('replaces the named Subjects return on web even after consuming the actual Hub transition', async () => {
+    const platformReplacement = jest.replaceProperty(Platform, 'OS', 'web');
+    try {
+      const mockBack = jest.fn();
+      const mockCanGoBack = jest.fn(() => true);
+      mockConsumeHubToSessionTransition.mockReturnValue(true);
+      (useRouter as jest.Mock).mockReturnValue({
+        back: mockBack,
+        canGoBack: mockCanGoBack,
+        replace: mockReplace,
+        setParams: mockSetParams,
+      });
+      (useLocalSearchParams as jest.Mock).mockReturnValue({
+        mode: 'learning',
+        subjectId: SUBJECT_ID,
+        subjectName: 'Math',
+        topicId: TOPIC_ID,
+        topicName: 'Linear equations',
+        returnTo: 'subjects',
+      });
+
+      const testScreen = renderSessionScreen();
+      await flushAsyncWork();
+      mockReplace.mockClear();
+
+      fireEvent.press(testScreen.getByTestId('mock-back-button'));
+
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects');
+      expect(mockCanGoBack).not.toHaveBeenCalled();
+      expect(mockBack).not.toHaveBeenCalled();
+    } finally {
+      platformReplacement.restore();
+    }
   });
 
   describe('managed-child mentor birth moment', () => {

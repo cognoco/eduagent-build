@@ -44,6 +44,7 @@ jest.mock('expo-router', () => ({
 jest.mock(
   '../../lib/navigation-transition-provenance',
   () => ({
+    ...jest.requireActual('../../lib/navigation-transition-provenance'),
     markSubjectsToHubTransition: (...args: unknown[]) =>
       mockMarkSubjectsToHubTransition(...args),
   }),

@@ -1,5 +1,12 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { platformAlert } from '../../../lib/platform-alert';
 import { goBackOrReplace, SUBJECTS_RETURN_TO } from '../../../lib/navigation';
 import { consumeHubToSessionTransition } from '../../../lib/navigation-transition-provenance';
@@ -417,7 +424,7 @@ function SessionScreenInner() {
   // never changed. Supplying an explicit handler that uses Expo Router's
   // typed object form makes the navigation reliable across web + native.
   const handleChatBackPress = useCallback(() => {
-    if (hasSubjectsPredecessor) {
+    if (hasSubjectsPredecessor && Platform.OS !== 'web') {
       goBackOrReplace(router, homeBackHref);
       return;
     }
@@ -437,7 +444,7 @@ function SessionScreenInner() {
     router.replace('/(app)/home' as Href);
   }, [hasSubjectsPredecessor, returnTo, subjectId, homeBackHref, router]);
   const handleHomeBack = useCallback(() => {
-    if (hasSubjectsPredecessor) {
+    if (hasSubjectsPredecessor && Platform.OS !== 'web') {
       goBackOrReplace(router, homeBackHref);
       return;
     }
