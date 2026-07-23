@@ -109,24 +109,7 @@ seed_flow() {
     -H 'Content-Type: application/json' \
     "${secret_header[@]}" \
     -d "$payload")
-  # The single-quoted program is JavaScript; its ${key} interpolation belongs
-  # to Node, not this shell.
-  # shellcheck disable=SC2016
-  node -e '
-    const data = JSON.parse(process.argv[1]);
-    const values = {
-      EMAIL: data.email,
-      PASSWORD: data.password,
-      ACCOUNT_ID: data.accountId,
-      PROFILE_ID: data.profileId,
-    };
-    for (const [key, value] of Object.entries(data.ids ?? {})) {
-      values[key.replace(/([A-Z])/g, "_$1").toUpperCase()] = value;
-    }
-    for (const [key, value] of Object.entries(values)) {
-      if (value !== undefined && value !== null) console.log(`${key}=${value}`);
-    }
-  ' "$response"
+  node apps/mobile/e2e/scripts/seed-response-to-maestro-env.mjs "$response"
 }
 
 reset_seed() {

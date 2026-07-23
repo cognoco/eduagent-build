@@ -1,15 +1,13 @@
-# PARKED (WI-1864; owner WI-1655): The parent-authenticated release flow has no
-# supported way to activate the uncredentialed child after SecureStore clear.
-# UNBLOCK: add an EXPO_PUBLIC_E2E-guarded child-activation seam through the real
-# profile-switch contract, then validate this verify-at-e2e flow on Orion.
+# PARKED (WI-1655): The E2E-only child-activation seam is implemented, but this
+# flow remains machine-excluded until its first direct Orion PASS.
+# UNPARK: remove this PARKED header and the blocked tag only after that receipt.
 # Flow: Child In-Chat Quota Exceeded - verify child-safe 402 actions
 # Validates: a non-owner child profile that exhausts its per-profile v2 quota
 # gets the structured in-chat quota card with notify-parent/home actions and no
-# owner upgrade/top-up action. Device execution is intentionally deferred to the
-# e2e lane; keep this tagged verify-at-e2e-run until run on a configured device.
-# The seed signs in with the parent Clerk login, but the seed result returns
-# profileId=childProfileId so seed-and-run exports the exhausted child as the
-# active profile; the mandatory learner-screen wait below verifies that context.
+# owner upgrade/top-up action. The seed signs in with the parent Clerk login and
+# returns the exhausted child's ID. The flow then uses the EXPO_PUBLIC_E2E-only
+# long-press seam on the real profile row, which calls the production
+# switchProfile contract; PROFILE_ID alone does not activate a child.
 appId: com.mentomate.app
 tags:
   - nightly
@@ -23,9 +21,62 @@ tags:
       SEED_SCENARIO: 'child-quota-exceeded'
       API_URL: ${API_URL}
 
+- extendedWaitUntil:
+    visible:
+      id: 'parent-home-screen'
+    timeout: 30000
+
 - tapOn:
-    text: "Let's Go"
-    optional: true # justified: PostApprovalLanding appears only after SecureStore wipe for consented children
+    id: 'tab-more'
+- extendedWaitUntil:
+    visible:
+      id: 'more-scroll'
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: 'more-row-account'
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    id: 'more-row-account'
+- extendedWaitUntil:
+    visible:
+      id: 'more-account-scroll'
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: 'more-row-profile'
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    id: 'more-row-profile'
+- extendedWaitUntil:
+    visible:
+      id: 'profiles-screen'
+    timeout: 15000
+
+# EXPO_PUBLIC_E2E-only: invokes the same server-authorized switchProfile
+# contract as a real profile switch, without entering parent-proxy mode.
+- longPressOn:
+    id: 'profile-row-${CHILD_PROFILE_ID}'
+
+# Some consented children see this one-time device-local landing after package
+# data was cleared. It is absent once already acknowledged.
+- extendedWaitUntil:
+    visible:
+      id: 'post-approval-landing'
+    timeout: 5000
+    optional: true
+- tapOn:
+    id: 'post-approval-continue'
+    optional: true # justified: the landing is device-local and may already have been acknowledged
+
+- extendedWaitUntil:
+    visible:
+      id: 'tab-home'
+    timeout: 15000
+- tapOn:
+    id: 'tab-home'
 
 - extendedWaitUntil:
     visible:

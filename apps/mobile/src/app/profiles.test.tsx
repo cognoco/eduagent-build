@@ -153,10 +153,12 @@ const { useProfile } = require('../lib/profile') as {
 
 const ProfilesScreen = require('./profiles').default;
 const mockUseReverification = useReverification as jest.Mock;
+const originalE2EFlag = process.env.EXPO_PUBLIC_E2E;
 
 describe('ProfilesScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    delete process.env.EXPO_PUBLIC_E2E;
     mockCanGoBack.mockReturnValue(true);
     // [BUG-375] Default to signed-in so existing tests are unaffected by the
     // new auth guard; auth-gate break tests override below.
@@ -167,6 +169,14 @@ describe('ProfilesScreen', () => {
     mockUseReverification.mockImplementation(
       (fn: (...args: unknown[]) => unknown) => fn,
     );
+  });
+
+  afterEach(() => {
+    if (originalE2EFlag === undefined) {
+      delete process.env.EXPO_PUBLIC_E2E;
+    } else {
+      process.env.EXPO_PUBLIC_E2E = originalE2EFlag;
+    }
   });
 
   it('shows empty state when no profiles', () => {
@@ -275,6 +285,59 @@ describe('ProfilesScreen', () => {
     expect(screen.queryByTestId('proxy-confirm-view')).toBeNull();
     expect(screen.queryByTestId('proxy-confirm-cancel')).toBeNull();
   });
+
+  it('[WI-1655] activates an owner-linked child on E2E long-press through the real switch contract', async () => {
+    process.env.EXPO_PUBLIC_E2E = 'true';
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile, childProfile],
+      activeProfile: ownerProfile,
+      switchProfile: mockSwitchProfile,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    const childRow = screen.getByTestId('profile-row-child-id');
+    fireEvent(childRow, 'longPress');
+
+    await waitFor(() => {
+      expect(mockSwitchProfile).toHaveBeenCalledTimes(1);
+      expect(mockSwitchProfile).toHaveBeenCalledWith('child-id');
+    });
+    expect(mockSetMode).not.toHaveBeenCalled();
+    expect(mockDismiss).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(mockBack).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it.each(['unset', 'false'] as const)(
+    '[WI-1655] does not expose child activation when EXPO_PUBLIC_E2E is %s',
+    (flagState) => {
+      if (flagState === 'unset') {
+        delete process.env.EXPO_PUBLIC_E2E;
+      } else {
+        process.env.EXPO_PUBLIC_E2E = flagState;
+      }
+      useProfile.mockReturnValue({
+        profiles: [ownerProfile, childProfile],
+        activeProfile: ownerProfile,
+        switchProfile: mockSwitchProfile,
+        isLoading: false,
+      });
+
+      render(<ProfilesScreen />);
+
+      fireEvent(screen.getByTestId('profile-row-child-id'), 'longPress');
+      expect(mockSwitchProfile).not.toHaveBeenCalled();
+      expect(mockDismiss).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalled();
+      expect(mockBack).not.toHaveBeenCalled();
+    },
+  );
 
   it('[BREAK][WI-301] requires reverification before a child switches into the owner row', async () => {
     let runReverifiedAction!: () => Promise<unknown>;

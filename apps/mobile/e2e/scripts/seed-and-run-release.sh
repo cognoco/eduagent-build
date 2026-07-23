@@ -63,7 +63,8 @@ MAESTRO="${MAESTRO_PATH:-/c/tools/maestro/bin/maestro}"
 ADB="${ADB_PATH:-/c/Android/Sdk/platform-tools/adb.exe}"
 APP_ID="com.mentomate.app"
 APP_TIMEOUT="${APP_TIMEOUT:-30}"
-CONFIG_FILE="$(dirname "$0")/../config-release.yaml"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="${SCRIPT_DIR}/../config-release.yaml"
 
 export TEMP="${TEMP:-C:\\tools\\tmp}"
 export TMP="${TMP:-C:\\tools\\tmp}"
@@ -177,36 +178,26 @@ if [ -z "$SEED_RESPONSE" ]; then
   exit 1
 fi
 
-SEED_EMAIL=$(node -e "process.stdout.write(JSON.parse(process.argv[1]).email)" "$SEED_RESPONSE")
-SEED_PASSWORD=$(node -e "process.stdout.write(JSON.parse(process.argv[1]).password)" "$SEED_RESPONSE")
-SEED_ACCOUNT_ID=$(node -e "process.stdout.write(JSON.parse(process.argv[1]).accountId)" "$SEED_RESPONSE")
-SEED_PROFILE_ID=$(node -e "process.stdout.write(JSON.parse(process.argv[1]).profileId)" "$SEED_RESPONSE")
-
-SEED_IDS=$(node -e "
-  const d = JSON.parse(process.argv[1]);
-  const ids = d.ids || {};
-  const parts = Object.entries(ids).map(([k,v]) => k + '=' + v);
-  process.stdout.write(parts.join(' '));
-" "$SEED_RESPONSE")
-
-echo "[release] Seeded: email=${SEED_EMAIL} account=${SEED_ACCOUNT_ID} profile=${SEED_PROFILE_ID}"
-
+SEED_ENV_VALUES=$(node \
+  "${SCRIPT_DIR}/seed-response-to-maestro-env.mjs" \
+  "$SEED_RESPONSE")
+SEED_EMAIL=""
 MAESTRO_ENV_ARGS=(
-  -e "EMAIL=${SEED_EMAIL}"
-  -e "PASSWORD=${SEED_PASSWORD}"
-  -e "ACCOUNT_ID=${SEED_ACCOUNT_ID}"
-  -e "PROFILE_ID=${SEED_PROFILE_ID}"
   -e "SCENARIO=${SCENARIO}"
   -e "API_URL=${API_URL}"
 )
-
-if [ -n "$SEED_IDS" ]; then
-  for pair in $SEED_IDS; do
-    KEY=$(node -e "process.stdout.write(process.argv[1].replace(/([A-Z])/g, '_\$1').toUpperCase())" "$(echo "$pair" | cut -d= -f1)")
-    VAL=$(echo "$pair" | cut -d= -f2)
-    MAESTRO_ENV_ARGS+=(-e "${KEY}=${VAL}")
-  done
+while IFS= read -r pair; do
+  [ -n "$pair" ] || continue
+  if [[ "$pair" == EMAIL=* ]]; then
+    SEED_EMAIL="${pair#EMAIL=}"
+  fi
+  MAESTRO_ENV_ARGS+=(-e "$pair")
+done <<< "$SEED_ENV_VALUES"
+if [ -z "$SEED_EMAIL" ]; then
+  echo "[release] ERROR: Seed response did not contain EMAIL" >&2
+  exit 1
 fi
+echo "[release] Seed prepared for scenario='${SCENARIO}'."
 
 echo "[release] Running: ${MAESTRO} test --config ${CONFIG_FILE} ${FLOW_FILE}"
 set +e

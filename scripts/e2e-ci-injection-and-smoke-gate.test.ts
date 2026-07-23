@@ -617,6 +617,42 @@ describe('[WI-1651] e2e-ci.yml propagates Maestro failures', () => {
       rmSync(harness.root, { recursive: true, force: true });
     }
   });
+
+  it('[WI-1655] exports camelCase seed IDs to Maestro and logs their keys without values', () => {
+    const ownSubjectId = 'own-subject-private-value';
+    const supporteePersonId = 'supportee-person-private-value';
+    const seedResponse = JSON.stringify({
+      email: 'private@example.com',
+      password: 'private-password',
+      accountId: 'private-account',
+      profileId: 'private-profile',
+      ids: { ownSubjectId, supporteePersonId },
+    });
+    const result = spawnSync(
+      process.execPath,
+      [
+        join(
+          repoRoot,
+          'apps/mobile/e2e/scripts/seed-response-to-maestro-env.mjs',
+        ),
+        seedResponse,
+      ],
+      { cwd: repoRoot, encoding: 'utf8' },
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain(`OWN_SUBJECT_ID=${ownSubjectId}`);
+    expect(result.stdout).toContain(`SUPPORTEE_PERSON_ID=${supporteePersonId}`);
+    expect(result.stderr).toContain('ownSubjectId->OWN_SUBJECT_ID');
+    expect(result.stderr).toContain('supporteePersonId->SUPPORTEE_PERSON_ID');
+    expect(result.stderr).not.toContain(ownSubjectId);
+    expect(result.stderr).not.toContain(supporteePersonId);
+    for (const runner of ['run-ci-maestro.sh', 'seed-and-run-release.sh']) {
+      expect(
+        readFileSync(join(repoRoot, 'apps/mobile/e2e/scripts', runner), 'utf8'),
+      ).toContain('seed-response-to-maestro-env.mjs');
+    }
+  });
 });
 
 describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () => {
@@ -1146,6 +1182,58 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       'flows/edge/animated-splash.yaml',
     );
     expect(plan.every(({ shard }) => shard >= 1 && shard <= 8)).toBe(true);
+  });
+
+  it('[WI-1655] activates the seeded child before asserting the child quota learner landing', () => {
+    const source = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/billing/child-in-chat-quota-exceeded.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      longPressOn?: { id?: string } | string;
+      extendedWaitUntil?: {
+        visible?: { id?: string } | string;
+        optional?: boolean;
+      };
+    }>;
+    const activateChild = commands.findIndex(
+      ({ longPressOn }) =>
+        typeof longPressOn === 'object' &&
+        longPressOn.id === 'profile-row-${CHILD_PROFILE_ID}',
+    );
+    const learnerLanding = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > activateChild &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'learner-screen' &&
+        extendedWaitUntil.optional !== true,
+    );
+
+    expect(activateChild).toBeGreaterThan(-1);
+    expect(learnerLanding).toBeGreaterThan(activateChild);
+  });
+
+  it('[WI-1655] keeps the child quota journey excluded only while its first Orion pass is parked', () => {
+    const childFlow =
+      'flows/billing/child-in-chat-quota-exceeded.yaml' as const;
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e', childFlow),
+      'utf8',
+    );
+    const header = parseYaml(source.split(/^---$/m)[0] ?? '') as {
+      tags?: string[];
+    };
+    const isParked =
+      source.includes('# PARKED (WI-1655)') &&
+      header.tags?.includes('blocked') === true;
+    const isScheduled = loadPlan('nightly').some(
+      ({ flow }) => flow === childFlow,
+    );
+
+    expect(isScheduled).toBe(!isParked);
   });
 
   it('[WI-1864] keeps every prose-parked flow machine-excluded from scheduled suites', () => {
@@ -6343,7 +6431,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(taggedV2).toEqual(manifestV2);
   });
 
-  it('[WI-1400] defines a V2-only native publish-readiness suite with interaction coverage', () => {
+  it('[WI-1400 / WI-1655] defines a V2-only native publish-readiness suite with interaction coverage', () => {
     const plan = loadPlan('v2');
     const workflowRaw = loadWorkflowRaw('e2e-ci.yml');
     const flow = readFileSync(
@@ -6398,6 +6486,13 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scenario: 'v2-supporter-accepted',
         shard: 1,
       },
+      // [WI-1655] Cold supporter self-learning doorway — a supporter with an
+      // accepted edge but no own learning state starts their first Me journey.
+      {
+        flow: 'flows/v2/v2-supporter-self-learning-cold.yaml',
+        scenario: 'v2-supporter-self-learning',
+        shard: 1,
+      },
       // [WI-2243] Supporter self-learning doorway + Me-scope persistence —
       // Support hub -> Me scope (equal, chip-reachable) -> resume own
       // subject -> Subjects -> relaunch preserves Me -> supportee and back,
@@ -6447,6 +6542,39 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(flow.match(/assertNotVisible:/g)).toHaveLength(6);
     expect(flow.match(/id: ['"]tab-subjects['"]/g)).toHaveLength(3);
     expect(flow.match(/retryTapIfNoChange: true/g)).toHaveLength(3);
+  });
+
+  it('[WI-1655] captures named receipts for both supporter self-learning variants', () => {
+    const coldFlow = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/v2/v2-supporter-self-learning-cold.yaml',
+      ),
+      'utf8',
+    );
+    const activeFlow = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/v2/v2-supporter-self-learning-doorway.yaml',
+      ),
+      'utf8',
+    );
+
+    for (const receipt of [
+      'v2-supporter-self-learning-cold-01-doorway',
+      'v2-supporter-self-learning-cold-02-me-mentor',
+      'v2-supporter-self-learning-cold-03-supportee',
+    ]) {
+      expect(coldFlow).toContain(`takeScreenshot: ${receipt}`);
+    }
+    for (const receipt of [
+      'v2-supporter-self-learning-active-01-own-subject',
+      'v2-supporter-self-learning-active-02-restored-own-subject',
+      'v2-supporter-self-learning-active-03-supportee',
+      'v2-supporter-self-learning-active-04-me-restored',
+    ]) {
+      expect(activeFlow).toContain(`takeScreenshot: ${receipt}`);
+    }
   });
 
   it('[WI-2584 profile-load-error] hard-fails authenticated bootstrap errors before Back recovery', () => {

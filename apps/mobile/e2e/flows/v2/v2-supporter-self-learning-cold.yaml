@@ -1,0 +1,56 @@
+# [WI-1655] V2 supporter self-learning doorway — first-time/no-own-learning.
+#
+# Runs only in the explicit V2 release-APK suite. The seed owns an accepted
+# supporter edge but no subject or session for the supporter, so `me` is absent
+# from the server-resolved scope list and the first-time doorway must render.
+#
+# The mandatory supportee scope selector interpolates SUPPORTEE_PERSON_ID from
+# the seed response. This is a positive selector, so a missing or literal env
+# value cannot make the flow pass vacuously.
+#
+# SEED_SCENARIO: 'v2-supporter-self-learning'
+appId: com.mentomate.app
+tags:
+  - v2
+  - navigation
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: 'v2-supporter-self-learning'
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: 'support-hub-mentor-tab'
+    timeout: 30000
+
+- extendedWaitUntil:
+    visible:
+      id: 'supporter-self-learning-doorway'
+    timeout: 15000
+- assertNotVisible:
+    id: 'scope-chip-option-me'
+- assertVisible:
+    id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}'
+- takeScreenshot: v2-supporter-self-learning-cold-01-doorway
+
+# The doorway enters the ordinary learner Mentor screen in Me scope.
+- tapOn:
+    id: 'supporter-self-learning-doorway'
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 15000
+- assertNotVisible:
+    id: 'support-hub-mentor-tab'
+- takeScreenshot: v2-supporter-self-learning-cold-02-me-mentor
+
+# Switch back to the accepted supportee through the real seeded person ID.
+- tapOn:
+    id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-mentor-tab'
+    timeout: 15000
+- takeScreenshot: v2-supporter-self-learning-cold-03-supportee

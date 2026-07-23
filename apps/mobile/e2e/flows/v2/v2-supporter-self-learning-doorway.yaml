@@ -98,6 +98,7 @@ tags:
       id: 'subjects-browse-row-${OWN_SUBJECT_ID}'
     direction: DOWN
     timeout: 15000
+- takeScreenshot: v2-supporter-self-learning-active-01-own-subject
 
 # Relaunch — see the persistence note in the file header. NO scope-chip tap
 # here: mentor-screen must appear on its own, restored from the persisted
@@ -121,6 +122,7 @@ tags:
       id: 'subjects-browse-row-${OWN_SUBJECT_ID}'
     direction: DOWN
     timeout: 15000
+- takeScreenshot: v2-supporter-self-learning-active-02-restored-own-subject
 
 # Switch to the accepted supportee: person scope, strict separation
 # direction 1 — the supporter's own Me-scope subject never appears here.
@@ -141,6 +143,7 @@ tags:
     id: 'person-scope-subject-${OWN_SUBJECT_ID}'
 - assertNotVisible:
     text: 'Supporter Own Subject'
+- takeScreenshot: v2-supporter-self-learning-active-03-supportee
 
 # Switch back to Me: direction 2 — no supportee-private content leaked into
 # Me (forward-regression canary; the actual authorization proof is the
@@ -158,3 +161,4 @@ tags:
     id: 'subjects-browse-row-${OWN_SUBJECT_ID}'
 - assertNotVisible:
     text: 'PRIVATE'
+- takeScreenshot: v2-supporter-self-learning-active-04-me-restored

@@ -343,6 +343,13 @@ export default function ProfilesScreen() {
               <Pressable
                 key={profile.id}
                 onPress={() => handleProfileTap(profile)}
+                onLongPress={
+                  process.env.EXPO_PUBLIC_E2E === 'true' &&
+                  activeProfile?.isOwner &&
+                  !profile.isOwner
+                    ? () => void handleSwitch(profile.id)
+                    : undefined
+                }
                 disabled={isSwitching}
                 className="flex-row items-center bg-surface rounded-card px-4 py-3.5 mb-2"
                 style={isSwitching ? { opacity: 0.6 } : undefined}
