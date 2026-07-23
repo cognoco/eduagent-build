@@ -301,6 +301,40 @@ describe('MentorMemoryScreen — interests null guard', () => {
     ).toBe(47);
   });
 
+  // [WI-2331 AC-2 core] `/(app)/more` is dead in V2 (not one of the three
+  // tabs) — mentor-memory has no parent more specific than its owning tab
+  // (Mentor), so the Back control must name and target that tab under V2,
+  // while leaving the legacy `/(app)/more` behavior untouched under V0/V1.
+  it('names and targets the owning Mentor tab for Back under V2', async () => {
+    mockModeNavV0Enabled = true;
+    mockModeNavV1Enabled = true;
+    mockModeNavV2Enabled = true;
+    // goBackOrReplace only exercises the fallback target (this fix's
+    // surface) when there is no history to pop — force that branch.
+    mockRouter.canGoBack.mockReturnValueOnce(false);
+
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    const backButton = await screen.findByTestId('mentor-memory-back');
+    expect(backButton.props.accessibilityLabel).toBe('Back to Mentor');
+
+    fireEvent.press(backButton);
+    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/mentor');
+    expect(mockRouter.replace).not.toHaveBeenCalledWith('/(app)/more');
+  });
+
+  it('preserves the legacy More target and generic label when V2 is off', async () => {
+    mockRouter.canGoBack.mockReturnValueOnce(false);
+
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    const backButton = await screen.findByTestId('mentor-memory-back');
+    expect(backButton.props.accessibilityLabel).toBe('Go Back');
+
+    fireEvent.press(backButton);
+    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/more');
+  });
+
   it('does not crash when profile.interests is undefined', () => {
     mockProfileData = { ...mockProfileBase, interests: undefined };
     expect(() =>

@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { platformAlert } from '../../lib/platform-alert';
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, type Href } from 'expo-router';
 import type {
   PurchasesPackage,
   PurchasesOffering,
@@ -31,6 +31,8 @@ import { queryKeys } from '../../lib/query-keys';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TimeoutLoader } from '../../components/common';
+import { V2_TAB_TITLE_KEYS } from '../../lib/navigation';
+import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import {
   useSubscription,
   useUsage,
@@ -144,6 +146,16 @@ function SubscriptionContent(): React.ReactElement | null {
   const activeProfileRole = useActiveProfileRole();
   const client = useApiClient();
   const { t, i18n } = useTranslation();
+  // WI-2331 AC-2 (core): `/(app)/more` is dead in V2 (not one of the three
+  // tabs) — subscription has no parent screen more specific than its owning
+  // tab (Mentor), so under V2 this timeout Back control routes to and names
+  // that tab instead, via the same owning-tab contract AC-1's tab highlight
+  // uses.
+  const v2Enabled = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+  const timeoutBackHref = v2Enabled ? '/(app)/mentor' : '/(app)/more';
+  const timeoutBackLabel = v2Enabled
+    ? t('common.backTo', { destination: t(V2_TAB_TITLE_KEYS.mentor) })
+    : t('common.goBack');
 
   const queryClient = useQueryClient();
 
@@ -811,8 +823,8 @@ function SubscriptionContent(): React.ReactElement | null {
               testID: 'subscription-loading-timeout-retry',
             }}
             secondaryAction={{
-              label: t('common.goBack'),
-              onPress: () => router.replace('/(app)/more'),
+              label: timeoutBackLabel,
+              onPress: () => router.replace(timeoutBackHref as Href),
               testID: 'subscription-loading-timeout-back',
             }}
             testID="subscription-loading-spinner"

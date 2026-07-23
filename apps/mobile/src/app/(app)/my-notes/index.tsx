@@ -7,7 +7,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   OWN_LEARNING_RETURN_TO,
   homeHrefForReturnTo,
+  V2_TAB_TITLE_KEYS,
 } from '../../../lib/navigation';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { useProfileSessions } from '../../../hooks/use-progress';
 import { useProfile } from '../../../lib/profile';
 import { useThemeColors } from '../../../lib/theme';
@@ -83,7 +85,16 @@ export default function MyNotesHubScreen(): React.ReactElement {
   const colors = useThemeColors();
   const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
   const returnTo = myNotesReturnTo(params.returnTo);
-  const homeHref = homeHrefForReturnTo(returnTo);
+  const v2Enabled = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+  const homeHref = homeHrefForReturnTo(returnTo, undefined, v2Enabled);
+  // WI-2331 AC-2 (core): my-notes has no parent screen more specific than
+  // its owning V2 tab (Mentor — my-notes is not a Subjects/Journal route),
+  // so the Back control names that tab instead of the generic `common.back`
+  // it showed before — same contract as AC-1's tab highlight, so the label
+  // and the highlighted tab always agree.
+  const backLabel = v2Enabled
+    ? t('common.backTo', { destination: t(V2_TAB_TITLE_KEYS.mentor) })
+    : t('common.back');
   const { activeProfile } = useProfile();
   const sessionsQuery = useProfileSessions(activeProfile?.id);
 
@@ -111,7 +122,7 @@ export default function MyNotesHubScreen(): React.ReactElement {
             onPress={() => router.replace(homeHref)}
             className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityRole="button"
-            accessibilityLabel={t('common.back')}
+            accessibilityLabel={backLabel}
             testID="my-notes-back"
           >
             <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />

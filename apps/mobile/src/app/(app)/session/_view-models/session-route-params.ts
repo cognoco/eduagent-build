@@ -2,6 +2,7 @@ import type { HomeworkCaptureSource, HomeworkProblem } from '@eduagent/schemas';
 
 import { parseHomeworkProblems } from '../../../../components/homework/problem-cards';
 import { firstParam } from '../../../../lib/route-params';
+import { FEATURE_FLAGS } from '../../../../lib/feature-flags';
 import {
   homeworkReturnHrefForReturnTo,
   normalizeHomeworkEntrySource,
@@ -76,7 +77,11 @@ export function getSessionRouteParams(
   const returnId = firstParam(rawParams.returnId);
   const effectiveMode = firstParam(rawParams.mode) ?? 'freeform';
   const problemText = firstParam(rawParams.problemText);
-  const homeBackHref = homeworkReturnHrefForReturnTo(returnTo, returnId);
+  const homeBackHref = homeworkReturnHrefForReturnTo(
+    returnTo,
+    returnId,
+    FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+  );
   const homeworkEntrySource = normalizeHomeworkEntrySource(
     rawParams.entrySource,
   );

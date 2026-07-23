@@ -120,6 +120,31 @@ describe('homeHrefForReturnTo', () => {
   it('resolves FAMILY_HOME_RETURN_TO to FAMILY_HOME_PATH', () => {
     expect(homeHrefForReturnTo(FAMILY_HOME_RETURN_TO)).toBe(FAMILY_HOME_PATH);
   });
+
+  // [WI-2331 AC-2/AC-5] The trailing catch-all used to be an unconditional
+  // dead `/(app)/home` (not a V2 tab) reachable from every root pushed screen
+  // whose returnTo is absent or unrecognized. With V2 on it now routes through
+  // the owning-tab contract (unknown -> Mentor); with V2 off it must not
+  // regress the legacy home fallback.
+  it('routes the unrecognized/absent catch-all to the Mentor tab when V2 is on', () => {
+    expect(homeHrefForReturnTo('something-else', undefined, true)).toBe(
+      '/(app)/mentor',
+    );
+    expect(homeHrefForReturnTo(undefined, undefined, true)).toBe(
+      '/(app)/mentor',
+    );
+  });
+
+  it('leaves recognized tokens and the V0/V1 catch-all unchanged under V2', () => {
+    // A recognized token resolves identically regardless of the V2 flag …
+    expect(homeHrefForReturnTo(SUBJECTS_RETURN_TO, undefined, true)).toBe(
+      SUBJECTS_HREF,
+    );
+    // … and with V2 off the catch-all still lands on the legacy home.
+    expect(homeHrefForReturnTo('something-else', undefined, false)).toBe(
+      '/(app)/home',
+    );
+  });
 });
 
 describe('goBackOrReplace', () => {

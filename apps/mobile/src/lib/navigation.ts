@@ -32,6 +32,16 @@ const V2_ACCOUNT_RETURN_HREFS = {
   journal: '/(app)/journal',
 } as const satisfies Record<V2AccountReturnToken, Href>;
 
+// WI-2331 AC-2/AC-5: i18n title keys for the "Back to {tab}" label contract,
+// shared by every V2 root-level pushed screen that names its owning tab as
+// its Back destination (not just the Account screen — each such screen maps
+// its own pathname to the owning tab via accountReturnTokenForPathname).
+export const V2_TAB_TITLE_KEYS = {
+  mentor: 'tabs.mentor',
+  subjects: 'tabs.subjects',
+  journal: 'tabs.journal',
+} as const satisfies Record<V2AccountReturnToken, string>;
+
 export function isSessionForwardableReturnTo(
   returnTo: string | undefined,
 ): returnTo is
@@ -113,9 +123,23 @@ export function childProfileHref(
   return `/(app)/child/${encodedProfileId}?mode=${encodedMode}` as Href;
 }
 
+/**
+ * WI-2331 AC-2 (core) / AC-3: the trailing catch-all below used to be an
+ * unconditional `/(app)/home` — dead in V2 (not one of the three tabs) and
+ * reachable whenever a caller's `returnTo` is absent or an unrecognized
+ * token (a plausible deep-link / stale-param path for session, quiz,
+ * practice, homework, topic/relearn, child/session, and my-notes, every one
+ * of which resolves its own exit target through this function). The
+ * `v2Enabled` param routes that catch-all through the same owning-tab
+ * contract AC-1 uses (`accountReturnTokenForPathname`'s "unknown -> Mentor"
+ * default) instead — every OTHER named token below is an intentional V0/V1
+ * destination (own-learning, family-home, family-recaps, …) and is left
+ * untouched so V0/V1 behavior does not change.
+ */
 export function homeHrefForReturnTo(
   returnTo: string | string[] | undefined,
   returnId?: string | string[] | undefined,
+  v2Enabled = false,
 ): Href {
   const token = firstParam(returnTo);
   const id = firstParam(returnId);
@@ -136,7 +160,9 @@ export function homeHrefForReturnTo(
   if (token === FAMILY_PROGRESS_RETURN_TO) return FAMILY_PROGRESS_HREF as Href;
   if (token === STUDY_PROGRESS_RETURN_TO) return STUDY_PROGRESS_HREF as Href;
   if (token === FAMILY_CHILDREN_RETURN_TO) return FAMILY_CHILDREN_HREF as Href;
-  return '/(app)/home' as Href;
+  return v2Enabled
+    ? (V2_ACCOUNT_RETURN_HREFS.mentor as Href)
+    : ('/(app)/home' as Href);
 }
 
 /**

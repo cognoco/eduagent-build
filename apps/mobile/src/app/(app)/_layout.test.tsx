@@ -212,6 +212,7 @@ const {
   V2_ROOT_SAFE_AREA_EXCEPTIONS,
   assertV2SafeAreaOwnershipInvariant,
   resolveV2PushedScenePaddingTop,
+  resolveV2TabIsActive,
 } = require('./_layout');
 const {
   computeModeVisibleTabs,
@@ -2078,6 +2079,67 @@ describe('V2 pushed-route safe-area ownership invariant', () => {
         safeAreaTop: 47,
       }),
     ).toBe(52);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2331 AC-1] V2 pushed screens lose the highlighted owning tab
+//
+// V2's tab bar only shows Mentor/Subjects/Journal, but every other route
+// (progress, subject-hub, child/[id], account, …) is a hidden SIBLING
+// Tabs.Screen. React Navigation tracks that hidden sibling as the actually
+// focused route, so none of the three visible tab buttons is ever reported
+// `focused` while on a pushed screen — the bug this suite locks down.
+// ---------------------------------------------------------------------------
+describe('resolveV2TabIsActive [WI-2331 AC-1]', () => {
+  it('passes React Navigation focus straight through when V2 is disabled', () => {
+    expect(resolveV2TabIsActive('/progress', 'mentor', false, true)).toBe(true);
+    expect(resolveV2TabIsActive('/progress', 'mentor', false, false)).toBe(
+      false,
+    );
+  });
+
+  it('highlights the owning tab for a pushed route React Navigation does not focus', () => {
+    // /progress is a hidden sibling Tabs.Screen — React Navigation reports
+    // focused=false for all three real tab buttons while it is active. The
+    // pre-fix behavior (bare `focused` passthrough) would leave every tab
+    // unhighlighted here; this is the regression this WI closes.
+    expect(resolveV2TabIsActive('/progress', 'mentor', true, false)).toBe(true);
+    expect(resolveV2TabIsActive('/progress', 'subjects', true, false)).toBe(
+      false,
+    );
+    expect(resolveV2TabIsActive('/progress', 'journal', true, false)).toBe(
+      false,
+    );
+  });
+
+  it('resolves Subjects-owned pushed routes (subject-hub, pick-book, shelf, …)', () => {
+    expect(
+      resolveV2TabIsActive('/subject-hub/subject-1', 'subjects', true, false),
+    ).toBe(true);
+    expect(
+      resolveV2TabIsActive('/subject-hub/subject-1', 'mentor', true, false),
+    ).toBe(false);
+    expect(
+      resolveV2TabIsActive('/pick-book/subject-1', 'subjects', true, false),
+    ).toBe(true);
+  });
+
+  it('resolves Journal-owned pushed routes', () => {
+    expect(
+      resolveV2TabIsActive('/journal/practice', 'journal', true, false),
+    ).toBe(true);
+    expect(
+      resolveV2TabIsActive('/journal/practice', 'mentor', true, false),
+    ).toBe(false);
+  });
+
+  it('agrees with React Navigation when a real tab root is actually focused', () => {
+    expect(resolveV2TabIsActive('/mentor', 'mentor', true, true)).toBe(true);
+    expect(resolveV2TabIsActive('/subjects', 'subjects', true, true)).toBe(
+      true,
+    );
+    expect(resolveV2TabIsActive('/journal', 'journal', true, true)).toBe(true);
   });
 });
 

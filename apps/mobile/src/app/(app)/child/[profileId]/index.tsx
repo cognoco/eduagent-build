@@ -28,7 +28,12 @@ import { CONVERSATION_LANGUAGE_LABELS } from '../../../../lib/conversation-langu
 import { getGracePeriodDaysRemaining } from '../../../../lib/consent-grace';
 import { formatApiError } from '../../../../lib/format-api-error';
 import { formatShortDate } from '../../../../lib/format-datetime';
-import { FAMILY_HOME_PATH, goBackOrReplace } from '../../../../lib/navigation';
+import {
+  FAMILY_HOME_PATH,
+  goBackOrReplace,
+  V2_TAB_TITLE_KEYS,
+} from '../../../../lib/navigation';
+import { FEATURE_FLAGS } from '../../../../lib/feature-flags';
 import { platformAlert } from '../../../../lib/platform-alert';
 import { isNewLearner } from '../../../../lib/progressive-disclosure';
 import { useProfile } from '../../../../lib/profile';
@@ -753,6 +758,19 @@ export default function ChildDetailScreen(): React.ReactElement {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  // WI-2331 AC-2 (core): FAMILY_HOME_PATH (`/(app)/home`) is dead in V2 (not
+  // one of the three tabs) for the *generic* Back controls below — this
+  // screen has no parent more specific than its owning tab (Mentor), so
+  // under V2 those controls route to and name that tab instead, via the
+  // same owning-tab contract AC-1's tab highlight uses. The "Back to
+  // Dashboard" secondary action further down already names a real,
+  // deliberate destination (the guardian Dashboard/Home surface, which
+  // still renders correctly under V2) and is left untouched.
+  const v2Enabled = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+  const genericBackFallback = v2Enabled ? '/(app)/mentor' : FAMILY_HOME_PATH;
+  const genericBackLabel = v2Enabled
+    ? t('common.backTo', { destination: t(V2_TAB_TITLE_KEYS.mentor) })
+    : t('common.goBack');
   const { profiles, isLoading: isProfileLoading } = useProfile();
   const { profileId: rawProfileId, mode: rawMode } = useLocalSearchParams<{
     profileId: string;
@@ -905,12 +923,12 @@ export default function ChildDetailScreen(): React.ReactElement {
           {t('parentView.index.noAccessToProfile')}
         </Text>
         <Pressable
-          onPress={() => goBackOrReplace(router, FAMILY_HOME_PATH)}
+          onPress={() => goBackOrReplace(router, genericBackFallback)}
           className="bg-primary rounded-button px-6 py-3"
           accessibilityRole="button"
         >
           <Text className="text-text-inverse text-body font-semibold">
-            {t('common.back')}
+            {genericBackLabel}
           </Text>
         </Pressable>
       </View>
@@ -928,8 +946,8 @@ export default function ChildDetailScreen(): React.ReactElement {
           testID: 'child-profile-loading-retry',
         }}
         secondaryAction={{
-          label: t('common.goBack'),
-          onPress: () => goBackOrReplace(router, FAMILY_HOME_PATH),
+          label: genericBackLabel,
+          onPress: () => goBackOrReplace(router, genericBackFallback),
           testID: 'child-profile-loading-back',
         }}
         testID="child-profile-loading"
@@ -1004,9 +1022,9 @@ export default function ChildDetailScreen(): React.ReactElement {
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => router.replace(FAMILY_HOME_PATH as Href)}
+          onPress={() => router.replace(genericBackFallback as Href)}
           className="me-3 py-2 pe-2"
-          accessibilityLabel={t('common.goBack')}
+          accessibilityLabel={genericBackLabel}
           accessibilityRole="button"
           testID="back-button"
         >
