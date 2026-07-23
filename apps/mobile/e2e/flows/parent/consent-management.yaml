@@ -66,7 +66,8 @@ tags:
     element:
       id: 'withdraw-consent-button'
     direction: DOWN
-    timeout: 10000
+    timeout: 20000
+    speed: 60
     visibilityPercentage: 50
     centerElement: true
     waitToSettleTimeoutMs: 1000
@@ -126,7 +127,8 @@ tags:
     element:
       id: 'withdraw-consent-button'
     direction: DOWN
-    timeout: 10000
+    timeout: 20000
+    speed: 60
     visibilityPercentage: 50
     centerElement: true
     waitToSettleTimeoutMs: 1000

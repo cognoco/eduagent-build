@@ -3589,6 +3589,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         centerElement?: boolean;
         element?: { id?: string };
         optional?: boolean;
+        speed?: number;
+        timeout?: number;
         visibilityPercentage?: number;
         waitToSettleTimeoutMs?: number;
       };
@@ -3603,6 +3605,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     for (const scroll of consentScrolls) {
       expect(scroll).toMatchObject({
         centerElement: true,
+        speed: 60,
+        timeout: 20000,
         visibilityPercentage: 50,
         waitToSettleTimeoutMs: 1000,
       });
