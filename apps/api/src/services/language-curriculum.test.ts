@@ -10,6 +10,7 @@ import {
 } from './language-curriculum';
 import type { Database } from '@eduagent/database';
 import type { GeneratedTopic } from '@eduagent/schemas';
+import { ConflictError } from '../errors';
 
 const PROFILE_ID = 'profile-001';
 const SUBJECT_ID = 'subject-001';
@@ -28,6 +29,7 @@ function createMockDb({
   sessionSummariesSelect = [] as Record<string, unknown>[],
   sessionEventsSelect = [] as Record<string, unknown>[],
   insertReturning = [] as unknown[],
+  updateReturning = [{ id: 'book-1' }] as unknown[],
 } = {}): Database {
   const makeSelectChain = (rows: Record<string, unknown>[]) => {
     const chain: Record<string, unknown> = {
@@ -81,7 +83,7 @@ function createMockDb({
     update: jest.fn().mockReturnValue({
       set: jest.fn().mockReturnValue({
         where: jest.fn().mockReturnValue({
-          returning: jest.fn().mockResolvedValue([{ id: 'book-1' }]),
+          returning: jest.fn().mockResolvedValue(updateReturning),
         }),
       }),
     }),
@@ -297,6 +299,25 @@ describe('regenerateLanguageCurriculum', () => {
     // Should be called at least for curriculum insert + topics insert
     const insertCallCount = (db.insert as jest.Mock).mock.calls.length;
     expect(insertCallCount).toBeGreaterThanOrEqual(1);
+  });
+
+  it('[WI-1864] returns a conflict before deleting when topic expansion owns the book', async () => {
+    const db = createMockDb({
+      subjectFindFirst: { id: SUBJECT_ID, profileId: PROFILE_ID },
+      updateReturning: [],
+    });
+
+    await expect(
+      regenerateLanguageCurriculum(db, PROFILE_ID, SUBJECT_ID, 'es', 'A1'),
+    ).rejects.toMatchObject<Partial<ConflictError>>({
+      name: 'ConflictError',
+      errorCode: 'CONFLICT',
+      status: 409,
+      message: 'Book topic expansion is in progress. Please retry shortly.',
+    });
+
+    expect(db.delete).not.toHaveBeenCalled();
+    expect(db.insert).not.toHaveBeenCalled();
   });
 
   // [BUG-655 / L3.M3.1] BREAK TEST — cross-profile delete attempt
