@@ -4,7 +4,9 @@ import {
   screen,
   within,
 } from '@testing-library/react-native';
+import { readFileSync } from 'node:fs';
 import type { NowResponse } from '@eduagent/schemas';
+import ts from 'typescript';
 
 import { JournalTabView } from './JournalTabView';
 
@@ -553,7 +555,7 @@ describe('JournalTabView', () => {
     screen.getByTestId('journal-notes-empty');
   });
 
-  it('uses the ruled animated motif for each Journal empty state', () => {
+  it('keeps the magic pen as the sole animated focal point in practice and reports empty states', () => {
     mockNowFeed = {
       data: {
         scope: 'self',
@@ -589,26 +591,90 @@ describe('JournalTabView', () => {
     });
 
     fireEvent.press(screen.getByTestId('journal-tab-practice'));
-    screen.getByTestId('journal-practice-empty-motif-lamp', {
-      includeHiddenElements: true,
-    });
     screen.getByTestId('journal-practice-empty-motif-pen', {
       includeHiddenElements: true,
     });
-    screen.getByTestId('journal-practice-empty-motif-book', {
-      includeHiddenElements: true,
-    });
+    expect(
+      screen.queryByTestId('journal-practice-empty-motif-lamp', {
+        includeHiddenElements: true,
+      }),
+    ).toBeNull();
+    expect(
+      screen.queryByTestId('journal-practice-empty-motif-book', {
+        includeHiddenElements: true,
+      }),
+    ).toBeNull();
 
     fireEvent.press(screen.getByTestId('journal-tab-reports'));
-    screen.getByTestId('journal-reports-empty-motif-lamp', {
-      includeHiddenElements: true,
-    });
     screen.getByTestId('journal-reports-empty-motif-pen', {
       includeHiddenElements: true,
     });
-    screen.getByTestId('journal-reports-empty-motif-book', {
-      includeHiddenElements: true,
+    expect(
+      screen.queryByTestId('journal-reports-empty-motif-lamp', {
+        includeHiddenElements: true,
+      }),
+    ).toBeNull();
+    expect(
+      screen.queryByTestId('journal-reports-empty-motif-book', {
+        includeHiddenElements: true,
+      }),
+    ).toBeNull();
+  });
+
+  it('does not add a second decorative animation to the shared empty motif', () => {
+    const source = readFileSync(require.resolve('./journal-shared'), 'utf8');
+    const file = ts.createSourceFile(
+      'journal-shared.tsx',
+      source,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX,
+    );
+    const imports = new Map<string, string>();
+
+    file.forEachChild((node) => {
+      if (
+        !ts.isImportDeclaration(node) ||
+        !ts.isStringLiteral(node.moduleSpecifier)
+      )
+        return;
+      if (node.importClause?.name) {
+        imports.set(node.importClause.name.text, node.moduleSpecifier.text);
+      }
+      const named = node.importClause?.namedBindings;
+      if (named && ts.isNamespaceImport(named)) {
+        imports.set(named.name.text, node.moduleSpecifier.text);
+        return;
+      }
+      if (!named || !ts.isNamedImports(named)) return;
+      for (const element of named.elements) {
+        imports.set(element.name.text, node.moduleSpecifier.text);
+      }
     });
+
+    const motif = file.statements.find(
+      (statement): statement is ts.FunctionDeclaration =>
+        ts.isFunctionDeclaration(statement) &&
+        statement.name?.text === 'PracticeReportsEmptyMotif',
+    );
+    if (!motif?.body) throw new Error('PracticeReportsEmptyMotif not found');
+
+    const importedComponents: string[] = [];
+    const visit = (node: ts.Node) => {
+      if (ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) {
+        const tag = node.tagName.getText(file);
+        const module = imports.get(tag) ?? imports.get(tag.split('.')[0] ?? '');
+        if (module?.includes('Animation')) {
+          importedComponents.push(`${module}:${tag}`);
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    ts.forEachChild(motif.body, visit);
+
+    expect(importedComponents).toEqual([
+      '../common/MagicPenAnimation:MagicPenAnimation',
+    ]);
   });
 
   it('[WI-1678] keeps the Reports empty motif hidden while report queries are still loading', () => {

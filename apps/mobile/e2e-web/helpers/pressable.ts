@@ -29,7 +29,7 @@ export async function pressableClick(
   for (let attempt = 0; attempt < 2; attempt += 1) {
     await expect(target).toBeVisible({ timeout: 15_000 });
 
-    let rollbackFailedDispatch: (() => void) | void;
+    let rollbackFailedDispatch: (() => void) | undefined;
     try {
       await target.scrollIntoViewIfNeeded();
       rollbackFailedDispatch = options.beforeDispatch?.();

@@ -214,7 +214,7 @@ export function AccountAdminSheet(): React.ReactElement {
           ) : null}
           <SettingsRow
             label={t('accountAdmin.familySettings')}
-            onPress={() => router.push('/(app)/more' as Href)}
+            onPress={() => router.push('/(app)/account/family' as Href)}
             testID="account-admin-family-settings"
           />
         </>
