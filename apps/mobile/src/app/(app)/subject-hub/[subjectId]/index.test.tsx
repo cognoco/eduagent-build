@@ -15,6 +15,10 @@ import {
   createTestProfile,
 } from '../../../../test-utils/screen-render';
 import {
+  consumeHubToSessionTransition,
+  resetNavigationTransitionProvenanceForTests,
+} from '../../../../lib/navigation-transition-provenance';
+import {
   extractJsonBody,
   fetchCallsMatching,
   type RoutedMockFetch,
@@ -49,7 +53,6 @@ const mockConsumeSubjectsToHubTransition = jest.fn(
   (_subjectId: string) => false,
 );
 const mockMarkHubToTopicTransition = jest.fn();
-const mockMarkHubToSessionTransition = jest.fn();
 let mockSearchParams: () => {
   subjectId?: string | string[];
   returnTo?: string | string[];
@@ -75,8 +78,6 @@ jest.mock(
       mockConsumeSubjectsToHubTransition(subjectId),
     markHubToTopicTransition: (subjectId: string, topicId: string) =>
       mockMarkHubToTopicTransition(subjectId, topicId),
-    markHubToSessionTransition: (subjectId: string) =>
-      mockMarkHubToSessionTransition(subjectId),
   }),
   { virtual: true },
 );
@@ -211,6 +212,7 @@ function seedRoutes() {
 describe('SubjectHubRoute', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    resetNavigationTransitionProvenanceForTests();
     mockPush.mockReset();
     mockConsumeSubjectsToHubTransition.mockReturnValue(false);
     mockSearchParams = () => ({ subjectId: SUBJECT_ID });
@@ -221,6 +223,7 @@ describe('SubjectHubRoute', () => {
     // Restores every jest.replaceProperty feature-flag override even when an
     // assertion aborts a test before its final line.
     jest.restoreAllMocks();
+    resetNavigationTransitionProvenanceForTests();
     mockPush.mockReset();
     mockReplace.mockReset();
   });
@@ -274,7 +277,7 @@ describe('SubjectHubRoute', () => {
       params: Record<string, unknown>;
     };
     expect(sessionHref.params).not.toHaveProperty('returnStrategy');
-    expect(mockMarkHubToSessionTransition).toHaveBeenCalledWith(SUBJECT_ID);
+    expect(consumeHubToSessionTransition(SUBJECT_ID)).toBe(true);
   });
 
   it.each([
@@ -302,7 +305,7 @@ describe('SubjectHubRoute', () => {
         }),
       );
       expect(mockReplace).not.toHaveBeenCalled();
-      expect(mockMarkHubToSessionTransition).not.toHaveBeenCalled();
+      expect(consumeHubToSessionTransition(SUBJECT_ID)).toBe(false);
     },
   );
 
