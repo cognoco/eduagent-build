@@ -131,6 +131,7 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
   // Mentor + exact chlorophyll search finds only the seeded Mentor bookmark,
   // which then opens the Bookmarks owner list without swapping source identity.
   await pressableClick(page.getByTestId('journal-tab-notes'));
+  await page.getByTestId('journal-notes-search-input').fill('');
   await pressableClick(page.getByTestId('journal-notes-filter-mentor'));
   const journalBookmark = page.getByTestId(
     `journal-note-bookmark:${bookmarkId}`,
