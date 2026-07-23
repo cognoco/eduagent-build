@@ -4,7 +4,7 @@ date: 2026-07-23
 profile: code
 work_items: [WI-1704]
 spec: docs/specs/2026-07-06-verified-learning-loop.md
-status: in-progress
+status: complete
 ---
 
 # WI-1704 Evidence Links Bounce Repair — Implementation Plan
@@ -57,7 +57,7 @@ Out of scope:
 - [x] T5: Isolate server-owned Challenge artifacts from learner surfaces — done when negative search,
   update, and delete regressions fail at the old behavior and pass only for learner-authored,
   unverified rows.
-- [ ] T6: Verify and deliver the exact branch state — done when focused suites, TypeScript/schema
+- [x] T6: Verify and deliver the exact branch state — done when focused suites, TypeScript/schema
   checks, the repository's full unbypassed pre-push gate, `git diff --check`, current-main migration
   ancestry/mergeability checks, and worktree cleanliness all pass; the repo-standard commit workflow
   pushes the exact head and PR #2532 truthfully records repairs, caveat/follow-up, evidence, and
