@@ -17,6 +17,7 @@
 
 import { resolve } from 'path';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import {
   consentGrant,
   consentRequest,
@@ -247,23 +248,33 @@ async function seedConsentState(
   const basis = 'gdpr_parental_consent';
 
   if (status === 'CONSENTED' || status === 'WITHDRAWN') {
-    await db.insert(consentGrant).values({
-      chargePersonId: profileId,
-      organizationId: accountId,
-      purpose: 'platform_use',
-      lawfulBasis: basis,
-      granted: true,
-      withdrawnAt: status === 'WITHDRAWN' ? new Date() : null,
-    });
+    const grantedAt = new Date();
+    await db.insert(consentGrant).values(
+      CONSENT_PURPOSES.map((purpose) => ({
+        chargePersonId: profileId,
+        organizationId: accountId,
+        purpose,
+        lawfulBasis: basis,
+        granted: true,
+        grantedAt,
+        withdrawnAt: status === 'WITHDRAWN' ? grantedAt : null,
+      })),
+    );
   } else {
     // PENDING / PARENTAL_CONSENT_REQUESTED / NOT_CONSENTED — a request row is
     // sufficient to block the "no rows at all" branch of the v2 gate.
-    await db.insert(consentRequest).values({
-      chargePersonId: profileId,
-      organizationId: accountId,
-      requestedBasis: basis,
-      status: status === 'PARENTAL_CONSENT_REQUESTED' ? 'requested' : 'pending',
-    });
+    await db.insert(consentRequest).values(
+      CONSENT_PURPOSES.map((purpose) => ({
+        chargePersonId: profileId,
+        organizationId: accountId,
+        purpose,
+        requestedBasis: basis,
+        status:
+          status === 'PARENTAL_CONSENT_REQUESTED'
+            ? ('requested' as const)
+            : ('pending' as const),
+      })),
+    );
   }
 }
 

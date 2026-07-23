@@ -32,6 +32,7 @@ import {
   organization,
   person,
 } from '@eduagent/database';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 
 import { archiveCleanup } from '../../apps/api/src/inngest/functions/archive-cleanup';
 import { restoreConsentV2 } from '../../apps/api/src/services/identity-v2/consent-v2';
@@ -102,17 +103,19 @@ async function seedV2ParentChildPair(): Promise<{
 
   // Withdrawn GDPR grant — the precondition for restoreConsentV2.
   // withdrawn 1 hour ago, well within the 7-day grace window.
-  await db.insert(consentGrant).values({
-    chargePersonId: childPersonId,
-    organizationId: orgId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-    grantedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    withdrawnAt: new Date(Date.now() - 60 * 60 * 1000),
-    priorValue: true,
-    auditFact: { source: 'guardian_revocation', guardianPersonId },
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      chargePersonId: childPersonId,
+      organizationId: orgId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent' as const,
+      granted: true,
+      grantedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+      withdrawnAt: new Date(Date.now() - 60 * 60 * 1000),
+      priorValue: true,
+      auditFact: { source: 'guardian_revocation', guardianPersonId },
+    })),
+  );
 
   return { orgId, guardianPersonId, childPersonId };
 }
@@ -335,20 +338,22 @@ async function cleanupV2Seed(
       });
 
       // Withdrawn grant — not restored.
-      await db.insert(consentGrant).values({
-        chargePersonId: unrestoredId,
-        organizationId: orgId,
-        purpose: 'platform_use',
-        lawfulBasis: 'gdpr_parental_consent',
-        granted: true,
-        grantedAt: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000),
-        withdrawnAt: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000),
-        priorValue: true,
-        auditFact: {
-          source: 'guardian_revocation',
-          guardianPersonId,
-        },
-      });
+      await db.insert(consentGrant).values(
+        CONSENT_PURPOSES.map((purpose) => ({
+          chargePersonId: unrestoredId,
+          organizationId: orgId,
+          purpose,
+          lawfulBasis: 'gdpr_parental_consent' as const,
+          granted: true,
+          grantedAt: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000),
+          withdrawnAt: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000),
+          priorValue: true,
+          auditFact: {
+            source: 'guardian_revocation',
+            guardianPersonId,
+          },
+        })),
+      );
 
       const mockStep = {
         sleep: jest.fn().mockResolvedValue(undefined),

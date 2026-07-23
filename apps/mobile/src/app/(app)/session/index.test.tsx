@@ -358,6 +358,10 @@ const mockSetSessionInputMode = jest.fn();
 const mockFlagSessionContent = jest.fn();
 const mockReplace = jest.fn();
 const mockSetParams = jest.fn();
+const mockUseSession = jest.fn<
+  { data: null | Record<string, unknown> },
+  [string?]
+>(() => ({ data: null }));
 
 type TranscriptMockReturn = {
   data: null | {
@@ -386,7 +390,7 @@ jest.mock(
   '../../../hooks/use-sessions' /* gc1-allow: useStreamMessage streams over XHR (bypasses useApiClient); synthetic onDone payloads are the test control surface */,
   () => ({
     ...jest.requireActual('../../../hooks/use-sessions'),
-    useSession: () => ({ data: null }),
+    useSession: (sessionId: string) => mockUseSession(sessionId),
     useStartSession: () => ({
       mutateAsync: mockStartSession,
     }),
@@ -496,6 +500,7 @@ jest.mock('expo-router', () => ({
 jest.mock(
   '../../../components/session' /* gc1-allow: ChatShell stub is the test's primary interaction surface (manual-send-button, mock-input-mode); the real composer pulls in native voice/keyboard input that can't render in JSDOM */,
   () => ({
+    ...jest.requireActual('../../../components/session'),
     ChatShell: ({
       subtitle,
       headerBelow,
@@ -663,27 +668,9 @@ jest.mock(
 // naturally. Individual tests use jest.spyOn() on readSessionRecoveryMarker
 // when they need to inject a marker (see hydrates-milestone-tracker test).
 
-const secureStore: Record<string, string> = {};
-jest.mock(
-  '../../../lib/secure-storage' /* gc1-allow: wraps Expo SecureStore native module (unavailable in JSDOM); in-memory map stands in for device keychain */,
-  () => ({
-    getItemAsync: jest.fn((key: string) =>
-      Promise.resolve(secureStore[key] ?? null),
-    ),
-    setItemAsync: jest.fn((key: string, value: string) => {
-      secureStore[key] = value;
-      return Promise.resolve();
-    }),
-    deleteItemAsync: jest.fn((key: string) => {
-      delete secureStore[key];
-      return Promise.resolve();
-    }),
-    // [I-4] sanitizeSecureStoreKey is a pure string function — no mock needed,
-    // but the module mock must export it or callers get "not a function".
-    sanitizeSecureStoreKey: (raw: string) =>
-      raw.replace(/[^a-zA-Z0-9._-]/g, '_'),
-  }),
-);
+const secureStore = (
+  jest.requireMock('expo-secure-store') as { __store: Map<string, string> }
+).__store;
 const mockReadSessionRecoveryMarker = jest.spyOn(
   sessionRecoveryModule,
   'readSessionRecoveryMarker',
@@ -695,13 +682,6 @@ const mockReadSessionRecoveryMarker = jest.spyOn(
 // text is rendered, not inspected.
 
 // lib/profile now runs for real — renderScreen provides the ProfileContext.
-
-// prettier-ignore
-jest.mock('../../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
-  useThemeColors: () => ({ accent: '#0ea5e9', background: '#18181b', border: '#d4d4d8', muted: '#71717a', surface: '#ffffff', textInverse: '#ffffff', textPrimary: '#18181b', textSecondary: '#52525b' }),
-  useTheme: () => ({ colorScheme: 'dark' }),
-  useTokenVars: () => ({}),
-}));
 
 describe('SessionScreen homework flow', () => {
   async function flushAsyncWork(): Promise<void> {
@@ -717,11 +697,12 @@ describe('SessionScreen homework flow', () => {
     getMockFeatureFlags().MODE_NAV_V2_ENABLED = false;
     mockFetch.mockClear();
     mockUseSessionTranscript.mockReturnValue({ data: null });
+    mockUseSession.mockReturnValue({ data: null });
     mockReadAsStringAsync.mockResolvedValue('base64-homework-image');
     // Default: no active session (null response body)
     mockFetch.setRoute('/progress/topic', null);
     // Clear SecureStore mock data
-    Object.keys(secureStore).forEach((key) => delete secureStore[key]);
+    secureStore.clear();
     let aiEventCount = 0;
     (useRouter as jest.Mock).mockReturnValue({
       replace: mockReplace,
@@ -825,7 +806,7 @@ describe('SessionScreen homework flow', () => {
       });
 
       testScreen.getByTestId('mentor-birth-animation');
-      expect(secureStore[childMentorBirthKey]).toBe('true');
+      expect(secureStore.get(childMentorBirthKey)).toBe('true');
     }, 15000);
 
     it('does not show or consume the child ceremony for an owner learning session', async () => {
@@ -842,11 +823,11 @@ describe('SessionScreen homework flow', () => {
         );
       });
       expect(testScreen.queryByTestId('mentor-birth-overlay')).toBeNull();
-      expect(secureStore[childMentorBirthKey]).toBeUndefined();
+      expect(secureStore.get(childMentorBirthKey)).toBeUndefined();
     }, 15000);
 
     it('is idempotent per child profile across app restarts', async () => {
-      secureStore[childMentorBirthKey] = 'true';
+      secureStore.set(childMentorBirthKey, 'true');
       useLearningRouteParams();
 
       const testScreen = renderSessionScreen(CHILD_PROFILE);
@@ -858,7 +839,7 @@ describe('SessionScreen homework flow', () => {
         expect(mockStream).toHaveBeenCalledTimes(1);
       });
       expect(testScreen.queryByTestId('mentor-birth-overlay')).toBeNull();
-      expect(secureStore[childMentorBirthKey]).toBe('true');
+      expect(secureStore.get(childMentorBirthKey)).toBe('true');
     }, 15000);
 
     it('completes instantly under reduced motion and does not block the session stream', async () => {
@@ -878,7 +859,7 @@ describe('SessionScreen homework flow', () => {
           expect(mockStream).toHaveBeenCalledTimes(1);
         });
         await waitFor(() => {
-          expect(secureStore[childMentorBirthKey]).toBe('true');
+          expect(secureStore.get(childMentorBirthKey)).toBe('true');
         });
         expect(testScreen.queryByTestId('mentor-birth-overlay')).toBeNull();
       } finally {
@@ -2093,7 +2074,7 @@ describe('SessionScreen homework flow', () => {
       await openerMayFinish;
     });
     await waitFor(() => {
-      expect(secureStore[recoveryKey]).toBeDefined();
+      expect(secureStore.get(recoveryKey)).toBeDefined();
       expect(testScreen.getByTestId('mock-streaming-state')).toHaveTextContent(
         'idle',
       );
@@ -2102,7 +2083,7 @@ describe('SessionScreen homework flow', () => {
     fireEvent.press(testScreen.getByTestId('mentor-follow-up-button'));
     await waitFor(() => {
       expect(mockStream).toHaveBeenCalledTimes(2);
-      expect(JSON.parse(secureStore[recoveryKey] ?? '{}')).toMatchObject({
+      expect(JSON.parse(secureStore.get(recoveryKey) ?? '{}')).toMatchObject({
         sessionId: SESSION_ID,
         topicId: TOPIC_ID,
       });
@@ -2116,7 +2097,7 @@ describe('SessionScreen homework flow', () => {
       mockFetch,
       `/subjects/${SECOND_SUBJECT_ID}/sessions`,
     )[0];
-    const recoveryMarker = JSON.parse(secureStore[recoveryKey] ?? '{}') as {
+    const recoveryMarker = JSON.parse(secureStore.get(recoveryKey) ?? '{}') as {
       subjectId?: string;
       topicId?: string;
     };
@@ -2452,6 +2433,7 @@ describe('SessionScreen homework flow', () => {
   // first-response actions — "help me solve this" / "check my answer" — and NO
   // subject-picking preamble. returnTo=mentor returns to the Mentor tab.
   describe('V2 mentor-homework round-trip (T23)', () => {
+    const originalE2E = process.env.EXPO_PUBLIC_E2E;
     const MENTOR_HOMEWORK_PARAMS = {
       mode: 'homework',
       subjectId: SUBJECT_ID,
@@ -2465,66 +2447,94 @@ describe('SessionScreen homework flow', () => {
         { id: 'problem-1', text: 'Solve 2x + 5 = 17', source: 'ocr' },
       ]),
     };
+    const MENTOR_MANUAL_HOMEWORK_PARAMS = {
+      ...MENTOR_HOMEWORK_PARAMS,
+      imageUri: undefined,
+      imageMimeType: undefined,
+      homeworkProblems: JSON.stringify([
+        { id: 'problem-1', text: 'Solve 2x + 5 = 17', source: 'manual' },
+      ]),
+    };
 
-    it('renders the captured image as a learner bubble with deterministic help/check buttons as the first in-thread response, with no subject preamble', async () => {
-      getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
-      (useLocalSearchParams as jest.Mock).mockReturnValue(
-        MENTOR_HOMEWORK_PARAMS,
-      );
+    const persistedManualHomeworkSession = (
+      overrides: {
+        id?: string;
+        subjectId?: string;
+        homework?: Record<string, unknown>;
+      } = {},
+    ) => ({
+      id: overrides.id ?? SESSION_ID,
+      subjectId: overrides.subjectId ?? SUBJECT_ID,
+      topicId: null,
+      sessionType: 'homework',
+      metadata: {
+        homework: {
+          problemCount: 1,
+          currentProblemIndex: 0,
+          problems: [
+            {
+              id: 'problem-1',
+              text: 'Solve 2x + 5 = 17',
+              source: 'manual',
+            },
+          ],
+          ...overrides.homework,
+        },
+      },
+    });
 
-      const testScreen = renderSessionScreen();
-
-      // Give the screen its initial async cycle + advance past the auto-send
-      // debounce window so we can prove the auto-send is DEFERRED (the buttons
-      // are the first actionable response, not an LLM/subject turn).
+    async function triggerManualHomeworkHelp(
+      testScreen: ReturnType<typeof renderSessionScreen>,
+    ): Promise<void> {
       await act(async () => {
         await Promise.resolve();
         jest.advanceTimersByTime(700);
       });
-
-      // The captured image renders as the learner's image bubble in-thread,
-      // with both deterministic buttons.
-      const accessory = testScreen.getByTestId('mock-input-accessory');
-      within(accessory).getByTestId('homework-image-bubble');
-      within(accessory).getByTestId('homework-help-me-solve');
-      within(accessory).getByTestId('homework-check-my-answer');
-
-      // First actionable response has NO subject-picking preamble and no
-      // tutoring turn has started yet — the buttons ARE the first response.
       expect(testScreen.queryByTestId('session-subject-resolution')).toBeNull();
       expect(mockStream).not.toHaveBeenCalled();
-      // The standard homework chips are suppressed so the two deterministic
-      // buttons are the only first response.
-      expect(testScreen.queryByTestId('homework-mode-help-me')).toBeNull();
-
-      testScreen.unmount();
-    }, 15000);
-
-    it('starts the tutoring turn with the chosen homework mode after the learner taps "help me solve"', async () => {
-      getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
-      (useLocalSearchParams as jest.Mock).mockReturnValue(
-        MENTOR_HOMEWORK_PARAMS,
-      );
-
-      const testScreen = renderSessionScreen();
-
-      await act(async () => {
-        await Promise.resolve();
-        jest.advanceTimersByTime(700);
-      });
-
-      // No turn before the learner picks a deterministic action.
-      expect(mockStream).not.toHaveBeenCalled();
-
       await act(async () => {
         fireEvent.press(testScreen.getByTestId('homework-help-me-solve'));
       });
-      // Picking a mode re-enables the (previously deferred) auto-send.
       await act(async () => {
         await Promise.resolve();
         jest.advanceTimersByTime(700);
       });
       await flushAsyncWork();
+    }
+
+    async function startManualHomeworkHelp(
+      testScreen: ReturnType<typeof renderSessionScreen>,
+    ): Promise<void> {
+      await triggerManualHomeworkHelp(testScreen);
+      await waitFor(() => {
+        testScreen.getByTestId('homework-first-response-complete');
+      });
+    }
+
+    beforeEach(() => {
+      process.env.EXPO_PUBLIC_E2E = 'true';
+    });
+
+    afterEach(() => {
+      if (originalE2E === undefined) {
+        delete process.env.EXPO_PUBLIC_E2E;
+      } else {
+        process.env.EXPO_PUBLIC_E2E = originalE2E;
+      }
+    });
+
+    it('creates exactly one associated manual homework session after the learner taps "help me solve"', async () => {
+      getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
+      (useLocalSearchParams as jest.Mock).mockReturnValue(
+        MENTOR_MANUAL_HOMEWORK_PARAMS,
+      );
+      mockUseSession.mockReturnValue({
+        data: persistedManualHomeworkSession(),
+      });
+
+      const testScreen = renderSessionScreen();
+
+      await startManualHomeworkHelp(testScreen);
 
       await waitFor(() => {
         expect(mockStream).toHaveBeenCalledWith(
@@ -2535,10 +2545,146 @@ describe('SessionScreen homework flow', () => {
           expect.objectContaining({ homeworkMode: 'help_me' }),
         );
       });
+      testScreen.getByTestId('homework-session-associated-once');
+      expect(
+        testScreen.queryByTestId('homework-session-created-more-than-once'),
+      ).toBeNull();
+      expect(mockStartSession).toHaveBeenCalledTimes(1);
+      expect(mockStartSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionType: 'homework',
+          metadata: expect.objectContaining({
+            homework: expect.objectContaining({
+              problemCount: 1,
+              problems: [
+                expect.objectContaining({
+                  text: 'Solve 2x + 5 = 17',
+                  source: 'manual',
+                }),
+              ],
+            }),
+          }),
+        }),
+      );
 
       // Once consumed, the deterministic first-response block is gone.
       expect(testScreen.queryByTestId('homework-help-me-solve')).toBeNull();
 
+      testScreen.unmount();
+    }, 15000);
+
+    it.each([
+      [
+        'a persisted session without homework metadata',
+        { ...persistedManualHomeworkSession(), metadata: {} },
+      ],
+      [
+        'a different persisted session identity',
+        persistedManualHomeworkSession({ id: RESUMED_SESSION_ID }),
+      ],
+      [
+        'a different persisted subject identity',
+        persistedManualHomeworkSession({ subjectId: SECOND_SUBJECT_ID }),
+      ],
+      [
+        'the wrong persisted problem count',
+        persistedManualHomeworkSession({ homework: { problemCount: 2 } }),
+      ],
+      [
+        'the wrong persisted problems cardinality',
+        persistedManualHomeworkSession({
+          homework: {
+            problems: [
+              {
+                id: 'problem-1',
+                text: 'Solve 2x + 5 = 17',
+                source: 'manual',
+              },
+              {
+                id: 'problem-2',
+                text: 'Factor x^2 + 3x + 2',
+                source: 'manual',
+              },
+            ],
+          },
+        }),
+      ],
+      [
+        'the wrong persisted current problem index',
+        persistedManualHomeworkSession({
+          homework: { currentProblemIndex: 1 },
+        }),
+      ],
+      [
+        'different persisted problem text',
+        persistedManualHomeworkSession({
+          homework: {
+            problems: [
+              {
+                id: 'problem-1',
+                text: 'Solve a different equation',
+                source: 'manual',
+              },
+            ],
+          },
+        }),
+      ],
+      [
+        'a non-manual persisted problem source',
+        persistedManualHomeworkSession({
+          homework: {
+            problems: [
+              {
+                id: 'problem-1',
+                text: 'Solve 2x + 5 = 17',
+                source: 'ocr',
+              },
+            ],
+          },
+        }),
+      ],
+    ])(
+      'keeps the association marker absent when the server returns %s',
+      async (_case, persistedSession) => {
+        getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
+        (useLocalSearchParams as jest.Mock).mockReturnValue(
+          MENTOR_MANUAL_HOMEWORK_PARAMS,
+        );
+        mockUseSession.mockReturnValue({ data: persistedSession });
+
+        const testScreen = renderSessionScreen();
+        await startManualHomeworkHelp(testScreen);
+
+        expect(
+          testScreen.queryByTestId('homework-session-associated-once'),
+        ).toBeNull();
+        testScreen.unmount();
+      },
+      15000,
+    );
+
+    it('does not render E2E session evidence outside an EXPO_PUBLIC_E2E build', async () => {
+      process.env.EXPO_PUBLIC_E2E = 'false';
+      getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
+      (useLocalSearchParams as jest.Mock).mockReturnValue(
+        MENTOR_MANUAL_HOMEWORK_PARAMS,
+      );
+      mockUseSession.mockReturnValue({
+        data: persistedManualHomeworkSession(),
+      });
+
+      const testScreen = renderSessionScreen();
+      await triggerManualHomeworkHelp(testScreen);
+
+      expect(
+        testScreen.queryByTestId('homework-session-associated-once'),
+      ).toBeNull();
+      expect(
+        testScreen.queryByTestId('homework-session-created-more-than-once'),
+      ).toBeNull();
+      expect(
+        testScreen.queryByTestId('homework-first-response-complete'),
+      ).toBeNull();
       testScreen.unmount();
     }, 15000);
 
@@ -3027,7 +3173,7 @@ describe('voice mode persistence', () => {
     mockFetch.mockClear();
     mockUseSessionTranscript.mockReturnValue({ data: null });
     mockFetch.setRoute('/progress/topic', null);
-    Object.keys(secureStore).forEach((key) => delete secureStore[key]);
+    secureStore.clear();
     (useRouter as jest.Mock).mockReturnValue({
       replace: mockReplace,
       setParams: mockSetParams,
@@ -3070,7 +3216,7 @@ describe('voice mode persistence', () => {
   });
 
   it('defaults to voice when SecureStore has voice preference', async () => {
-    secureStore[`voice-input-mode-${ACTIVE_PROFILE_ID}`] = 'voice';
+    secureStore.set(`voice-input-mode-${ACTIVE_PROFILE_ID}`, 'voice');
     const { getByTestId } = renderSessionScreen();
     await waitFor(() => {
       expect(getByTestId('mock-input-mode').props.children).toBe('voice');
@@ -3090,14 +3236,14 @@ describe('voice mode persistence', () => {
       fireEvent.press(getByTestId('mock-set-voice-mode'));
     });
     await waitFor(() => {
-      expect(secureStore[`voice-input-mode-${ACTIVE_PROFILE_ID}`]).toBe(
+      expect(secureStore.get(`voice-input-mode-${ACTIVE_PROFILE_ID}`)).toBe(
         'voice',
       );
     });
   });
 
   it('persists text preference when mode changes to text', async () => {
-    secureStore[`voice-input-mode-${ACTIVE_PROFILE_ID}`] = 'voice';
+    secureStore.set(`voice-input-mode-${ACTIVE_PROFILE_ID}`, 'voice');
     const { getByTestId } = renderSessionScreen();
     // Wait for initial voice mode to load
     await waitFor(() => {
@@ -3107,7 +3253,9 @@ describe('voice mode persistence', () => {
       fireEvent.press(getByTestId('mock-set-text-mode'));
     });
     await waitFor(() => {
-      expect(secureStore[`voice-input-mode-${ACTIVE_PROFILE_ID}`]).toBe('text');
+      expect(secureStore.get(`voice-input-mode-${ACTIVE_PROFILE_ID}`)).toBe(
+        'text',
+      );
     });
   });
 

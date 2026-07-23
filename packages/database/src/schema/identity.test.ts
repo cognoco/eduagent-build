@@ -19,6 +19,7 @@ import {
   guardianship,
   supportership,
   consentGrant,
+  consentRequest,
   consentReceipt,
   deletionAudit,
   financialRecord,
@@ -126,6 +127,11 @@ describe('identity schema — table exports', () => {
     expect(consentGrant.assuranceMethod).toBeDefined();
     expect(consentGrant.snapshotAgeAtGrant).toBeDefined();
     expect(consentGrant.snapshotJurisdictionAtGrant).toBeDefined();
+  });
+
+  it('[WI-2386] requires every consent_request writer to name its purpose', () => {
+    expect(consentRequest.purpose).toBeDefined();
+    expect(consentRequest.purpose.default).toBeUndefined();
   });
 
   it('exports person_retain set (consent_receipt, deletion_audit, financial_record)', () => {

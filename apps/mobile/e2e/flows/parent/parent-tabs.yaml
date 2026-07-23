@@ -23,18 +23,18 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "parent-with-children"
+      SEED_SCENARIO: 'parent-with-children'
       API_URL: ${API_URL}
 
 # 2. Wait for parent Home
 - extendedWaitUntil:
     visible:
-      id: "parent-home-screen"
+      id: 'parent-home-screen'
     timeout: 15000
 
 # 3. Verify Home content
 - assertVisible:
-    id: "parent-home-check-child-${CHILD_PROFILE_ID}"
+    id: 'parent-home-check-child-${CHILD_PROFILE_ID}'
 
 # 4. Screenshot: Home tab
 - takeScreenshot: parent-tabs-01-home
@@ -44,13 +44,13 @@ tags:
 # 5. Tap "Recaps" tab (use testID — survives i18n + copy edits)
 #    tabBarButtonTestID: 'tab-recaps' — apps/mobile/src/app/(app)/_layout.tsx:692
 - tapOn:
-    id: "tab-recaps"
+    id: 'tab-recaps'
 
 # 6. Wait for Recaps screen to render
 #    testID: 'recaps-screen' — apps/mobile/src/app/(app)/recaps/index.tsx:31
 - extendedWaitUntil:
     visible:
-      id: "recaps-screen"
+      id: 'recaps-screen'
     timeout: 10000
 
 # 7. Screenshot: Recaps tab
@@ -59,11 +59,11 @@ tags:
 # ---------- Progress tab ----------
 
 - tapOn:
-    id: "tab-progress"
+    id: 'tab-progress'
 
 - extendedWaitUntil:
     visible:
-      id: "progress-screen"
+      id: 'progress-screen'
     timeout: 15000
 
 - takeScreenshot: parent-tabs-03-progress
@@ -71,46 +71,56 @@ tags:
 # ---------- More tab ----------
 
 # 8. Tap "More" tab (use accessibility label to avoid matching heading)
-- tapOn: "More"
+- tapOn: 'More'
 
 # 9. Wait for More screen heading
 - extendedWaitUntil:
     visible:
-      text: "More"
+      text: 'More'
     timeout: 30000
 
-# 10. Scroll to sign-out button (may be below the fold)
+# 10. Verify the first settings row before moving down the viewport.
+- assertVisible:
+    id: 'more-row-learning-preferences'
+
+# 11. Bring the account and notification rows into the small-phone viewport
+#     in their rendered order. Scrolling to Sign out first would leave all of
+#     these rows above the viewport.
 - scrollUntilVisible:
     element:
-      id: "sign-out-button"
+      id: 'more-row-account'
     direction: DOWN
     timeout: 10000
+    visibilityPercentage: 100
+    centerElement: false
 
-# 11. Verify first settings row is always above the fold
 - assertVisible:
-    id: "more-row-learning-preferences"
+    id: 'more-row-account'
 
-# 12. Verify notifications section
+- scrollUntilVisible:
+    element:
+      id: 'more-row-notifications'
+    direction: DOWN
+    timeout: 10000
+    visibilityPercentage: 100
+    centerElement: false
+
 - assertVisible:
-    text: "Notifications"
+    id: 'more-row-notifications'
 
-# 13. Verify account section
-- assertVisible:
-    text: "Account"
-
-# 14. Screenshot: More tab (settings)
+# 12. Screenshot: More tab (settings)
 - takeScreenshot: parent-tabs-04-more
 
 # ---------- Back to Home tab ----------
 
-# 15. Tap "Home" tab to return to parent Home (use testID — avoids matching heading)
+# 13. Tap "Home" tab to return to parent Home (use testID — avoids matching heading)
 - tapOn:
-    id: "tab-home"
+    id: 'tab-home'
 
-# 16. Verify parent Home is visible again
+# 14. Verify parent Home is visible again
 - extendedWaitUntil:
     visible:
-      id: "parent-home-screen"
+      id: 'parent-home-screen'
     timeout: 10000
 
 # 17. Final screenshot: back on Home tab

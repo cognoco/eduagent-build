@@ -1,0 +1,18 @@
+{
+  "pageId": "3a48bce9-1f7c-81b6-8c3f-ff7cc2a99f6f",
+  "id": "WI-2547",
+  "name": "Build the mobile adult self-consent re-consent screen",
+  "description": "Build the missing adult self-consent acceptance capability as one bounded backend-plus-mobile slice. The profiles bootstrap already emits needsAdultConsent, and consent-v2 can write art6_1_a grants, but no authenticated route exposes that write: POST /learner-profile/consent is mentor-memory consent and must not be reused. Deliver a caller-bound acceptance endpoint plus a reusable adult gate screen; WI-2411 owns only the final bootstrap-signal-to-layout wiring.",
+  "acceptanceCriteria": "Root cause: the server can detect the missing adult lawful-basis record and has an internal writer, but there is no authenticated acceptance route or mobile surface. The existing /learner-profile/consent contract changes learning-profile memory settings only and is explicitly out of scope.\n\n1. Add a typed authenticated adult self-consent acceptance contract under the consent routes (for example POST /consent/self/accept). It takes no caller-supplied person ID, profile ID, organization ID, lawful basis, or policy version: callerPersonId comes from the verified login binding, organizationId from the authenticated account, lawful basis is art6_1_a, and termsVersion comes from the server CONSENT_POLICY_VERSION binding.\n2. The service verifies that the caller is the adult account owner eligible for this repair flow, writes the canonical platform_use and llm_disclosure grants with a versioned acceptance audit fact, and is idempotent under retry/concurrent submit. A minor, non-owner, missing identity, cross-organization caller, or spoofed X-Profile-Id fails closed without a write and without cross-account enumeration. Existing valid grants are not duplicated or weakened.\n3. Add a reusable mobile AdultSelfConsentGate (or equivalently named screen) that clearly identifies this as the adult owner's own processing/LLM consent, presents links or accessible access to the current terms/privacy information, and provides an explicit accept action. It does not render minor/guardian consent copy and does not reuse ConsentPendingGate, ConsentWithdrawnGate, or mentor-memory consent behavior.\n4. The mobile mutation calls only the new self-accept contract. On success it invalidates/refetches the user-scoped profiles query so needsAdultConsent can become false; double taps are suppressed. Server failure leaves the gate present with accessible error and retry behavior; cancel/sign-out remains available but there is no path into normal app use while the gate is active.\n5. This item exports/tests the component and mutation but does not add the final _layout bootstrap branch; WI-241\n\n1 consumes needsAdultConsent and mounts this gate in the correct order. The two WIs may ship together, but neither duplicates the other's responsibility.\n6. API route/service regressions cover success, exact audit version, idempotent replay/concurrency, already-consented adult, minor, non-owner, missing caller identity, cross-org/spoofed active profile, and no-write failures. Mobile tests cover render/copy/accessibility, submit/refetch, double-submit suppression, failure/retry, sign-out/cancel, and separation from both minor-consent and mentor-memory paths. Relevant API integration, schema, mobile, typecheck, and lint gates pass.",
+  "riskImpact": "",
+  "type": "Feature",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "Ramtop",
+  "bodyText": ""
+}

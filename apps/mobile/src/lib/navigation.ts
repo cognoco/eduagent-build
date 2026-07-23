@@ -24,6 +24,14 @@ export const STUDY_PROGRESS_HREF = '/(app)/progress';
 export const FAMILY_CHILDREN_RETURN_TO = 'family-children';
 export const FAMILY_CHILDREN_HREF = '/(app)/home';
 
+export type V2AccountReturnToken = 'mentor' | 'subjects' | 'journal';
+
+const V2_ACCOUNT_RETURN_HREFS = {
+  mentor: '/(app)/mentor',
+  subjects: '/(app)/subjects',
+  journal: '/(app)/journal',
+} as const satisfies Record<V2AccountReturnToken, Href>;
+
 export function isSessionForwardableReturnTo(
   returnTo: string | undefined,
 ): returnTo is
@@ -39,6 +47,57 @@ export function isSessionForwardableReturnTo(
 
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
+}
+
+// Pin Account to three V2 tab roots; unknown pushed routes return to Mentor, not retired Home.
+export function accountReturnTokenForPathname(
+  pathname: string,
+): V2AccountReturnToken {
+  const isChildSubjectsRoute =
+    /^\/child\/[^/]+\/(?:curriculum|(?:subjects|topic)\/[^/]+)\/?$/.test(
+      pathname,
+    );
+
+  if (
+    isChildSubjectsRoute ||
+    pathname === '/subjects' ||
+    pathname.startsWith('/subjects/') ||
+    pathname === '/subject' ||
+    pathname.startsWith('/subject/') ||
+    pathname === '/subject-hub' ||
+    pathname.startsWith('/subject-hub/') ||
+    pathname === '/topic' ||
+    pathname.startsWith('/topic/') ||
+    pathname === '/pick-book' ||
+    pathname.startsWith('/pick-book/') ||
+    pathname === '/vocabulary' ||
+    pathname.startsWith('/vocabulary/') ||
+    pathname === '/shelf' ||
+    pathname.startsWith('/shelf/')
+  ) {
+    return 'subjects';
+  }
+  if (pathname === '/journal' || pathname.startsWith('/journal/')) {
+    return 'journal';
+  }
+  return 'mentor';
+}
+
+export function accountReturnToken(
+  returnTo: string | string[] | undefined,
+): V2AccountReturnToken {
+  const token = firstParam(returnTo);
+  return token === 'subjects' || token === 'journal' ? token : 'mentor';
+}
+
+/** Resolve Account's empty-history fallback without trusting arbitrary URLs. */
+export function accountReturnHref(
+  returnTo: string | string[] | undefined,
+  v2Enabled: boolean,
+): Href {
+  if (!v2Enabled) return FAMILY_HOME_PATH as Href;
+
+  return V2_ACCOUNT_RETURN_HREFS[accountReturnToken(returnTo)] as Href;
 }
 
 export function childProfileHref(

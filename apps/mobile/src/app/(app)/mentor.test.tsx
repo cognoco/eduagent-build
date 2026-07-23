@@ -9,6 +9,7 @@ import type {
 import { MENTOR_CAPABILITY_CASES } from '@eduagent/test-utils';
 
 import {
+  ERROR_RESPONSES,
   NAMED_PROFILES,
   renderScreen,
   type RenderScreenOptions,
@@ -28,6 +29,7 @@ type PersonScope = Extract<ScopeDescriptor, { kind: 'person' }>;
 
 const PERSON_ID = '550e8400-e29b-41d4-a716-446655440101';
 const EDGE_ID = '550e8400-e29b-41d4-a716-446655440201';
+const ORIGINAL_E2E_FLAG = process.env.EXPO_PUBLIC_E2E;
 const mockPush = jest.fn();
 const mockNowRefetch = jest.fn();
 let mockFocusCallback: (() => void | (() => void)) | undefined;
@@ -54,6 +56,9 @@ let mockNowFeed: {
   isFetching: boolean;
   isSlowFallback: boolean;
   refetch: jest.Mock;
+  // [WI-2504 bounce 2] Only set by tests exercising the epoch-bound
+  // post-mutation navigation guard; other tests leave it undefined.
+  observedEpoch?: string;
 };
 let mockSubjects: Array<{
   subjectId: string;
@@ -188,6 +193,7 @@ function firstCallOrder(mockFn: jest.Mock): number {
 
 function renderMentorScreen(
   profileOverrides: Pick<RenderScreenOptions, 'profile' | 'profiles'> = {},
+  extraRoutes: RenderScreenOptions['routes'] = {},
 ) {
   const rendered = renderScreen(<MentorScreen />, {
     routes: {
@@ -202,6 +208,7 @@ function renderMentorScreen(
         cards: [],
         selfLearningDoorway: true,
       },
+      ...extraRoutes,
     },
     ...profileOverrides,
   });
@@ -234,6 +241,11 @@ describe('MentorScreen', () => {
   afterEach(() => {
     cleanupRender?.();
     cleanupRender = undefined;
+    if (ORIGINAL_E2E_FLAG === undefined) {
+      delete process.env.EXPO_PUBLIC_E2E;
+    } else {
+      process.env.EXPO_PUBLIC_E2E = ORIGINAL_E2E_FLAG;
+    }
   });
 
   beforeEach(() => {
@@ -343,6 +355,47 @@ describe('MentorScreen', () => {
     screen.getByTestId('mentor-bar-camera');
     screen.getByTestId('mentor-bar-homework-chip');
     screen.getByTestId('mentor-bar-mic');
+  });
+
+  it('routes the E2E homework chip directly to manual entry with the active subject', () => {
+    process.env.EXPO_PUBLIC_E2E = 'true';
+    renderMentorScreen();
+
+    fireEvent.press(screen.getByTestId('mentor-bar-homework-chip'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/homework/manual',
+      params: {
+        entrySource: 'mentor',
+        returnTo: 'mentor',
+        subjectId: 'subject-0',
+        subjectName: 'Mathematics',
+      },
+    });
+  });
+
+  it('keeps the camera affordance on the device-QA route in E2E builds', () => {
+    process.env.EXPO_PUBLIC_E2E = 'true';
+    renderMentorScreen();
+
+    fireEvent.press(screen.getByTestId('mentor-bar-camera'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/homework/camera',
+      params: { entrySource: 'mentor', returnTo: 'mentor' },
+    });
+  });
+
+  it('retains the camera route for the homework chip outside E2E builds', () => {
+    process.env.EXPO_PUBLIC_E2E = 'false';
+    renderMentorScreen();
+
+    fireEvent.press(screen.getByTestId('mentor-bar-homework-chip'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/homework/camera',
+      params: { entrySource: 'mentor', returnTo: 'mentor' },
+    });
   });
 
   it('shows the ask box and light practice instead of a dead-end on an empty feed', () => {
@@ -1033,6 +1086,390 @@ describe('MentorScreen', () => {
 
     screen.getByText('Session wrapped');
     screen.getByText('You chose the next step.');
+  });
+
+  function noticeCard(overrides: Partial<NowCard> = {}): NowCard {
+    return card({
+      kind: 'mentor_notice',
+      templateKey: 'now.mentor_notice.default',
+      params: { concept: 'changing signs', subjectName: 'Algebra' },
+      deepLink: {
+        route: 'notice.recheck',
+        params: { noticeId: 'notice-1', subjectId: 'subject-1' },
+        chain: [],
+      },
+      ...overrides,
+    });
+  }
+
+  // [WI-2499 AC-2/AC-3] Not now defers a mentor notice for the current
+  // learning day; it must never look like a generic decline. Removal from
+  // the feed is only ever server-authoritative (the defer mutation's
+  // onSuccess invalidate triggers a refetch) — the screen itself must not
+  // locally hide the card or fall into the "prefer something light" success
+  // affordance the generic decline path uses.
+  it('[WI-2499 AC-2/AC-3] keeps the mentor-notice card on screen and shows no light-practice success after a successful "Not now" defer', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+    };
+
+    renderMentorScreen(
+      {},
+      {
+        '/mentor-notices/notice-1/defer': {
+          noticeId: 'notice-1',
+          deferredAt: '2026-07-21T12:00:00.000Z',
+        },
+      },
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Not now'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    screen.getByTestId('now-card-mentor_notice');
+    expect(screen.queryByTestId('light-practice-capitals')).toBeNull();
+  });
+
+  // [WI-2499 AC-3] Navigation may only happen after a schema-valid server
+  // success — the counterpart to the rejected-recheck test below. A
+  // successful recheck must navigate to the returned session.
+  it('[WI-2499 AC-3] navigates to the returned session when the recheck mutation succeeds', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+    };
+
+    renderMentorScreen(
+      {},
+      {
+        '/mentor-notices/notice-1/recheck': {
+          sessionId: '550e8400-e29b-41d4-a716-446655440001',
+        },
+      },
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Check it now'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockPush).toHaveBeenCalledWith(
+      '/(app)/session?sessionId=550e8400-e29b-41d4-a716-446655440001',
+    );
+  });
+
+  // [WI-2504 bounce 2] The recheck mutation is async — the observed policy
+  // epoch can flip (e.g. a sibling surface observes a disabled epoch) while
+  // it is still in flight. A result that resolves AFTER that flip must not
+  // navigate into a surface the client has since suppressed.
+  it('[WI-2504 bounce 2] does not navigate when the observed policy epoch changes while the recheck mutation is in flight', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+      observedEpoch: 'epoch-enabled',
+    };
+
+    let resolveRecheck: ((body: unknown) => void) | undefined;
+    const recheckPending = new Promise((resolve) => {
+      resolveRecheck = resolve;
+    });
+
+    const rendered = renderMentorScreen(
+      {},
+      { '/mentor-notices/notice-1/recheck': () => recheckPending },
+    );
+
+    fireEvent.press(screen.getByText('Check it now'));
+
+    // The epoch flips while the recheck request is still pending.
+    await act(async () => {
+      mockNowFeed = { ...mockNowFeed, observedEpoch: 'epoch-disabled' };
+      rendered.result.rerender(<MentorScreen />);
+    });
+
+    await act(async () => {
+      resolveRecheck?.({
+        sessionId: '550e8400-e29b-41d4-a716-446655440001',
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockPush).not.toHaveBeenCalledWith(
+      expect.stringContaining('/(app)/session?sessionId='),
+    );
+    screen.getByTestId('now-card-mentor_notice');
+  });
+
+  // [WI-2504 bounce 3 / AC-2] Class-closing coverage for the LAST open
+  // stale-feed leak layer: `useTransitionBoundFeed`. A warm notice feed
+  // (enabled epoch) is rendered on the mentor tab; then the server flips the
+  // policy off and a `refetchOnWindowFocus` re-key delivers the disabled-epoch
+  // feed (no notice) WITHOUT a nav refocus — so `useFocusEffect` does NOT fire
+  // (mockFocusCallback is left uncalled). On the pre-fix code the snapshot is
+  // keyed only on profileId, so it pins the stale enabled-epoch NOTICE feed and
+  // the card renders indefinitely after observed-disabled — an AC-2 violation
+  // ("no mentor-notice Now card may render after observed-disabled") even
+  // though the bounce-2 handleContinue guard already blocks the stale
+  // navigation. The epoch-change branch in the snapshot effect closes it.
+  it('[WI-2504 bounce 3 / AC-2] drops the mentor-notice card when a window-focus refetch re-keys to a disabled epoch without a nav refocus', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+      observedEpoch: 'epoch-enabled',
+    };
+
+    const rendered = renderMentorScreen();
+
+    // The enabled-epoch feed renders the notice card.
+    screen.getByTestId('now-card-mentor_notice');
+    screen.getByText('Check it now');
+
+    // Server flips the policy off: the now-feed query re-keys to the disabled
+    // epoch and the fetch delivers a notice-free feed. This is a
+    // refetchOnWindowFocus re-key WHILE ALREADY ON THE TAB — no navigation
+    // refocus — so `useFocusEffect` is deliberately NOT triggered here.
+    await act(async () => {
+      mockNowFeed = {
+        ...mockNowFeed,
+        data: feed([card()]),
+        observedEpoch: 'epoch-disabled',
+      };
+      rendered.result.rerender(<MentorScreen />);
+    });
+
+    // AC-2: no mentor-notice Now card, and no actionable notice affordance,
+    // may survive observed-disabled.
+    expect(screen.queryByTestId('now-card-mentor_notice')).toBeNull();
+    expect(screen.queryByText('Check it now')).toBeNull();
+  });
+
+  // [WI-2499 AC-3] On a rejected/failed defer, no success state may appear —
+  // the card stays exactly as it was, and the generic light-practice success
+  // affordance never shows.
+  it('[WI-2499 AC-3] keeps the mentor-notice card on screen and shows no light-practice success when the defer mutation is rejected', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+    };
+
+    renderMentorScreen(
+      {},
+      {
+        '/mentor-notices/notice-1/defer': () => ERROR_RESPONSES.forbidden(),
+      },
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Not now'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    screen.getByTestId('now-card-mentor_notice');
+    expect(screen.queryByTestId('light-practice-capitals')).toBeNull();
+  });
+
+  // [WI-2499 AC-3] Continue starts/resumes the server re-check; navigation
+  // may only happen after a schema-valid server success. On a rejected
+  // recheck, the card must stay put with no navigation and no success state.
+  it('[WI-2499 AC-3] does not navigate and keeps the mentor-notice card when the recheck mutation is rejected', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+    };
+
+    renderMentorScreen(
+      {},
+      {
+        '/mentor-notices/notice-1/recheck': () => ERROR_RESPONSES.forbidden(),
+      },
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Check it now'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    screen.getByTestId('now-card-mentor_notice');
+    expect(mockPush).not.toHaveBeenCalledWith(
+      expect.stringContaining('/(app)/session?sessionId='),
+    );
+  });
+
+  // [WI-2499 AC-3/AC-6 rework] The three remaining failure modes the AC names
+  // for "Not now" beyond the 403 case above: server-authoritative conflict,
+  // a transport failure before any response arrives, and a schema-malformed
+  // 200. All three must land in the same place as the 403 case — card stays,
+  // no light-practice success — because removal is only ever driven by the
+  // defer mutation's onSuccess invalidate.
+  it('[WI-2499 AC-3/AC-6] keeps the mentor-notice card on screen and shows no light-practice success when the defer mutation conflicts (409)', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+    };
+
+    renderMentorScreen(
+      {},
+      {
+        '/mentor-notices/notice-1/defer': () =>
+          new Response(
+            JSON.stringify({ code: 'CONFLICT', message: 'Already resolved' }),
+            { status: 409, headers: { 'Content-Type': 'application/json' } },
+          ),
+      },
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Not now'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    screen.getByTestId('now-card-mentor_notice');
+    expect(screen.queryByTestId('light-practice-capitals')).toBeNull();
+  });
+
+  it('[WI-2499 AC-3/AC-6] keeps the mentor-notice card on screen and shows no light-practice success when the defer mutation fails at the transport layer', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+    };
+
+    renderMentorScreen(
+      {},
+      {
+        '/mentor-notices/notice-1/defer': () => {
+          throw new TypeError('Network request failed');
+        },
+      },
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Not now'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    screen.getByTestId('now-card-mentor_notice');
+    expect(screen.queryByTestId('light-practice-capitals')).toBeNull();
+  });
+
+  it('[WI-2499 AC-3/AC-6] keeps the mentor-notice card on screen and shows no light-practice success when the defer response is schema-malformed', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+    };
+
+    renderMentorScreen(
+      {},
+      {
+        // Missing the required `deferredAt`, so `mentorNoticeDeferResponseSchema`
+        // rejects it even though the HTTP layer reports 200.
+        '/mentor-notices/notice-1/defer': { noticeId: 'notice-1' },
+      },
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Not now'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    screen.getByTestId('now-card-mentor_notice');
+    expect(screen.queryByTestId('light-practice-capitals')).toBeNull();
+  });
+
+  // [WI-2499 AC-3/AC-6 rework] Same three failure modes on "Continue" —
+  // navigation may only ever follow a schema-valid server success.
+  it('[WI-2499 AC-3/AC-6] does not navigate and keeps the mentor-notice card when the recheck mutation conflicts (409)', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+    };
+
+    renderMentorScreen(
+      {},
+      {
+        '/mentor-notices/notice-1/recheck': () =>
+          new Response(
+            JSON.stringify({ code: 'CONFLICT', message: 'Already resolved' }),
+            { status: 409, headers: { 'Content-Type': 'application/json' } },
+          ),
+      },
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Check it now'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    screen.getByTestId('now-card-mentor_notice');
+    expect(mockPush).not.toHaveBeenCalledWith(
+      expect.stringContaining('/(app)/session?sessionId='),
+    );
+  });
+
+  it('[WI-2499 AC-3/AC-6] does not navigate and keeps the mentor-notice card when the recheck mutation fails at the transport layer', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+    };
+
+    renderMentorScreen(
+      {},
+      {
+        '/mentor-notices/notice-1/recheck': () => {
+          throw new TypeError('Network request failed');
+        },
+      },
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Check it now'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    screen.getByTestId('now-card-mentor_notice');
+    expect(mockPush).not.toHaveBeenCalledWith(
+      expect.stringContaining('/(app)/session?sessionId='),
+    );
+  });
+
+  it('[WI-2499 AC-3/AC-6] does not navigate and keeps the mentor-notice card when the recheck response is schema-malformed', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+    };
+
+    renderMentorScreen(
+      {},
+      {
+        // Not a valid UUID, so `mentorNoticeRecheckResponseSchema` rejects it
+        // even though the HTTP layer reports 200.
+        '/mentor-notices/notice-1/recheck': { sessionId: 'not-a-uuid' },
+      },
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Check it now'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    screen.getByTestId('now-card-mentor_notice');
+    expect(mockPush).not.toHaveBeenCalledWith(
+      expect.stringContaining('/(app)/session?sessionId='),
+    );
   });
 
   // WI-1393: the V2 shell previously had zero forward navigation to

@@ -26,6 +26,7 @@ import { eq, sql } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   consentGrant,
+  consentRequest,
   createDatabase,
   generateUUIDv7,
   login,
@@ -38,12 +39,14 @@ import {
   quotaPools,
   type Database,
 } from '@eduagent/database';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import { ConflictError } from '../../errors';
 import {
   createIdentityGraph,
   buildValidatedBirthDate,
   locationToJurisdiction,
 } from './identity-graph';
+import { resolveLatestConsentSetStatusAnyBasis } from './consent-status-v2';
 
 // Populate process.env.DATABASE_URL from the test env (no-op if already set).
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
@@ -106,6 +109,9 @@ async function cleanupByClerk(
   await db
     .delete(consentGrant)
     .where(eq(consentGrant.chargePersonId, personId));
+  await db
+    .delete(consentRequest)
+    .where(eq(consentRequest.chargePersonId, personId));
   await db.delete(membership).where(eq(membership.personId, personId));
   await db.delete(login).where(eq(login.clerkUserId, clerkUserId));
   await db.delete(person).where(eq(person.id, personId));
@@ -258,12 +264,7 @@ async function cleanupByClerk(
     }
   });
 
-  it('[WI-1193] does NOT record adult self-consent for a self-registered owner under 18', async () => {
-    // A 15-year-old self-registering as owner passes the >= 13 minimum-age gate
-    // (createIdentityGraph's only age check) but is not a true adult by the
-    // codebase's 18+ threshold — pre-existing gap (no consent workflow exists
-    // for a guardian-less self-registered teen); this WI does not resolve it,
-    // it only must not mis-record them as an adult.
+  it('[WI-1193][WI-1864] records pending GDPR, not adult self-consent, for a self-registered owner age 15', async () => {
     const clerkUserId = uniqueClerk();
     const email = `teen_owner_${generateUUIDv7()}@test.local`;
     const currentYear = new Date().getUTCFullYear();
@@ -282,6 +283,49 @@ async function cleanupByClerk(
       where: eq(consentGrant.chargePersonId, graph.personId),
     });
     expect(grants).toHaveLength(0);
+
+    const requests = await db.query.consentRequest.findMany({
+      where: eq(consentRequest.chargePersonId, graph.personId),
+    });
+    expect(requests).toHaveLength(CONSENT_PURPOSES.length);
+    expect(requests.map((request) => request.purpose).sort()).toEqual(
+      [...CONSENT_PURPOSES].sort(),
+    );
+    for (const request of requests) {
+      expect(request).toMatchObject({
+        organizationId: graph.organizationId,
+        requestedBasis: 'gdpr_parental_consent',
+        status: 'pending',
+      });
+    }
+    await expect(
+      resolveLatestConsentSetStatusAnyBasis(
+        db,
+        graph.personId,
+        graph.organizationId,
+      ),
+    ).resolves.toBe('PENDING');
+  });
+
+  it('[WI-1864] does not create a parental request for a self-registered owner age 17', async () => {
+    const clerkUserId = uniqueClerk();
+    const email = `seventeen_owner_${generateUUIDv7()}@test.local`;
+    const currentYear = new Date().getUTCFullYear();
+
+    const graph = await createIdentityGraph(db, {
+      clerkUserId,
+      verifiedEmail: email,
+      displayName: 'Seventeen Owner',
+      birthYear: currentYear - 17,
+      birthMonth: 1,
+      birthDay: 1,
+      location: 'EU',
+    });
+
+    const requests = await db.query.consentRequest.findMany({
+      where: eq(consentRequest.chargePersonId, graph.personId),
+    });
+    expect(requests).toHaveLength(0);
   });
 
   it('is idempotent on a repeated clerk id (login_clerk_user_id_unique replay)', async () => {

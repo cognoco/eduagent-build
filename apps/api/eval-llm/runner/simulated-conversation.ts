@@ -407,6 +407,10 @@ async function defaultGraderTurn(
   });
   const raw = await runHarnessLlm(messages, GRADER_RUNG, {
     capability: 'judge',
+    // WI-2624: mirrors runChallengeRoundGrader's own declaration — see that
+    // call site's comment for why this is 'not-applicable' rather than
+    // 'model-output' (no producer vendor is cleanly threadable here today).
+    judgeIndependence: { mode: 'not-applicable' },
     responseFormat: 'json',
     ageBracket: args.ageBracket,
     conversationLanguage: args.conversationLanguage,

@@ -1219,6 +1219,7 @@ if (isIdentityV2Enabled()) {
         await db.insert(consentRequest).values({
           chargePersonId: personId,
           organizationId,
+          purpose: 'platform_use',
           requestedBasis: 'gdpr_parental_consent',
           status: 'pending',
           requestedAt: new Date(),

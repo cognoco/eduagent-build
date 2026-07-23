@@ -96,11 +96,19 @@ function rewardReceiptFromFeed(
 function useTransitionBoundFeed(
   nowFeed: NowFeedQueryResult,
   profileId: string | undefined,
+  observedEpoch: string,
 ): NowResponse | undefined {
   const incoming = nowFeed.data ?? nowFeed.fallbackFeed ?? undefined;
   const latestRef = useRef({ profileId, feed: incoming });
   latestRef.current = { profileId, feed: incoming };
   const acceptedRef = useRef(Boolean(incoming));
+  // [WI-2504 bounce 3] The observed policy epoch the current snapshot was
+  // accepted under. The snapshot pin below suppresses mid-scroll card churn
+  // across a same-profile refetch — but that pin must NOT also hold a stale
+  // notice-bearing feed across a policy flip. When the observed epoch changes
+  // (e.g. a `refetchOnWindowFocus` re-key to a disabled epoch, which does not
+  // fire `useFocusEffect`), break the pin and accept the freshly re-keyed feed.
+  const snapshotEpochRef = useRef(observedEpoch);
   const [snapshot, setSnapshot] = useState<{
     profileId: string | undefined;
     feed: NowResponse | undefined;
@@ -109,6 +117,18 @@ function useTransitionBoundFeed(
   useEffect(() => {
     if (snapshot.profileId !== profileId) {
       acceptedRef.current = Boolean(incoming);
+      snapshotEpochRef.current = observedEpoch;
+      setSnapshot({ profileId, feed: incoming });
+      return;
+    }
+    if (snapshotEpochRef.current !== observedEpoch) {
+      // [WI-2504 bounce 3] Observed policy epoch flipped for the SAME profile.
+      // Because the now-feed query is already re-keyed to the new epoch (its
+      // data/fallback cleared of the old epoch's notice), resetting the
+      // snapshot to `incoming` yields a notice-free feed the moment the client
+      // observes flag-off — no nav refocus required.
+      snapshotEpochRef.current = observedEpoch;
+      acceptedRef.current = Boolean(incoming);
       setSnapshot({ profileId, feed: incoming });
       return;
     }
@@ -116,7 +136,7 @@ function useTransitionBoundFeed(
       acceptedRef.current = true;
       setSnapshot({ profileId, feed: incoming });
     }
-  }, [incoming, profileId, snapshot.profileId]);
+  }, [incoming, profileId, snapshot.profileId, observedEpoch]);
 
   const refetch = nowFeed.refetch;
   useFocusEffect(
@@ -153,6 +173,27 @@ function pushMentorHomeworkCamera(router: ReturnType<typeof useRouter>): void {
   } as Href);
 }
 
+function pushMentorHomework(
+  router: ReturnType<typeof useRouter>,
+  subject?: { subjectId: string; subjectName: string },
+): void {
+  if (process.env.EXPO_PUBLIC_E2E !== 'true') {
+    pushMentorHomeworkCamera(router);
+    return;
+  }
+
+  router.push({
+    pathname: '/(app)/homework/manual',
+    params: {
+      entrySource: 'mentor',
+      returnTo: 'mentor',
+      ...(subject
+        ? { subjectId: subject.subjectId, subjectName: subject.subjectName }
+        : {}),
+    },
+  } as Href);
+}
+
 function LearnerMentorScreen(): React.ReactElement {
   const { activeProfile } = useProfile();
   const { t } = useTranslation();
@@ -162,6 +203,9 @@ function LearnerMentorScreen(): React.ReactElement {
   const { width: windowWidth } = useWindowDimensions();
   const nowFeed = useNowFeed();
   const subjectsIndex = useSubjectsIndex();
+  const homeworkSubject = subjectsIndex.subjects.find(
+    (subject) => subject.status === 'active',
+  );
   const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(new Set());
   const [cardArcStates, setCardArcStates] = useState<
     Record<string, NowCardArcState>
@@ -205,7 +249,18 @@ function LearnerMentorScreen(): React.ReactElement {
   }, [announce, clarificationAnnouncement, clarificationRevision]);
   const overflow = useNowOverflow(showOverflow);
   const mentorNoticeActions = useMentorNoticeActions();
-  const feed = useTransitionBoundFeed(nowFeed, activeProfile?.id);
+  const feed = useTransitionBoundFeed(
+    nowFeed,
+    activeProfile?.id,
+    nowFeed.observedEpoch,
+  );
+  // [WI-2504 bounce 2] The recheck mutation below is async; the observed
+  // policy epoch can flip (a sibling surface can observe a disable) while it
+  // is in flight. Read through a ref so the post-mutation check sees the
+  // epoch AT RESOLUTION TIME, not the one closed over when the mutation
+  // started.
+  const observedEpochRef = useRef(nowFeed.observedEpoch);
+  observedEpochRef.current = nowFeed.observedEpoch;
   const firstRealState = hasFirstRealState({
     // Count ACTIVE subjects only. useSubjectsIndex now surfaces every status
     // (paused/archived included) for the Subjects browse grouping, so the
@@ -237,8 +292,18 @@ function LearnerMentorScreen(): React.ReactElement {
         setArcState(card, 'due');
         return;
       }
+      const epochAtRecheck = observedEpochRef.current;
       try {
         const result = await mentorNoticeActions.recheck.mutateAsync(noticeId);
+        if (observedEpochRef.current !== epochAtRecheck) {
+          // [WI-2504 bounce 2] The observed policy epoch changed while the
+          // recheck was in flight — navigating now would open a session
+          // behind a surface the client has since suppressed. Defer to the
+          // authoritative refetch instead of trusting this stale result.
+          await mentorNoticeActions.invalidate();
+          setArcState(card, 'due');
+          return;
+        }
         router.push(
           `/(app)/session?sessionId=${encodeURIComponent(result.sessionId)}` as Href,
         );
@@ -258,6 +323,13 @@ function LearnerMentorScreen(): React.ReactElement {
 
   const handleDecline = async (card: NowCard): Promise<void> => {
     if (card.kind === 'mentor_notice') {
+      // [WI-2499] Not now defers for the current learning day; it must not
+      // dismiss locally or show light-practice success — that would render a
+      // success state the server never confirmed. A successful defer
+      // invalidates the feed (mentorNoticeActions.defer's onSuccess), which
+      // is the only authoritative way the card leaves the screen; on
+      // conflict/rejection/transport failure/malformed response, the card
+      // stays until an authoritative refetch says otherwise.
       const noticeId = card.deepLink.params.noticeId;
       if (!noticeId) {
         await mentorNoticeActions.invalidate();
@@ -270,6 +342,7 @@ function LearnerMentorScreen(): React.ReactElement {
           await mentorNoticeActions.invalidate();
         }
       }
+      return;
     }
     setDismissedKeys((current) => {
       const next = new Set(current);
@@ -461,7 +534,7 @@ function LearnerMentorScreen(): React.ReactElement {
             <Pressable
               testID="mentor-homework-prompt"
               accessibilityRole="button"
-              onPress={() => pushMentorHomeworkCamera(router)}
+              onPress={() => pushMentorHomework(router, homeworkSubject)}
               className="rounded-card border border-border bg-surface px-4 py-3"
             >
               <Text className="text-body-sm text-text-secondary">
@@ -494,7 +567,7 @@ function LearnerMentorScreen(): React.ReactElement {
             unavailable={nowFeed.isError && !feed}
             onSubmitText={handleSubmitText}
             onOpenCamera={() => pushMentorHomeworkCamera(router)}
-            onOpenHomework={() => pushMentorHomeworkCamera(router)}
+            onOpenHomework={() => pushMentorHomework(router, homeworkSubject)}
             voiceLocale={getVoiceLocaleForLanguage(
               activeProfile?.conversationLanguage,
             )}

@@ -329,8 +329,14 @@ $ADB $DEVICE_FLAG shell am force-stop com.android.bluetooth 2>/dev/null || true
 reset_maestro_driver
 # BUG-22: Pre-grant notification permission so the dialog doesn't block UI
 $ADB $DEVICE_FLAG shell pm grant "$APP_ID" android.permission.POST_NOTIFICATIONS 2>/dev/null || true
-# BUG-39: Pre-grant camera permission so homework flows don't hit system dialog
-$ADB $DEVICE_FLAG shell pm grant "$APP_ID" android.permission.CAMERA 2>/dev/null || true
+# BUG-39: Pre-grant camera permission unless the flow explicitly exercises the
+# permanent-denial path. Apply this after pm clear so the requested state sticks.
+if [ "${E2E_CAMERA_PERMISSION_STATE:-granted}" = "permanently-denied" ]; then
+  $ADB $DEVICE_FLAG shell pm revoke "$APP_ID" android.permission.CAMERA 2>/dev/null || true
+  $ADB $DEVICE_FLAG shell pm set-permission-flags "$APP_ID" android.permission.CAMERA user-set user-fixed
+else
+  $ADB $DEVICE_FLAG shell pm grant "$APP_ID" android.permission.CAMERA 2>/dev/null || true
+fi
 # Pre-grant microphone so voice-focused flows don't hit the Android system
 # dialog unless the flow is explicitly testing the just-in-time permission ask.
 $ADB $DEVICE_FLAG shell pm grant "$APP_ID" android.permission.RECORD_AUDIO 2>/dev/null || true

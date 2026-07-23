@@ -40,17 +40,38 @@ function formatActivityType(raw: string): string {
 
 export default function QuizRoundDetailScreen() {
   const { t } = useTranslation();
-  const { roundId, returnTo } = useLocalSearchParams<{
-    roundId: string;
-    returnTo?: string;
-  }>();
+  const { roundId, returnTo, historyReturnTo, historyPracticeReturnTo } =
+    useLocalSearchParams<{
+      roundId: string;
+      returnTo?: string;
+      historyReturnTo?: string | string[];
+      historyPracticeReturnTo?: string | string[];
+    }>();
   const router = useRouter();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { data: round, isLoading, isError, refetch } = useRoundDetail(roundId);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
-  const backHref =
-    returnTo === 'practice' ? '/(app)/practice' : '/(app)/quiz/history';
+  const historyReturnToken = Array.isArray(historyReturnTo)
+    ? historyReturnTo[0]
+    : historyReturnTo;
+  const historyPracticeReturnToken = Array.isArray(historyPracticeReturnTo)
+    ? historyPracticeReturnTo[0]
+    : historyPracticeReturnTo;
+  const backHref: Href =
+    returnTo === 'practice'
+      ? '/(app)/practice'
+      : historyReturnToken
+        ? {
+            pathname: '/(app)/quiz/history',
+            params: {
+              returnTo: historyReturnToken,
+              ...(historyPracticeReturnToken
+                ? { practiceReturnTo: historyPracticeReturnToken }
+                : {}),
+            },
+          }
+        : '/(app)/quiz/history';
 
   const toggleExpanded = (index: number) => {
     setExpanded((prev) => {

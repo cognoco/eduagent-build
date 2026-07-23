@@ -13,6 +13,7 @@ import {
   getGdprGrantWithdrawalStateV2,
   withdrawConsentByToken,
   ConsentRecordNotFoundError,
+  ConsentReconsentRequiredError,
 } from '../services/identity-v2/consent-v2';
 import {
   signWithdrawalToken,
@@ -647,6 +648,19 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
             `<h1>This request has already been processed</h1>
              <p>A response for this consent request has already been recorded, so there is nothing more to do here.</p>
              <p>If you did not expect this, your child can send a new consent request from the app.</p>
+             ${errorActionHtml()}`,
+          ),
+          409,
+        );
+      }
+
+      if (error instanceof ConsentReconsentRequiredError) {
+        return c.html(
+          pageLayout(
+            'New Request Needed',
+            `<h1 class="error">A new consent request is needed</h1>
+             <p>This link predates the current consent choices and cannot authorize them.</p>
+             <p>Ask your child to send a new consent request from the app.</p>
              ${errorActionHtml()}`,
           ),
           409,

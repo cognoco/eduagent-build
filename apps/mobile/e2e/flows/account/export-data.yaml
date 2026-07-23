@@ -39,7 +39,7 @@
 #   more-row-export  apps/mobile/src/app/(app)/more.tsx line 879
 #
 # Run command:
-#   ./e2e/scripts/seed-and-run.sh onboarding-complete e2e/flows/account/export-data.yaml
+#   ./e2e/scripts/seed-and-run.sh subscription-pro-active e2e/flows/account/export-data.yaml
 #
 # Tags: nightly, account
 appId: com.mentomate.app
@@ -51,7 +51,7 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "onboarding-complete"
+      SEED_SCENARIO: "subscription-pro-active"
       API_URL: ${API_URL}
 
 # ── Step 2: Confirm home screen ──
@@ -74,6 +74,14 @@ tags:
 - takeScreenshot: export-02-more-loaded
 
 # ── Step 4: Navigate to Privacy sub-screen (Export lives there now) ──
+- scrollUntilVisible:
+    element:
+      id: "more-row-privacy"
+    direction: DOWN
+    timeout: 15000
+    speed: 50
+    visibilityPercentage: 40
+
 - tapOn:
     id: "more-row-privacy"
 

@@ -80,8 +80,8 @@ jest.mock('../../lib/theme', /* gc1-allow: theme hook requires native ColorSchem
 const mockSentryCaptureMessage = jest.fn();
 const mockSentryCaptureException = jest.fn();
 jest.mock(
-  '../../lib/sentry',
-  /* gc1-allow: external-boundary: @sentry/react-native native crash handlers */ () => ({
+  '../../lib/sentry' /* gc1-allow: external-boundary: @sentry/react-native native crash handlers */,
+  () => ({
     Sentry: {
       addBreadcrumb: jest.fn(),
       captureMessage: (...args: unknown[]) => mockSentryCaptureMessage(...args),
@@ -663,24 +663,41 @@ describe('SessionSummaryScreen', () => {
     screen.getByText(/strong independent thinking/);
   });
 
-  it('renders a persisted mentor notice receipt after reload', async () => {
-    mockSessionSummaryData = {
-      ...BASE_MOCK_SUMMARY,
-      mentorNotice: {
-        id: '550e8400-e29b-41d4-a716-446655440099',
-        concept: 'changing signs',
-        correctionHint: 'Apply the inverse operation to both sides.',
-      },
-    };
+  // [WI-2499 AC-5] The receipt renders only the server-accepted scrubbed
+  // concept and optional correction hint, with age- and source-neutral copy —
+  // same rendering for both eligible source types (an ordinary learning
+  // session and a homework session), and never an evidence quote, diagnosis,
+  // mastery claim, or future-review promise.
+  it.each([
+    ['ordinary learning session', undefined],
+    ['homework session', 'homework'],
+  ])(
+    'renders a persisted mentor notice receipt after reload for a %s',
+    async (_label, sessionType) => {
+      mockParams.sessionType = sessionType;
+      mockSessionSummaryData = {
+        ...BASE_MOCK_SUMMARY,
+        mentorNotice: {
+          id: '550e8400-e29b-41d4-a716-446655440099',
+          concept: 'changing signs',
+          correctionHint: 'Apply the inverse operation to both sides.',
+        },
+      };
 
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-    await waitFor(() => {
-      screen.getByText('Noticed along the way');
-      screen.getByText('changing signs');
-      screen.getByText('Apply the inverse operation to both sides.');
-    });
-  });
+      await waitFor(() => {
+        screen.getByText('Noticed along the way');
+        screen.getByText('changing signs');
+        screen.getByText('Apply the inverse operation to both sides.');
+      });
+      // No evidence quote, diagnosis, mastery claim, or future-review promise —
+      // the receipt is exactly {title, concept, correctionHint}, nothing else.
+      expect(
+        screen.queryByText(/mastered|diagnos|"changing signs"|next review/i),
+      ).toBeNull();
+    },
+  );
 
   // [BUG-801] When the URL passes exchangeCount='0' (legitimate value for
   // a session that ended before any exchanges), the screen must honor it
@@ -1047,6 +1064,46 @@ describe('SessionSummaryScreen', () => {
       expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
     });
     expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('[WI-1864] keeps a fresh submission on the Home path after its summary query refetches', async () => {
+    mockParams.topicId = '770e8400-e29b-41d4-a716-446655440000';
+    mockParams.subjectId = '550e8400-e29b-41d4-a716-446655440000';
+    const acceptedSummary = {
+      id: '880e8400-e29b-41d4-a716-446655440001',
+      sessionId: '660e8400-e29b-41d4-a716-446655440000',
+      content: 'I learned about quadratic equations and factoring methods',
+      aiFeedback: 'Well done.',
+      feedbackStatus: 'available' as const,
+      status: 'accepted' as const,
+    };
+    mockSubmitResult = { summary: acceptedSummary };
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('summary-input'),
+      acceptedSummary.content,
+    );
+    await pressAsync(screen.getByTestId('submit-summary-button'));
+
+    await act(async () => {
+      expect(activeQueryClient).not.toBeNull();
+      activeQueryClient!.setQueriesData(
+        {
+          predicate: (query) => query.queryKey[0] === 'session-summary',
+        },
+        acceptedSummary,
+      );
+    });
+    screen.getByLabelText('Continue to home');
+
+    await pressAsync(screen.getByTestId('continue-button'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+    expect(mockReplace).not.toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/(app)/topic/[topicId]' }),
+    );
   });
 
   it('triggers the rating prompt hook before leaving a recall summary', async () => {
@@ -2066,6 +2123,31 @@ describe('SessionSummaryScreen', () => {
 
       await waitFor(() => {
         expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+      });
+    });
+
+    it('[WI-1864] routes a persisted-on-entry summary back to its topic', async () => {
+      mockParams.topicId = '770e8400-e29b-41d4-a716-446655440000';
+      mockParams.subjectId = '550e8400-e29b-41d4-a716-446655440000';
+      mockSessionSummaryData = {
+        id: '880e8400-e29b-41d4-a716-446655440007',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'Previously saved reflection opened from its topic.',
+        aiFeedback: 'Good reflection.',
+        status: 'submitted',
+      };
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      const continueButton = await screen.findByLabelText('Continue learning');
+      await pressAsync(continueButton);
+
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(app)/topic/[topicId]',
+        params: {
+          topicId: '770e8400-e29b-41d4-a716-446655440000',
+          subjectId: '550e8400-e29b-41d4-a716-446655440000',
+        },
       });
     });
 

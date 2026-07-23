@@ -30,7 +30,7 @@
 // (single-live-store arg 2).
 // ---------------------------------------------------------------------------
 
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import {
   consentGrant,
   consentRequest,
@@ -41,14 +41,18 @@ import {
   subscription as subscriptionTable,
   type Database,
 } from '@eduagent/database';
-import type { ConsentStatus, ConsentType } from '@eduagent/schemas';
+import type {
+  ConsentPurpose,
+  ConsentStatus,
+  ConsentType,
+} from '@eduagent/schemas';
 import {
   sendEmail,
   formatConsentRequestEmail,
   type EmailOptions,
 } from '../notifications/email';
 import { createLogger } from '../logger';
-import { computeAgeBracketFromDate } from '@eduagent/schemas';
+import { computeAgeBracketFromDate, CONSENT_PURPOSES } from '@eduagent/schemas';
 import { inngest } from '../../inngest/client';
 import { safeSend } from '../safe-non-core';
 import {
@@ -56,10 +60,9 @@ import {
   type StripeClientLike,
 } from '../billing/store-teardown';
 import {
-  ADULT_SELF_CONSENT_PURPOSES,
   type ConsentBasis,
-  DEFAULT_CONSENT_PURPOSE,
-  resolveLatestConsentStatusAnyBasis,
+  resolveLatestConsentSetStatusAnyBasis,
+  resolveConsentSetStatus,
 } from './consent-status-v2';
 import {
   consentPersonLockKey,
@@ -69,6 +72,27 @@ import {
 import { isGuardianOf } from './guardianship';
 
 const logger = createLogger();
+
+/** A pre-purpose-set email token cannot authorize newly introduced purposes. */
+export class ConsentReconsentRequiredError extends Error {
+  constructor() {
+    super('This legacy consent link requires a new consent request');
+    this.name = 'ConsentReconsentRequiredError';
+  }
+}
+
+/**
+ * [WI-2547] The caller is not an adult account owner, so they may not record an
+ * adult self-consent. Deliberately ONE error for every ineligible shape (minor,
+ * non-owner, unknown person, cross-organization) so the route's response cannot
+ * be used to enumerate account membership or ages.
+ */
+export class AdultSelfConsentNotEligibleError extends Error {
+  constructor() {
+    super('This account is not eligible for adult self-consent');
+    this.name = 'AdultSelfConsentNotEligibleError';
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Error classes — re-exported 1:1 from the legacy machine so the route layer's
@@ -135,8 +159,10 @@ export function consentTypeToBasis(consentType: ConsentType): ConsentBasis {
  * `createPendingConsentState`. Recorded at child-profile creation; the email is
  * sent later via `requestConsentV2` when the parent email is supplied.
  *
- * Idempotent on the basis-keyed unique: a repeat resets the row to 'pending'
- * and clears any stale token/recipient, matching the legacy onConflictDoUpdate.
+ * Idempotent on the basis-keyed unique: a repeat resets only a non-terminal
+ * request set to 'pending' and clears stale token/recipient data. A terminal
+ * legacy partial remains immutable so the caller must start explicit
+ * re-consent instead of creating a mixed terminal/pending purpose set.
  */
 export async function createPendingConsentRequest(
   db: Database,
@@ -145,33 +171,54 @@ export async function createPendingConsentRequest(
   consentType: ConsentType,
 ): Promise<void> {
   const basis = consentTypeToBasis(consentType);
-  await db
-    .insert(consentRequest)
-    .values({
-      chargePersonId,
-      organizationId,
-      purpose: DEFAULT_CONSENT_PURPOSE,
-      requestedBasis: basis,
-      status: 'pending',
-    })
-    .onConflictDoUpdate({
-      target: [
-        consentRequest.chargePersonId,
-        consentRequest.purpose,
-        consentRequest.organizationId,
-        consentRequest.requestedBasis,
-      ],
-      set: {
-        status: 'pending',
-        guardianEmail: null,
-        token: null,
-        tokenExpiresAt: null,
-        respondedAt: null,
-        updatedAt: sql`now()`,
-      },
-      // Never revive a terminal (approved/denied) request to pending.
-      setWhere: sql`${consentRequest.status} NOT IN ('approved','denied')`,
+  await withConsentPersonLock(db, chargePersonId, async (tx) => {
+    const existing = await tx.query.consentRequest.findMany({
+      where: requestSetKey(chargePersonId, organizationId, basis),
+      columns: { status: true },
     });
+    // A terminal legacy partial must remain historical as a whole. Inserting
+    // only the missing purpose would create a mixed approved/pending set.
+    if (
+      existing.some(
+        (row) => row.status === 'approved' || row.status === 'denied',
+      )
+    ) {
+      return;
+    }
+    const rows = await tx
+      .insert(consentRequest)
+      .values(
+        CONSENT_PURPOSES.map((purpose) => ({
+          chargePersonId,
+          organizationId,
+          purpose,
+          requestedBasis: basis,
+          status: 'pending',
+        })),
+      )
+      .onConflictDoUpdate({
+        target: [
+          consentRequest.chargePersonId,
+          consentRequest.purpose,
+          consentRequest.organizationId,
+          consentRequest.requestedBasis,
+        ],
+        set: {
+          status: 'pending',
+          guardianEmail: null,
+          token: null,
+          tokenExpiresAt: null,
+          respondedAt: null,
+          updatedAt: sql`now()`,
+        },
+        // Database-side defense against a writer that does not share the lock.
+        setWhere: sql`${consentRequest.status} NOT IN ('approved','denied')`,
+      })
+      .returning({ id: consentRequest.id });
+    if (rows.length !== CONSENT_PURPOSES.length) {
+      throw new Error('pending consent purpose-set write was incomplete');
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -198,17 +245,21 @@ export async function createDirectConsentGrant(
   snapshot: { ageAtGrant?: number; jurisdictionAtGrant?: string } = {},
 ): Promise<void> {
   const basis = consentTypeToBasis(consentType);
-  await db.insert(consentGrant).values({
-    chargePersonId,
-    organizationId,
-    purpose: DEFAULT_CONSENT_PURPOSE,
-    lawfulBasis: basis,
-    granted: true,
-    priorValue: null,
-    auditFact: { source: 'parent_created_child', guardianPersonId },
-    snapshotAgeAtGrant: snapshot.ageAtGrant ?? null,
-    snapshotJurisdictionAtGrant: snapshot.jurisdictionAtGrant ?? null,
-  });
+  const grantedAt = new Date();
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      chargePersonId,
+      organizationId,
+      purpose,
+      lawfulBasis: basis,
+      granted: true,
+      grantedAt,
+      priorValue: null,
+      auditFact: { source: 'parent_created_child', guardianPersonId },
+      snapshotAgeAtGrant: snapshot.ageAtGrant ?? null,
+      snapshotJurisdictionAtGrant: snapshot.jurisdictionAtGrant ?? null,
+    })),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -218,14 +269,14 @@ export async function createDirectConsentGrant(
 // to consent on their behalf and no email workflow to run — the signup action
 // itself is the terms-acceptance/consent event (mirrors createDirectConsentGrant's
 // "no email workflow" reasoning above). This writes ONE CONSENTED consent_grant
-// per purpose in ADULT_SELF_CONSENT_PURPOSES (AC2 purpose split — each purpose
+// per purpose in CONSENT_PURPOSES (AC2 purpose split — each purpose
 // is its own row, so withdrawing one never touches the other), basis =
 // 'art6_1_a'. No consent_request row is written (there is no pre-grant
 // workflow for this basis — see the ConsentBasis doc comment).
 //
 // Withdrawal is deliberately NOT `stampWithdrawal`/`revokeConsentV2`: those are
 // GUARDIAN-authorized (isGuardianOf) and purpose-blind (hardcoded to
-// DEFAULT_CONSENT_PURPOSE) — neither fits here. An adult withdrawing their OWN
+// the whole guardian purpose set) — neither fits here. An adult withdrawing their OWN
 // consent has no guardian to check (authority = caller IS chargePersonId,
 // enforced by the route/caller, same as the other self-service onboarding
 // paths) and must be able to withdraw ONE purpose independently of the other
@@ -235,7 +286,7 @@ export async function createDirectConsentGrant(
 
 /**
  * [WI-1193 AC1/AC2] Write the adult self-consent grants — one CONSENTED row per
- * ADULT_SELF_CONSENT_PURPOSES purpose, basis='art6_1_a'. Called once,
+ * CONSENT_PURPOSES purpose, basis='art6_1_a'. Called once,
  * inside the identity-graph bootstrap transaction, for a self-registered adult
  * owner. `db` may be a transaction handle (passed through unchanged, same
  * pattern as createDirectConsentGrant).
@@ -248,7 +299,7 @@ export async function recordAdultSelfConsentV2(
 ): Promise<void> {
   const now = new Date();
   await db.insert(consentGrant).values(
-    ADULT_SELF_CONSENT_PURPOSES.map((purpose) => ({
+    CONSENT_PURPOSES.map((purpose) => ({
       chargePersonId,
       organizationId,
       purpose,
@@ -286,7 +337,7 @@ export async function withdrawAdultSelfConsentV2(
   db: Database,
   chargePersonId: string,
   organizationId: string,
-  purpose: string,
+  purpose: ConsentPurpose,
 ): Promise<RevokeConsentV2Result> {
   const current = await db.query.consentGrant.findFirst({
     where: and(
@@ -373,6 +424,47 @@ export async function withdrawAdultSelfConsentV2(
 // caller's own server-derived person id is passed (never request-supplied), so
 // this is self-scoped and carries no cross-profile hazard.
 
+/**
+ * [WI-2547] The ONE advisory-lock key every adult self-consent writer takes.
+ *
+ * Both writers that can create an `art6_1_a` grant — the first-use repair
+ * (`repairOrSignalAdultSelfConsentV2`) and the authenticated acceptance
+ * (`acceptAdultSelfConsentV2`) — must serialise against EACH OTHER, not just
+ * against themselves. They previously used two different namespaces, which left
+ * a real duplicate-write race: `POST /consent/self/accept` is an authenticated
+ * public contract with no dependency on the mobile gate, so an eligible adult
+ * can call it directly while a concurrent `GET /profiles` bootstrap runs repair
+ * case (a). With separate locks both transactions could observe no live
+ * `platform_use` grant and each insert one, duplicating a canonical compliance
+ * row. Sharing one key closes that.
+ *
+ * Keyed on the PERSON alone, deliberately not person+organization: the rows
+ * these writers guard are person-charged (`consent_grant.charge_person_id`), so
+ * a person-scoped key is the one that actually covers the invariant. It also
+ * serialises the rare cross-organization case for the same person, which is
+ * strictly safer and costs nothing real — a person accepting consent in two
+ * organizations at the same instant is not a hot path.
+ *
+ * **The literal value is load-bearing — do not "tidy" it.** It is exactly the
+ * key the first-use repair already takes on `origin/main`
+ * (`adult-consent-repair:<person>`), and it is kept verbatim so a ROLLING
+ * DEPLOY stays safe. Advisory locks only exclude processes that hash the same
+ * string, so minting a fresh literal here would leave an old repair worker and
+ * a new repair worker on different keys for the length of the rollout — able to
+ * bypass each other and duplicate the very repair row this lock exists to
+ * protect. Acceptance is new in this Work Item and has no deployed predecessor
+ * to preserve, so it is the writer that moves onto the established key. The name
+ * generalised (both writers use it now); the value must not.
+ *
+ * Exported so tests can queue on the same key without reaching into internals.
+ * Deliberately distinct from `consentPersonLockKey` (the deletion/revocation
+ * flow's key): merging with that would serialise these small writes behind a
+ * heavy multi-table teardown for no invariant either one needs.
+ */
+export function adultSelfConsentLockKey(chargePersonId: string): string {
+  return `adult-consent-repair:${chargePersonId}`;
+}
+
 export type AdultSelfConsentRepairOutcome =
   | 'not_applicable'
   | 'already_present'
@@ -407,6 +499,57 @@ function parseVersionedTermsFact(
   return null;
 }
 
+/**
+ * [WI-2547] The shared adult-account-OWNER gate: `admin` membership in THIS
+ * organization AND an adult (18+) birth date. Extracted verbatim from
+ * repairOrSignalAdultSelfConsentV2 so the repair path and the acceptance path
+ * (acceptAdultSelfConsentV2) can never drift apart on who counts as eligible.
+ *
+ * Fail-closed on every unknown: absent/non-admin membership (which also covers
+ * a CROSS-ORGANIZATION caller — no membership row in the passed org), missing
+ * person row, unparseable birth date, or any non-adult bracket.
+ *
+ * computeAgeBracketFromDate is the canonical feature-gating / safety-adjacent
+ * age function AGENTS.md §Profile Shapes names for the adult-owner gate
+ * (exact-date UTC math, year-only fallback when month/day are absent — never
+ * the year-only computeAgeBracket, which overestimates by up to 11 months and
+ * could read a late-in-the-year 17-year-old as 18). `birthDate` is the
+ * `YYYY-MM-DD` date column.
+ */
+export async function isAdultAccountOwnerV2(
+  db: Database,
+  personId: string,
+  organizationId: string,
+): Promise<boolean> {
+  const membershipRow = await db.query.membership.findFirst({
+    where: and(
+      eq(membership.personId, personId),
+      eq(membership.organizationId, organizationId),
+    ),
+    columns: { roles: true },
+  });
+  if (!membershipRow?.roles.includes('admin')) return false;
+
+  const personRow = await db.query.person.findFirst({
+    where: eq(person.id, personId),
+    columns: { birthDate: true },
+  });
+  if (!personRow) return false;
+
+  const birthDate = String(personRow.birthDate);
+  const birthYear = Number(birthDate.slice(0, 4));
+  const birthMonth = Number(birthDate.slice(5, 7));
+  const birthDay = Number(birthDate.slice(8, 10));
+  if (!Number.isFinite(birthYear)) return false;
+  return (
+    computeAgeBracketFromDate(
+      birthYear,
+      Number.isFinite(birthMonth) ? birthMonth : undefined,
+      Number.isFinite(birthDay) ? birthDay : undefined,
+    ) === 'adult'
+  );
+}
+
 export async function repairOrSignalAdultSelfConsentV2(
   db: Database,
   chargePersonId: string,
@@ -414,38 +557,7 @@ export async function repairOrSignalAdultSelfConsentV2(
 ): Promise<AdultSelfConsentRepairOutcome> {
   // Gate: adult (18+) account-OWNER only. A non-owner (managed-child login) or a
   // minor owner never receives an adult self-consent record.
-  const membershipRow = await db.query.membership.findFirst({
-    where: and(
-      eq(membership.personId, chargePersonId),
-      eq(membership.organizationId, organizationId),
-    ),
-    columns: { roles: true },
-  });
-  if (!membershipRow?.roles.includes('admin')) return 'not_applicable';
-
-  const personRow = await db.query.person.findFirst({
-    where: eq(person.id, chargePersonId),
-    columns: { birthDate: true },
-  });
-  if (!personRow) return 'not_applicable';
-  // Adult-owner gate — computeAgeBracketFromDate is the canonical feature-gating
-  // / safety-adjacent age function AGENTS.md §Profile Shapes names for the
-  // adult-owner gate (exact-date UTC math, year-only fallback when month/day are
-  // absent — never the year-only computeAgeBracket, which overestimates by up to
-  // 11 months and could read a late-in-the-year 17-year-old as 18). `birthDate`
-  // is the `YYYY-MM-DD` date column; fail-closed on a null/non-numeric birthYear.
-  const birthDate = String(personRow.birthDate);
-  const birthYear = Number(birthDate.slice(0, 4));
-  const birthMonth = Number(birthDate.slice(5, 7));
-  const birthDay = Number(birthDate.slice(8, 10));
-  if (
-    !Number.isFinite(birthYear) ||
-    computeAgeBracketFromDate(
-      birthYear,
-      Number.isFinite(birthMonth) ? birthMonth : undefined,
-      Number.isFinite(birthDay) ? birthDay : undefined,
-    ) !== 'adult'
-  ) {
+  if (!(await isAdultAccountOwnerV2(db, chargePersonId, organizationId))) {
     return 'not_applicable';
   }
 
@@ -483,11 +595,15 @@ export async function repairOrSignalAdultSelfConsentV2(
   // insert cannot be made idempotent by ON CONFLICT here. Same idiom as
   // services/nudge.ts. Double-checked: re-read existing INSIDE the lock so the
   // loser of a race early-outs instead of inserting.
+  //
+  // [WI-2547] The key is the SHARED adultSelfConsentLockKey, so this also
+  // serialises against acceptAdultSelfConsentV2 — the other writer that can
+  // create an art6_1_a grant for this person.
   return db.transaction(async (tx) => {
     await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtextextended(${
-        'adult-consent-repair:' + chargePersonId
-      }, 0))`,
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${adultSelfConsentLockKey(
+        chargePersonId,
+      )}, 0))`,
     );
 
     const existingLocked = await tx.query.consentGrant.findFirst({
@@ -503,7 +619,10 @@ export async function repairOrSignalAdultSelfConsentV2(
     await tx.insert(consentGrant).values({
       chargePersonId,
       organizationId,
-      purpose: DEFAULT_CONSENT_PURPOSE,
+      // Existing-account repair can restore only the platform purpose proven
+      // by this row's versioned acceptance evidence; it must never infer the
+      // independent LLM-disclosure purpose.
+      purpose: CONSENT_PURPOSES[0],
       lawfulBasis: 'art6_1_a',
       granted: true,
       grantedAt: new Date(),
@@ -516,6 +635,133 @@ export async function repairOrSignalAdultSelfConsentV2(
       },
     });
     return 'repaired'; // (a)
+  });
+}
+
+// ---------------------------------------------------------------------------
+// (2c) [WI-2547] acceptAdultSelfConsentV2 — the user-reachable ACCEPTANCE write
+// ---------------------------------------------------------------------------
+// repairOrSignalAdultSelfConsentV2 case (c) signals `needs_consent` and writes
+// nothing, deliberately: it will not fabricate a consent record without a
+// traceable versioned event. This is the function that closes that loop — the
+// adult performs a REAL consent event in the app, and we record it.
+//
+// Why this does NOT reuse repair's `already_present` gate: that gate matches on
+// (chargePersonId, lawfulBasis) with NO purpose predicate, while repair inserts
+// only CONSENT_PURPOSES[0]. An adult repaired into platform_use alone therefore
+// looks "already present" — reusing it here would silently never grant
+// llm_disclosure for exactly the legacy population this flow exists to serve.
+// Acceptance is decided PER PURPOSE instead.
+
+/**
+ * [WI-2547] Record an authenticated adult's acceptance of their OWN processing
+ * + LLM-disclosure consent, one `art6_1_a` grant per purpose in CONSENT_PURPOSES.
+ *
+ * Per-purpose and idempotent under retry AND concurrent submit:
+ *   - a LIVE grant (granted, not withdrawn) is left exactly as-is — never
+ *     duplicated, never weakened, never re-stamped;
+ *   - an ABSENT or WITHDRAWN purpose is granted afresh (the re-consent case).
+ * Returns the purposes this call actually wrote, so a replay returns `[]`.
+ *
+ * Authority: the caller passes their OWN server-derived person id
+ * (`callerPersonId` from the verified login binding) — never a request-supplied
+ * identifier — so this is self-scoped and carries no cross-profile hazard.
+ * Eligibility is the shared adult-account-owner gate; every ineligible shape
+ * throws AdultSelfConsentNotEligibleError BEFORE any write.
+ *
+ * `termsVersion` is the server's CONSENT_POLICY_VERSION, stamped into the
+ * versioned acceptance audit fact and kept separate from the lawful basis
+ * (MMT-ADR-0011: terms acceptance is a distinct, versioned fact).
+ */
+export async function acceptAdultSelfConsentV2(
+  db: Database,
+  chargePersonId: string,
+  organizationId: string,
+  termsVersion: string,
+): Promise<ConsentPurpose[]> {
+  if (!(await isAdultAccountOwnerV2(db, chargePersonId, organizationId))) {
+    throw new AdultSelfConsentNotEligibleError();
+  }
+
+  // Serialise per person on the SHARED adultSelfConsentLockKey, so no two
+  // art6_1_a writers can both observe an absent grant and each insert a row.
+  // There is no unique constraint to lean on here: a person legitimately holds
+  // one art6_1_a row per purpose (the AC2 purpose split), so ON CONFLICT cannot
+  // express this idempotency.
+  //
+  // Scope of the lock. It covers BOTH writers that can create an art6_1_a grant:
+  //   - accept vs. accept — the retry / concurrent-submit case the AC names;
+  //   - accept vs. first-use REPAIR — repairOrSignalAdultSelfConsentV2 takes the
+  //     same key. This is a real race, not a theoretical one: this function
+  //     backs an authenticated public API contract, and the mobile gate is a UI
+  //     affordance, NOT an authorization precondition on the route. An eligible
+  //     adult can call the endpoint directly while a concurrent GET /profiles
+  //     bootstrap runs repair case (a); with the two writers on separate keys
+  //     both could see no live platform_use grant and each insert one,
+  //     duplicating a canonical compliance row and breaking this function's own
+  //     "existing valid grants are never duplicated" guarantee. Their write
+  //     cases are NOT mutually exclusive, and nothing about the product flow may
+  //     be relied on to keep them apart.
+  // withdrawAdultSelfConsentV2 takes NO lock and is not given one here: it is
+  // already race-safe within itself (a conditional UPDATE ... WHERE
+  // withdrawn_at IS NULL ... RETURNING, so concurrent withdrawals leave exactly
+  // one winner), and every accept-vs-withdraw interleaving resolves to a
+  // legitimate serialisation rather than a lost update:
+  //   - accept reads a LIVE grant and skips, then withdraw stamps it → the
+  //     accept simply ordered before the withdrawal; withdrawn is correct.
+  //   - withdraw commits first, then accept reads WITHDRAWN and re-grants → the
+  //     accept ordered after; granted is correct.
+  //   - a withdrawal racing an accept on an ALREADY-withdrawn row is a no-op by
+  //     design (it returns the existing withdrawnAt), so nothing is lost.
+  // Neither order can duplicate a live grant or drop a committed write, so
+  // widening the lock to the withdrawal path would add contention to a shipped,
+  // separately-tested code path without fixing a demonstrable defect.
+
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${adultSelfConsentLockKey(
+        chargePersonId,
+      )}, 0))`,
+    );
+
+    const now = new Date();
+    const granted: ConsentPurpose[] = [];
+
+    for (const purpose of CONSENT_PURPOSES) {
+      const current = await tx.query.consentGrant.findFirst({
+        where: and(
+          eq(consentGrant.chargePersonId, chargePersonId),
+          eq(consentGrant.purpose, purpose),
+          eq(consentGrant.organizationId, organizationId),
+          eq(consentGrant.lawfulBasis, 'art6_1_a'),
+        ),
+        orderBy: (g, { desc }) => [desc(g.grantedAt), desc(g.id)],
+        columns: { id: true, granted: true, withdrawnAt: true },
+      });
+
+      // Already live → leave untouched (never duplicate or weaken a valid grant).
+      if (current?.granted && !current.withdrawnAt) continue;
+
+      await tx.insert(consentGrant).values({
+        chargePersonId,
+        organizationId,
+        purpose,
+        lawfulBasis: 'art6_1_a' as const,
+        granted: true,
+        grantedAt: now,
+        auditFact: {
+          // Distinct from 'adult_self_signup' / 'adult_self_consent_repair' so
+          // getConsentAccountabilityV2 can tell an in-app re-consent acceptance
+          // from bootstrap or derived-repair provenance.
+          source: 'adult_self_acceptance',
+          termsAcceptedAt: now.toISOString(),
+          termsVersion,
+        },
+      });
+      granted.push(purpose);
+    }
+
+    return granted;
   });
 }
 
@@ -554,84 +800,121 @@ export async function requestConsentV2(
   const basis = consentTypeToBasis(input.consentType);
   const token = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const write = await withConsentPersonLock(
+    db,
+    input.chargePersonId,
+    async (tx) => {
+      const existing = await tx.query.consentRequest.findMany({
+        where: requestSetKey(input.chargePersonId, input.organizationId, basis),
+      });
+      const representative = existing[0] ?? null;
+      const isRecipientChange =
+        representative?.guardianEmail != null &&
+        representative.guardianEmail !== input.guardianEmail;
+      const maxResendCount = Math.max(
+        0,
+        ...existing.map((row) => row.resendCount),
+      );
+      const maxRecipientChangeCount = Math.max(
+        0,
+        ...existing.map((row) => row.recipientChangeCount),
+      );
+      const currentGrants = await currentGrantSet(
+        tx,
+        input.chargePersonId,
+        input.organizationId,
+        basis,
+      );
+      const isLegacyIncompleteCycle = !hasCompletePurposeSet(existing);
+      const terminal = existing.some(
+        (row) => row.status === 'approved' || row.status === 'denied',
+      );
+      const allowLegacyIncompleteReconsent =
+        terminal &&
+        isLegacyIncompleteCycle &&
+        currentGrants.length > 0 &&
+        !hasCompletePurposeSet(currentGrants);
+      if (terminal && !allowLegacyIncompleteReconsent) {
+        throw new ConsentRequestNotFoundError();
+      }
+      if (isRecipientChange) {
+        if (maxRecipientChangeCount >= MAX_RECIPIENT_CHANGES) {
+          throw new ConsentRecipientChangeLimitError();
+        }
+      } else if (
+        representative?.guardianEmail != null &&
+        maxResendCount >= MAX_CONSENT_RESENDS
+      ) {
+        throw new ConsentResendLimitError();
+      }
 
-  // Pre-read for error classification + email-failure rollback only — the caps
-  // themselves are enforced atomically below, so a stale read cannot let a
-  // request exceed a cap.
-  const existing = await db.query.consentRequest.findFirst({
-    where: requestKey(input.chargePersonId, input.organizationId, basis),
-    columns: { guardianEmail: true },
-  });
-  const isRecipientChange =
-    existing != null &&
-    existing.guardianEmail != null &&
-    existing.guardianEmail !== input.guardianEmail;
-
-  const [row] = await db
-    .insert(consentRequest)
-    .values({
-      chargePersonId: input.chargePersonId,
-      organizationId: input.organizationId,
-      purpose: DEFAULT_CONSENT_PURPOSE,
-      requestedBasis: basis,
-      status: 'requested',
-      guardianEmail: input.guardianEmail,
-      token,
-      tokenExpiresAt: expiresAt,
-      resendCount: 0,
-      recipientChangeCount: 0,
-      policyVersion: input.audit?.policyVersion ?? null,
-      requestIp: input.audit?.requestIp ?? null,
-      userAgent: input.audit?.userAgent ?? null,
-      requestedAt: sql`now()`,
-    })
-    .onConflictDoUpdate({
-      target: [
-        consentRequest.chargePersonId,
-        consentRequest.purpose,
-        consentRequest.organizationId,
-        consentRequest.requestedBasis,
-      ],
-      set: {
-        status: 'requested',
-        guardianEmail: input.guardianEmail,
-        token,
-        tokenExpiresAt: expiresAt,
-        policyVersion: input.audit?.policyVersion ?? null,
-        requestIp: input.audit?.requestIp ?? null,
-        userAgent: input.audit?.userAgent ?? null,
-        // Same recipient → resend++; recipient change → reset to 0.
-        resendCount: sql`CASE WHEN ${consentRequest.guardianEmail} IS NOT DISTINCT FROM ${input.guardianEmail} THEN ${consentRequest.resendCount} + 1 ELSE 0 END`,
-        // Only a change BETWEEN two real recipients consumes a change slot.
-        recipientChangeCount: sql`CASE WHEN ${consentRequest.guardianEmail} IS NOT NULL AND ${consentRequest.guardianEmail} IS DISTINCT FROM ${input.guardianEmail} THEN ${consentRequest.recipientChangeCount} + 1 ELSE ${consentRequest.recipientChangeCount} END`,
-        requestedAt: sql`now()`,
-        respondedAt: null,
-        updatedAt: sql`now()`,
-      },
-      // Terminal-status guard (BUG-791) + the two caps, atomic. A terminal row
-      // (approved/denied) can never be revived to 'requested'. Same three
-      // branches as legacy: same recipient → resend cap; no recipient yet
-      // (NULL) → always allowed (initial assignment); real change → change cap.
-      setWhere: sql`${consentRequest.status} NOT IN ('approved','denied') AND ((${consentRequest.guardianEmail} IS NOT DISTINCT FROM ${input.guardianEmail} AND ${consentRequest.resendCount} < ${MAX_CONSENT_RESENDS}) OR ${consentRequest.guardianEmail} IS NULL OR (${consentRequest.guardianEmail} IS NOT NULL AND ${consentRequest.guardianEmail} IS DISTINCT FROM ${input.guardianEmail} AND ${consentRequest.recipientChangeCount} < ${MAX_RECIPIENT_CHANGES}))`,
-    })
-    .returning();
-
-  if (!row) {
-    // Conflict existed but setWhere blocked the update — terminal row or a cap.
-    const existingRow = await db.query.consentRequest.findFirst({
-      where: requestKey(input.chargePersonId, input.organizationId, basis),
-      columns: { status: true },
-    });
-    if (
-      existingRow != null &&
-      (existingRow.status === 'approved' || existingRow.status === 'denied')
-    ) {
-      throw new ConsentRequestNotFoundError();
-    }
-    throw isRecipientChange
-      ? new ConsentRecipientChangeLimitError()
-      : new ConsentResendLimitError();
-  }
+      const resendCount =
+        representative?.guardianEmail == null || isRecipientChange
+          ? 0
+          : maxResendCount + 1;
+      const recipientChangeCount = isRecipientChange
+        ? maxRecipientChangeCount + 1
+        : maxRecipientChangeCount;
+      const requestedAt = new Date();
+      const rows = await tx
+        .insert(consentRequest)
+        .values(
+          CONSENT_PURPOSES.map((purpose) => ({
+            chargePersonId: input.chargePersonId,
+            organizationId: input.organizationId,
+            purpose,
+            requestedBasis: basis,
+            status: 'requested',
+            guardianEmail: input.guardianEmail,
+            token,
+            tokenExpiresAt: expiresAt,
+            resendCount,
+            recipientChangeCount,
+            policyVersion: input.audit?.policyVersion ?? null,
+            requestIp: input.audit?.requestIp ?? null,
+            userAgent: input.audit?.userAgent ?? null,
+            requestedAt,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [
+            consentRequest.chargePersonId,
+            consentRequest.purpose,
+            consentRequest.organizationId,
+            consentRequest.requestedBasis,
+          ],
+          set: {
+            status: 'requested',
+            guardianEmail: input.guardianEmail,
+            token,
+            tokenExpiresAt: expiresAt,
+            resendCount,
+            recipientChangeCount,
+            policyVersion: input.audit?.policyVersion ?? null,
+            requestIp: input.audit?.requestIp ?? null,
+            userAgent: input.audit?.userAgent ?? null,
+            requestedAt,
+            respondedAt: null,
+            consentGrantId: null,
+            updatedAt: requestedAt,
+          },
+          // Preserve terminal-row immutability in the database predicate too.
+          // The sole exception is the explicit existing-data path above: an
+          // incomplete legacy event must be able to start a complete P-set
+          // re-consent cycle without rewriting the historical grant.
+          ...(allowLegacyIncompleteReconsent
+            ? {}
+            : {
+                setWhere: sql`${consentRequest.status} NOT IN ('approved','denied')`,
+              }),
+        })
+        .returning({ id: consentRequest.id });
+      if (rows.length !== CONSENT_PURPOSES.length) {
+        throw new Error('consent request purpose-set write was incomplete');
+      }
+      return { requestIds: rows.map((row) => row.id), isRecipientChange };
+    },
+  );
 
   const tokenUrl = `${input.appUrl}/v1/consent-page?token=${token}`;
   const emailResult = await sendEmail(
@@ -649,7 +932,7 @@ export async function requestConsentV2(
       // Config issue, not delivery failure — keep the request row.
       return { emailDelivered: false };
     }
-    await rollbackCounter(db, row.id, isRecipientChange);
+    await rollbackCounter(db, write.requestIds, write.isRecipientChange);
     throw new EmailDeliveryError(emailResult.reason ?? undefined);
   }
 
@@ -683,46 +966,54 @@ export async function resendConsentV2(
   const token = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-  const [row] = await db
-    .update(consentRequest)
-    .set({
-      status: 'requested',
-      token,
-      tokenExpiresAt: expiresAt,
-      resendCount: sql`${consentRequest.resendCount} + 1`,
-      requestedAt: sql`now()`,
-      respondedAt: null,
-      updatedAt: sql`now()`,
-    })
-    .where(
-      and(
-        requestKey(input.chargePersonId, input.organizationId, basis),
-        eq(consentRequest.status, 'requested'),
-        sql`${consentRequest.guardianEmail} IS NOT NULL`,
-        sql`${consentRequest.resendCount} < ${MAX_CONSENT_RESENDS}`,
-      ),
-    )
-    .returning();
+  const write = await withConsentPersonLock(
+    db,
+    input.chargePersonId,
+    async (tx) => {
+      const existing = await tx.query.consentRequest.findMany({
+        where: requestSetKey(input.chargePersonId, input.organizationId, basis),
+      });
+      if (
+        !hasCompletePurposeSet(existing) ||
+        existing.some((row) => row.status !== 'requested' || !row.guardianEmail)
+      ) {
+        throw new ConsentRequestNotFoundError();
+      }
+      const storedEmail = existing[0]!.guardianEmail!;
+      if (existing.some((row) => row.guardianEmail !== storedEmail)) {
+        throw new ConsentRequestNotFoundError();
+      }
+      const resendCount = Math.max(...existing.map((row) => row.resendCount));
+      if (resendCount >= MAX_CONSENT_RESENDS) {
+        throw new ConsentResendLimitError();
+      }
+      const now = new Date();
+      const rows = await tx
+        .update(consentRequest)
+        .set({
+          status: 'requested',
+          token,
+          tokenExpiresAt: expiresAt,
+          resendCount: resendCount + 1,
+          requestedAt: now,
+          respondedAt: null,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            requestSetKey(input.chargePersonId, input.organizationId, basis),
+            eq(consentRequest.status, 'requested'),
+          ),
+        )
+        .returning({ id: consentRequest.id });
+      if (rows.length !== CONSENT_PURPOSES.length) {
+        throw new Error('consent resend purpose-set write was incomplete');
+      }
+      return { storedEmail, requestIds: rows.map((row) => row.id) };
+    },
+  );
 
-  if (!row) {
-    const stillExists = await db.query.consentRequest.findFirst({
-      where: and(
-        requestKey(input.chargePersonId, input.organizationId, basis),
-        eq(consentRequest.status, 'requested'),
-        sql`${consentRequest.guardianEmail} IS NOT NULL`,
-      ),
-      columns: { id: true },
-    });
-    throw stillExists
-      ? new ConsentResendLimitError()
-      : new ConsentRequestNotFoundError();
-  }
-
-  const storedEmail = row.guardianEmail;
-  if (!storedEmail) {
-    await rollbackCounter(db, row.id, false);
-    throw new ConsentRequestNotFoundError();
-  }
+  const storedEmail = write.storedEmail;
 
   const tokenUrl = `${input.appUrl}/v1/consent-page?token=${token}`;
   const emailResult = await sendEmail(
@@ -739,7 +1030,7 @@ export async function resendConsentV2(
     if (emailResult.reason === 'no_api_key') {
       return { emailDelivered: false };
     }
-    await rollbackCounter(db, row.id, false);
+    await rollbackCounter(db, write.requestIds, false);
     throw new EmailDeliveryError(emailResult.reason ?? undefined);
   }
 
@@ -813,7 +1104,6 @@ export async function processConsentResponseV2(
   }
 
   const now = new Date();
-  const requestId = request.id;
   const chargePersonId = request.chargePersonId;
   const basis = request.requestedBasis;
 
@@ -822,64 +1112,118 @@ export async function processConsentResponseV2(
   const withdrawalTokenId = approved ? crypto.randomUUID() : null;
 
   if (approved) {
-    await db.transaction(async (tx) => {
-      // Atomic guard against a concurrent second submit.
-      const [grant] = await tx
-        .insert(consentGrant)
-        .values({
+    await withConsentPersonLock(db, chargePersonId, async (tx) => {
+      const requests = await tx.query.consentRequest.findMany({
+        where: requestSetKey(
           chargePersonId,
-          organizationId: request.organizationId,
-          purpose: request.purpose,
-          lawfulBasis: basis,
-          granted: true,
-          grantedAt: now,
-          priorValue: null,
-          auditFact: {
-            source: 'consent_response_approved',
-            policyVersion: audit?.policyVersion ?? request.policyVersion,
-          },
-          withdrawalTokenId,
-        })
-        .returning({ id: consentGrant.id });
-      if (!grant) {
-        throw new Error('consent_grant insert did not return a row');
+          request.organizationId,
+          basis as ConsentBasis,
+        ),
+      });
+      if (!hasCompletePurposeSet(requests)) {
+        throw new ConsentReconsentRequiredError();
+      }
+      if (
+        requests.some(
+          (row) =>
+            row.token !== token ||
+            row.status === 'approved' ||
+            row.status === 'denied',
+        )
+      ) {
+        throw new ConsentAlreadyProcessedError();
+      }
+      if (
+        requests.some(
+          (row) => row.tokenExpiresAt && new Date() > row.tokenExpiresAt,
+        )
+      ) {
+        throw new ConsentTokenExpiredError();
       }
 
-      const [updated] = await tx
-        .update(consentRequest)
-        .set({
-          status: 'approved',
-          respondedAt: now,
-          consentGrantId: grant.id,
-          updatedAt: now,
-          ...(audit?.policyVersion !== undefined
-            ? { policyVersion: audit.policyVersion }
-            : {}),
-          ...(audit?.requestIp !== undefined
-            ? { requestIp: audit.requestIp }
-            : {}),
-          ...(audit?.userAgent !== undefined
-            ? { userAgent: audit.userAgent }
-            : {}),
-        })
-        .where(
-          and(
-            eq(consentRequest.id, requestId),
-            sql`${consentRequest.status} NOT IN ('approved','denied')`,
-          ),
+      const grants = await tx
+        .insert(consentGrant)
+        .values(
+          CONSENT_PURPOSES.map((purpose) => ({
+            chargePersonId,
+            organizationId: request.organizationId,
+            purpose,
+            lawfulBasis: basis,
+            granted: true,
+            grantedAt: now,
+            priorValue: null,
+            auditFact: {
+              source: 'consent_response_approved',
+              policyVersion: audit?.policyVersion ?? request.policyVersion,
+            },
+            withdrawalTokenId,
+          })),
         )
-        .returning({ id: consentRequest.id });
+        .returning({ id: consentGrant.id, purpose: consentGrant.purpose });
+      if (!hasCompletePurposeSet(grants)) {
+        throw new Error('consent grant purpose-set insert was incomplete');
+      }
 
-      if (!updated) {
-        // The concurrent submitter won; abort so the grant insert rolls back.
-        throw new ConsentAlreadyProcessedError();
+      for (const purpose of CONSENT_PURPOSES) {
+        const grant = grants.find((row) => row.purpose === purpose);
+        const requestRow = requests.find((row) => row.purpose === purpose);
+        if (!grant || !requestRow) {
+          throw new Error('consent approval purpose mapping was incomplete');
+        }
+        const updated = await tx
+          .update(consentRequest)
+          .set({
+            status: 'approved',
+            respondedAt: now,
+            consentGrantId: grant.id,
+            updatedAt: now,
+            ...(audit?.policyVersion !== undefined
+              ? { policyVersion: audit.policyVersion }
+              : {}),
+            ...(audit?.requestIp !== undefined
+              ? { requestIp: audit.requestIp }
+              : {}),
+            ...(audit?.userAgent !== undefined
+              ? { userAgent: audit.userAgent }
+              : {}),
+          })
+          .where(
+            and(
+              eq(consentRequest.id, requestRow.id),
+              sql`${consentRequest.status} NOT IN ('approved','denied')`,
+            ),
+          )
+          .returning({ id: consentRequest.id });
+        if (updated.length !== 1) {
+          throw new ConsentAlreadyProcessedError();
+        }
       }
     });
   } else {
     let payerSubscriptions: SubscriptionSnapshot[] = [];
 
-    await db.transaction(async (tx) => {
-      const [updated] = await tx
+    await withConsentPersonLock(db, chargePersonId, async (tx) => {
+      const requests = await tx.query.consentRequest.findMany({
+        where: requestSetKey(
+          chargePersonId,
+          request.organizationId,
+          basis as ConsentBasis,
+        ),
+      });
+      if (!hasCompletePurposeSet(requests)) {
+        throw new ConsentReconsentRequiredError();
+      }
+      if (
+        requests.some(
+          (row) =>
+            row.token !== token ||
+            row.status === 'approved' ||
+            row.status === 'denied',
+        )
+      ) {
+        throw new ConsentAlreadyProcessedError();
+      }
+      const updated = await tx
         .update(consentRequest)
         .set({
           status: 'denied',
@@ -897,13 +1241,18 @@ export async function processConsentResponseV2(
         })
         .where(
           and(
-            eq(consentRequest.id, requestId),
+            requestSetKey(
+              chargePersonId,
+              request.organizationId,
+              basis as ConsentBasis,
+            ),
+            eq(consentRequest.token, token),
             sql`${consentRequest.status} NOT IN ('approved','denied')`,
           ),
         )
         .returning({ id: consentRequest.id });
 
-      if (!updated) {
+      if (updated.length !== CONSENT_PURPOSES.length) {
         throw new ConsentAlreadyProcessedError();
       }
 
@@ -1130,32 +1479,51 @@ async function stampWithdrawal(
   auditFact: Record<string, unknown>,
   expectedTokenId?: string | null,
 ): Promise<RevokeConsentV2Result> {
-  const current = await currentGrant(db, chargePersonId, organizationId, basis);
-  if (!current) {
-    throw new ConsentRecordNotFoundError();
-  }
-  if (
-    expectedTokenId !== undefined &&
-    current.withdrawalTokenId !== expectedTokenId
-  ) {
-    throw new ConsentRecordNotFoundError();
-  }
-  if (current.withdrawnAt) {
-    return { chargePersonId, withdrawnAt: current.withdrawnAt };
-  }
-
-  const now = new Date();
-  await db.transaction(async (tx) => {
-    await tx
-      .update(consentGrant)
-      .set({
-        withdrawnAt: now,
-        priorValue: true,
-        auditFact,
-      })
-      .where(
-        and(eq(consentGrant.id, current.id), isNull(consentGrant.withdrawnAt)),
+  return withConsentPersonLock(db, chargePersonId, async (tx) => {
+    const current = await currentGrantSet(
+      tx,
+      chargePersonId,
+      organizationId,
+      basis,
+    );
+    if (current.length === 0) {
+      throw new ConsentRecordNotFoundError();
+    }
+    if (
+      expectedTokenId !== undefined &&
+      current.some((grant) => grant.withdrawalTokenId !== expectedTokenId)
+    ) {
+      throw new ConsentRecordNotFoundError();
+    }
+    const withdrawn = current.filter((grant) => grant.withdrawnAt !== null);
+    if (withdrawn.length === current.length) {
+      const timestamps = new Set(
+        withdrawn.map((grant) => grant.withdrawnAt!.getTime()),
       );
+      if (timestamps.size !== 1) throw new ConsentRecordNotFoundError();
+      return { chargePersonId, withdrawnAt: withdrawn[0]!.withdrawnAt! };
+    }
+    if (withdrawn.length > 0) {
+      throw new ConsentRecordNotFoundError();
+    }
+
+    const now = new Date();
+    const updated = await tx
+      .update(consentGrant)
+      .set({ withdrawnAt: now, priorValue: true, auditFact })
+      .where(
+        and(
+          inArray(
+            consentGrant.id,
+            current.map((grant) => grant.id),
+          ),
+          isNull(consentGrant.withdrawnAt),
+        ),
+      )
+      .returning({ id: consentGrant.id });
+    if (updated.length !== current.length) {
+      throw new ConsentRecordNotFoundError();
+    }
 
     await tx
       .update(nudges)
@@ -1163,9 +1531,8 @@ async function stampWithdrawal(
       .where(
         and(eq(nudges.toProfileId, chargePersonId), isNull(nudges.readAt)),
       );
+    return { chargePersonId, withdrawnAt: now };
   });
-
-  return { chargePersonId, withdrawnAt: now };
 }
 
 // ---------------------------------------------------------------------------
@@ -1230,48 +1597,46 @@ async function appendRestoreGrant(
   // grace-check read + append inside the locked tx, so the restore and the
   // delete cannot interleave — whichever takes the lock first wins, and the
   // loser re-reads the other's committed state.
-  return db.transaction(async (tx) => {
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtextextended(${consentPersonLockKey(chargePersonId)}, 0))`,
+  return withConsentPersonLock(db, chargePersonId, async (tx) => {
+    const current = await currentGrantSet(
+      tx,
+      chargePersonId,
+      organizationId,
+      basis,
     );
-
-    const current = await tx.query.consentGrant.findFirst({
-      where: and(
-        eq(consentGrant.chargePersonId, chargePersonId),
-        eq(consentGrant.purpose, DEFAULT_CONSENT_PURPOSE),
-        eq(consentGrant.organizationId, organizationId),
-        eq(consentGrant.lawfulBasis, basis),
-      ),
-      orderBy: (g, { desc }) => [desc(g.grantedAt), desc(g.id)],
-      columns: { id: true, withdrawnAt: true, withdrawalTokenId: true },
-    });
-    if (!current) {
+    if (current.length === 0) {
       throw new ConsentRecordNotFoundError();
     }
-    // Not withdrawn → nothing to restore (idempotent no-op).
-    if (!current.withdrawnAt) {
+    const active = current.filter((grant) => grant.withdrawnAt === null);
+    if (active.length === current.length) {
       return { chargePersonId };
     }
+    if (active.length > 0) {
+      throw new ConsentRecordNotFoundError();
+    }
     if (
-      Date.now() - current.withdrawnAt.getTime() >
-      RESTORE_CONSENT_GRACE_PERIOD_MS
+      current.some(
+        (grant) =>
+          Date.now() - grant.withdrawnAt!.getTime() >
+          RESTORE_CONSENT_GRACE_PERIOD_MS,
+      )
     ) {
       throw new ConsentGracePeriodExpiredError();
     }
 
-    await tx.insert(consentGrant).values({
-      chargePersonId,
-      organizationId,
-      purpose: DEFAULT_CONSENT_PURPOSE,
-      lawfulBasis: basis,
-      granted: true,
-      grantedAt: now,
-      priorValue: false,
-      auditFact,
-      // [WI-2347] Carry the live link's id forward so the same emailed
-      // withdrawal link keeps matching `currentGrant` after this restore.
-      withdrawalTokenId: current.withdrawalTokenId,
-    });
+    await tx.insert(consentGrant).values(
+      current.map((grant) => ({
+        chargePersonId,
+        organizationId,
+        purpose: grant.purpose,
+        lawfulBasis: basis,
+        granted: true,
+        grantedAt: now,
+        priorValue: false,
+        auditFact,
+        withdrawalTokenId: grant.withdrawalTokenId,
+      })),
+    );
     await tx
       .update(person)
       .set({ archivedAt: null, updatedAt: now })
@@ -1299,19 +1664,34 @@ export async function refreshConsentTokenV2(
 ): Promise<string> {
   const newToken = crypto.randomUUID();
   const newExpiresAt = new Date(Date.now() + 16 * 24 * 60 * 60 * 1000);
-  const updated = await db
-    .update(consentRequest)
-    .set({
-      token: newToken,
-      tokenExpiresAt: newExpiresAt,
-      updatedAt: new Date(),
-    })
-    .where(requestKey(chargePersonId, organizationId, 'gdpr_parental_consent'))
-    .returning({ id: consentRequest.id });
-  if (updated.length === 0) {
-    throw new ConsentRecordNotFoundError();
-  }
-  return newToken;
+  return withConsentPersonLock(db, chargePersonId, async (tx) => {
+    const rows = await tx.query.consentRequest.findMany({
+      where: requestSetKey(
+        chargePersonId,
+        organizationId,
+        'gdpr_parental_consent',
+      ),
+      columns: { purpose: true },
+    });
+    if (!hasCompletePurposeSet(rows)) {
+      throw new ConsentRecordNotFoundError();
+    }
+    const updated = await tx
+      .update(consentRequest)
+      .set({
+        token: newToken,
+        tokenExpiresAt: newExpiresAt,
+        updatedAt: new Date(),
+      })
+      .where(
+        requestSetKey(chargePersonId, organizationId, 'gdpr_parental_consent'),
+      )
+      .returning({ id: consentRequest.id });
+    if (updated.length !== CONSENT_PURPOSES.length) {
+      throw new ConsentRecordNotFoundError();
+    }
+    return newToken;
+  });
 }
 
 export interface RefreshConsentTokenForRequestV2Input {
@@ -1338,30 +1718,50 @@ export async function refreshConsentTokenForRequestV2(
 ): Promise<RefreshedConsentTokenForRequestV2 | null> {
   const freshToken = crypto.randomUUID();
   const newExpiresAt = new Date(Date.now() + 16 * 24 * 60 * 60 * 1000);
-  const updated = await db
-    .update(consentRequest)
-    .set({
-      token: freshToken,
-      tokenExpiresAt: newExpiresAt,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        requestKey(
+  return withConsentPersonLock(db, input.chargePersonId, async (tx) => {
+    const rows = await tx.query.consentRequest.findMany({
+      where: requestSetKey(
+        input.chargePersonId,
+        input.organizationId,
+        'gdpr_parental_consent',
+      ),
+    });
+    if (
+      !hasCompletePurposeSet(rows) ||
+      rows.some(
+        (row) =>
+          !row.requestedAt ||
+          row.requestedAt < input.requestedAt ||
+          row.requestedAt >= input.requestedAtUpperBound ||
+          row.status === 'approved' ||
+          row.status === 'denied' ||
+          !row.guardianEmail,
+      )
+    ) {
+      return null;
+    }
+    const guardianEmail = rows[0]!.guardianEmail!;
+    if (rows.some((row) => row.guardianEmail !== guardianEmail)) return null;
+    const updated = await tx
+      .update(consentRequest)
+      .set({
+        token: freshToken,
+        tokenExpiresAt: newExpiresAt,
+        updatedAt: new Date(),
+      })
+      .where(
+        requestSetKey(
           input.chargePersonId,
           input.organizationId,
           'gdpr_parental_consent',
         ),
-        sql`${consentRequest.requestedAt} >= ${input.requestedAt}`,
-        sql`${consentRequest.requestedAt} < ${input.requestedAtUpperBound}`,
-        sql`${consentRequest.status} NOT IN ('approved','denied')`,
-        sql`${consentRequest.guardianEmail} IS NOT NULL`,
-      ),
-    )
-    .returning({ guardianEmail: consentRequest.guardianEmail });
-  const guardianEmail = updated[0]?.guardianEmail;
-  if (!guardianEmail) return null;
-  return { guardianEmail, freshToken };
+      )
+      .returning({ id: consentRequest.id });
+    if (updated.length !== CONSENT_PURPOSES.length) {
+      throw new Error('consent token refresh purpose-set write was incomplete');
+    }
+    return { guardianEmail, freshToken };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1381,13 +1781,30 @@ export async function getChildNameByTokenV2(
     where: eq(consentRequest.token, token),
     columns: {
       chargePersonId: true,
+      organizationId: true,
+      requestedBasis: true,
       respondedAt: true,
       tokenExpiresAt: true,
     },
   });
   if (!request) return null;
-  if (request.respondedAt) return null;
-  if (request.tokenExpiresAt && new Date() > request.tokenExpiresAt) {
+  const requests = await db.query.consentRequest.findMany({
+    where: and(
+      eq(consentRequest.chargePersonId, request.chargePersonId),
+      eq(consentRequest.organizationId, request.organizationId),
+      eq(consentRequest.requestedBasis, request.requestedBasis),
+      inArray(consentRequest.purpose, [...CONSENT_PURPOSES]),
+    ),
+  });
+  if (
+    requests.length === 0 ||
+    requests.some(
+      (row) =>
+        row.token !== token ||
+        row.respondedAt !== null ||
+        (row.tokenExpiresAt !== null && new Date() > row.tokenExpiresAt),
+    )
+  ) {
     return null;
   }
   const child = await db.query.person.findFirst({
@@ -1446,7 +1863,14 @@ export async function restoreChildConsentV2(
     organizationId,
     'GDPR',
   );
-  return { status: 'CONSENTED' };
+  const status = await resolveConsentSetStatus(
+    db,
+    childPersonId,
+    organizationId,
+    'gdpr_parental_consent',
+  );
+  if (status === null) throw new ConsentRecordNotFoundError();
+  return { status };
 }
 
 // ---------------------------------------------------------------------------
@@ -1480,11 +1904,10 @@ export async function getProfileConsentStateV2(
   if (!membershipRow) return null;
   const organizationId = membershipRow.organizationId;
 
-  const status = await resolveLatestConsentStatusAnyBasis(
+  const status = await resolveLatestConsentSetStatusAnyBasis(
     db,
     chargePersonId,
     organizationId,
-    DEFAULT_CONSENT_PURPOSE,
   );
   if (status === null) return null;
 
@@ -1493,8 +1916,8 @@ export async function getProfileConsentStateV2(
   const request = await db.query.consentRequest.findFirst({
     where: and(
       eq(consentRequest.chargePersonId, chargePersonId),
-      eq(consentRequest.purpose, DEFAULT_CONSENT_PURPOSE),
       eq(consentRequest.organizationId, organizationId),
+      inArray(consentRequest.purpose, [...CONSENT_PURPOSES]),
     ),
     orderBy: (r, { desc }) => [desc(r.requestedAt), desc(r.createdAt)],
     columns: {
@@ -1538,17 +1961,21 @@ export async function isConsentRevocationGenerationCurrentV2(
     columns: { organizationId: true },
   });
   if (!membershipRow) return false;
-  const current = await currentGrant(
+  const current = await currentGrantSet(
     db,
     chargePersonId,
     membershipRow.organizationId,
     'gdpr_parental_consent',
   );
-  if (!current?.withdrawnAt) return false;
+  if (current.length === 0 || current.some((grant) => !grant.withdrawnAt)) {
+    return false;
+  }
   // [WI-973] A missing revokedAt means we cannot confirm the generation;
   // return false so the cascade-delete guard does not pass vacuously.
   if (!revokedAt) return false;
-  return current.withdrawnAt.getTime() === revokedAt.getTime();
+  return current.every(
+    (grant) => grant.withdrawnAt!.getTime() === revokedAt.getTime(),
+  );
 }
 
 /**
@@ -1626,20 +2053,28 @@ export async function getGdprGrantWithdrawalStateV2(
    * "no grant". */
   expectedTokenId?: string | null,
 ): Promise<{ withdrawnAt: Date | null } | null> {
-  const current = await currentGrant(
+  const current = await currentGrantSet(
     db,
     chargePersonId,
     organizationId,
     'gdpr_parental_consent',
   );
-  if (!current) return null;
+  if (current.length === 0) return null;
   if (
     expectedTokenId !== undefined &&
-    current.withdrawalTokenId !== expectedTokenId
+    current.some((grant) => grant.withdrawalTokenId !== expectedTokenId)
   ) {
     return null;
   }
-  return { withdrawnAt: current.withdrawnAt };
+  const withdrawn = current.map((grant) => grant.withdrawnAt);
+  if (withdrawn.every((value) => value === null)) return { withdrawnAt: null };
+  if (
+    withdrawn.some((value) => value === null) ||
+    new Set(withdrawn.map((value) => value!.getTime())).size !== 1
+  ) {
+    return null;
+  }
+  return { withdrawnAt: withdrawn[0]! };
 }
 
 /**
@@ -1691,20 +2126,22 @@ export async function archivePersonOnRevocationV2(
   if (!(await isGuardianOf(db, guardianPersonId, chargePersonId))) {
     return false;
   }
-  return db.transaction(async (tx) => {
-    const current = await tx.query.consentGrant.findFirst({
-      where: and(
-        eq(consentGrant.chargePersonId, chargePersonId),
-        eq(consentGrant.purpose, DEFAULT_CONSENT_PURPOSE),
-        eq(consentGrant.lawfulBasis, 'gdpr_parental_consent'),
-      ),
-      orderBy: (g, { desc }) => [desc(g.grantedAt), desc(g.id)],
-      columns: { withdrawnAt: true },
-    });
-    if (!current?.withdrawnAt) return false;
+  return withConsentPersonLock(db, chargePersonId, async (tx) => {
+    const organizationId = await resolveOrgIdOrThrow(tx, chargePersonId);
+    const current = await currentGrantSet(
+      tx,
+      chargePersonId,
+      organizationId,
+      'gdpr_parental_consent',
+    );
+    if (current.length === 0 || current.some((grant) => !grant.withdrawnAt)) {
+      return false;
+    }
     if (
       withdrawnAt &&
-      current.withdrawnAt.getTime() !== withdrawnAt.getTime()
+      current.some(
+        (grant) => grant.withdrawnAt!.getTime() !== withdrawnAt.getTime(),
+      )
     ) {
       return false;
     }
@@ -1734,48 +2171,100 @@ async function resolveOrgIdOrThrow(
   return row.organizationId;
 }
 
-/** The basis-keyed request unique predicate. */
-function requestKey(
+/** The person/org/basis request-set predicate (purpose is intentionally set-wide). */
+function requestSetKey(
   chargePersonId: string,
   organizationId: string,
   basis: ConsentBasis,
 ) {
   return and(
     eq(consentRequest.chargePersonId, chargePersonId),
-    eq(consentRequest.purpose, DEFAULT_CONSENT_PURPOSE),
     eq(consentRequest.organizationId, organizationId),
     eq(consentRequest.requestedBasis, basis),
+    inArray(consentRequest.purpose, [...CONSENT_PURPOSES]),
   );
 }
 
-/** The current grant for a basis = max(granted_at), tiebreak id DESC. */
+/** The current grant for one explicit purpose and basis. */
 async function currentGrant(
   db: Database,
   chargePersonId: string,
   organizationId: string,
+  purpose: ConsentPurpose,
   basis: ConsentBasis,
 ): Promise<{
   id: string;
+  purpose: ConsentPurpose;
   withdrawnAt: Date | null;
   withdrawalTokenId: string | null;
 } | null> {
   const row = await db.query.consentGrant.findFirst({
     where: and(
       eq(consentGrant.chargePersonId, chargePersonId),
-      eq(consentGrant.purpose, DEFAULT_CONSENT_PURPOSE),
+      eq(consentGrant.purpose, purpose),
       eq(consentGrant.organizationId, organizationId),
       eq(consentGrant.lawfulBasis, basis),
     ),
     orderBy: (g, { desc }) => [desc(g.grantedAt), desc(g.id)],
-    columns: { id: true, withdrawnAt: true, withdrawalTokenId: true },
+    columns: {
+      id: true,
+      purpose: true,
+      withdrawnAt: true,
+      withdrawalTokenId: true,
+    },
   });
-  return row ?? null;
+  return row ? { ...row, purpose: row.purpose as ConsentPurpose } : null;
+}
+
+type CurrentConsentGrant = NonNullable<
+  Awaited<ReturnType<typeof currentGrant>>
+>;
+
+async function currentGrantSet(
+  db: Database,
+  chargePersonId: string,
+  organizationId: string,
+  basis: ConsentBasis,
+): Promise<CurrentConsentGrant[]> {
+  const rows = await Promise.all(
+    CONSENT_PURPOSES.map((purpose) =>
+      currentGrant(db, chargePersonId, organizationId, purpose, basis),
+    ),
+  );
+  return rows.filter((row): row is CurrentConsentGrant => row !== null);
+}
+
+function hasCompletePurposeSet(rows: readonly { purpose: string }[]): boolean {
+  return (
+    rows.length === CONSENT_PURPOSES.length &&
+    CONSENT_PURPOSES.every((purpose) =>
+      rows.some((row) => row.purpose === purpose),
+    )
+  );
+}
+
+async function withConsentPersonLock<T>(
+  db: Database,
+  chargePersonId: string,
+  operation: (
+    tx: Database & Parameters<Parameters<Database['transaction']>[0]>[0],
+  ) => Promise<T>,
+): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${consentPersonLockKey(chargePersonId)}, 0))`,
+    );
+    return operation(
+      tx as unknown as Database &
+        Parameters<Parameters<Database['transaction']>[0]>[0],
+    );
+  });
 }
 
 /** Roll back a burned resend/recipient counter after an email delivery failure. */
 async function rollbackCounter(
   db: Database,
-  requestId: string,
+  requestIds: readonly string[],
   isRecipientChange: boolean,
 ): Promise<void> {
   try {
@@ -1792,7 +2281,7 @@ async function rollbackCounter(
               updatedAt: sql`now()`,
             },
       )
-      .where(eq(consentRequest.id, requestId));
+      .where(inArray(consentRequest.id, [...requestIds]));
   } catch (rollbackError) {
     logger.warn('[consent-v2] Failed to rollback resend counter', {
       error:

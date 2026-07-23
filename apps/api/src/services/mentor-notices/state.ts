@@ -21,13 +21,17 @@ interface AcceptMentorNoticeInput extends MentorNoticeCopyInput {
   subjectId: string;
   topicId: string | null;
   sourceSessionId: string;
-  /** [WI-2500] The validated learner-answer event this notice's evidence is
+  /** [WI-2629] The validated learner-answer event this notice's evidence is
    *  anchored to. `evidence.ts`'s exchange-boundary path never returns
-   *  without one, but callers that predate WI-2500 (e.g. the pre-existing
-   *  concurrency test in `tests/integration/mentor-notice-lifecycle.integration.test.ts`)
-   *  still insert with no evidence, so this stays nullable and both
-   *  partial unique indexes below must be targeted, not just one. */
-  answerEventId: string | null;
+   *  without one, and this is now the write boundary's hard requirement: a
+   *  NEW notice must always carry evidence identity (AC-5). Legacy rows
+   *  written before this change may still hold `answer_event_id IS NULL` in
+   *  the database — the column itself stays nullable and both partial
+   *  unique indexes below are still targeted so those rows remain readable
+   *  and their invariants intact — but no new write is allowed to create
+   *  one. `acceptMentorNotice` enforces this with a runtime guard below,
+   *  since an untyped caller could still pass null/undefined at runtime. */
+  answerEventId: string;
 }
 
 export function prepareMentorNoticeCopy(
@@ -47,6 +51,14 @@ export async function acceptMentorNotice(
   db: Database,
   input: AcceptMentorNoticeInput,
 ): Promise<MentorNoticeAccepted | null> {
+  // [WI-2629 AC-5] Write-boundary guard: a NEW notice must always carry a
+  // validated answer-event identity. The type above requires a `string`, but
+  // an untyped caller (JS, a stale build, a loosened cast) could still pass
+  // null/undefined at runtime — reject rather than silently persist an
+  // evidence-absent row. Legacy rows with `answer_event_id IS NULL` remain in
+  // the database and readable; this only guards new writes.
+  if (!input.answerEventId) return null;
+
   const copy = prepareMentorNoticeCopy(input);
   if (!copy) return null;
 
@@ -61,27 +73,18 @@ export async function acceptMentorNotice(
       concept: copy.concept,
       correctionHint: copy.correctionHint,
     })
-    // [WI-2500] Target must match whichever partial index this row would
-    // violate: evidence-present rows collide on the (source_session_id,
-    // answer_event_id) index, evidence-absent rows on the source_session_id-only
-    // index. Postgres requires an EXACT target/predicate match to infer a
-    // conflict against a partial index — a mismatched target doesn't
-    // silently no-op, it raises the raw duplicate-key error (caught in CI by
-    // the pre-existing null-evidence concurrency test).
-    .onConflictDoNothing(
-      input.answerEventId
-        ? {
-            target: [
-              mentorNotices.sourceSessionId,
-              mentorNotices.answerEventId,
-            ],
-            where: sql`${mentorNotices.answerEventId} IS NOT NULL`,
-          }
-        : {
-            target: [mentorNotices.sourceSessionId],
-            where: sql`${mentorNotices.answerEventId} IS NULL`,
-          },
-    )
+    // [WI-2500] Every new write now always carries evidence, so it always
+    // collides on the (source_session_id, answer_event_id) partial index.
+    // Postgres requires an EXACT target/predicate match to infer a conflict
+    // against a partial index — a mismatched target doesn't silently no-op,
+    // it raises the raw duplicate-key error. The evidence-absent
+    // (`answer_event_id IS NULL`) partial index still exists in the schema
+    // to preserve legacy row integrity, but it is unreachable from this
+    // write path now that the guard above rejects null evidence.
+    .onConflictDoNothing({
+      target: [mentorNotices.sourceSessionId, mentorNotices.answerEventId],
+      where: sql`${mentorNotices.answerEventId} IS NOT NULL`,
+    })
     .returning({
       id: mentorNotices.id,
       concept: mentorNotices.concept,
@@ -226,19 +229,18 @@ export async function applyMentorNoticeOutcome(
       : null;
   }
 
-  const terminal =
-    input.outcome === 'locked_in' || input.outcome === 'dismissed';
-  const nextStatus =
-    input.outcome === 'locked_in'
-      ? 'locked_in'
-      : input.outcome === 'dismissed'
-        ? 'dismissed'
-        : 'open';
+  // [WI-2501] 'deferred' returned above; every remaining outcome
+  // (locked_in, dismissed, not_yet) is itself a terminal, non-open status —
+  // a completed not_yet re-check must stop being open-offer/Now-feed/
+  // re-check-context eligible exactly like locked_in/dismissed do, so it
+  // gets its own canonical terminal status rather than falling back to
+  // 'open'.
+  const nextStatus = input.outcome;
   const [updated] = await db
     .update(mentorNotices)
     .set({
       status: nextStatus,
-      resolvedAt: terminal ? occurredAt : null,
+      resolvedAt: occurredAt,
       firstRecheckAt: sql`coalesce(${mentorNotices.firstRecheckAt}, ${occurredAt})`,
       lastRecheckAt: occurredAt,
       lastRecheckOutcome: input.outcome,

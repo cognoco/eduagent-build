@@ -92,7 +92,8 @@ export function AccountAdminSheet(): React.ReactElement {
     }
   }, [isSigningOut, profiles, queryClient, router, signOut, t, userId]);
 
-  if (!navigationContract.gates.sessionIsOwner) {
+  // Only proxy sessions redirect here; sessionIsOwner gates each owner-only row below.
+  if (navigationContract.isParentProxy) {
     return <Redirect href="/(app)/home" />;
   }
 
@@ -163,13 +164,13 @@ export function AccountAdminSheet(): React.ReactElement {
       <SettingsRow
         label={t('more.account.profile')}
         value={displayName}
-        // '/profiles' is a TOP-LEVEL route (app/profiles.tsx), NOT under the
-        // (app) group — so '/(app)/profiles' would be a dead route. The cast
-        // types the correct top-level path.
-        onPress={() => router.push('/profiles' as Href)}
+        // Keep the Account-owned profile leaf in the (app) history so browser
+        // Back restores Account before its explicit initiating-tab return.
+        onPress={() => router.push('/(app)/account/profiles' as Href)}
         testID="account-admin-profile"
       />
-      {navigationContract.gates.showAccountSecurity ? (
+      {navigationContract.gates.sessionIsOwner &&
+      navigationContract.gates.showAccountSecurity ? (
         <SettingsRow
           label={t('accountAdmin.security')}
           targetName={displayName}
@@ -177,7 +178,8 @@ export function AccountAdminSheet(): React.ReactElement {
           testID="account-admin-security"
         />
       ) : null}
-      {navigationContract.gates.showBilling ? (
+      {navigationContract.gates.sessionIsOwner &&
+      navigationContract.gates.showBilling ? (
         <SettingsRow
           label={t('more.account.subscription')}
           targetName={displayName}
@@ -188,12 +190,13 @@ export function AccountAdminSheet(): React.ReactElement {
       <SettingsRow
         label={t('more.notifications.sectionHeader')}
         targetName={displayName}
-        onPress={() => router.push('/(app)/more/notifications' as Href)}
+        onPress={() => router.push('/(app)/account/notifications' as Href)}
         testID="account-admin-notifications"
       />
 
-      {navigationContract.gates.showAddChild ||
-      navigationContract.gates.showRemoveFamilyMember ? (
+      {navigationContract.gates.sessionIsOwner &&
+      (navigationContract.gates.showAddChild ||
+        navigationContract.gates.showRemoveFamilyMember) ? (
         <>
           <SectionHeader>{t('more.family.sectionHeader')}</SectionHeader>
           {navigationContract.gates.showAddChild ? (
@@ -221,7 +224,7 @@ export function AccountAdminSheet(): React.ReactElement {
       <SettingsRow
         label={t('more.privacy.privacyAndData')}
         targetName={displayName}
-        onPress={() => router.push('/(app)/more/privacy' as Href)}
+        onPress={() => router.push('/(app)/account/privacy' as Href)}
         testID="account-admin-privacy"
       />
       <SettingsRow

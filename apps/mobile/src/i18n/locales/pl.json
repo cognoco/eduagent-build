@@ -3137,7 +3137,24 @@
     "subjects": "Przedmioty",
     "subjectsLabel": "Przedmioty",
     "journal": "Dziennik",
-    "journalLabel": "Dziennik"
+    "journalLabel": "Dziennik",
+    "adultSelfConsent": {
+      "title": "Potwierdź, jak wykorzystujemy Twoje dane",
+      "intro": "Zanim przejdziesz dalej, potrzebujemy Twojej zgody na dwie rzeczy dotyczące Twojego konta.",
+      "platformUseHeading": "Korzystanie z MentoMate",
+      "platformUseBody": "Przetwarzamy dane Twojego konta i nauki, aby aplikacja działała dla Ciebie — Twoje przedmioty, sesje i postępy.",
+      "llmDisclosureHeading": "Nauka z AI",
+      "llmDisclosureBody": "Twoje wiadomości do mentora AI są wysyłane do dostawcy modelu AI, aby mógł odpowiadać i uczyć. Nigdy nie sprzedajemy Twoich danych.",
+      "legalIntro": "Zapoznaj się z pełnymi szczegółami, zanim wyrazisz zgodę:",
+      "termsLink": "Regulamin",
+      "privacyLink": "Polityka prywatności",
+      "accept": "Zgadzam się",
+      "submitting": "Zapisywanie…",
+      "errorTitle": "Nie mogliśmy zapisać Twojej zgody",
+      "errorBody": "Coś poszło nie tak po naszej stronie. Spróbuj ponownie.",
+      "retry": "Spróbuj ponownie",
+      "signOut": "Wyloguj się"
+    }
   },
   "subscription": {
     "trial": {
@@ -4516,7 +4533,9 @@
   },
   "accountAdmin": {
     "title": "Konto",
-    "openAccount": "Otwórz ustawienia konta",
+    "openAccount": "Otwórz ustawienia konta dla {{name}}",
+    "openAccountNoName": "Otwórz ustawienia konta",
+    "backTo": "Wróć do {{destination}}",
     "security": "Bezpieczeństwo konta",
     "familySettings": "Ustawienia rodzinne"
   },

@@ -25,6 +25,8 @@ import {
   FAMILY_CHILDREN_HREF,
   FAMILY_CHILDREN_RETURN_TO,
   FAMILY_HOME_RETURN_TO,
+  accountReturnHref,
+  accountReturnTokenForPathname,
 } from './navigation';
 import type { LearningResumeTarget } from '@eduagent/schemas';
 import type { Router } from 'expo-router';
@@ -185,6 +187,58 @@ describe('goBackOrReplace', () => {
     expect(router.back).not.toHaveBeenCalled();
     expect(router.replace).toHaveBeenCalledTimes(1);
     expect(router.replace).toHaveBeenCalledWith(parentHref);
+  });
+});
+
+describe('V2 account return contract [WI-2240]', () => {
+  it.each([
+    ['/mentor', 'mentor'],
+    ['/subjects', 'subjects'],
+    ['/subjects/subject-1', 'subjects'],
+    ['/subject/subject-1', 'subjects'],
+    ['/subject-hub/subject-1', 'subjects'],
+    ['/topic/topic-1', 'subjects'],
+    ['/pick-book/subject-1', 'subjects'],
+    ['/vocabulary/subject-1', 'subjects'],
+    ['/shelf/subject-1/book/book-1', 'subjects'],
+    ['/child/child-1/curriculum', 'subjects'],
+    ['/child/child-1/subjects/subject-1', 'subjects'],
+    ['/child/child-1/topic/topic-1', 'subjects'],
+    ['/journal', 'journal'],
+    ['/journal/practice', 'journal'],
+  ] as const)('maps %s to the initiating V2 tab token', (pathname, token) => {
+    expect(accountReturnTokenForPathname(pathname)).toBe(token);
+  });
+
+  it('uses Mentor as the strict V2 fallback for an unknown initiating path', () => {
+    expect(accountReturnTokenForPathname('/unexpected')).toBe('mentor');
+    expect(accountReturnTokenForPathname('/child/child-1')).toBe('mentor');
+    expect(accountReturnTokenForPathname('/child/child-1/reports')).toBe(
+      'mentor',
+    );
+    expect(
+      accountReturnTokenForPathname('/child/child-1/session/session-1'),
+    ).toBe('mentor');
+    expect(accountReturnTokenForPathname('/child/child-1/subjects')).toBe(
+      'mentor',
+    );
+    expect(
+      accountReturnTokenForPathname('/child/child-1/subject/subject-1'),
+    ).toBe('mentor');
+    expect(accountReturnHref(undefined, true)).toBe('/(app)/mentor');
+    expect(accountReturnHref('unexpected', true)).toBe('/(app)/mentor');
+  });
+
+  it.each([
+    ['mentor', '/(app)/mentor'],
+    ['subjects', '/(app)/subjects'],
+    ['journal', '/(app)/journal'],
+  ] as const)('resolves %s to its exact V2 tab root', (token, href) => {
+    expect(accountReturnHref(token, true)).toBe(href);
+  });
+
+  it('preserves the legacy home fallback when V2 is disabled', () => {
+    expect(accountReturnHref('journal', false)).toBe('/(app)/home');
   });
 });
 
