@@ -170,7 +170,7 @@ function useTransitionBoundFeed(
 function pushMentorHomeworkCamera(router: ReturnType<typeof useRouter>): void {
   router.push({
     pathname: '/(app)/homework/camera',
-    params: { entrySource: 'mentor', returnTo: 'mentor' },
+    params: { entrySource: 'mentor', returnTo: MENTOR_RETURN_TO },
   } as Href);
 }
 
@@ -187,7 +187,7 @@ function pushMentorHomework(
     pathname: '/(app)/homework/manual',
     params: {
       entrySource: 'mentor',
-      returnTo: 'mentor',
+      returnTo: MENTOR_RETURN_TO,
       ...(subject
         ? { subjectId: subject.subjectId, subjectName: subject.subjectName }
         : {}),
@@ -415,7 +415,7 @@ function LearnerMentorScreen(): React.ReactElement {
       pathname: '/(app)/quiz',
       params: {
         activityType: route === 'guess_who' ? 'guess_who' : route,
-        returnTo: 'mentor',
+        returnTo: MENTOR_RETURN_TO,
       },
     } as Href);
   };
