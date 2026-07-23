@@ -1,4 +1,4 @@
-# Rollback — 0153 verified learning artifacts
+# Rollback — 0154 verified learning artifacts
 
 - **Reversible?** Partially. Roll code back before removing the evidence-link
   table or artifact metadata.
@@ -9,5 +9,5 @@
   nullable because the previously deployed Worker explicitly writes `NULL`.
   A later migration may add `NOT NULL` only after every active Worker writes a
   non-NULL source and a final backfill has completed.
-- **Recovery:** Restore the database snapshot from before migration 0153 if the
+- **Recovery:** Restore the database snapshot from before migration 0154 if the
   metadata itself must be recovered.

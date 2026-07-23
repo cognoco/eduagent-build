@@ -102,6 +102,28 @@ async function seedSourceSession(
   return session.id;
 }
 
+// [WI-2629 AC-5] acceptMentorNotice now requires a validated answer-event
+// evidence id on every write. These lifecycle tests exercise downstream
+// state transitions (defer/lock-in/nudge), not the write boundary itself, so
+// they just need a real session_events row to anchor to.
+async function seedAnswerEvent(
+  fixture: { profileId: string; subjectId: string },
+  sessionId: string,
+) {
+  const [event] = await db
+    .insert(sessionEvents)
+    .values({
+      sessionId,
+      profileId: fixture.profileId,
+      subjectId: fixture.subjectId,
+      eventType: 'user_message',
+      content: 'A learner answer used as this notice evidence.',
+    })
+    .returning({ id: sessionEvents.id });
+  if (!event) throw new Error('answer event insert failed');
+  return event.id;
+}
+
 // getProfileTimeZone reads organization.timezone, which is nullable with no
 // default — an unset fixture resolves to UTC and any learning-day assertion
 // below would pass while proving nothing. Set it explicitly, and the tests
@@ -130,10 +152,12 @@ describe('mentor notice lifecycle — real database', () => {
   it('is idempotent under concurrent create, defer, and re-check start calls', async () => {
     const fixture = await seedFixture('concurrency');
     const sourceSessionId = await seedSourceSession(fixture);
+    const answerEventId = await seedAnswerEvent(fixture, sourceSessionId);
     const createInput = {
       ...fixture,
       topicId: null,
       sourceSessionId,
+      answerEventId,
       concept: 'Changing signs across the equals sign',
       correctionHint: 'Apply the inverse operation to both sides.',
     };
@@ -227,10 +251,12 @@ describe('mentor notice lifecycle — real database', () => {
   it('keeps terminal outcomes immutable and exposes the funnel fields', async () => {
     const fixture = await seedFixture('terminal');
     const sourceSessionId = await seedSourceSession(fixture);
+    const answerEventId = await seedAnswerEvent(fixture, sourceSessionId);
     const notice = await acceptMentorNotice(db, {
       ...fixture,
       topicId: null,
       sourceSessionId,
+      answerEventId,
       concept: 'Changing signs across the equals sign',
       correctionHint: null,
     });
@@ -300,10 +326,12 @@ describe('mentor notice lifecycle — real database', () => {
   it('terminalizes a completed not_yet re-check atomically, hides it from every open reader, and stays idempotent', async () => {
     const fixture = await seedFixture('not-yet-terminal');
     const sourceSessionId = await seedSourceSession(fixture);
+    const answerEventId = await seedAnswerEvent(fixture, sourceSessionId);
     const notice = await acceptMentorNotice(db, {
       ...fixture,
       topicId: null,
       sourceSessionId,
+      answerEventId,
       concept: 'Not-yet terminalization concept',
       correctionHint: null,
     });
@@ -402,10 +430,15 @@ describe('mentor notice lifecycle — real database', () => {
     // fresh notice cannot double-increment, emit twice, or overwrite the
     // winner: exactly one of a racing locked_in/not_yet pair survives.
     const raceSourceSessionId = await seedSourceSession(fixture);
+    const raceAnswerEventId = await seedAnswerEvent(
+      fixture,
+      raceSourceSessionId,
+    );
     const raceNotice = await acceptMentorNotice(db, {
       ...fixture,
       topicId: null,
       sourceSessionId: raceSourceSessionId,
+      answerEventId: raceAnswerEventId,
       concept: 'Not-yet terminalization race concept',
       correctionHint: null,
     });
@@ -449,10 +482,12 @@ describe('mentor notice lifecycle — real database', () => {
   it('atomically reserves one review-family slot and suppresses stale notices', async () => {
     const fixture = await seedFixture('reservation-fade');
     const sourceSessionId = await seedSourceSession(fixture);
+    const answerEventId = await seedAnswerEvent(fixture, sourceSessionId);
     const notice = await acceptMentorNotice(db, {
       ...fixture,
       topicId: null,
       sourceSessionId,
+      answerEventId,
       concept: 'Changing signs across the equals sign',
       correctionHint: null,
     });
@@ -520,10 +555,12 @@ describe('mentor notice lifecycle — real database', () => {
     );
 
     const sourceSessionId = await seedSourceSession(fixture);
+    const answerEventId = await seedAnswerEvent(fixture, sourceSessionId);
     const notice = await acceptMentorNotice(db, {
       ...fixture,
       topicId: null,
       sourceSessionId,
+      answerEventId,
       concept: 'Changing signs across the equals sign',
       correctionHint: 'Apply the inverse operation to both sides.',
     });
@@ -591,10 +628,12 @@ describe('mentor notice lifecycle — real database', () => {
       );
 
       const sourceSessionId = await seedSourceSession(fixture);
+      const answerEventId = await seedAnswerEvent(fixture, sourceSessionId);
       const notice = await acceptMentorNotice(db, {
         ...fixture,
         topicId: null,
         sourceSessionId,
+        answerEventId,
         concept: 'Changing signs across the equals sign',
         correctionHint: null,
       });

@@ -1,5 +1,5 @@
 {
-  "id": "ab696a6c-d03c-4499-97c9-9c7099a2bf6b",
+  "id": "c49af78c-3068-4cb6-ac72-161ffde3519a",
   "prevId": "4aa478d4-0b5b-48a8-973f-b4b555ef9c97",
   "version": "7",
   "dialect": "postgresql",
@@ -1749,20 +1749,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "artifact_source": {
-          "name": "artifact_source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'freeform_keep'"
-        },
-        "verification_state": {
-          "name": "verification_state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'unverified'"
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2507,166 +2493,6 @@
           "tableFrom": "session_embeddings",
           "tableTo": "curriculum_topics",
           "columnsFrom": ["topic_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.evidence_links": {
-      "name": "evidence_links",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "profile_id": {
-          "name": "profile_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "from_kind": {
-          "name": "from_kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "from_id": {
-          "name": "from_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "to_kind": {
-          "name": "to_kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "to_id": {
-          "name": "to_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "evidence_links_profile_from_idx": {
-          "name": "evidence_links_profile_from_idx",
-          "columns": [
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "from_kind",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "from_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "evidence_links_profile_to_idx": {
-          "name": "evidence_links_profile_to_idx",
-          "columns": [
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "to_kind",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "to_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "evidence_links_profile_endpoints_unique": {
-          "name": "evidence_links_profile_endpoints_unique",
-          "columns": [
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "from_kind",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "from_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "to_kind",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "to_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "evidence_links_profile_id_person_id_fk": {
-          "name": "evidence_links_profile_id_person_id_fk",
-          "tableFrom": "evidence_links",
-          "tableTo": "person",
-          "columnsFrom": ["profile_id"],
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
@@ -9673,15 +9499,7 @@
           "name": "artifact_source",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "default": "'learner_authored_note'"
-        },
-        "verification_state": {
-          "name": "verification_state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'unverified'"
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -12660,15 +12478,6 @@
           "tableFrom": "mentor_notices",
           "tableTo": "learning_sessions",
           "columnsFrom": ["source_session_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "mentor_notices_answer_event_id_session_events_id_fk": {
-          "name": "mentor_notices_answer_event_id_session_events_id_fk",
-          "tableFrom": "mentor_notices",
-          "tableTo": "session_events",
-          "columnsFrom": ["answer_event_id"],
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"

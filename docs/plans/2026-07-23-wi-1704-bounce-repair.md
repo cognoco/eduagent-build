@@ -13,7 +13,8 @@ status: complete
 implements the full shared learner-source contract, and cannot expose or mutate
 server-owned verified Challenge evidence incorrectly.
 
-**Approach:** Rebase the owned branch onto current `origin/main`, regenerate the
+**Approach:** Merge current `origin/main` into the already-pushed branch without
+rewriting history, regenerate the
 branch-only migration chain, and keep the artifact-source column nullable for the
 compatible-writer rollout. Add each missing behavior through a focused failing
 regression, then verify the complete branch against a freshly fetched base before
@@ -41,9 +42,11 @@ Out of scope:
 
 ## Tasks
 
-- [x] T1: Rebase and regenerate migration ancestry — done when branch migrations follow current
-  main's `0152_wi2386_consent_purpose_required`, journal ordinals and snapshot `prevId` values form
-  one chain, the artifact-source expansion remains nullable, and migration compatibility checks pass.
+- [x] T1: Merge and regenerate migration ancestry — done when branch migration
+  `0154_wi1704_verified_artifact_evidence_links` follows current main's
+  `0153_wi2629_mentor_notice_answer_event_scalar`, journal ordinals and snapshot
+  `prevId` values form one chain, the artifact-source expansion remains nullable,
+  and migration compatibility checks pass.
 - [x] T2: Implement the full shared `LearnerSource` substrate — done when schema tests first fail and
   then pass for all four discriminants and metadata, assembler tests cover every source store plus
   cross-profile isolation, and evidence-link endpoints/constraints represent the required directional

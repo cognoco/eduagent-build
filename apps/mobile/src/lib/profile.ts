@@ -263,6 +263,7 @@ export function ProfileProvider({
   // paths request it. Plain profile switches never set this. Initialised to
   // false; restored from SecureStore on cold start.
   const [isExplicitProxyMode, setIsExplicitProxyMode] = useState(false);
+  const [isRestoringProxyMode, setIsRestoringProxyMode] = useState(true);
 
   // On mount: restore saved profile ID from SecureStore
   useEffect(() => {
@@ -287,15 +288,23 @@ export function ProfileProvider({
   // from the last app session. The useParentProxy hook reads isExplicitProxyMode
   // from context — no more shape-derived override on cold start.
   useEffect(() => {
+    let cancelled = false;
     void SecureStore.getItemAsync(PARENT_PROXY_KEY)
       .then((value) => {
+        if (cancelled) return;
         const restoredProxy = value === 'true';
         setProxyMode(restoredProxy);
         setIsExplicitProxyMode(restoredProxy);
+        setIsRestoringProxyMode(false);
       })
       .catch(() => {
-        /* SecureStore unavailable */
+        // Fail closed: AppLayout's timed loading state exposes sign-out
+        // recovery, while assuming false here could briefly expose Account
+        // routes for a persisted parent-proxy session.
       });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Once profiles arrive, validate that saved ID exists in the list.
@@ -466,6 +475,7 @@ export function ProfileProvider({
   const isLoading =
     isProfilesLoading ||
     isRestoringId ||
+    isRestoringProxyMode ||
     (!isRestoringId && profiles.length > 0 && activeProfile === null) ||
     (activeProfileId !== null && activeProfile === null && isProfilesFetching);
 

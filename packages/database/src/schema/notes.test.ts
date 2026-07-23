@@ -5,7 +5,7 @@ import { topicNotes } from './notes.js';
 const migration = readFileSync(
   resolve(
     __dirname,
-    '../../../../apps/api/drizzle/0153_strong_quicksilver.sql',
+    '../../../../apps/api/drizzle/0154_wi1704_verified_artifact_evidence_links.sql',
   ),
   'utf8',
 );

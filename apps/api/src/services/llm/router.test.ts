@@ -2114,12 +2114,18 @@ describe('LLM Router', () => {
 
     // --- getModelConfigV2 path ---
 
-    it('[V2 path] judge with cerebras tutor resolves anthropic grader with GRADER_MODEL and no reasoningEffort', () => {
-      // V2 matrix (standard tier, rung 1) → tutor is cerebras → grader must be
-      // anthropic with GRADER_MODEL and no reasoningEffort (non-reasoning, §2).
+    it('[V2 path] judge with cerebras producer resolves anthropic grader with GRADER_MODEL and no reasoningEffort', () => {
+      // cerebras is not anthropic/openai → no exclusion applies → anthropic
+      // (preference order) with GRADER_MODEL, no reasoningEffort (§2).
       setLlmRoutingV2Enabled(true);
 
-      const cfg = getModelConfigForTest(1, { capability: 'judge' });
+      const cfg = getModelConfigForTest(1, {
+        capability: 'judge',
+        judgeIndependence: {
+          mode: 'model-output',
+          producerVendor: 'cerebras',
+        },
+      });
 
       expect(cfg.provider).toBe('anthropic');
       expect(cfg.model).toBe(GRADER_MODEL);
@@ -2127,14 +2133,14 @@ describe('LLM Router', () => {
       expect(cfg.maxTokens).toBeGreaterThanOrEqual(MIN_REPLY_MAX_TOKENS);
     });
 
-    it('[V2 path] judge with premium OpenAI tutor (rung 4) still resolves anthropic grader', () => {
-      // V2 matrix, premium tier, rung 4 → tutor is openai gpt-5.4.
-      // openai ≠ anthropic → grader stays anthropic.
+    it('[V2 path] judge with premium OpenAI producer still resolves anthropic grader', () => {
+      // producer is openai → openai excluded → anthropic (openai ≠ anthropic).
       setLlmRoutingV2Enabled(true);
 
       const cfg = getModelConfigForTest(4, {
         capability: 'judge',
         llmTier: 'premium',
+        judgeIndependence: { mode: 'model-output', producerVendor: 'openai' },
       });
 
       expect(cfg.provider).toBe('anthropic');
@@ -2144,24 +2150,41 @@ describe('LLM Router', () => {
 
     // --- getModelConfig legacy path ---
 
-    it('[legacy path] judge with gemini tutor resolves anthropic grader', () => {
-      // Legacy routing, standard tier → gemini tutor → grader must be anthropic.
+    it('[legacy path] judge with gemini producer resolves anthropic grader', () => {
+      // Legacy routing, standard tier → gemini producer (not anthropic/openai,
+      // so no exclusion applies) → grader must be anthropic.
       registerProvider(createMockProvider('gemini'));
       setLlmRoutingV2Enabled(false);
 
-      const cfg = getModelConfigForTest(1, { capability: 'judge' });
+      const cfg = getModelConfigForTest(1, {
+        capability: 'judge',
+        judgeIndependence: { mode: 'model-output', producerVendor: 'gemini' },
+      });
 
       expect(cfg.provider).toBe('anthropic');
       expect(cfg.model).toBe(GRADER_MODEL);
       expect(cfg.reasoningEffort).toBeUndefined();
     });
 
+    it('[not-applicable] judge grading learner input (no producer) resolves anthropic grader', () => {
+      registerProvider(createMockProvider('gemini'));
+      setLlmRoutingV2Enabled(false);
+
+      const cfg = getModelConfigForTest(1, {
+        capability: 'judge',
+        judgeIndependence: { mode: 'not-applicable' },
+      });
+
+      expect(cfg.provider).toBe('anthropic');
+      expect(cfg.model).toBe(GRADER_MODEL);
+    });
+
     // --- Break test (§2 enforcement, red → green) ---
 
-    it('[§2 break test] judge with anthropic tutor MUST NOT resolve to anthropic grader', () => {
-      // ADR-0016 §2: evaluator must not share blind spots with the tutor.
-      // With legacy routing, premium tier, anthropic registered → tutor is
-      // anthropic → vendor guard must redirect grader to a different vendor.
+    it('[§2 break test] judge with anthropic producer MUST NOT resolve to anthropic grader', () => {
+      // ADR-0016 §2: evaluator must not share blind spots with the producer.
+      // Legacy routing, premium tier, anthropic registered, producer=anthropic
+      // → vendor guard must redirect grader to a different vendor.
       //
       // RED: without the vendor guard, resolved provider would be 'anthropic'.
       // GREEN: with the guard, resolved provider is 'openai' (the only
@@ -2172,9 +2195,13 @@ describe('LLM Router', () => {
       const cfg = getModelConfigForTest(1, {
         capability: 'judge',
         llmTier: 'premium',
+        judgeIndependence: {
+          mode: 'model-output',
+          producerVendor: 'anthropic',
+        },
       });
 
-      // The grader vendor must differ from the tutor vendor (anthropic).
+      // The grader vendor must differ from the producer vendor (anthropic).
       expect(cfg.provider).not.toBe('anthropic');
       expect(cfg.provider).toBe('openai');
       // The forced-openai path uses OPENAI_MINI_MODEL (gpt-5-mini), not
@@ -2186,8 +2213,7 @@ describe('LLM Router', () => {
     // --- routeAndCall end-to-end ---
 
     it('routeAndCall with capability:judge resolves anthropic provider, GRADER_MODEL, and no reasoningEffort', async () => {
-      // V2 on: default tutor is cerebras → grader is anthropic.
-      // Register a capturing anthropic provider so we can inspect the config.
+      // Producer is cerebras (not anthropic/openai) → no exclusion → anthropic.
       setLlmRoutingV2Enabled(true);
       const spy = createCapturingProvider('anthropic');
       registerProvider(spy);
@@ -2195,7 +2221,14 @@ describe('LLM Router', () => {
       const result = await routeAndCall(
         [{ role: 'user', content: 'Grade this answer.' }],
         1,
-        { capability: 'judge', flow: 'challenge.grader' },
+        {
+          capability: 'judge',
+          judgeIndependence: {
+            mode: 'model-output',
+            producerVendor: 'cerebras',
+          },
+          flow: 'challenge.grader',
+        },
       );
 
       expect(result.provider).toBe('anthropic');

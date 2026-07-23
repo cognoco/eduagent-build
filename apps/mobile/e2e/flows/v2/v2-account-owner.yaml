@@ -1,0 +1,275 @@
+# [WI-2240] V2 owner Account entry, return, row-gating, and sign-out boundary.
+# WHICH cases: an owner learner enters from their own Mentor/Subjects/Journal
+# scope; Account Back and Android Back return to the exact initiating tab and
+# owner data; owner contract rows are present; sign-out + cold relaunch expose
+# no prior identity or learning shell.
+appId: com.mentomate.app
+tags:
+  - v2
+  - account
+  - navigation
+  - auth
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: 'parent-multi-child'
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'tab-mentor'
+    selected: true
+- assertVisible:
+    id: 'account-avatar-button'
+    text: '^Open account settings for Test Parent$'
+
+# Owner learner Mentor -> Account -> named back to the same selected tab and
+# the exact Test Parent learner scope. Mentor renders actionable Now-feed cards,
+# not the raw subject inventory proven separately on Subjects below.
+- tapOn:
+    id: 'account-avatar-button'
+- extendedWaitUntil:
+    visible:
+      id: 'account-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'account-admin-profile'
+- scrollUntilVisible:
+    element:
+      id: 'account-admin-notifications'
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: 'account-admin-notifications'
+- assertVisible:
+    id: 'account-admin-security'
+- assertVisible:
+    id: 'account-admin-subscription'
+- scrollUntilVisible:
+    element:
+      id: 'account-admin-add-child'
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: 'account-admin-add-child'
+- scrollUntilVisible:
+    element:
+      id: 'account-admin-family-settings'
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: 'account-admin-family-settings'
+- tapOn:
+    id: 'account-back'
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'tab-mentor'
+    selected: true
+- assertVisible:
+    id: 'account-avatar-button'
+    text: '^Open account settings for Test Parent$'
+
+# Owner learner Subjects -> Account -> Android Back returns to the selected
+# Subjects tab and the owner's seeded General Knowledge row.
+- tapOn:
+    id: 'tab-subjects'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'subjects-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'tab-subjects'
+    selected: true
+- assertVisible:
+    id: 'account-avatar-button'
+    text: '^Open account settings for Test Parent$'
+- assertVisible:
+    id: 'subjects-browse-row-${OWNER_SUBJECT_ID}'
+    containsDescendants:
+      - text: '^General Knowledge$'
+- tapOn:
+    id: 'account-avatar-button'
+- extendedWaitUntil:
+    visible:
+      id: 'account-screen'
+    timeout: 15000
+- pressKey: back
+- extendedWaitUntil:
+    visible:
+      id: 'subjects-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'tab-subjects'
+    selected: true
+- assertVisible:
+    id: 'account-avatar-button'
+    text: '^Open account settings for Test Parent$'
+- assertVisible:
+    id: 'subjects-browse-row-${OWNER_SUBJECT_ID}'
+    containsDescendants:
+      - text: '^General Knowledge$'
+- assertNotVisible:
+    id: 'learner-screen'
+
+# Owner learner Journal -> Account -> representative Privacy leaf -> Account
+# -> the same selected owner Journal tab.
+- tapOn:
+    id: 'tab-journal'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'journal-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'tab-journal'
+    selected: true
+- assertVisible:
+    id: 'account-avatar-button'
+    text: '^Open account settings for Test Parent$'
+- assertVisible:
+    id: 'journal-screen'
+- tapOn:
+    id: 'account-avatar-button'
+- extendedWaitUntil:
+    visible:
+      id: 'account-screen'
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: 'account-admin-privacy'
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: 'account-admin-privacy'
+- tapOn:
+    id: 'account-admin-privacy'
+- extendedWaitUntil:
+    visible:
+      id: 'more-privacy-scroll'
+    timeout: 15000
+- pressKey: back
+- extendedWaitUntil:
+    visible:
+      id: 'account-screen'
+    timeout: 15000
+- tapOn:
+    id: 'account-back'
+- extendedWaitUntil:
+    visible:
+      id: 'journal-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'tab-journal'
+    selected: true
+- assertVisible:
+    id: 'account-avatar-button'
+    text: '^Open account settings for Test Parent$'
+- assertVisible:
+    id: 'journal-screen'
+
+# Exact sign-out case: establish the Test Parent owner in Subjects with its
+# row-owned General Knowledge data, then cross the unauthenticated boundary.
+- tapOn:
+    id: 'tab-subjects'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'subjects-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'tab-subjects'
+    selected: true
+- assertVisible:
+    id: 'account-avatar-button'
+    text: '^Open account settings for Test Parent$'
+- assertVisible:
+    id: 'subjects-browse-row-${OWNER_SUBJECT_ID}'
+    containsDescendants:
+      - text: '^General Knowledge$'
+- tapOn:
+    id: 'account-avatar-button'
+- extendedWaitUntil:
+    visible:
+      id: 'account-screen'
+    timeout: 15000
+- assertVisible:
+    text: '^Test Parent$'
+- scrollUntilVisible:
+    element:
+      id: 'account-admin-sign-out'
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: 'account-admin-sign-out'
+- extendedWaitUntil:
+    visible:
+      id: 'sign-in-button'
+    timeout: 30000
+- assertNotVisible:
+    id: 'account-screen'
+- assertNotVisible:
+    id: 'account-avatar-button'
+- assertNotVisible:
+    id: 'mentor-screen'
+- assertNotVisible:
+    id: 'subjects-screen'
+- assertNotVisible:
+    id: 'journal-screen'
+- assertNotVisible:
+    text: '^Test Parent$'
+- assertNotVisible:
+    text: '^General Knowledge$'
+
+# Android Back can leave the auth activity. Re-enter the protected Subjects
+# link without clearing or stopping the process and re-check the boundary.
+- pressKey: back
+- openLink: 'mentomate:///subjects'
+- extendedWaitUntil:
+    visible:
+      id: 'sign-in-button'
+    timeout: 30000
+- assertNotVisible:
+    id: 'account-screen'
+- assertNotVisible:
+    id: 'account-avatar-button'
+- assertNotVisible:
+    id: 'mentor-screen'
+- assertNotVisible:
+    id: 'subjects-screen'
+- assertNotVisible:
+    id: 'journal-screen'
+- assertNotVisible:
+    text: '^Test Parent$'
+- assertNotVisible:
+    text: '^General Knowledge$'
+
+# Stop the app, then cold-open the same protected link without clearing state.
+# The exact Test Parent + General Knowledge boundary must hold again.
+- stopApp
+- openLink: 'mentomate:///subjects'
+- extendedWaitUntil:
+    visible:
+      id: 'sign-in-button'
+    timeout: 30000
+- assertNotVisible:
+    id: 'account-screen'
+- assertNotVisible:
+    id: 'account-avatar-button'
+- assertNotVisible:
+    id: 'mentor-screen'
+- assertNotVisible:
+    id: 'subjects-screen'
+- assertNotVisible:
+    id: 'journal-screen'
+- assertNotVisible:
+    text: '^Test Parent$'
+- assertNotVisible:
+    text: '^General Knowledge$'

@@ -40,6 +40,10 @@
   ],
   "v2": [
     {
+      "flow": "flows/v2/v2-homework-manual-entry.yaml",
+      "scenario": "trial-active"
+    },
+    {
       "flow": "flows/v2/v2-shell-navigation.yaml",
       "scenario": "learning-active"
     },
@@ -58,6 +62,14 @@
     {
       "flow": "flows/v2/v2-supporter-link-ceremony.yaml",
       "scenario": "v2-supporter-pending-link"
+    },
+    {
+      "flow": "flows/v2/v2-account-owner.yaml",
+      "scenario": "parent-multi-child"
+    },
+    {
+      "flow": "flows/v2/v2-account-non-owner-child.yaml",
+      "scenario": "v2-account-non-owner-child"
     },
     {
       "flow": "flows/v2/v2-supporter-self-learning-doorway.yaml",

@@ -13,7 +13,7 @@ import {
 
 import { generateUUIDv7 } from '../utils/uuid';
 import { person } from './identity';
-import { learningSessions, sessionEvents } from './sessions';
+import { learningSessions } from './sessions';
 import { curriculumTopics, subjects } from './subjects';
 
 export const mentorNoticeStatusEnum = pgEnum('mentor_notice_status', [
@@ -60,15 +60,24 @@ export const mentorNotices = pgTable(
     sourceSessionId: uuid('source_session_id')
       .notNull()
       .references(() => learningSessions.id, { onDelete: 'cascade' }),
-    // [WI-2500] The validated learner-answer event this notice's evidence is
-    // anchored to. Nullable only because rows created before this column
-    // existed have no honest value to backfill (their original evidence was
-    // never persisted) — every new notice always carries one; see state.ts's
-    // acceptMentorNotice. Never null-able as a domain matter, only as a
-    // migration-safety one.
-    answerEventId: uuid('answer_event_id').references(() => sessionEvents.id, {
-      onDelete: 'cascade',
-    }),
+    // [WI-2500 / WI-2629] The validated learner-answer event this notice's
+    // evidence is anchored to. Nullable only because rows created before
+    // this column existed have no honest value to backfill (their original
+    // evidence was never persisted) — every new notice always carries one;
+    // see evidence.ts's validateNoticeEvidence. Never null-able as a domain
+    // matter, only as a migration-safety one.
+    //
+    // [WI-2629 / OPQ-144 F2 Option A] Deliberately a bare scalar UUID, NOT a
+    // foreign key. This is the notice's immutable evidence identity, not a
+    // live pointer — a transcript purge of `session_events` must NOT touch
+    // it (must not cascade-delete the notice, must not null the column).
+    // Supersedes the WI-2500 FK+cascade design: that cascade was load-bearing
+    // only to avoid colliding two evidence-backed notices onto the
+    // null-evidence partial unique index below when SET NULL fired on purge.
+    // Dropping the FK removes the SET NULL entirely, so the collision never
+    // arises — do not reintroduce any app-level "null answer_event_id on
+    // purge" behavior, or the collision comes back.
+    answerEventId: uuid('answer_event_id'),
     concept: text('concept').notNull(),
     correctionHint: text('correction_hint'),
     status: mentorNoticeStatusEnum('status').notNull().default('open'),
