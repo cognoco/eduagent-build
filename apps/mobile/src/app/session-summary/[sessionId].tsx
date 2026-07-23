@@ -224,6 +224,7 @@ export default function SessionSummaryScreen() {
     persisted?.status === 'submitted' || persisted?.status === 'accepted';
   const isPersistedSkipped = persisted?.status === 'skipped';
   const isAlreadyPersisted = isPersistedSubmitted || isPersistedSkipped;
+  const isRevisitedPersistedSummary = isAlreadyPersisted && !submitted;
 
   useEffect(() => {
     setRecapTimedOut(false);
@@ -463,7 +464,7 @@ export default function SessionSummaryScreen() {
 
     const effectiveTopicId = topicId ?? fallbackSession?.topicId;
     const effectiveSubjectId = subjectId ?? fallbackSession?.subjectId;
-    if (isAlreadyPersisted && effectiveTopicId && effectiveSubjectId) {
+    if (isRevisitedPersistedSummary && effectiveTopicId && effectiveSubjectId) {
       router.replace({
         pathname: '/(app)/topic/[topicId]',
         params: { topicId: effectiveTopicId, subjectId: effectiveSubjectId },
@@ -471,7 +472,7 @@ export default function SessionSummaryScreen() {
       return;
     }
 
-    if (isAlreadyPersisted) {
+    if (isRevisitedPersistedSummary) {
       goBackOrReplace(router, summaryHomeHref);
       return;
     }
@@ -1702,7 +1703,7 @@ export default function SessionSummaryScreen() {
             className="bg-primary rounded-button py-3 items-center mt-2"
             testID="continue-button"
             accessibilityLabel={
-              isAlreadyPersisted
+              isRevisitedPersistedSummary
                 ? t('sessionSummary.a11yContinueLearning')
                 : t('sessionSummary.a11yContinueToHome')
             }

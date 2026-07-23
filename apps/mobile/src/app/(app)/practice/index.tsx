@@ -164,11 +164,18 @@ function getLanguageDisplayName(
   }
 }
 
-function SectionLabel({ children }: { children: string }): React.ReactElement {
+function SectionLabel({
+  children,
+  testID,
+}: {
+  children: string;
+  testID?: string;
+}): React.ReactElement {
   return (
     <Text
       className="text-caption font-bold text-text-secondary"
       style={styles.sectionLabel}
+      testID={testID}
     >
       {children}
     </Text>
@@ -393,6 +400,9 @@ export default function PracticeScreen(): React.ReactElement {
       ? t('practiceHub.history.roundsPlayed', { count: totalRoundsPlayed })
       : t('practiceHub.history.noRoundsYet');
   const practiceReturnParams = { returnTo: PRACTICE_RETURN_TO } as const;
+  const practiceChildReturnParams = returnTo
+    ? { ...practiceReturnParams, practiceReturnTo: returnTo }
+    : practiceReturnParams;
 
   const handleBack = () => {
     if (returnTo === JOURNAL_RETURN_TO) {
@@ -820,7 +830,7 @@ export default function PracticeScreen(): React.ReactElement {
           </View>
 
           <View className="gap-3">
-            <SectionLabel>
+            <SectionLabel testID="practice-other-practice-heading">
               {t('practiceHub.sections.otherPractice')}
             </SectionLabel>
             <ScrollView
@@ -906,7 +916,7 @@ export default function PracticeScreen(): React.ReactElement {
                 onPress={() =>
                   router.push({
                     pathname: '/(app)/dictation',
-                    params: practiceReturnParams,
+                    params: practiceChildReturnParams,
                   } as Href)
                 }
                 accessibilityRole="button"
@@ -998,7 +1008,7 @@ export default function PracticeScreen(): React.ReactElement {
               onPress={() =>
                 router.push({
                   pathname: '/(app)/quiz/history',
-                  params: practiceReturnParams,
+                  params: practiceChildReturnParams,
                 } as Href)
               }
               accessibilityRole="button"

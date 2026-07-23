@@ -439,9 +439,9 @@ export default function CreateProfileScreen() {
       // pending-consent profile: for status PENDING it renders the full
       // "send to parent" surface (with its own push to /consent), and for
       // PARENTAL_CONSENT_REQUESTED it renders the waiting/resend UI. So we do
-      // NOT push /consent here — we only switch to the child, and the gate takes
-      // over deterministically with exactly one consent surface. For the
-      // non-consent path we close the modal as before.
+      // NOT push /consent here. We dismiss this modal before switching to the
+      // child; otherwise the native stack can retain create-profile above the
+      // switch-induced gate even though the gate mounted successfully.
       //
       // switchProfile triggers a nav-tree remount via setActiveProfileId; any
       // router call that fires after the remount starts operates on a torn-down
@@ -449,7 +449,9 @@ export default function CreateProfileScreen() {
       // guard prevents CreateProfileGate from flashing during the switch window
       // (profiles.length > 0 && activeProfile === null stays true until the
       // switch completes).
-      if (!needsConsentFlow && wantsFamily) {
+      if (needsConsentFlow) {
+        handleClose();
+      } else if (wantsFamily) {
         // Parent's own profile is created — take them straight to the
         // add-a-child screen (skippable via its Cancel) instead of the learner
         // home. Navigate FIRST (same remount-ordering reason as below), then
@@ -458,7 +460,7 @@ export default function CreateProfileScreen() {
           pathname: '/create-profile',
           params: { for: 'child' },
         });
-      } else if (!needsConsentFlow) {
+      } else {
         if (isFirstProfileCreation && !isAddingChild) {
           await queueMentorBornCeremony({
             profileId: profile.id,

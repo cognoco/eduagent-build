@@ -50,7 +50,7 @@ import {
 import type { ConsentStatus, DataExport, Profile } from '@eduagent/schemas';
 import { generateExport, serializeDates } from '../export';
 import {
-  resolveLatestConsentStatusAnyBasis,
+  resolveLatestConsentSetStatusAnyBasis,
   type ConsentBasis,
 } from './consent-status-v2';
 import { birthMonthDayFromDate, birthYearFromDate } from './profile-v2';
@@ -145,7 +145,7 @@ export async function generateExportV2(
   const consentStatusByPersonId = new Map<string, ConsentStatus>();
   await Promise.all(
     personIds.map(async (pid) => {
-      const status = await resolveLatestConsentStatusAnyBasis(
+      const status = await resolveLatestConsentSetStatusAnyBasis(
         db,
         pid,
         organizationId,

@@ -1,14 +1,15 @@
 /**
  * Dev/E2E-only seed route — `mentomate:///dev-only/seed-pending-redirect`
  *
- * Reads `path` and `staleMs` from search params, calls
- * `seedPendingAuthRedirectForTesting`, then replaces to the sign-in screen.
- * Used by the `deep-link-redirect-ttl-expired.yaml` Maestro flow to write a
- * pre-aged pending-redirect record without waiting >5 min for the real TTL.
+ * Reads `path` and `staleMs` from search params and visibly acknowledges the
+ * seed. Its explicit action performs normal sign-out cleanup, re-seeds after
+ * cleanup, then opens sign-in. The fresh-control + expired pair in
+ * `deep-link-redirect-ttl-expired.yaml` proves both replay and TTL fallback
+ * without waiting >5 min for the real TTL.
  *
- * This route is dead in production: if NODE_ENV === 'production' or
- * EXPO_PUBLIC_E2E !== 'true', the component renders null and the seed call is
- * never made.
+ * This route is dead in store builds: unless EXPO_PUBLIC_E2E is exactly true,
+ * the component renders null and the seed call is never made. Native CI uses
+ * a release-mode E2E bundle, so NODE_ENV cannot be part of this gate.
  *
  * Requires the APK to be built with EXPO_PUBLIC_E2E=true.
  *
@@ -28,16 +29,16 @@
  * outside the allowlist falls back to the safe default `/(app)/home`.
  */
 
-import { useAuth } from '@clerk/expo';
+import { useAuth, useClerk } from '@clerk/expo';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect } from 'react';
-import { Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
 
 import { seedPendingAuthRedirectForTesting } from '../../lib/pending-auth-redirect';
+import { signOutWithCleanup } from '../../lib/sign-out';
 
-const IS_E2E_BUILD =
-  process.env.NODE_ENV !== 'production' &&
-  process.env.EXPO_PUBLIC_E2E === 'true';
+const IS_E2E_BUILD = process.env.EXPO_PUBLIC_E2E === 'true';
 
 /**
  * [CR-2026-05-21-113] Allowlist of `path` values that Maestro E2E flows are
@@ -55,7 +56,10 @@ const SAFE_DEFAULT_PATH = '/(app)/home';
 
 export default function SeedPendingRedirectScreen(): React.ReactElement | null {
   const router = useRouter();
-  const { isLoaded, isSignedIn } = useAuth();
+  const queryClient = useQueryClient();
+  const { signOut } = useClerk();
+  const { isLoaded, isSignedIn, userId } = useAuth();
+  const [isPreparingSignIn, setIsPreparingSignIn] = useState(false);
   const { path, staleMs } = useLocalSearchParams<{
     path: string;
     staleMs: string;
@@ -65,6 +69,7 @@ export default function SeedPendingRedirectScreen(): React.ReactElement | null {
     if (!IS_E2E_BUILD) return;
     if (!isLoaded) return;
     if (!isSignedIn) {
+      if (isPreparingSignIn) return;
       // [CR-2026-05-19-H25] Refuse to seed for unauthenticated callers — an
       // attacker on an E2E APK could otherwise plant a pending redirect that
       // hijacks the next sign-in. Bounce to sign-in instead of silently no-op
@@ -73,18 +78,37 @@ export default function SeedPendingRedirectScreen(): React.ReactElement | null {
       return;
     }
 
-    const staleMsNum = parseInt(staleMs ?? '0', 10);
-    // [CR-2026-05-21-113] Validate path against the allowlist before seeding.
-    // An out-of-allowlist value (including any attacker-controlled path from a
-    // malicious deep link) falls back to the safe default rather than being
-    // passed to seedPendingAuthRedirectForTesting.
-    const requestedPath = path ?? SAFE_DEFAULT_PATH;
-    const seedPath = SEED_PATH_ALLOWLIST.has(requestedPath)
-      ? requestedPath
-      : SAFE_DEFAULT_PATH;
-    seedPendingAuthRedirectForTesting(seedPath, staleMsNum);
-    router.replace('/(auth)/sign-in');
-  }, [isLoaded, isSignedIn, path, staleMs, router]);
+    // Do not seed while the authenticated app shell is mounted. That shell
+    // consumes pending redirects immediately and would navigate away before
+    // Maestro can press the explicit sign-out action below. The callback
+    // re-seeds only after normal sign-out cleanup has completed.
+  }, [isLoaded, isPreparingSignIn, isSignedIn, router]);
+
+  const prepareSignedOutReplay = useCallback(async () => {
+    if (isPreparingSignIn) return;
+    setIsPreparingSignIn(true);
+    try {
+      const requestedPath = path ?? SAFE_DEFAULT_PATH;
+      const seedPath = SEED_PATH_ALLOWLIST.has(requestedPath)
+        ? requestedPath
+        : SAFE_DEFAULT_PATH;
+      const staleMsNum = parseInt(staleMs ?? '0', 10);
+
+      // The normal sign-out path intentionally clears pending redirects. The
+      // E2E seam re-seeds only after that cleanup completes, creating the same
+      // signed-out pre-auth state that a real incoming deep link produces.
+      await signOutWithCleanup({
+        clerkSignOut: signOut,
+        queryClient,
+        profileIds: [],
+        clerkUserId: userId ?? undefined,
+      });
+      seedPendingAuthRedirectForTesting(seedPath, staleMsNum);
+      router.replace('/(auth)/sign-in');
+    } finally {
+      setIsPreparingSignIn(false);
+    }
+  }, [isPreparingSignIn, path, queryClient, router, signOut, staleMs, userId]);
 
   if (!IS_E2E_BUILD) {
     return null;
@@ -99,6 +123,12 @@ export default function SeedPendingRedirectScreen(): React.ReactElement | null {
       <Text>
         Seeding pending redirect (path={path ?? ''}, staleMs={staleMs ?? '0'})…
       </Text>
+      <Pressable
+        testID="pending-redirect-sign-out"
+        disabled={isPreparingSignIn}
+        onPress={() => void prepareSignedOutReplay()}
+        style={{ minHeight: 48, width: '100%' }}
+      />
     </View>
   );
 }

@@ -1,5 +1,10 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
+import {
+  installSeededProfileBootstrap,
+  PROFILE_BOOTSTRAP_GLOB,
+} from '../../helpers/profile-bootstrap';
+
 const HOST_PATH = '/quiz/dev-only/results';
 const NAVIGATION_LOG_KEY = 'e2e:quiz-results:navigation-log';
 
@@ -101,9 +106,25 @@ async function readNavigationCalls(page: Page): Promise<NavigationCall[]> {
   );
 }
 
+test('quiz-results host is isolated from unavailable upstream profile bootstrap', async ({
+  page,
+}) => {
+  // Matching routes run newest-first. If the seeded fixture is removed or
+  // falls through, this upstream sentinel makes the regression fail closed.
+  await page.route(PROFILE_BOOTSTRAP_GLOB, (route) => route.abort('failed'));
+  await installSeededProfileBootstrap(page);
+
+  await page.goto(`${HOST_PATH}?freeze=true`, { waitUntil: 'commit' });
+
+  await expect(page.getByTestId('quiz-results-screen')).toBeVisible({
+    timeout: 15_000,
+  });
+});
+
 test('quiz-results exits are real named buttons with exact-once web activation', async ({
   page,
 }) => {
+  await installSeededProfileBootstrap(page);
   await openHost(page, true);
 
   const screen = page.getByTestId('quiz-results-screen');

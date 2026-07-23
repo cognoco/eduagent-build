@@ -77,16 +77,34 @@ tags:
     id: "session-recap-highlight"
 
 # 9. Assert engagement chip (signal value matches what the seed inserts, e.g. "curious")
+- scrollUntilVisible:
+    element:
+      id: "engagement-chip-curious"
+    direction: DOWN
+    timeout: 10000
+    visibilityPercentage: 50
 - assertVisible:
     id: "engagement-chip-curious"
 
 # 10. Assert conversation-prompt container
+- scrollUntilVisible:
+    element:
+      id: "session-recap-conversation-prompt"
+    direction: DOWN
+    timeout: 10000
+    visibilityPercentage: 50
 - assertVisible:
     id: "session-recap-conversation-prompt"
 
 - takeScreenshot: 02-recap-populated
 
 # 11. Tap the copy button
+- scrollUntilVisible:
+    element:
+      id: "session-recap-copy-prompt"
+    direction: DOWN
+    timeout: 10000
+    visibilityPercentage: 50
 - tapOn:
     id: "session-recap-copy-prompt"
 
@@ -98,6 +116,12 @@ tags:
 - takeScreenshot: 03-after-copy
 
 # 13. Navigate back to child detail
+- scrollUntilVisible:
+    element:
+      id: "session-detail-back-to-child"
+    direction: DOWN
+    timeout: 10000
+    visibilityPercentage: 50
 - tapOn:
     id: "session-detail-back-to-child"
 

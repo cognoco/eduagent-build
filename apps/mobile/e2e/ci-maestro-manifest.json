@@ -90,7 +90,7 @@
     "flows/consent/consent-pending-gate.yaml": "consent-pending",
     "flows/consent/consent-withdrawn-gate.yaml": "consent-withdrawn-solo",
     "flows/consent/hand-to-parent-consent.yaml": "pre-profile",
-    "flows/consent/post-approval-landing.yaml": "onboarding-complete",
+    "flows/consent/post-approval-landing.yaml": "post-approval-ready",
     "flows/edge/animated-splash.yaml": null,
     "flows/onboarding/create-subject.yaml": "onboarding-complete",
     "flows/onboarding/preview-self.yaml": null,

@@ -25,20 +25,32 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "parent-with-weekly-report"
+      SEED_SCENARIO: 'parent-with-weekly-report'
 
-# 2. Wait for parent dashboard
-- runFlow:
-    file: ../_setup/open-family-dashboard.yaml
+# 2. Wait for parent home. The open-family-dashboard helper also taps the
+#    child's primary action and lands on child detail, so it is not appropriate
+#    before a parent-home Reports action.
+- extendedWaitUntil:
+    visible:
+      id: 'parent-home-screen'
+    timeout: 20000
 
-# 3. Tap the Reports action on the seeded child card
+# 3. Bring the below-fold Reports action into the small viewport, then tap it.
+- scrollUntilVisible:
+    element:
+      id: 'parent-home-weekly-report-${CHILD_PROFILE_ID}'
+    direction: DOWN
+    timeout: 10000
+    visibilityPercentage: 100
+    centerElement: true
+
 - tapOn:
-    id: "parent-home-weekly-report-${CHILD_PROFILE_ID}"
+    id: 'parent-home-weekly-report-${CHILD_PROFILE_ID}'
 
 # 4. Wait for the reports screen back button (screen-level indicator)
 - extendedWaitUntil:
     visible:
-      id: "child-reports-back"
+      id: 'child-reports-back'
     timeout: 10000
 
 - takeScreenshot: 01-reports-list
@@ -46,34 +58,34 @@ tags:
 # 5. Tap the seeded weekly report card
 #    weekly-report-card-${WEEKLY_REPORT_ID} is injected by seed-and-run.sh
 - tapOn:
-    id: "weekly-report-card-${WEEKLY_REPORT_ID}"
+    id: 'weekly-report-card-${WEEKLY_REPORT_ID}'
 
 # 6. Wait for the weekly report detail hero card
 - extendedWaitUntil:
     visible:
-      id: "child-weekly-report-hero"
+      id: 'child-weekly-report-hero'
     timeout: 10000
 
 # 7. Assert metric cards
 - assertVisible:
-    id: "child-weekly-report-metric-sessions"
+    id: 'child-weekly-report-metric-sessions'
 
 - assertVisible:
-    id: "child-weekly-report-metric-minutes"
+    id: 'child-weekly-report-metric-minutes'
 
 - assertVisible:
-    id: "child-weekly-report-metric-topics"
+    id: 'child-weekly-report-metric-topics'
 
 - takeScreenshot: 02-weekly-report-detail
 
 # 8. Navigate back to reports list via the back button
 - tapOn:
-    id: "child-weekly-report-back"
+    id: 'child-weekly-report-back'
 
 # 9. Confirm we are back on the reports list
 - extendedWaitUntil:
     visible:
-      id: "child-reports-back"
+      id: 'child-reports-back'
     timeout: 10000
 
 - takeScreenshot: 03-back-to-reports

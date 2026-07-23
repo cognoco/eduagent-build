@@ -19,8 +19,20 @@ capture_failure_artifacts() {
   adb logcat -d -t 500 > "$OUTPUT_DIR/logcat.txt" || true
 }
 
+sanitize_maestro_artifacts() {
+  local directory="$1"
+  if [ ! -d "$directory" ]; then
+    return 0
+  fi
+  node apps/mobile/e2e/scripts/redact-maestro-artifacts.mjs "$directory"
+}
+
 cleanup() {
-  status=$?
+  local status=$?
+  if ! sanitize_maestro_artifacts "$OUTPUT_DIR"; then
+    echo "[ci-maestro] ERROR: failed to sanitize Maestro artifacts during cleanup" >&2
+    status=1
+  fi
   if [ "$ACTIVE_SEED" -eq 1 ]; then
     reset_seed
   fi
@@ -28,6 +40,8 @@ cleanup() {
   if [ "$status" -ne 0 ]; then
     capture_failure_artifacts
   fi
+  trap - EXIT
+  exit "$status"
 }
 
 # Preserve the failing command's status while collecting diagnostics. The
@@ -51,6 +65,34 @@ fi
 echo "[ci-maestro] Selected shard $SHARD: $FLOW_COUNT of $TOTAL_FLOW_COUNT suite=$SUITE flows; seed-slot=$SEED_SLOT"
 
 adb install -r apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+
+plant_gallery_fixture() {
+  local fixture_source="apps/mobile/assets/images/icon.png"
+  local fixture_name="dictation-test-image.png"
+  local fixture_uri="file:///sdcard/Pictures/${fixture_name}"
+  local attempt
+
+  adb shell mkdir -p /sdcard/Pictures
+  adb push "$fixture_source" /sdcard/Pictures/dictation-test-image.png >/dev/null
+  adb shell am broadcast \
+    -a android.intent.action.MEDIA_SCANNER_SCAN_FILE \
+    -d "$fixture_uri" >/dev/null
+
+  for attempt in {1..20}; do
+    if adb shell content query \
+      --uri content://media/external/images/media \
+      --projection _display_name | grep -Fq "_display_name=${fixture_name}"; then
+      echo "[ci-maestro] Gallery fixture indexed: $fixture_name"
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "[ci-maestro] ERROR: gallery fixture was not indexed: $fixture_name" >&2
+  return 1
+}
+
+plant_gallery_fixture
 
 seed_flow() {
   local scenario="$1"
@@ -146,7 +188,12 @@ run_flow() {
   adb shell am force-stop "$APP_ID" >/dev/null 2>&1 || true
   adb shell pm clear "$APP_ID" >/dev/null 2>&1 || true
   adb shell pm grant "$APP_ID" android.permission.POST_NOTIFICATIONS >/dev/null 2>&1 || true
-  adb shell pm grant "$APP_ID" android.permission.CAMERA >/dev/null 2>&1 || true
+  if [ "$flow" = "flows/homework/camera-permission-denied.yaml" ]; then
+    adb shell pm revoke "$APP_ID" android.permission.CAMERA >/dev/null 2>&1 || true
+    adb shell pm set-permission-flags "$APP_ID" android.permission.CAMERA user-set user-fixed
+  else
+    adb shell pm grant "$APP_ID" android.permission.CAMERA >/dev/null 2>&1 || true
+  fi
   adb shell pm grant "$APP_ID" android.permission.RECORD_AUDIO >/dev/null 2>&1 || true
   adb logcat -c
   adb shell am start -W -n "$APP_ID/.MainActivity"
@@ -160,6 +207,11 @@ run_flow() {
   local status=$?
   set -e
 
+  if ! sanitize_maestro_artifacts "$flow_output"; then
+    echo "[ci-maestro] ERROR: failed to redact recorded input text for $flow" >&2
+    status=1
+  fi
+
   if [ "$scenario" != '-' ]; then
     reset_seed
   fi
@@ -172,3 +224,9 @@ while IFS=$'\t' read -r scenario flow <&3; do
   echo "[ci-maestro] [$index/$FLOW_COUNT] scenario=$scenario flow=$flow"
   run_flow "$scenario" "$flow"
 done 3< "$PLAN_FILE"
+
+if [ "$index" -ne "$FLOW_COUNT" ]; then
+  echo "[ci-maestro] ERROR: shard $SHARD completed $index/$FLOW_COUNT flows" >&2
+  exit 1
+fi
+echo "[ci-maestro] Completed shard $SHARD: $index/$FLOW_COUNT flows"

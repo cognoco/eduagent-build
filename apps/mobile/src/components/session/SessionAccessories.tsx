@@ -34,7 +34,7 @@ export function HomeworkFirstResponseCompleteMarker({
   messages,
   isStreaming,
   hasFailure,
-}: HomeworkFirstResponseCompleteMarkerProps) {
+}: HomeworkFirstResponseCompleteMarkerProps): React.JSX.Element | null {
   const complete = useMemo(() => {
     if (!active) return false;
 

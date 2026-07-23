@@ -78,6 +78,33 @@ describe('LLM provider fixtures', () => {
     await expect(result.stopReasonPromise).resolves.toBe('stop');
   });
 
+  it('[WI-1864] resolves a matching stream without consuming the queued fallback', async () => {
+    const fixture = createLlmProviderFixture({
+      streamResponses: [llmPlainText('queued fallback')],
+      streamResponseResolver: (messages) =>
+        messages.at(-1)?.content === 'match'
+          ? llmPlainText('resolved stream')
+          : undefined,
+    });
+
+    const matching = fixture.provider.chatStream(
+      [{ role: 'user', content: 'match' }],
+      TEST_CONFIG,
+    );
+    let matchingText = '';
+    for await (const chunk of matching.stream) matchingText += chunk;
+
+    const fallback = fixture.provider.chatStream(
+      [{ role: 'user', content: 'nonmatch' }],
+      TEST_CONFIG,
+    );
+    let fallbackText = '';
+    for await (const chunk of fallback.stream) fallbackText += chunk;
+
+    expect(matchingText).toBe('resolved stream');
+    expect(fallbackText).toBe('queued fallback');
+  });
+
   it('can queue provider failures before a later success', async () => {
     const fixture = createLlmProviderFixture({
       chatErrors: [new Error('temporary provider failure')],
@@ -89,6 +116,32 @@ describe('LLM provider fixtures', () => {
     );
     await expect(fixture.provider.chat([], TEST_CONFIG)).resolves.toEqual({
       content: 'recovered',
+      stopReason: 'stop',
+    });
+  });
+
+  it('[WI-1864] resolves matching chat calls without consuming the queued fallback', async () => {
+    const fixture = createLlmProviderFixture({
+      chatResponses: [llmPlainText('queued fallback')],
+      chatResponseResolver: (messages) =>
+        messages.at(-1)?.content === 'match'
+          ? llmStructuredJson({ resolved: true })
+          : undefined,
+    });
+
+    await expect(
+      fixture.provider.chat([{ role: 'user', content: 'match' }], TEST_CONFIG),
+    ).resolves.toEqual({
+      content: '{"resolved":true}',
+      stopReason: 'stop',
+    });
+    await expect(
+      fixture.provider.chat(
+        [{ role: 'user', content: 'nonmatch' }],
+        TEST_CONFIG,
+      ),
+    ).resolves.toEqual({
+      content: 'queued fallback',
       stopReason: 'stop',
     });
   });

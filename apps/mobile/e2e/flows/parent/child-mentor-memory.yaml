@@ -1,7 +1,7 @@
 # Parent child mentor memory - empty state and correction controls
 # Tags: nightly, parent
 # Seed: parent-multi-child
-# Covers: dashboard -> child detail -> mentor memory empty state
+# Covers: dashboard -> child settings -> mentor memory empty state
 # Usage: ./scripts/seed-and-run.sh parent-multi-child flows/parent/child-mentor-memory.yaml
 appId: com.mentomate.app
 tags:
@@ -14,51 +14,75 @@ tags:
 # open-family-dashboard.yaml navigates to child detail via CHILD_PROFILE_ID which is
 # not set by the parent-multi-child seed (it provides CHILD1/2/3_PROFILE_ID). Using
 # it here would cause double-navigation (dashboard -> child detail, then this flow
-# taps again). Replace with a bare wait for parent-home-screen, then tap CHILD1.
+# taps again). Wait for parent Home, then open CHILD1's settings-mode detail.
 - extendedWaitUntil:
     visible:
-      id: "parent-home-screen"
+      id: 'parent-home-screen'
     timeout: 15000
 
 - tapOn:
-    id: "parent-home-check-child-${CHILD1_PROFILE_ID}"
+    id: 'parent-home-child-profile-${CHILD1_PROFILE_ID}'
 
 - extendedWaitUntil:
     visible:
-      id: "child-detail-scroll"
+      id: 'child-detail-scroll'
     timeout: 10000
 
 - scrollUntilVisible:
     element:
-      id: "mentor-memory-link"
+      id: 'mentor-memory-link'
     direction: DOWN
     timeout: 10000
 
 - tapOn:
-    id: "mentor-memory-link"
+    id: 'mentor-memory-link'
 
 - extendedWaitUntil:
     visible:
-      text: "No learning observations yet."
+      id: 'child-mentor-memory-screen'
     timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      id: 'child-mentor-memory-empty-state'
+    direction: DOWN
+    timeout: 10000
+    visibilityPercentage: 100
+    centerElement: true
+
+- assertVisible:
+    id: 'child-mentor-memory-empty-state'
 
 - takeScreenshot: 01-parent-memory-empty
 
 - scrollUntilVisible:
     element:
-      id: "something-wrong-button"
+      id: 'something-wrong-button'
     direction: DOWN
     timeout: 10000
+    visibilityPercentage: 50
+    centerElement: false
+    optional: false
+
+- assertVisible:
+    id: 'something-wrong-button'
 
 - takeScreenshot: 02-parent-memory-controls
 
 - tapOn:
-    id: "something-wrong-button"
+    id: 'something-wrong-button'
 
-- extendedWaitUntil:
-    visible:
-      id: "correction-input"
+- scrollUntilVisible:
+    element:
+      id: 'correction-input'
+    direction: DOWN
     timeout: 5000
+    visibilityPercentage: 50
+    centerElement: false
+    optional: false
+
+- assertVisible:
+    id: 'correction-input'
 
 - takeScreenshot: 03-correction-open
 
@@ -66,7 +90,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "child-detail-scroll"
+      id: 'child-detail-scroll'
     timeout: 10000
 
 - takeScreenshot: 04-back-to-child

@@ -18,72 +18,72 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "subscription-pro-active"
+      SEED_SCENARIO: 'subscription-pro-active'
       API_URL: ${API_URL}
 
 # 2. Verify home screen loaded
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 15000
 
 # 3. Navigate to More tab
 - tapOn:
-    text: "More"
+    text: 'More'
 
 # 4. Wait for More tab index — First settings row is always above the fold
 - extendedWaitUntil:
     visible:
-      id: "more-row-learning-preferences"
+      id: 'more-row-learning-preferences'
     timeout: 15000
 
 # 4a. Navigate into Account sub-screen (Subscription has moved from More index to Account)
 - tapOn:
-    id: "more-row-account"
+    id: 'more-row-account'
 
 - extendedWaitUntil:
     visible:
-      id: "more-account-scroll"
+      id: 'more-account-scroll'
     timeout: 10000
 
 # 5. Scroll to the Subscription row on Account screen and tap it
 - scrollUntilVisible:
     element:
-      id: "more-row-subscription"
+      id: 'more-row-subscription'
     direction: DOWN
     timeout: 15000
 
 - tapOn:
-    id: "more-row-subscription"
+    id: 'more-row-subscription'
 
 # 6. Verify subscription screen loaded
 - extendedWaitUntil:
     visible:
-      id: "subscription-screen"
+      id: 'subscription-screen'
     timeout: 15000
 
 - takeScreenshot: subscription-screen-pro
 
-# 7. Wait for the no-offerings section to render before scrolling.
-#    The static comparison only mounts after RevenueCat offerings resolve
-#    (subscriptionPackages.length === 0 && !offeringsLoading) — subscription.tsx:1028.
-#    Without this guard, assertNotVisible below can race against a still-loading screen.
-- extendedWaitUntil:
-    visible:
-      id: "no-offerings"
+# 7. The no-offerings section mounts below the current-plan, usage, and pool
+#    cards. Scroll to it so the wait both proves it rendered and handles a
+#    small-phone viewport.
+- scrollUntilVisible:
+    element:
+      id: 'no-offerings'
+    direction: DOWN
     timeout: 20000
 
 # 7b. Scroll to the static tier comparison section
 #     (visible when RevenueCat returns no packages — always true in emulator)
 - scrollUntilVisible:
     element:
-      id: "static-tier-pro"
+      id: 'static-tier-pro'
     direction: DOWN
     timeout: 20000
 
 # 8. Pro card must be visible (current plan card for pro users)
 - assertVisible:
-    id: "static-tier-pro"
+    id: 'static-tier-pro'
 
 - takeScreenshot: static-tier-pro-visible
 
@@ -91,6 +91,6 @@ tags:
 #    getTiersToCompare('pro') returns [free, plus, pro] — no family entry.
 #    Source: tier-helpers.ts:17-19, constants.ts:45-48.
 - assertNotVisible:
-    id: "static-tier-family"
+    id: 'static-tier-family'
 
 - takeScreenshot: static-comparison-pro-complete

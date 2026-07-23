@@ -12,6 +12,15 @@ export const consentStatusSchema = z.enum([
 ]);
 export type ConsentStatus = z.infer<typeof consentStatusSchema>;
 
+/**
+ * Every independently auditable purpose required by the consent workflow.
+ * Whole-consent paths iterate this set; purpose-specific paths accept the
+ * derived ConsentPurpose type explicitly.
+ */
+export const CONSENT_PURPOSES = ['platform_use', 'llm_disclosure'] as const;
+export const consentPurposeSchema = z.enum(CONSENT_PURPOSES);
+export type ConsentPurpose = z.infer<typeof consentPurposeSchema>;
+
 export const consentRequestSchema = z
   .object({
     childProfileId: z.string().uuid(),
@@ -88,7 +97,7 @@ export type ConsentActionResult = z.infer<typeof consentActionResultSchema>;
 // function), so the contract lives here — the service and the accountability
 // route share ONE definition instead of drifting.
 export interface ConsentAccountabilityRecord {
-  purpose: string;
+  purpose: ConsentPurpose;
   lawfulBasis: string;
   granted: boolean;
   /**
@@ -114,7 +123,7 @@ export interface ConsentAccountabilityRecord {
 // caller and lets the DPO/data-subject retrieve the lawful basis + versioned
 // terms-acceptance + accepted purposes + any withdrawal in one query.
 export const consentAccountabilityRecordSchema = z.object({
-  purpose: z.string(),
+  purpose: consentPurposeSchema,
   lawfulBasis: z.string(),
   granted: z.boolean(),
   termsAcceptedAt: isoDateField,
@@ -134,7 +143,7 @@ export type ConsentAccountabilityReport = z.infer<
 // purposes, and withdrawing one never touches the other. The enum is the wire
 // contract mirror of the service's ADULT_SELF_CONSENT_PURPOSES.
 export const selfConsentWithdrawRequestSchema = z.object({
-  purpose: z.enum(['platform_use', 'llm_disclosure']),
+  purpose: consentPurposeSchema,
 });
 export type SelfConsentWithdrawRequest = z.infer<
   typeof selfConsentWithdrawRequestSchema

@@ -1547,6 +1547,47 @@ describe('LibraryScreen', () => {
       jest.useRealTimers();
     });
 
+    it('[WI-1864] empty-result clear resets the debounced query and restores shelves', async () => {
+      active = mount({
+        subjects: [{ id: SUBJECT_1_ID, name: 'Biology', status: 'active' }],
+        search: {
+          subjects: [],
+          books: [],
+          topics: [],
+          notes: [],
+          sessions: [],
+        },
+      });
+      await waitFor(() => {
+        active!.result.getByTestId(`shelf-row-header-${SUBJECT_1_ID}`);
+      });
+
+      fireEvent.changeText(
+        active.result.getByTestId('library-search-input'),
+        'no matches',
+      );
+      await act(async () => {
+        jest.advanceTimersByTime(350);
+      });
+      await waitFor(() => {
+        active!.result.getByTestId('library-search-empty');
+      });
+
+      fireEvent.press(
+        active.result.getByTestId('library-search-clear-results'),
+      );
+      await act(async () => {
+        jest.advanceTimersByTime(350);
+      });
+
+      await waitFor(() => {
+        active!.result.getByTestId('shelves-list');
+      });
+      expect(
+        active.result.getByTestId('library-search-input').props.value,
+      ).toBe('');
+    });
+
     it('subject row tap calls router.push to shelf', async () => {
       await renderSearching();
       fireEvent.press(

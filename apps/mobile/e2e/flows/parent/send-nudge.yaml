@@ -17,79 +17,88 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "parent-with-children"
+      SEED_SCENARIO: 'parent-with-children'
       API_URL: ${API_URL}
 
 # 2. Wait for parent Home
 - extendedWaitUntil:
     visible:
-      id: "parent-home-screen"
+      id: 'parent-home-screen'
     timeout: 15000
 
-# 3. Screenshot: parent Home with nudge card visible
+# 3. Bring the nudge action fully into the small-phone viewport.
+- scrollUntilVisible:
+    element:
+      id: 'parent-home-send-nudge-${CHILD_PROFILE_ID}'
+    direction: DOWN
+    timeout: 30000
+    visibilityPercentage: 100
+    centerElement: true
+
+# 4. Screenshot: parent Home with nudge card visible
 - takeScreenshot: send-nudge-01-home
 
-# 4. Tap "Send <child> a nudge" card
+# 5. Tap "Send <child> a nudge" card
 - tapOn:
-    id: "parent-home-send-nudge-${CHILD_PROFILE_ID}"
+    id: 'parent-home-send-nudge-${CHILD_PROFILE_ID}'
 
-# 5. Wait for the nudge action sheet to appear
+# 6. Wait for the nudge action sheet to appear
 - extendedWaitUntil:
     visible:
-      text: "Pick one short encouragement."
+      text: 'Pick one short encouragement.'
     timeout: 5000
 
-# 6. Screenshot: action sheet with 4 template options
+# 7. Screenshot: action sheet with 4 template options
 - takeScreenshot: send-nudge-02-action-sheet
 
-# 7. Verify all four templates are visible
+# 8. Verify all four templates are visible
 - assertVisible:
-    id: "nudge-template-you_got_this"
+    id: 'nudge-template-you_got_this'
 - assertVisible:
-    id: "nudge-template-proud_of_you"
+    id: 'nudge-template-proud_of_you'
 - assertVisible:
-    id: "nudge-template-quick_session"
+    id: 'nudge-template-quick_session'
 - assertVisible:
-    id: "nudge-template-thinking_of_you"
+    id: 'nudge-template-thinking_of_you'
 
-# 8. Verify cancel and close buttons are present
+# 9. Verify cancel and close buttons are present
 - assertVisible:
-    id: "nudge-action-sheet-cancel"
+    id: 'nudge-action-sheet-cancel'
 - assertVisible:
-    id: "nudge-action-sheet-close"
+    id: 'nudge-action-sheet-close'
 
-# 9. Tap "You got this" to send the nudge
+# 10. Tap "You got this" to send the nudge
 - tapOn:
-    id: "nudge-template-you_got_this"
+    id: 'nudge-template-you_got_this'
 
-# 10. Wait for the native "Nudge sent" alert
+# 11. Wait for the native "Nudge sent" alert
 #     platformAlert renders a native Alert.alert on Android.
 #     Text matching on native alerts can be unreliable (BUG-49 pattern),
 #     so use optional: true and back up with a screenshot.
 - extendedWaitUntil:
     visible:
-      text: "Nudge sent"
+      text: 'Nudge sent'
     timeout: 5000
-    optional: true  # justified: native Alert.alert text matching is unreliable on Android (BUG-49 pattern); screenshot provides visual evidence
+    optional: true # justified: native Alert.alert text matching is unreliable on Android (BUG-49 pattern); screenshot provides visual evidence
 
-# 11. Screenshot: success alert
+# 12. Screenshot: success alert
 - takeScreenshot: send-nudge-03-sent-alert
 
-# 12. Dismiss the native alert (tap OK)
+# 13. Dismiss the native alert (tap OK)
 - tapOn:
-    text: "OK"
-    optional: true  # justified: OK button only present when native alert appeared in step 10; no-op if alert text was not matched
+    text: 'OK'
+    optional: true # justified: OK button only present when native alert appeared in step 10; no-op if alert text was not matched
 
-# 13. The action sheet should auto-close after success.
+# 14. The action sheet should auto-close after success.
 #     Verify we're back on the parent Home screen.
 - extendedWaitUntil:
     visible:
-      id: "parent-home-screen"
+      id: 'parent-home-screen'
     timeout: 5000
 
-# 14. Confirm the action sheet is no longer visible
+# 15. Confirm the action sheet is no longer visible
 - assertNotVisible:
-    text: "Pick one short encouragement."
+    text: 'Pick one short encouragement.'
 
-# 15. Screenshot: back on Home after sending
+# 16. Screenshot: back on Home after sending
 - takeScreenshot: send-nudge-04-home-after-send

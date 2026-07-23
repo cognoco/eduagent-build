@@ -1,16 +1,29 @@
 # Verified-Learning Loop — Loop Map & Slice Plan (WI-1657)
 
-**Status:** Draft — AC1 deliverable of WI-1657 (Define and ship the full verified-learning loop) · 2026-07-06
-**Branch baseline for citations:** `main` @ `54501f7fb` (all file:line read from code 2026-07-06, not from docs)
+**Status:** Active slice map; partially shipped · last verified 2026-07-22
+**Original citation baseline:** `main` @ `54501f7fb` (body file:line claims remain the 2026-07-06 snapshot)
+**Current disposition:** The mastery-axis and artifact contracts are Accepted
+(`MMT-ADR-0031` / `MMT-ADR-0032`, landed with this spec's follow-up in
+`41eaf6c9b`, PR #2001). Challenge→SM-2 next-review scheduling is shipped in
+`apps/api/src/services/session/session-exchange.ts`; `evidence_links` /
+`LearnerSource` remain absent and are owned by
+**WI-1704 (verified-artifact evidence links)**. The design-only **WI-1465
+(low-stakes per-concept re-prove)** is Closed/Done after producing proposed
+`MMT-ADR-0034`; its learner-facing implementation remains unbuilt, and the ADR's
+API, mobile, and test follow-ups are not yet captured. Concept-targeted due-topic
+review for **WI-1454 (concept-targeted review for weak concepts)** is implemented
+and tested in `3b0fa9337` (PR #2223), though its live Cosmo record remains
+Backlog/Active and needs lifecycle reconciliation rather than duplicate execution. Use
+`docs/plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md` for launch disposition.
 **Relates:**
 
 - `docs/specs/2026-06-27-felt-knowing-loop.md` — owns the note-authoring / freeform-keep / citation glue (segments it owns are *sequenced*, not re-owned, here)
 - `docs/_archive/specs/Done/2026-06-08-memory-task-review-continuity.md` — Tier 1 shipped (`retrieval_events`, review opener); slice 2a (`evidence_links` + `LearnerSource`) decided, not built
 - `docs/specs/2026-06-03-review-relearn-findings-and-high-impact-todos.md` — RR-N register this spec maps onto WIs
 - `docs/_archive/plans/done/2026-05-30-topic-mastery-three-states.md` — shipped Untouched → Learning → Mastered model
-- `docs/plans/v2-plan/00-STATE-OF-PLAY.md` §5–§6 — the "knows-me" loop orientation
-- `docs/adr/MMT-ADR-0031-challenge-verification-and-sm2-are-complementary-mastery-axes.md` — proposed axes ruling for S4 / WI-1469
-- `docs/adr/MMT-ADR-0032-verified-learning-artifacts-require-source-and-verification-state.md` — proposed artifact provenance contract for S5a / S7
+- `docs/plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md` — current launch disposition
+- `docs/adr/MMT-ADR-0031-challenge-verification-and-sm2-are-complementary-mastery-axes.md` — Accepted axes ruling for S4 / WI-1469
+- `docs/adr/MMT-ADR-0032-verified-learning-artifacts-require-source-and-verification-state.md` — Accepted artifact provenance contract for S5a / S7
 
 ## Purpose
 

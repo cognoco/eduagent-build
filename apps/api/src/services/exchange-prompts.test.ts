@@ -584,15 +584,6 @@ describe('buildSystemPrompt — session-neutral mentor notices', () => {
         birthYear: new Date().getFullYear() - 50,
       },
     },
-    {
-      label: 'interleaved retrieval',
-      overrides: {
-        sessionType: 'interleaved' as const,
-        interleavedTopics: [
-          { topicId: interleavedTopicId, title: 'Cell division' },
-        ],
-      },
-    },
   ])(
     'injects the same evidence-bound observation contract for $label',
     ({ overrides }) => {
@@ -633,8 +624,11 @@ describe('buildSystemPrompt — session-neutral mentor notices', () => {
     },
   );
 
-  it('enumerates the only valid topic target for an interleaved notice', () => {
-    const otherTopicId = '550e8400-e29b-41d4-a716-446655440012';
+  // [WI-2500] Interleaved sessions are out of MVP scope for mentor notices
+  // (clause 6): the proposal schema no longer carries a topicId (clause 1),
+  // so a noticed gap in an interleaved session can never be unambiguously
+  // attributed to one of its several topics. The LLM is never even asked.
+  it('does not offer a mentor notice in an interleaved session', () => {
     const prompt = buildSystemPrompt(
       makeContext({
         sessionType: 'interleaved',
@@ -642,15 +636,17 @@ describe('buildSystemPrompt — session-neutral mentor notices', () => {
         currentUserMessageEventId: eventId,
         interleavedTopics: [
           { topicId: interleavedTopicId, title: 'Cell division' },
-          { topicId: otherTopicId, title: 'Genetics' },
+          {
+            topicId: '550e8400-e29b-41d4-a716-446655440012',
+            title: 'Genetics',
+          },
         ],
       }),
     );
 
-    expect(prompt).toContain('INTERLEAVED NOTICE TARGETS');
-    expect(prompt).toContain(interleavedTopicId);
-    expect(prompt).toContain(otherTopicId);
-    expect(prompt).toContain('topicId');
+    expect(prompt).not.toContain('MENTOR NOTICE OBSERVATION');
+    expect(prompt).not.toContain('noticed_gap');
+    expect(prompt).not.toContain('INTERLEAVED NOTICE TARGETS');
   });
 
   it.each([

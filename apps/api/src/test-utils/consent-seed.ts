@@ -1,4 +1,6 @@
 /// <reference types="jest" />
+import { CONSENT_PURPOSES, type ConsentPurpose } from '@eduagent/schemas';
+
 // ---------------------------------------------------------------------------
 // Consent v2 test seed (WI-867).
 //
@@ -39,15 +41,33 @@ const REFERENCE_DATE = new Date('2026-05-01T00:00:00.000Z');
  */
 function grantRowForState(
   state: SeedConsentState,
-): { granted: boolean; withdrawnAt: Date | null; grantedAt: Date } | null {
+  purpose: ConsentPurpose,
+): {
+  id: string;
+  purpose: ConsentPurpose;
+  granted: boolean;
+  withdrawnAt: Date | null;
+  grantedAt: Date;
+  withdrawalTokenId: string;
+} | null {
   if (state === 'CONSENTED') {
-    return { granted: true, withdrawnAt: null, grantedAt: REFERENCE_DATE };
+    return {
+      id: `grant-${purpose}`,
+      purpose,
+      granted: true,
+      withdrawnAt: null,
+      grantedAt: REFERENCE_DATE,
+      withdrawalTokenId: 'withdrawal-token-id',
+    };
   }
   if (state === 'WITHDRAWN') {
     return {
+      id: `grant-${purpose}`,
+      purpose,
       granted: true,
       withdrawnAt: new Date(REFERENCE_DATE.getTime() + 1000),
       grantedAt: REFERENCE_DATE,
+      withdrawalTokenId: 'withdrawal-token-id',
     };
   }
   // PENDING / PCR / null → no grant row
@@ -112,6 +132,8 @@ export interface ConsentSeedOptions {
    * consentGrant.findFirst + one consentRequest.findFirst pair.
    */
   state: SeedConsentState | SeedConsentState[];
+  /** Number of purpose rows read for one logical status resolution. */
+  purposesPerState?: number;
   /**
    * For DETAILS calls (lookupConsentDetails / `columns.guardianEmail`):
    * the row returned when the requestedAt window matches.
@@ -144,6 +166,7 @@ export function seedConsentState(
   const personId = opts.personId ?? 'test-profile-id';
   const organizationId = opts.organizationId ?? 'test-account-id';
   const states = Array.isArray(opts.state) ? opts.state : [opts.state];
+  const purposesPerState = opts.purposesPerState ?? 1;
   // Use explicit undefined-check: null is a valid "no email" signal, not a fallback.
   const detailsGuardianEmail =
     opts.details !== undefined && 'guardianEmail' in opts.details
@@ -152,6 +175,8 @@ export function seedConsentState(
   const detailsToken = opts.details?.token ?? 'test-token-abc123';
 
   let callIndex = 0;
+  let purposeReadCount = 0;
+  let grantReadCount = 0;
 
   function currentState(): SeedConsentState {
     const idx = Math.min(callIndex, states.length - 1);
@@ -171,7 +196,12 @@ export function seedConsentState(
   // consentGrant.findFirst — returns the grant row for the current state.
   // Called once per getCurrentConsentRequestStatus() invocation.
   const consentGrantFindFirst = jest.fn().mockImplementation(async () => {
-    return grantRowForState(currentState());
+    const purpose = CONSENT_PURPOSES[grantReadCount % CONSENT_PURPOSES.length];
+    if (!purpose) {
+      throw new Error('seedConsentState: consent purpose contract is empty');
+    }
+    grantReadCount++;
+    return grantRowForState(currentState(), purpose);
   });
 
   // consentRequest.findFirst — two distinct call shapes:
@@ -187,8 +217,12 @@ export function seedConsentState(
       }
       // STATUS call — return the request row for the current state.
       const row = requestStatusRowForState(currentState());
-      // Advance AFTER reading grant+request pair (grant fires first, request fires here).
-      callIndex++;
+      // Advance after every purpose in one logical aggregate status read.
+      purposeReadCount++;
+      if (purposeReadCount === purposesPerState) {
+        callIndex++;
+        purposeReadCount = 0;
+      }
       return row;
     });
 

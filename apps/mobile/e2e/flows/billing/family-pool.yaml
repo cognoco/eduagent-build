@@ -18,98 +18,109 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "mentor-audit-family-pool-members"
+      SEED_SCENARIO: 'mentor-audit-family-pool-members'
       API_URL: ${API_URL}
 
 # 2. Verify family home screen loaded
 - extendedWaitUntil:
     visible:
-      id: "parent-home-screen"
+      id: 'parent-home-screen'
     timeout: 15000
 
 # 3. Navigate to More tab
 - tapOn:
-    text: "More"
+    text: 'More'
 
 # 4. Wait for More tab index — First settings row is always above the fold
 - extendedWaitUntil:
     visible:
-      id: "more-row-learning-preferences"
+      id: 'more-row-learning-preferences'
     timeout: 15000
 
 # 4a. Navigate into Account sub-screen (Subscription has moved from More index to Account)
 - tapOn:
-    id: "more-row-account"
+    id: 'more-row-account'
 
 - extendedWaitUntil:
     visible:
-      id: "more-account-scroll"
+      id: 'more-account-scroll'
     timeout: 10000
 
 # 5. Scroll to the Subscription row on Account screen and tap it
 - scrollUntilVisible:
     element:
-      id: "more-row-subscription"
+      id: 'more-row-subscription'
     direction: DOWN
     timeout: 15000
 
 - tapOn:
-    id: "more-row-subscription"
+    id: 'more-row-subscription'
 
 # 6. Verify subscription screen loaded
 - extendedWaitUntil:
     visible:
-      id: "subscription-screen"
+      id: 'subscription-screen'
     timeout: 15000
 
 - takeScreenshot: subscription-screen-family-pool
 
-# 7. Wait for the family pool section — rendered only after a secondary
-#    useFamilySubscription() query resolves (cascade: subscription query →
-#    enabled family query → data populated → section renders). On a cold
-#    emulator the cascade can take well beyond a scroll timeout alone.
-- extendedWaitUntil:
-    visible:
-      id: "family-pool-section"
-    timeout: 30000
-
-# 7b. Now scroll to it (it may be below the fold)
+# 7. Scroll to the family pool section. This both waits for the secondary
+#    family query and brings the below-fold section into the viewport; a
+#    pre-scroll visibility assertion can never pass when the section starts
+#    below the small emulator viewport.
 - scrollUntilVisible:
     element:
-      id: "family-pool-section"
+      id: 'family-pool-section'
     direction: DOWN
-    timeout: 20000
+    timeout: 30000
 
 # 8. Family pool section must be visible for Family-tier users
 - assertVisible:
-    id: "family-pool-section"
+    id: 'family-pool-section'
 
 - takeScreenshot: family-pool-section-visible
 
 # 9. A non-owner child from the seed should be removable.
-- extendedWaitUntil:
-    visible:
-      id: "remove-family-member-${CHILD_PROFILE_ID1}"
+- scrollUntilVisible:
+    element:
+      id: 'remove-family-member-${CHILD_PROFILE_ID1}'
+    direction: DOWN
     timeout: 15000
+    visibilityPercentage: 100
+    centerElement: true
 
 - tapOn:
-    id: "remove-family-member-${CHILD_PROFILE_ID1}"
+    id: 'remove-family-member-${CHILD_PROFILE_ID1}'
 
 # 10. Confirm the native destructive alert.
 - tapOn:
-    text: "Remove"
+    text: 'Remove'
 
-# 11. The list refreshes after removal and the removed child row disappears.
+# 11. Wait for and dismiss the mutation receipt before inspecting the refreshed
+#     list. The alert is asynchronous and can appear after an immediate tap.
 - extendedWaitUntil:
-    notVisible:
-      id: "family-member-${CHILD_PROFILE_ID1}"
+    visible: 'Family updated'
     timeout: 15000
 
-- assertVisible:
-    id: "family-member-${CHILD_PROFILE_ID2}"
-
 - tapOn:
-    text: "OK"
-    optional: true  # justified: native success alert may auto-dismiss on some drivers
+    text: 'OK'
+
+- extendedWaitUntil:
+    visible: '2 of 4 profiles connected'
+    timeout: 15000
+
+- scrollUntilVisible:
+    element:
+      id: 'family-member-${CHILD_PROFILE_ID2}'
+    direction: DOWN
+    timeout: 15000
+    visibilityPercentage: 100
+    centerElement: true
+
+- assertNotVisible:
+    id: 'family-member-${CHILD_PROFILE_ID1}'
+
+- assertVisible:
+    id: 'family-member-${CHILD_PROFILE_ID2}'
 
 - takeScreenshot: family-pool-member-removed

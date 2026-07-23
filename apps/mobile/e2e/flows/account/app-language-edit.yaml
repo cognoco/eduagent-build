@@ -1,7 +1,7 @@
 # Flow: App Language Edit — Bottom-Sheet Picker [ACCOUNT-28]
 # Validates: user can open the language picker bottom sheet from the More
 # screen, select a language (nb), verify the locale change via the sign-out
-# button label ("Logg ut"), then reset back to English ("Log out").
+# button label ("Logg ut"), then reset back to English ("Sign out").
 #
 # PREREQUISITE FLAG: This flow requires FEATURE_FLAGS.I18N_ENABLED = true
 # and SUPPORTED_LANGUAGES to include 'nb'. Currently both are disabled in
@@ -23,98 +23,120 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "onboarding-complete"
+      SEED_SCENARIO: 'onboarding-complete'
       API_URL: ${API_URL}
 
 # 2. Verify home screen loaded
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 15000
 
 # 3. Navigate to More tab
 - tapOn:
-    text: "More"
+    text: 'More'
 
 # 4. Wait for More tab index — first settings row is always above the fold
 - extendedWaitUntil:
     visible:
-      id: "more-row-learning-preferences"
+      id: 'more-row-learning-preferences'
     timeout: 15000
 
 # 5. Navigate to Account sub-screen (language picker lives there now)
 - tapOn:
-    id: "more-row-account"
+    id: 'more-row-account'
 
 - extendedWaitUntil:
     visible:
-      id: "more-account-scroll"
+      id: 'more-account-scroll'
     timeout: 10000
 
 # 6. Tap the App Language settings row to open the bottom sheet
 - tapOn:
-    id: "settings-app-language"
+    id: 'settings-app-language'
 
 # 7. Verify the picker bottom sheet appeared
 - extendedWaitUntil:
     visible:
-      id: "app-language-backdrop"
+      id: 'app-language-backdrop'
     timeout: 10000
 
 - takeScreenshot: app-language-open
 
 # 8. Tap the Norwegian (nb) language option
 - tapOn:
-    id: "language-option-nb"
+    id: 'language-option-nb'
 
 # 9. Bottom sheet should close after selection
 - assertNotVisible:
-    id: "app-language-backdrop"
+    id: 'app-language-backdrop'
 
 - takeScreenshot: language-changed-nb
 
-# 10. Verify locale changed: sign-out button should read "Logg ut" (Norwegian)
+# 10. Return to More, where the sign-out control lives, and verify Norwegian.
+- pressKey: back
+
+- extendedWaitUntil:
+    visible:
+      id: 'more-scroll'
+    timeout: 10000
+
 - scrollUntilVisible:
     element:
-      id: "sign-out-button"
+      id: 'sign-out-button'
     direction: DOWN
     timeout: 10000
 
 - assertVisible:
-    text: "Logg ut"
+    text: 'Logg ut'
 
 - takeScreenshot: sign-out-label-norwegian
 
-# 11. Reset back to English — reopen the picker
+# 11. Reset back to English — re-enter Account and reopen the picker.
 - scrollUntilVisible:
     element:
-      id: "settings-app-language"
+      id: 'more-row-account'
     direction: UP
     timeout: 10000
 
 - tapOn:
-    id: "settings-app-language"
+    id: 'more-row-account'
 
 - extendedWaitUntil:
     visible:
-      id: "app-language-backdrop"
+      id: 'more-account-scroll'
+    timeout: 10000
+
+- tapOn:
+    id: 'settings-app-language'
+
+- extendedWaitUntil:
+    visible:
+      id: 'app-language-backdrop'
     timeout: 10000
 
 # 12. Select English (en) to restore default
 - tapOn:
-    id: "language-option-en"
+    id: 'language-option-en'
 
 - assertNotVisible:
-    id: "app-language-backdrop"
+    id: 'app-language-backdrop'
 
-# 13. Verify locale reset: sign-out button should read "Log out" (English)
+# 13. Return to More and verify the English label.
+- pressKey: back
+
+- extendedWaitUntil:
+    visible:
+      id: 'more-scroll'
+    timeout: 10000
+
 - scrollUntilVisible:
     element:
-      id: "sign-out-button"
+      id: 'sign-out-button'
     direction: DOWN
     timeout: 10000
 
 - assertVisible:
-    text: "Log out"
+    text: 'Sign out'
 
 - takeScreenshot: language-reset-english
