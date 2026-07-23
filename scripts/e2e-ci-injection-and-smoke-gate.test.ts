@@ -4833,128 +4833,128 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(staleAmbiguousWait).toBe(-1);
   });
 
-  it('[WI-1864] accepts both actionable Easter classifier outcomes', () => {
-    const source = readFileSync(
-      join(
-        repoRoot,
-        'apps/mobile/e2e/flows/regression/bug-233-chat-classifier-easter.yaml',
-      ),
-      'utf8',
-    );
-    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
-      pressKey?: string;
-      extendedWaitUntil?: {
-        visible?: { id?: string } | string;
-        timeout?: number;
-        optional?: boolean;
-      };
-      runFlow?: {
-        when?: {
+  it.each([
+    'apps/mobile/e2e/flows/regression/bug-233-chat-classifier-easter.yaml',
+    'apps/mobile/e2e/flows/regression/bug-234-chat-subject-picker.yaml',
+  ])(
+    '[WI-1864] accepts every classifier terminal outcome in %s',
+    (flowPath) => {
+      const source = readFileSync(join(repoRoot, flowPath), 'utf8');
+      const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+        pressKey?: string;
+        extendedWaitUntil?: {
           visible?: { id?: string } | string;
+          timeout?: number;
+          optional?: boolean;
         };
-        commands?: Array<{
-          assertVisible?: { id?: string } | string;
-          extendedWaitUntil?: {
+        runFlow?: {
+          when?: {
             visible?: { id?: string } | string;
-            timeout?: number;
-            optional?: boolean;
           };
-          repeat?: {
-            times?: number;
-            commands?: Array<{
-              swipe?: {
-                from?: { id?: string };
-                direction?: string;
-                duration?: number;
-                optional?: boolean;
-              };
-            }>;
-          };
-          scrollUntilVisible?: {
-            element?: { id?: string };
-            direction?: string;
-            timeout?: number;
-            visibilityPercentage?: number;
-            centerElement?: boolean;
-            optional?: boolean;
-          };
-        }>;
-      };
-    }>;
-    const submit = commands.findIndex(({ pressKey }) => pressKey === 'Enter');
-    const terminalOutcome = commands.findIndex(
-      ({ extendedWaitUntil }, index) =>
-        index > submit &&
-        typeof extendedWaitUntil?.visible === 'object' &&
-        typeof extendedWaitUntil.visible.id === 'string' &&
-        new RegExp(extendedWaitUntil.visible.id).test('chat-input') &&
-        new RegExp(extendedWaitUntil.visible.id).test(
-          'subject-resolution-create-suggested',
-        ) &&
-        new RegExp(extendedWaitUntil.visible.id).test(
-          'subject-resolution-create-new',
-        ) &&
-        (extendedWaitUntil.timeout ?? 0) >= 60000 &&
-        extendedWaitUntil.optional !== true,
-    );
-    const resolutionBranch = commands.findIndex(({ runFlow }, index) => {
-      const branchCommands = runFlow?.commands ?? [];
-      const targetedSwipe = branchCommands.findIndex(
-        ({ repeat }) =>
-          (repeat?.times ?? 0) >= 4 &&
-          (repeat?.commands ?? []).some(
-            ({ swipe }) =>
-              swipe?.from?.id === 'session-subject-resolution' &&
-              swipe.direction === 'LEFT' &&
-              (swipe.duration ?? 0) >= 400 &&
-              swipe.optional !== true,
-          ),
-      );
-      const escapeReceipt = branchCommands.findIndex(
-        ({ extendedWaitUntil }, commandIndex) =>
-          commandIndex > targetedSwipe &&
+          commands?: Array<{
+            assertVisible?: { id?: string } | string;
+            extendedWaitUntil?: {
+              visible?: { id?: string } | string;
+              timeout?: number;
+              optional?: boolean;
+            };
+            repeat?: {
+              times?: number;
+              commands?: Array<{
+                swipe?: {
+                  from?: { id?: string };
+                  direction?: string;
+                  duration?: number;
+                  optional?: boolean;
+                };
+              }>;
+            };
+            scrollUntilVisible?: {
+              element?: { id?: string };
+              direction?: string;
+              timeout?: number;
+              visibilityPercentage?: number;
+              centerElement?: boolean;
+              optional?: boolean;
+            };
+          }>;
+        };
+      }>;
+      const submit = commands.findIndex(({ pressKey }) => pressKey === 'Enter');
+      const terminalOutcome = commands.findIndex(
+        ({ extendedWaitUntil }, index) =>
+          index > submit &&
           typeof extendedWaitUntil?.visible === 'object' &&
-          extendedWaitUntil.visible.id === 'subject-resolution-new' &&
-          (extendedWaitUntil.timeout ?? 0) >= 5000 &&
+          typeof extendedWaitUntil.visible.id === 'string' &&
+          new RegExp(extendedWaitUntil.visible.id).test('chat-input') &&
+          new RegExp(extendedWaitUntil.visible.id).test(
+            'subject-resolution-create-suggested',
+          ) &&
+          new RegExp(extendedWaitUntil.visible.id).test(
+            'subject-resolution-create-new',
+          ) &&
+          (extendedWaitUntil.timeout ?? 0) >= 60000 &&
           extendedWaitUntil.optional !== true,
       );
-      return (
-        index > terminalOutcome &&
-        typeof runFlow?.when?.visible === 'object' &&
-        runFlow.when.visible.id === 'session-subject-resolution' &&
-        targetedSwipe >= 0 &&
-        escapeReceipt > targetedSwipe
+      const resolutionBranch = commands.findIndex(({ runFlow }, index) => {
+        const branchCommands = runFlow?.commands ?? [];
+        const targetedSwipe = branchCommands.findIndex(
+          ({ repeat }) =>
+            (repeat?.times ?? 0) >= 4 &&
+            (repeat?.commands ?? []).some(
+              ({ swipe }) =>
+                swipe?.from?.id === 'session-subject-resolution' &&
+                swipe.direction === 'LEFT' &&
+                (swipe.duration ?? 0) >= 400 &&
+                swipe.optional !== true,
+            ),
+        );
+        const escapeReceipt = branchCommands.findIndex(
+          ({ extendedWaitUntil }, commandIndex) =>
+            commandIndex > targetedSwipe &&
+            typeof extendedWaitUntil?.visible === 'object' &&
+            extendedWaitUntil.visible.id === 'subject-resolution-new' &&
+            (extendedWaitUntil.timeout ?? 0) >= 5000 &&
+            extendedWaitUntil.optional !== true,
+        );
+        return (
+          index > terminalOutcome &&
+          typeof runFlow?.when?.visible === 'object' &&
+          runFlow.when.visible.id === 'session-subject-resolution' &&
+          targetedSwipe >= 0 &&
+          escapeReceipt > targetedSwipe
+        );
+      });
+      const zeroCandidateBranch = commands.findIndex(
+        ({ runFlow }, index) =>
+          index > terminalOutcome &&
+          typeof runFlow?.when?.visible === 'object' &&
+          runFlow.when.visible.id === 'subject-resolution-create-new' &&
+          (runFlow.commands ?? []).some(
+            ({ assertVisible }) =>
+              typeof assertVisible === 'object' &&
+              assertVisible.id === 'subject-resolution-create-new',
+          ),
       );
-    });
-    const zeroCandidateBranch = commands.findIndex(
-      ({ runFlow }, index) =>
-        index > terminalOutcome &&
-        typeof runFlow?.when?.visible === 'object' &&
-        runFlow.when.visible.id === 'subject-resolution-create-new' &&
-        (runFlow.commands ?? []).some(
-          ({ assertVisible }) =>
-            typeof assertVisible === 'object' &&
-            assertVisible.id === 'subject-resolution-create-new',
-        ),
-    );
-    const autoMatchBranch = commands.findIndex(
-      ({ runFlow }, index) =>
-        index > terminalOutcome &&
-        typeof runFlow?.when?.visible === 'object' &&
-        runFlow.when.visible.id === 'chat-input' &&
-        (runFlow.commands ?? []).some(
-          ({ assertVisible }) =>
-            typeof assertVisible === 'object' &&
-            assertVisible.id === 'chat-input',
-        ),
-    );
+      const autoMatchBranch = commands.findIndex(
+        ({ runFlow }, index) =>
+          index > terminalOutcome &&
+          typeof runFlow?.when?.visible === 'object' &&
+          runFlow.when.visible.id === 'chat-input' &&
+          (runFlow.commands ?? []).some(
+            ({ assertVisible }) =>
+              typeof assertVisible === 'object' &&
+              assertVisible.id === 'chat-input',
+          ),
+      );
 
-    expect(submit).toBeGreaterThan(-1);
-    expect(terminalOutcome).toBeGreaterThan(submit);
-    expect(resolutionBranch).toBeGreaterThan(terminalOutcome);
-    expect(zeroCandidateBranch).toBeGreaterThan(terminalOutcome);
-    expect(autoMatchBranch).toBeGreaterThan(terminalOutcome);
-  });
+      expect(submit).toBeGreaterThan(-1);
+      expect(terminalOutcome).toBeGreaterThan(submit);
+      expect(resolutionBranch).toBeGreaterThan(terminalOutcome);
+      expect(zeroCandidateBranch).toBeGreaterThan(terminalOutcome);
+      expect(autoMatchBranch).toBeGreaterThan(terminalOutcome);
+    },
+  );
 
   it('[WI-1864] exercises the seeded answer-check failure before continuing the round', () => {
     const source = readFileSync(
