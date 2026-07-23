@@ -3872,6 +3872,8 @@
     "bridge": {
       "headline": "Zmień „Nie rozumiem” w „Mam to!”",
       "supporting": "Utwórz darmowe konto, aby Twój mentor mógł zapamiętać Twoje przedmioty, notatki i postępy.",
+      "parentHeadline": "Kontynuuj przy użyciu swojego konta, aby wspierać osobę uczącą się.",
+      "parentSupporting": "Zaloguj się lub zarejestruj, aby przyjąć zaproszenie i skonfigurować wsparcie. Twoje konto nie daje dostępu do aktywności edukacyjnej, chyba że osoba ucząca się na to zezwoli.",
       "primaryCta": "Utwórz darmowe konto",
       "secondaryCta": "Mam już konto"
     },
