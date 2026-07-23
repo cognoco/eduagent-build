@@ -67,20 +67,26 @@ tags:
 - assertVisible:
     id: "chat-messages"
 
-# 8. In the chips branch, scroll the horizontal tray to its guaranteed generic
-#    new-subject escape hatch before requiring it to be fully visible.
+# 8. In the chips branch, swipe from the horizontal tray itself. Maestro's
+#    built-in scroll search starts at screen center, which misses this compact
+#    bottom accessory and leaves the guaranteed generic escape hatch off-tree.
 - runFlow:
     when:
       visible:
         id: "session-subject-resolution"
     commands:
-      - scrollUntilVisible:
-          element:
+      - repeat:
+          times: 4
+          commands:
+            - swipe:
+                from:
+                  id: "session-subject-resolution"
+                direction: LEFT
+                duration: 400
+      - extendedWaitUntil:
+          visible:
             id: "subject-resolution-new"
-          direction: RIGHT
-          timeout: 15000
-          visibilityPercentage: 100
-          centerElement: true
+          timeout: 5000
 
 # 9. In the zero-candidate branch, require the full-width create action.
 - runFlow:

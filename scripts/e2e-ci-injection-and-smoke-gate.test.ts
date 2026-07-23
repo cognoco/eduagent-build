@@ -4854,6 +4854,22 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         };
         commands?: Array<{
           assertVisible?: { id?: string } | string;
+          extendedWaitUntil?: {
+            visible?: { id?: string } | string;
+            timeout?: number;
+            optional?: boolean;
+          };
+          repeat?: {
+            times?: number;
+            commands?: Array<{
+              swipe?: {
+                from?: { id?: string };
+                direction?: string;
+                duration?: number;
+                optional?: boolean;
+              };
+            }>;
+          };
           scrollUntilVisible?: {
             element?: { id?: string };
             direction?: string;
@@ -4881,20 +4897,35 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         (extendedWaitUntil.timeout ?? 0) >= 60000 &&
         extendedWaitUntil.optional !== true,
     );
-    const resolutionBranch = commands.findIndex(
-      ({ runFlow }, index) =>
+    const resolutionBranch = commands.findIndex(({ runFlow }, index) => {
+      const branchCommands = runFlow?.commands ?? [];
+      const targetedSwipe = branchCommands.findIndex(
+        ({ repeat }) =>
+          (repeat?.times ?? 0) >= 4 &&
+          (repeat?.commands ?? []).some(
+            ({ swipe }) =>
+              swipe?.from?.id === 'session-subject-resolution' &&
+              swipe.direction === 'LEFT' &&
+              (swipe.duration ?? 0) >= 400 &&
+              swipe.optional !== true,
+          ),
+      );
+      const escapeReceipt = branchCommands.findIndex(
+        ({ extendedWaitUntil }, commandIndex) =>
+          commandIndex > targetedSwipe &&
+          typeof extendedWaitUntil?.visible === 'object' &&
+          extendedWaitUntil.visible.id === 'subject-resolution-new' &&
+          (extendedWaitUntil.timeout ?? 0) >= 5000 &&
+          extendedWaitUntil.optional !== true,
+      );
+      return (
         index > terminalOutcome &&
         typeof runFlow?.when?.visible === 'object' &&
         runFlow.when.visible.id === 'session-subject-resolution' &&
-        (runFlow.commands ?? []).some(
-          ({ scrollUntilVisible }) =>
-            scrollUntilVisible?.element?.id === 'subject-resolution-new' &&
-            scrollUntilVisible.direction === 'RIGHT' &&
-            (scrollUntilVisible.timeout ?? 0) >= 15000 &&
-            scrollUntilVisible.visibilityPercentage === 100 &&
-            scrollUntilVisible.optional !== true,
-        ),
-    );
+        targetedSwipe >= 0 &&
+        escapeReceipt > targetedSwipe
+      );
+    });
     const zeroCandidateBranch = commands.findIndex(
       ({ runFlow }, index) =>
         index > terminalOutcome &&
