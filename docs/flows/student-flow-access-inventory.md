@@ -46,7 +46,7 @@ Learning-route gating (session/homework/dictation/quiz/practice `_layout`s): pro
 | ACCOUNT-22, ACCOUNT-32 | gated minors | ConsentPendingGate: send-to-parent vs waiting UI (masked email, 15s auto-poll). "While you wait" static previews (`PreviewSubjectBrowser`/`PreviewSampleCoaching`) fully replace the gate — no API. Sign-out always available. |
 | ACCOUNT-23, ACCOUNT-42 | child with revoked consent | ConsentWithdrawnGate full block during 7-day grace; refresh + sign-out; email-delivery-failed retry path on `/consent`. Restore is parent-side (mentor doc). |
 | ACCOUNT-24 | newly-consented child / teen-owner | Post-approval landing, once per profile (SecureStore); suppressed if profile already has subjects. |
-| ACCOUNT-26 | by age | Single GDPR-everywhere path; `COPPA` enum dormant; ≤16 consent threshold, hard floor 11 in code (13+ launch decision NOT in code yet). |
+| ACCOUNT-26 | by age | Single location-blind GDPR path; `COPPA` enum dormant; ≤16 conservative guardian gate; hard floor 13 is implemented. The flow does not yet satisfy the 2026-07-23 country ruling: identity stores only the legacy coarse `EU \| US \| ROW` jurisdiction mapping, while EEA-country habitual-residence capture and the server-owned allowlist are absent. |
 | ACCOUNT-38, ACCOUNT-39 | adults on gate / anyone | Gate profile-switch escape shown ONLY to 18+ adults sharing the account; the gated child cannot escape. `/consent` deep-link guards (foreign profileId → not-found + back). |
 | HOME-10 | all signed-in | App-layout gate stack + timeout/error recoveries (auth-redirect 15s, profile-load 20s retry/sign-out, profile-load error, profile-switched toast). |
 

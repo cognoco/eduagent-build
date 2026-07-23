@@ -6,7 +6,7 @@
 
 > **What this is / is not.** This note is **engineering evidence feeding the DPO/counsel launch decision** — it is not itself the C-5 launch gate. The go/no-go below is an engineering-readiness verdict; the legal go/no-go is the DPO's on a signed DPIA.
 
-**Artifacts reviewed:** `docs/compliance/dpia.md`, `docs/compliance/ropa.md`, `docs/compliance/identity-compliance-register.md`, `docs/privacy-policy.html`, `docs/screenshots_and_store_info/app-privacy-data-safety-worksheet.md`, `docs/audit/2026-06-07-data-retention-and-erasure-audit.md`. Code: `apps/api/src/services/identity-v2/*`, `apps/api/src/services/llm/router.ts`, `apps/api/src/middleware/account.ts`, `apps/api/src/routes/{account,homework}.ts`, `packages/schemas/src/age.ts`, `packages/database/src/schema/*`, mobile hooks.
+**Artifacts reviewed:** `docs/compliance/dpia.md`, `docs/compliance/ropa.md`, `docs/compliance/identity-compliance-register.md`, `docs/compliance/privacy-policy.html`, `docs/screenshots_and_store_info/app-privacy-data-safety-worksheet.md`, `docs/compliance/history/2026-06-07-data-retention-and-erasure-audit.md`. Code: `apps/api/src/services/identity-v2/*`, `apps/api/src/services/llm/router.ts`, `apps/api/src/middleware/account.ts`, `apps/api/src/routes/{account,homework}.ts`, `packages/schemas/src/age.ts`, `packages/database/src/schema/*`, mobile hooks.
 
 ---
 
@@ -67,7 +67,9 @@ Route to the named owner; presented as open, not pre-resolved:
 
 - **C4 — Privacy-policy profiling disclosure (C-1 canon / GDPR Art 13(2)(f)).** Adaptive profiling is real (`learning_profiles`, mastery, `needs_deepening_topics`). The canon requires copy to disclose profiling **as present and lawful** and never claim ADM is engineered out. The policy discloses "personalised tutoring / coaching insights" but not profiling explicitly. **Decision (policy-owner):** add an explicit profiling-present-and-lawful disclosure line.
 
-- **C5 — Store data-safety worksheet is stale** (dated 2026-05-15). Says minimum age **11** (`MINIMUM_AGE=11`); code is **13** (`packages/schemas/src/age.ts:10`). Cites **legacy** tables (`accounts.email`, `profiles.display_name`, `consent_states`, `family_links`); production identity/consent is v2 (`person`/`login`/`consent_grant`). Its "homework image retention" and "raw audio" open questions are now resolved (transient / transcript-only). **Action (before store submission = the FINAL GATE):** refresh the worksheet against current code.
+### Follow-up addendum — 2026-07-23
+
+- **C5 — Store data-safety worksheet was stale at this early pass; RESOLVED 2026-07-23.** The worksheet now records the 13+ floor, identity-v2 tables, and resolved homework-image/raw-audio retention facts. **Remaining final gate:** revalidate it against the production provider list, the EEA country allowlist implementation, and the then-current privacy notice before store submission.
 
 ---
 

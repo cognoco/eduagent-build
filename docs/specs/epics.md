@@ -13,6 +13,13 @@ This document is the **canonical spec** for all epics and stories. It describes 
 
 Detailed design specs for later epics live in `docs/specs/`.
 
+> **Age/compliance overlay (2026-07-23):** The canonical product bands and
+> launch geography now live in
+> [`docs/compliance/2026-07-23-13-plus-eea-launch-country-ruling.md`](../compliance/2026-07-23-13-plus-eea-launch-country-ruling.md).
+> Older epic requirements that say 11+, US/UK/Australia, English-only, or
+> GDPR-everywhere describe historical implementation decisions; they are not
+> current launch authority.
+
 ## Requirements Inventory
 
 ### Functional Requirements
@@ -688,7 +695,7 @@ Add native Apple/Google in-app purchases for mobile billing via RevenueCat. The 
 
 ### Epic 10: Pre-Launch UX Polish (PRE-LAUNCH — before public release)
 
-Eliminate UX gaps that risk user abandonment, support volume, or regulatory confusion. Focused on copy clarity, confirmation dialogs, consent unification (GDPR-everywhere), App Store compliance, and persona-appropriate language for English-speaking markets (US/UK/AU, ages 11-15). Identified from user testing / UX gap analysis + market strategy pivot (2026-03-23).
+Eliminate UX gaps that risk user abandonment, support volume, or regulatory confusion. This epic was scoped under the now-historical GDPR-everywhere / US-UK-Australia / ages 11–15 assumption. Current age bands and country clearance live in `docs/compliance/2026-07-23-13-plus-eea-launch-country-ruling.md`; the implementation history below is not launch authority.
 
 **Items addressed:** Topic skip undo (#4), child-friendly consent text (#9), profile removal alert (#15), actionable error messages (#10), curriculum label jargon (#2, #3), relearn method descriptions (#8), consent unification (GDPR-everywhere), App Store compliance audit, age-gated Sentry, offline action gating, parent email delivery feedback, App Store rating prompt, curriculum completion celebration.
 
@@ -4124,14 +4131,14 @@ The original architecture (docs/architecture.md) specified "Payments | Stripe" w
 
 ## Epic 10: Pre-Launch UX Polish (PRE-LAUNCH) — Stories
 
-**Goal:** Eliminate UX gaps that risk user abandonment, support volume, or regulatory confusion before first public release. Focused on copy clarity, confirmation dialogs, persona-appropriate language, consent unification, and App Store compliance for English-speaking markets (US, UK, Australia) targeting ages 11-15.
+**Goal (historical scope):** Eliminate UX gaps that risk user abandonment, support volume, or regulatory confusion before first public release. This epic originally targeted English-speaking US/UK/Australia users aged 11–15; that market and age posture is superseded by the current compliance ruling.
 **Stories:** 24 | **Priority:** Must-ship (10.1–10.7, 10.10–10.14, 10.16, 10.19-10.22), should-ship (10.15, 10.17, 10.18, 10.23, 10.24), fast-follow (10.8–10.9)
 24 story slices covering child-friendly copy, consent polish, curriculum labels, Living Book animations, session summary prompts, offline gating, App Store compliance, subject classification, and account security.
 **FRs:** FR7, FR8 (consent unification), FR18 (topic skip — undo gap), FR20 (relevance labels), FR19 (challenge naming), FR56 (relearn method descriptions), plus new NFR for actionable errors and child-friendly consent copy.
 **Dependencies:** Epics 0-5 complete (all screens and services exist). No new infrastructure needed.
 **Persona scope:** Items marked UNIVERSAL apply to all personas. Items marked LEARNER-ONLY apply only when persona is `learner` (ages ~10-12). See persona-conditional notes per story.
 
-**Market context (decided 2026-03-23):** Launch is English-only, targeting US/UK/AU. GDPR's under-16 parental consent threshold is applied globally ("GDPR-everywhere" strategy). This is the strictest standard and automatically satisfies US COPPA (under 13), UK GDPR + AADC (under 13 consent + under-18 design obligations), and Australia's Privacy Act. The location picker is removed — birth date alone drives consent. See Story 10.19 for consent unification.
+**Historical market context (superseded 2026-07-23):** The 2026-03-23 decision targeted an English-only US/UK/Australia launch and applied a location-blind under-16 guardian gate. It does **not** authorize launch or automatically satisfy local law. Current product bands, the 30-country EEA policy perimeter, and the requirement for exact age plus habitual-residence-based consent are governed by `docs/compliance/2026-07-23-13-plus-eea-launch-country-ruling.md`.
 
 **Story status (all stories, updated 2026-04-03):**
 
@@ -4155,7 +4162,7 @@ The original architecture (docs/architecture.md) specified "Payments | Stripe" w
 | 10.16 — Offline action gating | | Button disabling on consent + session screens |
 | **10.17 — Parent email delivery feedback** | **✅ Built** | API returns email delivery status and consent UI handles resend/failure states |
 | 10.18 — App Store rating prompt | | Rating hook is integrated into session-summary close flow after successful recall sessions |
-| 10.19 — Consent unification (GDPR-everywhere) | | Age-only logic, no location param, jurisdiction-neutral copy |
+| 10.19 — Consent unification (GDPR-everywhere) | | Historical implementation; age-only, locationless logic cannot enforce the current launch-country ruling |
 | 10.20 — Subject classification service | | `subject-classify.ts` with LLM + confidence scoring |
 | 10.21 — Camera/homework auto-detection | | `use-classify-subject.ts` hook wired in camera flow |
 | 10.22 — Chat/session subject inference | | First-message classification now pauses for subject resolution when confidence is ambiguous |
@@ -4788,7 +4795,7 @@ So that I know the AI is coaching my child through difficulty, not just giving a
 **What:**
 Determine whether MentoMate submits under Apple's **Kids Category** or **Education** category, execute the compliance checklist, and implement age-gated Sentry initialization.
 
-**Context:** The app targets ages 11-17+ across US/UK/AU. Under-16 users require parental consent (GDPR-everywhere, see Story 10.19). Apple's Kids Category imposes strict rules: no third-party analytics/tracking, no behavioral profiling, no ads, restricted data collection, and a parental gate on purchases. The Education category is less restrictive but still subject to COPPA for under-13 users.
+**Historical context:** This story was written for ages 11–17 across US/UK/Australia. The planned launch perimeter is 13+ and EEA-only, with the UK and US disabled. No EEA country is technically enabled until habitual-residence capture, national-threshold evaluation, and server/store allowlist enforcement are implemented; store classification and disclosures must be rechecked against the eventual enabled wave. Apple's Kids Category imposes strict rules: no third-party analytics/tracking, no behavioral profiling, no ads, restricted data collection, and a parental gate on purchases.
 
 **Recommendation:** **Education category** for v1. Kids Category readiness documented for v2 (when Age 6-10 mode ships). Rationale: Kids Category prohibits all third-party analytics — Sentry would need full conditional disable. Education category permits analytics when parental consent is obtained, which the app already requires for under-16.
 
@@ -4971,7 +4978,11 @@ Prompt for App Store rating at the psychologically optimal moment — immediatel
 
 ### Story 10.19: Consent Unification — GDPR-Everywhere
 
-_Priority: Must-ship (launch blocker). Scope: UNIVERSAL. **Status: Implemented** — age-only consent logic, no location param, jurisdiction-neutral copy._
+_Priority: Must-ship under the historical plan. Scope: UNIVERSAL. **Status: Implemented historically, but superseded as launch policy** — age-only consent logic and removal of residence cannot enforce the current country allowlist._
+
+> **Current gap:** the 2026-07-23 ruling requires exact age, habitual residence,
+> and a server-owned EEA allowlist. The acceptance criteria below preserve what
+> Story 10.19 built; they are not current compliance requirements.
 
 As a user in any country,
 I want a single, consistent consent experience based on my age,
@@ -5313,7 +5324,7 @@ Story 10.19 is the only sequencing dependency — it changes the consent data mo
 
 ### Why This Epic Exists
 
-User testing identified 15 UX gaps across the app. The first nine (10.1–10.9) were identified by a child-focused UX audit. A subsequent parent-perspective audit identified four additional gaps (10.10–10.13) that represent actual launch blockers: the consent flow is the single biggest onboarding funnel leak (10.10), accidental consent denial causes irreversible data loss (10.11), parents can't see why their child is studying a subject (10.12), and "Guided" labels in transcripts erode parent trust without context (10.13). An external strategic review then identified five more gaps (10.14–10.18) spanning App Store compliance, curriculum completion dead-ends, offline resilience, parent email delivery validation, and App Store rating optimization. A market strategy pivot (2026-03-23) to English-only launch (US/UK/AU) with GDPR-everywhere consent added Story 10.19 (consent unification) as a prerequisite for consent-related stories. The must-ship items (10.1–10.7, 10.10–10.14, 10.16, 10.19) fix issues that risk user abandonment, data loss, regulatory rejection, or trust erosion. The should-ship items (10.15, 10.17, 10.18) address retention cliffs and onboarding funnel leaks. The fast-follow items (10.8–10.9) address second-session experiences. Story 10.8 is deliberately data-gated. German localization (NFR36) deferred — English-only launch means it's no longer a v1 requirement. The cost of not shipping the must-ship items is disproportionately high; the rest are scheduled by measured impact, not guesswork.
+User testing identified 15 UX gaps across the app. The first nine (10.1–10.9) were identified by a child-focused UX audit. A subsequent parent-perspective audit identified four additional gaps (10.10–10.13) that represent actual launch blockers: the consent flow is the single biggest onboarding funnel leak (10.10), accidental consent denial causes irreversible data loss (10.11), parents can't see why their child is studying a subject (10.12), and "Guided" labels in transcripts erode parent trust without context (10.13). An external strategic review then identified five more gaps (10.14–10.18) spanning App Store compliance, curriculum completion dead-ends, offline resilience, parent email delivery validation, and App Store rating optimization. A historical market strategy pivot (2026-03-23) to English-only launch (US/UK/Australia) with GDPR-everywhere consent added Story 10.19 (consent unification) as a prerequisite for consent-related stories; that geography and consent policy is now superseded by the 2026-07-23 compliance ruling. The must-ship items (10.1–10.7, 10.10–10.14, 10.16, 10.19) fixed issues that risk user abandonment, data loss, regulatory rejection, or trust erosion under the original epic. The should-ship items (10.15, 10.17, 10.18) address retention cliffs and onboarding funnel leaks. The fast-follow items (10.8–10.9) address second-session experiences. Story 10.8 is deliberately data-gated. The original German-localization deferral is also historical; seven UI locales now ship. Current country enablement remains independent of UI locale coverage.
 
 ---
 

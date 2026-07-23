@@ -35,7 +35,7 @@
 - **Regulator:** Datatilsynet — www.datatilsynet.no — breach form on their site.
 - **Controller:** **ZWIZZLY AS**, org.nr **811696072**, Fiskekroken 3B, 0139 Oslo, Norway.
 - **DPO contact:** `[dpo@… — TODO]`.
-- **EU/UK representative:** `[Art 27 rep — TODO if serving UK]`.
+- **Representative:** none for the ruled EEA perimeter (controller established in Norway); UK representation reopens only if the UK is later enabled.
 - **Processor breach-contacts:** maintained in each provider's DPA file (see `ropa.md` recipients column).
 
 ---

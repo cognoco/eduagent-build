@@ -1,26 +1,31 @@
 # Audience Matrix — Scattered Gating Snapshot
 
-> **Reconstructed scaffold (2026-05-22).** The original `docs/audience-matrix.md` was lost — it was created in another agent's working tree on 2026-05-21 and wiped by a stash cycle before any git operation captured it (not in any commit, dangling blob, or worktree on disk).
+> **Reconstructed scaffold (2026-05-22).** The original `docs/compliance/audience-matrix.md` was lost — it was created in another agent's working tree on 2026-05-21 and wiped by a stash cycle before any git operation captured it (not in any commit, dangling blob, or worktree on disk).
 >
-> This scaffold rebuilds the doc from references in the earlier draft of `docs/specs/2026-05-21-navigation-contract.md` (dangling commit `e6287097`). All file:line citations below are extracted from that draft and re-verified against current HEAD — but the original severity labels (F1–F14) are *inferred* from the navigation-contract's "5 of 14 findings addressed" callout. Re-derive F-numbers from a fresh audit if precision matters.
+> **Scope boundary (2026-07-23):** this is a product-audience/navigation gating
+> inventory, not the country/consent matrix. Product age bands, national
+> Article 8 thresholds, and launch-country eligibility live in
+> [`docs/compliance/2026-07-23-13-plus-eea-launch-country-ruling.md`](2026-07-23-13-plus-eea-launch-country-ruling.md).
+>
+> This scaffold rebuilds the doc from references in the earlier draft of `docs/_archive/specs/Done/2026-05-21-navigation-contract.md` (dangling commit `e6287097`). The original severity labels (F1–F14) are *inferred* from the navigation-contract's "5 of 14 findings addressed" callout. Re-derive F-numbers and file:line citations from a fresh audit before using them as current evidence.
 
-**Status:** Verified 2026-05-23 against HEAD. File:line citations corrected (~14 entries had off-by-N or wrong-symbol issues; see git diff vs. 2026-05-21 for the deltas). F-numbering still scaffolded — re-derive from a fresh audit if precision matters.
+**Status:** Historical reconstructed inventory, partially refreshed 2026-07-23 for the home-route branch and compliance-document location. It is not a current whole-file line map. F-numbering remains scaffolded.
 
-> **Migration constraint.** Closing F5/F6/F7/F8/F11 by migrating these sites to `resolveNavigationContract` **must not regress today's 5-tab mode** (active when `MODE_NAV_V0_ENABLED=false` in Doppler). The contract is wired behind a separate `MODE_NAV_V1_ENABLED` flag; the V0 helpers consumed by each site below stay alive. See the "Hard Constraint" section of `docs/specs/2026-05-21-navigation-contract.md` for the flag matrix.
+> **Regression constraint.** All currently shipped flag states must remain intact until the V0-retirement milestone. Read the per-environment flags and the current rule in `AGENTS.md`; do not infer one global mode from this historical matrix.
 
 ## Related documents
 
-- [`docs/specs/2026-05-21-navigation-contract.md`](specs/2026-05-21-navigation-contract.md) — **paired target spec.** Defines `resolveNavigationContract(ctx)` (the function this matrix's F5/F6/F7/F8/F11 sites migrate to).
-- [`docs/flows/flow-master-directory.md`](flows/flow-master-directory.md) — flow register. Each flow page in `flows/master-directory/` cites this matrix when it touches a gated surface (home, more, account, privacy, progress).
-- `CLAUDE.md` — "Profile Shapes" section is authoritative for **current** tab shapes (`guardian` / `learner`) and the rule that `home.tsx` does not branch (the `ParentHomeScreen` decision lives inside `LearnerScreen.tsx`). The matrix below reflects this rule.
+- [`docs/_archive/specs/Done/2026-05-21-navigation-contract.md`](../_archive/specs/Done/2026-05-21-navigation-contract.md) — archived target spec that introduced `resolveNavigationContract(ctx)`.
+- [`docs/flows/flow-master-directory.md`](../flows/flow-master-directory.md) — flow register. Each flow page in `flows/master-directory/` cites this matrix when it touches a gated surface (home, more, account, privacy, progress).
+- `AGENTS.md` — "Profile Shapes" is authoritative for current tab shapes and records the `home.tsx` branch on `navigationContract.home.screen`.
 
 ---
 
 ## Purpose
 
-This matrix is the authoritative snapshot of **current** scattered UI/navigation gating across the mobile app. It exists because the answer to "what does this profile see?" is reconstructed in ~20 places — every fix patches one consumer; the contract lives in nobody's head.
+This matrix preserves the reconstructed 2026-05 snapshot of scattered UI/navigation gating across the mobile app. It is supporting compliance evidence, not current authority; current behavior must be checked against `AGENTS.md`, `apps/mobile/src/lib/navigation-contract.ts`, and the cited consumers.
 
-The matrix and `docs/specs/2026-05-21-navigation-contract.md` are **paired**:
+The matrix and `docs/_archive/specs/Done/2026-05-21-navigation-contract.md` are historically paired:
 
 - **This matrix = current state inventory** with file:line citations and findings F1–F14.
 - **The navigation-contract spec = target state** describing the single `resolveNavigationContract(ctx)` function consumers migrate to.
@@ -45,8 +50,8 @@ Each entry is a current-code site that branches on profile attributes (`isOwner`
 
 | File:line | Reads | What it gates | Finding |
 |---|---|---|---|
-| `apps/mobile/src/app/(app)/home.tsx:68, 76-78, 186` | `mode` (68 as `legacyMode`), `isOwner` (76-78) — passes `profiles`, `activeProfile`, `mode` to `<LearnerScreen>` | **Always mounts `<LearnerScreen>`** (the route itself does not branch — see CLAUDE.md "Profile Shapes" rule). The other gating inputs (`hasLinkedChildren`, `isFamilyPlanOwner`, `isParentProxy`, `showParentHome`) are read inside `LearnerScreen`, not here. | F11 |
-| `apps/mobile/src/components/home/LearnerScreen.tsx:474-483` | `isOwner`, `subscription.tier`, `showParentHome`, `isParentProxy`, `mode`, `hasLinkedChildren`, `isFamilyPlanOwner` | **The actual `ParentHomeScreen` vs learner-home branch** (lines 479-483, with `isFamilyPlanOwner` derived at 474-475). Inline switch instead of contract read. | F11 |
+| `apps/mobile/src/app/(app)/home.tsx:21, 166-169` | `navigationContract.home.screen` | **Current branch:** `FamilyHome` mounts `<ParentHomeScreen>`; every other contract result mounts `<LearnerScreen>`. | F11 (historical finding closed by contract wiring) |
+| `apps/mobile/src/components/home/LearnerScreen.tsx` | `navigationContract.gates.*` | Learner-home content consumes the navigation contract; the removed `showParentHome` / inline `ParentHomeScreen` branch must not be reintroduced. | F11 (historical finding closed) |
 
 ### More / Account / Privacy
 
@@ -146,7 +151,7 @@ Before citing this matrix in a PR or review:
 1. Open each `file:line` in the inventory table; confirm the gate still exists at that location.
 2. For findings F1–F14, re-derive the F-numbering from a fresh adversarial audit — the IDs here are scaffolded.
 3. Run AST grep for any new `isOwner`, `role`, `birthYear`, `isParentProxy`, `mode`, `consentStatus` reads that aren't in the inventory.
-4. Cross-check against `docs/specs/2026-05-21-navigation-contract.md` Phase 2 plan.
+4. Cross-check against `docs/_archive/specs/Done/2026-05-21-navigation-contract.md` Phase 2 plan and the current `AGENTS.md` profile-shape rules.
 
 ---
 
