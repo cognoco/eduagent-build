@@ -1,0 +1,335 @@
+# [WI-2239] V2 Journal populated paper-trail journey.
+#
+# Exact v2-journal-paper-trail artifacts open their owning existing surface
+# and return to the sole learner's Journal. The seed has no support edges, so
+# absence of scope-chip is the V2 structural proof that the view remains Me.
+# Every assertion below is hard; this workflow_dispatch evidence is invalid if
+# any exact seeded row, destination property, or return path is missing.
+appId: com.mentomate.app
+tags:
+  - v2
+  - navigation
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: 'v2-journal-paper-trail'
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 30000
+
+- tapOn:
+    id: 'tab-journal'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'journal-screen'
+    timeout: 15000
+- assertNotVisible:
+    id: 'scope-chip'
+
+# Exact seeded recap -> existing recap detail -> same Journal Me scope.
+- scrollUntilVisible:
+    element:
+      id: 'journal-recap-row-${RECAP_ID}'
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: 'journal-recap-row-${RECAP_ID}'
+    containsDescendants:
+      - text: 'Biology / Biology Topic 1'
+- tapOn:
+    id: 'journal-recap-row-${RECAP_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'session-recap-card'
+    timeout: 15000
+- assertVisible:
+    id: 'session-recap-learning-point-0'
+    text: 'We traced how photosynthesis stores sunlight as chemical energy in glucose.'
+- assertVisible:
+    id: 'summary-close-button'
+- tapOn:
+    id: 'summary-close-button'
+- extendedWaitUntil:
+    visible:
+      id: 'journal-recap-row-${RECAP_ID}'
+    timeout: 15000
+- assertNotVisible:
+    id: 'scope-chip'
+
+# Mine + exact glucose search finds only the seeded learner note, which opens
+# the Notes owner list without swapping source identity.
+- tapOn:
+    id: 'journal-tab-notes'
+- tapOn:
+    id: 'journal-notes-filter-mine'
+- scrollUntilVisible:
+    element:
+      id: 'journal-note-note:${LEARNER_NOTE_ID}'
+    direction: DOWN
+    timeout: 15000
+- assertNotVisible:
+    id: 'journal-note-bookmark:${BOOKMARK_ID}'
+- tapOn:
+    id: 'journal-notes-search-input'
+- inputText: 'not-in-this-archive'
+- hideKeyboard
+- assertVisible:
+    id: 'journal-notes-empty'
+- assertNotVisible:
+    id: 'journal-note-note:${LEARNER_NOTE_ID}'
+- tapOn:
+    id: 'journal-notes-search-input'
+    point: '95%,50%'
+- eraseText: 32
+- inputText: 'glucose'
+- hideKeyboard
+- assertVisible:
+    id: 'journal-notes-search-input'
+    text: 'glucose'
+- scrollUntilVisible:
+    element:
+      id: 'journal-note-note:${LEARNER_NOTE_ID}'
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: 'journal-note-note:${LEARNER_NOTE_ID}'
+    containsDescendants:
+      - text: 'Photosynthesis stores sunlight as chemical energy in glucose for the plant.'
+- assertNotVisible:
+    id: 'journal-note-bookmark:${BOOKMARK_ID}'
+- tapOn:
+    id: 'journal-note-note:${LEARNER_NOTE_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'my-notes-row-notes-${LEARNER_NOTE_ID}'
+    timeout: 15000
+- assertVisible:
+    id: 'my-notes-row-notes-${LEARNER_NOTE_ID}'
+    containsDescendants:
+      - text: 'Photosynthesis stores sunlight as chemical energy in glucose for the plant.'
+- assertNotVisible:
+    id: 'my-notes-row-bookmarks-${BOOKMARK_ID}'
+- tapOn:
+    id: 'my-notes-list-back'
+- extendedWaitUntil:
+    visible:
+      id: 'my-notes-hub'
+    timeout: 15000
+- tapOn:
+    id: 'my-notes-back'
+- extendedWaitUntil:
+    visible:
+      id: 'journal-screen'
+    timeout: 15000
+- assertNotVisible:
+    id: 'scope-chip'
+
+# Mentor + exact chlorophyll search finds only the seeded Mentor bookmark,
+# which opens the Bookmarks owner list without swapping source identity.
+- tapOn:
+    id: 'journal-tab-notes'
+- tapOn:
+    id: 'journal-notes-search-input'
+    point: '95%,50%'
+- eraseText: 32
+- hideKeyboard
+- tapOn:
+    id: 'journal-notes-filter-mentor'
+- scrollUntilVisible:
+    element:
+      id: 'journal-note-bookmark:${BOOKMARK_ID}'
+    direction: DOWN
+    timeout: 15000
+- assertNotVisible:
+    id: 'journal-note-note:${LEARNER_NOTE_ID}'
+- tapOn:
+    id: 'journal-notes-search-input'
+- inputText: 'not-in-this-archive'
+- hideKeyboard
+- assertVisible:
+    id: 'journal-notes-empty'
+- assertNotVisible:
+    id: 'journal-note-bookmark:${BOOKMARK_ID}'
+- tapOn:
+    id: 'journal-notes-search-input'
+    point: '95%,50%'
+- eraseText: 32
+- inputText: 'chlorophyll'
+- hideKeyboard
+- assertVisible:
+    id: 'journal-notes-search-input'
+    text: 'chlorophyll'
+- scrollUntilVisible:
+    element:
+      id: 'journal-note-bookmark:${BOOKMARK_ID}'
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: 'journal-note-bookmark:${BOOKMARK_ID}'
+    containsDescendants:
+      - text: 'Chlorophyll captures light energy that powers photosynthesis.'
+- assertNotVisible:
+    id: 'journal-note-note:${LEARNER_NOTE_ID}'
+- tapOn:
+    id: 'journal-note-bookmark:${BOOKMARK_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'my-notes-row-bookmarks-${BOOKMARK_ID}'
+    timeout: 15000
+- assertVisible:
+    id: 'my-notes-row-bookmarks-${BOOKMARK_ID}'
+    containsDescendants:
+      - text: 'Chlorophyll captures light energy that powers photosynthesis.'
+- assertNotVisible:
+    id: 'my-notes-row-notes-${LEARNER_NOTE_ID}'
+- tapOn:
+    id: 'my-notes-list-back'
+- extendedWaitUntil:
+    visible:
+      id: 'my-notes-hub'
+    timeout: 15000
+- tapOn:
+    id: 'my-notes-back'
+- extendedWaitUntil:
+    visible:
+      id: 'journal-screen'
+    timeout: 15000
+- assertNotVisible:
+    id: 'scope-chip'
+
+# Exact seeded practice event -> existing hub -> Journal Me.
+- tapOn:
+    id: 'journal-tab-practice'
+- scrollUntilVisible:
+    element:
+      id: 'journal-activity-${PRACTICE_ACTIVITY_EVENT_ID}'
+    direction: DOWN
+    timeout: 10000
+- assertVisible:
+    id: 'journal-activity-${PRACTICE_ACTIVITY_EVENT_ID}'
+- scrollUntilVisible:
+    element:
+      id: 'journal-practice-open-hub'
+    direction: UP
+    timeout: 10000
+- tapOn:
+    id: 'journal-practice-open-hub'
+- extendedWaitUntil:
+    visible:
+      id: 'practice-screen'
+    timeout: 15000
+- tapOn:
+    id: 'practice-back'
+- extendedWaitUntil:
+    visible:
+      id: 'journal-screen'
+    timeout: 15000
+- assertNotVisible:
+    id: 'scope-chip'
+
+# Populated Mentor memory -> existing owner view -> Journal Me.
+- tapOn:
+    id: 'journal-tab-memory'
+- tapOn:
+    id: 'journal-memory-open'
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-memory-screen'
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: 'mentor-memory-interests-section'
+    direction: DOWN
+    timeout: 10000
+- assertVisible:
+    id: 'mentor-memory-interests-section'
+- scrollUntilVisible:
+    element:
+      id: 'mentor-memory-back'
+    direction: UP
+    timeout: 10000
+- tapOn:
+    id: 'mentor-memory-back'
+- extendedWaitUntil:
+    visible:
+      id: 'journal-screen'
+    timeout: 15000
+- assertNotVisible:
+    id: 'scope-chip'
+
+# Exact weekly report -> weekly detail -> Journal Me.
+- tapOn:
+    id: 'journal-tab-reports'
+- scrollUntilVisible:
+    element:
+      id: 'weekly-report-card-${WEEKLY_REPORT_ID}'
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    id: 'weekly-report-card-${WEEKLY_REPORT_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'progress-weekly-report-metric-sessions'
+    timeout: 15000
+- assertVisible:
+    text: '4 sessions this week'
+- assertVisible:
+    id: 'progress-weekly-report-back'
+- tapOn:
+    id: 'progress-weekly-report-back'
+- extendedWaitUntil:
+    visible:
+      id: 'journal-screen'
+    timeout: 15000
+- assertNotVisible:
+    id: 'scope-chip'
+- tapOn:
+    id: 'journal-tab-reports'
+- scrollUntilVisible:
+    element:
+      id: 'weekly-report-card-${WEEKLY_REPORT_ID}'
+    direction: DOWN
+    timeout: 10000
+- assertVisible:
+    id: 'weekly-report-card-${WEEKLY_REPORT_ID}'
+
+# Exact monthly report -> monthly detail -> Journal Me.
+- scrollUntilVisible:
+    element:
+      id: 'report-card-${MONTHLY_REPORT_ID}'
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    id: 'report-card-${MONTHLY_REPORT_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'progress-report-metric-sessions'
+    timeout: 15000
+- assertVisible:
+    text: 'July 2026'
+- assertVisible:
+    text: '12 topics mastered'
+- assertVisible:
+    id: 'progress-report-back'
+- tapOn:
+    id: 'progress-report-back'
+- extendedWaitUntil:
+    visible:
+      id: 'journal-screen'
+    timeout: 15000
+- assertNotVisible:
+    id: 'scope-chip'
+- tapOn:
+    id: 'journal-tab-reports'
+- scrollUntilVisible:
+    element:
+      id: 'report-card-${MONTHLY_REPORT_ID}'
+    direction: DOWN
+    timeout: 10000
+- assertVisible:
+    id: 'report-card-${MONTHLY_REPORT_ID}'
