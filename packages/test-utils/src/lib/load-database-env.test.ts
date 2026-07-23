@@ -89,6 +89,13 @@ const SHARED_DOPPLER_OUTPUT = {
   ...DOPPLER_OUTPUT_SENTINELS,
   DOPPLER_PROJECT: 'mentomate',
   DOPPLER_CONFIG: 'stg',
+  DOPPLER_ENVIRONMENT: 'dev',
+};
+
+const SHARED_ENVIRONMENT_DOPPLER_OUTPUT = {
+  ...DOPPLER_OUTPUT_SENTINELS,
+  DOPPLER_PROJECT: 'mentomate',
+  DOPPLER_CONFIG: 'dev_personal',
   DOPPLER_ENVIRONMENT: 'stg',
 };
 
@@ -287,7 +294,36 @@ describe('loadDatabaseEnv', () => {
       });
 
     expect(runWithDatabaseConnection).toThrow(
-      /project=mentomate, config=stg, environment=stg/,
+      /project=mentomate, config=stg, environment=dev/,
+    );
+
+    expect(invocationCount(invocationMarker)).toBe(1);
+    expect(existsSync(connectionAttemptMarker)).toBe(false);
+    expect(process.env.DATABASE_URL).toBeUndefined();
+  });
+
+  it('refuses a development config whose Doppler environment is shared', () => {
+    expectHostEnvironmentIsolated();
+    const invocationMarker = join(binDir, 'doppler-invocations');
+    const connectionAttemptMarker = join(binDir, 'database-connection-attempt');
+    process.env.DOPPLER_CLI = writePortableNodeDoppler(
+      binDir,
+      SHARED_ENVIRONMENT_DOPPLER_OUTPUT,
+      invocationMarker,
+    );
+    process.env.PATH = binDir;
+
+    const runWithDatabaseConnection = () =>
+      withWorkingDirectory(binDir, () => {
+        loadDatabaseEnv(workspaceRoot);
+        writeFileSync(
+          connectionAttemptMarker,
+          process.env.DATABASE_URL ?? 'missing',
+        );
+      });
+
+    expect(runWithDatabaseConnection).toThrow(
+      /project=mentomate, config=dev_personal, environment=stg/,
     );
 
     expect(invocationCount(invocationMarker)).toBe(1);
@@ -315,7 +351,7 @@ describe('loadDatabaseEnv', () => {
         connectionAttemptMarker,
         process.env.DATABASE_URL ?? 'missing',
       );
-    }).toThrow();
+    }).toThrow(/project=mentomate, config=stg, environment=stg/);
 
     expect(existsSync(connectionAttemptMarker)).toBe(false);
     expect(process.env.DATABASE_URL).toBeUndefined();
