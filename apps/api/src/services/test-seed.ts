@@ -5526,7 +5526,7 @@ async function seedV2JournalPaperTrail(
       subjectId,
       topicId,
       recapContent:
-        'We traced how photosynthesis stores sunlight as chemical energy in glucose.',
+        'The learner connected sunlight, chlorophyll, and glucose while explaining how photosynthesis stores energy.',
       learnerRecap:
         'We traced how photosynthesis stores sunlight as chemical energy in glucose.',
       recapHighlight:

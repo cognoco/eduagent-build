@@ -201,15 +201,23 @@ describe('v2-journal-paper-trail seed', () => {
     expect(startedAt).toBeLessThanOrEqual(lastActivityAt);
     expect(lastActivityAt).toBeLessThanOrEqual(endedAt);
     expect(endedAt - startedAt).toBe(960_000);
-    expect(insertedRow(inserts, sessionSummaries, sessionSummaryId)).toEqual(
+    const journalSummary = insertedRow(
+      inserts,
+      sessionSummaries,
+      sessionSummaryId,
+    );
+    expect(journalSummary).toEqual(
       expect.objectContaining({
         sessionId,
         profileId: result.profileId,
         topicId,
+        content:
+          'The learner connected sunlight, chlorophyll, and glucose while explaining how photosynthesis stores energy.',
         learnerRecap:
           'We traced how photosynthesis stores sunlight as chemical energy in glucose.',
       }),
     );
+    expect(journalSummary.content).not.toBe(journalSummary.learnerRecap);
     const learnerNote = insertedRow(inserts, topicNotes, learnerNoteId);
     const mentorBookmark = insertedRow(inserts, bookmarks, bookmarkId);
     expect(learnerNote).toEqual(
