@@ -86,7 +86,8 @@ tags:
     element:
       id: 'parent-home-check-child-${CHILD1_PROFILE_ID}'
     direction: UP
-    timeout: 10000
+    timeout: 20000
+    speed: 60
     visibilityPercentage: 50
     centerElement: true
     waitToSettleTimeoutMs: 1000
