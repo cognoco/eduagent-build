@@ -68,6 +68,7 @@ tags:
     timeout: 10000
     visibilityPercentage: 50
     centerElement: true
+    waitToSettleTimeoutMs: 1000
 
 - assertVisible:
     id: 'parent-home-family-summary'
