@@ -46,7 +46,7 @@ import {
   buildValidatedBirthDate,
   locationToJurisdiction,
 } from './identity-graph';
-import { resolveLatestConsentStatusAnyBasis } from './consent-status-v2';
+import { resolveLatestConsentSetStatusAnyBasis } from './consent-status-v2';
 
 // Populate process.env.DATABASE_URL from the test env (no-op if already set).
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
@@ -299,7 +299,7 @@ async function cleanupByClerk(
       });
     }
     await expect(
-      resolveLatestConsentStatusAnyBasis(
+      resolveLatestConsentSetStatusAnyBasis(
         db,
         graph.personId,
         graph.organizationId,
