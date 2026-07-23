@@ -741,9 +741,17 @@ function judgeVendorModelConfig(
 function resolveGraderConfig(
   independence: JudgeIndependence | undefined,
 ): ModelConfig {
-  const [primaryVendor] = resolveJudgeEligibleVendors(independence);
-  // Never undefined: JUDGE_VENDOR_ORDER has 2 members and a single producer
-  // exclusion removes at most 1.
+  const eligible = resolveJudgeEligibleVendors(independence);
+  const primaryVendor = eligible[0];
+  if (!primaryVendor) {
+    // Unreachable: JUDGE_VENDOR_ORDER has 2 members and a single producer
+    // exclusion removes at most 1, so this always resolves. Guarded (rather
+    // than a non-null assertion) so a future change to JUDGE_VENDOR_ORDER
+    // fails loudly instead of silently routing an unservable config.
+    throw new Error(
+      'resolveGraderConfig: no eligible judge vendor (unreachable)',
+    );
+  }
   return judgeVendorModelConfig(primaryVendor);
 }
 
@@ -1725,8 +1733,11 @@ interface RouteAndCallBaseOptions {
 // than a convention. There is no default: a judge call site that cannot
 // state whether it is grading model output (and whose) or learner input is
 // exactly the ambiguity that produced the double-flip bug.
-type RouteAndCallOptions =
-  | (RouteAndCallBaseOptions & { capability?: never })
+export type RouteAndCallOptions =
+  | (RouteAndCallBaseOptions & {
+      capability?: never;
+      judgeIndependence?: never;
+    })
   | (RouteAndCallBaseOptions & {
       capability: 'judge';
       judgeIndependence: JudgeIndependence;
