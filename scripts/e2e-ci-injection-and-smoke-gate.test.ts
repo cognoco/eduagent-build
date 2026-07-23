@@ -4833,6 +4833,98 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(staleAmbiguousWait).toBe(-1);
   });
 
+  it('[WI-1864] accepts both actionable Easter classifier outcomes', () => {
+    const source = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/regression/bug-233-chat-classifier-easter.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      pressKey?: string;
+      extendedWaitUntil?: {
+        visible?: { id?: string } | string;
+        timeout?: number;
+        optional?: boolean;
+      };
+      runFlow?: {
+        when?: {
+          visible?: { id?: string } | string;
+        };
+        commands?: Array<{
+          assertVisible?: { id?: string } | string;
+          scrollUntilVisible?: {
+            element?: { id?: string };
+            direction?: string;
+            timeout?: number;
+            visibilityPercentage?: number;
+            centerElement?: boolean;
+            optional?: boolean;
+          };
+        }>;
+      };
+    }>;
+    const submit = commands.findIndex(({ pressKey }) => pressKey === 'Enter');
+    const terminalOutcome = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > submit &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        typeof extendedWaitUntil.visible.id === 'string' &&
+        new RegExp(extendedWaitUntil.visible.id).test('chat-input') &&
+        new RegExp(extendedWaitUntil.visible.id).test(
+          'session-subject-resolution',
+        ) &&
+        new RegExp(extendedWaitUntil.visible.id).test(
+          'subject-resolution-create-new',
+        ) &&
+        (extendedWaitUntil.timeout ?? 0) >= 60000 &&
+        extendedWaitUntil.optional !== true,
+    );
+    const resolutionBranch = commands.findIndex(
+      ({ runFlow }, index) =>
+        index > terminalOutcome &&
+        typeof runFlow?.when?.visible === 'object' &&
+        runFlow.when.visible.id === 'session-subject-resolution' &&
+        (runFlow.commands ?? []).some(
+          ({ scrollUntilVisible }) =>
+            scrollUntilVisible?.element?.id === 'subject-resolution-new' &&
+            scrollUntilVisible.direction === 'RIGHT' &&
+            (scrollUntilVisible.timeout ?? 0) >= 15000 &&
+            scrollUntilVisible.visibilityPercentage === 100 &&
+            scrollUntilVisible.optional !== true,
+        ),
+    );
+    const zeroCandidateBranch = commands.findIndex(
+      ({ runFlow }, index) =>
+        index > terminalOutcome &&
+        typeof runFlow?.when?.visible === 'object' &&
+        runFlow.when.visible.id === 'subject-resolution-create-new' &&
+        (runFlow.commands ?? []).some(
+          ({ assertVisible }) =>
+            typeof assertVisible === 'object' &&
+            assertVisible.id === 'subject-resolution-create-new',
+        ),
+    );
+    const autoMatchBranch = commands.findIndex(
+      ({ runFlow }, index) =>
+        index > terminalOutcome &&
+        typeof runFlow?.when?.visible === 'object' &&
+        runFlow.when.visible.id === 'chat-input' &&
+        (runFlow.commands ?? []).some(
+          ({ assertVisible }) =>
+            typeof assertVisible === 'object' &&
+            assertVisible.id === 'chat-input',
+        ),
+    );
+
+    expect(submit).toBeGreaterThan(-1);
+    expect(terminalOutcome).toBeGreaterThan(submit);
+    expect(resolutionBranch).toBeGreaterThan(terminalOutcome);
+    expect(zeroCandidateBranch).toBeGreaterThan(terminalOutcome);
+    expect(autoMatchBranch).toBeGreaterThan(terminalOutcome);
+  });
+
   it('[WI-1864] exercises the seeded answer-check failure before continuing the round', () => {
     const source = readFileSync(
       join(

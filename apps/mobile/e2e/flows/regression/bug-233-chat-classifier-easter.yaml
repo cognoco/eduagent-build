@@ -4,14 +4,14 @@
 #
 # This test verifies that asking about Easter in a freeform chat session either:
 # (a) matches an enrolled subject, or
-# (b) shows a "+" chip to create a suggested subject (e.g., Religious Studies)
+# (b) shows subject resolution with an actionable new-subject route.
 # It must NEVER show only "I couldn't place that" with no actionable escape.
 #
 # Prerequisite: learning-active scenario (provides World History subject)
 # testIDs verified against:
 #   - apps/mobile/src/app/(learner)/session/index.tsx
 #     (chat-input, chat-messages, session-subject-resolution,
-#      subject-resolution-create-new)
+#      subject-resolution-new, subject-resolution-create-new)
 appId: com.mentomate.app
 tags:
   - nightly
@@ -48,10 +48,13 @@ tags:
 - inputText: "please teach me about Easter"
 - pressKey: Enter
 
-# 6. Wait for classifier response (LLM call, generous timeout)
+# 6. Wait for either valid classifier outcome (LLM call, generous timeout).
+#    Auto-match restores chat-input; fallback mounts subject resolution and
+#    intentionally hides the composer until the learner picks a subject. The
+#    zero-candidate fallback renders its create action without the chip tray.
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
+      id: "^(chat-input|session-subject-resolution|subject-resolution-create-new)$"
     timeout: 60000
 
 # 7. The AI must NOT respond with the dead-end "I couldn't place that" message
@@ -64,13 +67,38 @@ tags:
 - assertVisible:
     id: "chat-messages"
 
-# 8. If the resolution bar appeared, verify the "+ New Subject" chip exists
-#    (This step may be skipped if the LLM matched an enrolled subject directly)
-- extendedWaitUntil:
-    visible:
-      id: "session-subject-resolution"
-    timeout: 5000
-    optional: true  # justified: session-subject-resolution only appears when LLM cannot auto-classify to an enrolled subject; classifier result varies per LLM response
+# 8. In the chips branch, scroll the horizontal tray to its guaranteed generic
+#    new-subject escape hatch before requiring it to be fully visible.
+- runFlow:
+    when:
+      visible:
+        id: "session-subject-resolution"
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: "subject-resolution-new"
+          direction: RIGHT
+          timeout: 15000
+          visibilityPercentage: 100
+          centerElement: true
 
-# 9. Screenshot for visual verification
+# 9. In the zero-candidate branch, require the full-width create action.
+- runFlow:
+    when:
+      visible:
+        id: "subject-resolution-create-new"
+    commands:
+      - assertVisible:
+          id: "subject-resolution-create-new"
+
+# 10. If the classifier auto-matched, require the restored composer.
+- runFlow:
+    when:
+      visible:
+        id: "chat-input"
+    commands:
+      - assertVisible:
+          id: "chat-input"
+
+# 11. Screenshot for visual verification
 - takeScreenshot: bug-233-easter-classifier-response
