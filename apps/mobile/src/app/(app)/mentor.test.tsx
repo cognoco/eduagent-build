@@ -29,6 +29,7 @@ type PersonScope = Extract<ScopeDescriptor, { kind: 'person' }>;
 
 const PERSON_ID = '550e8400-e29b-41d4-a716-446655440101';
 const EDGE_ID = '550e8400-e29b-41d4-a716-446655440201';
+const ORIGINAL_E2E_FLAG = process.env.EXPO_PUBLIC_E2E;
 const mockPush = jest.fn();
 const mockNowRefetch = jest.fn();
 let mockFocusCallback: (() => void | (() => void)) | undefined;
@@ -240,6 +241,11 @@ describe('MentorScreen', () => {
   afterEach(() => {
     cleanupRender?.();
     cleanupRender = undefined;
+    if (ORIGINAL_E2E_FLAG === undefined) {
+      delete process.env.EXPO_PUBLIC_E2E;
+    } else {
+      process.env.EXPO_PUBLIC_E2E = ORIGINAL_E2E_FLAG;
+    }
   });
 
   beforeEach(() => {
@@ -349,6 +355,47 @@ describe('MentorScreen', () => {
     screen.getByTestId('mentor-bar-camera');
     screen.getByTestId('mentor-bar-homework-chip');
     screen.getByTestId('mentor-bar-mic');
+  });
+
+  it('routes the E2E homework chip directly to manual entry with the active subject', () => {
+    process.env.EXPO_PUBLIC_E2E = 'true';
+    renderMentorScreen();
+
+    fireEvent.press(screen.getByTestId('mentor-bar-homework-chip'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/homework/manual',
+      params: {
+        entrySource: 'mentor',
+        returnTo: 'mentor',
+        subjectId: 'subject-0',
+        subjectName: 'Mathematics',
+      },
+    });
+  });
+
+  it('keeps the camera affordance on the device-QA route in E2E builds', () => {
+    process.env.EXPO_PUBLIC_E2E = 'true';
+    renderMentorScreen();
+
+    fireEvent.press(screen.getByTestId('mentor-bar-camera'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/homework/camera',
+      params: { entrySource: 'mentor', returnTo: 'mentor' },
+    });
+  });
+
+  it('retains the camera route for the homework chip outside E2E builds', () => {
+    process.env.EXPO_PUBLIC_E2E = 'false';
+    renderMentorScreen();
+
+    fireEvent.press(screen.getByTestId('mentor-bar-homework-chip'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/homework/camera',
+      params: { entrySource: 'mentor', returnTo: 'mentor' },
+    });
   });
 
   it('shows the ask box and light practice instead of a dead-end on an empty feed', () => {

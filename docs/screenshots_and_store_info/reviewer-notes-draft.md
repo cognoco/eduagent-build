@@ -2,6 +2,8 @@
 
 Date: 2026-05-15
 
+Refreshed: 2026-07-23 — privacy URL/controller identity, 13+ launch floor, and seven-day deletion grace reconciled with current source.
+
 Status: draft for App Store / Google Play reviewer notes. This cannot be final until a reviewer account, sandbox testers, IAP products, and store account access are confirmed.
 
 ## Required Admin Inputs
@@ -12,13 +14,13 @@ Status: draft for App Store / Google Play reviewer notes. This cannot be final u
 - Whether reviewer should use a parent account, learner account, or both: NEEDS PRODUCT INPUT
 - Sandbox tester account(s): NEEDS STORE ADMIN INPUT
 - Apple/Google IAP product readiness: NEEDS STORE ADMIN INPUT
-- Live privacy URL and legal entity: NEEDS USER/ADMIN INPUT
+- DPO-approved final notice publication and matching store-console privacy URL: NEEDS LEGAL/ADMIN INPUT
 
 Do not submit placeholder credentials.
 
 ## Draft Review Notes
 
-MentoMate is an education app for learners aged 11+ and for parents/adult learners. The app provides AI-guided tutoring, homework help, practice, spaced repetition, progress tracking, and parent oversight.
+MentoMate is an education app for learners aged 13+ and for parents/adult learners. The app provides AI-guided tutoring, homework help, practice, spaced repetition, progress tracking, and parent oversight.
 
 The core learning flow is private to the signed-in account. There is no public social feed. Learners can type questions, use voice transcription, or choose camera/photo homework capture to send learning content to the tutor. The AI tutoring and OCR/review features are processed through the app's backend services.
 
@@ -27,7 +29,7 @@ Account deletion and data export are available in the app:
 - More -> Privacy & Data -> Export my data
 - More -> Privacy & Data -> Delete account
 
-The delete-account flow uses an in-screen warning, exact `DELETE` typed confirmation, and a 7-day grace period before deletion is processed. The app also includes parental-consent flows for younger learners according to the current 11+ / consent-through-age-16 product posture.
+The delete-account flow uses an in-screen warning, exact `DELETE` typed confirmation, and a 7-day grace period before deletion is processed. The app also includes parental-consent flows where required for learners aged 13+ who are below the applicable age of digital consent.
 
 Camera access is used for photographing homework. Photo library access is used to import homework images. Microphone access is used for voice-based learning. Push notifications are optional and are used for learning reminders/progress notifications.
 
@@ -86,4 +88,3 @@ Choose one or more scenarios before submission:
 - Do not say the app is COPPA/GDPR compliant in reviewer notes unless legal signs off.
 - Do not claim raw audio is or is not collected until production speech-recognition behavior is reviewed.
 - Do not claim Family/Pro are public purchase options unless product/admin confirms store listing.
-

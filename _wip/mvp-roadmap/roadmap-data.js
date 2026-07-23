@@ -1,5 +1,5 @@
 window.ROADMAP_DATA = {
-  "generated": "2026-07-17T12:12Z",
+  "generated": "2026-07-23T16:00Z",
   "opq": [
     {
       "opq": "OPQ-11",
@@ -23,13 +23,6 @@ window.ROADMAP_DATA = {
       "deadline": "2026-07-25"
     },
     {
-      "opq": "OPQ-25",
-      "title": "WI-1194 — enable and verify the production retention purge",
-      "type": "Action",
-      "status": "Open",
-      "deadline": "2026-07-25"
-    },
-    {
       "opq": "OPQ-37",
       "title": "WI-1341 - store credentials, EAS access + Config-T go-ahead",
       "type": "Action",
@@ -38,7 +31,7 @@ window.ROADMAP_DATA = {
     },
     {
       "opq": "OPQ-40",
-      "title": "WI-1767 — trust-package design pass (Zuzka)",
+      "title": "WI-1767 — trust-package design pass",
       "type": "Action",
       "status": "Open",
       "deadline": ""
@@ -79,13 +72,6 @@ window.ROADMAP_DATA = {
       "deadline": ""
     },
     {
-      "opq": "OPQ-59",
-      "title": "WI-1337 — upload FCM V1 service-account credential to EAS (Android push)",
-      "type": "Action",
-      "status": "Open",
-      "deadline": ""
-    },
-    {
       "opq": "OPQ-60",
       "title": "WI-1335 — Play Console app record, store listing, Data Safety form (long-lead)",
       "type": "Action",
@@ -114,13 +100,6 @@ window.ROADMAP_DATA = {
       "deadline": ""
     },
     {
-      "opq": "OPQ-89",
-      "title": "WI-1920 — restore staging Sentry smoke authentication",
-      "type": "Infra",
-      "status": "Open",
-      "deadline": ""
-    },
-    {
       "opq": "OPQ-90",
       "title": "WI-1907 — authorize production deploy and capture production fleet-failure proof",
       "type": "Action",
@@ -131,13 +110,6 @@ window.ROADMAP_DATA = {
       "opq": "OPQ-92",
       "title": "WI-1833 — grant production telemetry read access for live judge verification",
       "type": "Action",
-      "status": "Open",
-      "deadline": ""
-    },
-    {
-      "opq": "OPQ-95",
-      "title": "Rule the Stream-2 D-gate (D5/D6/D7 now; D1–D4 after Wave-0 artifacts)",
-      "type": "Decision",
       "status": "Open",
       "deadline": ""
     },
@@ -219,15 +191,64 @@ window.ROADMAP_DATA = {
       "deadline": ""
     },
     {
-      "opq": "OPQ-114",
-      "title": "WI-2064 — rule consent-withdrawal bearer-token threat posture (owner + AC)",
+      "opq": "OPQ-120",
+      "title": "Approve MMT-ADR-0034 — per-concept low-stakes re-prove path (WI-1465)",
+      "type": "Approval",
+      "status": "Open",
+      "deadline": ""
+    },
+    {
+      "opq": "OPQ-128",
+      "title": "Mentor UI focal decisions — two one-line product calls (2106 + 2129) [fast-track]",
       "type": "Decision",
       "status": "Open",
       "deadline": ""
     },
     {
-      "opq": "OPQ-115",
-      "title": "WI-1111 — confirm + document the Art 9 OUT ruling; notify DPO",
+      "opq": "OPQ-129",
+      "title": "Locale copy native-quality rewrite — stand up content workstream (2093)",
+      "type": "Decision",
+      "status": "Open",
+      "deadline": ""
+    },
+    {
+      "opq": "OPQ-130",
+      "title": "Supporter pre-auth bridge copy — author audience-specific text (2121)",
+      "type": "Decision",
+      "status": "Open",
+      "deadline": ""
+    },
+    {
+      "opq": "OPQ-132",
+      "title": "WI-1561 AC-3: store data-safety worksheet cannot honestly assert image non-retention or on-device-only audio",
+      "type": "Decision",
+      "status": "Open",
+      "deadline": ""
+    },
+    {
+      "opq": "OPQ-135",
+      "title": "WI-1588 launch-proof: schedule controlled staging window (Option A) or re-scope gate (B)",
+      "type": "Decision",
+      "status": "Open",
+      "deadline": ""
+    },
+    {
+      "opq": "OPQ-136",
+      "title": "WI-2487 dev-Neon identity-FK repoint: approve bounded profiles-only transaction (NOT migration 0129 verbatim)",
+      "type": "Approval",
+      "status": "Open",
+      "deadline": ""
+    },
+    {
+      "opq": "OPQ-137",
+      "title": "WI-2386 gate: authorize bounded db:push:dev schema push on shared dev Neon (or record gate blocked)",
+      "type": "Approval",
+      "status": "Open",
+      "deadline": ""
+    },
+    {
+      "opq": "OPQ-138",
+      "title": "WI-2464: rule AC-5 semantic-equivalence/mastery-breadth + authorize AC-6 paid Tier-2 eval run",
       "type": "Decision",
       "status": "Open",
       "deadline": ""
@@ -275,14 +296,6 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-757",
-      "n": 757,
-      "name": "Amend MMT-ADR-0000 — crystal-clear reconstruct-vs-launder + L3-in-passing-only + operator sign-off + no feature-PR ADRs",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": []
-    },
-    {
       "wi": "WI-779",
       "n": 779,
       "name": "WP-FLAG — Remove IDENTITY_V2_ENABLED + legacy schema/twins",
@@ -301,38 +314,6 @@ window.ROADMAP_DATA = {
       "lanes": [
         "Post-MVP pen"
       ]
-    },
-    {
-      "wi": "WI-896",
-      "n": 896,
-      "name": "A — Amend MMT-ADR-0000 §II.6: shift-left ADR-provenance (ratified why; needs human-Architecture sign-off; gates B–E)",
-      "stage": "Backlog",
-      "priority": "",
-      "lanes": []
-    },
-    {
-      "wi": "WI-897",
-      "n": 897,
-      "name": "B — Layer 1: AGENTS.md doctrine rule — specs implement decisions, run §II.1 before writing a spec, ADR-first/lockstep",
-      "stage": "Backlog",
-      "priority": "",
-      "lanes": []
-    },
-    {
-      "wi": "WI-898",
-      "n": 898,
-      "name": "C — Layer 2: override superpowers brainstorming to inject the §II.1 gate + hierarchy (decisions spawn ADRs, specs point at them)",
-      "stage": "Backlog",
-      "priority": "",
-      "lanes": []
-    },
-    {
-      "wi": "WI-899",
-      "n": 899,
-      "name": "D — Layer 3: /refine ADR-gate — run the §II.1 five-trigger test at refine; flag ADR-class; require linked ADR before Ready (shared ZDX toolchain, coordinate w/ Nexus)",
-      "stage": "Backlog",
-      "priority": "",
-      "lanes": []
     },
     {
       "wi": "WI-900",
@@ -413,16 +394,6 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-1111",
-      "n": 1111,
-      "name": "Rule and document the Article 9 health / learning-disability decision",
-      "stage": "Ready",
-      "priority": "P1",
-      "lanes": [
-        "Compliance — Legal & External"
-      ]
-    },
-    {
       "wi": "WI-1114",
       "n": 1114,
       "name": "Complete store age-rating and kids/privacy declarations (both stores)",
@@ -493,30 +464,10 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-1193",
-      "n": 1193,
-      "name": "Record accountable lawful-basis + terms-accepted fact (incl. adults); split consent purposes",
-      "stage": "Ready",
-      "priority": "P1",
-      "lanes": [
-        "Compliance — Engineering"
-      ]
-    },
-    {
       "wi": "WI-1194",
       "n": 1194,
       "name": "Close retention gaps: verify transcript purge, age-out verbatim quotes, set retention periods, add dormancy sweep",
       "stage": "Executing",
-      "priority": "P1",
-      "lanes": [
-        "Compliance — Engineering"
-      ]
-    },
-    {
-      "wi": "WI-1196",
-      "n": 1196,
-      "name": "Activate DB-layer RLS for defence-in-depth, or formally accept app-layer-only isolation with tracked remediation",
-      "stage": "Ready",
       "priority": "P1",
       "lanes": [
         "Compliance — Engineering"
@@ -566,7 +517,7 @@ window.ROADMAP_DATA = {
       "wi": "WI-1328",
       "n": 1328,
       "name": "RevenueCat production monetization setup (MVP)",
-      "stage": "Ready",
+      "stage": "Executing",
       "priority": "P1",
       "lanes": [
         "Store, Billing & Release"
@@ -575,7 +526,7 @@ window.ROADMAP_DATA = {
     {
       "wi": "WI-1334",
       "n": 1334,
-      "name": "Rule dev/preview V0+V1+V2 flag combos: fix or sanction (banned per convergence spine)",
+      "name": "Rule the grandfathered non-sanctioned navigation flag combinations",
       "stage": "Ready",
       "priority": "P2",
       "lanes": [
@@ -623,26 +574,6 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-1378",
-      "n": 1378,
-      "name": "profile-isolation.integration.test.ts fails on real migrated DB — seeds legacy profiles but quiz_rounds.profile_id FKs person.id; suite not wired into any CI target",
-      "stage": "Refining",
-      "priority": "P3",
-      "lanes": [
-        "Identity Cutover"
-      ]
-    },
-    {
-      "wi": "WI-1394",
-      "n": 1394,
-      "name": "Re-home CEFR vocabulary browser into the V2 shell (legacy Progress-only today)",
-      "stage": "Ready",
-      "priority": "P3",
-      "lanes": [
-        "Four Strands Language Learning"
-      ]
-    },
-    {
       "wi": "WI-1395",
       "n": 1395,
       "name": "Re-home full milestone history list into the V2 shell (legacy Progress-only today)",
@@ -665,7 +596,7 @@ window.ROADMAP_DATA = {
     {
       "wi": "WI-1397",
       "n": 1397,
-      "name": "Update v2-dossier docs 06+07: stale Journal-practice/appeal/person-scope claims and moved code anchors",
+      "name": "Dissolved premise: v2-dossier docs 06 and 07 are archived as superseded",
       "stage": "Ready",
       "priority": "P3",
       "lanes": [
@@ -683,49 +614,9 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-1437",
-      "n": 1437,
-      "name": "Surface milestone_reached moments as cards in the Mentor /now stack",
-      "stage": "Ready",
-      "priority": "P2",
-      "lanes": [
-        "Mobile UX & Navigation"
-      ]
-    },
-    {
-      "wi": "WI-1439",
-      "n": 1439,
-      "name": "Fix stale status headers across shipped specs/plans (concept-capture, journal-redesign, forever-notebook, trial-onboarding, note-correctness)",
-      "stage": "Ready",
-      "priority": "P3",
-      "lanes": [
-        "Launch Readiness"
-      ]
-    },
-    {
-      "wi": "WI-1442",
-      "n": 1442,
-      "name": "Persist consent audit trail before profile hard-delete (GDPR proof-of-consent)",
-      "stage": "Ready",
-      "priority": "P1",
-      "lanes": [
-        "Compliance — Engineering"
-      ]
-    },
-    {
-      "wi": "WI-1443",
-      "n": 1443,
-      "name": "Correctness-chain #3: add per-turn answer-correctness signal to the learning envelope",
-      "stage": "Ready",
-      "priority": "P3",
-      "lanes": [
-        "Core Learning Loop"
-      ]
-    },
-    {
       "wi": "WI-1444",
       "n": 1444,
-      "name": "Correctness-chain #4: wire (or delete) the stranded three-strike adaptive-teaching system",
+      "name": "Retire the stranded duplicate adaptive-teaching strike subsystem",
       "stage": "Ready",
       "priority": "P3",
       "lanes": [
@@ -746,7 +637,7 @@ window.ROADMAP_DATA = {
       "wi": "WI-1454",
       "n": 1454,
       "name": "Concept-targeted review: focus due-topic recall on open weak concepts (concept-capture item 5)",
-      "stage": "Ready",
+      "stage": "Backlog",
       "priority": "P3",
       "lanes": [
         "Core Learning Loop"
@@ -800,46 +691,6 @@ window.ROADMAP_DATA = {
       "priority": "P3",
       "lanes": [
         "Mobile UX & Navigation"
-      ]
-    },
-    {
-      "wi": "WI-1460",
-      "n": 1460,
-      "name": "epics.md Annex A.5 superseded-annotation pass (FR6, Epic 4, Epic 7, Epic 12, WEB-A)",
-      "stage": "Ready",
-      "priority": "P2",
-      "lanes": [
-        "V2 finalization"
-      ]
-    },
-    {
-      "wi": "WI-1462",
-      "n": 1462,
-      "name": "Replace library-redirect dead-end with a bounded re-teach off-ramp on 3rd failed recall (RR-4)",
-      "stage": "Ready",
-      "priority": "P2",
-      "lanes": [
-        "Core Learning Loop"
-      ]
-    },
-    {
-      "wi": "WI-1463",
-      "n": 1463,
-      "name": "Default the relearn topic list to system-ranked order by SM-2 urgency (RR-5)",
-      "stage": "Ready",
-      "priority": "P2",
-      "lanes": [
-        "Core Learning Loop"
-      ]
-    },
-    {
-      "wi": "WI-1465",
-      "n": 1465,
-      "name": "Low-stakes per-concept re-prove path for recovering strugglers (RR-7 Challenge Round lockout)",
-      "stage": "Ready",
-      "priority": "P2",
-      "lanes": [
-        "Core Learning Loop"
       ]
     },
     {
@@ -933,16 +784,6 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-1486",
-      "n": 1486,
-      "name": "Continuity T7: defer mic permission request to an intentional voice action",
-      "stage": "Ready",
-      "priority": "P3",
-      "lanes": [
-        "Mobile UX & Navigation"
-      ]
-    },
-    {
       "wi": "WI-1488",
       "n": 1488,
       "name": "Notification reachability T4-T6: child-to-parent reciprocal nudges (needs re-triage + spec)",
@@ -1023,16 +864,6 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-1507",
-      "n": 1507,
-      "name": "Complete launch compliance closure check against actual data flows",
-      "stage": "Ready",
-      "priority": "P1",
-      "lanes": [
-        "Compliance — Engineering"
-      ]
-    },
-    {
       "wi": "WI-1550",
       "n": 1550,
       "name": "Add language-native competency profile model",
@@ -1053,60 +884,28 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-1559",
-      "n": 1559,
-      "name": "Controller legal entity mismatch across privacy policy vs DPIA/ROPA",
-      "stage": "Ready",
-      "priority": "P1",
-      "lanes": [
-        "Compliance — Engineering"
-      ]
+      "wi": "WI-1556",
+      "n": 1556,
+      "name": "Profile do-now siblings T1/T2/T5: first-run reachability for conversation-language fix (extraction gap)",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": []
     },
     {
       "wi": "WI-1561",
       "n": 1561,
       "name": "Store data-safety worksheet stale vs current code (age 11 vs 13; legacy tables)",
-      "stage": "Ready",
+      "stage": "Executing",
       "priority": "P1",
       "lanes": [
         "Compliance — Engineering"
-      ]
-    },
-    {
-      "wi": "WI-1566",
-      "n": 1566,
-      "name": "Scope LLM kill-switch KV read to LLM routes (avoid per-request read on all routes)",
-      "stage": "Ready",
-      "priority": "P3",
-      "lanes": [
-        "Launch Readiness"
-      ]
-    },
-    {
-      "wi": "WI-1574",
-      "n": 1574,
-      "name": "Consolidate activation-event recording into services/ — extract duplicated route-level call sites + occurrence-bucketing policy",
-      "stage": "Ready",
-      "priority": "P3",
-      "lanes": [
-        "Launch Readiness"
-      ]
-    },
-    {
-      "wi": "WI-1575",
-      "n": 1575,
-      "name": "Fold standalone ci.yml whole-tree ratchets into check-change-class.sh (run locally by change class)",
-      "stage": "Ready",
-      "priority": "P2",
-      "lanes": [
-        "Launch Readiness"
       ]
     },
     {
       "wi": "WI-1577",
       "n": 1577,
       "name": "Launch compliance closure — FINAL GATE (pre-store-submission re-run)",
-      "stage": "Refining",
+      "stage": "Executing",
       "priority": "P1",
       "lanes": [
         "Compliance — Engineering"
@@ -1126,7 +925,7 @@ window.ROADMAP_DATA = {
       "wi": "WI-1588",
       "n": 1588,
       "name": "LAUNCH-BLOCKING: verify activation instrumentation (WI-1504) + LLM kill-switch (WI-1505) end-to-end vs a real migrated Neon DB + KV in a staging/prod-profile build",
-      "stage": "Ready",
+      "stage": "Executing",
       "priority": "P1",
       "lanes": [
         "Store, Billing & Release"
@@ -1143,9 +942,19 @@ window.ROADMAP_DATA = {
       ]
     },
     {
+      "wi": "WI-1628",
+      "n": 1628,
+      "name": "Staging deploy blocker: 0131 out-of-band DDL vs drizzle journal (42P07 activation_events) — diagnosed+fixed by PM, needs verify + systemic guard",
+      "stage": "Captured",
+      "priority": "P1",
+      "lanes": [
+        "Bug Lane"
+      ]
+    },
+    {
       "wi": "WI-1642",
       "n": 1642,
-      "name": "All SENTRY_AUTH_TOKEN values in Doppler (dev/stg/prd) are invalid — crash triage is blind",
+      "name": "Dissolved premise: Sentry API tokens are valid in dev, staging, and production",
       "stage": "Ready",
       "priority": "P2",
       "lanes": [
@@ -1166,7 +975,7 @@ window.ROADMAP_DATA = {
       "wi": "WI-1655",
       "n": 1655,
       "name": "WS-44 device-evidence batch: run the verify-at-e2e-run Maestro flows on an emulator",
-      "stage": "Ready",
+      "stage": "Executing",
       "priority": "P2",
       "lanes": [
         "Launch Readiness"
@@ -1236,7 +1045,7 @@ window.ROADMAP_DATA = {
       "wi": "WI-1704",
       "n": 1704,
       "name": "Build evidence-links substrate for verified learning artifacts",
-      "stage": "Ready",
+      "stage": "Executing",
       "priority": "P2",
       "lanes": [
         "Core Learning Loop"
@@ -1260,16 +1069,6 @@ window.ROADMAP_DATA = {
       "priority": "P1",
       "lanes": [
         "Core Learning Loop"
-      ]
-    },
-    {
-      "wi": "WI-1763",
-      "n": 1763,
-      "name": "Voice-floor coverage audit across V2 surfaces (mic/transcription everywhere)",
-      "stage": "Ready",
-      "priority": "P2",
-      "lanes": [
-        "Mobile UX & Navigation"
       ]
     },
     {
@@ -1315,8 +1114,8 @@ window.ROADMAP_DATA = {
     {
       "wi": "WI-1770",
       "n": 1770,
-      "name": "Make native E2E use reusable seed user slots instead of ad-hoc accounts",
-      "stage": "Executing",
+      "name": "Dissolved premise: native E2E reusable seed slots already landed",
+      "stage": "Ready",
       "priority": "P2",
       "lanes": [
         "Launch Readiness"
@@ -1325,8 +1124,8 @@ window.ROADMAP_DATA = {
     {
       "wi": "WI-1771",
       "n": 1771,
-      "name": "Sweep stale E2E seed-created users and add a native cleanup safety net",
-      "stage": "Executing",
+      "name": "Dissolved premise: native E2E cleanup safety net already landed",
+      "stage": "Ready",
       "priority": "P2",
       "lanes": [
         "Launch Readiness"
@@ -1366,7 +1165,7 @@ window.ROADMAP_DATA = {
       "wi": "WI-1801",
       "n": 1801,
       "name": "Configure and verify production launch-health alerts",
-      "stage": "Executing",
+      "stage": "Ready",
       "priority": "P1",
       "lanes": [
         "Launch Readiness"
@@ -1393,16 +1192,6 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-1807",
-      "n": 1807,
-      "name": "Repair end-user LLM quality gate after profiles-table removal",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Dev-Infra & Tooling"
-      ]
-    },
-    {
       "wi": "WI-1808",
       "n": 1808,
       "name": "Remove or replace stale premium-routing command in change classifier",
@@ -1410,16 +1199,6 @@ window.ROADMAP_DATA = {
       "priority": "P2",
       "lanes": [
         "Post-MVP pen"
-      ]
-    },
-    {
-      "wi": "WI-1809",
-      "n": 1809,
-      "name": "GC1 checker (check-gc1-pattern-a.ts) blind to gc1-allow comments outside its AST span — 3 PRs bounced in one day",
-      "stage": "Backlog",
-      "priority": "P3",
-      "lanes": [
-        "Dev-Infra & Tooling"
       ]
     },
     {
@@ -1443,16 +1222,6 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-1813",
-      "n": 1813,
-      "name": "Reseed stale simulation-baseline.json (fails --validate-baseline; references retired grader slug)",
-      "stage": "Backlog",
-      "priority": "P3",
-      "lanes": [
-        "Dev-Infra & Tooling"
-      ]
-    },
-    {
       "wi": "WI-1814",
       "n": 1814,
       "name": "CRS03 simulator fixture expects 'reteach' outcome that its scenario shape can never produce",
@@ -1460,16 +1229,6 @@ window.ROADMAP_DATA = {
       "priority": "P3",
       "lanes": [
         "Core Learning Loop"
-      ]
-    },
-    {
-      "wi": "WI-1826",
-      "n": 1826,
-      "name": "Suitability judge adopts capability:'judge' routing path (completes H4 provider-safety-net gate)",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Safety & Eval"
       ]
     },
     {
@@ -1496,7 +1255,7 @@ window.ROADMAP_DATA = {
       "wi": "WI-1847",
       "n": 1847,
       "name": "Local pre-push jest failures: setTimeout/clearTimeout is not defined in jest-environment-node on drifted Node hosts (jwt.test.ts, gemini.test.ts)",
-      "stage": "Backlog",
+      "stage": "Ready",
       "priority": "P3",
       "lanes": [
         "Post-MVP pen"
@@ -1543,20 +1302,10 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-1862",
-      "n": 1862,
-      "name": "Local pre-push jest harness broken: gemini.test.ts clearTimeout fake-timers failure + inngest.test.ts worker-env 500 force SKIP_PRE_PUSH on unrelated pushes",
-      "stage": "Backlog",
-      "priority": "P3",
-      "lanes": [
-        "Dev-Infra & Tooling"
-      ]
-    },
-    {
       "wi": "WI-1864",
       "n": 1864,
       "name": "Nightly Maestro suite: 4 of 8 shards failing on first nightly since the release-APK switch",
-      "stage": "Backlog",
+      "stage": "Ready",
       "priority": "P2",
       "lanes": [
         "Dev-Infra & Tooling"
@@ -1603,16 +1352,6 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-1871",
-      "n": 1871,
-      "name": "Low-severity roundup — Correctness and logic",
-      "stage": "Backlog",
-      "priority": "P3",
-      "lanes": [
-        "Post-MVP pen"
-      ]
-    },
-    {
       "wi": "WI-1872",
       "n": 1872,
       "name": "Stop using gc1-allow to justify mocking internal hooks/components for test convenience",
@@ -1630,16 +1369,6 @@ window.ROADMAP_DATA = {
       "priority": "P3",
       "lanes": [
         "Post-MVP pen"
-      ]
-    },
-    {
-      "wi": "WI-1874",
-      "n": 1874,
-      "name": "db-push guard's DB_PUSH_LOCAL_DEV escape can still push to staging (no URL host check)",
-      "stage": "Backlog",
-      "priority": "P3",
-      "lanes": [
-        "Dev-Infra & Tooling"
       ]
     },
     {
@@ -1663,16 +1392,6 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-1877",
-      "n": 1877,
-      "name": "Fence learner-controlled text in suitability-judge prompt with data-only wrapper",
-      "stage": "Backlog",
-      "priority": "P3",
-      "lanes": [
-        "Safety & Eval"
-      ]
-    },
-    {
       "wi": "WI-1878",
       "n": 1878,
       "name": "Low-severity roundup — Accessibility and i18n",
@@ -1693,29 +1412,9 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-1880",
-      "n": 1880,
-      "name": "Fence learner answer in challenge-round grader prompt; result field is model-trusted and injectable",
-      "stage": "Backlog",
-      "priority": "P3",
-      "lanes": [
-        "Safety & Eval"
-      ]
-    },
-    {
       "wi": "WI-1881",
       "n": 1881,
       "name": "Low-severity roundup — LLM / AI surface",
-      "stage": "Backlog",
-      "priority": "P3",
-      "lanes": [
-        "Post-MVP pen"
-      ]
-    },
-    {
-      "wi": "WI-1882",
-      "n": 1882,
-      "name": "render-wrangler-kv.mjs prints raw CF account/KV identifier to console on format-mismatch",
       "stage": "Backlog",
       "priority": "P3",
       "lanes": [
@@ -1750,16 +1449,6 @@ window.ROADMAP_DATA = {
       "priority": "P3",
       "lanes": [
         "Post-MVP pen"
-      ]
-    },
-    {
-      "wi": "WI-1886",
-      "n": 1886,
-      "name": "GET/PATCH session routes skip learningSessionSchema.parse before returning to client",
-      "stage": "Backlog",
-      "priority": "P3",
-      "lanes": [
-        "Core Learning Loop"
       ]
     },
     {
@@ -1823,16 +1512,6 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-1893",
-      "n": 1893,
-      "name": "Stale config.ts comment claims judge flags Production stays off while both are true in prd",
-      "stage": "Ready",
-      "priority": "P3",
-      "lanes": [
-        "Post-MVP pen"
-      ]
-    },
-    {
       "wi": "WI-1894",
       "n": 1894,
       "name": "Opener check (learning_opening_too_thin) stochastically fails at raw-zero — needs structural fix",
@@ -1880,16 +1559,6 @@ window.ROADMAP_DATA = {
       "priority": "P3",
       "lanes": [
         "Safety & Eval"
-      ]
-    },
-    {
-      "wi": "WI-1899",
-      "n": 1899,
-      "name": "Voice/photo-first input loop for the homework wedge (reduce typing friction on small phones)",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "Post-MVP pen"
       ]
     },
     {
@@ -2003,146 +1672,6 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-1985",
-      "n": 1985,
-      "name": "Tear down guardianship/supportership edges in person-scoped deletes (GDPR/COPPA erasure)",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Compliance — Engineering"
-      ]
-    },
-    {
-      "wi": "WI-1986",
-      "n": 1986,
-      "name": "Close under-18 vendor bypass in legacy LLM fallback selector",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Safety & Eval"
-      ]
-    },
-    {
-      "wi": "WI-1987",
-      "n": 1987,
-      "name": "Stop persisting learner transcripts to plaintext AsyncStorage; purge scoped cache on sign-out",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Compliance — Engineering"
-      ]
-    },
-    {
-      "wi": "WI-1988",
-      "n": 1988,
-      "name": "Delete minors' homework photos from device cache after OCR/upload",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Compliance — Engineering"
-      ]
-    },
-    {
-      "wi": "WI-1989",
-      "n": 1989,
-      "name": "Close X-Profile-Id owner-gate IDOR on 7 un-swept owner routes",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Identity Cutover"
-      ]
-    },
-    {
-      "wi": "WI-1990",
-      "n": 1990,
-      "name": "Strip learner free-text PII from Sentry; add beforeSend scrubber",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Compliance — Engineering"
-      ]
-    },
-    {
-      "wi": "WI-1991",
-      "n": 1991,
-      "name": "Clamp day-of-month in billing/quota cycle-reset date math",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Store, Billing & Release"
-      ]
-    },
-    {
-      "wi": "WI-1992",
-      "n": 1992,
-      "name": "Route service-diff PRs through API integration suite (CI change-class gap)",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Dev-Infra & Tooling"
-      ]
-    },
-    {
-      "wi": "WI-1993",
-      "n": 1993,
-      "name": "Use exact birthdate in client adult-owner gate (match server decision)",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "Mobile UX & Navigation"
-      ]
-    },
-    {
-      "wi": "WI-1994",
-      "n": 1994,
-      "name": "Make getSubjectProgress read the latest curriculum version",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "Core Learning Loop"
-      ]
-    },
-    {
-      "wi": "WI-1995",
-      "n": 1995,
-      "name": "Parse LLM envelope signals field-tolerantly (degrade, don't drop)",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "Core Learning Loop"
-      ]
-    },
-    {
-      "wi": "WI-1996",
-      "n": 1996,
-      "name": "Stop blind metadata full-replace clobbering challenge-round state",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "Core Learning Loop"
-      ]
-    },
-    {
-      "wi": "WI-1997",
-      "n": 1997,
-      "name": "Stop swallowed dedup-log write double-notifying parents (weekly digest)",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "Supporter & Linking"
-      ]
-    },
-    {
-      "wi": "WI-1998",
-      "n": 1998,
-      "name": "Unify session idempotency gates to one fail-closed policy (+ retry-stable dispatchId)",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "Core Learning Loop"
-      ]
-    },
-    {
       "wi": "WI-1999",
       "n": 1999,
       "name": "Add route-handler tests for family-join and speaking-practice (+ stale-response fix)",
@@ -2160,16 +1689,6 @@ window.ROADMAP_DATA = {
       "priority": "P2",
       "lanes": [
         "Launch Readiness"
-      ]
-    },
-    {
-      "wi": "WI-2001",
-      "n": 2001,
-      "name": "Test webhook dispatcher and v2 top-up money writes for real",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "Store, Billing & Release"
       ]
     },
     {
@@ -2193,36 +1712,6 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-2004",
-      "n": 2004,
-      "name": "Add guard for the 'safety gate on primary path only' defect class",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "Safety & Eval"
-      ]
-    },
-    {
-      "wi": "WI-2005",
-      "n": 2005,
-      "name": "Make curriculum-adapt reorder switch exhaustive over CurriculumAdaptSignal",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "Core Learning Loop"
-      ]
-    },
-    {
-      "wi": "WI-2006",
-      "n": 2006,
-      "name": "Spike: define and apply read-side profile-authority check",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "Identity Cutover"
-      ]
-    },
-    {
       "wi": "WI-2007",
       "n": 2007,
       "name": "Adopt Inngest replay harness for step idempotency tests, or delete it",
@@ -2243,20 +1732,10 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-2009",
-      "n": 2009,
-      "name": "Make review-calibration-grade retry-safe (paid LLM call + bare insert share one step.run)",
-      "stage": "Backlog",
-      "priority": "P3",
-      "lanes": [
-        "Core Learning Loop"
-      ]
-    },
-    {
       "wi": "WI-2010",
       "n": 2010,
       "name": "Break two runtime circular imports (assessments<->retention-data, family-bridge<->family-bridge-v2)",
-      "stage": "Backlog",
+      "stage": "Refining",
       "priority": "P3",
       "lanes": [
         "Post-MVP pen"
@@ -2266,16 +1745,6 @@ window.ROADMAP_DATA = {
       "wi": "WI-2011",
       "n": 2011,
       "name": "Align .nullable().optional() drift in internal event schemas with canon",
-      "stage": "Backlog",
-      "priority": "P3",
-      "lanes": [
-        "Post-MVP pen"
-      ]
-    },
-    {
-      "wi": "WI-2012",
-      "n": 2012,
-      "name": "Add row lock to memory-consent toggle (check-then-act race)",
       "stage": "Backlog",
       "priority": "P3",
       "lanes": [
@@ -2323,26 +1792,6 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-2055",
-      "n": 2055,
-      "name": "Amend identity canon: forward-repair is the person_id recovery path (legacy rollback retired)",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Identity Cutover"
-      ]
-    },
-    {
-      "wi": "WI-2056",
-      "n": 2056,
-      "name": "Write Neon PITR/snapshot recovery runbook (identity/person_id data mistakes)",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Identity Cutover"
-      ]
-    },
-    {
       "wi": "WI-2057",
       "n": 2057,
       "name": "Build person merge / reparent / alias forward-repair primitives",
@@ -2350,16 +1799,6 @@ window.ROADMAP_DATA = {
       "priority": "P2",
       "lanes": [
         "Post-MVP pen"
-      ]
-    },
-    {
-      "wi": "WI-2058",
-      "n": 2058,
-      "name": "Write deletion irreversible-boundary runbook (grace / DB-delete / retain / Clerk-erasure / dead-letter)",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Compliance — Engineering"
       ]
     },
     {
@@ -2376,7 +1815,7 @@ window.ROADMAP_DATA = {
       "wi": "WI-2060",
       "n": 2060,
       "name": "Write billing external-contract escape-hatch runbook (product-ID migration, dual entitlements, webhook recovery)",
-      "stage": "Backlog",
+      "stage": "Refining",
       "priority": "P2",
       "lanes": [
         "Post-MVP pen"
@@ -2400,26 +1839,6 @@ window.ROADMAP_DATA = {
       "priority": "P1",
       "lanes": [
         "V2 finalization"
-      ]
-    },
-    {
-      "wi": "WI-2063",
-      "n": 2063,
-      "name": "Record web parent-control-center strategy checkpoint (trigger for web-learning investment)",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "Post-MVP pen"
-      ]
-    },
-    {
-      "wi": "WI-2064",
-      "n": 2064,
-      "name": "Define consent-withdrawal bearer-token threat posture (owner + acceptance criterion)",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Compliance — Engineering"
       ]
     },
     {
@@ -2456,7 +1875,7 @@ window.ROADMAP_DATA = {
       "wi": "WI-2069",
       "n": 2069,
       "name": "S2-06: ADR backfill batch 1 — census MUST rows (21 after D2 overrides)",
-      "stage": "Backlog",
+      "stage": "Refining",
       "priority": "P2",
       "lanes": [
         "Stream 2 — Estate-Canon Drain (PRG-20)"
@@ -2486,7 +1905,7 @@ window.ROADMAP_DATA = {
       "wi": "WI-2072",
       "n": 2072,
       "name": "S2-09: WI-387 nine-memory drain — content extraction to ruled targets",
-      "stage": "Backlog",
+      "stage": "Refining",
       "priority": "P2",
       "lanes": [
         "Stream 2 — Estate-Canon Drain (PRG-20)"
@@ -2516,7 +1935,7 @@ window.ROADMAP_DATA = {
       "wi": "WI-2075",
       "n": 2075,
       "name": "S2-12: Glossary bucket-3 routing (cards/celebrations)",
-      "stage": "Backlog",
+      "stage": "Refining",
       "priority": "P2",
       "lanes": [
         "Stream 2 — Estate-Canon Drain (PRG-20)"
@@ -2563,129 +1982,9 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-2080",
-      "n": 2080,
-      "name": "Verify accent-preset reality: shipped-intentional vs dead feature (brand 3-way contradiction)",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "Stream 2 — Estate-Canon Drain (PRG-20)"
-      ]
-    },
-    {
-      "wi": "WI-2081",
-      "n": 2081,
-      "name": "Fix dangling docs/superpowers/ citations in jest config comments",
-      "stage": "Backlog",
-      "priority": "P3",
-      "lanes": [
-        "Dev-Infra & Tooling"
-      ]
-    },
-    {
       "wi": "WI-2093",
       "n": 2093,
       "name": "Review and rewrite all UI locales for semantic, native-quality copy",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "QA Fix Factory"
-      ]
-    },
-    {
-      "wi": "WI-2094",
-      "n": 2094,
-      "name": "Route valid Mentor statements instead of silently ignoring send",
-      "stage": "Ready",
-      "priority": "P1",
-      "lanes": [
-        "Core Learning Loop"
-      ]
-    },
-    {
-      "wi": "WI-2095",
-      "n": 2095,
-      "name": "Prevent first-session reflection save from remaining indefinitely pending",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Core Learning Loop"
-      ]
-    },
-    {
-      "wi": "WI-2096",
-      "n": 2096,
-      "name": "Render only one header on the Mentor language screen",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "QA Fix Factory"
-      ]
-    },
-    {
-      "wi": "WI-2098",
-      "n": 2098,
-      "name": "Preserve explicit mentor language when app language changes",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Core Learning Loop"
-      ]
-    },
-    {
-      "wi": "WI-2099",
-      "n": 2099,
-      "name": "Preserve the opening Mentor exchange when starting a session",
-      "stage": "Ready",
-      "priority": "P1",
-      "lanes": [
-        "Core Learning Loop"
-      ]
-    },
-    {
-      "wi": "WI-2100",
-      "n": 2100,
-      "name": "Ask which source the learner means instead of assuming a book",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Core Learning Loop"
-      ]
-    },
-    {
-      "wi": "WI-2101",
-      "n": 2101,
-      "name": "Show every earned session milestone with clear context",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "QA Fix Factory"
-      ]
-    },
-    {
-      "wi": "WI-2102",
-      "n": 2102,
-      "name": "Keep the mentor writing indicator stable throughout long replies",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "QA Fix Factory"
-      ]
-    },
-    {
-      "wi": "WI-2103",
-      "n": 2103,
-      "name": "Cancel silence prompts when a learning session ends",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "QA Fix Factory"
-      ]
-    },
-    {
-      "wi": "WI-2105",
-      "n": 2105,
-      "name": "Always show the mentor-born ceremony after first profile creation",
       "stage": "Backlog",
       "priority": "P2",
       "lanes": [
@@ -2703,86 +2002,6 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-2107",
-      "n": 2107,
-      "name": "Make Mentor opening promises lead to an immediate next turn",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Core Learning Loop"
-      ]
-    },
-    {
-      "wi": "WI-2108",
-      "n": 2108,
-      "name": "Render one coherent Mentor waiting animation at a time",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "QA Fix Factory"
-      ]
-    },
-    {
-      "wi": "WI-2109",
-      "n": 2109,
-      "name": "Deduplicate identical learning-moment cards in the Mentor feed",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "QA Fix Factory"
-      ]
-    },
-    {
-      "wi": "WI-2110",
-      "n": 2110,
-      "name": "Deep-link learning-moment cards to the correct Journal section",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "QA Fix Factory"
-      ]
-    },
-    {
-      "wi": "WI-2111",
-      "n": 2111,
-      "name": "Place saved learning-moment receipts after Mentor action cards",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "QA Fix Factory"
-      ]
-    },
-    {
-      "wi": "WI-2112",
-      "n": 2112,
-      "name": "Redefine Challenge as deeper active learning instead of a recall quiz",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Core Learning Loop"
-      ]
-    },
-    {
-      "wi": "WI-2113",
-      "n": 2113,
-      "name": "Surface post-session Challenge actions at a deterministic transition",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "QA Fix Factory"
-      ]
-    },
-    {
-      "wi": "WI-2114",
-      "n": 2114,
-      "name": "Give answer-specific feedback in Recall Check instead of repeating generic copy",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Core Learning Loop"
-      ]
-    },
-    {
       "wi": "WI-2115",
       "n": 2115,
       "name": "Safety soft-block recovery affordance + FP instrumentation (split from WI-1898)",
@@ -2790,36 +2009,6 @@ window.ROADMAP_DATA = {
       "priority": "P2",
       "lanes": [
         "Post-MVP pen"
-      ]
-    },
-    {
-      "wi": "WI-2118",
-      "n": 2118,
-      "name": "Restore Expo web export dependency resolution",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "Dev-Infra & Tooling"
-      ]
-    },
-    {
-      "wi": "WI-2119",
-      "n": 2119,
-      "name": "Prevent Clerk security-service timeout from blocking web email sign-up",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Dev-Infra & Tooling"
-      ]
-    },
-    {
-      "wi": "WI-2120",
-      "n": 2120,
-      "name": "Provision Clerk publishable key in preview EAS builds",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Dev-Infra & Tooling"
       ]
     },
     {
@@ -2833,30 +2022,10 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-2123",
-      "n": 2123,
-      "name": "Restore the family shell after first-child creation in native preview",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Supporter & Linking"
-      ]
-    },
-    {
-      "wi": "WI-2124",
-      "n": 2124,
-      "name": "Render escaped Unicode formulas correctly in Mentor prose",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "QA Fix Factory"
-      ]
-    },
-    {
       "wi": "WI-2125",
       "n": 2125,
       "name": "Restore the staging family-join invite endpoint for preview clients",
-      "stage": "Backlog",
+      "stage": "Ready",
       "priority": "P1",
       "lanes": [
         "Supporter & Linking"
@@ -2916,110 +2085,10 @@ window.ROADMAP_DATA = {
       "wi": "WI-2176",
       "n": 2176,
       "name": "Keep the Support-hub scope selector clear of the avatar and page heading on small phones",
-      "stage": "Backlog",
+      "stage": "Executing",
       "priority": "P2",
       "lanes": [
         "QA Fix Factory"
-      ]
-    },
-    {
-      "wi": "WI-2177",
-      "n": 2177,
-      "name": "Make the canonical V2 parity test command portable to native Windows",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "Launch Readiness"
-      ]
-    },
-    {
-      "wi": "WI-2178",
-      "n": 2178,
-      "name": "Use the active app theme behind fixed V2 chrome on pushed screens",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "QA Fix Factory"
-      ]
-    },
-    {
-      "wi": "WI-2179",
-      "n": 2179,
-      "name": "Prevent AccountAvatar from intercepting the Subject Hub manage action",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "Mobile UX & Navigation"
-      ]
-    },
-    {
-      "wi": "WI-2182",
-      "n": 2182,
-      "name": "Separate BottomSheet backdrop dismissal from interactive sheet content",
-      "stage": "Backlog",
-      "priority": "P1",
-      "lanes": [
-        "QA Fix Factory"
-      ]
-    },
-    {
-      "wi": "WI-2183",
-      "n": 2183,
-      "name": "Provide a real recovery path when saved-summary AI feedback fails",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "Core Learning Loop"
-      ]
-    },
-    {
-      "wi": "WI-2184",
-      "n": 2184,
-      "name": "Show newly completed topic sessions in Topic Hub history",
-      "stage": "Ready",
-      "priority": "P2",
-      "lanes": [
-        "Core Learning Loop"
-      ]
-    },
-    {
-      "wi": "WI-2185",
-      "n": 2185,
-      "name": "Reserve fixed V2 chrome space before pushed-screen content",
-      "stage": "Ready",
-      "priority": "P2",
-      "lanes": [
-        "QA Fix Factory"
-      ]
-    },
-    {
-      "wi": "WI-2186",
-      "n": 2186,
-      "name": "Align Reports empty-state timing with weekly and monthly delivery",
-      "stage": "Ready",
-      "priority": "P3",
-      "lanes": [
-        "QA Fix Factory"
-      ]
-    },
-    {
-      "wi": "WI-2187",
-      "n": 2187,
-      "name": "Make owner-global Account settings unambiguous under learner scope",
-      "stage": "Ready",
-      "priority": "P1",
-      "lanes": [
-        "QA Fix Factory"
-      ]
-    },
-    {
-      "wi": "WI-2188",
-      "n": 2188,
-      "name": "Give every link-initiation step an explicit in-app exit",
-      "stage": "Ready",
-      "priority": "P2",
-      "lanes": [
-        "Supporter & Linking"
       ]
     },
     {
@@ -3030,56 +2099,6 @@ window.ROADMAP_DATA = {
       "priority": "P2",
       "lanes": [
         "Supporter & Linking"
-      ]
-    },
-    {
-      "wi": "WI-2190",
-      "n": 2190,
-      "name": "Persist quiz answers in the shape required by round-detail reads",
-      "stage": "Ready",
-      "priority": "P1",
-      "lanes": [
-        "Core Learning Loop"
-      ]
-    },
-    {
-      "wi": "WI-2191",
-      "n": 2191,
-      "name": "Remove nested interactive controls from the Practice quick-quiz card",
-      "stage": "Ready",
-      "priority": "P2",
-      "lanes": [
-        "QA Fix Factory"
-      ]
-    },
-    {
-      "wi": "WI-2192",
-      "n": 2192,
-      "name": "Expose quiz-results exit actions as accessible buttons",
-      "stage": "Ready",
-      "priority": "P2",
-      "lanes": [
-        "QA Fix Factory"
-      ]
-    },
-    {
-      "wi": "WI-2193",
-      "n": 2193,
-      "name": "Advance recitation after a valid title-only first turn",
-      "stage": "Ready",
-      "priority": "P2",
-      "lanes": [
-        "Four Strands Language Learning"
-      ]
-    },
-    {
-      "wi": "WI-2194",
-      "n": 2194,
-      "name": "Use one Family quota denominator across subscription usage surfaces",
-      "stage": "Ready",
-      "priority": "P1",
-      "lanes": [
-        "Store, Billing & Release"
       ]
     },
     {
@@ -3103,36 +2122,6 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-2198",
-      "n": 2198,
-      "name": "Reconcile the canonical mobile flow inventory and E2E manifests with the V2 shell",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "V2 finalization"
-      ]
-    },
-    {
-      "wi": "WI-2215",
-      "n": 2215,
-      "name": "Route V2 Subjects Add into the create-subject round trip",
-      "stage": "Ready",
-      "priority": "P1",
-      "lanes": [
-        "Mobile UX & Navigation"
-      ]
-    },
-    {
-      "wi": "WI-2216",
-      "n": 2216,
-      "name": "Enable voice capture on the V2 Mentor input",
-      "stage": "Ready",
-      "priority": "P2",
-      "lanes": [
-        "Core Learning Loop"
-      ]
-    },
-    {
       "wi": "WI-2217",
       "n": 2217,
       "name": "Supply scoped topic and session indexes before Mentor flow dispatch",
@@ -3153,26 +2142,6 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-2219",
-      "n": 2219,
-      "name": "Make Practice recovery browse routes V2-shell aware",
-      "stage": "Ready",
-      "priority": "P1",
-      "lanes": [
-        "V2 finalization"
-      ]
-    },
-    {
-      "wi": "WI-2220",
-      "n": 2220,
-      "name": "Carry the active app shell into production app-help prompt composition",
-      "stage": "Ready",
-      "priority": "P1",
-      "lanes": [
-        "V2 finalization"
-      ]
-    },
-    {
       "wi": "WI-2221",
       "n": 2221,
       "name": "Design a composed Mentor capability context over navigation, scope, and deep-link contracts",
@@ -3183,26 +2152,6 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-2222",
-      "n": 2222,
-      "name": "Consolidate Mentor capability contract tests and targeted E2E",
-      "stage": "Ready",
-      "priority": "P2",
-      "lanes": [
-        "Core Learning Loop"
-      ]
-    },
-    {
-      "wi": "WI-2223",
-      "n": 2223,
-      "name": "Make support.hub deep links select Support-hub scope before navigation",
-      "stage": "Backlog",
-      "priority": "P2",
-      "lanes": [
-        "Supporter & Linking"
-      ]
-    },
-    {
       "wi": "WI-2224",
       "n": 2224,
       "name": "Rule the V2 permanent subject-deletion policy and reachable surface",
@@ -3210,36 +2159,6 @@ window.ROADMAP_DATA = {
       "priority": "P3",
       "lanes": [
         "Post-MVP pen"
-      ]
-    },
-    {
-      "wi": "WI-2225",
-      "n": 2225,
-      "name": "Preserve non-authorizing supporter intent through signup and cold start",
-      "stage": "Ready",
-      "priority": "P1",
-      "lanes": [
-        "Supporter & Linking"
-      ]
-    },
-    {
-      "wi": "WI-2226",
-      "n": 2226,
-      "name": "Wire and correct landed supporter cold-start and self-learning doorways in V2",
-      "stage": "Refining",
-      "priority": "P1",
-      "lanes": [
-        "Supporter & Linking"
-      ]
-    },
-    {
-      "wi": "WI-2228",
-      "n": 2228,
-      "name": "Expand and gate the existing V2 E2E release lane across Maestro and Playwright",
-      "stage": "Ready",
-      "priority": "P1",
-      "lanes": [
-        "Launch Readiness"
       ]
     },
     {
@@ -3296,7 +2215,7 @@ window.ROADMAP_DATA = {
       "wi": "WI-2234",
       "n": 2234,
       "name": "Extend V2 E2E for returning learner feed, resume, and Mentor return",
-      "stage": "Ready",
+      "stage": "Executing",
       "priority": "P1",
       "lanes": [
         "Launch Readiness"
@@ -3316,27 +2235,17 @@ window.ROADMAP_DATA = {
       "wi": "WI-2236",
       "n": 2236,
       "name": "Extend V2 E2E for Mentor homework capture and same-session return",
-      "stage": "Ready",
+      "stage": "Executing",
       "priority": "P1",
       "lanes": [
         "Launch Readiness"
       ]
     },
     {
-      "wi": "WI-2237",
-      "n": 2237,
-      "name": "Gate supporter scopes and structural reads on accepted visibility",
-      "stage": "Ready",
-      "priority": "P1",
-      "lanes": [
-        "Supporter & Linking"
-      ]
-    },
-    {
       "wi": "WI-2238",
       "n": 2238,
       "name": "Cover V2 Subjects browse, Subject Hub, and first-subject creation",
-      "stage": "Ready",
+      "stage": "Executing",
       "priority": "P1",
       "lanes": [
         "Launch Readiness"
@@ -3346,27 +2255,7 @@ window.ROADMAP_DATA = {
       "wi": "WI-2239",
       "n": 2239,
       "name": "Cover the V2 Journal paper trail end to end",
-      "stage": "Ready",
-      "priority": "P1",
-      "lanes": [
-        "Launch Readiness"
-      ]
-    },
-    {
-      "wi": "WI-2240",
-      "n": 2240,
-      "name": "Cover V2 avatar account administration and exit paths end to end",
-      "stage": "Ready",
-      "priority": "P2",
-      "lanes": [
-        "Launch Readiness"
-      ]
-    },
-    {
-      "wi": "WI-2241",
-      "n": 2241,
-      "name": "Add supportership-aware V2 seeds and cover scope preservation and privacy",
-      "stage": "Ready",
+      "stage": "Executing",
       "priority": "P1",
       "lanes": [
         "Launch Readiness"
@@ -3383,13 +2272,1153 @@ window.ROADMAP_DATA = {
       ]
     },
     {
-      "wi": "WI-2243",
-      "n": 2243,
-      "name": "Wire the V2 supporter self-learning doorway and cover Me-scope persistence",
+      "wi": "WI-2331",
+      "n": 2331,
+      "name": "Restore V2 wayfinding and active-profile orientation on pushed screens",
+      "stage": "Executing",
+      "priority": "P2",
+      "lanes": [
+        "QA Fix Factory"
+      ]
+    },
+    {
+      "wi": "WI-2341",
+      "n": 2341,
+      "name": "HITL live-Clerk QA — device launch (WI-2120) + web sign-up verification (WI-2119)",
+      "stage": "Backlog",
+      "priority": "",
+      "lanes": []
+    },
+    {
+      "wi": "WI-2344",
+      "n": 2344,
+      "name": "Centralize jest fake-timer save/restore in apps/api shared setup (end pre-push SKIP_PRE_PUSH normalization from timer-global poisoning)",
+      "stage": "Backlog",
+      "priority": "P2",
+      "lanes": [
+        "Dev-Infra & Tooling"
+      ]
+    },
+    {
+      "wi": "WI-2346",
+      "n": 2346,
+      "name": "Dispatch durable dead-letter event on terminal deletion-teardown failure (account-deletion + subscription-store)",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Compliance — Engineering"
+      ]
+    },
+    {
+      "wi": "WI-2349",
+      "n": 2349,
+      "name": "Execute the column-level profile_id→person_id rename (24 schema files + code references)",
+      "stage": "Backlog",
+      "priority": "",
+      "lanes": [
+        "Identity Cutover"
+      ]
+    },
+    {
+      "wi": "WI-2350",
+      "n": 2350,
+      "name": "Ramtop worktrees run Node 26 vs repo's required 22.x — breaks local pre-push hooks",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Dev-Infra & Tooling"
+      ]
+    },
+    {
+      "wi": "WI-2351",
+      "n": 2351,
+      "name": "Decide immediate Challenge-Round entry for challenge.start deep links (WI-2112 AC-2 follow-up)",
+      "stage": "Executing",
+      "priority": "P2",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2357",
+      "n": 2357,
+      "name": "Challenge grader mislabels planted misconception as partial (diagnostic-label accuracy)",
+      "stage": "Backlog",
+      "priority": "",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2358",
+      "n": 2358,
+      "name": "Harden eval-harness asText extraction (robustness follow-on)",
+      "stage": "Backlog",
+      "priority": "",
+      "lanes": [
+        "Safety & Eval"
+      ]
+    },
+    {
+      "wi": "WI-2359",
+      "n": 2359,
+      "name": "Barrel-align escapeXml imports across the three LLM prompt files (cosmetic)",
+      "stage": "Backlog",
+      "priority": "",
+      "lanes": [
+        "Architecture Clean-Out"
+      ]
+    },
+    {
+      "wi": "WI-2360",
+      "n": 2360,
+      "name": "Repoint 5 stale docs/superpowers citations to their docs/_archive successors",
+      "stage": "Backlog",
+      "priority": "",
+      "lanes": [
+        "Architecture Clean-Out"
+      ]
+    },
+    {
+      "wi": "WI-2385",
+      "n": 2385,
+      "name": "V2 E2E lane final gate verification — full-suite green across the expanded lane",
+      "stage": "Refining",
+      "priority": "P1",
+      "lanes": [
+        "V2 finalization"
+      ]
+    },
+    {
+      "wi": "WI-2389",
+      "n": 2389,
+      "name": "Split proposal: retire duplicate ambient-smoke cure after WI-2450 diagnosis",
+      "stage": "Backlog",
+      "priority": "P1",
+      "lanes": [
+        "Launch Readiness"
+      ]
+    },
+    {
+      "wi": "WI-2390",
+      "n": 2390,
+      "name": "Harden account/person deletion recovery + audit proof (grace / export / Clerk erasure / teardown dead-letter) — T3 from the one-way-door drain",
+      "stage": "Captured",
+      "priority": "",
+      "lanes": [
+        "Compliance — Engineering"
+      ]
+    },
+    {
+      "wi": "WI-2395",
+      "n": 2395,
+      "name": "Decide and enforce the coldstart pre-acceptance disclosure policy for supporters",
       "stage": "Backlog",
       "priority": "P2",
       "lanes": [
         "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2399",
+      "n": 2399,
+      "name": "Generation-guard or cancel the link-initiate create mutation on Back to close the rapid-resubmit late-success race",
+      "stage": "Captured",
+      "priority": "P3",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2400",
+      "n": 2400,
+      "name": "Provision the EAS preview Environment Variables in the real EAS store (Clerk key, Sentry DSN, RevenueCat) — and verify WI-2120 wasn't validated against the wrong store",
+      "stage": "Captured",
+      "priority": "P3",
+      "lanes": [
+        "Dev-Infra & Tooling"
+      ]
+    },
+    {
+      "wi": "WI-2401",
+      "n": 2401,
+      "name": "Optionally fail-close the supporter challenge-ready read on a committed mid-request revoke",
+      "stage": "Captured",
+      "priority": "P3",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2402",
+      "n": 2402,
+      "name": "Size the DB pool for supporter-hub per-edge repeatable-read transactions (50-edge worst case)",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2411",
+      "n": 2411,
+      "name": "Mobile client consumes the needsAdultConsent server signal (first-use adult self-consent re-consent)",
+      "stage": "Refining",
+      "priority": "P2",
+      "lanes": [
+        "Compliance — Engineering"
+      ]
+    },
+    {
+      "wi": "WI-2413",
+      "n": 2413,
+      "name": "Keep absent terms acceptance distinct in accountability reports",
+      "stage": "Backlog",
+      "priority": "P1",
+      "lanes": [
+        "Compliance — Engineering"
+      ]
+    },
+    {
+      "wi": "WI-2444",
+      "n": 2444,
+      "name": "acceptedVisibilityCondition denies an archived supportee but not an archived supporter",
+      "stage": "Captured",
+      "priority": "P3",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2453",
+      "n": 2453,
+      "name": "Email-only parents have no restore path within the 7-day grace after bearer-restore removal (WI-2348 residual)",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2460",
+      "n": 2460,
+      "name": "Person-level mentor-language override provenance — cross-device persistence (WI-2098 Option A)",
+      "stage": "Captured",
+      "priority": "P3",
+      "lanes": []
+    },
+    {
+      "wi": "WI-2461",
+      "n": 2461,
+      "name": "Restore independent weekly teaching and mastery eval gates",
+      "stage": "Backlog",
+      "priority": "P1",
+      "lanes": [
+        "Safety & Eval"
+      ]
+    },
+    {
+      "wi": "WI-2462",
+      "n": 2462,
+      "name": "Add scoped under-10 and adult teaching-quality eval coverage",
+      "stage": "Backlog",
+      "priority": "P2",
+      "lanes": [
+        "Safety & Eval"
+      ]
+    },
+    {
+      "wi": "WI-2463",
+      "n": 2463,
+      "name": "Centralize latest-curriculum reads across version-sensitive consumers",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2464",
+      "n": 2464,
+      "name": "Prevent Challenge Round question repetition and expose tutor failures in the simulator",
+      "stage": "Executing",
+      "priority": "P2",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2467",
+      "n": 2467,
+      "name": "Make remaining empty-state Library-push CTAs V2-shell aware (sibling sweep from WI-2219)",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "V2 finalization"
+      ]
+    },
+    {
+      "wi": "WI-2469",
+      "n": 2469,
+      "name": "Reconcile/remove stale duplicate cosmo execute plugin (F4 — manifest-less completions pass locally, bounce at authoritative boundary)",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Compliance — Engineering"
+      ]
+    },
+    {
+      "wi": "WI-2471",
+      "n": 2471,
+      "name": "Supporter self-select at signup — durable supporter-intent state + signup affordance (post-MVP)",
+      "stage": "Captured",
+      "priority": "P3",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2472",
+      "n": 2472,
+      "name": "Thread active app shell into buildAppHelpDirectReply (assessment-answer app-help feedback)",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "V2 finalization"
+      ]
+    },
+    {
+      "wi": "WI-2483",
+      "n": 2483,
+      "name": "Lock clearContinuationDepth metadata merge against concurrent writers",
+      "stage": "Captured",
+      "priority": "P3",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2484",
+      "n": 2484,
+      "name": "Reconcile dev Neon notification-preferences FK after identity-v2 cutover",
+      "stage": "Executing",
+      "priority": "P1",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2487",
+      "n": 2487,
+      "name": "Complete dev Neon identity-v2 FK repoint without losing legacy support messages",
+      "stage": "Executing",
+      "priority": "P1",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2491",
+      "n": 2491,
+      "name": "Replace AccountAdminSheet test internal-module mocks",
+      "stage": "Captured",
+      "priority": "P3",
+      "lanes": [
+        "Launch Readiness"
+      ]
+    },
+    {
+      "wi": "WI-2502",
+      "n": 2502,
+      "name": "Make optional mentor-notice nudges reachable and lossless",
+      "stage": "Refining",
+      "priority": "P3",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2503",
+      "n": 2503,
+      "name": "Serialize mentor-notice dedup and defer-before-send suppression",
+      "stage": "Backlog",
+      "priority": "P1",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2505",
+      "n": 2505,
+      "name": "Align Now learning CTAs with their terminal actions",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2510",
+      "n": 2510,
+      "name": "Investigate 13 V2-parity test failures on native Windows (post-portability)",
+      "stage": "Captured",
+      "priority": "P3",
+      "lanes": []
+    },
+    {
+      "wi": "WI-2513",
+      "n": 2513,
+      "name": "Design durable grader-result storage for pre-commit retry idempotency",
+      "stage": "Captured",
+      "priority": "P3",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2514",
+      "n": 2514,
+      "name": "Replace six internal mocks in sessions route tests",
+      "stage": "Captured",
+      "priority": "P3",
+      "lanes": [
+        "Four Strands Language Learning"
+      ]
+    },
+    {
+      "wi": "WI-2515",
+      "n": 2515,
+      "name": "Assert supporter all-edges-revoked-at-runtime -> graceful learner-shape (revocation/unlink coverage)",
+      "stage": "Captured",
+      "priority": "P3",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2517",
+      "n": 2517,
+      "name": "Extend read-side profile-authority to remaining audited gaps (G9-G29, out of WI-2416 AC scope)",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Identity Cutover"
+      ]
+    },
+    {
+      "wi": "WI-2518",
+      "n": 2518,
+      "name": "Supporter-scope read-authority primitive (audit gaps G30/G32) — distinct from profile-authority",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Identity Cutover"
+      ]
+    },
+    {
+      "wi": "WI-2520",
+      "n": 2520,
+      "name": "Thread ageBracket to vendor-exclusion across 9 additional non-threading LEARNER_FACING_FLOWS callers",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Identity Cutover"
+      ]
+    },
+    {
+      "wi": "WI-2521",
+      "n": 2521,
+      "name": "Render + test supporter pending-visibility cold-start state in the production Support Hub (re-homed from WI-2226)",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2522",
+      "n": 2522,
+      "name": "Fix doppler-run main guard so Windows test scripts execute",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2525",
+      "n": 2525,
+      "name": "SupporterSelfLearningDoorway is dead code — supporters have no live UI path to their own Me scope",
+      "stage": "Captured",
+      "priority": "P3",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2526",
+      "n": 2526,
+      "name": "Make child reports date tests deterministic under the active locale",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2527",
+      "n": 2527,
+      "name": "Burn down raw-error→Sentry captureException backlog (18 sites) + promote gov/no-raw-error-to-sentry to error",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Compliance — Engineering"
+      ]
+    },
+    {
+      "wi": "WI-2529",
+      "n": 2529,
+      "name": "Define balanced evidence-backed mentor recognition",
+      "stage": "Captured",
+      "priority": "P1",
+      "lanes": []
+    },
+    {
+      "wi": "WI-2530",
+      "n": 2530,
+      "name": "Stabilize child session-detail async render under full serialized mobile Jest load",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2531",
+      "n": 2531,
+      "name": "Prevent DB clock skew from skipping a virgin retention card's first schedule",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2532",
+      "n": 2532,
+      "name": "Add the Me-or-someone-else fork to family-intent onboarding",
+      "stage": "Captured",
+      "priority": "P1",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2533",
+      "n": 2533,
+      "name": "Implement guardian attachment and jurisdictional consent for credentialed learners",
+      "stage": "Captured",
+      "priority": "P1",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2534",
+      "n": 2534,
+      "name": "Compose guardian consent and supportership into resumable family onboarding",
+      "stage": "Captured",
+      "priority": "P1",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2535",
+      "n": 2535,
+      "name": "Correct the blanket 13-plus self-consent launch model",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2536",
+      "n": 2536,
+      "name": "Cross-org supporter cold-start affordance (managed child not owned/switchable)",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": []
+    },
+    {
+      "wi": "WI-2537",
+      "n": 2537,
+      "name": "Remove legacy internal mocks from WI-2236-touched mobile tests",
+      "stage": "Captured",
+      "priority": "P3",
+      "lanes": [
+        "Launch Readiness"
+      ]
+    },
+    {
+      "wi": "WI-2538",
+      "n": 2538,
+      "name": "person.hasOwnAccount has no writer -> granted-idle/active cold-start branches unreachable in production",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2539",
+      "n": 2539,
+      "name": "Replace six full internal mocks in ChatShell tests",
+      "stage": "Captured",
+      "priority": "P3",
+      "lanes": [
+        "Launch Readiness"
+      ]
+    },
+    {
+      "wi": "WI-2540",
+      "n": 2540,
+      "name": "Add an empty-subject escape path to manual homework entry",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Launch Readiness"
+      ]
+    },
+    {
+      "wi": "WI-2543",
+      "n": 2543,
+      "name": "Service-layer granular consent gating — 5 mixed LLM/deterministic routes deferred from WI-2396",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Identity Cutover"
+      ]
+    },
+    {
+      "wi": "WI-2548",
+      "n": 2548,
+      "name": "Make coach-bubble visual flows deterministic in release Maestro CI",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Dev-Infra & Tooling"
+      ]
+    },
+    {
+      "wi": "WI-2549",
+      "n": 2549,
+      "name": "Add transcription to V2 Mentor cold-start, reflections, and memory inputs",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Mobile UX & Navigation"
+      ]
+    },
+    {
+      "wi": "WI-2550",
+      "n": 2550,
+      "name": "Add transcription to V2 Subjects search, notes, and creation inputs",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Mobile UX & Navigation"
+      ]
+    },
+    {
+      "wi": "WI-2551",
+      "n": 2551,
+      "name": "Add transcription to V2-reachable quiz, homework fallback, and session utility inputs",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Mobile UX & Navigation"
+      ]
+    },
+    {
+      "wi": "WI-2552",
+      "n": 2552,
+      "name": "Close transcription gaps in V2-reachable search and feedback utilities",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Mobile UX & Navigation"
+      ]
+    },
+    {
+      "wi": "WI-2553",
+      "n": 2553,
+      "name": "Ratify voice-floor exceptions for security, identity, and deliberate-typing inputs",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Mobile UX & Navigation"
+      ]
+    },
+    {
+      "wi": "WI-2565",
+      "n": 2565,
+      "name": "Give GET /now a read-authority guard consistent with the session-summary route",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2567",
+      "n": 2567,
+      "name": "secure-storage.test.ts cannot pass under the mobile jest config — 5 cases fail on localStorage",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2570",
+      "n": 2570,
+      "name": "Ratify mentor-notice MVP canon and reconcile PRs #2293/#2357",
+      "stage": "Ready",
+      "priority": "P1",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2571",
+      "n": 2571,
+      "name": "Guard: fail fast when selected Playwright fixtures reference scenarios the deployed seed catalog does not accept",
+      "stage": "Executing",
+      "priority": "P1",
+      "lanes": [
+        "Launch Readiness"
+      ]
+    },
+    {
+      "wi": "WI-2572",
+      "n": 2572,
+      "name": "getStartOfTodayInTimeZone has the same DST-gap latent bug as the mentor-notice learning-day primitive",
+      "stage": "Captured",
+      "priority": "P3",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2574",
+      "n": 2574,
+      "name": "Run final mentor-notice MVP acceptance audit against MMT-ADR-0036",
+      "stage": "Executing",
+      "priority": "P1",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2577",
+      "n": 2577,
+      "name": "Wire V2 build-time flags into the later-phases Playwright project so V2 web journeys can execute",
+      "stage": "Captured",
+      "priority": "P1",
+      "lanes": [
+        "Dev-Infra & Tooling"
+      ]
+    },
+    {
+      "wi": "WI-2578",
+      "n": 2578,
+      "name": "Integration test files under tests/integration are type-checked by nothing",
+      "stage": "Ready",
+      "priority": "P2",
+      "lanes": [
+        "Dev-Infra & Tooling"
+      ]
+    },
+    {
+      "wi": "WI-2580",
+      "n": 2580,
+      "name": "Fixed In ancestry check blesses a commit that does not contain the change",
+      "stage": "Backlog",
+      "priority": "P2",
+      "lanes": [
+        "Cosmo Lifecycle Tooling"
+      ]
+    },
+    {
+      "wi": "WI-2581",
+      "n": 2581,
+      "name": "complete auto-derives Fixed In from a stale same-repo HEAD after squash merge",
+      "stage": "Backlog",
+      "priority": "P1",
+      "lanes": [
+        "Cosmo Lifecycle Tooling"
+      ]
+    },
+    {
+      "wi": "WI-2583",
+      "n": 2583,
+      "name": "Tighten mentor-notice matrix positive rows from substring to structured assertion",
+      "stage": "Captured",
+      "priority": "P3",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2585",
+      "n": 2585,
+      "name": "Native Maestro deterministic seed slots collide across concurrent workflow runs",
+      "stage": "Executing",
+      "priority": "P1",
+      "lanes": [
+        "Launch Readiness"
+      ]
+    },
+    {
+      "wi": "WI-2586",
+      "n": 2586,
+      "name": "Restore the self-preview entry before re-enabling its nightly Maestro flow",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Dev-Infra & Tooling"
+      ]
+    },
+    {
+      "wi": "WI-2593",
+      "n": 2593,
+      "name": "Redact seeded login credentials from Playwright reports and rotate exposed staging test users",
+      "stage": "Captured",
+      "priority": "P0",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2599",
+      "n": 2599,
+      "name": "Deterministic receipt projection for multi-notice sessions",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2600",
+      "n": 2600,
+      "name": "Restore + device-verify the two Maestro flows quarantined by WI-2596 (more-row-subscription, progress-subject-back)",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "QA Fix Factory"
+      ]
+    },
+    {
+      "wi": "WI-2601",
+      "n": 2601,
+      "name": "Add timestamp to mentor-notice inngest event payloads (sweep)",
+      "stage": "Captured",
+      "priority": "P3",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2605",
+      "n": 2605,
+      "name": "Isolate legacy parent-gateway smoke from ambient profile bootstrap",
+      "stage": "Executing",
+      "priority": "P1",
+      "lanes": [
+        "Launch Readiness"
+      ]
+    },
+    {
+      "wi": "WI-2606",
+      "n": 2606,
+      "name": "Deduplicate parent-gateway seeding to avoid staging rate limits",
+      "stage": "Ready",
+      "priority": "P1",
+      "lanes": [
+        "Launch Readiness"
+      ]
+    },
+    {
+      "wi": "WI-2619",
+      "n": 2619,
+      "name": "Add non-mocked billing-v2 webhook selector and route-binding regressions",
+      "stage": "Ready",
+      "priority": "P2",
+      "lanes": [
+        "Store, Billing & Release"
+      ]
+    },
+    {
+      "wi": "WI-2620",
+      "n": 2620,
+      "name": "Add real-database regressions for billing-v2 top-up credit reattribution",
+      "stage": "Ready",
+      "priority": "P2",
+      "lanes": [
+        "Store, Billing & Release"
+      ]
+    },
+    {
+      "wi": "WI-2622",
+      "n": 2622,
+      "name": "Make jest maxWorkers tunable per-machine via JEST_MAX_WORKERS",
+      "stage": "Executing",
+      "priority": "P2",
+      "lanes": [
+        "Launch Readiness"
+      ]
+    },
+    {
+      "wi": "WI-2623",
+      "n": 2623,
+      "name": "Amend mentor-notice authority, rollback, safety, evidence-retention, and learning-day canon",
+      "stage": "Executing",
+      "priority": "P1",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2624",
+      "n": 2624,
+      "name": "Enforce explicit producer-vendor exclusion in judge routing",
+      "stage": "Executing",
+      "priority": "P1",
+      "lanes": [
+        "Compliance — Engineering"
+      ]
+    },
+    {
+      "wi": "WI-2625",
+      "n": 2625,
+      "name": "Make mentor-notice re-check outcomes independently server-judged",
+      "stage": "Ready",
+      "priority": "P1",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2627",
+      "n": 2627,
+      "name": "Make mentor-notice rollback observations monotonic across deployments",
+      "stage": "Ready",
+      "priority": "P1",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2628",
+      "n": 2628,
+      "name": "Fail closed on multilingual clinical inferences in persisted learning text",
+      "stage": "Ready",
+      "priority": "P1",
+      "lanes": [
+        "Compliance — Engineering"
+      ]
+    },
+    {
+      "wi": "WI-2633",
+      "n": 2633,
+      "name": "Resolve dev quota_pool subscription orphans before remaining identity-v2 FK repoints",
+      "stage": "Captured",
+      "priority": "P1",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2636",
+      "n": 2636,
+      "name": "Repair the existing semantic type debt in the integration-test graph",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Dev-Infra & Tooling"
+      ]
+    },
+    {
+      "wi": "WI-2639",
+      "n": 2639,
+      "name": "Concurrent filing calls return different shelf IDs despite deduplication invariant",
+      "stage": "Captured",
+      "priority": "P1",
+      "lanes": [
+        "Compliance — Engineering"
+      ]
+    },
+    {
+      "wi": "WI-2640",
+      "n": 2640,
+      "name": "Static sub_webhook_001 fixture makes subscription integration test non-repeatable",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Compliance — Engineering"
+      ]
+    },
+    {
+      "wi": "WI-2641",
+      "n": 2641,
+      "name": "Concurrent filing calls return different shelf IDs despite deduplication invariant",
+      "stage": "Captured",
+      "priority": "P1",
+      "lanes": [
+        "Compliance — Engineering"
+      ]
+    },
+    {
+      "wi": "WI-2642",
+      "n": 2642,
+      "name": "Static sub_webhook_001 fixture makes subscription integration test non-repeatable",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Compliance — Engineering"
+      ]
+    },
+    {
+      "wi": "WI-2643",
+      "n": 2643,
+      "name": "Shared integration database role cannot SET LOCAL ROLE for RLS isolation tests",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Compliance — Engineering"
+      ]
+    },
+    {
+      "wi": "WI-2649",
+      "n": 2649,
+      "name": "CI guard: enum ALTER TYPE ADD VALUE migrations must use IF NOT EXISTS",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2650",
+      "n": 2650,
+      "name": "CI guard: enum ALTER TYPE ADD VALUE migrations must use IF NOT EXISTS",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2653",
+      "n": 2653,
+      "name": "Allow credentialed non-owner callers through the proxy guard as self",
+      "stage": "Captured",
+      "priority": "P1",
+      "lanes": [
+        "Identity Cutover"
+      ]
+    },
+    {
+      "wi": "WI-2656",
+      "n": 2656,
+      "name": "Refresh docs/audience-matrix.md against current navigation-contract code",
+      "stage": "Captured",
+      "priority": "P1",
+      "lanes": [
+        "Stream 2 — Estate-Canon Drain (PRG-20)"
+      ]
+    },
+    {
+      "wi": "WI-2657",
+      "n": 2657,
+      "name": "Rebuild docs/INDEX.md coverage beyond the identity seed (<5% of live corpus)",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Stream 2 — Estate-Canon Drain (PRG-20)"
+      ]
+    },
+    {
+      "wi": "WI-2658",
+      "n": 2658,
+      "name": "Search-exclude docs/_archive/ from agent search surfaces (one ignore rule)",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Stream 2 — Estate-Canon Drain (PRG-20)"
+      ]
+    },
+    {
+      "wi": "WI-2659",
+      "n": 2659,
+      "name": "Fix verified doc-vs-code drifts in project_context.md and architecture.md (challenge turns 5→3, phantom easeFactor trigger, stale stamps)",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Stream 2 — Estate-Canon Drain (PRG-20)"
+      ]
+    },
+    {
+      "wi": "WI-2660",
+      "n": 2660,
+      "name": "Banner ontology.md jurisdiction-consent model as resolution-unbuilt (fail-closed scaffold)",
+      "stage": "Captured",
+      "priority": "P1",
+      "lanes": [
+        "Stream 2 — Estate-Canon Drain (PRG-20)"
+      ]
+    },
+    {
+      "wi": "WI-2661",
+      "n": 2661,
+      "name": "Extend docs/glossary.md with notice/journal/scope vocabulary",
+      "stage": "Captured",
+      "priority": "P3",
+      "lanes": [
+        "Stream 2 — Estate-Canon Drain (PRG-20)"
+      ]
+    },
+    {
+      "wi": "WI-2667",
+      "n": 2667,
+      "name": "check-change-class.sh --fast silently pushes DDL to shared dev Neon via Doppler",
+      "stage": "Captured",
+      "priority": "P2",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2669",
+      "n": 2669,
+      "name": "transcript-purge integration test afterAll leaks person row in shared dev DB on skip/fail",
+      "stage": "Captured",
+      "priority": "P3",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2670",
+      "n": 2670,
+      "name": "Thread per-turn producer vendor through exchange history and apply producer-exclusion to the Challenge Round grader",
+      "stage": "Ready",
+      "priority": "P1",
+      "lanes": [
+        "Compliance — Engineering"
       ]
     }
   ]

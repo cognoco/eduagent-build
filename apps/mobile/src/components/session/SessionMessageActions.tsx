@@ -4,12 +4,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { hapticLight } from '../../lib/haptics';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
-import type { ChatMessage } from './ChatShell';
 import { QuotaExceededCard } from './QuotaExceededCard';
 import type { QuotaExceededDetails } from '../../lib/api-client';
 import {
   getContextualQuickChips,
   quickChipLabel,
+  type ChatMessage,
   type QuickChipId,
   type MessageFeedbackState,
   type ConversationStage,

@@ -9,7 +9,7 @@ import type {
   CelebrationReason,
 } from '@eduagent/schemas';
 import type { Router, Href } from 'expo-router';
-import type { ChatMessage } from './ChatShell';
+import type { ChatMessage } from './session-types';
 import type {
   useCloseSession,
   useRecordSystemPrompt,
