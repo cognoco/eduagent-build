@@ -10,6 +10,7 @@ import {
   consentResendSchema,
   consentRequestSchema,
   selfConsentWithdrawRequestSchema,
+  selfConsentAcceptResultSchema,
   type ConsentPurpose,
   type ConsentResendRequest,
 } from './consent.js';
@@ -98,5 +99,44 @@ describe('consentRequestSchema (initial + change-recipient) [WI-374]', () => {
       consentType: 'GDPR',
     });
     expect(parsed.parentEmail).toBe('parent@example.com');
+  });
+});
+
+describe('selfConsentAcceptResultSchema [WI-2547]', () => {
+  it('parses a first-acceptance result carrying both granular purposes', () => {
+    const parsed = selfConsentAcceptResultSchema.parse({
+      message: 'Consent recorded.',
+      purposesGranted: [...CONSENT_PURPOSES],
+      termsVersion: '2026-05-31',
+    });
+    expect(parsed.purposesGranted).toEqual(['platform_use', 'llm_disclosure']);
+    expect(parsed.termsVersion).toBe('2026-05-31');
+  });
+
+  it('parses an idempotent replay result — no purposes written, still a result', () => {
+    const parsed = selfConsentAcceptResultSchema.parse({
+      message: 'Consent recorded.',
+      purposesGranted: [],
+      termsVersion: '2026-05-31',
+    });
+    expect(parsed.purposesGranted).toEqual([]);
+  });
+
+  it('rejects a purpose outside the canonical set', () => {
+    const result = selfConsentAcceptResultSchema.safeParse({
+      message: 'Consent recorded.',
+      purposesGranted: ['targeted_ads'],
+      termsVersion: '2026-05-31',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an empty termsVersion — the acceptance fact must be versioned', () => {
+    const result = selfConsentAcceptResultSchema.safeParse({
+      message: 'Consent recorded.',
+      purposesGranted: [],
+      termsVersion: '',
+    });
+    expect(result.success).toBe(false);
   });
 });

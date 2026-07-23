@@ -81,6 +81,19 @@ export class ConsentReconsentRequiredError extends Error {
   }
 }
 
+/**
+ * [WI-2547] The caller is not an adult account owner, so they may not record an
+ * adult self-consent. Deliberately ONE error for every ineligible shape (minor,
+ * non-owner, unknown person, cross-organization) so the route's response cannot
+ * be used to enumerate account membership or ages.
+ */
+export class AdultSelfConsentNotEligibleError extends Error {
+  constructor() {
+    super('This account is not eligible for adult self-consent');
+    this.name = 'AdultSelfConsentNotEligibleError';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Error classes — re-exported 1:1 from the legacy machine so the route layer's
 // `instanceof` checks work identically against either implementation. The v2
@@ -445,6 +458,57 @@ function parseVersionedTermsFact(
   return null;
 }
 
+/**
+ * [WI-2547] The shared adult-account-OWNER gate: `admin` membership in THIS
+ * organization AND an adult (18+) birth date. Extracted verbatim from
+ * repairOrSignalAdultSelfConsentV2 so the repair path and the acceptance path
+ * (acceptAdultSelfConsentV2) can never drift apart on who counts as eligible.
+ *
+ * Fail-closed on every unknown: absent/non-admin membership (which also covers
+ * a CROSS-ORGANIZATION caller — no membership row in the passed org), missing
+ * person row, unparseable birth date, or any non-adult bracket.
+ *
+ * computeAgeBracketFromDate is the canonical feature-gating / safety-adjacent
+ * age function AGENTS.md §Profile Shapes names for the adult-owner gate
+ * (exact-date UTC math, year-only fallback when month/day are absent — never
+ * the year-only computeAgeBracket, which overestimates by up to 11 months and
+ * could read a late-in-the-year 17-year-old as 18). `birthDate` is the
+ * `YYYY-MM-DD` date column.
+ */
+export async function isAdultAccountOwnerV2(
+  db: Database,
+  personId: string,
+  organizationId: string,
+): Promise<boolean> {
+  const membershipRow = await db.query.membership.findFirst({
+    where: and(
+      eq(membership.personId, personId),
+      eq(membership.organizationId, organizationId),
+    ),
+    columns: { roles: true },
+  });
+  if (!membershipRow?.roles.includes('admin')) return false;
+
+  const personRow = await db.query.person.findFirst({
+    where: eq(person.id, personId),
+    columns: { birthDate: true },
+  });
+  if (!personRow) return false;
+
+  const birthDate = String(personRow.birthDate);
+  const birthYear = Number(birthDate.slice(0, 4));
+  const birthMonth = Number(birthDate.slice(5, 7));
+  const birthDay = Number(birthDate.slice(8, 10));
+  if (!Number.isFinite(birthYear)) return false;
+  return (
+    computeAgeBracketFromDate(
+      birthYear,
+      Number.isFinite(birthMonth) ? birthMonth : undefined,
+      Number.isFinite(birthDay) ? birthDay : undefined,
+    ) === 'adult'
+  );
+}
+
 export async function repairOrSignalAdultSelfConsentV2(
   db: Database,
   chargePersonId: string,
@@ -452,38 +516,7 @@ export async function repairOrSignalAdultSelfConsentV2(
 ): Promise<AdultSelfConsentRepairOutcome> {
   // Gate: adult (18+) account-OWNER only. A non-owner (managed-child login) or a
   // minor owner never receives an adult self-consent record.
-  const membershipRow = await db.query.membership.findFirst({
-    where: and(
-      eq(membership.personId, chargePersonId),
-      eq(membership.organizationId, organizationId),
-    ),
-    columns: { roles: true },
-  });
-  if (!membershipRow?.roles.includes('admin')) return 'not_applicable';
-
-  const personRow = await db.query.person.findFirst({
-    where: eq(person.id, chargePersonId),
-    columns: { birthDate: true },
-  });
-  if (!personRow) return 'not_applicable';
-  // Adult-owner gate — computeAgeBracketFromDate is the canonical feature-gating
-  // / safety-adjacent age function AGENTS.md §Profile Shapes names for the
-  // adult-owner gate (exact-date UTC math, year-only fallback when month/day are
-  // absent — never the year-only computeAgeBracket, which overestimates by up to
-  // 11 months and could read a late-in-the-year 17-year-old as 18). `birthDate`
-  // is the `YYYY-MM-DD` date column; fail-closed on a null/non-numeric birthYear.
-  const birthDate = String(personRow.birthDate);
-  const birthYear = Number(birthDate.slice(0, 4));
-  const birthMonth = Number(birthDate.slice(5, 7));
-  const birthDay = Number(birthDate.slice(8, 10));
-  if (
-    !Number.isFinite(birthYear) ||
-    computeAgeBracketFromDate(
-      birthYear,
-      Number.isFinite(birthMonth) ? birthMonth : undefined,
-      Number.isFinite(birthDay) ? birthDay : undefined,
-    ) !== 'adult'
-  ) {
+  if (!(await isAdultAccountOwnerV2(db, chargePersonId, organizationId))) {
     return 'not_applicable';
   }
 
@@ -557,6 +590,104 @@ export async function repairOrSignalAdultSelfConsentV2(
       },
     });
     return 'repaired'; // (a)
+  });
+}
+
+// ---------------------------------------------------------------------------
+// (2c) [WI-2547] acceptAdultSelfConsentV2 — the user-reachable ACCEPTANCE write
+// ---------------------------------------------------------------------------
+// repairOrSignalAdultSelfConsentV2 case (c) signals `needs_consent` and writes
+// nothing, deliberately: it will not fabricate a consent record without a
+// traceable versioned event. This is the function that closes that loop — the
+// adult performs a REAL consent event in the app, and we record it.
+//
+// Why this does NOT reuse repair's `already_present` gate: that gate matches on
+// (chargePersonId, lawfulBasis) with NO purpose predicate, while repair inserts
+// only CONSENT_PURPOSES[0]. An adult repaired into platform_use alone therefore
+// looks "already present" — reusing it here would silently never grant
+// llm_disclosure for exactly the legacy population this flow exists to serve.
+// Acceptance is decided PER PURPOSE instead.
+
+/**
+ * [WI-2547] Record an authenticated adult's acceptance of their OWN processing
+ * + LLM-disclosure consent, one `art6_1_a` grant per purpose in CONSENT_PURPOSES.
+ *
+ * Per-purpose and idempotent under retry AND concurrent submit:
+ *   - a LIVE grant (granted, not withdrawn) is left exactly as-is — never
+ *     duplicated, never weakened, never re-stamped;
+ *   - an ABSENT or WITHDRAWN purpose is granted afresh (the re-consent case).
+ * Returns the purposes this call actually wrote, so a replay returns `[]`.
+ *
+ * Authority: the caller passes their OWN server-derived person id
+ * (`callerPersonId` from the verified login binding) — never a request-supplied
+ * identifier — so this is self-scoped and carries no cross-profile hazard.
+ * Eligibility is the shared adult-account-owner gate; every ineligible shape
+ * throws AdultSelfConsentNotEligibleError BEFORE any write.
+ *
+ * `termsVersion` is the server's CONSENT_POLICY_VERSION, stamped into the
+ * versioned acceptance audit fact and kept separate from the lawful basis
+ * (MMT-ADR-0011: terms acceptance is a distinct, versioned fact).
+ */
+export async function acceptAdultSelfConsentV2(
+  db: Database,
+  chargePersonId: string,
+  organizationId: string,
+  termsVersion: string,
+): Promise<ConsentPurpose[]> {
+  if (!(await isAdultAccountOwnerV2(db, chargePersonId, organizationId))) {
+    throw new AdultSelfConsentNotEligibleError();
+  }
+
+  // Serialise per person+org with the same pg_advisory_xact_lock idiom the
+  // repair path uses, so two concurrent accepts cannot both observe an absent
+  // grant and each insert a row. There is no unique constraint to lean on here:
+  // a person legitimately holds one art6_1_a row per purpose (the AC2 purpose
+  // split), so ON CONFLICT cannot express this idempotency.
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${
+        'adult-consent-accept:' + chargePersonId + ':' + organizationId
+      }, 0))`,
+    );
+
+    const now = new Date();
+    const granted: ConsentPurpose[] = [];
+
+    for (const purpose of CONSENT_PURPOSES) {
+      const current = await tx.query.consentGrant.findFirst({
+        where: and(
+          eq(consentGrant.chargePersonId, chargePersonId),
+          eq(consentGrant.purpose, purpose),
+          eq(consentGrant.organizationId, organizationId),
+          eq(consentGrant.lawfulBasis, 'art6_1_a'),
+        ),
+        orderBy: (g, { desc }) => [desc(g.grantedAt), desc(g.id)],
+        columns: { id: true, granted: true, withdrawnAt: true },
+      });
+
+      // Already live → leave untouched (never duplicate or weaken a valid grant).
+      if (current?.granted && !current.withdrawnAt) continue;
+
+      await tx.insert(consentGrant).values({
+        chargePersonId,
+        organizationId,
+        purpose,
+        lawfulBasis: 'art6_1_a' as const,
+        granted: true,
+        grantedAt: now,
+        auditFact: {
+          // Distinct from 'adult_self_signup' / 'adult_self_consent_repair' so
+          // getConsentAccountabilityV2 can tell an in-app re-consent acceptance
+          // from bootstrap or derived-repair provenance.
+          source: 'adult_self_acceptance',
+          termsAcceptedAt: now.toISOString(),
+          termsVersion,
+        },
+      });
+      granted.push(purpose);
+    }
+
+    return granted;
   });
 }
 

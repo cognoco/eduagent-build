@@ -10,6 +10,7 @@ import {
   childConsentStatusSchema,
   consentActionResultSchema,
   selfConsentWithdrawRequestSchema,
+  selfConsentAcceptResultSchema,
   consentAccountabilityReportSchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
@@ -51,9 +52,11 @@ import {
   revokeChildConsentV2,
   restoreChildConsentV2,
   withdrawAdultSelfConsentV2,
+  acceptAdultSelfConsentV2,
   getProfileConsentStateV2,
   getOrgMemberDisplayNameV2,
   ConsentReconsentRequiredError,
+  AdultSelfConsentNotEligibleError,
 } from '../services/identity-v2/consent-v2';
 import { getChildConsentForParentV2 } from '../services/identity-v2/family-v2';
 import { getConsentAccountabilityV2 } from '../services/identity-v2/consent-status-v2';
@@ -574,6 +577,59 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       }
       if (error instanceof ConsentRecordNotFoundError) {
         return notFound(c, error.message);
+      }
+      throw error;
+    }
+  })
+
+  // [WI-2547] Authenticated adult self-consent ACCEPTANCE — the write behind the
+  // mobile AdultSelfConsentGate, for an adult owner whose session bootstrap
+  // signalled `needsAdultConsent` (GET /v1/profiles). This is the ONLY
+  // user-reachable path that records an adult's own art6_1_a lawful basis;
+  // POST /learner-profile/consent is mentor-memory consent and is NOT this.
+  //
+  // The contract takes NO caller-supplied identifiers — no person, profile,
+  // organization, lawful basis, or policy version:
+  //   - `callerPersonId` is the login→person binding accountMiddleware resolves
+  //     server-side from the Clerk JWT (WI-774/WI-1302). Deliberately NOT
+  //     withProfile(c).profileId, which is the X-Profile-Id-SELECTABLE active
+  //     profile — binding there would let an account member write ANOTHER
+  //     in-account profile's adult consent (the WI-1193 IDOR). A spoofed
+  //     X-Profile-Id therefore cannot change WHOSE consent is written.
+  //   - the organization is the authenticated account;
+  //   - the lawful basis is fixed at art6_1_a inside the service;
+  //   - termsVersion is the server's CONSENT_POLICY_VERSION binding.
+  // A cross-organization caller holds no membership row in `account.id` and so
+  // fails the eligibility gate with no write.
+  .post('/consent/self/accept', async (c) => {
+    const db = c.get('db');
+    const chargePersonId = c.get('callerPersonId');
+    if (!chargePersonId) {
+      return unauthorized(c, 'No identity is provisioned for this login.');
+    }
+    const account = requireAccount(c.get('account'));
+    const termsVersion = c.env.CONSENT_POLICY_VERSION;
+
+    try {
+      const purposesGranted = await acceptAdultSelfConsentV2(
+        db,
+        chargePersonId,
+        account.id,
+        termsVersion,
+      );
+      return c.json(
+        selfConsentAcceptResultSchema.parse({
+          message: 'Consent recorded.',
+          purposesGranted,
+          termsVersion,
+        }),
+      );
+    } catch (error) {
+      // Uniform fail-closed response. Deliberately does NOT distinguish minor
+      // from non-owner from unknown-person from cross-org, so the route cannot
+      // be used to enumerate account membership or ages.
+      if (error instanceof AdultSelfConsentNotEligibleError) {
+        return forbidden(c, 'This account is not eligible for self-consent.');
       }
       throw error;
     }
