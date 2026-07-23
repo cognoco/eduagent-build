@@ -68,6 +68,7 @@ jest.mock(
 jest.mock(
   '../../lib/scope-context' /* gc1-allow: route branch test fixes the active V2 scope without exercising provider persistence */,
   () => ({
+    ...jest.requireActual('../../lib/scope-context'),
     useScopeContext: () => mockScopeContext,
   }),
 );
@@ -93,6 +94,7 @@ jest.mock(
   () => {
     const { Pressable, Text, View } = require('react-native');
     return {
+      ...jest.requireActual('../../components/support'),
       SupportHubSubjectsTab: ({
         personScopes,
         eligiblePersons,
