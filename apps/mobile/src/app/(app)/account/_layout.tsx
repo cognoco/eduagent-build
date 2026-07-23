@@ -38,6 +38,10 @@ export default function AccountLayout(): React.ReactElement {
         name="privacy"
         options={{ title: t('more.subscreens.privacy') }}
       />
+      <Stack.Screen
+        name="family"
+        options={{ title: t('accountAdmin.familySettings') }}
+      />
     </Stack>
   );
 }
