@@ -962,6 +962,7 @@ describeIfDb('session exchange production-path integration', () => {
       .select({
         content: topicNotes.content,
         artifactSource: topicNotes.artifactSource,
+        artifactConceptKey: topicNotes.artifactConceptKey,
       })
       .from(topicNotes)
       .where(
@@ -977,11 +978,13 @@ describeIfDb('session exchange production-path integration', () => {
       expect.arrayContaining([
         {
           artifactSource: 'challenge_solid_quote',
-          content: 'Plants use sunlight to split water.',
+          content: 'photosynthesis',
+          artifactConceptKey: 'photosynthesis',
         },
         {
           artifactSource: 'challenge_drafted_note',
           content: 'Plants use sunlight to split water.',
+          artifactConceptKey: null,
         },
       ]),
     );
