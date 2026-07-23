@@ -8,10 +8,11 @@ import type {
 import { formatShortDate } from '../../lib/format-datetime';
 import type { TranslateKey } from '../../i18n/types';
 
+type ProofBearingReceipt = Extract<VerifiedProofResponse, { hasProof: true }>;
 type VerificationState = NonNullable<
-  VerifiedProofResponse['masteryVerificationState']
+  ProofBearingReceipt['masteryVerificationState']
 >;
-type RetentionStatus = NonNullable<VerifiedProofResponse['retentionStatus']>;
+type RetentionStatus = NonNullable<ProofBearingReceipt['retentionStatus']>;
 
 const STATE_LABEL_KEYS: Record<VerificationState, TranslateKey> = {
   unverified: 'home.parent.verifiedProof.state.unverified',
