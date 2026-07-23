@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Umbrella Program · Flight Deck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Martian+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   FLIGHT DECK — umbrella program dashboard
+   View, not a home. Regenerate at umbrella touches.
+   ============================================================ */
+:root, [data-theme="dark"]{
+  --bg:#0a0d13; --bg2:#0e1219; --panel:#121723; --panel2:#171d2c;
+  --line:#222a3c; --line2:#2c3650;
+  --ink:#e8ecf4; --ink2:#9aa5bc; --ink3:#5f6b85;
+  --teal:#2dd4bf; --teal-dim:rgba(45,212,191,.14);
+  --lav:#a78bfa; --lav-dim:rgba(167,139,250,.13);
+  --amber:#f4b860; --amber-dim:rgba(244,184,96,.12);
+  --coral:#f4796b; --coral-dim:rgba(244,121,107,.12);
+  --green:#5ad48a; --green-dim:rgba(90,212,138,.12);
+  --glow:rgba(45,212,191,.35);
+  --grid:rgba(140,160,210,.045);
+  --shadow:0 18px 50px -18px rgba(0,0,0,.65);
+  --drawer-bg:#101522;
+}
+[data-theme="light"]{
+  --bg:#faf5ee; --bg2:#f4eee3; --panel:#fffdf8; --panel2:#f7f1e6;
+  --line:#e4dccb; --line2:#d5cab4;
+  --ink:#1c2030; --ink2:#565f75; --ink3:#8b91a3;
+  --teal:#0e9f8f; --teal-dim:rgba(14,159,143,.10);
+  --lav:#7c5fd3; --lav-dim:rgba(124,95,211,.10);
+  --amber:#b97f1e; --amber-dim:rgba(185,127,30,.12);
+  --coral:#cf4f41; --coral-dim:rgba(207,79,65,.10);
+  --green:#1f9d57; --green-dim:rgba(31,157,87,.10);
+  --glow:rgba(14,159,143,.22);
+  --grid:rgba(60,70,110,.05);
+  --shadow:0 16px 40px -20px rgba(70,55,20,.35);
+  --drawer-bg:#fffdf8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:'Instrument Sans',sans-serif; font-size:15px; line-height:1.55;
+  min-height:100vh; overflow-x:hidden;
+}
+/* atmosphere: blueprint grid + grain */
+body::before{
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size:44px 44px;
+  mask-image:radial-gradient(ellipse 90% 70% at 50% 0%, #000 30%, transparent 100%);
+}
+body::after{
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.5;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.05'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.wrap{position:relative; z-index:1; max-width:1340px; margin:0 auto; padding:0 28px 90px}
+
+/* ---------- header ---------- */
+header{
+  display:flex; align-items:flex-end; justify-content:space-between; gap:20px;
+  padding:34px 0 18px; flex-wrap:wrap;
+}
+.brand .kicker{
+  font-family:'Martian Mono',monospace; font-size:10.5px; letter-spacing:.22em;
+  text-transform:uppercase; color:var(--teal); display:flex; align-items:center; gap:10px;
+}
+.brand .kicker::before{
+  content:""; width:26px; height:1px; background:var(--teal); display:inline-block;
+}
+h1{
+  font-family:'Instrument Serif',serif; font-weight:400; font-size:clamp(40px,5.4vw,62px);
+  line-height:1.02; letter-spacing:-.01em; margin-top:8px;
+}
+h1 em{font-style:italic; color:var(--teal)}
+.brand .sub{color:var(--ink2); margin-top:8px; max-width:560px; font-size:14.5px}
+.hdr-right{display:flex; flex-direction:column; align-items:flex-end; gap:12px}
+.stamp{
+  font-family:'Martian Mono',monospace; font-size:10.5px; color:var(--ink3);
+  text-align:right; line-height:1.8; letter-spacing:.04em;
+}
+.stamp b{color:var(--ink2); font-weight:600}
+.theme-btn{
+  background:var(--panel); border:1px solid var(--line); color:var(--ink2);
+  font-family:'Martian Mono',monospace; font-size:10.5px; letter-spacing:.12em;
+  padding:8px 14px; border-radius:999px; cursor:pointer; transition:all .25s;
+  text-transform:uppercase;
+}
+.theme-btn:hover{border-color:var(--teal); color:var(--teal)}
+
+/* ---------- now banner ---------- */
+.nowbar{
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  border:1px solid var(--line); border-left:3px solid var(--teal);
+  background:linear-gradient(90deg, var(--teal-dim), transparent 60%);
+  border-radius:10px; padding:13px 18px; margin:10px 0 26px;
+  animation:fadeUp .6s .1s both;
+}
+.nowbar .dot{
+  width:8px; height:8px; border-radius:50%; background:var(--teal); flex:none;
+  box-shadow:0 0 0 0 var(--glow); animation:pulse 2.2s infinite;
+}
+.nowbar .txt{font-size:14px; color:var(--ink2)}
+.nowbar .txt b{color:var(--ink); font-weight:600}
+@keyframes pulse{0%{box-shadow:0 0 0 0 var(--glow)} 70%{box-shadow:0 0 0 11px transparent} 100%{box-shadow:0 0 0 0 transparent}}
+
+/* ---------- nav tabs ---------- */
+nav{
+  display:flex; gap:6px; border-bottom:1px solid var(--line); margin-bottom:30px;
+  position:sticky; top:0; z-index:40; background:linear-gradient(var(--bg) 75%, transparent);
+  padding-top:6px; backdrop-filter:blur(6px);
+}
+nav button{
+  background:none; border:none; cursor:pointer; color:var(--ink3);
+  font-family:'Instrument Sans',sans-serif; font-size:14.5px; font-weight:600;
+  padding:12px 18px 14px; position:relative; transition:color .2s; letter-spacing:.01em;
+}
+nav button .k{
+  font-family:'Martian Mono',monospace; font-size:9.5px; color:var(--ink3);
+  border:1px solid var(--line); border-radius:4px; padding:1px 5px; margin-right:8px;
+  vertical-align:1px;
+}
+nav button:hover{color:var(--ink2)}
+nav button.on{color:var(--ink)}
+nav button.on::after{
+  content:""; position:absolute; left:14px; right:14px; bottom:-1px; height:2px;
+  background:var(--teal); border-radius:2px;
+}
+
+/* ---------- views ---------- */
+.view{display:none}
+.view.on{display:block; animation:fadeUp .45s both}
+@keyframes fadeUp{from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none}}
+
+/* ---------- lane layout ---------- */
+.lane{margin-bottom:42px}
+.lane-head{display:flex; align-items:baseline; gap:14px; margin-bottom:16px}
+.lane-head h2{
+  font-family:'Instrument Serif',serif; font-weight:400; font-size:27px; letter-spacing:-.01em;
+}
+.lane-head .tag{
+  font-family:'Martian Mono',monospace; font-size:10px; letter-spacing:.16em; text-transform:uppercase;
+  padding:4px 10px; border-radius:999px;
+}
+.lane-head .desc{color:var(--ink3); font-size:13.5px}
+.lane.now .tag{color:var(--teal); background:var(--teal-dim); border:1px solid var(--teal)}
+.lane.armed .tag{color:var(--amber); background:var(--amber-dim); border:1px solid var(--amber)}
+.lane.later .tag{color:var(--lav); background:var(--lav-dim); border:1px solid var(--lav)}
+.cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px}
+
+/* ---------- status filter + card status badge ---------- */
+.filterbar{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:2px 0 24px}
+.filterbar .fb-label{
+  font-family:'Martian Mono',monospace; font-size:10px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--ink3); margin-right:4px;
+}
+.fbtn{
+  font-family:'Instrument Sans',sans-serif; font-size:12.5px; font-weight:600; cursor:pointer;
+  padding:6px 13px; border-radius:999px; border:1px solid var(--line2); background:var(--panel);
+  color:var(--ink2); display:inline-flex; align-items:center; gap:7px; transition:all .18s;
+}
+.fbtn:hover{border-color:var(--ink3); color:var(--ink)}
+.fbtn .fb-dot{width:8px; height:8px; border-radius:50%; background:var(--c,var(--ink3)); transition:all .18s}
+.fbtn .fb-ct{
+  font-family:'Martian Mono',monospace; font-size:9.5px; color:var(--ink3);
+  border:1px solid var(--line); border-radius:5px; padding:0 5px;
+}
+.fbtn.on{border-color:var(--c); color:var(--ink); background:color-mix(in srgb, var(--c) 13%, var(--panel))}
+.fbtn.on .fb-ct{color:var(--c); border-color:var(--c)}
+.fbtn.off{opacity:.5; border-style:dashed}
+.fbtn.off .fb-dot{background:transparent; box-shadow:inset 0 0 0 1.5px var(--ink3)}
+.fbtn-clear{color:var(--ink3); border-style:dashed}
+.fbtn-clear:hover:not(:disabled){border-color:var(--coral); color:var(--coral)}
+.fbtn-clear:disabled{opacity:.3; cursor:default}
+.lane-head .tag{
+  color:var(--c,var(--teal)); border:1px solid var(--c,var(--teal));
+  background:color-mix(in srgb, var(--c,var(--teal)) 13%, transparent);
+}
+.lane-head .lane-ct{font-family:'Martian Mono',monospace; font-size:10px; color:var(--ink3); margin-left:auto}
+.card .top-r{display:flex; align-items:center; gap:8px}
+.card .cstat{
+  font-family:'Martian Mono',monospace; font-size:8.5px; letter-spacing:.1em; text-transform:uppercase;
+  padding:2px 7px; border-radius:99px; white-space:nowrap;
+  border:1px solid var(--c,var(--line2)); color:var(--c,var(--ink2));
+  background:color-mix(in srgb, var(--c,var(--ink3)) 12%, transparent);
+}
+
+/* ---------- initiative card ---------- */
+.card{
+  background:var(--panel); border:1px solid var(--line); border-radius:14px;
+  padding:18px 18px 15px; cursor:pointer; position:relative; overflow:hidden;
+  transition:transform .25s cubic-bezier(.2,.7,.3,1), border-color .25s, box-shadow .25s;
+  animation:fadeUp .5s both;
+}
+.card:hover{transform:translateY(-3px); border-color:var(--line2); box-shadow:var(--shadow)}
+.card::before{
+  content:""; position:absolute; top:0; left:0; right:0; height:2px;
+  background:var(--accent,transparent); opacity:.8;
+}
+.card .top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:6px}
+.card .pid{
+  font-family:'Martian Mono',monospace; font-size:10.5px; font-weight:600;
+  color:var(--accent,var(--ink2)); letter-spacing:.08em;
+}
+.card .qpos{
+  font-family:'Martian Mono',monospace; font-size:9.5px; color:var(--ink3);
+  border:1px dashed var(--line2); padding:2px 7px; border-radius:5px; white-space:nowrap;
+}
+.card h3{font-size:17.5px; font-weight:700; letter-spacing:-.01em; margin-bottom:3px}
+.card .tagline{color:var(--ink2); font-size:13px; margin-bottom:12px; min-height:2.6em}
+.card .gateline{
+  display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--ink2);
+  border-top:1px dashed var(--line); padding-top:10px; margin-bottom:11px;
+}
+.card .gateline .glyph{font-size:13px; flex:none}
+.card .gateline b{color:var(--ink); font-weight:600}
+.chips{display:flex; flex-wrap:wrap; gap:6px}
+.chip{
+  font-size:11.5px; padding:4px 9px; border-radius:7px; border:1px solid var(--line);
+  background:var(--panel2); color:var(--ink2); display:inline-flex; align-items:center; gap:6px;
+  transition:border-color .2s;
+}
+.chip .n{font-family:'Martian Mono',monospace; font-size:9.5px; color:var(--ink3)}
+.chip.done{border-color:var(--green); color:var(--green); background:var(--green-dim)}
+.chip.done::before{content:"✓"; font-size:10px}
+.chip.go{border-color:var(--teal); color:var(--teal); background:var(--teal-dim)}
+.chip.hold{opacity:.66}
+.card .foot{
+  display:flex; justify-content:space-between; align-items:center; margin-top:13px;
+  font-size:11.5px; color:var(--ink3);
+}
+.card .foot .own{display:flex; align-items:center; gap:6px}
+.card .foot .more{color:var(--accent,var(--teal)); font-weight:600; opacity:0; transform:translateX(-4px); transition:all .25s}
+.card:hover .foot .more{opacity:1; transform:none}
+
+/* parked shelf */
+.shelf{
+  border:1px dashed var(--line2); border-radius:12px; padding:16px 18px; margin-top:6px;
+  background:transparent;
+}
+.shelf h4{font-size:13px; font-weight:600; color:var(--ink2); margin-bottom:8px; letter-spacing:.02em}
+.shelf .chips .chip{background:transparent}
+.shelf p{color:var(--ink3); font-size:12.5px; margin-top:10px}
+
+/* ---------- sequence view: gate rail ---------- */
+.rail-wrap{
+  background:var(--panel); border:1px solid var(--line); border-radius:16px;
+  padding:34px 30px 26px; margin-bottom:30px; position:relative; overflow:hidden;
+}
+.rail-wrap::before{
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(ellipse 60% 90% at 18% 0%, var(--teal-dim), transparent 70%);
+}
+.rail-title{
+  font-family:'Martian Mono',monospace; font-size:10.5px; letter-spacing:.2em;
+  text-transform:uppercase; color:var(--ink3); margin-bottom:26px;
+}
+.rail{display:flex; align-items:stretch; position:relative; min-width:760px}
+.rail-scroll{overflow-x:auto; padding-bottom:6px}
+.gate{flex:1; position:relative; padding:0 14px 0 0}
+.gate .node{
+  width:15px; height:15px; border-radius:50%; border:2px solid var(--ink3);
+  background:var(--bg); position:relative; z-index:2; margin-bottom:14px;
+}
+.gate .wire{
+  position:absolute; top:7px; left:15px; right:-2px; height:1.5px; background:var(--line2);
+}
+.gate:last-child .wire{display:none}
+.gate.fired .node{border-color:var(--green); background:var(--green)}
+.gate.fired .wire{background:var(--green)}
+.gate.hot .node{
+  border-color:var(--teal); background:var(--teal);
+  box-shadow:0 0 0 0 var(--glow); animation:pulse 2s infinite;
+}
+.gate.hot .wire{
+  background:repeating-linear-gradient(90deg, var(--teal) 0 7px, transparent 7px 14px);
+  background-size:28px 100%; animation:flow 1.1s linear infinite; opacity:.85;
+}
+@keyframes flow{to{background-position:28px 0}}
+.gate .gname{font-weight:700; font-size:14px; letter-spacing:-.01em; margin-bottom:2px}
+.gate .gid{font-family:'Martian Mono',monospace; font-size:9.5px; color:var(--ink3); letter-spacing:.1em; margin-bottom:7px}
+.gate .gwhat{font-size:12px; color:var(--ink2); margin-bottom:9px; padding-right:8px}
+.gate .gunlock{font-size:11.5px; color:var(--ink3); padding-right:8px}
+.gate .gunlock b{color:var(--teal); font-weight:600; font-family:'Martian Mono',monospace; font-size:10px}
+.gate.hot .gname{color:var(--teal)}
+.gate.fired .gname{color:var(--green)}
+.gstatus{
+  display:inline-block; font-family:'Martian Mono',monospace; font-size:9px; letter-spacing:.14em;
+  text-transform:uppercase; padding:2px 8px; border-radius:99px; margin-bottom:8px;
+}
+.gate.hot .gstatus{color:var(--teal); background:var(--teal-dim)}
+.gate.fired .gstatus{color:var(--green); background:var(--green-dim)}
+.gate.cold .gstatus{color:var(--ink3); background:var(--panel2)}
+.triggers{display:flex; gap:14px; margin-top:26px; flex-wrap:wrap}
+.trigger{
+  flex:1; min-width:260px; border:1px dashed var(--line2); border-radius:11px; padding:13px 16px;
+  display:flex; gap:12px; align-items:flex-start;
+}
+.trigger .tglyph{font-size:17px; color:var(--lav)}
+.trigger .tname{font-weight:700; font-size:13.5px}
+.trigger p{font-size:12.5px; color:var(--ink2)}
+.trigger p b{color:var(--lav); font-family:'Martian Mono',monospace; font-size:10.5px}
+
+/* queue table */
+.qtable{
+  width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--line);
+  border-radius:14px; overflow:hidden; font-size:13.5px;
+}
+.qtable th{
+  font-family:'Martian Mono',monospace; font-size:10px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--ink3); text-align:left; padding:13px 16px; border-bottom:1px solid var(--line);
+  background:var(--panel2); font-weight:600;
+}
+.qtable td{padding:12px 16px; border-bottom:1px solid var(--line); vertical-align:top}
+.qtable tr:last-child td{border-bottom:none}
+.qtable tr{cursor:pointer; transition:background .15s}
+.qtable tbody tr:hover{background:var(--panel2)}
+.qtable .qn{font-family:'Martian Mono',monospace; color:var(--ink3); font-size:11px}
+.qtable .qi b{font-weight:700}
+.qtable .qi .pid2{font-family:'Martian Mono',monospace; font-size:10px; margin-right:8px}
+.qtable .qg{color:var(--ink2); font-size:12.5px}
+.sec-h{
+  font-family:'Instrument Serif',serif; font-size:26px; font-weight:400; margin:36px 0 6px;
+}
+.sec-sub{color:var(--ink3); font-size:13.5px; margin-bottom:16px}
+
+/* ---------- field guide ---------- */
+.guide{max-width:880px}
+.guide .lede{
+  font-family:'Instrument Serif',serif; font-size:24px; line-height:1.35; color:var(--ink);
+  margin:6px 0 34px;
+}
+.guide .lede em{font-style:italic; color:var(--teal)}
+.gsec{margin-bottom:40px}
+.gsec h2{
+  font-family:'Instrument Serif',serif; font-weight:400; font-size:28px; margin-bottom:12px;
+  display:flex; align-items:baseline; gap:14px;
+}
+.gsec h2 .no{
+  font-family:'Martian Mono',monospace; font-size:11px; color:var(--teal); letter-spacing:.1em;
+}
+.gsec p{color:var(--ink2); margin-bottom:10px; max-width:72ch}
+.gsec p b, .gsec li b{color:var(--ink); font-weight:600}
+.gsec ul{margin:10px 0 10px 20px; color:var(--ink2)}
+.gsec li{margin-bottom:7px; max-width:70ch}
+.altitude{
+  display:flex; flex-direction:column; gap:0; margin:18px 0; max-width:660px;
+}
+.alt-row{
+  display:flex; align-items:center; gap:16px; padding:13px 18px;
+  border:1px solid var(--line); background:var(--panel); position:relative;
+}
+.alt-row:first-child{border-radius:12px 12px 0 0}
+.alt-row:last-child{border-radius:0 0 12px 12px}
+.alt-row + .alt-row{border-top:none}
+.alt-row .lvl{
+  font-family:'Martian Mono',monospace; font-size:9.5px; letter-spacing:.14em; color:var(--ink3);
+  width:86px; flex:none; text-transform:uppercase;
+}
+.alt-row .what{font-weight:700; font-size:14.5px; width:170px; flex:none}
+.alt-row .who{color:var(--ink2); font-size:12.5px}
+.alt-row.hot{border-left:3px solid var(--teal); background:linear-gradient(90deg,var(--teal-dim),var(--panel) 55%)}
+.alt-row.hot .what{color:var(--teal)}
+.recipe{display:flex; gap:0; margin:18px 0; flex-wrap:wrap}
+.rstep{
+  flex:1; min-width:170px; border:1px solid var(--line); background:var(--panel);
+  padding:15px 16px; position:relative;
+}
+.rstep:first-child{border-radius:12px 0 0 12px}
+.rstep:last-child{border-radius:0 12px 12px 0}
+.rstep + .rstep{border-left:none}
+.rstep .rn{
+  font-family:'Martian Mono',monospace; font-size:10px; color:var(--teal); letter-spacing:.12em;
+  margin-bottom:6px;
+}
+.rstep b{font-size:13.5px; display:block; margin-bottom:4px}
+.rstep span{font-size:12px; color:var(--ink2)}
+.gloss{display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:10px; margin-top:14px}
+.gterm{border:1px solid var(--line); background:var(--panel); border-radius:10px; padding:12px 14px}
+.gterm b{font-size:13px; display:block; margin-bottom:3px; color:var(--ink)}
+.gterm span{font-size:12px; color:var(--ink2)}
+.callout{
+  border:1px solid var(--line); border-left:3px solid var(--lav); border-radius:10px;
+  background:linear-gradient(90deg,var(--lav-dim),transparent 55%); padding:14px 18px; margin:16px 0;
+  font-size:13.5px; color:var(--ink2); max-width:72ch;
+}
+.callout b{color:var(--ink)}
+.whotbl{width:100%; max-width:660px; border-collapse:collapse; margin-top:8px; font-size:13.5px}
+.whotbl td{padding:10px 14px; border:1px solid var(--line); color:var(--ink2)}
+.whotbl td:first-child{font-weight:700; color:var(--ink); width:130px; background:var(--panel)}
+
+/* ---------- drawer ---------- */
+.overlay{
+  position:fixed; inset:0; background:rgba(4,6,10,.55); backdrop-filter:blur(3px);
+  opacity:0; pointer-events:none; transition:opacity .3s; z-index:90;
+}
+.overlay.on{opacity:1; pointer-events:auto}
+.drawer{
+  position:fixed; top:0; right:0; bottom:0; width:min(560px,94vw); z-index:100;
+  background:var(--drawer-bg); border-left:1px solid var(--line2);
+  transform:translateX(102%); transition:transform .38s cubic-bezier(.2,.8,.25,1);
+  overflow-y:auto; padding:30px 30px 50px; box-shadow:-30px 0 70px -30px rgba(0,0,0,.6);
+}
+.drawer.on{transform:none}
+.drawer .d-close{
+  position:sticky; top:0; float:right; background:var(--panel2); border:1px solid var(--line);
+  color:var(--ink2); border-radius:99px; width:32px; height:32px; cursor:pointer; font-size:15px;
+}
+.drawer .d-close:hover{color:var(--ink); border-color:var(--line2)}
+.drawer .d-pid{
+  font-family:'Martian Mono',monospace; font-size:11px; letter-spacing:.1em; font-weight:600;
+}
+.drawer h2{
+  font-family:'Instrument Serif',serif; font-weight:400; font-size:34px; line-height:1.08;
+  margin:8px 0 10px; letter-spacing:-.01em;
+}
+.drawer .d-meta{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px}
+.pill{
+  font-family:'Martian Mono',monospace; font-size:9.5px; letter-spacing:.1em; text-transform:uppercase;
+  padding:4px 10px; border-radius:99px; border:1px solid var(--line); color:var(--ink2);
+}
+.drawer .d-outcome{color:var(--ink2); font-size:14px; margin-bottom:20px}
+.drawer .d-outcome b{color:var(--ink)}
+.drawer h4{
+  font-family:'Martian Mono',monospace; font-size:10px; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--ink3); margin:22px 0 10px; font-weight:600;
+}
+.d-gate{
+  border:1px solid var(--line); border-left:3px solid var(--amber); border-radius:10px;
+  background:linear-gradient(90deg,var(--amber-dim),transparent 60%); padding:12px 15px; font-size:13.5px;
+  color:var(--ink2);
+}
+.d-gate b{color:var(--ink)}
+.bundle{
+  border:1px solid var(--line); border-radius:11px; padding:13px 15px; margin-bottom:9px;
+  background:var(--panel); display:flex; gap:12px; align-items:flex-start;
+}
+.bundle .b-state{flex:none; margin-top:3px; width:9px; height:9px; border-radius:50%}
+.bundle .b-state.done{background:var(--green)}
+.bundle .b-state.go{background:var(--teal); box-shadow:0 0 8px var(--glow)}
+.bundle .b-state.hold{background:transparent; border:1.5px solid var(--ink3)}
+.bundle .b-body{flex:1}
+.bundle .b-name{font-weight:700; font-size:14px}
+.bundle .b-note{font-size:12.5px; color:var(--ink2); margin-top:2px}
+.bundle .b-side{flex:none; text-align:right}
+.bundle .b-size{font-family:'Martian Mono',monospace; font-size:10px; color:var(--ink3)}
+.bundle .b-mode{font-size:10.5px; margin-top:3px; padding:2px 7px; border-radius:5px; display:inline-block}
+.b-mode.agent{color:var(--teal); background:var(--teal-dim)}
+.b-mode.mixed{color:var(--amber); background:var(--amber-dim)}
+.b-mode.human{color:var(--lav); background:var(--lav-dim)}
+.d-homes{font-size:12px; color:var(--ink2)}
+.d-homes code{
+  font-family:'Martian Mono',monospace; font-size:10.5px; background:var(--panel2);
+  border:1px solid var(--line); padding:2px 7px; border-radius:5px; display:inline-block;
+  margin:0 0 6px; word-break:break-all;
+}
+.legend{display:flex; gap:18px; flex-wrap:wrap; margin:4px 0 26px; font-size:12px; color:var(--ink3)}
+.legend span{display:inline-flex; align-items:center; gap:7px}
+.lg-dot{width:8px;height:8px;border-radius:50%}
+footer{
+  margin-top:70px; padding-top:22px; border-top:1px solid var(--line);
+  display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap;
+  font-size:12px; color:var(--ink3);
+}
+footer code{font-family:'Martian Mono',monospace; font-size:10.5px}
+footer .warn{color:var(--amber)}
+@media (max-width:720px){
+  .alt-row .who{display:none}
+  .card .tagline{min-height:0}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="brand">
+    <div class="kicker">Mentomate · pre-launch umbrella program</div>
+    <h1>The Flight <em>Deck</em></h1>
+    <div class="sub">Every delivery batch, its work items, and the launch chain that sequences them — on one surface. The level you steer at.</div>
+  </div>
+  <div class="hdr-right">
+    <button class="theme-btn" id="themeBtn" aria-label="Toggle theme">◐ theme</button>
+    <div class="stamp">snapshot <b>2026-07-23</b><br>1 program · 18 batches in motion · 6-gate launch chain<br>view · not a source of truth</div>
+  </div>
+</header>
+
+<div class="nowbar">
+  <span class="dot"></span>
+  <span class="txt"><b>Right now:</b> driving MentoMate to <b>PUBLIC LAUNCH</b>. Final compliance gate <b>WI-1577</b> (BID-38) Executing; the launch chain — store declarations <b>WI-1114/1115</b> → publishing <b>WI-1335</b> → production dogfood <b>WI-1503</b> → closed beta <b>WI-1506</b> → launch — is Ready behind operator/legal sign-offs (OPQ-109/108/60/11; legal clocks OPQ-102/110 <b>due 2026-07-24</b>, OPQ-24 07-25). <b>ZDX reboot 2026-07-22:</b> PM / orchestrator seat split; delivery now runs through <b>Delivery Batches (BID-NN)</b> with shepherd lanes, not ad-hoc bundles. <b>Critical path:</b> BID-35 mentor-notice (serial chain to the WI-2574 acceptance re-audit). <b>Formed today:</b> BID-44 (Billing-v2 + test-infra), BID-45 (UI polish + locale sweep); six singles activated (WI-2126/2413/1808/1870/1884/2008). <b>P0:</b> WI-2593 credential-redaction + staging-secret rotation → Refinery, operator-gated.</span>
+</div>
+
+<nav>
+  <button data-v="board" class="on"><span class="k">1</span>Board</button>
+  <button data-v="seq"><span class="k">2</span>Sequence &amp; gates</button>
+  <button data-v="guide"><span class="k">3</span>Field guide</button>
+</nav>
+
+<!-- ================= BOARD ================= -->
+<section class="view on" id="v-board">
+  <div class="legend">
+    <span><span class="lg-dot" style="background:var(--green)"></span> item closed</span>
+    <span><span class="lg-dot" style="background:var(--teal)"></span> executing / ready</span>
+    <span><span class="lg-dot" style="border:1.5px solid var(--ink3)"></span> not yet claimed</span>
+    <span style="margin-left:auto">click any card for the full picture ↗</span>
+  </div>
+  <div id="lanes"></div>
+  <div class="shelf" id="shelf"></div>
+</section>
+
+<!-- ================= SEQUENCE ================= -->
+<section class="view" id="v-seq">
+  <div class="rail-wrap">
+    <div class="rail-title">The launch chain — the sequence that ends at public launch</div>
+    <div class="rail-scroll"><div class="rail" id="rail"></div></div>
+    <div class="triggers" id="triggers"></div>
+  </div>
+  <div class="sec-h">The operator queue</div>
+  <div class="sec-sub">Decisions only the operator (or counsel) can make — in recommended order. Legal clocks are dated; the rest are readiness-ordered.</div>
+  <table class="qtable"><thead><tr><th style="width:46px">#</th><th>Operator decision</th><th>Rules on / unblocks…</th></tr></thead><tbody id="qbody"></tbody></table>
+</section>
+
+<!-- ================= FIELD GUIDE ================= -->
+<section class="view" id="v-guide">
+  <div class="guide">
+    <p class="lede">A program this size feels unmanageable when you watch it at the wrong altitude. This page exists so a <em>PM and an orchestrator</em> can drive one product to launch without holding any of it in their heads.</p>
+
+    <div class="gsec">
+      <h2><span class="no">01</span>The shape: four altitudes, watch one</h2>
+      <p>Since the <b>ZDX reboot (2026-07-22)</b>, all delivery runs through <b>Delivery Batches</b>. Each level below is somebody else's job to track, except one.</p>
+      <div class="altitude">
+        <div class="alt-row"><span class="lvl">Program</span><span class="what">MentoMate</span><span class="who">1 product, one destination: public launch. Operator + PM steer.</span></div>
+        <div class="alt-row hot"><span class="lvl">Delivery batch</span><span class="what">BID-NN lanes</span><span class="who">A shepherd-run cluster of work with one theme — “mentor-notice”, “run-smoke cure”. <b>This is your altitude.</b></span></div>
+        <div class="alt-row"><span class="lvl">Shepherd lane</span><span class="what">One driver per batch</span><span class="who">A shepherd (claude or codex) drives a batch's items to green: claim → build → review → merge.</span></div>
+        <div class="alt-row"><span class="lvl">Work item</span><span class="what">Cosmo WIs</span><span class="who">Hundreds. Agents claim, execute, and close them. You never need the list.</span></div>
+      </div>
+      <p>Batches are stable — a work item churns hourly, a batch changes only when its theme is delivered. If you can say "the mentor-notice batch is on its final audit, run-smoke cure is chasing the root cause", you have full situational awareness.</p>
+    </div>
+
+    <div class="gsec">
+      <h2><span class="no">02</span>Nobody picks from a hat: the launch chain sequences everything</h2>
+      <p>The program has <b>no calendar and no priority meetings</b>. Toward launch, sequencing is done by one ordered chain — the launch chain on the Sequence page: compliance closure → store declarations → publishing → production dogfood → closed beta → <b>public launch</b>. Each link is a real Work Item, and most are <b>operator-gated</b> (an OPQ) or <b>counsel-gated</b> (a legal clock).</p>
+      <p>So the answer to "what's between us and launch?" is never an opinion — it's the six links on the rail, and which OPQ each one waits behind.</p>
+      <div class="callout"><b>Only three things ever need a human decision:</b> ① an <b>operator queue</b> ruling (store creds, staging windows, product one-liners); ② a <b>legal clock</b> — DPO retainer, Art-28 DPAs, retention periods, the counsel packet; ③ the <b>public-launch go/no-go</b> once the chain is green. Everything else is a shepherd or an agent's job.</div>
+    </div>
+
+    <div class="gsec">
+      <h2><span class="no">03</span>A batch is a recipe, not a project</h2>
+      <p>A Delivery Batch is formed from a themed <b>brief</b> — its scope and which shepherd runtime drives it. We deliberately do <b>not</b> pre-slice everything into work items ahead of time (plans go stale; the brief is the right level until the work is real). Once formed, the lane is mechanical:</p>
+      <div class="recipe">
+        <div class="rstep"><div class="rn">STEP 1</div><b>Form</b><span>A brief + a shepherd lane. The batch appears as a card the moment it's formed.</span></div>
+        <div class="rstep"><div class="rn">STEP 2</div><b>Claim</b><span>The shepherd claims the batch's items in Cosmo, setting order and dependencies.</span></div>
+        <div class="rstep"><div class="rn">STEP 3</div><b>Shepherd</b><span>Agents claim → build → review → merge, item by item. You watch at batch level.</span></div>
+        <div class="rstep"><div class="rn">STEP 4</div><b>Graduate</b><span>When every item is Closed, the batch graduates — kept on the board for the record.</span></div>
+      </div>
+      <p>The batches that came first (identity cutover, the QA factory drains) proved the machinery. Every later batch reuses the pattern.</p>
+    </div>
+
+    <div class="gsec">
+      <h2><span class="no">04</span>Who does what</h2>
+      <table class="whotbl">
+        <tr><td>Operator</td><td>Human. Rules the operator queue, clears legal clocks, makes the public-launch call. (Zuzka on product; counsel on legal.)</td></tr>
+        <tr><td>PM</td><td><code>pm:claude:mentomate</code> — boots first, supervises the program, issues rulings + precedent, runs the refinery. Split from the orchestrator at the reboot.</td></tr>
+        <tr><td>Orchestrator</td><td>Owns delivery: forms batches, assigns shepherd lanes, holds ordering + dependencies across lanes.</td></tr>
+        <tr><td>Shepherds</td><td>One per batch. Drive its items to green — claim, dispatch, review, merge.</td></tr>
+        <tr><td>Agents</td><td>Everything below batch altitude: building, reviewing, record-keeping in Cosmo.</td></tr>
+        <tr><td>This page</td><td>The helicopter. Regenerated at each umbrella touch. If it disagrees with Cosmo, <b>Cosmo</b> wins — this is a view, never a home.</td></tr>
+      </table>
+    </div>
+
+    <div class="gsec">
+      <h2><span class="no">05</span>The program in one breath</h2>
+      <ul>
+        <li><b>Launch &amp; compliance:</b> the final compliance gate (WI-1577, BID-38) and the store/legal chain that follows it — the critical path to public launch.</li>
+        <li><b>Mentor experience:</b> mentor-notice feature completion (BID-35, the serial critical chain), mentor polish (BID-22), plus the closed mentor-loop and eval lanes.</li>
+        <li><b>V2 shell &amp; supporter:</b> shell coherence (BID-28), supporter linking + surfaces (BID-16, BID-36), and the E2E coverage expansion that gates the merge path (BID-19).</li>
+        <li><b>QA &amp; test-infra:</b> the run-smoke cure (BID-39), hygiene drains (BID-37), factory drains, and today's Billing-v2 + test-infra hardening (BID-44).</li>
+        <li><b>Security &amp; consent:</b> the security/compliance waves and consent re-consent + granular purposes (BID-40).</li>
+        <li><b>Continuous &amp; process:</b> the singles / heavy-singles pull lanes (BID-31/33), and the ZDX process lanes (reviewer authority, dispatch waves) that keep the merge path trustworthy.</li>
+      </ul>
+    </div>
+
+    <div class="gsec">
+      <h2><span class="no">06</span>Words that appear everywhere</h2>
+      <div class="gloss">
+        <div class="gterm"><b>Delivery batch</b><span>A themed, shepherd-run cluster of work. The BID-NN cards. Your watching altitude.</span></div>
+        <div class="gterm"><b>Shepherd lane</b><span>One shepherd (claude / codex) driving a batch's items to green.</span></div>
+        <div class="gterm"><b>Work item</b><span>A Cosmo WI. Agents claim, build, review, close. Source of truth for live per-item state.</span></div>
+        <div class="gterm"><b>Launch gate</b><span>A Work Item on the launch chain. Never a date — an event, usually operator- or counsel-gated.</span></div>
+        <div class="gterm"><b>Operator queue (OPQ)</b><span>A decision only the human operator (or counsel) can make. Ordered, some dated.</span></div>
+        <div class="gterm"><b>Graduated</b><span>Every work item in a batch is Closed. Kept on the board for the record.</span></div>
+        <div class="gterm"><b>Singles lane</b><span>A continuously-fed pull lane for independent items that don't belong to a themed batch.</span></div>
+        <div class="gterm"><b>Refinery</b><span>The PM-owned intake that refines raw findings (and P0 incidents) to Definition-of-Ready.</span></div>
+        <div class="gterm"><b>Narrative-sourced</b><span>A batch or WI newer than today's board pull — authoritative from the PM checkpoint, flagged as such.</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div>Generated <b>2026-07-23</b> from a live Cosmo board pull (<code>initiatives</code> · <code>batches</code> · <code>workitems</code> · <code>OPQ</code>) + the <code>pm-checkpoint-2026-07-23</code>.<br>
+  <span class="warn">⚠ View, not a home.</span> Live work-item state: Cosmo · newest batches / WIs (BID-40/41/44/45, mentor-notice chain) are narrative-sourced, post-pull · regenerate at umbrella touches.</div>
+  <div style="text-align:right">Keys: <code>1 2 3</code> views · <code>t</code> theme · <code>esc</code> close<br>MentoMate program · ZDX-reboot topology (PM + orchestrator)</div>
+</footer>
+</div>
+
+<div class="overlay" id="overlay"></div>
+<aside class="drawer" id="drawer" aria-label="Initiative detail"></aside>
+
+<script>
+/* =============== DATA — Cosmo board pull (initiatives/batches/workitems/OPQ) + PM checkpoint, 2026-07-23 =============== */
+const GATES = [{"id": "L1", "name": "Compliance closure", "state": "hot", "status": "executing", "what": "WI-1577 — Launch compliance closure, the FINAL pre-store-submission re-run against the actual data map. Executing in BID-38.", "unlocks": ["store submission — armed once green", "BID-38 consent/compliance close"]}, {"id": "L2", "name": "Store declarations", "state": "cold", "status": "ready", "what": "WI-1114 (age-rating + kids/privacy declarations, both consoles) + WI-1115 (country availability + hard-blocks). Ready; operator-gated on OPQ-109 / OPQ-108.", "unlocks": ["WI-1335 store records", "App Store + Play data-safety labels"]}, {"id": "L3", "name": "Store publishing", "state": "cold", "status": "ready", "what": "WI-1335 — App Store + Play Console records, listings, privacy labels, ratings. Long-lead; operator-gated on OPQ-60 (Play record).", "unlocks": ["production launch build", "closed-beta distribution"]}, {"id": "L4", "name": "Production dogfood", "state": "cold", "status": "ready", "what": "WI-1503 — dogfood the exact production-profile launch build end to end before any external user.", "unlocks": ["closed beta go"]}, {"id": "L5", "name": "Closed beta", "state": "cold", "status": "ready", "what": "WI-1506 — run a small closed beta with 5–10 real families before public launch. WI-1503+1506 operator-gated on OPQ-11.", "unlocks": ["public-launch decision"]}, {"id": "L6", "name": "PUBLIC LAUNCH", "state": "cold", "status": "operator call", "what": "The go/no-go. An operator decision once the chain is green and the legal clocks (DPO, DPAs, retention, counsel packet) have cleared.", "unlocks": ["MentoMate is live"]}];
+const TRIGGERS = [{"glyph": "⚖", "name": "Legal clocks (operator + counsel)", "body": "<b>OPQ-102</b> (outsourced DPO) + <b>OPQ-110</b> (Art-28 DPAs) DUE <b>2026-07-24</b>; <b>OPQ-24</b> (counsel retention periods) DUE <b>2026-07-25</b>; <b>OPQ-22</b> counsel packet still undispatched. These gate compliance closure, not code."}, {"glyph": "✦", "name": "Product rulings owed", "body": "Operator/PM calls the queue is waiting on — <b>OPQ-128</b> fast-track UI (2106+2129), <b>OPQ-130</b> supporter-bridge copy, <b>OPQ-132</b> data-safety worksheet honesty. Each unblocks a specific lane."}, {"glyph": "⟳", "name": "P0 credential incident", "body": "<b>WI-2593</b> — redact seeded login credentials from Playwright reports + rotate exposed staging secrets. Routed to the <b>Refinery</b>, operator-gated. Blocks nothing on the rail but is highest-urgency."}];
+const QUEUE = [["1", "OPQ-147", "Staging-acts class ruling", "WI-2125 + done OPQ-143. PM rec: hand-execute now; delegation waits for WI-1628 credential scoping."], ["2", "OPQ-37", "Store credentials + EAS access", "WI-1341 — store credentials, EAS access + Config-T go-ahead (FCM bind)."], ["3", "OPQ-136+137", "Bounded txn / db:push pair", "WI-2487 bounded txn (0129 NO-GO) then WI-2386 db:push. WI-2386 closed — 137 may be moot; verify."], ["4", "OPQ-135", "Staging window", "WI-1588 staging window."], ["5", "OPQ-61", "Play / RevenueCat setup", "WI-1328 — Play products + goog_ key + preflight re-tighten. Needs OPQ-60 (Play record) first."], ["6", "OPQ-138", "Notice AC-5 + Tier-2", "WI-2464 AC-5 + Tier-2."], ["7", "OPQ-128", "Fast-track UI calls", "Two one-line product calls (WI-2106 + WI-2129)."], ["—", "OPQ-102 / 110", "Legal — DPO + Art-28 DPAs", "DUE 2026-07-24. Outsourced DPO retainer + processor DPAs/TIAs."], ["—", "OPQ-24", "Legal — retention periods", "DUE 2026-07-25. Counsel-approved retention periods."], ["—", "OPQ-22", "Legal — counsel packet", "Undispatched. D2 denial-retention + A-03 crisis duties + WI-1559 controller entitlement."]];
+const INIT = [{"id": "BID-11", "name": "Compliance-Eng ruling application", "accent": "var(--teal)", "lane": "now", "status": "running", "q": "1 open · 5", "tagline": "Compliance-Eng ruling application — store data-safety worksheet reconciliation.", "owner": "shepherd:claude:mm-compliance-ruling", "gate": "WI-1561 store data-safety worksheet (age 11) Executing — the last open item.", "outcome": "Compliance-Eng rulings applied; store data-safety worksheet reconciled to current code.", "bundles": [{"n": "WI-1561 · Store data-safety worksheet stale vs current code (age 11…", "s": "Executing", "m": "mixed", "st": "go"}, {"n": "WI-1193 · Record accountable lawful-basis + terms-accepted fact (in…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1196 · Activate DB-layer RLS for defence-in-depth, or formally a…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1507 · Complete launch compliance closure check against actual d…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2064 · Define consent-withdrawal bearer-token threat posture (ow…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-11 (Running)", "Run by: shepherd:claude:mm-compliance-ruling"]}, {"id": "BID-16", "name": "Supporter linking E2E", "accent": "var(--teal)", "lane": "now", "status": "running", "q": "1 open · 7", "tagline": "Supporter linking end-to-end — V2 supporter onboarding and scope coverage.", "owner": "shepherd:claude:supporter-linking", "gate": "WI-2242 first-edge onboarding reachability the last open item.", "outcome": "Supporter linking reachable and covered end-to-end in V2, scopes preserved through signup.", "bundles": [{"n": "WI-2242 · Make V2 supporter first-edge onboarding reachable and cov…", "s": "Ready", "m": "mixed", "st": "go"}, {"n": "WI-2188 · Give every link-initiation step an explicit in-app exit", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2225 · Preserve non-authorizing supporter intent through signup…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2226 · Wire and correct landed supporter cold-start and self-lea…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2237 · Gate supporter scopes and structural reads on accepted vi…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2241 · Add supportership-aware V2 seeds and cover scope preserva…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2243 · Wire the V2 supporter self-learning doorway and cover Me-…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-16 (Running)", "Run by: shepherd:claude:supporter-linking"]}, {"id": "BID-17", "name": "PM remediation lane — reviewer/preflight hardening", "accent": "var(--teal)", "lane": "now", "status": "running", "q": "running", "tagline": "PM remediation lane — reviewer/preflight hardening (pm:hex:zdx-core).", "owner": "pm:hex:zdx-core", "gate": "Reviewer-authority + preflight hardening executing under the PM seat.", "outcome": "Reviewer and preflight gates hardened so the merge path is trustworthy under the reboot topology.", "bundles": [], "homes": ["Cosmo · Delivery Batch BID-17 (Running)", "Run by: pm:hex:zdx-core"]}, {"id": "BID-18", "name": "QA factory drain 2", "accent": "var(--teal)", "lane": "now", "status": "running", "q": "1 open · 8", "tagline": "QA factory drain 2 — V2 correctness/parity sweep (holding).", "owner": "shepherd:codex:factory-drain2", "gate": "WI-2189 family-settings destination the last open item.", "outcome": "Second QA factory drain complete: quota denominator, quiz persistence, V2 parity command portable.", "bundles": [{"n": "WI-2189 · Route V2 Family settings to a family-scoped destination", "s": "Ready", "m": "mixed", "st": "go"}, {"n": "WI-2177 · Make the canonical V2 parity test command portable to nat…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2179 · Prevent AccountAvatar from intercepting the Subject Hub m…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2183 · Provide a real recovery path when saved-summary AI feedba…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2184 · Show newly completed topic sessions in Topic Hub history", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2190 · Persist quiz answers in the shape required by round-detai…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2193 · Advance recitation after a valid title-only first turn", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2194 · Use one Family quota denominator across subscription usag…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-18 (Running)", "Run by: shepherd:codex:factory-drain2"]}, {"id": "BID-19", "name": "V2 E2E coverage expansion", "accent": "var(--teal)", "lane": "now", "status": "running", "q": "9 open · 14", "tagline": "V2 end-to-end coverage expansion — the Maestro/Playwright suite that gates the merge path.", "owner": "shepherd:codex:e2e-expansion", "gate": "WI-2234 unblocked post-OPQ-145, then WI-2240; final gate WI-2385 full-suite green across native + web.", "outcome": "V2 E2E coverage complete and green across native and web; avatar/account admin, supporter bootstrap, subject-create branches all covered.", "bundles": [{"n": "WI-2234 · Extend V2 E2E for returning learner feed, resume, and Men…", "s": "Executing", "m": "mixed", "st": "go"}, {"n": "WI-2236 · Extend V2 E2E for Mentor homework capture and same-sessio…", "s": "Executing", "m": "mixed", "st": "go"}, {"n": "WI-2238 · Cover V2 Subjects browse, Subject Hub, and first-subject…", "s": "Executing", "m": "mixed", "st": "go"}, {"n": "WI-2239 · Cover the V2 Journal paper trail end to end", "s": "Executing", "m": "mixed", "st": "go"}, {"n": "WI-2240 · Cover V2 avatar account administration and exit paths end…", "s": "Executing", "m": "mixed", "st": "go"}, {"n": "WI-2385 · V2 E2E lane final gate verification — full-suite green ac…", "s": "Refining", "m": "mixed", "st": "hold"}, {"n": "WI-2577 · Wire V2 build-time flags into the later-phases Playwright…", "s": "Captured", "m": "mixed", "st": "hold"}, {"n": "WI-2584 · Restore authenticated V2 supporter-managed profile bootst…", "s": "Executing", "m": "mixed", "st": "go"}, {"n": "WI-2585 · Native Maestro deterministic seed slots collide across co…", "s": "Executing", "m": "mixed", "st": "go"}, {"n": "WI-2215 · Route V2 Subjects Add into the create-subject round trip", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2228 · Expand and gate the existing V2 E2E release lane across M…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2506 · Handle the stable no-match branch in the V2 subject-creat…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-19 (Running)", "Run by: shepherd:codex:e2e-expansion"]}, {"id": "BID-22", "name": "Mentor polish — deterministic factory", "accent": "var(--teal)", "lane": "now", "status": "running", "q": "2 open · 15", "tagline": "Mentor polish — deterministic factory for Mentor-surface defects.", "owner": "shepherd:codex:mentor-polish", "gate": "WI-2460 override provenance the last open item; rest closed.", "outcome": "Mentor surface polished deterministically: coherent animations, receipts placed, cards deduped.", "bundles": [{"n": "WI-2103 · Cancel silence prompts when a learning session ends", "s": "Executing", "m": "mixed", "st": "go"}, {"n": "WI-2460 · Person-level mentor-language override provenance — cross-…", "s": "Captured", "m": "mixed", "st": "hold"}, {"n": "WI-2095 · Prevent first-session reflection save from remaining inde…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2096 · Render only one header on the Mentor language screen", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2098 · Preserve explicit mentor language when app language chang…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2101 · Show every earned session milestone with clear context", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2102 · Keep the mentor writing indicator stable throughout long…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2105 · Always show the mentor-born ceremony after first profile…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2108 · Render one coherent Mentor waiting animation at a time", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2109 · Deduplicate identical learning-moment cards in the Mentor…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2110 · Deep-link learning-moment cards to the correct Journal se…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2111 · Place saved learning-moment receipts after Mentor action…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-22 (Running)", "Run by: shepherd:codex:mentor-polish"]}, {"id": "BID-28", "name": "V2 shell coherence — navigation, wayfinding, deep-link scope", "accent": "var(--teal)", "lane": "now", "status": "running", "q": "2 open · 7", "tagline": "V2 shell coherence — navigation, wayfinding, deep-link scope (holding).", "owner": "shepherd:claude:V2-coherence", "gate": "WI-2331 wayfinding on push + WI-2595 durable evidence record the remaining items.", "outcome": "V2 shell navigation and wayfinding coherent; deep links select the correct scope before render.", "bundles": [{"n": "WI-2331 · Restore V2 wayfinding and active-profile orientation on p…", "s": "Ready", "m": "mixed", "st": "go"}, {"n": "WI-2595 · Preserve WI-2524 closed evidence as a durable in-repo rec…", "s": "Reviewing", "m": "mixed", "st": "go"}, {"n": "WI-2198 · Reconcile the canonical mobile flow inventory and E2E man…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2219 · Make Practice recovery browse routes V2-shell aware", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2220 · Carry the active app shell into production app-help promp…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2223 · Make support.hub deep links select Support-hub scope befo…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2524 · Re-run v2 nav-shell.spec.ts (support-hub Back scope) agai…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-28 (Running)", "Run by: shepherd:claude:V2-coherence"]}, {"id": "BID-30", "name": "Reviewer authority bridge + Adversarial lane (operator directive 2026-07-19)", "accent": "var(--teal)", "lane": "now", "status": "running", "q": "1 open · 1", "tagline": "Reviewer authority bridge + Adversarial lane (operator directive 2026-07-19).", "owner": "pm:hex:zdx-core", "gate": "WI-2407 machine-visible close-gates — reviewer-enforced.", "outcome": "Close-gates on WIs are machine-visible and reviewer-enforced; adversarial review lane wired.", "bundles": [{"n": "WI-2407 · Machine-visible close-gates on WIs — reviewer-enforced, r…", "s": "Backlog", "m": "mixed", "st": "hold"}], "homes": ["Cosmo · Delivery Batch BID-30 (Running)", "Run by: pm:hex:zdx-core"]}, {"id": "BID-31", "name": "Singles lane — continuously-fed independent items (pull lane)", "accent": "var(--teal)", "lane": "now", "status": "running", "q": "5 open · 11", "tagline": "Singles lane — continuously-fed independent items (pull lane). Six singles activated 2026-07-23.", "owner": "shepherd:codex:singles-lane", "gate": "Pull lane: WI-2594 (credential-artifact leak) executing; today's activations WI-2126/2413/1808/1870/1884/2008 feed here.", "outcome": "Independent, non-batchable items flow through a single continuously-fed lane rather than waiting on a themed batch.", "bundles": [{"n": "WI-1439 · Correct stale implementation-state headers in active spec…", "s": "Executing", "m": "mixed", "st": "go"}, {"n": "WI-1460 · Annotate V2-superseded legacy requirements in epics.md", "s": "Ready", "m": "mixed", "st": "go"}, {"n": "WI-2001 · Add real regressions for uncovered billing-v2 selector an…", "s": "Ready", "m": "mixed", "st": "go"}, {"n": "WI-2125 · Restore the staging family-join invite endpoint for previ…", "s": "Ready", "m": "human", "st": "go"}, {"n": "WI-2594 · Stop CI uploading credential-bearing Playwright artifacts…", "s": "Executing", "m": "mixed", "st": "go"}, {"n": "WI-1394 · Re-home CEFR vocabulary browser into the V2 shell (legacy…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1437 · Surface milestone_reached moments as cards in the Mentor…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1486 · Continuity T7: defer mic permission request to an intenti…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1574 · Consolidate activation-event recording into services/ — e…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1575 · Fold standalone ci.yml whole-tree ratchets into check-cha…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1763 · Voice-floor coverage audit across V2 surfaces (mic/transc…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-31 (Running)", "Run by: shepherd:codex:singles-lane"]}, {"id": "BID-33", "name": "Heavy singles — continuously-fed independents needing full/native suites", "accent": "var(--teal)", "lane": "now", "status": "running", "q": "5 open · 6", "tagline": "Heavy singles — independents needing full/native suites (Notion-gated).", "owner": "shepherd:codex:heavy-singles", "gate": "Nightly Maestro shard failures (WI-1864) + device-evidence batch (WI-1655) in flight.", "outcome": "Heavy independents that need native/device suites are driven to green without blocking the light singles lane.", "bundles": [{"n": "WI-1316 · Eval harness: HW02.solved-from-memory check false-fires o…", "s": "Ready", "m": "mixed", "st": "go"}, {"n": "WI-1655 · WS-44 device-evidence batch: run the verify-at-e2e-run Ma…", "s": "Ready", "m": "mixed", "st": "go"}, {"n": "WI-1864 · Nightly Maestro suite: 4 of 8 shards failing on first nig…", "s": "Executing", "m": "mixed", "st": "go"}, {"n": "WI-2176 · Keep the Support-hub scope selector clear of the avatar a…", "s": "Ready", "m": "mixed", "st": "go"}, {"n": "WI-2196 · Allow creating the correct homework subject when other su…", "s": "Ready", "m": "mixed", "st": "go"}, {"n": "WI-1443 · Correctness-chain #3: add per-turn answer-correctness sig…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-33 (Running)", "Run by: shepherd:codex:heavy-singles"]}, {"id": "BID-34", "name": "ZDX dispatch wave 1 — lifecycle + guard + tooling + infra + protocol", "accent": "var(--teal)", "lane": "now", "status": "running", "q": "running", "tagline": "ZDX dispatch wave 1 — lifecycle + guard + tooling + infra + protocol.", "owner": "—", "gate": "ZDX-core dispatch wave feeding the reboot topology.", "outcome": "First ZDX dispatch wave delivered across lifecycle, guard, tooling, infra and protocol surfaces.", "bundles": [], "homes": ["Cosmo · Delivery Batch BID-34 (Running)", "Run by: —"]}, {"id": "BID-35", "name": "Mentor-notice feature completion", "accent": "var(--teal)", "lane": "now", "status": "running", "q": "6 open · 8", "tagline": "Critical path. Mentor-notice feature completion — serial chain to the final MVP acceptance audit against MMT-ADR-0036.", "owner": "shepherd:claude:mentor-notice", "gate": "Serial chain WI-2500 (contracts) → 2501 → 2499 → 2504 → 2573 → WI-2574 zero-open re-audit → graduation. #2544 (WI-2624 CR) gating vs amended AC. Shepherd holds discipline.", "outcome": "Mentor-notice feature complete for the in-app MVP: contracts enforced at event/stream boundary, evidence-gated actions restored, push delivery disabled for MVP, learner-only in proxy reads; final acceptance audit passed.", "bundles": [{"n": "WI-2499 · Restore evidence-gated mentor-notice actions and receipt…", "s": "Ready", "m": "mixed", "st": "go"}, {"n": "WI-2500 · Enforce mentor-notice contracts at event and stream bound…", "s": "Executing", "m": "mixed", "st": "go"}, {"n": "WI-2501 · Terminalize completed not_yet mentor-notice offers idempo…", "s": "Ready", "m": "mixed", "st": "go"}, {"n": "WI-2504 · Make mentor-notice flag-off rollback remove cached surfac…", "s": "Ready", "m": "mixed", "st": "go"}, {"n": "WI-2573 · Disable mentor-notice push delivery for the in-app MVP", "s": "Ready", "m": "mixed", "st": "go"}, {"n": "WI-2574 · Run final mentor-notice MVP acceptance audit against MMT-…", "s": "Ready", "m": "mixed", "st": "go"}, {"n": "WI-2498 · Keep mentor-notice details learner-only in proxy reads", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2557 · Correct mentor-notice learning-day boundaries across IANA…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-35 (Running)", "Run by: shepherd:claude:mentor-notice"]}, {"id": "BID-36", "name": "V2 supporter surfaces", "accent": "var(--teal)", "lane": "now", "status": "running", "q": "1 open · 3", "tagline": "V2 supporter surfaces — voice capture + Maestro shard health.", "owner": "shepherd:claude:v2-supporter", "gate": "WI-2596 red Maestro shards 2+3 on main the open item.", "outcome": "V2 supporter surfaces landed with voice capture; Maestro shards green and visible to checks.", "bundles": [{"n": "WI-2596 · Maestro E2E shards 2+3 are red on main and invisible to c…", "s": "Executing", "m": "mixed", "st": "go"}, {"n": "WI-2216 · Enable voice capture on the V2 Mentor input", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2541 · Derive supporter cold-start identity state from Login pre…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-36 (Running)", "Run by: shepherd:claude:v2-supporter"]}, {"id": "BID-37", "name": "Hygiene drain 1", "accent": "var(--teal)", "lane": "now", "status": "running", "q": "4 open · 9", "tagline": "Hygiene drain 1 — staging-credential refusal, legacy quarantine wiring, stale-citation repoints.", "owner": "shepherd:codex:hygiene-drain", "gate": "WI-2587 rework PR #2540 in gate flow; WI-2568/2458 executing; WI-2063 in review (zero findings, thresholds ratified via OPQ-146).", "outcome": "Hygiene backlog drained: no Doppler staging URL in tests, legacy quarantine expiry-bearing, citations repointed, parent-control-center checkpoint recorded.", "bundles": [{"n": "WI-2063 · Record web parent-control-center strategy checkpoint (tri…", "s": "Reviewing", "m": "human", "st": "go"}, {"n": "WI-2458 · Wire expiry-bearing legacy Playwright quarantine and oper…", "s": "Executing", "m": "mixed", "st": "go"}, {"n": "WI-2568 · Restore the legacy accessibility quiz-results flow on exa…", "s": "Executing", "m": "mixed", "st": "go"}, {"n": "WI-2587 · Refuse a Doppler-sourced staging DATABASE_URL in test runs", "s": "Ready", "m": "mixed", "st": "go"}, {"n": "WI-1871 · Low-severity roundup — Correctness and logic", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1882 · render-wrangler-kv.mjs prints raw CF account/KV identifie…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1893 · Stale config.ts comment claims judge flags Production sta…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2005 · Make curriculum-adapt reorder switch exhaustive over Curr…", "s": "Closed", "m": "agent", "st": "done"}, {"n": "WI-2304 · Repoint 5 stale docs/superpowers citations to their docs/…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-37 (Running)", "Run by: shepherd:codex:hygiene-drain"]}, {"id": "BID-38", "name": "Consent and compliance security", "accent": "var(--teal)", "lane": "now", "status": "running", "q": "2 open · 6", "tagline": "Consent & compliance security — holds the launch FINAL GATE.", "owner": "shepherd:codex:consent-security", "gate": "WI-1577 Launch compliance closure (FINAL GATE) Executing; WI-1192 Art-28 DPAs Ready (OPQ-110, due 2026-07-24).", "outcome": "Consent/compliance security closed and the pre-store-submission launch compliance gate passed.", "bundles": [{"n": "WI-1192 · Sign Art 28 processor DPAs (business tier, no-training) a…", "s": "Ready", "m": "human", "st": "go"}, {"n": "WI-1577 · Launch compliance closure — FINAL GATE (pre-store-submiss…", "s": "Executing", "m": "mixed", "st": "go"}, {"n": "WI-1559 · Controller legal entity mismatch across privacy policy vs…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2431 · Fence learner text in teach-back grader prompt (assessmen…", "s": "Closed", "m": "human", "st": "done"}, {"n": "WI-2516 · G6 write-IDOR: consent self-service POST branch trusts sp…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2519 · In-service authorization assertion layer (WI-2241 placeme…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-38 (Running)", "Run by: shepherd:codex:consent-security"]}, {"id": "BID-39", "name": "Run-smoke cure — root-cause fix + required-check stabilization", "accent": "var(--teal)", "lane": "now", "status": "running", "q": "4 open · 5", "tagline": "Run-smoke CURE — root-cause fix of the web-smoke fault failing six open PRs. Scoped FIX, not tolerance.", "owner": "shepherd:codex:smoke-cure", "gate": "WI-2475 executing (DNS vs CF-edge vs runner discrimination); WI-2571 scoped-final-fix + tripwire armed; WI-2578 type-check gap.", "outcome": "Run-smoke required check stabilized at the root cause — no quarantine machinery, no merge-over-red; the ambient-red taxonomy resolved.", "bundles": [{"n": "WI-2389 · Split proposal: retire duplicate ambient-smoke cure after…", "s": "Backlog", "m": "mixed", "st": "hold"}, {"n": "WI-2475 · Discriminate DNS vs Cloudflare-edge vs GH-Actions-runner…", "s": "Executing", "m": "mixed", "st": "go"}, {"n": "WI-2571 · Guard: fail fast when selected Playwright fixtures refere…", "s": "Ready", "m": "mixed", "st": "go"}, {"n": "WI-2578 · Integration test files under tests/integration are type-c…", "s": "Ready", "m": "mixed", "st": "go"}, {"n": "WI-2451 · Cure pre-Worker api-stg transport gaps with bounded safe-…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-39 (Running)", "Run by: shepherd:codex:smoke-cure"]}, {"id": "BID-40", "name": "Consent re-consent + granular purposes", "status": "running · new", "gate": "WI-2547 PR #2530 in CI/review (Gate-1 heal path); WI-2386 closed.", "owner": "shepherd:claude (Gate-1 heal)", "bundles": [{"n": "WI-2547 · Build the mobile adult self-consent re-consent screen", "s": "Ready", "m": "mixed", "st": "go"}, {"n": "WI-2386 · Replace DEFAULT_CONSENT_PURPOSE with granular purposes", "s": "Closed", "m": "mixed", "st": "done"}], "accent": "var(--teal)", "lane": "now", "q": "running", "tagline": "Gate-1 heal path — adult self-consent re-consent screen + granular consent purposes.", "outcome": "Adult self-consent re-consent screen shipped and DEFAULT_CONSENT_PURPOSE replaced with granular purposes.", "homes": ["Cosmo · Delivery Batch BID-40 (narrative-sourced 2026-07-23)", "Source: PM checkpoint 2026-07-23 (post-JSON pull)"]}, {"id": "BID-41", "name": "Evidence-links substrate", "status": "running · new", "gate": "WI-1704 bounded repair items 1-6 authorized.", "owner": "shepherd:claude (bounded repair)", "bundles": [{"n": "WI-1704 · Build evidence-links substrate for verified learning arti…", "s": "Ready", "m": "mixed", "st": "go"}], "accent": "var(--teal)", "lane": "now", "q": "running", "tagline": "WI-1704 bounded repair — evidence-links substrate for verified learning artifacts.", "outcome": "Evidence-links substrate built for verified learning artifacts (bounded 6-item repair).", "homes": ["Cosmo · Delivery Batch BID-41 (narrative-sourced 2026-07-23)", "Source: PM checkpoint 2026-07-23 (post-JSON pull)"]}, {"id": "BID-6", "name": "P4.6 — measured run", "accent": "var(--lav)", "lane": "later", "status": "ready", "q": "ready", "tagline": "Board of record: _WIP/zdx-reboot/_docs/p4.6-board-formation.md (DRAFT — R1–R4 decision walk pending). Exit gate: evidence set operator-reviewed (boun…", "owner": "—", "gate": "Ready — not yet claimed; 0 members staged.", "outcome": "Board of record: _WIP/zdx-reboot/_docs/p4.6-board-formation.md (DRAFT — R1–R4 decision walk pending). Exit gate: evidence set operator-reviewed (bounce profile, burn, coverage, cycle-time decomposition). Members wired at pre-mint after the…", "bundles": [], "homes": ["Cosmo · Delivery Batch BID-6 (Ready)", "Run by: —"]}, {"id": "BID-32", "name": "Merge-gate integrity + crew-daemon reliability (ZDX velocity)", "accent": "var(--lav)", "lane": "later", "status": "formed", "q": "formed", "tagline": "Purpose: remove false-positive/false-negative merge decisions and make crew dispatch/provenance reliable enough for higher ZDX throughput across cogn…", "owner": "—", "gate": "Formed — not yet claimed; 0 members staged.", "outcome": "Purpose: remove false-positive/false-negative merge decisions and make crew dispatch/provenance reliable enough for higher ZDX throughput across cognoco/zdx-marketplace and cognoco/nexus.\n\nScope: WI-2459 (exclude Codex unavailable comments…", "bundles": [], "homes": ["Cosmo · Delivery Batch BID-32 (Formed)", "Run by: —"]}, {"id": "BID-44", "name": "Billing-v2 + test-infra hardening", "status": "formed 07-23", "gate": "Formed 2026-07-23; members: WI-2619, 2620, 2000, 1999, 2344, 1847, 1866.", "owner": "unclaimed (formed 07-23)", "bundles": [{"n": "WI-2619 · Billing-v2 hardening", "s": "new", "m": "mixed", "st": "hold"}, {"n": "WI-2620 · Billing-v2 hardening", "s": "new", "m": "mixed", "st": "hold"}, {"n": "WI-2000 · Unit-test sliding-window rate limiter and IP resolver", "s": "Backlog", "m": "mixed", "st": "hold"}, {"n": "WI-1999 · Add route-handler tests for family-join and speaking-prac…", "s": "Backlog", "m": "mixed", "st": "hold"}, {"n": "WI-2344 · Centralize jest fake-timer save/restore in apps/api share…", "s": "Backlog", "m": "mixed", "st": "hold"}, {"n": "WI-1847 · Local pre-push jest failures: setTimeout/clearTimeout is…", "s": "Ready", "m": "mixed", "st": "go"}, {"n": "WI-1866 · gemini.test.ts fails under local Node 26 (clearTimeout is…", "s": "Backlog", "m": "mixed", "st": "hold"}], "accent": "var(--lav)", "lane": "later", "q": "formed", "tagline": "Formed 2026-07-23 — Billing-v2 regression coverage + jest/test-infra hardening.", "outcome": "Billing-v2 selectors covered and the jest/fake-timer test-infra hardened across apps/api.", "homes": ["Cosmo · Delivery Batch BID-44 (narrative-sourced 2026-07-23)", "Source: PM checkpoint 2026-07-23 (post-JSON pull)"]}, {"id": "BID-45", "name": "UI polish + locale sweep", "status": "formed 07-23", "gate": "Formed 2026-07-23; members: WI-2106, 2121, 2129, 1876.", "owner": "unclaimed (formed 07-23)", "bundles": [{"n": "WI-2106 · Use one coherent focal animation in Journal empty states", "s": "Backlog", "m": "mixed", "st": "hold"}, {"n": "WI-2121 · Remove learner-persona copy from the supporter pre-auth b…", "s": "Backlog", "m": "mixed", "st": "hold"}, {"n": "WI-2129 · Consolidate duplicate Mentor home prompt cards", "s": "Backlog", "m": "mixed", "st": "hold"}, {"n": "WI-1876 · Fix systematically untranslated strings shipped identical…", "s": "Backlog", "m": "mixed", "st": "hold"}], "accent": "var(--lav)", "lane": "later", "q": "formed", "tagline": "Formed 2026-07-23 — Mentor/Journal UI polish + untranslated-string locale sweep.", "outcome": "Journal/Mentor UI polished (focal animation, deduped cards, audience-correct copy) and untranslated strings swept across 6 locales.", "homes": ["Cosmo · Delivery Batch BID-45 (narrative-sourced 2026-07-23)", "Source: PM checkpoint 2026-07-23 (post-JSON pull)"]}, {"id": "BID-29", "name": "Run-smoke stabilization — diagnose + gate hygiene (fast-track)", "accent": "var(--green)", "lane": "now", "status": "✓ closed", "q": "closed", "tagline": "BINDING BRIEF IS IN THE PAGE BODY (v1.6 conformance, PM 2026-07-19) - read it in full; it supersedes this property snapshot. Mission: fast-track run-…", "owner": "shepherd:claude:run-smoke", "gate": "Graduated — all 2 work items Closed.", "outcome": "BINDING BRIEF IS IN THE PAGE BODY (v1.6 conformance, PM 2026-07-19) - read it in full; it supersedes this property snapshot. Mission: fast-track run-smoke stabilization - WI-2450 Diagnose leads, WI-2452 gate hygiene parallel, WI-2451 joins…", "bundles": [{"n": "WI-2450 · Run-smoke ambient-red: failure taxonomy + staging root-ca…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2452 · Run-smoke gate hygiene: required-stable vs advisory lanes…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-29 (Closed)", "Run by: shepherd:claude:run-smoke"]}, {"id": "BID-27", "name": "Correctness factory drain 3 — adversarial-review bug family", "accent": "var(--green)", "lane": "now", "status": "✓ closed", "q": "closed", "tagline": "BINDING BRIEF IS IN THE PAGE BODY (v1.6 conformance, PM 2026-07-19) - read it in full; it supersedes this property snapshot. Mission: correctness fac…", "owner": "shepherd:codex:factory-drain3", "gate": "Graduated — all 9 work items Closed.", "outcome": "BINDING BRIEF IS IN THE PAGE BODY (v1.6 conformance, PM 2026-07-19) - read it in full; it supersedes this property snapshot. Mission: correctness factory drain 3, 9 deterministic Bug members, Codex lane, OPQ-121 close-exception law, claim…", "bundles": [{"n": "WI-1991 · Clamp day-of-month in billing/quota cycle-reset date math", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1993 · Use exact birthdate in client adult-owner gate (match ser…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1994 · Make getSubjectProgress read the latest curriculum version", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1995 · Parse LLM envelope signals field-tolerantly (degrade, don…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1996 · Stop blind metadata full-replace clobbering challenge-rou…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1997 · Stop swallowed dedup-log write double-notifying parents (…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1998 · Unify session idempotency gates to one fail-closed policy…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2009 · Make review-calibration-grade retry-safe (paid LLM call +…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2012 · Add row lock to memory-consent toggle (check-then-act rac…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-27 (Closed)", "Run by: shepherd:codex:factory-drain3"]}, {"id": "BID-26", "name": "Security & compliance wave — read-side authority, consent tokens, safety hardening", "accent": "var(--green)", "lane": "now", "status": "✓ closed", "q": "closed", "tagline": "BINDING BRIEF IS IN THE PAGE BODY (v1.7 conformance, PM 2026-07-19) - read body + Program Preamble. Mission: security & compliance wave, 7 members, 2…", "owner": "shepherd:claude:security-wave", "gate": "Graduated — all 7 work items Closed.", "outcome": "BINDING BRIEF IS IN THE PAGE BODY (v1.7 conformance, PM 2026-07-19) - read body + Program Preamble. Mission: security & compliance wave, 7 members, 2416 anchor; expect expert-paced adversarial parks. - pm:claude:mentomate", "bundles": [{"n": "WI-2396 · Extend R5 consent-withdrawal enforcement beyond the excha…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2397 · Root GET /dashboard has no owner gate (assess/close poten…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2398 · assertNotProxyMode has the same header-trust IDOR root ca…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2416 · Apply read-side profile-authority check across the 8 audi…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2432 · Thread ageBracket to vendor-exclusion across 4 non-thread…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2433 · Route assessments grader calls on capability:'judge' (con…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2434 · Reject old cw2 bearer tokens against newer tokenless cons…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-26 (Closed)", "Run by: shepherd:claude:security-wave"]}, {"id": "BID-25", "name": "Liveness and evidence hardening", "accent": "var(--green)", "lane": "now", "status": "✓ closed", "q": "closed", "tagline": "Full brief + interim conditions in page body (formed 2026-07-19, pm:hex:zdx-core). Members incl. WI-2420/WI-2425 per operator composition go, 2026-07…", "owner": "shepherd:claude:liveness-lane", "gate": "Graduated — all 0 work items Closed.", "outcome": "Full brief + interim conditions in page body (formed 2026-07-19, pm:hex:zdx-core). Members incl. WI-2420/WI-2425 per operator composition go, 2026-07-19.", "bundles": [], "homes": ["Cosmo · Delivery Batch BID-25 (Closed)", "Run by: shepherd:claude:liveness-lane"]}, {"id": "BID-24", "name": "Measured run 2", "accent": "var(--green)", "lane": "now", "status": "✓ closed", "q": "closed", "tagline": "Full brief + interim conditions in page body (formed 2026-07-19, pm:hex:zdx-core). Run-1 record + evidence ledger: BID-9 page.", "owner": "shepherd:claude:p4.6-run2", "gate": "Graduated — all 0 work items Closed.", "outcome": "Full brief + interim conditions in page body (formed 2026-07-19, pm:hex:zdx-core). Run-1 record + evidence ledger: BID-9 page.", "bundles": [], "homes": ["Cosmo · Delivery Batch BID-24 (Closed)", "Run by: shepherd:claude:p4.6-run2"]}, {"id": "BID-23", "name": "Mentor eval trio — LLM-behavior lane", "accent": "var(--green)", "lane": "now", "status": "✓ closed", "q": "closed", "tagline": "BINDING BRIEF IS IN THE PAGE BODY (v1.6 conformance, PM 2026-07-19) - read it in full; it supersedes this property snapshot. Mission: mentor LLM-beha…", "owner": "shepherd:claude:mentor-evals", "gate": "Graduated — all 3 work items Closed.", "outcome": "BINDING BRIEF IS IN THE PAGE BODY (v1.6 conformance, PM 2026-07-19) - read it in full; it supersedes this property snapshot. Mission: mentor LLM-behavior trio (2100/2107/2114), Claude lane, eval-harness evidence shape; 2114 Blocked-by 2098…", "bundles": [{"n": "WI-2100 · Ask which source the learner means instead of assuming a…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2107 · Make Mentor opening promises lead to an immediate next tu…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2114 · Give answer-specific feedback in Recall Check instead of…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-23 (Closed)", "Run by: shepherd:claude:mentor-evals"]}, {"id": "BID-21", "name": "delivery-process hardening", "accent": "var(--green)", "lane": "now", "status": "✓ closed", "q": "closed", "tagline": "|| INTERIM CONDITIONS (stamped 2026-07-19 per template-v2 convention): (1) The canonical reviewer runtime is FROZEN pending the sanctioned re-pin (WI…", "owner": "pm:hex:zdx-core", "gate": "Graduated — all 0 work items Closed.", "outcome": "|| INTERIM CONDITIONS (stamped 2026-07-19 per template-v2 convention): (1) The canonical reviewer runtime is FROZEN pending the sanctioned re-pin (WI-2388); if a review parks in Awaiting Info on DB-suite/Doppler-credential symptoms, do not…", "bundles": [], "homes": ["Cosmo · Delivery Batch BID-21 (Closed)", "Run by: pm:hex:zdx-core"]}, {"id": "BID-20", "name": "Compliance-Eng + security hardening", "accent": "var(--green)", "lane": "now", "status": "✓ closed", "q": "closed", "tagline": "Claude lane. 9 members. Priority head: WI-2353 (SECURITY — Authorization Bearer JWT reaches Sentry unredacted; live leak) → WI-2339 (harden beforeSen…", "owner": "shepherd:claude:compliance-security", "gate": "Graduated — all 8 work items Closed.", "outcome": "Claude lane. 9 members. Priority head: WI-2353 (SECURITY — Authorization Bearer JWT reaches Sentry unredacted; live leak) → WI-2339 (harden beforeSend scrub class-wide) → WI-2352 (lint guard arms the class) — hard-wired sequence. WI-2372 (…", "bundles": [{"n": "WI-2300 · Harden check-db-push-target tests: non-local non-neon hos…", "s": "Closed", "m": "agent", "st": "done"}, {"n": "WI-2301 · CI preview-build env check verifies wrong mechanism (GH s…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2339 · Harden Sentry beforeSend scrub — cover event.request / br…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2347 · Consent-withdrawal bearer token: server-side revocation +…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2348 · Reconcile MMT-ADR-0029 bearer-restore clause with OPQ-114…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2352 · Lint guard: forbid raw parse/DB errors reaching Sentry ca…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2353 · SECURITY: Authorization Bearer JWT reaches Sentry unredac…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2372 · Enforce consent withdrawal in the LLM/exchange pipeline (…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-20 (Closed)", "Run by: shepherd:claude:compliance-security"]}, {"id": "BID-15", "name": "QA factory drain 1", "accent": "var(--green)", "lane": "now", "status": "✓ closed", "q": "closed", "tagline": "First severity-gated drain of the QA Fix Factory — CI-VERIFIABLE ITEMS ONLY (operator-ruled mode 2026-07-17): every member's fix is provable by unit/…", "owner": "shepherd:codex:mm-factory-drain1", "gate": "Graduated — all 7 work items Closed.", "outcome": "First severity-gated drain of the QA Fix Factory — CI-VERIFIABLE ITEMS ONLY (operator-ruled mode 2026-07-17): every member's fix is provable by unit/integration/Playwright-web tests in CI; device/preview-build-verified fixes stay parked un…", "bundles": [{"n": "WI-2178 · Use the active app theme behind fixed V2 chrome on pushed…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2182 · Separate BottomSheet backdrop dismissal from interactive…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2185 · Reserve fixed V2 chrome space before pushed-screen content", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2186 · Align Reports empty-state timing with weekly and monthly…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2187 · Make owner-global Account settings unambiguous under lear…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2191 · Remove nested interactive controls from the Practice quic…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2192 · Expose quiz-results exit actions as accessible buttons", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-15 (Closed)", "Run by: shepherd:codex:mm-factory-drain1"]}, {"id": "BID-14", "name": "Identity cutover", "accent": "var(--green)", "lane": "now", "status": "✓ closed", "q": "closed", "tagline": "person_id / identity-authority chain — closes the identity-cutover engineering tail. Members: WI-1989 (close X-Profile-Id owner-gate IDOR on 7 un-swe…", "owner": "shepherd:claude:identity-cutover", "gate": "Graduated — all 4 work items Closed.", "outcome": "person_id / identity-authority chain — closes the identity-cutover engineering tail. Members: WI-1989 (close X-Profile-Id owner-gate IDOR on 7 un-swept owner routes — security), WI-2006 (spike: define + apply read-side profile-authority ch…", "bundles": [{"n": "WI-1989 · Close X-Profile-Id owner-gate IDOR on 7 un-swept owner ro…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2006 · Spike: define and apply read-side profile-authority check", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2055 · Amend identity canon: forward-repair is the person_id rec…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2056 · Write Neon PITR/snapshot recovery runbook (identity/perso…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-14 (Closed)", "Run by: shepherd:claude:identity-cutover"]}, {"id": "BID-13", "name": "Mentor loop", "accent": "var(--green)", "lane": "now", "status": "✓ closed", "q": "closed", "tagline": "Mentor-interaction correctness cluster — the learner-facing Mentor conversation loop. Members: WI-2094 (route valid Mentor statements instead of sile…", "owner": "shepherd:codex:mm-mentor-loop", "gate": "Graduated — all 3 work items Closed.", "outcome": "Mentor-interaction correctness cluster — the learner-facing Mentor conversation loop. Members: WI-2094 (route valid Mentor statements instead of silently ignoring send), WI-2099 (preserve the opening Mentor exchange when starting a session…", "bundles": [{"n": "WI-2094 · Route valid Mentor statements instead of silently ignorin…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2099 · Preserve the opening Mentor exchange when starting a sess…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2222 · Consolidate Mentor capability contract tests and targeted…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-13 (Closed)", "Run by: shepherd:codex:mm-mentor-loop"]}, {"id": "BID-12", "name": "Correctness & review loop", "accent": "var(--green)", "lane": "now", "status": "✓ closed", "q": "closed", "tagline": "Core Learning Loop correctness/review cluster (SM-2 / recall / re-teach subsystem affinity). Members: WI-1443, WI-1444, WI-1454, WI-1455, WI-1462, WI…", "owner": "shepherd:claude:mm-correctness-loop", "gate": "Graduated — all 4 work items Closed.", "outcome": "Core Learning Loop correctness/review cluster (SM-2 / recall / re-teach subsystem affinity). Members: WI-1443, WI-1444, WI-1454, WI-1455, WI-1462, WI-1463, WI-1465, WI-2112 (Challenge redefinition per OPQ-118 ruling — coordinate with Execu…", "bundles": [{"n": "WI-1462 · Replace library-redirect dead-end with a bounded re-teach…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1463 · Default the relearn topic list to system-ranked order by…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1465 · Low-stakes per-concept re-prove path for recovering strug…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2112 · Redefine Challenge as deeper active learning instead of a…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-12 (Closed)", "Run by: shepherd:claude:mm-correctness-loop"]}, {"id": "BID-10", "name": "Substrate hardening tail", "accent": "var(--green)", "lane": "now", "status": "✓ closed", "q": "closed", "tagline": "Carries the two correctly-scoped follow-ons deferred from B6/WI-2023's cutover close (operator/PM ruling 2026-07-17): WI-2297 (bootstrap admission /…", "owner": "claude:orchestrator (P4.2 seat)", "gate": "Graduated — all 0 work items Closed.", "outcome": "Carries the two correctly-scoped follow-ons deferred from B6/WI-2023's cutover close (operator/PM ruling 2026-07-17): WI-2297 (bootstrap admission / commissioning drill, T4.8 pending->active — P1, becomes a Gated by-WI on the M1 relaunch b…", "bundles": [], "homes": ["Cosmo · Delivery Batch BID-10 (Closed)", "Run by: claude:orchestrator (P4.2 seat)"]}, {"id": "BID-8", "name": "P4.5 — supervision & instrumentation", "accent": "var(--green)", "lane": "now", "status": "✓ closed", "q": "closed", "tagline": "Board of record: _WIP/zdx-reboot/_docs/p4.5-board-formation.md (D-board). Back-filled batch page 2026-07-16. D1/D2 Closed; D3 held on B3; D4-D6 mint…", "owner": "claude:p4.5-agent (parked pending B3-Closed relay)", "gate": "Graduated — all 0 work items Closed.", "outcome": "Board of record: _WIP/zdx-reboot/_docs/p4.5-board-formation.md (D-board). Back-filled batch page 2026-07-16. D1/D2 Closed; D3 held on B3; D4-D6 mint at board-open — NOT fully delivered.", "bundles": [], "homes": ["Cosmo · Delivery Batch BID-8 (Closed)", "Run by: claude:p4.5-agent (parked pending B3-Closed relay)"]}, {"id": "BID-7", "name": "P4.2 — substrate completion", "accent": "var(--green)", "lane": "now", "status": "✓ closed", "q": "closed", "tagline": "Board of record: _WIP/zdx-reboot/_docs/p4.2-board-formation (B-board, 8 rows). Back-filled batch page 2026-07-16 (post first-contact). Members: the B…", "owner": "claude:orchestrator (P4.2 delivery agent)", "gate": "Graduated — all 0 work items Closed.", "outcome": "Board of record: _WIP/zdx-reboot/_docs/p4.2-board-formation (B-board, 8 rows). Back-filled batch page 2026-07-16 (post first-contact). Members: the B-board rows; B1/B2/B4/B7 already Closed at back-fill.", "bundles": [], "homes": ["Cosmo · Delivery Batch BID-7 (Closed)", "Run by: claude:orchestrator (P4.2 delivery agent)"]}, {"id": "BID-5", "name": "P4.4 — crew build (remaining board)", "accent": "var(--green)", "lane": "now", "status": "✓ closed", "q": "closed", "tagline": "Board of record: _WIP/zdx-reboot/_docs/p4.4-board-formation.md (ruled). First Nexus batch page (WI-2140 ruling rider, back-filled at P4.6 formation).…", "owner": "—", "gate": "Graduated — all 0 work items Closed.", "outcome": "Board of record: _WIP/zdx-reboot/_docs/p4.4-board-formation.md (ruled). First Nexus batch page (WI-2140 ruling rider, back-filled at P4.6 formation). Members: the open board rows C1a/C1b/C2a/C2b/C3/C4/C5.", "bundles": [], "homes": ["Cosmo · Delivery Batch BID-5 (Closed)", "Run by: —"]}, {"id": "BID-4", "name": "Safety floor", "accent": "var(--green)", "lane": "now", "status": "✓ closed", "q": "closed", "tagline": "Safety floor on the LLM routing/safety stack; one adversarial verification pass over the whole batch. Members: WI-1986 (close under-18 vendor bypass…", "owner": "shepherd:claude:mm-safety-floor", "gate": "Graduated — all 6 work items Closed.", "outcome": "Safety floor on the LLM routing/safety stack; one adversarial verification pass over the whole batch. Members: WI-1986 (close under-18 vendor bypass in legacy fallback selector — P1), WI-1826 (suitability judge adopts capability:'judge' ro…", "bundles": [{"n": "WI-1826 · Suitability judge adopts capability:'judge' routing path…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1877 · Fence learner-controlled text in suitability-judge prompt…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1880 · Fence learner answer in challenge-round grader prompt; re…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1986 · Close under-18 vendor bypass in legacy LLM fallback selec…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2004 · Add guard for the 'safety gate on primary path only' defe…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2364 · Cross-branch invariant test: LLM fallback config preserve…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-4 (Closed)", "Run by: shepherd:claude:mm-safety-floor"]}, {"id": "BID-3", "name": "Deletion & PII hygiene", "accent": "var(--green)", "lane": "now", "status": "✓ closed", "q": "closed", "tagline": "The deletion/PII data-lifecycle chain — pure engineering, zero counsel input; burns down WI-1577's engineering preconditions while paper rolls. Membe…", "owner": "shepherd:claude:mm-pii-hygiene", "gate": "Graduated — all 6 work items Closed.", "outcome": "The deletion/PII data-lifecycle chain — pure engineering, zero counsel input; burns down WI-1577's engineering preconditions while paper rolls. Members: WI-1985 (guardianship/supportership edge teardown in person-scoped deletes — root FK-v…", "bundles": [{"n": "WI-1442 · Persist consent audit trail before profile hard-delete (G…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1985 · Tear down guardianship/supportership edges in person-scop…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1987 · Stop persisting learner transcripts to plaintext AsyncSto…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1988 · Delete minors' homework photos from device cache after OC…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1990 · Strip learner free-text PII from Sentry; add beforeSend s…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2058 · Write deletion irreversible-boundary runbook (grace / DB-…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-3 (Closed)", "Run by: shepherd:claude:mm-pii-hygiene"]}, {"id": "BID-2", "name": "CI & gates unblock", "accent": "var(--green)", "lane": "now", "status": "✓ closed", "q": "closed", "tagline": "De-friction CI and local gates so every later batch runs clean. Members: WI-1807 (repair test:llm:enduser after profiles-table removal), WI-1992 (rou…", "owner": "shepherd:claude:mm-ci-gates", "gate": "Graduated — all 7 work items Closed.", "outcome": "De-friction CI and local gates so every later batch runs clean. Members: WI-1807 (repair test:llm:enduser after profiles-table removal), WI-1992 (route service-diff PRs through API integration suite), WI-1809 (GC1 checker blind to multi-li…", "bundles": [{"n": "WI-1807 · Repair end-user LLM quality gate after profiles-table rem…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1809 · GC1 checker (check-gc1-pattern-a.ts) blind to gc1-allow c…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1813 · Reseed stale simulation-baseline.json (fails --validate-b…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1862 · Local pre-push jest harness broken: gemini.test.ts clearT…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1874 · db-push guard's DB_PUSH_LOCAL_DEV escape can still push t…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-1992 · Route service-diff PRs through API integration suite (CI…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2081 · Fix dangling docs/superpowers/ citations in jest config c…", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-2 (Closed)", "Run by: shepherd:claude:mm-ci-gates"]}, {"id": "BID-1", "name": "Preview vehicle", "accent": "var(--green)", "lane": "now", "status": "✓ closed", "q": "closed", "tagline": "Restore the QA vehicle: preview builds + web export + web sign-up. Members: WI-2118 (Expo web export dep resolution), WI-2119 (Clerk security-service…", "owner": "shepherd:claude:mm-preview-vehicle", "gate": "Graduated — all 3 work items Closed.", "outcome": "Restore the QA vehicle: preview builds + web export + web sign-up. Members: WI-2118 (Expo web export dep resolution), WI-2119 (Clerk security-service timeout on web sign-up), WI-2120 (Clerk publishable key in preview EAS builds). One surfa…", "bundles": [{"n": "WI-2118 · Restore Expo web export dependency resolution", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2119 · Prevent Clerk security-service timeout from blocking web…", "s": "Closed", "m": "mixed", "st": "done"}, {"n": "WI-2120 · Provision Clerk publishable key in preview EAS builds", "s": "Closed", "m": "mixed", "st": "done"}], "homes": ["Cosmo · Delivery Batch BID-1 (Closed)", "Run by: shepherd:claude:mm-preview-vehicle"]}, {"id": "BID-9", "name": "Measured-run workload", "accent": "var(--green)", "lane": "now", "status": "cancelled", "q": "cancelled", "tagline": "The P4.6 measured run's chartered 14-atom slice (charter: _WIP/zdx-reboot/_docs/p4.6-run-charter.md, RATIFIED 2026-07-16). Group N = nexus repo (WI-2…", "owner": "shepherd:claude:p4.6-run", "gate": "Cancelled — superseded; workload re-homed.", "outcome": "The P4.6 measured run's chartered 14-atom slice (charter: _WIP/zdx-reboot/_docs/p4.6-run-charter.md, RATIFIED 2026-07-16). Group N = nexus repo (WI-25/26/346/439/1696/1713/1749); Group C = cosmograph repo (WI-753/1534/1535/1536/1537/1541/1…", "bundles": [], "homes": ["Cosmo · Delivery Batch BID-9 (Cancelled)", "Run by: shepherd:claude:p4.6-run"]}];
+const PARKED = [["WI-2593", "P0 · credential redaction + staging secret rotation", "Refinery-gated · operator authorization"], ["OPQ-71", "V0-retirement ruling (irreversible — removes flag-flip rollback)", "operator ruling"], ["OPQ-82", "agent-usable Stripe management access (fleet-wide)", "operator ruling"], ["WI-782", "V2-shell S4/S5 visibility-contract rework", "re-home if a V2-shell initiative activates"], ["BID-32", "Merge-gate integrity + crew-daemon reliability", "Formed — awaiting shepherd claim"]];
+/* =============== RENDER =============== */
+// Status taxonomy drives BOTH the board grouping and the filter. A graduated
+// initiative is NOT "in motion" — it gets its own section.
+const CATS = [
+  {k:"motion",   t:"In motion",  glyph:"▸", c:"var(--teal)",  d:"executing or actively worked — shepherded at bundle level"},
+  {k:"waiting",  t:"Waiting",    glyph:"✦", c:"var(--lav)",   d:"charters ratified or backlogged — each starts when its gate or trigger fires"},
+  {k:"graduated",t:"Graduated",  glyph:"✓", c:"var(--green)", d:"outcome met — done, kept on the board for the record"}
+];
+function catOf(i){
+  const s=(i.status||"").toLowerCase();
+  if(s.includes("graduat")||s.includes("closed")||s.includes("cancel")) return "graduated";
+  // active work — including a live design phase — is in motion, even if the
+  // status string also carries a "design" qualifier. This check wins first.
+  if(s.includes("active")) return "motion";
+  if(i.lane==="later"||i.lane==="armed"||s.includes("embryo")||s.includes("backlog")||s.includes("design")||s.includes("park")) return "waiting";
+  return "motion";
+}
+
+function el(h){const t=document.createElement("template"); t.innerHTML=h.trim(); return t.content.firstChild}
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;")}
+
+/* ---- status filter (toggle each status on/off; clear = show all) ---- */
+const ALL_CATS=CATS.map(c=>c.k);
+function loadFilter(){
+  try{const s=localStorage.getItem("flightdeck-filter"); if(s){const a=JSON.parse(s);
+    if(Array.isArray(a)&&a.length){const f=a.filter(k=>ALL_CATS.includes(k)); if(f.length) return new Set(f);}}}catch(e){}
+  return new Set(ALL_CATS);
+}
+let activeCats=loadFilter();
+function saveFilter(){try{localStorage.setItem("flightdeck-filter",JSON.stringify([...activeCats]))}catch(e){}}
+function renderFilterBar(){
+  let bar=document.getElementById("filterbar");
+  if(!bar){bar=el(`<div class="filterbar" id="filterbar"></div>`);
+    const b=document.getElementById("v-board"); b.insertBefore(bar, b.firstChild);}
+  const counts={}; CATS.forEach(c=>counts[c.k]=INIT.filter(i=>catOf(i)===c.k).length);
+  const allOn=activeCats.size===ALL_CATS.length;
+  bar.innerHTML=`<span class="fb-label">Show status</span>`+
+    CATS.map(c=>{const on=activeCats.has(c.k);
+      return `<button class="fbtn cat-${c.k} ${on?'on':'off'}" data-cat="${c.k}" style="--c:${c.c}" aria-pressed="${on}"><span class="fb-dot"></span>${c.t}<span class="fb-ct">${counts[c.k]}</span></button>`;
+    }).join("")+
+    `<button class="fbtn fbtn-clear" id="fbClear"${allOn?' disabled':''}>↺ clear</button>`;
+  bar.querySelectorAll(".fbtn[data-cat]").forEach(b=>b.addEventListener("click",()=>{
+    const k=b.dataset.cat;
+    if(activeCats.has(k)) activeCats.delete(k); else activeCats.add(k);
+    if(activeCats.size===0) activeCats=new Set(ALL_CATS);   // never blank the board
+    saveFilter(); renderBoard();
+  }));
+  const clr=document.getElementById("fbClear");
+  if(clr&&!allOn) clr.addEventListener("click",()=>{activeCats=new Set(ALL_CATS); saveFilter(); renderBoard();});
+}
+
+function renderBoard(){
+  renderFilterBar();
+  const root=document.getElementById("lanes"); root.innerHTML="";
+  CATS.forEach(C=>{
+    if(!activeCats.has(C.k)) return;
+    const items=INIT.filter(i=>catOf(i)===C.k);
+    if(!items.length) return;
+    const lane=el(`<div class="lane cat-${C.k}"><div class="lane-head"><span class="tag" style="--c:${C.c}">${C.glyph} ${C.t}</span><span class="desc">${C.d}</span><span class="lane-ct">${items.length}</span></div><div class="cards"></div></div>`);
+    const grid=lane.querySelector(".cards");
+    items.forEach((i,idx)=>{
+      const chips=i.bundles.map(b=>`<span class="chip ${b.st}">${esc(b.n.split("·")[0].trim())}<span class="n">${esc(b.s)}</span></span>`).join("");
+      const st=esc((i.status||"").replace(/^✓\s*/,""));
+      const c=el(`<article class="card" style="--accent:${i.accent}; --c:${C.c}; animation-delay:${.05*idx+.06}s" data-id="${i.id}">
+        <div class="top"><span class="pid">${i.id}</span><span class="top-r"><span class="cstat">${st}</span><span class="qpos">${i.q}</span></span></div>
+        <h3>${esc(i.name)}</h3>
+        <p class="tagline">${esc(i.tagline)}</p>
+        <div class="gateline"><span class="glyph">⌖</span><span>${i.gate.split(".")[0]}.</span></div>
+        <div class="chips">${chips}</div>
+        <div class="foot"><span class="own">⌬ ${esc(i.owner)}</span><span class="more">detail →</span></div>
+      </article>`);
+      c.addEventListener("click",()=>openDrawer(i.id));
+      grid.appendChild(c);
+    });
+    root.appendChild(lane);
+  });
+  const shelf=document.getElementById("shelf");
+  shelf.innerHTML=`<h4>⊘ The parked shelf — real, not-now, re-entry written down</h4>
+    <div class="chips">${PARKED.map(p=>`<span class="chip hold">${p[0]} · ${esc(p[1])}<span class="n">↻ ${esc(p[2])}</span></span>`).join("")}</div>
+    <p>Parked findings keep their full record in the audit register. They re-enter through the intake rule if their trigger fires — nothing here can silently rot.</p>`;
+}
+
+function renderSeq(){
+  const rail=document.getElementById("rail"); rail.innerHTML="";
+  GATES.forEach(g=>{
+    rail.appendChild(el(`<div class="gate ${g.state}">
+      <div class="node"></div><div class="wire"></div>
+      <div class="gid">${g.id}</div><div class="gname">${esc(g.name)}</div>
+      <span class="gstatus">${g.status}</span>
+      <div class="gwhat">${esc(g.what)}</div>
+      <div class="gunlock">unlocks → ${g.unlocks.map(u=>`<b>${esc(u)}</b>`).join(" · ")}</div>
+    </div>`));
+  });
+  document.getElementById("triggers").innerHTML = TRIGGERS.map(t=>
+    `<div class="trigger"><span class="tglyph">${t.glyph}</span><div><div class="tname">${esc(t.name)}</div><p>${t.body}</p></div></div>`).join("");
+  const qb=document.getElementById("qbody");
+  qb.innerHTML = QUEUE.map(q=>`<tr data-id="${q[1]}"><td class="qn">${q[0]}</td><td class="qi"><span class="pid2" style="color:var(--teal)">${q[1]}</span><b>${esc(q[2])}</b></td><td class="qg">${esc(q[3])}</td></tr>`).join("");
+  qb.querySelectorAll("tr").forEach(r=>r.addEventListener("click",()=>{const i=INIT.find(x=>x.id===r.dataset.id); if(i) openDrawer(i.id);}));
+}
+
+/* =============== DRAWER =============== */
+const drawer=document.getElementById("drawer"), overlay=document.getElementById("overlay");
+function openDrawer(id){
+  const i=INIT.find(x=>x.id===id); if(!i) return;
+  drawer.innerHTML=`<button class="d-close" aria-label="Close">✕</button>
+    <div class="d-pid" style="color:${i.accent}">${i.id} · ${i.q}</div>
+    <h2>${esc(i.name)}</h2>
+    <div class="d-meta"><span class="pill">${esc(i.status)}</span><span class="pill">⌬ ${esc(i.owner)}</span></div>
+    <p class="d-outcome"><b>Done means:</b> ${esc(i.outcome)}</p>
+    ${i.exports?`<p class="d-outcome">${esc(i.exports)}</p>`:""}
+    <h4>Gate</h4><div class="d-gate"><b>⌖</b> ${esc(i.gate)}</div>
+    <h4>Work items — the level to watch</h4>
+    ${i.bundles.map(b=>`<div class="bundle">
+       <span class="b-state ${b.st}"></span>
+       <div class="b-body"><div class="b-name">${esc(b.n)}</div>${b.note?`<div class="b-note">${esc(b.note)}</div>`:""}</div>
+       <div class="b-side"><div class="b-size">${esc(b.s)}</div><span class="b-mode ${b.m}">${b.m==="agent"?"agent-sweep":b.m==="human"?"human-led":"mixed"}</span></div>
+     </div>`).join("")}
+    <h4>Where the truth lives</h4>
+    <div class="d-homes">${i.homes.map(h=>`<code>${esc(h)}</code>`).join("<br>")}</div>`;
+  drawer.querySelector(".d-close").addEventListener("click",closeDrawer);
+  drawer.classList.add("on"); overlay.classList.add("on"); drawer.scrollTop=0;
+}
+function closeDrawer(){drawer.classList.remove("on"); overlay.classList.remove("on")}
+overlay.addEventListener("click",closeDrawer);
+
+/* =============== NAV / THEME =============== */
+const tabs=document.querySelectorAll("nav button");
+function show(v){
+  tabs.forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+  document.querySelectorAll(".view").forEach(s=>s.classList.toggle("on",s.id==="v-"+v));
+  if(location.hash!=="#"+v) history.replaceState(null,"","#"+v);
+}
+tabs.forEach(b=>b.addEventListener("click",()=>show(b.dataset.v)));
+document.addEventListener("keydown",e=>{
+  if(e.target.matches("input,textarea")) return;
+  if(e.key==="1") show("board"); if(e.key==="2") show("seq"); if(e.key==="3") show("guide");
+  if(e.key==="t") toggleTheme(); if(e.key==="Escape") closeDrawer();
+});
+function toggleTheme(){
+  const r=document.documentElement, next=r.dataset.theme==="dark"?"light":"dark";
+  r.dataset.theme=next; try{localStorage.setItem("flightdeck-theme",next)}catch(e){}
+}
+document.getElementById("themeBtn").addEventListener("click",toggleTheme);
+try{const s=localStorage.getItem("flightdeck-theme"); if(s) document.documentElement.dataset.theme=s}catch(e){}
+
+renderBoard(); renderSeq();
+const h=location.hash.slice(1); if(["board","seq","guide"].includes(h)) show(h);
+</script>
+</body>
+</html>
