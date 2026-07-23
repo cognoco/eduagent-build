@@ -48,6 +48,14 @@
       "scenario": "onboarding-no-subject"
     },
     {
+      "flow": "flows/v2/v2-subjects-browse-resume.yaml",
+      "scenario": "learning-active"
+    },
+    {
+      "flow": "flows/v2/v2-subjects-due-review.yaml",
+      "scenario": "retention-due"
+    },
+    {
       "flow": "flows/v2/v2-supporter-scope-journey.yaml",
       "scenario": "v2-supporter-accepted"
     },

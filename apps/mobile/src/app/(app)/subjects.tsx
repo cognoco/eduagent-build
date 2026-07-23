@@ -20,6 +20,7 @@ import {
   pushLinkInitiatePicker,
   SUBJECTS_RETURN_TO,
 } from '../../lib/navigation';
+import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { useScopeContext } from '../../lib/scope-context';
 import { buildSessionDetailHref } from '../../lib/session-detail-navigation';
 
@@ -27,7 +28,9 @@ export default function SubjectsScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const { activeScope, availableScopes, setActiveScope } = useScopeContext();
-  const subjectsIndex = useSubjectsIndex();
+  const subjectsIndex = useSubjectsIndex({
+    includeInactive: FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+  });
   const eligiblePersons = useEligibleManagedPersons();
 
   // Navigation handlers wired to search results from cross-entity library search.

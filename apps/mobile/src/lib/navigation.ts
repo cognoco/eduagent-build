@@ -14,6 +14,7 @@ export const JOURNAL_RETURN_TO = 'journal';
 export const JOURNAL_HREF = '/(app)/journal';
 export const SUBJECTS_RETURN_TO = 'subjects';
 export const SUBJECTS_HREF = '/(app)/subjects';
+export const SUBJECT_HUB_RETURN_TO = 'subject-hub';
 export const SETTINGS_RETURN_TO = 'settings';
 export const FAMILY_RECAPS_RETURN_TO = 'family-recaps';
 export const FAMILY_RECAPS_HREF = '/(app)/recaps';
@@ -124,6 +125,12 @@ export function homeHrefForReturnTo(
   if (token === PRACTICE_RETURN_TO) return PRACTICE_HREF as Href;
   if (token === JOURNAL_RETURN_TO) return JOURNAL_HREF as Href;
   if (token === SUBJECTS_RETURN_TO) return SUBJECTS_HREF as Href;
+  if (token === SUBJECT_HUB_RETURN_TO && id) {
+    return {
+      pathname: '/(app)/subject-hub/[subjectId]',
+      params: { subjectId: id },
+    } as Href;
+  }
   if (token === FAMILY_RECAPS_RETURN_TO && id) {
     return {
       pathname: '/(app)/recaps/[recapId]',
@@ -179,9 +186,10 @@ export function goBackOrReplace(
 }
 
 export function pushLearningResumeTarget(
-  router: Pick<Router, 'push'>,
+  router: Pick<Router, 'push' | 'replace'>,
   target: LearningResumeTarget,
   returnTo?: string,
+  options: { replaceTarget?: boolean } = {},
 ): void {
   // [BUG-977 / CCR-PR126-M-2] Replace the previous `as never` cast (which
   // silenced the typed Href system entirely) with `as Href`. The Expo Router
@@ -196,11 +204,10 @@ export function pushLearningResumeTarget(
   // ancestor chain. A single push to /(app)/session synthesises a 1-deep stack,
   // so back() from session falls through to the active tab's first-route
   // (Home) instead of the caller's previous screen.
-  // Fix: push the home screen first to seed the back-stack, then push session
-  // on top. The session screen uses homeHrefForReturnTo(returnTo) for its own
-  // back-navigation, so this also gives the correct target when returnTo is set.
-  router.push('/(app)/home' as Href);
-  router.push({
+  // Fix: seed the contextual return ancestor before pushing session. A caller
+  // already sitting directly above that ancestor can instead replace its
+  // current route; Session then uses history for its visible Back control.
+  const sessionHref = {
     pathname: '/(app)/session',
     params: {
       mode: 'learning',
@@ -213,8 +220,19 @@ export function pushLearningResumeTarget(
         ? { resumeFromSessionId: target.resumeFromSessionId }
         : {}),
       ...(returnTo ? { returnTo } : {}),
+      ...(options.replaceTarget ? { returnStrategy: 'history' } : {}),
     },
-  } as Href);
+  } as Href;
+
+  if (options.replaceTarget) {
+    router.replace(sessionHref);
+    return;
+  }
+
+  router.push(
+    returnTo ? homeHrefForReturnTo(returnTo) : ('/(app)/home' as Href),
+  );
+  router.push(sessionHref);
 }
 
 /**

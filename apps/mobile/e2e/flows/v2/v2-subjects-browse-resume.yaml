@@ -1,0 +1,175 @@
+# WI-2238: V2 Subjects browse, Subject Hub, and active-session return paths
+#
+# Exercises the learning-active case. The row/topic IDs come from the seed,
+# while the transcript assertions identify the exact seeded active session.
+# Every case-specific assertion is hard; this flow has no optional assertions.
+appId: com.mentomate.app
+tags:
+  - v2
+  - subjects
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: 'learning-active'
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 30000
+
+- tapOn:
+    id: 'tab-subjects'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'subjects-screen'
+    timeout: 15000
+
+# An impossible query must produce the hard no-result state, and clearing it
+# must restore the exact seeded World History row.
+- tapOn:
+    id: 'subjects-browse-search'
+- inputText: 'zzzz-no-such-subject-2238'
+- extendedWaitUntil:
+    visible:
+      id: 'library-search-empty'
+    timeout: 15000
+- assertNotVisible:
+    id: 'subjects-browse-row-${SUBJECT_ID}'
+- tapOn:
+    id: 'library-search-clear-results'
+- extendedWaitUntil:
+    visible:
+      id: 'subjects-browse-row-${SUBJECT_ID}'
+    timeout: 15000
+- assertVisible:
+    id: 'subjects-browse-row-${SUBJECT_ID}'
+    containsDescendants:
+      - text: '^World History$'
+
+# Open the exact seeded subject and topic. Closing the detail sheet must leave
+# the same Subject Hub mounted rather than losing the drill-in ancestor.
+- tapOn:
+    id: 'subjects-browse-row-${SUBJECT_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'subject-hub-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'subject-hub-title-${SUBJECT_ID}'
+    text: '^World History$'
+- extendedWaitUntil:
+    visible:
+      id: 'subject-hub-topic-${TOPIC_ID}'
+    timeout: 15000
+- assertVisible:
+    id: 'subject-hub-topic-${TOPIC_ID}'
+    containsDescendants:
+      - text: '^World History Topic 1$'
+- tapOn:
+    id: 'subject-hub-topic-${TOPIC_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'subject-hub-topic-sheet'
+    timeout: 10000
+- assertVisible:
+    id: 'subject-hub-topic-sheet'
+    containsDescendants:
+      - text: '^World History Topic 1$'
+- tapOn:
+    id: 'subject-hub-topic-sheet-close'
+- assertNotVisible:
+    id: 'subject-hub-topic-sheet'
+- assertVisible:
+    id: 'subject-hub-screen'
+- assertVisible:
+    id: 'subject-hub-title-${SUBJECT_ID}'
+    text: '^World History$'
+
+# Next Up must resume the seed's active SESSION_ID. These transcript lines are
+# stored only on that seeded session, so their presence proves the association
+# rather than merely proving that some session screen opened.
+- assertVisible:
+    id: 'subject-hub-next-up'
+    containsDescendants:
+      - text: '^World History Topic 1$'
+      - id: 'subject-hub-next-up-action'
+        text: '^Resume$'
+- tapOn:
+    id: 'subject-hub-next-up-action'
+    text: '^Resume$'
+    childOf:
+      id: 'subject-hub-next-up'
+- extendedWaitUntil:
+    visible:
+      id: 'session-screen'
+    timeout: 45000
+- extendedWaitUntil:
+    visible:
+      id: 'session-screen'
+      containsDescendants:
+        - text: '^Tell me about ancient Rome$'
+        - text: '^Ancient Rome was founded in 753 BC\.\.\.$'
+    timeout: 30000
+
+# Android hardware Back must honor the Subjects return contract.
+- pressKey: back
+- extendedWaitUntil:
+    visible:
+      id: 'subjects-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'subjects-browse-row-${SUBJECT_ID}'
+    containsDescendants:
+      - text: '^World History$'
+
+# The visible session Back affordance must honor the same return contract.
+- tapOn:
+    id: 'subjects-browse-row-${SUBJECT_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'subject-hub-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'subject-hub-next-up'
+    containsDescendants:
+      - text: '^World History Topic 1$'
+      - id: 'subject-hub-next-up-action'
+        text: '^Resume$'
+- tapOn:
+    id: 'subject-hub-next-up-action'
+    text: '^Resume$'
+    childOf:
+      id: 'subject-hub-next-up'
+- extendedWaitUntil:
+    visible:
+      id: 'session-screen'
+    timeout: 45000
+- assertVisible:
+    id: 'session-screen'
+    containsDescendants:
+      - text: '^Tell me about ancient Rome$'
+      - text: '^Ancient Rome was founded in 753 BC\.\.\.$'
+- tapOn:
+    id: 'chat-shell-back'
+- extendedWaitUntil:
+    visible:
+      id: 'subjects-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'subjects-browse-row-${SUBJECT_ID}'
+    containsDescendants:
+      - text: '^World History$'
+
+# Prove Me identity through the shared Account/Profile assertion, then require
+# the same exact seeded World History row on return.
+- runFlow:
+    file: ../_setup/assert-v2-active-profile-and-return.yaml
+    env:
+      PROFILE_ID: ${PROFILE_ID}
+      PROFILE_NAME: 'Active Learner'
+      RETURN_SCREEN_ID: 'subjects-screen'
+      RETURN_ROW_ID: 'subjects-browse-row-${SUBJECT_ID}'
+      RETURN_ROW_NAME: 'World History'

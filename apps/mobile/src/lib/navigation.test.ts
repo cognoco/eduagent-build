@@ -86,6 +86,13 @@ describe('homeHrefForReturnTo', () => {
     expect(homeHrefForReturnTo(SUBJECTS_RETURN_TO)).toBe(SUBJECTS_HREF);
   });
 
+  it('returns the exact Subject Hub when a topic carries the hub return contract', () => {
+    expect(homeHrefForReturnTo('subject-hub', 'biology-subject')).toEqual({
+      pathname: '/(app)/subject-hub/[subjectId]',
+      params: { subjectId: 'biology-subject' },
+    });
+  });
+
   it('resolves Family and Study context return tokens', () => {
     expect(homeHrefForReturnTo(FAMILY_RECAPS_RETURN_TO)).toBe(
       FAMILY_RECAPS_HREF,
@@ -254,7 +261,10 @@ describe('V2 account return contract [WI-2240]', () => {
 
 describe('pushLearningResumeTarget [BUG-977]', () => {
   function makeRouter() {
-    return { push: jest.fn() } satisfies Pick<Router, 'push'>;
+    return {
+      push: jest.fn(),
+      replace: jest.fn(),
+    } satisfies Pick<Router, 'push' | 'replace'>;
   }
 
   function makeMinimalTarget(): LearningResumeTarget {
@@ -271,11 +281,9 @@ describe('pushLearningResumeTarget [BUG-977]', () => {
     };
   }
 
-  // [BUG-551] Cross-tab push must seed the back-stack with the home screen
-  // BEFORE pushing session. A single push synthesises a 1-deep stack so
-  // back() from session falls through to the active tab's first-route (Home)
-  // instead of the caller's previous screen.
-  it('[BUG-551] pushes home screen before session to seed the ancestor back-stack', () => {
+  // [BUG-551] Cross-tab push must seed the contextual ancestor BEFORE pushing
+  // session. With no return token, Home remains the fallback ancestor.
+  it('keeps Home as the ancestor when returnTo is absent', () => {
     const router = makeRouter();
     const target = makeMinimalTarget();
     pushLearningResumeTarget(router, target);
@@ -288,6 +296,62 @@ describe('pushLearningResumeTarget [BUG-977]', () => {
       2,
       expect.objectContaining({ pathname: '/(app)/session' }),
     );
+  });
+
+  it('pushes Subjects before the exact session when returnTo is subjects', () => {
+    const router = makeRouter();
+    const target: LearningResumeTarget = {
+      ...makeMinimalTarget(),
+      topicId: 'topic-subjects-return',
+      topicTitle: 'Linear equations',
+      sessionId: 'session-subjects-return',
+    };
+
+    pushLearningResumeTarget(router, target, SUBJECTS_RETURN_TO);
+
+    expect(router.push).toHaveBeenCalledTimes(2);
+    expect(router.push).toHaveBeenNthCalledWith(1, SUBJECTS_HREF);
+    expect(router.push).toHaveBeenNthCalledWith(2, {
+      pathname: '/(app)/session',
+      params: {
+        mode: 'learning',
+        subjectId: 'subj-1',
+        subjectName: 'Math',
+        topicId: 'topic-subjects-return',
+        topicName: 'Linear equations',
+        sessionId: 'session-subjects-return',
+        returnTo: SUBJECTS_RETURN_TO,
+      },
+    });
+  });
+
+  it('replaces the current route with a history-return session when the caller already has the return ancestor', () => {
+    const router = makeRouter();
+    const target: LearningResumeTarget = {
+      ...makeMinimalTarget(),
+      topicId: 'topic-hub-resume',
+      topicTitle: 'Cell respiration',
+      sessionId: 'session-hub-resume',
+    };
+
+    pushLearningResumeTarget(router, target, SUBJECTS_RETURN_TO, {
+      replaceTarget: true,
+    });
+
+    expect(router.push).not.toHaveBeenCalled();
+    expect(router.replace).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: {
+        mode: 'learning',
+        subjectId: 'subj-1',
+        subjectName: 'Math',
+        topicId: 'topic-hub-resume',
+        topicName: 'Cell respiration',
+        sessionId: 'session-hub-resume',
+        returnTo: SUBJECTS_RETURN_TO,
+        returnStrategy: 'history',
+      },
+    });
   });
 
   it('passes the session pathname and required params for a minimal target', () => {

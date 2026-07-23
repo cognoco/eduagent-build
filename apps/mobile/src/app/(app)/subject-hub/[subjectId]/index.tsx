@@ -21,7 +21,11 @@ import { useSubjects, useUpdateSubject } from '../../../../hooks/use-subjects';
 import { useCreateNote } from '../../../../hooks/use-notes';
 import { useNavigationContract } from '../../../../hooks/use-navigation-contract';
 import { useProgressInventory } from '../../../../hooks/use-progress';
-import { pushLearningResumeTarget } from '../../../../lib/navigation';
+import {
+  pushLearningResumeTarget,
+  SUBJECT_HUB_RETURN_TO,
+  SUBJECTS_RETURN_TO,
+} from '../../../../lib/navigation';
 import { FEATURE_FLAGS } from '../../../../lib/feature-flags';
 import { platformAlert } from '../../../../lib/platform-alert';
 import { formatApiError } from '../../../../lib/format-api-error';
@@ -80,6 +84,8 @@ export default function SubjectHubRoute(): React.ReactElement {
   // the sheet on the 'active' fallback would show the wrong action set for a
   // deep-linked paused/archived subject (pause+archive instead of resume/restore).
   const manageReady = canManage && !!subjectsQuery.data;
+  const isV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+  const showHubHeader = isV2 || manageReady;
   const updateSubject = useUpdateSubject();
   const inventoryEnabled =
     FEATURE_FLAGS.MODE_NAV_V2_ENABLED &&
@@ -119,15 +125,13 @@ export default function SubjectHubRoute(): React.ReactElement {
     // The Subjects tab moves to /(app)/subjects under the V2 shell; fall back to
     // the legacy Library tab only when V2 nav is off, so a back-stack-exhausted
     // user lands on the tab they actually came from.
-    const fallback = (
-      FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? '/(app)/subjects' : '/(app)/library'
-    ) as Href;
+    const fallback = (isV2 ? '/(app)/subjects' : '/(app)/library') as Href;
     // Subject-hub entries are cross-stack pushes from tab surfaces. On native,
     // canGoBack() can still be true for a one-deep synthesized stack, and
     // router.back() then falls through to the Tabs first route (Home). This
     // exit is intentionally contextual, so replace to the owning tab directly.
     router.replace(fallback);
-  }, [router]);
+  }, [isV2, router]);
 
   const goPickBook = useCallback(() => {
     router.push({
@@ -166,30 +170,40 @@ export default function SubjectHubRoute(): React.ReactElement {
   );
 
   const handleReviewTopic = useCallback(
-    (topicId: string) => {
+    (topicId: string, bookId?: string | null) => {
       router.push({
         pathname: '/(app)/topic/[topicId]',
-        params: { subjectId, topicId },
+        params: {
+          subjectId,
+          topicId,
+          ...(isV2 && bookId ? { bookId } : {}),
+          ...(isV2 ? { returnTo: SUBJECT_HUB_RETURN_TO } : {}),
+        },
       } as Href);
     },
-    [router, subjectId],
+    [isV2, router, subjectId],
   );
 
   const handleNextUp = useCallback(
     (nextUp: HubNextUp) => {
       if (!nextUp.topicId) return;
       if (nextUp.kind === 'resume' && hub.data?.nextUp.resumeTarget) {
-        pushLearningResumeTarget(router, hub.data.nextUp.resumeTarget);
+        pushLearningResumeTarget(
+          router,
+          hub.data.nextUp.resumeTarget,
+          isV2 ? SUBJECTS_RETURN_TO : undefined,
+          { replaceTarget: isV2 },
+        );
         return;
       }
       if (nextUp.kind === 'review-due') {
-        handleReviewTopic(nextUp.topicId);
+        handleReviewTopic(nextUp.topicId, nextUp.bookId);
         return;
       }
 
       openTopic(nextUp.topicId, nextUp.bookId);
     },
-    [handleReviewTopic, hub.data?.nextUp.resumeTarget, openTopic, router],
+    [handleReviewTopic, hub.data?.nextUp.resumeTarget, isV2, openTopic, router],
   );
 
   // HIGH-3: surface a platform alert when the retry mutation fails so the
@@ -317,19 +331,40 @@ export default function SubjectHubRoute(): React.ReactElement {
         />
       ) : hubData ? (
         <View className="flex-1" testID="subject-hub-screen">
-          {manageReady ? (
-            <View className="flex-row justify-end px-5 pt-3">
-              <Pressable
-                testID="subject-hub-manage"
-                accessibilityRole="button"
-                accessibilityLabel={t('subjectHub.manage.accessibilityLabel')}
-                onPress={() => setManageOpen(true)}
-                className="min-h-[40px] justify-center rounded-button px-3"
-              >
-                <Text className="text-body-sm font-semibold text-primary">
-                  {t('subjectHub.manage.open')}
-                </Text>
-              </Pressable>
+          {showHubHeader ? (
+            <View
+              className="flex-row items-center px-5 pt-3"
+              style={{
+                justifyContent: isV2 ? 'space-between' : 'flex-end',
+              }}
+              testID="subject-hub-header"
+            >
+              {isV2 ? (
+                <Pressable
+                  testID="subject-hub-back"
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.goBackAction')}
+                  onPress={goBack}
+                  className="min-h-[40px] justify-center rounded-button px-3"
+                >
+                  <Text className="text-body-sm font-semibold text-primary">
+                    {t('common.goBack')}
+                  </Text>
+                </Pressable>
+              ) : null}
+              {manageReady ? (
+                <Pressable
+                  testID="subject-hub-manage"
+                  accessibilityRole="button"
+                  accessibilityLabel={t('subjectHub.manage.accessibilityLabel')}
+                  onPress={() => setManageOpen(true)}
+                  className="min-h-[40px] justify-center rounded-button px-3"
+                >
+                  <Text className="text-body-sm font-semibold text-primary">
+                    {t('subjectHub.manage.open')}
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
           ) : null}
           <SubjectHub

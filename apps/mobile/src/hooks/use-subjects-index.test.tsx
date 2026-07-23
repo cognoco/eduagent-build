@@ -1,6 +1,14 @@
+import { createElement, type ReactElement, type ReactNode } from 'react';
+import { renderHook, waitFor } from '@testing-library/react-native';
 import type { CurriculumBook, Subject } from '@eduagent/schemas';
 
-import { buildSubjectsIndex } from './use-subjects-index';
+import {
+  createHookWrapper,
+  createTestProfile,
+} from '../test-utils/app-hook-test-utils';
+import { AppContextProvider } from '../lib/app-context';
+import { setActiveProfileId } from '../lib/api-client';
+import { buildSubjectsIndex, useSubjectsIndex } from './use-subjects-index';
 import type { OverallProgressResponse } from './use-progress';
 
 const SUBJECT_A = '550e8400-e29b-41d4-a716-446655440000';
@@ -126,5 +134,96 @@ describe('buildSubjectsIndex', () => {
     expect(result[2]).toEqual(
       expect.objectContaining({ subjectId: SUBJECT_C, status: 'archived' }),
     );
+  });
+});
+
+describe('useSubjectsIndex', () => {
+  async function captureSubjectsRequest(
+    callback: () => ReturnType<typeof useSubjectsIndex>,
+  ): Promise<string> {
+    const harness = createHookWrapper({
+      activeProfile: createTestProfile({ id: 'subjects-index-profile' }),
+    });
+    function Wrapper({ children }: { children: ReactNode }): ReactElement {
+      return createElement(
+        harness.wrapper,
+        null,
+        createElement(AppContextProvider, null, children),
+      );
+    }
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (input: RequestInfo | URL) => {
+        const url = typeof input === 'string' ? input : input.toString();
+
+        if (url.includes('/subjects')) {
+          return new Response(JSON.stringify({ subjects: [] }), {
+            status: 200,
+          });
+        }
+        if (url.includes('/library/books')) {
+          return new Response(
+            JSON.stringify({ subjects: [], nextCursor: null }),
+            { status: 200 },
+          );
+        }
+        if (url.includes('/progress/overview')) {
+          return new Response(
+            JSON.stringify({
+              subjects: [],
+              totalTopicsCompleted: 0,
+              totalTopicsVerified: 0,
+              totalTopicsMastered: 0,
+              totalTopicsLearning: 0,
+            }),
+            { status: 200 },
+          );
+        }
+
+        throw new Error(`Unexpected request: ${url}`);
+      });
+
+    try {
+      setActiveProfileId('subjects-index-profile');
+      const { result } = renderHook(callback, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      const subjectsRequest = fetchSpy.mock.calls
+        .map(([input]) =>
+          typeof input === 'string' ? input : input.toString(),
+        )
+        .find((url) => url.includes('/subjects'));
+      if (!subjectsRequest) {
+        throw new Error('useSubjectsIndex did not request /subjects');
+      }
+      return subjectsRequest;
+    } finally {
+      fetchSpy.mockRestore();
+      harness.queryClient.clear();
+      setActiveProfileId(undefined);
+    }
+  }
+
+  it('requests active subjects by default', async () => {
+    const requestUrl = new URL(
+      await captureSubjectsRequest(() => useSubjectsIndex()),
+      'https://test.invalid',
+    );
+
+    expect(requestUrl.searchParams.has('includeInactive')).toBe(false);
+  });
+
+  it('requests inactive subjects when explicitly enabled', async () => {
+    const requestUrl = new URL(
+      await captureSubjectsRequest(() =>
+        useSubjectsIndex({ includeInactive: true }),
+      ),
+      'https://test.invalid',
+    );
+
+    expect(requestUrl.searchParams.get('includeInactive')).toBe('true');
   });
 });

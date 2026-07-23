@@ -64,6 +64,7 @@ type TopicRouteParams = {
   bookId?: string;
   chapter?: string;
   mode?: string;
+  returnTo?: string;
 };
 const mockUseLocalSearchParams = jest.fn(
   (): TopicRouteParams => ({
@@ -116,6 +117,7 @@ jest.mock(
 jest.mock(
   '../../../lib/navigation' /* gc1-allow: goBackOrReplace calls router.back which requires native navigation context */,
   () => ({
+    ...jest.requireActual('../../../lib/navigation'),
     goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
     pushLearningResumeTarget: (...args: unknown[]) =>
       mockPushLearningResumeTarget(...args),
@@ -841,6 +843,28 @@ describe('TopicDetailScreen rendering details', () => {
     expect(mockReplace).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
       params: { subjectId: SUBJECT_ID, bookId: BOOK_ID },
+    });
+    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
+  });
+
+  it('returns a due-review topic to the exact Subject Hub contract', async () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      subjectId: SUBJECT_ID,
+      bookId: BOOK_ID,
+      topicId: TOPIC_ID,
+      returnTo: 'subject-hub',
+    });
+    setupRoutes({ completionStatus: 'completed' });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('topic-detail-back');
+    });
+    fireEvent.press(screen.getByTestId('topic-detail-back'));
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/subject-hub/[subjectId]',
+      params: { subjectId: SUBJECT_ID },
     });
     expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });

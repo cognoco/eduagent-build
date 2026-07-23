@@ -1,6 +1,12 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native';
 
 import { ProfileContext, type Profile } from '../../lib/profile';
+import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { createTestProfile } from '../../test-utils/app-hook-test-utils';
 import type { SubjectIndexItem } from '../../hooks/use-subjects-index';
 
@@ -37,7 +43,14 @@ jest.mock('expo-router', () => ({
 jest.mock(
   '../../hooks/use-subjects-index' /* gc1-allow: route screen test pins hook state; hook behavior is covered in use-subjects-index.test.tsx */,
   () => ({
-    useSubjectsIndex: () => mockSubjectsIndex,
+    useSubjectsIndex: (options?: { includeInactive?: boolean }) => ({
+      ...mockSubjectsIndex,
+      subjects: options?.includeInactive
+        ? mockSubjectsIndex.subjects
+        : mockSubjectsIndex.subjects.filter(
+            (subject) => subject.status === 'active',
+          ),
+    }),
   }),
 );
 
@@ -169,9 +182,22 @@ const SUBJECTS: SubjectIndexItem[] = [
   },
 ];
 
+const PAUSED_SUBJECT: SubjectIndexItem = {
+  subjectId: '550e8400-e29b-41d4-a716-446655440001',
+  subjectName: 'Paused Physics',
+  status: 'paused',
+  urgencyBoostUntil: null,
+  mastered: 1,
+  learning: 0,
+  total: 4,
+  dueReviews: 0,
+  books: [],
+};
+
 describe('SubjectsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPush.mockReset();
     mockSubjectsIndex = {
       subjects: SUBJECTS,
       isLoading: false,
@@ -192,7 +218,58 @@ describe('SubjectsScreen', () => {
     };
   });
 
-  it('mounts the real browse list and routes rows to the V2 subject hub', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('renders the exact active row and omits the paused row while V2 is off', () => {
+    jest.replaceProperty(FEATURE_FLAGS, 'MODE_NAV_V2_ENABLED', false);
+    mockSubjectsIndex = {
+      ...mockSubjectsIndex,
+      subjects: [...SUBJECTS, PAUSED_SUBJECT],
+    };
+
+    render(<SubjectsScreen />);
+
+    within(
+      screen.getByTestId(`subjects-browse-row-${SUBJECTS[0]!.subjectId}`),
+    ).getByText(/^Spanish$/);
+    expect(
+      screen.queryByTestId(`subjects-browse-row-${PAUSED_SUBJECT.subjectId}`),
+    ).toBeNull();
+    expect(screen.queryByText(/^Paused Physics$/)).toBeNull();
+  });
+
+  it('renders the exact paused row and preserves the active row while V2 is on', () => {
+    jest.replaceProperty(FEATURE_FLAGS, 'MODE_NAV_V2_ENABLED', true);
+    mockSubjectsIndex = {
+      ...mockSubjectsIndex,
+      subjects: [...SUBJECTS, PAUSED_SUBJECT],
+    };
+
+    render(<SubjectsScreen />);
+
+    within(
+      screen.getByTestId(`subjects-browse-row-${SUBJECTS[0]!.subjectId}`),
+    ).getByText(/^Spanish$/);
+    within(
+      screen.getByTestId(`subjects-browse-row-${PAUSED_SUBJECT.subjectId}`),
+    ).getByText(/^Paused Physics$/);
+  });
+
+  it('routes a row to its exact hub without pushing the current Subjects tab again', () => {
+    const visibleStack = ['subjects'];
+    mockPush.mockImplementation((href: unknown) => {
+      const pathname =
+        typeof href === 'string'
+          ? href
+          : (href as { pathname?: string }).pathname;
+      if (pathname === '/(app)/subjects') visibleStack.push('subjects');
+      else if (pathname === '/(app)/subject-hub/[subjectId]')
+        visibleStack.push('subject-hub');
+      else visibleStack.push(pathname ?? 'unknown');
+    });
+
     render(<SubjectsScreen />);
 
     screen.getByTestId('subjects-screen');
@@ -203,6 +280,11 @@ describe('SubjectsScreen', () => {
       screen.getByTestId(`subjects-browse-row-${SUBJECTS[0]!.subjectId}`),
     );
 
+    expect(visibleStack).toEqual(['subjects', 'subject-hub']);
+    expect(visibleStack.filter((route) => route === 'subjects')).toHaveLength(
+      1,
+    );
+    expect(mockPush).toHaveBeenCalledTimes(1);
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/subject-hub/[subjectId]',
       params: { subjectId: SUBJECTS[0]!.subjectId },

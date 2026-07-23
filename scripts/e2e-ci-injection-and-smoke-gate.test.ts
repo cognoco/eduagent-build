@@ -37,6 +37,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
+import * as ts from 'typescript';
 import { parse as parseYaml, parseAllDocuments } from 'yaml';
 
 const repoRoot = join(__dirname, '..');
@@ -6858,6 +6859,16 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scenario: 'onboarding-no-subject',
         shard: 1,
       },
+      {
+        flow: 'flows/v2/v2-subjects-browse-resume.yaml',
+        scenario: 'learning-active',
+        shard: 1,
+      },
+      {
+        flow: 'flows/v2/v2-subjects-due-review.yaml',
+        scenario: 'retention-due',
+        shard: 1,
+      },
       // [WI-2226 owner-gate retarget] Supporter cold-start mount — the
       // owner-gated managed card renders on Support hub landing for a
       // same-org managed child (hasOwnAccount=false, on the SUPPORTER's own
@@ -6935,6 +6946,1630 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(flow.match(/assertNotVisible:/g)).toHaveLength(6);
     expect(flow.match(/id: ['"]tab-subjects['"]/g)).toHaveLength(3);
     expect(flow.match(/retryTapIfNoChange: true/g)).toHaveLength(3);
+  });
+
+  it('[WI-2238] binds exact case properties to their ID-bearing owners', () => {
+    type Selector = Record<string, unknown>;
+    const includesSelectorProperties = (
+      actual: unknown,
+      expected: Selector,
+    ): boolean =>
+      actual !== null &&
+      typeof actual === 'object' &&
+      Object.entries(expected).every(
+        ([key, value]) => (actual as Selector)[key] === value,
+      );
+    const hasHardOwnedAssertion = (
+      value: unknown,
+      ownerId: string,
+      descendants: Selector[],
+    ): boolean => {
+      if (Array.isArray(value)) {
+        return value.some((entry) =>
+          hasHardOwnedAssertion(entry, ownerId, descendants),
+        );
+      }
+      if (value === null || typeof value !== 'object') return false;
+
+      const record = value as Record<string, unknown>;
+      const asserted = record.assertVisible;
+      if (asserted !== null && typeof asserted === 'object') {
+        const selector = asserted as Selector;
+        const actualDescendants = selector.containsDescendants;
+        if (
+          selector.id === ownerId &&
+          selector.optional !== true &&
+          Array.isArray(actualDescendants) &&
+          descendants.every((expected) =>
+            actualDescendants.some((actual) =>
+              includesSelectorProperties(actual, expected),
+            ),
+          )
+        ) {
+          return true;
+        }
+      }
+
+      return Object.values(record).some((entry) =>
+        hasHardOwnedAssertion(entry, ownerId, descendants),
+      );
+    };
+    const hasHardIdAssertion = (value: unknown, ownerId: string): boolean => {
+      if (Array.isArray(value)) {
+        return value.some((entry) => hasHardIdAssertion(entry, ownerId));
+      }
+      if (value === null || typeof value !== 'object') return false;
+
+      const record = value as Record<string, unknown>;
+      const asserted = record.assertVisible;
+      if (asserted !== null && typeof asserted === 'object') {
+        const selector = asserted as Selector;
+        if (selector.id === ownerId && selector.optional !== true) return true;
+      }
+
+      return Object.values(record).some((entry) =>
+        hasHardIdAssertion(entry, ownerId),
+      );
+    };
+    const hasRunFlowWithEnv = (
+      value: unknown,
+      file: string,
+      expectedEnv: Selector,
+    ): boolean => {
+      if (Array.isArray(value)) {
+        return value.some((entry) =>
+          hasRunFlowWithEnv(entry, file, expectedEnv),
+        );
+      }
+      if (value === null || typeof value !== 'object') return false;
+
+      const record = value as Record<string, unknown>;
+      const runFlow = record.runFlow;
+      if (runFlow !== null && typeof runFlow === 'object') {
+        const command = runFlow as Record<string, unknown>;
+        const env = command.env;
+        if (
+          command.file === file &&
+          env !== null &&
+          typeof env === 'object' &&
+          Object.entries(expectedEnv).every(
+            ([key, expected]) =>
+              (env as Record<string, unknown>)[key] === expected,
+          )
+        ) {
+          return true;
+        }
+      }
+
+      return Object.values(record).some((entry) =>
+        hasRunFlowWithEnv(entry, file, expectedEnv),
+      );
+    };
+    const hasExactCommandSequence = (
+      value: unknown,
+      expected: Selector[],
+    ): boolean =>
+      Array.isArray(value) &&
+      expected.length > 0 &&
+      value.some((_, start) =>
+        expected.every(
+          (command, offset) =>
+            JSON.stringify(value[start + offset]) === JSON.stringify(command),
+        ),
+      );
+    const loadCommands = (...segments: string[]): unknown =>
+      parseAllDocuments(
+        readFileSync(
+          join(repoRoot, 'apps/mobile/e2e/flows', ...segments),
+          'utf8',
+        ),
+      )[1]?.toJS();
+
+    const resume = loadCommands('v2', 'v2-subjects-browse-resume.yaml');
+    const dueReview = loadCommands('v2', 'v2-subjects-due-review.yaml');
+    const subjectCreate = loadCommands(
+      'v2',
+      'v2-subject-create-round-trip.yaml',
+    );
+    const profileIdentity = loadCommands(
+      '_setup',
+      'assert-v2-active-profile-and-return.yaml',
+    );
+
+    const impossibleSearchAbsence: Selector[] = [
+      { tapOn: { id: 'subjects-browse-search' } },
+      { inputText: 'zzzz-no-such-subject-2238' },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'library-search-empty' },
+          timeout: 15000,
+        },
+      },
+      {
+        assertNotVisible: {
+          id: 'subjects-browse-row-${SUBJECT_ID}',
+        },
+      },
+      { tapOn: { id: 'library-search-clear-results' } },
+    ];
+    const exactWorldHistoryRestore: Selector[] = [
+      ...impossibleSearchAbsence,
+      {
+        extendedWaitUntil: {
+          visible: { id: 'subjects-browse-row-${SUBJECT_ID}' },
+          timeout: 15000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'subjects-browse-row-${SUBJECT_ID}',
+          containsDescendants: [{ text: '^World History$' }],
+        },
+      },
+    ];
+    const exactWorldHistoryHubTitle: Selector = {
+      assertVisible: {
+        id: 'subject-hub-title-${SUBJECT_ID}',
+        text: '^World History$',
+      },
+    };
+    const exactHubEntry: Selector[] = [
+      { tapOn: { id: 'subjects-browse-row-${SUBJECT_ID}' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'subject-hub-screen' },
+          timeout: 15000,
+        },
+      },
+      exactWorldHistoryHubTitle,
+    ];
+    const exactPostSheetCloseHub: Selector[] = [
+      { tapOn: { id: 'subject-hub-topic-sheet-close' } },
+      { assertNotVisible: { id: 'subject-hub-topic-sheet' } },
+      { assertVisible: { id: 'subject-hub-screen' } },
+      exactWorldHistoryHubTitle,
+    ];
+
+    expect(hasExactCommandSequence(resume, exactWorldHistoryRestore)).toBe(
+      true,
+    );
+    const titleCheckpointMutations = (checkpoint: Selector[]): Selector[][] => {
+      const titleIndex = checkpoint.findIndex((command) =>
+        isDeepStrictEqual(command, exactWorldHistoryHubTitle),
+      );
+      if (titleIndex < 0) {
+        throw new Error('Subject Hub checkpoint is missing its exact title');
+      }
+      const replaceTitle = (titleSelector: Selector): Selector[] =>
+        checkpoint.with(titleIndex, { assertVisible: titleSelector });
+
+      return [
+        checkpoint.filter((_, index) => index !== titleIndex),
+        replaceTitle({
+          id: 'subject-hub-screen',
+          containsDescendants: [{ text: '^World History$' }],
+        }),
+        replaceTitle({
+          id: 'subject-hub-title-adjacent-subject',
+          text: '^World History$',
+        }),
+        replaceTitle({
+          id: 'subject-hub-title-${SUBJECT_ID}',
+          text: '^Adjacent History$',
+        }),
+        replaceTitle({
+          id: 'subject-hub-title-${SUBJECT_ID}',
+          text: '^World History$',
+          optional: true,
+        }),
+        [
+          ...checkpoint.slice(0, titleIndex),
+          { assertVisible: { id: 'subject-hub-title-${SUBJECT_ID}' } },
+          { assertVisible: { text: '^World History$' } },
+          ...checkpoint.slice(titleIndex + 1),
+        ],
+      ];
+    };
+    for (const checkpoint of [exactHubEntry, exactPostSheetCloseHub]) {
+      expect(hasExactCommandSequence(resume, checkpoint)).toBe(true);
+      for (const mutation of titleCheckpointMutations(checkpoint)) {
+        expect(hasExactCommandSequence(mutation, checkpoint)).toBe(false);
+      }
+    }
+
+    const exactBiologyHubTitle: Selector = {
+      assertVisible: {
+        id: 'subject-hub-title-${SUBJECT_ID}',
+        text: '^Biology$',
+      },
+    };
+    const exactDueReviewHubEntry: Selector[] = [
+      { tapOn: { id: 'subjects-browse-row-${SUBJECT_ID}' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'subject-hub-screen' },
+          timeout: 15000,
+        },
+      },
+      exactBiologyHubTitle,
+      {
+        assertVisible: {
+          id: 'subject-hub-next-up',
+          containsDescendants: [
+            { text: '^Biology Topic 1$' },
+            { id: 'subject-hub-next-up-action', text: '^Review$' },
+          ],
+        },
+      },
+    ];
+    const exactDueReviewPostTopicBack: Selector[] = [
+      { pressKey: 'back' },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'subject-hub-screen' },
+          timeout: 15000,
+        },
+      },
+      exactBiologyHubTitle,
+      {
+        assertVisible: {
+          id: 'subject-hub-topic-${TOPIC_ID}',
+          containsDescendants: [{ text: '^Biology Topic 1$' }],
+        },
+      },
+    ];
+    const dueReviewTitleMutations = (checkpoint: Selector[]): Selector[][] => {
+      const titleIndex = checkpoint.findIndex((command) =>
+        isDeepStrictEqual(command, exactBiologyHubTitle),
+      );
+      if (titleIndex < 0) {
+        throw new Error('Due-review Hub checkpoint is missing its exact title');
+      }
+      const replaceTitle = (titleSelector: Selector): Selector[] =>
+        checkpoint.with(titleIndex, { assertVisible: titleSelector });
+
+      return [
+        // Removing the exact title leaves the seeded subject identity unproved.
+        checkpoint.filter((_, index) => index !== titleIndex),
+        // The generic Hub screen cannot own the exact Biology title property.
+        replaceTitle({
+          id: 'subject-hub-screen',
+          containsDescendants: [{ text: '^Biology$' }],
+        }),
+        // Global text can be rendered outside the seeded Subject Hub title.
+        replaceTitle({ text: '^Biology$' }),
+        // An adjacent title owner proves a different seeded subject.
+        replaceTitle({
+          id: 'subject-hub-title-adjacent-subject',
+          text: '^Biology$',
+        }),
+        // Optional title evidence does not establish the guaranteed property.
+        replaceTitle({
+          id: 'subject-hub-title-${SUBJECT_ID}',
+          text: '^Biology$',
+          optional: true,
+        }),
+        // The exact title must follow readiness of its Subject Hub ancestor.
+        checkpoint.with(1, checkpoint[2]!).with(2, checkpoint[1]!),
+      ];
+    };
+    for (const checkpoint of [
+      exactDueReviewHubEntry,
+      exactDueReviewPostTopicBack,
+    ]) {
+      expect(hasExactCommandSequence(dueReview, checkpoint)).toBe(true);
+      for (const mutation of dueReviewTitleMutations(checkpoint)) {
+        expect(hasExactCommandSequence(mutation, checkpoint)).toBe(false);
+      }
+    }
+    for (const mutation of [
+      // No-result row-absence removal.
+      exactWorldHistoryRestore.filter((_, index) => index !== 3),
+      // No-result row-absence optionalization.
+      exactWorldHistoryRestore.with(3, {
+        assertNotVisible: {
+          id: 'subjects-browse-row-${SUBJECT_ID}',
+          optional: true,
+        },
+      }),
+      // No-result row-absence wrong owner.
+      exactWorldHistoryRestore.with(3, {
+        assertNotVisible: { id: 'subjects-browse-row-adjacent' },
+      }),
+      // No-result row-absence reordering after the recovery action.
+      exactWorldHistoryRestore
+        .with(3, exactWorldHistoryRestore[4]!)
+        .with(4, exactWorldHistoryRestore[3]!),
+      // Exact restored-row assertion removal.
+      exactWorldHistoryRestore.filter((_, index) => index !== 6),
+      // Exact restored-row assertion optionalization.
+      exactWorldHistoryRestore.with(6, {
+        assertVisible: {
+          id: 'subjects-browse-row-${SUBJECT_ID}',
+          containsDescendants: [{ text: '^World History$' }],
+          optional: true,
+        },
+      }),
+      // Exact restored-row wrong owner.
+      exactWorldHistoryRestore.with(6, {
+        assertVisible: {
+          id: 'subjects-browse-row-adjacent',
+          containsDescendants: [{ text: '^World History$' }],
+        },
+      }),
+      // Exact restored-row wrong name.
+      exactWorldHistoryRestore.with(6, {
+        assertVisible: {
+          id: 'subjects-browse-row-${SUBJECT_ID}',
+          containsDescendants: [{ text: '^Adjacent History$' }],
+        },
+      }),
+      // Exact restored-row wait/assertion reordering.
+      exactWorldHistoryRestore
+        .with(5, exactWorldHistoryRestore[6]!)
+        .with(6, exactWorldHistoryRestore[5]!),
+    ]) {
+      expect(hasExactCommandSequence(mutation, exactWorldHistoryRestore)).toBe(
+        false,
+      );
+    }
+    for (const mutation of [
+      // Topic-sheet absence removal.
+      exactPostSheetCloseHub.filter((_, index) => index !== 1),
+      // Topic-sheet absence optionalization.
+      exactPostSheetCloseHub.with(1, {
+        assertNotVisible: {
+          id: 'subject-hub-topic-sheet',
+          optional: true,
+        },
+      }),
+      // Topic-sheet absence wrong owner.
+      exactPostSheetCloseHub.with(1, {
+        assertNotVisible: { id: 'subject-hub-screen' },
+      }),
+      // Topic-sheet absence reordering after the next Subject Hub assertion.
+      exactPostSheetCloseHub
+        .with(1, exactPostSheetCloseHub[2]!)
+        .with(2, exactPostSheetCloseHub[1]!),
+      // Exact title reordering before Subject Hub readiness.
+      exactPostSheetCloseHub
+        .with(2, exactPostSheetCloseHub[3]!)
+        .with(3, exactPostSheetCloseHub[2]!),
+    ]) {
+      expect(hasExactCommandSequence(mutation, exactPostSheetCloseHub)).toBe(
+        false,
+      );
+    }
+
+    expect(Array.isArray(subjectCreate)).toBe(true);
+    if (!Array.isArray(subjectCreate)) {
+      throw new Error('V2 subject-create Maestro commands must be a YAML list');
+    }
+    const initialSubjectsReady = subjectCreate.findIndex(
+      (command) =>
+        JSON.stringify(command) ===
+        JSON.stringify({
+          extendedWaitUntil: {
+            visible: { id: 'subjects-screen' },
+            timeout: 15000,
+          },
+        }),
+    );
+    expect(initialSubjectsReady).toBeGreaterThanOrEqual(0);
+    expect(
+      subjectCreate.slice(initialSubjectsReady + 1, initialSubjectsReady + 3),
+    ).toEqual([
+      { assertVisible: { id: 'subjects-browse-empty' } },
+      { assertNotVisible: { id: 'subjects-browse-row-.*' } },
+    ]);
+
+    const exactPhotosynthesisRow: Selector = {
+      assertVisible: {
+        id: '^subjects-browse-row-.*$',
+        text: 'Open Photosynthesis',
+      },
+    };
+    const exactCreatedSubjectReturn: Selector[] = [
+      {
+        extendedWaitUntil: {
+          visible: {
+            id: '^subjects-browse-row-.*$',
+            text: 'Open Photosynthesis',
+          },
+          timeout: 15000,
+        },
+      },
+      exactPhotosynthesisRow,
+      {
+        runFlow: {
+          file: '../_setup/assert-v2-active-profile-and-return.yaml',
+          env: {
+            PROFILE_ID: '${PROFILE_ID}',
+            PROFILE_NAME: 'Test Learner',
+            RETURN_SCREEN_ID: 'subjects-screen',
+            RETURN_ROW_ID: 'subjects-browse-row-.*',
+            RETURN_ROW_NAME: 'Photosynthesis',
+          },
+        },
+      },
+    ];
+    const exactActiveProfileReturn: Selector[] = [
+      {
+        assertVisible: {
+          id: 'profile-row-${PROFILE_ID}',
+          containsDescendants: [
+            { text: '^${PROFILE_NAME}$' },
+            { id: 'profile-active-check' },
+          ],
+        },
+      },
+      { tapOn: { id: 'profiles-close' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'account-admin-sheet' },
+          timeout: 10000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'account-admin-sheet',
+          containsDescendants: [{ text: '^${PROFILE_NAME}$' }],
+        },
+      },
+      { tapOn: { id: 'account-back' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: '${RETURN_SCREEN_ID}' },
+          timeout: 15000,
+        },
+      },
+      { assertVisible: { id: '${RETURN_SCREEN_ID}' } },
+      {
+        assertVisible: {
+          id: '${RETURN_ROW_ID}',
+          containsDescendants: [{ text: '^${RETURN_ROW_NAME}$' }],
+        },
+      },
+    ];
+    const hasExactCreatedSubjectIdentityReturn = (
+      subjectCommands: unknown,
+      identityCommands: unknown,
+    ): boolean =>
+      hasExactCommandSequence(subjectCommands, exactCreatedSubjectReturn) &&
+      hasExactCommandSequence(identityCommands, exactActiveProfileReturn);
+    expect(
+      hasExactCreatedSubjectIdentityReturn(subjectCreate, profileIdentity),
+    ).toBe(true);
+
+    const replaceCreatedReturn = (
+      index: number,
+      replacement: Selector[],
+    ): Selector[] => [
+      ...exactCreatedSubjectReturn.slice(0, index),
+      ...replacement,
+      ...exactCreatedSubjectReturn.slice(index + 1),
+    ];
+    for (const mutation of [
+      // Global text can be rendered outside the created Subject row.
+      replaceCreatedReturn(1, [
+        { assertVisible: { text: '^Photosynthesis$' } },
+      ]),
+      // Split sibling assertions do not prove the name belongs to the row.
+      replaceCreatedReturn(1, [
+        { assertVisible: { id: 'subjects-browse-row-.*' } },
+        { assertVisible: { text: '^Photosynthesis$' } },
+      ]),
+      // Optional row evidence does not establish the guaranteed property.
+      replaceCreatedReturn(1, [
+        {
+          assertVisible: {
+            id: 'subjects-browse-row-.*',
+            containsDescendants: [{ text: '^Photosynthesis$' }],
+            optional: true,
+          },
+        },
+      ]),
+      // The correct owner with an adjacent name proves the wrong case.
+      replaceCreatedReturn(1, [
+        {
+          assertVisible: {
+            id: 'subjects-browse-row-.*',
+            containsDescendants: [{ text: '^Biology$' }],
+          },
+        },
+      ]),
+      // The active seeded learner must be verified after the return.
+      exactCreatedSubjectReturn.slice(0, -1),
+    ]) {
+      expect(
+        hasExactCreatedSubjectIdentityReturn(mutation, profileIdentity),
+      ).toBe(false);
+    }
+
+    const replaceActiveProfileReturn = (
+      index: number,
+      replacement: Selector[],
+    ): Selector[] => [
+      ...exactActiveProfileReturn.slice(0, index),
+      ...replacement,
+      ...exactActiveProfileReturn.slice(index + 1),
+    ];
+    for (const mutation of [
+      // Removing the active-profile property leaves the named learner unproved.
+      exactActiveProfileReturn.slice(1),
+      // Optional identity evidence does not establish the guaranteed property.
+      replaceActiveProfileReturn(0, [
+        {
+          assertVisible: {
+            id: 'profile-row-${PROFILE_ID}',
+            containsDescendants: [
+              { text: '^${PROFILE_NAME}$' },
+              { id: 'profile-active-check' },
+            ],
+            optional: true,
+          },
+        },
+      ]),
+      // An adjacent profile row cannot own the active Test Learner evidence.
+      replaceActiveProfileReturn(0, [
+        {
+          assertVisible: {
+            id: 'profile-row-adjacent',
+            containsDescendants: [
+              { text: '^${PROFILE_NAME}$' },
+              { id: 'profile-active-check' },
+            ],
+          },
+        },
+      ]),
+      // The correct profile row with an adjacent name proves the wrong case.
+      replaceActiveProfileReturn(0, [
+        {
+          assertVisible: {
+            id: 'profile-row-${PROFILE_ID}',
+            containsDescendants: [
+              { text: '^Adjacent Learner$' },
+              { id: 'profile-active-check' },
+            ],
+          },
+        },
+      ]),
+      // Identity must be established before the return navigation begins.
+      exactActiveProfileReturn
+        .with(0, exactActiveProfileReturn[1]!)
+        .with(1, exactActiveProfileReturn[0]!),
+      // Removing the returned row loses the post-return Photosynthesis proof.
+      exactActiveProfileReturn.slice(0, -1),
+      // Optional returned-row evidence does not establish the property.
+      replaceActiveProfileReturn(7, [
+        {
+          assertVisible: {
+            id: '${RETURN_ROW_ID}',
+            containsDescendants: [{ text: '^${RETURN_ROW_NAME}$' }],
+            optional: true,
+          },
+        },
+      ]),
+      // The returned name must belong to the same row owner from the caller.
+      replaceActiveProfileReturn(7, [
+        {
+          assertVisible: {
+            id: 'subjects-browse-row-adjacent',
+            containsDescendants: [{ text: '^${RETURN_ROW_NAME}$' }],
+          },
+        },
+      ]),
+      // The returned row must own the exact Photosynthesis case name.
+      replaceActiveProfileReturn(7, [
+        {
+          assertVisible: {
+            id: '${RETURN_ROW_ID}',
+            containsDescendants: [{ text: '^Adjacent Science$' }],
+          },
+        },
+      ]),
+      // The owned row proof must follow restoration of its return screen.
+      exactActiveProfileReturn
+        .with(6, exactActiveProfileReturn[7]!)
+        .with(7, exactActiveProfileReturn[6]!),
+    ]) {
+      expect(
+        hasExactCreatedSubjectIdentityReturn(subjectCreate, mutation),
+      ).toBe(false);
+    }
+
+    const expectedBindings: Array<[unknown, string, Selector[]]> = [
+      [
+        resume,
+        'subjects-browse-row-${SUBJECT_ID}',
+        [{ text: '^World History$' }],
+      ],
+      [
+        resume,
+        'subject-hub-topic-${TOPIC_ID}',
+        [{ text: '^World History Topic 1$' }],
+      ],
+      [
+        resume,
+        'subject-hub-next-up',
+        [
+          { text: '^World History Topic 1$' },
+          { id: 'subject-hub-next-up-action', text: '^Resume$' },
+        ],
+      ],
+      [dueReview, 'subjects-browse-row-${SUBJECT_ID}', [{ text: '^Biology$' }]],
+      [
+        dueReview,
+        'subject-hub-next-up',
+        [
+          { text: '^Biology Topic 1$' },
+          { id: 'subject-hub-next-up-action', text: '^Review$' },
+        ],
+      ],
+      [profileIdentity, 'account-admin-sheet', [{ text: '^${PROFILE_NAME}$' }]],
+      [
+        profileIdentity,
+        'profile-row-${PROFILE_ID}',
+        [{ text: '^${PROFILE_NAME}$' }, { id: 'profile-active-check' }],
+      ],
+      [profileIdentity, '${RETURN_ROW_ID}', [{ text: '^${RETURN_ROW_NAME}$' }]],
+    ];
+
+    for (const [commands, ownerId, descendants] of expectedBindings) {
+      expect(hasHardOwnedAssertion(commands, ownerId, descendants)).toBe(true);
+    }
+
+    expect(hasHardIdAssertion(profileIdentity, '${RETURN_SCREEN_ID}')).toBe(
+      true,
+    );
+    expect(
+      hasRunFlowWithEnv(
+        resume,
+        '../_setup/assert-v2-active-profile-and-return.yaml',
+        {
+          PROFILE_ID: '${PROFILE_ID}',
+          PROFILE_NAME: 'Active Learner',
+          RETURN_SCREEN_ID: 'subjects-screen',
+          RETURN_ROW_ID: 'subjects-browse-row-${SUBJECT_ID}',
+          RETURN_ROW_NAME: 'World History',
+        },
+      ),
+    ).toBe(true);
+    expect(
+      hasRunFlowWithEnv(
+        dueReview,
+        '../_setup/assert-v2-active-profile-and-return.yaml',
+        {
+          PROFILE_ID: '${PROFILE_ID}',
+          PROFILE_NAME: 'Review Learner',
+          RETURN_SCREEN_ID: 'subjects-screen',
+          RETURN_ROW_ID: 'subjects-browse-row-${SUBJECT_ID}',
+          RETURN_ROW_NAME: 'Biology',
+        },
+      ),
+    ).toBe(true);
+
+    const splitAcrossSiblings = [
+      { assertVisible: { id: 'subjects-browse-row-${SUBJECT_ID}' } },
+      { assertVisible: { text: '^World History$' } },
+    ];
+    expect(
+      hasHardOwnedAssertion(
+        splitAcrossSiblings,
+        'subjects-browse-row-${SUBJECT_ID}',
+        [{ text: '^World History$' }],
+      ),
+    ).toBe(false);
+
+    const liftedToCommonAncestor = [
+      {
+        assertVisible: {
+          id: 'subjects-screen',
+          containsDescendants: [
+            { id: 'subjects-browse-row-${SUBJECT_ID}' },
+            { text: '^World History$' },
+          ],
+        },
+      },
+    ];
+    expect(
+      hasHardOwnedAssertion(
+        liftedToCommonAncestor,
+        'subjects-browse-row-${SUBJECT_ID}',
+        [{ text: '^World History$' }],
+      ),
+    ).toBe(false);
+
+    const adjacentSeedCase = [
+      {
+        assertVisible: {
+          id: 'subject-hub-next-up',
+          containsDescendants: [
+            { text: '^Biology Topic 2$' },
+            { id: 'subject-hub-next-up-action', text: '^Review$' },
+          ],
+        },
+      },
+    ];
+    expect(
+      hasHardOwnedAssertion(adjacentSeedCase, 'subject-hub-next-up', [
+        { text: '^Biology Topic 1$' },
+        { id: 'subject-hub-next-up-action', text: '^Review$' },
+      ]),
+    ).toBe(false);
+
+    expect(
+      hasRunFlowWithEnv(
+        resume,
+        '../_setup/assert-v2-active-profile-and-return.yaml',
+        {
+          PROFILE_ID: '${PROFILE_ID}',
+          PROFILE_NAME: 'Adjacent Learner',
+          RETURN_SCREEN_ID: 'subjects-screen',
+          RETURN_ROW_ID: 'subjects-browse-row-${SUBJECT_ID}',
+          RETURN_ROW_NAME: 'World History',
+        },
+      ),
+    ).toBe(false);
+  });
+
+  it('[WI-2238] binds every browser Me check to the exact seeded active profile ID', () => {
+    const hasExactSeedProfileMeIdentity = (source: string): boolean => {
+      const sourceFile = ts.createSourceFile(
+        'v2-subjects.spec.ts',
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS,
+      );
+      let helper: ts.FunctionDeclaration | undefined;
+      const identityCalls: ts.CallExpression[] = [];
+
+      const visit = (node: ts.Node): void => {
+        if (
+          ts.isFunctionDeclaration(node) &&
+          node.name?.text === 'expectMeIdentity'
+        ) {
+          helper = node;
+        } else if (
+          ts.isCallExpression(node) &&
+          ts.isIdentifier(node.expression) &&
+          node.expression.text === 'expectMeIdentity'
+        ) {
+          identityCalls.push(node);
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(sourceFile);
+
+      if (!helper?.body || helper.parameters.length !== 3) return false;
+      const [pageParameter, displayNameParameter, profileIdParameter] =
+        helper.parameters;
+      if (
+        !pageParameter ||
+        !displayNameParameter ||
+        !profileIdParameter ||
+        !ts.isIdentifier(pageParameter.name) ||
+        !ts.isIdentifier(displayNameParameter.name) ||
+        !ts.isIdentifier(profileIdParameter.name)
+      ) {
+        return false;
+      }
+
+      const profileRowVariables = new Set<string>();
+      const collectProfileRows = (node: ts.Node): void => {
+        if (
+          ts.isVariableDeclaration(node) &&
+          ts.isIdentifier(node.name) &&
+          node.initializer &&
+          ts.isCallExpression(node.initializer) &&
+          ts.isPropertyAccessExpression(node.initializer.expression) &&
+          ts.isIdentifier(node.initializer.expression.expression) &&
+          node.initializer.expression.expression.text ===
+            pageParameter.name.text &&
+          node.initializer.expression.name.text === 'getByTestId'
+        ) {
+          const selector = node.initializer.arguments[0];
+          if (
+            selector &&
+            ts.isTemplateExpression(selector) &&
+            selector.head.text === 'profile-row-' &&
+            selector.templateSpans.length === 1 &&
+            ts.isIdentifier(selector.templateSpans[0]?.expression) &&
+            selector.templateSpans[0].expression.text ===
+              profileIdParameter.name.text &&
+            selector.templateSpans[0].literal.text === ''
+          ) {
+            profileRowVariables.add(node.name.text);
+          }
+        }
+        ts.forEachChild(node, collectProfileRows);
+      };
+      collectProfileRows(helper.body);
+      if (profileRowVariables.size !== 1) return false;
+
+      let hasExactDisplayName = false;
+      let hasActiveCheck = false;
+      const isAwaitedVisibleAssertion = (
+        locator: ts.CallExpression,
+      ): boolean => {
+        const expectation = locator.parent;
+        if (
+          !ts.isCallExpression(expectation) ||
+          !ts.isIdentifier(expectation.expression) ||
+          expectation.expression.text !== 'expect' ||
+          expectation.arguments[0] !== locator
+        ) {
+          return false;
+        }
+        const matcher = expectation.parent;
+        if (
+          !ts.isPropertyAccessExpression(matcher) ||
+          matcher.expression !== expectation ||
+          matcher.name.text !== 'toBeVisible'
+        ) {
+          return false;
+        }
+        const invocation = matcher.parent;
+        return (
+          ts.isCallExpression(invocation) &&
+          invocation.expression === matcher &&
+          ts.isAwaitExpression(invocation.parent)
+        );
+      };
+      const inspectOwnedAssertions = (node: ts.Node): void => {
+        if (
+          ts.isCallExpression(node) &&
+          isAwaitedVisibleAssertion(node) &&
+          ts.isPropertyAccessExpression(node.expression) &&
+          ts.isIdentifier(node.expression.expression) &&
+          profileRowVariables.has(node.expression.expression.text)
+        ) {
+          const method = node.expression.name.text;
+          const firstArgument = node.arguments[0];
+          if (
+            method === 'getByTestId' &&
+            firstArgument &&
+            ts.isStringLiteral(firstArgument) &&
+            firstArgument.text === 'profile-active-check'
+          ) {
+            hasActiveCheck = true;
+          }
+          if (
+            method === 'getByText' &&
+            firstArgument &&
+            ts.isIdentifier(firstArgument) &&
+            firstArgument.text === displayNameParameter.name.text
+          ) {
+            const options = node.arguments[1];
+            hasExactDisplayName = Boolean(
+              options &&
+              ts.isObjectLiteralExpression(options) &&
+              options.properties.some(
+                (property) =>
+                  ts.isPropertyAssignment(property) &&
+                  ts.isIdentifier(property.name) &&
+                  property.name.text === 'exact' &&
+                  property.initializer.kind === ts.SyntaxKind.TrueKeyword,
+              ),
+            );
+          }
+        }
+        ts.forEachChild(node, inspectOwnedAssertions);
+      };
+      inspectOwnedAssertions(helper.body);
+
+      const everyCallUsesSeedProfileId =
+        identityCalls.length === 4 &&
+        identityCalls.every((call) => {
+          const profileId = call.arguments[2];
+          return Boolean(
+            profileId &&
+            ts.isPropertyAccessExpression(profileId) &&
+            ts.isIdentifier(profileId.expression) &&
+            profileId.expression.text === 'seed' &&
+            profileId.name.text === 'profileId',
+          );
+        });
+
+      return (
+        hasExactDisplayName && hasActiveCheck && everyCallUsesSeedProfileId
+      );
+    };
+
+    const subjectsSpec = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e-web/flows/v2/v2-subjects.spec.ts'),
+      'utf8',
+    );
+    expect(hasExactSeedProfileMeIdentity(subjectsSpec)).toBe(true);
+
+    for (const mutation of [
+      subjectsSpec.replace(
+        "activeProfile.getByTestId('profile-active-check')",
+        'activeProfile.getByText(displayName, { exact: true })',
+      ),
+      subjectsSpec.replace(
+        "await expect(activeProfile.getByTestId('profile-active-check')).toBeVisible();",
+        "activeProfile.getByTestId('profile-active-check');",
+      ),
+      subjectsSpec.replace(
+        'page.getByTestId(`profile-row-${profileId}`)',
+        "page.getByTestId('profile-row-adjacent-profile-id')",
+      ),
+      subjectsSpec.replace(
+        "expectMeIdentity(page, 'Multi-Subject Learner', seed.profileId)",
+        "expectMeIdentity(page, 'Multi-Subject Learner', activeSubjectId)",
+      ),
+    ]) {
+      expect(hasExactSeedProfileMeIdentity(mutation)).toBe(false);
+    }
+  });
+
+  it('[WI-2238] structurally binds the retention-due browser case to seed-owned IDs and the observed route', () => {
+    const hasSeedOwnedRetentionRouteBinding = (source: string): boolean => {
+      const sourceFile = ts.createSourceFile(
+        'v2-subjects.spec.ts',
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS,
+      );
+      let caseBody: ts.Block | undefined;
+
+      const visit = (node: ts.Node): void => {
+        if (
+          ts.isCallExpression(node) &&
+          ts.isIdentifier(node.expression) &&
+          node.expression.text === 'test' &&
+          ts.isStringLiteral(node.arguments[0]) &&
+          node.arguments[0].text.startsWith('WI-2238 retention-due case:')
+        ) {
+          const callback = node.arguments[1];
+          if (
+            (ts.isArrowFunction(callback) ||
+              ts.isFunctionExpression(callback)) &&
+            ts.isBlock(callback.body)
+          ) {
+            caseBody = callback.body;
+          }
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(sourceFile);
+      if (!caseBody) return false;
+
+      const compactBody = caseBody.getText(sourceFile).replace(/\s+/g, '');
+      const hasBothSeedIds =
+        compactBody.includes('constsubjectId=seed.ids.subjectId;') &&
+        compactBody.includes('consttopicId=seed.ids.topicId;');
+      const hasFailClosedIdGuard =
+        compactBody.includes('if(!subjectId||!topicId){thrownewError(') ||
+        compactBody.includes('if(!topicId||!subjectId){thrownewError(');
+      const hasExactSubjectFlow =
+        compactBody.includes(
+          "awaitexpectSubjectRow(page,subjectId,'Biology');",
+        ) &&
+        compactBody.includes(
+          'awaitpressableClick(page.getByTestId(`subjects-browse-row-${subjectId}`));',
+        ) &&
+        compactBody.includes(
+          "awaitexpectSubjectHub(page,subjectId,'Biology');",
+        );
+
+      const isExactTopicRowLocator = (node: ts.Expression): boolean => {
+        if (
+          !ts.isCallExpression(node) ||
+          node.arguments.length !== 1 ||
+          !ts.isPropertyAccessExpression(node.expression) ||
+          !ts.isIdentifier(node.expression.expression) ||
+          node.expression.expression.text !== 'page' ||
+          node.expression.name.text !== 'getByTestId'
+        ) {
+          return false;
+        }
+        const selector = node.arguments[0];
+        return Boolean(
+          selector &&
+          ts.isTemplateExpression(selector) &&
+          selector.head.text === 'subject-hub-topic-' &&
+          selector.templateSpans.length === 1 &&
+          ts.isIdentifier(selector.templateSpans[0]?.expression) &&
+          selector.templateSpans[0].expression.text === 'topicId' &&
+          selector.templateSpans[0].literal.text === '',
+        );
+      };
+      const topicRowOwners = new Map<string, number>();
+      for (const statement of caseBody.statements) {
+        if (
+          !ts.isVariableStatement(statement) ||
+          (statement.declarationList.flags & ts.NodeFlags.Const) === 0
+        ) {
+          continue;
+        }
+        for (const declaration of statement.declarationList.declarations) {
+          if (
+            ts.isIdentifier(declaration.name) &&
+            declaration.initializer &&
+            isExactTopicRowLocator(declaration.initializer)
+          ) {
+            topicRowOwners.set(declaration.name.text, statement.getStart());
+          }
+        }
+      }
+
+      const hasExactTrueOption = (node: ts.Expression | undefined): boolean =>
+        Boolean(
+          node &&
+          ts.isObjectLiteralExpression(node) &&
+          node.properties.some(
+            (property) =>
+              ts.isPropertyAssignment(property) &&
+              ((ts.isIdentifier(property.name) &&
+                property.name.text === 'exact') ||
+                (ts.isStringLiteral(property.name) &&
+                  property.name.text === 'exact')) &&
+              property.initializer.kind === ts.SyntaxKind.TrueKeyword,
+          ),
+        );
+      let exactOwnedTopicAssertionPosition: number | undefined;
+      let reviewActionPosition: number | undefined;
+      const visitTopicOwnership = (node: ts.Node): void => {
+        if (
+          ts.isCallExpression(node) &&
+          ts.isPropertyAccessExpression(node.expression) &&
+          node.expression.name.text === 'toBeVisible' &&
+          node.arguments.length === 0 &&
+          ts.isAwaitExpression(node.parent)
+        ) {
+          const expectCall = node.expression.expression;
+          const textCall =
+            ts.isCallExpression(expectCall) &&
+            ts.isIdentifier(expectCall.expression) &&
+            expectCall.expression.text === 'expect'
+              ? expectCall.arguments[0]
+              : undefined;
+          if (
+            textCall &&
+            ts.isCallExpression(textCall) &&
+            ts.isPropertyAccessExpression(textCall.expression) &&
+            textCall.expression.name.text === 'getByText' &&
+            ts.isIdentifier(textCall.expression.expression) &&
+            topicRowOwners.has(textCall.expression.expression.text) &&
+            ts.isStringLiteral(textCall.arguments[0]) &&
+            textCall.arguments[0].text === 'Biology Topic 1' &&
+            hasExactTrueOption(textCall.arguments[1])
+          ) {
+            const assertionPosition = node.getStart();
+            const ownerPosition = topicRowOwners.get(
+              textCall.expression.expression.text,
+            );
+            if (
+              ownerPosition !== undefined &&
+              ownerPosition < assertionPosition &&
+              (exactOwnedTopicAssertionPosition === undefined ||
+                assertionPosition < exactOwnedTopicAssertionPosition)
+            ) {
+              exactOwnedTopicAssertionPosition = assertionPosition;
+            }
+          }
+        }
+
+        if (
+          ts.isCallExpression(node) &&
+          ts.isIdentifier(node.expression) &&
+          node.expression.text === 'pressableClick' &&
+          ts.isAwaitExpression(node.parent)
+        ) {
+          const target = node.arguments[0];
+          if (
+            target &&
+            ts.isCallExpression(target) &&
+            ts.isPropertyAccessExpression(target.expression) &&
+            ts.isIdentifier(target.expression.expression) &&
+            target.expression.expression.text === 'page' &&
+            target.expression.name.text === 'getByTestId' &&
+            ts.isStringLiteral(target.arguments[0]) &&
+            target.arguments[0].text === 'subject-hub-next-up-action'
+          ) {
+            const actionPosition = node.getStart();
+            if (
+              reviewActionPosition === undefined ||
+              actionPosition < reviewActionPosition
+            ) {
+              reviewActionPosition = actionPosition;
+            }
+          }
+        }
+        ts.forEachChild(node, visitTopicOwnership);
+      };
+      visitTopicOwnership(caseBody);
+      // Structural source protection only; Playwright runtime evidence remains
+      // responsible for proving the rendered text and interaction property.
+      const hasExactOwnedTopicBeforeReview =
+        exactOwnedTopicAssertionPosition !== undefined &&
+        reviewActionPosition !== undefined &&
+        exactOwnedTopicAssertionPosition < reviewActionPosition;
+
+      let hasObservedUrlPolling = false;
+      const visitPoll = (node: ts.Node): void => {
+        if (
+          ts.isCallExpression(node) &&
+          ts.isPropertyAccessExpression(node.expression) &&
+          node.expression.name.text === 'toEqual' &&
+          ts.isCallExpression(node.expression.expression)
+        ) {
+          const pollCall = node.expression.expression;
+          if (
+            ts.isPropertyAccessExpression(pollCall.expression) &&
+            ts.isIdentifier(pollCall.expression.expression) &&
+            pollCall.expression.expression.text === 'expect' &&
+            pollCall.expression.name.text === 'poll'
+          ) {
+            const callback = pollCall.arguments[0];
+            if (
+              (ts.isArrowFunction(callback) ||
+                ts.isFunctionExpression(callback)) &&
+              ts.isBlock(callback.body)
+            ) {
+              const urlDeclarations = callback.body.statements.flatMap(
+                (statement) =>
+                  ts.isVariableStatement(statement)
+                    ? statement.declarationList.declarations.filter(
+                        (declaration) =>
+                          ts.isIdentifier(declaration.name) &&
+                          declaration.name.text === 'url',
+                      )
+                    : [],
+              );
+              const urlDeclaration = urlDeclarations[0];
+              const urlInitializer = urlDeclaration?.initializer;
+              const pageUrlArgument =
+                urlInitializer && ts.isNewExpression(urlInitializer)
+                  ? urlInitializer.arguments?.[0]
+                  : undefined;
+              let hasUrlWrite = false;
+              const visitUrlWrites = (candidate: ts.Node): void => {
+                if (
+                  ts.isBinaryExpression(candidate) &&
+                  ts.isIdentifier(candidate.left) &&
+                  candidate.left.text === 'url' &&
+                  candidate.operatorToken.kind >=
+                    ts.SyntaxKind.FirstAssignment &&
+                  candidate.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+                ) {
+                  hasUrlWrite = true;
+                }
+                if (
+                  (ts.isPrefixUnaryExpression(candidate) ||
+                    ts.isPostfixUnaryExpression(candidate)) &&
+                  (candidate.operator === ts.SyntaxKind.PlusPlusToken ||
+                    candidate.operator === ts.SyntaxKind.MinusMinusToken) &&
+                  ts.isIdentifier(candidate.operand) &&
+                  candidate.operand.text === 'url'
+                ) {
+                  hasUrlWrite = true;
+                }
+                ts.forEachChild(candidate, visitUrlWrites);
+              };
+              visitUrlWrites(callback.body);
+              const hasExactObservedUrlBinding =
+                urlDeclarations.length === 1 &&
+                Boolean(
+                  urlDeclaration &&
+                  ts.isVariableDeclarationList(urlDeclaration.parent) &&
+                  (urlDeclaration.parent.flags & ts.NodeFlags.Const) !== 0,
+                ) &&
+                !hasUrlWrite &&
+                Boolean(
+                  urlInitializer &&
+                  ts.isNewExpression(urlInitializer) &&
+                  ts.isIdentifier(urlInitializer.expression) &&
+                  urlInitializer.expression.text === 'URL' &&
+                  urlInitializer.arguments?.length === 1 &&
+                  pageUrlArgument &&
+                  ts.isCallExpression(pageUrlArgument) &&
+                  pageUrlArgument.arguments.length === 0 &&
+                  ts.isPropertyAccessExpression(pageUrlArgument.expression) &&
+                  ts.isIdentifier(pageUrlArgument.expression.expression) &&
+                  pageUrlArgument.expression.expression.text === 'page' &&
+                  pageUrlArgument.expression.name.text === 'url',
+                );
+              const returnedObjects = callback.body.statements.flatMap(
+                (statement) =>
+                  ts.isReturnStatement(statement) &&
+                  statement.expression &&
+                  ts.isObjectLiteralExpression(statement.expression)
+                    ? [statement.expression]
+                    : [],
+              );
+              const returnedObject = returnedObjects[0];
+              const hasExactPollStatements =
+                callback.body.statements.length === 2 &&
+                ts.isVariableStatement(callback.body.statements[0]) &&
+                callback.body.statements[0].declarationList.declarations
+                  .length === 1 &&
+                callback.body.statements[0].declarationList.declarations[0] ===
+                  urlDeclaration &&
+                ts.isReturnStatement(callback.body.statements[1]) &&
+                callback.body.statements[1].expression === returnedObject;
+              const pathnameProperty = returnedObject?.properties.find(
+                (property) =>
+                  ts.isPropertyAssignment(property) &&
+                  ts.isIdentifier(property.name) &&
+                  property.name.text === 'pathname',
+              );
+              const subjectIdProperty = returnedObject?.properties.find(
+                (property) =>
+                  ts.isPropertyAssignment(property) &&
+                  ts.isIdentifier(property.name) &&
+                  property.name.text === 'subjectId',
+              );
+              const hasExactObservedReturn = Boolean(
+                returnedObjects.length === 1 &&
+                returnedObject?.properties.length === 2 &&
+                returnedObject.properties.every((property) =>
+                  ts.isPropertyAssignment(property),
+                ) &&
+                pathnameProperty &&
+                ts.isPropertyAssignment(pathnameProperty) &&
+                ts.isPropertyAccessExpression(pathnameProperty.initializer) &&
+                ts.isIdentifier(pathnameProperty.initializer.expression) &&
+                pathnameProperty.initializer.expression.text === 'url' &&
+                pathnameProperty.initializer.name.text === 'pathname' &&
+                subjectIdProperty &&
+                ts.isPropertyAssignment(subjectIdProperty) &&
+                ts.isCallExpression(subjectIdProperty.initializer) &&
+                subjectIdProperty.initializer.arguments.length === 1 &&
+                ts.isStringLiteral(
+                  subjectIdProperty.initializer.arguments[0],
+                ) &&
+                subjectIdProperty.initializer.arguments[0].text ===
+                  'subjectId' &&
+                ts.isPropertyAccessExpression(
+                  subjectIdProperty.initializer.expression,
+                ) &&
+                subjectIdProperty.initializer.expression.name.text === 'get' &&
+                ts.isPropertyAccessExpression(
+                  subjectIdProperty.initializer.expression.expression,
+                ) &&
+                ts.isIdentifier(
+                  subjectIdProperty.initializer.expression.expression
+                    .expression,
+                ) &&
+                subjectIdProperty.initializer.expression.expression.expression
+                  .text === 'url' &&
+                subjectIdProperty.initializer.expression.expression.name
+                  .text === 'searchParams',
+              );
+              const compactExpected = node.arguments[0]
+                ?.getText(sourceFile)
+                .replace(/\s+/g, '');
+              const hasExactExpectedUrl =
+                compactExpected ===
+                  '{pathname:`/topic/${topicId}`,subjectId}' ||
+                compactExpected === '{pathname:`/topic/${topicId}`,subjectId,}';
+              if (
+                hasExactPollStatements &&
+                hasExactObservedUrlBinding &&
+                hasExactObservedReturn &&
+                hasExactExpectedUrl
+              ) {
+                hasObservedUrlPolling = true;
+              }
+            }
+          }
+        }
+        ts.forEachChild(node, visitPoll);
+      };
+      visitPoll(caseBody);
+
+      return (
+        hasBothSeedIds &&
+        hasFailClosedIdGuard &&
+        hasExactSubjectFlow &&
+        hasExactOwnedTopicBeforeReview &&
+        hasObservedUrlPolling
+      );
+    };
+
+    const exactBindingFixture = `
+      test('WI-2238 retention-due case: exact seeded Topic fixture', async ({ page }) => {
+        const seed = await seedAndSignIn(page, { scenario: 'retention-due' });
+        const subjectId = seed.ids.subjectId;
+        const topicId = seed.ids.topicId;
+        if (!subjectId || !topicId) {
+          throw new Error('retention-due seed did not return subjectId and topicId');
+        }
+        await expectSubjectRow(page, subjectId, 'Biology');
+        await pressableClick(page.getByTestId(\`subjects-browse-row-\${subjectId}\`));
+        await expectSubjectHub(page, subjectId, 'Biology');
+        const biologyTopicRow = page.getByTestId(\`subject-hub-topic-\${topicId}\`);
+        await expect(
+          biologyTopicRow.getByText('Biology Topic 1', { exact: true }),
+        ).toBeVisible();
+        await pressableClick(page.getByTestId('subject-hub-next-up-action'));
+        await expect.poll(() => {
+          const url = new URL(page.url());
+          return {
+            pathname: url.pathname,
+            subjectId: url.searchParams.get('subjectId'),
+          };
+        }).toEqual({
+          pathname: \`/topic/\${topicId}\`,
+          subjectId,
+        });
+      });
+    `;
+    expect(hasSeedOwnedRetentionRouteBinding(exactBindingFixture)).toBe(true);
+
+    const retentionTopicOwnershipMutations = [
+      exactBindingFixture.replace(
+        `        const biologyTopicRow = page.getByTestId(\`subject-hub-topic-\${topicId}\`);
+        await expect(
+          biologyTopicRow.getByText('Biology Topic 1', { exact: true }),
+        ).toBeVisible();
+`,
+        '',
+      ),
+      exactBindingFixture.replace(
+        'page.getByTestId(`subject-hub-topic-${topicId}`)',
+        "page.getByTestId('subject-hub-topic-adjacent-topic-id')",
+      ),
+      exactBindingFixture.replace(
+        "biologyTopicRow.getByText('Biology Topic 1', { exact: true })",
+        "page.getByText('Biology Topic 1', { exact: true })",
+      ),
+    ];
+    expect(
+      retentionTopicOwnershipMutations.map((mutation) =>
+        hasSeedOwnedRetentionRouteBinding(mutation),
+      ),
+    ).toEqual([false, false, false]);
+
+    for (const mutation of [
+      exactBindingFixture.replace(
+        'const url = new URL(page.url());',
+        "const url = new URL(page.url());\n          url.pathname = `/topic/${topicId}`;\n          url.searchParams.set('subjectId', subjectId);",
+      ),
+      exactBindingFixture.replace(
+        'const url = new URL(page.url());',
+        'let url = new URL(page.url());\n          url = new URL(`https://example.test/topic/${topicId}?subjectId=${subjectId}`);',
+      ),
+      exactBindingFixture.replace(
+        "subjectId: url.searchParams.get('subjectId'),\n          };",
+        "subjectId: url.searchParams.get('subjectId'),\n            ...{ pathname: `/topic/${topicId}`, subjectId },\n          };",
+      ),
+      exactBindingFixture.replace(
+        'const url = new URL(page.url());',
+        'const observedUrl = new URL(page.url());\n          const url = new URL(`https://example.test/topic/${topicId}?subjectId=${subjectId}`);',
+      ),
+      exactBindingFixture.replace(
+        "return {\n            pathname: url.pathname,\n            subjectId: url.searchParams.get('subjectId'),\n          };",
+        "const observedUrl = {\n            pathname: url.pathname,\n            subjectId: url.searchParams.get('subjectId'),\n          };\n          return { pathname: `/topic/${topicId}`, subjectId };",
+      ),
+      exactBindingFixture.replace(
+        'const topicId = seed.ids.topicId;',
+        "const topicId = 'adjacent-topic-id';",
+      ),
+      exactBindingFixture.replace(
+        'if (!subjectId || !topicId)',
+        'if (!subjectId)',
+      ),
+      exactBindingFixture.replace(
+        'const url = new URL(page.url());',
+        'const url = new URL(`https://example.test/topic/${topicId}?subjectId=${subjectId}`);',
+      ),
+      exactBindingFixture.replace(
+        "expectSubjectRow(page, subjectId, 'Biology')",
+        "expectSubjectRow(page, 'adjacent-subject-id', 'Biology')",
+      ),
+      exactBindingFixture.replace(
+        'page.getByTestId(`subjects-browse-row-${subjectId}`)',
+        "page.getByTestId('subjects-browse-row-adjacent-subject-id')",
+      ),
+      exactBindingFixture.replace(
+        "expectSubjectHub(page, subjectId, 'Biology')",
+        "expectSubjectHub(page, 'adjacent-subject-id', 'Biology')",
+      ),
+      exactBindingFixture.replace(
+        'pathname: `/topic/${topicId}`',
+        "pathname: '/topic/adjacent-topic-id'",
+      ),
+      exactBindingFixture.replace(
+        'pathname: `/topic/${topicId}`,\n          subjectId,',
+        "pathname: `/topic/${topicId}`,\n          subjectId: 'adjacent-subject-id',",
+      ),
+    ]) {
+      expect(hasSeedOwnedRetentionRouteBinding(mutation)).toBe(false);
+    }
+
+    const subjectsSpec = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e-web/flows/v2/v2-subjects.spec.ts'),
+      'utf8',
+    );
+    expect(hasSeedOwnedRetentionRouteBinding(subjectsSpec)).toBe(true);
+  });
+
+  it('[WI-2238] starts the self-seeded Playwright cases from empty storage', () => {
+    const hasEmptyStorageStateBeforeCases = (source: string): boolean => {
+      const sourceFile = ts.createSourceFile(
+        'v2-subjects.spec.ts',
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS,
+      );
+      const hasPropertyName = (
+        candidate: ts.ObjectLiteralElementLike,
+        name: string,
+      ): boolean => {
+        if (!('name' in candidate)) return false;
+        return (
+          (ts.isIdentifier(candidate.name) && candidate.name.text === name) ||
+          (ts.isStringLiteral(candidate.name) && candidate.name.text === name)
+        );
+      };
+      const property = (
+        object: ts.ObjectLiteralExpression,
+        name: string,
+      ): ts.PropertyAssignment | undefined =>
+        object.properties.find(
+          (candidate): candidate is ts.PropertyAssignment =>
+            ts.isPropertyAssignment(candidate) &&
+            hasPropertyName(candidate, name),
+        );
+      const hasOpaqueObjectProperties = (
+        object: ts.ObjectLiteralExpression,
+      ): boolean =>
+        object.properties.some(
+          (candidate) =>
+            ts.isSpreadAssignment(candidate) ||
+            ('name' in candidate && ts.isComputedPropertyName(candidate.name)),
+        );
+      const isTestUseCall = (
+        expression: ts.Expression,
+      ): expression is ts.CallExpression =>
+        ts.isCallExpression(expression) &&
+        ((ts.isPropertyAccessExpression(expression.expression) &&
+          ts.isIdentifier(expression.expression.expression) &&
+          expression.expression.expression.text === 'test' &&
+          expression.expression.name.text === 'use') ||
+          (ts.isElementAccessExpression(expression.expression) &&
+            ts.isIdentifier(expression.expression.expression) &&
+            expression.expression.expression.text === 'test' &&
+            expression.expression.argumentExpression !== undefined &&
+            (ts.isStringLiteral(expression.expression.argumentExpression) ||
+              ts.isNoSubstitutionTemplateLiteral(
+                expression.expression.argumentExpression,
+              )) &&
+            expression.expression.argumentExpression.text === 'use'));
+      const isOpaqueComputedTestCall = (
+        expression: ts.Expression,
+      ): expression is ts.CallExpression =>
+        ts.isCallExpression(expression) &&
+        ts.isElementAccessExpression(expression.expression) &&
+        ts.isIdentifier(expression.expression.expression) &&
+        expression.expression.expression.text === 'test' &&
+        !ts.isStringLiteral(expression.expression.argumentExpression) &&
+        !ts.isNoSubstitutionTemplateLiteral(
+          expression.expression.argumentExpression,
+        );
+      const storageStateInitializer = (
+        expression: ts.Expression,
+      ): ts.Expression | undefined => {
+        if (!isTestUseCall(expression)) {
+          return undefined;
+        }
+
+        const options = expression.arguments[0];
+        if (!options || !ts.isObjectLiteralExpression(options)) {
+          return undefined;
+        }
+        return property(options, 'storageState')?.initializer;
+      };
+      const firstCase = sourceFile.statements.findIndex(
+        (statement) =>
+          ts.isExpressionStatement(statement) &&
+          ts.isCallExpression(statement.expression) &&
+          ts.isIdentifier(statement.expression.expression) &&
+          statement.expression.expression.text === 'test',
+      );
+      const emptyOverride = sourceFile.statements.findIndex((statement) => {
+        if (!ts.isExpressionStatement(statement)) return false;
+        const storageState = storageStateInitializer(statement.expression);
+        if (!storageState || !ts.isObjectLiteralExpression(storageState)) {
+          return false;
+        }
+        if (storageState.properties.length !== 2) return false;
+        const cookiesProperty = property(storageState, 'cookies');
+        const originsProperty = property(storageState, 'origins');
+        const cookies = cookiesProperty?.initializer;
+        const origins = originsProperty?.initializer;
+        return (
+          !!cookies &&
+          ts.isArrayLiteralExpression(cookies) &&
+          cookies.elements.length === 0 &&
+          !!origins &&
+          ts.isArrayLiteralExpression(origins) &&
+          origins.elements.length === 0
+        );
+      });
+      let storageOverrideCount = 0;
+      let hasOpaqueTestUse = false;
+      const countStorageOverrides = (node: ts.Node): void => {
+        if (ts.isCallExpression(node) && isOpaqueComputedTestCall(node)) {
+          hasOpaqueTestUse = true;
+        }
+        if (ts.isCallExpression(node) && isTestUseCall(node)) {
+          const options = node.arguments[0];
+          if (!options || !ts.isObjectLiteralExpression(options)) {
+            hasOpaqueTestUse = true;
+          } else {
+            if (hasOpaqueObjectProperties(options)) {
+              hasOpaqueTestUse = true;
+            }
+            const storageProperties = options.properties.filter((candidate) =>
+              hasPropertyName(candidate, 'storageState'),
+            );
+            storageOverrideCount += storageProperties.length;
+            if (
+              storageProperties.some(
+                (candidate) =>
+                  !ts.isPropertyAssignment(candidate) ||
+                  (!ts.isObjectLiteralExpression(candidate.initializer) &&
+                    !ts.isStringLiteral(candidate.initializer)) ||
+                  (ts.isObjectLiteralExpression(candidate.initializer) &&
+                    hasOpaqueObjectProperties(candidate.initializer)),
+              )
+            ) {
+              hasOpaqueTestUse = true;
+            }
+          }
+        }
+        ts.forEachChild(node, countStorageOverrides);
+      };
+      countStorageOverrides(sourceFile);
+
+      return (
+        firstCase >= 0 &&
+        emptyOverride >= 0 &&
+        emptyOverride < firstCase &&
+        storageOverrideCount === 1 &&
+        !hasOpaqueTestUse
+      );
+    };
+    const caseStub = "test('self-seeded case', async () => {});";
+
+    expect(
+      hasEmptyStorageStateBeforeCases(
+        `test.use({ storageState: { cookies: [], origins: [] } });\n${caseStub}`,
+      ),
+    ).toBe(true);
+    for (const mutation of [
+      caseStub,
+      `test.use({ storageState: 'solo-learner.json' });\n${caseStub}`,
+      `test.use({ storageState: { cookies: [{}], origins: [] } });\n${caseStub}`,
+      `test.use({ storageState: { cookies: [], origins: [{}] } });\n${caseStub}`,
+      `${caseStub}\ntest.use({ storageState: { cookies: [], origins: [] } });`,
+      `test.use({ storageState: { cookies: [], origins: [] } });\n${caseStub}\ntest.use({ storageState: 'solo-learner.json' });\n${caseStub}`,
+      `test.use({ storageState: { cookies: [], origins: [] } });\n${caseStub}\ntest.describe('authenticated', () => { test.use({ storageState: 'solo-learner.json' }); ${caseStub} });`,
+      `test.use({ storageState: { cookies: [], origins: [] } });\n${caseStub}\ntest['use']({ storageState: 'solo-learner.json' });\n${caseStub}`,
+      `test.use({ storageState: { cookies: [], origins: [] } });\n${caseStub}\ntest.describe('computed authenticated', () => { test['use']({ storageState: 'solo-learner.json' }); ${caseStub} });`,
+      `test.use({ storageState: { cookies: [], origins: [] } });\n${caseStub}\nconst method = 'use';\ntest[method]({ storageState: 'solo-learner.json' });\n${caseStub}`,
+      `test.use({ storageState: { cookies: [], origins: [] } });\n${caseStub}\nconst storageState = { cookies: [], origins: [] };\ntest.use({ storageState });\n${caseStub}`,
+      `test.use({ storageState: { cookies: [], origins: [] } });\n${caseStub}\nconst options = getTestOptions();\ntest.use(options);\n${caseStub}`,
+      `test.use({ storageState: { cookies: [], origins: [] } });\n${caseStub}\nconst options = getTestOptions();\ntest.use({ ...options });\n${caseStub}`,
+      `test.use({ storageState: { cookies: [], origins: [] } });\n${caseStub}\nconst opaqueState = getStorageState();\ntest.use({ storageState: opaqueState });\n${caseStub}`,
+      `const opaqueState = getStorageState();\ntest.use({ storageState: { ...opaqueState, cookies: [], origins: [] } });\n${caseStub}`,
+    ]) {
+      expect(hasEmptyStorageStateBeforeCases(mutation)).toBe(false);
+    }
+
+    const subjectsSpec = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e-web/flows/v2/v2-subjects.spec.ts'),
+      'utf8',
+    );
+    expect(hasEmptyStorageStateBeforeCases(subjectsSpec)).toBe(true);
   });
 
   it('[WI-2584 profile-load-error] hard-fails authenticated bootstrap errors before Back recovery', () => {
