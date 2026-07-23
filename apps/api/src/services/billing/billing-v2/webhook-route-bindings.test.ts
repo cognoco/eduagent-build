@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { AppVariables } from '../../../types/hono';
 
 const mockStripeHandler = jest.fn().mockResolvedValue(undefined);
 const mockRevenuecatHandlers = {
@@ -38,16 +39,16 @@ import { revenuecatWebhookRoute } from '../../../routes/revenuecat-webhook';
 import { stripeWebhookRoute } from '../../../routes/stripe-webhook';
 import { verifyWebhookSignature } from '../../stripe';
 
-const stripeApp = new Hono()
+const stripeApp = new Hono<{ Variables: AppVariables }>()
   .use('*', async (c, next) => {
-    c.set('db', {});
+    c.set('db', {} as AppVariables['db']);
     await next();
   })
   .route('/', stripeWebhookRoute);
 
-const revenuecatApp = new Hono()
+const revenuecatApp = new Hono<{ Variables: AppVariables }>()
   .use('*', async (c, next) => {
-    c.set('db', {});
+    c.set('db', {} as AppVariables['db']);
     await next();
   })
   .route('/', revenuecatWebhookRoute);
