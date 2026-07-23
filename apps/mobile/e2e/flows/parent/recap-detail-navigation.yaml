@@ -83,6 +83,14 @@ tags:
 # branch rendered rather than the loading/error/notFound branches — those
 # branches mount recap-detail-loading / recap-detail-error / recap-detail-not-found
 # instead and do NOT mount recap-detail-open-session.
+- scrollUntilVisible:
+    element:
+      id: 'recap-detail-open-session'
+    direction: DOWN
+    timeout: 10000
+    visibilityPercentage: 100
+    centerElement: true
+
 - assertVisible:
     id: 'recap-detail-open-session'
 
@@ -102,6 +110,14 @@ tags:
 # recap-detail-back invokes goBackOrReplace(router, FAMILY_RECAPS_HREF), so on
 # a deep-link entry the fallback is /(app)/recaps. Here we arrived from the
 # Recaps tab, so router.back() restores recaps-screen.
+- scrollUntilVisible:
+    element:
+      id: 'recap-detail-back'
+    direction: UP
+    timeout: 10000
+    visibilityPercentage: 100
+    centerElement: false
+
 - tapOn:
     id: 'recap-detail-back'
 

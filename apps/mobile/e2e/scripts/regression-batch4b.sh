@@ -32,7 +32,7 @@ run_seeded "onboarding-no-subject" "flows/edge/empty-first-user.yaml"
 
 # Consent flows
 run_seeded "consent-withdrawn-solo" "flows/consent/consent-withdrawn-gate.yaml"
-run_seeded "onboarding-complete"    "flows/consent/post-approval-landing.yaml"
+run_seeded "post-approval-ready"    "flows/consent/post-approval-landing.yaml"
 run_seeded "consent-pending"        "flows/consent/consent-pending-gate.yaml"
 
 # Sign-up (manual-only)

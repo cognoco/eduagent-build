@@ -53,9 +53,12 @@ tags:
 - tapOn:
     id: "google-sso-button"
 
-# Brief settle so the Custom Tab activity is actually in the foreground before
-# we send Back. takeScreenshot adds a small implicit wait + gives us evidence
-# in failure triage.
+# Wait for the OAuth URL so Back is sent to the browser activity, not the app.
+# A screenshot alone does not wait for the Custom Tab launch to finish.
+- extendedWaitUntil:
+    visible: ".*accounts[.]google.*"
+    timeout: 15000
+
 - takeScreenshot: sso-user-cancel-02-after-tap
 
 # Step 2: Press hardware Back to dismiss the Custom Tab. WebBrowser resolves

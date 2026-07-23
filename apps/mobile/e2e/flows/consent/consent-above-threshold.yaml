@@ -1,7 +1,7 @@
 # Flow: Above Consent Threshold — No Consent Required
 # Validates: creating a profile for a 17-year-old does NOT trigger consent.
 # GDPR-everywhere: age >= 16 means no consent required (no location selector).
-# Profile creation goes straight to the home/subject-creation flow.
+# Profile creation goes straight to the empty learner Home.
 # Tags: nightly, consent
 #
 # Journey: UX Journey 1 (Onboarding) — happy path without consent
@@ -28,25 +28,25 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: 'sign-in-button'
     timeout: 120000
 
 - tapOn:
-    id: "sign-in-email"
+    id: 'sign-in-email'
 - inputText: ${EMAIL}
 - hideKeyboard
 
 - tapOn:
-    id: "sign-in-password"
+    id: 'sign-in-password'
 - inputText: ${PASSWORD}
 - hideKeyboard
 
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: 'sign-in-button'
     timeout: 10000
 - tapOn:
-    id: "sign-in-button"
+    id: 'sign-in-button'
 
 # ============================================================
 # NAVIGATE TO CREATE PROFILE (pre-profile gate → Create)
@@ -59,42 +59,42 @@ tags:
 # ============================================================
 # Enter display name
 - tapOn:
-    id: "create-profile-name"
-- inputText: "Above Threshold Teen"
+    id: 'create-profile-name'
+- inputText: 'Above Threshold Teen'
 - hideKeyboard
 
 # Open date picker
 - tapOn:
-    id: "create-profile-birthdate"
+    id: 'create-profile-birthdate'
 
 # Wait for date picker dialog
 - extendedWaitUntil:
     visible:
-      text: "OK"
+      text: 'OK'
     timeout: 5000
 
 # Tap the year header "2010" to switch to year selection mode
 - tapOn:
-    id: "android:id/date_picker_header_year"
+    id: 'android:id/date_picker_header_year'
 
 # 2009 should be visible in the initial year list, scrollUntilVisible as safety
 - scrollUntilVisible:
     element:
-      text: "2009"
+      text: '2009'
     direction: UP
     timeout: 5000
 
 # Tap year 2009 (age = 17 in 2026 → above both COPPA 13 and GDPR 16)
 - tapOn:
-    text: "2009"
+    text: '2009'
 
 # Confirm date selection
 - tapOn:
-    text: "OK"
+    text: 'OK'
 
 # Verify date was set
 - assertVisible:
-    text: "January 1, 2009"
+    text: 'January 1, 2009'
 
 - takeScreenshot: above-threshold-01-date-set
 
@@ -102,29 +102,33 @@ tags:
 
 # Submit profile creation (GDPR-everywhere: age 17 >= 16 → no consent)
 - tapOn:
-    id: "create-profile-submit"
+    id: 'create-profile-submit'
 
 # ============================================================
-# VERIFY: NO CONSENT SCREEN — lands on create-subject
+# VERIFY: NO CONSENT SCREEN — lands on learner Home
 # ============================================================
 # After profile creation for age 17+ (no consent), the app creates the
-# profile and redirects to create-subject (0 subjects). The profiles
-# screen may flash briefly or be skipped entirely — timing varies.
-# The key proof: landing on create-subject (not consent) confirms success.
+# profile and redirects to Home. The empty state owns the add-first-subject
+# action; profile creation no longer redirects directly to create-subject.
+# Landing on Home rather than consent confirms the no-consent branch.
 
 - extendedWaitUntil:
     visible:
-      id: "create-subject-name"
+      id: 'home-screen'
     timeout: 30000
+
+# home-screen wraps both learner and Family variants; pin the intended audience.
+- assertVisible:
+    id: 'learner-screen'
 
 # MANDATORY: Consent screen must NOT have appeared
 - assertNotVisible:
-    id: "consent-child-view"
+    id: 'consent-child-view'
 
 - assertNotVisible:
-    text: "One more step!"
+    text: 'One more step!'
 
 - assertNotVisible:
-    text: "Hang tight!"
+    text: 'Hang tight!'
 
-- takeScreenshot: above-threshold-02-no-consent-create-subject
+- takeScreenshot: above-threshold-02-no-consent-home

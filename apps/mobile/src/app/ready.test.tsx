@@ -1,4 +1,5 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
+import { ScrollView } from 'react-native';
 import { Sentry } from '../lib/sentry';
 import {
   createScreenWrapper,
@@ -125,6 +126,23 @@ describe('ReadyScreen', () => {
     getByTestId('mentor-birth-animation');
     getByText('Your mentor is ready.');
     expect(queryByTestId('ready-lamp')).toBeNull();
+  });
+
+  it('[WI-1864] keeps the primary CTA reachable on short screens', () => {
+    const activeProfile = createTestProfile({
+      id: 'profile-1',
+      displayName: 'Ari',
+      isOwner: true,
+      birthYear: 2014,
+    });
+    const { wrapper } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
+
+    const { UNSAFE_getByType } = render(<ReadyScreen />, { wrapper });
+
+    expect(UNSAFE_getByType(ScrollView)).toBeTruthy();
   });
 
   it('does not render ellipsis subject copy when no subject is available', () => {

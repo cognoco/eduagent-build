@@ -1511,6 +1511,7 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
         "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.",
       );
     });
+    expect(await screen.findByTestId('quiz-answer-check-failed')).toBeTruthy();
     expect(mockSentryCapture).toHaveBeenCalledTimes(1);
   });
 

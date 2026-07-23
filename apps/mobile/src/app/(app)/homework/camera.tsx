@@ -957,34 +957,30 @@ export default function CameraScreen(): React.ReactNode {
             </View>
           </View>
 
+          <Pressable
+            testID="manual-entry-button"
+            onPress={handleStartManualEntry}
+            className="absolute left-6 right-6 flex-row items-center justify-center gap-2 rounded-full bg-white py-3 px-4"
+            style={{ bottom: insets.bottom + 96 }}
+            accessibilityLabel={t('homework.typeOrRecordInstead')}
+            accessibilityRole="button"
+          >
+            <Ionicons
+              name="create-outline"
+              size={18}
+              color={colors.textPrimary}
+            />
+            <Text className="text-body-sm font-semibold text-text-primary text-center">
+              {t('homework.typeOrRecordInstead')}
+            </Text>
+            <Ionicons name="mic-outline" size={18} color={colors.textPrimary} />
+          </Pressable>
+
           {/* Bottom controls: gallery + capture + flash */}
           <View
             className="flex-row items-center justify-center px-8 pb-4"
             style={{ paddingBottom: insets.bottom + 16 }}
           >
-            <Pressable
-              testID="manual-entry-button"
-              onPress={handleStartManualEntry}
-              className="absolute left-6 right-6 flex-row items-center justify-center gap-2 rounded-full bg-white py-3 px-4"
-              style={{ bottom: insets.bottom + 96 }}
-              accessibilityLabel={t('homework.typeOrRecordInstead')}
-              accessibilityRole="button"
-            >
-              <Ionicons
-                name="create-outline"
-                size={18}
-                color={colors.textPrimary}
-              />
-              <Text className="text-body-sm font-semibold text-text-primary text-center">
-                {t('homework.typeOrRecordInstead')}
-              </Text>
-              <Ionicons
-                name="mic-outline"
-                size={18}
-                color={colors.textPrimary}
-              />
-            </Pressable>
-
             <Pressable
               testID="gallery-button"
               onPress={() => void handlePickFromGallery()}

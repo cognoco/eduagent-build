@@ -52,6 +52,7 @@ import {
 import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import { listSubjects } from './subject';
 import { getTierConfig } from './subscription';
+import { addMonthsClamped } from './billing/billing-shared';
 import { sleep } from './sleep';
 import {
   seedV2SupporterAccepted,
@@ -87,6 +88,7 @@ const CLERK_FETCH_BASE_DELAY_MS = 500;
 export type SeedScenario =
   | 'onboarding-complete'
   | 'onboarding-no-subject'
+  | 'post-approval-ready'
   | 'learning-active'
   | 'retention-due'
   | 'failed-recall-3x'
@@ -1139,6 +1141,63 @@ async function seedOnboardingNoSubject(
   };
 }
 
+/** Teen owner immediately after parental approval. The profile deliberately
+ * has zero subjects and an approved request with a guardian recipient, which
+ * is the exact contract usePostApprovalLanding requires. */
+async function seedPostApprovalReady(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Approved Learner',
+    birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
+  });
+  const now = new Date();
+  const purposeGrants = CONSENT_PURPOSES.map((purpose) => ({
+    purpose,
+    grantId: generateUUIDv7(),
+  }));
+
+  await db.insert(consentGrant).values(
+    purposeGrants.map(({ purpose, grantId }) => ({
+      id: grantId,
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
+  await db.insert(consentRequest).values(
+    purposeGrants.map(({ purpose, grantId }) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      requestedBasis: 'gdpr_parental_consent',
+      guardianEmail: 'parent-e2e-test@example.com',
+      status: 'approved' as const,
+      requestedAt: now,
+      respondedAt: now,
+      consentGrantId: grantId,
+    })),
+  );
+
+  return {
+    scenario: 'post-approval-ready',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: {},
+  };
+}
+
 async function seedOnboardingComplete(
   db: Database,
   email: string,
@@ -1360,14 +1419,22 @@ async function seedRetentionDue(
   await db.insert(retentionCards).values(cardValues);
 
   const firstCard = cardValues[0];
-  if (!firstCard) throw new Error('No retention cards created');
+  const firstTopicId = topicIds[0];
+  if (!firstCard || !firstTopicId) {
+    throw new Error('No retention cards created');
+  }
   return {
     scenario: 'retention-due',
     accountId,
     profileId,
     email,
     password,
-    ids: { subjectId, bookId, retentionCardId: firstCard.id },
+    ids: {
+      subjectId,
+      bookId,
+      topicId: firstTopicId,
+      retentionCardId: firstCard.id,
+    },
   };
 }
 
@@ -3637,14 +3704,16 @@ async function seedSubscriptionFamilyActive(
   );
 
   const subscriptionId = generateUUIDv7();
+  const periodStartAt = new Date();
+  const cycleResetAt = addMonthsClamped(periodStartAt, 1);
   await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: profileId,
     planTier: 'family',
     status: 'active',
-    periodStartAt: new Date(),
-    periodEndAt: futureDate(30),
+    periodStartAt,
+    periodEndAt: cycleResetAt,
   });
 
   await db.insert(quotaPools).values({
@@ -3652,7 +3721,7 @@ async function seedSubscriptionFamilyActive(
     subscriptionId,
     monthlyLimit: familyTier.monthlyQuota,
     usedThisMonth: 120,
-    cycleResetAt: futureDate(30),
+    cycleResetAt,
   });
 
   const { subjectId } = await createSubjectWithCurriculum(
@@ -3704,14 +3773,16 @@ async function seedSubscriptionProActive(
   );
 
   const subscriptionId = generateUUIDv7();
+  const periodStartAt = new Date();
+  const cycleResetAt = addMonthsClamped(periodStartAt, 1);
   await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: profileId,
     planTier: 'pro',
     status: 'active',
-    periodStartAt: new Date(),
-    periodEndAt: futureDate(30),
+    periodStartAt,
+    periodEndAt: cycleResetAt,
   });
 
   await db.insert(quotaPools).values({
@@ -3719,7 +3790,7 @@ async function seedSubscriptionProActive(
     subscriptionId,
     monthlyLimit: proTier.monthlyQuota,
     usedThisMonth: 250,
-    cycleResetAt: futureDate(30),
+    cycleResetAt,
   });
 
   const { subjectId } = await createSubjectWithCurriculum(
@@ -3925,6 +3996,7 @@ async function seedQuotaExceeded(
     periodEndAt: futureDate(30),
   });
 
+  const cycleResetAt = futureDate(30);
   await db.insert(quotaPools).values({
     id: generateUUIDv7(),
     subscriptionId,
@@ -3933,7 +4005,23 @@ async function seedQuotaExceeded(
     usedThisMonth: freeTier.monthlyQuota,
     dailyLimit: freeTier.dailyLimit,
     usedToday: 2, // Daily still has headroom; server caps on monthly
-    cycleResetAt: futureDate(30),
+    cycleResetAt,
+  });
+
+  // Free-tier enforcement reads the owner's per-profile meter. Keep the
+  // shared pool above for legacy readers, but exhaust the authoritative row so
+  // this scenario cannot be lazily provisioned back to zero usage.
+  const ownerMonthlyLimit = freeTier.ownerMonthlyQuota ?? freeTier.monthlyQuota;
+  await db.insert(profileQuotaUsage).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    profileId,
+    role: 'owner',
+    monthlyLimit: ownerMonthlyLimit,
+    usedThisMonth: ownerMonthlyLimit,
+    dailyLimit: freeTier.dailyLimit,
+    usedToday: 2,
+    cycleResetAt,
   });
 
   const { subjectId, topicIds } = await createSubjectWithCurriculum(
@@ -4107,12 +4195,12 @@ async function seedQuizMalformedRound(
 
 // ---------------------------------------------------------------------------
 // Scenario: quiz-deterministic-wrong-answer
-// A pre-inserted quiz round with a known-wrong option at a deterministic index.
-// The E2E dispute test taps option index 1 which is always wrong (correctAnswer
-// is at index 0 after the server side shuffle; we arrange distractors so the
-// round's stored question places the correct answer first in the options
-// presented to the client).
-// Returns ROUND_ID.
+// A pre-inserted three-question vocabulary round. The E2E dispute test selects
+// answer text rather than an option index because the client-safe API projection
+// deliberately shuffles options on every fetch. Three questions keep both the
+// wrong-answer dispute and correct-answer suppression checks away from the final
+// question's automatic round submission.
+// Returns ROUND_ID, WRONG_ANSWER, and CORRECT_ANSWER.
 // ---------------------------------------------------------------------------
 
 async function seedQuizDeterministicWrongAnswer(
@@ -4166,29 +4254,53 @@ async function seedQuizDeterministicWrongAnswer(
     'Geography',
   );
 
-  // Question with correctAnswer='Paris', distractors are clearly wrong.
-  // Index 0 = correct, index 1-3 = wrong — E2E flow taps index 1 to submit
-  // a known-wrong answer for the dispute test.
-  const deterministicQuestion = {
-    type: 'capitals',
-    country: 'France',
-    correctAnswer: 'Paris',
-    acceptedAliases: ['Paris'],
-    distractors: ['London', 'Berlin', 'Madrid'],
-    funFact: 'Paris has been the capital of France since the 10th century.',
-    isLibraryItem: false,
-    topicId: null,
-    freeTextEligible: false,
-  };
+  const deterministicQuestions = [
+    {
+      type: 'vocabulary',
+      term: 'bonjour',
+      correctAnswer: 'hello',
+      acceptedAnswers: ['hello'],
+      distractors: ['goodbye', 'please', 'thanks'],
+      funFact: '',
+      cefrLevel: 'A1',
+      isLibraryItem: false,
+      vocabularyId: null,
+      freeTextEligible: false,
+    },
+    {
+      type: 'vocabulary',
+      term: 'merci',
+      correctAnswer: 'thanks',
+      acceptedAnswers: ['thanks'],
+      distractors: ['hello', 'please', 'goodbye'],
+      funFact: '',
+      cefrLevel: 'A1',
+      isLibraryItem: false,
+      vocabularyId: null,
+      freeTextEligible: false,
+    },
+    {
+      type: 'vocabulary',
+      term: 'au revoir',
+      correctAnswer: 'goodbye',
+      acceptedAnswers: ['goodbye'],
+      distractors: ['hello', 'please', 'thanks'],
+      funFact: '',
+      cefrLevel: 'A1',
+      isLibraryItem: false,
+      vocabularyId: null,
+      freeTextEligible: false,
+    },
+  ];
 
   const roundId = generateUUIDv7();
   await db.insert(quizRounds).values({
     id: roundId,
     profileId,
-    activityType: 'capitals',
-    theme: 'European Capitals',
-    questions: [deterministicQuestion],
-    total: 1,
+    activityType: 'vocabulary',
+    theme: 'Deterministic vocabulary',
+    questions: deterministicQuestions,
+    total: 3,
     libraryQuestionIndices: [],
     status: 'active',
   });
@@ -4199,7 +4311,12 @@ async function seedQuizDeterministicWrongAnswer(
     profileId,
     email,
     password,
-    ids: { subjectId, roundId, wrongOptionIndex: '1' },
+    ids: {
+      subjectId,
+      roundId,
+      wrongAnswer: 'goodbye',
+      correctAnswer: 'thanks',
+    },
   };
 }
 
@@ -4277,6 +4394,17 @@ async function seedQuizAnswerCheckFails(
     topicId: null,
     freeTextEligible: false,
   };
+  const secondQuestion = {
+    type: 'capitals',
+    country: 'France',
+    correctAnswer: 'Paris',
+    acceptedAliases: ['Paris'],
+    distractors: ['Lyon', 'Marseille', 'Toulouse'],
+    funFact: 'Paris has been the capital of France for more than a millennium.',
+    isLibraryItem: false,
+    topicId: null,
+    freeTextEligible: false,
+  };
 
   const roundId = generateUUIDv7();
   await db.insert(quizRounds).values({
@@ -4284,10 +4412,10 @@ async function seedQuizAnswerCheckFails(
     profileId,
     activityType: 'capitals',
     theme: 'European Capitals',
-    questions: [question],
+    questions: [question, secondQuestion],
     results: [],
     score: 1,
-    total: 1,
+    total: 2,
     status: 'completed',
     completedAt: new Date(),
     libraryQuestionIndices: [],
@@ -5583,14 +5711,16 @@ async function seedMentorAuditFamilyPoolMembers(
   );
 
   const subscriptionId = generateUUIDv7();
+  const periodStartAt = new Date();
+  const cycleResetAt = addMonthsClamped(periodStartAt, 1);
   await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: parentProfileId,
     planTier: 'family',
     status: 'active',
-    periodStartAt: new Date(),
-    periodEndAt: futureDate(30),
+    periodStartAt,
+    periodEndAt: cycleResetAt,
   });
 
   const usedThisMonth = Math.floor(familyTier.monthlyQuota / 2);
@@ -5599,7 +5729,7 @@ async function seedMentorAuditFamilyPoolMembers(
     subscriptionId,
     monthlyLimit: familyTier.monthlyQuota,
     usedThisMonth,
-    cycleResetAt: futureDate(30),
+    cycleResetAt,
   });
 
   // Pinned at 2 consented children — see docstring.
@@ -6121,6 +6251,7 @@ export async function attachClerkTotpFactor(
 const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'onboarding-complete': seedOnboardingComplete,
   'onboarding-no-subject': seedOnboardingNoSubject,
+  'post-approval-ready': seedPostApprovalReady,
   'learning-active': seedLearningActive,
   'retention-due': seedRetentionDue,
   'failed-recall-3x': seedFailedRecall3x,

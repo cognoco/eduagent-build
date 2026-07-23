@@ -49,7 +49,10 @@ import { addMonthsClamped } from '../billing/billing-shared';
 import { resolveIdentityV2, type ResolvedIdentityV2 } from './identity-resolve';
 import { checkConsentRequiredFromDate } from '../consent';
 import { ProfileValidationError } from '../profile';
-import { recordAdultSelfConsentV2 } from './consent-v2';
+import {
+  createPendingConsentRequest,
+  recordAdultSelfConsentV2,
+} from './consent-v2';
 
 const logger = createLogger();
 
@@ -324,18 +327,21 @@ export async function createIdentityGraph(
         roles: ['admin', 'learner'],
       });
 
-      // (6a) [WI-1193 AC1] Adult self-consent: a self-registered owner who is a
-      // true adult (age >= 18 — the codebase's established adult threshold, e.g.
-      // family-access.ts / child-profile-v2.ts's `adultOwnerGateEnabled` gate;
-      // NOT the GDPR-consent-required age-16 threshold `consentCheck` also
-      // carries) has no guardian to consent on their behalf, so record their own
-      // lawful-basis + terms-accepted fact here — this bootstrap IS the signup
-      // acceptance point. A self-registered OWNER aged 13-17 (self-consent-
-      // capable per `consentCheck.required === false` at 17, or even a
-      // GDPR-consent-required 13-16 owner, both allowed through the age gate
-      // above) gets NO consent recorded by this call — a pre-existing gap this
-      // WI does not resolve; see the PR description for the follow-up.
-      if (consentCheck.age >= 18) {
+      // (6a) [WI-1864] A self-registered owner aged 13-16 still requires the
+      // same GDPR parental-consent workflow as any other learner. Persist its
+      // PENDING request inside this graph transaction so the response cannot
+      // expose an ungated profile whose consent row failed to land.
+      if (consentCheck.required && consentCheck.consentType) {
+        await createPendingConsentRequest(
+          txDb,
+          personRow.id,
+          orgRow.id,
+          consentCheck.consentType,
+        );
+      } else if (consentCheck.age >= 18) {
+        // [WI-1193 AC1] A true adult has no guardian to consent on their
+        // behalf, so bootstrap records their own lawful basis and accepted
+        // terms. Age 17 needs neither parental nor adult self-consent here.
         await recordAdultSelfConsentV2(
           txDb,
           personRow.id,

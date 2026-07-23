@@ -5,6 +5,7 @@
 import { createMiddleware } from 'hono/factory';
 import {
   registerProvider,
+  getRegisteredProviders,
   _clearProviders,
   runWithLlmRequestContext,
   setLlmRoutingV2Enabled,
@@ -124,8 +125,17 @@ export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
     // the legacy primaries. A Gemini-free deployment whose text primary is
     // Cerebras and vision is Mistral is a valid boot — gating only on
     // Gemini/OpenAI/Anthropic would reject it despite working providers.
+    // A dedicated Worker entrypoint may install an external-boundary provider
+    // before the first request (hosted Maestro does this). Cold production
+    // index.ts installs none, and an env-hash change clears the registry above,
+    // so accepting an existing provider does not weaken the no-key boot gate.
     const hasAnyProvider =
-      cerebrasKey || mistralKey || openaiKey || anthropicKey || geminiKey;
+      cerebrasKey ||
+      mistralKey ||
+      openaiKey ||
+      anthropicKey ||
+      geminiKey ||
+      getRegisteredProviders().length > 0;
 
     if (!hasAnyProvider) {
       if (

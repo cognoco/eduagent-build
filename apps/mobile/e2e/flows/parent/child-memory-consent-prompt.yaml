@@ -36,9 +36,10 @@ tags:
       id: 'parent-home-screen'
     timeout: 15000
 
-# 3. Tap child card to open child detail
+# 3. Tap the child profile control to open settings-mode child detail. The
+# generic check-child card opens overview mode, which does not expose memory.
 - tapOn:
-    id: "parent-home-check-child-${CHILD_PROFILE_ID}"
+    id: "parent-home-child-profile-${CHILD_PROFILE_ID}"
 
 - extendedWaitUntil:
     visible:
