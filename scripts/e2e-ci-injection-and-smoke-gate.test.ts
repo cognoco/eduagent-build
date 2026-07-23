@@ -4791,6 +4791,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       scrollUntilVisible?: {
         element?: { id?: string };
         centerElement?: boolean;
+        visibilityPercentage?: number;
       };
     }>;
     const summaryScroll = commands.find(
@@ -4799,6 +4800,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     )?.scrollUntilVisible;
 
     expect(summaryScroll?.centerElement).toBe(true);
+    expect(summaryScroll?.visibilityPercentage).toBe(50);
   });
 
   it('[WI-1864] returns from every multi-child detail through the route-aware app back control', () => {
