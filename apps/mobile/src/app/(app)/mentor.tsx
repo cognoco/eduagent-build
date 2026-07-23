@@ -393,7 +393,7 @@ function LearnerMentorScreen(): React.ReactElement {
         pathname: '/(app)/session',
         params: {
           entrySource: 'mentor',
-          returnTo: 'mentor',
+          returnTo: MENTOR_RETURN_TO,
           mode: 'freeform',
           rawInput: result.text,
         },
@@ -471,7 +471,7 @@ function LearnerMentorScreen(): React.ReactElement {
       }
       router.push({
         pathname: '/(app)/session',
-        params: { entrySource: 'mentor', returnTo: 'mentor' },
+        params: { entrySource: 'mentor', returnTo: MENTOR_RETURN_TO },
       } as Href);
     };
     renderedFeed = (
