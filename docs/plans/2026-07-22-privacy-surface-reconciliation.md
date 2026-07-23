@@ -19,7 +19,7 @@ In scope:
 - `apps/mobile/src/app/privacy.test.tsx`
 - `apps/mobile/src/i18n/locales/*.json`
 - `apps/mobile/src/i18n/source-baseline.json`
-- `docs/privacy-policy.html`
+- `docs/compliance/privacy-policy.html`
 - `docs/compliance/privacy-surface-evidence-2026-07-22.md`
 - `docs/compliance/child-readable-privacy-summary-draft.md`
 
@@ -33,7 +33,7 @@ Out of scope:
 ## Tasks
 
 - [x] T1: Add privacy-surface regression checks — focused tests failed for the stale app-store URL and the March/ten-section in-app notice before the implementation, while the existing navigation tests remained intact.
-- [x] T2: Reconcile the English legal surfaces — the app URL targets the live notice, the in-app screen renders the July 2026 eleven-section notice, and `docs/privacy-policy.html` carries the same material facts and explicit pre-publish dependencies.
+- [x] T2: Reconcile the English legal surfaces — the app URL targets the live notice, the in-app screen renders the July 2026 eleven-section notice, and `docs/compliance/privacy-policy.html` carries the same material facts and explicit pre-publish dependencies.
 - [x] T3: Regenerate and semantically review supported-locale policy drafts — all seven locale files have the same 32-key privacy shape, no 11–17/11–15 launch-floor wording remains in the active privacy/terms copy, and the automated i18n checks pass. The generated translations remain subject to native/legal publication review.
 - [x] T4: Produce the DPO engineering evidence matrix — every material public claim is classified as code-verified, configuration-dependent, contract-dependent, legal-decision-dependent, or human-review-dependent with current source citations and a named evidence owner.
 - [x] T5: Draft the child-readable privacy summary — the plain-language draft explains AI interaction, learning memory/profiling, recipients, transfers, retention, rights, and guardian visibility without presenting unresolved legal matters as settled.
