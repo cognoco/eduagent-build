@@ -92,8 +92,7 @@ export function AccountAdminSheet(): React.ReactElement {
     }
   }, [isSigningOut, profiles, queryClient, router, signOut, t, userId]);
 
-  // Only proxy sessions redirect here. Non-proxy non-owners remain so
-  // sessionIsOwner can gate every owner-only row below.
+  // Only proxy sessions redirect here; sessionIsOwner gates each owner-only row below.
   if (navigationContract.isParentProxy) {
     return <Redirect href="/(app)/home" />;
   }

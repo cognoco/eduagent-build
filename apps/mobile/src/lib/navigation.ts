@@ -49,10 +49,7 @@ function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-/**
- * Pin Account entry to one of the three V2 tab roots. Unknown pushed routes
- * intentionally return to Mentor instead of the retired Home shell.
- */
+// Pin Account to three V2 tab roots; unknown pushed routes return to Mentor, not retired Home.
 export function accountReturnTokenForPathname(
   pathname: string,
 ): V2AccountReturnToken {
