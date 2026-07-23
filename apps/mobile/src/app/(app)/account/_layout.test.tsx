@@ -122,6 +122,7 @@ describe('account nested layout', () => {
         'Notifications',
       );
       expect(mockStackScreens.get('privacy')?.title).toBe('Privacy & data');
+      expect(mockStackScreens.get('family')?.title).toBe('Family settings');
     },
   );
 });
