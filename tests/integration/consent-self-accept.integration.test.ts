@@ -28,7 +28,7 @@
  *   - minor / non-owner / cross-organization / mismatched X-Profile-Id → no write.
  */
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { consentGrant } from '@eduagent/database';
 
 import {
@@ -41,8 +41,6 @@ import {
   createProfileViaRoute,
   seedDirectChildProfileForTest,
 } from './route-fixtures';
-import { sql } from 'drizzle-orm';
-
 import {
   acceptAdultSelfConsentV2,
   repairOrSignalAdultSelfConsentV2,
@@ -688,5 +686,29 @@ describe('Integration: POST /v1/consent/self/accept (WI-2547)', () => {
     expect(await art6Grants(owner.id)).toHaveLength(0);
     // ...and not the caller's own record either.
     expect(await art6Grants(otherOrgOwner.id)).toHaveLength(0);
+  });
+});
+
+/**
+ * [WI-2547] Literal-continuity guard for the shared advisory-lock key.
+ *
+ * The key's VALUE is load-bearing, not just its uniqueness: advisory locks only
+ * exclude processes that hash the same string, and the first-use repair already
+ * takes `adult-consent-repair:<person>` on origin/main. Renaming the literal —
+ * however tidy the new name — would leave an old repair worker and a new repair
+ * worker on different keys for the length of a rolling deploy, free to bypass
+ * each other and duplicate the repair row the lock exists to protect.
+ *
+ * The mixed-writer regression above CANNOT catch that: its barrier derives its
+ * key from this same helper, so a rename moves both sides together and the test
+ * stays green. This assertion pins the value itself, and needs no database.
+ */
+describe('adultSelfConsentLockKey literal continuity [WI-2547]', () => {
+  it('returns the already-deployed repair lock literal verbatim', () => {
+    const personId = '019f8d28-d977-7ecd-94d9-6e11035ec057';
+
+    expect(adultSelfConsentLockKey(personId)).toBe(
+      'adult-consent-repair:019f8d28-d977-7ecd-94d9-6e11035ec057',
+    );
   });
 });
