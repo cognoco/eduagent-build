@@ -12,7 +12,7 @@ red-green-revert regression guard.
 > was written before implementation, but the code was **not** produced test-first:
 > for each layer the implementation and its tests were written together and run
 > together. Do not read the step headings below as a claim of a strict red→green
-> TDD cycle. What *was* genuinely exercised are three **durable negative
+> TDD cycle. What *was* genuinely exercised are five **durable negative
 > controls** — each an intentional mutation of shipped code, observed failing,
 > then reverted and observed passing again:
 >
@@ -31,6 +31,11 @@ red-green-revert regression guard.
 >    as it normally does — failed the production-shaped mobile case with
 >    `Expected "adult-owner-profile" / Received "managed-child-profile"`, which
 >    is exactly the end-to-end lockout an independent reviewer proved.
+> 5. **Reverting acceptance to its own advisory-lock namespace.** With the two
+>    art6_1_a writers back on separate keys, the mixed-writer regression failed
+>    3/3 runs with two LIVE `platform_use` grants for one person — one stamped
+>    `adult_self_consent_repair`, one `adult_self_acceptance`. Restoring the
+>    shared key returned it to green 2/2.
 >
 > A further control is structural rather than mutational: the pre-service guard
 > tests run against a tripwire `db` whose every property access throws, so any
@@ -79,8 +84,30 @@ loser observes the winner's rows and skips.
 **No schema mutation.** There is deliberately no unique index on
 `(charge_person_id, purpose, organization_id, lawful_basis)` — the purpose split means one
 person legitimately holds several `art6_1_a` rows — so idempotency comes from
-`pg_advisory_xact_lock`, the idiom already used at `consent-v2.ts:525-529`. Adding a
-constraint would be a shared-dev schema mutation, which this brief does **not** authorize.
+`pg_advisory_xact_lock`, the idiom already used by the repair path. Adding a constraint would
+be a shared-dev schema mutation, which this brief does **not** authorize.
+
+### The lock must be SHARED across writers (correction, second review round)
+
+Two functions can create an `art6_1_a` grant: `repairOrSignalAdultSelfConsentV2` (first-use
+repair) and `acceptAdultSelfConsentV2`. They originally took **different** advisory-lock
+namespaces, which left a real duplicate-write race.
+
+`POST /consent/self/accept` is an **authenticated public API contract**; the mobile gate is a
+UI affordance, **not** an authorization precondition on the route. An eligible adult can call
+the endpoint directly while a concurrent `GET /profiles` bootstrap runs repair case (a). With
+separate keys both transactions observe no live `platform_use` grant and each insert one —
+duplicating a canonical compliance row and breaking this item's own "existing valid grants are
+never duplicated" invariant. Their write cases are **not** mutually exclusive, and no property
+of the product flow may be relied on to keep them apart.
+
+Both writers therefore take one canonical key from `adultSelfConsentLockKey(chargePersonId)`,
+keyed on the **person alone**. The rows guarded are person-charged
+(`consent_grant.charge_person_id`), so a person-scoped key is the one that covers the
+invariant; it also serialises the rare same-person cross-organization case, which is strictly
+safer and costs nothing real. The key is deliberately distinct from `consentPersonLockKey`
+(the deletion/revocation flow) so these small writes never queue behind a heavy multi-table
+teardown. Accept-vs-withdraw is a **separate** question, analysed below and unchanged.
 
 ---
 

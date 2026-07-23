@@ -41,8 +41,12 @@ import {
   createProfileViaRoute,
   seedDirectChildProfileForTest,
 } from './route-fixtures';
+import { sql } from 'drizzle-orm';
+
 import {
   acceptAdultSelfConsentV2,
+  repairOrSignalAdultSelfConsentV2,
+  adultSelfConsentLockKey,
   AdultSelfConsentNotEligibleError,
 } from '../../apps/api/src/services/identity-v2/consent-v2';
 
@@ -374,6 +378,129 @@ describe('Integration: POST /v1/consent/self/accept (WI-2547)', () => {
     expect(res.status).toBe(403);
     expect(await art6Grants(minorOwner.id)).toHaveLength(0);
   });
+
+  // [WI-2547] MIXED-WRITER concurrency: the two writers that can create an
+  // art6_1_a grant must serialise against EACH OTHER, not just against
+  // themselves.
+  //
+  // POST /consent/self/accept is an authenticated public contract — the mobile
+  // gate is a UI affordance, not an authorization precondition on the route. So
+  // an eligible adult can call accept directly at the same moment a GET
+  // /profiles bootstrap runs first-use repair case (a). While the two writers
+  // used separate advisory-lock namespaces, both transactions could observe no
+  // live platform_use grant and each insert one, duplicating a canonical
+  // compliance row.
+  //
+  // Determinism: a barrier connection holds the advisory keys and releases both
+  // writers at the same instant. It takes the CURRENT shared key AND the two
+  // superseded per-writer keys, so the release is simultaneous under either
+  // implementation — that is what makes this test genuinely red when the shared
+  // key is reverted, rather than red only when the scheduler happens to
+  // cooperate. Production code carries no test hook; the barrier is just
+  // another client taking advisory locks.
+  it('[AC2] concurrent first-use REPAIR and ACCEPT leave exactly one live grant per purpose', async () => {
+    const owner = await createLegacyAdultOwner();
+    const db = createIntegrationDb();
+
+    // Put the owner in repair case (a): no art6_1_a grant, but a genuinely
+    // captured VERSIONED terms fact on a prior grant — the only lawful repair
+    // source. Without this, repair returns needs_consent and writes nothing,
+    // and the race cannot occur.
+    const priorAcceptedAt = new Date('2026-01-01T00:00:00.000Z').toISOString();
+    await db.insert(consentGrant).values({
+      chargePersonId: owner.id,
+      organizationId: owner.accountId,
+      purpose: 'platform_use',
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+      grantedAt: new Date('2026-01-01T00:00:00.000Z'),
+      auditFact: {
+        source: 'legacy_signup',
+        termsAcceptedAt: priorAcceptedAt,
+        termsVersion: 'legacy-terms-v1',
+      },
+    });
+    expect(await art6Grants(owner.id)).toHaveLength(0);
+
+    // --- barrier: hold every key either implementation may take -------------
+    const barrierDb = createIntegrationDb();
+    let releaseBarrier!: () => void;
+    const barrierHeld = new Promise<void>((resolve) => {
+      releaseBarrier = resolve;
+    });
+    const barrierKeys = [
+      adultSelfConsentLockKey(owner.id), // current shared key
+      `adult-consent-repair:${owner.id}`, // superseded repair-only key
+      `adult-consent-accept:${owner.id}:${owner.accountId}`, // superseded accept-only key
+    ];
+    const barrierTx = barrierDb.transaction(async (tx) => {
+      for (const key of barrierKeys) {
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`,
+        );
+      }
+      await barrierHeld;
+    });
+    // Let the barrier transaction actually acquire the locks first.
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    // Both writers start and queue behind the barrier.
+    const repairPromise = repairOrSignalAdultSelfConsentV2(
+      createIntegrationDb(),
+      owner.id,
+      owner.accountId,
+    );
+    const acceptPromise = acceptAdultSelfConsentV2(
+      createIntegrationDb(),
+      owner.id,
+      owner.accountId,
+      TEST_POLICY_VERSION,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    releaseBarrier();
+    await barrierTx;
+
+    const [repairOutcome, acceptedPurposes] = await Promise.all([
+      repairPromise,
+      acceptPromise,
+    ]);
+
+    // The invariant: exactly one LIVE grant per canonical purpose. No duplicate
+    // platform_use row, whichever transaction serialised first.
+    const live = (await art6Grants(owner.id)).filter(
+      (g) => g.granted && g.withdrawnAt === null,
+    );
+    const livePlatform = live.filter((g) => g.purpose === 'platform_use');
+    const liveLlm = live.filter((g) => g.purpose === 'llm_disclosure');
+    expect(livePlatform).toHaveLength(1);
+    expect(liveLlm).toHaveLength(1);
+
+    // Outcomes/provenance must agree with whichever transaction won.
+    expect(['repaired', 'already_present']).toContain(repairOutcome);
+    const platformSource = (
+      livePlatform[0]?.auditFact as Record<string, unknown>
+    )['source'];
+    if (repairOutcome === 'repaired') {
+      // Repair went first: it wrote platform_use from the versioned fact, so
+      // accept found it live and only had llm_disclosure left to grant.
+      expect(platformSource).toBe('adult_self_consent_repair');
+      expect(acceptedPurposes).toEqual(['llm_disclosure']);
+    } else {
+      // Accept went first and wrote both purposes; repair then saw an existing
+      // art6_1_a grant and stood down without writing.
+      expect(platformSource).toBe('adult_self_acceptance');
+      expect(acceptedPurposes.sort()).toEqual([
+        'llm_disclosure',
+        'platform_use',
+      ]);
+    }
+
+    // llm_disclosure only ever comes from acceptance — repair never infers it.
+    expect((liveLlm[0]?.auditFact as Record<string, unknown>)['source']).toBe(
+      'adult_self_acceptance',
+    );
+  }, 60_000);
 
   // A managed member holds no Login, so the non-owner and unknown-person
   // branches are not reachable over HTTP. Assert them against the service the

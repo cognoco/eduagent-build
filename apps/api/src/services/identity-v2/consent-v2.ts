@@ -424,6 +424,36 @@ export async function withdrawAdultSelfConsentV2(
 // caller's own server-derived person id is passed (never request-supplied), so
 // this is self-scoped and carries no cross-profile hazard.
 
+/**
+ * [WI-2547] The ONE advisory-lock key every adult self-consent writer takes.
+ *
+ * Both writers that can create an `art6_1_a` grant — the first-use repair
+ * (`repairOrSignalAdultSelfConsentV2`) and the authenticated acceptance
+ * (`acceptAdultSelfConsentV2`) — must serialise against EACH OTHER, not just
+ * against themselves. They previously used two different namespaces, which left
+ * a real duplicate-write race: `POST /consent/self/accept` is an authenticated
+ * public contract with no dependency on the mobile gate, so an eligible adult
+ * can call it directly while a concurrent `GET /profiles` bootstrap runs repair
+ * case (a). With separate locks both transactions could observe no live
+ * `platform_use` grant and each insert one, duplicating a canonical compliance
+ * row. Sharing one key closes that.
+ *
+ * Keyed on the PERSON alone, deliberately not person+organization: the rows
+ * these writers guard are person-charged (`consent_grant.charge_person_id`), so
+ * a person-scoped key is the one that actually covers the invariant. It also
+ * serialises the rare cross-organization case for the same person, which is
+ * strictly safer and costs nothing real — a person accepting consent in two
+ * organizations at the same instant is not a hot path.
+ *
+ * Exported so tests can queue on the same key without reaching into internals.
+ * Deliberately distinct from `consentPersonLockKey` (the deletion/revocation
+ * flow's key): merging with that would serialise these small writes behind a
+ * heavy multi-table teardown for no invariant either one needs.
+ */
+export function adultSelfConsentLockKey(chargePersonId: string): string {
+  return `adult-self-consent:${chargePersonId}`;
+}
+
 export type AdultSelfConsentRepairOutcome =
   | 'not_applicable'
   | 'already_present'
@@ -554,11 +584,15 @@ export async function repairOrSignalAdultSelfConsentV2(
   // insert cannot be made idempotent by ON CONFLICT here. Same idiom as
   // services/nudge.ts. Double-checked: re-read existing INSIDE the lock so the
   // loser of a race early-outs instead of inserting.
+  //
+  // [WI-2547] The key is the SHARED adultSelfConsentLockKey, so this also
+  // serialises against acceptAdultSelfConsentV2 — the other writer that can
+  // create an art6_1_a grant for this person.
   return db.transaction(async (tx) => {
     await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtextextended(${
-        'adult-consent-repair:' + chargePersonId
-      }, 0))`,
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${adultSelfConsentLockKey(
+        chargePersonId,
+      )}, 0))`,
     );
 
     const existingLocked = await tx.query.consentGrant.findFirst({
@@ -638,14 +672,25 @@ export async function acceptAdultSelfConsentV2(
     throw new AdultSelfConsentNotEligibleError();
   }
 
-  // Serialise per person+org with the same pg_advisory_xact_lock idiom the
-  // repair path uses, so two concurrent accepts cannot both observe an absent
-  // grant and each insert a row. There is no unique constraint to lean on here:
-  // a person legitimately holds one art6_1_a row per purpose (the AC2 purpose
-  // split), so ON CONFLICT cannot express this idempotency.
+  // Serialise per person on the SHARED adultSelfConsentLockKey, so no two
+  // art6_1_a writers can both observe an absent grant and each insert a row.
+  // There is no unique constraint to lean on here: a person legitimately holds
+  // one art6_1_a row per purpose (the AC2 purpose split), so ON CONFLICT cannot
+  // express this idempotency.
   //
-  // Scope of the lock — deliberate. It serialises accept-vs-accept, which is
-  // what "idempotent under retry/concurrent submit" requires.
+  // Scope of the lock. It covers BOTH writers that can create an art6_1_a grant:
+  //   - accept vs. accept — the retry / concurrent-submit case the AC names;
+  //   - accept vs. first-use REPAIR — repairOrSignalAdultSelfConsentV2 takes the
+  //     same key. This is a real race, not a theoretical one: this function
+  //     backs an authenticated public API contract, and the mobile gate is a UI
+  //     affordance, NOT an authorization precondition on the route. An eligible
+  //     adult can call the endpoint directly while a concurrent GET /profiles
+  //     bootstrap runs repair case (a); with the two writers on separate keys
+  //     both could see no live platform_use grant and each insert one,
+  //     duplicating a canonical compliance row and breaking this function's own
+  //     "existing valid grants are never duplicated" guarantee. Their write
+  //     cases are NOT mutually exclusive, and nothing about the product flow may
+  //     be relied on to keep them apart.
   // withdrawAdultSelfConsentV2 takes NO lock and is not given one here: it is
   // already race-safe within itself (a conditional UPDATE ... WHERE
   // withdrawn_at IS NULL ... RETURNING, so concurrent withdrawals leave exactly
@@ -660,27 +705,12 @@ export async function acceptAdultSelfConsentV2(
   // Neither order can duplicate a live grant or drop a committed write, so
   // widening the lock to the withdrawal path would add contention to a shipped,
   // separately-tested code path without fixing a demonstrable defect.
-  //
-  // Accept vs. first-use REPAIR likewise stays unmerged, and the namespaces are
-  // deliberately different ('adult-consent-accept:<person>:<org>' here vs.
-  // 'adult-consent-repair:<person>'), so the two do not exclude each other. On
-  // the supported flow their write cases are mutually exclusive by
-  // construction: repair writes only in case (a) — a versioned terms fact
-  // exists and no art6_1_a grant does — whereas the gate that drives this
-  // function is raised only when repair returns 'needs_consent' (case (c),
-  // which writes nothing). If repair CAN repair, the gate never appears and
-  // this function is never called. The residual is an unsupported one: a direct
-  // API call racing a bootstrap that happens to hit case (a) could interleave
-  // two platform_use inserts. That is not reachable from the product flow and
-  // not the concurrency the AC requires (accept retry / concurrent submit,
-  // which the shared key above serialises), so merging the namespaces — which
-  // would put this path's contention onto every session bootstrap — is not
-  // justified on current evidence.
+
   return db.transaction(async (tx) => {
     await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtextextended(${
-        'adult-consent-accept:' + chargePersonId + ':' + organizationId
-      }, 0))`,
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${adultSelfConsentLockKey(
+        chargePersonId,
+      )}, 0))`,
     );
 
     const now = new Date();
