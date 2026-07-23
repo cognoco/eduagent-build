@@ -3,7 +3,7 @@
 Consolidated, prioritized action list from run `wf_84c3040e-660` (2026-05-30). Evidence
 for every item is in `README.md`, `citations.csv`, and `findings.csv` in this directory.
 
-**Scope note:** this audit was read-only. Nothing in `docs/audience-matrix.md`, `CLAUDE.md`,
+**Scope note:** this audit was read-only. Nothing in `docs/compliance/audience-matrix.md`, `CLAUDE.md`,
 or source was modified. Each item below is a *proposed* change for a maintainer to apply.
 
 ---
@@ -11,7 +11,7 @@ or source was modified. Each item below is a *proposed* change for a maintainer 
 ## P0 — Resolve before citing the matrix again
 
 ### R1. Confirm the `home.tsx` branching contradiction, then fix BOTH docs
-- **What:** `docs/audience-matrix.md` (row C4) and `CLAUDE.md` ("Profile Shapes" section)
+- **What:** `docs/compliance/audience-matrix.md` (row C4) and `CLAUDE.md` ("Profile Shapes" section)
   both state *"`home.tsx` always mounts `<LearnerScreen>`; the route does not branch."*
   The verifier found `home.tsx` now branches on
   `navigationContract.home.screen === 'FamilyHome'` (rendering `<ParentHomeScreen>` vs
@@ -27,7 +27,7 @@ or source was modified. Each item below is a *proposed* change for a maintainer 
   read but the canonical branch still lives in `LearnerScreen` (C5), and leave CLAUDE.md as-is.
 
 ### R2. Downgrade the matrix's reliability banner
-- **What:** `docs/audience-matrix.md` line 7 reads *"Status: Verified 2026-05-23 against
+- **What:** `docs/compliance/audience-matrix.md` line 7 reads *"Status: Verified 2026-05-23 against
   HEAD."* 29 of 32 citations were inaccurate 9 days later.
 - **Action:** replace with a dated-but-honest banner, e.g. *"Line citations drift quickly —
   last full re-verification 2026-05-30 (run wf_84c3040e-660) found 29/32 inventory lines
@@ -39,7 +39,7 @@ or source was modified. Each item below is a *proposed* change for a maintainer 
 ## P1 — Correct the inventory (if keeping the line-level table)
 
 ### R3. Apply the corrected line-map to all 15 `moved` + key `changed` rows
-- **What:** the citations table in `docs/audience-matrix.md` has stale line numbers; several
+- **What:** the citations table in `docs/compliance/audience-matrix.md` has stale line numbers; several
   (C1 `_layout.tsx:2093-2109`, C3 `:2491`, C11 `subscription.tsx:1590`) point past EOF.
 - **Action:** apply the corrected map in `README.md` → "Corrected citation map" and the
   per-row `actualLocation`/`note` columns in `citations.csv`. Highlights:
@@ -118,7 +118,7 @@ or source was modified. Each item below is a *proposed* change for a maintainer 
   moved nearly every gate. Patching line numbers (R3) is a treadmill. Now that gating reads
   through `apps/mobile/src/lib/navigation-contract.ts` (`resolveNavigationContract` + its
   `gates.*`), that file is the single source of truth the matrix was always a stopgap for.
-- **Action:** replace the 32-row line-level inventory in `docs/audience-matrix.md` with a
+- **Action:** replace the 32-row line-level inventory in `docs/compliance/audience-matrix.md` with a
   short pointer ("current gating is centralized in `resolveNavigationContract`; see its
   `gates.*` fields") and keep only the **findings ledger** (F1–F14), which ages far better.
   This subsumes R3 and most of R4.
@@ -137,7 +137,7 @@ Either path requires R1 (home.tsx/CLAUDE.md), R2 (banner), R5 (F9), R6 (F12), R7
 ## On the two next-steps offered in review
 
 Both were offered in conversation and are recorded here so they aren't lost:
-- **(a) Apply corrected line-map + F9/F12 wording to `docs/audience-matrix.md`** → captured as
+- **(a) Apply corrected line-map + F9/F12 wording to `docs/compliance/audience-matrix.md`** → captured as
   R3, R5, R6.
 - **(b) Manually confirm `home.tsx` branching and update `CLAUDE.md`** → captured as R1.
 

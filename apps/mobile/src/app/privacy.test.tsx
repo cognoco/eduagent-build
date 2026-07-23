@@ -118,7 +118,7 @@ describe('PrivacyPolicyScreen', () => {
 
   it('keeps the repository HTML notice blocked on external evidence', () => {
     const policyHtml = readFileSync(
-      join(__dirname, '../../../../docs/privacy-policy.html'),
+      join(__dirname, '../../../../docs/compliance/privacy-policy.html'),
       'utf8',
     );
 
@@ -129,6 +129,25 @@ describe('PrivacyPolicyScreen', () => {
     );
     expect(policyHtml).toContain(
       'Before any international transfer of learner data occurs',
+    );
+    expect(policyHtml).toContain(
+      'Within enabled EEA countries, the age at which a minor may consent',
+    );
+    expect(policyHtml).toContain(
+      'MentoMate is unavailable to users under 13 at launch',
+    );
+    expect(policyHtml).toContain(
+      'verified authorization from the holder of parental responsibility',
+    );
+    expect(policyHtml).toContain(
+      'intended launch perimeter covers all 30 EEA countries',
+    );
+    expect(policyHtml).toContain('country of habitual residence');
+    expect(policyHtml).toContain(
+      'The United Kingdom, United States, and all other non-EEA markets are disabled',
+    );
+    expect(policyHtml).not.toContain(
+      'first launch perimeter includes only countries whose current threshold is 13',
     );
   });
 });
