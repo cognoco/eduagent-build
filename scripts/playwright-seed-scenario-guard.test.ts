@@ -159,6 +159,32 @@ describe('[WI-2571] selected Playwright seed-scenario collector', () => {
     ]);
   });
 
+  it('excludes named aliases passed to a fixed-scenario wrapper', () => {
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/sign-in-fresh-owner.ts',
+      `
+        import { seedScenario } from './test-seed';
+        export async function signInFreshOwner({ alias }: { alias: string }) {
+          void alias;
+          return seedScenario({ scenario: 'parent-multi-child' });
+        }
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/shape.spec.ts',
+      `
+        import { signInFreshOwner } from './helpers/sign-in-fresh-owner';
+        void signInFreshOwner({ alias: 'v2-account-owner-return' });
+        void signInFreshOwner({ alias: 'v2-account-owner-empty-history' });
+        void signInFreshOwner({ alias: 'v2-account-owner-sign-out' });
+      `,
+    );
+
+    expect(collectShapeScenarios(fixtureRoot)).toEqual(['parent-multi-child']);
+  });
+
   it('resolves default-imported wrappers exported as declarations and identifiers', () => {
     writeFixture(
       fixtureRoot,

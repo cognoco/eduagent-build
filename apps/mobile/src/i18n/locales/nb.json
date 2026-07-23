@@ -4361,7 +4361,9 @@
   },
   "accountAdmin": {
     "title": "Konto",
-    "openAccount": "Åpne kontoinnstillinger",
+    "openAccount": "Åpne kontoinnstillingene for {{name}}",
+    "openAccountNoName": "Åpne kontoinnstillingene",
+    "backTo": "Tilbake til {{destination}}",
     "security": "Kontosikkerhet",
     "familySettings": "Familieinnstillinger"
   },

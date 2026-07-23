@@ -1839,8 +1839,14 @@ async function seedParentMultiChild(
     defaultAppContext: 'family',
   });
 
-  // Parent also gets a subject so the inline "Learn something" view works
-  await createSubjectWithCurriculum(db, parentProfileId, 'General Knowledge');
+  // Parent also gets a subject so the inline "Learn something" view works.
+  // Expose its ID separately from the child subjects so owner-learner E2E
+  // evidence can bind content to the exact owner's row.
+  const { subjectId: ownerSubjectId } = await createSubjectWithCurriculum(
+    db,
+    parentProfileId,
+    'General Knowledge',
+  );
 
   // Child 1 — teen with active learning
   const child1ProfileId = await createBaseProfile(db, accountId, {
@@ -2008,6 +2014,7 @@ async function seedParentMultiChild(
     password,
     ids: {
       parentProfileId,
+      ownerSubjectId,
       child1ProfileId,
       child2ProfileId,
       child3ProfileId,

@@ -459,6 +459,39 @@ describe('seedScenario', () => {
     );
   });
 
+  it('[WI-2240] exposes the parent-multi-child owner learner subject separately from every child subject', async () => {
+    const db = createMockDb();
+    const result = await seedScenario(
+      db,
+      'parent-multi-child',
+      'owner@example.com',
+    );
+    const insertResult = (db.insert as jest.Mock).mock.results[0]?.value as
+      | { values?: jest.Mock }
+      | undefined;
+    const insertedRows =
+      insertResult?.values?.mock.calls.map(([row]) => row) ?? [];
+
+    expect(insertedRows).toContainEqual(
+      expect.objectContaining({
+        id: result.profileId,
+        displayName: 'Test Parent',
+      }),
+    );
+    expect(insertedRows).toContainEqual(
+      expect.objectContaining({
+        id: result.ids.ownerSubjectId,
+        profileId: result.profileId,
+        name: 'General Knowledge',
+      }),
+    );
+    expect([
+      result.ids.subject1Id,
+      result.ids.subject2Id,
+      result.ids.subject3Id,
+    ]).not.toContain(result.ids.ownerSubjectId);
+  });
+
   it.each([
     ['parent-with-children', 'Test Parent'],
     ['parent-multi-child', 'Test Parent'],
