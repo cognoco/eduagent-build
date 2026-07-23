@@ -148,3 +148,26 @@ export const selfConsentWithdrawRequestSchema = z.object({
 export type SelfConsentWithdrawRequest = z.infer<
   typeof selfConsentWithdrawRequestSchema
 >;
+
+// [WI-2547] Result of the authenticated adult self-consent ACCEPTANCE route
+// (POST /consent/self/accept). There is deliberately no request schema: the
+// contract takes no caller-supplied person / profile / organization / lawful
+// basis / policy version — every one of those is server-derived.
+//
+// `purposesGranted` reports the purposes this call actually wrote, so an
+// idempotent replay legitimately returns an empty array alongside a 200 (the
+// caller's consent is recorded either way). `termsVersion` echoes the server's
+// CONSENT_POLICY_VERSION that was stamped into the acceptance audit fact; it is
+// trimmed BEFORE the non-empty check so the shared contract encodes its own
+// nonblank invariant rather than trusting every caller to have trimmed first — a
+// whitespace-only version is as unversioned as an empty one for GDPR
+// Art 5(2)/7(1). Trimming is also a transform, so a parsed `termsVersion` never
+// carries surrounding whitespace.
+export const selfConsentAcceptResultSchema = z.object({
+  message: z.string(),
+  purposesGranted: z.array(consentPurposeSchema),
+  termsVersion: z.string().trim().min(1),
+});
+export type SelfConsentAcceptResult = z.infer<
+  typeof selfConsentAcceptResultSchema
+>;

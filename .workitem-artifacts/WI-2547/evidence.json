@@ -1,0 +1,70 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "POST /consent/self/accept added under the consent routes, mirroring the PUT /consent/self/withdraw sibling. It registers no zValidator and reads no request body: chargePersonId comes from c.get('callerPersonId') (the login->person binding accountMiddleware resolves from the Clerk JWT, never the X-Profile-Id-selectable active profile), the organization from requireAccount(c.get('account')), the lawful basis is fixed at art6_1_a inside the service, and termsVersion from c.env.CONSENT_POLICY_VERSION.",
+      "pointer": "apps/api/src/routes/consent.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Typed response contract selfConsentAcceptResultSchema added to the shared @eduagent/schemas package (no locally redefined API-facing type). There is deliberately no request schema because the contract accepts no input identifiers. Unit tests cover first-acceptance, idempotent-replay (empty purposesGranted), a purpose outside the canonical set, and an empty termsVersion.",
+      "pointer": "packages/schemas/src/consent.test.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "acceptAdultSelfConsentV2 gates on the shared adult-account-owner check (isAdultAccountOwnerV2, extracted verbatim from repairOrSignalAdultSelfConsentV2 so the two paths cannot drift) and writes one art6_1_a grant per CONSENT_PURPOSES purpose with a versioned acceptance audit fact (source adult_self_acceptance, termsAcceptedAt, termsVersion). Idempotency is per purpose inside a pg_advisory_xact_lock transaction: a live grant is skipped, an absent or withdrawn purpose is granted afresh. The lock key is the canonical adultSelfConsentLockKey(chargePersonId), taken by BOTH writers that can create an art6_1_a grant, so it closes accept-vs-accept AND accept-vs-first-use-repair. The latter is a real race on an authenticated public contract - the mobile gate is a UI affordance, not an authorization precondition - and with the previously distinct namespaces both transactions could insert a duplicate live platform_use grant. Accept-vs-withdraw is a separate question, analysed in the docblock and left unchanged: withdrawal is race-safe within itself and every interleaving resolves to a legitimate serialisation rather than a lost update.",
+      "pointer": "apps/api/src/services/identity-v2/consent-v2.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "X-Profile-Id is an anti-spoof consistency check, never an input to the write: the subject is always callerPersonId. A presented header that is not the caller is rejected with the uniform forbidden response BEFORE the service call, so no write transaction opens. Real-DB coverage asserts 403 with zero grants for BOTH caller and target on the same-org and cross-org mismatched-header cases (explicit attacker/tamper shapes, no conditional assertions), and separately covers TWO happy paths: header-equals-caller - the shape the mobile mutation pins and the production path - returning 200 and writing exactly the caller's canonical two grants, and the no-header direct server-contract path also returning 200.",
+      "pointer": "tests/integration/consent-self-accept.integration.test.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Remaining fail-closed shapes proven against a real database: minor owner -> 403 with zero grants. Service-level for the shapes that hold no Login and are therefore unreachable over HTTP: adult non-owner (learner membership only), unknown person id, and an adult owner of another organization all throw AdultSelfConsentNotEligibleError with no write. The 403 is uniform across every ineligible shape so it cannot enumerate membership or ages; a focused route test asserts a known-foreign and a bogus profile id produce byte-identical responses.",
+      "pointer": "tests/integration/consent-self-accept.integration.test.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Existing valid grants are neither duplicated nor weakened, and the flow is idempotent under retry and concurrent submit: replay returns an empty purposesGranted and preserves the original row ids; two concurrent accepts yield exactly one grant per purpose; an already-consented adult keeps every row untouched; a withdrawn purpose is re-granted while the live sibling row is left byte-identical. A dedicated regression test covers the population this route exists for - an adult repaired into platform_use only - proving llm_disclosure is still granted. A durable mixed-writer regression additionally proves the cross-writer invariant: with the owner in repair case (a), repairOrSignalAdultSelfConsentV2 and acceptAdultSelfConsentV2 are released simultaneously by a barrier connection holding the advisory keys, and the final state contains exactly one live platform_use grant and exactly one live llm_disclosure grant with provenance matching whichever transaction serialised first.",
+      "pointer": "tests/integration/consent-self-accept.integration.test.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "A missing, empty, or whitespace-only CONSENT_POLICY_VERSION is refused with 503 before any service call, so an UNVERSIONED acceptance fact can never be written (the response schema's .trim().min(1) would otherwise reject only AFTER the transaction committed, leaving a written-but-unreportable grant). Proven with a tripwire db whose every property access throws: the guard cases return 503 rather than 500, and a negative control shows a fully satisfied request DOES reach the service and DOES 500 - pinning that the 503s come from the version guard and not an earlier short-circuit.",
+      "pointer": "apps/api/src/routes/consent-self-accept.test.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "AdultSelfConsentGate exports a blocking adult-owner gate with its own tabs.adultSelfConsent.* copy naming the two purposes (platform use and AI tutoring), an accessibilityRole=header title, and terms/privacy exposed as two independently focusable accessibilityRole=link controls routing to the in-app /terms and /privacy screens. It imports neither ConsentPendingGate, ConsentWithdrawnGate, getConsentWithdrawnCopy, nor any mentor-memory consent surface; a test asserts none of those testIDs render.",
+      "pointer": "apps/mobile/src/app/(app)/_components/AdultSelfConsentGate.tsx"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "useAdultSelfConsent posts only to /consent/self/accept, takes no variables (public variable type void) and chooses no caller-supplied identifier, and invalidates the user-scoped ['profiles'] query on success so needsAdultConsent can settle false. The shared API client normally carries profile context by injecting the persisted ACTIVE profile as X-Profile-Id when the call did not preset one; because a guardian can have a managed child restored as active, this mutation pins that context to the already-loaded OWNER identity from ProfileProvider so a restored child selection cannot poison an owner-scoped request and trip the server's anti-spoof check. If no owner can be derived it fails locally through the normal mutation error path and sends no request - never falling back to the active child. Tests drive the REAL injection path via setActiveProfileId (no internal module mock, GC1-clean) with module state reset between tests, and assert the outgoing header is the owner's id and not the active child's, plus endpoint-only, refetch, error/403, double-submit and mentor-memory separation.",
+      "pointer": "apps/mobile/src/hooks/use-adult-self-consent.test.ts"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "The component and mutation are exported and tested but nothing mounts them: apps/mobile/src/app/(app)/_layout.tsx is untouched on this branch and needsAdultConsent has no field read under apps/mobile/src (its only occurrences are doc comments naming WI-2411 as the owner of the bootstrap-signal-to-layout branch). Verify with: git diff --stat origin/main...HEAD",
+      "pointer": "git diff --stat origin/main...HEAD"
+    },
+    {
+      "acRef": "AC-6",
+      "description": "The WI-2411 boundary holds in both directions: this item ships the gate and mutation but mounts nothing, so it cannot pre-empt WI-2411's bootstrap-signal-to-layout branch, and it does not duplicate that responsibility. apps/mobile/src/app/(app)/_layout.tsx is untouched on this branch, needsAdultConsent has no field read under apps/mobile/src (only doc comments naming WI-2411 as the owner), and the gate is a plain named export with no route registration or navigation side effect - so the two may ship together in either order without conflict.",
+      "pointer": "apps/mobile/src/app/(app)/_components/AdultSelfConsentGate.tsx"
+    },
+    {
+      "acRef": "AC-7",
+      "description": "API coverage is 15 real-DB integration cases (including a mixed-writer repair-vs-accept concurrency regression) (success, exact audit version, repaired-into-platform_use-only, idempotent replay, concurrency, already-consented, re-consent after withdrawal, minor, adult non-owner, unknown person, same-org mismatched header, cross-org mismatched header, header-equals-caller happy path, no-header happy path) plus 9 focused route tests for the three pre-service guards. Mobile coverage is 9 mutation cases and 9 gate cases. The code was NOT written test-first; what was durably exercised are five negative controls, each an intentional mutation observed failing then reverted and observed passing: the purpose-blind gating substitution (failed 6 of 12 cases), the caller-binding break test (profileId instead of callerPersonId failed the spoof case), removal of the presented-profile guard (failed the same-org spoof case), removal of the mutation's owner-header override (failed the production-shaped mobile case with received managed-child-profile instead of adult-owner-profile), and reverting acceptance to its own advisory-lock namespace (failed the mixed-writer regression 3 of 3 runs with two live platform_use grants for one person, one stamped adult_self_consent_repair and one adult_self_acceptance; green 2 of 2 after restore).",
+      "pointer": "apps/api/src/routes/consent-self-accept.test.ts"
+    },
+    {
+      "acRef": "AC-7",
+      "description": "Repo-required gates green on this branch: api typecheck and lint (0 errors), api unit tests related to the changed files, schemas suite, mobile tsc --noEmit clean, nx lint mobile 0 errors, the WI-2386 consent-purpose contract guard clean, GC1 internal-mock ratchet clean, i18n orphan-key checker (no findings), i18n hardcoded-JSX-literal ratchet clean, no-clinical-copy ratchet clean, and check-i18n-staleness up to date after pnpm translate.",
+      "pointer": "bun scripts/check-consent-purpose-contract.ts"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13"
+}

@@ -81,6 +81,19 @@ export class ConsentReconsentRequiredError extends Error {
   }
 }
 
+/**
+ * [WI-2547] The caller is not an adult account owner, so they may not record an
+ * adult self-consent. Deliberately ONE error for every ineligible shape (minor,
+ * non-owner, unknown person, cross-organization) so the route's response cannot
+ * be used to enumerate account membership or ages.
+ */
+export class AdultSelfConsentNotEligibleError extends Error {
+  constructor() {
+    super('This account is not eligible for adult self-consent');
+    this.name = 'AdultSelfConsentNotEligibleError';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Error classes — re-exported 1:1 from the legacy machine so the route layer's
 // `instanceof` checks work identically against either implementation. The v2
@@ -411,6 +424,47 @@ export async function withdrawAdultSelfConsentV2(
 // caller's own server-derived person id is passed (never request-supplied), so
 // this is self-scoped and carries no cross-profile hazard.
 
+/**
+ * [WI-2547] The ONE advisory-lock key every adult self-consent writer takes.
+ *
+ * Both writers that can create an `art6_1_a` grant — the first-use repair
+ * (`repairOrSignalAdultSelfConsentV2`) and the authenticated acceptance
+ * (`acceptAdultSelfConsentV2`) — must serialise against EACH OTHER, not just
+ * against themselves. They previously used two different namespaces, which left
+ * a real duplicate-write race: `POST /consent/self/accept` is an authenticated
+ * public contract with no dependency on the mobile gate, so an eligible adult
+ * can call it directly while a concurrent `GET /profiles` bootstrap runs repair
+ * case (a). With separate locks both transactions could observe no live
+ * `platform_use` grant and each insert one, duplicating a canonical compliance
+ * row. Sharing one key closes that.
+ *
+ * Keyed on the PERSON alone, deliberately not person+organization: the rows
+ * these writers guard are person-charged (`consent_grant.charge_person_id`), so
+ * a person-scoped key is the one that actually covers the invariant. It also
+ * serialises the rare cross-organization case for the same person, which is
+ * strictly safer and costs nothing real — a person accepting consent in two
+ * organizations at the same instant is not a hot path.
+ *
+ * **The literal value is load-bearing — do not "tidy" it.** It is exactly the
+ * key the first-use repair already takes on `origin/main`
+ * (`adult-consent-repair:<person>`), and it is kept verbatim so a ROLLING
+ * DEPLOY stays safe. Advisory locks only exclude processes that hash the same
+ * string, so minting a fresh literal here would leave an old repair worker and
+ * a new repair worker on different keys for the length of the rollout — able to
+ * bypass each other and duplicate the very repair row this lock exists to
+ * protect. Acceptance is new in this Work Item and has no deployed predecessor
+ * to preserve, so it is the writer that moves onto the established key. The name
+ * generalised (both writers use it now); the value must not.
+ *
+ * Exported so tests can queue on the same key without reaching into internals.
+ * Deliberately distinct from `consentPersonLockKey` (the deletion/revocation
+ * flow's key): merging with that would serialise these small writes behind a
+ * heavy multi-table teardown for no invariant either one needs.
+ */
+export function adultSelfConsentLockKey(chargePersonId: string): string {
+  return `adult-consent-repair:${chargePersonId}`;
+}
+
 export type AdultSelfConsentRepairOutcome =
   | 'not_applicable'
   | 'already_present'
@@ -445,6 +499,57 @@ function parseVersionedTermsFact(
   return null;
 }
 
+/**
+ * [WI-2547] The shared adult-account-OWNER gate: `admin` membership in THIS
+ * organization AND an adult (18+) birth date. Extracted verbatim from
+ * repairOrSignalAdultSelfConsentV2 so the repair path and the acceptance path
+ * (acceptAdultSelfConsentV2) can never drift apart on who counts as eligible.
+ *
+ * Fail-closed on every unknown: absent/non-admin membership (which also covers
+ * a CROSS-ORGANIZATION caller — no membership row in the passed org), missing
+ * person row, unparseable birth date, or any non-adult bracket.
+ *
+ * computeAgeBracketFromDate is the canonical feature-gating / safety-adjacent
+ * age function AGENTS.md §Profile Shapes names for the adult-owner gate
+ * (exact-date UTC math, year-only fallback when month/day are absent — never
+ * the year-only computeAgeBracket, which overestimates by up to 11 months and
+ * could read a late-in-the-year 17-year-old as 18). `birthDate` is the
+ * `YYYY-MM-DD` date column.
+ */
+export async function isAdultAccountOwnerV2(
+  db: Database,
+  personId: string,
+  organizationId: string,
+): Promise<boolean> {
+  const membershipRow = await db.query.membership.findFirst({
+    where: and(
+      eq(membership.personId, personId),
+      eq(membership.organizationId, organizationId),
+    ),
+    columns: { roles: true },
+  });
+  if (!membershipRow?.roles.includes('admin')) return false;
+
+  const personRow = await db.query.person.findFirst({
+    where: eq(person.id, personId),
+    columns: { birthDate: true },
+  });
+  if (!personRow) return false;
+
+  const birthDate = String(personRow.birthDate);
+  const birthYear = Number(birthDate.slice(0, 4));
+  const birthMonth = Number(birthDate.slice(5, 7));
+  const birthDay = Number(birthDate.slice(8, 10));
+  if (!Number.isFinite(birthYear)) return false;
+  return (
+    computeAgeBracketFromDate(
+      birthYear,
+      Number.isFinite(birthMonth) ? birthMonth : undefined,
+      Number.isFinite(birthDay) ? birthDay : undefined,
+    ) === 'adult'
+  );
+}
+
 export async function repairOrSignalAdultSelfConsentV2(
   db: Database,
   chargePersonId: string,
@@ -452,38 +557,7 @@ export async function repairOrSignalAdultSelfConsentV2(
 ): Promise<AdultSelfConsentRepairOutcome> {
   // Gate: adult (18+) account-OWNER only. A non-owner (managed-child login) or a
   // minor owner never receives an adult self-consent record.
-  const membershipRow = await db.query.membership.findFirst({
-    where: and(
-      eq(membership.personId, chargePersonId),
-      eq(membership.organizationId, organizationId),
-    ),
-    columns: { roles: true },
-  });
-  if (!membershipRow?.roles.includes('admin')) return 'not_applicable';
-
-  const personRow = await db.query.person.findFirst({
-    where: eq(person.id, chargePersonId),
-    columns: { birthDate: true },
-  });
-  if (!personRow) return 'not_applicable';
-  // Adult-owner gate — computeAgeBracketFromDate is the canonical feature-gating
-  // / safety-adjacent age function AGENTS.md §Profile Shapes names for the
-  // adult-owner gate (exact-date UTC math, year-only fallback when month/day are
-  // absent — never the year-only computeAgeBracket, which overestimates by up to
-  // 11 months and could read a late-in-the-year 17-year-old as 18). `birthDate`
-  // is the `YYYY-MM-DD` date column; fail-closed on a null/non-numeric birthYear.
-  const birthDate = String(personRow.birthDate);
-  const birthYear = Number(birthDate.slice(0, 4));
-  const birthMonth = Number(birthDate.slice(5, 7));
-  const birthDay = Number(birthDate.slice(8, 10));
-  if (
-    !Number.isFinite(birthYear) ||
-    computeAgeBracketFromDate(
-      birthYear,
-      Number.isFinite(birthMonth) ? birthMonth : undefined,
-      Number.isFinite(birthDay) ? birthDay : undefined,
-    ) !== 'adult'
-  ) {
+  if (!(await isAdultAccountOwnerV2(db, chargePersonId, organizationId))) {
     return 'not_applicable';
   }
 
@@ -521,11 +595,15 @@ export async function repairOrSignalAdultSelfConsentV2(
   // insert cannot be made idempotent by ON CONFLICT here. Same idiom as
   // services/nudge.ts. Double-checked: re-read existing INSIDE the lock so the
   // loser of a race early-outs instead of inserting.
+  //
+  // [WI-2547] The key is the SHARED adultSelfConsentLockKey, so this also
+  // serialises against acceptAdultSelfConsentV2 — the other writer that can
+  // create an art6_1_a grant for this person.
   return db.transaction(async (tx) => {
     await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtextextended(${
-        'adult-consent-repair:' + chargePersonId
-      }, 0))`,
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${adultSelfConsentLockKey(
+        chargePersonId,
+      )}, 0))`,
     );
 
     const existingLocked = await tx.query.consentGrant.findFirst({
@@ -557,6 +635,133 @@ export async function repairOrSignalAdultSelfConsentV2(
       },
     });
     return 'repaired'; // (a)
+  });
+}
+
+// ---------------------------------------------------------------------------
+// (2c) [WI-2547] acceptAdultSelfConsentV2 — the user-reachable ACCEPTANCE write
+// ---------------------------------------------------------------------------
+// repairOrSignalAdultSelfConsentV2 case (c) signals `needs_consent` and writes
+// nothing, deliberately: it will not fabricate a consent record without a
+// traceable versioned event. This is the function that closes that loop — the
+// adult performs a REAL consent event in the app, and we record it.
+//
+// Why this does NOT reuse repair's `already_present` gate: that gate matches on
+// (chargePersonId, lawfulBasis) with NO purpose predicate, while repair inserts
+// only CONSENT_PURPOSES[0]. An adult repaired into platform_use alone therefore
+// looks "already present" — reusing it here would silently never grant
+// llm_disclosure for exactly the legacy population this flow exists to serve.
+// Acceptance is decided PER PURPOSE instead.
+
+/**
+ * [WI-2547] Record an authenticated adult's acceptance of their OWN processing
+ * + LLM-disclosure consent, one `art6_1_a` grant per purpose in CONSENT_PURPOSES.
+ *
+ * Per-purpose and idempotent under retry AND concurrent submit:
+ *   - a LIVE grant (granted, not withdrawn) is left exactly as-is — never
+ *     duplicated, never weakened, never re-stamped;
+ *   - an ABSENT or WITHDRAWN purpose is granted afresh (the re-consent case).
+ * Returns the purposes this call actually wrote, so a replay returns `[]`.
+ *
+ * Authority: the caller passes their OWN server-derived person id
+ * (`callerPersonId` from the verified login binding) — never a request-supplied
+ * identifier — so this is self-scoped and carries no cross-profile hazard.
+ * Eligibility is the shared adult-account-owner gate; every ineligible shape
+ * throws AdultSelfConsentNotEligibleError BEFORE any write.
+ *
+ * `termsVersion` is the server's CONSENT_POLICY_VERSION, stamped into the
+ * versioned acceptance audit fact and kept separate from the lawful basis
+ * (MMT-ADR-0011: terms acceptance is a distinct, versioned fact).
+ */
+export async function acceptAdultSelfConsentV2(
+  db: Database,
+  chargePersonId: string,
+  organizationId: string,
+  termsVersion: string,
+): Promise<ConsentPurpose[]> {
+  if (!(await isAdultAccountOwnerV2(db, chargePersonId, organizationId))) {
+    throw new AdultSelfConsentNotEligibleError();
+  }
+
+  // Serialise per person on the SHARED adultSelfConsentLockKey, so no two
+  // art6_1_a writers can both observe an absent grant and each insert a row.
+  // There is no unique constraint to lean on here: a person legitimately holds
+  // one art6_1_a row per purpose (the AC2 purpose split), so ON CONFLICT cannot
+  // express this idempotency.
+  //
+  // Scope of the lock. It covers BOTH writers that can create an art6_1_a grant:
+  //   - accept vs. accept — the retry / concurrent-submit case the AC names;
+  //   - accept vs. first-use REPAIR — repairOrSignalAdultSelfConsentV2 takes the
+  //     same key. This is a real race, not a theoretical one: this function
+  //     backs an authenticated public API contract, and the mobile gate is a UI
+  //     affordance, NOT an authorization precondition on the route. An eligible
+  //     adult can call the endpoint directly while a concurrent GET /profiles
+  //     bootstrap runs repair case (a); with the two writers on separate keys
+  //     both could see no live platform_use grant and each insert one,
+  //     duplicating a canonical compliance row and breaking this function's own
+  //     "existing valid grants are never duplicated" guarantee. Their write
+  //     cases are NOT mutually exclusive, and nothing about the product flow may
+  //     be relied on to keep them apart.
+  // withdrawAdultSelfConsentV2 takes NO lock and is not given one here: it is
+  // already race-safe within itself (a conditional UPDATE ... WHERE
+  // withdrawn_at IS NULL ... RETURNING, so concurrent withdrawals leave exactly
+  // one winner), and every accept-vs-withdraw interleaving resolves to a
+  // legitimate serialisation rather than a lost update:
+  //   - accept reads a LIVE grant and skips, then withdraw stamps it → the
+  //     accept simply ordered before the withdrawal; withdrawn is correct.
+  //   - withdraw commits first, then accept reads WITHDRAWN and re-grants → the
+  //     accept ordered after; granted is correct.
+  //   - a withdrawal racing an accept on an ALREADY-withdrawn row is a no-op by
+  //     design (it returns the existing withdrawnAt), so nothing is lost.
+  // Neither order can duplicate a live grant or drop a committed write, so
+  // widening the lock to the withdrawal path would add contention to a shipped,
+  // separately-tested code path without fixing a demonstrable defect.
+
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${adultSelfConsentLockKey(
+        chargePersonId,
+      )}, 0))`,
+    );
+
+    const now = new Date();
+    const granted: ConsentPurpose[] = [];
+
+    for (const purpose of CONSENT_PURPOSES) {
+      const current = await tx.query.consentGrant.findFirst({
+        where: and(
+          eq(consentGrant.chargePersonId, chargePersonId),
+          eq(consentGrant.purpose, purpose),
+          eq(consentGrant.organizationId, organizationId),
+          eq(consentGrant.lawfulBasis, 'art6_1_a'),
+        ),
+        orderBy: (g, { desc }) => [desc(g.grantedAt), desc(g.id)],
+        columns: { id: true, granted: true, withdrawnAt: true },
+      });
+
+      // Already live → leave untouched (never duplicate or weaken a valid grant).
+      if (current?.granted && !current.withdrawnAt) continue;
+
+      await tx.insert(consentGrant).values({
+        chargePersonId,
+        organizationId,
+        purpose,
+        lawfulBasis: 'art6_1_a' as const,
+        granted: true,
+        grantedAt: now,
+        auditFact: {
+          // Distinct from 'adult_self_signup' / 'adult_self_consent_repair' so
+          // getConsentAccountabilityV2 can tell an in-app re-consent acceptance
+          // from bootstrap or derived-repair provenance.
+          source: 'adult_self_acceptance',
+          termsAcceptedAt: now.toISOString(),
+          termsVersion,
+        },
+      });
+      granted.push(purpose);
+    }
+
+    return granted;
   });
 }
 

@@ -2978,7 +2978,24 @@
     "subjects": "科目",
     "subjectsLabel": "科目",
     "journal": "ジャーナル",
-    "journalLabel": "ジャーナル"
+    "journalLabel": "ジャーナル",
+    "adultSelfConsent": {
+      "title": "データの使用方法の確認",
+      "intro": "続行する前に、ご自身のアカウントに関する2つの事項について同意していただく必要があります。",
+      "platformUseHeading": "MentoMateの利用",
+      "platformUseBody": "アプリがあなたに合わせて機能するよう、アカウントと学習データ（科目、セッション、進捗状況）を処理します。",
+      "llmDisclosureHeading": "AIチュータリング",
+      "llmDisclosureBody": "AIメンターへのメッセージは、AIが返信して指導できるよう、AIモデルのプロバイダーに送信されます。あなたのデータを販売することは決してありません。",
+      "legalIntro": "同意する前に、詳細をすべてご確認ください：",
+      "termsLink": "利用規約",
+      "privacyLink": "プライバシーポリシー",
+      "accept": "同意する",
+      "submitting": "保存中…",
+      "errorTitle": "同意を保存できませんでした",
+      "errorBody": "エラーが発生しました。もう一度お試しください。",
+      "retry": "再試行",
+      "signOut": "代わりにサインアウト"
+    }
   },
   "subscription": {
     "trial": {

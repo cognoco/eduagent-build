@@ -10,6 +10,7 @@ import {
   childConsentStatusSchema,
   consentActionResultSchema,
   selfConsentWithdrawRequestSchema,
+  selfConsentAcceptResultSchema,
   consentAccountabilityReportSchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
@@ -51,9 +52,11 @@ import {
   revokeChildConsentV2,
   restoreChildConsentV2,
   withdrawAdultSelfConsentV2,
+  acceptAdultSelfConsentV2,
   getProfileConsentStateV2,
   getOrgMemberDisplayNameV2,
   ConsentReconsentRequiredError,
+  AdultSelfConsentNotEligibleError,
 } from '../services/identity-v2/consent-v2';
 import { getChildConsentForParentV2 } from '../services/identity-v2/family-v2';
 import { getConsentAccountabilityV2 } from '../services/identity-v2/consent-status-v2';
@@ -574,6 +577,95 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       }
       if (error instanceof ConsentRecordNotFoundError) {
         return notFound(c, error.message);
+      }
+      throw error;
+    }
+  })
+
+  // [WI-2547] Authenticated adult self-consent ACCEPTANCE — the write behind the
+  // mobile AdultSelfConsentGate, for an adult owner whose session bootstrap
+  // signalled `needsAdultConsent` (GET /v1/profiles). This is the ONLY
+  // user-reachable path that records an adult's own art6_1_a lawful basis;
+  // POST /learner-profile/consent is mentor-memory consent and is NOT this.
+  //
+  // The contract takes NO caller-supplied identifiers — no person, profile,
+  // organization, lawful basis, or policy version:
+  //   - `callerPersonId` is the login→person binding accountMiddleware resolves
+  //     server-side from the Clerk JWT (WI-774/WI-1302). Deliberately NOT
+  //     withProfile(c).profileId, which is the X-Profile-Id-SELECTABLE active
+  //     profile — binding there would let an account member write ANOTHER
+  //     in-account profile's adult consent (the WI-1193 IDOR).
+  //   - the organization is the authenticated account;
+  //   - the lawful basis is fixed at art6_1_a inside the service;
+  //   - termsVersion is the server's CONSENT_POLICY_VERSION binding.
+  // A cross-organization caller holds no membership row in `account.id` and so
+  // fails the eligibility gate with no write.
+  .post('/consent/self/accept', async (c) => {
+    const db = c.get('db');
+    const chargePersonId = c.get('callerPersonId');
+    if (!chargePersonId) {
+      return unauthorized(c, 'No identity is provisioned for this login.');
+    }
+
+    // Anti-spoof consistency check — NOT an input to the write. The write
+    // subject is always `chargePersonId` above; this header can never select
+    // it. Binding that way already makes a mismatched header harmless, but
+    // "harmless" is not what this route promises: recording consent while
+    // *presenting as someone else* is an authorization failure, not a silently
+    // rewritten request, so it fails CLOSED rather than succeeding against the
+    // caller's own record.
+    //
+    // The header is optional against this contract, but callers generally do
+    // send it: the mobile API client carries profile context on every request,
+    // and the self-consent mutation deliberately pins that context to the
+    // account OWNER's id so a restored managed-child selection cannot aim an
+    // owner-scoped request at a child (apps/mobile/src/hooks/
+    // use-adult-self-consent.ts). So the production shape is header == caller;
+    // a header naming anyone else is a tampered client. Checked BEFORE the
+    // service call, so a mismatch never opens a write transaction.
+    const presentedProfileId = c.req.header('X-Profile-Id');
+    if (presentedProfileId && presentedProfileId !== chargePersonId) {
+      return forbidden(c, 'This account is not eligible for self-consent.');
+    }
+
+    const account = requireAccount(c.get('account'));
+
+    // A blank/whitespace policy version would mint an UNVERSIONED acceptance
+    // fact — precisely the weak GDPR Art 5(2)/7(1) evidence
+    // repairOrSignalAdultSelfConsentV2 refuses to fabricate. The response
+    // schema's `.trim().min(1)` rejects a blank version too, but only AFTER the
+    // transaction committed, leaving a written-but-unreportable grant — so it is
+    // refused up front here, with no service call at all.
+    const termsVersion = c.env.CONSENT_POLICY_VERSION?.trim();
+    if (!termsVersion) {
+      return apiError(
+        c,
+        503,
+        ERROR_CODES.SERVICE_UNAVAILABLE,
+        'Consent policy version is not configured.',
+      );
+    }
+
+    try {
+      const purposesGranted = await acceptAdultSelfConsentV2(
+        db,
+        chargePersonId,
+        account.id,
+        termsVersion,
+      );
+      return c.json(
+        selfConsentAcceptResultSchema.parse({
+          message: 'Consent recorded.',
+          purposesGranted,
+          termsVersion,
+        }),
+      );
+    } catch (error) {
+      // Uniform fail-closed response. Deliberately does NOT distinguish minor
+      // from non-owner from unknown-person from cross-org, so the route cannot
+      // be used to enumerate account membership or ages.
+      if (error instanceof AdultSelfConsentNotEligibleError) {
+        return forbidden(c, 'This account is not eligible for self-consent.');
       }
       throw error;
     }
