@@ -83,12 +83,17 @@ jest.mock(
 
 import { NonRetriableError } from 'inngest';
 import { CONSENT_PURPOSES } from '@eduagent/schemas';
+import * as sentry from '../../services/sentry';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import {
   seedConsentState,
   type SeedConsentState,
 } from '../../test-utils/consent-seed';
 import { consentReminder } from './consent-reminders';
+
+const captureMessageSpy = jest
+  .spyOn(sentry, 'captureMessage')
+  .mockImplementation(() => undefined);
 
 interface ProfileConsentState {
   status: string;
@@ -184,6 +189,7 @@ async function executeHandler(
   // no longer has a separate code path — resolveConsentStatus is called once
   // per status-check step and statusSequence drives all calls.
   _latestAnyConsentStatusSequence: (string | null)[] = statusSequence,
+  detailsRows?: Array<{ guardianEmail: string | null; token: string | null }>,
 ): Promise<{ stepReturns: Record<string, unknown> }> {
   const eventRequestedAt =
     typeof eventData.requestedAt === 'string' ? eventData.requestedAt : null;
@@ -214,6 +220,7 @@ async function executeHandler(
   });
   seededConsentRequest.mockImplementation(mockConsentFindFirst);
   mockConsentFindMany.mockImplementation(async () => {
+    if (detailsRows) return detailsRows;
     const currentRequestMatches =
       eventRequestedAt && stateRequestedAt === eventRequestedAt;
     if (!currentRequestMatches || !profileState?.parentEmail) return [];
@@ -482,6 +489,38 @@ describe('consentReminder', () => {
       expect.anything(),
       'profile-1',
       new Date('2026-05-01T00:00:00.000Z'),
+    );
+  });
+
+  it('[WI-2386 review] escalates a suppressed legacy partial request without capturing guardian PII', async () => {
+    await executeHandler(
+      ['PENDING', 'PENDING', 'PENDING', 'PENDING'],
+      undefined,
+      undefined,
+      undefined,
+      [{ guardianEmail: 'parent@example.com', token: 'legacy-token' }],
+    );
+
+    expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(captureMessageSpy).toHaveBeenCalledTimes(3);
+    expect(captureMessageSpy).toHaveBeenCalledWith(
+      'consent-reminder: contact details suppressed',
+      expect.objectContaining({
+        level: 'warning',
+        profileId: 'profile-1',
+        extra: expect.objectContaining({
+          surface: 'consent-reminder.contact_details_suppressed',
+          reason: 'incomplete_purpose_set',
+          expectedRowCount: CONSENT_PURPOSES.length,
+          actualRowCount: 1,
+        }),
+      }),
+    );
+    expect(JSON.stringify(captureMessageSpy.mock.calls)).not.toContain(
+      'parent@example.com',
+    );
+    expect(JSON.stringify(captureMessageSpy.mock.calls)).not.toContain(
+      'legacy-token',
     );
   });
 

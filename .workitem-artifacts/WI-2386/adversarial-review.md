@@ -44,3 +44,17 @@ independently confirmed complete-set processing gates, recorded-event legacy
 transitions, non-destructive partial-grant handling, exact token supersession,
 org/basis isolation, adult purpose-specific behavior, metadata-only migration,
 and a non-vacuous guard. No round 3 is required.
+
+## Draft-PR automated review follow-up
+
+The GitHub Claude review found one valid **SHOULD FIX**: complete-set reminder
+reads suppressed legacy or internally inconsistent request rows without an
+operational escalation. The fix preserves fail-closed delivery while emitting
+a PII-free Sentry message with the suppression reason, expected/actual row
+counts, and contact/token consistency counts.
+
+TDD proof: the focused regression failed with zero captures before the fix and
+passes afterward (21/21 reminder tests). API lint, API typecheck, and the
+consent-purpose contract guard also pass. The review's two **CONSIDER** items
+were documentation suggestions for already-tested invariants, not correctness
+findings; no production behavior changed for them.

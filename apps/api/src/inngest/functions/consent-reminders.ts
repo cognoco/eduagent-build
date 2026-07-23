@@ -24,6 +24,7 @@ import {
 } from '../../services/notifications';
 import { deletePersonIfNoConsentV2 } from '../../services/identity-v2/deletion-v2';
 import { buildEmailIdempotencyKey } from '../../services/dedupe-key';
+import { captureMessage } from '../../services/sentry';
 
 // [WI-973] Schema for the app/consent.requested event payload.
 const consentRequestedEventSchema = z.object({
@@ -94,11 +95,32 @@ export const consentReminder = inngest.createFunction(
         where,
         columns: { guardianEmail: true, token: true },
       });
+      const distinctGuardianEmails = new Set(
+        rows.map((row) => row.guardianEmail),
+      );
+      const distinctTokens = new Set(rows.map((row) => row.token));
       if (
         rows.length !== CONSENT_PURPOSES.length ||
-        new Set(rows.map((row) => row.guardianEmail)).size !== 1 ||
-        new Set(rows.map((row) => row.token)).size !== 1
+        distinctGuardianEmails.size !== 1 ||
+        distinctTokens.size !== 1
       ) {
+        captureMessage('consent-reminder: contact details suppressed', {
+          level: 'warning',
+          profileId,
+          extra: {
+            surface: 'consent-reminder.contact_details_suppressed',
+            reason:
+              rows.length < CONSENT_PURPOSES.length
+                ? 'incomplete_purpose_set'
+                : rows.length > CONSENT_PURPOSES.length
+                  ? 'unexpected_extra_rows'
+                  : 'inconsistent_request_set',
+            expectedRowCount: CONSENT_PURPOSES.length,
+            actualRowCount: rows.length,
+            distinctGuardianEmailCount: distinctGuardianEmails.size,
+            distinctTokenCount: distinctTokens.size,
+          },
+        });
         return { parentEmail: null, consentToken: null };
       }
       return {
