@@ -119,6 +119,9 @@ export const PROFILE_SCOPED_TABLES: readonly string[] = [
   // Added migration 0147: mentor_notices_profile_isolation policy, in the
   // same migration that creates the profile-scoped lifecycle table.
   'mentor_notices',
+  // Added migration 0152: evidence_links_profile_isolation policy, in the
+  // same migration that creates the profile-scoped provenance table.
+  'evidence_links',
 ] as const;
 
 /**
