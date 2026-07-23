@@ -32,7 +32,9 @@ export async function pressableClick(
     let rollbackFailedDispatch: (() => void) | undefined;
     try {
       await target.scrollIntoViewIfNeeded();
-      rollbackFailedDispatch = options.beforeDispatch?.();
+      const rollback = options.beforeDispatch?.();
+      rollbackFailedDispatch =
+        typeof rollback === 'function' ? rollback : undefined;
       await target.evaluate((element) => {
         const eventDefaults = {
           bubbles: true,
