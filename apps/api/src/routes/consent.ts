@@ -607,15 +607,22 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       return unauthorized(c, 'No identity is provisioned for this login.');
     }
 
-    // Binding to `callerPersonId` already makes a spoofed X-Profile-Id
-    // harmless — it cannot change WHOSE consent is written. But "harmless" is
-    // not what this route promises: an attempt to record consent while
+    // Anti-spoof consistency check — NOT an input to the write. The write
+    // subject is always `chargePersonId` above; this header can never select
+    // it. Binding that way already makes a mismatched header harmless, but
+    // "harmless" is not what this route promises: recording consent while
     // *presenting as someone else* is an authorization failure, not a silently
     // rewritten request, so it fails CLOSED rather than succeeding against the
-    // caller's own record. The header is optional (the client normally sends
-    // none and the owner is auto-resolved); when present it must name the
-    // caller themselves. Checked BEFORE the service call, so a spoof never
-    // opens a write transaction.
+    // caller's own record.
+    //
+    // The header is optional against this contract, but callers generally do
+    // send it: the mobile API client carries profile context on every request,
+    // and the self-consent mutation deliberately pins that context to the
+    // account OWNER's id so a restored managed-child selection cannot aim an
+    // owner-scoped request at a child (apps/mobile/src/hooks/
+    // use-adult-self-consent.ts). So the production shape is header == caller;
+    // a header naming anyone else is a tampered client. Checked BEFORE the
+    // service call, so a mismatch never opens a write transaction.
     const presentedProfileId = c.req.header('X-Profile-Id');
     if (presentedProfileId && presentedProfileId !== chargePersonId) {
       return forbidden(c, 'This account is not eligible for self-consent.');

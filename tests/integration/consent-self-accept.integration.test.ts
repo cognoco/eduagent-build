@@ -7,14 +7,25 @@
  * that loop: the adult performs a real consent event and the server records one
  * `art6_1_a` grant per granular purpose with a versioned acceptance audit fact.
  *
- * The contract takes NO caller-supplied identifiers — person, organization,
- * lawful basis and policy version are all server-derived — so these cases pin
- * both the happy path and the fail-closed matrix:
+ * The contract takes NO caller-supplied identifiers — the write subject is
+ * always callerPersonId (the login→person binding), and organization, lawful
+ * basis and policy version are server-derived too. `X-Profile-Id` is NOT an
+ * input to the write: the route treats it purely as an anti-spoof consistency
+ * check, rejecting a header that is not the caller.
+ *
+ * Transport note: the shared mobile API client normally carries profile
+ * context, and useAdultSelfConsent pins that context to the loaded OWNER
+ * identity, so the production request carries a header EQUAL to the caller.
+ * Omitting the header is also valid against the server contract, but it is not
+ * the mobile path. A header naming anyone else is an attacker/tamper shape.
+ *
+ * These cases pin both the happy paths and the fail-closed matrix:
  *   - success + EXACT audit version, both granular purposes;
+ *   - header-equals-caller (the pinned production path) and no-header;
  *   - idempotent replay and concurrent submit (no duplicate rows);
  *   - already-consented adult (existing grants never duplicated or weakened);
  *   - re-consent after a withdrawal (the actual point of the flow);
- *   - minor / non-owner / cross-organization / spoofed X-Profile-Id → no write.
+ *   - minor / non-owner / cross-organization / mismatched X-Profile-Id → no write.
  */
 
 import { and, eq } from 'drizzle-orm';
@@ -430,6 +441,10 @@ describe('Integration: POST /v1/consent/self/accept (WI-2547)', () => {
     });
   });
 
+  // ATTACKER / TAMPER shape — deliberately NOT the mobile client's transport.
+  // A legitimate request carries the owner id (pinned by useAdultSelfConsent);
+  // a header naming a DIFFERENT in-account profile can only arrive from a
+  // tampered or hand-rolled client, and AC2 requires it to fail closed.
   it('[AC2] a same-org spoofed X-Profile-Id FAILS CLOSED — 403, and neither caller nor target is written', async () => {
     const owner = await createLegacyAdultOwner();
     const child = await seedDirectChildProfileForTest({
@@ -459,10 +474,49 @@ describe('Integration: POST /v1/consent/self/accept (WI-2547)', () => {
     expect(await art6Grants(owner.id)).toHaveLength(0);
   });
 
-  it('[AC2] accepts with NO X-Profile-Id header (the auto-resolved owner path)', async () => {
+  // The shape the mobile mutation actually puts on the wire. The shared API
+  // client normally carries profile context, and useAdultSelfConsent pins that
+  // context to the loaded OWNER identity so a restored managed-child selection
+  // cannot poison the request — so a header equal to callerPersonId is the
+  // production path, not an edge case.
+  it('[AC2] accepts with X-Profile-Id EQUAL to the caller — the pinned production path', async () => {
     const owner = await createLegacyAdultOwner();
 
-    // No header at all — the normal client shape.
+    const res = await acceptRequest(
+      buildAuthHeaders(
+        { sub: ADULT_USER.userId, email: ADULT_USER.email },
+        owner.id,
+      ),
+    );
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { purposesGranted: string[] };
+    expect(body.purposesGranted.sort()).toEqual([
+      'llm_disclosure',
+      'platform_use',
+    ]);
+
+    // Exactly the caller's canonical two grants — nothing more, nothing less.
+    const grants = await art6Grants(owner.id);
+    expect(grants).toHaveLength(2);
+    expect(grants.map((g) => g.purpose).sort()).toEqual([
+      'llm_disclosure',
+      'platform_use',
+    ]);
+    for (const grant of grants) {
+      expect(grant.chargePersonId).toBe(owner.id);
+      expect(grant.organizationId).toBe(owner.accountId);
+      expect(grant.granted).toBe(true);
+      expect(grant.withdrawnAt).toBeNull();
+    }
+  });
+
+  it('[AC2] accepts with NO X-Profile-Id header — a valid direct server-contract path', async () => {
+    const owner = await createLegacyAdultOwner();
+
+    // Omitting the header is a legitimate way to call the contract (the server
+    // derives everything from callerPersonId), but it is NOT what the mobile
+    // client sends — see the pinned production path above.
     const res = await acceptRequest(
       buildAuthHeaders({ sub: ADULT_USER.userId, email: ADULT_USER.email }),
     );
@@ -470,6 +524,8 @@ describe('Integration: POST /v1/consent/self/accept (WI-2547)', () => {
     expect(await art6Grants(owner.id)).toHaveLength(2);
   });
 
+  // ATTACKER / TAMPER shape (cross-organization variant) — as above, this
+  // header can only arrive from a tampered client.
   it('[AC2] an X-Profile-Id naming ANOTHER organization never writes into that org', async () => {
     const owner = await createLegacyAdultOwner();
     const otherOrgOwner = await createProfileViaRoute({

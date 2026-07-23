@@ -660,6 +660,22 @@ export async function acceptAdultSelfConsentV2(
   // Neither order can duplicate a live grant or drop a committed write, so
   // widening the lock to the withdrawal path would add contention to a shipped,
   // separately-tested code path without fixing a demonstrable defect.
+  //
+  // Accept vs. first-use REPAIR likewise stays unmerged, and the namespaces are
+  // deliberately different ('adult-consent-accept:<person>:<org>' here vs.
+  // 'adult-consent-repair:<person>'), so the two do not exclude each other. On
+  // the supported flow their write cases are mutually exclusive by
+  // construction: repair writes only in case (a) — a versioned terms fact
+  // exists and no art6_1_a grant does — whereas the gate that drives this
+  // function is raised only when repair returns 'needs_consent' (case (c),
+  // which writes nothing). If repair CAN repair, the gate never appears and
+  // this function is never called. The residual is an unsupported one: a direct
+  // API call racing a bootstrap that happens to hit case (a) could interleave
+  // two platform_use inserts. That is not reachable from the product flow and
+  // not the concurrency the AC requires (accept retry / concurrent submit,
+  // which the shared key above serialises), so merging the namespaces — which
+  // would put this path's contention onto every session bootstrap — is not
+  // justified on current evidence.
   return db.transaction(async (tx) => {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${

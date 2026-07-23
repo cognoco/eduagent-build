@@ -26,8 +26,13 @@ red-green-revert regression guard.
 >    `callerPersonId` check failed the same-org spoof case. (The cross-org case
 >    still passed without it — that one is already caught by the eligibility
 >    gate, so the same-org spoof is what this guard uniquely catches.)
+> 4. **Owner-header override removal.** Dropping the mutation's explicit
+>    `X-Profile-Id` preset — letting the shared client inject the active profile
+>    as it normally does — failed the production-shaped mobile case with
+>    `Expected "adult-owner-profile" / Received "managed-child-profile"`, which
+>    is exactly the end-to-end lockout an independent reviewer proved.
 >
-> A fourth control is structural rather than mutational: the pre-service guard
+> A further control is structural rather than mutational: the pre-service guard
 > tests run against a tripwire `db` whose every property access throws, so any
 > path reaching the service surfaces as a 500. Its negative control (a fully
 > satisfied request *does* reach the service and *does* 500) pins that the 503s
@@ -360,15 +365,37 @@ against a tripwire `db`, proving no write transaction is opened.
 
 `apps/mobile/src/hooks/use-adult-self-consent.ts`, following `use-restore-consent.ts`
 (Hono RPC + `assertOk` + `parseJson`). It calls **only** the new contract, and on success
-invalidates the **user-scoped profiles** query so `needsAdultConsent` can flip false:
+invalidates the **user-scoped profiles** query so `needsAdultConsent` can flip false.
+
+**The mutation takes no variables and chooses no caller-supplied identifier** — its public
+variable type is `void`. The server derives the write subject from `callerPersonId` and
+treats `X-Profile-Id` only as an anti-spoof consistency check.
+
+**Why it pins `X-Profile-Id` anyway (correction, post-review).** The shared API client
+normally carries profile context: it injects the persisted **active** profile as
+`X-Profile-Id` on any request that did not preset one
+(`apps/mobile/src/lib/api-client.ts`, the `!headers.has('X-Profile-Id')` branch). A guardian
+can legitimately have a managed child restored as their active profile, so that ambient
+context would put the **child's** id on this request, the server's anti-spoof check would
+reject it, and an otherwise eligible adult owner would be locked out of the gate — a 403 that
+never resolves, because the gate keeps re-presenting. The mutation therefore presets the
+header to the already-loaded **owner** identity from `ProfileProvider`. That is not the client
+choosing a subject; it is this call refusing to let a restored child selection poison an
+owner-scoped request. If no owner can be derived it fails locally through the normal mutation
+error path and sends **no** request — it never falls back to the active child.
 
 ```ts
 export function useAdultSelfConsent(): UseMutationResult<SelfConsentAcceptResult, Error, void> {
   const client = useApiClient();
   const queryClient = useQueryClient();
+  const { profiles } = useProfile();
   return useMutation({
     mutationFn: async (): Promise<SelfConsentAcceptResult> => {
-      const res = await client.consent.self.accept.$post();
+      const ownerProfileId = profiles.find((p) => p.isOwner)?.id;
+      if (!ownerProfileId) throw new AdultSelfConsentOwnerUnresolvedError();
+      const res = await client.consent.self.accept.$post(undefined, {
+        headers: { 'X-Profile-Id': ownerProfileId },
+      });
       await assertOk(res);
       return await parseJson(res, selfConsentAcceptResultSchema);
     },
@@ -380,7 +407,11 @@ export function useAdultSelfConsent(): UseMutationResult<SelfConsentAcceptResult
 ```
 
 **Verify:** hook tests — posts to the right path, parses, invalidates `['profiles']`, and
-surfaces a server failure as an error (no swallow).
+surfaces a server failure as an error (no swallow). Plus the production-shaped case: with a
+managed child published as the active profile (via `setActiveProfileId`, driving the **real**
+injection path with no internal module mock) and the owner present in the loaded profile set,
+the outgoing `X-Profile-Id` must be the **owner's** id and the body must carry no identifiers.
+Module-level active-profile state is reset between tests so the suite is order-independent.
 
 ## Step 5 — `AdultSelfConsentGate`
 

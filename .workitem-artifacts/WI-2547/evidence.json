@@ -17,7 +17,7 @@
     },
     {
       "acRef": "AC-2",
-      "description": "Spoofed X-Profile-Id fails CLOSED rather than silently succeeding against the caller's own record. The route rejects a presented X-Profile-Id that is not the caller with the uniform forbidden response BEFORE the service call, so no write transaction opens. Real-DB coverage asserts 403 with zero grants for BOTH caller and target on the same-org spoof and on the cross-org spoof, with no conditional assertions; the no-header (auto-resolved owner) and header-equals-caller happy paths both still return 200.",
+      "description": "X-Profile-Id is an anti-spoof consistency check, never an input to the write: the subject is always callerPersonId. A presented header that is not the caller is rejected with the uniform forbidden response BEFORE the service call, so no write transaction opens. Real-DB coverage asserts 403 with zero grants for BOTH caller and target on the same-org and cross-org mismatched-header cases (explicit attacker/tamper shapes, no conditional assertions), and separately covers TWO happy paths: header-equals-caller - the shape the mobile mutation pins and the production path - returning 200 and writing exactly the caller's canonical two grants, and the no-header direct server-contract path also returning 200.",
       "pointer": "tests/integration/consent-self-accept.integration.test.ts"
     },
     {
@@ -42,7 +42,7 @@
     },
     {
       "acRef": "AC-4",
-      "description": "useAdultSelfConsent posts only to /consent/self/accept and invalidates the user-scoped ['profiles'] query on success so needsAdultConsent can settle false. Tests assert the request carries no person/profile/organization/lawfulBasis identifiers, that learner-profile/consent is never called, that a double tap submits once, that a server failure leaves the gate mounted with an accessibilityRole=alert error plus retry and does not invalidate profiles, and that sign-out (the only cancel path) invokes signOutWithCleanup.",
+      "description": "useAdultSelfConsent posts only to /consent/self/accept, takes no variables (public variable type void) and chooses no caller-supplied identifier, and invalidates the user-scoped ['profiles'] query on success so needsAdultConsent can settle false. The shared API client normally carries profile context by injecting the persisted ACTIVE profile as X-Profile-Id when the call did not preset one; because a guardian can have a managed child restored as active, this mutation pins that context to the already-loaded OWNER identity from ProfileProvider so a restored child selection cannot poison an owner-scoped request and trip the server's anti-spoof check. If no owner can be derived it fails locally through the normal mutation error path and sends no request - never falling back to the active child. Tests drive the REAL injection path via setActiveProfileId (no internal module mock, GC1-clean) with module state reset between tests, and assert the outgoing header is the owner's id and not the active child's, plus endpoint-only, refetch, error/403, double-submit and mentor-memory separation.",
       "pointer": "apps/mobile/src/hooks/use-adult-self-consent.test.ts"
     },
     {
@@ -57,7 +57,7 @@
     },
     {
       "acRef": "AC-7",
-      "description": "API coverage is 13 real-DB integration cases (success, exact audit version, repaired-into-platform_use-only, idempotent replay, concurrency, already-consented, re-consent after withdrawal, minor, adult non-owner, unknown person, same-org spoof, cross-org spoof, no-header happy path) plus 9 focused route tests for the three pre-service guards. Mobile coverage is 15 cases across the gate and the mutation. The code was NOT written test-first; what was durably exercised are three negative controls, each an intentional mutation observed failing then reverted and observed passing: the purpose-blind gating substitution (failed 6 of 12 cases), the caller-binding break test (profileId instead of callerPersonId failed the spoof case), and removal of the presented-profile guard (failed the same-org spoof case).",
+      "description": "API coverage is 14 real-DB integration cases (success, exact audit version, repaired-into-platform_use-only, idempotent replay, concurrency, already-consented, re-consent after withdrawal, minor, adult non-owner, unknown person, same-org mismatched header, cross-org mismatched header, header-equals-caller happy path, no-header happy path) plus 9 focused route tests for the three pre-service guards. Mobile coverage is 9 mutation cases and 9 gate cases. The code was NOT written test-first; what was durably exercised are four negative controls, each an intentional mutation observed failing then reverted and observed passing: the purpose-blind gating substitution (failed 6 of 12 cases), the caller-binding break test (profileId instead of callerPersonId failed the spoof case), removal of the presented-profile guard (failed the same-org spoof case), and removal of the mutation's owner-header override (failed the production-shaped mobile case with received managed-child-profile instead of adult-owner-profile).",
       "pointer": "apps/api/src/routes/consent-self-accept.test.ts"
     },
     {
