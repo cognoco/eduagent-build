@@ -1,6 +1,6 @@
 # MMT-ADR-0036 — Mentor notices use bounded in-app scope and server authority for the MVP
 
-**Status:** Accepted · 2026-07-21 · amended 2026-07-22 · **Scope:** Mentor-notice eligibility, interaction lifecycle, AI contract, persistence authority, rollout, and rollback · **Decider:** MentoMate operator (interactive Product and Architecture rulings, 2026-07-21 and 2026-07-22)
+**Status:** Accepted · 2026-07-21 · amended 2026-07-22 · **Scope:** Mentor-notice eligibility, interaction lifecycle, AI contract, persistence authority, rollout, and rollback · **Deciders:** Product sign-off: MentoMate operator; Architect (Jørn Jørgensen), rulings 2026-07-21 and 2026-07-22
 
 ## Context
 
