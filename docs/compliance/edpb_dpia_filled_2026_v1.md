@@ -15,7 +15,7 @@
 | Controller | |
 | --- | --- |
 | Management units responsible for the processing inside the organisation | **ZWIZZLY AS**, org.nr **811696072**, Fiskekroken 3B, 0139 Oslo, Norway, the product/engineering organisation operating MentoMate. Single controller (no joint controllership identified in code). |
-| Main establishment / point of contact or representative | **ZWIZZLY AS**, org.nr **811696072**, Fiskekroken 3B, 0139 Oslo, Norway (EEA). Lead supervisory authority via one-stop-shop: **Norwegian Datatilsynet**. `[UK Art 27 representative — TODO if serving UK]`. |
+| Main establishment / point of contact or representative | **ZWIZZLY AS**, org.nr **811696072**, Fiskekroken 3B, 0139 Oslo, Norway (EEA). Lead supervisory authority via one-stop-shop: **Norwegian Datatilsynet**. No separate GDPR representative is required for the ruled EEA perimeter; UK representation is dormant while the UK is disabled. |
 | Information about the DPO or similar function, if applicable | **DPO appointment is a launch-blocking condition** (Art 37 assessed mandatory — regular & systematic monitoring of learners is a core activity). `[DPO name / dpo@… — TODO before launch]`. |
 
 ## 0.2 Processor(s) and sub-processor(s)
@@ -59,7 +59,7 @@ Each row is a processor confirmed **wired in code** (see §1.3 / §2.3.c for `fi
 | --- | --- |
 | Current version & version log | v0.1, 2026-06-30 — initial code-grounded completion of the EDPB 2026 template. |
 | Team conducting this DPIA | Engineering (evidence-gathering from source, `file:line`-cited); **DPO + privacy counsel own and sign** (pending appointment). |
-| Guidelines / standards used | EDPB DPIA template 2026 v1.0; WP248rev.01; GDPR Arts 5, 6, 8, 9, 13–22, 25, 28, 30, 32, 35; Datatilsynet Art 35(4) list; UK Children's Code (AADC); EU AI Act Arts 5(1)(f) & 50. Companion repo artifacts: `ropa.md`, `art9-special-category-decision.md`, `breach-response-plan.md`, `docs/meetings/minors-compliance-requirements.md`. |
+| Guidelines / standards used | EDPB DPIA template 2026 v1.0; WP248rev.01; GDPR Arts 5, 6, 8, 9, 13–22, 25, 28, 30, 32, 35; Datatilsynet Art 35(4) list; UK Children's Code (AADC, retained only as a design benchmark); EU AI Act Arts 5(1)(f) & 50. Companion repo artifacts: `ropa.md`, `art9-special-category-decision.md`, `breach-response-plan.md`, `2026-07-23-13-plus-eea-launch-country-ruling.md`. |
 | Reasons to conduct the DPIA | **Category 1 (Art 35(3)) + Category 3 (EDPB/Datatilsynet guidance).** Selected: ☒ Systematic & extensive evaluation based on automated processing incl. profiling (learner knowledge evaluation & tailoring); ☒ Evaluation/scoring incl. profiling & predicting (mastery, misconceptions, learning preferences); ☒ Sensitive/highly-personal data risk (incidental special-category in free-text — see §1.1.a); ☒ Data concerning **vulnerable data subjects (children)** — the decisive factor; ☒ Innovative use / new technology (large language models). **Three+ criteria → DPIA mandatory.** Trigger = first real child's data at scale; **the free tier is not exempt.** |
 | Scope of this DPIA | **In scope:** all personal-data processing in the live mobile app + API (auth, onboarding/age-gating, tutoring conversation, persistent learning memory, assessments/progress, guardian dashboard, billing, transactional email, error monitoring, background jobs, LLM/embedding egress). **Out of scope (cross-referenced, not re-assessed here):** the full EU AI Act high-risk provider conformity regime (deferred to ~2 Dec 2027 per the launch-gate memo; see `art9-special-category-decision.md` + the E5 launch-gate analysis); marketing/website analytics (none wired in app code). |
 | Completion date | `[TODO — DPO]` |
@@ -124,7 +124,7 @@ Data subjects: **adult Subscription-administrator/owner** (`isOwner`/`admin`), *
 | Dimension | Description |
 | --- | --- |
 | **Nature** | Collection (sign-up, conversation, voice→on-device transcription), use (LLM generation, profiling for personalisation, embeddings), storage (Neon Postgres; pgvector; on-device SecureStore for tokens), sharing/transfer (to processors in §0.2; LLM egress per turn), deletion (7-day-grace erasure + scheduled transcript purge). Technologies: large language models, vector embeddings, React Native mobile, Cloudflare Workers/Hono API, Drizzle/Neon. |
-| **Scope** | Consumer scale at launch (per `AGENTS.md`: ~88 mobile screens, large learning-data surface). Geographic: EEA (Norway seat) + UK + US, with US-resident under-13 excluded. Per data subject: continuous longitudinal learning record (a child's performance history) — high frequency, long duration. |
+| **Scope** | Consumer scale at launch (per `AGENTS.md`: ~88 mobile screens, large learning-data surface). Geographic: EEA-only, with the enabled-country list and residence-based national consent thresholds defined in `2026-07-23-13-plus-eea-launch-country-ruling.md`; UK, US, and all other non-EEA markets are disabled. Per data subject: continuous longitudinal learning record (a child's performance history) — high frequency, long duration. |
 | **Context** | B2C consumer subscription, paid by an adult; **children are a primary user group → power imbalance and heightened protection.** Controller↔subject relationship is service-provider↔consumer. **Cross-border: Yes** — almost all processors are US-based (Clerk, the LLM/embedding vendors, RevenueCat, Resend, Sentry, Inngest, Expo, Neon); Cloudflare is global-edge with no EU pin. **International transfer to a third country: Yes** — EEA→US for the processors above; mechanism per Chapter V (DPF where certified, else SCCs + TIA) — see §2.3.c. |
 
 ## 1.2 Functional description
@@ -344,7 +344,7 @@ A standard **likelihood × severity** matrix (each 1–4: Low / Medium / High / 
 | R2 | Cross-profile access | #7 (accepted, not a technical mitigation — RLS stays inert) | Low–Med | High | Med–High (unchanged from inherent) | Conditional — formally accepted per `rls-risk-acceptance-memo.md`, tracked remediation trigger |
 | R4 | US-vendor transfer | #1 | Low | High | Low | Yes once DPAs signed |
 | R5/R7 | Quote survival / notice | #3 + #6 | Low | Med | Low | Yes |
-| R6 | Age assurance | (self-declared accepted at 13+ launch) | Med | Med | Med | DPO call |
+| R6 | Age and residence assurance | Exact date of birth + habitual residence + server allowlist required; fail closed on ambiguity; DPO sets the proportionate assurance method | Med | Med | Med | DPO call |
 | R8 | I-C1 | v2 live (confirmed) | Low | High | Low | Yes |
 | R9 | Art 50 | #5 | Low | Low–Med | Low | Yes before 2 Aug 2026 |
 
@@ -362,7 +362,7 @@ Measures #1–#9 are owned across **DPO/counsel** (DPAs, TIAs, lawful-basis valu
 
 ## 5.2 Views of data subjects or their representatives
 
-Because the data subjects include **children**, direct consultation is qualified ("where appropriate", Art 35(9)). Pre-launch the controller relies on a **children's-product proxy**: applying the UK Children's Code and a child-readable privacy summary as the representation of children's interests, plus (recommended) a parent/youth-expert review panel. `[Document the panel/representative consultation — DPO.]`
+Because the data subjects include **children**, direct consultation is qualified ("where appropriate", Art 35(9)). Pre-launch the controller relies on a **children's-product proxy**: child-readable privacy information and a parent/youth-expert review panel, with the UK Children's Code retained only as a non-binding design benchmark while the UK is disabled. `[Document the panel/representative consultation — DPO.]`
 
 ---
 
@@ -372,7 +372,7 @@ Based on the assessment:
 
 ☒ **CONDITIONALLY APPROVED** *(engineering recommendation — final decision is the DPO's).* The processing may proceed only after these conditions are met:
 
-- **Condition 1 — Governance:** DPO appointed; this DPIA signed; privacy-policy pre-publish TODOs (DPO name, registered address, Art 27 rep) resolved.
+- **Condition 1 — Governance and perimeter:** DPO appointed; this DPIA signed; privacy-policy pre-publish TODOs resolved; country allowlist, exact-age/residence assurance, and launch-day legal refresh completed. UK representation remains dormant while the UK is disabled.
 - **Condition 2 — Processors & transfers:** Art 28 DPAs signed on business tier with no-training terms; per-vendor TIA; minor-Gemini exclusion confirmed at go-live.
 - **Condition 3 — Lawful-basis accountability:** a recorded lawful-basis + terms-accepted fact (incl. adults). *(The live v2 cutover that closes I-C1 is confirmed enabled, 2026-06-30 — no longer an open item.)*
 - **Condition 4 — Retention truth:** `RETENTION_PURGE_ENABLED=true` confirmed in prod; verbatim-quote age-out built or tracked; `retention_period` values set; dormancy sweep planned.

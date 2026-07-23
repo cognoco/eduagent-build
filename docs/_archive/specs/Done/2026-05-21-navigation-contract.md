@@ -17,8 +17,8 @@ This document reconciles the narrower navigation-contract draft with the FULL St
 
 ## Related documents
 
-- [`docs/audience-matrix.md`](../audience-matrix.md) — **paired current-state inventory.** ~119 scattered gating reads with F1–F14 findings; this spec closes F5, F6, F7, F8, F11.
-- [`docs/flows/flow-master-directory.md`](../flows/flow-master-directory.md) — flow register that cites this spec from per-flow detail pages.
+- [`docs/compliance/audience-matrix.md`](../../../compliance/audience-matrix.md) — **paired current-state inventory.** ~119 scattered gating reads with F1–F14 findings; this spec closes F5, F6, F7, F8, F11.
+- [`docs/flows/flow-master-directory.md`](../../../flows/flow-master-directory.md) — flow register that cites this spec from per-flow detail pages.
 - `CLAUDE.md` — "Profile Shapes" section is authoritative for **current (V0)** tab shapes (`guardian` / `learner`). This spec describes the **target (FULL)** shapes (`study` / `family`); the V0 → FULL mapping is in the "Decision" section below. Until `resolveNavigationContract` ships, CLAUDE.md's two-shape rule (`guardian` / `learner` — no third shape) governs production code.
 
 > **V0 vs target — important signpost.** This document targets `study` / `family` tab shapes. CLAUDE.md describes today's `guardian` / `learner` shapes. Both are "two shapes" but in **different universes**: V0 is what production renders today; FULL is what the contract migrates to. The MEMORY.md rule "NEVER add a third shape" applies to V0 — it does not forbid the V0 → FULL transition described here.
@@ -576,7 +576,7 @@ Server-backed `profiles.default_app_context` + `hasFamilyLinks` shipped via migr
 - Migrate deep-route guards to `canEnter()`.
 - Add child curriculum route from Family surfaces.
 
-Absorbed into [`docs/_archive/plans/done/2026-05-24-navigation-contract-phase-6-completion-plan.md`](../_archive/plans/done/2026-05-24-navigation-contract-phase-6-completion-plan.md) as its PR 3 (More + Progress) and PR 4 (deep-route guards + child curriculum). Commit refs:
+Absorbed into [`docs/_archive/plans/done/2026-05-24-navigation-contract-phase-6-completion-plan.md`](../../plans/done/2026-05-24-navigation-contract-phase-6-completion-plan.md) as its PR 3 (More + Progress) and PR 4 (deep-route guards + child curriculum). Commit refs:
 
 - More gates: `2c07944a4 refactor(mobile): route More-screen gates through navigation contract for V0+V1`
 - Progress refactor: `d8b288011 refactor(mobile): extract progress screen components and view-models`; `b6a2e3e93 fix(mobile): show child pills without own-profile pill in Family Progress`

@@ -27,6 +27,12 @@ date: '2025-12-11'
 **Date:** 2025-12-11
 **Version:** 1.0 (BMAD Standard)
 
+> **Current age/compliance overlay (2026-07-23):** Product bands and launch
+> geography are governed by
+> [`docs/compliance/2026-07-23-13-plus-eea-launch-country-ruling.md`](compliance/2026-07-23-13-plus-eea-launch-country-ruling.md).
+> Any older 11+ floor, UK/US launch scope, or jurisdiction-neutral consent
+> wording in this PRD is superseded.
+
 ---
 
 ## Executive Summary
@@ -389,13 +395,15 @@ Ask Anything starts without a required topic. It can resolve or ask for a subjec
 
 ### Age & Compliance Requirements
 
-**Minimum Age:** 11 years old
+**Minimum Age:** 13 years old at launch
 - Conversational AI works better with older learners
 - Can sustain 20-30 minute sessions
 - Can learn independently (parents don't need to hover)
 
-**GDPR Compliance (Ages 11-15 in EU):**
-- Parental consent required for users aged 11-15 in EU countries
+**GDPR Compliance (Minors aged 13–17 in enabled EEA countries):**
+- Block every user under 13
+- Apply the national Article 8 threshold for the user's habitual-residence country
+- Require verified guardian authorization only where the learner is below that national threshold
 - Parent email collection during registration
 - Consent email with approve/decline links
 - Pending consent state (child cannot start until parent approves)
@@ -403,11 +411,9 @@ Ask Anything starts without a required topic. It can resolve or ask for a subjec
 - Account deletion flow (GDPR right to erasure)
 - Data export capability
 
-**COPPA Compliance (Ages 11-12 in US):**
-- Verifiable parental consent required for users aged 11-12 in US
-- Same consent workflow as GDPR (email verification)
-- Cannot collect personal data before consent obtained
-- Parent must be able to review and delete child's data
+**COPPA posture:**
+- Dormant at launch because all under-13 users and every non-EEA country are disabled
+- Any later US or under-13 launch requires a separate country/product ruling and COPPA-grade implementation
 - Clear privacy policy in child-accessible language
 
 **Consent Decline Flow:**
@@ -947,9 +953,10 @@ Ask Anything starts without a required topic. It can resolve or ask for a subjec
 
 **Privacy:**
 - System must comply with GDPR (account deletion, data export, parental consent)
-- System must verify user age (11+ minimum)
-- System must require parental consent for users aged 11-15 in EU
-- System must not collect PII from minors without parental consent
+- System must verify exact age against the 13+ launch floor
+- System must record and enforce the enabled-country allowlist
+- System must require verified guardian authorization when a 13–17-year-old is below the national Article 8 threshold
+- System must not collect PII from minors without applicable self-consent or guardian authorization
 
 **API Security:**
 - System must implement rate limiting per user and IP address
@@ -1691,8 +1698,8 @@ BYOK allows power users who already have AI subscriptions (Claude Pro, ChatGPT P
 | Requirement | Implementation |
 |-------------|---------------|
 | GDPR Compliance | Account deletion, data export, parental consent |
-| Age Verification | 11+ minimum, birthdate validation |
-| Parental Consent | Required for ages 11-15 in EU |
+| Age Verification | 13+ minimum, exact birth-date validation |
+| Parental Consent | Required when a 13–17-year-old is below the enabled residence country's Article 8 threshold |
 | Data Retention | User data deleted within 30 days of account deletion request |
 | Cookie Consent | EU cookie banner (web only) |
 | Privacy Policy | Available during registration |

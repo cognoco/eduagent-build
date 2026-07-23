@@ -15,7 +15,7 @@ login model this entry used to spell out is now ratified canon.
 
 **Navigation IA (NOT identity canon — different owner):** the parent→My-Learning path,
 Family-Hub-default landing, and the "Viewing &lt;child&gt;" context-switch live in
-`docs/audience-matrix.md` + the tab-set source of truth `apps/mobile/src/lib/navigation-contract.ts`.
+`docs/compliance/audience-matrix.md` + the tab-set source of truth `apps/mobile/src/lib/navigation-contract.ts`.
 
 **Durable agent caution (the reason this entry exists):** MentoMate is **not** a kids-only app —
 do not flatten it into "a children's learning app with parent controls." Keep family-review and

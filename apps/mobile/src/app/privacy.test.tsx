@@ -118,7 +118,7 @@ describe('PrivacyPolicyScreen', () => {
 
   it('keeps the repository HTML notice blocked on external evidence', () => {
     const policyHtml = readFileSync(
-      join(__dirname, '../../../../docs/privacy-policy.html'),
+      join(__dirname, '../../../../docs/compliance/privacy-policy.html'),
       'utf8',
     );
 
@@ -129,6 +129,13 @@ describe('PrivacyPolicyScreen', () => {
     );
     expect(policyHtml).toContain(
       'Before any international transfer of learner data occurs',
+    );
+    expect(policyHtml).toContain(
+      'Within enabled EEA countries, the age at which a minor may consent',
+    );
+    expect(policyHtml).toContain('country of habitual residence');
+    expect(policyHtml).not.toContain(
+      'first launch perimeter includes only countries whose current threshold is 13',
     );
   });
 });

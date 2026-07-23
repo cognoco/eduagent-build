@@ -140,7 +140,7 @@ _This document is **L1 canon** — the authoritative *what* of how the system is
 | **Data privacy & compliance** | **Consent state machine**: `PENDING → PARENTAL_CONSENT_REQUESTED → CONSENTED → WITHDRAWN`, enforced at repository layer (no data access without CONSENTED). **Deletion orchestrator**: knows every table and external system, anonymizes immediately, full deletion within 30 days, idempotent/retryable steps. | Full stack |
 | **Error boundaries & graceful degradation** | Per-dependency circuit breakers with specific thresholds: **LLM providers** — trip after 3 consecutive 5xx/timeouts within 30-second window, half-open after 60s (one probe request). Tight window intentional — 30s wait is already bad UX in tutoring. **OCR** — no circuit breaker; single-request 5s timeout, immediate text input fallback (failures are per-image, not systemic). **Stripe** — no circuit breaker; webhook delays are normal. Check subscription from local DB (webhook-synced), never call Stripe during learning session. 3-day grace period per PRD. **Neon** — if DB is down, almost nothing works. Cache coaching card + Library on client after each successful load, show with "limited mode" banner. Don't build elaborate fallbacks — invest in Neon reliability instead. | Full stack |
 | **Observability** | Structured JSON logging via `services/logger.ts`, compatible with Workers Logpush and `wrangler tail`. No Axiom SDK integration. Every LLM call logged: model, tokens in/out, latency, context hash, routing decision, cost. SM-2 decisions logged: card, interval, ease factor, grade. | Backend |
-| **i18n** | English-only UI for v1.0 — no i18n framework implemented. Multi-language UI deferred. Backend: English only. Learning languages: any (via LLM). RTL deferred. | Frontend |
+| **i18n** | Seven UI locales are implemented (`en`, `de`, `es`, `ja`, `nb`, `pl`, `pt`); tutor-prose languages are an intentional ten-language superset. Locale availability is not country launch clearance. RTL is deferred. | Frontend |
 
 ### Consumer Family Compliance Boundary
 
@@ -1458,7 +1458,7 @@ Different concerns: rate limiting protects infrastructure, quota metering enforc
 
 **i18n — two distinct concerns:**
 
-1. **UI translations**: English only for v1.0 — no i18n framework implemented. Multi-language UI (react-i18next + locale files) is deferred. The original architecture planned `apps/mobile/assets/locales/{en,de}/*.json` via react-i18next, but this was not built for the MVP market pivot to English-only.
+1. **UI translations**: react-i18next and seven UI locales are implemented (`en`, `de`, `es`, `ja`, `nb`, `pl`, `pt`). Tutor-prose supports three additional languages (`cs`, `fr`, `it`). The current launch-country allowlist is governed separately by `docs/compliance/2026-07-23-13-plus-eea-launch-country-ruling.md`; a UI locale never authorizes a market.
 2. **LLM language preference**: NOT i18n infrastructure. The learner's preferred language is a field on their profile (`preferredLanguage`), injected into the system prompt during prompt assembly in `services/exchanges.ts`. The LLM responds in the learner's language naturally. This is a prompt construction concern, not a translation file concern.
 
 **Test data co-location:**

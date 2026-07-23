@@ -47,7 +47,13 @@ walkthrough (2026-06-03) + the Phase-E filler walkthrough (2026-06-04), preserve
   language. A static-analysis CI guard fails on prohibited vocabulary. *Basis:* EU AI Act emotion-recognition
   prohibition.
 
-## C-3 — Online Safety Act (OSA)
+## C-3 — Online Safety Act (OSA) — dormant launch regime
+
+The United Kingdom is disabled by the
+[`13+ EEA launch-country ruling`](2026-07-23-13-plus-eea-launch-country-ruling.md).
+The existing OSA-derived guards remain useful global minimization controls, but
+OSA and UK-representative work are not part of the ruled v1 launch perimeter.
+Any future UK enablement reopens the full UK legal review.
 
 - **Two forward-only OSA guards.** (a) **No verbatim learner quote in the guardian-visible schema** — a
   guardian/supporter view never surfaces a child's verbatim message text. (b) the dated OSA note (the second
@@ -76,9 +82,10 @@ walkthrough (2026-06-03) + the Phase-E filler walkthrough (2026-06-04), preserve
 
 ## C-5 — DPIA / governance launch gate
 
-- **DPIA complete before the first real child; DPO appointment mandatory.** A Data Protection Impact
+- **DPIA complete before the first real minor; DPO appointment mandatory.** A Data Protection Impact
   Assessment must be complete before the first real consent-gated child is onboarded, and a Data Protection
-  Officer must be appointed. **This gates launch.** *Basis:* UK Children's Code + UK/EU GDPR Art 35.
+  Officer must be appointed. **This gates launch.** *Basis:* GDPR Arts 35 and 37. UK-specific duties are
+  dormant while the UK is disabled.
 
 ---
 
@@ -86,7 +93,12 @@ walkthrough (2026-06-03) + the Phase-E filler walkthrough (2026-06-04), preserve
 
 | Parameter | v1 value | Owner |
 |---|---|---|
-| Signup age floor | **13+** (the v1 launch floor; any-age charge lawful with VPC, but v1 ships 13+ pending app-store rating) | product + counsel |
+| Product age brackets | **0–12 unavailable; 13–17 minor; 18+ adult.** These product bands do not replace national Article 8 consent thresholds. | product + counsel |
+| Signup age floor | **13+ in every enabled country.** No guardian workaround admits an under-13 user at v1. | product + counsel |
+| EEA country perimeter | **All 30 EEA countries**, subject to common launch gates, national review, localization, and implementation of the applicable consent band. An allowlist entry is not a legal-safety guarantee. | product + DPO/counsel |
+| Residence-based consent gate | Apply the national Article 8 threshold by habitual residence: 13 → self-consent from 13; 14 → guardian at 13; 15 → guardian at 13–14; 16 → guardian at 13–15. France requires joint child + parental consent below 15. | product + DPO/counsel |
+| Live-law rechecks | **NO and PT** require launch-day review of active legislation. Update the threshold policy or fail closed if the law has changed. | product + DPO/counsel |
+| Country exclusions | **GB denylisted**; all other non-EEA countries disabled until separately ruled. | product + DPO/counsel |
 | Dormancy → cleanup | **~24 months** inactivity, **30-day** pre-deletion notice + export window | counsel |
 | Moved-country grace window | parameter, value *(counsel)* | counsel |
 | Retention periods (consent receipt / deletion audit / financial record) | *(counsel fills `retention_period`)* | counsel |
@@ -102,4 +114,6 @@ walkthrough (2026-06-03) + the Phase-E filler walkthrough (2026-06-04), preserve
   child-AI-chatbot regs) — counsel-owned.
 - VPC vendor selection (KWS vs k-ID) + platform Age-Signals timing — procurement, after legal requirements
   are clear.
-- The real age floor (per-jurisdiction + app-store rating) — product + counsel.
+- The EEA residence/threshold policy engine, verified guardian flow, Portugal
+  and Norway live-law checks, and any non-EEA market — the EEA controls follow
+  the launch-country ruling; every non-EEA market requires a separate ruling.

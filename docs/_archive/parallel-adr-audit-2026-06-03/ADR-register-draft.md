@@ -582,7 +582,7 @@ Each item below was a genuine spec-vs-spec disagreement (or an evolution chain).
 - **Files covered:** all 82 specs under `docs/_archive/specs/` (incl. 3 `deferred/`, 2 root, and `email-digest-channel.md` which the first batch pass missed — folded in as [[AUTH-25]]).
 - **Decisions recorded:** ~190 across 14 domains; cross-batch duplicates merged; 11 conflicts/supersession chains resolved against code in §1.
 - **Code-verified ground-truth deltas worth a follow-up cleanup of stale doc prose:** auto-file threshold is 3 not 5 ([[C-1]]); session effective modes are `freeform|learning` only — `practice`/`review` both gone ([[C-5]]); `topic_notes` is multi-note ([[C-3]]); V0 helpers now in `legacy-navigation-contract.ts` not `_layout.tsx` (CLAUDE.md drift, [[C-6]]).
-- **Not yet folded in:** live `docs/specs/**` (e.g. the navigation-contract target spec), `docs/audience-matrix.md`, and `docs/architecture.md`. Several "Draft" entries here have since shipped — a code-status reconciliation pass (mark each Draft → Implemented/Dropped against the current tree) should follow before this register is treated as authoritative.
+- **Not yet folded in:** live `docs/specs/**` (e.g. the navigation-contract target spec), `docs/compliance/audience-matrix.md`, and `docs/architecture.md`. Several "Draft" entries here have since shipped — a code-status reconciliation pass (mark each Draft → Implemented/Dropped against the current tree) should follow before this register is treated as authoritative.
 
 ---
 
@@ -740,7 +740,7 @@ Second pass over `docs/_archive/plans/` (123 files, ~98K lines). The index confi
 - **Biggest register gap closed by the plans pass:** **Challenge Round** (CR-01..25) — a shipped subsystem with no spec.
 - **Code-verified stale-doc deltas (from §1) still worth a cleanup:** auto-file threshold 3 not 5 ([[C-1]]); session effective modes `freeform|learning` only ([[C-5]]); `topic_notes` multi-note ([[C-3]]); V0 nav helpers in `legacy-navigation-contract.ts` ([[C-6]]).
 - **Plan-time supersessions to note:** interview screen deleted ([[ONB-P2]]) supersedes the interview half of [[ONB-05]]/[[TEACH-01]]; mentor-language axis collapsed ([[I18N-P1]]); LLM-first OCR ([[OCR-P2]]) supersedes the shape-heuristic gate ([[OCR-P1]]).
-- **Not yet folded in:** live `docs/specs/**`, `docs/audience-matrix.md`, `docs/architecture.md`, and the CLAUDE.md-referenced Challenge Round policy text (now partially reconstructable from CR-*). Many §4 entries are "Designed" — a code-status reconciliation pass (Designed → Implemented/Dropped against the current tree) should precede treating this register as authoritative.
+- **Not yet folded in:** live `docs/specs/**`, `docs/compliance/audience-matrix.md`, `docs/architecture.md`, and the CLAUDE.md-referenced Challenge Round policy text (now partially reconstructable from CR-*). Many §4 entries are "Designed" — a code-status reconciliation pass (Designed → Implemented/Dropped against the current tree) should precede treating this register as authoritative.
 
 ---
 
