@@ -8,7 +8,11 @@ import {
   topicNotes,
   type Database,
 } from '@eduagent/database';
-import type { VerifiedProofReceipt } from '@eduagent/schemas';
+import type {
+  EvidenceAvailability,
+  VerifiedEvidenceQuote,
+  VerifiedProofReceipt,
+} from '@eduagent/schemas';
 import {
   assertChargeNotCredentialed,
   assertParentAccess,
@@ -27,6 +31,15 @@ import { getArtifactEvidenceAvailability } from './evidence-links';
 // only — past the window the quote reads back as null and the existing
 // degradation branch below renders the abstracted line instead.
 const QUOTE_AGE_OUT_DAYS = 30;
+
+function verifiedEvidenceQuote(
+  evidenceAvailability: EvidenceAvailability,
+  quote: string | null,
+): VerifiedEvidenceQuote {
+  return evidenceAvailability === 'available'
+    ? { evidenceAvailability, quote }
+    : { evidenceAvailability, quote: null };
+}
 
 /**
  * The verified artifact for one exact Recap session/topic. Unlike the home
@@ -119,10 +132,6 @@ export async function getVerifiedProofForSessionTopic(
     subjectId: verified.subjectId,
     sessionId: verified.sessionId,
     verifiedAt: verified.verifiedAt.toISOString(),
-    quote:
-      note.createdAt.getTime() >= quoteAgeOutCutoff.getTime()
-        ? note.content
-        : null,
     masteryVerificationState: resolveMasteryVerificationState({
       verifiedAt: verified.verifiedAt,
       newWeakSpotRows: weakSpotRows,
@@ -135,7 +144,12 @@ export async function getVerifiedProofForSessionTopic(
         })
       : undefined,
     nextReviewDate: retentionCard?.nextReviewAt?.toISOString(),
-    evidenceAvailability,
+    ...verifiedEvidenceQuote(
+      evidenceAvailability,
+      note.createdAt.getTime() >= quoteAgeOutCutoff.getTime()
+        ? note.content
+        : null,
+    ),
   };
 }
 
@@ -248,7 +262,6 @@ export async function getLatestVerifiedProofForChild(
     // persisted for this round (e.g. finalize only produced a fallback
     // prompt) — the card still shows the verified fact, never a fabricated
     // quote or a fallback to raw transcript.
-    quote: noteRow[0]?.content ?? null,
     masteryVerificationState: resolveMasteryVerificationState({
       verifiedAt: latest.verifiedAt,
       newWeakSpotRows: weakSpotRows,
@@ -261,6 +274,6 @@ export async function getLatestVerifiedProofForChild(
           nextReviewAt: retentionCard[0].nextReviewAt?.toISOString() ?? null,
         })
       : undefined,
-    evidenceAvailability,
+    ...verifiedEvidenceQuote(evidenceAvailability, noteRow[0]?.content ?? null),
   };
 }

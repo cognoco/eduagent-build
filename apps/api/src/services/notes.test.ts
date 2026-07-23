@@ -29,6 +29,7 @@ import {
   getNotesForTopic,
   getTopicIdsWithNotes,
 } from './notes';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 // ---------------------------------------------------------------------------
 // Shared stub factory
@@ -64,6 +65,10 @@ interface StubConfig {
   queryFindMany?: StubRow[][];
   /** Whether tx.execute() (advisory lock) should resolve (default true) */
   txExecuteOk?: boolean;
+  /** Observe an UPDATE predicate for ownership/authorization assertions. */
+  onUpdateWhere?: (condition: unknown) => void;
+  /** Observe a DELETE predicate for ownership/authorization assertions. */
+  onDeleteWhere?: (condition: unknown) => void;
 }
 
 type ChainCall = { [k: string]: (...args: unknown[]) => any };
@@ -77,18 +82,30 @@ function makeInsertChain(rows: StubRow[]): ChainCall {
   return chain;
 }
 
-function makeUpdateChain(rows: StubRow[]): ChainCall {
+function makeUpdateChain(
+  rows: StubRow[],
+  onWhere?: (condition: unknown) => void,
+): ChainCall {
   const chain: ChainCall = {
     set: () => chain,
-    where: () => chain,
+    where: (condition: unknown) => {
+      onWhere?.(condition);
+      return chain;
+    },
     returning: async () => rows,
   };
   return chain;
 }
 
-function makeDeleteChain(rows: StubRow[]): ChainCall {
+function makeDeleteChain(
+  rows: StubRow[],
+  onWhere?: (condition: unknown) => void,
+): ChainCall {
   const chain: ChainCall = {
-    where: () => chain,
+    where: (condition: unknown) => {
+      onWhere?.(condition);
+      return chain;
+    },
     returning: async () => rows,
   };
   return chain;
@@ -173,11 +190,11 @@ function makeDbStub(config: StubConfig): Parameters<typeof listAllNotes>[0] {
     },
     update: () => {
       const rows = updateBatches.shift() ?? [];
-      return makeUpdateChain(rows);
+      return makeUpdateChain(rows, config.onUpdateWhere);
     },
     delete: () => {
       const rows = deleteBatches.shift() ?? [];
-      return makeDeleteChain(rows);
+      return makeDeleteChain(rows, config.onDeleteWhere);
     },
     query: queryProxy,
     transaction: async (cb: (tx: unknown) => Promise<unknown>) => {
@@ -372,6 +389,38 @@ describe('listAllNotes — ISO date formatting', () => {
     expect(typeof result.notes[0]!.updatedAt).toBe('string');
     expect(result.notes[0]!.createdAt).toBe(testDate.toISOString());
   });
+
+  it('normalizes rollout-era null metadata as learner-authored/unverified', async () => {
+    const testDate = new Date('2026-03-15T10:30:00.000Z');
+    const db = makeDbStub({
+      selectMany: [
+        [
+          {
+            id: 'note-rollout',
+            topicId: 'topic-1',
+            topicTitle: 'Topic',
+            bookId: 'book-1',
+            bookTitle: 'Book',
+            subjectId: 'subject-1',
+            subjectName: 'Subject',
+            sessionId: null,
+            content: 'Compatible writer note',
+            artifactSource: null,
+            verificationState: 'unverified',
+            createdAt: testDate,
+            updatedAt: testDate,
+          },
+        ],
+      ],
+    });
+
+    const result = await listAllNotes(db, 'profile-1');
+
+    expect(result.notes[0]).toMatchObject({
+      artifactSource: 'learner_authored_note',
+      verificationState: 'unverified',
+    });
+  });
 });
 
 describe('listAllNotes — session_id schema drift fallback', () => {
@@ -518,6 +567,27 @@ describe('updateNote — profile isolation', () => {
     expect(result.content).toBe('updated content');
   });
 
+  it('refuses to update server-owned or verified artifacts', async () => {
+    let capturedWhere: unknown;
+    const db = makeDbStub({
+      updateReturning: [[]],
+      onUpdateWhere: (condition) => {
+        capturedWhere = condition;
+      },
+    });
+
+    await expect(
+      updateNote(db, 'profile-1', 'note-123', 'new content'),
+    ).rejects.toThrow('Note not found');
+
+    const rendered = new PgDialect().sqlToQuery(capturedWhere as never);
+    expect(rendered.sql).toMatch(/"artifact_source"\s*=\s*\$\d+/);
+    expect(rendered.sql).toMatch(/"verification_state"\s*=\s*\$\d+/);
+    expect(rendered.params).toEqual(
+      expect.arrayContaining(['learner_authored_note', 'unverified']),
+    );
+  });
+
   // [BUG-391] NoteRow mapper — neon-serverless returns Date objects for
   // timestamp columns; the mapper must normalise them to ISO 8601 strings
   // so callers always receive the API-contract shape regardless of whether
@@ -563,5 +633,26 @@ describe('deleteNoteById — profile isolation', () => {
     const db = makeDbStub({ deleteReturning: [[{ id: 'note-123' }]] });
     const deleted = await deleteNoteById(db, 'profile-1', 'note-123');
     expect(deleted).toBe(true);
+  });
+
+  it('refuses to delete server-owned or verified artifacts', async () => {
+    let capturedWhere: unknown;
+    const db = makeDbStub({
+      deleteReturning: [[]],
+      onDeleteWhere: (condition) => {
+        capturedWhere = condition;
+      },
+    });
+
+    await expect(deleteNoteById(db, 'profile-1', 'note-123')).resolves.toBe(
+      false,
+    );
+
+    const rendered = new PgDialect().sqlToQuery(capturedWhere as never);
+    expect(rendered.sql).toMatch(/"artifact_source"\s*=\s*\$\d+/);
+    expect(rendered.sql).toMatch(/"verification_state"\s*=\s*\$\d+/);
+    expect(rendered.params).toEqual(
+      expect.arrayContaining(['learner_authored_note', 'unverified']),
+    );
   });
 });

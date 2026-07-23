@@ -8,6 +8,7 @@ import {
   sessionSummaries,
   bookmarks,
   evidenceLinks,
+  topicNotes,
   needsDeepeningTopics,
   onboardingDrafts,
   parkingLotItems,
@@ -38,6 +39,14 @@ export function createSessionRepository(
         return db.query.learningSessions.findFirst({
           where: scopedWhere(learningSessions, extraWhere),
         });
+      },
+      async findId(extraWhere?: SQL): Promise<{ id: string } | undefined> {
+        const [row] = await db
+          .select({ id: learningSessions.id })
+          .from(learningSessions)
+          .where(scopedWhere(learningSessions, extraWhere))
+          .limit(1);
+        return row;
       },
       /**
        * Return topicIds this profile has *meaningfully completed* in a
@@ -138,6 +147,25 @@ export function createSessionRepository(
         return db.query.bookmarks.findFirst({
           where: scopedWhere(bookmarks, extraWhere),
         });
+      },
+      async findId(extraWhere?: SQL): Promise<{ id: string } | undefined> {
+        const [row] = await db
+          .select({ id: bookmarks.id })
+          .from(bookmarks)
+          .where(scopedWhere(bookmarks, extraWhere))
+          .limit(1);
+        return row;
+      },
+    },
+
+    topicNotes: {
+      async findId(extraWhere?: SQL): Promise<{ id: string } | undefined> {
+        const [row] = await db
+          .select({ id: topicNotes.id })
+          .from(topicNotes)
+          .where(scopedWhere(topicNotes, extraWhere))
+          .limit(1);
+        return row;
       },
     },
 

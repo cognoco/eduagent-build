@@ -1,6 +1,6 @@
 {
-  "id": "0d27d3a1-2e37-4f61-a733-e6be31f22e7f",
-  "prevId": "4a13c202-c822-4a84-a55c-956215a942ca",
+  "id": "ab696a6c-d03c-4499-97c9-9c7099a2bf6b",
+  "prevId": "4aa478d4-0b5b-48a8-973f-b4b555ef9c97",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -3147,8 +3147,7 @@
           "name": "purpose",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'platform_use'"
+          "notNull": true
         },
         "requested_basis": {
           "name": "requested_basis",
@@ -9674,7 +9673,7 @@
           "name": "artifact_source",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "default": "'learner_authored_note'"
         },
         "verification_state": {

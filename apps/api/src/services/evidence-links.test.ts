@@ -1,9 +1,15 @@
 import {
+  bookmarks,
   evidenceLinks,
+  learningSessions,
   sessionEvents,
   topicNotes,
   type Database,
 } from '@eduagent/database';
+import type {
+  EvidenceLinkFromKind,
+  EvidenceLinkToKind,
+} from '@eduagent/schemas';
 
 import { BadRequestError } from '../errors';
 import {
@@ -26,14 +32,14 @@ const CREATED_AT = new Date('2026-07-22T12:00:00.000Z');
 type EvidenceRow = {
   id: string;
   profileId: string;
-  fromKind: 'artifact';
+  fromKind: EvidenceLinkFromKind;
   fromId: string;
-  toKind: 'transcript_excerpt';
+  toKind: EvidenceLinkToKind;
   toId: string;
   createdAt: Date;
 };
 
-type SessionEventRow = {
+type SourceRow = {
   id: string;
   profileId: string;
   content: string;
@@ -81,9 +87,12 @@ function tableName(table: unknown): string | undefined {
 
 function createEvidenceReadDb(state: {
   links: EvidenceRow[];
-  events: SessionEventRow[];
-}): { db: Database; selectedSessionEventFields: string[][] } {
-  const selectedSessionEventFields: string[][] = [];
+  events: SourceRow[];
+  notes?: SourceRow[];
+  bookmarks?: SourceRow[];
+  sessions?: SourceRow[];
+}): { db: Database; selectedSourceFields: string[][] } {
+  const selectedSourceFields: string[][] = [];
 
   const db = {
     query: {
@@ -101,17 +110,27 @@ function createEvidenceReadDb(state: {
     },
     select: (selection: Record<string, unknown>) => ({
       from: (table: unknown) => {
-        if (table !== sessionEvents) {
+        const sourceRows =
+          table === sessionEvents
+            ? state.events
+            : table === topicNotes
+              ? (state.notes ?? [])
+              : table === bookmarks
+                ? (state.bookmarks ?? [])
+                : table === learningSessions
+                  ? (state.sessions ?? [])
+                  : undefined;
+        if (!sourceRows) {
           throw new Error(
             `Unexpected direct select from ${tableName(table) ?? 'unknown table'}`,
           );
         }
-        selectedSessionEventFields.push(Object.keys(selection));
+        selectedSourceFields.push(Object.keys(selection));
         return {
           where: (where: unknown) => ({
             limit: async (limit: number) => {
               const values = new Set(boundStringValues(where));
-              return state.events
+              return sourceRows
                 .filter(
                   (row) => values.has(row.id) && values.has(row.profileId),
                 )
@@ -126,7 +145,7 @@ function createEvidenceReadDb(state: {
 
   return {
     db: db as unknown as Database,
-    selectedSessionEventFields,
+    selectedSourceFields,
   };
 }
 
@@ -310,7 +329,7 @@ describe('verified Challenge artifact persistence', () => {
 
 describe('evidence-link availability reads', () => {
   it('reports available while returning no transcript body', async () => {
-    const { db, selectedSessionEventFields } = createEvidenceReadDb({
+    const { db, selectedSourceFields } = createEvidenceReadDb({
       links: [evidenceRow()],
       events: [
         {
@@ -335,7 +354,69 @@ describe('evidence-link availability reads', () => {
       availability: 'available',
     });
     expect(resolution).not.toHaveProperty('content');
-    expect(selectedSessionEventFields).toEqual([['id'], ['id']]);
+    expect(selectedSourceFields).toEqual([['id'], ['id']]);
+  });
+
+  it.each([
+    ['note', 'notes'],
+    ['bookmark', 'bookmarks'],
+    ['homework_ocr', 'sessions'],
+  ] as const)(
+    'resolves an available %s target without selecting its content',
+    async (toKind, stateKey) => {
+      const link = evidenceRow({ toKind });
+      const { db, selectedSourceFields } = createEvidenceReadDb({
+        links: [link],
+        events: [],
+        [stateKey]: [
+          {
+            id: EVENT_ID,
+            profileId: PROFILE_ID,
+            content: 'must not leave the target store',
+          },
+        ],
+      });
+
+      await expect(
+        resolveEvidenceLink(db, {
+          ...link,
+          createdAt: CREATED_AT.toISOString(),
+        }),
+      ).resolves.toEqual({
+        evidenceLinkId: LINK_ID,
+        toKind,
+        availability: 'available',
+      });
+      expect(selectedSourceFields).toEqual([['id']]);
+    },
+  );
+
+  it('resolves exchange-to-note citations with directional endpoint kinds', async () => {
+    const link = evidenceRow({
+      fromKind: 'exchange',
+      toKind: 'note',
+    });
+    const { db } = createEvidenceReadDb({
+      links: [link],
+      events: [],
+      notes: [
+        {
+          id: EVENT_ID,
+          profileId: PROFILE_ID,
+          content: 'learner-authored note',
+        },
+      ],
+    });
+
+    await expect(
+      resolveEvidenceLink(db, {
+        ...link,
+        createdAt: CREATED_AT.toISOString(),
+      }),
+    ).resolves.toMatchObject({
+      toKind: 'note',
+      availability: 'available',
+    });
   });
 
   it('reports source_unavailable when the transcript target was purged', async () => {

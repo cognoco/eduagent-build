@@ -15,6 +15,7 @@ import { consentStatusSchema } from './consent';
 import { struggleStatusSchema } from './struggle-status';
 import { retentionStatusSchema } from './retention-status.ts';
 import { isoDateField } from './common';
+import { verifiedEvidenceQuoteSchema } from './evidence-links';
 // [SC-04] Canonical session-type and engagement-signal enums — import instead of redefining inline.
 // Imported from the ./session-enums.ts leaf (not ./sessions) to avoid a circular
 // import: sessions.ts imports celebration schemas from this file.
@@ -951,17 +952,28 @@ export type ChildSessionDetailResponse = z.infer<
 >;
 
 // GET /dashboard/children/:profileId/verified-proof
-export const verifiedProofResponseSchema = z.object({
-  hasProof: z.boolean(),
-  topicId: z.string().uuid().optional(),
-  topicTitle: z.string().optional(),
-  subjectId: z.string().uuid().optional(),
-  sessionId: z.string().uuid().optional(),
-  verifiedAt: isoDateField.optional(),
-  quote: z.string().nullable(),
-  masteryVerificationState: z.enum(['unverified', 'fresh', 'stale']).optional(),
-  retentionStatus: z.enum(['strong', 'fading', 'weak', 'forgotten']).optional(),
-});
+export const verifiedProofResponseSchema = z.union([
+  z.object({
+    hasProof: z.literal(false),
+    quote: z.null(),
+  }),
+  z
+    .object({
+      hasProof: z.literal(true),
+      topicId: z.string().uuid().optional(),
+      topicTitle: z.string().optional(),
+      subjectId: z.string().uuid().optional(),
+      sessionId: z.string().uuid().optional(),
+      verifiedAt: isoDateField.optional(),
+      masteryVerificationState: z
+        .enum(['unverified', 'fresh', 'stale'])
+        .optional(),
+      retentionStatus: z
+        .enum(['strong', 'fading', 'weak', 'forgotten'])
+        .optional(),
+    })
+    .and(verifiedEvidenceQuoteSchema),
+]);
 export type VerifiedProofResponse = z.infer<typeof verifiedProofResponseSchema>;
 
 // Curated memory view schema — shared contract for API and mobile memory UI.

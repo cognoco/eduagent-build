@@ -2,7 +2,8 @@ import {
   eq,
   and,
   inArray,
-  notInArray,
+  isNull,
+  or,
   sql,
   desc,
   lt,
@@ -31,10 +32,6 @@ import * as learningTextGuard from './persisted-learning-text-guard';
 
 const MAX_NOTES_PER_TOPIC = 50;
 const POSTGRES_UNDEFINED_COLUMN = '42703';
-const CHALLENGE_EVIDENCE_SOURCES: NoteArtifactSource[] = [
-  'challenge_solid_quote',
-  'challenge_drafted_note',
-];
 
 const logger = createLogger();
 
@@ -42,15 +39,20 @@ const logger = createLogger();
  * Raw DB row shape returned by neon-serverless for timestamp columns.
  * Not exported — internal to this module only.
  */
-type NoteRow = {
+type RawNoteRow = {
   id: string;
   topicId: string;
   sessionId: string | null;
   content: string;
-  artifactSource: string;
+  artifactSource: string | null;
   verificationState: string;
   createdAt: Date;
   updatedAt: Date;
+};
+
+type NoteRow = Omit<RawNoteRow, 'artifactSource' | 'verificationState'> & {
+  artifactSource: NoteArtifactSource;
+  verificationState: ArtifactVerificationState;
 };
 
 /**
@@ -79,11 +81,36 @@ type AllNoteRow = Omit<
   AllNote,
   'artifactSource' | 'verificationState' | 'createdAt' | 'updatedAt'
 > & {
-  artifactSource: string;
+  artifactSource: string | null;
   verificationState: string;
   createdAt: Date;
   updatedAt: Date;
 };
+
+function normalizeNoteArtifactSource(
+  artifactSource: string | null | undefined,
+): NoteArtifactSource {
+  return (artifactSource ?? 'learner_authored_note') as NoteArtifactSource;
+}
+
+function normalizeNoteVerificationState(
+  verificationState: string | null | undefined,
+): ArtifactVerificationState {
+  return (verificationState ?? 'unverified') as ArtifactVerificationState;
+}
+
+function learnerVisibleNoteSourcePredicate(): SQL {
+  return or(
+    isNull(topicNotes.artifactSource),
+    eq(topicNotes.artifactSource, 'learner_authored_note'),
+  ) as SQL;
+}
+
+function artifactSourcePredicate(artifactSource: NoteArtifactSource): SQL {
+  return artifactSource === 'learner_authored_note'
+    ? learnerVisibleNoteSourcePredicate()
+    : eq(topicNotes.artifactSource, artifactSource);
+}
 
 function isMissingTopicNotesSessionIdColumn(error: unknown): boolean {
   const code =
@@ -149,14 +176,22 @@ async function withTopicNotesSessionIdFallback<T>(
  * Normalise a raw Drizzle NoteRow (neon-serverless returns Date objects for
  * timestamp columns) to the API-contract shape with ISO 8601 strings.
  */
-function mapNoteRow(row: NoteRow): MappedNoteRow {
+function normalizeRawNoteRow(row: RawNoteRow): NoteRow {
+  return {
+    ...row,
+    artifactSource: normalizeNoteArtifactSource(row.artifactSource),
+    verificationState: normalizeNoteVerificationState(row.verificationState),
+  };
+}
+
+function mapNoteRow(row: RawNoteRow): MappedNoteRow {
   return {
     id: row.id,
     topicId: row.topicId,
     sessionId: row.sessionId,
     content: row.content,
-    artifactSource: row.artifactSource as NoteArtifactSource,
-    verificationState: row.verificationState as ArtifactVerificationState,
+    artifactSource: normalizeNoteArtifactSource(row.artifactSource),
+    verificationState: normalizeNoteVerificationState(row.verificationState),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -206,7 +241,7 @@ async function insertNoteWithCap(
     // Artifact metadata is part of a note's idempotency identity: a verified
     // artifact must never collapse into an unverified learner-authored note.
     if (options.dedupeExactSessionContent && values.sessionId) {
-      const artifactSourceMatch = eq(topicNotes.artifactSource, artifactSource);
+      const artifactSourceMatch = artifactSourcePredicate(artifactSource);
       const [existingForSession] = await tx
         .select({
           id: topicNotes.id,
@@ -239,7 +274,7 @@ async function insertNoteWithCap(
         and(
           eq(topicNotes.topicId, values.topicId),
           eq(topicNotes.profileId, values.profileId),
-          notInArray(topicNotes.artifactSource, CHALLENGE_EVIDENCE_SOURCES),
+          learnerVisibleNoteSourcePredicate(),
         ),
       );
     if (countRow && Number(countRow.count) >= MAX_NOTES_PER_TOPIC) {
@@ -341,13 +376,21 @@ export async function getNote(
       and(
         eq(topicNotes.topicId, topicId),
         eq(topicNotes.profileId, profileId),
-        notInArray(topicNotes.artifactSource, CHALLENGE_EVIDENCE_SOURCES),
+        learnerVisibleNoteSourcePredicate(),
       ),
     )
     .orderBy(desc(topicNotes.updatedAt))
     .limit(1);
 
-  return row ?? null;
+  return row
+    ? {
+        ...row,
+        artifactSource: normalizeNoteArtifactSource(row.artifactSource),
+        verificationState: normalizeNoteVerificationState(
+          row.verificationState,
+        ),
+      }
+    : null;
 }
 
 /**
@@ -404,7 +447,7 @@ async function selectNotesForTopicIds(
   topicIds: string[],
   includeSessionId: boolean,
 ): Promise<NoteRow[]> {
-  return db
+  const rows: RawNoteRow[] = await db
     .select({
       id: topicNotes.id,
       topicId: topicNotes.topicId,
@@ -420,10 +463,12 @@ async function selectNotesForTopicIds(
       and(
         inArray(topicNotes.topicId, topicIds),
         eq(topicNotes.profileId, profileId),
-        notInArray(topicNotes.artifactSource, CHALLENGE_EVIDENCE_SOURCES),
+        learnerVisibleNoteSourcePredicate(),
       ),
     )
     .orderBy(desc(topicNotes.createdAt));
+
+  return rows.map(normalizeRawNoteRow);
 }
 
 /**
@@ -443,7 +488,7 @@ export async function getTopicIdsWithNotes(
     .where(
       and(
         eq(topicNotes.profileId, profileId),
-        notInArray(topicNotes.artifactSource, CHALLENGE_EVIDENCE_SOURCES),
+        learnerVisibleNoteSourcePredicate(),
       ),
     );
 
@@ -463,7 +508,7 @@ export async function listAllNotes(
   const conditions: SQL[] = [
     eq(topicNotes.profileId, profileId),
     eq(subjects.profileId, profileId),
-    notInArray(topicNotes.artifactSource, CHALLENGE_EVIDENCE_SOURCES),
+    learnerVisibleNoteSourcePredicate(),
   ];
 
   if (options.subjectId) {
@@ -488,8 +533,8 @@ export async function listAllNotes(
   return {
     notes: page.map((row) => ({
       ...row,
-      artifactSource: row.artifactSource as NoteArtifactSource,
-      verificationState: row.verificationState as ArtifactVerificationState,
+      artifactSource: normalizeNoteArtifactSource(row.artifactSource),
+      verificationState: normalizeNoteVerificationState(row.verificationState),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     })),
@@ -580,11 +625,16 @@ export async function updateNote(
     .update(topicNotes)
     .set({
       content,
-      artifactSource: 'learner_authored_note',
-      verificationState: 'unverified',
       updatedAt: new Date(),
     })
-    .where(and(eq(topicNotes.id, noteId), eq(topicNotes.profileId, profileId)))
+    .where(
+      and(
+        eq(topicNotes.id, noteId),
+        eq(topicNotes.profileId, profileId),
+        eq(topicNotes.artifactSource, 'learner_authored_note'),
+        eq(topicNotes.verificationState, 'unverified'),
+      ),
+    )
     .returning({
       id: topicNotes.id,
       topicId: topicNotes.topicId,
@@ -607,7 +657,14 @@ export async function deleteNoteById(
 ): Promise<boolean> {
   const result = await db
     .delete(topicNotes)
-    .where(and(eq(topicNotes.id, noteId), eq(topicNotes.profileId, profileId)))
+    .where(
+      and(
+        eq(topicNotes.id, noteId),
+        eq(topicNotes.profileId, profileId),
+        eq(topicNotes.artifactSource, 'learner_authored_note'),
+        eq(topicNotes.verificationState, 'unverified'),
+      ),
+    )
     .returning({ id: topicNotes.id });
 
   return result.length > 0;
@@ -635,7 +692,7 @@ async function selectNotesForTopic(
   topicId: string,
   includeSessionId: boolean,
 ): Promise<NoteRow[]> {
-  return db
+  const rows: RawNoteRow[] = await db
     .select({
       id: topicNotes.id,
       topicId: topicNotes.topicId,
@@ -651,8 +708,10 @@ async function selectNotesForTopic(
       and(
         eq(topicNotes.topicId, topicId),
         eq(topicNotes.profileId, profileId),
-        notInArray(topicNotes.artifactSource, CHALLENGE_EVIDENCE_SOURCES),
+        learnerVisibleNoteSourcePredicate(),
       ),
     )
     .orderBy(desc(topicNotes.createdAt));
+
+  return rows.map(normalizeRawNoteRow);
 }

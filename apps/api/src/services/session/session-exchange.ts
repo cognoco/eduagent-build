@@ -835,14 +835,30 @@ function buildFallbackDraft(
  * here should only happen if an answer row becomes unreadable between that
  * claim and the note-draft guard.
  */
+function wholeEventVerifiedSolidItems(
+  evaluations: ChallengeRoundEvaluationItem[],
+): ChallengeRoundEvaluationItem[] {
+  const nonSolidEventIds = new Set(
+    evaluations
+      .filter((item) => item.result !== 'solid')
+      .map((item) => item.answerEventId),
+  );
+  return evaluations.filter(
+    (item) =>
+      item.result === 'solid' && !nonSolidEventIds.has(item.answerEventId),
+  );
+}
+
 async function fetchVerifiedSolidContents(
   db: Database,
   profileId: string,
   sessionId: string,
   evaluations: ChallengeRoundEvaluationItem[],
 ): Promise<string[] | null> {
-  const solidItems = evaluations.filter((item) => item.result === 'solid');
-  if (solidItems.length === 0) return [];
+  const allSolidItems = evaluations.filter((item) => item.result === 'solid');
+  const solidItems = wholeEventVerifiedSolidItems(evaluations);
+  if (allSolidItems.length === 0) return [];
+  if (solidItems.length === 0) return null;
   try {
     const verified = await validateEvaluationEventIds(
       db,
@@ -866,9 +882,7 @@ function buildValidatedDraft(
   verifiedSolidContents: string[] | null,
 ): DraftedChallengeNote | undefined {
   const solidEventIds = new Set(
-    evaluations
-      .filter((item) => item.result === 'solid')
-      .map((item) => item.answerEventId),
+    wholeEventVerifiedSolidItems(evaluations).map((item) => item.answerEventId),
   );
   const solidAnswerEventIds = Array.from(solidEventIds);
   if (!noteDraft) {
@@ -1374,12 +1388,11 @@ export async function finalizeChallengeRoundIfReady(
     verifiedSolidContents,
   );
 
-  // Persist each DB-confirmed solid answer as its own verified artifact. This
-  // is deliberately independent of the whole-round outcome: a partial round
-  // can still have a concept-grain solid explanation, but consumers must not
-  // promote it to topic proof unless the topic verification state permits it.
+  // Persist only DB-confirmed solid answers whose whole source event is solid.
+  // If the same event also carries partial/misconception/missing content, the
+  // unsliced event cannot safely become verified evidence.
   if (verifiedSolidContents !== null) {
-    const solidItems = evaluations.filter((item) => item.result === 'solid');
+    const solidItems = wholeEventVerifiedSolidItems(evaluations);
     await safeWrite(
       async () => {
         await persistVerifiedChallengeArtifacts(db, {

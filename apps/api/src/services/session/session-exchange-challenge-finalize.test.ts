@@ -1454,6 +1454,26 @@ describe('finalizeChallengeRoundIfReady — verified-proof persistence', () => {
     },
   ];
 
+  const SAME_EVENT_MIXED_EVALS: ChallengeRoundEvaluationItem[] = [
+    {
+      concept: 'photosynthesis',
+      result: 'solid',
+      evidence: 'Correctly described light-to-chemical energy conversion.',
+      answerEventId: ANSWER_EVENT_ID,
+      learnerQuote:
+        'Plants convert light into energy, and chlorophyll is in the roots.',
+    },
+    {
+      concept: 'chlorophyll location',
+      result: 'misconception',
+      evidence: 'Incorrectly placed chlorophyll in roots.',
+      answerEventId: ANSWER_EVENT_ID,
+      learnerQuote:
+        'Plants convert light into energy, and chlorophyll is in the roots.',
+      correction: 'Chlorophyll is located in chloroplasts.',
+    },
+  ];
+
   const solidSourcedNoteDraft: ChallengeRoundNoteDraftHint = {
     content: 'Plants convert light into chemical energy.',
     source_concepts: ['photosynthesis'],
@@ -1553,6 +1573,46 @@ describe('finalizeChallengeRoundIfReady — verified-proof persistence', () => {
       },
     ]);
     expect(state.evidenceLinkRows).toHaveLength(1);
+  });
+
+  it('does not verify a whole answer event that also carries a misconception', async () => {
+    const challengeRound = draftingState(SAME_EVENT_MIXED_EVALS);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+      sessionEventRows: [
+        {
+          id: ANSWER_EVENT_ID,
+          profileId: PROFILE_ID,
+          sessionId: SESSION_ID,
+          eventType: 'user_message',
+          content:
+            'Plants convert light into energy, and chlorophyll is in the roots.',
+        },
+      ],
+    };
+    const db = makeFakeDb(state);
+    const session = makeSession(state.sessionMetadata);
+    const noteDraft: ChallengeRoundNoteDraftHint = {
+      content:
+        'Plants convert light into energy, and chlorophyll is in the roots.',
+      source_concepts: ['photosynthesis'],
+      source_answer_event_ids: [ANSWER_EVENT_ID],
+    };
+
+    const outcome = await finalizeChallengeRoundIfReady(
+      db,
+      PROFILE_ID,
+      session,
+      challengeRound,
+      noteDraft,
+    );
+
+    expect(outcome?.draftedNote?.body).toBeNull();
+    expect(state.artifactRows).toEqual([]);
+    expect(state.evidenceLinkRows).toEqual([]);
   });
 
   it('persists the verified solid quote when draftedNote.body is null', async () => {

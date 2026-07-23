@@ -1,6 +1,9 @@
 import { Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import type { VerifiedProofResponse } from '@eduagent/schemas';
+import type {
+  EvidenceAvailability,
+  VerifiedProofResponse,
+} from '@eduagent/schemas';
 
 import { formatShortDate } from '../../lib/format-datetime';
 import type { TranslateKey } from '../../i18n/types';
@@ -27,6 +30,7 @@ export function VerifiedProofBlock({
   topicTitle,
   verifiedAt,
   quote,
+  evidenceAvailability,
   verificationState,
   retentionStatus,
   nextReviewDate,
@@ -35,6 +39,7 @@ export function VerifiedProofBlock({
   topicTitle: string;
   verifiedAt: string;
   quote: string | null;
+  evidenceAvailability: EvidenceAvailability;
   verificationState?: VerificationState | null;
   retentionStatus?: RetentionStatus | null;
   nextReviewDate?: string | null;
@@ -47,6 +52,7 @@ export function VerifiedProofBlock({
   const retentionLabel = retentionStatus
     ? t(RETENTION_LABEL_KEYS[retentionStatus])
     : null;
+  const availableQuote = evidenceAvailability === 'available' ? quote : null;
 
   return (
     <>
@@ -60,12 +66,12 @@ export function VerifiedProofBlock({
         {stateLabel ? ` · ${stateLabel}` : null}
         {retentionLabel ? ` · ${retentionLabel}` : null}
       </Text>
-      {quote ? (
+      {availableQuote ? (
         <Text
           className="text-body-sm text-text-primary mt-2"
           style={{ fontStyle: 'italic' }}
         >
-          “{quote}”
+          “{availableQuote}”
         </Text>
       ) : (
         <Text className="text-caption text-text-secondary mt-2">

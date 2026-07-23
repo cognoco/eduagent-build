@@ -6,6 +6,10 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import type {
+  EvidenceLinkFromKind,
+  EvidenceLinkToKind,
+} from '@eduagent/schemas';
 import { person } from './identity';
 import { generateUUIDv7 } from '../utils/uuid';
 
@@ -21,9 +25,9 @@ export const evidenceLinks = pgTable(
     profileId: uuid('profile_id')
       .notNull()
       .references(() => person.id, { onDelete: 'cascade' }),
-    fromKind: text('from_kind').notNull(),
+    fromKind: text('from_kind').$type<EvidenceLinkFromKind>().notNull(),
     fromId: uuid('from_id').notNull(),
-    toKind: text('to_kind').notNull(),
+    toKind: text('to_kind').$type<EvidenceLinkToKind>().notNull(),
     toId: uuid('to_id').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()

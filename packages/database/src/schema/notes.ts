@@ -21,11 +21,10 @@ export const topicNotes = pgTable(
       onDelete: 'set null',
     }),
     content: text('content').notNull(),
-    // Artifact source and verification state are required after the migration's
-    // ordered backfill. SQL CHECK constraints own the narrow persisted vocabulary.
-    artifactSource: text('artifact_source')
-      .notNull()
-      .default('learner_authored_note'),
+    // Keep nullable during the compatible-writer rollout: the previously
+    // deployed Worker explicitly writes NULL. The default covers new writers;
+    // readers normalize legacy/null rows until a later contraction migration.
+    artifactSource: text('artifact_source').default('learner_authored_note'),
     verificationState: text('verification_state')
       .notNull()
       .default('unverified'),

@@ -1,3 +1,5 @@
+import type { VerifiedEvidenceQuote } from './evidence-links.ts';
+
 /**
  * Service-layer receipt for a verified-learning proof, shared between the
  * parent-proof resolver (which produces it) and the recap derivation (which
@@ -10,16 +12,20 @@
  * inlined here to keep the schema package free of any dependency on API service
  * code.
  */
-export interface VerifiedProofReceipt {
-  hasProof: boolean;
+interface VerifiedProofMetadata {
   topicId?: string;
   topicTitle?: string;
   subjectId?: string;
   sessionId?: string;
   verifiedAt?: string;
-  quote: string | null;
-  evidenceAvailability?: 'available' | 'source_unavailable';
   masteryVerificationState?: 'unverified' | 'fresh' | 'stale';
   retentionStatus?: 'strong' | 'fading' | 'weak' | 'forgotten';
   nextReviewDate?: string;
 }
+
+export type VerifiedProofReceipt =
+  | {
+      hasProof: false;
+      quote: null;
+    }
+  | ({ hasProof: true } & VerifiedProofMetadata & VerifiedEvidenceQuote);

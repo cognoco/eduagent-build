@@ -148,6 +148,81 @@ describe('getVerifiedProofForSessionTopic', () => {
     ).resolves.toEqual({ hasProof: false, quote: null });
   });
 
+  it('keeps the verified fact but suppresses a fresh note with no evidence link', async () => {
+    const db = fakeDbByTable(
+      new Map<unknown, unknown[]>([
+        [assessments, verifiedAssessmentRows()],
+        [
+          topicNotes,
+          [
+            {
+              id: ARTIFACT_ID,
+              content: 'Fresh but ungrounded note text.',
+              createdAt: new Date(),
+            },
+          ],
+        ],
+        [needsDeepeningTopics, []],
+        [retentionCards, retentionRows()],
+        [evidenceLinks, []],
+      ]),
+    );
+
+    await expect(
+      getVerifiedProofForSessionTopic(db, PROFILE_ID, SESSION_ID, TOPIC_ID),
+    ).resolves.toMatchObject({
+      hasProof: true,
+      topicId: TOPIC_ID,
+      verifiedAt: VERIFIED_AT.toISOString(),
+      quote: null,
+      evidenceAvailability: 'source_unavailable',
+    });
+  });
+
+  it('keeps the verified fact but suppresses a fresh note whose target was purged', async () => {
+    const db = fakeDbByTable(
+      new Map<unknown, unknown[]>([
+        [assessments, verifiedAssessmentRows()],
+        [
+          topicNotes,
+          [
+            {
+              id: ARTIFACT_ID,
+              content: 'Fresh note whose transcript target is gone.',
+              createdAt: new Date(),
+            },
+          ],
+        ],
+        [needsDeepeningTopics, []],
+        [retentionCards, retentionRows()],
+        [
+          evidenceLinks,
+          [
+            {
+              id: '10000000-0000-4000-8000-000000000001',
+              profileId: PROFILE_ID,
+              fromKind: 'artifact',
+              fromId: ARTIFACT_ID,
+              toKind: 'transcript_excerpt',
+              toId: EVENT_ID,
+              createdAt: new Date(),
+            },
+          ],
+        ],
+        [sessionEvents, []],
+      ]),
+    );
+
+    await expect(
+      getVerifiedProofForSessionTopic(db, PROFILE_ID, SESSION_ID, TOPIC_ID),
+    ).resolves.toMatchObject({
+      hasProof: true,
+      topicId: TOPIC_ID,
+      quote: null,
+      evidenceAvailability: 'source_unavailable',
+    });
+  });
+
   it('keeps proof metadata but ages the marked note quote out after 30 days', async () => {
     const agedCreatedAt = new Date();
     agedCreatedAt.setUTCDate(agedCreatedAt.getUTCDate() - 31);

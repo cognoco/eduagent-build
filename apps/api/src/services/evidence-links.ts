@@ -1,7 +1,9 @@
 import { and, eq } from 'drizzle-orm';
 import {
+  bookmarks,
   createScopedRepository,
   evidenceLinks,
+  learningSessions,
   sessionEvents,
   topicNotes,
   type Database,
@@ -22,9 +24,9 @@ export async function recordArtifactEvidenceLinks(
     .values(
       sourceEventIds.map((toId) => ({
         profileId: params.profileId,
-        fromKind: 'artifact',
+        fromKind: 'artifact' as const,
         fromId: params.artifactId,
-        toKind: 'transcript_excerpt',
+        toKind: 'transcript_excerpt' as const,
         toId,
       })),
     )
@@ -135,26 +137,23 @@ export async function getArtifactEvidenceAvailability(
 }
 
 /**
- * Resolve only whether a transcript target still exists for this profile.
- * Intentionally returns no transcript content, so a dangling evidence link
- * becomes an honest unavailable-source state rather than a privacy fallback.
+ * Resolve only whether the cited learner source still exists for this profile.
+ * Intentionally returns no source content, so a dangling evidence link becomes
+ * an honest unavailable-source state rather than a privacy fallback.
  */
 export async function resolveEvidenceLink(
   db: Database,
   link: EvidenceLink,
 ): Promise<EvidenceLinkResolution> {
-  if (link.toKind !== 'transcript_excerpt') {
-    return {
-      evidenceLinkId: link.id,
-      toKind: link.toKind,
-      availability: 'source_unavailable',
-    };
-  }
-
   const repo = createScopedRepository(db, link.profileId);
-  const target = await repo.sessionEvents.findId(
-    eq(sessionEvents.id, link.toId),
-  );
+  const target =
+    link.toKind === 'note'
+      ? await repo.topicNotes.findId(eq(topicNotes.id, link.toId))
+      : link.toKind === 'bookmark'
+        ? await repo.bookmarks.findId(eq(bookmarks.id, link.toId))
+        : link.toKind === 'homework_ocr'
+          ? await repo.sessions.findId(eq(learningSessions.id, link.toId))
+          : await repo.sessionEvents.findId(eq(sessionEvents.id, link.toId));
 
   return {
     evidenceLinkId: link.id,

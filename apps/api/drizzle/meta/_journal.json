@@ -1058,6 +1058,13 @@
       "when": 1784764598371,
       "tag": "0152_wi2386_consent_purpose_required",
       "breakpoints": true
+    },
+    {
+      "idx": 153,
+      "version": "7",
+      "when": 1784789746470,
+      "tag": "0153_strong_quicksilver",
+      "breakpoints": true
     }
   ]
 }

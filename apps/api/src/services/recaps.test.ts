@@ -55,6 +55,7 @@ import {
   evidenceLinks,
   needsDeepeningTopics,
   retentionCards,
+  sessionEvents,
   sessionSummaries,
   topicNotes,
   type Database,
@@ -73,6 +74,8 @@ const ORGANIZATION_ID = 'c0000000-0000-4000-8000-000000000001';
 const VISIBLE_CHILD = 'a0000000-0000-4000-8000-000000000010';
 const HIDDEN_CHILD = 'a0000000-0000-4000-8000-000000000020';
 const RECAP_ID = 'b0000000-0000-4000-8000-000000000100';
+const ARTIFACT_ID = 'e0000000-0000-4000-8000-000000000001';
+const EVENT_ID = 'f0000000-0000-4000-8000-000000000001';
 
 const db = {} as Database;
 
@@ -444,7 +447,10 @@ describe('getRecapForParent — verified-proof enrichment', () => {
     mockGetChildSessionDetail.mockResolvedValue(topicSessionRow(RECAP_ID));
   });
 
-  function proofDb(noteCreatedAt = new Date()): Database {
+  function proofDb(
+    noteCreatedAt = new Date(),
+    targetAvailable = true,
+  ): Database {
     return fakeProofDb(
       new Map<unknown, unknown[]>([
         [sessionSummaries, []],
@@ -464,11 +470,27 @@ describe('getRecapForParent — verified-proof enrichment', () => {
           topicNotes,
           [
             {
+              id: ARTIFACT_ID,
               content: 'Equivalent fractions name the same amount.',
               createdAt: noteCreatedAt,
             },
           ],
         ],
+        [
+          evidenceLinks,
+          [
+            {
+              id: '10000000-0000-4000-8000-000000000001',
+              profileId: VISIBLE_CHILD,
+              fromKind: 'artifact',
+              fromId: ARTIFACT_ID,
+              toKind: 'transcript_excerpt',
+              toId: EVENT_ID,
+              createdAt: new Date(),
+            },
+          ],
+        ],
+        [sessionEvents, targetAvailable ? [{ id: EVENT_ID }] : []],
         [needsDeepeningTopics, []],
         [
           retentionCards,
@@ -507,6 +529,7 @@ describe('getRecapForParent — verified-proof enrichment', () => {
       verificationState: 'fresh',
       retentionStatus: 'strong',
       nextReviewDate: nextReviewAt.toISOString(),
+      evidenceAvailability: 'available',
       quote: 'Equivalent fractions name the same amount.',
     });
   });
@@ -553,6 +576,23 @@ describe('getRecapForParent — verified-proof enrichment', () => {
       verifiedAt: verifiedAt.toISOString(),
       verificationState: 'fresh',
       nextReviewDate: nextReviewAt.toISOString(),
+      quote: null,
+    });
+  });
+
+  it('keeps recap proof metadata but nulls the quote when evidence was purged', async () => {
+    const recap = await getRecapForParent(
+      proofDb(new Date(), false),
+      PARENT_ID,
+      RECAP_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
+
+    expect(recap?.verifiedProof).toMatchObject({
+      topicId: topicSessionRow(RECAP_ID).topicId,
+      verifiedAt: verifiedAt.toISOString(),
+      evidenceAvailability: 'source_unavailable',
       quote: null,
     });
   });
