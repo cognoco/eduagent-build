@@ -2862,6 +2862,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       extendedWaitUntil?: {
         visible?: { id?: string } | string;
         optional?: boolean;
+        timeout?: number;
       };
       takeScreenshot?: string;
     }>;
@@ -2875,8 +2876,9 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         index > processing &&
         typeof extendedWaitUntil?.visible === 'object' &&
         extendedWaitUntil.visible.id ===
-          '^(?:result-text-input|try-camera-again-button)$' &&
-        extendedWaitUntil.optional !== true,
+          '^(?:result-text-input|manual-input|retry-button)$' &&
+        extendedWaitUntil.optional !== true &&
+        (extendedWaitUntil.timeout ?? 0) >= 50000,
     );
     const receipt = commands.findIndex(
       ({ takeScreenshot }, index) =>

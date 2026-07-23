@@ -22,7 +22,7 @@
 #   - apps/mobile/src/components/home/LearnerScreen.tsx (home-action-homework)
 #   - apps/mobile/src/app/(app)/homework/camera.tsx (gallery-button,
 #     photo-preview, camera-use-this-button, camera-cancel-ocr,
-#     result-text-input, try-camera-again-button)
+#     result-text-input, manual-input, retry-button)
 appId: com.mentomate.app
 tags:
   - nightly
@@ -95,10 +95,10 @@ tags:
 
 # OCR outcome depends on emulator image content and live OCR availability.
 # Require either the populated OCR result editor or the supported manual
-# fallback error UI before capturing the terminal receipt.
+# fallback / safety-timeout error UI before capturing the terminal receipt.
 - extendedWaitUntil:
     visible:
-      id: '^(?:result-text-input|try-camera-again-button)$'
-    timeout: 35000
+      id: '^(?:result-text-input|manual-input|retry-button)$'
+    timeout: 50000
 
 - takeScreenshot: homework-gallery-05-ocr-outcome
