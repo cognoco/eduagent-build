@@ -46,7 +46,7 @@ Resume only after the deterministic Cosmo CLI can reach Notion REST; rerun fetch
   fixture surfaces now operate on the complete set or take an explicit purpose.
 - Approval/revoke/restore are transactionally serialized with the existing
   per-person advisory lock; dual-connection integration tests are green.
-- Added metadata-only migration 0151 to drop the request-purpose default; no
+- Added metadata-only migration 0152 to drop the request-purpose default; no
   existing row or grant is rewritten or inferred.
 - Whole-repo guard and its 8 tests are green.
 - Full API unit gate: 473 suites passed; 8,971 tests passed, 11 skipped.
@@ -98,3 +98,13 @@ Resume only after the deterministic Cosmo CLI can reach Notion REST; rerun fetch
   2026-07-23 01:51+02:00: Stage=Executing, State=Active,
   Claimed By=`builder:codex:WI-2386`, Fixed In empty, Claim Expires=
   `July 23, 2026 02:38`, Claim Expired=false.
+
+## 2026-07-23 — current-main reconciliation
+
+- `origin/main` advanced from the dispatched base through `a153dcd55`; neither
+  WI-2127 nor WI-2128 landed in that interval.
+- Merged current `origin/main` without rewriting branch history.
+- Re-generated the consent migration as 0152 after main claimed 0151 for the
+  mentor-notice status change. The regenerated SQL remains the same
+  metadata-only `DROP DEFAULT`, while snapshot 0152 now incorporates both the
+  landed mentor-notice schema and this consent schema change.

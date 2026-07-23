@@ -65,7 +65,7 @@ describe('consent purpose contract guard [WI-2386]', () => {
     const migration = readFileSync(
       resolve(
         __dirname,
-        '../apps/api/drizzle/0151_wi2386_consent_purpose_required.sql',
+        '../apps/api/drizzle/0152_wi2386_consent_purpose_required.sql',
       ),
       'utf8',
     ).trim();

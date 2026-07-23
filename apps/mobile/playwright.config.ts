@@ -200,6 +200,7 @@ export default defineConfig({
     },
     {
       name: 'smoke-learner',
+      retries: 0,
       dependencies: ['setup'],
       testMatch: /flows[\\/]journeys[\\/]j01-.*\.spec\.ts/,
       use: {

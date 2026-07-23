@@ -1,5 +1,5 @@
 {
-  "id": "936d9f48-fd85-4736-ab2a-8a125c27cee9",
+  "id": "44407865-4a53-4bac-965b-aa2012319c41",
   "prevId": "8426bedc-6a89-4b60-88d4-e5f81733d2e8",
   "version": "7",
   "dialect": "postgresql",
@@ -2973,7 +2973,8 @@
           "name": "purpose",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "'platform_use'"
         },
         "requested_basis": {
           "name": "requested_basis",
@@ -12774,7 +12775,7 @@
     "public.mentor_notice_status": {
       "name": "mentor_notice_status",
       "schema": "public",
-      "values": ["open", "locked_in", "dismissed", "faded"]
+      "values": ["open", "locked_in", "dismissed", "faded", "not_yet"]
     }
   },
   "schemas": {},

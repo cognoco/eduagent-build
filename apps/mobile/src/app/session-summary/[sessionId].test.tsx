@@ -663,24 +663,41 @@ describe('SessionSummaryScreen', () => {
     screen.getByText(/strong independent thinking/);
   });
 
-  it('renders a persisted mentor notice receipt after reload', async () => {
-    mockSessionSummaryData = {
-      ...BASE_MOCK_SUMMARY,
-      mentorNotice: {
-        id: '550e8400-e29b-41d4-a716-446655440099',
-        concept: 'changing signs',
-        correctionHint: 'Apply the inverse operation to both sides.',
-      },
-    };
+  // [WI-2499 AC-5] The receipt renders only the server-accepted scrubbed
+  // concept and optional correction hint, with age- and source-neutral copy —
+  // same rendering for both eligible source types (an ordinary learning
+  // session and a homework session), and never an evidence quote, diagnosis,
+  // mastery claim, or future-review promise.
+  it.each([
+    ['ordinary learning session', undefined],
+    ['homework session', 'homework'],
+  ])(
+    'renders a persisted mentor notice receipt after reload for a %s',
+    async (_label, sessionType) => {
+      mockParams.sessionType = sessionType;
+      mockSessionSummaryData = {
+        ...BASE_MOCK_SUMMARY,
+        mentorNotice: {
+          id: '550e8400-e29b-41d4-a716-446655440099',
+          concept: 'changing signs',
+          correctionHint: 'Apply the inverse operation to both sides.',
+        },
+      };
 
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-    await waitFor(() => {
-      screen.getByText('Noticed along the way');
-      screen.getByText('changing signs');
-      screen.getByText('Apply the inverse operation to both sides.');
-    });
-  });
+      await waitFor(() => {
+        screen.getByText('Noticed along the way');
+        screen.getByText('changing signs');
+        screen.getByText('Apply the inverse operation to both sides.');
+      });
+      // No evidence quote, diagnosis, mastery claim, or future-review promise —
+      // the receipt is exactly {title, concept, correctionHint}, nothing else.
+      expect(
+        screen.queryByText(/mastered|diagnos|"changing signs"|next review/i),
+      ).toBeNull();
+    },
+  );
 
   // [BUG-801] When the URL passes exchangeCount='0' (legitimate value for
   // a session that ended before any exchanges), the screen must honor it
