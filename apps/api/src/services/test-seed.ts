@@ -986,6 +986,8 @@ export async function insertSessionWithRecap(
   },
 ): Promise<{ sessionId: string; summaryId: string }> {
   const sessionId = generateUUIDv7();
+  const wallClockSeconds = opts.wallClockSeconds ?? 1080;
+  const endedAt = pastDate(opts.endedDaysAgo ?? 1);
   await db.insert(learningSessions).values({
     id: sessionId,
     profileId: opts.profileId,
@@ -994,8 +996,10 @@ export async function insertSessionWithRecap(
     sessionType: 'learning',
     status: 'completed',
     exchangeCount: opts.exchangeCount ?? 10,
-    endedAt: pastDate(opts.endedDaysAgo ?? 1),
-    wallClockSeconds: opts.wallClockSeconds ?? 1080,
+    startedAt: new Date(endedAt.getTime() - wallClockSeconds * 1000),
+    lastActivityAt: endedAt,
+    endedAt,
+    wallClockSeconds,
   });
 
   const summaryId = generateUUIDv7();

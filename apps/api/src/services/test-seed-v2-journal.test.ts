@@ -1,13 +1,17 @@
 import {
   bookmarks,
   consentGrant,
+  curriculumTopics,
   guardianship,
   learningProfiles,
   learningSessions,
+  login,
+  membership,
   monthlyReports,
   person,
   practiceActivityEvents,
   sessionSummaries,
+  subjects,
   supportership,
   topicNotes,
   weeklyReports,
@@ -25,14 +29,21 @@ function insertedRow(
   table: unknown,
   id: string,
 ): Record<string, unknown> {
-  const values = inserts
+  const values = insertedRows(inserts, table);
+  const row = values.find((candidate) => candidate.id === id);
+  if (!row) throw new Error(`No inserted row found for ${id}`);
+  return row;
+}
+
+function insertedRows(
+  inserts: TestSeedInsertRecord[],
+  table: unknown,
+): Record<string, unknown>[] {
+  return inserts
     .filter((record) => record.table === table)
     .flatMap((record) =>
       Array.isArray(record.values) ? record.values : [record.values],
     );
-  const row = values.find((candidate) => candidate.id === id);
-  if (!row) throw new Error(`No inserted row found for ${id}`);
-  return row;
 }
 
 function requiredId(ids: Record<string, string>, key: string): string {
@@ -69,6 +80,15 @@ describe('v2-journal-paper-trail seed', () => {
     expect(result.ids.learnerProfileId).toBe(result.profileId);
     expect(result.ids.recapId).toBe(sessionId);
     const journalLearner = insertedRow(inserts, person, result.profileId);
+    const journalLogin = insertedRows(inserts, login).find(
+      (row) => row.personId === result.profileId,
+    );
+    const journalMembership = insertedRows(inserts, membership).find(
+      (row) => row.personId === result.profileId,
+    );
+    if (!journalLogin || !journalMembership) {
+      throw new Error('Journal learner is missing credential or membership');
+    }
     expect(journalLearner).toEqual(
       expect.objectContaining({
         id: result.profileId,
@@ -79,6 +99,20 @@ describe('v2-journal-paper-trail seed', () => {
       new Date().getUTCFullYear() -
         Number(String(journalLearner.birthDate).slice(0, 4)),
     ).toBeGreaterThanOrEqual(18);
+    expect(journalLogin).toEqual(
+      expect.objectContaining({
+        personId: result.profileId,
+        email: 'v2-journal@example.com',
+        clerkUserId: expect.stringMatching(/^clerk_seed_/),
+      }),
+    );
+    expect(journalMembership).toEqual(
+      expect.objectContaining({
+        personId: result.profileId,
+        organizationId: result.accountId,
+        roles: ['admin', 'learner'],
+      }),
+    );
     const consentRows = inserts
       .filter((record) => record.table === consentGrant)
       .flatMap((record) =>
@@ -134,14 +168,39 @@ describe('v2-journal-paper-trail seed', () => {
       }),
     );
 
-    expect(insertedRow(inserts, learningSessions, sessionId)).toEqual(
+    const journalSubject = insertedRow(inserts, subjects, subjectId);
+    const journalTopic = insertedRow(inserts, curriculumTopics, topicId);
+    expect(journalSubject).toEqual(
+      expect.objectContaining({
+        profileId: result.profileId,
+        name: 'Biology',
+      }),
+    );
+    expect(journalTopic).toEqual(
+      expect.objectContaining({
+        title: 'Biology Topic 1',
+      }),
+    );
+
+    const journalSession = insertedRow(inserts, learningSessions, sessionId);
+    expect(journalSession).toEqual(
       expect.objectContaining({
         profileId: result.profileId,
         subjectId,
         topicId,
         status: 'completed',
+        wallClockSeconds: 960,
+        startedAt: expect.any(Date),
+        lastActivityAt: expect.any(Date),
+        endedAt: expect.any(Date),
       }),
     );
+    const startedAt = (journalSession.startedAt as Date).getTime();
+    const lastActivityAt = (journalSession.lastActivityAt as Date).getTime();
+    const endedAt = (journalSession.endedAt as Date).getTime();
+    expect(startedAt).toBeLessThanOrEqual(lastActivityAt);
+    expect(lastActivityAt).toBeLessThanOrEqual(endedAt);
+    expect(endedAt - startedAt).toBe(960_000);
     expect(insertedRow(inserts, sessionSummaries, sessionSummaryId)).toEqual(
       expect.objectContaining({
         sessionId,
@@ -151,21 +210,28 @@ describe('v2-journal-paper-trail seed', () => {
           'We traced how photosynthesis stores sunlight as chemical energy in glucose.',
       }),
     );
-    expect(insertedRow(inserts, topicNotes, learnerNoteId)).toEqual(
+    const learnerNote = insertedRow(inserts, topicNotes, learnerNoteId);
+    const mentorBookmark = insertedRow(inserts, bookmarks, bookmarkId);
+    expect(learnerNote).toEqual(
       expect.objectContaining({
         profileId: result.profileId,
         sessionId,
         topicId,
+        content:
+          'Photosynthesis stores sunlight as chemical energy in glucose for the plant.',
       }),
     );
-    expect(insertedRow(inserts, bookmarks, bookmarkId)).toEqual(
+    expect(mentorBookmark).toEqual(
       expect.objectContaining({
         profileId: result.profileId,
         sessionId,
         subjectId,
         topicId,
+        content:
+          'Chlorophyll captures light energy that powers photosynthesis.',
       }),
     );
+    expect(learnerNote.content).not.toBe(mentorBookmark.content);
 
     expect(
       insertedRow(inserts, practiceActivityEvents, practiceActivityEventId),
@@ -173,25 +239,42 @@ describe('v2-journal-paper-trail seed', () => {
       expect.objectContaining({
         profileId: result.profileId,
         subjectId,
+        activityType: 'review',
+        activitySubtype: 'spaced_repetition',
+        pointsEarned: 8,
+        score: 3,
+        total: 3,
+        sourceType: 'topic',
+        sourceId: topicId,
         metadata: expect.objectContaining({ topicId }),
       }),
     );
 
-    for (const [table, id] of [
-      [weeklyReports, weeklyReportId],
-      [monthlyReports, monthlyReportId],
-    ] as const) {
-      expect(insertedRow(inserts, table, id)).toEqual(
-        expect.objectContaining({
-          profileId: result.profileId,
-          childProfileId: result.profileId,
+    expect(insertedRow(inserts, weeklyReports, weeklyReportId)).toEqual(
+      expect.objectContaining({
+        profileId: result.profileId,
+        childProfileId: result.profileId,
+        reportWeek: '2026-07-13',
+        reportData: expect.objectContaining({
+          thisWeek: expect.objectContaining({ totalSessions: 4 }),
         }),
-      );
-    }
+      }),
+    );
+    expect(insertedRow(inserts, monthlyReports, monthlyReportId)).toEqual(
+      expect.objectContaining({
+        profileId: result.profileId,
+        childProfileId: result.profileId,
+        reportMonth: '2026-07-01',
+        reportData: expect.objectContaining({
+          thisMonth: expect.objectContaining({ topicsMastered: 12 }),
+        }),
+      }),
+    );
 
     expect(insertedRow(inserts, learningProfiles, mentorMemoryId)).toEqual(
       expect.objectContaining({
         profileId: result.profileId,
+        interests: ['Plant biology', 'Nature photography'],
         memoryConsentStatus: 'granted',
         memoryCollectionEnabled: true,
         memoryInjectionEnabled: true,
