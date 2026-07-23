@@ -33,57 +33,31 @@ import {
   activateSubscriptionFromRevenuecatV2,
   isRevenuecatEventProcessedV2,
   purchaseTopUpCreditsV2,
+  reattributeTopUpCreditsOnModelChangeV2,
   updateSubscriptionFromRevenuecatWebhookV2,
 } from '../../apps/api/src/services/billing/billing-v2';
 import { getTierConfig } from '../../apps/api/src/services/subscription';
-import { cleanupAccounts, createIntegrationDb } from './helpers';
+import { createIntegrationDb } from './helpers';
 
-const TEST_ACCOUNTS = [
-  {
-    clerkUserId: 'integration-billing-service-01',
-    email: 'integration-billing-service-01@integration.test',
-  },
-  {
-    clerkUserId: 'integration-billing-service-02',
-    email: 'integration-billing-service-02@integration.test',
-  },
-  {
-    clerkUserId: 'integration-billing-service-03',
-    email: 'integration-billing-service-03@integration.test',
-  },
-  {
-    clerkUserId: 'integration-billing-service-04',
-    email: 'integration-billing-service-04@integration.test',
-  },
-  {
-    clerkUserId: 'integration-billing-service-05',
-    email: 'integration-billing-service-05@integration.test',
-  },
-  {
-    clerkUserId: 'integration-billing-service-06',
-    email: 'integration-billing-service-06@integration.test',
-  },
-  {
-    clerkUserId: 'integration-billing-service-07',
-    email: 'integration-billing-service-07@integration.test',
-  },
-];
-
-const ALL_EMAILS = TEST_ACCOUNTS.map((account) => account.email);
-const ALL_CLERK_USER_IDS = TEST_ACCOUNTS.map((account) => account.clerkUserId);
-
-// [WI-1128] `accounts` is on the drop list — seedAccount's real anchor is now
-// the v2 `organization`, keyed by name so cleanupOrgAccounts (below) can sweep
-// it (helpers.ts's cleanupAccounts only finds v2 rows via a `login` row, and
-// seedAccount never creates one).
-const ORG_NAMES = TEST_ACCOUNTS.map(
+// This suite seeds only v2 organizations. Keep cleanup scoped to those names;
+// `cleanupAccounts` reads the retired `login` table and cannot clean this data.
+const ORG_NAMES = Array.from(
+  { length: 7 },
   (_, i) => `integration-billing-service-org-${i}`,
 );
+
+const REATTRIBUTION_ORG_NAMES = [
+  'integration-billing-service-reattribution-target',
+  'integration-billing-service-reattribution-other',
+];
 
 async function cleanupOrgAccounts() {
   const db = createIntegrationDb();
   const orgs = await db.query.organization.findMany({
-    where: inArray(organization.name, ORG_NAMES),
+    where: inArray(organization.name, [
+      ...ORG_NAMES,
+      ...REATTRIBUTION_ORG_NAMES,
+    ]),
   });
   const orgIds = orgs.map((o) => o.id);
   if (orgIds.length === 0) return;
@@ -372,20 +346,132 @@ async function loadTopUps(subscriptionId: string) {
   });
 }
 
+const REATTRIBUTION_TIERS = ['free', 'plus', 'family', 'pro'] as const;
+
+function reattributionTierPairs(
+  predicate: (
+    from: (typeof REATTRIBUTION_TIERS)[number],
+    to: (typeof REATTRIBUTION_TIERS)[number],
+  ) => boolean,
+) {
+  return REATTRIBUTION_TIERS.flatMap((previousTier) =>
+    REATTRIBUTION_TIERS.flatMap((newTier) =>
+      predicate(previousTier, newTier)
+        ? [[previousTier, newTier] as const]
+        : [],
+    ),
+  );
+}
+
+function snapshotTopUpRows(rows: Awaited<ReturnType<typeof loadTopUps>>) {
+  return rows.map((row) => ({
+    id: row.id,
+    subscriptionId: row.subscriptionId,
+    profileId: row.profileId,
+    amount: row.amount,
+    remaining: row.remaining,
+    purchasedAt: row.purchasedAt.toISOString(),
+    expiresAt: row.expiresAt.toISOString(),
+    revenuecatTransactionId: row.revenuecatTransactionId,
+    createdAt: row.createdAt.toISOString(),
+  }));
+}
+
+async function seedReattributionFixture(withOwner = true) {
+  const db = createIntegrationDb();
+  const [targetOrganization] = await db
+    .insert(organization)
+    .values({ name: REATTRIBUTION_ORG_NAMES[0] })
+    .returning();
+  const [otherOrganization] = await db
+    .insert(organization)
+    .values({ name: REATTRIBUTION_ORG_NAMES[1] })
+    .returning();
+
+  const [targetPayer] = await db
+    .insert(person)
+    .values({
+      displayName: 'Reattribution target payer',
+      birthDate: '1990-01-01',
+      residenceJurisdiction: 'EU',
+    })
+    .returning();
+  const [otherPayer] = await db
+    .insert(person)
+    .values({
+      displayName: 'Reattribution other payer',
+      birthDate: '1990-01-01',
+      residenceJurisdiction: 'EU',
+    })
+    .returning();
+  await db.insert(membership).values([
+    {
+      personId: targetPayer!.id,
+      organizationId: targetOrganization!.id,
+      roles: withOwner ? ['admin'] : ['learner'],
+    },
+    {
+      personId: otherPayer!.id,
+      organizationId: otherOrganization!.id,
+      roles: ['admin'],
+    },
+  ]);
+
+  const [targetSubscription] = await db
+    .insert(subscriptionV2Table)
+    .values({
+      organizationId: targetOrganization!.id,
+      planTier: 'family',
+      status: 'active',
+      payerPersonId: targetPayer!.id,
+    })
+    .returning();
+  const [otherSubscription] = await db
+    .insert(subscriptionV2Table)
+    .values({
+      organizationId: otherOrganization!.id,
+      planTier: 'family',
+      status: 'active',
+      payerPersonId: otherPayer!.id,
+    })
+    .returning();
+
+  const rowInputs = [
+    { profileId: null, remaining: 11 },
+    { profileId: targetPayer!.id, remaining: 13 },
+    { profileId: null, remaining: 0 },
+    { profileId: targetPayer!.id, remaining: 0 },
+  ] as const;
+  for (const [subscriptionId, profileId] of [
+    [targetSubscription!.id, targetPayer!.id],
+    [otherSubscription!.id, otherPayer!.id],
+  ] as const) {
+    for (const [index, row] of rowInputs.entries()) {
+      await seedTopUpCredit({
+        subscriptionId,
+        profileId: row.profileId === null ? null : profileId,
+        amount: 20 + index,
+        remaining: row.remaining,
+        purchasedAt: new Date(`2026-01-0${index + 1}T00:00:00.000Z`),
+        expiresAt: new Date('2027-01-01T00:00:00.000Z'),
+      });
+    }
+  }
+
+  return {
+    targetOrganization: targetOrganization!,
+    targetSubscription: targetSubscription!,
+    otherSubscription: otherSubscription!,
+    targetPayer: targetPayer!,
+  };
+}
+
 beforeEach(async () => {
-  await cleanupAccounts({
-    emails: ALL_EMAILS,
-    clerkUserIds: ALL_CLERK_USER_IDS,
-  });
   await cleanupOrgAccounts();
   await cleanupV2();
 });
 
 afterAll(async () => {
-  await cleanupAccounts({
-    emails: ALL_EMAILS,
-    clerkUserIds: ALL_CLERK_USER_IDS,
-  });
   await cleanupOrgAccounts();
   await cleanupV2();
 });
@@ -398,6 +484,181 @@ describe('Integration: billing service', () => {
   // and the legacy `subscriptions` table def is now removed too. Deleted per
   // the WI-1128 quarantine comment's own "deletion + un-skip = WI-1139
   // dead-sweep" disposition. See docs/_archive/retired-code.md.
+
+  const sharedToPerProfilePairs = reattributionTierPairs(
+    (previousTier, newTier) =>
+      getTierConfig(previousTier).quotaModel === 'shared-pool' &&
+      getTierConfig(newTier).quotaModel === 'per-profile',
+  );
+  const perProfileToSharedPairs = reattributionTierPairs(
+    (previousTier, newTier) =>
+      getTierConfig(previousTier).quotaModel === 'per-profile' &&
+      getTierConfig(newTier).quotaModel === 'shared-pool',
+  );
+  const unchangedModelPairs = reattributionTierPairs(
+    (previousTier, newTier) =>
+      getTierConfig(previousTier).quotaModel ===
+      getTierConfig(newTier).quotaModel,
+  );
+
+  it.each(sharedToPerProfilePairs)(
+    'reattributes every eligible target credit from shared-pool %s to per-profile %s and preserves every other row',
+    async (previousTier, newTier) => {
+      const fixture = await seedReattributionFixture();
+      const beforeTarget = await loadTopUps(fixture.targetSubscription.id);
+      const beforeOther = await loadTopUps(fixture.otherSubscription.id);
+      const beforeSnapshot = snapshotTopUpRows([
+        ...beforeTarget,
+        ...beforeOther,
+      ]);
+      const totalRemaining = beforeSnapshot.reduce(
+        (total, row) => total + row.remaining,
+        0,
+      );
+
+      const updated = await reattributeTopUpCreditsOnModelChangeV2(
+        createIntegrationDb(),
+        fixture.targetSubscription.id,
+        fixture.targetOrganization.id,
+        previousTier,
+        newTier,
+      );
+      const afterTarget = await loadTopUps(fixture.targetSubscription.id);
+      const afterOther = await loadTopUps(fixture.otherSubscription.id);
+      const afterSnapshot = snapshotTopUpRows([...afterTarget, ...afterOther]);
+      const eligibleIds = beforeTarget
+        .filter((row) => row.profileId === null && row.remaining > 0)
+        .map((row) => row.id);
+
+      expect(updated).toBe(eligibleIds.length);
+      expect(afterSnapshot).toHaveLength(beforeSnapshot.length);
+      expect(
+        afterSnapshot.reduce((total, row) => total + row.remaining, 0),
+      ).toBe(totalRemaining);
+      expect(afterSnapshot).toEqual(
+        beforeSnapshot.map((row) =>
+          eligibleIds.includes(row.id)
+            ? { ...row, profileId: fixture.targetPayer.id }
+            : row,
+        ),
+      );
+
+      const replay = await reattributeTopUpCreditsOnModelChangeV2(
+        createIntegrationDb(),
+        fixture.targetSubscription.id,
+        fixture.targetOrganization.id,
+        previousTier,
+        newTier,
+      );
+      expect(replay).toBe(0);
+      expect(
+        snapshotTopUpRows(await loadTopUps(fixture.targetSubscription.id)),
+      ).toEqual(snapshotTopUpRows(afterTarget));
+    },
+  );
+
+  it('leaves target credits unchanged when a shared-pool to per-profile transition has no owner', async () => {
+    const fixture = await seedReattributionFixture(false);
+    const beforeTarget = snapshotTopUpRows(
+      await loadTopUps(fixture.targetSubscription.id),
+    );
+
+    const updated = await reattributeTopUpCreditsOnModelChangeV2(
+      createIntegrationDb(),
+      fixture.targetSubscription.id,
+      fixture.targetOrganization.id,
+      'family',
+      'plus',
+    );
+
+    expect(updated).toBe(0);
+    expect(
+      snapshotTopUpRows(await loadTopUps(fixture.targetSubscription.id)),
+    ).toEqual(beforeTarget);
+  });
+
+  it.each(perProfileToSharedPairs)(
+    'reattributes every eligible target credit from per-profile %s to shared-pool %s and preserves every other row',
+    async (previousTier, newTier) => {
+      const fixture = await seedReattributionFixture();
+      const beforeTarget = await loadTopUps(fixture.targetSubscription.id);
+      const beforeOther = await loadTopUps(fixture.otherSubscription.id);
+      const beforeSnapshot = snapshotTopUpRows([
+        ...beforeTarget,
+        ...beforeOther,
+      ]);
+      const totalRemaining = beforeSnapshot.reduce(
+        (total, row) => total + row.remaining,
+        0,
+      );
+
+      const updated = await reattributeTopUpCreditsOnModelChangeV2(
+        createIntegrationDb(),
+        fixture.targetSubscription.id,
+        fixture.targetOrganization.id,
+        previousTier,
+        newTier,
+      );
+      const afterTarget = await loadTopUps(fixture.targetSubscription.id);
+      const afterOther = await loadTopUps(fixture.otherSubscription.id);
+      const afterSnapshot = snapshotTopUpRows([...afterTarget, ...afterOther]);
+      const eligibleIds = beforeTarget
+        .filter((row) => row.profileId !== null && row.remaining > 0)
+        .map((row) => row.id);
+
+      expect(updated).toBe(eligibleIds.length);
+      expect(afterSnapshot).toHaveLength(beforeSnapshot.length);
+      expect(
+        afterSnapshot.reduce((total, row) => total + row.remaining, 0),
+      ).toBe(totalRemaining);
+      expect(afterSnapshot).toEqual(
+        beforeSnapshot.map((row) =>
+          eligibleIds.includes(row.id) ? { ...row, profileId: null } : row,
+        ),
+      );
+
+      const replay = await reattributeTopUpCreditsOnModelChangeV2(
+        createIntegrationDb(),
+        fixture.targetSubscription.id,
+        fixture.targetOrganization.id,
+        previousTier,
+        newTier,
+      );
+      expect(replay).toBe(0);
+      expect(
+        snapshotTopUpRows(await loadTopUps(fixture.targetSubscription.id)),
+      ).toEqual(snapshotTopUpRows(afterTarget));
+    },
+  );
+
+  it.each(unchangedModelPairs)(
+    'is a no-op for unchanged quota-model pair %s to %s',
+    async (previousTier, newTier) => {
+      const fixture = await seedReattributionFixture();
+      const beforeTarget = snapshotTopUpRows(
+        await loadTopUps(fixture.targetSubscription.id),
+      );
+      const beforeOther = snapshotTopUpRows(
+        await loadTopUps(fixture.otherSubscription.id),
+      );
+
+      const updated = await reattributeTopUpCreditsOnModelChangeV2(
+        createIntegrationDb(),
+        fixture.targetSubscription.id,
+        fixture.targetOrganization.id,
+        previousTier,
+        newTier,
+      );
+
+      expect(updated).toBe(0);
+      expect(
+        snapshotTopUpRows(await loadTopUps(fixture.targetSubscription.id)),
+      ).toEqual(beforeTarget);
+      expect(
+        snapshotTopUpRows(await loadTopUps(fixture.otherSubscription.id)),
+      ).toEqual(beforeOther);
+    },
+  );
 
   it('decrements monthly quota against the real quota pool row', async () => {
     const account = await seedAccount(2);
