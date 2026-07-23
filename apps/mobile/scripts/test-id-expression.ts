@@ -58,11 +58,14 @@ export function extractValueProducingTestIds(
       collectValue(node.whenFalse);
     } else if (
       ts.isBinaryExpression(node) &&
-      [
-        ts.SyntaxKind.QuestionQuestionToken,
-        ts.SyntaxKind.BarBarToken,
-        ts.SyntaxKind.AmpersandAmpersandToken,
-      ].includes(node.operatorToken.kind)
+      node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+    ) {
+      collectValue(node.right);
+    } else if (
+      ts.isBinaryExpression(node) &&
+      [ts.SyntaxKind.QuestionQuestionToken, ts.SyntaxKind.BarBarToken].includes(
+        node.operatorToken.kind,
+      )
     ) {
       collectValue(node.left);
       collectValue(node.right);

@@ -57,6 +57,16 @@ describe('extractValueProducingTestIds', () => {
     });
   });
 
+  it('ignores the predicate side of a logical AND expression', () => {
+    expect(
+      extractValueProducingTestIds("'predicate-decoy' && 'actual-id'"),
+    ).toEqual({
+      staticIds: ['actual-id'],
+      dynamicPrefixes: [],
+      dynamicWitnesses: [],
+    });
+  });
+
   it('ignores values used only by predicates and helper calls', () => {
     expect(
       extractValueProducingTestIds(
