@@ -5,8 +5,33 @@
 unchanged).
 **Branch/worktree:** `WI-2547` @ `.worktrees/WI-2547`, cut from `origin/main` @ `13c35837e`
 (the landed WI-2386 squash — *granular consent purposes*).
-**Type:** Feature → greenfield TDD decomposition (tests first, red → green). **Not** a
-`Type=Bug`, so no red-green-revert guard is required by the review gate.
+**Type:** Feature. **Not** a `Type=Bug`, so the review gate requires no
+red-green-revert regression guard.
+
+> **Honest record of how this was actually built (corrected post-hoc).** This plan
+> was written before implementation, but the code was **not** produced test-first:
+> for each layer the implementation and its tests were written together and run
+> together. Do not read the step headings below as a claim of a strict red→green
+> TDD cycle. What *was* genuinely exercised are three **durable negative
+> controls** — each an intentional mutation of shipped code, observed failing,
+> then reverted and observed passing again:
+>
+> 1. **Purpose-blind gating substitution.** Replacing the per-purpose idempotency
+>    check with `repairOrSignalAdultSelfConsentV2`'s any-purpose `already_present`
+>    gate failed 6 of the then-12 integration cases, including the
+>    repaired-into-`platform_use`-only regression test.
+> 2. **Caller-binding break test.** Binding the route to `profileId` instead of
+>    `callerPersonId` failed the spoofed-`X-Profile-Id` case.
+> 3. **Presented-profile guard removal.** Deleting the `X-Profile-Id` ≠
+>    `callerPersonId` check failed the same-org spoof case. (The cross-org case
+>    still passed without it — that one is already caught by the eligibility
+>    gate, so the same-org spoof is what this guard uniquely catches.)
+>
+> A fourth control is structural rather than mutational: the pre-service guard
+> tests run against a tripwire `db` whose every property access throws, so any
+> path reaching the service surfaces as a 500. Its negative control (a fully
+> satisfied request *does* reach the service and *does* 500) pins that the 503s
+> come from the policy-version guard and not an earlier short-circuit.
 
 ---
 
@@ -78,10 +103,10 @@ variable in both the selector and the write. Test files are exempt (`isTestFile`
 |---|---|---|
 | 1 | `packages/schemas/src/consent.ts` | add `selfConsentAcceptResultSchema` + type |
 | 2 | `packages/schemas/src/consent.test.ts` | schema unit tests |
-| 3 | `apps/api/src/services/identity-v2/consent-v2.ts` | add `acceptAdultSelfConsentV2` + extract shared `resolveAdultOwnerEligibility` |
-| 4 | `apps/api/src/services/identity-v2/consent-v2.integration.test.ts` | service-level cases |
-| 5 | `apps/api/src/routes/consent.ts` | add `POST /consent/self/accept` |
-| 6 | `tests/integration/consent-self-accept.integration.test.ts` | **new** — route-level AC6 matrix |
+| 3 | `apps/api/src/services/identity-v2/consent-v2.ts` | add `acceptAdultSelfConsentV2` + extract shared `isAdultAccountOwnerV2` |
+| 4 | `apps/api/src/routes/consent.ts` | add `POST /consent/self/accept` |
+| 5 | `apps/api/src/routes/consent-self-accept.test.ts` | **new** — pre-service guard tests (tripwire `db`) |
+| 6 | `tests/integration/consent-self-accept.integration.test.ts` | **new** — real-DB AC6 matrix, incl. the service-level shapes that hold no Login |
 | 7 | `apps/mobile/src/hooks/use-adult-self-consent.ts` | **new** — mutation hook |
 | 8 | `apps/mobile/src/hooks/use-adult-self-consent.test.ts` | **new** |
 | 9 | `apps/mobile/src/app/(app)/_components/AdultSelfConsentGate.tsx` | **new** — the gate |
@@ -94,7 +119,7 @@ variable in both the selector and the write. Test files are exempt (`isTestFile`
 
 ---
 
-## Step 1 — schemas (RED → GREEN)
+## Step 1 — schemas
 
 `packages/schemas/src/consent.ts`. The request body is **empty by construction** — the route
 accepts *no* caller-supplied identifiers — so only a response schema is added.
@@ -113,7 +138,7 @@ export type SelfConsentAcceptResult = z.infer<typeof selfConsentAcceptResultSche
 
 **Verify:** `pnpm exec nx run schemas:test` green; `purposesGranted: []` parses.
 
-## Step 2 — service `acceptAdultSelfConsentV2` (RED → GREEN)
+## Step 2 — service `acceptAdultSelfConsentV2`
 
 `apps/api/src/services/identity-v2/consent-v2.ts`.
 
@@ -251,7 +276,7 @@ row per purpose; withdrawn purpose → re-granted while the sibling live purpose
 minor / non-owner / unknown person → `AdultSelfConsentNotEligibleError`, **zero** rows
 written; two concurrent accepts on a fresh person → exactly one granted row per purpose.
 
-## Step 3 — route `POST /consent/self/accept` (RED → GREEN)
+## Step 3 — route `POST /consent/self/accept`
 
 `apps/api/src/routes/consent.ts`, mirroring `PUT /consent/self/withdraw` exactly. **No
 `zValidator`** — the contract takes no body:
@@ -272,8 +297,26 @@ written; two concurrent accepts on a fresh person → exactly one granted row pe
     if (!chargePersonId) {
       return unauthorized(c, 'No identity is provisioned for this login.');
     }
+    // Presented-profile guard: the header is optional, but when present it must
+    // name the caller. Fails closed BEFORE any service call.
+    const presentedProfileId = c.req.header('X-Profile-Id');
+    if (presentedProfileId && presentedProfileId !== chargePersonId) {
+      return forbidden(c, 'This account is not eligible for self-consent.');
+    }
+
     const account = requireAccount(c.get('account'));
-    const termsVersion = c.env.CONSENT_POLICY_VERSION;
+
+    // Policy-version guard: a blank version would mint an UNVERSIONED
+    // acceptance fact. Refused up front so no transaction is opened.
+    const termsVersion = c.env.CONSENT_POLICY_VERSION?.trim();
+    if (!termsVersion) {
+      return apiError(
+        c,
+        503,
+        ERROR_CODES.SERVICE_UNAVAILABLE,
+        'Consent policy version is not configured.',
+      );
+    }
 
     try {
       const purposesGranted = await acceptAdultSelfConsentV2(
@@ -301,17 +344,19 @@ written; two concurrent accepts on a fresh person → exactly one granted row pe
   })
 ```
 
-`CONSENT_POLICY_VERSION` is read the same way `profiles.ts` / `consent-web.ts` read it —
-confirm the exact accessor at implementation time and match it verbatim rather than inventing
-one.
+`CONSENT_POLICY_VERSION` is read via `c.env`, matching `profiles.ts` / `consent-web.ts`; it is
+already declared in this router's `Bindings`, as is `callerPersonId` in its `Variables`.
 
-**Verify:** `tests/integration/consent-self-accept.integration.test.ts` covering the full AC6
-matrix — success, exact audit version, idempotent replay, concurrent submit, already-consented
-adult, minor, non-owner, missing caller identity, cross-org, spoofed `X-Profile-Id` (asserting
-the *caller's* grants are written and the spoofed target's are untouched), and no-write on
-every failure.
+**Verify:** `tests/integration/consent-self-accept.integration.test.ts` covering the real-DB
+AC6 matrix — success, exact audit version, idempotent replay, concurrent submit,
+already-consented adult, re-consent after withdrawal, repaired-into-`platform_use`-only,
+minor, adult non-owner, unknown person, cross-org, and **both** spoof shapes (same-org and
+cross-org) asserting `403` with **zero** grants for caller *and* target, plus the no-header
+happy path. `apps/api/src/routes/consent-self-accept.test.ts` covers the three pre-service
+guards (401 missing identity, 403 presented-profile mismatch, 503 blank policy version)
+against a tripwire `db`, proving no write transaction is opened.
 
-## Step 4 — mobile mutation hook (RED → GREEN)
+## Step 4 — mobile mutation hook
 
 `apps/mobile/src/hooks/use-adult-self-consent.ts`, following `use-restore-consent.ts`
 (Hono RPC + `assertOk` + `parseJson`). It calls **only** the new contract, and on success
@@ -337,7 +382,7 @@ export function useAdultSelfConsent(): UseMutationResult<SelfConsentAcceptResult
 **Verify:** hook tests — posts to the right path, parses, invalidates `['profiles']`, and
 surfaces a server failure as an error (no swallow).
 
-## Step 5 — `AdultSelfConsentGate` (RED → GREEN)
+## Step 5 — `AdultSelfConsentGate`
 
 `apps/mobile/src/app/(app)/_components/AdultSelfConsentGate.tsx` — exported, **not** mounted.
 Structural reuse of `ConsentWithdrawnGate`'s shell (`GateContent`, `useSafeAreaInsets`,

@@ -643,6 +643,23 @@ export async function acceptAdultSelfConsentV2(
   // grant and each insert a row. There is no unique constraint to lean on here:
   // a person legitimately holds one art6_1_a row per purpose (the AC2 purpose
   // split), so ON CONFLICT cannot express this idempotency.
+  //
+  // Scope of the lock — deliberate. It serialises accept-vs-accept, which is
+  // what "idempotent under retry/concurrent submit" requires.
+  // withdrawAdultSelfConsentV2 takes NO lock and is not given one here: it is
+  // already race-safe within itself (a conditional UPDATE ... WHERE
+  // withdrawn_at IS NULL ... RETURNING, so concurrent withdrawals leave exactly
+  // one winner), and every accept-vs-withdraw interleaving resolves to a
+  // legitimate serialisation rather than a lost update:
+  //   - accept reads a LIVE grant and skips, then withdraw stamps it → the
+  //     accept simply ordered before the withdrawal; withdrawn is correct.
+  //   - withdraw commits first, then accept reads WITHDRAWN and re-grants → the
+  //     accept ordered after; granted is correct.
+  //   - a withdrawal racing an accept on an ALREADY-withdrawn row is a no-op by
+  //     design (it returns the existing withdrawnAt), so nothing is lost.
+  // Neither order can duplicate a live grant or drop a committed write, so
+  // widening the lock to the withdrawal path would add contention to a shipped,
+  // separately-tested code path without fixing a demonstrable defect.
   return db.transaction(async (tx) => {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${

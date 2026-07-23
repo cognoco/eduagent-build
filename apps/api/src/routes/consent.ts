@@ -594,8 +594,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
   //     server-side from the Clerk JWT (WI-774/WI-1302). Deliberately NOT
   //     withProfile(c).profileId, which is the X-Profile-Id-SELECTABLE active
   //     profile — binding there would let an account member write ANOTHER
-  //     in-account profile's adult consent (the WI-1193 IDOR). A spoofed
-  //     X-Profile-Id therefore cannot change WHOSE consent is written.
+  //     in-account profile's adult consent (the WI-1193 IDOR).
   //   - the organization is the authenticated account;
   //   - the lawful basis is fixed at art6_1_a inside the service;
   //   - termsVersion is the server's CONSENT_POLICY_VERSION binding.
@@ -607,8 +606,38 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     if (!chargePersonId) {
       return unauthorized(c, 'No identity is provisioned for this login.');
     }
+
+    // Binding to `callerPersonId` already makes a spoofed X-Profile-Id
+    // harmless — it cannot change WHOSE consent is written. But "harmless" is
+    // not what this route promises: an attempt to record consent while
+    // *presenting as someone else* is an authorization failure, not a silently
+    // rewritten request, so it fails CLOSED rather than succeeding against the
+    // caller's own record. The header is optional (the client normally sends
+    // none and the owner is auto-resolved); when present it must name the
+    // caller themselves. Checked BEFORE the service call, so a spoof never
+    // opens a write transaction.
+    const presentedProfileId = c.req.header('X-Profile-Id');
+    if (presentedProfileId && presentedProfileId !== chargePersonId) {
+      return forbidden(c, 'This account is not eligible for self-consent.');
+    }
+
     const account = requireAccount(c.get('account'));
-    const termsVersion = c.env.CONSENT_POLICY_VERSION;
+
+    // A blank/whitespace policy version would mint an UNVERSIONED acceptance
+    // fact — precisely the weak GDPR Art 5(2)/7(1) evidence
+    // repairOrSignalAdultSelfConsentV2 refuses to fabricate. The response
+    // schema's `.min(1)` would catch it only AFTER the transaction committed,
+    // leaving a written-but-unreportable grant, so it is refused up front with
+    // no service call at all.
+    const termsVersion = c.env.CONSENT_POLICY_VERSION?.trim();
+    if (!termsVersion) {
+      return apiError(
+        c,
+        503,
+        ERROR_CODES.SERVICE_UNAVAILABLE,
+        'Consent policy version is not configured.',
+      );
+    }
 
     try {
       const purposesGranted = await acceptAdultSelfConsentV2(

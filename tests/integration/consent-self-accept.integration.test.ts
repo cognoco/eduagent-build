@@ -430,7 +430,7 @@ describe('Integration: POST /v1/consent/self/accept (WI-2547)', () => {
     });
   });
 
-  it('[AC2] a spoofed X-Profile-Id cannot retarget the write — the CALLER is recorded, the target is untouched', async () => {
+  it('[AC2] a same-org spoofed X-Profile-Id FAILS CLOSED — 403, and neither caller nor target is written', async () => {
     const owner = await createLegacyAdultOwner();
     const child = await seedDirectChildProfileForTest({
       parentProfileId: owner.id,
@@ -440,19 +440,33 @@ describe('Integration: POST /v1/consent/self/accept (WI-2547)', () => {
     });
     expect(await art6Grants(child.id)).toHaveLength(0);
 
-    // Owner's JWT, but X-Profile-Id points at the managed child.
+    // Owner's JWT, but X-Profile-Id presents as the managed child.
     const res = await acceptRequest(
       buildAuthHeaders(
         { sub: ADULT_USER.userId, email: ADULT_USER.email },
         child.id,
       ),
     );
-    expect(res.status).toBe(200);
 
-    // The CHILD gains nothing — the route binds to callerPersonId, never to the
-    // X-Profile-Id-selectable active profile (the WI-1193 IDOR shape).
+    // Binding to callerPersonId alone would make this a harmless 200 against
+    // the caller's own record. AC2 requires it to fail CLOSED instead:
+    // recording consent while presenting as someone else is an authorization
+    // failure, not a silently rewritten request.
+    expect(res.status).toBe(403);
+    // The spoof target gains nothing...
     expect(await art6Grants(child.id)).toHaveLength(0);
-    // The caller's OWN consent is what was recorded.
+    // ...and neither does the caller — no write happened at all.
+    expect(await art6Grants(owner.id)).toHaveLength(0);
+  });
+
+  it('[AC2] accepts with NO X-Profile-Id header (the auto-resolved owner path)', async () => {
+    const owner = await createLegacyAdultOwner();
+
+    // No header at all — the normal client shape.
+    const res = await acceptRequest(
+      buildAuthHeaders({ sub: ADULT_USER.userId, email: ADULT_USER.email }),
+    );
+    expect(res.status).toBe(200);
     expect(await art6Grants(owner.id)).toHaveLength(2);
   });
 
@@ -468,7 +482,7 @@ describe('Integration: POST /v1/consent/self/accept (WI-2547)', () => {
     await clearArt6Grants(otherOrgOwner.id);
     expect(otherOrgOwner.accountId).not.toBe(owner.accountId);
 
-    // The other-org login selects a profile belonging to a DIFFERENT org.
+    // The other-org login presents a profile belonging to a DIFFERENT org.
     const res = await acceptRequest(
       buildAuthHeaders(
         { sub: OTHER_ORG_USER.userId, email: OTHER_ORG_USER.email },
@@ -476,20 +490,13 @@ describe('Integration: POST /v1/consent/self/accept (WI-2547)', () => {
       ),
     );
 
-    // The foreign person is untouched regardless of how the middleware rules on
-    // the spoofed header — nothing this caller sends can write into `owner`'s org.
+    // Fail closed, unconditionally — same disposition as the same-org spoof, so
+    // the response cannot distinguish "profile exists in another org" from
+    // "profile does not exist" (no cross-account enumeration).
+    expect(res.status).toBe(403);
+    // Nothing written anywhere: not the foreign target...
     expect(await art6Grants(owner.id)).toHaveLength(0);
-
-    // And if the request was allowed to proceed at all, it acted ONLY on the
-    // caller's own person, inside the caller's own organization.
-    if (res.status === 200) {
-      const callerGrants = await art6Grants(otherOrgOwner.id);
-      expect(callerGrants).toHaveLength(2);
-      for (const grant of callerGrants) {
-        expect(grant.organizationId).toBe(otherOrgOwner.accountId);
-      }
-    } else {
-      expect(await art6Grants(otherOrgOwner.id)).toHaveLength(0);
-    }
+    // ...and not the caller's own record either.
+    expect(await art6Grants(otherOrgOwner.id)).toHaveLength(0);
   });
 });
