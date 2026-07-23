@@ -112,10 +112,13 @@ export async function runTeachBackGrader(
   });
 
   // 1. Route to the judge (capability:'judge' selects the tier/age-blind path).
+  // WI-2624: grades the LEARNER's teach-back explanation, not any model's
+  // output — no producer vendor to exclude (not-applicable).
   let response: string;
   try {
     const result = await routeAndCall(messages, GRADER_RUNG, {
       capability: 'judge',
+      judgeIndependence: { mode: 'not-applicable' },
       flow: TEACH_BACK_GRADER_FLOW,
       responseFormat: 'json',
       conversationLanguage: input.conversationLanguage,
