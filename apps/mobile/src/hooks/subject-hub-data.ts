@@ -64,7 +64,11 @@ interface BuildSubjectHubDataInput {
 }
 
 function byTopicSort(a: CurriculumTopic, b: CurriculumTopic): number {
-  return a.sortOrder - b.sortOrder || a.title.localeCompare(b.title);
+  return (
+    a.sortOrder - b.sortOrder ||
+    a.title.localeCompare(b.title) ||
+    a.id.localeCompare(b.id)
+  );
 }
 
 function isActiveTopic(topic: CurriculumTopic): boolean {
@@ -318,10 +322,16 @@ export function buildSubjectHubData({
   const reviewTopicId =
     retentionTopics
       .filter((topic) => activeTopicIds.has(topic.topicId) && isDue(topic, now))
-      .sort(
-        (a, b) =>
-          Date.parse(a.nextReviewAt ?? '') - Date.parse(b.nextReviewAt ?? ''),
-      )[0]?.topicId ?? null;
+      .sort((a, b) => {
+        const dueDelta =
+          Date.parse(a.nextReviewAt ?? '') - Date.parse(b.nextReviewAt ?? '');
+        if (dueDelta !== 0) return dueDelta;
+
+        const aTopic = topicById.get(a.topicId);
+        const bTopic = topicById.get(b.topicId);
+        if (!aTopic || !bTopic) return a.topicId.localeCompare(b.topicId);
+        return byTopicSort(aTopic, bTopic);
+      })[0]?.topicId ?? null;
   const chapters = buildChapters({
     topics,
     continueTopicId,

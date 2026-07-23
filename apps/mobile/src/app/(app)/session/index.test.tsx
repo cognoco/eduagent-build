@@ -358,6 +358,9 @@ const mockSetSessionInputMode = jest.fn();
 const mockFlagSessionContent = jest.fn();
 const mockReplace = jest.fn();
 const mockSetParams = jest.fn();
+const mockConsumeHubToSessionTransition = jest.fn(
+  (_subjectId: string) => false,
+);
 const mockUseSession = jest.fn<
   { data: null | Record<string, unknown> },
   [string?]
@@ -496,6 +499,17 @@ jest.mock('expo-router', () => ({
     useEffect(() => callback(), [callback]);
   },
 }));
+
+jest.mock(
+  '../../../lib/navigation-transition-provenance',
+  () => ({
+    ...jest.requireActual('../../../lib/navigation-transition-provenance'),
+    consumeHubToSessionTransition: (subjectId: string) =>
+      mockConsumeHubToSessionTransition(subjectId),
+    markHubToSessionTransition: jest.fn(),
+  }),
+  { virtual: true },
+);
 
 jest.mock(
   '../../../components/session' /* gc1-allow: ChatShell stub is the test's primary interaction surface (manual-send-button, mock-input-mode); the real composer pulls in native voice/keyboard input that can't render in JSDOM */,
@@ -693,6 +707,7 @@ describe('SessionScreen homework flow', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockConsumeHubToSessionTransition.mockReturnValue(false);
     jest.useFakeTimers();
     getMockFeatureFlags().MODE_NAV_V2_ENABLED = false;
     mockFetch.mockClear();
@@ -948,7 +963,7 @@ describe('SessionScreen homework flow', () => {
     });
   });
 
-  it('uses the existing Subjects history entry from the session-expired escape action', () => {
+  it('does not trust a crafted history return URL from the session-expired escape action', () => {
     const mockBack = jest.fn();
     const mockCanGoBack = jest.fn(() => true);
     (useRouter as jest.Mock).mockReturnValue({
@@ -966,6 +981,50 @@ describe('SessionScreen homework flow', () => {
       sessionId: 'expired-session',
       returnTo: 'subjects',
       returnStrategy: 'history',
+    });
+    const { NotFoundError } = require('../../../lib/api-client');
+    mockUseSessionTranscript.mockReturnValue({
+      data: null,
+      error: new NotFoundError('Session not found'),
+    } as never);
+
+    const testScreen = renderSessionScreen();
+    mockReplace.mockClear();
+
+    const goHomeActions = testScreen.getAllByTestId('session-expired-go-home');
+    expect(goHomeActions).toHaveLength(2);
+
+    for (const goHomeAction of goHomeActions) {
+      mockCanGoBack.mockClear();
+      mockBack.mockClear();
+      mockReplace.mockClear();
+
+      fireEvent.press(goHomeAction);
+
+      expect(mockCanGoBack).not.toHaveBeenCalled();
+      expect(mockBack).not.toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects');
+    }
+  });
+
+  it('uses Subjects history only after consuming the actual Hub-to-Session transition', () => {
+    const mockBack = jest.fn();
+    const mockCanGoBack = jest.fn(() => true);
+    mockConsumeHubToSessionTransition.mockReturnValue(true);
+    (useRouter as jest.Mock).mockReturnValue({
+      back: mockBack,
+      canGoBack: mockCanGoBack,
+      replace: mockReplace,
+      setParams: mockSetParams,
+    });
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: SUBJECT_ID,
+      subjectName: 'Math',
+      topicId: TOPIC_ID,
+      topicName: 'Linear equations',
+      sessionId: 'expired-session',
+      returnTo: 'subjects',
     });
     const { NotFoundError } = require('../../../lib/api-client');
     mockUseSessionTranscript.mockReturnValue({

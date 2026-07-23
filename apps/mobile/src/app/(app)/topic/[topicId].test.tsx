@@ -56,8 +56,13 @@ jest.mock(
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+const mockBack = jest.fn();
+const mockCanGoBack = jest.fn(() => true);
 const mockGoBackOrReplace = jest.fn();
 const mockPushLearningResumeTarget = jest.fn();
+const mockConsumeHubToTopicTransition = jest.fn(
+  (_subjectId: string, _topicId: string) => false,
+);
 type TopicRouteParams = {
   subjectId: string;
   topicId: string;
@@ -65,6 +70,7 @@ type TopicRouteParams = {
   chapter?: string;
   mode?: string;
   returnTo?: string;
+  hubReturnTo?: string;
 };
 const mockUseLocalSearchParams = jest.fn(
   (): TopicRouteParams => ({
@@ -76,12 +82,22 @@ const mockUseLocalSearchParams = jest.fn(
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     push: mockPush,
-    back: jest.fn(),
-    canGoBack: jest.fn().mockReturnValue(true),
+    back: mockBack,
+    canGoBack: mockCanGoBack,
     replace: mockReplace,
   }),
   useLocalSearchParams: () => mockUseLocalSearchParams(),
 }));
+
+jest.mock(
+  '../../../lib/navigation-transition-provenance',
+  () => ({
+    ...jest.requireActual('../../../lib/navigation-transition-provenance'),
+    consumeHubToTopicTransition: (subjectId: string, topicId: string) =>
+      mockConsumeHubToTopicTransition(subjectId, topicId),
+  }),
+  { virtual: true },
+);
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -320,6 +336,7 @@ describe('TopicDetailScreen action buttons', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockConsumeHubToTopicTransition.mockReturnValue(false);
     mockUseLocalSearchParams.mockReturnValue({
       subjectId: SUBJECT_ID,
       topicId: TOPIC_ID,
@@ -866,6 +883,61 @@ describe('TopicDetailScreen rendering details', () => {
       pathname: '/(app)/subject-hub/[subjectId]',
       params: { subjectId: SUBJECT_ID },
     });
+    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
+  });
+
+  it('does not trust crafted Hub ancestry URL params when browser history exists', async () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      subjectId: SUBJECT_ID,
+      bookId: BOOK_ID,
+      topicId: TOPIC_ID,
+      returnTo: 'subject-hub',
+      hubReturnTo: 'subjects',
+    });
+    setupRoutes({ completionStatus: 'completed' });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('topic-detail-back');
+    });
+    fireEvent.press(screen.getByTestId('topic-detail-back'));
+
+    expect(mockConsumeHubToTopicTransition).toHaveBeenCalledWith(
+      SUBJECT_ID,
+      TOPIC_ID,
+    );
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/subject-hub/[subjectId]',
+      params: { subjectId: SUBJECT_ID },
+    });
+    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
+  });
+
+  it('pops to the Hub only after consuming the actual Hub-to-Topic transition', async () => {
+    mockConsumeHubToTopicTransition.mockReturnValue(true);
+    mockUseLocalSearchParams.mockReturnValue({
+      subjectId: SUBJECT_ID,
+      bookId: BOOK_ID,
+      topicId: TOPIC_ID,
+      returnTo: 'subject-hub',
+    });
+    setupRoutes({ completionStatus: 'completed' });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('topic-detail-back');
+    });
+    fireEvent.press(screen.getByTestId('topic-detail-back'));
+
+    expect(mockConsumeHubToTopicTransition).toHaveBeenCalledWith(
+      SUBJECT_ID,
+      TOPIC_ID,
+    );
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockReplace).not.toHaveBeenCalled();
     expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 

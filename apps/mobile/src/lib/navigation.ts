@@ -1,5 +1,6 @@
 import type { Href, Router } from 'expo-router';
 import type { LearningResumeTarget } from '@eduagent/schemas';
+import { markHubToSessionTransition } from './navigation-transition-provenance';
 
 export const FAMILY_HOME_PATH = '/(app)/home';
 // [WI-1658]
@@ -186,10 +187,9 @@ export function goBackOrReplace(
 }
 
 export function pushLearningResumeTarget(
-  router: Pick<Router, 'push' | 'replace'>,
+  router: Pick<Router, 'push'>,
   target: LearningResumeTarget,
   returnTo?: string,
-  options: { replaceTarget?: boolean } = {},
 ): void {
   // [BUG-977 / CCR-PR126-M-2] Replace the previous `as never` cast (which
   // silenced the typed Href system entirely) with `as Href`. The Expo Router
@@ -204,10 +204,10 @@ export function pushLearningResumeTarget(
   // ancestor chain. A single push to /(app)/session synthesises a 1-deep stack,
   // so back() from session falls through to the active tab's first-route
   // (Home) instead of the caller's previous screen.
-  // Fix: seed the contextual return ancestor before pushing session. A caller
-  // already sitting directly above that ancestor can instead replace its
-  // current route; Session then uses history for its visible Back control.
-  const sessionHref = {
+  // Preserve the legacy contract for V0/V1 callers: Home is always seeded as
+  // the ancestor, while returnTo controls only Session's deterministic Back.
+  router.push('/(app)/home' as Href);
+  router.push({
     pathname: '/(app)/session',
     params: {
       mode: 'learning',
@@ -220,19 +220,35 @@ export function pushLearningResumeTarget(
         ? { resumeFromSessionId: target.resumeFromSessionId }
         : {}),
       ...(returnTo ? { returnTo } : {}),
-      ...(options.replaceTarget ? { returnStrategy: 'history' } : {}),
     },
-  } as Href;
+  } as Href);
+}
 
-  if (options.replaceTarget) {
-    router.replace(sessionHref);
-    return;
+export function replaceV2LearningResumeTarget(
+  router: Pick<Router, 'replace'>,
+  target: LearningResumeTarget,
+  returnTo: typeof SUBJECTS_RETURN_TO,
+  options: { preserveSubjectsHistory: boolean },
+): void {
+  if (options.preserveSubjectsHistory) {
+    markHubToSessionTransition(target.subjectId);
   }
 
-  router.push(
-    returnTo ? homeHrefForReturnTo(returnTo) : ('/(app)/home' as Href),
-  );
-  router.push(sessionHref);
+  router.replace({
+    pathname: '/(app)/session',
+    params: {
+      mode: 'learning',
+      subjectId: target.subjectId,
+      subjectName: target.subjectName,
+      ...(target.topicId ? { topicId: target.topicId } : {}),
+      ...(target.topicTitle ? { topicName: target.topicTitle } : {}),
+      ...(target.sessionId ? { sessionId: target.sessionId } : {}),
+      ...(target.resumeFromSessionId
+        ? { resumeFromSessionId: target.resumeFromSessionId }
+        : {}),
+      returnTo,
+    },
+  } as Href);
 }
 
 /**

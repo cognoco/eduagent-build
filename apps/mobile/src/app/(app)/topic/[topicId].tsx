@@ -51,6 +51,7 @@ import {
   pushLearningResumeTarget,
   SUBJECT_HUB_RETURN_TO,
 } from '../../../lib/navigation';
+import { consumeHubToTopicTransition } from '../../../lib/navigation-transition-provenance';
 import { TimeoutLoader } from '../../../components/common';
 import { ShimmerSkeleton } from '../../../components/common/ShimmerSkeleton';
 import { TopicHeader } from '../../../components/library/TopicHeader';
@@ -309,6 +310,29 @@ export default function TopicDetailScreen() {
     resolveAttempt,
   );
   const subjectId = paramSubjectId || resolved?.subjectId;
+  const hubTransitionKey =
+    returnTo === SUBJECT_HUB_RETURN_TO && subjectId && topicId
+      ? `${subjectId}:${topicId}`
+      : undefined;
+  const [hubPredecessorKey, setHubPredecessorKey] = useState<
+    string | undefined
+  >();
+  useEffect(() => {
+    if (
+      hubTransitionKey &&
+      subjectId &&
+      topicId &&
+      consumeHubToTopicTransition(subjectId, topicId)
+    ) {
+      setHubPredecessorKey(hubTransitionKey);
+      return;
+    }
+    setHubPredecessorKey((current) =>
+      current === hubTransitionKey ? current : undefined,
+    );
+  }, [hubTransitionKey, subjectId, topicId]);
+  const hasHubPredecessor =
+    !!hubTransitionKey && hubPredecessorKey === hubTransitionKey;
   const topicBackFallback = useMemo(
     (): Href =>
       returnTo === SUBJECT_HUB_RETURN_TO && subjectId
@@ -322,8 +346,14 @@ export default function TopicDetailScreen() {
     [paramBookId, returnTo, subjectId],
   );
   const handleTopicBack = useCallback(() => {
+    // Only the consumed in-memory Hub → Topic transition proves the immediate
+    // parent. Crafted/refreshed URLs retain the deterministic Hub replacement.
+    if (hasHubPredecessor && router.canGoBack()) {
+      router.back();
+      return;
+    }
     router.replace(topicBackFallback);
-  }, [router, topicBackFallback]);
+  }, [hasHubPredecessor, router, topicBackFallback]);
 
   const { data: resumeTarget } = useLearningResumeTarget({
     subjectId: subjectId ?? undefined,

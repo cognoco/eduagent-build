@@ -7755,6 +7755,118 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     ).toBe(false);
   });
 
+  describe.each([
+    {
+      name: 'learning-active World History Hub owner',
+      file: ['v2', 'v2-subjects-browse-resume.yaml'],
+      expected: [
+        { tapOn: { id: 'subjects-browse-row-${SUBJECT_ID}' } },
+        {
+          extendedWaitUntil: {
+            visible: { id: 'subject-hub-screen' },
+            timeout: 15000,
+          },
+        },
+        {
+          assertVisible: {
+            id: 'subject-hub-title-${SUBJECT_ID}',
+            text: '^World History$',
+          },
+        },
+      ],
+      mutation: [
+        { tapOn: { id: 'subjects-browse-row-${SUBJECT_ID}' } },
+        {
+          extendedWaitUntil: {
+            visible: { id: 'subject-hub-screen' },
+            timeout: 15000,
+          },
+        },
+        {
+          assertVisible: {
+            id: 'subject-hub-title-adjacent-subject',
+            text: '^World History$',
+          },
+        },
+      ],
+    },
+    {
+      name: 'retention-due Biology review owner',
+      file: ['v2', 'v2-subjects-due-review.yaml'],
+      expected: [
+        {
+          assertVisible: {
+            id: 'subject-hub-next-up',
+            containsDescendants: [
+              { text: '^Biology Topic 1$' },
+              { id: 'subject-hub-next-up-action', text: '^Review$' },
+            ],
+          },
+        },
+        {
+          tapOn: {
+            id: 'subject-hub-next-up-action',
+            text: '^Review$',
+            childOf: { id: 'subject-hub-next-up' },
+          },
+        },
+      ],
+      mutation: [
+        {
+          assertVisible: {
+            id: 'subject-hub-next-up',
+            containsDescendants: [
+              { text: '^Biology Topic 2$' },
+              { id: 'subject-hub-next-up-action', text: '^Review$' },
+            ],
+          },
+        },
+        {
+          tapOn: {
+            id: 'subject-hub-next-up-action',
+            text: '^Review$',
+            childOf: { id: 'subject-hub-next-up' },
+          },
+        },
+      ],
+    },
+    {
+      name: 'created Photosynthesis row owner',
+      file: ['v2', 'v2-subject-create-round-trip.yaml'],
+      expected: [
+        {
+          assertVisible: {
+            id: '^subjects-browse-row-.*$',
+            text: 'Open Photosynthesis',
+          },
+        },
+      ],
+      mutation: [
+        {
+          assertVisible: {
+            id: '^subjects-browse-row-.*$',
+            text: 'Open Adjacent Science',
+          },
+        },
+      ],
+    },
+  ])('[WI-2238] $name structural property', ({ file, expected, mutation }) => {
+    const commands = parseAllDocuments(
+      readFileSync(join(repoRoot, 'apps/mobile/e2e/flows', ...file), 'utf8'),
+    )[1]?.toJS() as unknown[];
+    const hasExactSequence = (candidate: unknown[]): boolean =>
+      candidate.some((_, start) =>
+        expected.every((command, offset) =>
+          isDeepStrictEqual(candidate[start + offset], command),
+        ),
+      );
+
+    it('keeps its asserted identity on the named owner and rejects its mutation', () => {
+      expect(hasExactSequence(commands)).toBe(true);
+      expect(hasExactSequence(mutation)).toBe(false);
+    });
+  });
+
   it('[WI-2238] binds every browser Me check to the exact seeded active profile ID', () => {
     const hasExactSeedProfileMeIdentity = (source: string): boolean => {
       const sourceFile = ts.createSourceFile(
@@ -7784,7 +7896,13 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       };
       visit(sourceFile);
 
-      if (!helper?.body || helper.parameters.length !== 3) return false;
+      if (
+        !helper?.body ||
+        helper.parameters.length < 3 ||
+        helper.parameters.length > 4
+      ) {
+        return false;
+      }
       const [pageParameter, displayNameParameter, profileIdParameter] =
         helper.parameters;
       if (
@@ -7921,21 +8039,76 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       };
       inspectOwnedAssertions(helper.body);
 
-      const everyCallUsesSeedProfileId =
-        identityCalls.length === 4 &&
-        identityCalls.every((call) => {
-          const profileId = call.arguments[2];
-          return Boolean(
-            profileId &&
-            ts.isPropertyAccessExpression(profileId) &&
-            ts.isIdentifier(profileId.expression) &&
-            profileId.expression.text === 'seed' &&
-            profileId.name.text === 'profileId',
-          );
-        });
+      const expectedCaseIdentities = new Map([
+        ['WI-2238 multi-subject case:', 'Multi-Subject Learner'],
+        ['WI-2238 learning-active case:', 'Active Learner'],
+        ['WI-2238 retention-due case:', 'Review Learner'],
+        ['WI-2238 onboarding-no-subject case:', 'Test Learner'],
+      ]);
+      const identityCallsByCase = new Map<string, ts.CallExpression[]>();
+      for (const statement of sourceFile.statements) {
+        if (
+          !ts.isExpressionStatement(statement) ||
+          !ts.isCallExpression(statement.expression) ||
+          !ts.isIdentifier(statement.expression.expression) ||
+          statement.expression.expression.text !== 'test' ||
+          !ts.isStringLiteral(statement.expression.arguments[0])
+        ) {
+          continue;
+        }
+        const testName = statement.expression.arguments[0].text;
+        const callback = statement.expression.arguments[1];
+        const expectedCase = [...expectedCaseIdentities.entries()].find(
+          ([caseName]) => testName.startsWith(caseName),
+        );
+        if (
+          !expectedCase ||
+          (!ts.isArrowFunction(callback) && !ts.isFunctionExpression(callback))
+        ) {
+          continue;
+        }
+        const caseCalls: ts.CallExpression[] = [];
+        const collectCaseCalls = (node: ts.Node): void => {
+          if (
+            ts.isCallExpression(node) &&
+            ts.isIdentifier(node.expression) &&
+            node.expression.text === 'expectMeIdentity'
+          ) {
+            caseCalls.push(node);
+          }
+          ts.forEachChild(node, collectCaseCalls);
+        };
+        collectCaseCalls(callback.body);
+        identityCallsByCase.set(expectedCase[0], caseCalls);
+      }
+      const eachNamedCaseUsesItsSeededIdentity =
+        identityCalls.length === expectedCaseIdentities.size &&
+        expectedCaseIdentities.size === identityCallsByCase.size &&
+        [...expectedCaseIdentities.entries()].every(
+          ([testName, displayName]) => {
+            const caseCalls = identityCallsByCase.get(testName);
+            const call = caseCalls?.[0];
+            const profileId = call?.arguments[2];
+            return (
+              caseCalls?.length === 1 &&
+              call?.arguments[0] !== undefined &&
+              ts.isIdentifier(call.arguments[0]) &&
+              call.arguments[0].text === pageParameter.name.text &&
+              ts.isStringLiteral(call.arguments[1]) &&
+              call.arguments[1].text === displayName &&
+              !!profileId &&
+              ts.isPropertyAccessExpression(profileId) &&
+              ts.isIdentifier(profileId.expression) &&
+              profileId.expression.text === 'seed' &&
+              profileId.name.text === 'profileId'
+            );
+          },
+        );
 
       return (
-        hasExactDisplayName && hasActiveCheck && everyCallUsesSeedProfileId
+        hasExactDisplayName &&
+        hasActiveCheck &&
+        eachNamedCaseUsesItsSeededIdentity
       );
     };
 
@@ -7962,6 +8135,10 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       subjectsSpec.replace(
         "expectMeIdentity(page, 'Multi-Subject Learner', seed.profileId)",
         "expectMeIdentity(page, 'Multi-Subject Learner', activeSubjectId)",
+      ),
+      subjectsSpec.replace(
+        "expectMeIdentity(page, 'Review Learner', seed.profileId",
+        "expectMeIdentity(page, 'Active Learner', seed.profileId",
       ),
     ]) {
       expect(hasExactSeedProfileMeIdentity(mutation)).toBe(false);

@@ -5,6 +5,7 @@ import {
   isSessionForwardableReturnTo,
   goBackOrReplace,
   pushLearningResumeTarget,
+  replaceV2LearningResumeTarget,
   pushChildReport,
   pushChildWeeklyReport,
   LEARNER_HOME_HREF,
@@ -28,6 +29,10 @@ import {
   accountReturnHref,
   accountReturnTokenForPathname,
 } from './navigation';
+import {
+  consumeHubToSessionTransition,
+  resetNavigationTransitionProvenanceForTests,
+} from './navigation-transition-provenance';
 import type { LearningResumeTarget } from '@eduagent/schemas';
 import type { Router } from 'expo-router';
 
@@ -260,6 +265,10 @@ describe('V2 account return contract [WI-2240]', () => {
 // ---------------------------------------------------------------------------
 
 describe('pushLearningResumeTarget [BUG-977]', () => {
+  beforeEach(() => {
+    resetNavigationTransitionProvenanceForTests();
+  });
+
   function makeRouter() {
     return {
       push: jest.fn(),
@@ -298,7 +307,7 @@ describe('pushLearningResumeTarget [BUG-977]', () => {
     );
   });
 
-  it('pushes Subjects before the exact session when returnTo is subjects', () => {
+  it('preserves the legacy Home ancestor when returnTo is subjects', () => {
     const router = makeRouter();
     const target: LearningResumeTarget = {
       ...makeMinimalTarget(),
@@ -310,7 +319,7 @@ describe('pushLearningResumeTarget [BUG-977]', () => {
     pushLearningResumeTarget(router, target, SUBJECTS_RETURN_TO);
 
     expect(router.push).toHaveBeenCalledTimes(2);
-    expect(router.push).toHaveBeenNthCalledWith(1, SUBJECTS_HREF);
+    expect(router.push).toHaveBeenNthCalledWith(1, '/(app)/home');
     expect(router.push).toHaveBeenNthCalledWith(2, {
       pathname: '/(app)/session',
       params: {
@@ -325,7 +334,7 @@ describe('pushLearningResumeTarget [BUG-977]', () => {
     });
   });
 
-  it('replaces the current route with a history-return session when the caller already has the return ancestor', () => {
+  it('isolates current-route replacement behind the V2-only helper', () => {
     const router = makeRouter();
     const target: LearningResumeTarget = {
       ...makeMinimalTarget(),
@@ -334,8 +343,8 @@ describe('pushLearningResumeTarget [BUG-977]', () => {
       sessionId: 'session-hub-resume',
     };
 
-    pushLearningResumeTarget(router, target, SUBJECTS_RETURN_TO, {
-      replaceTarget: true,
+    replaceV2LearningResumeTarget(router, target, SUBJECTS_RETURN_TO, {
+      preserveSubjectsHistory: true,
     });
 
     expect(router.push).not.toHaveBeenCalled();
@@ -349,9 +358,23 @@ describe('pushLearningResumeTarget [BUG-977]', () => {
         topicName: 'Cell respiration',
         sessionId: 'session-hub-resume',
         returnTo: SUBJECTS_RETURN_TO,
-        returnStrategy: 'history',
       },
     });
+    expect(consumeHubToSessionTransition('subj-1')).toBe(true);
+  });
+
+  it('does not create history proof for a V2 replacement without a proven Subjects predecessor', () => {
+    const router = makeRouter();
+
+    replaceV2LearningResumeTarget(
+      router,
+      makeMinimalTarget(),
+      SUBJECTS_RETURN_TO,
+      { preserveSubjectsHistory: false },
+    );
+
+    expect(router.replace).toHaveBeenCalledTimes(1);
+    expect(consumeHubToSessionTransition('subj-1')).toBe(false);
   });
 
   it('passes the session pathname and required params for a minimal target', () => {

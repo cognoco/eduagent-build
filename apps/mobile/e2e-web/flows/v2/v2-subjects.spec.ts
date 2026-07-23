@@ -80,19 +80,56 @@ async function expectSubjectRow(
   });
 }
 
-async function expectStatusRow(
+async function expectExactSubjectBrowseRows(
   page: Page,
-  status: 'active' | 'paused' | 'archived',
-  subjectId: string,
-  subjectName: string,
+  expectedByStatus: Readonly<
+    Record<
+      'active' | 'paused' | 'archived',
+      readonly {
+        id: string;
+        name: string;
+      }[]
+    >
+  >,
 ): Promise<void> {
-  const statusGroup = page.getByTestId(
-    `subjects-browse-status-group-${status}`,
+  const expectedRows = Object.entries(expectedByStatus).flatMap(
+    ([status, rows]) => rows.map((row) => ({ status, ...row })),
   );
-  const row = statusGroup.getByTestId(`subjects-browse-row-${subjectId}`);
-  await expect(row.getByText(subjectName, { exact: true })).toBeVisible({
-    timeout: 60_000,
-  });
+  const actualIds: string[] = [];
+
+  for (const status of ['active', 'paused', 'archived'] as const) {
+    const rows = expectedByStatus[status];
+    const statusGroup = page.getByTestId(
+      `subjects-browse-status-group-${status}`,
+    );
+    const statusRows = statusGroup.locator(
+      '[data-testid^="subjects-browse-row-"]',
+    );
+    await expect(statusRows).toHaveCount(rows.length, { timeout: 60_000 });
+
+    for (const row of rows) {
+      const rowLocator = statusGroup.getByTestId(
+        `subjects-browse-row-${row.id}`,
+      );
+      await expect(rowLocator.getByText(row.name, { exact: true })).toBeVisible(
+        { timeout: 60_000 },
+      );
+    }
+    actualIds.push(
+      ...(await statusRows.evaluateAll((elements) =>
+        elements.map((element) => {
+          const testId = element.getAttribute('data-testid');
+          if (!testId) throw new Error('Subject row is missing its test ID');
+          return testId;
+        }),
+      )),
+    );
+  }
+
+  const expectedIds = expectedRows.map(({ id }) => `subjects-browse-row-${id}`);
+  expect(actualIds).toHaveLength(expectedIds.length);
+  expect(new Set(actualIds).size).toBe(actualIds.length);
+  expect([...actualIds].sort()).toEqual([...expectedIds].sort());
 }
 
 async function expectSubjectHub(
@@ -115,6 +152,7 @@ async function expectMeIdentity(
   page: Page,
   displayName: string,
   profileId: string,
+  options: { expectSubjectsReturn?: boolean } = {},
 ): Promise<void> {
   await pressableClick(
     page.locator('[data-testid="account-avatar-button"]:visible'),
@@ -144,7 +182,9 @@ async function expectMeIdentity(
     page.locator('[data-testid="account-screen"]:visible'),
   ).toBeVisible({ timeout: 60_000 });
   await pressableClick(page.locator('[data-testid="account-back"]:visible'));
-  await expectSubjectsPath(page);
+  if (options.expectSubjectsReturn !== false) {
+    await expectSubjectsPath(page);
+  }
 }
 
 async function expectSessionIdentity(
@@ -254,9 +294,12 @@ test('WI-2238 multi-subject case: exact status rows, Physics search/no-result cl
     );
   }
 
-  await expectStatusRow(page, 'active', activeSubjectId, 'Physics');
-  await expectStatusRow(page, 'paused', pausedSubjectId, 'Literature');
-  await expectStatusRow(page, 'archived', archivedSubjectId, 'Art History');
+  const expectedRows = {
+    active: [{ id: activeSubjectId, name: 'Physics' }],
+    paused: [{ id: pausedSubjectId, name: 'Literature' }],
+    archived: [{ id: archivedSubjectId, name: 'Art History' }],
+  } as const;
+  await expectExactSubjectBrowseRows(page, expectedRows);
 
   const search = page.getByTestId('subjects-browse-search');
   await fillTextInput(search, 'Physics');
@@ -291,9 +334,7 @@ test('WI-2238 multi-subject case: exact status rows, Physics search/no-result cl
   ).toBeVisible();
   await pressableClick(page.getByTestId('library-search-clear-results'));
   await expect(search).toHaveValue('');
-  await expectStatusRow(page, 'active', activeSubjectId, 'Physics');
-  await expectStatusRow(page, 'paused', pausedSubjectId, 'Literature');
-  await expectStatusRow(page, 'archived', archivedSubjectId, 'Art History');
+  await expectExactSubjectBrowseRows(page, expectedRows);
 });
 
 test('WI-2238 learning-active case: exact World History resume IDs and visible session Back restore Subjects + Active Learner Me identity', async ({
@@ -381,7 +422,13 @@ test('WI-2238 retention-due case: exact Biology Topic 1 review and visible Back 
   await pressableClick(page.getByTestId('subject-hub-back'));
   await expectSubjectsPath(page);
   await expectSubjectRow(page, subjectId, 'Biology');
-  await expectMeIdentity(page, 'Review Learner', seed.profileId);
+  await page.goBack();
+  await expect(page).not.toHaveURL(
+    new RegExp(`/subject-hub/${subjectId}(?:\\?.*)?$`),
+  );
+  await expectMeIdentity(page, 'Review Learner', seed.profileId, {
+    expectSubjectsReturn: false,
+  });
 });
 
 test('WI-2238 Subjects API recovery case: a visible failure stays recoverable and Retry restores the exact seeded World History row', async ({

@@ -1,7 +1,8 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { platformAlert } from '../../../lib/platform-alert';
-import { goBackOrReplace } from '../../../lib/navigation';
+import { goBackOrReplace, SUBJECTS_RETURN_TO } from '../../../lib/navigation';
+import { consumeHubToSessionTransition } from '../../../lib/navigation-transition-provenance';
 import { shouldShowBookLink } from '../../../lib/show-book-link';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import {
@@ -315,7 +316,6 @@ function SessionScreenInner() {
     gaps: rawGaps,
     returnTo: rawReturnTo,
     returnId: rawReturnId,
-    returnStrategy: rawReturnStrategy,
     verificationType: routeVerificationType,
     imageUri: rawImageUri,
     imageMimeType: rawImageMimeType,
@@ -337,7 +337,6 @@ function SessionScreenInner() {
     gaps?: string;
     returnTo?: string | string[];
     returnId?: string | string[];
-    returnStrategy?: string | string[];
     verificationType?: string;
     imageUri?: string;
     imageMimeType?: string;
@@ -355,7 +354,6 @@ function SessionScreenInner() {
     imageMimeType,
     returnTo,
     returnId,
-    returnStrategy,
     gaps,
     normalizedOcrText,
     homeworkCaptureSource,
@@ -377,7 +375,6 @@ function SessionScreenInner() {
         gaps: rawGaps,
         returnTo: rawReturnTo,
         returnId: rawReturnId,
-        returnStrategy: rawReturnStrategy,
         imageUri: rawImageUri,
         imageMimeType: rawImageMimeType,
       }),
@@ -392,25 +389,42 @@ function SessionScreenInner() {
       rawImageMimeType,
       rawImageUri,
       rawReturnId,
-      rawReturnStrategy,
       rawReturnTo,
       subjectId,
     ],
   );
+  const subjectsTransitionId =
+    returnTo === SUBJECTS_RETURN_TO ? subjectId : undefined;
+  const [subjectsPredecessorId, setSubjectsPredecessorId] = useState<
+    string | undefined
+  >();
+  useEffect(() => {
+    if (
+      subjectsTransitionId &&
+      consumeHubToSessionTransition(subjectsTransitionId)
+    ) {
+      setSubjectsPredecessorId(subjectsTransitionId);
+      return;
+    }
+    setSubjectsPredecessorId((current) =>
+      current === subjectsTransitionId ? current : undefined,
+    );
+  }, [subjectsTransitionId]);
+  const hasSubjectsPredecessor =
+    !!subjectsTransitionId && subjectsPredecessorId === subjectsTransitionId;
   // [BUG-867] String-templated dynamic paths (`/(app)/shelf/${subjectId}`)
   // don't always resolve on web — the chevron looked clickable but the URL
   // never changed. Supplying an explicit handler that uses Expo Router's
   // typed object form makes the navigation reliable across web + native.
   const handleChatBackPress = useCallback(() => {
-    if (returnTo) {
-      // A named return destination is stronger than ambient browser history.
-      // Expo web can retain the replaced Subject Hub entry, so back() would
-      // reopen the Hub instead of honoring the Subjects return contract.
-      router.replace(homeBackHref as Href);
+    if (hasSubjectsPredecessor) {
+      goBackOrReplace(router, homeBackHref);
       return;
     }
-    if (returnStrategy === 'history') {
-      goBackOrReplace(router, homeBackHref);
+    if (returnTo) {
+      // Without consumed runtime provenance, a named destination is only a
+      // deterministic replacement fallback, never permission to pop history.
+      router.replace(homeBackHref as Href);
       return;
     }
     if (subjectId) {
@@ -421,9 +435,9 @@ function SessionScreenInner() {
       return;
     }
     router.replace('/(app)/home' as Href);
-  }, [returnStrategy, returnTo, subjectId, homeBackHref, router]);
+  }, [hasSubjectsPredecessor, returnTo, subjectId, homeBackHref, router]);
   const handleHomeBack = useCallback(() => {
-    if (returnStrategy === 'history') {
+    if (hasSubjectsPredecessor) {
       goBackOrReplace(router, homeBackHref);
       return;
     }
@@ -433,7 +447,7 @@ function SessionScreenInner() {
     }
 
     goBackOrReplace(router, homeBackHref);
-  }, [homeBackHref, returnStrategy, returnTo, router]);
+  }, [hasSubjectsPredecessor, homeBackHref, returnTo, router]);
   const handleStartNewSession = useCallback(() => {
     router.replace({
       pathname: '/(app)/session',

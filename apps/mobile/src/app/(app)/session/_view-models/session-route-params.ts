@@ -19,7 +19,6 @@ export interface RawSessionRouteParams {
   gaps?: string | string[];
   returnTo?: string | string[];
   returnId?: string | string[];
-  returnStrategy?: string | string[];
   imageUri?: string | string[];
   imageMimeType?: string | string[];
 }
@@ -30,7 +29,6 @@ export interface SessionRouteParams {
   imageMimeType: string | undefined;
   returnTo: string | undefined;
   returnId: string | undefined;
-  returnStrategy: 'history' | undefined;
   gaps: string[] | undefined;
   normalizedOcrText: string | undefined;
   homeworkCaptureSource: HomeworkCaptureSource | undefined;
@@ -76,8 +74,6 @@ export function getSessionRouteParams(
   const subjectId = firstParam(rawParams.subjectId);
   const returnTo = firstParam(rawParams.returnTo);
   const returnId = firstParam(rawParams.returnId);
-  const returnStrategy =
-    firstParam(rawParams.returnStrategy) === 'history' ? 'history' : undefined;
   const effectiveMode = firstParam(rawParams.mode) ?? 'freeform';
   const problemText = firstParam(rawParams.problemText);
   const homeBackHref = homeworkReturnHrefForReturnTo(returnTo, returnId);
@@ -95,7 +91,6 @@ export function getSessionRouteParams(
     imageMimeType: firstParam(rawParams.imageMimeType),
     returnTo,
     returnId,
-    returnStrategy,
     gaps: parseGaps(rawParams.gaps),
     normalizedOcrText: firstParam(rawParams.ocrText),
     homeworkCaptureSource: normalizeHomeworkCaptureSource(

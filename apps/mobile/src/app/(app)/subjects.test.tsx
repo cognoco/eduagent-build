@@ -11,6 +11,7 @@ import { createTestProfile } from '../../test-utils/app-hook-test-utils';
 import type { SubjectIndexItem } from '../../hooks/use-subjects-index';
 
 const mockPush = jest.fn();
+const mockMarkSubjectsToHubTransition = jest.fn();
 let mockSubjectsIndex: {
   subjects: SubjectIndexItem[];
   isLoading: boolean;
@@ -39,6 +40,15 @@ let mockScopeContext: {
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
+
+jest.mock(
+  '../../lib/navigation-transition-provenance',
+  () => ({
+    markSubjectsToHubTransition: (...args: unknown[]) =>
+      mockMarkSubjectsToHubTransition(...args),
+  }),
+  { virtual: true },
+);
 
 jest.mock(
   '../../hooks/use-subjects-index' /* gc1-allow: route screen test pins hook state; hook behavior is covered in use-subjects-index.test.tsx */,
@@ -287,8 +297,13 @@ describe('SubjectsScreen', () => {
     expect(mockPush).toHaveBeenCalledTimes(1);
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/subject-hub/[subjectId]',
-      params: { subjectId: SUBJECTS[0]!.subjectId },
+      params: {
+        subjectId: SUBJECTS[0]!.subjectId,
+      },
     });
+    expect(mockMarkSubjectsToHubTransition).toHaveBeenCalledWith(
+      SUBJECTS[0]!.subjectId,
+    );
   });
 
   it.each([
