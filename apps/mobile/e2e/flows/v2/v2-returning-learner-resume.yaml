@@ -36,8 +36,9 @@ tags:
 # The exact pre-existing assistant transcript binds Continue to the seeded
 # unfinished session before this flow submits a new learner turn.
 - assertVisible:
-    id: 'message-bubble-assistant-.*'
     text: '^They connected cities, trade, armies, and new ideas\.$'
+    childOf:
+      id: 'message-bubble-assistant-.*'
 
 - tapOn:
     id: 'chat-input'
