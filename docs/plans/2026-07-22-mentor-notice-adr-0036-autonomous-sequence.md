@@ -92,7 +92,7 @@ Refresh the bounced review findings and reconcile the existing worktree before p
   - `dismissed/explicit_stop`
   - `deferred/explicit_not_now`
   - `continue/unclear`
-- `continue` makes no transition. Malformed or unavailable judging makes no transition before turn three and deterministically terminalizes `not_yet` at the cap.
+- Before turn three, `continue` and malformed or unavailable judging make no transition. At turn three, any evaluation that does not commit `locked_in`, `not_yet`, `dismissed`, or `deferred`—including valid `continue` or malformed or unavailable judging—deterministically terminalizes `not_yet`.
 - Reuse the landed WI-2501 idempotency primitive so a valid transition applies once under retries.
 - Persist only event identity needed for idempotency, never answer text, judge reasoning, or confidence.
 - Put the server-committed transition in non-stream responses and SSE done frames; mobile renders only that transition.
