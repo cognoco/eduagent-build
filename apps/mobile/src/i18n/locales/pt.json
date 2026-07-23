@@ -3005,7 +3005,24 @@
     "subjects": "Matérias",
     "subjectsLabel": "Matérias",
     "journal": "Diário",
-    "journalLabel": "Diário"
+    "journalLabel": "Diário",
+    "adultSelfConsent": {
+      "title": "Confirme como usamos os seus dados",
+      "intro": "Antes de continuar, precisamos do seu consentimento para duas coisas sobre a sua conta.",
+      "platformUseHeading": "Usar o MentoMate",
+      "platformUseBody": "Processamos os dados da sua conta e aprendizagem para que a app funcione para si — as suas disciplinas, sessões e progresso.",
+      "llmDisclosureHeading": "Mentoria de IA",
+      "llmDisclosureBody": "As suas mensagens para o seu mentor de IA são enviadas a um fornecedor de modelos de IA para que ele possa responder e ensinar. Nunca vendemos os seus dados.",
+      "legalIntro": "Reveja todos os detalhes antes de concordar:",
+      "termsLink": "Termos de Serviço",
+      "privacyLink": "Política de Privacidade",
+      "accept": "Concordo",
+      "submitting": "A guardar…",
+      "errorTitle": "Não foi possível guardar o seu acordo",
+      "errorBody": "Ocorreu um erro da nossa parte. Tente novamente.",
+      "retry": "Tentar novamente",
+      "signOut": "Sair da conta"
+    }
   },
   "subscription": {
     "trial": {

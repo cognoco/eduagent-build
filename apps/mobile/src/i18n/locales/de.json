@@ -2978,7 +2978,24 @@
     "subjects": "Fächer",
     "subjectsLabel": "Fächer",
     "journal": "Tagebuch",
-    "journalLabel": "Tagebuch"
+    "journalLabel": "Tagebuch",
+    "adultSelfConsent": {
+      "title": "Bestätige, wie wir deine Daten verwenden",
+      "intro": "Bevor du weitermachst, brauchen wir deine Zustimmung zu zwei Dingen bezüglich deines Kontos.",
+      "platformUseHeading": "Nutzung von MentoMate",
+      "platformUseBody": "Wir verarbeiten deine Konto- und Lerndaten, damit die App für dich funktioniert – deine Fächer, Sitzungen und Fortschritte.",
+      "llmDisclosureHeading": "KI-Mentor",
+      "llmDisclosureBody": "Deine Nachrichten an deinen KI-Mentor werden an einen KI-Modellanbieter gesendet, damit er antworten und lehren kann. Wir verkaufen deine Daten niemals.",
+      "legalIntro": "Lies dir die vollständigen Details durch, bevor du zustimmst:",
+      "termsLink": "Nutzungsbedingungen",
+      "privacyLink": "Datenschutzrichtlinie",
+      "accept": "Ich stimme zu",
+      "submitting": "Speichern…",
+      "errorTitle": "Wir konnten deine Zustimmung nicht speichern",
+      "errorBody": "Das hat bei uns nicht geklappt. Bitte versuche es erneut.",
+      "retry": "Erneut versuchen",
+      "signOut": "Stattdessen abmelden"
+    }
   },
   "subscription": {
     "trial": {

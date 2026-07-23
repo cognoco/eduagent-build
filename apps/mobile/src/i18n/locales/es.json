@@ -2978,7 +2978,24 @@
     "subjects": "Asignaturas",
     "subjectsLabel": "Asignaturas",
     "journal": "Diario",
-    "journalLabel": "Diario"
+    "journalLabel": "Diario",
+    "adultSelfConsent": {
+      "title": "Confirma cómo usamos tus datos",
+      "intro": "Antes de continuar, necesitamos tu consentimiento para dos cosas sobre tu propia cuenta.",
+      "platformUseHeading": "Uso de MentoMate",
+      "platformUseBody": "Procesamos los datos de tu cuenta y aprendizaje para que la app funcione para ti: tus materias, sesiones y progreso.",
+      "llmDisclosureHeading": "Tutoría con IA",
+      "llmDisclosureBody": "Tus mensajes a tu mentor de IA se envían a un proveedor de modelos de IA para que pueda responder y enseñar. Nunca vendemos tus datos.",
+      "legalIntro": "Revisa todos los detalles antes de aceptar:",
+      "termsLink": "Términos de servicio",
+      "privacyLink": "Política de privacidad",
+      "accept": "Acepto",
+      "submitting": "Guardando…",
+      "errorTitle": "No pudimos guardar tu consentimiento",
+      "errorBody": "No se pudo procesar. Inténtalo de nuevo.",
+      "retry": "Reintentar",
+      "signOut": "Cerrar sesión"
+    }
   },
   "subscription": {
     "trial": {

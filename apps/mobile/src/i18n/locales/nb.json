@@ -2978,7 +2978,24 @@
     "subjects": "Fag",
     "subjectsLabel": "Fag",
     "journal": "Logg",
-    "journalLabel": "Logg"
+    "journalLabel": "Logg",
+    "adultSelfConsent": {
+      "title": "Bekreft hvordan vi bruker dataene dine",
+      "intro": "Før du fortsetter, må vi ha ditt samtykke til to ting som gjelder kontoen din.",
+      "platformUseHeading": "Bruk av MentoMate",
+      "platformUseBody": "Vi behandler konto- og læringsdataene dine slik at appen fungerer for deg – dine emner, økter og fremgang.",
+      "llmDisclosureHeading": "AI-veiledning",
+      "llmDisclosureBody": "Meldingene dine til AI-mentoren din sendes til en leverandør av AI-modeller slik at den kan svare og undervise. Vi selger aldri dataene dine.",
+      "legalIntro": "Les gjennom alle detaljene før du godtar:",
+      "termsLink": "Tjenestevilkår",
+      "privacyLink": "Personvernerklæring",
+      "accept": "Jeg godtar",
+      "submitting": "Lagrer …",
+      "errorTitle": "Vi kunne ikke lagre samtykket ditt",
+      "errorBody": "Det gikk ikke gjennom hos oss. Prøv igjen.",
+      "retry": "Prøv igjen",
+      "signOut": "Logg ut i stedet"
+    }
   },
   "subscription": {
     "trial": {

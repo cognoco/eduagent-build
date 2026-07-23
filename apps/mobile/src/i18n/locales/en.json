@@ -3029,6 +3029,23 @@
       "switchProfile": "Switch profile",
       "signOut": "Sign out"
     },
+    "adultSelfConsent": {
+      "title": "Confirm how we use your data",
+      "intro": "Before you continue, we need your agreement to two things about your own account.",
+      "platformUseHeading": "Using MentoMate",
+      "platformUseBody": "We process your account and learning data so the app works for you — your subjects, sessions, and progress.",
+      "llmDisclosureHeading": "AI tutoring",
+      "llmDisclosureBody": "Your messages to your AI mentor are sent to an AI model provider so it can reply and teach. We never sell your data.",
+      "legalIntro": "Review the full details before you agree:",
+      "termsLink": "Terms of Service",
+      "privacyLink": "Privacy Policy",
+      "accept": "I agree",
+      "submitting": "Saving…",
+      "errorTitle": "We couldn't save your agreement",
+      "errorBody": "That didn't go through on our end. Please try again.",
+      "retry": "Try again",
+      "signOut": "Sign out instead"
+    },
     "consentPending": {
       "linkSentTitle": "Link sent to {{email}}",
       "linkSentMessage": "Ask your parent to check their email and approve your account",
