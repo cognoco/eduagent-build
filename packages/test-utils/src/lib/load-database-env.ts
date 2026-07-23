@@ -37,6 +37,8 @@ interface DopplerSource {
   environment: string;
 }
 
+const LOCAL_DOPPLER_CONFIGS = new Set(['dev', 'dev_personal']);
+
 function readDopplerSource(
   values: Record<string, string | undefined>,
 ): DopplerSource | undefined {
@@ -58,7 +60,10 @@ function readDopplerSource(
 }
 
 function assertLocalDopplerSource(source: DopplerSource): void {
-  if (source.environment !== 'dev') {
+  if (
+    !LOCAL_DOPPLER_CONFIGS.has(source.config) ||
+    source.environment !== 'dev'
+  ) {
     throw new Error(
       `Refusing Doppler database fallback for tests: project=${source.project}, config=${source.config}, environment=${source.environment} is shared/non-local. Set DATABASE_URL explicitly or select a development Doppler config.`,
     );
