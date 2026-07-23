@@ -44,7 +44,10 @@ const ENTRY_CASES = [
   },
 ] as const;
 
-async function signInFreshOwner(page: Page, alias: string): Promise<void> {
+async function signInFreshOwner(
+  page: Page,
+  { alias }: { alias: string },
+): Promise<void> {
   await seedAndSignIn(page, {
     scenario: 'parent-multi-child',
     alias,
@@ -87,7 +90,7 @@ async function expectOwnerLearnerEntry(
 test('V2 owner learner Account returns its exact self scope to each initiating tab', async ({
   page,
 }) => {
-  await signInFreshOwner(page, 'v2-account-owner-return');
+  await signInFreshOwner(page, { alias: 'v2-account-owner-return' });
 
   for (const entry of ENTRY_CASES) {
     await test.step(`${entry.name} avatar -> ${entry.leafRow} -> ${entry.name}`, async () => {
@@ -125,7 +128,7 @@ test('V2 owner learner Account returns its exact self scope to each initiating t
 test('V2 Account empty history falls back to Journal and never legacy Home', async ({
   page,
 }) => {
-  await signInFreshOwner(page, 'v2-account-owner-empty-history');
+  await signInFreshOwner(page, { alias: 'v2-account-owner-empty-history' });
 
   const journalEntry = ENTRY_CASES.find((entry) => entry.name === 'Journal');
   if (!journalEntry) {
@@ -168,7 +171,7 @@ async function expectSignedOutWithoutTestParentData(page: Page): Promise<void> {
 test('V2 Test Parent sign-out keeps its General Knowledge row behind the unauthenticated boundary after Back and a fresh protected page', async ({
   page,
 }) => {
-  await signInFreshOwner(page, 'v2-account-owner-sign-out');
+  await signInFreshOwner(page, { alias: 'v2-account-owner-sign-out' });
 
   const subjectsEntry = ENTRY_CASES.find((entry) => entry.name === 'Subjects');
   if (!subjectsEntry) {
