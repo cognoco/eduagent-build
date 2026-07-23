@@ -139,4 +139,47 @@ describe('selfConsentAcceptResultSchema [WI-2547]', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  // The shared contract encodes its own nonblank invariant rather than relying
+  // on the route to have trimmed first. A whitespace-only version is as
+  // unversioned as an empty one for GDPR Art 5(2)/7(1) purposes, so the schema
+  // must reject it on its own.
+  it.each([
+    ['spaces', '   '],
+    ['tab', '\t'],
+    ['newline', '\n'],
+    ['mixed whitespace', ' \t\n '],
+  ])(
+    'rejects a whitespace-only termsVersion (%s)',
+    (_label, termsVersion: string) => {
+      const result = selfConsentAcceptResultSchema.safeParse({
+        message: 'Consent recorded.',
+        purposesGranted: [],
+        termsVersion,
+      });
+      expect(result.success).toBe(false);
+    },
+  );
+
+  // Output semantics, pinned explicitly rather than left implicit: the nonblank
+  // check trims first, so a padded-but-valid version parses AND the parsed
+  // value is the trimmed form. Anything reading `termsVersion` off a parsed
+  // result therefore never sees surrounding whitespace.
+  it('accepts a padded valid termsVersion and yields the trimmed value', () => {
+    const parsed = selfConsentAcceptResultSchema.parse({
+      message: 'Consent recorded.',
+      purposesGranted: [],
+      termsVersion: '  2026-05-31\n',
+    });
+    expect(parsed.termsVersion).toBe('2026-05-31');
+  });
+
+  it('leaves an already-trimmed termsVersion byte-identical', () => {
+    const parsed = selfConsentAcceptResultSchema.parse({
+      message: 'Consent recorded.',
+      purposesGranted: [...CONSENT_PURPOSES],
+      termsVersion: '2026-05-31',
+    });
+    expect(parsed.termsVersion).toBe('2026-05-31');
+  });
 });

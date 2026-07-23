@@ -172,7 +172,7 @@ accepts *no* caller-supplied identifiers — so only a response schema is added.
 export const selfConsentAcceptResultSchema = z.object({
   message: z.string(),
   purposesGranted: z.array(consentPurposeSchema),
-  termsVersion: z.string().min(1),
+  termsVersion: z.string().trim().min(1),
 });
 export type SelfConsentAcceptResult = z.infer<typeof selfConsentAcceptResultSchema>;
 ```

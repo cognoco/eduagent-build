@@ -633,9 +633,9 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     // A blank/whitespace policy version would mint an UNVERSIONED acceptance
     // fact — precisely the weak GDPR Art 5(2)/7(1) evidence
     // repairOrSignalAdultSelfConsentV2 refuses to fabricate. The response
-    // schema's `.min(1)` would catch it only AFTER the transaction committed,
-    // leaving a written-but-unreportable grant, so it is refused up front with
-    // no service call at all.
+    // schema's `.trim().min(1)` rejects a blank version too, but only AFTER the
+    // transaction committed, leaving a written-but-unreportable grant — so it is
+    // refused up front here, with no service call at all.
     const termsVersion = c.env.CONSENT_POLICY_VERSION?.trim();
     if (!termsVersion) {
       return apiError(

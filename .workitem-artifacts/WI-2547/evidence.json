@@ -32,7 +32,7 @@
     },
     {
       "acRef": "AC-2",
-      "description": "A missing, empty, or whitespace-only CONSENT_POLICY_VERSION is refused with 503 before any service call, so an UNVERSIONED acceptance fact can never be written (the response schema's .min(1) would otherwise reject only AFTER the transaction committed, leaving a written-but-unreportable grant). Proven with a tripwire db whose every property access throws: the guard cases return 503 rather than 500, and a negative control shows a fully satisfied request DOES reach the service and DOES 500 - pinning that the 503s come from the version guard and not an earlier short-circuit.",
+      "description": "A missing, empty, or whitespace-only CONSENT_POLICY_VERSION is refused with 503 before any service call, so an UNVERSIONED acceptance fact can never be written (the response schema's .trim().min(1) would otherwise reject only AFTER the transaction committed, leaving a written-but-unreportable grant). Proven with a tripwire db whose every property access throws: the guard cases return 503 rather than 500, and a negative control shows a fully satisfied request DOES reach the service and DOES 500 - pinning that the 503s come from the version guard and not an earlier short-circuit.",
       "pointer": "apps/api/src/routes/consent-self-accept.test.ts"
     },
     {

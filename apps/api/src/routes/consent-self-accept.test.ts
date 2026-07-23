@@ -122,9 +122,9 @@ describe('POST /consent/self/accept — presented-profile guard [WI-2547]', () =
 describe('POST /consent/self/accept — policy-version guard [WI-2547]', () => {
   // A blank version would mint an UNVERSIONED acceptance fact — the weak GDPR
   // Art 5(2)/7(1) evidence repairOrSignalAdultSelfConsentV2 refuses to
-  // fabricate. The response schema's `.min(1)` would only reject it AFTER the
-  // transaction committed, leaving a written-but-unreportable grant, so the
-  // route refuses up front.
+  // fabricate. The response schema's `.trim().min(1)` rejects a blank version
+  // too, but only AFTER the transaction committed, leaving a
+  // written-but-unreportable grant, so the route refuses up front.
   const cases: Array<[string, Record<string, string>]> = [
     ['missing', {}],
     ['empty', { CONSENT_POLICY_VERSION: '' }],
