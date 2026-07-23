@@ -9,9 +9,12 @@ import { ProfileContext, type Profile } from '../../lib/profile';
 import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { createTestProfile } from '../../test-utils/app-hook-test-utils';
 import type { SubjectIndexItem } from '../../hooks/use-subjects-index';
+import {
+  consumeSubjectsToHubTransition,
+  resetNavigationTransitionProvenanceForTests,
+} from '../../lib/navigation-transition-provenance';
 
 const mockPush = jest.fn();
-const mockMarkSubjectsToHubTransition = jest.fn();
 let mockSubjectsIndex: {
   subjects: SubjectIndexItem[];
   isLoading: boolean;
@@ -40,16 +43,6 @@ let mockScopeContext: {
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
-
-jest.mock(
-  '../../lib/navigation-transition-provenance',
-  () => ({
-    ...jest.requireActual('../../lib/navigation-transition-provenance'),
-    markSubjectsToHubTransition: (...args: unknown[]) =>
-      mockMarkSubjectsToHubTransition(...args),
-  }),
-  { virtual: true },
-);
 
 jest.mock(
   '../../hooks/use-subjects-index' /* gc1-allow: route screen test pins hook state; hook behavior is covered in use-subjects-index.test.tsx */,
@@ -210,6 +203,7 @@ const PAUSED_SUBJECT: SubjectIndexItem = {
 describe('SubjectsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    resetNavigationTransitionProvenanceForTests();
     mockPush.mockReset();
     mockSubjectsIndex = {
       subjects: SUBJECTS,
@@ -233,6 +227,7 @@ describe('SubjectsScreen', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    resetNavigationTransitionProvenanceForTests();
   });
 
   it('renders the exact active row and omits the paused row while V2 is off', () => {
@@ -304,9 +299,7 @@ describe('SubjectsScreen', () => {
         subjectId: SUBJECTS[0]!.subjectId,
       },
     });
-    expect(mockMarkSubjectsToHubTransition).toHaveBeenCalledWith(
-      SUBJECTS[0]!.subjectId,
-    );
+    expect(consumeSubjectsToHubTransition(SUBJECTS[0]!.subjectId)).toBe(true);
   });
 
   it.each([

@@ -4,6 +4,11 @@ import { Alert, Platform } from 'react-native';
 import { fireEvent, waitFor, act, within } from '@testing-library/react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { QuotaExceededError } from '../../../lib/api-client';
+import {
+  consumeHubToSessionTransition,
+  markHubToSessionTransition,
+  resetNavigationTransitionProvenanceForTests,
+} from '../../../lib/navigation-transition-provenance';
 import * as Sentry from '@sentry/react-native';
 import {
   fetchCallsMatching,
@@ -358,9 +363,6 @@ const mockSetSessionInputMode = jest.fn();
 const mockFlagSessionContent = jest.fn();
 const mockReplace = jest.fn();
 const mockSetParams = jest.fn();
-const mockConsumeHubToSessionTransition = jest.fn(
-  (_subjectId: string) => false,
-);
 const mockUseSession = jest.fn<
   { data: null | Record<string, unknown> },
   [string?]
@@ -499,17 +501,6 @@ jest.mock('expo-router', () => ({
     useEffect(() => callback(), [callback]);
   },
 }));
-
-jest.mock(
-  '../../../lib/navigation-transition-provenance',
-  () => ({
-    ...jest.requireActual('../../../lib/navigation-transition-provenance'),
-    consumeHubToSessionTransition: (subjectId: string) =>
-      mockConsumeHubToSessionTransition(subjectId),
-    markHubToSessionTransition: jest.fn(),
-  }),
-  { virtual: true },
-);
 
 jest.mock(
   '../../../components/session' /* gc1-allow: ChatShell stub is the test's primary interaction surface (manual-send-button, mock-input-mode); the real composer pulls in native voice/keyboard input that can't render in JSDOM */,
@@ -707,7 +698,7 @@ describe('SessionScreen homework flow', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockConsumeHubToSessionTransition.mockReturnValue(false);
+    resetNavigationTransitionProvenanceForTests();
     jest.useFakeTimers();
     getMockFeatureFlags().MODE_NAV_V2_ENABLED = false;
     mockFetch.mockClear();
@@ -787,6 +778,7 @@ describe('SessionScreen homework flow', () => {
   afterEach(() => {
     activeRender?.cleanup();
     activeRender = null;
+    resetNavigationTransitionProvenanceForTests();
     jest.useRealTimers();
   });
 
@@ -806,7 +798,6 @@ describe('SessionScreen homework flow', () => {
       topicId: TOPIC_ID,
       topicName: 'Linear equations',
       returnTo: 'subjects',
-      returnStrategy: 'history',
     });
 
     const testScreen = renderSessionScreen();
@@ -825,7 +816,7 @@ describe('SessionScreen homework flow', () => {
     try {
       const mockBack = jest.fn();
       const mockCanGoBack = jest.fn(() => true);
-      mockConsumeHubToSessionTransition.mockReturnValue(true);
+      markHubToSessionTransition(SUBJECT_ID);
       (useRouter as jest.Mock).mockReturnValue({
         back: mockBack,
         canGoBack: mockCanGoBack,
@@ -843,6 +834,7 @@ describe('SessionScreen homework flow', () => {
 
       const testScreen = renderSessionScreen();
       await flushAsyncWork();
+      expect(consumeHubToSessionTransition(SUBJECT_ID)).toBe(false);
       mockReplace.mockClear();
 
       fireEvent.press(testScreen.getByTestId('mock-back-button'));
@@ -1015,7 +1007,6 @@ describe('SessionScreen homework flow', () => {
       topicName: 'Linear equations',
       sessionId: 'expired-session',
       returnTo: 'subjects',
-      returnStrategy: 'history',
     });
     const { NotFoundError } = require('../../../lib/api-client');
     mockUseSessionTranscript.mockReturnValue({
@@ -1045,7 +1036,7 @@ describe('SessionScreen homework flow', () => {
   it('uses Subjects history only after consuming the actual Hub-to-Session transition', () => {
     const mockBack = jest.fn();
     const mockCanGoBack = jest.fn(() => true);
-    mockConsumeHubToSessionTransition.mockReturnValue(true);
+    markHubToSessionTransition(SUBJECT_ID);
     (useRouter as jest.Mock).mockReturnValue({
       back: mockBack,
       canGoBack: mockCanGoBack,
@@ -1068,7 +1059,7 @@ describe('SessionScreen homework flow', () => {
     } as never);
 
     const testScreen = renderSessionScreen();
-    expect(mockConsumeHubToSessionTransition).toHaveBeenCalledWith(SUBJECT_ID);
+    expect(consumeHubToSessionTransition(SUBJECT_ID)).toBe(false);
     mockReplace.mockClear();
 
     const goHomeActions = testScreen.getAllByTestId('session-expired-go-home');

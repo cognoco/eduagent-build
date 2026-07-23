@@ -18,6 +18,11 @@ import {
 } from '../../../lib/profile';
 import { queryKeys } from '../../../lib/query-keys';
 import { createTestProfile } from '../../../test-utils/app-hook-test-utils';
+import {
+  consumeHubToTopicTransition,
+  markHubToTopicTransition,
+  resetNavigationTransitionProvenanceForTests,
+} from '../../../lib/navigation-transition-provenance';
 
 // ---------------------------------------------------------------------------
 // Fetch-boundary mock — mockFetch assigned inside factory to bypass hoisting
@@ -59,9 +64,6 @@ const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockCanGoBack = jest.fn(() => true);
 const mockPushLearningResumeTarget = jest.fn();
-const mockConsumeHubToTopicTransition = jest.fn(
-  (_subjectId: string, _topicId: string) => false,
-);
 type TopicRouteParams = {
   subjectId: string;
   topicId: string;
@@ -87,16 +89,6 @@ jest.mock('expo-router', () => ({
   }),
   useLocalSearchParams: () => mockUseLocalSearchParams(),
 }));
-
-jest.mock(
-  '../../../lib/navigation-transition-provenance',
-  () => ({
-    ...jest.requireActual('../../../lib/navigation-transition-provenance'),
-    consumeHubToTopicTransition: (subjectId: string, topicId: string) =>
-      mockConsumeHubToTopicTransition(subjectId, topicId),
-  }),
-  { virtual: true },
-);
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -325,6 +317,14 @@ function createWrapper(profileContext?: Partial<ProfileContextValue>) {
 
 const TopicDetailScreen = require('./[topicId]').default;
 
+beforeEach(() => {
+  resetNavigationTransitionProvenanceForTests();
+});
+
+afterEach(() => {
+  resetNavigationTransitionProvenanceForTests();
+});
+
 // ---------------------------------------------------------------------------
 // Test suites
 // ---------------------------------------------------------------------------
@@ -334,7 +334,6 @@ describe('TopicDetailScreen action buttons', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockConsumeHubToTopicTransition.mockReturnValue(false);
     mockUseLocalSearchParams.mockReturnValue({
       subjectId: SUBJECT_ID,
       topicId: TOPIC_ID,
@@ -896,10 +895,7 @@ describe('TopicDetailScreen rendering details', () => {
     });
     fireEvent.press(screen.getByTestId('topic-detail-back'));
 
-    expect(mockConsumeHubToTopicTransition).toHaveBeenCalledWith(
-      SUBJECT_ID,
-      TOPIC_ID,
-    );
+    expect(consumeHubToTopicTransition(SUBJECT_ID, TOPIC_ID)).toBe(false);
     expect(mockBack).not.toHaveBeenCalled();
     expect(mockReplace).toHaveBeenCalledWith({
       pathname: '/(app)/subject-hub/[subjectId]',
@@ -908,7 +904,7 @@ describe('TopicDetailScreen rendering details', () => {
   });
 
   it('pops to the Hub only after consuming the actual Hub-to-Topic transition', async () => {
-    mockConsumeHubToTopicTransition.mockReturnValue(true);
+    markHubToTopicTransition(SUBJECT_ID, TOPIC_ID);
     mockUseLocalSearchParams.mockReturnValue({
       subjectId: SUBJECT_ID,
       bookId: BOOK_ID,
@@ -924,10 +920,7 @@ describe('TopicDetailScreen rendering details', () => {
     });
     fireEvent.press(screen.getByTestId('topic-detail-back'));
 
-    expect(mockConsumeHubToTopicTransition).toHaveBeenCalledWith(
-      SUBJECT_ID,
-      TOPIC_ID,
-    );
+    expect(consumeHubToTopicTransition(SUBJECT_ID, TOPIC_ID)).toBe(false);
     expect(mockBack).toHaveBeenCalledTimes(1);
     expect(mockReplace).not.toHaveBeenCalled();
   });

@@ -15,7 +15,10 @@ import {
   createTestProfile,
 } from '../../../../test-utils/screen-render';
 import {
+  consumeHubToTopicTransition,
   consumeHubToSessionTransition,
+  consumeSubjectsToHubTransition,
+  markSubjectsToHubTransition,
   resetNavigationTransitionProvenanceForTests,
 } from '../../../../lib/navigation-transition-provenance';
 import {
@@ -49,10 +52,6 @@ const mockPush = jest.fn();
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockCanGoBack = jest.fn(() => false);
-const mockConsumeSubjectsToHubTransition = jest.fn(
-  (_subjectId: string) => false,
-);
-const mockMarkHubToTopicTransition = jest.fn();
 let mockSearchParams: () => {
   subjectId?: string | string[];
   returnTo?: string | string[];
@@ -69,18 +68,6 @@ jest.mock('expo-router', () => ({
     replace: mockReplace,
   }),
 }));
-
-jest.mock(
-  '../../../../lib/navigation-transition-provenance',
-  () => ({
-    ...jest.requireActual('../../../../lib/navigation-transition-provenance'),
-    consumeSubjectsToHubTransition: (subjectId: string) =>
-      mockConsumeSubjectsToHubTransition(subjectId),
-    markHubToTopicTransition: (subjectId: string, topicId: string) =>
-      mockMarkHubToTopicTransition(subjectId, topicId),
-  }),
-  { virtual: true },
-);
 
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 const BOOK_ID = '660e8400-e29b-41d4-a716-446655440001';
@@ -214,7 +201,6 @@ describe('SubjectHubRoute', () => {
     jest.clearAllMocks();
     resetNavigationTransitionProvenanceForTests();
     mockPush.mockReset();
-    mockConsumeSubjectsToHubTransition.mockReturnValue(false);
     mockSearchParams = () => ({ subjectId: SUBJECT_ID });
     seedRoutes();
   });
@@ -230,7 +216,7 @@ describe('SubjectHubRoute', () => {
 
   it('replaces the Hub with the session so hardware Back returns to the single Subjects ancestor', async () => {
     jest.replaceProperty(FEATURE_FLAGS, 'MODE_NAV_V2_ENABLED', true);
-    mockConsumeSubjectsToHubTransition.mockReturnValue(true);
+    markSubjectsToHubTransition(SUBJECT_ID);
     const visibleStack = ['subjects', 'subject-hub'];
     mockReplace.mockImplementation((href: unknown) => {
       const pathname =
@@ -363,7 +349,7 @@ describe('SubjectHubRoute', () => {
     });
     fireEvent.press(screen.getByTestId('subject-hub-back'));
 
-    expect(mockConsumeSubjectsToHubTransition).toHaveBeenCalledWith(SUBJECT_ID);
+    expect(consumeSubjectsToHubTransition(SUBJECT_ID)).toBe(false);
     expect(mockBack).not.toHaveBeenCalled();
     expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects');
   });
@@ -371,7 +357,7 @@ describe('SubjectHubRoute', () => {
   it('pops to Subjects only after consuming the actual Subjects-to-Hub transition', async () => {
     jest.replaceProperty(FEATURE_FLAGS, 'MODE_NAV_V2_ENABLED', true);
     mockCanGoBack.mockReturnValue(true);
-    mockConsumeSubjectsToHubTransition.mockReturnValue(true);
+    markSubjectsToHubTransition(SUBJECT_ID);
 
     render(<SubjectHubRoute />, { wrapper: wrapper() });
 
@@ -380,7 +366,7 @@ describe('SubjectHubRoute', () => {
     });
     fireEvent.press(screen.getByTestId('subject-hub-back'));
 
-    expect(mockConsumeSubjectsToHubTransition).toHaveBeenCalledWith(SUBJECT_ID);
+    expect(consumeSubjectsToHubTransition(SUBJECT_ID)).toBe(false);
     expect(mockBack).toHaveBeenCalledTimes(1);
     expect(mockReplace).not.toHaveBeenCalled();
   });
@@ -432,10 +418,7 @@ describe('SubjectHubRoute', () => {
         returnTo: 'subject-hub',
       },
     });
-    expect(mockMarkHubToTopicTransition).toHaveBeenCalledWith(
-      SUBJECT_ID,
-      TOPIC_ID,
-    );
+    expect(consumeHubToTopicTransition(SUBJECT_ID, TOPIC_ID)).toBe(true);
   });
 
   it('preserves Hub ancestry when Study opens a topic from the focused sheet', async () => {
@@ -460,10 +443,7 @@ describe('SubjectHubRoute', () => {
         returnTo: 'subject-hub',
       },
     });
-    expect(mockMarkHubToTopicTransition).toHaveBeenCalledWith(
-      SUBJECT_ID,
-      TOPIC_ID,
-    );
+    expect(consumeHubToTopicTransition(SUBJECT_ID, TOPIC_ID)).toBe(true);
   });
 
   it('preserves Hub ancestry when ordinary Next up opens a topic', async () => {
@@ -492,10 +472,7 @@ describe('SubjectHubRoute', () => {
         returnTo: 'subject-hub',
       },
     });
-    expect(mockMarkHubToTopicTransition).toHaveBeenCalledWith(
-      SUBJECT_ID,
-      TOPIC_ID,
-    );
+    expect(consumeHubToTopicTransition(SUBJECT_ID, TOPIC_ID)).toBe(true);
   });
 
   it('preserves the V0 due-review topic route without V2 return or book context', async () => {
