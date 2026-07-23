@@ -24,6 +24,19 @@ if ($parseErrors.Count -gt 0) {
   throw "Runner did not parse: $($parseErrors[0].Message)"
 }
 
+$healthRequest = $ast.Find(
+  {
+    param($node)
+    $node -is [System.Management.Automation.Language.CommandAst] -and
+      $node.GetCommandName() -eq 'Invoke-WebRequest' -and
+      $node.Extent.Text -match '/v1/health'
+  },
+  $true
+)
+if (-not $healthRequest -or $healthRequest.Extent.Text -notmatch '(?i)-TimeoutSec\s+15\b') {
+  throw 'Expected the API health check to use a bounded 15-second timeout'
+}
+
 $cleanupFunction = $ast.Find(
   {
     param($node)

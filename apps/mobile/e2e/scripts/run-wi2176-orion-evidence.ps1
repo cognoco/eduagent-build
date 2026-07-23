@@ -279,7 +279,7 @@ if ((Invoke-AdbText shell getprop ro.build.version.sdk) -ne '34') {
   throw 'WI-2176 evidence requires Orion Android API 34'
 }
 
-$health = Invoke-WebRequest -Uri "$ApiUrl/v1/health" -UseBasicParsing
+$health = Invoke-WebRequest -Uri "$ApiUrl/v1/health" -UseBasicParsing -TimeoutSec 15
 if ($health.StatusCode -ne 200) {
   throw "API health check failed with HTTP $($health.StatusCode)"
 }
