@@ -27,7 +27,7 @@ const mockParams = {
   subjectName: 'Mathematics',
   exchangeCount: '5',
   escalationRung: '2',
-} as Record<string, string | undefined>;
+} as Record<string, string | string[] | undefined>;
 
 const mockTestProfileId = '10000000-0000-4000-8000-000000000001';
 const mockTestAccountId = '10000000-0000-4000-8000-000000000002';
@@ -227,6 +227,7 @@ let mockSessionSummaryData: {
   aiFeedback: string | null;
   feedbackStatus?: 'available' | 'unavailable';
   status: 'pending' | 'submitted' | 'accepted' | 'skipped' | 'auto_closed';
+  learnerRecap?: string | null;
   baseXp?: number | null;
   reflectionBonusXp?: number | null;
   purgedAt?: string | null;
@@ -533,6 +534,7 @@ describe('SessionSummaryScreen', () => {
     mockParams.topicId = undefined;
     mockParams.filedSubjectId = undefined;
     mockParams.filedBookId = undefined;
+    mockParams.returnTo = undefined;
     mockTranscriptData = null;
     mockSessionSummaryData = null;
     mockTotalSessions = 0;
@@ -661,6 +663,30 @@ describe('SessionSummaryScreen', () => {
     // 5 exchanges, rung 2 → "strong independent thinking"
     screen.getByText(/worked through 5 exchanges/);
     screen.getByText(/strong independent thinking/);
+  });
+
+  it('owns two persisted learner recap points with exact text at stable indexed row IDs', async () => {
+    const learningPoints = [
+      'We traced how photosynthesis stores sunlight as chemical energy in glucose.',
+      'Chlorophyll captures the light energy that powers this process.',
+    ] as const;
+    mockSessionSummaryData = {
+      ...BASE_MOCK_SUMMARY,
+      learnerRecap: learningPoints.join('\n'),
+    };
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    expect(
+      await screen.findByTestId('session-recap-learning-point-0'),
+    ).toHaveTextContent(
+      /^We traced how photosynthesis stores sunlight as chemical energy in glucose\.$/,
+    );
+    expect(
+      screen.getByTestId('session-recap-learning-point-1'),
+    ).toHaveTextContent(
+      /^Chlorophyll captures the light energy that powers this process\.$/,
+    );
   });
 
   // [WI-2499 AC-5] The receipt renders only the server-accepted scrubbed
@@ -2171,6 +2197,64 @@ describe('SessionSummaryScreen', () => {
       await waitFor(() => {
         expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
       });
+    });
+
+    it('returns a persisted Journal recap to Journal without swapping to its topic', async () => {
+      mockSessionSummaryData = {
+        id: '880e8400-e29b-41d4-a716-446655440005',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'Existing Biology recap.',
+        aiFeedback: 'Helpful reflection.',
+        status: 'submitted',
+      };
+      mockParams.subjectId = mockSubjectId;
+      mockParams.topicId = mockSuggestedTopicAId;
+      mockParams.returnTo = 'journal';
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('summary-close-button');
+      });
+      fireEvent.press(screen.getByTestId('summary-close-button'));
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith('/(app)/journal');
+      });
+      expect(mockReplace).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/topic/[topicId]',
+        }),
+      );
+    });
+
+    it('keeps Journal precedence when duplicate returnTo parameters produce an array', async () => {
+      mockSessionSummaryData = {
+        id: '880e8400-e29b-41d4-a716-446655440005',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'Existing Biology recap.',
+        aiFeedback: 'Helpful reflection.',
+        status: 'submitted',
+      };
+      mockParams.subjectId = mockSubjectId;
+      mockParams.topicId = mockSuggestedTopicAId;
+      mockParams.returnTo = ['journal', 'learner-home'];
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('summary-close-button');
+      });
+      fireEvent.press(screen.getByTestId('summary-close-button'));
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith('/(app)/journal');
+      });
+      expect(mockReplace).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/topic/[topicId]',
+        }),
+      );
     });
 
     it('prefers router.back() over replace when canGoBack() is true on revisit continue', async () => {

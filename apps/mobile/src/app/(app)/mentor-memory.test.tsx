@@ -698,6 +698,33 @@ describe('MentorMemoryScreen — explicit return target from More', () => {
   });
 });
 
+describe('MentorMemoryScreen — Journal round trip', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockIsParentProxy = false;
+    mockModeNavV1Enabled = false;
+    mockSearchParams = { returnTo: 'journal' };
+    mockProfileData = {
+      ...mockProfileBase,
+      interests: [],
+      memoryConsentStatus: 'granted',
+    };
+  });
+
+  afterEach(() => {
+    mockSearchParams = {};
+  });
+
+  it('returns the exact Journal caller when opened from its Memory section', async () => {
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    fireEvent.press(await screen.findByTestId('mentor-memory-back'));
+
+    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/journal');
+    expect(mockRouter.back).not.toHaveBeenCalled();
+  });
+});
+
 // Break test: proxy/restricted users must be redirected to home, not shown
 // the mentor-memory screen. canEnter('mentor-memory') returns false for proxy
 // sessions and any other context where the screen is off-limits.

@@ -18,6 +18,8 @@ jest.mock(
   '../../../../lib/navigation' /* gc1-allow: navigation stub captures goBackOrReplace calls; real impl requires expo-router Router which is also mocked at this boundary */,
   () => ({
     goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+    JOURNAL_HREF: '/(app)/journal',
+    JOURNAL_RETURN_TO: 'journal',
   }),
 );
 
@@ -186,10 +188,37 @@ describe('ProgressWeeklyReportDetail', () => {
 
     render(<ProgressWeeklyReportDetail />);
 
+    screen.getByText('Back to reports');
+    expect(screen.queryByText('Go back')).toBeNull();
     fireEvent.press(screen.getByTestId('progress-weekly-report-error-back'));
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
       expect.anything(),
       '/(app)/progress/reports',
+    );
+  });
+
+  it('labels and routes Journal error recovery to the exact Journal caller', () => {
+    mockSearchParams = {
+      weeklyReportId: 'weekly-uuid-1',
+      returnTo: 'journal',
+    };
+    mockUseProfileWeeklyReportDetail.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('Network failure'),
+      refetch: mockRefetch,
+    });
+
+    render(<ProgressWeeklyReportDetail />);
+
+    const backAction = screen.getByTestId('progress-weekly-report-error-back');
+    screen.getByText('Go back');
+    expect(screen.queryByText('Back to reports')).toBeNull();
+    fireEvent.press(backAction);
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/journal',
     );
   });
 
@@ -297,6 +326,28 @@ describe('ProgressWeeklyReportDetail', () => {
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
       expect.anything(),
       '/(app)/progress/reports',
+    );
+  });
+
+  it('returns the exact Journal caller when the report was opened from Journal', () => {
+    mockSearchParams = {
+      weeklyReportId: 'weekly-uuid-1',
+      returnTo: 'journal',
+    };
+    mockUseProfileWeeklyReportDetail.mockReturnValue({
+      data: WEEKLY_REPORT,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+
+    render(<ProgressWeeklyReportDetail />);
+
+    fireEvent.press(screen.getByTestId('progress-weekly-report-back'));
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/journal',
     );
   });
 

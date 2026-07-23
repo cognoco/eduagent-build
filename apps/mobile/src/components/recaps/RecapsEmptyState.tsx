@@ -11,8 +11,8 @@ import { Button } from '../common';
  * the same welcoming empty state (with a CTA) instead of its own bare
  * one-liner. The CTA destination differs per surface (the standalone screen
  * goes Home; the Journal goes to the Mentor tab), so it is injected via
- * `onStart` rather than hard-coded. testIDs are overridable so both surfaces
- * can embed the component while keeping distinct, assertable testIDs.
+ * `onStart` rather than hard-coded. TestIDs are overridable so both surfaces
+ * can embed the component while keeping distinct, assertable anchors.
  */
 export function RecapsEmptyState({
   onStart,

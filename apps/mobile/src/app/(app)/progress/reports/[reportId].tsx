@@ -11,7 +11,11 @@ import {
 } from '../../../../components/progress';
 import { classifyApiError } from '../../../../lib/format-api-error';
 import { formatMinutes } from '../../../../lib/format-relative-date';
-import { goBackOrReplace } from '../../../../lib/navigation';
+import {
+  goBackOrReplace,
+  JOURNAL_HREF,
+  JOURNAL_RETURN_TO,
+} from '../../../../lib/navigation';
 import {
   useProfileReportDetail,
   useMarkProfileReportViewed,
@@ -21,8 +25,16 @@ export default function ProgressMonthlyReportDetail(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { reportId } = useLocalSearchParams<{ reportId: string }>();
+  const { reportId, returnTo } = useLocalSearchParams<{
+    reportId: string;
+    returnTo?: string | string[];
+  }>();
   const resolvedReportId = Array.isArray(reportId) ? reportId[0] : reportId;
+  const resolvedReturnTo = Array.isArray(returnTo) ? returnTo[0] : returnTo;
+  const reportsHref =
+    resolvedReturnTo === JOURNAL_RETURN_TO
+      ? JOURNAL_HREF
+      : '/(app)/progress/reports';
   const {
     data: report,
     isLoading,
@@ -58,7 +70,7 @@ export default function ProgressMonthlyReportDetail(): React.ReactElement {
       >
         <View className="flex-row items-center mt-4">
           <Pressable
-            onPress={() => goBackOrReplace(router, '/(app)/progress/reports')}
+            onPress={() => goBackOrReplace(router, reportsHref)}
             className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel={t('common.goBack')}
@@ -94,8 +106,11 @@ export default function ProgressMonthlyReportDetail(): React.ReactElement {
               testID: 'progress-report-error-retry',
             }}
             secondaryAction={{
-              label: t('parentView.report.backToReports'),
-              onPress: () => goBackOrReplace(router, '/(app)/progress/reports'),
+              label:
+                resolvedReturnTo === JOURNAL_RETURN_TO
+                  ? t('common.goBack')
+                  : t('parentView.report.backToReports'),
+              onPress: () => goBackOrReplace(router, reportsHref),
               testID: 'progress-report-error-back',
             }}
             testID="progress-report-error"

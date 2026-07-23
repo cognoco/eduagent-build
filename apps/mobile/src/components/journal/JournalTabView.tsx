@@ -17,6 +17,7 @@ import { JournalSegmentedControl } from './JournalSegmentedControl';
 import { JournalNotesArchive } from './JournalNotesArchive';
 import { JournalPracticeSection } from './JournalPracticeSection';
 import { RecapRow } from './RecapRow';
+import { JOURNAL_RETURN_TO } from '../../lib/navigation';
 import {
   JOURNAL_SECTION_IDS,
   PracticeReportsEmptyMotif,
@@ -136,12 +137,18 @@ function JournalReportsSection(): React.ReactElement {
     if (latestReport.kind === 'weekly') {
       router.push({
         pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
-        params: { weeklyReportId: latestReport.report.id },
+        params: {
+          weeklyReportId: latestReport.report.id,
+          returnTo: JOURNAL_RETURN_TO,
+        },
       } as Href);
     } else {
       router.push({
         pathname: '/(app)/progress/reports/[reportId]',
-        params: { reportId: latestReport.report.id },
+        params: {
+          reportId: latestReport.report.id,
+          returnTo: JOURNAL_RETURN_TO,
+        },
       } as Href);
     }
   };
@@ -218,13 +225,13 @@ function JournalReportsSection(): React.ReactElement {
         onPressMonthly={(reportId) =>
           router.push({
             pathname: '/(app)/progress/reports/[reportId]',
-            params: { reportId },
+            params: { reportId, returnTo: JOURNAL_RETURN_TO },
           } as Href)
         }
         onPressWeekly={(weeklyReportId) =>
           router.push({
             pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
-            params: { weeklyReportId },
+            params: { weeklyReportId, returnTo: JOURNAL_RETURN_TO },
           } as Href)
         }
       />
@@ -251,7 +258,10 @@ function JournalMemorySection(): React.ReactElement {
         accessibilityRole="button"
         accessibilityLabel={t('journal.memory.open')}
         onPress={() =>
-          router.push('/(app)/mentor-memory?returnTo=journal' as Href)
+          router.push({
+            pathname: '/(app)/mentor-memory',
+            params: { returnTo: JOURNAL_RETURN_TO },
+          } as Href)
         }
         testID="journal-memory-open"
         className="mt-4 self-start rounded-button bg-primary px-4 py-2"

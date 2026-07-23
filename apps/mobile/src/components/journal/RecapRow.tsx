@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import type { RecapListItem } from '@eduagent/schemas';
 
 import { buildSessionDetailHref } from '../../lib/session-detail-navigation';
+import { JOURNAL_RETURN_TO } from '../../lib/navigation';
 
 export function RecapRow({
   recap,
@@ -29,6 +30,7 @@ export function RecapRow({
             sessionId: recap.sessionId,
             subjectId: recap.subjectId,
             topicId: recap.topicId,
+            returnTo: JOURNAL_RETURN_TO,
           }),
         )
       }
