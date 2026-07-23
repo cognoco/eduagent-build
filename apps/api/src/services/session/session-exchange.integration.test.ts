@@ -972,9 +972,19 @@ describeIfDb('session exchange production-path integration', () => {
         ),
       );
 
-    expect(noteRows).toHaveLength(1);
-    expect(noteRows[0]!.artifactSource).toBe('challenge_drafted_note');
-    expect(noteRows[0]!.content).toBe('Plants use sunlight to split water.');
+    expect(noteRows).toHaveLength(2);
+    expect(noteRows).toEqual(
+      expect.arrayContaining([
+        {
+          artifactSource: 'challenge_solid_quote',
+          content: 'Plants use sunlight to split water.',
+        },
+        {
+          artifactSource: 'challenge_drafted_note',
+          content: 'Plants use sunlight to split water.',
+        },
+      ]),
+    );
   });
 
   // -------------------------------------------------------------------------

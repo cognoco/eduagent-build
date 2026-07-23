@@ -9,6 +9,7 @@ import {
   curricula,
   curriculumBooks,
   curriculumTopics,
+  evidenceLinks,
   generateUUIDv7,
   guardianship,
   learningSessions,
@@ -256,13 +257,32 @@ describeIfDb('getLatestVerifiedProofForChild (integration) [WI-1658]', () => {
       consecutiveSuccesses: 1,
       failureCount: 0,
     });
-    await db.insert(topicNotes).values({
+    const [sourceNote] = await db
+      .insert(topicNotes)
+      .values({
+        profileId: child.profileId,
+        topicId,
+        sessionId,
+        content: 'Learner source for the verified concept quote.',
+      })
+      .returning({ id: topicNotes.id });
+    const [verifiedNote] = await db
+      .insert(topicNotes)
+      .values({
+        profileId: child.profileId,
+        topicId,
+        sessionId,
+        content: 'Plants convert light into chemical energy.',
+        artifactSource: 'challenge_drafted_note',
+        verificationState: 'verified',
+      })
+      .returning({ id: topicNotes.id });
+    await db.insert(evidenceLinks).values({
       profileId: child.profileId,
-      topicId,
-      sessionId,
-      content: 'Plants convert light into chemical energy.',
-      artifactSource: 'challenge_drafted_note',
-      verificationState: 'verified',
+      fromKind: 'artifact',
+      fromId: verifiedNote!.id,
+      toKind: 'note',
+      toId: sourceNote!.id,
     });
 
     const result = await getLatestVerifiedProofForChild(
@@ -396,21 +416,34 @@ describeIfDb('getLatestVerifiedProofForChild (integration) [WI-1658]', () => {
     // (unmarked, newer) row instead of passing by an unspecified
     // same-timestamp tie-break.
     const now = new Date();
-    await db.insert(topicNotes).values({
+    const [verifiedNote] = await db
+      .insert(topicNotes)
+      .values({
+        profileId: child.profileId,
+        topicId,
+        sessionId,
+        content: 'The verified concept quote.',
+        artifactSource: 'challenge_drafted_note',
+        verificationState: 'verified',
+        createdAt: new Date(now.getTime() - 1000),
+      })
+      .returning({ id: topicNotes.id });
+    const [ordinaryNote] = await db
+      .insert(topicNotes)
+      .values({
+        profileId: child.profileId,
+        topicId,
+        sessionId,
+        content: 'An ordinary session-summary reflection.',
+        createdAt: now,
+      })
+      .returning({ id: topicNotes.id });
+    await db.insert(evidenceLinks).values({
       profileId: child.profileId,
-      topicId,
-      sessionId,
-      content: 'The verified concept quote.',
-      artifactSource: 'challenge_drafted_note',
-      verificationState: 'verified',
-      createdAt: new Date(now.getTime() - 1000),
-    });
-    await db.insert(topicNotes).values({
-      profileId: child.profileId,
-      topicId,
-      sessionId,
-      content: 'An ordinary session-summary reflection.',
-      createdAt: now,
+      fromKind: 'artifact',
+      fromId: verifiedNote!.id,
+      toKind: 'note',
+      toId: ordinaryNote!.id,
     });
 
     const result = await getLatestVerifiedProofForChild(
