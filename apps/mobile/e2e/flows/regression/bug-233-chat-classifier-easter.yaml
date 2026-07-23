@@ -54,7 +54,7 @@ tags:
 #    zero-candidate fallback renders its create action without the chip tray.
 - extendedWaitUntil:
     visible:
-      id: "^(chat-input|session-subject-resolution|subject-resolution-create-new)$"
+      id: "subject-resolution-.*|chat-input"
     timeout: 60000
 
 # 7. The AI must NOT respond with the dead-end "I couldn't place that" message

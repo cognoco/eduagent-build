@@ -4873,7 +4873,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         typeof extendedWaitUntil.visible.id === 'string' &&
         new RegExp(extendedWaitUntil.visible.id).test('chat-input') &&
         new RegExp(extendedWaitUntil.visible.id).test(
-          'session-subject-resolution',
+          'subject-resolution-create-suggested',
         ) &&
         new RegExp(extendedWaitUntil.visible.id).test(
           'subject-resolution-create-new',
