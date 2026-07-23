@@ -6890,6 +6890,14 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scenario: 'trial-active',
         shard: 1,
       },
+      // [WI-2234] Returning learner release case — exact unfinished session
+      // resume, new assistant exchange, supported Mentor return, and refreshed
+      // Me-scope feed with the unfinished session and due review still present.
+      {
+        flow: 'flows/v2/v2-returning-learner-resume.yaml',
+        scenario: 'v2-returning-learner',
+        shard: 1,
+      },
       {
         flow: 'flows/v2/v2-shell-navigation.yaml',
         scenario: 'learning-active',
@@ -7863,6 +7871,43 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       ),
     ).toBeGreaterThan(mentorReturn);
     expect(containsOptionalTrue(commands)).toBe(false);
+  });
+
+  it('[WI-2234] binds the returning-learner Continue action to the unfinished-session card', () => {
+    type Command = Record<string, unknown>;
+    const returningLearner = parseAllDocuments(
+      readFileSync(
+        join(
+          repoRoot,
+          'apps/mobile/e2e/flows/v2/v2-returning-learner-resume.yaml',
+        ),
+        'utf8',
+      ),
+    )[1]?.toJS() as unknown;
+
+    expect(Array.isArray(returningLearner)).toBe(true);
+    if (!Array.isArray(returningLearner)) {
+      throw new Error(
+        'V2 returning-learner Maestro commands must be a YAML list',
+      );
+    }
+
+    const continueActions = returningLearner
+      .map((command) => (command as Command).tapOn)
+      .filter(
+        (tap): tap is Command =>
+          tap !== null &&
+          typeof tap === 'object' &&
+          (tap as Command).id === 'now-card-continue',
+      );
+
+    expect(continueActions).toEqual([
+      {
+        id: 'now-card-continue',
+        childOf: { id: 'now-card-unfinished_session' },
+      },
+    ]);
+    expect(continueActions[0]).not.toHaveProperty('index');
   });
 
   it('[WI-2584 profile-load-error] hard-fails authenticated bootstrap errors before Back recovery', () => {

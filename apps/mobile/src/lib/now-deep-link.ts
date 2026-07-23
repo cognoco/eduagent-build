@@ -11,6 +11,7 @@ export type SubjectHubTarget = 'legacy-shelf' | 'v2-subject-hub';
 
 interface NowPathOptions {
   subjectHubTarget?: SubjectHubTarget;
+  returnTo?: string;
 }
 
 export interface PushNowDeepLinkOptions extends NowPathOptions {
@@ -21,12 +22,17 @@ export interface PushNowDeepLinkOptions extends NowPathOptions {
   setActiveScope?: (scope: ScopeDescriptor) => void;
 }
 
+type ResolvedNowPathOptions = {
+  subjectHubTarget: SubjectHubTarget;
+  returnTo?: string;
+};
+
 type PathBuilder = (
   params: Record<string, string>,
-  options: Required<NowPathOptions>,
+  options: ResolvedNowPathOptions,
 ) => string;
 
-const DEFAULT_OPTIONS: Required<NowPathOptions> = {
+const DEFAULT_OPTIONS: ResolvedNowPathOptions = {
   subjectHubTarget: 'legacy-shelf',
 };
 
@@ -64,10 +70,14 @@ const PATH_BUILDERS: Partial<Record<NowDeepLinkRoute, PathBuilder>> = {
   'settings.more': () => '/(app)/more',
   'settings.account': () => '/(app)/more/account',
   'billing.manage': () => '/(app)/subscription',
-  'session.resume': (params) =>
+  'session.resume': (params, options) =>
     `/(app)/session?sessionId=${encodeURIComponent(
       requiredParam(params, 'sessionId', 'session.resume'),
-    )}`,
+    )}${
+      options.returnTo
+        ? `&returnTo=${encodeURIComponent(options.returnTo)}`
+        : ''
+    }`,
   // [WI-1121 review fix] Matches the path buildSessionDetailHref() builds for
   // a completed session (session-detail-navigation.ts) — the recap/summary
   // screen, distinct from 'session.resume' (the live session chat).

@@ -45,6 +45,7 @@ import { hasFirstRealState } from '../../lib/first-real-state';
 import { getVoiceLocaleForLanguage } from '../../lib/language-locales';
 import { useProfile } from '../../lib/profile';
 import {
+  MENTOR_RETURN_TO,
   pushAddChildForSupport,
   pushLinkInitiateForManagedPerson,
   pushLinkInitiatePicker,
@@ -317,6 +318,7 @@ function LearnerMentorScreen(): React.ReactElement {
     }
     pushNowDeepLink(router, card.deepLink, {
       subjectHubTarget: 'v2-subject-hub',
+      returnTo: MENTOR_RETURN_TO,
       setActiveScope,
     });
   };
@@ -380,6 +382,7 @@ function LearnerMentorScreen(): React.ReactElement {
       setBarClarification(null);
       pushNowDeepLink(router, result.deepLink, {
         subjectHubTarget: 'v2-subject-hub',
+        returnTo: MENTOR_RETURN_TO,
         setActiveScope,
       });
       return;
@@ -461,6 +464,7 @@ function LearnerMentorScreen(): React.ReactElement {
       if (resumeLink) {
         pushNowDeepLink(router, resumeLink, {
           subjectHubTarget: 'v2-subject-hub',
+          returnTo: MENTOR_RETURN_TO,
           setActiveScope,
         });
         return;
@@ -613,6 +617,7 @@ function LearnerMentorScreen(): React.ReactElement {
 }
 
 export default function MentorScreen(): React.ReactElement {
+  const { activeProfile } = useProfile();
   const { activeScope, availableScopes, setActiveScope } = useScopeContext();
   const router = useRouter();
   const eligiblePersons = useEligibleManagedPersons();
@@ -662,5 +667,5 @@ export default function MentorScreen(): React.ReactElement {
     );
   }
 
-  return <LearnerMentorScreen />;
+  return <LearnerMentorScreen key={activeProfile?.id ?? 'no-profile'} />;
 }

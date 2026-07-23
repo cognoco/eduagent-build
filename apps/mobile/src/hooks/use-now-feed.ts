@@ -34,6 +34,14 @@ import { useApiQuery } from './use-api-query';
 const NOW_FEED_STALE_TIME_MS = 30_000;
 const NOW_FEED_SLOW_FALLBACK_MS = 2_000;
 
+export function nowFeedQueryKey(
+  actorId: string,
+  profileId: string,
+  policyEpoch: string,
+) {
+  return ['now-feed', actorId, profileId, policyEpoch] as const;
+}
+
 export type NowFeedQueryResult = UseQueryResult<NowResponse> & {
   fallbackFeed: NowResponse | null;
   isSlowFallback: boolean;
@@ -182,7 +190,7 @@ export function useNowFeed(): NowFeedQueryResult {
     // shared across actors selecting the same profile.
     // [WI-2504] ...and by the observed epoch, so the warm in-memory projection
     // is dropped at the same moment the persisted one becomes unreachable.
-    queryKey: ['now-feed', userId, profileId, observedEpoch],
+    queryKey: nowFeedQueryKey(userId!, profileId!, observedEpoch),
     queryFn: async ({ signal: querySignal }): Promise<NowResponse> => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {

@@ -40,6 +40,10 @@
   ],
   "v2": [
     {
+      "flow": "flows/v2/v2-returning-learner-resume.yaml",
+      "scenario": "v2-returning-learner"
+    },
+    {
       "flow": "flows/v2/v2-homework-manual-entry.yaml",
       "scenario": "trial-active"
     },

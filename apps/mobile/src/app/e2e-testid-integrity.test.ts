@@ -171,6 +171,7 @@ function extractSourceTestIds(tsxFiles: string[]): {
   // (handled separately by dynamicTemplatePattern).
   const stringLiteralPattern =
     /'([^'\\]*(?:\\.[^'\\]*)*)'|"([^"\\]*(?:\\.[^"\\]*)*)"/g;
+  const templateLiteralPattern = /`(([^$`]+)\$\{[^`]+)`/g;
 
   for (const file of tsxFiles) {
     const source = fs.readFileSync(file, 'utf-8');
@@ -232,6 +233,13 @@ function extractSourceTestIds(tsxFiles: string[]): {
         let litMatch;
         while ((litMatch = stringLiteralPattern.exec(body)) !== null) {
           staticIds.add(litMatch[1] ?? litMatch[2]!);
+        }
+        templateLiteralPattern.lastIndex = 0;
+        while ((litMatch = templateLiteralPattern.exec(body)) !== null) {
+          dynamicPrefixes.push(litMatch[2]!);
+          dynamicWitnesses.push(
+            litMatch[1]!.replace(/\$\{[^}]+\}/g, 'DYNAMIC'),
+          );
         }
       }
     }

@@ -299,6 +299,16 @@ describe('JournalTabView', () => {
     screen.getByTestId(`journal-recap-row-${recap.recapId}`);
   });
 
+  it('[WI-2234] opens the Journal session_filed case without a Mentor return destination', () => {
+    render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-moment-session_filed'));
+
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith('/(app)/session?sessionId=session-1');
+    expect(mockSetActiveScope).not.toHaveBeenCalled();
+  });
+
   // [WI-2223 AC-1] activating a support.hub-linked ledger moment must select
   // the Support-hub scope BEFORE the Mentor tab opens — the second
   // pushNowDeepLink caller (the first is mentor.tsx, covered in

@@ -17,6 +17,8 @@ export interface ChatMessage {
   verificationBadge?: VerificationBadge;
   eventId?: string;
   isSystemPrompt?: boolean;
+  /** Set only after a real assistant reply has completed successfully. */
+  isResponseComplete?: boolean;
   /** BUG-373: True for programmatically auto-sent messages (homework OCR, queued
    *  multi-problem). Used to exclude from userMessageCount so the voice/text
    *  toggle stays visible until the user deliberately sends a message. */

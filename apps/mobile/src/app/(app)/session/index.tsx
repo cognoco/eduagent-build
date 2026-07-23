@@ -1,7 +1,9 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@clerk/expo';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { platformAlert } from '../../../lib/platform-alert';
-import { goBackOrReplace } from '../../../lib/navigation';
+import { goBackOrReplace, MENTOR_RETURN_TO } from '../../../lib/navigation';
 import { shouldShowBookLink } from '../../../lib/show-book-link';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import {
@@ -59,6 +61,10 @@ import {
   useIsFirstSession,
 } from '../../../hooks/use-session-context';
 import { useNetworkStatus } from '../../../hooks/use-network-status';
+import {
+  nowFeedQueryKey,
+  useObservedPolicyEpoch,
+} from '../../../hooks/use-now-feed';
 import { useApiReachability } from '../../../hooks/use-api-reachability';
 import { useCelebrationLevel } from '../../../hooks/use-settings';
 import { useLearnerProfile } from '../../../hooks/use-learner-profile';
@@ -189,6 +195,7 @@ function isExactManualHomeworkSessionAssociated({
 }
 
 const MENTOR_BIRTH_SESSION_TIME_SCALE = 0.35;
+const MENTOR_RETURN_EPOCH_WAIT_MS = 2_000;
 
 interface FirstSessionWrapUpCardProps {
   value: string;
@@ -341,6 +348,7 @@ function SessionScreenInner() {
     imageMimeType?: string;
   }>();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
   const navigationContract = useNavigationContract();
@@ -396,8 +404,87 @@ function SessionScreenInner() {
   // don't always resolve on web — the chevron looked clickable but the URL
   // never changed. Supplying an explicit handler that uses Expo Router's
   // typed object form makes the navigation reliable across web + native.
+  const { userId } = useAuth();
+  const { epoch: observedNowFeedEpoch, hydrated: nowFeedEpochHydrated } =
+    useObservedPolicyEpoch(userId, activeProfile?.id);
+  const [pendingMentorReturn, setPendingMentorReturn] = useState(false);
+  const canRefreshMentorFeed =
+    returnTo === MENTOR_RETURN_TO &&
+    !!userId &&
+    !!activeProfile?.id &&
+    nowFeedEpochHydrated;
+  const refreshMentorFeedBeforeReturn = useCallback(async () => {
+    if (!canRefreshMentorFeed || !userId || !activeProfile?.id) return false;
+
+    // The Mentor feed was warm before this session opened. Refetch its exact
+    // actor/profile/epoch projection (including an inactive cache entry) and
+    // wait for that projection before remounting Mentor.
+    await queryClient.invalidateQueries(
+      {
+        queryKey: nowFeedQueryKey(
+          userId,
+          activeProfile.id,
+          observedNowFeedEpoch,
+        ),
+        exact: true,
+        refetchType: 'all',
+      },
+      { throwOnError: true },
+    );
+    return true;
+  }, [
+    activeProfile?.id,
+    canRefreshMentorFeed,
+    observedNowFeedEpoch,
+    queryClient,
+    userId,
+  ]);
+  useEffect(() => {
+    if (!pendingMentorReturn) return;
+
+    // An epoch read can fail to settle (for example, a storage failure during
+    // cold start). We must not call that an exact refreshed projection, but a
+    // back action also must not strand the learner in the session forever.
+    if (!nowFeedEpochHydrated) {
+      const timer = setTimeout(() => {
+        setPendingMentorReturn(false);
+        router.replace(homeBackHref as Href);
+      }, MENTOR_RETURN_EPOCH_WAIT_MS);
+      return () => clearTimeout(timer);
+    }
+    if (!canRefreshMentorFeed) return;
+
+    let cancelled = false;
+    const returnAfterRefreshSucceeds = () => {
+      if (cancelled) return;
+      setPendingMentorReturn(false);
+      router.replace(homeBackHref as Href);
+    };
+    const stayAfterRefreshFailure = () => {
+      if (cancelled) return;
+      setPendingMentorReturn(false);
+    };
+    void refreshMentorFeedBeforeReturn().then(
+      returnAfterRefreshSucceeds,
+      stayAfterRefreshFailure,
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    canRefreshMentorFeed,
+    homeBackHref,
+    nowFeedEpochHydrated,
+    pendingMentorReturn,
+    refreshMentorFeedBeforeReturn,
+    router,
+  ]);
   const handleChatBackPress = useCallback(() => {
     if (returnTo) {
+      if (returnTo === MENTOR_RETURN_TO) {
+        setPendingMentorReturn(true);
+        return;
+      }
       router.replace(homeBackHref as Href);
       return;
     }
@@ -412,6 +499,10 @@ function SessionScreenInner() {
   }, [returnTo, subjectId, homeBackHref, router]);
   const handleHomeBack = useCallback(() => {
     if (returnTo) {
+      if (returnTo === MENTOR_RETURN_TO) {
+        setPendingMentorReturn(true);
+        return;
+      }
       router.replace(homeBackHref as Href);
       return;
     }

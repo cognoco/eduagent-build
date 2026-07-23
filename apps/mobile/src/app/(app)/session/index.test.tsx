@@ -3,6 +3,7 @@ import React from 'react';
 import { Alert } from 'react-native';
 import { fireEvent, waitFor, act, within } from '@testing-library/react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import { QuotaExceededError } from '../../../lib/api-client';
 import * as Sentry from '@sentry/react-native';
 import {
@@ -16,6 +17,9 @@ import {
   type RenderScreenResult,
 } from '../../../test-utils/screen-render';
 import SessionScreen from './index';
+import { nowFeedQueryKey } from '../../../hooks/use-now-feed';
+import * as nowFeedModule from '../../../hooks/use-now-feed';
+import { NOW_FEED_CACHE_POLICY_EPOCH } from '../../../lib/now-feed-cache';
 
 // Real session-recovery module; tests spy on readSessionRecoveryMarker as
 // needed via jest.spyOn().
@@ -26,6 +30,9 @@ import * as sessionRecoveryModule from '../../../lib/session-recovery';
 // GC1/GC6-clean). `track` calls Sentry.addBreadcrumb, which is globally mocked
 // in test-setup.ts, so the real implementation runs without side effects.
 import * as analyticsModule from '../../../lib/analytics';
+
+const NOW_FEED_ACTOR_ID = 'session-test-actor';
+const NOW_FEED_POLICY_EPOCH = NOW_FEED_CACHE_POLICY_EPOCH;
 
 const ACTIVE_PROFILE_ID = '10000000-0000-4000-8000-000000000001';
 const CHILD_PROFILE_ID = '10000000-0000-4000-8000-000000000002';
@@ -284,7 +291,10 @@ const mockFetch = (global as { __sessionTestMockFetch?: RoutedMockFetch })
 jest.mock(
   '@clerk/expo' /* gc1-allow: external auth provider — getToken is a network/native call */,
   () => ({
-    useAuth: () => ({ getToken: jest.fn().mockResolvedValue('test-token') }),
+    useAuth: jest.fn(() => ({
+      userId: NOW_FEED_ACTOR_ID,
+      getToken: jest.fn().mockResolvedValue('test-token'),
+    })),
   }),
 );
 
@@ -694,6 +704,10 @@ describe('SessionScreen homework flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    (useAuth as jest.Mock).mockReturnValue({
+      userId: NOW_FEED_ACTOR_ID,
+      getToken: jest.fn().mockResolvedValue('test-token'),
+    });
     getMockFeatureFlags().MODE_NAV_V2_ENABLED = false;
     mockFetch.mockClear();
     mockUseSessionTranscript.mockReturnValue({ data: null });
@@ -916,6 +930,295 @@ describe('SessionScreen homework flow', () => {
         topicName: 'Linear equations',
       },
     });
+  });
+
+  it('[WI-2234] invalidates the active-profile Now feed before the expired-session Go home path returns to Mentor', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: SUBJECT_ID,
+      subjectName: 'Math',
+      topicId: TOPIC_ID,
+      topicName: 'Linear equations',
+      sessionId: 'expired-session',
+      returnTo: 'mentor',
+    });
+    const { NotFoundError } = require('../../../lib/api-client');
+    mockUseSessionTranscript.mockReturnValue({
+      data: null,
+      error: new NotFoundError('Session not found'),
+    } as never);
+
+    const testScreen = renderSessionScreen();
+    const invalidateSpy = jest.spyOn(
+      activeRender!.queryClient,
+      'invalidateQueries',
+    );
+    let releaseInvalidation!: () => void;
+    const invalidation = new Promise<void>((resolve) => {
+      releaseInvalidation = resolve;
+    });
+    invalidateSpy.mockReturnValue(invalidation);
+
+    const expiredMessage = await waitFor(() =>
+      testScreen.getByTestId('mock-message-session-expired'),
+    );
+    fireEvent.press(
+      within(expiredMessage).getByTestId('session-expired-go-home'),
+    );
+
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        {
+          queryKey: nowFeedQueryKey(
+            NOW_FEED_ACTOR_ID,
+            ACTIVE_PROFILE_ID,
+            NOW_FEED_POLICY_EPOCH,
+          ),
+          exact: true,
+          refetchType: 'all',
+        },
+        { throwOnError: true },
+      ),
+    );
+    expect(mockReplace).not.toHaveBeenCalled();
+
+    await act(async () => {
+      releaseInvalidation();
+      await invalidation;
+    });
+
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor'),
+    );
+    expect(invalidateSpy.mock.invocationCallOrder[0]).toBeLessThan(
+      mockReplace.mock.invocationCallOrder[0]!,
+    );
+
+    testScreen.unmount();
+  });
+
+  it('[WI-2234] keeps the learner in Session when the Mentor refresh fails and allows a successful retry', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: SUBJECT_ID,
+      subjectName: 'Math',
+      topicId: TOPIC_ID,
+      topicName: 'Linear equations',
+      sessionId: 'expired-session',
+      returnTo: 'mentor',
+    });
+    const { NotFoundError } = require('../../../lib/api-client');
+    mockUseSessionTranscript.mockReturnValue({
+      data: null,
+      error: new NotFoundError('Session not found'),
+    } as never);
+
+    const testScreen = renderSessionScreen();
+    const invalidateSpy = jest
+      .spyOn(activeRender!.queryClient, 'invalidateQueries')
+      .mockRejectedValueOnce(new Error('Now feed unavailable'))
+      .mockResolvedValueOnce(undefined);
+    const expiredMessage = await waitFor(() =>
+      testScreen.getByTestId('mock-message-session-expired'),
+    );
+    const returnToMentor = within(expiredMessage).getByTestId(
+      'session-expired-go-home',
+    );
+
+    fireEvent.press(returnToMentor);
+
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(1));
+    expect(mockReplace).not.toHaveBeenCalled();
+
+    fireEvent.press(returnToMentor);
+
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor'),
+    );
+    expect(invalidateSpy.mock.invocationCallOrder[1]).toBeLessThan(
+      mockReplace.mock.invocationCallOrder[0]!,
+    );
+
+    testScreen.unmount();
+  });
+
+  it('[WI-2234] waits for a persisted non-bootstrap epoch before invalidating and returning to Mentor', async () => {
+    const persistedEpoch = 'notice-policy-v1:on:self:consented';
+    const observedEpochSpy = jest
+      .spyOn(nowFeedModule, 'useObservedPolicyEpoch')
+      .mockReturnValue({
+        epoch: persistedEpoch,
+        hydrated: false,
+        observe: jest.fn(),
+      });
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: SUBJECT_ID,
+      subjectName: 'Math',
+      topicId: TOPIC_ID,
+      topicName: 'Linear equations',
+      sessionId: 'expired-session',
+      returnTo: 'mentor',
+    });
+    const { NotFoundError } = require('../../../lib/api-client');
+    mockUseSessionTranscript.mockReturnValue({
+      data: null,
+      error: new NotFoundError('Session not found'),
+    } as never);
+
+    const testScreen = renderSessionScreen();
+    const invalidateSpy = jest.spyOn(
+      activeRender!.queryClient,
+      'invalidateQueries',
+    );
+    let releaseInvalidation!: () => void;
+    const invalidation = new Promise<void>((resolve) => {
+      releaseInvalidation = resolve;
+    });
+    invalidateSpy.mockReturnValue(invalidation);
+    const expiredMessage = await waitFor(() =>
+      testScreen.getByTestId('mock-message-session-expired'),
+    );
+
+    fireEvent.press(
+      within(expiredMessage).getByTestId('session-expired-go-home'),
+    );
+    expect(invalidateSpy).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+
+    observedEpochSpy.mockReturnValue({
+      epoch: persistedEpoch,
+      hydrated: true,
+      observe: jest.fn(),
+    });
+    testScreen.rerender(<SessionScreen />);
+
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        {
+          queryKey: nowFeedQueryKey(
+            NOW_FEED_ACTOR_ID,
+            ACTIVE_PROFILE_ID,
+            persistedEpoch,
+          ),
+          exact: true,
+          refetchType: 'all',
+        },
+        { throwOnError: true },
+      ),
+    );
+    expect(mockReplace).not.toHaveBeenCalled();
+
+    await act(async () => {
+      releaseInvalidation();
+      await invalidation;
+    });
+
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor'),
+    );
+    expect(invalidateSpy.mock.invocationCallOrder[0]).toBeLessThan(
+      mockReplace.mock.invocationCallOrder[0]!,
+    );
+
+    observedEpochSpy.mockRestore();
+    testScreen.unmount();
+  });
+
+  it('[WI-2234] escapes a permanently unhydrated Mentor-return epoch without claiming a refreshed feed', async () => {
+    const persistedEpoch = 'notice-policy-v1:on:self:consented';
+    const observedEpochSpy = jest
+      .spyOn(nowFeedModule, 'useObservedPolicyEpoch')
+      .mockReturnValue({
+        epoch: persistedEpoch,
+        hydrated: false,
+        observe: jest.fn(),
+      });
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: SUBJECT_ID,
+      subjectName: 'Math',
+      topicId: TOPIC_ID,
+      topicName: 'Linear equations',
+      sessionId: 'expired-session',
+      returnTo: 'mentor',
+    });
+    const { NotFoundError } = require('../../../lib/api-client');
+    mockUseSessionTranscript.mockReturnValue({
+      data: null,
+      error: new NotFoundError('Session not found'),
+    } as never);
+
+    const testScreen = renderSessionScreen();
+    const invalidateSpy = jest.spyOn(
+      activeRender!.queryClient,
+      'invalidateQueries',
+    );
+    const expiredMessage = await waitFor(() =>
+      testScreen.getByTestId('mock-message-session-expired'),
+    );
+
+    fireEvent.press(
+      within(expiredMessage).getByTestId('session-expired-go-home'),
+    );
+    expect(invalidateSpy).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor'),
+    );
+    expect(invalidateSpy).not.toHaveBeenCalled();
+
+    observedEpochSpy.mockRestore();
+    testScreen.unmount();
+  });
+
+  it('[WI-2234] does not use the unhydrated-epoch escape when the actor binding is missing', async () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      userId: null,
+      getToken: jest.fn().mockResolvedValue(null),
+    });
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: SUBJECT_ID,
+      subjectName: 'Math',
+      topicId: TOPIC_ID,
+      topicName: 'Linear equations',
+      sessionId: 'expired-session',
+      returnTo: 'mentor',
+    });
+    const { NotFoundError } = require('../../../lib/api-client');
+    mockUseSessionTranscript.mockReturnValue({
+      data: null,
+      error: new NotFoundError('Session not found'),
+    } as never);
+
+    const testScreen = renderSessionScreen();
+    const invalidateSpy = jest.spyOn(
+      activeRender!.queryClient,
+      'invalidateQueries',
+    );
+    const expiredMessage = await waitFor(() =>
+      testScreen.getByTestId('mock-message-session-expired'),
+    );
+
+    fireEvent.press(
+      within(expiredMessage).getByTestId('session-expired-go-home'),
+    );
+
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+
+    expect(invalidateSpy).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+
+    testScreen.unmount();
   });
 
   it('[F-110] engages the session-expired UI for any error the boundary classifies as not-found, not only typed NotFoundError instances', () => {
@@ -2688,13 +2991,17 @@ describe('SessionScreen homework flow', () => {
       testScreen.unmount();
     }, 15000);
 
-    it('returns to the Mentor tab when returnTo=mentor', async () => {
+    it('[WI-2234] invalidates only the active profile Now feed before returning to Mentor', async () => {
       getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
       (useLocalSearchParams as jest.Mock).mockReturnValue(
         MENTOR_HOMEWORK_PARAMS,
       );
 
       const testScreen = renderSessionScreen();
+      const invalidateSpy = jest.spyOn(
+        activeRender!.queryClient,
+        'invalidateQueries',
+      );
 
       await act(async () => {
         await Promise.resolve();
@@ -2706,6 +3013,21 @@ describe('SessionScreen homework flow', () => {
       });
 
       expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor');
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        {
+          queryKey: nowFeedQueryKey(
+            NOW_FEED_ACTOR_ID,
+            ACTIVE_PROFILE_ID,
+            NOW_FEED_POLICY_EPOCH,
+          ),
+          exact: true,
+          refetchType: 'all',
+        },
+        { throwOnError: true },
+      );
+      expect(invalidateSpy.mock.invocationCallOrder[0]).toBeLessThan(
+        mockReplace.mock.invocationCallOrder[0]!,
+      );
 
       testScreen.unmount();
     }, 15000);

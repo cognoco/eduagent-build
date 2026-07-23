@@ -1023,7 +1023,9 @@ describe('MentorScreen', () => {
     fireEvent.press(fallback);
 
     // The cached unfinished_session deep-links straight back into that session.
-    expect(mockPush).toHaveBeenCalledWith('/(app)/session?sessionId=session-1');
+    expect(mockPush).toHaveBeenCalledWith(
+      '/(app)/session?sessionId=session-1&returnTo=mentor',
+    );
   });
 
   it('falls back to the session spine when the cache has no resumable session [T11]', () => {
