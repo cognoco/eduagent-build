@@ -7,6 +7,7 @@ import {
 } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ProfileContext, type ProfileContextValue } from '../../../lib/profile';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import * as navigationContractModule from '../../../hooks/use-navigation-contract';
 import * as platformAlertModule from '../../../lib/platform-alert';
 import {
@@ -16,9 +17,14 @@ import {
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+const mockRedirect = jest.fn();
 
 jest.mock('expo-router' /* gc1-allow: native router boundary */, () => ({
   useRouter: () => ({ push: mockPush, replace: mockReplace }),
+  Redirect: ({ href }: { href: string }) => {
+    mockRedirect(href);
+    return null;
+  },
 }));
 
 jest.mock(
@@ -90,14 +96,35 @@ function renderFamily({
 }
 
 describe('Account family settings', () => {
+  let originalV2: boolean;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      true;
   });
 
   afterEach(() => {
     cleanupActiveRender?.();
     cleanupActiveRender = undefined;
     jest.restoreAllMocks();
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      originalV2;
+  });
+
+  it('redirects a flags-off direct entry to home without mounting family hooks', async () => {
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      false;
+
+    const { mockFetch } = renderFamily();
+
+    expect(mockRedirect).toHaveBeenCalledWith('/(app)/home');
+    expect(screen.queryByTestId('family-settings-screen')).toBeNull();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(
+      fetchCallsMatching(mockFetch, '/settings/family-pool-breakdown-sharing'),
+    ).toHaveLength(0);
   });
 
   it('renders only titled family controls and sends canonical actions to their existing destinations', async () => {
