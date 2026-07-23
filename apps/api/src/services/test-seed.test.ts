@@ -67,7 +67,13 @@ function createMockDb(): Database {
 
   return {
     insert: jest.fn().mockReturnValue({
-      values: jest.fn().mockResolvedValue(undefined),
+      values: jest.fn().mockReturnValue({
+        onConflictDoNothing: jest.fn().mockReturnValue({
+          returning: jest
+            .fn()
+            .mockResolvedValue([{ id: 'mock-practice-activity-event-id' }]),
+        }),
+      }),
     }),
     update: jest.fn().mockReturnValue(updateChain),
     select: jest.fn().mockReturnValue(selectChain),
@@ -192,6 +198,8 @@ describe('VALID_SCENARIOS', () => {
       'mentor-audit-family-owner-daily-quota-with-child',
       'mentor-audit-bridge-backstack',
       'wi-2194-stale-family-cycle',
+      // [WI-2239] Self-owned V2 Journal paper trail.
+      'v2-journal-paper-trail',
       // [WI-2241] Supportership-aware v2 seed.
       'v2-supporter-accepted',
       // [WI-2226 owner-gate corroboration] Same-org managed cold-start seed.
