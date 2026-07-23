@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import * as ts from 'typescript';
@@ -27,16 +27,13 @@ interface CoverageInput {
   fetchImpl?: typeof fetch;
 }
 
-type RequestedExports = Set<string> | null;
-
 interface SelectedRoot {
   node: ts.Node;
-  localToImportedExport: ReadonlyMap<string, string>;
 }
 
 interface FunctionDefinition {
-  node: ts.Node;
-  localToImportedExport: ReadonlyMap<string, string>;
+  node: ts.FunctionLikeDeclaration;
+  name: string | null;
 }
 
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
@@ -95,189 +92,260 @@ function selectedEntryFiles(input: CollectorInput): string[] {
   });
 }
 
-function resolveRelativeImport(
-  importerPath: string,
-  specifier: string,
-): string | null {
-  if (!specifier.startsWith('.')) return null;
-  const unresolved = path.resolve(path.dirname(importerPath), specifier);
-  const candidates = [
-    unresolved,
-    ...SOURCE_EXTENSIONS.map((extension) => `${unresolved}${extension}`),
-    ...SOURCE_EXTENSIONS.map((extension) =>
-      path.join(unresolved, `index${extension}`),
-    ),
-  ];
-  for (const candidate of candidates) {
-    try {
-      if (statSync(candidate).isFile()) return candidate;
-    } catch {
-      // Try the next extension candidate.
-    }
-  }
-  return null;
-}
-
-function scriptKind(filePath: string): ts.ScriptKind {
-  if (filePath.endsWith('.tsx')) return ts.ScriptKind.TSX;
-  if (filePath.endsWith('.jsx')) return ts.ScriptKind.JSX;
-  if (filePath.endsWith('.js') || filePath.endsWith('.mjs')) {
-    return ts.ScriptKind.JS;
-  }
-  return ts.ScriptKind.TS;
-}
-
-function parseSource(filePath: string): ts.SourceFile {
-  return ts.createSourceFile(
-    filePath,
-    readFileSync(filePath, 'utf8'),
-    ts.ScriptTarget.Latest,
-    true,
-    scriptKind(filePath),
-  );
-}
-
-function importedExports(importDeclaration: ts.ImportDeclaration): Set<string> {
-  const requested = new Set<string>();
-  const clause = importDeclaration.importClause;
-  if (!clause) return requested.add('*');
-  if (clause.name) requested.add('default');
-  if (clause.namedBindings) {
-    if (ts.isNamespaceImport(clause.namedBindings)) {
-      requested.add('*');
-    } else {
-      for (const element of clause.namedBindings.elements) {
-        requested.add(element.propertyName?.text ?? element.name.text);
-      }
-    }
-  }
-  return requested;
-}
-
-function localToImportedExports(
-  sourceFile: ts.SourceFile,
-): Map<string, string> {
-  const bindings = new Map<string, string>();
-  for (const statement of sourceFile.statements) {
-    if (!ts.isImportDeclaration(statement)) continue;
-    const namedBindings = statement.importClause?.namedBindings;
-    if (!namedBindings || !ts.isNamedImports(namedBindings)) continue;
-    for (const element of namedBindings.elements) {
-      bindings.set(
-        element.name.text,
-        element.propertyName?.text ?? element.name.text,
-      );
-    }
-  }
-  return bindings;
-}
-
-function mergeRequestedExports(
-  selections: Map<string, RequestedExports>,
-  filePath: string,
-  requested: RequestedExports,
-): boolean {
-  if (!selections.has(filePath)) {
-    selections.set(filePath, requested);
-    return true;
-  }
-  const existing = selections.get(filePath);
-  if (existing === undefined) return false;
-  if (existing === null || requested === null) {
-    if (existing === null) return false;
-    selections.set(filePath, null);
-    return true;
-  }
-  const before = existing.size;
-  for (const name of requested) existing.add(name);
-  return existing.size !== before;
-}
-
-function collectModuleSelections(
-  entries: string[],
-): Map<string, RequestedExports> {
-  const selections = new Map<string, RequestedExports>();
-  const queue = [...entries];
-  for (const entry of entries) selections.set(entry, null);
-
-  while (queue.length > 0) {
-    const filePath = queue.shift();
-    if (!filePath) break;
-    const sourceFile = parseSource(filePath);
-    for (const statement of sourceFile.statements) {
-      if (
-        !ts.isImportDeclaration(statement) ||
-        !ts.isStringLiteral(statement.moduleSpecifier)
-      ) {
-        continue;
-      }
-      const importedPath = resolveRelativeImport(
-        filePath,
-        statement.moduleSpecifier.text,
-      );
-      if (!importedPath) continue;
-      if (
-        mergeRequestedExports(
-          selections,
-          importedPath,
-          importedExports(statement),
-        )
-      ) {
-        queue.push(importedPath);
-      }
-    }
-  }
-  return selections;
-}
-
-function declarationName(node: ts.Node): string | null {
-  if (
-    (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) &&
-    node.name
-  ) {
-    return node.name.text;
-  }
-  if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
-    return node.name.text;
-  }
-  return null;
-}
-
-function selectedRoots(
-  sourceFile: ts.SourceFile,
-  requested: RequestedExports,
-): SelectedRoot[] {
-  const localToImportedExport = localToImportedExports(sourceFile);
-  if (requested === null || requested.has('*')) {
-    return [{ node: sourceFile, localToImportedExport }];
-  }
-  const roots: SelectedRoot[] = [];
-  for (const statement of sourceFile.statements) {
-    if (ts.isVariableStatement(statement)) {
-      for (const declaration of statement.declarationList.declarations) {
-        const name = declarationName(declaration);
-        if (name && requested.has(name)) {
-          roots.push({ node: declaration, localToImportedExport });
-        }
-      }
-    } else {
-      const name = declarationName(statement);
-      if (name && requested.has(name)) {
-        roots.push({ node: statement, localToImportedExport });
-      }
-    }
-  }
-  return roots;
-}
-
 function walk(node: ts.Node, visit: (candidate: ts.Node) => void): void {
   visit(node);
   node.forEachChild((child) => walk(child, visit));
 }
 
-function calleeName(expression: ts.Expression): string | null {
-  if (ts.isIdentifier(expression)) return expression.text;
-  if (ts.isPropertyAccessExpression(expression)) return expression.name.text;
+function isWithinDirectory(filePath: string, directory: string): boolean {
+  const relative = path.relative(directory, filePath);
+  return (
+    relative === '' ||
+    (!relative.startsWith(`..${path.sep}`) &&
+      relative !== '..' &&
+      !path.isAbsolute(relative))
+  );
+}
+
+function resolvedAliasSymbol(
+  checker: ts.TypeChecker,
+  initial: ts.Symbol,
+): ts.Symbol {
+  let symbol = initial;
+  const seen = new Set<ts.Symbol>();
+  while ((symbol.flags & ts.SymbolFlags.Alias) !== 0 && !seen.has(symbol)) {
+    seen.add(symbol);
+    const aliased = checker.getAliasedSymbol(symbol);
+    if (aliased === symbol) break;
+    symbol = aliased;
+  }
+  return symbol;
+}
+
+function resolvedSymbol(
+  checker: ts.TypeChecker,
+  node: ts.Node,
+): ts.Symbol | null {
+  const symbol = checker.getSymbolAtLocation(node);
+  return symbol ? resolvedAliasSymbol(checker, symbol) : null;
+}
+
+function namespaceMemberSymbol(
+  checker: ts.TypeChecker,
+  namespaceExpression: ts.Expression,
+  memberName: string,
+): ts.Symbol | null {
+  const namespaceAlias = checker.getSymbolAtLocation(namespaceExpression);
+  if (!namespaceAlias) return null;
+  const namespace = resolvedAliasSymbol(checker, namespaceAlias);
+  if ((namespace.flags & ts.SymbolFlags.Module) === 0) return null;
+  const member = checker
+    .getExportsOfModule(namespace)
+    .find((candidate) => candidate.getName() === memberName);
+  return member ? resolvedAliasSymbol(checker, member) : null;
+}
+
+function bindingElementPropertyName(node: ts.BindingElement): string | null {
+  const property = node.propertyName ?? node.name;
+  return ts.isIdentifier(property) || ts.isStringLiteral(property)
+    ? property.text
+    : null;
+}
+
+function destructuredNamespaceMemberSymbol(
+  checker: ts.TypeChecker,
+  symbol: ts.Symbol,
+): ts.Symbol | null {
+  for (const declaration of symbol.declarations ?? []) {
+    if (
+      !ts.isBindingElement(declaration) ||
+      !ts.isObjectBindingPattern(declaration.parent) ||
+      !ts.isVariableDeclaration(declaration.parent.parent) ||
+      !declaration.parent.parent.initializer
+    ) {
+      continue;
+    }
+    const memberName = bindingElementPropertyName(declaration);
+    if (!memberName) continue;
+    const member = namespaceMemberSymbol(
+      checker,
+      declaration.parent.parent.initializer,
+      memberName,
+    );
+    if (member) return member;
+  }
+  return null;
+}
+
+function staticReferenceSymbol(
+  checker: ts.TypeChecker,
+  node: ts.Node,
+): ts.Symbol | null {
+  if (ts.isPropertyAccessExpression(node)) {
+    return (
+      namespaceMemberSymbol(checker, node.expression, node.name.text) ??
+      resolvedSymbol(checker, node.name)
+    );
+  }
+  if (
+    ts.isElementAccessExpression(node) &&
+    node.argumentExpression &&
+    (ts.isStringLiteral(node.argumentExpression) ||
+      ts.isNoSubstitutionTemplateLiteral(node.argumentExpression))
+  ) {
+    return namespaceMemberSymbol(
+      checker,
+      node.expression,
+      node.argumentExpression.text,
+    );
+  }
+  if (!ts.isIdentifier(node)) return null;
+  const symbol = checker.getSymbolAtLocation(node);
+  if (!symbol) return null;
+  return (
+    destructuredNamespaceMemberSymbol(checker, symbol) ??
+    resolvedAliasSymbol(checker, symbol)
+  );
+}
+
+function declarationRoot(node: ts.Declaration): ts.Node | null {
+  if (
+    ts.isFunctionDeclaration(node) ||
+    ts.isClassDeclaration(node) ||
+    ts.isEnumDeclaration(node) ||
+    ts.isVariableDeclaration(node) ||
+    ts.isPropertyAssignment(node) ||
+    ts.isMethodDeclaration(node) ||
+    ts.isExportAssignment(node)
+  ) {
+    return node;
+  }
+  return null;
+}
+
+function collectSelectedRoots(
+  entries: string[],
+  testDir: string,
+  program: ts.Program,
+  checker: ts.TypeChecker,
+): SelectedRoot[] {
+  const roots = new Map<string, SelectedRoot>();
+  const queue: ts.Node[] = [];
+  const scannedModuleSources = new Set<string>();
+  const add = (node: ts.Node): void => {
+    const sourceFile = node.getSourceFile();
+    const key = `${sourceFile.fileName}:${node.pos}:${node.end}`;
+    if (roots.has(key)) return;
+    roots.set(key, { node });
+    queue.push(node);
+  };
+  const scanModuleSource = (sourceFile: ts.SourceFile): void => {
+    if (scannedModuleSources.has(sourceFile.fileName)) return;
+    scannedModuleSources.add(sourceFile.fileName);
+    for (const statement of sourceFile.statements) {
+      const moduleSpecifier =
+        ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)
+          ? statement.moduleSpecifier
+          : null;
+      if (!moduleSpecifier || !ts.isStringLiteral(moduleSpecifier)) continue;
+      const importedModule = checker.getSymbolAtLocation(moduleSpecifier);
+      for (const declaration of importedModule?.declarations ?? []) {
+        if (
+          !ts.isSourceFile(declaration) ||
+          !isWithinDirectory(declaration.fileName, testDir)
+        ) {
+          continue;
+        }
+        scanModuleSource(declaration);
+        if (ts.isImportDeclaration(statement) && !statement.importClause) {
+          add(declaration);
+        }
+      }
+    }
+  };
+
+  for (const entry of entries) {
+    const sourceFile = program.getSourceFile(entry);
+    if (sourceFile) add(sourceFile);
+  }
+
+  while (queue.length > 0) {
+    const root = queue.shift();
+    if (!root) break;
+    scanModuleSource(root.getSourceFile());
+    walk(root, (node) => {
+      if (
+        ts.isIdentifier(node) &&
+        ts.isPropertyAccessExpression(node.parent) &&
+        node.parent.name === node
+      ) {
+        return;
+      }
+      const symbol = staticReferenceSymbol(checker, node);
+      for (const declaration of symbol?.declarations ?? []) {
+        const sourceFile = declaration.getSourceFile();
+        if (!isWithinDirectory(sourceFile.fileName, testDir)) continue;
+        const selected = declarationRoot(declaration);
+        if (selected) add(selected);
+      }
+    });
+  }
+
+  return [...roots.values()];
+}
+
+function functionKey(node: ts.FunctionLikeDeclaration): string {
+  const sourceFile = node.getSourceFile();
+  return `${sourceFile.fileName}:${node.pos}:${node.end}`;
+}
+
+function functionName(node: ts.FunctionLikeDeclaration): string | null {
+  if ('name' in node && node.name && ts.isIdentifier(node.name)) {
+    return node.name.text;
+  }
+  if (
+    (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) &&
+    ts.isVariableDeclaration(node.parent) &&
+    ts.isIdentifier(node.parent.name)
+  ) {
+    return node.parent.name.text;
+  }
+  return null;
+}
+
+function unwrapParenthesizedExpression(
+  expression: ts.Expression,
+): ts.Expression {
+  let unwrapped = expression;
+  while (ts.isParenthesizedExpression(unwrapped)) {
+    unwrapped = unwrapped.expression;
+  }
+  return unwrapped;
+}
+
+function functionDefinition(node: ts.Node): ts.FunctionLikeDeclaration | null {
+  if (
+    ts.isFunctionDeclaration(node) ||
+    ts.isMethodDeclaration(node) ||
+    ts.isArrowFunction(node) ||
+    ts.isFunctionExpression(node)
+  ) {
+    return node;
+  }
+  if (
+    ts.isVariableDeclaration(node) &&
+    node.initializer &&
+    (ts.isArrowFunction(node.initializer) ||
+      ts.isFunctionExpression(node.initializer))
+  ) {
+    return node.initializer;
+  }
+  if (ts.isExportAssignment(node)) {
+    const expression = unwrapParenthesizedExpression(node.expression);
+    if (ts.isArrowFunction(expression) || ts.isFunctionExpression(expression)) {
+      return expression;
+    }
+  }
   return null;
 }
 
@@ -287,49 +355,80 @@ function collectFunctionDefinitions(
   const definitions = new Map<string, FunctionDefinition>();
   for (const root of roots) {
     walk(root.node, (node) => {
-      if (ts.isFunctionDeclaration(node) && node.name) {
-        definitions.set(node.name.text, {
-          node,
-          localToImportedExport: root.localToImportedExport,
-        });
-      } else if (
-        ts.isVariableDeclaration(node) &&
-        ts.isIdentifier(node.name) &&
-        node.initializer &&
-        (ts.isArrowFunction(node.initializer) ||
-          ts.isFunctionExpression(node.initializer))
-      ) {
-        definitions.set(node.name.text, {
-          node: node.initializer,
-          localToImportedExport: root.localToImportedExport,
-        });
-      }
+      const definition = functionDefinition(node);
+      if (!definition) return;
+      definitions.set(functionKey(definition), {
+        node: definition,
+        name: functionName(definition),
+      });
     });
   }
   return definitions;
 }
 
-function normalizedCalleeName(
+function calleeSymbol(
+  checker: ts.TypeChecker,
   expression: ts.Expression,
-  localToImportedExport: ReadonlyMap<string, string>,
+): ts.Symbol | null {
+  return staticReferenceSymbol(checker, expression);
+}
+
+function calledFunctionKeys(
+  checker: ts.TypeChecker,
+  expression: ts.Expression,
+): string[] {
+  const keys: string[] = [];
+  for (const declaration of calleeSymbol(checker, expression)?.declarations ??
+    []) {
+    const definition = functionDefinition(declaration);
+    if (definition) keys.push(functionKey(definition));
+  }
+  return keys;
+}
+
+function calleeName(
+  checker: ts.TypeChecker,
+  expression: ts.Expression,
 ): string | null {
-  const name = calleeName(expression);
-  return name ? (localToImportedExport.get(name) ?? name) : null;
+  if (ts.isIdentifier(expression)) {
+    return calleeSymbol(checker, expression)?.getName() ?? expression.text;
+  }
+  if (ts.isPropertyAccessExpression(expression)) {
+    return calleeSymbol(checker, expression)?.getName() ?? expression.name.text;
+  }
+  if (
+    ts.isElementAccessExpression(expression) &&
+    expression.argumentExpression &&
+    (ts.isStringLiteral(expression.argumentExpression) ||
+      ts.isNoSubstitutionTemplateLiteral(expression.argumentExpression))
+  ) {
+    return (
+      calleeSymbol(checker, expression)?.getName() ??
+      expression.argumentExpression.text
+    );
+  }
+  return null;
 }
 
 function containsCallTo(
+  checker: ts.TypeChecker,
   node: ts.Node,
-  names: Set<string>,
-  localToImportedExport: ReadonlyMap<string, string>,
+  functionKeys: Set<string>,
 ): boolean {
   let found = false;
   walk(node, (candidate) => {
     if (!ts.isCallExpression(candidate)) return;
-    const name = normalizedCalleeName(
-      candidate.expression,
-      localToImportedExport,
-    );
-    if (name && names.has(name)) found = true;
+    if (calleeName(checker, candidate.expression) === 'seedScenario') {
+      found = true;
+      return;
+    }
+    if (
+      calledFunctionKeys(checker, candidate.expression).some((key) =>
+        functionKeys.has(key),
+      )
+    ) {
+      found = true;
+    }
   });
   return found;
 }
@@ -369,26 +468,38 @@ function collectCallLiterals(
 export function collectSelectedPlaywrightSeedScenarios(
   input: CollectorInput,
 ): string[] {
-  const moduleSelections = collectModuleSelections(selectedEntryFiles(input));
-  const roots = [...moduleSelections].flatMap(([filePath, requested]) =>
-    selectedRoots(parseSource(filePath), requested),
-  );
+  const entries = selectedEntryFiles(input);
+  const testDir = path.resolve(input.rootDir, input.testDir);
+  const program = ts.createProgram({
+    rootNames: entries,
+    options: {
+      allowJs: true,
+      checkJs: false,
+      jsx: ts.JsxEmit.Preserve,
+      module: ts.ModuleKind.CommonJS,
+      moduleResolution: ts.ModuleResolutionKind.Node10,
+      skipLibCheck: true,
+      target: ts.ScriptTarget.Latest,
+    },
+  });
+  const checker = program.getTypeChecker();
+  const roots = collectSelectedRoots(entries, testDir, program, checker);
   const definitions = collectFunctionDefinitions(roots);
-  const seedFunctions = new Set(['seedScenario']);
+  const seedFunctions = new Set(
+    [...definitions]
+      .filter(([, definition]) => definition.name === 'seedScenario')
+      .map(([key]) => key),
+  );
 
   let changed = true;
   while (changed) {
     changed = false;
-    for (const [name, definition] of definitions) {
+    for (const [key, definition] of definitions) {
       if (
-        !seedFunctions.has(name) &&
-        containsCallTo(
-          definition.node,
-          seedFunctions,
-          definition.localToImportedExport,
-        )
+        !seedFunctions.has(key) &&
+        containsCallTo(checker, definition.node, seedFunctions)
       ) {
-        seedFunctions.add(name);
+        seedFunctions.add(key);
         changed = true;
       }
     }
@@ -405,11 +516,15 @@ export function collectSelectedPlaywrightSeedScenarios(
         if (value) scenarios.add(value);
       }
       if (!ts.isCallExpression(node)) return;
-      const name = normalizedCalleeName(
-        node.expression,
-        root.localToImportedExport,
-      );
-      if (name && seedFunctions.has(name)) collectCallLiterals(node, scenarios);
+      const name = calleeName(checker, node.expression);
+      if (
+        name === 'seedScenario' ||
+        calledFunctionKeys(checker, node.expression).some((key) =>
+          seedFunctions.has(key),
+        )
+      ) {
+        collectCallLiterals(node, scenarios);
+      }
     });
   }
   return [...scenarios].sort();
