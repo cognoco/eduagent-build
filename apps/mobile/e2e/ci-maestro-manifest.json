@@ -62,6 +62,10 @@
     {
       "flow": "flows/v2/v2-supporter-self-learning-doorway.yaml",
       "scenario": "v2-supporter-self-learning-active"
+    },
+    {
+      "flow": "flows/v2/v2-supporter-scope-geometry.yaml",
+      "scenario": "v2-supporter-self-learning-active"
     }
   ],
   "scenarioOverrides": {

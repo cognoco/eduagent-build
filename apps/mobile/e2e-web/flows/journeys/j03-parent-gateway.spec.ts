@@ -1,9 +1,40 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { installSeededProfileBootstrap } from '../../helpers/profile-bootstrap';
 import { emulateNativeTopSafeArea } from '../../helpers/native-safe-area';
+import { pressableClick } from '../../helpers/pressable';
 
 test.describe.configure({ mode: 'serial' });
+
+const LOCALIZED_SUPPORT_HUB_LABELS = fs
+  .readdirSync(
+    path.join(process.cwd(), 'apps', 'mobile', 'src', 'i18n', 'locales'),
+  )
+  .filter((file) => file.endsWith('.json'))
+  .map((file) => {
+    const catalog = JSON.parse(
+      fs.readFileSync(
+        path.join(
+          process.cwd(),
+          'apps',
+          'mobile',
+          'src',
+          'i18n',
+          'locales',
+          file,
+        ),
+        'utf8',
+      ),
+    ) as { scopeChip?: { supportHub?: unknown } };
+    const hubLabel = catalog.scopeChip?.supportHub;
+    if (typeof hubLabel !== 'string' || hubLabel.length === 0) {
+      throw new Error(`${file} is missing scopeChip.supportHub`);
+    }
+    return { code: path.basename(file, '.json'), hubLabel };
+  })
+  .sort((left, right) => left.code.localeCompare(right.code));
 
 async function openSeededParent(page: Page): Promise<void> {
   await installSeededProfileBootstrap(page, 'owner-with-children');
@@ -311,4 +342,76 @@ test('J-03 360px long supporter scopes remain operable and clear pushed content 
       headingClearsChrome: true,
       tallerThanAvatar: true,
     });
+});
+
+test('J-03 360px longest localized supporter labels clear native chrome and Mentor copy @smoke', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 760 });
+  await emulateNativeTopSafeArea(page, 47);
+  await installLongSupporterScopes(page);
+  await openSeededParent(page);
+
+  for (const locale of LOCALIZED_SUPPORT_HUB_LABELS) {
+    await page.goto('/more/account', { waitUntil: 'commit' });
+    await expect(page.getByTestId('more-account-scroll')).toBeVisible({
+      timeout: 60_000,
+    });
+    await pressableClick(page.getByTestId('settings-app-language'));
+    await expect(page.getByTestId('app-language-backdrop')).toBeVisible({
+      timeout: 15_000,
+    });
+    await pressableClick(page.getByTestId(`language-option-${locale.code}`));
+    await expect(page.getByTestId('app-language-backdrop')).not.toBeVisible({
+      timeout: 15_000,
+    });
+
+    await page.goto('/mentor', { waitUntil: 'commit' });
+    await applyScopeTextScale(page);
+
+    const hubOption = page.getByTestId('scope-chip-option-supporter-hub');
+    await expect(hubOption).toBeVisible({ timeout: 60_000 });
+    await expect(hubOption).toHaveAccessibleName(locale.hubLabel);
+    await expect(hubOption).toContainText(locale.hubLabel);
+    await pressableClick(hubOption);
+
+    const scopeShell = page.getByTestId('scope-chip-shell');
+    const avatarShell = page.getByTestId('account-avatar-shell');
+    const heading = page.getByTestId('support-hub-mentor-heading');
+    const subtitle = page.getByTestId('support-hub-mentor-subtitle');
+    await expect(heading).toBeVisible({ timeout: 60_000 });
+    await expect(subtitle).toBeVisible();
+
+    await expect
+      .poll(async () => {
+        const [scopeBox, avatarBox, hubBox, headingBox, subtitleBox] =
+          await Promise.all([
+            scopeShell.boundingBox(),
+            avatarShell.boundingBox(),
+            hubOption.boundingBox(),
+            heading.boundingBox(),
+            subtitle.boundingBox(),
+          ]);
+        if (!scopeBox || !avatarBox || !hubBox || !headingBox || !subtitleBox) {
+          return null;
+        }
+        const chromeBottom = Math.max(
+          scopeBox.y + scopeBox.height,
+          avatarBox.y + avatarBox.height,
+        );
+        return {
+          headingClearsChrome: headingBox.y >= chromeBottom - 0.5,
+          hubClearsAvatar: hubBox.x + hubBox.width <= avatarBox.x - 8,
+          hubTargetHeight: hubBox.height >= 44,
+          subtitleClearsHeading:
+            subtitleBox.y >= headingBox.y + headingBox.height - 0.5,
+        };
+      })
+      .toEqual({
+        headingClearsChrome: true,
+        hubClearsAvatar: true,
+        hubTargetHeight: true,
+        subtitleClearsHeading: true,
+      });
+  }
 });

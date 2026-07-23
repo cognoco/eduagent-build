@@ -6399,6 +6399,14 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scenario: 'v2-supporter-pending-link',
         shard: 1,
       },
+      // [WI-2176] Orion-small-phone Support-hub geometry — exact Support
+      // hub + one supportee + Me shape, Account action, separate cold-launch
+      // persistence checks for Me/person, and deterministic hierarchy endpoint.
+      {
+        flow: 'flows/v2/v2-supporter-scope-geometry.yaml',
+        scenario: 'v2-supporter-self-learning-active',
+        shard: 1,
+      },
       // [WI-2241] Supporter scope journey — Support hub -> person scope ->
       // Mentor -> Subjects -> Journal -> Support hub, structural/negative
       // walls, empty-record honest-empty-state, revoked-edge affordance

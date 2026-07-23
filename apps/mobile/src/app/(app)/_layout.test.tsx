@@ -407,6 +407,14 @@ describe('AppLayout', () => {
         }),
     );
     mockFetch.setRoute(
+      '/scopes',
+      () =>
+        new Response(JSON.stringify({ shape: 'learner' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    mockFetch.setRoute(
       '/dashboard',
       () =>
         new Response(JSON.stringify({ children: [], demoMode: false }), {
@@ -1171,6 +1179,78 @@ describe('AppLayout', () => {
         paddingTop: 119,
       });
     } finally {
+      (
+        flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+      ).MODE_NAV_V2_ENABLED = original;
+    }
+  });
+
+  it('[WI-2176] moves visible content through the real loading-to-loaded scope transition', async () => {
+    const flags = require('../../lib/feature-flags') as {
+      FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+    };
+    const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    let resolveScopes!: (response: Response) => void;
+    const scopesResponse = new Promise<Response>((resolve) => {
+      resolveScopes = resolve;
+    });
+
+    try {
+      (
+        flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+      ).MODE_NAV_V2_ENABLED = true;
+      mockSafeAreaInsets = { top: 47, bottom: 0, left: 0, right: 0 };
+      mockUsePathname.mockReturnValue('/subjects');
+      mockFetch.setRoute('/scopes', () => scopesResponse);
+
+      renderLayout();
+
+      const activeScene = await screen.findByTestId('active-root-scene', {
+        includeHiddenElements: true,
+      });
+      expect(screen.queryByTestId('scope-chip')).toBeNull();
+      expect(activeScene).toHaveStyle({ paddingTop: 99 });
+
+      resolveScopes(
+        new Response(
+          JSON.stringify({
+            shape: 'supporter',
+            scopes: [
+              { kind: 'supporter-hub' },
+              {
+                kind: 'person',
+                personId: '00000000-0000-4000-8000-000000000201',
+                edgeId: '00000000-0000-4000-8000-000000000301',
+                displayName: 'Alexandria-Cassandra',
+              },
+              { kind: 'me' },
+            ],
+            defaultScopeIndex: 0,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+
+      await screen.findByTestId('scope-chip');
+      const scopeShell = screen.getByTestId('scope-chip-shell', {
+        includeHiddenElements: true,
+      });
+      fireEvent(scopeShell, 'layout', {
+        nativeEvent: { layout: { height: 64 } },
+      });
+
+      await waitFor(() => {
+        expect(activeScene).toHaveStyle({ paddingTop: 119 });
+      });
+    } finally {
+      mockFetch.setRoute(
+        '/scopes',
+        () =>
+          new Response(JSON.stringify({ shape: 'learner' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+      );
       (
         flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
       ).MODE_NAV_V2_ENABLED = original;

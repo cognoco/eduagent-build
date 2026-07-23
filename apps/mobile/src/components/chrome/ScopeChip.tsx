@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, Text } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { ScopeDescriptor } from '@eduagent/schemas';
 
@@ -35,8 +35,13 @@ function sameScope(left: ScopeDescriptor, right: ScopeDescriptor): boolean {
 
 export function ScopeChip(): React.ReactElement | null {
   const { t } = useTranslation();
-  const { scopeList, availableScopes, activeScope, setActiveScope } =
-    useScopeContext();
+  const {
+    scopeList,
+    availableScopes,
+    activeScope,
+    isActiveScopePersisted,
+    setActiveScope,
+  } = useScopeContext();
   const labels = {
     supportHub: t('scopeChip.supportHub'),
     me: t('scopeChip.me'),
@@ -81,6 +86,21 @@ export function ScopeChip(): React.ReactElement | null {
           </Pressable>
         );
       })}
+      {process.env.EXPO_PUBLIC_E2E === 'true' && isActiveScopePersisted && (
+        <View
+          accessible
+          collapsable={false}
+          pointerEvents="none"
+          testID={`scope-chip-persisted-${scopeOptionKey(activeScope)}`}
+          style={{
+            position: 'absolute',
+            right: 4,
+            bottom: 4,
+            width: 2,
+            height: 2,
+          }}
+        />
+      )}
     </ScrollView>
   );
 }
