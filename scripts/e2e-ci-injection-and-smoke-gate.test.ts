@@ -3445,6 +3445,35 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(finalCtaReferences).toBeNull();
   });
 
+  it('[WI-1655] settles quiz results before the terminal evidence screenshot', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/quiz/quiz-quit-modal.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      extendedWaitUntil?: { visible?: { id?: string } | string };
+      takeScreenshot?: string;
+      waitForAnimationToEnd?: { timeout?: number };
+    }>;
+    const resultsScreen = commands.findIndex(
+      ({ extendedWaitUntil }) =>
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'quiz-results-screen',
+    );
+    const settled = commands.findIndex(
+      ({ waitForAnimationToEnd }, index) =>
+        index > resultsScreen && (waitForAnimationToEnd?.timeout ?? 0) >= 5000,
+    );
+    const terminalScreenshot = commands.findIndex(
+      ({ takeScreenshot }, index) =>
+        index > settled && takeScreenshot === 'quit-05-save-and-finish-results',
+    );
+
+    expect(resultsScreen).toBeGreaterThan(-1);
+    expect(settled).toBeGreaterThan(resultsScreen);
+    expect(terminalScreenshot).toBeGreaterThan(settled);
+  });
+
   it('[WI-1864] opens the seeded parent topic through its stable card id', () => {
     const source = readFileSync(
       join(repoRoot, 'apps/mobile/e2e/flows/parent/child-drill-down.yaml'),

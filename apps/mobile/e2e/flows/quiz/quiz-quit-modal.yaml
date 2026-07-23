@@ -144,4 +144,7 @@ tags:
       id: "quiz-results-screen"
     timeout: 20000
 
+- waitForAnimationToEnd:
+    timeout: 10000
+
 - takeScreenshot: quit-05-save-and-finish-results
