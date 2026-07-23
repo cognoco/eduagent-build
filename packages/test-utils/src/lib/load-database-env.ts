@@ -3,11 +3,11 @@
  *
  * Resolution order:
  * 1. DATABASE_URL already in env (CI, Docker, `doppler run --`)  → use it
- * 2. .env.test.local / .env.development.local file exists        → load it
- * 3. Doppler CLI available (DOPPLER_CLI, fixed paths, or PATH)   → fetch from Doppler
+ * 2. .env.test.local / .env.development.local file exists        → load it if local
+ * 3. Doppler CLI available (DOPPLER_CLI, fixed paths, or PATH)   → fetch from a dev config
  *
  * This guarantees integration tests get DATABASE_URL regardless of how
- * Jest is invoked (NX target, direct jest, pnpm script, etc.).
+ * Jest is invoked without silently targeting a shared Doppler environment.
  */
 
 import { config } from 'dotenv';
@@ -30,6 +30,40 @@ const DOPPLER_SECRETS = [
   'INNGEST_SIGNING_KEY',
   'TEST_SEED_SECRET',
 ] as const;
+
+interface DopplerSource {
+  project: string;
+  config: string;
+  environment: string;
+}
+
+function readDopplerSource(
+  values: Record<string, string | undefined>,
+): DopplerSource | undefined {
+  const project = values.DOPPLER_PROJECT?.trim();
+  const dopplerConfig = values.DOPPLER_CONFIG?.trim();
+  const environment = values.DOPPLER_ENVIRONMENT?.trim();
+
+  if (!project && !dopplerConfig && !environment) {
+    return undefined;
+  }
+
+  if (!project || !dopplerConfig || !environment) {
+    throw new Error(
+      'Refusing Doppler database fallback for tests because its project, config, or environment could not be resolved.',
+    );
+  }
+
+  return { project, config: dopplerConfig, environment };
+}
+
+function assertLocalDopplerSource(source: DopplerSource): void {
+  if (source.environment !== 'dev') {
+    throw new Error(
+      `Refusing Doppler database fallback for tests: project=${source.project}, config=${source.config}, environment=${source.environment} is shared/non-local. Set DATABASE_URL explicitly or select a development Doppler config.`,
+    );
+  }
+}
 
 function findDopplerCliCandidates(): string[] {
   const candidates: string[] = [];
@@ -67,6 +101,8 @@ function findDopplerCliCandidates(): string[] {
 
 function loadFromDoppler(): boolean {
   for (const dopplerCli of findDopplerCliCandidates()) {
+    let secrets: Record<string, string>;
+
     try {
       const json = execFileSync(
         dopplerCli,
@@ -78,20 +114,31 @@ function loadFromDoppler(): boolean {
         },
       );
 
-      const secrets = JSON.parse(json) as Record<string, string>;
-
-      for (const key of DOPPLER_SECRETS) {
-        if (secrets[key] && !process.env[key]) {
-          process.env[key] = secrets[key];
-        }
-      }
-
-      if (process.env.DATABASE_URL) {
-        console.log('✅ Loaded test secrets from Doppler CLI');
-        return true;
-      }
+      secrets = JSON.parse(json) as Record<string, string>;
     } catch {
       // Try the next candidate (not logged in, stale PATH entry, network issue).
+      continue;
+    }
+
+    const source = readDopplerSource(secrets);
+    if (!source) {
+      throw new Error(
+        'Refusing Doppler database fallback for tests because its project, config, or environment could not be resolved.',
+      );
+    }
+    assertLocalDopplerSource(source);
+
+    for (const key of DOPPLER_SECRETS) {
+      if (secrets[key] && !process.env[key]) {
+        process.env[key] = secrets[key];
+      }
+    }
+
+    if (process.env.DATABASE_URL) {
+      console.log(
+        `✅ Loaded test secrets from Doppler CLI (project=${source.project}, config=${source.config}, environment=${source.environment})`,
+      );
+      return true;
     }
   }
 
@@ -116,7 +163,21 @@ export function loadDatabaseEnv(workspaceRoot: string): void {
       continue;
     }
 
-    config({ path: envPath });
+    const fileEnv: Record<string, string> = {};
+    config({ path: envPath, processEnv: fileEnv });
+    if (fileEnv.DATABASE_URL) {
+      const source = readDopplerSource(fileEnv);
+      if (source) {
+        assertLocalDopplerSource(source);
+      }
+    }
+
+    for (const [key, value] of Object.entries(fileEnv)) {
+      if (process.env[key] === undefined) {
+        process.env[key] = value;
+      }
+    }
+
     if (process.env.DATABASE_URL) {
       return;
     }
