@@ -292,6 +292,121 @@ describe('[WI-2571] selected Playwright seed-scenario collector', () => {
     ]);
   });
 
+  it('includes immediately invoked arrow and function-expression bodies during module evaluation', () => {
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/runtime-iifes.ts',
+      `
+        import { seedScenario } from './test-seed';
+        void (() => {
+          seedScenario({ scenario: 'runtime-arrow-iife-scenario' });
+        })();
+        void (function () {
+          seedScenario({ scenario: 'runtime-function-iife-scenario' });
+        })();
+        void (() => {
+          void (function () {
+            seedScenario({ scenario: 'runtime-nested-iife-scenario' });
+          })();
+        })();
+        export const runtimeIifeMarker = true;
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/shape.spec.ts',
+      `
+        import { runtimeIifeMarker } from './helpers/runtime-iifes';
+        void runtimeIifeMarker;
+      `,
+    );
+
+    expect(collectShapeScenarios(fixtureRoot)).toEqual([
+      'runtime-arrow-iife-scenario',
+      'runtime-function-iife-scenario',
+      'runtime-nested-iife-scenario',
+    ]);
+  });
+
+  it('includes class static runtime effects without unused method bodies', () => {
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/runtime-classes.ts',
+      `
+        import { seedScenario } from './test-seed';
+        export class UnreferencedRuntimeClass {
+          static initialized = seedScenario({
+            scenario: 'unreferenced-class-static-initializer-scenario',
+          });
+          static {
+            seedScenario({
+              scenario: 'unreferenced-class-static-block-scenario',
+            });
+          }
+          unusedInstanceMethod() {
+            return seedScenario({
+              scenario: 'unreferenced-class-instance-method-scenario',
+            });
+          }
+        }
+        export class ReferencedRuntimeClass {
+          instanceInitialized = seedScenario({
+            scenario: 'referenced-class-instance-initializer-scenario',
+          });
+          static initialized = seedScenario({
+            scenario: 'referenced-class-static-initializer-scenario',
+          });
+          static unusedArrow = () =>
+            seedScenario({
+              scenario: 'referenced-class-static-arrow-body-scenario',
+            });
+          static {
+            seedScenario({
+              scenario: 'referenced-class-static-block-scenario',
+            });
+          }
+          unusedInstanceMethod() {
+            return seedScenario({
+              scenario: 'referenced-class-instance-method-scenario',
+            });
+          }
+          static unusedStaticMethod() {
+            return seedScenario({
+              scenario: 'referenced-class-static-method-scenario',
+            });
+          }
+          static calledStaticMethod() {
+            return seedScenario({
+              scenario: 'referenced-class-called-static-method-scenario',
+            });
+          }
+        }
+        export const runtimeClassMarker = true;
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/shape.spec.ts',
+      `
+        import {
+          ReferencedRuntimeClass,
+          runtimeClassMarker,
+        } from './helpers/runtime-classes';
+        void ReferencedRuntimeClass.calledStaticMethod();
+        void ReferencedRuntimeClass;
+        void runtimeClassMarker;
+      `,
+    );
+
+    expect(collectShapeScenarios(fixtureRoot)).toEqual([
+      'referenced-class-called-static-method-scenario',
+      'referenced-class-static-block-scenario',
+      'referenced-class-static-initializer-scenario',
+      'unreferenced-class-static-block-scenario',
+      'unreferenced-class-static-initializer-scenario',
+    ]);
+  });
+
   it('preserves side-effect static import closure', () => {
     writeFixture(
       fixtureRoot,
@@ -487,6 +602,159 @@ describe('[WI-2571] selected Playwright seed-scenario collector', () => {
 
     expect(collectShapeScenarios(fixtureRoot)).toEqual([
       'runtime-value-edge-scenario',
+    ]);
+  });
+
+  it('does not expand erased class symbols while preserving runtime module effects', () => {
+    for (const variant of [
+      'declaration-import',
+      'named-import',
+      'declaration-export',
+      'named-export',
+    ]) {
+      writeFixture(
+        fixtureRoot,
+        `e2e/helpers/${variant}-register.ts`,
+        `
+          import { seedScenario } from './test-seed';
+          void seedScenario({ scenario: '${variant}-register-scenario' });
+        `,
+      );
+      writeFixture(
+        fixtureRoot,
+        `e2e/helpers/${variant}-class.ts`,
+        `
+          import './${variant}-register';
+          import { seedScenario } from './test-seed';
+          export class ${variant
+            .split('-')
+            .map((part) => `${part[0]?.toUpperCase()}${part.slice(1)}`)
+            .join('')}Class {
+            unusedMethod() {
+              return seedScenario({
+                scenario: '${variant}-class-body-scenario',
+              });
+            }
+          }
+        `,
+      );
+    }
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/erased-class-barrel.ts',
+      `
+        import { seedScenario } from './test-seed';
+        void seedScenario({ scenario: 'erased-class-runtime-control-scenario' });
+        export type {
+          DeclarationExportClass,
+        } from './declaration-export-class';
+        export {
+          type NamedExportClass,
+        } from './named-export-class';
+        export const runtimeMarker = true;
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/erased-enum-register.ts',
+      `
+        import { seedScenario } from './test-seed';
+        void seedScenario({ scenario: 'erased-enum-register-scenario' });
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/erased-enum.ts',
+      `
+        import './erased-enum-register';
+        export enum ErasedEnum { Value = 'value' }
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/shape.spec.ts',
+      `
+        import type {
+          DeclarationImportClass,
+        } from './helpers/declaration-import-class';
+        import {
+          type NamedImportClass,
+        } from './helpers/named-import-class';
+        import type {
+          DeclarationExportClass,
+          NamedExportClass,
+        } from './helpers/erased-class-barrel';
+        import type { ErasedEnum } from './helpers/erased-enum';
+        import { runtimeMarker } from './helpers/erased-class-barrel';
+        type ErasedClasses =
+          | DeclarationImportClass
+          | NamedImportClass
+          | DeclarationExportClass
+          | NamedExportClass
+          | ErasedEnum;
+        void (null as ErasedClasses | null);
+        void runtimeMarker;
+      `,
+    );
+
+    expect(collectShapeScenarios(fixtureRoot)).toEqual([
+      'erased-class-runtime-control-scenario',
+    ]);
+  });
+
+  it('keeps mixed value/type edges and runtime extends separate from erased heritage', () => {
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/mixed-runtime-base.ts',
+      `
+        import { seedScenario } from './test-seed';
+        void seedScenario({ scenario: 'mixed-runtime-base-scenario' });
+        export class MixedRuntimeBase {}
+        export interface MixedRuntimeType {}
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/erased-heritage-register.ts',
+      `
+        import { seedScenario } from './test-seed';
+        void seedScenario({ scenario: 'erased-heritage-scenario' });
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/erased-heritage.ts',
+      `
+        import './erased-heritage-register';
+        export interface ErasedHeritage {}
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/helpers/mixed-runtime-derived.ts',
+      `
+        import {
+          MixedRuntimeBase,
+          type MixedRuntimeType,
+        } from './mixed-runtime-base';
+        import type { ErasedHeritage } from './erased-heritage';
+        export class MixedRuntimeDerived
+          extends MixedRuntimeBase
+          implements MixedRuntimeType, ErasedHeritage {}
+        export const mixedRuntimeMarker = true;
+      `,
+    );
+    writeFixture(
+      fixtureRoot,
+      'e2e/shape.spec.ts',
+      `
+        import { mixedRuntimeMarker } from './helpers/mixed-runtime-derived';
+        void mixedRuntimeMarker;
+      `,
+    );
+
+    expect(collectShapeScenarios(fixtureRoot)).toEqual([
+      'mixed-runtime-base-scenario',
     ]);
   });
 
@@ -858,6 +1126,29 @@ describe('[WI-2571] selected Playwright seed-scenario collector', () => {
     expect(collectShapeScenarios(fixtureRoot)).toEqual([
       'namespace-alias-bracket-scenario',
       'namespace-alias-dot-scenario',
+    ]);
+  });
+
+  it('resolves local object-property seed aliases for dot and bracket calls', () => {
+    writeFixture(
+      fixtureRoot,
+      'e2e/shape.spec.ts',
+      `
+        import { seedScenario } from './helpers/test-seed';
+        const seedAliases = {
+          dot: seedScenario,
+          bracket: seedScenario,
+        };
+        void seedAliases.dot({ scenario: 'object-alias-dot-scenario' });
+        void seedAliases['bracket']({
+          scenario: 'object-alias-bracket-scenario',
+        });
+      `,
+    );
+
+    expect(collectShapeScenarios(fixtureRoot)).toEqual([
+      'object-alias-bracket-scenario',
+      'object-alias-dot-scenario',
     ]);
   });
 });

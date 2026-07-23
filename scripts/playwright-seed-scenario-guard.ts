@@ -98,15 +98,56 @@ function walk(node: ts.Node, visit: (candidate: ts.Node) => void): void {
   node.forEachChild((child) => walk(child, visit));
 }
 
+function isImmediatelyInvokedFunction(
+  node: ts.FunctionLikeDeclaration,
+): boolean {
+  let expression: ts.Node = node;
+  while (ts.isParenthesizedExpression(expression.parent)) {
+    expression = expression.parent;
+  }
+  return (
+    ts.isCallExpression(expression.parent) &&
+    expression.parent.expression === expression
+  );
+}
+
+function isStaticClassMember(node: ts.ClassElement): boolean {
+  return (
+    ts.canHaveModifiers(node) &&
+    (ts.getModifiers(node) ?? []).some(
+      (modifier) => modifier.kind === ts.SyntaxKind.StaticKeyword,
+    )
+  );
+}
+
+function walkRuntimeClass(
+  node: ts.ClassDeclaration | ts.ClassExpression,
+  visit: (candidate: ts.Node) => void,
+): void {
+  visit(node);
+  for (const member of node.members) {
+    if (ts.isClassStaticBlockDeclaration(member)) {
+      walkRuntime(member, visit);
+    } else if (
+      ts.isPropertyDeclaration(member) &&
+      isStaticClassMember(member)
+    ) {
+      walkRuntime(member, visit);
+    }
+  }
+}
+
 function walkRuntime(node: ts.Node, visit: (candidate: ts.Node) => void): void {
   visit(node);
   node.forEachChild((child) => {
+    if (ts.isClassDeclaration(child) || ts.isClassExpression(child)) {
+      walkRuntimeClass(child, visit);
+      return;
+    }
     if (
       ts.isImportDeclaration(child) ||
       ts.isExportDeclaration(child) ||
-      ts.isFunctionLike(child) ||
-      ts.isClassDeclaration(child) ||
-      ts.isClassExpression(child)
+      (ts.isFunctionLike(child) && !isImmediatelyInvokedFunction(child))
     ) {
       return;
     }
@@ -239,11 +280,12 @@ function staticReferenceSymbol(
     (ts.isStringLiteral(node.argumentExpression) ||
       ts.isNoSubstitutionTemplateLiteral(node.argumentExpression))
   ) {
-    symbol = namespaceMemberSymbol(
-      checker,
-      node.expression,
-      node.argumentExpression.text,
-    );
+    symbol =
+      namespaceMemberSymbol(
+        checker,
+        node.expression,
+        node.argumentExpression.text,
+      ) ?? resolvedSymbol(checker, node.argumentExpression);
   } else if (ts.isIdentifier(node)) {
     const identifierSymbol = checker.getSymbolAtLocation(node);
     symbol = identifierSymbol
@@ -260,6 +302,8 @@ function staticReferenceSymbol(
     let target: ts.Expression | null = null;
     if (ts.isVariableDeclaration(declaration) && declaration.initializer) {
       target = unwrapParenthesizedExpression(declaration.initializer);
+    } else if (ts.isPropertyAssignment(declaration)) {
+      target = unwrapParenthesizedExpression(declaration.initializer);
     } else if (ts.isExportAssignment(declaration)) {
       target = unwrapParenthesizedExpression(declaration.expression);
     }
@@ -273,7 +317,6 @@ function staticReferenceSymbol(
 function declarationRoot(node: ts.Declaration): ts.Node | null {
   if (
     ts.isFunctionDeclaration(node) ||
-    ts.isClassDeclaration(node) ||
     ts.isEnumDeclaration(node) ||
     ts.isVariableDeclaration(node) ||
     ts.isPropertyAssignment(node) ||
@@ -331,6 +374,30 @@ function isStaticCallTarget(node: ts.Node): boolean {
   );
 }
 
+function isTypePosition(node: ts.Node): boolean {
+  let current = node;
+  while (current.parent) {
+    const parent = current.parent;
+    if (ts.isImportClause(parent) && parent.isTypeOnly) return true;
+    if (ts.isImportSpecifier(parent) && parent.isTypeOnly) return true;
+    if (ts.isExportDeclaration(parent) && parent.isTypeOnly) return true;
+    if (ts.isExportSpecifier(parent) && parent.isTypeOnly) return true;
+    if (
+      ts.isExpressionWithTypeArguments(parent) &&
+      ts.isHeritageClause(parent.parent)
+    ) {
+      const owner = parent.parent.parent;
+      return (
+        ts.isInterfaceDeclaration(owner) ||
+        parent.parent.token === ts.SyntaxKind.ImplementsKeyword
+      );
+    }
+    if (ts.isTypeNode(parent)) return true;
+    current = parent;
+  }
+  return false;
+}
+
 function collectSelectedRoots(
   entries: string[],
   testDir: string,
@@ -384,6 +451,7 @@ function collectSelectedRoots(
     scanModuleSource(root.node.getSourceFile());
     walkSelectedRoot(root, (node) => {
       if (root.traversal !== 'full' && isDeclarationBinding(node)) return;
+      if (isTypePosition(node)) return;
       if (
         ts.isIdentifier(node) &&
         ts.isPropertyAccessExpression(node.parent) &&
