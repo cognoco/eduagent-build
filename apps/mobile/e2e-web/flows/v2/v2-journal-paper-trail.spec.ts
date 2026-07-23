@@ -124,8 +124,12 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
     page.getByTestId(`my-notes-row-bookmarks-${bookmarkId}`),
   ).toHaveCount(0);
   await pressableClick(page.getByTestId('my-notes-list-back'));
-  await expect(page.getByTestId('my-notes-hub')).toBeVisible();
-  await pressableClick(page.getByTestId('my-notes-back'));
+  const visibleLearnerMyNotesHub = page
+    .getByTestId('my-notes-hub')
+    .filter({ visible: true });
+  await expect(visibleLearnerMyNotesHub).toHaveCount(1);
+  await expect(visibleLearnerMyNotesHub).toBeVisible();
+  await pressableClick(visibleLearnerMyNotesHub.getByTestId('my-notes-back'));
   await expectJournalReturn(page);
 
   // Mentor + exact chlorophyll search finds only the seeded Mentor bookmark,
@@ -175,8 +179,12 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
     page.getByTestId(`my-notes-row-notes-${learnerNoteId}`),
   ).toHaveCount(0);
   await pressableClick(page.getByTestId('my-notes-list-back'));
-  await expect(page.getByTestId('my-notes-hub')).toBeVisible();
-  await pressableClick(page.getByTestId('my-notes-back'));
+  const visibleBookmarkMyNotesHub = page
+    .getByTestId('my-notes-hub')
+    .filter({ visible: true });
+  await expect(visibleBookmarkMyNotesHub).toHaveCount(1);
+  await expect(visibleBookmarkMyNotesHub).toBeVisible();
+  await pressableClick(visibleBookmarkMyNotesHub.getByTestId('my-notes-back'));
   await expectJournalReturn(page);
 
   // Exact seeded practice activity -> existing Practice hub -> Journal Me.
