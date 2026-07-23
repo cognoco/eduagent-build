@@ -869,6 +869,9 @@ export default function AppLayout() {
            (immersive screens like session, onboarding, homework).
          ──────────────────────────────────────────────────────────── */}
           <Tabs
+            backBehavior={
+              FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? 'history' : 'firstRoute'
+            }
             screenOptions={({ route }) => {
               const isVisible = visibleTabs.has(route.name);
               const isFullScreen = FULL_SCREEN_ROUTES.has(route.name);

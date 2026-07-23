@@ -50,6 +50,44 @@ function loadWorkflow(name: string): Record<string, unknown> {
   return parseYaml(loadWorkflowRaw(name)) as Record<string, unknown>;
 }
 
+type ElementSelector = {
+  id?: string;
+  text?: string;
+  enabled?: boolean;
+  containsDescendants?: ElementSelector[];
+};
+
+type MaestroCommand = {
+  assertVisible?: ElementSelector;
+  assertNotVisible?: ElementSelector;
+  extendedWaitUntil?: {
+    visible?: ElementSelector;
+    timeout?: number;
+  };
+  tapOn?: ElementSelector;
+  inputText?: string;
+  optional?: boolean;
+  runFlow?: {
+    when?: { visible?: ElementSelector };
+    commands?: MaestroCommand[];
+    file?: string;
+  };
+};
+
+function parseMaestroCommands(source: string): MaestroCommand[] {
+  return parseYaml(source.split(/^---$/m)[1] ?? '') as MaestroCommand[];
+}
+
+function maestroSelectorIds(value: unknown): string[] {
+  if (Array.isArray(value)) return value.flatMap(maestroSelectorIds);
+  if (!value || typeof value !== 'object') return [];
+  return Object.entries(value).flatMap(([key, nested]) =>
+    key === 'id' && typeof nested === 'string'
+      ? [nested]
+      : maestroSelectorIds(nested),
+  );
+}
+
 type Job = {
   name?: string;
   concurrency?: unknown;
@@ -1059,12 +1097,12 @@ describe('[WI-1651] e2e-ci.yml propagates Maestro failures', () => {
 });
 
 describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () => {
-  type MaestroCommand = Record<string, unknown>;
-  const allObjects = (value: unknown): MaestroCommand[] => {
+  type LooseMaestroObject = Record<string, unknown>;
+  const allObjects = (value: unknown): LooseMaestroObject[] => {
     if (Array.isArray(value)) return value.flatMap(allObjects);
     if (value === null || typeof value !== 'object') return [];
     return [
-      value as MaestroCommand,
+      value as LooseMaestroObject,
       ...Object.values(value).flatMap(allObjects),
     ];
   };
@@ -6835,7 +6873,6 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       join(repoRoot, 'apps/mobile/e2e/CONVENTIONS.md'),
       'utf8',
     );
-
     expect(plan).toEqual([
       // [WI-2240] Account row contract for a credentialed learner-only login.
       {
@@ -6847,6 +6884,11 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       {
         flow: 'flows/v2/v2-account-owner.yaml',
         scenario: 'parent-multi-child',
+        shard: 1,
+      },
+      {
+        flow: 'flows/v2/v2-homework-manual-entry.yaml',
+        scenario: 'trial-active',
         shard: 1,
       },
       {
@@ -6919,8 +6961,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       'tab-journal',
       'mentor-screen',
       'mentor-bar-homework-chip',
-      'camera-view',
-      'close-button',
+      'homework-entry-mode-manual',
+      'manual-entry-cancel',
       'subjects-screen',
       'subjects-browse-row-${SUBJECT_ID}',
       'subject-hub-screen',
@@ -7764,12 +7806,32 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           node.initializer &&
           ts.isCallExpression(node.initializer) &&
           ts.isPropertyAccessExpression(node.initializer.expression) &&
-          ts.isIdentifier(node.initializer.expression.expression) &&
-          node.initializer.expression.expression.text ===
-            pageParameter.name.text &&
-          node.initializer.expression.name.text === 'getByTestId'
+          node.initializer.expression.name.text === 'filter' &&
+          ts.isCallExpression(node.initializer.expression.expression)
         ) {
-          const selector = node.initializer.arguments[0];
+          const testIdCall = node.initializer.expression.expression;
+          const filterOptions = node.initializer.arguments[0];
+          const hasVisibleTrueFilter =
+            filterOptions &&
+            ts.isObjectLiteralExpression(filterOptions) &&
+            filterOptions.properties.some(
+              (property) =>
+                ts.isPropertyAssignment(property) &&
+                ts.isIdentifier(property.name) &&
+                property.name.text === 'visible' &&
+                property.initializer.kind === ts.SyntaxKind.TrueKeyword,
+            );
+          if (
+            !hasVisibleTrueFilter ||
+            !ts.isPropertyAccessExpression(testIdCall.expression) ||
+            !ts.isIdentifier(testIdCall.expression.expression) ||
+            testIdCall.expression.expression.text !== pageParameter.name.text ||
+            testIdCall.expression.name.text !== 'getByTestId'
+          ) {
+            ts.forEachChild(node, collectProfileRows);
+            return;
+          }
+          const selector = testIdCall.arguments[0];
           if (
             selector &&
             ts.isTemplateExpression(selector) &&
@@ -7893,9 +7955,10 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         "activeProfile.getByTestId('profile-active-check');",
       ),
       subjectsSpec.replace(
-        'page.getByTestId(`profile-row-${profileId}`)',
-        "page.getByTestId('profile-row-adjacent-profile-id')",
+        'page\n    .getByTestId(`profile-row-${profileId}`)\n    .filter({ visible: true })',
+        "page\n    .getByTestId('profile-row-adjacent-profile-id')\n    .filter({ visible: true })",
       ),
+      subjectsSpec.replace('\n    .filter({ visible: true });', ';'),
       subjectsSpec.replace(
         "expectMeIdentity(page, 'Multi-Subject Learner', seed.profileId)",
         "expectMeIdentity(page, 'Multi-Subject Learner', activeSubjectId)",
@@ -8572,6 +8635,892 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(hasEmptyStorageStateBeforeCases(subjectsSpec)).toBe(true);
   });
 
+  it('[WI-2236] routes the V2 shell Mentor homework action through manual entry and back to Mentor', () => {
+    const flow = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-shell-navigation.yaml'),
+      'utf8',
+    );
+    const commands = parseMaestroCommands(flow);
+
+    const homeworkLaunch = commands.findIndex(
+      (command) =>
+        command.optional !== true &&
+        command.tapOn?.id === 'mentor-bar-homework-chip',
+    );
+    expect(commands.slice(homeworkLaunch, homeworkLaunch + 4)).toEqual([
+      { tapOn: { id: 'mentor-bar-homework-chip' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'homework-entry-mode-manual' },
+          timeout: 15_000,
+        },
+      },
+      { tapOn: { id: 'manual-entry-cancel' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'mentor-screen' },
+          timeout: 15_000,
+        },
+      },
+    ]);
+    expect(
+      maestroSelectorIds(commands).filter((id) =>
+        ['camera-view', 'close-button'].includes(id),
+      ),
+    ).toEqual([]);
+  });
+
+  it('[WI-2236] registers the manual homework case in the V2 Maestro manifest', () => {
+    const manifest = JSON.parse(
+      readFileSync(
+        join(repoRoot, 'apps/mobile/e2e/ci-maestro-manifest.json'),
+        'utf8',
+      ),
+    ) as { v2: Array<{ flow: string; scenario: string | null }> };
+
+    expect(manifest.v2).toContainEqual({
+      flow: 'flows/v2/v2-homework-manual-entry.yaml',
+      scenario: 'trial-active',
+    });
+  });
+
+  it('[WI-2236] hard-gates the exact guaranteed properties of the manual homework case', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-homework-manual-entry.yaml'),
+      'utf8',
+    );
+    const commands = parseMaestroCommands(source);
+
+    const exactSelector = (
+      actual: ElementSelector | undefined,
+      expected: ElementSelector,
+    ): boolean => {
+      if (!actual) return false;
+      const actualDescendants = actual.containsDescendants ?? [];
+      const expectedDescendants = expected.containsDescendants ?? [];
+      return (
+        actual.id === expected.id &&
+        actual.text === expected.text &&
+        actual.enabled === expected.enabled &&
+        actualDescendants.length === expectedDescendants.length &&
+        expectedDescendants.every((selector, index) =>
+          exactSelector(actualDescendants[index], selector),
+        ) &&
+        Object.keys(actual).length === Object.keys(expected).length
+      );
+    };
+
+    const mandatoryAssertVisible = (selector: ElementSelector): number =>
+      commands.findIndex(
+        (command) =>
+          command.optional !== true &&
+          exactSelector(command.assertVisible, selector),
+      );
+    const mandatoryExtendedWait = (
+      selector: ElementSelector,
+      timeout: number,
+      startAt = 0,
+    ): number =>
+      commands.findIndex(
+        (command, index) =>
+          index >= startAt &&
+          command.optional !== true &&
+          command.extendedWaitUntil?.timeout === timeout &&
+          exactSelector(command.extendedWaitUntil.visible, selector),
+      );
+    const tapIndex = (id: string, startAt = 0): number =>
+      commands.findIndex(
+        (command, index) =>
+          index >= startAt &&
+          command.optional !== true &&
+          command.tapOn?.id === id,
+      );
+    const hasSequenceBoundSubjectReadiness = (
+      items: MaestroCommand[],
+    ): boolean => {
+      const exactTypedProblem = items.findIndex(
+        (command) =>
+          command.optional !== true &&
+          exactSelector(command.assertVisible, {
+            id: 'result-text-input',
+            text: 'Solve 3x + 7 = 22',
+          }),
+      );
+      const subjectReadiness = items.findIndex(
+        (command, index) =>
+          index > exactTypedProblem &&
+          command.optional !== true &&
+          command.extendedWaitUntil?.timeout === 60_000 &&
+          exactSelector(command.extendedWaitUntil.visible, {
+            id: 'homework-subject-resolution-ready',
+          }),
+      );
+
+      return exactTypedProblem >= 0 && subjectReadiness > exactTypedProblem;
+    };
+    const containsOptionalTrue = (value: unknown): boolean => {
+      if (Array.isArray(value)) return value.some(containsOptionalTrue);
+      if (!value || typeof value !== 'object') return false;
+      return Object.entries(value).some(
+        ([key, nested]) =>
+          (key === 'optional' && nested === true) ||
+          containsOptionalTrue(nested),
+      );
+    };
+    const commandSurfaceFor = (value: unknown): string[] => {
+      if (typeof value === 'string') return [value];
+      if (Array.isArray(value)) return value.flatMap(commandSurfaceFor);
+      if (!value || typeof value !== 'object') return [];
+      return Object.entries(value).flatMap(([key, nested]) => [
+        key,
+        ...commandSurfaceFor(nested),
+      ]);
+    };
+    for (const selector of [
+      { id: 'homework-problem-text-bubble', text: 'Solve 3x + 7 = 22' },
+      { id: 'homework-problem-text', text: 'Solve 3x + 7 = 22' },
+      {
+        id: 'message-bubble-user-1',
+        containsDescendants: [{ text: 'Solve 3x + 7 = 22' }],
+      },
+    ]) {
+      expect(mandatoryAssertVisible(selector)).toBeGreaterThan(-1);
+    }
+
+    expect(
+      mandatoryExtendedWait(
+        { id: 'homework-problem-progress', text: 'Problem 1 of 1' },
+        30_000,
+      ),
+    ).toBeGreaterThan(-1);
+    expect(
+      mandatoryExtendedWait({ id: 'homework-first-response-complete' }, 60_000),
+    ).toBeGreaterThan(-1);
+    const deviceOnlySelector =
+      /(camera|gallery|ocr|permission|shutter|flash|retake|message-image|homework-image)/i;
+    expect(
+      commandSurfaceFor(commands).filter((value) =>
+        deviceOnlySelector.test(value),
+      ),
+    ).toEqual([]);
+
+    const deviceOnlyCommandFixtures = [
+      { cameraAction: true },
+      { tapOn: { text: 'Open gallery' } },
+      {
+        assertVisible: {
+          id: 'status',
+          containsDescendants: [{ text: 'OCR result' }],
+        },
+      },
+      { inputText: 'permission prompt' },
+      { runFlow: { file: '../device/shutter-setup.yaml' } },
+      { assertVisible: { text: 'Enable flash' } },
+      { retakeAction: false },
+      {
+        tapOn: {
+          id: 'container',
+          containsDescendants: [{ id: 'message-image' }],
+        },
+      },
+      { runFlow: { file: '../device/homework-image.yaml' } },
+    ] as unknown as MaestroCommand[];
+    for (const fixture of deviceOnlyCommandFixtures) {
+      expect(
+        commandSurfaceFor([fixture]).some((value) =>
+          deviceOnlySelector.test(value),
+        ),
+      ).toBe(true);
+    }
+
+    const isAssociationWait = (command: MaestroCommand): boolean =>
+      command.optional !== true &&
+      command.extendedWaitUntil?.timeout === 30_000 &&
+      exactSelector(command.extendedWaitUntil.visible, {
+        id: 'homework-session-associated-once',
+      });
+    const isFinalAssociation = (command: MaestroCommand): boolean =>
+      command.optional !== true &&
+      exactSelector(command.assertVisible, {
+        id: 'homework-session-associated-once',
+      });
+    const isDuplicateAbsence = (command: MaestroCommand): boolean =>
+      command.optional !== true &&
+      exactSelector(command.assertNotVisible, {
+        id: 'homework-session-created-more-than-once',
+      });
+    const hasSequenceBoundSessionEvidence = (
+      items: MaestroCommand[],
+    ): boolean => {
+      type RawCommandObject = Record<string, unknown>;
+      const asCommandObject = (value: unknown): RawCommandObject | null =>
+        value !== null && typeof value === 'object' && !Array.isArray(value)
+          ? (value as RawCommandObject)
+          : null;
+      let hasInvalidExecutableChild = false;
+      const directExecutableChildren = (
+        command: MaestroCommand,
+      ): MaestroCommand[] =>
+        Object.values(command as unknown as RawCommandObject).flatMap(
+          (operatorValue) => {
+            const operator = asCommandObject(operatorValue);
+            const rawChildren = operator?.['commands'];
+            if (!Array.isArray(rawChildren)) return [];
+            return rawChildren.flatMap((child) => {
+              if (!asCommandObject(child)) {
+                hasInvalidExecutableChild = true;
+                return [];
+              }
+              return [child as MaestroCommand];
+            });
+          },
+        );
+      const collectNestedCommands = (
+        commands: MaestroCommand[],
+      ): MaestroCommand[] =>
+        commands.flatMap((command) => {
+          const nested = directExecutableChildren(command);
+          return [...nested, ...collectNestedCommands(nested)];
+        });
+      const nestedCommands = collectNestedCommands(items);
+      const criticalTapIds = new Set([
+        'mentor-bar-homework-chip',
+        'manual-entry-cancel',
+        'confirm-button',
+        'homework-help-me-solve',
+      ]);
+      const criticalWaitIds = new Set([
+        'homework-entry-mode-manual',
+        'homework-subject-resolution-ready',
+        'session-screen',
+      ]);
+      const targetsCriticalJourney = (command: MaestroCommand): boolean =>
+        (command.tapOn?.id !== undefined &&
+          criticalTapIds.has(command.tapOn.id)) ||
+        (command.extendedWaitUntil?.visible?.id !== undefined &&
+          criticalWaitIds.has(command.extendedWaitUntil.visible.id)) ||
+        command.assertVisible?.id === 'homework-help-me-solve' ||
+        command.assertNotVisible?.id === 'session-subject-resolution' ||
+        command.inputText === 'Solve 3x + 7 = 22';
+      const rawOperator = (
+        command: MaestroCommand,
+        name: 'runFlow' | 'retry',
+      ): unknown => (command as unknown as RawCommandObject)[name];
+      const hasOpaqueExecutableReference = (
+        command: MaestroCommand,
+        topLevelIndex?: number,
+      ): boolean =>
+        (['runFlow', 'retry'] as const).some((name) => {
+          const raw = rawOperator(command, name);
+          if (raw === undefined) return false;
+          const operator = asCommandObject(raw);
+          if (!operator) return true;
+          if (operator['file'] === undefined) return false;
+          return !(
+            name === 'runFlow' &&
+            topLevelIndex === 0 &&
+            operator['file'] === '../_setup/seed-and-sign-in.yaml'
+          );
+        });
+      const canonicalSetup = asCommandObject(rawOperator(items[0]!, 'runFlow'));
+      if (
+        hasInvalidExecutableChild ||
+        canonicalSetup?.['file'] !== '../_setup/seed-and-sign-in.yaml' ||
+        items.some((command, index) =>
+          hasOpaqueExecutableReference(command, index),
+        ) ||
+        nestedCommands.some((command) =>
+          hasOpaqueExecutableReference(command),
+        ) ||
+        nestedCommands.some(targetsCriticalJourney)
+      ) {
+        return false;
+      }
+      const matchingIndices = (
+        predicate: (command: MaestroCommand) => boolean,
+      ): number[] =>
+        items.flatMap((command, index) => (predicate(command) ? [index] : []));
+      const tapTargets = (id: string): number[] =>
+        matchingIndices((command) => command.tapOn?.id === id);
+      const waitTargets = (id: string): number[] =>
+        matchingIndices(
+          (command) => command.extendedWaitUntil?.visible?.id === id,
+        );
+      const visibleTargets = (id: string): number[] =>
+        matchingIndices((command) => command.assertVisible?.id === id);
+      const notVisibleTargets = (id: string): number[] =>
+        matchingIndices((command) => command.assertNotVisible?.id === id);
+      const homeworkLaunches = tapTargets('mentor-bar-homework-chip');
+      const manualMarkers = waitTargets('homework-entry-mode-manual');
+      const cancels = tapTargets('manual-entry-cancel');
+      const exactProblemInputs = matchingIndices(
+        (command) => command.inputText === 'Solve 3x + 7 = 22',
+      );
+      const subjectReadinessWaits = waitTargets(
+        'homework-subject-resolution-ready',
+      );
+      const confirms = tapTargets('confirm-button');
+      const sessionArrivals = waitTargets('session-screen');
+      const enabledHelpActions = visibleTargets('homework-help-me-solve');
+      const subjectResolutionAbsences = notVisibleTargets(
+        'session-subject-resolution',
+      );
+      const helpActions = tapTargets('homework-help-me-solve');
+      if (
+        homeworkLaunches.length !== 2 ||
+        manualMarkers.length !== 2 ||
+        cancels.length !== 1 ||
+        exactProblemInputs.length !== 1 ||
+        subjectReadinessWaits.length !== 1 ||
+        confirms.length !== 1 ||
+        sessionArrivals.length !== 1 ||
+        enabledHelpActions.length !== 1 ||
+        subjectResolutionAbsences.length !== 1 ||
+        helpActions.length !== 1
+      ) {
+        return false;
+      }
+      const exactTapAt = (index: number, id: string): boolean => {
+        const command = items[index]!;
+        return (
+          command.optional !== true && exactSelector(command.tapOn, { id })
+        );
+      };
+      const hardWaitAt = (
+        index: number,
+        id: string,
+        timeout: number,
+      ): boolean => {
+        const command = items[index]!;
+        return (
+          command.optional !== true &&
+          command.extendedWaitUntil?.timeout === timeout &&
+          exactSelector(command.extendedWaitUntil.visible, { id })
+        );
+      };
+      if (
+        !homeworkLaunches.every((index) =>
+          exactTapAt(index, 'mentor-bar-homework-chip'),
+        ) ||
+        !manualMarkers.every((index) =>
+          hardWaitAt(index, 'homework-entry-mode-manual', 15_000),
+        ) ||
+        !cancels.every((index) => exactTapAt(index, 'manual-entry-cancel')) ||
+        !exactProblemInputs.every((index) => items[index]!.optional !== true) ||
+        !subjectReadinessWaits.every((index) =>
+          hardWaitAt(index, 'homework-subject-resolution-ready', 60_000),
+        ) ||
+        !confirms.every((index) => exactTapAt(index, 'confirm-button')) ||
+        !sessionArrivals.every((index) =>
+          hardWaitAt(index, 'session-screen', 30_000),
+        ) ||
+        !enabledHelpActions.every((index) => {
+          const command = items[index]!;
+          return (
+            command.optional !== true &&
+            exactSelector(command.assertVisible, {
+              id: 'homework-help-me-solve',
+              enabled: true,
+            })
+          );
+        }) ||
+        !subjectResolutionAbsences.every((index) => {
+          const command = items[index]!;
+          return (
+            command.optional !== true &&
+            exactSelector(command.assertNotVisible, {
+              id: 'session-subject-resolution',
+            })
+          );
+        }) ||
+        !helpActions.every((index) =>
+          exactTapAt(index, 'homework-help-me-solve'),
+        )
+      ) {
+        return false;
+      }
+      const [firstHomeworkLaunch, secondHomeworkLaunch] = homeworkLaunches;
+      const [firstManualMarker, secondManualMarker] = manualMarkers;
+      const cancel = cancels[0]!;
+      const exactProblemInput = exactProblemInputs[0]!;
+      const subjectReadiness = subjectReadinessWaits[0]!;
+      const confirm = confirms[0]!;
+      const sessionArrival = sessionArrivals[0]!;
+      const enabledHelpAction = enabledHelpActions[0]!;
+      const subjectResolutionAbsent = subjectResolutionAbsences[0]!;
+      const helpAction = helpActions[0]!;
+      const associationWait = items.findIndex(
+        (command, index) => index > helpAction && isAssociationWait(command),
+      );
+      const completedResponse = items.findIndex(
+        (command, index) =>
+          index > associationWait &&
+          command.optional !== true &&
+          command.extendedWaitUntil?.timeout === 60_000 &&
+          exactSelector(command.extendedWaitUntil.visible, {
+            id: 'homework-first-response-complete',
+          }),
+      );
+      const finalAssociation = items.findIndex(
+        (command, index) =>
+          index > completedResponse && isFinalAssociation(command),
+      );
+      const duplicateAbsence = items.findIndex(
+        (command, index) =>
+          index > completedResponse && isDuplicateAbsence(command),
+      );
+      return (
+        firstHomeworkLaunch >= 0 &&
+        firstManualMarker > firstHomeworkLaunch &&
+        cancel > firstManualMarker &&
+        secondHomeworkLaunch > cancel &&
+        secondManualMarker > secondHomeworkLaunch &&
+        exactProblemInput > secondManualMarker &&
+        subjectReadiness > exactProblemInput &&
+        confirm > subjectReadiness &&
+        sessionArrival > confirm &&
+        enabledHelpAction > sessionArrival &&
+        subjectResolutionAbsent > enabledHelpAction &&
+        helpAction === subjectResolutionAbsent + 1 &&
+        associationWait > helpAction &&
+        completedResponse > associationWait &&
+        finalAssociation > completedResponse &&
+        duplicateAbsence > completedResponse
+      );
+    };
+
+    const firstHomeworkLaunch = tapIndex('mentor-bar-homework-chip');
+    const firstManualMarker = mandatoryExtendedWait(
+      { id: 'homework-entry-mode-manual' },
+      15_000,
+      firstHomeworkLaunch + 1,
+    );
+    const cancel = tapIndex('manual-entry-cancel', firstManualMarker + 1);
+    const mentorAfterCancel = mandatoryExtendedWait(
+      { id: 'mentor-screen' },
+      15_000,
+      cancel + 1,
+    );
+    const usableMentorInput = commands.findIndex(
+      (command, index) =>
+        index > mentorAfterCancel &&
+        command.optional !== true &&
+        exactSelector(command.assertVisible, {
+          id: 'mentor-bar-input',
+          enabled: true,
+        }),
+    );
+    const secondHomeworkLaunch = tapIndex(
+      'mentor-bar-homework-chip',
+      usableMentorInput + 1,
+    );
+    const secondManualMarker = mandatoryExtendedWait(
+      { id: 'homework-entry-mode-manual' },
+      15_000,
+      secondHomeworkLaunch + 1,
+    );
+    const emptyManualEntry = mandatoryExtendedWait(
+      { id: 'homework-manual-entry-empty' },
+      15_000,
+      secondManualMarker + 1,
+    );
+    const exactProblemInput = commands.findIndex(
+      (command, index) =>
+        index > emptyManualEntry &&
+        command.optional !== true &&
+        command.inputText === 'Solve 3x + 7 = 22',
+    );
+    const exactTypedProblem = commands.findIndex(
+      (command, index) =>
+        index > exactProblemInput &&
+        command.optional !== true &&
+        exactSelector(command.assertVisible, {
+          id: 'result-text-input',
+          text: 'Solve 3x + 7 = 22',
+        }),
+    );
+    expect(firstHomeworkLaunch).toBeGreaterThan(-1);
+    expect(firstManualMarker).toBeGreaterThan(firstHomeworkLaunch);
+    expect(cancel).toBeGreaterThan(firstManualMarker);
+    expect(mentorAfterCancel).toBeGreaterThan(cancel);
+    expect(usableMentorInput).toBeGreaterThan(mentorAfterCancel);
+    expect(secondHomeworkLaunch).toBeGreaterThan(usableMentorInput);
+    expect(secondManualMarker).toBeGreaterThan(secondHomeworkLaunch);
+    expect(emptyManualEntry).toBeGreaterThan(secondManualMarker);
+    expect(exactProblemInput).toBeGreaterThan(emptyManualEntry);
+    expect(exactTypedProblem).toBeGreaterThan(exactProblemInput);
+    expect(tapIndex('manual-entry-button')).toBe(-1);
+
+    const resolvedSubject = mandatoryExtendedWait(
+      { id: 'homework-subject-resolution-ready' },
+      60_000,
+      exactTypedProblem + 1,
+    );
+    const enabledConfirm = commands.findIndex(
+      (command, index) =>
+        index > resolvedSubject &&
+        command.optional !== true &&
+        exactSelector(command.assertVisible, {
+          id: 'confirm-button',
+          enabled: true,
+        }),
+    );
+    const confirmTap = tapIndex('confirm-button', enabledConfirm + 1);
+    expect(resolvedSubject).toBeGreaterThan(exactTypedProblem);
+    expect(enabledConfirm).toBeGreaterThan(resolvedSubject);
+    expect(confirmTap).toBeGreaterThan(enabledConfirm);
+
+    expect(hasSequenceBoundSubjectReadiness(commands)).toBe(true);
+    const subjectReadinessCommands = commands.filter(
+      (command) =>
+        command.optional !== true &&
+        command.extendedWaitUntil?.timeout === 60_000 &&
+        exactSelector(command.extendedWaitUntil.visible, {
+          id: 'homework-subject-resolution-ready',
+        }),
+    );
+    const commandsWithoutSubjectReadiness = commands.filter(
+      (command) => !subjectReadinessCommands.includes(command),
+    );
+    const readinessCancelPhaseIndex = commandsWithoutSubjectReadiness.findIndex(
+      (command) => command.tapOn?.id === 'manual-entry-cancel',
+    );
+    const readinessMovedIntoCancelPhase = [
+      ...commandsWithoutSubjectReadiness.slice(
+        0,
+        readinessCancelPhaseIndex + 1,
+      ),
+      ...subjectReadinessCommands,
+      ...commandsWithoutSubjectReadiness.slice(readinessCancelPhaseIndex + 1),
+    ];
+    expect(
+      hasSequenceBoundSubjectReadiness(readinessMovedIntoCancelPhase),
+    ).toBe(false);
+
+    expect(hasSequenceBoundSessionEvidence(commands)).toBe(true);
+    const duplicateEarlyProblemInput = [
+      ...commands.slice(0, secondManualMarker + 1),
+      { inputText: 'Solve 3x + 7 = 22' },
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(duplicateEarlyProblemInput)).toBe(
+      false,
+    );
+    const duplicateEarlySubjectReadiness = [
+      ...commands.slice(0, secondManualMarker + 1),
+      {
+        extendedWaitUntil: {
+          visible: { id: 'homework-subject-resolution-ready' },
+          timeout: 60_000,
+        },
+      },
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(
+      hasSequenceBoundSessionEvidence(duplicateEarlySubjectReadiness),
+    ).toBe(false);
+    const nearShapeThirdJourney = [
+      {
+        tapOn: {
+          id: 'manual-entry-cancel',
+          retryTapIfNoChange: true,
+        },
+      },
+      {
+        tapOn: {
+          id: 'mentor-bar-homework-chip',
+          retryTapIfNoChange: true,
+        },
+      },
+      {
+        extendedWaitUntil: {
+          visible: {
+            id: 'homework-entry-mode-manual',
+            enabled: true,
+          },
+          timeout: 15_000,
+        },
+      },
+    ] as unknown as MaestroCommand[];
+    const nearShapeThirdJourneyAfterSecondMarker = [
+      ...commands.slice(0, secondManualMarker + 1),
+      ...nearShapeThirdJourney,
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(
+      hasSequenceBoundSessionEvidence(nearShapeThirdJourneyAfterSecondMarker),
+    ).toBe(false);
+    const nestedThirdJourneyCommands: MaestroCommand[] = [
+      { tapOn: { id: 'manual-entry-cancel' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'mentor-screen' },
+          timeout: 15_000,
+        },
+      },
+      { tapOn: { id: 'mentor-bar-homework-chip' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'homework-entry-mode-manual' },
+          timeout: 15_000,
+        },
+      },
+    ];
+    const nestedThirdJourneyAfterSecondMarker = [
+      ...commands.slice(0, secondManualMarker + 1),
+      {
+        runFlow: {
+          when: { visible: { id: 'homework-entry-mode-manual' } },
+          commands: nestedThirdJourneyCommands,
+        },
+      },
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(
+      hasSequenceBoundSessionEvidence(nestedThirdJourneyAfterSecondMarker),
+    ).toBe(false);
+    const lateOpaqueSubflow = [
+      ...commands.slice(0, secondManualMarker + 1),
+      { runFlow: { file: '../_setup/opaque-journey.yaml' } },
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(lateOpaqueSubflow)).toBe(false);
+    const lateScalarSubflow = [
+      ...commands.slice(0, secondManualMarker + 1),
+      {
+        runFlow: '../_setup/opaque-journey.yaml',
+      } as unknown as MaestroCommand,
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(lateScalarSubflow)).toBe(false);
+    const deepScalarSubflow = [
+      ...commands.slice(0, secondManualMarker + 1),
+      {
+        runFlow: {
+          commands: [
+            {
+              runFlow: {
+                commands: [
+                  {
+                    runFlow: '../_setup/opaque-journey.yaml',
+                  } as unknown as MaestroCommand,
+                ],
+              },
+            },
+          ],
+        },
+      },
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(deepScalarSubflow)).toBe(false);
+    const repeatThirdJourney = [
+      ...commands.slice(0, secondManualMarker + 1),
+      {
+        repeat: { times: 1, commands: nestedThirdJourneyCommands },
+      } as unknown as MaestroCommand,
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(repeatThirdJourney)).toBe(false);
+    const retryThirdJourney = [
+      ...commands.slice(0, secondManualMarker + 1),
+      {
+        retry: { maxRetries: 1, commands: nestedThirdJourneyCommands },
+      } as unknown as MaestroCommand,
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(retryThirdJourney)).toBe(false);
+    const opaqueRetryFile = [
+      ...commands.slice(0, secondManualMarker + 1),
+      {
+        retry: { file: '../_setup/opaque-journey.yaml' },
+      } as unknown as MaestroCommand,
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(opaqueRetryFile)).toBe(false);
+    const deepMixedThirdJourney = [
+      ...commands.slice(0, secondManualMarker + 1),
+      {
+        runFlow: {
+          commands: [
+            {
+              repeat: {
+                times: 1,
+                commands: [
+                  {
+                    retry: {
+                      maxRetries: 1,
+                      commands: nestedThirdJourneyCommands,
+                    },
+                  } as unknown as MaestroCommand,
+                ],
+              },
+            } as unknown as MaestroCommand,
+          ],
+        },
+      },
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(deepMixedThirdJourney)).toBe(false);
+    const harmlessNestedCommand = [
+      ...commands.slice(0, secondManualMarker + 1),
+      {
+        runFlow: {
+          when: { visible: { id: 'mentor-screen' } },
+          commands: [{ assertVisible: { id: 'mentor-screen' } }],
+        },
+      },
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(harmlessNestedCommand)).toBe(true);
+    const harmlessRepeatAndRetry = [
+      ...commands.slice(0, secondManualMarker + 1),
+      {
+        repeat: {
+          times: 1,
+          commands: [{ assertVisible: { id: 'mentor-screen' } }],
+        },
+      } as unknown as MaestroCommand,
+      {
+        retry: {
+          maxRetries: 1,
+          commands: [{ assertVisible: { id: 'mentor-screen' } }],
+        },
+      } as unknown as MaestroCommand,
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(harmlessRepeatAndRetry)).toBe(true);
+    const subjectResolutionAbsenceCommands = commands.filter(
+      (command) =>
+        command.optional !== true &&
+        exactSelector(command.assertNotVisible, {
+          id: 'session-subject-resolution',
+        }),
+    );
+    expect(subjectResolutionAbsenceCommands).toHaveLength(1);
+    const commandsWithoutSubjectResolutionAbsence = commands.filter(
+      (command) => !subjectResolutionAbsenceCommands.includes(command),
+    );
+    const subjectAbsenceInCancelPhase = [
+      ...commandsWithoutSubjectResolutionAbsence.slice(0, cancel + 1),
+      ...subjectResolutionAbsenceCommands,
+      ...commandsWithoutSubjectResolutionAbsence.slice(cancel + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(subjectAbsenceInCancelPhase)).toBe(
+      false,
+    );
+    const subjectResolutionAbsenceIndex = commands.indexOf(
+      subjectResolutionAbsenceCommands[0]!,
+    );
+    const prematureSubjectPair = commands.slice(
+      subjectResolutionAbsenceIndex,
+      subjectResolutionAbsenceIndex + 2,
+    );
+    const commandsWithoutSubjectPair = commands.filter(
+      (_command, index) =>
+        index < subjectResolutionAbsenceIndex ||
+        index >= subjectResolutionAbsenceIndex + 2,
+    );
+    const subjectPairBeforeProblemEntry = [
+      ...commandsWithoutSubjectPair.slice(0, secondManualMarker + 1),
+      ...prematureSubjectPair,
+      ...commandsWithoutSubjectPair.slice(secondManualMarker + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(subjectPairBeforeProblemEntry)).toBe(
+      false,
+    );
+    const sessionEvidenceCommands = commands.filter(
+      (command) =>
+        isAssociationWait(command) ||
+        isFinalAssociation(command) ||
+        isDuplicateAbsence(command),
+    );
+    const commandsWithoutSessionEvidence = commands.filter(
+      (command) => !sessionEvidenceCommands.includes(command),
+    );
+    const cancelPhaseIndex = commandsWithoutSessionEvidence.findIndex(
+      (command) => command.tapOn?.id === 'manual-entry-cancel',
+    );
+    const evidenceMovedIntoCancelPhase = [
+      ...commandsWithoutSessionEvidence.slice(0, cancelPhaseIndex + 1),
+      ...sessionEvidenceCommands,
+      ...commandsWithoutSessionEvidence.slice(cancelPhaseIndex + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(evidenceMovedIntoCancelPhase)).toBe(
+      false,
+    );
+    const thirdJourneyOwnedCommands = commands.filter(
+      (command, index) =>
+        (index >= subjectResolutionAbsenceIndex &&
+          index < subjectResolutionAbsenceIndex + 2) ||
+        isAssociationWait(command) ||
+        (command.optional !== true &&
+          command.extendedWaitUntil?.timeout === 60_000 &&
+          exactSelector(command.extendedWaitUntil.visible, {
+            id: 'homework-first-response-complete',
+          })) ||
+        isFinalAssociation(command) ||
+        isDuplicateAbsence(command),
+    );
+    const commandsWithoutThirdJourneyEvidence = commands.filter(
+      (command) => !thirdJourneyOwnedCommands.includes(command),
+    );
+    const secondHelpVisibility = commandsWithoutThirdJourneyEvidence.findIndex(
+      (command) =>
+        command.optional !== true &&
+        exactSelector(command.assertVisible, {
+          id: 'homework-help-me-solve',
+          enabled: true,
+        }),
+    );
+    const evidenceOwnedByThirdJourney = [
+      ...commandsWithoutThirdJourneyEvidence.slice(0, secondHelpVisibility + 1),
+      { tapOn: { id: 'manual-entry-cancel' } },
+      { tapOn: { id: 'mentor-bar-homework-chip' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'homework-entry-mode-manual' },
+          timeout: 15_000,
+        },
+      },
+      ...thirdJourneyOwnedCommands,
+      ...commandsWithoutThirdJourneyEvidence.slice(secondHelpVisibility + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(evidenceOwnedByThirdJourney)).toBe(
+      false,
+    );
+
+    expect(
+      commands.findIndex(
+        (command) =>
+          command.optional !== true &&
+          exactSelector(command.assertNotVisible, {
+            id: 'session-reconnect-.*',
+          }),
+      ),
+    ).toBeGreaterThan(-1);
+
+    const back = tapIndex('chat-shell-back');
+    expect(back).toBeGreaterThan(-1);
+    const mentorReturn = mandatoryExtendedWait(
+      { id: 'mentor-screen' },
+      30_000,
+      back + 1,
+    );
+    expect(mentorReturn).toBeGreaterThan(back);
+    expect(
+      commands.findIndex(
+        (command, index) =>
+          index > mentorReturn &&
+          command.optional !== true &&
+          exactSelector(command.assertVisible, {
+            id: 'mentor-bar-input',
+            enabled: true,
+          }),
+      ),
+    ).toBeGreaterThan(mentorReturn);
+    expect(containsOptionalTrue(commands)).toBe(false);
+  });
+
   it('[WI-2584 profile-load-error] hard-fails authenticated bootstrap errors before Back recovery', () => {
     const commands = parseAllDocuments(
       readFileSync(
@@ -8674,7 +9623,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
   });
 
   it('[WI-2616] hard-routes V2 link-ceremony cross-logins through Account', () => {
-    type Command = MaestroCommand;
+    type Command = LooseMaestroObject;
     const v2SignOutPath = join(
       repoRoot,
       'apps/mobile/e2e/flows/_setup/sign-out-v2.yaml',
@@ -9003,7 +9952,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
   });
 
   it('[WI-2506 / WI-2608] binds resolver actions and requires the exact stable Photosynthesis round trip', () => {
-    type Command = MaestroCommand;
+    type Command = LooseMaestroObject;
     const subjectCreate = parseAllDocuments(
       readFileSync(
         join(

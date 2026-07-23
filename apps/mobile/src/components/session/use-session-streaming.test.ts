@@ -6,25 +6,15 @@ import {
 } from './use-session-streaming';
 import { QuotaExceededError } from '../../lib/api-client';
 import { UpstreamError } from '../../lib/api-errors';
+import { Sentry } from '../../lib/sentry';
+import * as sessionRecoveryModule from '../../lib/session-recovery';
 
-const mockCaptureException = jest.fn();
-
-jest.mock(
-  '../../lib/sentry' /* gc1-allow: Sentry SDK loads native module config in Jest */,
-  () => ({
-    Sentry: {
-      captureException: (...args: unknown[]) => mockCaptureException(...args),
-    },
-  }),
-);
+const mockCaptureException = jest.spyOn(Sentry, 'captureException');
 
 // Mock session recovery
-const mockWriteRecoveryMarker = jest.fn().mockResolvedValue(undefined);
-// prettier-ignore
-jest.mock('../../lib/session-recovery', () => ({ // gc1-allow: uses Expo SecureStore native storage that cannot be exercised in JSDOM
-  writeSessionRecoveryMarker: (...args: unknown[]) =>
-    mockWriteRecoveryMarker(...args),
-}));
+const mockWriteRecoveryMarker = jest
+  .spyOn(sessionRecoveryModule, 'writeSessionRecoveryMarker')
+  .mockResolvedValue(undefined);
 
 // Mock homework problem-cards
 jest.mock(
@@ -236,6 +226,7 @@ describe('buildSessionApiMessage', () => {
 });
 
 describe('useSessionStreaming', () => {
+  const originalE2E = process.env.EXPO_PUBLIC_E2E;
   // Track silence timer refs across tests so afterEach can clear pending timers
   // created by scheduleSilencePrompt (real setTimeout with multi-minute delay).
   const activeTimerRefs: Array<{
@@ -254,6 +245,11 @@ describe('useSessionStreaming', () => {
   });
 
   afterEach(() => {
+    if (originalE2E === undefined) {
+      delete process.env.EXPO_PUBLIC_E2E;
+    } else {
+      process.env.EXPO_PUBLIC_E2E = originalE2E;
+    }
     for (const ref of activeTimerRefs) {
       if (ref.current) clearTimeout(ref.current);
       ref.current = null;
@@ -279,8 +275,10 @@ describe('useSessionStreaming', () => {
       expect(opts.startSession.mutateAsync).not.toHaveBeenCalled();
     });
 
-    it('creates a new session via startSession when none exists', async () => {
-      const opts = makeOpts();
+    it('reports a supplied allocation callback exactly once regardless of the build flag', async () => {
+      process.env.EXPO_PUBLIC_E2E = 'false';
+      const onSessionCreated = jest.fn();
+      const opts = makeOpts({ onSessionCreated });
       const { result } = renderHook(() => useSessionStreaming(opts as any));
 
       let sessionId: string | null = null;
@@ -297,6 +295,31 @@ describe('useSessionStreaming', () => {
           metadata: expect.objectContaining({ effectiveMode: 'learning' }),
         }),
       );
+      expect(opts.setActiveSessionId).toHaveBeenCalledWith('new-session-1');
+      expect(onSessionCreated).toHaveBeenCalledTimes(1);
+      expect(onSessionCreated).toHaveBeenCalledWith('new-session-1');
+
+      await act(async () => {
+        sessionId = await result.current.ensureSession();
+      });
+
+      expect(sessionId).toBe('new-session-1');
+      expect(opts.startSession.mutateAsync).toHaveBeenCalledTimes(1);
+      expect(onSessionCreated).toHaveBeenCalledTimes(1);
+    });
+
+    it('creates a session when the optional allocation callback is omitted', async () => {
+      process.env.EXPO_PUBLIC_E2E = 'false';
+      const opts = makeOpts({ onSessionCreated: undefined });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      let sessionId: string | null = null;
+      await act(async () => {
+        sessionId = await result.current.ensureSession();
+      });
+
+      expect(sessionId).toBe('new-session-1');
+      expect(opts.startSession.mutateAsync).toHaveBeenCalledTimes(1);
       expect(opts.setActiveSessionId).toHaveBeenCalledWith('new-session-1');
     });
 

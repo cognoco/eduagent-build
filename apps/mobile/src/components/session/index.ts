@@ -1,4 +1,5 @@
-export { ChatShell, animateResponse, type ChatMessage } from './ChatShell';
+export { ChatShell, animateResponse } from './ChatShell';
+export type { ChatMessage } from './session-types';
 export { MessageBubble, type VerificationBadge } from './MessageBubble';
 export {
   type SessionModeConfig,

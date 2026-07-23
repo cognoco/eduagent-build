@@ -48,9 +48,23 @@ function photosynthesisSubject(profileId: string): Subject {
 
 async function expectSubjectsPath(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/subjects(?:\?.*)?$/);
-  await expect(page.getByTestId('subjects-screen')).toBeVisible({
-    timeout: 60_000,
+  await expect(
+    page.locator('[data-testid="subjects-screen"]:visible'),
+  ).toHaveCount(1, { timeout: 60_000 });
+}
+
+async function seedAndOpenSubjects(
+  page: Page,
+  options: { scenario: string; alias: string },
+) {
+  const seed = await seedAndSignIn(page, {
+    ...options,
+    landingTestId: 'mentor-screen',
+    landingPath: '/mentor',
   });
+  await page.goto('/subjects', { waitUntil: 'commit' });
+  await expectSubjectsPath(page);
+  return seed;
 }
 
 async function expectSubjectRow(
@@ -58,7 +72,9 @@ async function expectSubjectRow(
   subjectId: string,
   subjectName: string,
 ): Promise<void> {
-  const row = page.getByTestId(`subjects-browse-row-${subjectId}`);
+  const row = page
+    .locator('[data-testid="subjects-screen"]:visible')
+    .getByTestId(`subjects-browse-row-${subjectId}`);
   await expect(row.getByText(subjectName, { exact: true })).toBeVisible({
     timeout: 60_000,
   });
@@ -100,28 +116,34 @@ async function expectMeIdentity(
   displayName: string,
   profileId: string,
 ): Promise<void> {
-  await pressableClick(page.getByTestId('account-avatar-button'));
-  await expect(page.getByTestId('account-screen')).toBeVisible({
-    timeout: 60_000,
-  });
-  const accountProfile = page.getByTestId('account-admin-profile');
+  await pressableClick(
+    page.locator('[data-testid="account-avatar-button"]:visible'),
+  );
+  await expect(
+    page.locator('[data-testid="account-screen"]:visible'),
+  ).toBeVisible({ timeout: 60_000 });
+  const accountProfile = page.locator(
+    '[data-testid="account-admin-profile"]:visible',
+  );
   await expect(
     accountProfile.getByText(displayName, { exact: true }),
   ).toBeVisible();
   await pressableClick(accountProfile);
-  await expect(page.getByTestId('profiles-screen')).toBeVisible({
-    timeout: 60_000,
-  });
-  const activeProfile = page.getByTestId(`profile-row-${profileId}`);
+  await expect(
+    page.locator('[data-testid="profiles-screen"]:visible'),
+  ).toBeVisible({ timeout: 60_000 });
+  const activeProfile = page
+    .getByTestId(`profile-row-${profileId}`)
+    .filter({ visible: true });
   await expect(
     activeProfile.getByText(displayName, { exact: true }),
   ).toBeVisible();
   await expect(activeProfile.getByTestId('profile-active-check')).toBeVisible();
-  await pressableClick(page.getByTestId('profiles-close'));
-  await expect(page.getByTestId('account-screen')).toBeVisible({
-    timeout: 60_000,
-  });
-  await pressableClick(page.getByTestId('account-back'));
+  await pressableClick(page.locator('[data-testid="profiles-close"]:visible'));
+  await expect(
+    page.locator('[data-testid="account-screen"]:visible'),
+  ).toBeVisible({ timeout: 60_000 });
+  await pressableClick(page.locator('[data-testid="account-back"]:visible'));
   await expectSubjectsPath(page);
 }
 
@@ -219,11 +241,9 @@ async function mockFocusedFirstSubjectCreation(
 test('WI-2238 multi-subject case: exact status rows, Physics search/no-result clear, and browser Back preserve Physics + Me identity', async ({
   page,
 }) => {
-  const seed = await seedAndSignIn(page, {
+  const seed = await seedAndOpenSubjects(page, {
     scenario: 'multi-subject',
     alias: 'v2-subjects-multi',
-    landingTestId: 'subjects-screen',
-    landingPath: '/subjects',
   });
   const activeSubjectId = seed.ids.activeSubjectId;
   const pausedSubjectId = seed.ids.pausedSubjectId;
@@ -279,11 +299,9 @@ test('WI-2238 multi-subject case: exact status rows, Physics search/no-result cl
 test('WI-2238 learning-active case: exact World History resume IDs and visible session Back restore Subjects + Active Learner Me identity', async ({
   page,
 }) => {
-  const seed = await seedAndSignIn(page, {
+  const seed = await seedAndOpenSubjects(page, {
     scenario: 'learning-active',
     alias: 'v2-subjects-resume',
-    landingTestId: 'subjects-screen',
-    landingPath: '/subjects',
   });
   const subjectId = seed.ids.subjectId;
   const topicId = seed.ids.topicId;
@@ -317,11 +335,9 @@ test('WI-2238 learning-active case: exact World History resume IDs and visible s
 test('WI-2238 retention-due case: exact Biology Topic 1 review and visible Back controls restore Biology Hub, Subjects, and Review Learner Me identity', async ({
   page,
 }) => {
-  const seed = await seedAndSignIn(page, {
+  const seed = await seedAndOpenSubjects(page, {
     scenario: 'retention-due',
     alias: 'v2-subjects-review',
-    landingTestId: 'subjects-screen',
-    landingPath: '/subjects',
   });
   const subjectId = seed.ids.subjectId;
   const topicId = seed.ids.topicId;
@@ -390,11 +406,9 @@ test('WI-2238 Subjects API recovery case: a visible failure stays recoverable an
     );
   });
 
-  const seed = await seedAndSignIn(page, {
+  const seed = await seedAndOpenSubjects(page, {
     scenario: 'learning-active',
     alias: 'v2-subjects-retry',
-    landingTestId: 'subjects-screen',
-    landingPath: '/subjects',
   });
   const subjectId = seed.ids.subjectId;
   if (!subjectId) {
@@ -413,11 +427,9 @@ test('WI-2238 Subjects API recovery case: a visible failure stays recoverable an
 test('WI-2238 curriculum-preparing case: exact World History empty Hub and visible Back restore the same Subjects row', async ({
   page,
 }) => {
-  const seed = await seedAndSignIn(page, {
+  const seed = await seedAndOpenSubjects(page, {
     scenario: 'learning-active',
     alias: 'v2-subjects-preparing',
-    landingTestId: 'subjects-screen',
-    landingPath: '/subjects',
   });
   const subjectId = seed.ids.subjectId;
   if (!subjectId) {
@@ -469,11 +481,9 @@ test('WI-2238 curriculum-preparing case: exact World History empty Hub and visib
 test('WI-2238 onboarding-no-subject case: Add creates exact Photosynthesis first session and visible exit returns only to V2 Subjects', async ({
   page,
 }) => {
-  const seed = await seedAndSignIn(page, {
+  const seed = await seedAndOpenSubjects(page, {
     scenario: 'onboarding-no-subject',
     alias: 'v2-subjects-first',
-    landingTestId: 'subjects-screen',
-    landingPath: '/subjects',
   });
   await mockFocusedFirstSubjectCreation(page, seed.profileId);
 

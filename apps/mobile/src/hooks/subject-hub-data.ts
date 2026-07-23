@@ -215,7 +215,10 @@ function buildNextUp(input: {
   topicById: ReadonlyMap<string, CurriculumTopic>;
   topicBookIdByTopicId: ReadonlyMap<string, string>;
 }): SubjectHubNextUpWithResume {
-  if (input.resumeTarget?.topicId) {
+  if (
+    input.resumeTarget?.topicId &&
+    input.resumeTarget.resumeKind !== 'next_topic'
+  ) {
     return {
       kind: 'resume',
       topicId: input.resumeTarget.topicId,

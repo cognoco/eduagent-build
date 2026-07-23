@@ -171,6 +171,40 @@ describe('computeEmptyKind', () => {
 // ---------------------------------------------------------------------------
 
 describe('buildSubjectHubData', () => {
+  it('prioritizes an exact due review over a generic next-topic suggestion', () => {
+    const data = buildSubjectHubData({
+      subjectId: SUBJECT_ID,
+      subjectName: 'Spanish',
+      books: [book()],
+      bookDetails: [bookWithTopics],
+      sessionsByBookId: new Map(),
+      retentionTopics: [
+        {
+          topicId: TOPIC_ACTIVE,
+          xpStatus: 'pending',
+          masteredAt: null,
+          nextReviewAt: '2026-06-13T00:00:00.000Z',
+        },
+      ],
+      resumeTarget: {
+        ...resumeTarget,
+        sessionId: null,
+        resumeKind: 'next_topic',
+        lastActivityAt: null,
+        reason: 'Start Greetings',
+      },
+      notes: [],
+      now: new Date('2026-06-14T00:00:00.000Z'),
+    });
+
+    expect(data.nextUp).toEqual({
+      kind: 'review-due',
+      topicId: TOPIC_ACTIVE,
+      bookId: BOOK_ID,
+      topicTitle: 'Greetings',
+    });
+  });
+
   it('composes hub data and preserves active-session resume identity', () => {
     const data = buildSubjectHubData({
       subjectId: SUBJECT_ID,

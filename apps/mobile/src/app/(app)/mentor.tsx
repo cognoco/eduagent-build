@@ -173,6 +173,27 @@ function pushMentorHomeworkCamera(router: ReturnType<typeof useRouter>): void {
   } as Href);
 }
 
+function pushMentorHomework(
+  router: ReturnType<typeof useRouter>,
+  subject?: { subjectId: string; subjectName: string },
+): void {
+  if (process.env.EXPO_PUBLIC_E2E !== 'true') {
+    pushMentorHomeworkCamera(router);
+    return;
+  }
+
+  router.push({
+    pathname: '/(app)/homework/manual',
+    params: {
+      entrySource: 'mentor',
+      returnTo: 'mentor',
+      ...(subject
+        ? { subjectId: subject.subjectId, subjectName: subject.subjectName }
+        : {}),
+    },
+  } as Href);
+}
+
 function LearnerMentorScreen(): React.ReactElement {
   const { activeProfile } = useProfile();
   const { t } = useTranslation();
@@ -182,6 +203,9 @@ function LearnerMentorScreen(): React.ReactElement {
   const { width: windowWidth } = useWindowDimensions();
   const nowFeed = useNowFeed();
   const subjectsIndex = useSubjectsIndex();
+  const homeworkSubject = subjectsIndex.subjects.find(
+    (subject) => subject.status === 'active',
+  );
   const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(new Set());
   const [cardArcStates, setCardArcStates] = useState<
     Record<string, NowCardArcState>
@@ -508,7 +532,7 @@ function LearnerMentorScreen(): React.ReactElement {
             <Pressable
               testID="mentor-homework-prompt"
               accessibilityRole="button"
-              onPress={() => pushMentorHomeworkCamera(router)}
+              onPress={() => pushMentorHomework(router, homeworkSubject)}
               className="rounded-card border border-border bg-surface px-4 py-3"
             >
               <Text className="text-body-sm text-text-secondary">
@@ -541,7 +565,7 @@ function LearnerMentorScreen(): React.ReactElement {
             unavailable={nowFeed.isError && !feed}
             onSubmitText={handleSubmitText}
             onOpenCamera={() => pushMentorHomeworkCamera(router)}
-            onOpenHomework={() => pushMentorHomeworkCamera(router)}
+            onOpenHomework={() => pushMentorHomework(router, homeworkSubject)}
             voiceLocale={getVoiceLocaleForLanguage(
               activeProfile?.conversationLanguage,
             )}
