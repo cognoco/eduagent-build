@@ -4805,6 +4805,34 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(summaryScroll?.waitToSettleTimeoutMs).toBe(1000);
   });
 
+  it('[WI-1655] stabilizes every multi-child scroll locator', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/parent/multi-child-dashboard.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      scrollUntilVisible?: {
+        centerElement?: boolean;
+        optional?: boolean;
+        visibilityPercentage?: number;
+        waitToSettleTimeoutMs?: number;
+      };
+    }>;
+    const scrolls = commands.flatMap(({ scrollUntilVisible }) =>
+      scrollUntilVisible ? [scrollUntilVisible] : [],
+    );
+
+    expect(scrolls).toHaveLength(6);
+    for (const scroll of scrolls) {
+      expect(scroll).toMatchObject({
+        centerElement: true,
+        visibilityPercentage: 50,
+        waitToSettleTimeoutMs: 1000,
+      });
+      expect(scroll.optional).not.toBe(true);
+    }
+  });
+
   it('[WI-1864] returns from every multi-child detail through the route-aware app back control', () => {
     const source = readFileSync(
       join(repoRoot, 'apps/mobile/e2e/flows/parent/multi-child-dashboard.yaml'),
