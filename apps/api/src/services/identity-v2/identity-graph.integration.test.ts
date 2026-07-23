@@ -39,6 +39,7 @@ import {
   quotaPools,
   type Database,
 } from '@eduagent/database';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import { ConflictError } from '../../errors';
 import {
   createIdentityGraph,
@@ -286,12 +287,17 @@ async function cleanupByClerk(
     const requests = await db.query.consentRequest.findMany({
       where: eq(consentRequest.chargePersonId, graph.personId),
     });
-    expect(requests).toHaveLength(1);
-    expect(requests[0]).toMatchObject({
-      organizationId: graph.organizationId,
-      requestedBasis: 'gdpr_parental_consent',
-      status: 'pending',
-    });
+    expect(requests).toHaveLength(CONSENT_PURPOSES.length);
+    expect(requests.map((request) => request.purpose).sort()).toEqual(
+      [...CONSENT_PURPOSES].sort(),
+    );
+    for (const request of requests) {
+      expect(request).toMatchObject({
+        organizationId: graph.organizationId,
+        requestedBasis: 'gdpr_parental_consent',
+        status: 'pending',
+      });
+    }
     await expect(
       resolveLatestConsentStatusAnyBasis(
         db,

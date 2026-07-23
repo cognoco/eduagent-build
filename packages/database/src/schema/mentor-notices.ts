@@ -7,13 +7,13 @@ import {
   pgTable,
   text,
   timestamp,
-  unique,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 
 import { generateUUIDv7 } from '../utils/uuid';
 import { person } from './identity';
-import { learningSessions } from './sessions';
+import { learningSessions, sessionEvents } from './sessions';
 import { curriculumTopics, subjects } from './subjects';
 
 export const mentorNoticeStatusEnum = pgEnum('mentor_notice_status', [
@@ -21,6 +21,15 @@ export const mentorNoticeStatusEnum = pgEnum('mentor_notice_status', [
   'locked_in',
   'dismissed',
   'faded',
+  // [WI-2501] Terminal status for a completed 'not_yet' re-check. Distinct
+  // from 'open' so every open-offer / Now-feed / re-check-context reader
+  // (all of which filter on status='open') stops returning the record once
+  // it resolves — and distinct from 'locked_in'/'dismissed' so it is never
+  // read as mastery or dismissal. A later notice for the same gap requires
+  // newly accepted evidence, which creates a new durable row (see
+  // acceptMentorNotice's evidence-aware unique index); this status never
+  // reopens.
+  'not_yet',
 ]);
 
 export const mentorNoticeNudgeStatusEnum = pgEnum(
@@ -51,6 +60,15 @@ export const mentorNotices = pgTable(
     sourceSessionId: uuid('source_session_id')
       .notNull()
       .references(() => learningSessions.id, { onDelete: 'cascade' }),
+    // [WI-2500] The validated learner-answer event this notice's evidence is
+    // anchored to. Nullable only because rows created before this column
+    // existed have no honest value to backfill (their original evidence was
+    // never persisted) — every new notice always carries one; see state.ts's
+    // acceptMentorNotice. Never null-able as a domain matter, only as a
+    // migration-safety one.
+    answerEventId: uuid('answer_event_id').references(() => sessionEvents.id, {
+      onDelete: 'cascade',
+    }),
     concept: text('concept').notNull(),
     correctionHint: text('correction_hint'),
     status: mentorNoticeStatusEnum('status').notNull().default('open'),
@@ -75,7 +93,28 @@ export const mentorNotices = pgTable(
     resolvedAt: timestamp('resolved_at', { withTimezone: true }),
   },
   (table) => [
-    unique('mentor_notices_source_session_unique').on(table.sourceSessionId),
+    // [WI-2500] Evidence-aware replacement for the old source-session-only
+    // unique constraint (clause 4 — durable identity includes source session
+    // PLUS validated answer-event evidence). Expressed as two PARTIAL unique
+    // indexes rather than one `NULLS NOT DISTINCT` constraint — that syntax
+    // is PostgreSQL 15+ only and this program's deployed Postgres version
+    // floor could not be established from repo docs/config, so the portable
+    // (9.5+) partial-index form is used instead:
+    //   1. Evidence-backed rows (answer_event_id IS NOT NULL): unique per
+    //      (session, evidence) — a retry of the same accepted evidence is
+    //      idempotent; a second, differently-evidenced notice in the same
+    //      session is now allowed (the exact case the old constraint forbade).
+    //   2. Legacy NULL-evidence rows: unique per session, preserving the old
+    //      constraint's at-most-one-per-session invariant for rows that
+    //      predate this column and have no evidence to key on. No backfill
+    //      needed — the old constraint already guaranteed at most one row
+    //      per session, so every existing row trivially satisfies this.
+    uniqueIndex('mentor_notices_source_session_answer_event_uq')
+      .on(table.sourceSessionId, table.answerEventId)
+      .where(sql`${table.answerEventId} IS NOT NULL`),
+    uniqueIndex('mentor_notices_source_session_null_evidence_uq')
+      .on(table.sourceSessionId)
+      .where(sql`${table.answerEventId} IS NULL`),
     index('mentor_notices_profile_status_created_idx').on(
       table.profileId,
       table.status,

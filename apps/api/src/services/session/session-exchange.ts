@@ -4254,7 +4254,6 @@ export async function processMessage(
         profileId,
         session,
         signal: result.noticedGap,
-        interleavedTopics: context.interleavedTopics,
         isMentorNoticeRecheck: Boolean(context.mentorNoticeRecheck),
       })) ?? undefined;
   }
@@ -4876,7 +4875,6 @@ export async function streamMessage(
             profileId,
             session,
             signal: parsed.noticedGap,
-            interleavedTopics: context.interleavedTopics,
             isMentorNoticeRecheck: Boolean(context.mentorNoticeRecheck),
           })) ?? undefined;
       }

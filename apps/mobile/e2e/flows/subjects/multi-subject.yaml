@@ -23,24 +23,24 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "multi-subject"
+      SEED_SCENARIO: 'multi-subject'
       API_URL: ${API_URL}
 
 # 2. Home screen loaded
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 15000
 
 # ── Visual integrity: tab bar ──────────────────────────────────────────
 # All 3 tabs must render with correct testIDs. Catches missing icons (BUG-53),
 # hidden tabs (BUG-10), and tab bar rendering failures.
 - assertVisible:
-    id: "tab-home"
+    id: 'tab-home'
 - assertVisible:
-    id: "tab-library"
+    id: 'tab-library'
 - assertVisible:
-    id: "tab-more"
+    id: 'tab-more'
 
 # ── Visual integrity: subject carousel ────────────────────────────────
 # With active subjects, the carousel must render (not loading spinner forever).
@@ -48,12 +48,12 @@ tags:
 # so scroll until it's on-screen before asserting.
 - scrollUntilVisible:
     element:
-      id: "home-subject-carousel"
+      id: 'home-subject-carousel'
     direction: DOWN
     timeout: 10000
 
 - assertVisible:
-    id: "home-subject-carousel"
+    id: 'home-subject-carousel'
 
 # 3. Screenshot: home screen — captures what's actually rendering
 - takeScreenshot: multi-subject-01-home
@@ -63,68 +63,68 @@ tags:
 #    seed-and-run.sh provides ACTIVE_SUBJECT_ID for the Physics subject.
 - extendedWaitUntil:
     visible:
-      id: "home-subject-card-${ACTIVE_SUBJECT_ID}"
+      id: 'home-subject-card-${ACTIVE_SUBJECT_ID}'
     timeout: 10000
 
 # ── Negative assertions: empty-state must NOT appear with real data ───
 # If seeded with subjects, the empty-state placeholder must not render.
 - assertNotVisible:
-    id: "home-empty-subjects"
+    id: 'home-empty-subjects'
 
 # 5. Navigate to Library tab (v3 single-pane shelf list)
 - tapOn:
-    id: "tab-library"
+    id: 'tab-library'
 
 # 6. Wait for Library v3 shelf list to render
 - extendedWaitUntil:
     visible:
-      id: "shelves-list"
+      id: 'shelves-list'
     timeout: 10000
 
 # 7. Verify at least one shelf row is present for the active subject
 - assertVisible:
-    id: "shelf-row-header-${ACTIVE_SUBJECT_ID}"
+    id: 'shelf-row-header-${ACTIVE_SUBJECT_ID}'
 
 # 8. Screenshot: Library v3 content
 - takeScreenshot: multi-subject-02-library
 
 # 9. Navigate back to Home tab
 - tapOn:
-    id: "tab-home"
+    id: 'tab-home'
 
 # 10. Verify home screen is visible again
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 10000
 
 # 11. Tap the Physics subject card via testID.
 #     home-subject-card-${id} is in LearnerScreen's carousel.
 - tapOn:
-    id: "home-subject-card-${ACTIVE_SUBJECT_ID}"
+    id: 'home-subject-card-${ACTIVE_SUBJECT_ID}'
 
 # 12. Wait for the subject shelf opened by the home card.
 - extendedWaitUntil:
     visible:
-      id: "shelf-screen"
+      id: 'shelf-screen'
     timeout: 10000
 
 # 13. Return through the shelf's supported navigation, then select Home.
 - tapOn:
-    id: "shelf-back"
+    id: 'shelf-back'
 
 - extendedWaitUntil:
     visible:
-      id: "shelves-list"
+      id: 'shelves-list'
     timeout: 10000
 
 - tapOn:
-    id: "tab-home"
+    id: 'tab-home'
 
 # 14. Verify back on home screen after curriculum round-trip
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 10000
 
 # 15. Final screenshot

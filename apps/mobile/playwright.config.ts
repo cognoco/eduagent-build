@@ -41,12 +41,14 @@ const e2eWebDir = path.join(process.cwd(), 'apps', 'mobile', 'e2e-web');
 const mobileDir = path.join(process.cwd(), 'apps', 'mobile');
 const shouldStartLocalApi = process.env.PLAYWRIGHT_SKIP_LOCAL_API !== '1';
 const artifactLane = process.env.PLAYWRIGHT_ARTIFACT_LANE;
-if (artifactLane && artifactLane !== 'legacy') {
+const legacyArtifactLanes = new Set(['legacy-core', 'legacy-advisory']);
+if (artifactLane && !legacyArtifactLanes.has(artifactLane)) {
   throw new Error(
-    `PLAYWRIGHT_ARTIFACT_LANE must be "legacy" when set; received ${JSON.stringify(artifactLane)}`,
+    'PLAYWRIGHT_ARTIFACT_LANE must be "legacy-core" or "legacy-advisory" when set; received ' +
+      JSON.stringify(artifactLane),
   );
 }
-const artifactSuffix = artifactLane === 'legacy' ? '-legacy' : '';
+const artifactSuffix = artifactLane ? '-' + artifactLane : '';
 
 // [BUG-325] Worker-count discriminator. We previously inferred "is this the
 // shared *.workers.dev staging API?" by substring-matching the API URL —
@@ -103,19 +105,11 @@ export default defineConfig({
   // Shared *.workers.dev throttles parallel bursts → 1 worker; everything
   // else (custom-domain staging, local API) gets the full 4 workers.
   workers: process.env.CI ? (usesRateLimitedApi ? 1 : 4) : undefined,
-  reporter: [
-    ['line'],
-    [
-      'html',
-      {
-        open: 'never',
-        outputFolder: path.join(
-          e2eWebDir,
-          `playwright-report${artifactSuffix}`,
-        ),
-      },
-    ],
-  ],
+  // WI-2594: the 'html' reporter was removed here. It embeds a base64
+  // payload that records Playwright fill-step values (including seeded
+  // login credentials) in clear text — see WI-2593. 'line' remains as the
+  // debuggable failure signal; its output survives in the CI job log.
+  reporter: [['line']],
   timeout: 90_000,
   expect: {
     timeout: 15_000,
@@ -131,9 +125,17 @@ export default defineConfig({
       args: ['--disable-quic'],
     },
     navigationTimeout: 120_000,
-    screenshot: 'only-on-failure',
-    trace: 'retain-on-failure',
-    video: 'retain-on-failure',
+    // WI-2594: screenshot/trace/video were all 'retain-on-failure' (screenshot
+    // was 'only-on-failure'). All three record fill-step values (including
+    // seeded login credentials) — see WI-2593. Turned off entirely so nothing
+    // credential-bearing is generated. Trade-off: scripts/playwright-staging-gate.cjs's
+    // trace-corroborated `infra-signalled` classification (a mid-run staging
+    // outage auto-passing CI) is no longer reachable without trace zips; its
+    // resultText-based classification (product/unknown) is unaffected. See
+    // PR body for the full reasoning.
+    screenshot: 'off',
+    trace: 'off',
+    video: 'off',
     viewport: { width: 1440, height: 1080 },
   },
   globalSetup: path.join(e2eWebDir, 'helpers', 'global-setup.ts'),
@@ -198,6 +200,7 @@ export default defineConfig({
     },
     {
       name: 'smoke-learner',
+      retries: 0,
       dependencies: ['setup'],
       testMatch: /flows[\\/]journeys[\\/]j01-.*\.spec\.ts/,
       use: {

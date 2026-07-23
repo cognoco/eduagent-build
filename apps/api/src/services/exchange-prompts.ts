@@ -328,7 +328,6 @@ function getExchangeEnvelopeInstruction(context: {
    *  from the envelope template so the tutor does not also emit it. */
   graderEnabled?: boolean;
   includeMentorNotice?: boolean;
-  mentorNoticeRequiresTopicTarget?: boolean;
   includeNoticeRecheck?: boolean;
 }): string {
   // During an active Challenge Round the mastery pipeline reads
@@ -345,11 +344,8 @@ function getExchangeEnvelopeInstruction(context: {
   const answerEvaluationField = context.includeAnswerEvaluation
     ? ', "answer_evaluation": { "correctness": "<correct|partial|incorrect|na>", "concept": "<optional; concept just assessed; omit key when absent>" }'
     : '';
-  const mentorNoticeTopicField = context.mentorNoticeRequiresTopicTarget
-    ? ', "topicId": "<one topic ID from INTERLEAVED NOTICE TARGETS or empty string>"'
-    : '';
   const mentorNoticeField = context.includeMentorNotice
-    ? `, "noticed_gap": { "observed": <bool>, "concept": "<one concrete concept or empty string>", "correctionHint": "<short correction hint or empty string>", "answerEventId": "<CURRENT LEARNER EVENT ID or empty string>", "learnerQuote": "<short verbatim quote or empty string>"${mentorNoticeTopicField} }`
+    ? `, "noticed_gap": { "observed": <bool>, "concept": "<one concrete concept or empty string>", "correctionHint": "<short correction hint or empty string>", "answerEventId": "<CURRENT LEARNER EVENT ID or empty string>", "learnerQuote": "<short verbatim quote or empty string>" }`
     : '';
   const noticeRecheckField = context.includeNoticeRecheck
     ? ', "notice_recheck": { "noticeId": "<ACTIVE NOTICE ID>", "verdict": "<locked_in|not_yet|dismissed|deferred>", "answerEventId": "<CURRENT LEARNER EVENT ID>", "learnerQuote": "<short verbatim quote from that learner message>" }'
@@ -404,11 +400,6 @@ function getExchangeEnvelopeInstruction(context: {
     signalGuidance.push(
       "MENTOR NOTICE OBSERVATION: Always emit `signals.noticed_gap` as a decision. Set `observed` to false when the answer is correct or no concrete durable gap appears; in that case the other fields may be empty strings. A possible follow-up check or extra practice is not evidence of a gap. Set `observed` to true only when the latest learner message proves a concrete durable gap. Signal binding: If your visible reply corrects the learner's answer or reasoning, `observed` must be true. When `observed` is true, copy a short verbatim `learnerQuote`, use the supplied CURRENT LEARNER EVENT ID exactly, name one concrete `concept`, and keep `correctionHint` short. Finish the learner's immediate goal first. Do not quiz or re-check the learner now. Do not promise a future check-in in visible prose.",
     );
-    if (context.mentorNoticeRequiresTopicTarget) {
-      signalGuidance.push(
-        'INTERLEAVED NOTICE TARGET: when `observed` is true, `topicId` is required and must be copied exactly from INTERLEAVED NOTICE TARGETS for the single topic evidenced by the latest learner message. Never guess or combine targets.',
-      );
-    }
   }
   if (context.includeNoticeRecheck) {
     signalGuidance.push(
@@ -1576,20 +1567,15 @@ export function buildSystemPromptSegments(
   const mentorNoticeEnabled =
     context.mentorNoticeEnabled === true &&
     Boolean(context.currentUserMessageEventId) &&
-    !context.mentorNoticeRecheck;
+    !context.mentorNoticeRecheck &&
+    // [WI-2500] Interleaved sessions are out of MVP scope for mentor notices —
+    // the proposal schema no longer carries a topicId to target one of the
+    // session's several topics, so the LLM is never asked for a notice here.
+    context.sessionType !== 'interleaved';
   if (mentorNoticeEnabled) {
     volatile.push(
       `MENTOR NOTICE OBSERVATION\nCURRENT LEARNER EVENT ID: Use "${context.currentUserMessageEventId}" exactly as answerEventId when signals.noticed_gap.observed is true.\nFinish the learner's immediate goal first. A noticed gap is a quiet observation, not a new activity. Always emit \`signals.noticed_gap\` as a decision. Set \`observed\` to false when the answer is correct or no concrete durable gap appears; the other fields may be empty strings. A possible follow-up check or extra practice is not evidence of a gap. Set \`observed\` to true only for a concrete durable gap in the latest learner message. Signal binding: If your visible reply corrects the learner's answer or reasoning, \`observed\` must be true. Do not quiz or re-check the learner now. Do not promise a future check-in in the visible reply. When \`observed\` is true, emit one concrete concept with a short correction hint and an exact learner quote.`,
     );
-    if (context.sessionType === 'interleaved') {
-      const targets = (context.interleavedTopics ?? []).map(
-        (topic) =>
-          `- topicId "${topic.topicId}" — ${sanitizeXmlValue(topic.title, 200)}`,
-      );
-      volatile.push(
-        `INTERLEAVED NOTICE TARGETS\nA noticed gap must belong to exactly one of these server-owned topics. When observed is true, copy that topicId exactly into signals.noticed_gap.topicId:\n${targets.join('\n')}`,
-      );
-    }
   }
   if (context.mentorNoticeRecheck && context.currentUserMessageEventId) {
     const notice = context.mentorNoticeRecheck;
@@ -1661,8 +1647,6 @@ export function buildSystemPromptSegments(
         cr?.state !== 'active',
       graderEnabled,
       includeMentorNotice: mentorNoticeEnabled,
-      mentorNoticeRequiresTopicTarget:
-        mentorNoticeEnabled && context.sessionType === 'interleaved',
       includeNoticeRecheck: Boolean(context.mentorNoticeRecheck),
     }),
   );

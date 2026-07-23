@@ -1128,13 +1128,13 @@ A mentor notice is a quiet, learner-only acknowledgement that the Mentor recorde
 
 | State | Primary action | Secondary behavior |
 |---|---|---|
-| Eligible open notice | `Continue` starts or resumes a focused re-check capped at three learner responses | `Not now` defers the notice for the current learning day |
-| Re-check complete, evidence supports understanding | Show concise `locked_in` acknowledgement | Do not inflate into a diagnosis or expose it to a proxy viewer |
-| Re-check complete, understanding not yet evidenced | End the current offer with encouraging `not_yet` copy | Do not claim mastery; a later notice requires new evidence |
+| Eligible open notice | `Continue` starts or resumes a focused re-check capped at three learner responses | `Not now` defers until the next learning day, measured from local 04:00 in the learner's IANA time zone |
+| Independent server judge commits `locked_in` | Show concise acknowledgement from the committed server transition | The tutor's prose never self-certifies understanding; do not inflate into a diagnosis or expose it to a proxy viewer |
+| Independent server judge commits `not_yet` | End the current offer with encouraging copy | Do not claim mastery; a later notice requires new evidence |
 | Learner explicitly asks to stop | Dismiss terminally | Do not resurface the record |
 | No notice activity for 21 days | Fade silently | No guilt copy, badge, or queue remains |
 
-The MVP is in-app only. It has no lock-screen copy, notification permission primer, or scheduled nudge. All ages use the same calm, age-neutral interaction, and an observed feature-flag shutdown removes cards, receipts, deep links, actions, and cached fallbacks. See [`MMT-ADR-0036`](adr/MMT-ADR-0036-mentor-notice-mvp-boundaries-and-server-authority.md).
+The MVP is in-app only. It has no lock-screen copy, notification permission primer, or scheduled nudge. All ages use the same calm, age-neutral interaction. Every surface follows one learner-scoped rollout observation: a stale lower revision cannot resurrect UI, disabled wins a same-revision tie, and re-enable requires a higher revision. Missing or malformed policy remains hidden. The amendment authorizes no production activation, percentage rollout, OTA, release, deployment, or push delivery. See [`MMT-ADR-0036`](adr/MMT-ADR-0036-mentor-notice-mvp-boundaries-and-server-authority.md).
 
 **Socratic Escalation Ladder (Child Profiles):**
 

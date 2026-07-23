@@ -256,6 +256,13 @@ jobs:
         if: github.event_name == 'push' || (github.event_name == 'pull_request' && steps.scope.outputs.no_gemini_runtime == 'true')
         run: pnpm run check:no-gemini-runtime
 
+      # WI-2386: guardian/non-adult whole-consent paths consume the canonical
+      # typed purpose set. Historical migration literals are narrowly
+      # allowlisted inside the executable guard.
+      - name: Consent purpose-set contract guard (WI-2386)
+        if: steps.scope.outputs.docs_only != 'true'
+        run: pnpm run check:consent-purpose-contract
+
       # [R9 / WI-1304 / WS-37 M1 "Seam Hardening"] Forward-only ratchet:
       # pins the build-time MODE_NAV_V0/V1/V2 flag triple in
       # apps/mobile/eas.json + .github/workflows/ci.yml to the 3 sanctioned
@@ -319,6 +326,12 @@ jobs:
       - name: tools/scripts/* tests
         if: steps.scope.outputs.docs_only != 'true'
         run: pnpm exec jest --config tools/scripts/jest.config.cjs --no-coverage
+
+      # WI-2458: lane resolver + expiry/quarantine contract. tools/quarantine
+      # is outside Nx project inference, so invoke its focused Jest config.
+      - name: tools/quarantine/* tests
+        if: steps.scope.outputs.docs_only != 'true'
+        run: pnpm exec jest --config tools/quarantine/jest.config.cjs --no-coverage
 
       # Optional advisory: detect .claude/skills/ entries whose .agents/skills/
       # master was removed but the generated copy was left behind. continue-on-error

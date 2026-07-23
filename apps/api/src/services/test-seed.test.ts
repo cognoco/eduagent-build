@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { ENGAGEMENT_SIGNALS } from '@eduagent/schemas';
+import { CONSENT_PURPOSES, ENGAGEMENT_SIGNALS } from '@eduagent/schemas';
 import {
   profileQuotaUsage,
   person,
@@ -1198,14 +1198,14 @@ describe('new Stage-0 scenarios return required IDs', () => {
     );
     const insertMock = mockDb.insert as jest.Mock;
     const valuesMock = insertMock.mock.results[0]?.value.values as jest.Mock;
-    const insertedValues = valuesMock.mock.calls.map(
-      ([value]) => value,
+    const insertedValues = valuesMock.mock.calls.flatMap(([value]) =>
+      Array.isArray(value) ? value : [value],
     ) as Array<Record<string, unknown>>;
-    const grant = insertedValues.find(
+    const grants = insertedValues.filter(
       (value) =>
         value.chargePersonId === result.profileId && value.granted === true,
     );
-    const request = insertedValues.find(
+    const requests = insertedValues.filter(
       (value) =>
         value.chargePersonId === result.profileId &&
         value.status === 'approved',
@@ -1217,23 +1217,33 @@ describe('new Stage-0 scenarios return required IDs', () => {
     expect(
       insertMock.mock.calls.some(([table]) => table === consentRequest),
     ).toBe(true);
-    expect(grant).toEqual(
-      expect.objectContaining({
-        organizationId: result.accountId,
-        purpose: 'platform_use',
-        lawfulBasis: 'gdpr_parental_consent',
-        granted: true,
-      }),
+    expect(grants).toHaveLength(CONSENT_PURPOSES.length);
+    expect(grants.map(({ purpose }) => purpose).sort()).toEqual(
+      [...CONSENT_PURPOSES].sort(),
     );
-    expect(request).toEqual(
-      expect.objectContaining({
-        organizationId: result.accountId,
-        requestedBasis: 'gdpr_parental_consent',
-        guardianEmail: 'parent-e2e-test@example.com',
-        status: 'approved',
-        consentGrantId: grant?.id,
-      }),
+    expect(requests).toHaveLength(CONSENT_PURPOSES.length);
+    expect(requests.map(({ purpose }) => purpose).sort()).toEqual(
+      [...CONSENT_PURPOSES].sort(),
     );
+    for (const grant of grants) {
+      expect(grant).toEqual(
+        expect.objectContaining({
+          organizationId: result.accountId,
+          lawfulBasis: 'gdpr_parental_consent',
+          granted: true,
+        }),
+      );
+      expect(requests).toContainEqual(
+        expect.objectContaining({
+          organizationId: result.accountId,
+          purpose: grant.purpose,
+          requestedBasis: 'gdpr_parental_consent',
+          guardianEmail: 'parent-e2e-test@example.com',
+          status: 'approved',
+          consentGrantId: grant.id,
+        }),
+      );
+    }
     expect(insertMock.mock.calls.some(([table]) => table === subjects)).toBe(
       false,
     );

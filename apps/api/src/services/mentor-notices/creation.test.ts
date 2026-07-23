@@ -9,8 +9,6 @@ const PROFILE_ID = '00000000-0000-4000-8000-000000000001';
 const SESSION_ID = '00000000-0000-4000-8000-000000000002';
 const SUBJECT_ID = '00000000-0000-4000-8000-000000000003';
 const TOPIC_ID = '00000000-0000-4000-8000-000000000004';
-const OTHER_SUBJECT_ID = '00000000-0000-4000-8000-000000000005';
-const OTHER_TOPIC_ID = '00000000-0000-4000-8000-000000000006';
 const EVENT_ID = '00000000-0000-4000-8000-000000000007';
 const NOTICE_ID = '00000000-0000-4000-8000-000000000008';
 
@@ -79,7 +77,7 @@ describe('createMentorNoticeFromExchange', () => {
         createMentorNoticeFromExchange(db, {
           profileId: PROFILE_ID,
           session: session(sessionType),
-          signal: { ...signal, topicId: OTHER_TOPIC_ID },
+          signal,
         }),
       ).resolves.toMatchObject({ id: NOTICE_ID });
 
@@ -88,63 +86,29 @@ describe('createMentorNoticeFromExchange', () => {
           subjectId: SUBJECT_ID,
           topicId: TOPIC_ID,
           sourceSessionId: SESSION_ID,
+          answerEventId: EVENT_ID,
         }),
       );
     },
   );
 
-  it('resolves an interleaved target to its server-owned subject and topic', async () => {
-    const { db, insertedValues } = makeDb();
+  // [WI-2500] Interleaved sessions are out of MVP scope for mentor notices
+  // (clause 6): the proposal schema no longer carries a topicId (clause 1),
+  // so a noticed gap in an interleaved session can never be unambiguously
+  // attributed to one of its several topics. Rejected outright rather than
+  // persisted against the wrong topic.
+  it('rejects a notice proposed in an interleaved session', async () => {
+    const { db, insert } = makeDb();
 
-    await createMentorNoticeFromExchange(db, {
-      profileId: PROFILE_ID,
-      session: session('interleaved'),
-      signal: { ...signal, topicId: OTHER_TOPIC_ID },
-      interleavedTopics: [
-        {
-          topicId: OTHER_TOPIC_ID,
-          subjectId: OTHER_SUBJECT_ID,
-          title: 'Cell division',
-        },
-      ],
-    });
-
-    expect(insertedValues).toContainEqual(
-      expect.objectContaining({
-        subjectId: OTHER_SUBJECT_ID,
-        topicId: OTHER_TOPIC_ID,
+    await expect(
+      createMentorNoticeFromExchange(db, {
+        profileId: PROFILE_ID,
+        session: session('interleaved'),
+        signal,
       }),
-    );
+    ).resolves.toBeNull();
+    expect(insert).not.toHaveBeenCalled();
   });
-
-  it.each([
-    { label: 'missing', proposedTopicId: undefined },
-    {
-      label: 'unknown',
-      proposedTopicId: '00000000-0000-4000-8000-000000000009',
-    },
-  ])(
-    'rejects a $label interleaved topic target',
-    async ({ proposedTopicId }) => {
-      const { db, insert } = makeDb();
-
-      await expect(
-        createMentorNoticeFromExchange(db, {
-          profileId: PROFILE_ID,
-          session: session('interleaved'),
-          signal: { ...signal, topicId: proposedTopicId },
-          interleavedTopics: [
-            {
-              topicId: OTHER_TOPIC_ID,
-              subjectId: OTHER_SUBJECT_ID,
-              title: 'Cell division',
-            },
-          ],
-        }),
-      ).resolves.toBeNull();
-      expect(insert).not.toHaveBeenCalled();
-    },
-  );
 
   it('rejects a new notice while the session is already re-checking one', async () => {
     const { db, insert } = makeDb();

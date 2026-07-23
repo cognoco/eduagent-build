@@ -5,6 +5,7 @@ import {
   dismissPostApprovalIfVisible,
   waitForScreenDismissingPostApproval,
 } from '../../helpers/post-approval';
+import { installSeededProfileBootstrap } from '../../helpers/profile-bootstrap';
 import { readSeedData } from '../../helpers/seed-data';
 
 const shotDir = path.join(
@@ -25,12 +26,19 @@ async function capture(page: Page, name: string): Promise<void> {
   });
 }
 
+async function navigateWithinApp(page: Page, url: string): Promise<void> {
+  await page.evaluate((nextUrl) => {
+    window.history.pushState({}, '', nextUrl);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }, url);
+}
+
 async function gotoScreen(
   page: Page,
   url: string,
   targetTestId: string,
 ): Promise<void> {
-  await page.goto(url, { waitUntil: 'commit' });
+  await navigateWithinApp(page, url);
   await waitForScreenDismissingPostApproval(page, targetTestId);
 }
 
@@ -39,8 +47,19 @@ test('single learner UX screenshot crawl', async ({ page }) => {
   await mkdir(shotDir, { recursive: true });
   const seed = await readSeedData('solo-learner');
   const subjectId = seed.ids.subjectId;
+  await installSeededProfileBootstrap(page);
+  let profileBootstrapRequests = 0;
+  page.on('request', (request) => {
+    if (
+      request.method() === 'GET' &&
+      new URL(request.url()).pathname === '/v1/profiles'
+    ) {
+      profileBootstrapRequests += 1;
+    }
+  });
 
-  await gotoScreen(page, '/mentor', 'mentor-screen');
+  await page.goto('/mentor', { waitUntil: 'commit' });
+  await waitForScreenDismissingPostApproval(page, 'mentor-screen');
   await capture(page, '01-home');
 
   await gotoScreen(page, '/practice', 'practice-screen');
@@ -50,15 +69,7 @@ test('single learner UX screenshot crawl', async ({ page }) => {
   await gotoScreen(page, '/create-subject', 'create-subject-name');
   await capture(page, '03-study-new-click');
 
-  await page.goto('/library', { waitUntil: 'commit' });
-  // Wait for the subjects query + /library/retention to settle before asserting.
-  // Without this, the shelf-row testID poll can race the first paint on slow CI.
-  await page.waitForLoadState('networkidle');
-  await waitForScreenDismissingPostApproval(
-    page,
-    `shelf-row-header-${subjectId}`,
-    30_000,
-  );
+  await gotoScreen(page, '/library', `shelf-row-header-${subjectId}`);
   await capture(page, '04-library');
 
   await gotoScreen(page, `/shelf/${subjectId}`, 'shelf-screen');
@@ -67,15 +78,10 @@ test('single learner UX screenshot crawl', async ({ page }) => {
   await gotoScreen(page, '/progress', 'progress-screen');
   await capture(page, '06-progress-overview');
 
-  await page.goto(`/progress/${subjectId}`, { waitUntil: 'commit' });
-  await waitForScreenDismissingPostApproval(
-    page,
-    'progress-subject-bar',
-    30_000,
-  );
+  await gotoScreen(page, `/progress/${subjectId}`, 'progress-subject-bar');
   await capture(page, '07-progress-subject');
 
-  await page.goto(`/progress/${subjectId}/sessions`, { waitUntil: 'commit' });
+  await navigateWithinApp(page, `/progress/${subjectId}/sessions`);
   await expect(
     page
       .getByTestId('subject-sessions-empty')
@@ -87,7 +93,7 @@ test('single learner UX screenshot crawl', async ({ page }) => {
   await gotoScreen(page, '/quiz', 'quiz-index-screen');
   await capture(page, '09-quiz-home');
 
-  await page.goto('/quiz/history', { waitUntil: 'commit' });
+  await navigateWithinApp(page, '/quiz/history');
   await expect(
     page
       .getByTestId('quiz-history-screen')
@@ -108,7 +114,7 @@ test('single learner UX screenshot crawl', async ({ page }) => {
   await gotoScreen(page, '/dictation', 'dictation-choice-screen');
   await capture(page, '13-dictation');
 
-  await page.goto('/homework/camera', { waitUntil: 'commit' });
+  await navigateWithinApp(page, '/homework/camera');
   await expect(
     page
       .getByTestId('camera-view')
@@ -118,7 +124,7 @@ test('single learner UX screenshot crawl', async ({ page }) => {
   ).toBeVisible({ timeout: 30_000 });
   await capture(page, '14-homework-camera');
 
-  await page.goto('/mentor-memory', { waitUntil: 'commit' });
+  await navigateWithinApp(page, '/mentor-memory');
   await expect(page.getByText('Mentor memory')).toBeVisible({
     timeout: 30_000,
   });
@@ -127,31 +133,31 @@ test('single learner UX screenshot crawl', async ({ page }) => {
   await gotoScreen(page, '/own-learning', 'learner-screen');
   await capture(page, '16-own-learning');
 
-  await page.goto('/more', { waitUntil: 'commit' });
+  await navigateWithinApp(page, '/more');
   await expect(page.getByTestId('more-row-account')).toBeVisible({
     timeout: 30_000,
   });
   await capture(page, '17-more');
 
-  await page.goto('/more/account', { waitUntil: 'commit' });
+  await navigateWithinApp(page, '/more/account');
   await expect(page.getByTestId('more-account-scroll')).toBeVisible({
     timeout: 30_000,
   });
   await capture(page, '18-more-account');
 
-  await page.goto('/more/privacy', { waitUntil: 'commit' });
+  await navigateWithinApp(page, '/more/privacy');
   await expect(page.getByTestId('more-privacy-scroll')).toBeVisible({
     timeout: 30_000,
   });
   await capture(page, '19-more-privacy');
 
-  await page.goto('/more/notifications', { waitUntil: 'commit' });
+  await navigateWithinApp(page, '/more/notifications');
   await expect(page.getByTestId('more-notifications-scroll')).toBeVisible({
     timeout: 30_000,
   });
   await capture(page, '20-more-notifications');
 
-  await page.goto('/more/help', { waitUntil: 'commit' });
+  await navigateWithinApp(page, '/more/help');
   await expect(page.getByTestId('more-help-scroll')).toBeVisible({
     timeout: 30_000,
   });
@@ -165,4 +171,6 @@ test('single learner UX screenshot crawl', async ({ page }) => {
 
   await gotoScreen(page, '/subscription', 'subscription-screen');
   await capture(page, '24-subscription');
+
+  expect(profileBootstrapRequests).toBe(1);
 });

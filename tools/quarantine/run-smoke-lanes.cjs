@@ -7,13 +7,15 @@
 // core until a PM-approved quarantine says otherwise. A project moves to the
 // non-gating ADVISORY lane only via an unexpired entry in
 // run-smoke-quarantine.json; an expired (or absent) entry is ignored and the
-// project auto-reverts to core — no permanent mutes.
+// project auto-reverts to core — no permanent mutes. The existing run-smoke
+// job consumes both lanes; its core result is required and advisory remains
+// visible without gating.
 //
 // This is a DIFFERENT mechanism from tools/quarantine/quarantine.json
 // (registry.cjs / WI-536): that registry fully SKIPS a test FILE from the PR
 // gate. This one DEMOTES a Playwright smoke PROJECT from the required-stable
-// core lane to the advisory lane — the project still runs, it just stops
-// being part of the set a future required check (WI-2458) would gate on.
+// core lane to the advisory lane — the project still runs, it just stops being
+// part of the required-stable set wired by WI-2458.
 // Kept as a sibling file/registry rather than folded into registry.cjs
 // because the two answer different questions and conflating them risks
 // silently changing one mechanism's semantics while editing the other.
@@ -23,15 +25,15 @@ const path = require('path');
 
 const REGISTRY_PATH = path.join(__dirname, 'run-smoke-quarantine.json');
 
-// The full project set `pnpm run test:e2e:web:smoke` (package.json) invokes
-// today. Keep this list in lockstep with that script's --project flags —
-// apps/mobile/playwright.config.ts is the source of truth for what each
-// project matches.
+// The full legacy project set. The package runner and workflow consume this
+// declaration; neither repeats the project list. The Playwright config is
+// the source of truth for what each named project matches.
 const DECLARED_CORE_PROJECTS = Object.freeze([
   'smoke-auth',
   'smoke-learner',
   'smoke-parent',
   'smoke-accessibility',
+  'smoke-transport-recovery',
 ]);
 
 const WI_RE = /^WI-\d+$/;
@@ -108,9 +110,7 @@ function resolveLanes(now = new Date(), entries = loadRegistry()) {
       .map((e) => e.project),
   );
   const core = DECLARED_CORE_PROJECTS.filter((p) => !activeAdvisory.has(p));
-  const advisory = DECLARED_CORE_PROJECTS.filter((p) =>
-    activeAdvisory.has(p),
-  );
+  const advisory = DECLARED_CORE_PROJECTS.filter((p) => activeAdvisory.has(p));
   return { core, advisory };
 }
 
