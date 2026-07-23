@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react-native';
 import type { SupporterScopeList } from '@eduagent/schemas';
 
@@ -97,6 +98,17 @@ describe('ScopeChip', () => {
       await waitFor(() => {
         expect(screen.getByTestId('scope-chip-persisted-me')).toBeTruthy();
       });
+      const receipt = screen.getByTestId('scope-chip-persisted-me');
+      expect(
+        within(screen.getByTestId('scope-chip-persistence-anchor')).getByTestId(
+          'scope-chip-persisted-me',
+        ),
+      ).toBe(receipt);
+      expect(
+        within(screen.getByTestId('scope-chip')).queryByTestId(
+          'scope-chip-persisted-me',
+        ),
+      ).toBeNull();
     } finally {
       setItemSpy.mockRestore();
       if (previousE2E === undefined) {

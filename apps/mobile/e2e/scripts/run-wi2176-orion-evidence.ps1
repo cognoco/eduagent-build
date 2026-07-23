@@ -43,6 +43,11 @@ $scenario = 'v2-supporter-self-learning-active'
 $apkPath = Join-Path $repoRoot `
   'apps\mobile\android\app\build\outputs\apk\release\app-release.apk'
 
+[System.IO.Directory]::CreateDirectory($OutputDir) | Out-Null
+if (Test-Path -LiteralPath $receiptPath) {
+  Remove-Item -LiteralPath $receiptPath -Force
+}
+
 function Invoke-Checked {
   param(
     [Parameter(Mandatory = $true)][string]$FilePath,
@@ -101,6 +106,117 @@ function Restore-Setting {
   } else {
     [void](Invoke-AdbText shell settings put $Namespace $Name $Value)
   }
+}
+
+function Get-ReverseLocalSocket {
+  param([Parameter(Mandatory = $true)][string]$RemoteSocket)
+
+  $reverseList = Invoke-AdbText reverse --list
+  foreach ($line in ($reverseList -split "`r?`n")) {
+    $parts = @($line.Trim() -split '\s+')
+    if (
+      $parts.Count -ge 2 -and
+      $parts[$parts.Count - 2] -eq $RemoteSocket
+    ) {
+      return $parts[$parts.Count - 1]
+    }
+  }
+  return $null
+}
+
+function Restore-ReverseMapping {
+  param(
+    [Parameter(Mandatory = $true)][string]$RemoteSocket,
+    [AllowNull()][string]$OriginalLocalSocket,
+    [Parameter(Mandatory = $true)][bool]$WasChanged
+  )
+
+  if (-not $WasChanged) {
+    return
+  }
+  if ([string]::IsNullOrWhiteSpace($OriginalLocalSocket)) {
+    [void](Invoke-AdbText reverse --remove $RemoteSocket)
+  } else {
+    [void](Invoke-AdbText reverse $RemoteSocket $OriginalLocalSocket)
+  }
+}
+
+function Invoke-CleanupActions {
+  param(
+    [Parameter(Mandatory = $true)][object[]]$Actions,
+    [System.Management.Automation.ErrorRecord]$PrimaryFailure
+  )
+
+  $cleanupFailures = [System.Collections.Generic.List[object]]::new()
+  foreach ($cleanupAction in $Actions) {
+    $action = $cleanupAction.Action
+    try {
+      & $action
+    } catch {
+      $cleanupFailures.Add(
+        [pscustomobject]@{
+          Name = $cleanupAction.Name
+          Error = $_
+        }
+      )
+    }
+  }
+
+  if ($PrimaryFailure) {
+    foreach ($cleanupFailure in $cleanupFailures) {
+      Write-Warning (
+        "WI-2176 cleanup step '$($cleanupFailure.Name)' failed: " +
+        $cleanupFailure.Error.Exception.Message
+      )
+    }
+    throw $PrimaryFailure
+  }
+
+  if ($cleanupFailures.Count -gt 0) {
+    $failureSummary = $cleanupFailures |
+      ForEach-Object {
+        "'$($_.Name)': $($_.Error.Exception.Message)"
+      }
+    throw (
+      "WI-2176 cleanup failed after the evidence run:`n" +
+      ($failureSummary -join [Environment]::NewLine)
+    )
+  }
+}
+
+function Complete-EvidenceRun {
+  param(
+    [Parameter(Mandatory = $true)][object[]]$CleanupActions,
+    [System.Management.Automation.ErrorRecord]$PrimaryFailure,
+    [object]$Receipt,
+    [Parameter(Mandatory = $true)][string]$ReceiptPath
+  )
+
+  $finalizationActions = @(
+    [pscustomobject]@{
+      Name = 'invalidate prior evidence receipt'
+      Action = {
+        if (Test-Path -LiteralPath $ReceiptPath) {
+          Remove-Item -LiteralPath $ReceiptPath -Force
+        }
+      }
+    }
+  ) + @($CleanupActions)
+
+  Invoke-CleanupActions `
+    -Actions $finalizationActions `
+    -PrimaryFailure $PrimaryFailure
+  if ($null -eq $Receipt) {
+    throw 'WI-2176 evidence body completed without preparing a receipt'
+  }
+
+  $utf8WithoutBom = [System.Text.UTF8Encoding]::new($false)
+  [System.IO.File]::WriteAllText(
+    $ReceiptPath,
+    ($Receipt | ConvertTo-Json -Depth 8),
+    $utf8WithoutBom
+  )
+  Write-Output "WI-2176_ORION_EVIDENCE=SOUND receipt=$ReceiptPath"
 }
 
 function Assert-ExactSourceState {
@@ -184,8 +300,12 @@ $originalFontScale = Get-Setting system font_scale
 $originalWindowAnimation = Get-Setting global window_animation_scale
 $originalTransitionAnimation = Get-Setting global transition_animation_scale
 $originalAnimatorDuration = Get-Setting global animator_duration_scale
+$originalReverse8787 = Get-ReverseLocalSocket 'tcp:8787'
 $profilePrepared = $false
+$reverse8787Changed = $false
 $captureOutput = ''
+$primaryFailure = $null
+$receipt = $null
 
 try {
   [System.IO.Directory]::CreateDirectory($OutputDir) | Out-Null
@@ -254,6 +374,7 @@ try {
   [void](Invoke-AdbText shell settings put global window_animation_scale 0)
   [void](Invoke-AdbText shell settings put global transition_animation_scale 0)
   [void](Invoke-AdbText shell settings put global animator_duration_scale 0)
+  $reverse8787Changed = $true
   [void](Invoke-AdbText reverse tcp:8787 tcp:8787)
   $env:API_URL = $ApiUrl
   $env:E2E_SEED_SLOT = $SeedSlot
@@ -341,34 +462,88 @@ try {
       sha256 = $screenshotSha256
     }
   }
-  $utf8WithoutBom = [System.Text.UTF8Encoding]::new($false)
-  [System.IO.File]::WriteAllText(
-    $receiptPath,
-    ($receipt | ConvertTo-Json -Depth 8),
-    $utf8WithoutBom
-  )
-  Write-Output "WI-2176_ORION_EVIDENCE=SOUND receipt=$receiptPath"
+} catch {
+  $primaryFailure = $_
 } finally {
-  & $AdbBin -s $DeviceId shell rm -f $deviceScreenshotPath 2>$null |
-    Out-Null
+  $cleanupActions = @(
+    [pscustomobject]@{
+      Name = 'remove device screenshot'
+      Action = {
+        [void](Invoke-AdbText shell rm -f $deviceScreenshotPath)
+      }
+    },
+    [pscustomobject]@{
+      Name = 'restore adb reverse tcp:8787'
+      Action = {
+        Restore-ReverseMapping `
+          -RemoteSocket 'tcp:8787' `
+          -OriginalLocalSocket $originalReverse8787 `
+          -WasChanged $reverse8787Changed
+      }
+    }
+  )
   if ($profilePrepared) {
-    Restore-WmValue size $originalSize 'Override size:\s*(\d+x\d+)'
-    Restore-WmValue density $originalDensity 'Override density:\s*(\d+)'
-    Restore-Setting system font_scale $originalFontScale
-    Restore-Setting global window_animation_scale $originalWindowAnimation
-    Restore-Setting global transition_animation_scale `
-      $originalTransitionAnimation
-    Restore-Setting global animator_duration_scale $originalAnimatorDuration
+    $cleanupActions += @(
+      [pscustomobject]@{
+        Name = 'restore wm size'
+        Action = {
+          Restore-WmValue size $originalSize 'Override size:\s*(\d+x\d+)'
+        }
+      },
+      [pscustomobject]@{
+        Name = 'restore wm density'
+        Action = {
+          Restore-WmValue density $originalDensity 'Override density:\s*(\d+)'
+        }
+      },
+      [pscustomobject]@{
+        Name = 'restore system font_scale'
+        Action = {
+          Restore-Setting system font_scale $originalFontScale
+        }
+      },
+      [pscustomobject]@{
+        Name = 'restore global window_animation_scale'
+        Action = {
+          Restore-Setting global window_animation_scale `
+            $originalWindowAnimation
+        }
+      },
+      [pscustomobject]@{
+        Name = 'restore global transition_animation_scale'
+        Action = {
+          Restore-Setting global transition_animation_scale `
+            $originalTransitionAnimation
+        }
+      },
+      [pscustomobject]@{
+        Name = 'restore global animator_duration_scale'
+        Action = {
+          Restore-Setting global animator_duration_scale `
+            $originalAnimatorDuration
+        }
+      }
+    )
   }
-  if (Test-Path -LiteralPath $captureDir -PathType Container) {
-    $resolvedCaptureDir = [System.IO.Path]::GetFullPath($captureDir)
-    if (
-      $resolvedCaptureDir.StartsWith(
-        $workItemTempRoot + [System.IO.Path]::DirectorySeparatorChar,
-        [System.StringComparison]::OrdinalIgnoreCase
-      )
-    ) {
-      Remove-Item -LiteralPath $resolvedCaptureDir -Recurse -Force
+  $cleanupActions += [pscustomobject]@{
+    Name = 'remove raw hierarchy capture'
+    Action = {
+      if (Test-Path -LiteralPath $captureDir -PathType Container) {
+        $resolvedCaptureDir = [System.IO.Path]::GetFullPath($captureDir)
+        if (
+          $resolvedCaptureDir.StartsWith(
+            $workItemTempRoot + [System.IO.Path]::DirectorySeparatorChar,
+            [System.StringComparison]::OrdinalIgnoreCase
+          )
+        ) {
+          Remove-Item -LiteralPath $resolvedCaptureDir -Recurse -Force
+        }
+      }
     }
   }
+  Complete-EvidenceRun `
+    -CleanupActions $cleanupActions `
+    -PrimaryFailure $primaryFailure `
+    -Receipt $receipt `
+    -ReceiptPath $receiptPath
 }

@@ -52,40 +52,42 @@ export function ScopeChip(): React.ReactElement | null {
   }
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      testID="scope-chip"
-      accessibilityRole="tablist"
-      className="max-w-[260px] rounded-full border border-border bg-surface shadow-sm"
-      contentContainerClassName="items-center gap-1 p-1"
-    >
-      {availableScopes.map((scope) => {
-        const selected = sameScope(scope, activeScope);
-        const label = scopeLabel(scope, labels);
-        return (
-          <Pressable
-            key={scopeOptionKey(scope)}
-            testID={`scope-chip-option-${scopeOptionKey(scope)}`}
-            accessibilityRole="button"
-            accessibilityLabel={label}
-            accessibilityState={{ selected }}
-            onPress={() => setActiveScope(scope)}
-            className={`min-h-11 min-w-11 max-w-[150px] items-center justify-center rounded-full px-3 ${
-              selected ? 'bg-primary' : 'bg-transparent'
-            }`}
-          >
-            <Text
-              numberOfLines={1}
-              className={`text-body-sm font-semibold ${
-                selected ? 'text-on-primary' : 'text-text-secondary'
+    <View testID="scope-chip-persistence-anchor" className="max-w-[260px]">
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        testID="scope-chip"
+        accessibilityRole="tablist"
+        className="max-w-[260px] rounded-full border border-border bg-surface shadow-sm"
+        contentContainerClassName="items-center gap-1 p-1"
+      >
+        {availableScopes.map((scope) => {
+          const selected = sameScope(scope, activeScope);
+          const label = scopeLabel(scope, labels);
+          return (
+            <Pressable
+              key={scopeOptionKey(scope)}
+              testID={`scope-chip-option-${scopeOptionKey(scope)}`}
+              accessibilityRole="button"
+              accessibilityLabel={label}
+              accessibilityState={{ selected }}
+              onPress={() => setActiveScope(scope)}
+              className={`min-h-11 min-w-11 max-w-[150px] items-center justify-center rounded-full px-3 ${
+                selected ? 'bg-primary' : 'bg-transparent'
               }`}
             >
-              {label}
-            </Text>
-          </Pressable>
-        );
-      })}
+              <Text
+                numberOfLines={1}
+                className={`text-body-sm font-semibold ${
+                  selected ? 'text-on-primary' : 'text-text-secondary'
+                }`}
+              >
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
       {process.env.EXPO_PUBLIC_E2E === 'true' && isActiveScopePersisted && (
         <View
           accessible
@@ -101,6 +103,6 @@ export function ScopeChip(): React.ReactElement | null {
           }}
         />
       )}
-    </ScrollView>
+    </View>
   );
 }
