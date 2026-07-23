@@ -445,13 +445,24 @@ export async function withdrawAdultSelfConsentV2(
  * strictly safer and costs nothing real — a person accepting consent in two
  * organizations at the same instant is not a hot path.
  *
+ * **The literal value is load-bearing — do not "tidy" it.** It is exactly the
+ * key the first-use repair already takes on `origin/main`
+ * (`adult-consent-repair:<person>`), and it is kept verbatim so a ROLLING
+ * DEPLOY stays safe. Advisory locks only exclude processes that hash the same
+ * string, so minting a fresh literal here would leave an old repair worker and
+ * a new repair worker on different keys for the length of the rollout — able to
+ * bypass each other and duplicate the very repair row this lock exists to
+ * protect. Acceptance is new in this Work Item and has no deployed predecessor
+ * to preserve, so it is the writer that moves onto the established key. The name
+ * generalised (both writers use it now); the value must not.
+ *
  * Exported so tests can queue on the same key without reaching into internals.
  * Deliberately distinct from `consentPersonLockKey` (the deletion/revocation
  * flow's key): merging with that would serialise these small writes behind a
  * heavy multi-table teardown for no invariant either one needs.
  */
 export function adultSelfConsentLockKey(chargePersonId: string): string {
-  return `adult-self-consent:${chargePersonId}`;
+  return `adult-consent-repair:${chargePersonId}`;
 }
 
 export type AdultSelfConsentRepairOutcome =

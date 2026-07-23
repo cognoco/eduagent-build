@@ -392,12 +392,12 @@ describe('Integration: POST /v1/consent/self/accept (WI-2547)', () => {
   // compliance row.
   //
   // Determinism: a barrier connection holds the advisory keys and releases both
-  // writers at the same instant. It takes the CURRENT shared key AND the two
-  // superseded per-writer keys, so the release is simultaneous under either
-  // implementation — that is what makes this test genuinely red when the shared
-  // key is reverted, rather than red only when the scheduler happens to
-  // cooperate. Production code carries no test hook; the barrier is just
-  // another client taking advisory locks.
+  // writers at the same instant. It takes the shared key AND the superseded
+  // acceptance-only key, so the release is simultaneous under either
+  // implementation — that is what makes this test genuinely red when acceptance
+  // is reverted to its own namespace, rather than red only when the scheduler
+  // happens to cooperate. Production code carries no test hook; the barrier is
+  // just another client taking advisory locks.
   it('[AC2] concurrent first-use REPAIR and ACCEPT leave exactly one live grant per purpose', async () => {
     const owner = await createLegacyAdultOwner();
     const db = createIntegrationDb();
@@ -428,10 +428,17 @@ describe('Integration: POST /v1/consent/self/accept (WI-2547)', () => {
     const barrierHeld = new Promise<void>((resolve) => {
       releaseBarrier = resolve;
     });
+    // The shared key IS the repair writer's established literal (kept verbatim
+    // for rolling-deploy safety), so those two collapse to one entry — hence the
+    // Set. The acceptance-only key is the superseded namespace this test's
+    // negative control reverts to; the barrier holds it so the release stays
+    // simultaneous under that reverted implementation too, which is what keeps
+    // the test genuinely red rather than scheduler-dependent.
     const barrierKeys = [
-      adultSelfConsentLockKey(owner.id), // current shared key
-      `adult-consent-repair:${owner.id}`, // superseded repair-only key
-      `adult-consent-accept:${owner.id}:${owner.accountId}`, // superseded accept-only key
+      ...new Set([
+        adultSelfConsentLockKey(owner.id), // shared key == deployed repair key
+        `adult-consent-accept:${owner.id}:${owner.accountId}`, // negative-control key
+      ]),
     ];
     const barrierTx = barrierDb.transaction(async (tx) => {
       for (const key of barrierKeys) {

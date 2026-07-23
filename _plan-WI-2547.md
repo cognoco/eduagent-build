@@ -109,6 +109,15 @@ safer and costs nothing real. The key is deliberately distinct from `consentPers
 (the deletion/revocation flow) so these small writes never queue behind a heavy multi-table
 teardown. Accept-vs-withdraw is a **separate** question, analysed below and unchanged.
 
+**Literal continuity is load-bearing (rolling deploys).** The helper returns exactly
+`adult-consent-repair:<person>` — the key the repair writer *already takes on `origin/main`* —
+and that value must not be "tidied" into a nicer namespace. Advisory locks only exclude
+processes that hash the same string, so minting a fresh literal would leave an old repair
+worker and a new repair worker on different keys for the length of a rollout, able to bypass
+each other and duplicate the very repair row the lock protects. Acceptance is new in this WI
+and has no deployed predecessor, so acceptance is the writer that moves onto the established
+key. The helper's *name* generalised; its *value* did not.
+
 ---
 
 ## CI contract already in force (read before writing)
@@ -255,9 +264,9 @@ export async function acceptAdultSelfConsentV2(
   // purpose by design).
   return db.transaction(async (tx) => {
     await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtextextended(${
-        'adult-consent-accept:' + chargePersonId + ':' + organizationId
-      }, 0))`,
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${adultSelfConsentLockKey(
+        chargePersonId,
+      )}, 0))`,
     );
 
     const now = new Date();
