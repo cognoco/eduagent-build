@@ -425,7 +425,7 @@ describe('AccountAdminSheet', () => {
     });
 
     fireEvent.press(screen.getByTestId('account-admin-family-settings'));
-    expect(mockPush).toHaveBeenCalledWith('/(app)/more');
+    expect(mockPush).toHaveBeenCalledWith('/(app)/account/family');
 
     fireEvent.press(screen.getByTestId('account-admin-privacy'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/account/privacy');
