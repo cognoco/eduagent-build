@@ -114,10 +114,30 @@ export async function runChallengeRoundGrader(
 
   // 1. Route to the judge (capability:'judge' selects the tier/age-blind
   //    grader path — exempt from the under-18 Gemini-ban gate, WI-1800).
+  //
+  // WI-2624 SCOPE GAP: this grades the LEARNER's answer, but is judged
+  // against `askedQuestion` — the mentor's own prior turn, i.e. tutor
+  // output. AC-3 calls for `model-output` independence (excluding whichever
+  // vendor produced that prior turn), but no REAL producer vendor is
+  // cleanly threadable here today: `askedQuestion` is sourced from
+  // `context.exchangeHistory` (session-exchange.ts, T6), and history entries
+  // carry only `{ role, content, orphan_reason }` — no per-turn vendor is
+  // persisted or threaded. The current turn's own `result.provider` (session-
+  // exchange.ts) is NOT a substitute — it is the vendor for THIS turn's
+  // response, not the vendor that produced the PRIOR turn's question, and
+  // can differ from it (e.g. a mid-session provider fallback). Guessing
+  // would reintroduce exactly the kind of silent mislabeling this WI exists
+  // to remove, so this site is left `not-applicable` (no producer exclusion,
+  // Gemini/Vertex still banned) pending a follow-up that threads a real
+  // per-turn provider (e.g. onto exchangeHistory entries or via a DB read of
+  // the last assistant turn's persisted llmProvider). Flagged in WI-2624's
+  // completion report as an open scope question — see that report before
+  // reclassifying this call site.
   let response: string;
   try {
     const result = await routeAndCall(messages, GRADER_RUNG, {
       capability: 'judge',
+      judgeIndependence: { mode: 'not-applicable' },
       flow: GRADER_FLOW,
       responseFormat: 'json',
       conversationLanguage: input.conversationLanguage,

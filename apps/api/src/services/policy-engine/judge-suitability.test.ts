@@ -18,7 +18,7 @@ jest.mock('../llm', () => {
 
 import type { RouteResult } from '../llm';
 import { routeAndCall } from '../llm';
-import { runSuitabilityJudge, selectJudgeProvider } from './judge-suitability';
+import { runSuitabilityJudge } from './judge-suitability';
 
 const mockRouteAndCall = routeAndCall as jest.MockedFunction<
   typeof routeAndCall
@@ -51,33 +51,6 @@ beforeEach(() => {
   mockRouteAndCall.mockReset();
 });
 
-describe('selectJudgeProvider — vendor-independence (MMT-ADR-0016 §2)', () => {
-  it('uses OpenAI when the tutor is Anthropic (cannot share the tutor vendor)', () => {
-    expect(selectJudgeProvider('anthropic')).toBe('openai');
-  });
-
-  it('uses Anthropic when the tutor is OpenAI', () => {
-    expect(selectJudgeProvider('openai')).toBe('anthropic');
-  });
-
-  it('defaults to Anthropic for a non-Anthropic tutor (cerebras/google)', () => {
-    expect(selectJudgeProvider('cerebras')).toBe('anthropic');
-    expect(selectJudgeProvider('google')).toBe('anthropic');
-  });
-
-  it('never returns gemini (under-18 + judge-vendor constraint)', () => {
-    for (const vendor of [
-      'anthropic',
-      'openai',
-      'cerebras',
-      'google',
-      'gemini',
-    ]) {
-      expect(selectJudgeProvider(vendor)).not.toBe('gemini');
-    }
-  });
-});
-
 describe('runSuitabilityJudge', () => {
   it('parses a valid verdict from the LLM response', async () => {
     mockRouteAndCall.mockResolvedValue(routeResult(VALID_VERDICT_JSON));
@@ -99,14 +72,18 @@ describe('runSuitabilityJudge', () => {
     expect(verdict?.overall).toBe('concern');
   });
 
-  it('routes with the judge flow, JSON format, and vendor-independent provider', async () => {
+  it('routes with the judge flow, JSON format, and a model-output judgeIndependence naming the real producer', async () => {
     mockRouteAndCall.mockResolvedValue(routeResult(VALID_VERDICT_JSON));
-    await runSuitabilityJudge(baseInput); // cerebras tutor → anthropic judge
+    await runSuitabilityJudge(baseInput); // producerVendor: 'cerebras'
     expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
     const [, , options] = mockRouteAndCall.mock.calls[0]!;
     expect(options?.flow).toBe('judge.suitability');
     expect(options?.responseFormat).toBe('json');
-    expect(options?.preferredProvider).toBe('anthropic');
+    expect(options?.capability).toBe('judge');
+    expect(options?.judgeIndependence).toEqual({
+      mode: 'model-output',
+      producerVendor: 'cerebras',
+    });
     expect(options?.ageBracket).toBe('adolescent');
   });
 
@@ -126,11 +103,17 @@ describe('runSuitabilityJudge', () => {
     expect(options?.capability).toBe('judge');
   });
 
-  it('routes the judge to OpenAI when the tutor itself is Anthropic', async () => {
+  it('declares the real tutor vendor as the producer to exclude, even when the tutor is Anthropic', async () => {
+    // WI-2624 regression: this must NOT preselect the opposite vendor (the
+    // old selectJudgeProvider/preferredProvider hack) — it must declare the
+    // REAL producer so the router can exclude it once, not twice.
     mockRouteAndCall.mockResolvedValue(routeResult(VALID_VERDICT_JSON));
     await runSuitabilityJudge({ ...baseInput, tutorVendor: 'anthropic' });
     const [, , options] = mockRouteAndCall.mock.calls[0]!;
-    expect(options?.preferredProvider).toBe('openai');
+    expect(options?.judgeIndependence).toEqual({
+      mode: 'model-output',
+      producerVendor: 'anthropic',
+    });
   });
 
   it('fails open (returns null, does not throw) when the route throws', async () => {
