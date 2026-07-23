@@ -22,6 +22,7 @@ import { useCreateNote } from '../../../../hooks/use-notes';
 import { useNavigationContract } from '../../../../hooks/use-navigation-contract';
 import { useProgressInventory } from '../../../../hooks/use-progress';
 import {
+  goBackOrReplace,
   pushLearningResumeTarget,
   replaceV2LearningResumeTarget,
   SUBJECT_HUB_RETURN_TO,
@@ -149,8 +150,8 @@ export default function SubjectHubRoute(): React.ReactElement {
     // Only an in-memory proof consumed from the actual Subjects → Hub
     // transition may authorize a pop. URL params and ambient history are not
     // ancestry evidence; deep links and refreshes use the stable fallback.
-    if (isV2 && hasSubjectsPredecessor && router.canGoBack()) {
-      router.back();
+    if (isV2 && hasSubjectsPredecessor) {
+      goBackOrReplace(router, fallback);
       return;
     }
     router.replace(fallback);

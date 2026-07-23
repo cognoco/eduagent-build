@@ -58,7 +58,6 @@ const mockPush = jest.fn();
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockCanGoBack = jest.fn(() => true);
-const mockGoBackOrReplace = jest.fn();
 const mockPushLearningResumeTarget = jest.fn();
 const mockConsumeHubToTopicTransition = jest.fn(
   (_subjectId: string, _topicId: string) => false,
@@ -134,7 +133,6 @@ jest.mock(
   '../../../lib/navigation' /* gc1-allow: goBackOrReplace calls router.back which requires native navigation context */,
   () => ({
     ...jest.requireActual('../../../lib/navigation'),
-    goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
     pushLearningResumeTarget: (...args: unknown[]) =>
       mockPushLearningResumeTarget(...args),
   }),
@@ -644,7 +642,6 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
 
     fireEvent.press(screen.getByTestId('topic-detail-missing-params-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
-    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 
   it('shows load error when the topic payload is null after loading', async () => {
@@ -687,7 +684,6 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
 
     fireEvent.press(screen.getByTestId('topic-detail-go-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
-    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
 
     fireEvent.press(screen.getByTestId('topic-detail-go-home'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
@@ -840,7 +836,6 @@ describe('TopicDetailScreen rendering details', () => {
     });
     fireEvent.press(screen.getByTestId('topic-detail-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
-    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 
   it('replaces to the parent book when opened from a book route', async () => {
@@ -861,7 +856,6 @@ describe('TopicDetailScreen rendering details', () => {
       pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
       params: { subjectId: SUBJECT_ID, bookId: BOOK_ID },
     });
-    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 
   it('returns a due-review topic to the exact Subject Hub contract', async () => {
@@ -883,7 +877,6 @@ describe('TopicDetailScreen rendering details', () => {
       pathname: '/(app)/subject-hub/[subjectId]',
       params: { subjectId: SUBJECT_ID },
     });
-    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 
   it('does not trust crafted Hub ancestry URL params when browser history exists', async () => {
@@ -912,7 +905,6 @@ describe('TopicDetailScreen rendering details', () => {
       pathname: '/(app)/subject-hub/[subjectId]',
       params: { subjectId: SUBJECT_ID },
     });
-    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 
   it('pops to the Hub only after consuming the actual Hub-to-Topic transition', async () => {
@@ -938,7 +930,6 @@ describe('TopicDetailScreen rendering details', () => {
     );
     expect(mockBack).toHaveBeenCalledTimes(1);
     expect(mockReplace).not.toHaveBeenCalled();
-    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 
   it('shows "No sessions yet. Start one below!" when sessions are empty', async () => {

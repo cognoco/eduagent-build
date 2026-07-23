@@ -47,6 +47,7 @@ import { useThemeColors } from '../../../lib/theme';
 import { formatSourceLine } from '../../../lib/format-note-source';
 import { deriveRetentionStatus } from '../../../lib/retention-utils';
 import {
+  goBackOrReplace,
   homeHrefForReturnTo,
   pushLearningResumeTarget,
   SUBJECT_HUB_RETURN_TO,
@@ -348,8 +349,8 @@ export default function TopicDetailScreen() {
   const handleTopicBack = useCallback(() => {
     // Only the consumed in-memory Hub → Topic transition proves the immediate
     // parent. Crafted/refreshed URLs retain the deterministic Hub replacement.
-    if (hasHubPredecessor && router.canGoBack()) {
-      router.back();
+    if (hasHubPredecessor) {
+      goBackOrReplace(router, topicBackFallback);
       return;
     }
     router.replace(topicBackFallback);
