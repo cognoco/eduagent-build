@@ -41,7 +41,7 @@ date: '2025-12-11'
 
 *"A teacher who grows with you."*
 
-MentoMate is a premium AI tutoring platform that teaches through conversation—using research-backed methodologies to guide motivated learners aged 11+ to understanding, remembering what they've learned across sessions, and verifying retention.
+MentoMate is a premium AI tutoring platform that teaches through conversation—using research-backed methodologies to guide motivated learners aged 13+ to understanding, remembering what they've learned across sessions, and verifying retention.
 
 ### The Problem
 
@@ -67,7 +67,7 @@ MentoMate delivers personalized AI tutoring through tiered subscriptions—combi
 
 ### Target Users
 
-Motivated learners aged 11+ who really want to learn—not casual browsers:
+Motivated learners aged 13+ who really want to learn—not casual browsers:
 
 - **Parents of struggling students** (primary): Kid needs to pass, catch up, get into good school. Affordable subscription tiers cheaper than tutor, available anytime
 - **Career changers**: Need new skills for hiring/promotion. Investment in earning potential
@@ -138,7 +138,7 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 
 | Feature Category | Included Features |
 |------------------|-------------------|
-| **Authentication** | Email + password, Google OAuth, Apple Sign-in, OpenAI OAuth (implemented via Clerk custom OAuth), multi-profile (family), GDPR parental consent (11-15, EU) |
+| **Authentication** | Email + password, Google OAuth, Apple Sign-in, OpenAI OAuth (implemented via Clerk custom OAuth), multi-profile (family), GDPR guardian authorization where a 13–17-year-old is below the habitual-residence Article 8 threshold |
 | **Onboarding** | Subject selection (any topic), conversational interview, dynamic curriculum generation, homework help quick entry |
 | **Learning Experience** | Real-time AI chat, prior knowledge context, adaptive explanations, mandatory user summaries, homework integrity mode |
 | **Assessments** | In-lesson quizzes, topic completion tests, re-testing from summaries |
@@ -165,7 +165,7 @@ Ask Anything starts without a required topic. It can resolve or ask for a subjec
 | Cohorts, buddy matching, study groups | Needs user volume | v1.5 |
 | Human coaching add-on | New business model | v2.0 |
 | Portfolio projects | Complexity, needs curriculum stability | v2.0 |
-| Multi-language UI (beyond English) | English only for v1.0 | v2.0 |
+| Additional UI locales beyond the seven shipped languages | Current UI set is en, de, es, ja, nb, pl, pt | Post-v1 |
 | Offline mode | Significant caching complexity | v2.0 |
 | Age 6-10 mode | Different UX, stricter COPPA requirements | v2.0 |
 | B2B/Team licensing | Focus on B2C first | v2.0 |
@@ -189,7 +189,7 @@ Ask Anything starts without a required topic. It can resolve or ask for a subjec
    - Downloads app or visits web app
    - Creates account (email/Google/Apple)
    - Completes profile (name, birthdate, country)
-   - If 11-15 in EU: Parent receives consent email
+   - If aged 13–17 and below the Article 8 threshold for habitual residence: guardian receives consent email
    - Parent approves consent (if applicable)
 
 2. **Intent Selection**
@@ -419,7 +419,7 @@ Ask Anything starts without a required topic. It can resolve or ask for a subjec
 **Consent Decline Flow:**
 - If parent declines consent → Account deleted immediately
 - No data retained (child's registration data purged)
-- Child notified: "Your parent declined. You can register again when you're [16 in EU / 13 in US]."
+- Child notified: "Your guardian declined. You can register again when you reach the digital-consent age for your country of habitual residence."
 - Email not blocked (can re-register at appropriate age)
 
 **Consent Timeout & Non-Response:**
@@ -474,7 +474,7 @@ Ask Anything starts without a required topic. It can resolve or ask for a subjec
 
 **Family Member Removal:**
 - **Parent removes child:**
-  - Child's profile becomes standalone Free account (if child is 16+ EU / 13+ US)
+  - Child's profile becomes standalone Free account only if they have reached the Article 8 threshold for their country of habitual residence
   - Child's profile deleted if under consent age (data can't exist without consent)
   - All progress preserved for eligible standalone accounts
   - Child notified: "You've been removed from family. Your account is now Free tier."
@@ -900,7 +900,7 @@ Ask Anything starts without a required topic. It can resolve or ask for a subjec
 **Authentication & Authorization:**
 - System must support multiple authentication methods including social login and email/password
 - System must manage multiple learner profiles under single subscription (family accounts)
-- System must implement parental consent workflow for users aged 11-15 in EU
+- System must implement verified guardian authorization for 13–17-year-olds below the Article 8 threshold for their EEA country of habitual residence
 - System must maintain user sessions with automatic expiration for security
 
 **Payment Processing:**
@@ -956,7 +956,7 @@ Ask Anything starts without a required topic. It can resolve or ask for a subjec
 - System must verify exact age against the 13+ launch floor
 - System must record and enforce the enabled-country allowlist
 - System must require verified guardian authorization when a 13–17-year-old is below the national Article 8 threshold
-- System must not collect PII from minors without applicable self-consent or guardian authorization
+- System must not collect consent-gated PII from minors without applicable self-consent or guardian authorization. Age, residence, security, registration, account-enforcement, and retention-only data may be processed where necessary for legal compliance, safety, or accountability.
 
 **API Security:**
 - System must implement rate limiting per user and IP address
@@ -980,8 +980,8 @@ Ask Anything starts without a required topic. It can resolve or ask for a subjec
 - FR4: Users can create multiple learner profiles under single subscription (family accounts)
 - FR5: Users can switch between learner profiles
 - FR6: Parents can switch into child's profile for full access to learning history
-- FR7: Users aged 11-15 in EU can request parental consent during registration
-- FR8: Users aged 11-12 in US can request parental consent during registration (COPPA)
+- FR7: Users aged 13–17 below the Article 8 threshold for their EEA country of habitual residence can request guardian authorization during registration
+- FR8: US registration and COPPA flows are dormant because the United States and all under-13 users are outside the launch perimeter
 - FR9: Parents can approve or decline consent via email link
 - FR10: If parent declines consent, child account is deleted immediately with no data retained
 - FR11: Users can delete their accounts and all associated data (GDPR)

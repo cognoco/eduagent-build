@@ -261,7 +261,7 @@ AGENTS.md divergence below are judged against that hand-maintained model.
   drift found beyond the documented `commit` SKIP exception.
 - All file/script/doc paths cited in CLAUDE.md that I spot-checked exist
   (`docs/project_context.md`, `docs/architecture.md`, `docs/compliance/audience-matrix.md`,
-  `docs/specs/2026-05-21-navigation-contract.md`, `docs/change-classes.md`,
+  `docs/_archive/specs/Done/2026-05-21-navigation-contract.md`, `docs/change-classes.md`,
   `scripts/check-change-class.sh`, `apps/mobile/src/lib/navigation-contract.ts`,
   `persona-fossil-guard.test.ts`, `worktree-setup/SKILL.md`).
 - `settings.json` permission/hook config is minimal and reasonable; the only

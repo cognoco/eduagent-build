@@ -17,7 +17,7 @@ This document reconciles the narrower navigation-contract draft with the FULL St
 
 ## Related documents
 
-- [`docs/compliance/audience-matrix.md`](../../../compliance/audience-matrix.md) — **paired current-state inventory.** ~119 scattered gating reads with F1–F14 findings; this spec closes F5, F6, F7, F8, F11.
+- [`docs/compliance/audience-matrix.md`](../../../compliance/audience-matrix.md) — **reconstructed historical provenance.** Its ~119 scattered gating reads and F1–F14 findings explain the original problem; verify current state against `AGENTS.md` and `apps/mobile/src/lib/navigation-contract.ts`.
 - [`docs/flows/flow-master-directory.md`](../../../flows/flow-master-directory.md) — flow register that cites this spec from per-flow detail pages.
 - `CLAUDE.md` — "Profile Shapes" section is authoritative for **current (V0)** tab shapes (`guardian` / `learner`). This spec describes the **target (FULL)** shapes (`study` / `family`); the V0 → FULL mapping is in the "Decision" section below. Until `resolveNavigationContract` ships, CLAUDE.md's two-shape rule (`guardian` / `learner` — no third shape) governs production code.
 

@@ -82,10 +82,10 @@ Any future UK enablement reopens the full UK legal review.
 
 ## C-5 — DPIA / governance launch gate
 
-- **DPIA complete before the first real minor; DPO appointment mandatory.** A Data Protection Impact
-  Assessment must be complete before the first real consent-gated child is onboarded, and a Data Protection
-  Officer must be appointed. **This gates launch.** *Basis:* GDPR Arts 35 and 37. UK-specific duties are
-  dormant while the UK is disabled.
+- **DPIA complete before production processing or country enablement; DPO appointment mandatory.** A Data
+  Protection Impact Assessment must be signed before production processing begins or any launch country is
+  enabled, and a Data Protection Officer must be appointed. **This gates launch.** *Basis:* GDPR Arts 35 and
+  37. UK-specific duties are dormant while the UK is disabled.
 
 ---
 

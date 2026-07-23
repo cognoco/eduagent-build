@@ -4795,7 +4795,7 @@ So that I know the AI is coaching my child through difficulty, not just giving a
 **What:**
 Determine whether MentoMate submits under Apple's **Kids Category** or **Education** category, execute the compliance checklist, and implement age-gated Sentry initialization.
 
-**Historical context:** This story was written for ages 11–17 across US/UK/Australia. The current product is 13+ and EEA-only, with the UK and US disabled; store classification and disclosures must be rechecked against that perimeter. Apple's Kids Category imposes strict rules: no third-party analytics/tracking, no behavioral profiling, no ads, restricted data collection, and a parental gate on purchases.
+**Historical context:** This story was written for ages 11–17 across US/UK/Australia. The planned launch perimeter is 13+ and EEA-only, with the UK and US disabled. No EEA country is technically enabled until habitual-residence capture, national-threshold evaluation, and server/store allowlist enforcement are implemented; store classification and disclosures must be rechecked against the eventual enabled wave. Apple's Kids Category imposes strict rules: no third-party analytics/tracking, no behavioral profiling, no ads, restricted data collection, and a parental gate on purchases.
 
 **Recommendation:** **Education category** for v1. Kids Category readiness documented for v2 (when Age 6-10 mode ships). Rationale: Kids Category prohibits all third-party analytics — Sentry would need full conditional disable. Education category permits analytics when parental consent is obtained, which the app already requires for under-16.
 

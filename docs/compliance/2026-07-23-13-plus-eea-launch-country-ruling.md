@@ -340,11 +340,12 @@ The launch-country policy produced by this ruling is:
 
 ```text
 minimum_age = 13
-eea_country_allowlist = [
+intended_eea_country_perimeter = [
   "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR",
   "DE", "GR", "HU", "IS", "IE", "IT", "LV", "LI", "LT", "LU",
   "MT", "NL", "NO", "PL", "PT", "RO", "SK", "SI", "ES", "SE"
 ]
+enabled_eea_country_allowlist = []
 article_8_threshold_by_residence = {
   13: ["BE", "EE", "FI", "IS", "LV", "MT", "NO", "PT", "SE"],
   14: ["AT", "BG", "CY", "IT", "LT", "ES"],
@@ -356,11 +357,11 @@ denylist = ["GB"]
 non_eea_countries = "disabled unless separately ruled"
 ```
 
-The allowlist expresses the intended EEA-wide product perimeter, not a claim
-that every country is ready today. Each country remains disabled until its
-common gates, national review, localization, and applicable guardian flow are
-production-ready. The UK and every other non-EEA country require a separate
-ruling.
+The perimeter expresses the intended EEA-wide product scope. The empty enabled
+allowlist records the current implementation truth: no country is enabled by
+this document alone. Add a country only after its common gates, national
+review, localization, and applicable guardian flow are production-ready. The
+UK and every other non-EEA country require a separate ruling.
 
 ## Primary framework sources
 

@@ -67,6 +67,8 @@ Route to the named owner; presented as open, not pre-resolved:
 
 - **C4 — Privacy-policy profiling disclosure (C-1 canon / GDPR Art 13(2)(f)).** Adaptive profiling is real (`learning_profiles`, mastery, `needs_deepening_topics`). The canon requires copy to disclose profiling **as present and lawful** and never claim ADM is engineered out. The policy discloses "personalised tutoring / coaching insights" but not profiling explicitly. **Decision (policy-owner):** add an explicit profiling-present-and-lawful disclosure line.
 
+### Follow-up addendum — 2026-07-23
+
 - **C5 — Store data-safety worksheet was stale at this early pass; RESOLVED 2026-07-23.** The worksheet now records the 13+ floor, identity-v2 tables, and resolved homework-image/raw-audio retention facts. **Remaining final gate:** revalidate it against the production provider list, the EEA country allowlist implementation, and the then-current privacy notice before store submission.
 
 ---

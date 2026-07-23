@@ -4,7 +4,7 @@
 >
 > **Status:** ENGINEERING DRAFT for DPO + privacy-counsel review. **Not legal advice.** Items in `[brackets]` need the company's registration details or a qualified privacy professional's judgement. Drafted 2026-06-30 against the tree at/near `origin/main`.
 >
-> **Method note — the two-axis identity state.** The app carries two parallel data layers. The **legacy** schema (`accounts`, `profiles`, `consent_states`, `family_links` + learning/billing tables) is the live *physical* data home. An **identity-v2** schema (`person`, `login`, `consent_grant`, `consent_receipt`, `organization`, `financial_record`, `deletion_audit`) is wired and gated by `IDENTITY_V2_ENABLED` (`apps/api/src/config.ts:214`). **`IDENTITY_V2_ENABLED='true'` in staging + production is operator-confirmed (2026-06-30)** → the **v2 reader/writer tree is the live deployed path for deletion/export/consent**, so the **re-home-then-delete erasure flow is live and the legacy I-C1 consent-receipt-destruction defect is closed** (it was only ever live on the legacy v1 path). The live *physical tables* remain the legacy ones (the `person` table is a baseline shell), so the personal-data inventory in §1.1.a cites legacy columns; this is immaterial to the rights/retention analysis, which follows the live v2 code path. This document describes processing in substance (the personal data, purposes, flows, recipients, rights) — the same across both layers.
+> **Implementation-status overlay (updated 2026-07-23).** Identity v2 is the live production data layer; the legacy `accounts`/`profiles`/`family_links` tables are dropped. Exact date of birth is persisted in `person.birth_date`. `person.residence_jurisdiction` exists, but profile creation still maps only the coarse legacy `EU | US | OTHER` values to `EU | US | ROW`; it does not collect an EEA country of habitual residence. The national-threshold lookup and server/store enabled-country allowlist are therefore **not implemented**. Where older rows below describe legacy physical tables or year-only signup, treat them as historical evidence unless this overlay or the current ROPA confirms them.
 
 ---
 
@@ -15,7 +15,7 @@
 | Controller | |
 | --- | --- |
 | Management units responsible for the processing inside the organisation | **ZWIZZLY AS**, org.nr **811696072**, Fiskekroken 3B, 0139 Oslo, Norway, the product/engineering organisation operating MentoMate. Single controller (no joint controllership identified in code). |
-| Main establishment / point of contact or representative | **ZWIZZLY AS**, org.nr **811696072**, Fiskekroken 3B, 0139 Oslo, Norway (EEA). Lead supervisory authority via one-stop-shop: **Norwegian Datatilsynet**. No separate GDPR representative is required for the ruled EEA perimeter; UK representation is dormant while the UK is disabled. |
+| Main establishment / point of contact or representative | **ZWIZZLY AS**, org.nr **811696072**, Fiskekroken 3B, 0139 Oslo, Norway (EEA). **Proposed** lead supervisory authority via one-stop-shop: Norwegian Datatilsynet, subject to DPO/counsel confirmation of the factual main establishment and decision-making location. No separate GDPR representative is required for the ruled EEA perimeter; UK representation is dormant while the UK is disabled. |
 | Information about the DPO or similar function, if applicable | **DPO appointment is a launch-blocking condition** (Art 37 assessed mandatory — regular & systematic monitoring of learners is a core activity). `[DPO name / dpo@… — TODO before launch]`. |
 
 ## 0.2 Processor(s) and sub-processor(s)
@@ -105,7 +105,7 @@ Data subjects: **adult Subscription-administrator/owner** (`isOwner`/`admin`), *
 | 3 | **Track & adapt learning / progress** | Items 7, 11. Assessments, quizzes, streaks, reports. |
 | 4 | **Guardian oversight of a child's learning** | Item 8 (derived only) + item 4. A guardian sees progress/summaries — never the raw transcript (§2.3.b). |
 | 5 | **Account provision & authentication** | Items 1, 2. Sign-up, sign-in (Clerk), profile management. |
-| 6 | **Age & jurisdiction gating / lawful consent** | Items 2, 3. Birth-year + residence drive the consent route and the under-13 block. |
+| 6 | **Age & jurisdiction gating / lawful consent** | Items 2, 3. Exact date of birth drives the under-13 block. Specific EEA habitual residence does not yet drive consent: only the coarse legacy region is mapped, so the national-threshold gate remains open. |
 | 7 | **Subscription billing & quota** | Item 12. Paid plan via IAP/RevenueCat; usage quota enforcement. |
 | 8 | **Transactional communication** | Items 1, 3, 14. Consent, security, and progress emails/push. |
 | 9 | **Security, abuse prevention & reliability** | Items 1, 13, 14 + error telemetry. Auth, webhook-fraud escalation, error monitoring. |
@@ -131,7 +131,7 @@ Data subjects: **adult Subscription-administrator/owner** (`isOwner`/`admin`), *
 
 | # | Phase | Operations | Explanation (`file:line`) |
 | --- | --- | --- | --- |
-| 1 | **Sign-up & age/consent gating** | ☒ Collection ☒ Storage | Self-declared 4-digit birth year (`ProfileBasicsStep.tsx:279-291`); server rejects under-13 at parse (`packages/schemas/src/profiles.ts:55-57`); 18+ gate to add a child (`apps/api/src/services/profile.ts:539-574`); consent recorded with IP/UA. **No verified-age/VPC — self-declared only (gap, §risk).** |
+| 1 | **Sign-up & age/consent gating** | ☒ Collection ☒ Storage | Mobile collects a self-declared exact date of birth and identity v2 persists `person.birth_date`; the server rejects under-13. Profile creation does **not** collect a specific EEA country of habitual residence and consent remains location-blind through age 16. **Age assurance is self-declared and the national-threshold gate is absent (gap, §risk).** |
 | 2 | **Authentication** | ☒ Use | Clerk JWT verified on every request (`apps/api/src/middleware/auth.ts:187-273`, `middleware/jwt.ts`); profileId ownership-checked against the account (`middleware/profile-scope.ts:117-223`). |
 | 3 | **Tutoring exchange** | ☒ Collection ☒ Use ☒ Sharing/Transfer | Learner turn → minimised system prompt (`exchange-prompts.ts:576-1115`) → vetted LLM via the router (`services/llm/router.ts`) → reply rendered. Personal data leaving per turn enumerated in §2.3.c. |
 | 4 | **Learning-memory distillation** | ☒ Use ☒ Storage | After a session, the conversation is distilled into mastery/notes/facts/summary (scoped `profileId`); embeddings generated via **Voyage** (`apps/api/src/services/embeddings.ts:81-127`). |
@@ -159,7 +159,7 @@ Data subjects: **adult Subscription-administrator/owner** (`isOwner`/`admin`), *
 
 | # | Code of conduct | Explanation |
 | --- | --- | --- |
-| 1 | **UK Children's Code (Age-Appropriate Design Code)** | ☒ Compliance necessary/beneficial — extraterritorial to UK-accessed children; informs high-privacy defaults, no nudge/streak pressure, child-readable transparency. Not a formally-approved Art 40 code, applied as binding regulatory guidance. |
+| 1 | **UK Children's Code (Age-Appropriate Design Code)** | UK is disabled. The Code is retained only as a non-binding design benchmark for high-privacy defaults, no nudge/streak pressure, and child-readable transparency; any future UK enablement requires a fresh binding-law review. |
 | 2 | No formally-approved GDPR Art 40 code of conduct is adhered to | — |
 
 ---
@@ -189,7 +189,7 @@ Data subjects: **adult Subscription-administrator/owner** (`isOwner`/`admin`), *
 
 | Personal data | Need / relevance | Recipients | Retention | Status / `file:line` |
 | --- | --- | --- | --- | --- |
-| Birth year (not full DOB by default) | Age/consent gating only | Internal | Life of profile | **Minimised** — year-only default (`profiles.ts:74`); full DOB optional. **Birth year is not sent to the LLM** (only a derived age-voice band, `exchange-prompts.ts:54-88`). |
+| Exact date of birth | Age/consent gating only | Internal | Life of person | Persisted as `person.birth_date`; the raw date is not sent to the LLM, which receives only a derived age-voice band. |
 | Learner first name | Personalisation | LLM (adults only) | Life of profile | **Minimised for minors** — name suppressed from LLM payload for non-adults (`exchange-prompts.ts:624-627,721-724`). |
 | Raw transcript (`session_events.content`) | Deliver the conversation | LLM, Voyage | **Hard-deleted 30 days after summary** | **Implemented** purge (`transcript-purge-cron.ts`; cutoff `:41`), gated by `RETENTION_PURGE_ENABLED` (`config.ts:107`, default `false`; **doc-asserted `true` in prod — DPO must confirm Doppler value**). |
 | `retrieval_events` (learner answers, rationale) | Review scheduling | Internal | **37 days, always-on** | **Implemented** unconditional (`retrieval-events-retention-cron.ts:16,30-34`). |
@@ -218,7 +218,7 @@ Data subjects: **adult Subscription-administrator/owner** (`isOwner`/`admin`), *
 | **Fairness** | No dark patterns / no streak-guilt pressure; upsell adult-facing & neutral; children's-code defaults. | Reduces manipulation risk for minors. | ☒ Partially implemented (no-clinical-copy + UX rules live; full children's-code audit pending) |
 | **Transparency** | Privacy policy + ToS (`en.json:1886-1924`); child-readable summary; **but no in-chat "AI" indicator (Art 50 gap)**. | Policy-level disclosure present; point-of-interaction disclosure missing. | ☒ Partially implemented |
 | **Purpose limitation** | Learning memory used for tutoring continuity only; training/marketing fenced off. | Strong contractual + product fence. | ☒ Partially implemented (provider DPAs pending) |
-| **Data minimisation** | LLM egress minimised (band-not-age, name suppressed for minors, consent-gated memory); year-only birth date; opaque IDs to Sentry. | Materially implemented at the highest-volume egress. | ☒ Partially implemented |
+| **Data minimisation** | LLM egress minimised (band-not-age, name suppressed for minors, consent-gated memory); exact DOB retained internally for boundary decisions; opaque IDs to Sentry. | Materially implemented at the highest-volume egress. | ☒ Partially implemented |
 | **Accuracy** | User-correctable profile; revisable mastery. | Adequate for identity attributes; learning records read-only. | ☒ Partially implemented |
 | **Storage limitation** | 30-day transcript purge; 37-day retrieval purge. | Good for transcripts; **gaps**: verbatim quotes survive, no dormancy sweep, NULL retention periods. | ☒ Partially implemented |
 | **Integrity & confidentiality** | Per-profile scoped repository; Clerk JWT auth + ownership checks; TLS; SecureStore; webhook breach escalation. | Strong app-layer model; **RLS parked** (single line of defence). | ☒ Partially implemented |
@@ -250,7 +250,7 @@ Data subjects: **adult Subscription-administrator/owner** (`isOwner`/`admin`), *
 | --- | --- | --- |
 | **Per-profile scoped repository** — `createScopedRepository(profileId)` ANDs `profileId` into every query; empty profileId throws at construction (`packages/database/src/repository.ts:26-54`). | Cross-profile read structurally prevented at app layer. | ☒ Implemented |
 | **Ownership-verified profile scope** — `X-Profile-Id` checked against the account, not trusted (`middleware/profile-scope.ts:117-223`). | No client-supplied identifier trusted. | ☒ Implemented |
-| **High-privacy defaults** — year-only age; memory egress off until consent granted; minor-gated Sentry; minors excluded from Gemini. | Privacy-protective defaults, esp. for children. | ☒ Implemented |
+| **High-privacy defaults** — raw DOB stays internal; memory egress off until consent granted; minor-gated Sentry; minors excluded from Gemini. Specific-country residence and threshold enforcement remain unimplemented. | Privacy-protective defaults, with the country-policy gap tracked separately. | ☒ Partially implemented |
 | **Guardian sees derived data only** — raw transcript never selected in dashboard paths (`dashboard.ts:1381-1383`). | Minimises child-data exposure to guardian. | ☒ Partially implemented (by SELECT-omission convention, not RLS) |
 | **Abuse/crisis-disclosure handling** — when a learner discloses distress/self-harm/abuse, the response is **learner-facing resources only** (empathise + trusted-adult/helpline redirect, never the guardian) plus **operator-alarmed telemetry** (`emitCrisisRedirectEvent`, `services/exchanges.ts`): a reliable server-side log + a structured Sentry operator alarm carrying **metadata-only** (correlation event-id + profileId-scoped pointers — never the disclosure text or raw minor PII). The server takes **no guardian-notification action** (guardian-is-the-abuser failure mode); **mandatory-reporting integration is deferred pending legal counsel**. Ruling se-032 (§6(b)); see `docs/registers/safety-guards/master.md`. | No sensitive disclosure reaches a guardian or a third-party event store; the highest-stakes path is never silent. | ☒ Implemented (WI-1358; guardian-notify ruled out on merits, mandatory-reporting deferred) |
 
@@ -278,7 +278,7 @@ Data subjects: **adult Subscription-administrator/owner** (`isOwner`/`admin`), *
 | 2 | **Persistent child profile** held long-term | Longitudinal learning record retained for teaching continuity | Product design (the "remembers" promise) | Profiling permanence; surveillance feel if over-broad |
 | 3 | **Transfer of a child's data to US AI vendors** | Each turn's transcript leaves the EEA | Cross-border processing; vendor terms | Reduced control / redress over the child's data abroad |
 | 4 | **Verbatim child quotes persist past the purge** | `concept_mastery.learner_quote` / summaries survive 30-day transcript purge | No purge path on those tables | Storage-limitation breach; misleading retention notice |
-| 5 | **Weak age assurance** | Self-declared birth year; under-floor child slips in | No VPC/verified age | Wrong-regime processing of an actual child |
+| 5 | **Weak age/residence assurance** | Self-declared exact DOB plus no specific EEA habitual-residence capture; under-floor child or wrong-country classification | No verified-age method and no national-threshold lookup | Wrong-regime processing of an actual child |
 
 ## 3.2 Necessity
 
@@ -344,7 +344,7 @@ A standard **likelihood × severity** matrix (each 1–4: Low / Medium / High / 
 | R2 | Cross-profile access | #7 (accepted, not a technical mitigation — RLS stays inert) | Low–Med | High | Med–High (unchanged from inherent) | Conditional — formally accepted per `rls-risk-acceptance-memo.md`, tracked remediation trigger |
 | R4 | US-vendor transfer | #1 | Low | High | Low | Yes once DPAs signed |
 | R5/R7 | Quote survival / notice | #3 + #6 | Low | Med | Low | Yes |
-| R6 | Age and residence assurance | Exact date of birth + habitual residence + server allowlist required; fail closed on ambiguity; DPO sets the proportionate assurance method | Med | Med | Med | DPO call |
+| R6 | Age and residence assurance | Exact DOB is collected but remains self-declared; specific EEA habitual residence, national-threshold lookup, and server allowlist are required and must fail closed on ambiguity; DPO sets the proportionate assurance method | Med | Med | Med | DPO call |
 | R8 | I-C1 | v2 live (confirmed) | Low | High | Low | Yes |
 | R9 | Art 50 | #5 | Low | Low–Med | Low | Yes before 2 Aug 2026 |
 

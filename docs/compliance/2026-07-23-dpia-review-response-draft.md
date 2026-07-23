@@ -76,7 +76,7 @@ The following is the current engineering inventory as of the production evidence
 
 | Provider and model | Production role | Route status | Can receive children’s data? |
 |---|---|---|---|
-| Cerebras — `gpt-oss-120b` | Default text route for all tiers and asynchronous deep jobs | **Active primary** | **Yes**, including eligible 13+ learners |
+| Cerebras — `gpt-oss-120b` | Default text route except eligible paid deep-reasoning requests; also used for asynchronous deep jobs | **Active primary outside paid deep-reasoning rungs** | **Yes**, including eligible 13+ learners |
 | Mistral — `mistral-small-2603` | Free-tier text fallback and free vision/OCR | **Active primary for free vision; active fallback for text** | **Yes** |
 | OpenAI — `gpt-5-mini` | Paid vision/OCR and paid/free text fallback | **Active primary for paid vision; active fallback for text** | **Yes** |
 | OpenAI — `gpt-5.4` | Plus/Pro/add-on deep reasoning at routing rungs 4–5 | **Active primary for eligible deep-reasoning calls** | **Yes**, for eligible 13+ paid learners |
