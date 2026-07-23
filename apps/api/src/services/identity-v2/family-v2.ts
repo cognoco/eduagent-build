@@ -182,6 +182,7 @@ export async function getChildConsentForParentV2(
     const grant = await db.query.consentGrant.findFirst({
       where: and(
         eq(consentGrant.chargePersonId, childPersonId),
+        eq(consentGrant.organizationId, organizationId),
         inArray(consentGrant.purpose, [...CONSENT_PURPOSES]),
         eq(consentGrant.lawfulBasis, GDPR_BASIS),
       ),

@@ -768,17 +768,28 @@ export async function resolveConsentSetStatusesForBasis(
     string,
     { status: ConsentStatus; withdrawnAt: Date | null }
   >();
-  await Promise.all(
-    chargePersonIds.map(async (personId) => {
-      const row = await resolveConsentSetStatusAndWithdrawnAt(
-        db,
-        personId,
-        organizationId,
-        basis,
-      );
-      if (row !== null) result.set(personId, row);
-    }),
+  if (chargePersonIds.length === 0) return result;
+
+  const rowsByPurpose = await Promise.all(
+    CONSENT_PURPOSES.map((purpose) =>
+      fetchConsentBasisRows(db, chargePersonIds, organizationId, purpose),
+    ),
   );
+  for (const personId of chargePersonIds) {
+    const reduction = reduceConsentPurposeSet(
+      rowsByPurpose.map((rows) =>
+        reduceBasisFromRows(
+          rows.get(basisRowKey(personId, basis)) ?? EMPTY_BASIS_ROWS,
+        ),
+      ),
+    );
+    if (reduction.status !== null) {
+      result.set(personId, {
+        status: reduction.status,
+        withdrawnAt: reduction.withdrawnAt,
+      });
+    }
+  }
   return result;
 }
 

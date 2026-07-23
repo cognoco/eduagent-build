@@ -108,3 +108,21 @@ Resume only after the deterministic Cosmo CLI can reach Notion REST; rerun fetch
   mentor-notice status change. The regenerated SQL remains the same
   metadata-only `DROP DEFAULT`, while snapshot 0152 now incorporates both the
   landed mentor-notice schema and this consent schema change.
+
+## 2026-07-23 — final review-thread audit
+
+- Triaged every CodeRabbit comment under the receiving-review protocol.
+- Fixed all five valid findings: stale handoff, invalid rollback cast,
+  basis-explicit batch fan-out, child-detail cross-org timestamp lookup, and
+  guard coverage of `llm_disclosure` proxies.
+- Focused tests were red before their production fixes: guard/rollback had six
+  failures and the real-pool batch counter observed 24 queries versus the fixed
+  bound of 4. Temporarily reverting the cross-org predicate returned the newer
+  foreign timestamp; restoring it returned the in-org timestamp.
+- Green evidence: consent-purpose guard 17/17 plus clean production scan;
+  complete `consent-status-v2` + `consent-v2` real-database suites 98/98.
+- The session-exchange review-body suggestion is dispositioned as invalid:
+  its unit test proves entry-point ordering through real production functions,
+  while persistence and aggregate semantics are covered by real DB suites.
+- Pending: repeat named gates, commit/push, review-thread replies/resolution,
+  and strict-green/CLEAN PR revalidation. Do not merge or run `complete`.

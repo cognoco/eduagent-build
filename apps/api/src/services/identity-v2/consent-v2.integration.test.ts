@@ -72,6 +72,7 @@ import {
 } from './deletion-v2';
 import {
   familyV2ChildReadProof,
+  getChildConsentForParentV2,
   getChildGdprConsentStatusV2,
   getChildrenGdprConsentStatusesV2,
 } from './family-v2';
@@ -1941,6 +1942,44 @@ const COPPA = 'coppa_parental_consent';
           proof,
         );
         expect(batch.get(childId)?.status).toBe('CONSENTED');
+      });
+
+      it('[WI-2386 SECURITY] child detail respondedAt ignores a newer grant from another organization', async () => {
+        const orgId = await seedOrg();
+        const foreignOrgId = await seedOrg();
+        const guardianId = await seedPerson(orgId, {
+          roles: ['admin', 'learner'],
+          displayName: 'Guardian',
+        });
+        const childId = await seedPerson(orgId);
+        await seedGuardianEdge(guardianId, childId);
+        const inOrgGrantedAt = new Date('2026-01-01T00:00:00.000Z');
+        await db.insert(consentGrant).values(
+          CONSENT_PURPOSES.map((purpose) => ({
+            chargePersonId: childId,
+            organizationId: orgId,
+            purpose,
+            lawfulBasis: GDPR,
+            granted: true,
+            grantedAt: inOrgGrantedAt,
+          })),
+        );
+        await db.insert(consentGrant).values({
+          chargePersonId: childId,
+          organizationId: foreignOrgId,
+          purpose: 'llm_disclosure',
+          lawfulBasis: GDPR,
+          granted: true,
+          grantedAt: new Date('2026-02-01T00:00:00.000Z'),
+        });
+
+        await expect(
+          getChildConsentForParentV2(db, childId, guardianId),
+        ).resolves.toEqual({
+          status: 'CONSENTED',
+          respondedAt: inOrgGrantedAt.toISOString(),
+          consentType: 'GDPR',
+        });
       });
     });
 

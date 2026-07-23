@@ -23,6 +23,7 @@ import {
   consentedExistsSql,
   getConsentAccountabilityV2,
   resolveConsentSetStatus,
+  resolveConsentSetStatusesForBasis,
   resolveLatestConsentSetStatusAnyBasis,
   resolveLatestConsentSetStatusesAnyBasis,
   resolveConsentStatus,
@@ -206,6 +207,51 @@ const COPPA = 'coppa_parental_consent';
       );
       expect(statuses.get(personId)).toBe('CONSENTED');
       expect(statuses.get(incompleteId)).toBe('PENDING');
+    });
+
+    it('[WI-2386] basis-explicit purpose-set batch uses four round trips independent of family size', async () => {
+      const { personId: firstId, orgId } = await seedPersonOrg();
+      const ids = [firstId];
+      for (let i = 0; i < 3; i++) ids.push(await seedPersonInOrg());
+      await db.insert(consentGrant).values(
+        ids.flatMap((chargePersonId) =>
+          CONSENT_PURPOSES.map((purpose) => ({
+            chargePersonId,
+            organizationId: orgId,
+            purpose,
+            lawfulBasis: GDPR,
+            granted: true,
+          })),
+        ),
+      );
+
+      const client = (db as unknown as { $client: { query: unknown } }).$client;
+      const original = client.query.bind(client) as (
+        ...args: unknown[]
+      ) => unknown;
+      let roundTrips = 0;
+      (client as { query: unknown }).query = (...args: unknown[]) => {
+        roundTrips++;
+        return original(...args);
+      };
+
+      let resolved: Map<string, { status: string }>;
+      try {
+        resolved = (await resolveConsentSetStatusesForBasis(
+          db,
+          ids,
+          orgId,
+          GDPR,
+        )) as Map<string, { status: string }>;
+      } finally {
+        (client as { query: unknown }).query = original;
+      }
+
+      expect(roundTrips).toBeLessThanOrEqual(CONSENT_PURPOSES.length * 2);
+      expect(resolved.size).toBe(ids.length);
+      for (const personId of ids) {
+        expect(resolved.get(personId)?.status).toBe('CONSENTED');
+      }
     });
 
     it('PENDING / PARENTAL_CONSENT_REQUESTED map from request status', async () => {

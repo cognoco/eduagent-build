@@ -21,6 +21,7 @@ const HISTORICAL_MIGRATION_ALLOWLIST = new Set([
   'apps/api/drizzle/0114_identity_cutover_homes.sql',
   'apps/api/drizzle/0115_identity_cutover_reseed.sql',
 ]);
+const CONSENT_PURPOSE_LITERALS = new Set(['platform_use', 'llm_disclosure']);
 
 export type ConsentPurposeGuardRule =
   | 'default-purpose-identifier'
@@ -77,7 +78,7 @@ export function analyzeSource(
   }
 
   for (const literal of source.getDescendantsOfKind(SyntaxKind.StringLiteral)) {
-    if (literal.getLiteralText() !== 'platform_use') continue;
+    if (!CONSENT_PURPOSE_LITERALS.has(literal.getLiteralText())) continue;
     if (isCanonicalPurposeDeclaration(file, literal)) continue;
 
     const property = literal.getFirstAncestorByKind(
@@ -112,7 +113,12 @@ export function analyzeSource(
   )) {
     if (tagged.getTag().getText() !== 'sql') continue;
     const template = tagged.getTemplate().getText();
-    if (template.includes('platform_use') && /\bpurpose\b/.test(template)) {
+    if (
+      [...CONSENT_PURPOSE_LITERALS].some((purpose) =>
+        template.includes(purpose),
+      ) &&
+      /\bpurpose\b/.test(template)
+    ) {
       add(tagged, 'literal-purpose-selector');
     }
   }
@@ -144,14 +150,18 @@ export function collectConsentPurposeViolations(): ConsentPurposeViolation[] {
     if (!entry.endsWith('.sql')) continue;
     const file = `apps/api/drizzle/${entry}`;
     const content = fs.readFileSync(path.join(migrationDir, entry), 'utf8');
+    const purposeIndex = Math.min(
+      ...[...CONSENT_PURPOSE_LITERALS]
+        .map((purpose) => content.indexOf(purpose))
+        .filter((index) => index >= 0),
+    );
     if (
-      content.includes('platform_use') &&
+      purposeIndex !== Infinity &&
       !HISTORICAL_MIGRATION_ALLOWLIST.has(file)
     ) {
       violations.push({
         file,
-        line: content.slice(0, content.indexOf('platform_use')).split('\n')
-          .length,
+        line: content.slice(0, purposeIndex).split('\n').length,
         rule: 'unallowlisted-historical-purpose-sql',
       });
     }

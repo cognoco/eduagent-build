@@ -18,7 +18,7 @@ unchanged.
 
 ```sql
 ALTER TABLE "consent_request"
-  ALTER COLUMN "purpose" SET DEFAULT 'platform_use'::"consent_purpose";
+  ALTER COLUMN "purpose" SET DEFAULT 'platform_use';
 ```
 
 **Side effects on rollback:**

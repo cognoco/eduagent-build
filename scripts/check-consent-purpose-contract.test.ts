@@ -42,6 +42,36 @@ describe('consent purpose contract guard [WI-2386]', () => {
       `function read(purpose: ConsentPurpose = 'platform_use') { return purpose; }`,
       'defaulted-purpose-parameter',
     ],
+    [
+      'llm-disclosure whole-consent selector',
+      `eq(consentGrant.purpose, 'llm_disclosure')`,
+      'literal-purpose-selector',
+    ],
+    [
+      'llm-disclosure inArray whole-consent selector',
+      `inArray(consentGrant.purpose, ['llm_disclosure'])`,
+      'literal-purpose-selector',
+    ],
+    [
+      'llm-disclosure SQL whole-consent selector',
+      "sql`consent_grant.purpose = 'llm_disclosure'`",
+      'literal-purpose-selector',
+    ],
+    [
+      'llm-disclosure purpose write',
+      `db.insert(consentGrant).values({ purpose: 'llm_disclosure' })`,
+      'literal-purpose-write',
+    ],
+    [
+      'llm-disclosure implicit database default',
+      `purpose: text('purpose').notNull().default('llm_disclosure')`,
+      'implicit-database-purpose-default',
+    ],
+    [
+      'llm-disclosure defaulted purpose argument',
+      `function read(purpose: ConsentPurpose = 'llm_disclosure') { return purpose; }`,
+      'defaulted-purpose-parameter',
+    ],
   ])('rejects %s', (_name, source, rule) => {
     expect(analyzeSource('apps/api/src/example.ts', source)).toEqual(
       expect.arrayContaining([expect.objectContaining({ rule })]),
@@ -72,5 +102,19 @@ describe('consent purpose contract guard [WI-2386]', () => {
     expect(migration).toBe(
       'ALTER TABLE "consent_request" ALTER COLUMN "purpose" DROP DEFAULT;',
     );
+  });
+
+  it('documents a valid text-column rollback without a nonexistent enum cast', () => {
+    const rollback = readFileSync(
+      resolve(
+        __dirname,
+        '../apps/api/drizzle/0152_wi2386_consent_purpose_required.rollback.md',
+      ),
+      'utf8',
+    );
+    expect(rollback).toContain(
+      `ALTER COLUMN "purpose" SET DEFAULT 'platform_use';`,
+    );
+    expect(rollback).not.toContain(`::"consent_purpose"`);
   });
 });

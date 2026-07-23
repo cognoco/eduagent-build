@@ -58,3 +58,30 @@ passes afterward (21/21 reminder tests). API lint, API typecheck, and the
 consent-purpose contract guard also pass. The review's two **CONSIDER** items
 were documentation suggestions for already-tested invariants, not correctness
 findings; no production behavior changed for them.
+
+## Draft-PR CodeRabbit follow-up
+
+A final thread audit found five valid comments despite a green review status:
+
+- Replaced the stale pre-claim executor handoff with the current claimed,
+  implemented, draft-PR state.
+- Corrected migration 0152's rollback SQL for the actual text column and added
+  an executable rollback-contract assertion.
+- Replaced the basis-explicit family dashboard's per-person fan-out with four
+  set-based queries (grant + request for each canonical purpose). A pass-through
+  real-pool counter failed at 24 round trips before the fix and passes at 4.
+- Added the missing organization predicate to the child-detail grant timestamp
+  read. A real-DB regression with a newer foreign-org grant fails without the
+  predicate and now returns only the in-org timestamp.
+- Extended the AST and migration guard from `platform_use` alone to both
+  canonical purpose literals. The six new negative samples and rollback check
+  failed before the fixes; the complete guard now passes 17/17 and the
+  production scan is clean.
+
+The review-body request to replace the session-exchange ordering test with a
+database integration was not accepted as a valid defect. That test deliberately
+runs the real `processMessage` and `streamMessage` entry points against a
+controlled query seam to prove the consent gate precedes session lookup and LLM
+dispatch. The complete-set persistence/reducer semantics it consumes are
+separately exercised by the real database suites; those suites pass 98/98 after
+the follow-up fixes.

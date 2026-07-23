@@ -29,3 +29,34 @@ full gates verify that none of the mutations remains.
 - RED: 1 failed with `ConsentRecordNotFoundError` at the full-set row-count
   assertion; the transaction rolled back.
 - Revert + GREEN: 1 passed, 70 skipped.
+
+## Review follow-up — canonical guard and rollback contract
+
+- Added six `llm_disclosure` forbidden-proxy samples and the rollback SQL
+  contract before changing the guard or sidecar.
+- Command: `pnpm check:consent-purpose-contract`
+- RED: 6 failed, 11 passed (five ignored `llm_disclosure` proxy forms plus the
+  invalid enum-cast rollback).
+- GREEN: 17/17 passed and the production-tree scan reported
+  `consent-purpose-contract: clean`.
+
+## Review follow-up — basis-explicit family batch
+
+- Added a pass-through counter on the real database pool for a four-child,
+  complete-purpose-set family before replacing the per-person fan-out.
+- Command: focused `consent-status-v2.integration.test.ts` run matching
+  `basis-explicit purpose-set batch`.
+- RED: observed 24 round trips; expected at most 4.
+- GREEN: 1/1 passed at 4 round trips. The complete reducer + state-machine
+  integration run subsequently passed 98/98.
+
+## Review follow-up — child-detail organization isolation
+
+- Mutation: temporarily removed the new
+  `consentGrant.organizationId = organizationId` predicate from the latest-grant
+  lookup.
+- Command: focused `consent-v2.integration.test.ts` run matching
+  `child detail respondedAt ignores`.
+- RED: expected the in-org `2026-01-01` timestamp, received the newer foreign-org
+  `2026-02-01` timestamp.
+- Revert + GREEN: 1/1 passed; `git diff --check` remained clean.
