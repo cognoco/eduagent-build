@@ -66,6 +66,7 @@ tags:
       id: 'parent-home-family-summary'
     direction: DOWN
     timeout: 10000
+    centerElement: true
 
 - assertVisible:
     id: 'parent-home-family-summary'

@@ -4782,6 +4782,25 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(prematureSummaryAssert).toBe(-1);
   });
 
+  it('[WI-1655] centers the multi-child family summary before asserting it', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/parent/multi-child-dashboard.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        centerElement?: boolean;
+      };
+    }>;
+    const summaryScroll = commands.find(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id === 'parent-home-family-summary',
+    )?.scrollUntilVisible;
+
+    expect(summaryScroll?.centerElement).toBe(true);
+  });
+
   it('[WI-1864] returns from every multi-child detail through the route-aware app back control', () => {
     const source = readFileSync(
       join(repoRoot, 'apps/mobile/e2e/flows/parent/multi-child-dashboard.yaml'),
