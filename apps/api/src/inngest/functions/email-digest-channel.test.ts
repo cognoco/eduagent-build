@@ -694,6 +694,7 @@ describe('Email digest channel — weekly', () => {
     //             send-push(A=CONSENTED), send-email(A=CONSENTED).
     seedConsentState(db as unknown as Record<string, unknown>, {
       state: ['CONSENTED', 'WITHDRAWN', 'CONSENTED', 'CONSENTED'],
+      purposesPerState: 2,
     });
 
     const result = (await executeWeeklyGenerate(PARENT_ID, db)) as {

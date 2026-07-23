@@ -256,6 +256,13 @@ jobs:
         if: github.event_name == 'push' || (github.event_name == 'pull_request' && steps.scope.outputs.no_gemini_runtime == 'true')
         run: pnpm run check:no-gemini-runtime
 
+      # WI-2386: guardian/non-adult whole-consent paths consume the canonical
+      # typed purpose set. Historical migration literals are narrowly
+      # allowlisted inside the executable guard.
+      - name: Consent purpose-set contract guard (WI-2386)
+        if: steps.scope.outputs.docs_only != 'true'
+        run: pnpm run check:consent-purpose-contract
+
       # [R9 / WI-1304 / WS-37 M1 "Seam Hardening"] Forward-only ratchet:
       # pins the build-time MODE_NAV_V0/V1/V2 flag triple in
       # apps/mobile/eas.json + .github/workflows/ci.yml to the 3 sanctioned

@@ -158,7 +158,10 @@ export function NudgeActionSheet({
         </View>
 
         {errorCopy ? (
-          <View className="rounded-card bg-danger-soft px-4 py-3 mt-3">
+          <View
+            className="rounded-card bg-danger-soft px-4 py-3 mt-3"
+            testID={`nudge-inline-error-${inlineError}`}
+          >
             <Text className="text-body-sm font-semibold text-danger">
               {errorCopy}
             </Text>

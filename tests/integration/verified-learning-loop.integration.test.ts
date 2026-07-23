@@ -53,6 +53,7 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import { deleteV2IdentitiesForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { finalizeChallengeRoundIfReady } from '../../apps/api/src/services/session/session-exchange';
 import { mapSessionRow } from '../../apps/api/src/services/session/session-events';
@@ -168,14 +169,16 @@ async function seedConsented(
   profileId: string,
   orgId: string,
 ): Promise<void> {
-  await db.insert(consentGrant).values({
-    chargePersonId: profileId,
-    organizationId: orgId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-    grantedAt: new Date(),
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      chargePersonId: profileId,
+      organizationId: orgId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent' as const,
+      granted: true,
+      grantedAt: new Date(),
+    })),
+  );
 }
 
 async function seedCurriculumTopic(

@@ -235,15 +235,20 @@ jobs:
       NX_DAEMON: false
       NX_ISOLATE_PLUGINS: false
       EXPO_PUBLIC_E2E: 'true'
-      # V2 is a build-time flag. Keep the existing PR/nightly APKs on their
-      # established V0/V1 posture; only the explicit publish-readiness suite
-      # bakes the Mentor/Subjects/Journal shell into the JS bundle.
+      # Match the preview APK's established V0/V1 navigation posture. These
+      # flags are inlined at bundle time and several native family flows depend
+      # on the V1 capability contract rather than the flags-off legacy shell.
+      EXPO_PUBLIC_ENABLE_MODE_NAV: 'true'
+      EXPO_PUBLIC_ENABLE_MODE_NAV_V1: 'true'
+      # V2 remains exclusive to the explicit publish-readiness suite.
       EXPO_PUBLIC_ENABLE_MODE_NAV_V2: ${{ github.event_name == 'workflow_dispatch' && inputs.maestro_suite == 'v2' && 'true' || 'false' }}
       EXPO_PUBLIC_API_URL: http://10.0.2.2:8787
       SENTRY_DISABLE_AUTO_UPLOAD: 'true'
       # Expo inlines EXPO_PUBLIC_* vars at JS bundle time.
       # Clerk publishable key is needed for auth screens to render.
       EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY_PREVIEW }}
+      # Public custom-provider slug used by the strict Android SSO render flow.
+      EXPO_PUBLIC_CLERK_OPENAI_SSO_SLUG: openai
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
@@ -334,9 +339,18 @@ jobs:
           fi
           doppler run -p mentomate -c stg --preserve-env=DATABASE_URL --command "
             umask 077
-            printf 'DATABASE_URL=%s\nNODE_ENV=test\nTEST_SEED_SECRET=%s\nCLERK_SECRET_KEY=%s\nCLERK_JWKS_URL=%s\nCLERK_AUDIENCE=%s\nSEED_PASSWORD=%s\n' \
+            # The hosted worker pre-registers its deterministic provider before
+            # the first request. Keep provider keys absent: llmMiddleware accepts
+            # that registry, while any key here would overwrite the fixture.
+            # Session close/summary paths use a CORE Inngest dispatch. Give the
+            # local Worker the staging outbound key so those user actions keep
+            # their production fail-closed contract during native E2E.
+            # Consent action links must point back to the emulator-reachable
+            # runner Worker; this origin is public configuration, not a secret.
+            printf 'DATABASE_URL=%s\nNODE_ENV=test\nTEST_SEED_SECRET=%s\nCLERK_SECRET_KEY=%s\nCLERK_JWKS_URL=%s\nCLERK_AUDIENCE=%s\nSEED_PASSWORD=%s\nINNGEST_EVENT_KEY=%s\nAPI_ORIGIN=http://10.0.2.2:8787\n' \
               \"\$DATABASE_URL\" \"\$TEST_SEED_SECRET\" \"\$CLERK_SECRET_KEY\" \
               \"\$CLERK_JWKS_URL\" \"\$CLERK_AUDIENCE\" \"\$SEED_PASSWORD\" \
+              \"\$INNGEST_EVENT_KEY\" \
               > apps/api/.dev.vars
           "
         env:
@@ -344,16 +358,8 @@ jobs:
 
       # Start API server in background (NODE_ENV=test enables __test/* routes)
       - name: Start API server (background)
-        env:
-          # V2 is selectable only by workflow_dispatch; schedule selects nightly
-          # and every other trusted trigger selects pr in MAESTRO_CI_SUITE below.
-          USE_MAESTRO_V2_FIXTURE: ${{ github.event_name == 'workflow_dispatch' && inputs.maestro_suite == 'v2' }}
         run: |
-          if [ "$USE_MAESTRO_V2_FIXTURE" = "true" ]; then
-            pnpm --dir apps/api exec wrangler dev src/test-utils/maestro-e2e-worker.ts &
-          else
-            pnpm --dir apps/api exec wrangler dev &
-          fi
+          pnpm --dir apps/api exec wrangler dev src/test-utils/maestro-e2e-worker.ts &
           echo "Waiting for API server..."
           for i in $(seq 1 30); do
             if curl -sf http://localhost:8787/v1/health > /dev/null 2>&1; then
@@ -536,8 +542,16 @@ jobs:
           MAESTRO_CI_SHARD: ${{ matrix.shard }}
           E2E_SEED_SLOT: native-0${{ matrix.shard }}
 
-      - name: Upload Maestro artifacts
+      - name: Sanitize Maestro artifacts
         if: always()
+        id: sanitize_maestro_artifacts
+        run: |
+          if [ -d maestro-screenshots ]; then
+            node apps/mobile/e2e/scripts/redact-maestro-artifacts.mjs maestro-screenshots
+          fi
+
+      - name: Upload Maestro artifacts
+        if: always() && steps.sanitize_maestro_artifacts.outcome == 'success'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: maestro-results-${{ matrix.shard }}

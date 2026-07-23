@@ -30,9 +30,8 @@ import type {
 } from '@eduagent/schemas';
 import type { ProfileMeta } from '../../middleware/profile-scope';
 import {
-  resolveLatestConsentStatusAnyBasis,
-  resolveLatestConsentStatusesAnyBasis,
-  DEFAULT_CONSENT_PURPOSE,
+  resolveLatestConsentSetStatusAnyBasis,
+  resolveLatestConsentSetStatusesAnyBasis,
 } from './consent-status-v2';
 
 /**
@@ -159,11 +158,10 @@ export async function findOwnerPersonScope(
   const owner = ownerRow[0];
   if (!owner) return null;
 
-  const consentStatus = await resolveLatestConsentStatusAnyBasis(
+  const consentStatus = await resolveLatestConsentSetStatusAnyBasis(
     db,
     owner.personId,
     organizationId,
-    DEFAULT_CONSENT_PURPOSE,
   );
 
   return {
@@ -222,11 +220,10 @@ export async function getOwnerProfileV2(
   const owner = ownerRow[0];
   if (!owner) return null;
 
-  const consentStatus = await resolveLatestConsentStatusAnyBasis(
+  const consentStatus = await resolveLatestConsentSetStatusAnyBasis(
     db,
     owner.personId,
     organizationId,
-    DEFAULT_CONSENT_PURPOSE,
   );
   const { birthMonth, birthDay } = birthMonthDayFromDate(owner.birthDate);
 
@@ -329,11 +326,10 @@ export async function getProfileV2(
     ? null
     : (chargeEdge?.grantedAt.toISOString() ?? null);
 
-  const consentStatus = await resolveLatestConsentStatusAnyBasis(
+  const consentStatus = await resolveLatestConsentSetStatusAnyBasis(
     db,
     profileId,
     organizationId,
-    DEFAULT_CONSENT_PURPOSE,
   );
   const { birthMonth, birthDay } = birthMonthDayFromDate(row.birthDate);
 
@@ -394,11 +390,10 @@ export async function getPersonScope(
   const found = row[0];
   if (!found) return null;
 
-  const consentStatus = await resolveLatestConsentStatusAnyBasis(
+  const consentStatus = await resolveLatestConsentSetStatusAnyBasis(
     db,
     found.personId,
     organizationId,
-    DEFAULT_CONSENT_PURPOSE,
   );
 
   return {
@@ -525,11 +520,10 @@ export async function listProfilesV2(
 
   // Batched consent status (the L7-F1 batch replacement; behavior-preserving
   // latest-any-basis read). Persons with no consent rows are absent → null.
-  const consentByPersonId = await resolveLatestConsentStatusesAnyBasis(
+  const consentByPersonId = await resolveLatestConsentSetStatusesAnyBasis(
     db,
     personIds,
     organizationId,
-    DEFAULT_CONSENT_PURPOSE,
   );
 
   return rows.map((row) => {

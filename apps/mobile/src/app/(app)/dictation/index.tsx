@@ -1,21 +1,45 @@
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import {
+  BackHandler,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, type Href } from 'expo-router';
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+  type Href,
+} from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { IntentCard } from '../../../components/home/IntentCard';
-import { goBackOrReplace, PRACTICE_HREF } from '../../../lib/navigation';
+import {
+  goBackOrReplace,
+  PRACTICE_HREF,
+  PRACTICE_RETURN_TO,
+} from '../../../lib/navigation';
 import { useGenerateDictation } from '../../../hooks/use-dictation-api';
 import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
 import { useDictationData } from './_layout';
 import { formatApiError } from '../../../lib/format-api-error';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import * as Crypto from 'expo-crypto';
 
 export default function DictationChoiceScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
+  const { returnTo, practiceReturnTo } = useLocalSearchParams<{
+    returnTo?: string | string[];
+    practiceReturnTo?: string | string[];
+  }>();
+  const returnToken = Array.isArray(returnTo) ? returnTo[0] : returnTo;
+  const practiceReturnToken = Array.isArray(practiceReturnTo)
+    ? practiceReturnTo[0]
+    : practiceReturnTo;
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const generateMutation = useGenerateDictation();
@@ -29,6 +53,51 @@ export default function DictationChoiceScreen(): React.ReactElement {
   // the mutation is in flight. Prevents late-arriving response from pushing to
   // the playback screen after the user has already navigated away.
   const generateCancelledRef = useRef(false);
+
+  const returnToPractice = useCallback(() => {
+    // Practice and Dictation are sibling tabs. navigate emits the tab-supported
+    // NAVIGATE action and retains the existing Practice route key/nested state;
+    // dismissTo emits POP_TO and is unhandled by this navigator. Reapply the
+    // upstream destination explicitly because a path navigation replaces params.
+    if (practiceReturnToken) {
+      router.navigate({
+        pathname: PRACTICE_HREF,
+        params: { returnTo: practiceReturnToken },
+      } as Href);
+      return;
+    }
+    router.navigate(PRACTICE_HREF as Href);
+  }, [practiceReturnToken, router]);
+
+  const handleBack = useCallback(() => {
+    generateCancelledRef.current = true; // [BUG-692]
+    if (returnToken === PRACTICE_RETURN_TO) {
+      returnToPractice();
+      return;
+    }
+    goBackOrReplace(router, PRACTICE_HREF as Href);
+  }, [returnToPractice, returnToken, router]);
+
+  // The native stack produced by the Practice → Dictation cross-tab push can
+  // otherwise send Android hardware Back to Home. Scope this listener to the
+  // focused choice screen so nested Dictation routes retain their own back
+  // behavior.
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS === 'web' || returnToken !== PRACTICE_RETURN_TO) {
+        return undefined;
+      }
+
+      const subscription = BackHandler.addEventListener(
+        'hardwareBackPress',
+        () => {
+          handleBack();
+          return true;
+        },
+      );
+      return () => subscription.remove();
+    }, [handleBack, returnToken]),
+  );
 
   // Start/clear 20s timeout whenever the pending state changes
   useEffect(() => {
@@ -118,10 +187,7 @@ export default function DictationChoiceScreen(): React.ReactElement {
     >
       <View className="flex-row items-center mb-6">
         <Pressable
-          onPress={() => {
-            generateCancelledRef.current = true; // [BUG-692]
-            goBackOrReplace(router, PRACTICE_HREF as Href);
-          }}
+          onPress={handleBack}
           className="mr-3 min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('common.goBack')}

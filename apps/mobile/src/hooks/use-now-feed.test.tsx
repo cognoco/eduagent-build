@@ -1,9 +1,13 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { NowOverflowResponse, NowResponse } from '@eduagent/schemas';
+import {
+  ApiResponseShapeError,
+  type NowOverflowResponse,
+  type NowResponse,
+} from '@eduagent/schemas';
 
 import { createHookWrapper } from '../test-utils/app-hook-test-utils';
-import { setActiveProfileId } from '../lib/api-client';
+import { NetworkError, setActiveProfileId } from '../lib/api-client';
 import { buildNowFeedCacheKey, readCachedNowFeed } from '../lib/now-feed-cache';
 
 import {
@@ -368,6 +372,24 @@ describe('useNowFeed + useNowOverflow — shared observed epoch across concurren
     });
   }
 
+  function noticeNowResponse(epoch: string): NowResponse {
+    return feed({
+      cards: [
+        {
+          kind: 'mentor_notice',
+          templateKey: 'now.mentor_notice.default',
+          params: {
+            noticeId: '33333333-3333-4333-8333-333333333333',
+            concept: 'sign flip',
+          },
+          deepLink: { route: 'notice.recheck', params: {}, chain: [] },
+          scope: 'self',
+        },
+      ] as NowResponse['cards'],
+      mentorNoticePolicyEpoch: epoch,
+    });
+  }
+
   beforeEach(async () => {
     originalFetch = globalThis.fetch;
     setActiveProfileId(CACHE_BINDING.profileId);
@@ -446,6 +468,215 @@ describe('useNowFeed + useNowOverflow — shared observed epoch across concurren
     );
 
     queryClient.clear();
+  });
+
+  // [WI-2504 bounce 2] `useNowFeed` only ever observes epoch changes from ITS
+  // OWN fetch (the sole writer of the shared observation — see
+  // `useObservedPolicyEpoch` above), so the leak this reproduces is a
+  // SECOND fetch of an ALREADY-SETTLED query that observes a new epoch: the
+  // settled query keeps its OLD (notice-bearing) `data` visible while that
+  // very fetch is in flight (ordinary React Query refetch behavior) — and
+  // when it resolves, `observe()` fires and re-keys the query BEFORE this
+  // fetch's own new (non-notice) data commits to the OLD key. The freshly
+  // mounted re-keyed query has no data of its own yet, so
+  // `placeholderData: keepPreviousData` would paint the OLD key's
+  // still-notice-bearing `data` for the whole window the re-keyed query's
+  // own fetch is pending, even though nothing has told the client the
+  // notice is still valid under the new (disabled) epoch.
+  it("does not expose a stale ENABLED-epoch notice card while the re-keyed query's own fetch is pending after a later same-hook fetch observes a disabled epoch", async () => {
+    let nowCallCount = 0;
+    let resolveFourthCall: (() => void) | undefined;
+    globalThis.fetch = jest.fn(async () => {
+      nowCallCount += 1;
+      if (nowCallCount === 1 || nowCallCount === 2) {
+        // Call 1 (bootstrap key) observes ENABLED_EPOCH and re-keys to it;
+        // call 2 (now under the ENABLED_EPOCH key) settles that query with
+        // notice-bearing data — this is the warm, stable state before
+        // anything observes a disable.
+        return new Response(JSON.stringify(noticeNowResponse(ENABLED_EPOCH)), {
+          status: 200,
+        });
+      }
+      if (nowCallCount === 3) {
+        // A later refetch of the SAME (still ENABLED_EPOCH-keyed) query
+        // that now observes the disabled epoch and re-keys again.
+        return new Response(
+          JSON.stringify({
+            ...feed(),
+            mentorNoticePolicyEpoch: DISABLED_EPOCH,
+          }),
+          { status: 200 },
+        );
+      }
+      // The re-keyed (DISABLED_EPOCH) query's own fetch. Held pending so
+      // the assertion below runs during the exact window a leaking
+      // placeholder would expose the ENABLED_EPOCH key's stale notice card.
+      return new Promise<Response>((resolve) => {
+        resolveFourthCall = () =>
+          resolve(new Response(JSON.stringify(feed()), { status: 200 }));
+      });
+    }) as unknown as typeof globalThis.fetch;
+
+    const { queryClient, wrapper } = createHookWrapper();
+    const nowFeedHook = renderHook(() => useNowFeed(), { wrapper });
+
+    // The warm, settled state: 2 calls in, notice-bearing, under ENABLED_EPOCH.
+    await waitFor(() =>
+      expect(nowFeedHook.result.current.isSuccess).toBe(true),
+    );
+    expect(nowCallCount).toBe(2);
+    expect(nowFeedHook.result.current.data?.cards.map((c) => c.kind)).toEqual([
+      'mentor_notice',
+    ]);
+
+    // Force the 3rd fetch — the one that observes the disabled epoch.
+    act(() => {
+      void nowFeedHook.result.current.refetch();
+    });
+    await waitFor(() => expect(nowCallCount).toBe(4));
+
+    // Consumer-visible outcome: while the re-keyed (DISABLED_EPOCH) query's
+    // own fetch is pending, the hook must not still paint the notice card
+    // from the now-superseded ENABLED_EPOCH key.
+    expect(
+      nowFeedHook.result.current.data?.cards.some(
+        (c) => c.kind === 'mentor_notice',
+      ),
+    ).not.toBe(true);
+
+    resolveFourthCall?.();
+    await waitFor(() =>
+      expect(nowFeedHook.result.current.isSuccess).toBe(true),
+    );
+
+    queryClient.clear();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2504 bounce 2] The `placeholderData` epoch gate above (Finding 1) makes
+// `query.data` come back undefined immediately after a re-key — but the
+// slow-fallback effect's OTHER piece of exposed state, `fallbackFeed`, was
+// never epoch-gated. If a fallback had already been populated from an OLDER
+// epoch's cache entry, `data ?? fallbackFeed` (the pattern every consumer
+// uses — see mentor.tsx's `useTransitionBoundFeed`) would keep exposing that
+// stale, possibly notice-bearing feed for the whole window until — or
+// unless — the re-keyed query's own cache read lands.
+// ---------------------------------------------------------------------------
+describe('useNowFeed — fallbackFeed must not survive an epoch re-key', () => {
+  const DISABLED_EPOCH = 'notice-policy-v1:off';
+
+  let originalFetch: typeof globalThis.fetch;
+
+  function noticeFallback(): NowResponse {
+    return feed({
+      generatedAt: '2999-06-14T07:59:00.000Z',
+      cards: [
+        {
+          kind: 'mentor_notice',
+          templateKey: 'now.mentor_notice.default',
+          params: {
+            noticeId: '44444444-4444-4444-8444-444444444444',
+            concept: 'sign flip',
+          },
+          deepLink: { route: 'notice.recheck', params: {}, chain: [] },
+          scope: 'self',
+        },
+      ] as NowResponse['cards'],
+    });
+  }
+
+  beforeEach(async () => {
+    originalFetch = globalThis.fetch;
+    setActiveProfileId(CACHE_BINDING.profileId);
+    await AsyncStorage.clear();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    setActiveProfileId(undefined);
+  });
+
+  it('clears a stale bootstrap-epoch fallback once the re-keyed (disabled-epoch) query starts its own pending fetch', async () => {
+    jest.useFakeTimers();
+    try {
+      // Seeded under the BOOTSTRAP epoch (no policyEpoch override) — the key
+      // the first, un-observed fetch's slow-fallback read will use.
+      await AsyncStorage.setItem(
+        buildNowFeedCacheKey(CACHE_BINDING),
+        JSON.stringify(noticeFallback()),
+      );
+
+      let nowCallCount = 0;
+      let resolveFirstCall: (() => void) | undefined;
+      globalThis.fetch = jest.fn(async () => {
+        nowCallCount += 1;
+        if (nowCallCount === 1) {
+          // Held pending long enough to trigger the slow-fallback read,
+          // then resolved later (by the test) with a body that observes a
+          // DIFFERENT epoch — the trigger for the re-key.
+          return new Promise<Response>((resolve) => {
+            resolveFirstCall = () =>
+              resolve(
+                new Response(
+                  JSON.stringify({
+                    ...feed(),
+                    mentorNoticePolicyEpoch: DISABLED_EPOCH,
+                  }),
+                  { status: 200 },
+                ),
+              );
+          });
+        }
+        // The re-keyed (DISABLED_EPOCH) query's own fetch — left pending so
+        // the assertion below runs before it could supply real data.
+        return new Promise<Response>(() => undefined);
+      }) as unknown as typeof globalThis.fetch;
+
+      const { queryClient, wrapper } = createHookWrapper();
+      const nowFeedHook = renderHook(() => useNowFeed(), { wrapper });
+
+      await waitFor(() =>
+        expect(nowFeedHook.result.current.isFetching).toBe(true),
+      );
+      await act(async () => {
+        jest.advanceTimersByTime(2_001);
+        await Promise.resolve();
+      });
+
+      // Precondition: the stale-fallback source is real, not a no-op.
+      await waitFor(() =>
+        expect(nowFeedHook.result.current.isSlowFallback).toBe(true),
+      );
+      expect(
+        nowFeedHook.result.current.fallbackFeed?.cards.some(
+          (c) => c.kind === 'mentor_notice',
+        ),
+      ).toBe(true);
+
+      // Resolve the first fetch — its response observes DISABLED_EPOCH,
+      // re-keying the query to a brand-new, dataless, pending query.
+      await act(async () => {
+        resolveFirstCall?.();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      // Consumer-visible outcome (`data ?? fallbackFeed`): the re-keyed query
+      // has no data of its own yet, and the fallback populated for the
+      // now-superseded bootstrap epoch must not still be exposed.
+      expect(nowFeedHook.result.current.data).toBeUndefined();
+      expect(
+        (nowFeedHook.result.current.fallbackFeed?.cards ?? []).some(
+          (c) => c.kind === 'mentor_notice',
+        ),
+      ).toBe(false);
+
+      queryClient.clear();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 
@@ -553,6 +784,151 @@ describe('useMentorNoticeActions', () => {
     expect(String(mockFetch.mock.calls[0]?.[0])).toContain(
       '/mentor-notices/550e8400-e29b-41d4-a716-446655440002/defer',
     );
+
+    queryClient.clear();
+  });
+
+  // [WI-2499 AC-3/AC-6 rework] The success cases above only prove the happy
+  // path. The evidence gate (defer/recheck can only ever succeed on a
+  // schema-valid server confirmation) is enforced by these three failure
+  // modes rejecting rather than resolving. `mentor.tsx`'s catch block only
+  // treats a `status === 409` error as authoritative-refetch-worthy, so the
+  // conflict case must surface that status.
+  it('rejects a notice re-check with a typed ConflictError on a 409 response', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({ code: 'CONFLICT', message: 'Already resolved' }),
+        { status: 409, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    const { queryClient, wrapper } = createHookWrapper();
+    const rendered = renderHook(() => useMentorNoticeActions(), { wrapper });
+
+    await expect(
+      rendered.result.current.recheck.mutateAsync(
+        '550e8400-e29b-41d4-a716-446655440002',
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+    });
+    await waitFor(() =>
+      expect(rendered.result.current.recheck.isError).toBe(true),
+    );
+    expect(rendered.result.current.recheck.isSuccess).toBe(false);
+
+    queryClient.clear();
+  });
+
+  it('rejects a notice re-check when the request fails at the transport layer', async () => {
+    mockFetch.mockRejectedValue(new TypeError('Network request failed'));
+    const { queryClient, wrapper } = createHookWrapper();
+    const rendered = renderHook(() => useMentorNoticeActions(), { wrapper });
+
+    await expect(
+      rendered.result.current.recheck.mutateAsync(
+        '550e8400-e29b-41d4-a716-446655440002',
+      ),
+    ).rejects.toBeInstanceOf(NetworkError);
+    await waitFor(() =>
+      expect(rendered.result.current.recheck.isError).toBe(true),
+    );
+    expect(rendered.result.current.recheck.isSuccess).toBe(false);
+
+    queryClient.clear();
+  });
+
+  it('rejects a notice re-check with ApiResponseShapeError when the response is schema-malformed', async () => {
+    // A 200 whose body fails `mentorNoticeRecheckResponseSchema` (sessionId
+    // must be a UUID) — the HTTP layer reports success but the body is not
+    // trustworthy.
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ sessionId: 'not-a-uuid' }), {
+        status: 200,
+      }),
+    );
+    const { queryClient, wrapper } = createHookWrapper();
+    const rendered = renderHook(() => useMentorNoticeActions(), { wrapper });
+
+    await expect(
+      rendered.result.current.recheck.mutateAsync(
+        '550e8400-e29b-41d4-a716-446655440002',
+      ),
+    ).rejects.toBeInstanceOf(ApiResponseShapeError);
+    await waitFor(() =>
+      expect(rendered.result.current.recheck.isError).toBe(true),
+    );
+    expect(rendered.result.current.recheck.isSuccess).toBe(false);
+
+    queryClient.clear();
+  });
+
+  it('rejects a notice defer with a typed ConflictError on a 409 response', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({ code: 'CONFLICT', message: 'Already resolved' }),
+        { status: 409, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    const { queryClient, wrapper } = createHookWrapper();
+    const rendered = renderHook(() => useMentorNoticeActions(), { wrapper });
+
+    await expect(
+      rendered.result.current.defer.mutateAsync(
+        '550e8400-e29b-41d4-a716-446655440002',
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+    });
+    await waitFor(() =>
+      expect(rendered.result.current.defer.isError).toBe(true),
+    );
+    expect(rendered.result.current.defer.isSuccess).toBe(false);
+
+    queryClient.clear();
+  });
+
+  it('rejects a notice defer when the request fails at the transport layer', async () => {
+    mockFetch.mockRejectedValue(new TypeError('Network request failed'));
+    const { queryClient, wrapper } = createHookWrapper();
+    const rendered = renderHook(() => useMentorNoticeActions(), { wrapper });
+
+    await expect(
+      rendered.result.current.defer.mutateAsync(
+        '550e8400-e29b-41d4-a716-446655440002',
+      ),
+    ).rejects.toBeInstanceOf(NetworkError);
+    await waitFor(() =>
+      expect(rendered.result.current.defer.isError).toBe(true),
+    );
+    expect(rendered.result.current.defer.isSuccess).toBe(false);
+
+    queryClient.clear();
+  });
+
+  it('rejects a notice defer with ApiResponseShapeError when the response is schema-malformed', async () => {
+    // A 200 whose body fails `mentorNoticeDeferResponseSchema` (missing the
+    // required `deferredAt`) — the HTTP layer reports success but the body
+    // is not trustworthy.
+    mockFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          noticeId: '550e8400-e29b-41d4-a716-446655440002',
+        }),
+        { status: 200 },
+      ),
+    );
+    const { queryClient, wrapper } = createHookWrapper();
+    const rendered = renderHook(() => useMentorNoticeActions(), { wrapper });
+
+    await expect(
+      rendered.result.current.defer.mutateAsync(
+        '550e8400-e29b-41d4-a716-446655440002',
+      ),
+    ).rejects.toBeInstanceOf(ApiResponseShapeError);
+    await waitFor(() =>
+      expect(rendered.result.current.defer.isError).toBe(true),
+    );
+    expect(rendered.result.current.defer.isSuccess).toBe(false);
 
     queryClient.clear();
   });

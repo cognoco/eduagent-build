@@ -256,10 +256,37 @@ export default function ChildReportsScreen(): React.ReactElement {
         </View>
       </View>
 
-      <ReportsHeaderSummary
-        latestReport={selectedWeeklyReport}
-        showNewBadge={isViewingLatestWeeklyReport && hasUnviewedWeeklyReport}
-      />
+      {selectedWeeklyReport?.headlineStat ? (
+        <Pressable
+          onPress={() => {
+            if (!profileId) return;
+            router.push({
+              pathname:
+                '/(app)/child/[profileId]/weekly-report/[weeklyReportId]',
+              params: {
+                profileId,
+                weeklyReportId: selectedWeeklyReport.id,
+              },
+            } as Href);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={t('progress.latestReport.openWithDate', {
+            date: formatReportWeek(
+              selectedWeeklyReport.reportWeek,
+              t('guardian.latestWeekFallback'),
+              i18n?.language,
+            ),
+          })}
+          testID={`weekly-report-card-${selectedWeeklyReport.id}`}
+        >
+          <ReportsHeaderSummary
+            latestReport={selectedWeeklyReport}
+            showNewBadge={
+              isViewingLatestWeeklyReport && hasUnviewedWeeklyReport
+            }
+          />
+        </Pressable>
+      ) : null}
       {selectedWeeklyReport && !isViewingLatestWeeklyReport ? (
         <Pressable
           onPress={() =>
