@@ -10,7 +10,10 @@
 // ---------------------------------------------------------------------------
 
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
+
+import { extractValueProducingTestIds } from '../../scripts/test-id-expression';
 
 const E2E_FLOWS_DIR = path.resolve(__dirname, '../../e2e/flows');
 const SOURCE_DIR = path.resolve(__dirname, '..');
@@ -167,12 +170,6 @@ function extractSourceTestIds(tsxFiles: string[]): {
   const derivedSuffixPattern =
     /testID=\{[^`]*`\$\{[^}]+\}([^`$]+)`\s*:\s*undefined\s*\}/g;
 
-  // String literals inside JSX expression bodies. Skips template literals
-  // (handled separately by dynamicTemplatePattern).
-  const stringLiteralPattern =
-    /'([^'\\]*(?:\\.[^'\\]*)*)'|"([^"\\]*(?:\\.[^"\\]*)*)"/g;
-  const templateLiteralPattern = /`(([^$`]+)\$\{[^`]+)`/g;
-
   for (const file of tsxFiles) {
     const source = fs.readFileSync(file, 'utf-8');
 
@@ -229,18 +226,10 @@ function extractSourceTestIds(tsxFiles: string[]): {
       }
       if (depth === 0) {
         const body = source.slice(start, i);
-        stringLiteralPattern.lastIndex = 0;
-        let litMatch;
-        while ((litMatch = stringLiteralPattern.exec(body)) !== null) {
-          staticIds.add(litMatch[1] ?? litMatch[2]!);
-        }
-        templateLiteralPattern.lastIndex = 0;
-        while ((litMatch = templateLiteralPattern.exec(body)) !== null) {
-          dynamicPrefixes.push(litMatch[2]!);
-          dynamicWitnesses.push(
-            litMatch[1]!.replace(/\$\{[^}]+\}/g, 'DYNAMIC'),
-          );
-        }
+        const extracted = extractValueProducingTestIds(body);
+        for (const id of extracted.staticIds) staticIds.add(id);
+        dynamicPrefixes.push(...extracted.dynamicPrefixes);
+        dynamicWitnesses.push(...extracted.dynamicWitnesses);
       }
     }
   }
@@ -409,6 +398,38 @@ describe('E2E testID integrity', () => {
 
   it('should find source files with testIDs', () => {
     expect(staticIds.size).toBeGreaterThan(0);
+  });
+
+  it('collects only value-producing testID branches, not predicate or helper-call decoys', () => {
+    const fixtureDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'e2e-testid-integrity-'),
+    );
+    const fixturePath = path.join(fixtureDir, 'fixture.tsx');
+    fs.writeFileSync(
+      fixturePath,
+      [
+        'export const fixture = (',
+        '  <View',
+        '    testID={',
+        "      shouldRender('predicate-decoy', `predicate-${id}`)",
+        '        ? `actual-${id}`',
+        "        : formatTestId('helper-decoy', `helper-${id}`)",
+        '    }',
+        '  />',
+        ');',
+      ].join('\n'),
+    );
+
+    try {
+      expect(extractSourceTestIds([fixturePath])).toEqual({
+        staticIds: new Set(),
+        dynamicPrefixes: ['actual-'],
+        dynamicWitnesses: ['actual-DYNAMIC'],
+        derivedSuffixes: [],
+      });
+    } finally {
+      fs.rmSync(fixtureDir, { recursive: true, force: true });
+    }
   });
 
   // Build the list of Maestro IDs that are NOT in source (excluding known drift)

@@ -455,19 +455,18 @@ function SessionScreenInner() {
     if (!canRefreshMentorFeed) return;
 
     let cancelled = false;
-    const returnAfterRefreshSucceeds = () => {
-      if (cancelled) return;
-      setPendingMentorReturn(false);
-      router.replace(homeBackHref as Href);
-    };
-    const stayAfterRefreshFailure = () => {
-      if (cancelled) return;
-      setPendingMentorReturn(false);
-    };
-    void refreshMentorFeedBeforeReturn().then(
-      returnAfterRefreshSucceeds,
-      stayAfterRefreshFailure,
-    );
+    async function returnAfterMentorRefresh(): Promise<void> {
+      try {
+        await refreshMentorFeedBeforeReturn();
+        if (cancelled) return;
+        setPendingMentorReturn(false);
+        router.replace(homeBackHref as Href);
+      } catch {
+        if (cancelled) return;
+        setPendingMentorReturn(false);
+      }
+    }
+    void returnAfterMentorRefresh();
     return () => {
       cancelled = true;
     };

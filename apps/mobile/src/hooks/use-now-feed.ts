@@ -38,7 +38,7 @@ export function nowFeedQueryKey(
   actorId: string,
   profileId: string,
   policyEpoch: string,
-) {
+): readonly ['now-feed', string, string, string] {
   return ['now-feed', actorId, profileId, policyEpoch] as const;
 }
 
