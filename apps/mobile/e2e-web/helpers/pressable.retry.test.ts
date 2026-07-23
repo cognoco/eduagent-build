@@ -1,5 +1,5 @@
 import { expect as playwrightExpect, type Locator } from '@playwright/test';
-import { pressableClick } from '../e2e-web/helpers/pressable';
+import { pressableClick } from './pressable';
 
 jest.mock('@playwright/test', () => ({
   expect: jest.fn(() => ({
