@@ -170,7 +170,7 @@ Per-file evidence is brief ("active workflow rule", "active architecture fact");
 | `docs/deployment-and-secrets.md` | Live operational guide for Doppler / Workers / Cloudflare. |
 | `docs/ux-todos.md` | Active rolling list (created 2026-04-26); H-priority items unresolved. |
 | `docs/audit/_changelog.md` | **User's personal cleanup log** (relocated 2026-05-02 from `docs/changelog.md` as part of audit consolidation). Self-references this very task as "RUNNING #9". Do not touch. |
-| `docs/privacy-policy.html` | Required for both blocked store submissions; will be needed when unblocked. |
+| `docs/compliance/privacy-policy.html` | Required for both blocked store submissions; will be needed when unblocked. |
 | `docs/logo.svg` | Out of scope (binary asset), but list anyway for completeness. |
 | `docs/screenshots_and_store_info/store description.md` | App / Play Store listing copy; needed when stores unblock. |
 | `docs/E2Edocs/e2e-emulator-issues.md` | Required reading before any emulator work (per memory rule). **Note co-change C5.** |
