@@ -33,6 +33,12 @@ tags:
       id: 'chat-input'
     timeout: 30000
 
+# The exact pre-existing assistant transcript binds Continue to the seeded
+# unfinished session before this flow submits a new learner turn.
+- assertVisible:
+    id: 'message-bubble-assistant-.*'
+    text: '^They connected cities, trade, armies, and new ideas\.$'
+
 - tapOn:
     id: 'chat-input'
 - inputText: 'How did Roman roads help people exchange ideas?'
@@ -40,13 +46,15 @@ tags:
 - tapOn:
     id: 'send-button'
 
-# The seed contains exactly one prior completed assistant response. A second
-# semantic completion marker proves this resumed session received a non-empty
-# reply, not merely a streaming/thinking or reconnect/fallback row.
+# The completed assistant reply below the exact new learner message proves this
+# resumed session received a non-empty reply; the seeded assistant reply is
+# above that message and cannot satisfy this relational assertion.
 - extendedWaitUntil:
     visible:
       id: 'assistant-response-complete-.*'
-      index: 1
+      below:
+        id: 'message-bubble-user-.*'
+        text: '^How did Roman roads help people exchange ideas\?$'
     timeout: 60000
 
 - tapOn:

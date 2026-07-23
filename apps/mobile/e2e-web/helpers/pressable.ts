@@ -14,7 +14,10 @@ import { expect, type Locator, type Page } from '@playwright/test';
  * mouse/hit-testing layer and goes straight to the responder, which is the
  * exact path React Native Web listens on. Equivalent UX, reliable in e2e.
  */
-export async function pressableClick(target: Locator): Promise<void> {
+export async function pressableClick(
+  target: Locator,
+  options: { beforeDispatch?: () => (() => void) | void } = {},
+): Promise<void> {
   const page = target.page();
   const splash = page.getByTestId('animated-splash');
 
@@ -26,8 +29,10 @@ export async function pressableClick(target: Locator): Promise<void> {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     await expect(target).toBeVisible({ timeout: 15_000 });
 
+    let rollbackFailedDispatch: (() => void) | void;
     try {
       await target.scrollIntoViewIfNeeded();
+      rollbackFailedDispatch = options.beforeDispatch?.();
       await target.evaluate((element) => {
         const eventDefaults = {
           bubbles: true,
@@ -69,6 +74,7 @@ export async function pressableClick(target: Locator): Promise<void> {
       });
       return;
     } catch (error) {
+      rollbackFailedDispatch?.();
       if (
         attempt === 1 ||
         !(error instanceof Error) ||

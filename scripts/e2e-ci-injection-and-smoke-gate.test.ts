@@ -53,6 +53,7 @@ type ElementSelector = {
   id?: string;
   text?: string;
   enabled?: boolean;
+  below?: ElementSelector;
   containsDescendants?: ElementSelector[];
 };
 
@@ -7908,6 +7909,68 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       },
     ]);
     expect(continueActions[0]).not.toHaveProperty('index');
+  });
+
+  it('[WI-2234] binds the new completed reply below the exact submitted learner message', () => {
+    const commands = parseMaestroCommands(
+      readFileSync(
+        join(
+          repoRoot,
+          'apps/mobile/e2e/flows/v2/v2-returning-learner-resume.yaml',
+        ),
+        'utf8',
+      ),
+    );
+
+    const completedReplyWaits = commands.filter((command) =>
+      isDeepStrictEqual(command, {
+        extendedWaitUntil: {
+          visible: {
+            id: 'assistant-response-complete-.*',
+            below: {
+              id: 'message-bubble-user-.*',
+              text: '^How did Roman roads help people exchange ideas\\?$',
+            },
+          },
+          timeout: 60_000,
+        },
+      }),
+    );
+
+    expect(completedReplyWaits).toHaveLength(1);
+    expect(
+      completedReplyWaits[0]?.extendedWaitUntil?.visible,
+    ).not.toHaveProperty('index');
+    expect(commands.some((command) => command.optional === true)).toBe(false);
+  });
+
+  it('[WI-2234] proves the seeded transcript before submitting the new learner message', () => {
+    const commands = parseMaestroCommands(
+      readFileSync(
+        join(
+          repoRoot,
+          'apps/mobile/e2e/flows/v2/v2-returning-learner-resume.yaml',
+        ),
+        'utf8',
+      ),
+    );
+    const seededTranscriptAssertion = {
+      assertVisible: {
+        id: 'message-bubble-assistant-.*',
+        text: '^They connected cities, trade, armies, and new ideas\\.$',
+      },
+    };
+    const transcriptIndex = commands.findIndex((command) =>
+      isDeepStrictEqual(command, seededTranscriptAssertion),
+    );
+    const newInputIndex = commands.findIndex(
+      (command) =>
+        command.inputText === 'How did Roman roads help people exchange ideas?',
+    );
+
+    expect(transcriptIndex).toBeGreaterThan(-1);
+    expect(newInputIndex).toBeGreaterThan(transcriptIndex);
+    expect(commands[transcriptIndex]).not.toHaveProperty('optional', true);
   });
 
   it('[WI-2584 profile-load-error] hard-fails authenticated bootstrap errors before Back recovery', () => {

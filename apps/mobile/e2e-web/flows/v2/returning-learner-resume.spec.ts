@@ -8,17 +8,20 @@ test.use({ storageState: { cookies: [], origins: [] } });
 test('WI-2234 returning learner: unfinished session resumes, exchanges, and returns to refreshed Mentor', async ({
   page,
 }) => {
-  const initialNowResponsePromise = page.waitForResponse((response) => {
-    const request = response.request();
-    const url = new URL(response.url());
-    return (
-      response.ok() &&
-      request.method() === 'GET' &&
-      url.pathname.endsWith('/v1/now') &&
-      url.searchParams.get('scope') === 'self'
-    );
-  });
-  await seedAndSignIn(page, {
+  const initialNowResponsePromise = page.waitForResponse(
+    (response) => {
+      const request = response.request();
+      const url = new URL(response.url());
+      return (
+        response.ok() &&
+        request.method() === 'GET' &&
+        url.pathname.endsWith('/v1/now') &&
+        url.searchParams.get('scope') === 'self'
+      );
+    },
+    { timeout: 60_000 },
+  );
+  const seeded = await seedAndSignIn(page, {
     scenario: 'v2-returning-learner',
     alias: 'wi2234-returning',
     landingTestId: 'mentor-screen',
@@ -38,28 +41,38 @@ test('WI-2234 returning learner: unfinished session resumes, exchanges, and retu
   await pressableClick(unfinishedCard.getByTestId('now-card-continue'));
   const chatInput = page.getByTestId('chat-input');
   await expect(chatInput).toBeVisible({ timeout: 30_000 });
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get('sessionId'))
+    .toBe(seeded.ids.sessionId);
+  await expect(
+    page
+      .getByTestId('chat-messages')
+      .getByText('They connected cities, trade, armies, and new ideas.', {
+        exact: true,
+      }),
+  ).toBeVisible();
 
-  const completedAssistantResponses = page.getByTestId(
-    /^assistant-response-complete-/,
-  );
-  const completedResponsesBeforeExchange =
-    await completedAssistantResponses.count();
   await fillTextInput(
     chatInput,
     'How did Roman roads help people exchange ideas?',
   );
   await pressableClick(page.getByTestId('send-button'));
-  await expect
-    .poll(async () => completedAssistantResponses.count(), { timeout: 60_000 })
-    .toBeGreaterThan(completedResponsesBeforeExchange);
-  await expect(
-    completedAssistantResponses.nth(completedResponsesBeforeExchange),
-  ).not.toHaveText(/^\s*$/);
+  const exactLearnerMessage = page.getByTestId(/^message-bubble-user-/).filter({
+    hasText: /^How did Roman roads help people exchange ideas\?$/,
+  });
+  await expect(exactLearnerMessage).toHaveCount(1);
+  const completedReplyBelowExactMessage = exactLearnerMessage.locator(
+    'xpath=following::*[starts-with(@data-testid, "assistant-response-complete-")][1]',
+  );
+  await expect(completedReplyBelowExactMessage).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(completedReplyBelowExactMessage).not.toHaveText(/^\s*$/);
 
-  // Hold the self-scoped Now response caused by Back. Mentor must stay
-  // unmounted until this exact response is allowed through; otherwise the
-  // journey could pass by painting the warm pre-return cards first.
-  let backStartedAt = Number.POSITIVE_INFINITY;
+  // Hold the self-scoped Now response caused by Back. The Session route must
+  // remain active until this exact response is allowed through; the tab
+  // navigator keeps Mentor mounted underneath the pushed Session route.
+  let capturePostBackNowRequest = false;
   let releasePostBackNowResponse!: () => void;
   let observePostBackNowRequest!: (request: Request) => void;
   const postBackNowRequest = new Promise<Request>((resolve) => {
@@ -74,22 +87,29 @@ test('WI-2234 returning learner: unfinished session resumes, exchanges, and retu
     if (
       request.method() !== 'GET' ||
       url.searchParams.get('scope') !== 'self' ||
-      request.timing().startTime < backStartedAt
+      !capturePostBackNowRequest
     ) {
       await route.continue();
       return;
     }
 
-    backStartedAt = Number.POSITIVE_INFINITY;
+    capturePostBackNowRequest = false;
     observePostBackNowRequest(request);
     await allowPostBackNowResponse;
     await route.continue();
   });
 
-  backStartedAt = Date.now();
-  await pressableClick(page.getByTestId('chat-shell-back'));
+  await pressableClick(page.getByTestId('chat-shell-back'), {
+    beforeDispatch: () => {
+      capturePostBackNowRequest = true;
+      return () => {
+        capturePostBackNowRequest = false;
+      };
+    },
+  });
   const heldPostBackNowRequest = await postBackNowRequest;
-  await expect(page.getByTestId('mentor-screen')).toHaveCount(0);
+  await expect(page).toHaveURL(/\/session(?:\?|$)/);
+  await expect(page.getByTestId('session-screen')).toBeVisible();
   const postBackNowResponsePromise = page.waitForResponse(
     (response) => response.request() === heldPostBackNowRequest,
   );
@@ -101,6 +121,7 @@ test('WI-2234 returning learner: unfinished session resumes, exchanges, and retu
   };
   expect(typeof postBackNowFeed.generatedAt).toBe('string');
   expect(postBackNowFeed.generatedAt).not.toBe(initialNowFeed.generatedAt);
+  await expect(page).toHaveURL(/\/mentor(?:\?|$)/);
   await expect(page.getByTestId('mentor-screen')).toBeVisible({
     timeout: 30_000,
   });
