@@ -3553,6 +3553,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         direction?: string;
         visibilityPercentage?: number;
         centerElement?: boolean;
+        waitToSettleTimeoutMs?: number;
       };
     }>;
     const profileTap = commands.findIndex(
@@ -3563,8 +3564,9 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       ({ scrollUntilVisible }) =>
         scrollUntilVisible?.element?.id === 'withdraw-consent-button' &&
         scrollUntilVisible.direction === 'DOWN' &&
-        scrollUntilVisible.visibilityPercentage === 100 &&
-        scrollUntilVisible.centerElement === true,
+        scrollUntilVisible.visibilityPercentage === 50 &&
+        scrollUntilVisible.centerElement === true &&
+        scrollUntilVisible.waitToSettleTimeoutMs === 1000,
     );
     const withdrawTap = commands.findIndex(
       ({ tapOn }, index) =>
@@ -3575,6 +3577,37 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(consentScroll).toBeGreaterThan(profileTap);
     expect(withdrawTap).toBeGreaterThan(consentScroll);
     expect(source).not.toContain('parent-home-check-child-${CHILD_PROFILE_ID}');
+  });
+
+  it('[WI-1655] stabilizes both consent action scrolls for the release APK', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/parent/consent-management.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      scrollUntilVisible?: {
+        centerElement?: boolean;
+        element?: { id?: string };
+        optional?: boolean;
+        visibilityPercentage?: number;
+        waitToSettleTimeoutMs?: number;
+      };
+    }>;
+    const consentScrolls = commands.flatMap(({ scrollUntilVisible }) =>
+      scrollUntilVisible?.element?.id === 'withdraw-consent-button'
+        ? [scrollUntilVisible]
+        : [],
+    );
+
+    expect(consentScrolls).toHaveLength(2);
+    for (const scroll of consentScrolls) {
+      expect(scroll).toMatchObject({
+        centerElement: true,
+        visibilityPercentage: 50,
+        waitToSettleTimeoutMs: 1000,
+      });
+      expect(scroll.optional).not.toBe(true);
+    }
   });
 
   it('[WI-1864] scrolls to the owner subscription row on the Account screen', () => {

@@ -67,8 +67,9 @@ tags:
       id: 'withdraw-consent-button'
     direction: DOWN
     timeout: 10000
-    visibilityPercentage: 100
+    visibilityPercentage: 50
     centerElement: true
+    waitToSettleTimeoutMs: 1000
 
 # 6. Screenshot: consent section visible with "Withdraw Consent" button
 - takeScreenshot: consent-mgmt-01-consent-section
@@ -126,6 +127,9 @@ tags:
       id: 'withdraw-consent-button'
     direction: DOWN
     timeout: 10000
+    visibilityPercentage: 50
+    centerElement: true
+    waitToSettleTimeoutMs: 1000
 
 # 18. Screenshot: consent restored, withdraw button visible again
 - takeScreenshot: consent-mgmt-04-consent-restored
