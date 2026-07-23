@@ -3,7 +3,8 @@
 #
 # This is the release-APK counterpart to seed-and-run.sh. The key difference:
 # release APKs have no Metro, no dev-client launcher, no "Continue" overlay.
-# The app boots directly into the sign-in screen (or splash → sign-in).
+# The app boots directly into the supported auth entry (welcome chooser or
+# sign-in screen).
 #
 # Usage:
 #   ./seed-and-run-release.sh <scenario> <flow-file> [maestro-args...]
@@ -20,7 +21,7 @@
 #   EMAIL            — Explicit seed email override; requires E2E_ALLOW_ARBITRARY_EMAIL=1
 #   E2E_ALLOW_ARBITRARY_EMAIL — Allow EMAIL override for one-off debug runs (default: 0)
 #   MAESTRO_PATH     — Path to maestro binary (default: /c/tools/maestro/bin/maestro)
-#   APP_TIMEOUT      — Seconds to wait for sign-in screen (default: 30)
+#   APP_TIMEOUT      — Seconds to wait for an auth-entry screen (default: 30)
 #
 # Prerequisites:
 #   - Release APK installed on emulator/device (EAS preview profile):
@@ -99,10 +100,11 @@ sleep 1
 echo "[release] Launching app..."
 $ADB shell am start -n "$APP_ID/.MainActivity" 2>/dev/null || true
 
-# ── Wait for sign-in screen ──
+# ── Wait for supported auth entry ──
 # Release APKs have no dev-client launcher or Metro connection.
-# The app boots splash → auth in ~3-5 seconds on emulator.
-echo "[release] Waiting for sign-in screen (max ${APP_TIMEOUT}s)..."
+# A pm-clear'd app boots splash → welcome chooser; returning state may boot
+# directly to sign-in. The shared Maestro setup owns chooser → sign-in.
+echo "[release] Waiting for auth entry (max ${APP_TIMEOUT}s)..."
 ELAPSED=0
 while [ $ELAPSED -lt $APP_TIMEOUT ]; do
   sleep 2
@@ -115,8 +117,8 @@ while [ $ELAPSED -lt $APP_TIMEOUT ]; do
 
   if $ADB shell uiautomator dump /sdcard/ui_dump.xml 2>/dev/null; then
     DUMP=$($ADB exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null || echo "")
-    if echo "$DUMP" | grep -q "sign-in-button\|Welcome to MentoMate\|Welcome back"; then
-      echo "[release] Sign-in screen reached after ${ELAPSED}s."
+    if echo "$DUMP" | grep -q "welcome-chooser\|sign-in-button\|Welcome to MentoMate\|Welcome back"; then
+      echo "[release] Auth entry reached after ${ELAPSED}s."
       break
     fi
 
@@ -141,7 +143,7 @@ while [ $ELAPSED -lt $APP_TIMEOUT ]; do
 done
 
 if [ $ELAPSED -ge $APP_TIMEOUT ]; then
-  echo "[release] FATAL: Sign-in screen not reached in ${APP_TIMEOUT}s" >&2
+  echo "[release] FATAL: Auth entry not reached in ${APP_TIMEOUT}s" >&2
   exit 1
 fi
 

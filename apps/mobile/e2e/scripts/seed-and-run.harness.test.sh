@@ -301,6 +301,19 @@ for script in "$SEED_RUN_SH" "$SEED_RELEASE_SH"; do
 done
 
 echo ""
+echo "─── release auth-entry preflight (WI-1655) ────────────────────────────"
+
+# A pm-clear'd release APK lands on the supported welcome chooser before the
+# shared Maestro setup walks chooser → cards → bridge → sign-in. The release
+# runner must hand control to Maestro from that stable auth-entry surface
+# instead of timing out while waiting for a later sign-in screen.
+if grep -q 'welcome-chooser' "$SEED_RELEASE_SH"; then
+  _tpass "seed-and-run-release.sh accepts the pm-clear welcome chooser"
+else
+  _tfail "seed-and-run-release.sh must accept welcome-chooser before Maestro walks to sign-in"
+fi
+
+echo ""
 echo "─── Summary ────────────────────────────────────────────────────────────"
 echo "  PASS: $PASS"
 echo "  FAIL: $FAIL"
