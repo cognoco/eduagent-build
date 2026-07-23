@@ -3,6 +3,7 @@ import * as path from 'path';
 
 import { CONSENT_PURPOSES, ENGAGEMENT_SIGNALS } from '@eduagent/schemas';
 import {
+  learningSessions,
   profileQuotaUsage,
   person,
   login,
@@ -10,6 +11,8 @@ import {
   consentGrant,
   consentRequest,
   quizRounds,
+  retentionCards,
+  sessionEvents,
   subjects,
   usageEvents,
   type Database,
@@ -119,6 +122,7 @@ describe('VALID_SCENARIOS', () => {
       'onboarding-no-subject',
       'post-approval-ready',
       'learning-active',
+      'v2-returning-learner',
       'retention-due',
       'failed-recall-3x',
       'parent-with-children',
@@ -393,6 +397,58 @@ describe('seedScenario', () => {
     await expect(
       seedScenario(db, 'nonexistent' as SeedScenario, 'test@example.com'),
     ).rejects.toThrow('Unknown scenario: nonexistent');
+  });
+
+  it('[WI-2234] seeds one unfinished session and due review on distinct topics with scoped transcript events', async () => {
+    const db = createMockDb();
+    const result = await seedScenario(
+      db,
+      'v2-returning-learner' as SeedScenario,
+      'returning@example.com',
+    );
+    const insertMock = db.insert as unknown as jest.Mock;
+    const valuesMock = insertMock.mock.results[0]?.value.values as jest.Mock;
+    const insertedRowsFor = (table: unknown): unknown[] =>
+      insertMock.mock.calls.flatMap(([insertedTable], index) => {
+        if (insertedTable !== table) return [];
+        const value = valuesMock.mock.calls[index]?.[0];
+        return Array.isArray(value) ? value : [value];
+      });
+
+    const seededSessions = insertedRowsFor(learningSessions) as Array<{
+      id: string;
+      status: string;
+      topicId: string;
+    }>;
+    const seededReviews = insertedRowsFor(retentionCards) as Array<{
+      id: string;
+      nextReviewAt: Date;
+      topicId: string;
+    }>;
+    const transcriptEvents = insertedRowsFor(sessionEvents) as Array<{
+      sessionId: string;
+      topicId?: string;
+    }>;
+
+    expect(seededSessions).toHaveLength(1);
+    expect(seededSessions[0]).toMatchObject({
+      id: result.ids.sessionId,
+      status: 'active',
+    });
+    expect(seededReviews).toHaveLength(1);
+    expect(seededReviews[0]).toMatchObject({
+      id: result.ids.retentionCardId,
+    });
+    expect(seededReviews[0]!.nextReviewAt.getTime()).toBeLessThan(Date.now());
+    expect(seededReviews[0]!.topicId).not.toBe(seededSessions[0]!.topicId);
+    expect(transcriptEvents).not.toHaveLength(0);
+    expect(
+      transcriptEvents.every(
+        (event) =>
+          event.sessionId === seededSessions[0]!.id &&
+          event.topicId === seededSessions[0]!.topicId,
+      ),
+    ).toBe(true);
   });
 
   it('uses SEED_CLERK_PREFIX in clerkUserId for all scenarios', async () => {
