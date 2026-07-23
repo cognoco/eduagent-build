@@ -73,6 +73,7 @@ export default function PrivacyPolicyScreen() {
           <Paragraph>{t('legal.privacy.s2Body2')}</Paragraph>
           <Paragraph>{t('legal.privacy.s2Body3')}</Paragraph>
           <Paragraph>{t('legal.privacy.s2Body4')}</Paragraph>
+          <Paragraph>{t('legal.privacy.s2Body5')}</Paragraph>
         </Section>
 
         <Section title={t('legal.privacy.s3Title')}>
@@ -100,6 +101,7 @@ export default function PrivacyPolicyScreen() {
         <Section title={t('legal.privacy.s8Title')}>
           <Paragraph>{t('legal.privacy.s8Body1')}</Paragraph>
           <Paragraph>{t('legal.privacy.s8Body2')}</Paragraph>
+          <Paragraph>{t('legal.privacy.s8Body3')}</Paragraph>
         </Section>
 
         <Section title={t('legal.privacy.s9Title')}>
@@ -108,6 +110,10 @@ export default function PrivacyPolicyScreen() {
 
         <Section title={t('legal.privacy.s10Title')}>
           <Paragraph>{t('legal.privacy.s10Body')}</Paragraph>
+        </Section>
+
+        <Section title={t('legal.privacy.s11Title')}>
+          <Paragraph>{t('legal.privacy.s11Body')}</Paragraph>
         </Section>
       </ScrollView>
     </View>
