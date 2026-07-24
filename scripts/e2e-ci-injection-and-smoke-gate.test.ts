@@ -7955,25 +7955,112 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         'utf8',
       ),
     );
-    const seededTranscriptAssertion = {
-      assertVisible: {
-        text: '^They connected cities, trade, armies, and new ideas\\.$',
-        childOf: {
-          id: 'message-bubble-assistant-.*',
+    const seededTranscriptOwner = {
+      id: 'message-bubble-assistant-1',
+      containsDescendants: [
+        {
+          text: '^They connected cities, trade, armies, and new ideas\\.$',
+        },
+      ],
+    };
+    const inputText = 'How did Roman roads help people exchange ideas?';
+    const inputIndex = (items: MaestroCommand[]): number =>
+      items.findIndex((command) => command.inputText === inputText);
+    const hardAssertionIndex = (
+      items: MaestroCommand[],
+      selector: ElementSelector,
+    ): number => {
+      const newInputIndex = inputIndex(items);
+      return items.findIndex(
+        (command, index) =>
+          index < newInputIndex &&
+          command.optional !== true &&
+          isDeepStrictEqual(command.assertVisible, selector),
+      );
+    };
+    const hasSeededTranscriptProperty = (items: MaestroCommand[]): boolean =>
+      inputIndex(items) >= 0 &&
+      hardAssertionIndex(items, seededTranscriptOwner) >= 0;
+
+    expect(hasSeededTranscriptProperty(commands)).toBe(true);
+
+    const transcriptOwnerIndex = hardAssertionIndex(
+      commands,
+      seededTranscriptOwner,
+    );
+    const replaceAssertion = (
+      assertVisible: ElementSelector,
+      optional = false,
+    ): MaestroCommand[] =>
+      commands.map((command, commandIndex) =>
+        commandIndex === transcriptOwnerIndex
+          ? { assertVisible, ...(optional ? { optional: true } : {}) }
+          : command,
+      );
+    const replaceWithIndependentAssertions = (id: string): MaestroCommand[] => [
+      ...commands.slice(0, transcriptOwnerIndex),
+      {
+        assertVisible: {
+          text: '^They connected cities, trade, armies, and new ideas\\.$',
         },
       },
+      { assertVisible: { id } },
+      ...commands.slice(transcriptOwnerIndex + 1),
+    ];
+    const moveOwnedIdentityAndTextAfterInput = (): MaestroCommand[] => {
+      const ownedIdentityAndText = commands[transcriptOwnerIndex];
+      const withoutEvidence = commands.filter(
+        (_, commandIndex) => commandIndex !== transcriptOwnerIndex,
+      );
+      const newInputIndex = inputIndex(withoutEvidence);
+      return [
+        ...withoutEvidence.slice(0, newInputIndex + 1),
+        ownedIdentityAndText!,
+        ...withoutEvidence.slice(newInputIndex + 1),
+      ];
     };
-    const transcriptIndex = commands.findIndex((command) =>
-      isDeepStrictEqual(command, seededTranscriptAssertion),
-    );
-    const newInputIndex = commands.findIndex(
-      (command) =>
-        command.inputText === 'How did Roman roads help people exchange ideas?',
-    );
+    const mutations = [
+      {
+        name: 'optional owned seeded identity and text',
+        commands: replaceAssertion(seededTranscriptOwner, true),
+      },
+      {
+        name: 'wrong seeded assistant identity',
+        commands: replaceAssertion({
+          ...seededTranscriptOwner,
+          id: 'message-bubble-assistant-0',
+        }),
+      },
+      {
+        name: 'wrong seeded transcript text',
+        commands: replaceAssertion({
+          ...seededTranscriptOwner,
+          containsDescendants: [{ text: '^They connected roads only\\.$' }],
+        }),
+      },
+      {
+        name: 'owned seeded identity and text both after new input',
+        commands: moveOwnedIdentityAndTextAfterInput(),
+      },
+      {
+        name: 'adjacent independent seeded text and identity assertions',
+        commands: replaceWithIndependentAssertions(
+          'message-bubble-assistant-1',
+        ),
+      },
+      {
+        name: 'mismatched adjacent seeded text and identity assertions',
+        commands: replaceWithIndependentAssertions(
+          'message-bubble-assistant-0',
+        ),
+      },
+    ];
 
-    expect(transcriptIndex).toBeGreaterThan(-1);
-    expect(newInputIndex).toBeGreaterThan(transcriptIndex);
-    expect(commands[transcriptIndex]).not.toHaveProperty('optional', true);
+    for (const mutation of mutations) {
+      expect({
+        [mutation.name]: hasSeededTranscriptProperty(mutation.commands),
+      }).toEqual({ [mutation.name]: false });
+    }
   });
 
   it('[WI-2584 profile-load-error] hard-fails authenticated bootstrap errors before Back recovery', () => {

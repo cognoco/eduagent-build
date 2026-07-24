@@ -33,12 +33,12 @@ tags:
       id: 'chat-input'
     timeout: 30000
 
-# The exact pre-existing assistant transcript binds Continue to the seeded
-# unfinished session before this flow submits a new learner turn.
+# The seeded user turn is index 0 and its assistant reply is index 1. The
+# assistant bubble owns the exact seeded transcript as a descendant.
 - assertVisible:
-    text: '^They connected cities, trade, armies, and new ideas\.$'
-    childOf:
-      id: 'message-bubble-assistant-.*'
+    id: 'message-bubble-assistant-1'
+    containsDescendants:
+      - text: '^They connected cities, trade, armies, and new ideas\.$'
 
 - tapOn:
     id: 'chat-input'
