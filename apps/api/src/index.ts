@@ -16,6 +16,11 @@ import {
   scrubSentryEvent,
   dropConsoleBreadcrumb,
 } from './services/sentry';
+import { setStructuredLogSink } from './services/logger';
+import {
+  forwardLlmVolumeAlertToSink,
+  scrubLlmVolumeAlertSentryLog,
+} from './services/llm-volume-alert-sink';
 import { CircuitOpenError } from './services/llm';
 import { isTransientDatabaseError } from './services/transient-db-retry';
 import { ConsentWithdrawnError } from './services/session';
@@ -104,6 +109,15 @@ import { scopesRoutes } from './routes/scopes';
 import { visibilityRoutes } from './routes/visibility';
 import { familyJoinRoutes } from './routes/family-join';
 import { analyticsRoutes } from './routes/analytics';
+
+// Route the existing canonical threshold warning into Sentry Logs without
+// importing Sentry from the LLM router. The bridge reconstructs an explicit
+// seven-field allowlist; all other repository logs remain console-only.
+setStructuredLogSink((entry) => {
+  forwardLlmVolumeAlertToSink(entry, (message, attributes) => {
+    Sentry.logger.warn(message, attributes);
+  });
+});
 
 // [Issue-888] Bindings must stay in sync with envSchema in config.ts.
 // All string env vars that envSchema declares must appear here so c.env.X
@@ -663,6 +677,15 @@ export { app };
 export default Sentry.withSentry(
   (env) => ({
     dsn: (env as unknown as Bindings).SENTRY_DSN,
+    // WI-2717 — only the explicitly bridged, PII-free daily LLM threshold
+    // warning uses Sentry.logger. We intentionally do not install
+    // consoleLoggingIntegration(), so unrelated console output stays out of
+    // Sentry Logs and the beforeBreadcrumb console guard remains intact.
+    enableLogs: true,
+    // Sentry enriches logs with active user/trace/SDK attributes before this
+    // hook. Rebuild the canonical seven-field allowlist at the final
+    // pre-serialization boundary and drop every unrelated direct SDK log.
+    beforeSendLog: scrubLlmVolumeAlertSentryLog,
     tracesSampleRate:
       (env as unknown as Bindings).ENVIRONMENT === 'production' ? 0.1 : 1.0,
     // [WI-2339] @sentry/cloudflare's sdk.js already defaults

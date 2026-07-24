@@ -21,14 +21,17 @@ Two related pieces:
    `environment`, `count`, `threshold`, `utc_date` fields) when a single Worker
    isolate's own count for a `(provider, environment)` pair crosses
    `LLM_DAILY_VOLUME_ALERT_THRESHOLD` (`5000`, exported from `router.ts`)
-   within a UTC day. This is a **queryable log line** on the deployment's log
-   sink (Sentry Logs / Cloudflare Logpush) — **not** a Sentry error or
-   captureMessage event. This is NOT a globally accurate daily total —
-   Cloudflare Workers isolates are ephemeral and do not share memory — it is
-   an early-warning signal for a single hot isolate; treat the external
-   log-pipeline sum as authoritative. The operator **alert rule** that pages on
-   `event: llm.volume.daily_threshold_exceeded` lives on the WI-1500 operator-
-   console alert-rules, not in this codebase.
+   within a UTC day. The production Worker entry point registers a structured
+   logger sink that forwards only that exact record to `Sentry.logger.warn`,
+   with the seven fields above reconstructed from an explicit allowlist.
+   `enableLogs: true` makes it queryable in Sentry Logs; the original
+   `console.warn` record remains available to Cloudflare. This is **not** a
+   Sentry error or `captureMessage` event, and Sentry's console-log integration
+   is deliberately not enabled. This is NOT a globally accurate daily total —
+   Cloudflare Workers isolates are ephemeral and do not share memory — it is an
+   early-warning signal for a single hot isolate; treat the external
+   log-pipeline sum as authoritative. The operator alert rule is configured
+   separately under WI-2706; it is not mutated by this code path.
 
 2. **Kill switch** — a KV-backed boolean, read lazily at the first LLM router
    choke point in each LLM request, that blocks learner-facing LLM traffic
@@ -123,13 +126,38 @@ error type already wired everywhere:
 | Signal | Threshold | Where |
 |---|---|---|
 | Aggregate daily volume (authoritative) | Operator-configured on the external log/metrics pipeline over the `llm.stop_reason` log line, grouped by `(provider, environment)` | Sentry Logs / Cloudflare Logpush query — no fixed number shipped in code; set per deployment's traffic baseline |
-| Per-isolate early warning (best-effort) | `LLM_DAILY_VOLUME_ALERT_THRESHOLD = 5000` requests, per `(provider, environment)`, per isolate, per UTC day | `apps/api/src/services/llm/router.ts` — emits a structured `logger.warn` **log line** with `event: llm.volume.daily_threshold_exceeded` (a queryable log record on Sentry Logs / Cloudflare Logpush, **not** a Sentry error/captureMessage event) |
+| Per-isolate early warning (best-effort) | `LLM_DAILY_VOLUME_ALERT_THRESHOLD = 5000` requests, per `(provider, environment)`, per isolate, per UTC day | `apps/api/src/services/llm/router.ts` emits the canonical structured warning; `apps/api/src/index.ts` routes only that record through `apps/api/src/services/llm-volume-alert-sink.ts` to Sentry Logs while preserving the Cloudflare console line |
 
 Tune `LLM_DAILY_VOLUME_ALERT_THRESHOLD` in `router.ts` if the per-isolate
 signal is too noisy or too quiet once real traffic volume is known; it is a
 named exported constant, not a magic number. The **alert rule** that fires on
-this log event is configured on the WI-1500 operator-console alert-rules (a
-metric-emission hook here + an alert rule there), not in this repo.
+this log event is configured under WI-2706 (a metric-emission hook here + an
+alert rule there), not in this repo.
+
+### 5.1 Production sink query and bounded proof
+
+After this code lands and the API Worker is deployed through the authorized
+production workflow, Sentry Logs should return the canonical record for:
+
+```text
+message:"llm.volume.daily_threshold_exceeded"
+```
+
+The record's custom attributes must be exactly `event`, `surface`, `provider`,
+`environment`, `count`, `threshold`, and `utc_date`. No prompt, response,
+learner text, profile/session identifier, or arbitrary logger context is
+forwarded. Because the Sentry SDK enriches logs before serialization,
+`beforeSendLog` reconstructs this seven-field allowlist at the final boundary
+and drops every unrelated direct SDK log. `beforeSend`,
+`beforeSendTransaction`, and `beforeBreadcrumb: dropConsoleBreadcrumb` remain
+installed; enabling Sentry Logs does not opt into
+`consoleLoggingIntegration()`.
+
+The source-to-sink proof is a separate authorized operation: emit one bounded
+synthetic through the deployed Worker path, query the record and seven fields
+above in Sentry Logs, then let WI-2706 configure and verify the alert without
+changing unrelated rules. Do not simulate the transport by calling Sentry
+directly—the proof must originate from the repository logger path.
 
 ## 6. Rollback / recovery
 
