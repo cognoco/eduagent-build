@@ -15,9 +15,11 @@ import {
 } from '@eduagent/schemas';
 import * as learningTextGuard from './persisted-learning-text-guard';
 
+type EvidenceLinkWriter = Pick<Database, 'insert'>;
+
 /** Record transcript-safe provenance for an artifact without copying text. */
 export async function recordArtifactEvidenceLinks(
-  db: Database,
+  db: EvidenceLinkWriter,
   params: { profileId: string; artifactId: string; sourceEventIds: string[] },
 ): Promise<void> {
   const sourceEventIds = [...new Set(params.sourceEventIds)];
@@ -95,7 +97,7 @@ export async function persistVerifiedChallengeArtifacts(
       if (!artifact) {
         throw new Error('Challenge artifact insert did not return a row');
       }
-      await recordArtifactEvidenceLinks(tx as unknown as Database, {
+      await recordArtifactEvidenceLinks(tx, {
         profileId: params.profileId,
         artifactId: artifact.id,
         sourceEventIds: input.sourceEventIds,
@@ -178,20 +180,33 @@ export async function resolveEvidenceLink(
   link: EvidenceLink,
 ): Promise<EvidenceLinkResolution> {
   const repo = createScopedRepository(db, link.profileId);
-  const target =
-    link.toKind === 'note'
-      ? await repo.topicNotes.findId(eq(topicNotes.id, link.toId))
-      : link.toKind === 'bookmark'
-        ? await repo.bookmarks.findId(eq(bookmarks.id, link.toId))
-        : link.toKind === 'homework_ocr'
-          ? await resolveHomeworkOcrTarget(repo, link.toId)
-          : await repo.sessionEvents.findId(eq(sessionEvents.id, link.toId));
+  let target: { id: string } | undefined;
+  switch (link.toKind) {
+    case 'note':
+      target = await repo.topicNotes.findId(eq(topicNotes.id, link.toId));
+      break;
+    case 'bookmark':
+      target = await repo.bookmarks.findId(eq(bookmarks.id, link.toId));
+      break;
+    case 'homework_ocr':
+      target = await resolveHomeworkOcrTarget(repo, link.toId);
+      break;
+    case 'transcript_excerpt':
+      target = await repo.sessionEvents.findId(eq(sessionEvents.id, link.toId));
+      break;
+    default:
+      return assertUnreachableEvidenceLinkToKind(link.toKind);
+  }
 
   return {
     evidenceLinkId: link.id,
     toKind: link.toKind,
     availability: target ? 'available' : 'source_unavailable',
   };
+}
+
+function assertUnreachableEvidenceLinkToKind(value: never): never {
+  throw new Error(`Unhandled evidence-link target kind: ${value}`);
 }
 
 async function resolveHomeworkOcrTarget(
