@@ -50,7 +50,11 @@ import type {
   ConsentStatus,
   ConsentAccountabilityRecord,
 } from '@eduagent/schemas';
-import { CONSENT_PURPOSES, consentPurposeSchema } from '@eduagent/schemas';
+import {
+  CONSENT_PURPOSES,
+  consentPurposeSchema,
+  isoDateField,
+} from '@eduagent/schemas';
 
 /**
  * The regulatory/lawful bases the consent workflow runs per (mirroring the
@@ -983,9 +987,9 @@ export function consentGateSatisfiedSql(personColumn: ReturnType<typeof sql>) {
  * [WI-1193 AC1] `termsAcceptedAt`/`termsVersion` come from the grant's
  * `audit_fact` (the durable terms-acceptance fact recorded at signup, kept
  * SEPARATE from the lawful basis per MMT-ADR-0011), NOT a rename of
- * `granted_at`. `termsAcceptedAt` falls back to `granted_at` and `termsVersion`
- * to null for grants written before the fact was captured, so pre-existing rows
- * still resolve. The withdrawal path MERGES `audit_fact`, so these survive a
+ * `granted_at`. Both fields remain null for grants written before the fact was
+ * captured; a grant or withdrawal timestamp must never fabricate acceptance.
+ * The withdrawal path MERGES `audit_fact`, so captured facts survive a
  * withdrawal — the report proves consent WAS validly obtained even after it is
  * withdrawn.
  *
@@ -1020,23 +1024,15 @@ export async function getConsentAccountabilityV2(
   // `minGrantedAt` aggregate above.
   return list.map((r) => {
     const audit = parseAuditFact(r.audit_fact);
-    const acceptedAt =
-      typeof audit?.['termsAcceptedAt'] === 'string'
-        ? (audit['termsAcceptedAt'] as string)
-        : null;
+    const termsFact = parseVersionedTermsFact(audit);
     return {
       purpose: consentPurposeSchema.parse(r.purpose),
       lawfulBasis: r.lawful_basis,
       granted: r.granted,
-      // Durable terms-acceptance moment; fall back to granted_at for grants
-      // written before the fact was captured.
-      termsAcceptedAt: acceptedAt
-        ? new Date(acceptedAt)
-        : new Date(r.granted_at),
-      termsVersion:
-        typeof audit?.['termsVersion'] === 'string'
-          ? (audit['termsVersion'] as string)
-          : null,
+      // A missing acceptance fact stays missing. The grant and withdrawal
+      // timestamps describe different events and must not substitute for it.
+      termsAcceptedAt: termsFact?.termsAcceptedAt ?? null,
+      termsVersion: termsFact?.termsVersion ?? null,
       withdrawnAt: r.withdrawn_at ? new Date(r.withdrawn_at) : null,
     };
   });
@@ -1069,4 +1065,28 @@ function parseAuditFact(
   } catch {
     return null;
   }
+}
+
+/**
+ * Acceptance is one atomic, versioned fact. Partial or malformed historical
+ * JSON must not assert acceptance and must not make the report endpoint fail.
+ */
+function parseVersionedTermsFact(
+  audit: Record<string, unknown> | null,
+): { termsAcceptedAt: Date; termsVersion: string } | null {
+  const acceptedAt = audit?.['termsAcceptedAt'];
+  const version = audit?.['termsVersion'];
+  if (
+    typeof acceptedAt !== 'string' ||
+    typeof version !== 'string' ||
+    version.trim().length === 0
+  ) {
+    return null;
+  }
+  const parsedAt = isoDateField.safeParse(acceptedAt);
+  if (!parsedAt.success) return null;
+  return {
+    termsAcceptedAt: new Date(parsedAt.data),
+    termsVersion: version,
+  };
 }
