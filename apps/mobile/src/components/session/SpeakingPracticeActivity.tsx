@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -48,7 +54,27 @@ export function SpeakingPracticeActivity({
   const [feedback, setFeedback] = useState<AttemptFeedback | null>(null);
   const [attemptFailed, setAttemptFailed] = useState(false);
   const wasListeningRef = useRef(false);
+  const attemptGenerationRef = useRef(0);
   const { t } = useTranslation();
+
+  // Only the request belonging to the current recording/session generation
+  // may update feedback. Layout cleanup is intentionally commit-synchronous:
+  // changing session context or unmounting must invalidate in-flight requests
+  // before a promise continuation can settle into stale UI.
+  useLayoutEffect(() => {
+    attemptGenerationRef.current += 1;
+    setFeedback(null);
+    setAttemptFailed(false);
+
+    return () => {
+      attemptGenerationRef.current += 1;
+    };
+  }, [
+    sessionId,
+    subjectId,
+    speakingPractice?.targetText,
+    speakingPractice?.locale,
+  ]);
 
   // Submits exactly once per stop-listening transition, when a non-empty
   // transcript exists. Guarded by `wasListeningRef` so a late STT `result`
@@ -59,6 +85,7 @@ export function SpeakingPracticeActivity({
     if (wasListeningRef.current && !isListening) {
       const trimmed = transcript.trim();
       if (trimmed && speakingPractice) {
+        const attemptGeneration = ++attemptGenerationRef.current;
         setAttemptFailed(false);
         void (async () => {
           try {
@@ -70,12 +97,14 @@ export function SpeakingPracticeActivity({
               transcript: trimmed,
               locale: speakingPractice.locale,
             });
+            if (attemptGeneration !== attemptGenerationRef.current) return;
             setFeedback({
               missingWords: result.missingWords,
               extraWords: result.extraWords,
               isComplete: result.isComplete,
             });
           } catch {
+            if (attemptGeneration !== attemptGenerationRef.current) return;
             setAttemptFailed(true);
           }
         })();
@@ -105,6 +134,7 @@ export function SpeakingPracticeActivity({
       void stopListening();
       return;
     }
+    attemptGenerationRef.current += 1;
     setFeedback(null);
     setAttemptFailed(false);
     void startListening();
@@ -113,6 +143,7 @@ export function SpeakingPracticeActivity({
   const handleRetry = useCallback(() => {
     // Target text is a prop derived from `activity`, never local state — no
     // code path here can lose it. Only the transcript/feedback reset.
+    attemptGenerationRef.current += 1;
     clearTranscript();
     setFeedback(null);
     setAttemptFailed(false);
