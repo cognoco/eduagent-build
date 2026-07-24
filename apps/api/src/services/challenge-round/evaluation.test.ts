@@ -1,4 +1,7 @@
-import type { ChallengeRoundEvaluationItem } from '@eduagent/schemas';
+import type {
+  ChallengeRoundEvaluationItem,
+  ChallengeRoundQuestionIdentity,
+} from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import {
   decideMasteryAndReview,
@@ -13,6 +16,12 @@ const allSolid: ChallengeRoundEvaluationItem[] = [
     evidence: 'x',
     answerEventId: '00000000-0000-4000-8000-000000000001',
     learnerQuote: 'I said a clearly',
+    questionIdentity: {
+      questionText: 'Explain why a works.',
+      minimalLearningClaim: 'a works through its stated mechanism',
+      cognitiveOperation: 'causal_explanation',
+      materialContext: '',
+    },
   },
   {
     concept: 'b',
@@ -20,6 +29,12 @@ const allSolid: ChallengeRoundEvaluationItem[] = [
     evidence: 'y',
     answerEventId: '00000000-0000-4000-8000-000000000002',
     learnerQuote: 'I said b clearly',
+    questionIdentity: {
+      questionText: 'Compare b with its alternative.',
+      minimalLearningClaim: 'b differs from its alternative',
+      cognitiveOperation: 'comparison',
+      materialContext: '',
+    },
   },
   {
     concept: 'c',
@@ -27,8 +42,24 @@ const allSolid: ChallengeRoundEvaluationItem[] = [
     evidence: 'z',
     answerEventId: '00000000-0000-4000-8000-000000000003',
     learnerQuote: 'I said c clearly',
+    questionIdentity: {
+      questionText: 'Apply c in a new case.',
+      minimalLearningClaim: 'c transfers to the new case',
+      cognitiveOperation: 'application',
+      materialContext: 'new case',
+    },
   },
 ];
+
+function withQuestionIdentity(
+  evaluation: ChallengeRoundEvaluationItem,
+  questionIdentity: ChallengeRoundQuestionIdentity,
+): ChallengeRoundEvaluationItem {
+  return {
+    ...evaluation,
+    questionIdentity,
+  };
+}
 
 const mixed: ChallengeRoundEvaluationItem[] = [
   {
@@ -84,6 +115,138 @@ describe('decideMasteryAndReview — happy path (all solid)', () => {
       'I said b clearly',
       'I said c clearly',
     ]);
+  });
+});
+
+describe('decideMasteryAndReview — distinct probe breadth [WI-2464]', () => {
+  const sameClaim = 'photosynthesis stores light energy as chemical energy';
+  const sameContext = 'a plant leaf in sunlight';
+
+  it('returns insufficient_breadth when all-solid evaluations repeat an equivalent probe', () => {
+    const repeatedProbe = allSolid.slice(0, 2).map((evaluation, index) =>
+      withQuestionIdentity(evaluation, {
+        questionText:
+          index === 0
+            ? 'Why does photosynthesis store sunlight as chemical energy?'
+            : 'How does photosynthesis turn sunlight into stored chemical energy?',
+        minimalLearningClaim: sameClaim,
+        cognitiveOperation: 'causal_explanation',
+        materialContext: sameContext,
+      }),
+    );
+
+    const decision = decideMasteryAndReview(repeatedProbe);
+
+    expect(decision.outcome).toBe('insufficient_breadth');
+    expect(decision.markMasteryVerified).toBe(false);
+  });
+
+  it('allows a narrow topic to verify through genuinely different reasoning', () => {
+    const distinctNarrowTopicProbes = [
+      withQuestionIdentity(allSolid[0]!, {
+        questionText:
+          'Why does photosynthesis store sunlight as chemical energy?',
+        minimalLearningClaim: sameClaim,
+        cognitiveOperation: 'causal_explanation',
+        materialContext: sameContext,
+      }),
+      withQuestionIdentity(allSolid[1]!, {
+        questionText:
+          'Compare how a leaf stores energy in sunlight and in darkness.',
+        minimalLearningClaim: sameClaim,
+        cognitiveOperation: 'comparison',
+        materialContext: sameContext,
+      }),
+    ];
+
+    const decision = decideMasteryAndReview(distinctNarrowTopicProbes);
+
+    expect(decision.outcome).toBe('verified');
+    expect(decision.markMasteryVerified).toBe(true);
+  });
+
+  it('treats an exact normalized duplicate as a repeat despite conflicting metadata', () => {
+    const exactDuplicate = [
+      withQuestionIdentity(allSolid[0]!, {
+        questionText: 'Why does a leaf store light energy?',
+        minimalLearningClaim: sameClaim,
+        cognitiveOperation: 'causal_explanation',
+        materialContext: sameContext,
+      }),
+      withQuestionIdentity(allSolid[1]!, {
+        questionText: '  WHY does a leaf store light-energy?!  ',
+        minimalLearningClaim: 'a conflicting model claim',
+        cognitiveOperation: 'comparison',
+        materialContext: 'a conflicting model context',
+      }),
+    ];
+
+    expect(decideMasteryAndReview(exactDuplicate).outcome).toBe(
+      'insufficient_breadth',
+    );
+  });
+
+  it('keeps bridged equivalents in one probe class regardless of item order', () => {
+    const bridgedDuplicates = [
+      withQuestionIdentity(allSolid[0]!, {
+        questionText: 'Why does a leaf store light energy?',
+        minimalLearningClaim: sameClaim,
+        cognitiveOperation: 'causal_explanation',
+        materialContext: sameContext,
+      }),
+      withQuestionIdentity(allSolid[1]!, {
+        questionText: '  WHY does a leaf store light-energy?!  ',
+        minimalLearningClaim: 'leaf energy storage under artificial light',
+        cognitiveOperation: 'comparison',
+        materialContext: 'an algae bioreactor',
+      }),
+      withQuestionIdentity(allSolid[2]!, {
+        questionText:
+          'Compare energy storage inside two artificially lit algae tanks.',
+        minimalLearningClaim: 'leaf energy storage under artificial light',
+        cognitiveOperation: 'comparison',
+        materialContext: 'an algae bioreactor',
+      }),
+    ];
+
+    expect(decideMasteryAndReview(bridgedDuplicates).outcome).toBe(
+      'insufficient_breadth',
+    );
+  });
+
+  it('allows the same claim and operation in a genuinely new context', () => {
+    const newContext = [
+      withQuestionIdentity(allSolid[0]!, {
+        questionText:
+          'Why does photosynthesis store sunlight as chemical energy in a leaf?',
+        minimalLearningClaim: sameClaim,
+        cognitiveOperation: 'causal_explanation',
+        materialContext: 'a plant leaf in sunlight',
+      }),
+      withQuestionIdentity(allSolid[1]!, {
+        questionText:
+          'Why would the same energy conversion matter inside an algae bioreactor?',
+        minimalLearningClaim: sameClaim,
+        cognitiveOperation: 'causal_explanation',
+        materialContext: 'an algae bioreactor under artificial light',
+      }),
+    ];
+
+    expect(decideMasteryAndReview(newContext).outcome).toBe('verified');
+  });
+
+  it('fails closed when legacy all-solid evaluations lack identity evidence', () => {
+    const legacyWithoutIdentity = allSolid
+      .slice(0, 2)
+      .map(
+        ({ questionIdentity: _questionIdentity, ...evaluation }) => evaluation,
+      );
+
+    expect(
+      decideMasteryAndReview(
+        legacyWithoutIdentity as ChallengeRoundEvaluationItem[],
+      ).outcome,
+    ).toBe('insufficient_breadth');
   });
 });
 

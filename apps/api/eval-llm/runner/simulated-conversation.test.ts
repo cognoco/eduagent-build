@@ -290,11 +290,42 @@ describe('runSimulatedRound — conversation loop', () => {
     const verifiedProfile = PROFILES.find(
       (p) => p.id === verifiedScenario.profileId,
     )!;
+    const tutorQuestions = [
+      'Compare rapid burial with remains left exposed at the surface.',
+      'Apply that reasoning to remains buried by a sudden ash fall.',
+    ];
+    const identities = [
+      {
+        minimalLearningClaim: 'rapid burial protects remains from decay',
+        cognitiveOperation: 'causal_explanation' as const,
+        materialContext: 'bones buried rapidly in sediment',
+      },
+      {
+        minimalLearningClaim: 'rapid burial protects remains from decay',
+        cognitiveOperation: 'comparison' as const,
+        materialContext: 'buried remains compared with exposed remains',
+      },
+      {
+        minimalLearningClaim: 'rapid burial protects remains from decay',
+        cognitiveOperation: 'application' as const,
+        materialContext: 'remains buried by a sudden ash fall',
+      },
+    ];
+    let tutorIndex = 0;
+    let graderIndex = 0;
     const overrides: SimulatedRoundOverrides = {
       learnerTurn: async () =>
         'Because rapid burial protects the bones from decay.',
-      tutorTurn: async () => 'Great — and then what?',
-      graderTurn: async () => gradedItems('solid'),
+      tutorTurn: async () => tutorQuestions[tutorIndex++]!,
+      graderTurn: async ({ askedQuestion }) => [
+        {
+          ...gradedItems('solid')[0]!,
+          questionIdentity: {
+            questionText: askedQuestion,
+            ...identities[graderIndex++]!,
+          },
+        },
+      ],
     };
     const result = await runSimulatedRound(
       {

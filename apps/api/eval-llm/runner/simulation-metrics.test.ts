@@ -167,6 +167,7 @@ describe('aggregate', () => {
       verified: 2,
       partial: 1,
       reteach: 0,
+      insufficient_breadth: 0,
       invalid: 1,
     });
     expect(m.conceptResultCounts).toEqual({
@@ -384,6 +385,7 @@ const OUTCOME_QUARTERS = {
   verified: 0.25,
   partial: 0.25,
   reteach: 0.25,
+  insufficient_breadth: 0,
   invalid: 0.25,
 } as const;
 
@@ -391,7 +393,13 @@ function makeMetrics(over: Partial<SimMetrics> = {}): SimMetrics {
   return {
     totalRounds: 20,
     sufficientForCalibration: false,
-    outcomeCounts: { verified: 5, partial: 5, reteach: 5, invalid: 5 },
+    outcomeCounts: {
+      verified: 5,
+      partial: 5,
+      reteach: 5,
+      insufficient_breadth: 0,
+      invalid: 5,
+    },
     outcomeRates: { ...OUTCOME_QUARTERS },
     conceptResultCounts: { solid: 0, partial: 0, missing: 0, misconception: 0 },
     masteryVerifiedRate: 0.5,

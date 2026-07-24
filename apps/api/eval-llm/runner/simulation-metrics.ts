@@ -29,6 +29,7 @@ const ALL_OUTCOMES: MasteryOutcome[] = [
   'verified',
   'partial',
   'reteach',
+  'insufficient_breadth',
   'invalid',
 ];
 type ConceptResult = 'solid' | 'partial' | 'missing' | 'misconception';
@@ -77,7 +78,7 @@ export interface SimMetrics {
   /** The exact scenario ids that over-credited (gate `verified`, ground truth
    *  not). Feeds the hard ceiling: a non-empty list means a breach to name. */
   overCreditScenarioIds: string[];
-  /** Gate said `partial`/`reteach`/`invalid` but ground truth was `verified`. */
+  /** Gate did not verify mastery but ground truth was `verified`. */
   underCreditRate: number;
   /** Share of rounds whose GRADER emitted a usable evaluation signal, overall… */
   signalEmissionRate: number;
@@ -130,6 +131,7 @@ export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
     verified: 0,
     partial: 0,
     reteach: 0,
+    insufficient_breadth: 0,
     invalid: 0,
   };
   const conceptResultCounts: Record<ConceptResult, number> = {

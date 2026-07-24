@@ -66,6 +66,10 @@ describe('buildChallengeRoundGraderPrompt', () => {
     expect(systemContent).toContain('"result"');
     expect(systemContent).toContain('"evidence"');
     expect(systemContent).toContain('"learnerQuote"');
+    expect(systemContent).toContain('"questionIdentity"');
+    expect(systemContent).toContain('"minimalLearningClaim"');
+    expect(systemContent).toContain('"cognitiveOperation"');
+    expect(systemContent).toContain('"materialContext"');
   });
 
   it('includes min-1 items requirement', () => {

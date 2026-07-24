@@ -19,6 +19,8 @@ import type { ChallengeRoundEvaluationItem } from '@eduagent/schemas';
  *  - An empty evaluation array → `outcome: 'invalid'` and NEVER
  *    `markMasteryVerified` (CRIT-9: `0 === 0` would otherwise pass a
  *    naive "all solid" check).
+ *  - Verified mastery requires at least two genuinely non-equivalent probes.
+ *    Equivalent paraphrases cannot manufacture breadth from repeated evidence.
  *  - A single `partial` or `misconception` is sufficient to block
  *    `markMasteryVerified` regardless of how many concepts were solid.
  *  - `solidConcepts` / `solidAnswerQuotes` only ever contain items
@@ -45,7 +47,12 @@ export interface ReviewTarget {
   source: 'challenge_round';
 }
 
-export type MasteryOutcome = 'verified' | 'partial' | 'reteach' | 'invalid';
+export type MasteryOutcome =
+  | 'verified'
+  | 'partial'
+  | 'reteach'
+  | 'insufficient_breadth'
+  | 'invalid';
 
 export interface MasteryDecision {
   outcome: MasteryOutcome;
@@ -61,6 +68,69 @@ export interface EvaluationSummary {
   missing: number;
   misconception: number;
   total: number;
+}
+
+const REQUIRED_DISTINCT_PROBES = 2;
+
+function normalizeIdentityPart(value: string): string {
+  return value
+    .normalize('NFKC')
+    .toLocaleLowerCase('en')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function questionsAreEquivalent(
+  left: ChallengeRoundEvaluationItem,
+  right: ChallengeRoundEvaluationItem,
+): boolean {
+  const leftIdentity = left.questionIdentity;
+  const rightIdentity = right.questionIdentity;
+  if (!leftIdentity || !rightIdentity) return false;
+
+  if (
+    normalizeIdentityPart(leftIdentity.questionText) ===
+    normalizeIdentityPart(rightIdentity.questionText)
+  ) {
+    return true;
+  }
+
+  return (
+    normalizeIdentityPart(leftIdentity.minimalLearningClaim) ===
+      normalizeIdentityPart(rightIdentity.minimalLearningClaim) &&
+    leftIdentity.cognitiveOperation === rightIdentity.cognitiveOperation &&
+    normalizeIdentityPart(leftIdentity.materialContext) ===
+      normalizeIdentityPart(rightIdentity.materialContext)
+  );
+}
+
+function countDistinctProbes(evals: ChallengeRoundEvaluationItem[]): number {
+  const identified = evals.filter((evaluation) => evaluation.questionIdentity);
+  const visited = new Set<number>();
+  let classCount = 0;
+
+  for (let index = 0; index < identified.length; index += 1) {
+    if (visited.has(index)) continue;
+    classCount += 1;
+    visited.add(index);
+
+    const pending = [index];
+    while (pending.length > 0) {
+      const current = pending.pop()!;
+      for (let candidate = 0; candidate < identified.length; candidate += 1) {
+        if (
+          !visited.has(candidate) &&
+          questionsAreEquivalent(identified[current]!, identified[candidate]!)
+        ) {
+          visited.add(candidate);
+          pending.push(candidate);
+        }
+      }
+    }
+  }
+
+  return classCount;
 }
 
 /**
@@ -167,6 +237,16 @@ export function decideMasteryAndReview(
   }
 
   if (solidItems.length === evals.length && !hasMisconception && !hasPartial) {
+    if (countDistinctProbes(solidItems) < REQUIRED_DISTINCT_PROBES) {
+      return {
+        outcome: 'insufficient_breadth',
+        markMasteryVerified: false,
+        solidConcepts,
+        solidAnswerQuotes,
+        reviewTargets: [],
+      };
+    }
+
     return {
       outcome: 'verified',
       markMasteryVerified: true,
