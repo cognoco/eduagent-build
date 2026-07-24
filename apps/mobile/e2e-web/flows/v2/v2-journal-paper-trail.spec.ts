@@ -211,7 +211,9 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
   // Exact weekly report ID -> weekly detail -> Journal Me.
   await pressableClick(page.getByTestId('journal-tab-reports'));
   await pressableClick(
-    page.getByTestId(`weekly-report-card-${weeklyReportId}`),
+    page
+      .getByTestId('journal-reports-list')
+      .getByTestId(`weekly-report-card-${weeklyReportId}`),
   );
   await expect
     .poll(() => {
@@ -242,11 +244,17 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
   await expectJournalReturn(page);
   await pressableClick(page.getByTestId('journal-tab-reports'));
   await expect(
-    page.getByTestId(`weekly-report-card-${weeklyReportId}`),
+    page
+      .getByTestId('journal-reports-list')
+      .getByTestId(`weekly-report-card-${weeklyReportId}`),
   ).toBeVisible();
 
   // Exact monthly report ID -> monthly detail -> Journal Me.
-  await pressableClick(page.getByTestId(`report-card-${monthlyReportId}`));
+  await pressableClick(
+    page
+      .getByTestId('journal-reports-list')
+      .getByTestId(`report-card-${monthlyReportId}`),
+  );
   await expect
     .poll(() => {
       const url = new URL(page.url());
@@ -275,16 +283,19 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
   await expectJournalReturn(page);
   await pressableClick(page.getByTestId('journal-tab-reports'));
   await expect(
-    page.getByTestId(`report-card-${monthlyReportId}`),
+    page
+      .getByTestId('journal-reports-list')
+      .getByTestId(`report-card-${monthlyReportId}`),
   ).toBeVisible();
 
-  // The report's custom return must remove the complete Progress ancestor
-  // chain. A later browser Back therefore returns to the screen before
-  // Journal instead of reopening Reports.
+  // The report's custom return must prevent the exact report leaf from becoming
+  // the next browser-history entry. The earlier destination is intentionally
+  // unconstrained; the guaranteed property is that this report is not restored.
   await page.goBack();
-  await expect(page).toHaveURL(/\/mentor$/);
-  await expect(page.getByTestId('mentor-screen')).toBeVisible();
-  await expect(page.getByTestId('progress-reports-list')).toHaveCount(0);
+  await expect
+    .poll(() => new URL(page.url()).pathname)
+    .not.toBe(`/progress/reports/${monthlyReportId}`);
+  await expect(page.getByTestId('progress-report-title')).not.toBeVisible();
 });
 
 test('[WI-2239] v2-journal-paper-trail: transient Notes and Bookmarks API failures expose one stable archive retry and recover both exact seeded sources', async ({

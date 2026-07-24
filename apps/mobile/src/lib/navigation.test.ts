@@ -196,45 +196,28 @@ describe('goBackOrReplace', () => {
 });
 
 describe('returnJournalReportToCaller [WI-2239]', () => {
-  function createRouter(canGoBack: boolean) {
+  function createRouter() {
     return {
-      back: jest.fn(),
-      canGoBack: jest.fn().mockReturnValue(canGoBack),
       dismissTo: jest.fn(),
       replace: jest.fn(),
-    } satisfies Pick<Router, 'back' | 'canGoBack' | 'dismissTo' | 'replace'>;
+    } satisfies Pick<Router, 'dismissTo' | 'replace'>;
   }
 
-  it('returns the web report to its exact Journal history entry', () => {
-    const router = createRouter(true);
+  it('replaces the web report with its exact Journal caller', () => {
+    const router = createRouter();
 
     returnJournalReportToCaller(router, 'web');
 
-    expect(router.canGoBack).toHaveBeenCalledTimes(1);
-    expect(router.back).toHaveBeenCalledTimes(1);
-    expect(router.replace).not.toHaveBeenCalled();
-    expect(router.dismissTo).not.toHaveBeenCalled();
-  });
-
-  it('replaces a direct web report deep-link with the Journal caller', () => {
-    const router = createRouter(false);
-
-    returnJournalReportToCaller(router, 'web');
-
-    expect(router.canGoBack).toHaveBeenCalledTimes(1);
-    expect(router.back).not.toHaveBeenCalled();
     expect(router.replace).toHaveBeenCalledWith(JOURNAL_HREF);
     expect(router.dismissTo).not.toHaveBeenCalled();
   });
 
   it('dismisses the complete native report stack to Journal', () => {
-    const router = createRouter(true);
+    const router = createRouter();
 
     returnJournalReportToCaller(router, 'native');
 
     expect(router.dismissTo).toHaveBeenCalledWith(JOURNAL_HREF);
-    expect(router.canGoBack).not.toHaveBeenCalled();
-    expect(router.back).not.toHaveBeenCalled();
     expect(router.replace).not.toHaveBeenCalled();
   });
 });

@@ -184,16 +184,16 @@ export function goBackOrReplace(
 /**
  * Return a Journal-origin report to Journal without leaving Reports behind.
  *
- * Web preserves the caller in browser history, so Back is the exact inverse
- * of the report push; a direct deep-link replaces safely. Native receives a
- * seeded cross-tab ancestor stack and must dismiss that complete stack.
+ * Web replaces the report with Journal because Expo Router's stack can point
+ * at the hidden Progress ancestor instead of the visible Journal caller.
+ * Native dismisses the complete cross-tab Progress ancestry to Journal.
  */
 export function returnJournalReportToCaller(
-  router: Pick<Router, 'back' | 'canGoBack' | 'dismissTo' | 'replace'>,
+  router: Pick<Router, 'dismissTo' | 'replace'>,
   platform: 'web' | 'native',
 ): void {
   if (platform === 'web') {
-    goBackOrReplace(router, JOURNAL_HREF);
+    router.replace(JOURNAL_HREF);
     return;
   }
 
