@@ -64,6 +64,10 @@ export function consumeHubToSessionTransition(subjectId: string): boolean {
   return consumeTransition({ kind: 'hub-to-session', subjectId });
 }
 
-export function resetNavigationTransitionProvenanceForTests(): void {
+export function clearNavigationTransitionProvenance(): void {
   pendingTransition = undefined;
+}
+
+export function resetNavigationTransitionProvenanceForTests(): void {
+  clearNavigationTransitionProvenance();
 }
