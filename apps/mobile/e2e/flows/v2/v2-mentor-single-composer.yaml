@@ -50,14 +50,13 @@ tags:
     id: 'mentor-bar-send'
     enabled: true
 
-# The homework starter reuses the composer's Camera action instead of mounting
-# a second control, and it preserves the learner's existing draft.
+# The homework starter preserves the learner's existing draft while the
+# composer's canonical Camera action remains available. Component and web E2E
+# coverage prove the removed duplicate control stays absent.
 - tapOn:
     id: 'cold-start-chip-homework'
 - assertVisible:
     id: 'cold-start-homework-reply'
-- assertNotVisible:
-    id: 'cold-start-homework-camera'
 - assertVisible:
     id: 'mentor-bar-camera'
 - assertVisible:
