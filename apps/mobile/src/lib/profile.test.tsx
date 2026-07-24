@@ -16,7 +16,6 @@ import {
 } from './api-client';
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
 import { queryKeys } from './query-keys';
-import { nowFeedQueryKey } from '../hooks/use-now-feed';
 import { NOW_FEED_CACHE_POLICY_EPOCH } from './now-feed-cache';
 
 // ./secure-storage uses real implementation: expo-secure-store is globally mocked
@@ -545,7 +544,7 @@ describe('ProfileProvider', () => {
         value: { topicId: 'topic-1' },
       },
       {
-        key: nowFeedQueryKey(
+        key: queryKeys.now.feed(
           'clerk-user-test',
           OWNER_PROFILE_ID,
           NOW_FEED_CACHE_POLICY_EPOCH,
@@ -553,12 +552,11 @@ describe('ProfileProvider', () => {
         value: { cards: [{ templateKey: 'profile-a-card' }] },
       },
       {
-        key: [
-          'now-overflow',
+        key: queryKeys.now.overflow(
           'clerk-user-test',
           OWNER_PROFILE_ID,
           NOW_FEED_CACHE_POLICY_EPOCH,
-        ],
+        ),
         value: { items: [{ templateKey: 'profile-a-overflow-item' }] },
       },
     ];
@@ -633,17 +631,16 @@ describe('ProfileProvider', () => {
       ['quiz-recent', OWNER_PROFILE_ID],
       ['quiz-stats', OWNER_PROFILE_ID],
       ['topic-suggestions', 'subject-1', OWNER_PROFILE_ID],
-      nowFeedQueryKey(
+      queryKeys.now.feed(
         'clerk-user-test',
         OWNER_PROFILE_ID,
         NOW_FEED_CACHE_POLICY_EPOCH,
       ),
-      [
-        'now-overflow',
+      queryKeys.now.overflow(
         'clerk-user-test',
         OWNER_PROFILE_ID,
         NOW_FEED_CACHE_POLICY_EPOCH,
-      ],
+      ),
     ];
     const scopedPrefixes = new Set(
       [...profileScopedFactoryKeys, ...representativeScopedLiteralKeys].map(

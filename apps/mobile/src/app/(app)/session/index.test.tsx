@@ -17,9 +17,9 @@ import {
   type RenderScreenResult,
 } from '../../../test-utils/screen-render';
 import SessionScreen from './index';
-import { nowFeedQueryKey } from '../../../hooks/use-now-feed';
 import * as nowFeedModule from '../../../hooks/use-now-feed';
 import { NOW_FEED_CACHE_POLICY_EPOCH } from '../../../lib/now-feed-cache';
+import { queryKeys } from '../../../lib/query-keys';
 
 // Real session-recovery module; tests spy on readSessionRecoveryMarker as
 // needed via jest.spyOn().
@@ -971,7 +971,7 @@ describe('SessionScreen homework flow', () => {
     await waitFor(() =>
       expect(invalidateSpy).toHaveBeenCalledWith(
         {
-          queryKey: nowFeedQueryKey(
+          queryKey: queryKeys.now.feed(
             NOW_FEED_ACTOR_ID,
             ACTIVE_PROFILE_ID,
             NOW_FEED_POLICY_EPOCH,
@@ -1099,7 +1099,7 @@ describe('SessionScreen homework flow', () => {
     await waitFor(() =>
       expect(invalidateSpy).toHaveBeenCalledWith(
         {
-          queryKey: nowFeedQueryKey(
+          queryKey: queryKeys.now.feed(
             NOW_FEED_ACTOR_ID,
             ACTIVE_PROFILE_ID,
             persistedEpoch,
@@ -3075,7 +3075,7 @@ describe('SessionScreen homework flow', () => {
       expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor');
       expect(invalidateSpy).toHaveBeenCalledWith(
         {
-          queryKey: nowFeedQueryKey(
+          queryKey: queryKeys.now.feed(
             NOW_FEED_ACTOR_ID,
             ACTIVE_PROFILE_ID,
             NOW_FEED_POLICY_EPOCH,

@@ -181,6 +181,44 @@ describe('queryKeys mode-scoped factories', () => {
 });
 
 describe('queryKeys non-mode-scoped factories', () => {
+  it('keeps Now projections bound to exact actor/profile/epoch keys', () => {
+    const actorId = 'actor-abc';
+    const profileId = 'prof-abc';
+    const policyEpoch = 'epoch-enabled';
+
+    expect(queryKeys.now.feed(actorId, profileId, policyEpoch)).toEqual([
+      'now-feed',
+      actorId,
+      profileId,
+      policyEpoch,
+    ]);
+    expect(queryKeys.now.overflow(actorId, profileId, policyEpoch)).toEqual([
+      'now-overflow',
+      actorId,
+      profileId,
+      policyEpoch,
+    ]);
+  });
+
+  it.each([
+    ['feed', 'now-feed'],
+    ['overflow', 'now-overflow'],
+  ] as const)(
+    'rejects narrowed or wrongly bound Now %s keys',
+    (projection, prefix) => {
+      const actorId = 'actor-abc';
+      const profileId = 'prof-abc';
+      const policyEpoch = 'epoch-enabled';
+      const key = queryKeys.now[projection](actorId, profileId, policyEpoch);
+
+      expect(key).toHaveLength(4);
+      expect(key).not.toEqual([prefix, profileId, policyEpoch]);
+      expect(key).not.toEqual([prefix, 'actor-other', profileId, policyEpoch]);
+      expect(key).not.toEqual([prefix, actorId, 'prof-other', policyEpoch]);
+      expect(key).not.toEqual([prefix, actorId, profileId, 'epoch-disabled']);
+    },
+  );
+
   it('[WI-2184] matches only completed-session history keys for one profile', () => {
     const matchProfileHistory = queryKeys.historySessionsMatch('prof-abc');
 

@@ -61,10 +61,7 @@ import {
   useIsFirstSession,
 } from '../../../hooks/use-session-context';
 import { useNetworkStatus } from '../../../hooks/use-network-status';
-import {
-  nowFeedQueryKey,
-  useObservedPolicyEpoch,
-} from '../../../hooks/use-now-feed';
+import { useObservedPolicyEpoch } from '../../../hooks/use-now-feed';
 import { useApiReachability } from '../../../hooks/use-api-reachability';
 import { useCelebrationLevel } from '../../../hooks/use-settings';
 import { useLearnerProfile } from '../../../hooks/use-learner-profile';
@@ -77,6 +74,7 @@ import {
   useApiClient,
   type QuotaExceededDetails,
 } from '../../../lib/api-client';
+import { queryKeys } from '../../../lib/query-keys';
 import { classifyApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
 import { useCreateNote } from '../../../hooks/use-notes';
@@ -421,7 +419,7 @@ function SessionScreenInner() {
     // wait for that projection before remounting Mentor.
     await queryClient.invalidateQueries(
       {
-        queryKey: nowFeedQueryKey(
+        queryKey: queryKeys.now.feed(
           userId,
           activeProfile.id,
           observedNowFeedEpoch,
