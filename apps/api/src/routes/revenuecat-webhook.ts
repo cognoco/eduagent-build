@@ -8,7 +8,7 @@
 // services/billing/revenuecat-webhook-handler.ts. This route file owns ONLY:
 //   1. Bearer-token validation (timing-safe HMAC compare)
 //   2. Zod payload parsing
-//   3. account-resolution, idempotency gate, SANDBOX-in-prod guard,
+//   3. account-resolution, idempotency gate, bounded SANDBOX-in-prod guard,
 //      late-event observability log, ensureFreeSubscription
 //   4. event-type dispatch to the service-side handlers
 //   5. HTTP response
@@ -28,6 +28,7 @@ import { getRevenuecatWebhookHandlers } from '../services/billing/billing-v2/dis
 import { captureException, captureMessage } from '../services/sentry';
 import { createLogger } from '../services/logger';
 import { revenuecatAuthFailureEscalator } from '../services/webhooks/signature-failure-escalator';
+import { authorizeRevenuecatSandboxVerification } from '../services/billing/revenuecat-sandbox-verification';
 
 const logger = createLogger();
 
@@ -87,6 +88,7 @@ async function constantTimeCompare(a: string, b: string): Promise<boolean> {
 export const revenuecatWebhookRoute = new Hono<{
   Bindings: {
     REVENUECAT_WEBHOOK_SECRET?: string;
+    REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION?: string;
     SUBSCRIPTION_KV?: KVNamespace;
     ENVIRONMENT?: string;
   };
@@ -180,16 +182,32 @@ export const revenuecatWebhookRoute = new Hono<{
 
   const { event } = parsed.data;
 
+  const sandboxVerification =
+    event.environment === 'SANDBOX' && c.env.ENVIRONMENT === 'production'
+      ? authorizeRevenuecatSandboxVerification(
+          c.env.REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION,
+          event,
+        )
+      : undefined;
+
   // [WI-170 / DS-081] Production SANDBOX events must be rejected immediately
   // after payload validation, before account lookup, idempotency checks, free
-  // subscription provisioning, handler dispatch, KV writes, or any other
-  // billing-state mutation.
-  if (event.environment === 'SANDBOX' && c.env.ENVIRONMENT === 'production') {
+  // subscription provisioning, handler dispatch, KV writes, or any other billing
+  // mutation. [WI-2705] The sole exceptions are exact, <=15-minute server-side
+  // authorizations for one pre-observed Google Play INITIAL_PURCHASE grant or
+  // one NORMAL-period EXPIRATION cleanup event.
+  if (
+    event.environment === 'SANDBOX' &&
+    c.env.ENVIRONMENT === 'production' &&
+    !sandboxVerification?.authorized
+  ) {
     logger.warn(
       '[revenuecat] Rejected SANDBOX webhook event in production environment',
       {
         eventType: event.type,
         eventId: event.id,
+        verificationDenialReason:
+          sandboxVerification?.reason ?? 'missing_authorization',
       },
     );
     return c.json({
@@ -197,6 +215,20 @@ export const revenuecatWebhookRoute = new Hono<{
       skipped: true,
       reason: 'sandbox_in_production',
     });
+  }
+
+  if (sandboxVerification?.authorized) {
+    logger.warn(
+      '[revenuecat] Authorized bounded SANDBOX verification event in production',
+      {
+        authorizationId: sandboxVerification.authorizationId,
+        eventType: event.type,
+        eventId: event.id,
+        appId: event.app_id,
+        productId: event.product_id,
+        store: event.store,
+      },
+    );
   }
 
   // [revenuecat-webhook fail-closed guard] RevenueCat does not guarantee the
@@ -210,7 +242,8 @@ export const revenuecatWebhookRoute = new Hono<{
   // banned in billing/webhook code — escalate via logger.warn + captureMessage.
   if (
     c.env.ENVIRONMENT === 'production' &&
-    event.environment !== 'PRODUCTION'
+    event.environment !== 'PRODUCTION' &&
+    !sandboxVerification?.authorized
   ) {
     logger.warn(
       '[revenuecat] Rejected non-PRODUCTION webhook event in production environment',

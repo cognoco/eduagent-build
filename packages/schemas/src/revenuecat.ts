@@ -11,6 +11,7 @@ import { z } from 'zod';
 export const revenuecatWebhookEventSchema = z.object({
   id: z.string(),
   type: z.string(),
+  app_id: z.string().optional(),
   app_user_id: z.string(),
   original_app_user_id: z.string().optional(),
   product_id: z.string().optional(),
