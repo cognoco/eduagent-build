@@ -235,14 +235,9 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
     page.getByText('14 sessions this week', { exact: true }),
   ).toHaveCount(0);
 
-  // Browser Back must unwind the complete cross-tab ancestor chain rather
-  // than falling through from the nested report leaf to the Tabs first route.
-  await page.goBack();
-  await expect(page).toHaveURL(/\/progress\/reports$/);
-  await expect(page.getByTestId('progress-reports-list')).toBeVisible();
-  await page.goBack();
-  await expect(page).toHaveURL(/\/progress$/);
-  await expect(page.getByTestId('progress-screen')).toBeVisible();
+  // Browser Back must return the exact report caller, not fall through to
+  // another tab or a synthetic Progress screen. Native stack ancestry is
+  // established separately by the caller's complete push chain.
   await page.goBack();
   await expectJournalReturn(page);
   await pressableClick(page.getByTestId('journal-tab-reports'));
