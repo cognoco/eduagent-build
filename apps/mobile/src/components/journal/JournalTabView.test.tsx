@@ -4,12 +4,14 @@ import {
   screen,
   within,
 } from '@testing-library/react-native';
+import { Platform } from 'react-native';
 import type { NowResponse, RecapListItem } from '@eduagent/schemas';
 
 import { JournalTabView } from './JournalTabView';
 
 const mockPush = jest.fn();
 const mockSetActiveScope = jest.fn();
+const originalPlatformOs = Object.getOwnPropertyDescriptor(Platform, 'OS');
 let mockJournalSection: string | undefined;
 let mockNowFeed: {
   data: NowResponse | undefined;
@@ -25,6 +27,13 @@ let mockNotes: ReturnType<typeof infiniteQuery>;
 let mockBookmarks: ReturnType<typeof infiniteQuery>;
 let mockPracticeHistory!: ReturnType<typeof infiniteQuery>;
 let lastPracticeOpts: { limit?: number; type?: string } | undefined;
+
+function setPlatformOs(os: 'android' | 'ios' | 'web'): void {
+  Object.defineProperty(Platform, 'OS', {
+    configurable: true,
+    value: os,
+  });
+}
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -286,6 +295,12 @@ describe('JournalTabView', () => {
     });
   });
 
+  afterEach(() => {
+    if (originalPlatformOs) {
+      Object.defineProperty(Platform, 'OS', originalPlatformOs);
+    }
+  });
+
   it('renders ledger moments and defaults to the sessions section', () => {
     render(<JournalTabView />);
 
@@ -440,7 +455,8 @@ describe('JournalTabView', () => {
     expect(lastPracticeOpts?.type).toBeUndefined();
   });
 
-  it('auto-surfaces the latest report inline in the Reports section', () => {
+  it('auto-surfaces the latest report with native Progress ancestry', () => {
+    setPlatformOs('android');
     render(<JournalTabView />);
 
     fireEvent.press(screen.getByTestId('journal-tab-reports'));
@@ -455,6 +471,37 @@ describe('JournalTabView', () => {
       params: { weeklyReportId: 'weekly-1', returnTo: 'journal' },
     });
   });
+
+  it.each([
+    [
+      'weekly',
+      'weekly-report-card-weekly-1',
+      {
+        pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
+        params: { weeklyReportId: 'weekly-1', returnTo: 'journal' },
+      },
+    ],
+    [
+      'monthly',
+      'report-card-monthly-1',
+      {
+        pathname: '/(app)/progress/reports/[reportId]',
+        params: { reportId: 'monthly-1', returnTo: 'journal' },
+      },
+    ],
+  ])(
+    'routes a web %s report directly to its exact leaf without synthetic Progress ancestry',
+    (_kind, reportTestId, expectedHref) => {
+      setPlatformOs('web');
+      render(<JournalTabView />);
+
+      fireEvent.press(screen.getByTestId('journal-tab-reports'));
+      fireEvent.press(screen.getByTestId(reportTestId));
+
+      expect(mockPush).toHaveBeenCalledTimes(1);
+      expect(mockPush).toHaveBeenCalledWith(expectedHref);
+    },
+  );
 
   it('filters the notes archive by authorship with one-click chips', () => {
     render(<JournalTabView />);
@@ -497,7 +544,8 @@ describe('JournalTabView', () => {
     });
   });
 
-  it('switches to reports and routes report rows to existing report details', () => {
+  it('routes native report rows through complete Progress ancestry', () => {
+    setPlatformOs('android');
     render(<JournalTabView />);
 
     fireEvent.press(screen.getByTestId('journal-tab-reports'));

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import {
@@ -60,8 +60,11 @@ function pushJournalReport(
   router: Pick<Router, 'push'>,
   target: JournalReportTarget,
 ): void {
-  router.push('/(app)/progress' as Href);
-  router.push('/(app)/progress/reports' as Href);
+  if (Platform.OS !== 'web') {
+    router.push('/(app)/progress' as Href);
+    router.push('/(app)/progress/reports' as Href);
+  }
+
   if (target.kind === 'weekly') {
     router.push({
       pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
