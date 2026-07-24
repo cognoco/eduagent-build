@@ -23,13 +23,13 @@ uses one consistent launch-country position:
 | Artefact | Intended change | Done when |
 |---|---|---|
 | `docs/compliance/DPO exchanges/2026-07-23-dpia-review-response-draft.md` | Replace the partial six-question draft with a challenged, evidence-labelled response to questions 1–10 | Every DPO question is answered; unsupported claims are removed or qualified; open evidence and decisions are explicit |
-| `docs/compliance/2026-07-23-dpia-review-response-draft.md` | Retain the earlier body but add an unmistakable superseded/do-not-send banner | Readers cannot confuse the incomplete snapshot with the current response |
+| `docs/compliance/history/2026-07-23-dpia-review-response-superseded.md` | Retain the earlier body but add an unmistakable superseded/do-not-send banner | Readers cannot confuse the incomplete snapshot with the current response |
 | `docs/compliance/DPO exchanges/2026-07-24-stephan-decision-annex.md` | Add a decision/sign-off annex | Management decisions, DPO advice requests, prerequisites, and signature meanings are separated |
-| `docs/compliance/privacy-surface-evidence-2026-07-24.md` | Add a dated production-source configuration refresh | Only allowlisted flags and credential presence/absence are recorded; no secret values appear; limits of the evidence are stated |
+| `docs/compliance/history/2026-07-24-legacy-test-environment-disposition.md` | Record the obsolete owner-only test environment’s disposition | Readers cannot mistake it for launch evidence or include it in the DPO bundle |
 | Notion `OPQ-108`, `OPQ-133`, and `OPQ-103` discussion | Reconcile the country-consent ruling | The age-13-jurisdiction launch rule and later expansion rule read consistently, with the superseded ruling preserved as history |
 
 The similarly named
-`docs/compliance/2026-07-23-dpia-review-response-draft.md` is an older retained
+`docs/compliance/history/2026-07-23-dpia-review-response-superseded.md` is an older retained
 snapshot, not the user-nominated working response. Its body remains historical;
 an explicit superseded/do-not-send banner and index correction prevent it from
 being mistaken for the current response.
