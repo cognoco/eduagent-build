@@ -7332,7 +7332,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           visible: {
             id: 'message-bubble-assistant-1',
             containsDescendants: [
-              { text: '^Ancient Rome was founded in 753 BC\\.\\.\\.$' },
+              { text: '^Ancient Rome was founded in 753 BC…$' },
             ],
           },
           timeout: 30000,
@@ -7512,7 +7512,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
             visible: {
               id: 'message-bubble-assistant-adjacent',
               containsDescendants: [
-                { text: '^Ancient Rome was founded in 753 BC\\.\\.\\.$' },
+                { text: '^Ancient Rome was founded in 753 BC…$' },
               ],
             },
             timeout: 30000,
@@ -7603,7 +7603,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           visible: {
             id: 'message-bubble-assistant-adjacent',
             containsDescendants: [
-              { text: '^Ancient Rome was founded in 753 BC\\.\\.\\.$' },
+              { text: '^Ancient Rome was founded in 753 BC…$' },
             ],
             optional: true,
           },

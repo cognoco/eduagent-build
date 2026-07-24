@@ -145,7 +145,7 @@ tags:
     visible:
       id: 'message-bubble-assistant-1'
       containsDescendants:
-        - text: '^Ancient Rome was founded in 753 BC\.\.\.$'
+        - text: '^Ancient Rome was founded in 753 BC…$'
     timeout: 30000
 - pressKey: back
 - extendedWaitUntil:
@@ -196,7 +196,7 @@ tags:
     visible:
       id: 'message-bubble-assistant-1'
       containsDescendants:
-        - text: '^Ancient Rome was founded in 753 BC\.\.\.$'
+        - text: '^Ancient Rome was founded in 753 BC…$'
     timeout: 30000
 
 # Android hardware Back must honor the Subjects return contract.
@@ -242,7 +242,7 @@ tags:
     visible:
       id: 'message-bubble-assistant-1'
       containsDescendants:
-        - text: '^Ancient Rome was founded in 753 BC\.\.\.$'
+        - text: '^Ancient Rome was founded in 753 BC…$'
     timeout: 30000
 - tapOn:
     id: 'chat-shell-back'
