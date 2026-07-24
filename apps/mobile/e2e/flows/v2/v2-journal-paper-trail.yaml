@@ -1,0 +1,81 @@
+# [WI-2239] V2 Journal native Practice paper-trail journey.
+#
+# The item assigns the complete five-section retrieval journey to Playwright.
+# This sole V2 Maestro case proves only the complementary release-APK property:
+# the exact seeded Practice event opens its existing hub and returns to the same
+# Journal Practice section in Me scope. Every assertion is hard.
+appId: com.mentomate.app
+tags:
+  - v2
+  - navigation
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: 'v2-journal-paper-trail'
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 30000
+
+- tapOn:
+    id: 'tab-journal'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'journal-screen'
+    timeout: 15000
+- assertNotVisible:
+    id: 'scope-chip'
+
+- tapOn:
+    id: 'journal-tab-practice'
+- scrollUntilVisible:
+    element:
+      id: 'journal-activity-${PRACTICE_ACTIVITY_EVENT_ID}'
+    direction: DOWN
+    timeout: 10000
+- assertVisible:
+    id: 'journal-activity-${PRACTICE_ACTIVITY_EVENT_ID}'
+- assertVisible:
+    id: 'journal-activity-headline-${PRACTICE_ACTIVITY_EVENT_ID}'
+    text: '^Biology Topic 1$'
+- assertVisible:
+    id: 'journal-activity-meta-${PRACTICE_ACTIVITY_EVENT_ID}'
+    text: '^Review · Biology · .+$'
+
+- scrollUntilVisible:
+    element:
+      id: 'journal-practice-open-hub'
+    direction: UP
+    timeout: 10000
+- tapOn:
+    id: 'journal-practice-open-hub'
+- extendedWaitUntil:
+    visible:
+      id: 'practice-screen'
+    timeout: 15000
+- tapOn:
+    id: 'practice-back'
+
+- extendedWaitUntil:
+    visible:
+      id: 'journal-screen'
+    timeout: 15000
+- assertNotVisible:
+    id: 'scope-chip'
+- scrollUntilVisible:
+    element:
+      id: 'journal-activity-${PRACTICE_ACTIVITY_EVENT_ID}'
+    direction: DOWN
+    timeout: 10000
+- assertVisible:
+    id: 'journal-activity-${PRACTICE_ACTIVITY_EVENT_ID}'
+- assertVisible:
+    id: 'journal-activity-headline-${PRACTICE_ACTIVITY_EVENT_ID}'
+    text: '^Biology Topic 1$'
+- assertVisible:
+    id: 'journal-activity-meta-${PRACTICE_ACTIVITY_EVENT_ID}'
+    text: '^Review · Biology · .+$'

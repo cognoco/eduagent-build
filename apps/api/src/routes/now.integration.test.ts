@@ -511,7 +511,7 @@ describe('Integration: now routes', () => {
     ]);
   });
 
-  it('surfaces unfinished, needs-deepening, and challenge-ready cards from DB state', async () => {
+  it('[WI-2351] does not claim Challenge readiness from completed-session history', async () => {
     const profileId = await seedProfile(db, 'candidate-kinds');
 
     const activeSessionId = await seedActiveSession(
@@ -524,11 +524,7 @@ describe('Integration: now routes', () => {
       profileId,
       'candidate-deepening',
     );
-    const challenge = await seedAssessmentEligibleTopic(
-      db,
-      profileId,
-      'candidate-challenge',
-    );
+    await seedAssessmentEligibleTopic(db, profileId, 'candidate-challenge');
 
     const res = await makeApp(db, profileId).request('/v1/now?scope=self');
 
@@ -543,14 +539,12 @@ describe('Integration: now routes', () => {
     expect(body.cards.map((card) => card.kind)).toEqual([
       'unfinished_session',
       'needs_deepening',
-      'challenge_ready',
     ]);
     expect(body.cards[0]?.params.sessionId).toBe(activeSessionId);
     expect(body.cards[1]?.deepLink.params.topicId).toBe(deepening.topicId);
-    expect(body.cards[2]?.deepLink.params.topicId).toBe(challenge.topicId);
   });
 
-  it('promotes aged parked items above challenge-ready cards through the DB-backed feed', async () => {
+  it('[WI-2351] keeps an honest parked action while suppressing false Challenge readiness', async () => {
     const profileId = await seedProfile(db, 'parked-aging');
     const parkedTopic = await seedTopic(db, profileId, 'parked-aging');
     const sessionId = await seedCompletedSession(
@@ -567,11 +561,7 @@ describe('Integration: now routes', () => {
       'aged-parked',
       new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
     );
-    const challenge = await seedAssessmentEligibleTopic(
-      db,
-      profileId,
-      'parked-aging-challenge',
-    );
+    await seedAssessmentEligibleTopic(db, profileId, 'parked-aging-challenge');
 
     const res = await makeApp(db, profileId).request('/v1/now?scope=self');
 
@@ -582,15 +572,11 @@ describe('Integration: now routes', () => {
         params: Record<string, unknown>;
       }>;
     };
-    expect(body.cards.map((card) => card.kind)).toEqual([
-      'parked_item',
-      'challenge_ready',
-    ]);
+    expect(body.cards.map((card) => card.kind)).toEqual(['parked_item']);
     expect(body.cards[0]?.params.question).toBe('parked question aged-parked');
-    expect(body.cards[1]?.params.topicId).toBe(challenge.topicId);
   });
 
-  it('surfaces unfinished, needs-deepening, and challenge-ready cards in supporter person and hub scopes', async () => {
+  it('[WI-2351] keeps the learner-only Challenge action out of supporter person and hub scopes', async () => {
     const supporterId = await seedProfile(db, 'supporter-candidate-kinds');
     const childId = await seedProfile(db, 'child-candidate-kinds');
     const edgeId = await seedAcceptedContract(db, supporterId, childId);
@@ -619,7 +605,6 @@ describe('Integration: now routes', () => {
       expect(body.cards.map((card) => card.kind)).toEqual([
         'unfinished_session',
         'needs_deepening',
-        'challenge_ready',
       ]);
       expect(body.cards.every((card) => card.personId === childId)).toBe(true);
       expect(body.cards.every((card) => card.edgeId === edgeId)).toBe(true);
@@ -864,12 +849,12 @@ describe('Integration: now routes', () => {
   // regression guard. This test instead calls the candidate-read seam
   // (`collectCandidatesForRequest`, exported test-only) DIRECTLY with a
   // stale personId/edgeId, bypassing `resolveNowTarget` entirely, to prove
-  // the read itself denies once the edge is revoked — the exact
+  // the read itself returns no cards once the edge is revoked — the exact
   // intra-call TOCTOU window Codex's review flagged (a revoke landing
   // between the pre-check and these reads). Watched RED with
   // `acceptedSupporterAccessExists` reverted (revoked edge still returned
   // the unfinished-session candidate), GREEN with the fix restored.
-  it('RGR: denies the now-feed candidate read for a revoked edge even when called directly, bypassing the outer pre-check [revoke-race]', async () => {
+  it('RGR: returns no now-feed candidates for a revoked edge when called directly, bypassing the outer pre-check [revoke-race]', async () => {
     const supporterId = await seedProfile(db, 'supporter-revoke-race');
     const childId = await seedProfile(db, 'child-revoke-race');
     const edgeId = await seedAcceptedContract(db, supporterId, childId);
@@ -907,9 +892,10 @@ describe('Integration: now routes', () => {
     // The SAME stale personId/edgeId/viewer, re-requested directly against
     // the candidate-read seam (no fresh resolveNowTarget pre-check in
     // between), must now deny — no person-scoped Now data leaks through.
-    // (`collectChallengeReadyCandidates`'s re-check rejects the whole read
-    // rather than silently filtering the revoked candidate out — a
-    // stronger, fail-closed denial than an empty array.)
+    // Challenge actions are learner-only, so the supporter read no longer
+    // invokes the Challenge collector's throwing authorization check. The
+    // remaining candidate queries still fail closed through their correlated
+    // accepted-edge predicates: a stale direct call resolves to no cards.
     await expect(
       collectCandidatesForRequest(
         db,
@@ -919,12 +905,12 @@ describe('Integration: now routes', () => {
         edgeId,
         supporterId,
       ),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    ).resolves.toEqual([]);
   });
 
   // [WI-2237] Complementary coverage for the challenge-ready supporter path's
   // snapshot-atomicity fix. The security DENIAL proof is the sibling RGR above
-  // (collectCandidatesForRequest, revoke-then-recall -> ForbiddenError, watched
+  // (collectCandidatesForRequest, revoke-then-recall -> empty, watched
   // red/green). This block adds two properties: (a) an accepted edge with no
   // revoke still returns the child's challenge_ready candidate (the guard is not
   // always-deny); and (b) a revoke committed before the eligibility read (the

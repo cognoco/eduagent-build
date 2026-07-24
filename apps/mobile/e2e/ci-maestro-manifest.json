@@ -52,6 +52,10 @@
       "scenario": "trial-active"
     },
     {
+      "flow": "flows/v2/v2-journal-paper-trail.yaml",
+      "scenario": "v2-journal-paper-trail"
+    },
+    {
       "flow": "flows/v2/v2-shell-navigation.yaml",
       "scenario": "learning-active"
     },

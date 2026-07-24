@@ -4,6 +4,7 @@ import {
   homeHrefForReturnTo,
   isSessionForwardableReturnTo,
   goBackOrReplace,
+  returnJournalReportToCaller,
   pushLearningResumeTarget,
   replaceV2LearningResumeTarget,
   pushChildReport,
@@ -215,6 +216,33 @@ describe('goBackOrReplace', () => {
     expect(router.back).not.toHaveBeenCalled();
     expect(router.replace).toHaveBeenCalledTimes(1);
     expect(router.replace).toHaveBeenCalledWith(parentHref);
+  });
+});
+
+describe('returnJournalReportToCaller [WI-2239]', () => {
+  function createRouter() {
+    return {
+      dismissTo: jest.fn(),
+      replace: jest.fn(),
+    } satisfies Pick<Router, 'dismissTo' | 'replace'>;
+  }
+
+  it('replaces the web report with its exact Journal caller', () => {
+    const router = createRouter();
+
+    returnJournalReportToCaller(router, 'web');
+
+    expect(router.replace).toHaveBeenCalledWith(JOURNAL_HREF);
+    expect(router.dismissTo).not.toHaveBeenCalled();
+  });
+
+  it('dismisses the complete native report stack to Journal', () => {
+    const router = createRouter();
+
+    returnJournalReportToCaller(router, 'native');
+
+    expect(router.dismissTo).toHaveBeenCalledWith(JOURNAL_HREF);
+    expect(router.replace).not.toHaveBeenCalled();
   });
 });
 

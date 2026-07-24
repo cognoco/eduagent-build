@@ -17,8 +17,10 @@ import {
   createRoutedMockFetch,
   fetchCallsMatching,
 } from '../../test-utils/mock-api-routes';
+import { JOURNAL_HREF } from '../../lib/navigation';
 
 const mockReplace = jest.fn();
+const mockDismissTo = jest.fn();
 const mockPush = jest.fn();
 const mockBack = jest.fn();
 const mockCanGoBack = jest.fn(() => false);
@@ -27,7 +29,7 @@ const mockParams = {
   subjectName: 'Mathematics',
   exchangeCount: '5',
   escalationRung: '2',
-} as Record<string, string | undefined>;
+} as Record<string, string | string[] | undefined>;
 
 const mockTestProfileId = '10000000-0000-4000-8000-000000000001';
 const mockTestAccountId = '10000000-0000-4000-8000-000000000002';
@@ -39,12 +41,26 @@ const mockSuggestedTopicAId = '11111111-1111-4111-8111-111111111111';
 const mockSuggestedTopicBId = '33333333-3333-4333-8333-333333333333';
 const mockSuggestedTopicCId = '44444444-4444-4444-8444-444444444444';
 const mockSuggestedTopicDId = '55555555-5555-4555-8555-555555555555';
+const defaultActiveProfile = {
+  id: mockTestProfileId,
+  accountId: mockTestAccountId,
+  displayName: 'Test Learner',
+  isOwner: true,
+  hasPremiumLlm: false,
+  conversationLanguage: 'en',
+  pronouns: null,
+  consentStatus: null,
+  birthYear: 2012,
+};
+let mockActiveProfile: typeof defaultActiveProfile | null =
+  defaultActiveProfile;
 
 // [BUG-134] Test-side: Redirect stub so we can observe the auth-gate output
 // without pulling in a real navigation context.
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     replace: mockReplace,
+    dismissTo: mockDismissTo,
     push: mockPush,
     back: mockBack,
     canGoBack: mockCanGoBack,
@@ -115,17 +131,7 @@ jest.mock(
 jest.mock('../../lib/profile', /* gc1-allow: native-boundary: ProfileProvider uses SecureStore (native) */ () => ({
     ...jest.requireActual('../../lib/profile'),
     useProfile: () => ({
-      activeProfile: {
-        id: mockTestProfileId,
-        accountId: mockTestAccountId,
-        displayName: 'Test Learner',
-        isOwner: true,
-        hasPremiumLlm: false,
-        conversationLanguage: 'en',
-        pronouns: null,
-        consentStatus: null,
-        birthYear: 2012,
-      },
+      activeProfile: mockActiveProfile,
       profiles: [
         {
           id: mockTestProfileId,
@@ -227,6 +233,7 @@ let mockSessionSummaryData: {
   aiFeedback: string | null;
   feedbackStatus?: 'available' | 'unavailable';
   status: 'pending' | 'submitted' | 'accepted' | 'skipped' | 'auto_closed';
+  learnerRecap?: string | null;
   baseXp?: number | null;
   reflectionBonusXp?: number | null;
   purgedAt?: string | null;
@@ -502,6 +509,7 @@ describe('SessionSummaryScreen', () => {
       childProfile: null,
       parentProfile: null,
     });
+    mockActiveProfile = defaultActiveProfile;
     mockSubmitResult = null;
     mockRetryFeedbackResult = {
       summary: {
@@ -523,6 +531,7 @@ describe('SessionSummaryScreen', () => {
       },
     };
     mockParams.subjectName = 'Mathematics';
+    mockParams.sessionId = '660e8400-e29b-41d4-a716-446655440000';
     mockParams.exchangeCount = '5';
     mockParams.escalationRung = '2';
     mockParams.wallClockSeconds = undefined;
@@ -533,6 +542,7 @@ describe('SessionSummaryScreen', () => {
     mockParams.topicId = undefined;
     mockParams.filedSubjectId = undefined;
     mockParams.filedBookId = undefined;
+    mockParams.returnTo = undefined;
     mockTranscriptData = null;
     mockSessionSummaryData = null;
     mockTotalSessions = 0;
@@ -661,6 +671,30 @@ describe('SessionSummaryScreen', () => {
     // 5 exchanges, rung 2 → "strong independent thinking"
     screen.getByText(/worked through 5 exchanges/);
     screen.getByText(/strong independent thinking/);
+  });
+
+  it('owns two persisted learner recap points with exact text at stable indexed row IDs', async () => {
+    const learningPoints = [
+      'We traced how photosynthesis stores sunlight as chemical energy in glucose.',
+      'Chlorophyll captures the light energy that powers this process.',
+    ] as const;
+    mockSessionSummaryData = {
+      ...BASE_MOCK_SUMMARY,
+      learnerRecap: learningPoints.join('\n'),
+    };
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    expect(
+      await screen.findByTestId('session-recap-learning-point-0'),
+    ).toHaveTextContent(
+      /^We traced how photosynthesis stores sunlight as chemical energy in glucose\.$/,
+    );
+    expect(
+      screen.getByTestId('session-recap-learning-point-1'),
+    ).toHaveTextContent(
+      /^Chlorophyll captures the light energy that powers this process\.$/,
+    );
   });
 
   // [WI-2499 AC-5] The receipt renders only the server-accepted scrubbed
@@ -2173,6 +2207,70 @@ describe('SessionSummaryScreen', () => {
       });
     });
 
+    it('returns a persisted Journal recap to the existing Journal route without duplicating it or swapping to its topic', async () => {
+      mockCanGoBack.mockReturnValue(true);
+      mockSessionSummaryData = {
+        id: '880e8400-e29b-41d4-a716-446655440005',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'Existing Biology recap.',
+        aiFeedback: 'Helpful reflection.',
+        status: 'submitted',
+      };
+      mockParams.subjectId = mockSubjectId;
+      mockParams.topicId = mockSuggestedTopicAId;
+      mockParams.returnTo = 'journal';
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('summary-close-button');
+      });
+      fireEvent.press(screen.getByTestId('summary-close-button'));
+
+      await waitFor(() => {
+        expect(mockDismissTo).toHaveBeenCalledWith(JOURNAL_HREF);
+      });
+      expect(mockBack).not.toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalledWith(JOURNAL_HREF);
+      expect(mockReplace).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/topic/[topicId]',
+        }),
+      );
+    });
+
+    it('keeps Journal precedence when duplicate returnTo parameters produce an array', async () => {
+      mockCanGoBack.mockReturnValue(true);
+      mockSessionSummaryData = {
+        id: '880e8400-e29b-41d4-a716-446655440005',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'Existing Biology recap.',
+        aiFeedback: 'Helpful reflection.',
+        status: 'submitted',
+      };
+      mockParams.subjectId = mockSubjectId;
+      mockParams.topicId = mockSuggestedTopicAId;
+      mockParams.returnTo = ['journal', 'learner-home'];
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('summary-close-button');
+      });
+      fireEvent.press(screen.getByTestId('summary-close-button'));
+
+      await waitFor(() => {
+        expect(mockDismissTo).toHaveBeenCalledWith(JOURNAL_HREF);
+      });
+      expect(mockBack).not.toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalledWith(JOURNAL_HREF);
+      expect(mockReplace).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/topic/[topicId]',
+        }),
+      );
+    });
+
     it('prefers router.back() over replace when canGoBack() is true on revisit continue', async () => {
       mockSessionSummaryData = {
         id: '880e8400-e29b-41d4-a716-446655440006',
@@ -2467,6 +2565,57 @@ describe('SessionSummaryScreen', () => {
       // It must NOT fall through to the generic "Session not found"
       // catch-all — that branch is for non-404 errors.
       expect(screen.queryByTestId('session-not-found-go-home')).toBeNull();
+    });
+
+    it('dismisses an expired Journal summary to the retained Journal tab', async () => {
+      mockParams.returnTo = 'journal';
+      mockFetch.setRoute(
+        'transcript',
+        () =>
+          new Response(JSON.stringify({ message: 'Gone' }), { status: 404 }),
+      );
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('expired-session-go-home');
+      });
+      fireEvent.press(screen.getByTestId('expired-session-go-home'));
+
+      expect(mockDismissTo).toHaveBeenCalledWith(JOURNAL_HREF);
+      expect(mockBack).not.toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalledWith(JOURNAL_HREF);
+    });
+
+    it('dismisses a Journal summary with a missing session id to the retained Journal tab', () => {
+      mockParams.returnTo = 'journal';
+      mockParams.sessionId = undefined;
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      fireEvent.press(screen.getByTestId('session-summary-missing-param'));
+
+      expect(mockDismissTo).toHaveBeenCalledWith(JOURNAL_HREF);
+      expect(mockBack).not.toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalledWith(JOURNAL_HREF);
+    });
+
+    it('dismisses a settled no-data Journal summary to the retained Journal tab', async () => {
+      mockActiveProfile = null;
+      mockParams.returnTo = 'journal';
+      mockParams.exchangeCount = undefined;
+      mockParams.wallClockSeconds = undefined;
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('session-not-found-go-home');
+      });
+      fireEvent.press(screen.getByTestId('session-not-found-go-home'));
+
+      expect(mockDismissTo).toHaveBeenCalledWith(JOURNAL_HREF);
+      expect(mockBack).not.toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalledWith(JOURNAL_HREF);
     });
   });
 
