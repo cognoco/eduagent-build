@@ -6,6 +6,7 @@ import {
   type NavigationAction,
 } from '@react-navigation/native';
 import {
+  BackHandler,
   Platform,
   Pressable,
   StyleSheet,
@@ -486,6 +487,25 @@ function SessionScreenInner() {
   const [subjectsReturnReady, setSubjectsReturnReady] = useState(false);
   const shouldGuardSubjectsRemoval =
     hasSubjectsPredecessor && Platform.OS !== 'web' && !subjectsReturnReady;
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS !== 'android' || !shouldGuardSubjectsRemoval) {
+        return undefined;
+      }
+
+      const subscription = BackHandler.addEventListener(
+        'hardwareBackPress',
+        () => {
+          // Android's device Back reaches BackHandler before this Expo Router
+          // stack emits a prevent-remove action. Consume it here, then let the
+          // existing guarded replacement restore the proven owning route.
+          setSubjectsReturnReady(true);
+          return true;
+        },
+      );
+      return () => subscription.remove();
+    }, [shouldGuardSubjectsRemoval]),
+  );
   usePreventRemove(
     ((returnTo === MENTOR_RETURN_TO && !mentorReturnReady) ||
       shouldGuardSubjectsRemoval) &&
