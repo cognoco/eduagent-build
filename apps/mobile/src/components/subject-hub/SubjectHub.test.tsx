@@ -95,7 +95,9 @@ describe('SubjectHub', () => {
       />,
     );
 
-    screen.getByText('Biology');
+    expect(screen.getByTestId('subject-hub-title-subject-1')).toHaveTextContent(
+      'Biology',
+    );
     screen.getByText('subjectHub.progress.threeState');
     screen.getByText('subjectHub.progress.reviewsDue');
     screen.getByText('subjectHub.progress.weeklyDelta');
@@ -154,7 +156,9 @@ describe('SubjectHub', () => {
       />,
     );
 
-    screen.getByText('Biology');
+    expect(screen.getByTestId('subject-hub-title-subject-1')).toHaveTextContent(
+      'Biology',
+    );
     screen.getByText('Core');
     screen.getByText('Photosynthesis');
     expect(screen.queryByText('subjectHub.notes.heading')).toBeNull();

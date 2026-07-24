@@ -5,9 +5,22 @@ import {
   usePreventRemove,
   type NavigationAction,
 } from '@react-navigation/native';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { platformAlert } from '../../../lib/platform-alert';
-import { goBackOrReplace, MENTOR_RETURN_TO } from '../../../lib/navigation';
+import {
+  goBackOrReplace,
+  MENTOR_RETURN_TO,
+  SUBJECT_HUB_RETURN_TO,
+  SUBJECTS_RETURN_TO,
+} from '../../../lib/navigation';
+import { consumeHubToSessionTransition } from '../../../lib/navigation-transition-provenance';
 import { shouldShowBookLink } from '../../../lib/show-book-link';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import {
@@ -444,6 +457,32 @@ function SessionScreenInner() {
     setMentorReturnReady(false);
     setPendingMentorReturn(true);
   }, []);
+  const subjectsTransitionId =
+    returnTo === SUBJECTS_RETURN_TO
+      ? subjectId
+      : returnTo === SUBJECT_HUB_RETURN_TO
+        ? returnId
+        : undefined;
+  const [subjectsPredecessorId, setSubjectsPredecessorId] = useState<
+    string | undefined
+  >();
+  useEffect(() => {
+    // Promote the one-shot transition proof into this mounted route's state.
+    // A same-screen transcript retry keeps that exact predecessor without
+    // making the token reusable by a later, unrelated navigation.
+    if (
+      subjectsTransitionId &&
+      consumeHubToSessionTransition(subjectsTransitionId)
+    ) {
+      setSubjectsPredecessorId(subjectsTransitionId);
+      return;
+    }
+    setSubjectsPredecessorId((current) =>
+      current === subjectsTransitionId ? current : undefined,
+    );
+  }, [subjectsTransitionId]);
+  const hasSubjectsPredecessor =
+    !!subjectsTransitionId && subjectsPredecessorId === subjectsTransitionId;
   usePreventRemove(
     returnTo === MENTOR_RETURN_TO &&
       !mentorReturnReady &&
@@ -514,11 +553,17 @@ function SessionScreenInner() {
     setMentorReturnReady(false);
   }, [homeBackHref, mentorReturnReady, router]);
   const handleChatBackPress = useCallback(() => {
+    if (hasSubjectsPredecessor && Platform.OS !== 'web') {
+      goBackOrReplace(router, homeBackHref);
+      return;
+    }
     if (returnTo) {
       if (returnTo === MENTOR_RETURN_TO) {
         startMentorReturn();
         return;
       }
+      // A named destination without consumed runtime provenance is only a
+      // deterministic replacement fallback, never permission to pop history.
       router.replace(homeBackHref as Href);
       return;
     }
@@ -530,8 +575,19 @@ function SessionScreenInner() {
       return;
     }
     router.replace('/(app)/home' as Href);
-  }, [returnTo, subjectId, homeBackHref, router, startMentorReturn]);
+  }, [
+    hasSubjectsPredecessor,
+    returnTo,
+    subjectId,
+    homeBackHref,
+    router,
+    startMentorReturn,
+  ]);
   const handleHomeBack = useCallback(() => {
+    if (hasSubjectsPredecessor && Platform.OS !== 'web') {
+      goBackOrReplace(router, homeBackHref);
+      return;
+    }
     if (returnTo) {
       if (returnTo === MENTOR_RETURN_TO) {
         startMentorReturn();
@@ -542,7 +598,13 @@ function SessionScreenInner() {
     }
 
     goBackOrReplace(router, homeBackHref);
-  }, [homeBackHref, returnTo, router, startMentorReturn]);
+  }, [
+    hasSubjectsPredecessor,
+    homeBackHref,
+    returnTo,
+    router,
+    startMentorReturn,
+  ]);
   const handleStartNewSession = useCallback(() => {
     router.replace({
       pathname: '/(app)/session',
@@ -2055,8 +2117,7 @@ function SessionScreenInner() {
               profileId={activeProfile?.id}
             />
             <SessionFooter
-              router={router}
-              homeHref={homeBackHref}
+              onHomeBack={handleHomeBack}
               sessionExpired={sessionExpired}
               notePromptOffered={notePromptOffered}
               showNoteInput={showNoteInput}

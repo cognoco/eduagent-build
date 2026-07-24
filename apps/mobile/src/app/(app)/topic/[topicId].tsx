@@ -46,7 +46,16 @@ import { formatShortDate } from '../../../lib/format-datetime';
 import { useThemeColors } from '../../../lib/theme';
 import { formatSourceLine } from '../../../lib/format-note-source';
 import { deriveRetentionStatus } from '../../../lib/retention-utils';
-import { pushLearningResumeTarget } from '../../../lib/navigation';
+import {
+  goBackOrReplace,
+  homeHrefForReturnTo,
+  pushLearningResumeTarget,
+  SUBJECT_HUB_RETURN_TO,
+} from '../../../lib/navigation';
+import {
+  consumeHubToTopicTransition,
+  markHubToSessionTransition,
+} from '../../../lib/navigation-transition-provenance';
 import { TimeoutLoader } from '../../../components/common';
 import { ShimmerSkeleton } from '../../../components/common/ShimmerSkeleton';
 import { TopicHeader } from '../../../components/library/TopicHeader';
@@ -283,13 +292,16 @@ export default function TopicDetailScreen() {
     topicId,
     chapter: paramChapter,
     mode: deepLinkMode,
+    returnTo: rawReturnTo,
   } = useLocalSearchParams<{
     subjectId: string;
     bookId?: string;
     topicId: string;
     chapter: string;
     mode?: string;
+    returnTo?: string | string[];
   }>();
+  const returnTo = Array.isArray(rawReturnTo) ? rawReturnTo[0] : rawReturnTo;
 
   // [H9] Attempt counter — incremented on Retry to force a new query key and a fresh network call.
   // Must be declared before useResolveTopicSubject so it can be passed as a key segment.
@@ -302,24 +314,119 @@ export default function TopicDetailScreen() {
     resolveAttempt,
   );
   const subjectId = paramSubjectId || resolved?.subjectId;
+  const sessionReturnId =
+    returnTo === SUBJECT_HUB_RETURN_TO ? subjectId : undefined;
+  const sessionReturnParams = useMemo(
+    () =>
+      sessionReturnId
+        ? {
+            returnTo: SUBJECT_HUB_RETURN_TO,
+            returnId: sessionReturnId,
+          }
+        : {},
+    [sessionReturnId],
+  );
+  const hubTransitionKey =
+    returnTo === SUBJECT_HUB_RETURN_TO && subjectId && topicId
+      ? `${subjectId}:${topicId}`
+      : undefined;
+  const [hubPredecessorKey, setHubPredecessorKey] = useState<
+    string | undefined
+  >();
+  useEffect(() => {
+    if (
+      hubTransitionKey &&
+      subjectId &&
+      topicId &&
+      consumeHubToTopicTransition(subjectId, topicId)
+    ) {
+      setHubPredecessorKey(hubTransitionKey);
+      return;
+    }
+    setHubPredecessorKey((current) =>
+      current === hubTransitionKey ? current : undefined,
+    );
+  }, [hubTransitionKey, subjectId, topicId]);
+  const hasHubPredecessor =
+    !!hubTransitionKey && hubPredecessorKey === hubTransitionKey;
   const topicBackFallback = useMemo(
     (): Href =>
-      subjectId && paramBookId
-        ? ({
-            pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-            params: { subjectId, bookId: paramBookId },
-          } as Href)
-        : ('/(app)/library' as Href),
-    [paramBookId, subjectId],
+      returnTo === SUBJECT_HUB_RETURN_TO && subjectId
+        ? homeHrefForReturnTo(returnTo, subjectId)
+        : subjectId && paramBookId
+          ? ({
+              pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
+              params: { subjectId, bookId: paramBookId },
+            } as Href)
+          : ('/(app)/library' as Href),
+    [paramBookId, returnTo, subjectId],
   );
   const handleTopicBack = useCallback(() => {
+    // Only the consumed in-memory Hub → Topic transition proves the immediate
+    // parent. Crafted/refreshed URLs retain the deterministic Hub replacement.
+    if (hasHubPredecessor) {
+      goBackOrReplace(router, topicBackFallback);
+      return;
+    }
     router.replace(topicBackFallback);
-  }, [router, topicBackFallback]);
+  }, [hasHubPredecessor, router, topicBackFallback]);
 
+  const openTopicSession = useCallback(
+    (params: {
+      mode: 'learning' | 'review';
+      subjectId?: string;
+      subjectName?: string;
+      topicId?: string;
+      topicName?: string;
+      sessionId?: string;
+      resumeFromSessionId?: string;
+    }): void => {
+      const href = {
+        pathname: '/(app)/session',
+        params: {
+          ...params,
+          ...sessionReturnParams,
+        },
+      } as Href;
+
+      if (sessionReturnId && hasHubPredecessor) {
+        markHubToSessionTransition(sessionReturnId);
+        router.replace(href);
+        return;
+      }
+
+      router.push(href);
+    },
+    [hasHubPredecessor, router, sessionReturnId, sessionReturnParams],
+  );
   const { data: resumeTarget } = useLearningResumeTarget({
     subjectId: subjectId ?? undefined,
     topicId: topicId ?? undefined,
   });
+  const pushResumeTarget = useCallback((): boolean => {
+    if (!resumeTarget) return false;
+
+    if (sessionReturnId) {
+      openTopicSession({
+        mode: 'learning',
+        subjectId: resumeTarget.subjectId,
+        subjectName: resumeTarget.subjectName,
+        ...(resumeTarget.topicId ? { topicId: resumeTarget.topicId } : {}),
+        ...(resumeTarget.topicTitle
+          ? { topicName: resumeTarget.topicTitle }
+          : {}),
+        ...(resumeTarget.sessionId
+          ? { sessionId: resumeTarget.sessionId }
+          : {}),
+        ...(resumeTarget.resumeFromSessionId
+          ? { resumeFromSessionId: resumeTarget.resumeFromSessionId }
+          : {}),
+      });
+    } else {
+      pushLearningResumeTarget(router, resumeTarget);
+    }
+    return true;
+  }, [openTopicSession, resumeTarget, router, sessionReturnId]);
 
   const {
     data: topicProgress,
@@ -464,10 +571,12 @@ export default function TopicDetailScreen() {
     // Deep-link mode overrides: route directly to the appropriate mode entry point.
     if (deepLinkMode === 'review' && subjectId && topicId) {
       return () =>
-        router.push({
-          pathname: '/(app)/session',
-          params: { mode: 'review', subjectId, topicId, topicName },
-        } as Href);
+        openTopicSession({
+          mode: 'review',
+          subjectId,
+          topicId,
+          topicName,
+        });
     }
     // [WI-2112] Challenge Round is not a standalone screen — it is an
     // in-session offer/accept flow (useChallengeRound) gated server-side by
@@ -482,22 +591,17 @@ export default function TopicDetailScreen() {
     // recall quiz.
     if (deepLinkMode === 'challenge' && topicId) {
       return () => {
-        if (resumeTarget) {
-          pushLearningResumeTarget(router, resumeTarget);
-          return;
-        }
-        router.push({
-          pathname: '/(app)/session',
-          params: {
-            mode: 'learning',
-            subjectId,
-            topicId,
-            topicName,
-            ...(activeSession?.sessionId && {
-              sessionId: activeSession.sessionId,
-            }),
-          },
-        } as Href);
+        if (pushResumeTarget()) return;
+
+        openTopicSession({
+          mode: 'learning',
+          subjectId,
+          topicId,
+          topicName,
+          ...(activeSession?.sessionId && {
+            sessionId: activeSession.sessionId,
+          }),
+        });
       };
     }
 
@@ -506,10 +610,12 @@ export default function TopicDetailScreen() {
     const completionStatus = topicProgress.completionStatus;
     if (completionStatus === 'not_started') {
       return () =>
-        router.push({
-          pathname: '/(app)/session',
-          params: { mode: 'learning', subjectId, topicId, topicName },
-        } as Href);
+        openTopicSession({
+          mode: 'learning',
+          subjectId,
+          topicId,
+          topicName,
+        });
     }
 
     const isOverdue =
@@ -521,36 +627,33 @@ export default function TopicDetailScreen() {
       ['completed', 'verified', 'stable'].includes(completionStatus)
     ) {
       return () =>
-        router.push({
-          pathname: '/(app)/session',
-          params: { mode: 'review', subjectId, topicId, topicName },
-        } as Href);
-    }
-
-    return () => {
-      if (resumeTarget) {
-        pushLearningResumeTarget(router, resumeTarget);
-        return;
-      }
-      router.push({
-        pathname: '/(app)/session',
-        params: {
-          mode: 'learning',
+        openTopicSession({
+          mode: 'review',
           subjectId,
           topicId,
           topicName,
-          ...(activeSession?.sessionId && {
-            sessionId: activeSession.sessionId,
-          }),
-        },
-      } as Href);
+        });
+    }
+
+    return () => {
+      if (pushResumeTarget()) return;
+
+      openTopicSession({
+        mode: 'learning',
+        subjectId,
+        topicId,
+        topicName,
+        ...(activeSession?.sessionId && {
+          sessionId: activeSession.sessionId,
+        }),
+      });
     };
   }, [
     activeSession?.sessionId,
     deepLinkMode,
+    openTopicSession,
+    pushResumeTarget,
     retentionCard?.nextReviewAt,
-    resumeTarget,
-    router,
     subjectId,
     topicId,
     topicName,

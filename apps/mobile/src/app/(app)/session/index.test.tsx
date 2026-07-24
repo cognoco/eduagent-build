@@ -1,11 +1,16 @@
 import type { InputMode } from '@eduagent/schemas';
 import React from 'react';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { fireEvent, waitFor, act, within } from '@testing-library/react-native';
 import { usePreventRemove } from '@react-navigation/native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { QuotaExceededError } from '../../../lib/api-client';
+import { NotFoundError, QuotaExceededError } from '../../../lib/api-client';
+import {
+  consumeHubToSessionTransition,
+  markHubToSessionTransition,
+  resetNavigationTransitionProvenanceForTests,
+} from '../../../lib/navigation-transition-provenance';
 import * as Sentry from '@sentry/react-native';
 import {
   fetchCallsMatching,
@@ -402,6 +407,7 @@ type TranscriptMockReturn = {
       escalationRung: number;
     }>;
   };
+  error?: unknown;
 };
 const mockUseSessionTranscript = jest.fn<TranscriptMockReturn, [string?]>(
   () => ({ data: null }),
@@ -719,6 +725,7 @@ describe('SessionScreen homework flow', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    resetNavigationTransitionProvenanceForTests();
     jest.useFakeTimers();
     (useAuth as jest.Mock).mockReturnValue({
       userId: NOW_FEED_ACTOR_ID,
@@ -814,7 +821,145 @@ describe('SessionScreen homework flow', () => {
   afterEach(() => {
     activeRender?.cleanup();
     activeRender = null;
+    resetNavigationTransitionProvenanceForTests();
     jest.useRealTimers();
+  });
+
+  it('honors the named Subjects return when ambient web history still contains the Hub', async () => {
+    const mockBack = jest.fn();
+    const mockCanGoBack = jest.fn(() => true);
+    (useRouter as jest.Mock).mockReturnValue({
+      back: mockBack,
+      canGoBack: mockCanGoBack,
+      replace: mockReplace,
+      setParams: mockSetParams,
+    });
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: SUBJECT_ID,
+      subjectName: 'Math',
+      topicId: TOPIC_ID,
+      topicName: 'Linear equations',
+      returnTo: 'subjects',
+    });
+
+    const testScreen = renderSessionScreen();
+    await flushAsyncWork();
+    mockReplace.mockClear();
+
+    fireEvent.press(testScreen.getByTestId('mock-back-button'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects');
+    expect(mockCanGoBack).not.toHaveBeenCalled();
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('replaces the named Subjects return on web even after consuming the actual Hub transition', async () => {
+    const platformReplacement = jest.replaceProperty(Platform, 'OS', 'web');
+    try {
+      const mockBack = jest.fn();
+      const mockCanGoBack = jest.fn(() => true);
+      markHubToSessionTransition(SUBJECT_ID);
+      (useRouter as jest.Mock).mockReturnValue({
+        back: mockBack,
+        canGoBack: mockCanGoBack,
+        replace: mockReplace,
+        setParams: mockSetParams,
+      });
+      (useLocalSearchParams as jest.Mock).mockReturnValue({
+        mode: 'learning',
+        subjectId: SUBJECT_ID,
+        subjectName: 'Math',
+        topicId: TOPIC_ID,
+        topicName: 'Linear equations',
+        returnTo: 'subjects',
+      });
+
+      const testScreen = renderSessionScreen();
+      await flushAsyncWork();
+      expect(consumeHubToSessionTransition(SUBJECT_ID)).toBe(false);
+      mockReplace.mockClear();
+
+      fireEvent.press(testScreen.getByTestId('mock-back-button'));
+
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects');
+      expect(mockCanGoBack).not.toHaveBeenCalled();
+      expect(mockBack).not.toHaveBeenCalled();
+    } finally {
+      platformReplacement.restore();
+    }
+  });
+
+  it('pops to the owning Subject Hub on native after consuming the real Topic handoff', async () => {
+    const mockBack = jest.fn();
+    const mockCanGoBack = jest.fn(() => true);
+    markHubToSessionTransition(SUBJECT_ID);
+    (useRouter as jest.Mock).mockReturnValue({
+      back: mockBack,
+      canGoBack: mockCanGoBack,
+      replace: mockReplace,
+      setParams: mockSetParams,
+    });
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: SUBJECT_ID,
+      subjectName: 'Math',
+      topicId: TOPIC_ID,
+      topicName: 'Linear equations',
+      returnTo: 'subject-hub',
+      returnId: SUBJECT_ID,
+    });
+
+    const testScreen = renderSessionScreen();
+    await flushAsyncWork();
+    expect(consumeHubToSessionTransition(SUBJECT_ID)).toBe(false);
+    mockReplace.mockClear();
+
+    fireEvent.press(testScreen.getByTestId('mock-back-button'));
+
+    expect(mockCanGoBack).toHaveBeenCalledTimes(1);
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('replaces to the exact owning Subject Hub on web after the same Topic handoff', async () => {
+    const platformReplacement = jest.replaceProperty(Platform, 'OS', 'web');
+    try {
+      const mockBack = jest.fn();
+      const mockCanGoBack = jest.fn(() => true);
+      markHubToSessionTransition(SUBJECT_ID);
+      (useRouter as jest.Mock).mockReturnValue({
+        back: mockBack,
+        canGoBack: mockCanGoBack,
+        replace: mockReplace,
+        setParams: mockSetParams,
+      });
+      (useLocalSearchParams as jest.Mock).mockReturnValue({
+        mode: 'learning',
+        subjectId: SUBJECT_ID,
+        subjectName: 'Math',
+        topicId: TOPIC_ID,
+        topicName: 'Linear equations',
+        returnTo: 'subject-hub',
+        returnId: SUBJECT_ID,
+      });
+
+      const testScreen = renderSessionScreen();
+      await flushAsyncWork();
+      expect(consumeHubToSessionTransition(SUBJECT_ID)).toBe(false);
+      mockReplace.mockClear();
+
+      fireEvent.press(testScreen.getByTestId('mock-back-button'));
+
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(app)/subject-hub/[subjectId]',
+        params: { subjectId: SUBJECT_ID },
+      });
+      expect(mockCanGoBack).not.toHaveBeenCalled();
+      expect(mockBack).not.toHaveBeenCalled();
+    } finally {
+      platformReplacement.restore();
+    }
   });
 
   describe('managed-child mentor birth moment', () => {
@@ -938,11 +1083,10 @@ describe('SessionScreen homework flow', () => {
       topicName: 'Linear equations',
       sessionId: 'expired-session',
     });
-    const { NotFoundError } = require('../../../lib/api-client');
     mockUseSessionTranscript.mockReturnValue({
       data: null,
       error: new NotFoundError('Session not found'),
-    } as never);
+    });
 
     const testScreen = renderSessionScreen();
 
@@ -970,11 +1114,10 @@ describe('SessionScreen homework flow', () => {
       sessionId: 'expired-session',
       returnTo: 'mentor',
     });
-    const { NotFoundError } = require('../../../lib/api-client');
     mockUseSessionTranscript.mockReturnValue({
       data: null,
       error: new NotFoundError('Session not found'),
-    } as never);
+    });
 
     const testScreen = renderSessionScreen();
     const invalidateSpy = jest.spyOn(
@@ -1232,11 +1375,10 @@ describe('SessionScreen homework flow', () => {
       sessionId: 'expired-session',
       returnTo: 'mentor',
     });
-    const { NotFoundError } = require('../../../lib/api-client');
     mockUseSessionTranscript.mockReturnValue({
       data: null,
       error: new NotFoundError('Session not found'),
-    } as never);
+    });
 
     const testScreen = renderSessionScreen();
     const invalidateSpy = jest
@@ -1286,11 +1428,10 @@ describe('SessionScreen homework flow', () => {
       sessionId: 'expired-session',
       returnTo: 'mentor',
     });
-    const { NotFoundError } = require('../../../lib/api-client');
     mockUseSessionTranscript.mockReturnValue({
       data: null,
       error: new NotFoundError('Session not found'),
-    } as never);
+    });
 
     const testScreen = renderSessionScreen();
     const invalidateSpy = jest.spyOn(
@@ -1369,11 +1510,10 @@ describe('SessionScreen homework flow', () => {
       sessionId: 'expired-session',
       returnTo: 'mentor',
     });
-    const { NotFoundError } = require('../../../lib/api-client');
     mockUseSessionTranscript.mockReturnValue({
       data: null,
       error: new NotFoundError('Session not found'),
-    } as never);
+    });
 
     const testScreen = renderSessionScreen();
     const invalidateSpy = jest.spyOn(
@@ -1417,11 +1557,10 @@ describe('SessionScreen homework flow', () => {
       sessionId: 'expired-session',
       returnTo: 'mentor',
     });
-    const { NotFoundError } = require('../../../lib/api-client');
     mockUseSessionTranscript.mockReturnValue({
       data: null,
       error: new NotFoundError('Session not found'),
-    } as never);
+    });
 
     const testScreen = renderSessionScreen();
     const invalidateSpy = jest.spyOn(
@@ -1444,6 +1583,135 @@ describe('SessionScreen homework flow', () => {
     testScreen.unmount();
   });
 
+  it('does not trust a crafted history return URL from the session-expired escape action', () => {
+    const mockBack = jest.fn();
+    const mockCanGoBack = jest.fn(() => true);
+    (useRouter as jest.Mock).mockReturnValue({
+      back: mockBack,
+      canGoBack: mockCanGoBack,
+      replace: mockReplace,
+      setParams: mockSetParams,
+    });
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: SUBJECT_ID,
+      subjectName: 'Math',
+      topicId: TOPIC_ID,
+      topicName: 'Linear equations',
+      sessionId: 'expired-session',
+      returnTo: 'subjects',
+    });
+    mockUseSessionTranscript.mockReturnValue({
+      data: null,
+      error: new NotFoundError('Session not found'),
+    });
+
+    const testScreen = renderSessionScreen();
+    mockReplace.mockClear();
+
+    const goHomeActions = testScreen.getAllByTestId('session-expired-go-home');
+    expect(goHomeActions).toHaveLength(2);
+
+    for (const goHomeAction of goHomeActions) {
+      mockCanGoBack.mockClear();
+      mockBack.mockClear();
+      mockReplace.mockClear();
+
+      fireEvent.press(goHomeAction);
+
+      expect(mockCanGoBack).not.toHaveBeenCalled();
+      expect(mockBack).not.toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects');
+    }
+  });
+
+  it('uses Subjects history only after consuming the actual Hub-to-Session transition', () => {
+    const mockBack = jest.fn();
+    const mockCanGoBack = jest.fn(() => true);
+    markHubToSessionTransition(SUBJECT_ID);
+    (useRouter as jest.Mock).mockReturnValue({
+      back: mockBack,
+      canGoBack: mockCanGoBack,
+      replace: mockReplace,
+      setParams: mockSetParams,
+    });
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: SUBJECT_ID,
+      subjectName: 'Math',
+      topicId: TOPIC_ID,
+      topicName: 'Linear equations',
+      sessionId: 'expired-session',
+      returnTo: 'subjects',
+    });
+    mockUseSessionTranscript.mockReturnValue({
+      data: null,
+      error: new NotFoundError('Session not found'),
+    });
+
+    const testScreen = renderSessionScreen();
+    expect(consumeHubToSessionTransition(SUBJECT_ID)).toBe(false);
+    mockReplace.mockClear();
+
+    const goHomeActions = testScreen.getAllByTestId('session-expired-go-home');
+    expect(goHomeActions).toHaveLength(2);
+
+    for (const goHomeAction of goHomeActions) {
+      mockCanGoBack.mockClear();
+      mockBack.mockClear();
+      mockReplace.mockClear();
+
+      fireEvent.press(goHomeAction);
+
+      expect(mockCanGoBack).toHaveBeenCalledTimes(1);
+      expect(mockBack).toHaveBeenCalledTimes(1);
+      expect(mockReplace).not.toHaveBeenCalled();
+    }
+  });
+
+  it('retains the proven Hub predecessor across a transient transcript failure and same-screen retry', async () => {
+    const mockBack = jest.fn();
+    const mockCanGoBack = jest.fn(() => true);
+    markHubToSessionTransition(SUBJECT_ID);
+    (useRouter as jest.Mock).mockReturnValue({
+      back: mockBack,
+      canGoBack: mockCanGoBack,
+      replace: mockReplace,
+      setParams: mockSetParams,
+    });
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: SUBJECT_ID,
+      subjectName: 'Math',
+      topicId: TOPIC_ID,
+      topicName: 'Linear equations',
+      sessionId: SESSION_ID,
+      returnTo: 'subjects',
+    });
+    mockUseSessionTranscript.mockReturnValue({
+      data: null,
+      error: new TypeError('Network request failed'),
+    });
+
+    const testScreen = renderSessionScreen();
+    await flushAsyncWork();
+    expect(consumeHubToSessionTransition(SUBJECT_ID)).toBe(false);
+
+    mockUseSessionTranscript.mockReturnValue({
+      data: null,
+      error: null,
+    });
+    activeRender?.result.rerender(<SessionScreen />);
+    await flushAsyncWork();
+    mockReplace.mockClear();
+
+    fireEvent.press(testScreen.getByTestId('mock-back-button'));
+
+    expect(mockCanGoBack).toHaveBeenCalledTimes(1);
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
   it('[F-110] engages the session-expired UI for any error the boundary classifies as not-found, not only typed NotFoundError instances', () => {
     // sessionExpired is computed from
     // classifyApiError(transcript.error).category === 'not-found' rather
@@ -1462,7 +1730,7 @@ describe('SessionScreen homework flow', () => {
     mockUseSessionTranscript.mockReturnValue({
       data: null,
       error: Object.assign(new Error('Session not found'), { status: 404 }),
-    } as never);
+    });
 
     const testScreen = renderSessionScreen();
 

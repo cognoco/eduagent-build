@@ -67,7 +67,10 @@ export function computeEmptyKind(
   return 'stuck';
 }
 
-export function useSubjectHub(subjectId: string | undefined): {
+export function useSubjectHub(
+  subjectId: string | undefined,
+  options: { preferDueReviewOverNextTopic?: boolean } = {},
+): {
   data: SubjectHubDataWithResume | null;
   isLoading: boolean;
   isError: boolean;
@@ -78,7 +81,10 @@ export function useSubjectHub(subjectId: string | undefined): {
   const client = useApiClient();
   const { activeProfile } = useProfile();
   const navigationContract = useNavigationContract();
-  const subjectsQuery = useSubjects({ enabled: !!subjectId });
+  const subjectsQuery = useSubjects({
+    includeInactive: true,
+    enabled: !!subjectId,
+  });
   const curriculumStatus = subjectId
     ? (subjectsQuery.data?.find((subject) => subject.id === subjectId)
         ?.curriculumStatus ?? null)
@@ -188,6 +194,8 @@ export function useSubjectHub(subjectId: string | undefined): {
       resumeTarget: resumeTargetQuery.data,
       notes: notesQuery.notes,
       canStudy: navigationContract.gates.showLearningActions,
+      preferDueReviewOverNextTopic:
+        options.preferDueReviewOverNextTopic ?? false,
     });
   }, [
     bookDetailQueries,
@@ -196,6 +204,7 @@ export function useSubjectHub(subjectId: string | undefined): {
     generatedBooks,
     navigationContract.gates.showLearningActions,
     notesQuery.notes,
+    options.preferDueReviewOverNextTopic,
     retentionQuery.data?.topics,
     resumeTargetQuery.data,
     subjectId,

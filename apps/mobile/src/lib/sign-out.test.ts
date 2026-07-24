@@ -37,6 +37,11 @@ import {
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
 import { setActiveProfileId, resetAuthExpiredGuard } from './api-client';
 import { buildPersisterKey, LEGACY_CACHE_KEY } from './query-persister';
+import {
+  consumeHubToSessionTransition,
+  markHubToSessionTransition,
+  resetNavigationTransitionProvenanceForTests,
+} from './navigation-transition-provenance';
 
 // Mock dependencies that signOutWithCleanup touches so the test is
 // self-contained and order-of-calls is verifiable via invocationCallOrder.
@@ -103,6 +108,7 @@ function makeClerkSignOut(): jest.Mock {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resetNavigationTransitionProvenanceForTests();
 });
 
 // ---------------------------------------------------------------------------
@@ -167,6 +173,20 @@ describe('signOutWithCleanup — Sentry scope wipe [SEC-SENTRY-SCOPE]', () => {
 // ---------------------------------------------------------------------------
 
 describe('signOutWithCleanup — cleanup ordering', () => {
+  it('clears navigation proof owned by the signed-out account', async () => {
+    const scope = makeScopeMock();
+    (Sentry.getCurrentScope as jest.Mock).mockReturnValue(scope);
+    markHubToSessionTransition('shared-subject-id');
+
+    await signOutWithCleanup({
+      clerkSignOut: makeClerkSignOut(),
+      queryClient: makeQueryClient(),
+      profileIds: [],
+    });
+
+    expect(consumeHubToSessionTransition('shared-subject-id')).toBe(false);
+  });
+
   it('resets api-client identity before queryClient.clear', async () => {
     const scope = makeScopeMock();
     (Sentry.getCurrentScope as jest.Mock).mockReturnValue(scope);

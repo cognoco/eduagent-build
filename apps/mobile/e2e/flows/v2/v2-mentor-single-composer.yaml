@@ -53,7 +53,9 @@ tags:
 # The homework starter preserves the learner's existing draft while the
 # composer's canonical Camera action remains available and no second Camera
 # accessibility target appears. Component and web E2E coverage additionally
-# prove the removed duplicate testID stays absent.
+# prove the removed duplicate testID stays absent. Dismiss the proven input
+# keyboard first so Android delivers this second starter tap to its Pressable.
+- hideKeyboard
 - tapOn:
     id: 'cold-start-chip-homework'
 - assertVisible:
