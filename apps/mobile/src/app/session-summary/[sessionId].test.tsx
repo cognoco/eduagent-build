@@ -17,8 +17,10 @@ import {
   createRoutedMockFetch,
   fetchCallsMatching,
 } from '../../test-utils/mock-api-routes';
+import { JOURNAL_HREF } from '../../lib/navigation';
 
 const mockReplace = jest.fn();
+const mockDismissTo = jest.fn();
 const mockPush = jest.fn();
 const mockBack = jest.fn();
 const mockCanGoBack = jest.fn(() => false);
@@ -45,6 +47,7 @@ const mockSuggestedTopicDId = '55555555-5555-4555-8555-555555555555';
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     replace: mockReplace,
+    dismissTo: mockDismissTo,
     push: mockPush,
     back: mockBack,
     canGoBack: mockCanGoBack,
@@ -2199,7 +2202,7 @@ describe('SessionSummaryScreen', () => {
       });
     });
 
-    it('returns a persisted Journal recap to Journal without swapping to its topic', async () => {
+    it('returns a persisted Journal recap to the existing Journal route without duplicating it or swapping to its topic', async () => {
       mockCanGoBack.mockReturnValue(true);
       mockSessionSummaryData = {
         id: '880e8400-e29b-41d4-a716-446655440005',
@@ -2220,9 +2223,10 @@ describe('SessionSummaryScreen', () => {
       fireEvent.press(screen.getByTestId('summary-close-button'));
 
       await waitFor(() => {
-        expect(mockReplace).toHaveBeenCalledWith('/(app)/journal');
+        expect(mockDismissTo).toHaveBeenCalledWith(JOURNAL_HREF);
       });
       expect(mockBack).not.toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalledWith(JOURNAL_HREF);
       expect(mockReplace).not.toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/(app)/topic/[topicId]',
@@ -2251,9 +2255,10 @@ describe('SessionSummaryScreen', () => {
       fireEvent.press(screen.getByTestId('summary-close-button'));
 
       await waitFor(() => {
-        expect(mockReplace).toHaveBeenCalledWith('/(app)/journal');
+        expect(mockDismissTo).toHaveBeenCalledWith(JOURNAL_HREF);
       });
       expect(mockBack).not.toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalledWith(JOURNAL_HREF);
       expect(mockReplace).not.toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/(app)/topic/[topicId]',

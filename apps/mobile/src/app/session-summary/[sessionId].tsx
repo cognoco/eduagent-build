@@ -451,7 +451,10 @@ export default function SessionSummaryScreen() {
 
   const finishSummaryNavigation = (): void => {
     if (resolvedReturnTo === JOURNAL_RETURN_TO) {
-      router.replace(JOURNAL_HREF);
+      // Pop to the already-mounted Journal tab route. Replacing this root
+      // summary route leaves the retained tab underneath and mounts a second
+      // Journal screen; dismissTo also replaces safely for a direct deep link.
+      router.dismissTo(JOURNAL_HREF);
       return;
     }
 

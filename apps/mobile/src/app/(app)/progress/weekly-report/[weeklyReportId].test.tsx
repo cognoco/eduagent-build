@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { JOURNAL_HREF } from '../../../../lib/navigation';
 
 const mockGoBackOrReplace = jest.fn();
 const mockReplace = jest.fn();
@@ -218,7 +219,7 @@ describe('ProgressWeeklyReportDetail', () => {
     screen.getByText('Go back');
     expect(screen.queryByText('Back to reports')).toBeNull();
     fireEvent.press(backAction);
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/journal');
+    expect(mockReplace).toHaveBeenCalledWith(JOURNAL_HREF);
     expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 
@@ -345,7 +346,7 @@ describe('ProgressWeeklyReportDetail', () => {
     render(<ProgressWeeklyReportDetail />);
 
     fireEvent.press(screen.getByTestId('progress-weekly-report-back'));
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/journal');
+    expect(mockReplace).toHaveBeenCalledWith(JOURNAL_HREF);
     expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 

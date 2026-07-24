@@ -16,6 +16,7 @@ async function openJournal(page: Page): Promise<void> {
 
 async function expectJournalReturn(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/journal$/);
+  await expect(page.getByTestId('journal-screen')).toHaveCount(1);
   await expect(page.getByTestId('journal-screen')).toBeVisible();
   await expect(page.getByTestId('scope-chip')).toHaveCount(0);
 }
