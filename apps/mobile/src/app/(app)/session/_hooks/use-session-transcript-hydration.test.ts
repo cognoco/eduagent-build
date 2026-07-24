@@ -98,6 +98,7 @@ describe('useSessionTranscriptHydration', () => {
         eventId: 'event-user-1',
         isSystemPrompt: undefined,
         escalationRung: undefined,
+        isResponseComplete: false,
       },
       {
         id: 'assistant-1-2026-05-26T08:00:02.000Z',
@@ -106,6 +107,7 @@ describe('useSessionTranscriptHydration', () => {
         eventId: 'event-ai-1',
         isSystemPrompt: undefined,
         escalationRung: 4,
+        isResponseComplete: true,
       },
     ]);
     expect(setters.setExchangeCount).toHaveBeenCalledWith(3);

@@ -44,6 +44,7 @@ import { hasFirstRealState } from '../../lib/first-real-state';
 import { getVoiceLocaleForLanguage } from '../../lib/language-locales';
 import { useProfile } from '../../lib/profile';
 import {
+  MENTOR_RETURN_TO,
   pushAddChildForSupport,
   pushLinkInitiateForManagedPerson,
   pushLinkInitiatePicker,
@@ -168,7 +169,7 @@ function useTransitionBoundFeed(
 function pushMentorHomeworkCamera(router: ReturnType<typeof useRouter>): void {
   router.push({
     pathname: '/(app)/homework/camera',
-    params: { entrySource: 'mentor', returnTo: 'mentor' },
+    params: { entrySource: 'mentor', returnTo: MENTOR_RETURN_TO },
   } as Href);
 }
 
@@ -185,7 +186,7 @@ function pushMentorHomework(
     pathname: '/(app)/homework/manual',
     params: {
       entrySource: 'mentor',
-      returnTo: 'mentor',
+      returnTo: MENTOR_RETURN_TO,
       ...(subject
         ? { subjectId: subject.subjectId, subjectName: subject.subjectName }
         : {}),
@@ -320,6 +321,7 @@ function LearnerMentorScreen(): React.ReactElement {
     }
     pushNowDeepLink(router, card.deepLink, {
       subjectHubTarget: 'v2-subject-hub',
+      returnTo: MENTOR_RETURN_TO,
       setActiveScope,
     });
   };
@@ -383,6 +385,7 @@ function LearnerMentorScreen(): React.ReactElement {
       setBarClarification(null);
       pushNowDeepLink(router, result.deepLink, {
         subjectHubTarget: 'v2-subject-hub',
+        returnTo: MENTOR_RETURN_TO,
         setActiveScope,
       });
       return;
@@ -393,7 +396,7 @@ function LearnerMentorScreen(): React.ReactElement {
         pathname: '/(app)/session',
         params: {
           entrySource: 'mentor',
-          returnTo: 'mentor',
+          returnTo: MENTOR_RETURN_TO,
           mode: 'freeform',
           rawInput: result.text,
         },
@@ -415,7 +418,7 @@ function LearnerMentorScreen(): React.ReactElement {
       pathname: '/(app)/quiz',
       params: {
         activityType: route === 'guess_who' ? 'guess_who' : route,
-        returnTo: 'mentor',
+        returnTo: MENTOR_RETURN_TO,
       },
     } as Href);
   };
@@ -458,13 +461,14 @@ function LearnerMentorScreen(): React.ReactElement {
       if (resumeLink) {
         pushNowDeepLink(router, resumeLink, {
           subjectHubTarget: 'v2-subject-hub',
+          returnTo: MENTOR_RETURN_TO,
           setActiveScope,
         });
         return;
       }
       router.push({
         pathname: '/(app)/session',
-        params: { entrySource: 'mentor', returnTo: 'mentor' },
+        params: { entrySource: 'mentor', returnTo: MENTOR_RETURN_TO },
       } as Href);
     };
     renderedFeed = (
@@ -610,7 +614,8 @@ function LearnerMentorScreen(): React.ReactElement {
   );
 }
 
-export default function MentorScreen(): React.ReactElement {
+export default function MentorScreen(): React.ReactElement | null {
+  const { activeProfile } = useProfile();
   const { activeScope, availableScopes, setActiveScope } = useScopeContext();
   const router = useRouter();
   const eligiblePersons = useEligibleManagedPersons();
@@ -660,5 +665,7 @@ export default function MentorScreen(): React.ReactElement {
     );
   }
 
-  return <LearnerMentorScreen />;
+  if (!activeProfile) return null;
+
+  return <LearnerMentorScreen key={activeProfile.id} />;
 }
