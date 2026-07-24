@@ -414,7 +414,7 @@ function SessionScreenInner() {
     !!activeProfile?.id &&
     nowFeedEpochHydrated;
   const refreshMentorFeedBeforeReturn = useCallback(async () => {
-    if (!canRefreshMentorFeed || !userId || !activeProfile?.id) return false;
+    if (!userId || !activeProfile?.id) return;
 
     // The Mentor feed was warm before this session opened. Refetch its exact
     // actor/profile/epoch projection (including an inactive cache entry) and
@@ -431,14 +431,7 @@ function SessionScreenInner() {
       },
       { throwOnError: true },
     );
-    return true;
-  }, [
-    activeProfile?.id,
-    canRefreshMentorFeed,
-    observedNowFeedEpoch,
-    queryClient,
-    userId,
-  ]);
+  }, [activeProfile?.id, observedNowFeedEpoch, queryClient, userId]);
   useEffect(() => {
     if (!pendingMentorReturn) return;
 
@@ -452,6 +445,9 @@ function SessionScreenInner() {
       }, MENTOR_RETURN_EPOCH_WAIT_MS);
       return () => clearTimeout(timer);
     }
+    // A hydrated epoch without an actor/profile binding cannot identify the
+    // scoped Mentor projection. Wait for the authenticated screen to reload
+    // instead of claiming an unscoped refresh.
     if (!canRefreshMentorFeed) return;
 
     let cancelled = false;
@@ -478,10 +474,13 @@ function SessionScreenInner() {
     refreshMentorFeedBeforeReturn,
     router,
   ]);
+  const startMentorReturn = useCallback(() => {
+    setPendingMentorReturn(true);
+  }, []);
   const handleChatBackPress = useCallback(() => {
     if (returnTo) {
       if (returnTo === MENTOR_RETURN_TO) {
-        setPendingMentorReturn(true);
+        startMentorReturn();
         return;
       }
       router.replace(homeBackHref as Href);
@@ -495,11 +494,11 @@ function SessionScreenInner() {
       return;
     }
     router.replace('/(app)/home' as Href);
-  }, [returnTo, subjectId, homeBackHref, router]);
+  }, [returnTo, subjectId, homeBackHref, router, startMentorReturn]);
   const handleHomeBack = useCallback(() => {
     if (returnTo) {
       if (returnTo === MENTOR_RETURN_TO) {
-        setPendingMentorReturn(true);
+        startMentorReturn();
         return;
       }
       router.replace(homeBackHref as Href);
@@ -507,7 +506,7 @@ function SessionScreenInner() {
     }
 
     goBackOrReplace(router, homeBackHref);
-  }, [homeBackHref, returnTo, router]);
+  }, [homeBackHref, returnTo, router, startMentorReturn]);
   const handleStartNewSession = useCallback(() => {
     router.replace({
       pathname: '/(app)/session',
