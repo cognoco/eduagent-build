@@ -57,17 +57,13 @@ export default function ProgressWeeklyReportDetail(): React.ReactElement {
     ? weeklyReportId[0]
     : weeklyReportId;
   const resolvedReturnTo = Array.isArray(returnTo) ? returnTo[0] : returnTo;
-  const reportsHref =
-    resolvedReturnTo === JOURNAL_RETURN_TO
-      ? JOURNAL_HREF
-      : '/(app)/progress/reports';
   const handleBack = () => {
     if (resolvedReturnTo === JOURNAL_RETURN_TO) {
       router.replace(JOURNAL_HREF);
       return;
     }
 
-    goBackOrReplace(router, reportsHref);
+    goBackOrReplace(router, '/(app)/progress/reports');
   };
   const {
     data: report,
