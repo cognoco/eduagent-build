@@ -52,4 +52,4 @@ export const evidenceLinks = pgTable(
       table.toId,
     ),
   ],
-);
+).enableRLS();

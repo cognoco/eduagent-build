@@ -2676,7 +2676,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.allowed_models": {
       "name": "allowed_models",
