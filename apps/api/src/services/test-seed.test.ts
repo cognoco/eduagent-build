@@ -5,13 +5,12 @@ import { CONSENT_PURPOSES, ENGAGEMENT_SIGNALS } from '@eduagent/schemas';
 import {
   learningSessions,
   profileQuotaUsage,
-  quizRounds,
   person,
   login,
   membership,
-  guardianship,
   consentGrant,
   consentRequest,
+  quizRounds,
   retentionCards,
   sessionEvents,
   subjects,
@@ -32,7 +31,6 @@ import {
   SEED_CLERK_PREFIX,
   type SeedScenario,
 } from './test-seed';
-import { createRecordingDb } from '../test-utils/test-seed-db';
 import { getTierConfig } from './subscription';
 import { addMonthsClamped } from './billing/billing-shared';
 
@@ -41,21 +39,76 @@ import { addMonthsClamped } from './billing/billing-shared';
 // ---------------------------------------------------------------------------
 
 function createMockDb(): Database {
-  return createRecordingDb().db;
-}
+  const deleteWhere = jest.fn().mockReturnValue({
+    returning: jest.fn().mockResolvedValue([]),
+  });
 
-function insertedRowsFor(
-  inserts: Array<{
-    table: unknown;
-    values: Record<string, unknown> | Array<Record<string, unknown>>;
-  }>,
-  table: unknown,
-): Array<Record<string, unknown>> {
-  return inserts
-    .filter((insert) => insert.table === table)
-    .flatMap((insert) =>
-      Array.isArray(insert.values) ? insert.values : [insert.values],
-    );
+  // Fluent select chain: db.select({}).from(table).where(...) / .innerJoin(...).where(...).limit(n)
+  // Returns [] by default (no existing seed data — idempotency check finds nothing to clean up).
+  const selectChain = {
+    from: jest.fn().mockReturnThis(),
+    where: jest.fn().mockResolvedValue([]),
+    innerJoin: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockResolvedValue([]),
+  };
+  // Make `.where()` after `.innerJoin()` also resolve to []:
+  selectChain.innerJoin.mockReturnValue({
+    where: jest.fn().mockReturnValue({
+      limit: jest.fn().mockResolvedValue([]),
+    }),
+  });
+
+  // Fluent update chain: db.update(table).set({}).where(...)
+  const updateChain = {
+    set: jest.fn().mockReturnValue({
+      where: jest.fn().mockResolvedValue(undefined),
+    }),
+  };
+
+  return {
+    insert: jest.fn().mockReturnValue({
+      values: jest.fn().mockReturnValue({
+        onConflictDoNothing: jest.fn().mockReturnValue({
+          returning: jest
+            .fn()
+            .mockResolvedValue([{ id: 'mock-practice-activity-event-id' }]),
+        }),
+      }),
+    }),
+    update: jest.fn().mockReturnValue(updateChain),
+    select: jest.fn().mockReturnValue(selectChain),
+    delete: jest.fn().mockReturnValue({
+      where: deleteWhere,
+    }),
+    // db.execute is used only by the WI-788 legacy-table existence probe
+    // (to_regclass). The unit mock has no legacy tables → return an empty
+    // result so tableExists() resolves false and the conditional legacy writes
+    // self-inert, keeping these tests focused on the v2 path.
+    execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
+    query: {
+      // Extended for scenarios that query curricula/topics (e.g. parent-subject-with-retention)
+      curricula: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'mock-curriculum-id',
+          subjectId: 'mock-subject-id',
+        }),
+      },
+      curriculumTopics: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'mock-topic-id',
+          curriculumId: 'mock-curriculum-id',
+        }),
+        findMany: jest
+          .fn()
+          .mockResolvedValue([
+            { id: 'mock-topic-id', curriculumId: 'mock-curriculum-id' },
+          ]),
+      },
+      subjects: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    },
+  } as unknown as Database;
 }
 
 // ---------------------------------------------------------------------------
@@ -347,23 +400,32 @@ describe('seedScenario', () => {
   });
 
   it('[WI-2234] seeds one unfinished session and due review on distinct topics with scoped transcript events', async () => {
-    const { db, inserts } = createRecordingDb();
+    const db = createMockDb();
     const result = await seedScenario(
       db,
       'v2-returning-learner' as SeedScenario,
       'returning@example.com',
     );
-    const seededSessions = insertedRowsFor(inserts, learningSessions) as Array<{
+    const insertMock = db.insert as unknown as jest.Mock;
+    const valuesMock = insertMock.mock.results[0]?.value.values as jest.Mock;
+    const insertedRowsFor = (table: unknown): unknown[] =>
+      insertMock.mock.calls.flatMap(([insertedTable], index) => {
+        if (insertedTable !== table) return [];
+        const value = valuesMock.mock.calls[index]?.[0];
+        return Array.isArray(value) ? value : [value];
+      });
+
+    const seededSessions = insertedRowsFor(learningSessions) as Array<{
       id: string;
       status: string;
       topicId: string;
     }>;
-    const seededReviews = insertedRowsFor(inserts, retentionCards) as Array<{
+    const seededReviews = insertedRowsFor(retentionCards) as Array<{
       id: string;
       nextReviewAt: Date;
       topicId: string;
     }>;
-    const transcriptEvents = insertedRowsFor(inserts, sessionEvents) as Array<{
+    const transcriptEvents = insertedRowsFor(sessionEvents) as Array<{
       sessionId: string;
       topicId?: string;
     }>;
@@ -405,55 +467,54 @@ describe('seedScenario', () => {
   });
 
   it('[WI-2554] seeds a credentialed learner-only person without an admin role or managed-child guardianship', async () => {
-    const { db, inserts } = createRecordingDb();
+    const db = createMockDb();
     const result = await seedScenario(
       db,
       'v2-account-non-owner-child',
       'child@example.com',
     );
-    const people = insertedRowsFor(inserts, person);
-    const logins = insertedRowsFor(inserts, login);
-    const memberships = insertedRowsFor(inserts, membership);
-    const grants = insertedRowsFor(inserts, consentGrant);
-    const guardianships = insertedRowsFor(inserts, guardianship);
-    const seededSubjects = insertedRowsFor(inserts, subjects);
+    const insertResult = (db.insert as jest.Mock).mock.results[0]?.value as
+      | { values?: jest.Mock }
+      | undefined;
+    const insertedRows =
+      insertResult?.values?.mock.calls.map(([row]) => row) ?? [];
 
-    expect(people).toContainEqual(
+    expect(insertedRows).toContainEqual(
       expect.objectContaining({
         id: result.profileId,
         displayName: 'Test Child',
       }),
     );
-    expect(logins).toContainEqual(
+    expect(insertedRows).toContainEqual(
       expect.objectContaining({
         personId: result.profileId,
         clerkUserId: expect.stringMatching(/^clerk_seed_/),
         email: 'child@example.com',
       }),
     );
-    expect(memberships).toContainEqual(
+    expect(insertedRows).toContainEqual(
       expect.objectContaining({
         personId: result.profileId,
         organizationId: result.accountId,
         roles: ['learner'],
       }),
     );
-    expect(memberships).not.toContainEqual(
+    expect(insertedRows).not.toContainEqual(
       expect.objectContaining({ roles: expect.arrayContaining(['admin']) }),
     );
-    expect(grants).not.toContainEqual(
+    expect(insertedRows).not.toContainEqual(
       expect.objectContaining({
         chargePersonId: result.profileId,
         lawfulBasis: expect.any(String),
       }),
     );
-    expect(guardianships).not.toContainEqual(
+    expect(insertedRows).not.toContainEqual(
       expect.objectContaining({
         guardianPersonId: expect.any(String),
         chargePersonId: result.profileId,
       }),
     );
-    expect(seededSubjects).toContainEqual(
+    expect(insertedRows).toContainEqual(
       expect.objectContaining({
         id: result.ids.subjectId,
         profileId: result.profileId,
@@ -463,22 +524,25 @@ describe('seedScenario', () => {
   });
 
   it('[WI-2240] exposes the parent-multi-child owner learner subject separately from every child subject', async () => {
-    const { db, inserts } = createRecordingDb();
+    const db = createMockDb();
     const result = await seedScenario(
       db,
       'parent-multi-child',
       'owner@example.com',
     );
-    const people = insertedRowsFor(inserts, person);
-    const seededSubjects = insertedRowsFor(inserts, subjects);
+    const insertResult = (db.insert as jest.Mock).mock.results[0]?.value as
+      | { values?: jest.Mock }
+      | undefined;
+    const insertedRows =
+      insertResult?.values?.mock.calls.map(([row]) => row) ?? [];
 
-    expect(people).toContainEqual(
+    expect(insertedRows).toContainEqual(
       expect.objectContaining({
         id: result.profileId,
         displayName: 'Test Parent',
       }),
     );
-    expect(seededSubjects).toContainEqual(
+    expect(insertedRows).toContainEqual(
       expect.objectContaining({
         id: result.ids.ownerSubjectId,
         profileId: result.profileId,
@@ -503,14 +567,10 @@ describe('seedScenario', () => {
       const db = createMockDb();
       await seedScenario(db, scenario, 'test@example.com');
 
-      const insertMock = db.insert as unknown as jest.Mock;
-      const parentProfileInsert = insertMock.mock.calls
-        .flatMap(([table], index) =>
-          table === person
-            ? ((insertMock.mock.results[index]?.value.values as jest.Mock).mock
-                .calls ?? [])
-            : [],
-        )
+      const firstInsertResult = (db.insert as unknown as jest.Mock).mock
+        .results[0];
+      const valuesMock = firstInsertResult?.value.values as jest.Mock;
+      const parentProfileInsert = valuesMock.mock.calls
         .map(([value]) => value as { displayName?: string })
         .find((value) => value.displayName === parentName);
 
@@ -1182,9 +1242,9 @@ describe('new Stage-0 scenarios return required IDs', () => {
   });
 
   it('[WI-1864] seeds a non-final dispute round with stable wrong and correct answer text', async () => {
-    const { db, inserts } = createRecordingDb();
+    const mockDb = createMockDb();
     const result = await seedScenario(
-      db,
+      mockDb,
       'quiz-deterministic-wrong-answer' as SeedScenario,
       'test@example.com',
     );
@@ -1196,7 +1256,9 @@ describe('new Stage-0 scenarios return required IDs', () => {
         correctAnswer: 'thanks',
       }),
     );
-    expect(insertedRowsFor(inserts, quizRounds)).toContainEqual(
+    const valuesMock = (mockDb.insert as jest.Mock).mock.results[0]?.value
+      .values as jest.Mock;
+    expect(valuesMock).toHaveBeenCalledWith(
       expect.objectContaining({
         id: result.ids.roundId,
         activityType: 'vocabulary',
@@ -1225,24 +1287,33 @@ describe('new Stage-0 scenarios return required IDs', () => {
   });
 
   it('[WI-1864] seeds post-approval landing with approved consent and zero subjects', async () => {
-    const { db, inserts } = createRecordingDb();
+    const mockDb = createMockDb();
     const result = await seedScenario(
-      db,
+      mockDb,
       'post-approval-ready' as SeedScenario,
       'test@example.com',
     );
-    const grants = insertedRowsFor(inserts, consentGrant).filter(
+    const insertMock = mockDb.insert as jest.Mock;
+    const valuesMock = insertMock.mock.results[0]?.value.values as jest.Mock;
+    const insertedValues = valuesMock.mock.calls.flatMap(([value]) =>
+      Array.isArray(value) ? value : [value],
+    ) as Array<Record<string, unknown>>;
+    const grants = insertedValues.filter(
       (value) =>
         value.chargePersonId === result.profileId && value.granted === true,
     );
-    const requests = insertedRowsFor(inserts, consentRequest).filter(
+    const requests = insertedValues.filter(
       (value) =>
         value.chargePersonId === result.profileId &&
         value.status === 'approved',
     );
 
-    expect(insertedRowsFor(inserts, consentGrant)).not.toHaveLength(0);
-    expect(insertedRowsFor(inserts, consentRequest)).not.toHaveLength(0);
+    expect(
+      insertMock.mock.calls.some(([table]) => table === consentGrant),
+    ).toBe(true);
+    expect(
+      insertMock.mock.calls.some(([table]) => table === consentRequest),
+    ).toBe(true);
     expect(grants).toHaveLength(CONSENT_PURPOSES.length);
     expect(grants.map(({ purpose }) => purpose).sort()).toEqual(
       [...CONSENT_PURPOSES].sort(),
@@ -1270,7 +1341,9 @@ describe('new Stage-0 scenarios return required IDs', () => {
         }),
       );
     }
-    expect(insertedRowsFor(inserts, subjects)).toHaveLength(0);
+    expect(insertMock.mock.calls.some(([table]) => table === subjects)).toBe(
+      false,
+    );
   });
 
   it('[WI-2190] seeds a completed quiz round in the schema-valid graded detail shape', async () => {
@@ -1282,15 +1355,9 @@ describe('new Stage-0 scenarios return required IDs', () => {
     );
 
     expect(result.ids.roundId).toBeTruthy();
-    const insertMock = mockDb.insert as unknown as jest.Mock;
-    const quizRoundInsertIndex = insertMock.mock.calls.findIndex(
-      ([table]) => table === quizRounds,
-    );
-    const quizRoundInsert = insertMock.mock.results[quizRoundInsertIndex]
-      ?.value as { values: jest.Mock } | undefined;
-
-    expect(quizRoundInsertIndex).toBeGreaterThanOrEqual(0);
-    expect(quizRoundInsert?.values).toHaveBeenCalledWith(
+    const valuesMock = (mockDb.insert as jest.Mock).mock.results[0]?.value
+      .values as jest.Mock;
+    expect(valuesMock).toHaveBeenCalledWith(
       expect.objectContaining({
         id: result.ids.roundId,
         activityType: 'capitals',
