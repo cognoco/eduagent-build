@@ -6,6 +6,9 @@ const mockDatabaseModule = createDatabaseModuleMock({
     createScopedRepository: jest.fn(),
   },
 });
+const mockRecallQualityWarn = jest.fn();
+const mockCaptureException = jest.fn();
+const mockInngestSend = jest.fn().mockResolvedValue(undefined);
 
 jest.mock(
   '@eduagent/database' /* gc1-allow: service unit test — db boundary mocked; real DB covered by sibling .integration.test.ts where present */,
@@ -42,6 +45,47 @@ jest.mock(
         .mockReturnValue({ atCapacity: false, shouldPromote: false }),
     };
   },
+);
+
+jest.mock(
+  './logger' /* gc1-allow: logger is an observability boundary; assertions verify degraded branches without emitting test logs */,
+  () => {
+    const actual = jest.requireActual('./logger') as typeof import('./logger');
+    return {
+      ...actual,
+      createLogger: (...args: Parameters<typeof actual.createLogger>) => {
+        const actualLogger = actual.createLogger(...args);
+        return {
+          ...actualLogger,
+          warn: (...warnArgs: Parameters<typeof actualLogger.warn>) => {
+            mockRecallQualityWarn(...warnArgs);
+            if (
+              typeof warnArgs[0] !== 'string' ||
+              !warnArgs[0].startsWith('[retention.recall-quality]')
+            ) {
+              actualLogger.warn(...warnArgs);
+            }
+          },
+        };
+      },
+    };
+  },
+);
+
+jest.mock(
+  './sentry' /* gc1-allow: Sentry is an external observability boundary */,
+  () => ({
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  }),
+);
+
+jest.mock(
+  '../inngest/client' /* gc1-allow: Inngest is an external event-dispatch boundary */,
+  () => ({
+    inngest: {
+      send: (...args: unknown[]) => mockInngestSend(...args),
+    },
+  }),
 );
 
 import { z } from 'zod';
@@ -2842,6 +2886,12 @@ describe('buildRecallGradeMessages [WI-2114]', () => {
 // ---------------------------------------------------------------------------
 
 describe('evaluateRecallQuality', () => {
+  beforeEach(() => {
+    mockRecallQualityWarn.mockClear();
+    mockCaptureException.mockClear();
+    mockInngestSend.mockClear();
+  });
+
   afterEach(() => {
     registerProvider(createMockProvider('gemini'));
   });
@@ -2888,6 +2938,9 @@ describe('evaluateRecallQuality', () => {
       // [WI-2114] Grader response above omits feedback → null passthrough.
       feedback: null,
     });
+    expect(mockRecallQualityWarn).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(mockInngestSend).not.toHaveBeenCalled();
   });
 
   it('handles quality 0 / verdict "missing" (blackout)', async () => {
@@ -2956,13 +3009,49 @@ describe('evaluateRecallQuality', () => {
 
     const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
     expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
+    expect(mockRecallQualityWarn).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ reason: 'no_json' }),
+    );
+    expect(mockInngestSend).toHaveBeenCalledWith({
+      name: 'app/retention.recall_quality_degraded',
+      data: expect.objectContaining({ reason: 'no_json' }),
+    });
+  });
+
+  it('observes malformed JSON separately from a response with no JSON', async () => {
+    registerGrader('{"quality": 4,}');
+
+    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
+    expect(mockRecallQualityWarn).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ reason: 'parse_error' }),
+    );
+    expect(mockInngestSend).toHaveBeenCalledWith({
+      name: 'app/retention.recall_quality_degraded',
+      data: expect.objectContaining({ reason: 'parse_error' }),
+    });
+  });
+
+  it('keeps the honest fallback when degraded-event dispatch fails', async () => {
+    mockInngestSend.mockRejectedValueOnce(new Error('Inngest unavailable'));
+    registerGrader('not json');
+
+    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+
+    expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
+    expect(mockInngestSend).toHaveBeenCalledWith({
+      name: 'app/retention.recall_quality_degraded',
+      data: expect.objectContaining({ reason: 'no_json' }),
+    });
   });
 
   it('returns an honest fallback on an LLM error', async () => {
     const provider: LLMProvider = {
       id: 'gemini',
       async chat(): Promise<ChatResult> {
-        throw new Error('LLM unavailable');
+        throw new Error('LLM unavailable: learner answer must stay private');
       },
       chatStream(): ChatStreamResult {
         return makeChatStreamResult(
@@ -2977,6 +3066,25 @@ describe('evaluateRecallQuality', () => {
 
     const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
     expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
+    expect(mockRecallQualityWarn).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ reason: 'route_error' }),
+    );
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Recall quality grading route failed',
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({ reason: 'route_error' }),
+      }),
+    );
+    expect(
+      (mockCaptureException.mock.calls[0]?.[0] as Error).message,
+    ).not.toContain('learner answer');
+    expect(mockInngestSend).toHaveBeenCalledWith({
+      name: 'app/retention.recall_quality_degraded',
+      data: expect.objectContaining({ reason: 'route_error' }),
+    });
   });
 
   it('returns an honest fallback when quality is above range', async () => {
@@ -2986,6 +3094,14 @@ describe('evaluateRecallQuality', () => {
 
     const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
     expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
+    expect(mockRecallQualityWarn).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ reason: 'schema_invalid' }),
+    );
+    expect(mockInngestSend).toHaveBeenCalledWith({
+      name: 'app/retention.recall_quality_degraded',
+      data: expect.objectContaining({ reason: 'schema_invalid' }),
+    });
   });
 
   it('returns an honest fallback when quality is below range (negative)', async () => {

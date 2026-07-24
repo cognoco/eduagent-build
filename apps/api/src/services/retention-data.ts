@@ -81,6 +81,8 @@ import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { NotFoundError } from '../errors';
 import { captureException } from './sentry';
 import { createLogger } from './logger';
+import { inngest } from '../inngest/client';
+import { safeSend } from './safe-non-core';
 import {
   assertOwnedCurriculumTopic,
   findOwnedCurriculumTopic,
@@ -89,6 +91,8 @@ import {
 
 const logger = createLogger();
 const DAY_MS = 1000 * 60 * 60 * 24;
+const RECALL_QUALITY_FLOW = 'retention.recall_quality';
+const RECALL_QUALITY_DEGRADED_EVENT = 'app/retention.recall_quality_degraded';
 
 // ---------------------------------------------------------------------------
 // Mappers
@@ -218,20 +222,68 @@ export const recallGradeJsonSchema = z
 
 /**
  * Parse the grader's JSON envelope. Tolerates surrounding prose / code fences
- * by extracting the first balanced object. Returns null on any failure so the
- * caller falls back honestly rather than inventing a score.
+ * by extracting the first balanced object. Classifies failures without
+ * retaining the raw response so the caller can observe degradation safely.
  */
-function parseRecallGradeJson(
-  raw: string,
-): z.infer<typeof recallGradeJsonSchema> | null {
+type RecallQualityDegradedReason =
+  | 'route_error'
+  | 'no_json'
+  | 'parse_error'
+  | 'schema_invalid';
+
+type RecallGradeParseResult =
+  | {
+      success: true;
+      data: z.infer<typeof recallGradeJsonSchema>;
+    }
+  | {
+      success: false;
+      reason: Exclude<RecallQualityDegradedReason, 'route_error'>;
+    };
+
+const recallQualityDegradedEventSchema = z.object({
+  timestamp: z.string().datetime(),
+  flow: z.literal(RECALL_QUALITY_FLOW),
+  reason: z.enum(['route_error', 'no_json', 'parse_error', 'schema_invalid']),
+});
+
+async function emitRecallQualityDegraded(
+  reason: RecallQualityDegradedReason,
+): Promise<void> {
+  const payload = recallQualityDegradedEventSchema.parse({
+    timestamp: new Date().toISOString(),
+    flow: RECALL_QUALITY_FLOW,
+    reason,
+  });
+
+  await safeSend(
+    () =>
+      inngest.send({
+        // orphan-allow: observability-only event — the honest fallback remains
+        // non-advancing; this event feeds degraded-rate monitoring.
+        name: RECALL_QUALITY_DEGRADED_EVENT,
+        data: payload,
+      }),
+    RECALL_QUALITY_FLOW,
+    { reason },
+  );
+}
+
+function parseRecallGradeJson(raw: string): RecallGradeParseResult {
   const jsonText = extractFirstJsonObject(raw);
-  if (jsonText === null) return null;
+  if (jsonText === null) return { success: false, reason: 'no_json' };
+
+  let candidate: unknown;
   try {
-    const parsed = recallGradeJsonSchema.safeParse(JSON.parse(jsonText));
-    return parsed.success ? parsed.data : null;
+    candidate = JSON.parse(jsonText);
   } catch {
-    return null;
+    return { success: false, reason: 'parse_error' };
   }
+
+  const parsed = recallGradeJsonSchema.safeParse(candidate);
+  return parsed.success
+    ? { success: true, data: parsed.data }
+    : { success: false, reason: 'schema_invalid' };
 }
 
 /**
@@ -316,37 +368,67 @@ export async function evaluateRecallQuality(
   // [WI-2114] Learner's tutor-prose language for the feedback strings (AC-4).
   conversationLanguage?: ConversationLanguage,
 ): Promise<RecallGrade> {
+  const fallback: RecallGrade = {
+    graded: false,
+    gradedBy: 'fallback_heuristic',
+  };
+
+  const messages = buildRecallGradeMessages(
+    answer,
+    topicTitle,
+    topicDescription,
+    focusConcepts,
+    conversationLanguage,
+  );
+
+  let response: string;
   try {
-    const messages = buildRecallGradeMessages(
-      answer,
-      topicTitle,
-      topicDescription,
-      focusConcepts,
-      conversationLanguage,
-    );
-
     const result = await routeAndCall(messages, 1);
-    const parsed = parseRecallGradeJson(result.response);
-
-    if (!parsed) {
-      return { graded: false, gradedBy: 'fallback_heuristic' };
-    }
-
-    return {
-      graded: true,
-      quality: parsed.quality,
-      gradedBy: 'llm',
-      verdict: parsed.verdict,
-      rationale: parsed.rationale ?? null,
-      misconception: parsed.misconception ?? null,
-      rung: 1,
-      // [WI-2114] Pass through the grader's answer-specific feedback; null when
-      // the grader omitted it so the caller leaves response.feedback unset.
-      feedback: parsed.feedback ?? null,
-    };
-  } catch {
-    return { graded: false, gradedBy: 'fallback_heuristic' };
+    response = result.response;
+  } catch (error) {
+    logger.warn('[retention.recall-quality] degraded — route error', {
+      flow: RECALL_QUALITY_FLOW,
+      reason: 'route_error',
+    });
+    captureException(
+      new Error('Recall quality grading route failed', {
+        cause: {
+          errorKind: error instanceof Error ? 'error' : 'non_error',
+        },
+      }),
+      {
+        extra: {
+          surface: RECALL_QUALITY_FLOW,
+          reason: 'route_error',
+        },
+      },
+    );
+    await emitRecallQualityDegraded('route_error');
+    return fallback;
   }
+
+  const parsed = parseRecallGradeJson(response);
+  if (!parsed.success) {
+    logger.warn('[retention.recall-quality] degraded — invalid response', {
+      flow: RECALL_QUALITY_FLOW,
+      reason: parsed.reason,
+    });
+    await emitRecallQualityDegraded(parsed.reason);
+    return fallback;
+  }
+
+  return {
+    graded: true,
+    quality: parsed.data.quality,
+    gradedBy: 'llm',
+    verdict: parsed.data.verdict,
+    rationale: parsed.data.rationale ?? null,
+    misconception: parsed.data.misconception ?? null,
+    rung: 1,
+    // [WI-2114] Pass through the grader's answer-specific feedback; null when
+    // the grader omitted it so the caller leaves response.feedback unset.
+    feedback: parsed.data.feedback ?? null,
+  };
 }
 
 // ---------------------------------------------------------------------------
