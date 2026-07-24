@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { inngest } from '../inngest/client';
+import type { LlmVolumeAlertAttributes } from '../services/llm-volume-alert-sink';
 import { createLogger } from '../services/logger';
 import { captureException } from '../services/sentry';
 import { apiError } from '../errors';
@@ -183,7 +184,7 @@ export const maintenanceRoutes = new Hono<MaintenanceEnv>()
     const provider = 'synthetic-operator-probe';
     const emittedAt = new Date().toISOString();
     const utcDate = emittedAt.slice(0, 10);
-    logger.warn('llm.volume.daily_threshold_exceeded', {
+    const context: LlmVolumeAlertAttributes = {
       event: 'llm.volume.daily_threshold_exceeded',
       surface: 'llm_volume_alert',
       provider,
@@ -191,7 +192,8 @@ export const maintenanceRoutes = new Hono<MaintenanceEnv>()
       count: 1,
       threshold: 1,
       utc_date: utcDate,
-    });
+    };
+    logger.warn('llm.volume.daily_threshold_exceeded', context);
 
     return c.json({ emitted: true, provider, emittedAt, utcDate });
   })

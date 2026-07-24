@@ -185,6 +185,10 @@ describe('createLogger', () => {
 
       expect(captured.warns).toHaveLength(1);
       expect(parseEntry(captured.warns[0]!).message).toBe('canonical warning');
+      expect(captured.errors).toHaveLength(1);
+      expect(parseEntry(captured.errors[0]!).message).toBe(
+        'structured_log_sink.failed',
+      );
     });
   });
 
