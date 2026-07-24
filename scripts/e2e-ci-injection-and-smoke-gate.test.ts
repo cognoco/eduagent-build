@@ -6801,6 +6801,56 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(noMatchInput).toBeGreaterThan(-1);
   });
 
+  it('[WI-2238 gate] dismisses the Mentor draft keyboard before exercising the Homework starter', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-mentor-single-composer.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<
+      | string
+      | {
+          assertVisible?: { id?: string; text?: string };
+          tapOn?: { id?: string };
+        }
+    >;
+    const draftConfirmed = commands.findIndex(
+      (command) =>
+        typeof command === 'object' &&
+        command.assertVisible?.id === 'mentor-bar-input' &&
+        command.assertVisible.text === 'Teach me something new please',
+    );
+    const keyboardDismiss = commands.findIndex(
+      (command, index) => index > draftConfirmed && command === 'hideKeyboard',
+    );
+    const homeworkStarter = commands.findIndex(
+      (command, index) =>
+        index > keyboardDismiss &&
+        typeof command === 'object' &&
+        command.tapOn?.id === 'cold-start-chip-homework',
+    );
+    const homeworkReply = commands.findIndex(
+      (command, index) =>
+        index > homeworkStarter &&
+        typeof command === 'object' &&
+        command.assertVisible?.id === 'cold-start-homework-reply',
+    );
+
+    expect([
+      draftConfirmed,
+      keyboardDismiss,
+      homeworkStarter,
+      homeworkReply,
+    ]).toEqual(
+      [
+        draftConfirmed,
+        keyboardDismiss,
+        homeworkStarter,
+        homeworkReply,
+      ].toSorted((left, right) => left - right),
+    );
+    expect(draftConfirmed).toBeGreaterThan(-1);
+  });
+
   it('[WI-1406] keeps native MFA placeholders explicitly non-executable until OPQ-26 fixtures exist', () => {
     const nightlyFlows = new Set(loadPlan('nightly').map(({ flow }) => flow));
     const placeholders = [
