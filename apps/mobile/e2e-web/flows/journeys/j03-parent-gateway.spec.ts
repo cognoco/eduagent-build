@@ -450,10 +450,14 @@ test('J-03 360px longest localized supporter labels clear native chrome and Ment
   }
 });
 
-test('J-03 1440px supporter scope strip remains one vertically-contained row @smoke', async ({
+test('J-03 normal-width tablet and desktop scope strips remain one vertically-contained row @smoke', async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 1440, height: 1080 });
+  const viewports = [
+    { height: 1024, surface: 'tablet', width: 768 },
+    { height: 1080, surface: 'desktop', width: 1440 },
+  ];
+  await page.setViewportSize(viewports[0]);
   await installLongSupporterScopes(page);
   await openSeededParent(page);
 
@@ -461,44 +465,50 @@ test('J-03 1440px supporter scope strip remains one vertically-contained row @sm
   const scopeShell = page.getByTestId('scope-chip-shell');
   const avatarShell = page.getByTestId('account-avatar-shell');
   const options = page.locator('[data-testid^="scope-chip-option-"]');
-  await expect(scopeChip).toBeVisible({ timeout: 60_000 });
-  await expect(options).toHaveCount(5);
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    await expect(scopeChip).toBeVisible({ timeout: 60_000 });
+    await expect(options).toHaveCount(5);
 
-  const rowGeometry = await options.evaluateAll((elements) => {
-    const boxes = elements.map((element) => element.getBoundingClientRect());
-    const top = Math.min(...boxes.map((box) => box.top));
-    const bottom = Math.max(...boxes.map((box) => box.bottom));
-    return {
-      bottomSpread:
-        Math.max(...boxes.map((box) => box.bottom)) -
-        Math.min(...boxes.map((box) => box.bottom)),
-      rowHeight: bottom - top,
-      topSpread:
-        Math.max(...boxes.map((box) => box.top)) -
-        Math.min(...boxes.map((box) => box.top)),
-    };
-  });
-  expect(rowGeometry.topSpread).toBeLessThanOrEqual(1);
-  expect(rowGeometry.bottomSpread).toBeLessThanOrEqual(1);
+    const rowGeometry = await options.evaluateAll((elements) => {
+      const boxes = elements.map((element) => element.getBoundingClientRect());
+      const top = Math.min(...boxes.map((box) => box.top));
+      const bottom = Math.max(...boxes.map((box) => box.bottom));
+      return {
+        bottomSpread:
+          Math.max(...boxes.map((box) => box.bottom)) -
+          Math.min(...boxes.map((box) => box.bottom)),
+        rowHeight: bottom - top,
+        topSpread:
+          Math.max(...boxes.map((box) => box.top)) -
+          Math.min(...boxes.map((box) => box.top)),
+      };
+    });
+    expect(rowGeometry.topSpread, viewport.surface).toBeLessThanOrEqual(1);
+    expect(rowGeometry.bottomSpread, viewport.surface).toBeLessThanOrEqual(1);
 
-  const chipGeometry = await scopeChip.evaluate((element) => ({
-    clientHeight: element.clientHeight,
-    scrollHeight: element.scrollHeight,
-  }));
-  expect(
-    chipGeometry.scrollHeight - chipGeometry.clientHeight,
-  ).toBeLessThanOrEqual(1);
-  expect(rowGeometry.rowHeight).toBeLessThanOrEqual(
-    chipGeometry.clientHeight + 1,
-  );
+    const chipGeometry = await scopeChip.evaluate((element) => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+    }));
+    expect(
+      chipGeometry.scrollHeight - chipGeometry.clientHeight,
+      viewport.surface,
+    ).toBeLessThanOrEqual(1);
+    expect(rowGeometry.rowHeight, viewport.surface).toBeLessThanOrEqual(
+      chipGeometry.clientHeight + 1,
+    );
 
-  const [scopeBox, avatarBox] = await Promise.all([
-    scopeShell.boundingBox(),
-    avatarShell.boundingBox(),
-  ]);
-  expect(scopeBox).not.toBeNull();
-  expect(avatarBox).not.toBeNull();
-  expect(scopeBox!.y).toBeCloseTo(avatarBox!.y, 0);
-  expect(scopeBox!.x + scopeBox!.width).toBeLessThanOrEqual(avatarBox!.x - 8);
-  await expectTopmostAtCenter(options.first());
+    const [scopeBox, avatarBox] = await Promise.all([
+      scopeShell.boundingBox(),
+      avatarShell.boundingBox(),
+    ]);
+    expect(scopeBox, viewport.surface).not.toBeNull();
+    expect(avatarBox, viewport.surface).not.toBeNull();
+    expect(scopeBox!.y, viewport.surface).toBeCloseTo(avatarBox!.y, 0);
+    expect(scopeBox!.x + scopeBox!.width, viewport.surface).toBeLessThanOrEqual(
+      avatarBox!.x - 8,
+    );
+    await expectTopmostAtCenter(options.first());
+  }
 });
