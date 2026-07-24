@@ -2,8 +2,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { inngest } from '../inngest/client';
-import type { LlmVolumeAlertAttributes } from '../services/llm-volume-alert-sink';
-import { createLogger } from '../services/logger';
+import { emitLlmVolumeAlertProbe } from '../services/llm-volume-alert-sink';
 import { captureException } from '../services/sentry';
 import { apiError } from '../errors';
 import { isMaintenanceProductionEnabled } from '../config';
@@ -26,7 +25,6 @@ type MaintenanceEnv = {
 // Mirrors the canonical HMAC compare pattern at
 // apps/api/src/routes/revenuecat-webhook.ts:59 (constantTimeCompare).
 const HMAC_COMPARISON_LABEL = 'eduagent-maintenance-hmac-comparison-v1';
-const logger = createLogger();
 
 /**
  * HMAC-based constant-time comparison. Both inputs are hashed with SHA-256
@@ -181,21 +179,7 @@ export const maintenanceRoutes = new Hono<MaintenanceEnv>()
       );
     }
 
-    const provider = 'synthetic-operator-probe';
-    const emittedAt = new Date().toISOString();
-    const utcDate = emittedAt.slice(0, 10);
-    const context: LlmVolumeAlertAttributes = {
-      event: 'llm.volume.daily_threshold_exceeded',
-      surface: 'llm_volume_alert',
-      provider,
-      environment: c.env.ENVIRONMENT ?? 'unknown',
-      count: 1,
-      threshold: 1,
-      utc_date: utcDate,
-    };
-    logger.warn('llm.volume.daily_threshold_exceeded', context);
-
-    return c.json({ emitted: true, provider, emittedAt, utcDate });
+    return c.json(emitLlmVolumeAlertProbe(c.env.ENVIRONMENT));
   })
   .post('/maintenance/memory-facts-backfill', async (c) => {
     const environmentRefusal = refuseBackfillByEnvironment(c);

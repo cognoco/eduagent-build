@@ -1,8 +1,10 @@
+import { createLogger } from './logger';
 import type { LogEntry } from './logger';
 
 const LLM_VOLUME_ALERT_EVENT = 'llm.volume.daily_threshold_exceeded';
 const LLM_VOLUME_ALERT_SURFACE = 'llm_volume_alert';
 const UTC_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const logger = createLogger();
 
 export interface LlmVolumeAlertAttributes extends Record<string, unknown> {
   event: typeof LLM_VOLUME_ALERT_EVENT;
@@ -18,6 +20,29 @@ export type LlmVolumeAlertSink = (
   message: typeof LLM_VOLUME_ALERT_EVENT,
   attributes: LlmVolumeAlertAttributes,
 ) => void;
+
+export function emitLlmVolumeAlertProbe(environment?: string): {
+  emitted: true;
+  provider: string;
+  emittedAt: string;
+  utcDate: string;
+} {
+  const provider = 'synthetic-operator-probe';
+  const emittedAt = new Date().toISOString();
+  const utcDate = emittedAt.slice(0, 10);
+  const context: LlmVolumeAlertAttributes = {
+    event: LLM_VOLUME_ALERT_EVENT,
+    surface: LLM_VOLUME_ALERT_SURFACE,
+    provider,
+    environment: environment ?? 'unknown',
+    count: 1,
+    threshold: 1,
+    utc_date: utcDate,
+  };
+  logger.warn(LLM_VOLUME_ALERT_EVENT, context);
+
+  return { emitted: true, provider, emittedAt, utcDate };
+}
 
 function selectLlmVolumeAlertAttributes(
   level: string,

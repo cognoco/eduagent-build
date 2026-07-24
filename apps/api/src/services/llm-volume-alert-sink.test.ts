@@ -1,4 +1,5 @@
 import {
+  emitLlmVolumeAlertProbe,
   forwardLlmVolumeAlertToSink,
   scrubLlmVolumeAlertSentryLog,
 } from './llm-volume-alert-sink';
@@ -23,6 +24,41 @@ function entry(overrides: Partial<LogEntry> = {}): LogEntry {
     ...overrides,
   };
 }
+
+describe('emitLlmVolumeAlertProbe', () => {
+  it('constructs and emits the canonical bounded probe alert', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-24T12:34:56.789Z'));
+    const warnSpy = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+
+    try {
+      expect(emitLlmVolumeAlertProbe('production')).toEqual({
+        emitted: true,
+        provider: 'synthetic-operator-probe',
+        emittedAt: '2026-07-24T12:34:56.789Z',
+        utcDate: '2026-07-24',
+      });
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(String(warnSpy.mock.calls[0]?.[0]))).toMatchObject({
+        level: 'warn',
+        message: 'llm.volume.daily_threshold_exceeded',
+        context: {
+          event: 'llm.volume.daily_threshold_exceeded',
+          surface: 'llm_volume_alert',
+          provider: 'synthetic-operator-probe',
+          environment: 'production',
+          count: 1,
+          threshold: 1,
+          utc_date: '2026-07-24',
+        },
+      });
+    } finally {
+      warnSpy.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+});
 
 describe('forwardLlmVolumeAlertToSink', () => {
   it('forwards only the canonical bounded fields to the alert sink', () => {
