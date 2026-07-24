@@ -243,15 +243,18 @@ type RecallGradeParseResult =
 
 const recallQualityDegradedEventSchema = z.object({
   timestamp: z.string().datetime(),
+  profileId: z.string().min(1),
   flow: z.literal(RECALL_QUALITY_FLOW),
   reason: z.enum(['route_error', 'no_json', 'parse_error', 'schema_invalid']),
 });
 
 async function emitRecallQualityDegraded(
+  profileId: string,
   reason: RecallQualityDegradedReason,
 ): Promise<void> {
   const payload = recallQualityDegradedEventSchema.parse({
     timestamp: new Date().toISOString(),
+    profileId,
     flow: RECALL_QUALITY_FLOW,
     reason,
   });
@@ -361,6 +364,7 @@ export function buildRecallGradeMessages(
 export async function evaluateRecallQuality(
   answer: string,
   topicTitle: string,
+  profileId: string,
   topicDescription?: string,
   // [WI-1454] Optional open weak-concept labels to focus the grade on; see
   // buildRecallGradeMessages. Absent/empty preserves whole-topic grading.
@@ -403,7 +407,7 @@ export async function evaluateRecallQuality(
         },
       },
     );
-    await emitRecallQualityDegraded('route_error');
+    await emitRecallQualityDegraded(profileId, 'route_error');
     return fallback;
   }
 
@@ -413,7 +417,7 @@ export async function evaluateRecallQuality(
       flow: RECALL_QUALITY_FLOW,
       reason: parsed.reason,
     });
-    await emitRecallQualityDegraded(parsed.reason);
+    await emitRecallQualityDegraded(profileId, parsed.reason);
     return fallback;
   }
 
@@ -1237,6 +1241,7 @@ export async function processRecallTest(
       : await evaluateRecallQuality(
           input.answer ?? '',
           topicTitle,
+          profileId,
           topic.topicDescription ?? undefined,
           focusConcepts,
           conversationLanguage,

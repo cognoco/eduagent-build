@@ -2926,6 +2926,7 @@ describe('evaluateRecallQuality', () => {
     const result = await evaluateRecallQuality(
       'A thorough explanation of photosynthesis involving chlorophyll and light reactions',
       'Photosynthesis',
+      profileId,
     );
     expect(result).toEqual({
       graded: true,
@@ -2948,7 +2949,7 @@ describe('evaluateRecallQuality', () => {
       '{"quality": 0, "verdict": "missing", "rationale": "No meaningful content.", "misconception": null}',
     );
 
-    const result = await evaluateRecallQuality('', 'Photosynthesis');
+    const result = await evaluateRecallQuality('', 'Photosynthesis', profileId);
     expect(result).toMatchObject({
       graded: true,
       quality: 0,
@@ -2964,6 +2965,7 @@ describe('evaluateRecallQuality', () => {
     const result = await evaluateRecallQuality(
       'Complete and perfect explanation of the topic',
       'Topic',
+      profileId,
     );
     expect(result).toMatchObject({
       graded: true,
@@ -2980,6 +2982,7 @@ describe('evaluateRecallQuality', () => {
     const result = await evaluateRecallQuality(
       'Mitosis makes four cells with half the chromosomes',
       'Mitosis',
+      profileId,
     );
     expect(result).toMatchObject({
       graded: true,
@@ -2996,6 +2999,7 @@ describe('evaluateRecallQuality', () => {
     const result = await evaluateRecallQuality(
       'Some answer about the topic',
       'Topic',
+      profileId,
     );
     expect(result).toMatchObject({
       graded: true,
@@ -3007,7 +3011,11 @@ describe('evaluateRecallQuality', () => {
   it('returns an honest fallback (no fabricated score) on an unparseable response', async () => {
     registerGrader('I think the answer is pretty good, maybe a 4?');
 
-    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    const result = await evaluateRecallQuality(
+      'A'.repeat(60),
+      'Topic',
+      profileId,
+    );
     expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
     expect(mockRecallQualityWarn).toHaveBeenCalledWith(
       expect.any(String),
@@ -3015,14 +3023,18 @@ describe('evaluateRecallQuality', () => {
     );
     expect(mockInngestSend).toHaveBeenCalledWith({
       name: 'app/retention.recall_quality_degraded',
-      data: expect.objectContaining({ reason: 'no_json' }),
+      data: expect.objectContaining({ profileId, reason: 'no_json' }),
     });
   });
 
   it('observes malformed JSON separately from a response with no JSON', async () => {
     registerGrader('{"quality": 4,}');
 
-    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    const result = await evaluateRecallQuality(
+      'A'.repeat(60),
+      'Topic',
+      profileId,
+    );
     expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
     expect(mockRecallQualityWarn).toHaveBeenCalledWith(
       expect.any(String),
@@ -3030,7 +3042,7 @@ describe('evaluateRecallQuality', () => {
     );
     expect(mockInngestSend).toHaveBeenCalledWith({
       name: 'app/retention.recall_quality_degraded',
-      data: expect.objectContaining({ reason: 'parse_error' }),
+      data: expect.objectContaining({ profileId, reason: 'parse_error' }),
     });
   });
 
@@ -3038,12 +3050,16 @@ describe('evaluateRecallQuality', () => {
     mockInngestSend.mockRejectedValueOnce(new Error('Inngest unavailable'));
     registerGrader('not json');
 
-    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    const result = await evaluateRecallQuality(
+      'A'.repeat(60),
+      'Topic',
+      profileId,
+    );
 
     expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
     expect(mockInngestSend).toHaveBeenCalledWith({
       name: 'app/retention.recall_quality_degraded',
-      data: expect.objectContaining({ reason: 'no_json' }),
+      data: expect.objectContaining({ profileId, reason: 'no_json' }),
     });
   });
 
@@ -3064,7 +3080,11 @@ describe('evaluateRecallQuality', () => {
     };
     registerProvider(provider);
 
-    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    const result = await evaluateRecallQuality(
+      'A'.repeat(60),
+      'Topic',
+      profileId,
+    );
     expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
     expect(mockRecallQualityWarn).toHaveBeenCalledWith(
       expect.any(String),
@@ -3083,7 +3103,7 @@ describe('evaluateRecallQuality', () => {
     ).not.toContain('learner answer');
     expect(mockInngestSend).toHaveBeenCalledWith({
       name: 'app/retention.recall_quality_degraded',
-      data: expect.objectContaining({ reason: 'route_error' }),
+      data: expect.objectContaining({ profileId, reason: 'route_error' }),
     });
   });
 
@@ -3092,7 +3112,11 @@ describe('evaluateRecallQuality', () => {
       '{"quality": 7, "verdict": "solid", "rationale": "x", "misconception": null}',
     );
 
-    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    const result = await evaluateRecallQuality(
+      'A'.repeat(60),
+      'Topic',
+      profileId,
+    );
     expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
     expect(mockRecallQualityWarn).toHaveBeenCalledWith(
       expect.any(String),
@@ -3100,7 +3124,7 @@ describe('evaluateRecallQuality', () => {
     );
     expect(mockInngestSend).toHaveBeenCalledWith({
       name: 'app/retention.recall_quality_degraded',
-      data: expect.objectContaining({ reason: 'schema_invalid' }),
+      data: expect.objectContaining({ profileId, reason: 'schema_invalid' }),
     });
   });
 
@@ -3109,7 +3133,11 @@ describe('evaluateRecallQuality', () => {
       '{"quality": -1, "verdict": "missing", "rationale": "x", "misconception": null}',
     );
 
-    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    const result = await evaluateRecallQuality(
+      'A'.repeat(60),
+      'Topic',
+      profileId,
+    );
     expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
   });
 
@@ -3122,7 +3150,11 @@ describe('evaluateRecallQuality', () => {
       '{"quality": 5, "verdict": "misconception", "rationale": "x", "misconception": "thinks mass and weight are identical"}',
     );
 
-    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    const result = await evaluateRecallQuality(
+      'A'.repeat(60),
+      'Topic',
+      profileId,
+    );
     expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
   });
 
@@ -3135,7 +3167,11 @@ describe('evaluateRecallQuality', () => {
       '{"quality": 0, "verdict": "solid", "rationale": "x", "misconception": null}',
     );
 
-    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    const result = await evaluateRecallQuality(
+      'A'.repeat(60),
+      'Topic',
+      profileId,
+    );
     expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
   });
 });
