@@ -465,6 +465,121 @@ function validateClaudeCodeActionOidcPermission(
   };
 }
 
+const CLAUDE_REVIEW_WORKFLOW = '.github/workflows/claude-code-review.yml';
+const CLAUDE_REVIEW_ALL_PRS_MESSAGE =
+  'Claude review must be eligible for every pull request; remove pull_request paths and paths-ignore filters';
+const CLAUDE_REVIEW_UNAVAILABLE_RESULT_MESSAGE =
+  'Claude review must bound reviewer attempts and always upload a machine-readable fail-closed result with an executable recovery command';
+
+function validateClaudeReviewContract(
+  file: string,
+  parsed: Record<string, unknown>,
+): Violation[] {
+  if (file.replaceAll('\\', '/') !== CLAUDE_REVIEW_WORKFLOW) return [];
+
+  const violations: Violation[] = [];
+  const workflowOn = getWorkflowOn(parsed);
+  const pullRequestTrigger = isRecord(workflowOn)
+    ? workflowOn.pull_request
+    : undefined;
+  const hasPullRequestFilters =
+    isRecord(pullRequestTrigger) &&
+    (Object.hasOwn(pullRequestTrigger, 'paths') ||
+      Object.hasOwn(pullRequestTrigger, 'paths-ignore'));
+
+  if (!hasEvent(workflowOn, 'pull_request') || hasPullRequestFilters) {
+    violations.push({
+      file,
+      message: CLAUDE_REVIEW_ALL_PRS_MESSAGE,
+    });
+  }
+
+  const reviewJob =
+    isRecord(parsed.jobs) && isRecord(parsed.jobs['claude-review'])
+      ? parsed.jobs['claude-review']
+      : undefined;
+  const steps = getSteps(reviewJob);
+  const reviewStepIndexes = steps.flatMap((step, index) =>
+    typeof step.uses === 'string' && CLAUDE_CODE_ACTION.test(step.uses)
+      ? [index]
+      : [],
+  );
+  const hasThreeBoundedAttempts =
+    reviewStepIndexes.length === 3 &&
+    reviewStepIndexes.every((index) => {
+      const timeoutMinutes = steps[index]?.['timeout-minutes'];
+      return (
+        steps[index]?.['continue-on-error'] === true &&
+        typeof timeoutMinutes === 'number' &&
+        timeoutMinutes > 0 &&
+        timeoutMinutes <= 30
+      );
+    });
+
+  const initializerIndex = steps.findIndex((step) => {
+    const run = typeof step.run === 'string' ? step.run : '';
+    return (
+      run.includes('REVIEWER_UNAVAILABLE') &&
+      run.includes('merge_eligible') &&
+      run.includes('false') &&
+      run.includes('head_sha') &&
+      run.includes('run_id') &&
+      run.includes('recovery_command') &&
+      run.includes('gh run rerun') &&
+      run.includes('--failed') &&
+      run.includes('claude-review-verdict.json')
+    );
+  });
+  const firstReviewStepIndex = reviewStepIndexes[0];
+  const initializesBeforeReview =
+    initializerIndex >= 0 &&
+    firstReviewStepIndex !== undefined &&
+    initializerIndex < firstReviewStepIndex;
+
+  const hasFailClosedVerdictCheck = steps.some((step) => {
+    const run = typeof step.run === 'string' ? step.run : '';
+    return (
+      run.includes('review_json') &&
+      run.includes('Claude Code Review:') &&
+      run.includes('metadata_complete') &&
+      run.includes('merge_eligible') &&
+      run.includes('exit 1')
+    );
+  });
+
+  const hasAlwaysUploadedResult = steps.some((step) => {
+    if (
+      typeof step.uses !== 'string' ||
+      !step.uses.startsWith('actions/upload-artifact@')
+    ) {
+      return false;
+    }
+    if (unwrapGithubExpression(stringify(step.if)) !== 'always()') {
+      return false;
+    }
+    if (!isRecord(step.with)) return false;
+    return (
+      step.with.path === 'claude-review-verdict.json' &&
+      step.with['if-no-files-found'] === 'error'
+    );
+  });
+
+  if (
+    !reviewJob ||
+    !hasThreeBoundedAttempts ||
+    !initializesBeforeReview ||
+    !hasFailClosedVerdictCheck ||
+    !hasAlwaysUploadedResult
+  ) {
+    violations.push({
+      file,
+      message: CLAUDE_REVIEW_UNAVAILABLE_RESULT_MESSAGE,
+    });
+  }
+
+  return violations;
+}
+
 function collectFileViolations(rootDir: string, file: string): Violation[] {
   const raw = readFileSync(join(rootDir, file), 'utf8');
   const violations: Violation[] = [];
@@ -484,6 +599,8 @@ function collectFileViolations(rootDir: string, file: string): Violation[] {
   }
 
   if (!isRecord(parsed)) return violations;
+
+  violations.push(...validateClaudeReviewContract(file, parsed));
 
   const workflowOn = getWorkflowOn(parsed);
   const pullRequestWorkflow =

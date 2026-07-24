@@ -683,6 +683,118 @@ describe('checkGithubWorkflowSecurity', () => {
     expect(() => expectSensitiveMobileIfExpressions(workflow)).toThrow('toBe');
   });
 
+  it('rejects documentation path filters on the Claude review workflow', () => {
+    writeFixture(
+      root,
+      '.github/workflows/claude-code-review.yml',
+      `
+      name: Claude Code Review
+      on:
+        pull_request:
+          types: [opened, synchronize, ready_for_review, reopened]
+          paths-ignore:
+            - '**.md'
+            - 'docs/**'
+      permissions: {}
+      jobs: {}
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'Claude review must be eligible for every pull request; remove pull_request paths and paths-ignore filters',
+    );
+  });
+
+  it('rejects a Claude review workflow without a machine-readable unavailable result', () => {
+    writeFixture(
+      root,
+      '.github/workflows/claude-code-review.yml',
+      `
+      name: Claude Code Review
+      on:
+        pull_request:
+          types: [opened, synchronize, ready_for_review, reopened]
+      permissions: {}
+      jobs:
+        claude-review:
+          runs-on: ubuntu-latest
+          permissions:
+            id-token: write
+          steps:
+            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              continue-on-error: true
+              timeout-minutes: 20
+            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              continue-on-error: true
+              timeout-minutes: 20
+            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              continue-on-error: true
+              timeout-minutes: 20
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'Claude review must bound reviewer attempts and always upload a machine-readable fail-closed result with an executable recovery command',
+    );
+  });
+
+  it('allows the bounded fail-closed Claude review contract', () => {
+    writeFixture(
+      root,
+      '.github/workflows/claude-code-review.yml',
+      `
+      name: Claude Code Review
+      on:
+        pull_request:
+          types: [opened, synchronize, ready_for_review, reopened]
+      permissions: {}
+      jobs:
+        claude-review:
+          runs-on: ubuntu-latest
+          permissions:
+            id-token: write
+          steps:
+            - name: Initialize fail-closed review result
+              run: |
+                jq -n '{
+                  status: "REVIEWER_UNAVAILABLE",
+                  merge_eligible: false,
+                  head_sha: "abc123",
+                  run_id: "123",
+                  recovery_command: "gh run rerun 123 --failed --repo example/repo"
+                }' > claude-review-verdict.json
+            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              continue-on-error: true
+              timeout-minutes: 20
+            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              continue-on-error: true
+              timeout-minutes: 20
+            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              continue-on-error: true
+              timeout-minutes: 20
+            - name: Evaluate review verdict
+              run: |
+                comments_json="$(gh api "repos/\${REPO}/issues/\${PR_NUMBER}/comments" --paginate)"
+                review_json="$(jq -c '[ .[] | select(.user.login == "claude[bot]") | select(.user.type == "Bot") | select(.body | contains("## Claude Code Review:")) ] | last' <<< "$comments_json")"
+                if [[ -z "$review_json" ]]; then
+                  exit 1
+                fi
+                metadata_complete=true
+                jq -n --argjson metadata_complete "$metadata_complete" '{
+                  merge_eligible: $metadata_complete
+                }' > claude-review-verdict.json
+            - name: Upload review verdict artifact
+              if: always()
+              uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+              with:
+                path: claude-review-verdict.json
+                if-no-files-found: error
+      `,
+    );
+
+    expect(checkGithubWorkflowSecurity(root)).toEqual([]);
+  });
+
   // [F-132] The review-verdict gate must not parse a comment as the verdict
   // source unless the comment author is constrained to a trusted bot identity.
   // Otherwise a PR author can post the verdict marker and forge the gate.
