@@ -6,7 +6,6 @@ const mockDatabaseModule = createDatabaseModuleMock({
     createScopedRepository: jest.fn(),
   },
 });
-const mockRecallQualityWarn = jest.fn();
 const mockCaptureException = jest.fn();
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
 
@@ -43,31 +42,6 @@ jest.mock(
       checkNeedsDeepeningCapacity: jest
         .fn()
         .mockReturnValue({ atCapacity: false, shouldPromote: false }),
-    };
-  },
-);
-
-jest.mock(
-  './logger' /* gc1-allow: logger is an observability boundary; assertions verify degraded branches without emitting test logs */,
-  () => {
-    const actual = jest.requireActual('./logger') as typeof import('./logger');
-    return {
-      ...actual,
-      createLogger: (...args: Parameters<typeof actual.createLogger>) => {
-        const actualLogger = actual.createLogger(...args);
-        return {
-          ...actualLogger,
-          warn: (...warnArgs: Parameters<typeof actualLogger.warn>) => {
-            mockRecallQualityWarn(...warnArgs);
-            if (
-              typeof warnArgs[0] !== 'string' ||
-              !warnArgs[0].startsWith('[retention.recall-quality]')
-            ) {
-              actualLogger.warn(...warnArgs);
-            }
-          },
-        };
-      },
     };
   },
 );
@@ -2886,15 +2860,36 @@ describe('buildRecallGradeMessages [WI-2114]', () => {
 // ---------------------------------------------------------------------------
 
 describe('evaluateRecallQuality', () => {
+  let consoleWarnSpy: jest.SpiedFunction<typeof console.warn>;
+
   beforeEach(() => {
-    mockRecallQualityWarn.mockClear();
+    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
     mockCaptureException.mockClear();
     mockInngestSend.mockClear();
   });
 
   afterEach(() => {
+    consoleWarnSpy.mockRestore();
     registerProvider(createMockProvider('gemini'));
   });
+
+  function recallQualityWarnings(): unknown[] {
+    return consoleWarnSpy.mock.calls
+      .map(([line]) => {
+        if (typeof line !== 'string') return null;
+        try {
+          return JSON.parse(line) as {
+            message?: string;
+            context?: Record<string, unknown>;
+          };
+        } catch {
+          return null;
+        }
+      })
+      .filter((entry) =>
+        entry?.message?.startsWith('[retention.recall-quality]'),
+      );
+  }
 
   // Helper: register a grader provider that returns a fixed string body.
   function registerGrader(body: string): void {
@@ -2939,7 +2934,7 @@ describe('evaluateRecallQuality', () => {
       // [WI-2114] Grader response above omits feedback → null passthrough.
       feedback: null,
     });
-    expect(mockRecallQualityWarn).not.toHaveBeenCalled();
+    expect(recallQualityWarnings()).toHaveLength(0);
     expect(mockCaptureException).not.toHaveBeenCalled();
     expect(mockInngestSend).not.toHaveBeenCalled();
   });
@@ -3017,9 +3012,10 @@ describe('evaluateRecallQuality', () => {
       profileId,
     );
     expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
-    expect(mockRecallQualityWarn).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({ reason: 'no_json' }),
+    expect(recallQualityWarnings()).toContainEqual(
+      expect.objectContaining({
+        context: expect.objectContaining({ reason: 'no_json' }),
+      }),
     );
     expect(mockInngestSend).toHaveBeenCalledWith({
       name: 'app/retention.recall_quality_degraded',
@@ -3036,9 +3032,10 @@ describe('evaluateRecallQuality', () => {
       profileId,
     );
     expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
-    expect(mockRecallQualityWarn).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({ reason: 'parse_error' }),
+    expect(recallQualityWarnings()).toContainEqual(
+      expect.objectContaining({
+        context: expect.objectContaining({ reason: 'parse_error' }),
+      }),
     );
     expect(mockInngestSend).toHaveBeenCalledWith({
       name: 'app/retention.recall_quality_degraded',
@@ -3086,9 +3083,10 @@ describe('evaluateRecallQuality', () => {
       profileId,
     );
     expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
-    expect(mockRecallQualityWarn).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({ reason: 'route_error' }),
+    expect(recallQualityWarnings()).toContainEqual(
+      expect.objectContaining({
+        context: expect.objectContaining({ reason: 'route_error' }),
+      }),
     );
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -3118,9 +3116,10 @@ describe('evaluateRecallQuality', () => {
       profileId,
     );
     expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
-    expect(mockRecallQualityWarn).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({ reason: 'schema_invalid' }),
+    expect(recallQualityWarnings()).toContainEqual(
+      expect.objectContaining({
+        context: expect.objectContaining({ reason: 'schema_invalid' }),
+      }),
     );
     expect(mockInngestSend).toHaveBeenCalledWith({
       name: 'app/retention.recall_quality_degraded',
