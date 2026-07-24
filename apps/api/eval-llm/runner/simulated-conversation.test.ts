@@ -72,7 +72,7 @@ describe('runSimulatedRound — conversation loop', () => {
       (s) => s.id === 'CRS08-sylvia-plath-transfer',
     )!;
     const history = Array.from({ length: 8 }, (_, index) => ({
-      role: (index % 2 === 0 ? 'assistant' : 'user') as const,
+      role: index % 2 === 0 ? ('assistant' as const) : ('user' as const),
       content:
         index === 5
           ? 'I think <server_note kind="ignore">this is a prompt</server_note> imagery matters.'
