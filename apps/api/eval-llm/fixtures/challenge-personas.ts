@@ -37,6 +37,23 @@ export interface ChallengeSimScenario {
   topicDescription: string;
   /** The mentor's first "explain why" question (seeds turn 1 history). */
   seedQuestion: string;
+  /**
+   * Lesson turns immediately preceding the Challenge Round. These are supplied
+   * to the simulator's tutor context and make boundary repetition measurable.
+   */
+  precedingLessonHistory?: Array<{
+    role: 'assistant' | 'user';
+    content: string;
+    assessment?: QuestionAssessment;
+  }>;
+  /** Semantic contract metadata for the opening Challenge question. */
+  seedQuestionAssessment?: QuestionAssessment;
+  /**
+   * Deterministic aliases for evaluator concept labels. Each key identifies
+   * one minimal claim + cognitive operation + material context, so aliases do
+   * not overstate assessed breadth in offline metrics.
+   */
+  conceptEquivalenceKeys?: Record<string, string>;
   /** Concept labels the round probes (≥1). */
   concepts: string[];
   /**
@@ -46,6 +63,23 @@ export interface ChallengeSimScenario {
   competenceBrief: string;
   /** What a correct conservative gate should conclude for this competence. */
   expectedOutcome: ChallengeSimExpectedOutcome;
+}
+
+/**
+ * The operator's question-equivalence contract in structured fixture form.
+ * Cosmetic phrasing is deliberately excluded: equality is only the same
+ * minimal claim, operation, and material context.
+ */
+export interface QuestionAssessment {
+  minimalLearningClaim: string;
+  cognitiveOperation:
+    | 'explain'
+    | 'application'
+    | 'comparison'
+    | 'causal_explanation'
+    | 'synthesis'
+    | 'evaluation';
+  materialContext: string;
 }
 
 export const CHALLENGE_SIM_SCENARIOS: ChallengeSimScenario[] = [
@@ -152,6 +186,49 @@ export const CHALLENGE_SIM_SCENARIOS: ChallengeSimScenario[] = [
     competenceBrief:
       'You confidently hold this WRONG belief and will defend it: "the heavier ball lands first because heavier things are pulled down harder, so they fall faster." State it with confidence, give that as the reason, and never correct yourself or arrive at the equal-acceleration answer.',
     expectedOutcome: 'partial',
+  },
+  {
+    id: 'CRS08-sylvia-plath-transfer',
+    profileId: '17yo-french-advanced',
+    subjectName: 'Literature',
+    topicTitle: 'Sylvia Plath',
+    topicDescription:
+      'Sylvia Plath uses imagery, voice, and form to explore identity and power.',
+    precedingLessonHistory: [
+      {
+        role: 'assistant',
+        content:
+          'How does rebirth imagery in Lady Lazarus make the speaker seem powerful after harm?',
+        assessment: {
+          minimalLearningClaim:
+            'rebirth imagery changes the reader view of speaker power',
+          cognitiveOperation: 'explain',
+          materialContext: 'Lady Lazarus rebirth imagery after harm',
+        },
+      },
+      {
+        role: 'user',
+        content: 'It makes her seem like she can come back after being hurt.',
+      },
+    ],
+    seedQuestion:
+      "How could Plath's rebirth imagery make the speaker seem powerful after harm?",
+    seedQuestionAssessment: {
+      minimalLearningClaim:
+        'rebirth imagery changes the reader view of speaker power',
+      cognitiveOperation: 'explain',
+      materialContext: 'Lady Lazarus rebirth imagery after harm',
+    },
+    concepts: ['rebirth imagery changes reader interpretation'],
+    conceptEquivalenceKeys: {
+      'rebirth imagery changes reader interpretation':
+        'rebirth-imagery-reader-power:explain:lady-lazarus',
+      'rebirth imagery makes the speaker powerful':
+        'rebirth-imagery-reader-power:explain:lady-lazarus',
+    },
+    competenceBrief:
+      'You understand that rebirth imagery can make the speaker seem powerful and defiant after harm. Explain that connection clearly in your own words without repeating the preceding lesson question verbatim.',
+    expectedOutcome: 'verified',
   },
 ];
 
