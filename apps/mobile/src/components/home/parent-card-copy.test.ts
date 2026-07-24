@@ -61,7 +61,7 @@ function makeRecap(overrides: Partial<RecapListItem> = {}): RecapListItem {
     engagementSignal: null,
     nextTopicTitle: null,
     nextTopicReason: null,
-    verifiedProof: null,
+    verifiedProof: { status: 'absent' },
     ...overrides,
   };
 }

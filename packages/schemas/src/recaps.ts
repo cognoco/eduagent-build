@@ -24,6 +24,18 @@ const recapVerifiedProofSchema = z
   })
   .and(verifiedEvidenceQuoteSchema);
 
+export const recapVerifiedProofResultSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('present'),
+    proof: recapVerifiedProofSchema,
+  }),
+  z.object({ status: z.literal('absent') }),
+  z.object({ status: z.literal('unavailable') }),
+]);
+export type RecapVerifiedProofResult = z.infer<
+  typeof recapVerifiedProofResultSchema
+>;
+
 export const recapListItemSchema = z.object({
   recapId: z.string().uuid(),
   sessionId: z.string().uuid(),
@@ -50,10 +62,10 @@ export const recapListItemSchema = z.object({
   // recap *generation* path is unchanged. Powers the home card's "Coming up" line.
   nextTopicTitle: z.string().nullable().default(null),
   nextTopicReason: z.string().nullable().default(null),
-  // Verified proof is additive + nullable: null when this session/topic has no
-  // explicitly marked Challenge-drafted note, and defaulted so older API
-  // responses remain readable by newer mobile builds.
-  verifiedProof: recapVerifiedProofSchema.nullable().default(null),
+  // The outer lookup state stays distinct from the inner evidence source
+  // state: a completed lookup may find no proof, while a read failure means
+  // proof availability is unknown.
+  verifiedProof: recapVerifiedProofResultSchema.default({ status: 'absent' }),
 });
 export type RecapListItem = z.infer<typeof recapListItemSchema>;
 

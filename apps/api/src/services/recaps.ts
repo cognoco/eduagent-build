@@ -34,7 +34,11 @@ interface NextTopic {
   nextTopicReason: string | null;
 }
 
-type RecapVerifiedProof = NonNullable<RecapListItem['verifiedProof']>;
+type RecapVerifiedProofResult = RecapListItem['verifiedProof'];
+type RecapVerifiedProof = Extract<
+  RecapVerifiedProofResult,
+  { status: 'present' }
+>['proof'];
 
 interface ProofLookup {
   childProfileId: string;
@@ -46,12 +50,16 @@ const NO_NEXT_TOPIC: NextTopic = {
   nextTopicTitle: null,
   nextTopicReason: null,
 };
+const NO_VERIFIED_PROOF: RecapVerifiedProofResult = { status: 'absent' };
+const VERIFIED_PROOF_UNAVAILABLE: RecapVerifiedProofResult = {
+  status: 'unavailable',
+};
 
 function toRecapItem(
   child: DashboardChildSummary,
   session: Awaited<ReturnType<typeof getChildSessions>>[number],
   nextTopic: NextTopic = NO_NEXT_TOPIC,
-  verifiedProof: RecapVerifiedProof | null = null,
+  verifiedProof: RecapVerifiedProofResult = NO_VERIFIED_PROOF,
 ): RecapListItem {
   return {
     recapId: session.sessionId,
@@ -83,7 +91,7 @@ function profileSessionToRecapItem(
   displayName: string,
   session: Awaited<ReturnType<typeof listProfileSessions>>['sessions'][number],
   nextTopic: NextTopic = NO_NEXT_TOPIC,
-  verifiedProof: RecapVerifiedProof | null = null,
+  verifiedProof: RecapVerifiedProofResult = NO_VERIFIED_PROOF,
 ): RecapListItem {
   return {
     recapId: session.sessionId,
@@ -112,7 +120,7 @@ function profileSessionToRecapItem(
 
 function toRecapVerifiedProof(
   receipt: VerifiedProofReceipt,
-): RecapVerifiedProof | null {
+): RecapVerifiedProofResult {
   if (
     !receipt.hasProof ||
     !receipt.topicId ||
@@ -120,7 +128,7 @@ function toRecapVerifiedProof(
     !receipt.verifiedAt ||
     !receipt.masteryVerificationState
   ) {
-    return null;
+    return NO_VERIFIED_PROOF;
   }
 
   const metadata = {
@@ -132,31 +140,33 @@ function toRecapVerifiedProof(
     retentionStatus: receipt.retentionStatus ?? null,
     nextReviewDate: receipt.nextReviewDate ?? null,
   };
-  return receipt.evidenceAvailability === 'available'
-    ? {
-        ...metadata,
-        evidenceAvailability: receipt.evidenceAvailability,
-        quote: receipt.quote,
-      }
-    : {
-        ...metadata,
-        evidenceAvailability: receipt.evidenceAvailability,
-        quote: null,
-      };
+  const proof: RecapVerifiedProof =
+    receipt.evidenceAvailability === 'available'
+      ? {
+          ...metadata,
+          evidenceAvailability: receipt.evidenceAvailability,
+          quote: receipt.quote,
+        }
+      : {
+          ...metadata,
+          evidenceAvailability: receipt.evidenceAvailability,
+          quote: null,
+        };
+  return { status: 'present', proof };
 }
 
 /**
  * Session-keyed additive enrichment. Each lookup remains pinned to the exact
- * child/session/topic tuple; failures degrade to null so proof cannot break or
- * alter the existing Recap surface.
+ * child/session/topic tuple. Completed lookups distinguish proof from absence;
+ * read failures are observed and represented only by a safe unavailable state.
  */
 async function loadVerifiedProofMap(
   db: Database,
   lookups: ProofLookup[],
-): Promise<Map<string, RecapVerifiedProof>> {
+): Promise<Map<string, RecapVerifiedProofResult>> {
   const entries = await Promise.all(
     lookups.map(async ({ childProfileId, sessionId, topicId }) => {
-      if (!topicId) return null;
+      if (!topicId) return [sessionId, NO_VERIFIED_PROOF] as const;
 
       try {
         const receipt = await getVerifiedProofForSessionTopic(
@@ -165,20 +175,22 @@ async function loadVerifiedProofMap(
           sessionId,
           topicId,
         );
-        const proof = toRecapVerifiedProof(receipt);
-        return proof ? ([sessionId, proof] as const) : null;
+        return [sessionId, toRecapVerifiedProof(receipt)] as const;
       } catch (error) {
-        // Proof enrichment is additive — a failure degrades the recap to no
-        // verified block rather than failing the list — but the failure must
-        // stay visible, or a production-wide proof outage reads as "no
-        // verified assessment" with zero signal.
-        captureException(error);
-        return null;
+        captureException(
+          new Error('Verified proof lookup failed', {
+            cause: {
+              errorKind: error instanceof Error ? 'error' : 'non_error',
+            },
+          }),
+          { tags: { surface: 'recaps.verified-proof' } },
+        );
+        return [sessionId, VERIFIED_PROOF_UNAVAILABLE] as const;
       }
     }),
   );
 
-  return new Map(entries.filter((entry) => entry !== null));
+  return new Map(entries);
 }
 
 /**

@@ -3406,6 +3406,7 @@
     "emptyCtaStartSession": "Iniciar una sesión",
     "verifiedProof": {
       "holdsStrong": "sigue vigente",
+      "lookupUnavailable": "La prueba verificada no está disponible temporalmente",
       "recheckDue": "próxima revisión: {{date}}"
     }
   },
