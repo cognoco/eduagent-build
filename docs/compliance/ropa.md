@@ -23,7 +23,16 @@ Age and geography posture (per `data-model.md` §2A.5 + the [`13+ EEA launch-cou
 
 ## Special categories
 
-**None.** No Art 9 health/disability data is processed — see [`art9-special-category-decision.md`](art9-special-category-decision.md). `person.birth_date` and the `knowledge_assertions` age/residence history are ordinary personal data (processed for lawful age/regime gating).
+MentoMate does not solicit or intend to use special-category data. In an
+open-text AI service, however, learners may disclose and models may infer
+health, disability, belief, ethnicity, sexual-orientation, or other sensitive
+information. Incidental transmission and temporary storage are therefore
+foreseeable. The proposed minimisation and suppression treatment, and the
+applicable Article 9 condition if one is required, are recorded in
+[`art9-special-category-position.md`](art9-special-category-position.md) for
+DPO/privacy advice. `person.birth_date` and the `knowledge_assertions`
+age/residence history are ordinary personal data used for lawful age and
+jurisdiction gating.
 
 ## Legal bases
 
