@@ -145,6 +145,7 @@ const recap = {
   engagementSignal: null,
   nextTopicTitle: null,
   nextTopicReason: null,
+  verifiedProof: null,
 };
 
 const weeklyReport = {
