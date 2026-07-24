@@ -120,11 +120,10 @@ export async function getVerifiedProofForSessionTopic(
     quoteAgeOutCutoff.getUTCDate() - QUOTE_AGE_OUT_DAYS,
   );
 
-  const evidenceAvailability = await getArtifactEvidenceAvailability(
-    db,
-    childProfileId,
-    note.id,
-  );
+  const evidenceAvailability =
+    note.createdAt.getTime() >= quoteAgeOutCutoff.getTime()
+      ? await getArtifactEvidenceAvailability(db, childProfileId, note.id)
+      : 'source_unavailable';
   return {
     hasProof: true,
     topicId: verified.topicId,

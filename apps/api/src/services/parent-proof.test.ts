@@ -257,7 +257,10 @@ describe('getVerifiedProofForSessionTopic', () => {
             },
           ],
         ],
-        [sessionEvents, []],
+        [
+          sessionEvents,
+          [{ id: EVENT_ID, content: 'retained transcript body' }],
+        ],
       ]),
     );
 
