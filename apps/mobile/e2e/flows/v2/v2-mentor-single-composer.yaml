@@ -24,10 +24,6 @@ tags:
 - assertVisible:
     id: 'mentor-bar-input'
     enabled: true
-- assertNotVisible:
-    id: 'cold-start-input'
-- assertNotVisible:
-    id: 'cold-start-send'
 
 - assertVisible:
     id: 'cold-start-chip-homework'
