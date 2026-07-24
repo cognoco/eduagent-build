@@ -141,6 +141,44 @@ describe('decideMasteryAndReview — distinct probe breadth [WI-2464]', () => {
     expect(decision.markMasteryVerified).toBe(false);
   });
 
+  it('returns insufficient_breadth when cosmetic paraphrases use synonymous identity prose', () => {
+    const repeatedProbe = [
+      withQuestionIdentity(
+        {
+          ...allSolid[0]!,
+          concept: 'energy storage',
+        },
+        {
+          questionText:
+            'Why does photosynthesis turn sunlight into stored chemical energy?',
+          minimalLearningClaim:
+            'photosynthesis stores light energy as chemical energy',
+          cognitiveOperation: 'causal_explanation',
+          materialContext: 'a plant leaf in sunlight',
+        },
+      ),
+      withQuestionIdentity(
+        {
+          ...allSolid[1]!,
+          concept: 'stored energy',
+        },
+        {
+          questionText:
+            'How does photosynthesis convert sunlight into chemical energy for storage?',
+          minimalLearningClaim:
+            'light becomes energy stored chemically during photosynthesis',
+          cognitiveOperation: 'causal_explanation',
+          materialContext: 'sunlit plant leaf',
+        },
+      ),
+    ];
+
+    const decision = decideMasteryAndReview(repeatedProbe);
+
+    expect(decision.outcome).toBe('insufficient_breadth');
+    expect(decision.markMasteryVerified).toBe(false);
+  });
+
   it('allows a narrow topic to verify through genuinely different reasoning', () => {
     const distinctNarrowTopicProbes = [
       withQuestionIdentity(allSolid[0]!, {
@@ -178,6 +216,7 @@ describe('decideMasteryAndReview — distinct probe breadth [WI-2464]', () => {
         minimalLearningClaim: 'a conflicting model claim',
         cognitiveOperation: 'comparison',
         materialContext: 'a conflicting model context',
+        noveltyBasis: 'new_reasoning',
       }),
     ];
 
@@ -229,6 +268,7 @@ describe('decideMasteryAndReview — distinct probe breadth [WI-2464]', () => {
         minimalLearningClaim: sameClaim,
         cognitiveOperation: 'causal_explanation',
         materialContext: 'an algae bioreactor under artificial light',
+        noveltyBasis: 'new_material_evidence_or_context',
       }),
     ];
 
