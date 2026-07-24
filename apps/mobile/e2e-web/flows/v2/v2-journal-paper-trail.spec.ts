@@ -234,7 +234,16 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
   await expect(
     page.getByText('14 sessions this week', { exact: true }),
   ).toHaveCount(0);
-  await pressableClick(page.getByTestId('progress-weekly-report-back'));
+
+  // Browser Back must unwind the complete cross-tab ancestor chain rather
+  // than falling through from the nested report leaf to the Tabs first route.
+  await page.goBack();
+  await expect(page).toHaveURL(/\/progress\/reports$/);
+  await expect(page.getByTestId('progress-reports-list')).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/progress$/);
+  await expect(page.getByTestId('progress-screen')).toBeVisible();
+  await page.goBack();
   await expectJournalReturn(page);
   await pressableClick(page.getByTestId('journal-tab-reports'));
   await expect(
@@ -273,6 +282,14 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
   await expect(
     page.getByTestId(`report-card-${monthlyReportId}`),
   ).toBeVisible();
+
+  // The report's custom return must remove the complete Progress ancestor
+  // chain. A later browser Back therefore returns to the screen before
+  // Journal instead of reopening Reports.
+  await page.goBack();
+  await expect(page).toHaveURL(/\/mentor$/);
+  await expect(page.getByTestId('mentor-screen')).toBeVisible();
+  await expect(page.getByTestId('progress-reports-list')).toHaveCount(0);
 });
 
 test('[WI-2239] v2-journal-paper-trail: transient Notes and Bookmarks API failures expose one stable archive retry and recover both exact seeded sources', async ({

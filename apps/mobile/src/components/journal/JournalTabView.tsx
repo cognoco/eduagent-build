@@ -2,7 +2,12 @@ import React, { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import {
+  useLocalSearchParams,
+  useRouter,
+  type Href,
+  type Router,
+} from 'expo-router';
 
 import { ErrorFallback, TimeoutLoader } from '../common';
 import { BookPageFlipAnimation } from '../common/BookPageFlipAnimation';
@@ -45,6 +50,36 @@ function sectionSubtitle(section: JournalSectionId, t: TFunction): string {
     case 'reports':
       return t('journal.sections.reportsSubtitle');
   }
+}
+
+type JournalReportTarget =
+  | { kind: 'monthly'; reportId: string }
+  | { kind: 'weekly'; reportId: string };
+
+function pushJournalReport(
+  router: Pick<Router, 'push'>,
+  target: JournalReportTarget,
+): void {
+  router.push('/(app)/progress' as Href);
+  router.push('/(app)/progress/reports' as Href);
+  if (target.kind === 'weekly') {
+    router.push({
+      pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
+      params: {
+        weeklyReportId: target.reportId,
+        returnTo: JOURNAL_RETURN_TO,
+      },
+    } as Href);
+    return;
+  }
+
+  router.push({
+    pathname: '/(app)/progress/reports/[reportId]',
+    params: {
+      reportId: target.reportId,
+      returnTo: JOURNAL_RETURN_TO,
+    },
+  } as Href);
 }
 
 function JournalRecapsSection(): React.ReactElement {
@@ -138,23 +173,10 @@ function JournalReportsSection(): React.ReactElement {
   const isSettled = !monthlyReports.isLoading && !weeklyReports.isLoading;
   const openLatestReport = () => {
     if (!latestReport) return;
-    if (latestReport.kind === 'weekly') {
-      router.push({
-        pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
-        params: {
-          weeklyReportId: latestReport.report.id,
-          returnTo: JOURNAL_RETURN_TO,
-        },
-      } as Href);
-    } else {
-      router.push({
-        pathname: '/(app)/progress/reports/[reportId]',
-        params: {
-          reportId: latestReport.report.id,
-          returnTo: JOURNAL_RETURN_TO,
-        },
-      } as Href);
-    }
+    pushJournalReport(router, {
+      kind: latestReport.kind,
+      reportId: latestReport.report.id,
+    });
   };
   const refetchReports = () => {
     void monthlyReports.refetch();
@@ -227,16 +249,10 @@ function JournalReportsSection(): React.ReactElement {
         showEmptyState={false}
         testID="journal-reports-list"
         onPressMonthly={(reportId) =>
-          router.push({
-            pathname: '/(app)/progress/reports/[reportId]',
-            params: { reportId, returnTo: JOURNAL_RETURN_TO },
-          } as Href)
+          pushJournalReport(router, { kind: 'monthly', reportId })
         }
-        onPressWeekly={(weeklyReportId) =>
-          router.push({
-            pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
-            params: { weeklyReportId, returnTo: JOURNAL_RETURN_TO },
-          } as Href)
+        onPressWeekly={(reportId) =>
+          pushJournalReport(router, { kind: 'weekly', reportId })
         }
       />
     </View>

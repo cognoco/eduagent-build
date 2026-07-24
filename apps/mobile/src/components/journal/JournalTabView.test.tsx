@@ -447,7 +447,10 @@ describe('JournalTabView', () => {
     // The most-recent report is opened inline (not just listed) — the V1
     // Progress "latest report" card, reused here.
     fireEvent.press(screen.getByTestId('progress-latest-report-card'));
-    expect(mockPush).toHaveBeenCalledWith({
+    expect(mockPush).toHaveBeenCalledTimes(3);
+    expect(mockPush).toHaveBeenNthCalledWith(1, '/(app)/progress');
+    expect(mockPush).toHaveBeenNthCalledWith(2, '/(app)/progress/reports');
+    expect(mockPush).toHaveBeenNthCalledWith(3, {
       pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
       params: { weeklyReportId: 'weekly-1', returnTo: 'journal' },
     });
@@ -501,13 +504,18 @@ describe('JournalTabView', () => {
     screen.getByTestId('journal-reports-section');
 
     fireEvent.press(screen.getByTestId('weekly-report-card-weekly-1'));
-    expect(mockPush).toHaveBeenCalledWith({
+    expect(mockPush).toHaveBeenNthCalledWith(1, '/(app)/progress');
+    expect(mockPush).toHaveBeenNthCalledWith(2, '/(app)/progress/reports');
+    expect(mockPush).toHaveBeenNthCalledWith(3, {
       pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
       params: { weeklyReportId: 'weekly-1', returnTo: 'journal' },
     });
 
     fireEvent.press(screen.getByTestId('report-card-monthly-1'));
-    expect(mockPush).toHaveBeenCalledWith({
+    expect(mockPush).toHaveBeenCalledTimes(6);
+    expect(mockPush).toHaveBeenNthCalledWith(4, '/(app)/progress');
+    expect(mockPush).toHaveBeenNthCalledWith(5, '/(app)/progress/reports');
+    expect(mockPush).toHaveBeenNthCalledWith(6, {
       pathname: '/(app)/progress/reports/[reportId]',
       params: { reportId: 'monthly-1', returnTo: 'journal' },
     });

@@ -59,7 +59,7 @@ export default function ProgressWeeklyReportDetail(): React.ReactElement {
   const resolvedReturnTo = Array.isArray(returnTo) ? returnTo[0] : returnTo;
   const handleBack = useCallback(() => {
     if (resolvedReturnTo === JOURNAL_RETURN_TO) {
-      router.replace(JOURNAL_HREF);
+      router.dismissTo(JOURNAL_HREF);
       return;
     }
 

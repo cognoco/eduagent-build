@@ -3,12 +3,13 @@ import { JOURNAL_HREF } from '../../../../lib/navigation';
 
 const mockGoBackOrReplace = jest.fn();
 const mockReplace = jest.fn();
+const mockDismissTo = jest.fn();
 const mockRefetch = jest.fn();
 const mockUseProfileReportDetail = jest.fn();
 let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ replace: mockReplace }),
+  useRouter: () => ({ replace: mockReplace, dismissTo: mockDismissTo }),
   useLocalSearchParams: () => mockSearchParams,
 }));
 
@@ -219,7 +220,8 @@ describe('ProgressMonthlyReportDetail', () => {
     screen.getByText('Go back');
     expect(screen.queryByText('Back to reports')).toBeNull();
     fireEvent.press(backAction);
-    expect(mockReplace).toHaveBeenCalledWith(JOURNAL_HREF);
+    expect(mockDismissTo).toHaveBeenCalledWith(JOURNAL_HREF);
+    expect(mockReplace).not.toHaveBeenCalled();
     expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 
@@ -358,7 +360,8 @@ describe('ProgressMonthlyReportDetail', () => {
     render(<ProgressMonthlyReportDetail />);
 
     fireEvent.press(screen.getByTestId('progress-report-back'));
-    expect(mockReplace).toHaveBeenCalledWith(JOURNAL_HREF);
+    expect(mockDismissTo).toHaveBeenCalledWith(JOURNAL_HREF);
+    expect(mockReplace).not.toHaveBeenCalled();
     expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 
