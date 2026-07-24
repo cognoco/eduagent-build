@@ -48,21 +48,7 @@ jest.mock(
   }),
 );
 
-// [WI-1658] The fake Database above models only the surface finalize
-// historically touched (session metadata, assessments, needs_deepening_topics,
-// session_events) — it has no topic_notes surface. Real persistence of the
-// verified-proof note is covered by session-exchange.integration.test.ts
-// against a real DB; this spy exists only to assert the GATING decision (was
-// createNoteForSession called, and with what args) without expanding the fake
-// DB to model insertNoteWithCap's advisory-lock/cap/dedup transaction. The
-// real module loads fine in this environment, so only the one write function
-// is stubbed — everything else is the real ../notes implementation.
-jest.mock('../notes', () => ({
-  ...jest.requireActual('../notes'),
-  createNoteForSession: jest.fn(),
-}));
-
-import type { Database } from '@eduagent/database';
+import { evidenceLinks, topicNotes, type Database } from '@eduagent/database';
 import type {
   ChallengeRoundEvaluationItem,
   ChallengeRoundNoteDraftHint,
@@ -78,7 +64,6 @@ import {
 import { MAX_CHALLENGE_QUESTIONS } from '../challenge-round/caps';
 import { captureException } from '../sentry';
 import { inngest } from '../../inngest/client';
-import { createNoteForSession } from '../notes';
 import {
   TEST_PROFILE_ID,
   TEST_SESSION_ID,
@@ -91,9 +76,6 @@ const mockCaptureException = captureException as jest.MockedFunction<
 >;
 const mockInngestSend = inngest.send as jest.MockedFunction<
   typeof inngest.send
->;
-const mockCreateNoteForSession = createNoteForSession as jest.MockedFunction<
-  typeof createNoteForSession
 >;
 
 // ---------------------------------------------------------------------------
@@ -122,6 +104,17 @@ interface SessionEventRow {
   content: string;
 }
 
+interface ArtifactRow extends Record<string, unknown> {
+  id: string;
+  artifactSource: string;
+  verificationState: string;
+}
+
+interface EvidenceLinkRow extends Record<string, unknown> {
+  fromId: string;
+  toId: string;
+}
+
 interface FakeDbState {
   // Persisted session metadata. The claim/lock operates on this.
   sessionMetadata: Record<string, unknown>;
@@ -136,11 +129,14 @@ interface FakeDbState {
   // the default durable ANSWER_EVENT_ID row; explicit [] models the same-turn /
   // conflicted case where the current-turn answer is not yet persisted.
   sessionEventRows?: SessionEventRow[];
+  artifactRows?: ArtifactRow[];
+  evidenceLinkRows?: EvidenceLinkRow[];
   // When set, the NEXT matching terminal insert throws — models a transient DB
   // error / constraint violation on the post-claim mastery or deepening write.
   failNextMasteryInsert?: boolean;
   failNextDeepeningInsert?: boolean;
   failNextCooldownInsert?: boolean;
+  failNextArtifactInsert?: boolean;
   // challengeRoundCooldowns upserts observed (WI-1804): one entry per
   // insert().values().onConflictDoUpdate() call that reaches the fake DB.
   cooldownUpserts?: Array<Record<string, unknown>>;
@@ -213,8 +209,39 @@ function makeFakeDb(state: FakeDbState): Database {
   // handed to db.transaction(). [WI-1060] persistChallengeRoundReviewTargets now
   // routes its needsDeepeningTopics read + update/insert loop through `tx`, so
   // the tx must expose the same insert/update/query surface as the top-level db.
-  const insertHandler = (_table: unknown) => ({
-    values: (vals: Record<string, unknown>) => {
+  const insertHandler = (table: unknown) => ({
+    values: (
+      input: Record<string, unknown> | Array<Record<string, unknown>>,
+    ) => {
+      if (table === topicNotes) {
+        return {
+          returning: async () => {
+            if (state.failNextArtifactInsert) {
+              state.failNextArtifactInsert = false;
+              throw new Error('transient artifact insert failure');
+            }
+            const artifactRows = (state.artifactRows ??= []);
+            const row = {
+              ...(input as Record<string, unknown>),
+              id: `artifact-${artifactRows.length + 1}`,
+            } as ArtifactRow;
+            artifactRows.push(row);
+            return [{ id: row.id }];
+          },
+        };
+      }
+      if (table === evidenceLinks) {
+        return {
+          onConflictDoNothing: async () => {
+            const rows = Array.isArray(input) ? input : [input];
+            (state.evidenceLinkRows ??= []).push(
+              ...(rows as EvidenceLinkRow[]),
+            );
+          },
+        };
+      }
+
+      const vals = input as Record<string, unknown>;
       const runInsert = async () => {
         // Distinguish assessments / needs_deepening_topics / retention_cards
         // by their distinctive columns.
@@ -286,7 +313,14 @@ function makeFakeDb(state: FakeDbState): Database {
         onConflictDoNothing: (_opts?: unknown) => runInsert(),
         // [WI-1804] challengeRoundCooldowns upsert uses onConflictDoUpdate,
         // mirroring route-actions.ts's decline writer.
-        onConflictDoUpdate: (_opts?: unknown) => runInsert(),
+        onConflictDoUpdate: (_opts?: unknown) => ({
+          then: (resolve: (v: unknown) => void, reject: (e: unknown) => void) =>
+            runInsert().then(resolve, reject),
+          returning: async () => {
+            await runInsert();
+            return [{ id: 'upserted-row-1' }];
+          },
+        }),
       };
     },
   });
@@ -425,8 +459,17 @@ function makeFakeDb(state: FakeDbState): Database {
   }
 
   const db = {
-    transaction: async (fn: (tx: ReturnType<typeof makeTx>) => unknown) =>
-      fn(makeTx()),
+    transaction: async (fn: (tx: ReturnType<typeof makeTx>) => unknown) => {
+      const artifactSnapshot = [...(state.artifactRows ?? [])];
+      const evidenceLinkSnapshot = [...(state.evidenceLinkRows ?? [])];
+      try {
+        return await fn(makeTx());
+      } catch (error) {
+        state.artifactRows = artifactSnapshot;
+        state.evidenceLinkRows = evidenceLinkSnapshot;
+        throw error;
+      }
+    },
 
     // findOwnedCurriculumTopic entry point.
     select: makeSelectChain,
@@ -1382,20 +1425,12 @@ describe('finalizeChallengeRoundIfReady — note-draft guard uses DB-verified co
 });
 
 // ---------------------------------------------------------------------------
-// [WI-1658] Verified-proof note persistence — gating only (boundary spy).
-//
-// The fake Database above has no topic_notes surface, so real persistence is
-// asserted in session-exchange.integration.test.ts against a real DB. These
-// tests assert the GATING decision: createNoteForSession is called only when
-// the round is fully verified (decision.outcome === 'verified') AND the
-// drafted note has body content — never merely because a draft body exists,
-// which a MIXED round (one solid + one partial concept) can still produce
-// for its solid-sourced concept. That mixed-round case is exactly the
-// event-grain gap the Artifact Provenance Contract flags for partial rounds;
-// Ruling 2 sidesteps it by gating strictly on the fully-verified outcome.
+// Verified-proof persistence behavior. These tests drive the production
+// finalizer and persistence service through an in-memory DB boundary, including
+// artifact rows and opaque evidence-link rows.
 // ---------------------------------------------------------------------------
 
-describe('finalizeChallengeRoundIfReady — verified-proof note persistence (gating) [WI-1658]', () => {
+describe('finalizeChallengeRoundIfReady — verified-proof persistence', () => {
   // A solid concept whose real DB event content (defaultSessionEventRows)
   // matches the draft exactly, plus a SEPARATE partial concept on a
   // different answerEventId — the round is 'partial' overall (not every
@@ -1419,19 +1454,35 @@ describe('finalizeChallengeRoundIfReady — verified-proof note persistence (gat
     },
   ];
 
+  const SAME_EVENT_MIXED_EVALS: ChallengeRoundEvaluationItem[] = [
+    {
+      concept: 'photosynthesis',
+      result: 'solid',
+      evidence: 'Correctly described light-to-chemical energy conversion.',
+      answerEventId: ANSWER_EVENT_ID,
+      learnerQuote:
+        'Plants convert light into energy, and chlorophyll is in the roots.',
+    },
+    {
+      concept: 'chlorophyll location',
+      result: 'misconception',
+      evidence: 'Incorrectly placed chlorophyll in roots.',
+      answerEventId: ANSWER_EVENT_ID,
+      learnerQuote:
+        'Plants convert light into energy, and chlorophyll is in the roots.',
+      correction: 'Chlorophyll is located in chloroplasts.',
+    },
+  ];
+
   const solidSourcedNoteDraft: ChallengeRoundNoteDraftHint = {
     content: 'Plants convert light into chemical energy.',
     source_concepts: ['photosynthesis'],
     source_answer_event_ids: [ANSWER_EVENT_ID],
   };
 
-  beforeEach(() => {
-    mockCaptureException.mockClear();
-    mockCreateNoteForSession.mockReset();
-    mockCreateNoteForSession.mockResolvedValue({} as never);
-  });
+  beforeEach(() => mockCaptureException.mockClear());
 
-  it('calls createNoteForSession with artifactSource challenge_drafted_note when the round is fully verified and the draft has body content', async () => {
+  it('persists a solid quote and drafted note with opaque provenance for a verified round', async () => {
     const challengeRound = draftingState(SOLID_EVALS);
     const state: FakeDbState = {
       sessionMetadata: { challengeRound },
@@ -1458,20 +1509,22 @@ describe('finalizeChallengeRoundIfReady — verified-proof note persistence (gat
     expect(outcome?.draftedNote?.body).toBe(
       'Plants convert light into chemical energy.',
     );
-    expect(mockCreateNoteForSession).toHaveBeenCalledTimes(1);
-    expect(mockCreateNoteForSession).toHaveBeenCalledWith(
-      db,
-      expect.objectContaining({
-        profileId: PROFILE_ID,
-        topicId: TOPIC_ID,
-        sessionId: SESSION_ID,
-        content: 'Plants convert light into chemical energy.',
+    expect(state.artifactRows).toMatchObject([
+      {
+        artifactConceptKey: 'photosynthesis',
+        artifactSource: 'challenge_solid_quote',
+        content: 'photosynthesis',
+        verificationState: 'verified',
+      },
+      {
         artifactSource: 'challenge_drafted_note',
-      }),
-    );
+        verificationState: 'verified',
+      },
+    ]);
+    expect(state.evidenceLinkRows).toHaveLength(2);
   });
 
-  it('does NOT call createNoteForSession when the outcome is partial, even though the mixed round still produces a body-bearing draft from its solid concept', async () => {
+  it('persists only the verified solid quote when the outcome is partial', async () => {
     const challengeRound = draftingState(MIXED_EVALS);
     const state: FakeDbState = {
       sessionMetadata: { challengeRound },
@@ -1515,10 +1568,119 @@ describe('finalizeChallengeRoundIfReady — verified-proof note persistence (gat
     expect(outcome?.draftedNote?.body).toBe(
       'Plants convert light into chemical energy.',
     );
-    expect(mockCreateNoteForSession).not.toHaveBeenCalled();
+    expect(state.artifactRows).toMatchObject([
+      {
+        artifactConceptKey: 'photosynthesis',
+        artifactSource: 'challenge_solid_quote',
+        content: 'photosynthesis',
+        verificationState: 'verified',
+      },
+    ]);
+    expect(state.evidenceLinkRows).toHaveLength(1);
   });
 
-  it('does NOT call createNoteForSession when draftedNote.body is null (fallback draft)', async () => {
+  it('persists distinct concept-grained pointers for multiple solid concepts from one answer event', async () => {
+    const sameEventSolidEvaluations: ChallengeRoundEvaluationItem[] = [
+      {
+        concept: 'Light Absorption',
+        result: 'solid',
+        evidence: 'Correctly described chlorophyll absorbing light.',
+        answerEventId: ANSWER_EVENT_ID,
+        learnerQuote:
+          'Chlorophyll absorbs light and the plant uses that energy to make glucose.',
+      },
+      {
+        concept: 'Glucose Production',
+        result: 'solid',
+        evidence: 'Correctly connected light energy to glucose production.',
+        answerEventId: ANSWER_EVENT_ID,
+        learnerQuote:
+          'Chlorophyll absorbs light and the plant uses that energy to make glucose.',
+      },
+    ];
+    const challengeRound = draftingState(sameEventSolidEvaluations);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+      sessionEventRows: [
+        {
+          id: ANSWER_EVENT_ID,
+          profileId: PROFILE_ID,
+          sessionId: SESSION_ID,
+          eventType: 'user_message',
+          content:
+            'Chlorophyll absorbs light and the plant uses that energy to make glucose.',
+        },
+      ],
+    };
+
+    await finalizeChallengeRoundIfReady(
+      makeFakeDb(state),
+      PROFILE_ID,
+      makeSession(state.sessionMetadata),
+      challengeRound,
+      null,
+    );
+
+    expect(state.artifactRows).toMatchObject([
+      {
+        artifactConceptKey: 'light absorption',
+        artifactSource: 'challenge_solid_quote',
+        content: 'light absorption',
+      },
+      {
+        artifactConceptKey: 'glucose production',
+        artifactSource: 'challenge_solid_quote',
+        content: 'glucose production',
+      },
+    ]);
+    expect(state.artifactRows).toHaveLength(2);
+    expect(state.evidenceLinkRows).toHaveLength(2);
+  });
+
+  it('does not verify a whole answer event that also carries a misconception', async () => {
+    const challengeRound = draftingState(SAME_EVENT_MIXED_EVALS);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+      sessionEventRows: [
+        {
+          id: ANSWER_EVENT_ID,
+          profileId: PROFILE_ID,
+          sessionId: SESSION_ID,
+          eventType: 'user_message',
+          content:
+            'Plants convert light into energy, and chlorophyll is in the roots.',
+        },
+      ],
+    };
+    const db = makeFakeDb(state);
+    const session = makeSession(state.sessionMetadata);
+    const noteDraft: ChallengeRoundNoteDraftHint = {
+      content:
+        'Plants convert light into energy, and chlorophyll is in the roots.',
+      source_concepts: ['photosynthesis'],
+      source_answer_event_ids: [ANSWER_EVENT_ID],
+    };
+
+    const outcome = await finalizeChallengeRoundIfReady(
+      db,
+      PROFILE_ID,
+      session,
+      challengeRound,
+      noteDraft,
+    );
+
+    expect(outcome?.draftedNote?.body).toBeNull();
+    expect(state.artifactRows).toEqual([]);
+    expect(state.evidenceLinkRows).toEqual([]);
+  });
+
+  it('persists the verified solid quote when draftedNote.body is null', async () => {
     const challengeRound = draftingState(SOLID_EVALS);
     const state: FakeDbState = {
       sessionMetadata: { challengeRound },
@@ -1540,19 +1702,23 @@ describe('finalizeChallengeRoundIfReady — verified-proof note persistence (gat
     );
 
     expect(outcome?.draftedNote?.body).toBeNull();
-    expect(mockCreateNoteForSession).not.toHaveBeenCalled();
+    expect(state.artifactRows).toMatchObject([
+      {
+        artifactSource: 'challenge_solid_quote',
+        verificationState: 'verified',
+      },
+    ]);
+    expect(state.evidenceLinkRows).toHaveLength(1);
   });
 
-  it('a createNoteForSession rejection does not throw out of finalizeChallengeRoundIfReady', async () => {
-    mockCreateNoteForSession.mockRejectedValueOnce(
-      new Error('note cap reached'),
-    );
+  it('does not throw when artifact persistence fails', async () => {
     const challengeRound = draftingState(SOLID_EVALS);
     const state: FakeDbState = {
       sessionMetadata: { challengeRound },
       masteryInserts: [],
       deepeningRows: [],
       deepeningInsertCount: 0,
+      failNextArtifactInsert: true,
     };
     const db = makeFakeDb(state);
     const session = makeSession(state.sessionMetadata);
@@ -1576,6 +1742,62 @@ describe('finalizeChallengeRoundIfReady — verified-proof note persistence (gat
     expect(outcome?.challengeRoundVerdict).toBeDefined();
     expect(outcome?.challengeRound?.state).toBe('complete');
     expect(mockCaptureException).toHaveBeenCalled();
+  });
+
+  it('keeps a clinical transcript pointer-only and rejects a clinical drafted note', async () => {
+    const clinicalText = 'The learner has ADHD.';
+    const evaluation: ChallengeRoundEvaluationItem = {
+      concept: 'attention',
+      result: 'solid',
+      evidence: 'Clinical inference must not become a learning record.',
+      answerEventId: ANSWER_EVENT_ID,
+      learnerQuote: clinicalText,
+    };
+    const challengeRound = draftingState([evaluation]);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+      sessionEventRows: [
+        {
+          id: ANSWER_EVENT_ID,
+          profileId: PROFILE_ID,
+          sessionId: SESSION_ID,
+          eventType: 'user_message',
+          content: clinicalText,
+        },
+      ],
+    };
+    const db = makeFakeDb(state);
+
+    const outcome = await finalizeChallengeRoundIfReady(
+      db,
+      PROFILE_ID,
+      makeSession(state.sessionMetadata),
+      challengeRound,
+      {
+        content: clinicalText,
+        source_concepts: ['attention'],
+        source_answer_event_ids: [ANSWER_EVENT_ID],
+      },
+    );
+
+    expect(outcome?.challengeRound?.state).toBe('complete');
+    expect(state.artifactRows ?? []).toMatchObject([
+      {
+        artifactConceptKey: 'attention',
+        artifactSource: 'challenge_solid_quote',
+        content: 'attention',
+      },
+    ]);
+    expect(state.evidenceLinkRows ?? []).toHaveLength(1);
+    const clinicalGuardCaptures = mockCaptureException.mock.calls.filter(
+      ([error]) =>
+        error instanceof Error &&
+        error.message.includes('health or disability characterisation'),
+    );
+    expect(clinicalGuardCaptures).toHaveLength(1);
   });
 });
 

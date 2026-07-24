@@ -17,6 +17,7 @@ export * from './sessions';
 export * from './mentor-notices';
 export * from './language';
 export * from './bookmarks';
+export * from './evidence-links';
 
 // Assessment & Retention (Epic 3)
 export * from './assessments';

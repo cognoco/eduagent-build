@@ -19,6 +19,8 @@ function mapBookmarkRow(row: {
   subjectId: string;
   topicId: string | null;
   content: string;
+  artifactSource: Bookmark['artifactSource'];
+  verificationState: Bookmark['verificationState'];
   createdAt: Date;
   subjectName: string | null;
   topicTitle: string | null;
@@ -32,6 +34,8 @@ function mapBookmarkRow(row: {
     subjectName: row.subjectName ?? 'Unknown',
     topicTitle: row.topicTitle ?? null,
     content: row.content,
+    artifactSource: row.artifactSource,
+    verificationState: row.verificationState,
     // [BUG-858] neon-serverless can return timestamp columns as raw strings
     // rather than Date instances; wrap with `new Date(...)` so `.toISOString()`
     // does not crash if the driver shape flips. See project memory
@@ -97,6 +101,8 @@ export async function createBookmark(
         subjectId: bookmarks.subjectId,
         topicId: bookmarks.topicId,
         content: bookmarks.content,
+        artifactSource: bookmarks.artifactSource,
+        verificationState: bookmarks.verificationState,
         createdAt: bookmarks.createdAt,
       });
 
@@ -173,6 +179,8 @@ export async function listBookmarks(
       subjectId: bookmarks.subjectId,
       topicId: bookmarks.topicId,
       content: bookmarks.content,
+      artifactSource: bookmarks.artifactSource,
+      verificationState: bookmarks.verificationState,
       createdAt: bookmarks.createdAt,
       subjectName: subjects.name,
       topicTitle: curriculumTopics.title,
