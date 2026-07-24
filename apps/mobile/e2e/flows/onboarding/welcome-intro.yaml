@@ -51,111 +51,117 @@ tags:
 #    probe routes to /(auth)/welcome. The audience chooser is the first surface.
 - extendedWaitUntil:
     visible:
-      id: "welcome-chooser"
+      id: 'welcome-chooser'
     timeout: 120000
 - assertVisible:
-    id: "welcome-chooser-learner"
+    id: 'welcome-chooser-learner'
 - assertVisible:
-    id: "welcome-chooser-parent"
+    id: 'welcome-chooser-parent'
 
 - takeScreenshot: welcome-intro-chooser
 
 # 2. Pick "I want to learn" → the 3-card learner deck mounts on card 1.
 - tapOn:
-    id: "welcome-chooser-learner"
+    id: 'welcome-chooser-learner'
 - extendedWaitUntil:
     visible:
-      id: "welcome-card-1"
+      id: 'welcome-card-1'
     timeout: 10000
 
 - takeScreenshot: welcome-intro-card-1
 
 # 3. Advance through cards 2 → 3 via the primary "Next" CTA.
 - tapOn:
-    id: "welcome-next-button"
+    id: 'welcome-next-button'
 - extendedWaitUntil:
     visible:
-      id: "welcome-card-2"
+      id: 'welcome-card-2'
     timeout: 10000
 
 - tapOn:
-    id: "welcome-next-button"
+    id: 'welcome-next-button'
 - extendedWaitUntil:
     visible:
-      id: "welcome-card-3"
+      id: 'welcome-card-3'
     timeout: 10000
 
 # 4. The final card (card 3) swaps the CTA to "Let's start". Confirm the
 #    next-button is unmounted (not just hidden) and start-button is present.
 - assertNotVisible:
-    id: "welcome-next-button"
+    id: 'welcome-next-button'
 - assertVisible:
-    id: "welcome-start-button"
+    id: 'welcome-start-button'
 
 - takeScreenshot: welcome-intro-card-3
 
 # 5. Tap "Let's start" — the route transitions from the cards to the
 #    LightBulb bridge. Both CTAs must be present.
 - tapOn:
-    id: "welcome-start-button"
+    id: 'welcome-start-button'
 
 - extendedWaitUntil:
     visible:
-      id: "pre-auth-bridge"
+      id: 'pre-auth-bridge'
     timeout: 10000
 - assertVisible:
-    id: "pre-auth-bridge-primary"
+    id: 'pre-auth-bridge-primary'
 - assertVisible:
-    id: "pre-auth-bridge-secondary"
+    id: 'pre-auth-bridge-secondary'
+- assertVisible:
+    text: 'Turn "I don''t get it" into "I''ve got this."'
+- assertVisible:
+    text: 'Create a free account so your mentor can remember your subjects, notes, and progress.'
+- assertNotVisible:
+    text: 'Continue with your account to support your learner.'
 
 - takeScreenshot: welcome-intro-bridge
 
 # 6. Tap "I already have an account" — markPreAuthIntroSeenSync fires
 #    synchronously and the route replaces to /(auth)/sign-in.
 - tapOn:
-    id: "pre-auth-bridge-secondary"
+    id: 'pre-auth-bridge-secondary'
 
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: 'sign-in-button'
     timeout: 30000
 
 # 7. Sign in with the seeded test user.
 - extendedWaitUntil:
     visible:
-      id: "sign-in-email"
+      id: 'sign-in-email'
     timeout: 15000
 
 - tapOn:
-    id: "sign-in-email"
+    id: 'sign-in-email'
 - inputText: ${EMAIL}
 - hideKeyboard
 
 - tapOn:
-    id: "sign-in-password"
+    id: 'sign-in-password'
 - inputText: ${PASSWORD}
 - hideKeyboard
 
 - scrollUntilVisible:
     element:
-      id: "sign-in-button"
+      id: 'sign-in-button'
     direction: DOWN
     timeout: 5000
 
 - tapOn:
-    id: "sign-in-button"
+    id: 'sign-in-button'
 
 # 8. Land in the learner app shell. The intro must NOT re-render — the (app)
 #    layout has no welcome-intro probe, and the index probe respects the
 #    in-memory seen bit.
 - extendedWaitUntil:
     visible:
-      id: "home-my-notes"
+      id: 'home-my-notes'
     timeout: 30000
 
 - assertNotVisible:
-    id: "welcome-intro"
+    id: 'welcome-intro'
 - assertNotVisible:
-    id: "welcome-chooser"
+    id: 'welcome-chooser'
 
 - takeScreenshot: welcome-intro-completed-on-home

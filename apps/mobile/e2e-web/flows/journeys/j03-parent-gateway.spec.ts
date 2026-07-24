@@ -5,6 +5,40 @@ import { emulateNativeTopSafeArea } from '../../helpers/native-safe-area';
 
 test.describe.configure({ mode: 'serial' });
 
+let restoreSeedBoundary: (() => void) | undefined;
+
+test.beforeEach(() => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const url =
+      typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
+    const method = (
+      init?.method ?? (input instanceof Request ? input.method : 'GET')
+    ).toUpperCase();
+
+    if (method === 'POST' && new URL(url).pathname === '/v1/__test/seed') {
+      return new Response('error code: 1015 (synthetic parent seed limit)', {
+        status: 429,
+        statusText: 'Too Many Requests',
+      });
+    }
+
+    return realFetch(input, init);
+  };
+  restoreSeedBoundary = () => {
+    globalThis.fetch = realFetch;
+  };
+});
+
+test.afterEach(() => {
+  restoreSeedBoundary?.();
+  restoreSeedBoundary = undefined;
+});
+
 async function openSeededParent(page: Page): Promise<void> {
   await installSeededProfileBootstrap(page, 'owner-with-children');
   await page.goto('/mentor', { waitUntil: 'commit' });

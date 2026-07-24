@@ -1,0 +1,15 @@
+{
+  "observedAtUtc": "2026-07-23T19:13:28Z",
+  "target": {
+    "projectId": "lingering-violet-30592106",
+    "branchId": "br-weathered-silence-agw4on4x",
+    "endpointId": "ep-muddy-sunset-agtc6kor"
+  },
+  "results": {
+    "survivingNonlegacyProfilesFks": 0,
+    "supportMessageOrphans": 0,
+    "deletedIdsStillPresent": 0,
+    "intentionallyUnmodifiedSubscriptionFks": 4,
+    "accountDeletionTestLoginsRemaining": 0
+  }
+}

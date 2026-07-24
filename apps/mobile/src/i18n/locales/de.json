@@ -3718,6 +3718,8 @@
     "bridge": {
       "headline": "Mache aus „Ich verstehe es nicht“ ein „Ich hab's!“",
       "supporting": "Erstelle ein kostenloses Konto, damit dein Mentor deine Fächer, Notizen und Fortschritte speichern kann.",
+      "parentHeadline": "Fahre mit deinem Konto fort, um den Lernenden zu unterstützen.",
+      "parentSupporting": "Melde dich an oder registriere dich, um die Einladung anzunehmen und die Unterstützung einzurichten. Dein Konto gewährt keinen Zugriff auf Lernaktivitäten, solange der Lernende dies nicht autorisiert.",
       "primaryCta": "Kostenloses Konto erstellen",
       "secondaryCta": "Ich habe bereits ein Konto"
     },

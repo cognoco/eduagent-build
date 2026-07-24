@@ -27,56 +27,62 @@ tags:
 # 1. Clean install → audience chooser is the first surface.
 - extendedWaitUntil:
     visible:
-      id: "welcome-chooser"
+      id: 'welcome-chooser'
     timeout: 120000
 - assertVisible:
-    id: "welcome-chooser-learner"
+    id: 'welcome-chooser-learner'
 - assertVisible:
-    id: "welcome-chooser-parent"
+    id: 'welcome-chooser-parent'
 
 - takeScreenshot: welcome-intro-parent-chooser
 
 # 2. Pick "I'm done fighting over homework" → the 3-card parent deck mounts.
 - tapOn:
-    id: "welcome-chooser-parent"
+    id: 'welcome-chooser-parent'
 - extendedWaitUntil:
     visible:
-      id: "welcome-card-1"
+      id: 'welcome-card-1'
     timeout: 10000
 
 - takeScreenshot: welcome-intro-parent-card-1
 
 # 3. Advance through cards 2 → 3 via the primary "Next" CTA.
 - tapOn:
-    id: "welcome-next-button"
+    id: 'welcome-next-button'
 - extendedWaitUntil:
     visible:
-      id: "welcome-card-2"
+      id: 'welcome-card-2'
     timeout: 10000
 
 - tapOn:
-    id: "welcome-next-button"
+    id: 'welcome-next-button'
 - extendedWaitUntil:
     visible:
-      id: "welcome-card-3"
+      id: 'welcome-card-3'
     timeout: 10000
 
 # 4. Final card swaps the CTA to "Let's start".
 - assertNotVisible:
-    id: "welcome-next-button"
+    id: 'welcome-next-button'
 - assertVisible:
-    id: "welcome-start-button"
+    id: 'welcome-start-button'
 
 # 5. Tap "Let's start" → the LightBulb bridge with both auth CTAs.
 - tapOn:
-    id: "welcome-start-button"
+    id: 'welcome-start-button'
 - extendedWaitUntil:
     visible:
-      id: "pre-auth-bridge"
+      id: 'pre-auth-bridge'
     timeout: 10000
 - assertVisible:
-    id: "pre-auth-bridge-primary"
+    id: 'pre-auth-bridge-primary'
 - assertVisible:
-    id: "pre-auth-bridge-secondary"
+    id: 'pre-auth-bridge-secondary'
+- assertVisible:
+    text: 'Continue with your account to support your learner.'
+- assertVisible:
+    text: 'Sign in or sign up to accept the invitation and set up support. Your account does not grant access to learning activity unless the learner authorizes it.'
+- assertNotVisible:
+    text: 'Create a free account so your mentor can remember your subjects, notes, and progress.'
 
 - takeScreenshot: welcome-intro-parent-bridge

@@ -1,43 +1,14 @@
 import { Hono } from 'hono';
 import type { AppVariables } from '../../../types/hono';
 
-const mockStripeHandler = jest.fn().mockResolvedValue(undefined);
-const mockRevenuecatHandlers = {
-  resolveAccountId: jest.fn().mockResolvedValue('org-1'),
-  isRevenuecatEventProcessed: jest.fn().mockResolvedValue(false),
-  ensureFreeSubscription: jest.fn().mockResolvedValue(undefined),
-  handleInitialPurchase: jest.fn().mockResolvedValue(undefined),
-};
-
-jest.mock('./index', () => {
-  const actual = jest.requireActual('./index') as typeof import('./index');
-  return {
-    ...actual,
-    handleSubscriptionEventV2: mockStripeHandler,
-    resolveAccountIdV2: mockRevenuecatHandlers.resolveAccountId,
-    isRevenuecatEventProcessedV2:
-      mockRevenuecatHandlers.isRevenuecatEventProcessed,
-    ensureFreeSubscriptionV2: mockRevenuecatHandlers.ensureFreeSubscription,
-    handleInitialPurchaseV2: mockRevenuecatHandlers.handleInitialPurchase,
-  };
-});
-
-jest.mock('../../stripe', () => {
-  const actual = jest.requireActual(
-    '../../stripe',
-  ) as typeof import('../../stripe');
-  return {
-    ...actual,
-    verifyWebhookSignature: jest.fn(),
-  };
-});
-
-const { getRevenuecatWebhookHandlers, getStripeWebhookHandlers } =
-  require('./dispatch') as typeof import('./dispatch');
-
 import { revenuecatWebhookRoute } from '../../../routes/revenuecat-webhook';
 import { stripeWebhookRoute } from '../../../routes/stripe-webhook';
-import { verifyWebhookSignature } from '../../stripe';
+import * as stripeService from '../../stripe';
+import * as dispatch from './dispatch';
+import type {
+  RevenuecatWebhookHandlers,
+  StripeWebhookHandlers,
+} from './dispatch';
 
 const stripeApp = new Hono<{ Variables: AppVariables }>()
   .use('*', async (c, next) => {
@@ -54,22 +25,27 @@ const revenuecatApp = new Hono<{ Variables: AppVariables }>()
   .route('/', revenuecatWebhookRoute);
 
 describe('billing-v2 production webhook route bindings [WI-2619]', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockStripeHandler.mockResolvedValue(undefined);
-    mockRevenuecatHandlers.resolveAccountId.mockResolvedValue('org-1');
-    mockRevenuecatHandlers.isRevenuecatEventProcessed.mockResolvedValue(false);
-    mockRevenuecatHandlers.ensureFreeSubscription.mockResolvedValue(undefined);
-    mockRevenuecatHandlers.handleInitialPurchase.mockResolvedValue(undefined);
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('Stripe route consumes handleSubscriptionEvent from its real selector bundle', async () => {
-    (verifyWebhookSignature as jest.Mock).mockResolvedValue({
+    const handlers = {
+      handleSubscriptionEvent: jest.fn().mockResolvedValue(undefined),
+      handleSubscriptionDeleted: jest.fn().mockResolvedValue(undefined),
+      handleCheckoutCompleted: jest.fn().mockResolvedValue(undefined),
+      handlePaymentFailed: jest.fn().mockResolvedValue(undefined),
+      handlePaymentSucceeded: jest.fn().mockResolvedValue(undefined),
+    } satisfies StripeWebhookHandlers;
+    const selectorSpy = jest
+      .spyOn(dispatch, 'getStripeWebhookHandlers')
+      .mockReturnValue(handlers);
+    jest.spyOn(stripeService, 'verifyWebhookSignature').mockResolvedValue({
       id: 'evt_subscription_updated',
       type: 'customer.subscription.updated',
       created: Math.floor(Date.now() / 1000),
       data: { object: {} },
-    });
+    } as Awaited<ReturnType<typeof stripeService.verifyWebhookSignature>>);
 
     const response = await stripeApp.request(
       '/stripe/webhook',
@@ -82,13 +58,29 @@ describe('billing-v2 production webhook route bindings [WI-2619]', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(getStripeWebhookHandlers().handleSubscriptionEvent).toBe(
-      mockStripeHandler,
-    );
-    expect(mockStripeHandler).toHaveBeenCalledTimes(1);
+    expect(selectorSpy).toHaveBeenCalledTimes(1);
+    expect(handlers.handleSubscriptionEvent).toHaveBeenCalledTimes(1);
   });
 
   it('RevenueCat route consumes selected account, idempotency, provisioning, and event handlers', async () => {
+    const handlers = {
+      resolveAccountId: jest.fn().mockResolvedValue('org-1'),
+      isRevenuecatEventProcessed: jest.fn().mockResolvedValue(false),
+      ensureFreeSubscription: jest.fn().mockResolvedValue(undefined),
+      handleInitialPurchase: jest.fn().mockResolvedValue(undefined),
+      handleRenewal: jest.fn().mockResolvedValue(undefined),
+      handleCancellation: jest.fn().mockResolvedValue(undefined),
+      handleExpiration: jest.fn().mockResolvedValue(undefined),
+      handleBillingIssue: jest.fn().mockResolvedValue(undefined),
+      handleSubscriberAlias: jest.fn().mockResolvedValue(undefined),
+      handleProductChange: jest.fn().mockResolvedValue(undefined),
+      handleNonRenewingPurchase: jest.fn().mockResolvedValue(null),
+      handleUncancellation: jest.fn().mockResolvedValue(undefined),
+    } satisfies RevenuecatWebhookHandlers;
+    const selectorSpy = jest
+      .spyOn(dispatch, 'getRevenuecatWebhookHandlers')
+      .mockReturnValue(handlers);
+
     const response = await revenuecatApp.request(
       '/revenuecat/webhook',
       {
@@ -118,23 +110,11 @@ describe('billing-v2 production webhook route bindings [WI-2619]', () => {
       { REVENUECAT_WEBHOOK_SECRET: 'rc_webhook_test' },
     );
 
+    expect(selectorSpy).toHaveBeenCalledTimes(1);
+    expect(handlers.resolveAccountId).toHaveBeenCalledTimes(1);
     expect(response.status).toBe(200);
-    expect(getRevenuecatWebhookHandlers()).toMatchObject({
-      resolveAccountId: mockRevenuecatHandlers.resolveAccountId,
-      isRevenuecatEventProcessed:
-        mockRevenuecatHandlers.isRevenuecatEventProcessed,
-      ensureFreeSubscription: mockRevenuecatHandlers.ensureFreeSubscription,
-      handleInitialPurchase: mockRevenuecatHandlers.handleInitialPurchase,
-    });
-    expect(mockRevenuecatHandlers.resolveAccountId).toHaveBeenCalledTimes(1);
-    expect(
-      mockRevenuecatHandlers.isRevenuecatEventProcessed,
-    ).toHaveBeenCalledTimes(1);
-    expect(mockRevenuecatHandlers.ensureFreeSubscription).toHaveBeenCalledTimes(
-      1,
-    );
-    expect(mockRevenuecatHandlers.handleInitialPurchase).toHaveBeenCalledTimes(
-      1,
-    );
+    expect(handlers.isRevenuecatEventProcessed).toHaveBeenCalledTimes(1);
+    expect(handlers.ensureFreeSubscription).toHaveBeenCalledTimes(1);
+    expect(handlers.handleInitialPurchase).toHaveBeenCalledTimes(1);
   });
 });
