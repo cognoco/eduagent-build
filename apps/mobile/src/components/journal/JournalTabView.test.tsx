@@ -1,9 +1,4 @@
-import {
-  fireEvent,
-  render,
-  screen,
-  within,
-} from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import type { NowResponse } from '@eduagent/schemas';
 
 import { JournalTabView } from './JournalTabView';
@@ -402,12 +397,18 @@ describe('JournalTabView', () => {
 
     expect(screen.getByTestId('journal-activity-activity-1')).toBeTruthy();
     expect(screen.getByTestId('journal-activity-activity-2')).toBeTruthy();
-    within(screen.getByTestId('journal-activity-activity-1')).getByText(
-      'Photosynthesis',
-    );
-    within(screen.getByTestId('journal-activity-activity-2')).getByText(
-      'Dictation',
-    );
+    expect(
+      screen.getByTestId('journal-activity-headline-activity-1'),
+    ).toHaveTextContent('Photosynthesis');
+    expect(
+      screen.getByTestId('journal-activity-meta-activity-1'),
+    ).toHaveTextContent(/^Assessment · Biology · .+$/);
+    expect(
+      screen.getByTestId('journal-activity-headline-activity-2'),
+    ).toHaveTextContent('Dictation');
+    expect(
+      screen.getByTestId('journal-activity-meta-activity-2'),
+    ).toHaveTextContent(/^Spanish · .+$/);
   });
 
   it('filters past activity by type chips, driving the server query', () => {

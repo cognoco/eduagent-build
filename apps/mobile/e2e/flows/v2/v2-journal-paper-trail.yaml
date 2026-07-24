@@ -39,9 +39,12 @@ tags:
     timeout: 10000
 - assertVisible:
     id: 'journal-activity-${PRACTICE_ACTIVITY_EVENT_ID}'
-    containsDescendants:
-      - text: '^Biology Topic 1$'
-      - text: '^Review · Biology · .+$'
+- assertVisible:
+    id: 'journal-activity-headline-${PRACTICE_ACTIVITY_EVENT_ID}'
+    text: '^Biology Topic 1$'
+- assertVisible:
+    id: 'journal-activity-meta-${PRACTICE_ACTIVITY_EVENT_ID}'
+    text: '^Review · Biology · .+$'
 
 - scrollUntilVisible:
     element:
@@ -70,6 +73,9 @@ tags:
     timeout: 10000
 - assertVisible:
     id: 'journal-activity-${PRACTICE_ACTIVITY_EVENT_ID}'
-    containsDescendants:
-      - text: '^Biology Topic 1$'
-      - text: '^Review · Biology · .+$'
+- assertVisible:
+    id: 'journal-activity-headline-${PRACTICE_ACTIVITY_EVENT_ID}'
+    text: '^Biology Topic 1$'
+- assertVisible:
+    id: 'journal-activity-meta-${PRACTICE_ACTIVITY_EVENT_ID}'
+    text: '^Review · Biology · .+$'

@@ -8359,15 +8359,25 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       );
     }
 
-    const exactPracticeOwner = {
-      assertVisible: {
-        id: 'journal-activity-${PRACTICE_ACTIVITY_EVENT_ID}',
-        containsDescendants: [
-          { text: '^Biology Topic 1$' },
-          { text: '^Review · Biology · .+$' },
-        ],
+    const exactPracticeEvidence = [
+      {
+        assertVisible: {
+          id: 'journal-activity-${PRACTICE_ACTIVITY_EVENT_ID}',
+        },
       },
-    };
+      {
+        assertVisible: {
+          id: 'journal-activity-headline-${PRACTICE_ACTIVITY_EVENT_ID}',
+          text: '^Biology Topic 1$',
+        },
+      },
+      {
+        assertVisible: {
+          id: 'journal-activity-meta-${PRACTICE_ACTIVITY_EVENT_ID}',
+          text: '^Review · Biology · .+$',
+        },
+      },
+    ];
     expect(() =>
       assertCommandsInOrder(journalFlow, [
         { tapOn: { id: 'tab-journal', retryTapIfNoChange: true } },
@@ -8388,7 +8398,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
             timeout: 10000,
           },
         },
-        exactPracticeOwner,
+        ...exactPracticeEvidence,
         { tapOn: { id: 'journal-practice-open-hub' } },
         {
           extendedWaitUntil: {
@@ -8404,7 +8414,16 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           },
         },
         { assertNotVisible: { id: 'scope-chip' } },
-        exactPracticeOwner,
+        {
+          scrollUntilVisible: {
+            element: {
+              id: 'journal-activity-${PRACTICE_ACTIVITY_EVENT_ID}',
+            },
+            direction: 'DOWN',
+            timeout: 10000,
+          },
+        },
+        ...exactPracticeEvidence,
       ]),
     ).not.toThrow();
 
@@ -8422,6 +8441,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       'practice-back',
     ]);
     expect(JSON.stringify(journalFlow)).not.toContain('"optional":true');
+    expect(JSON.stringify(journalFlow)).not.toContain('"containsDescendants"');
   });
 
   it('[WI-2506 / WI-2608] binds resolver actions and requires the exact stable Photosynthesis round trip', () => {
