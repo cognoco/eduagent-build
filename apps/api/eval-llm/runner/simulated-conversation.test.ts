@@ -109,7 +109,7 @@ describe('runSimulatedRound — conversation loop', () => {
     expect(contexts.flat().join('\n')).not.toContain('<server_note');
   });
 
-  it('classifies Sylvia Plath cosmetic paraphrase as a repeat while preserving a new comparison as new', async () => {
+  it('starts Sylvia Plath Challenge with a new probe and preserves later new operations', async () => {
     const fixtureScenario = CHALLENGE_SIM_SCENARIOS.find(
       (s) => s.id === 'CRS08-sylvia-plath-transfer',
     )!;
@@ -155,7 +155,7 @@ describe('runSimulatedRound — conversation loop', () => {
     expect(result.questionDiagnostics).toEqual([
       expect.objectContaining({
         source: 'seed',
-        repeatsPriorQuestion: true,
+        repeatsPriorQuestion: false,
       }),
       expect.objectContaining({
         source: 'model',

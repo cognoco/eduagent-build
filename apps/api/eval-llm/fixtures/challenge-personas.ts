@@ -212,22 +212,24 @@ export const CHALLENGE_SIM_SCENARIOS: ChallengeSimScenario[] = [
       },
     ],
     seedQuestion:
-      "How could Plath's rebirth imagery make the speaker seem powerful after harm?",
+      'When the speaker addresses the watching crowd in Lady Lazarus, why does that audience make her rebirth feel like a display of power rather than only recovery?',
     seedQuestionAssessment: {
       minimalLearningClaim:
-        'rebirth imagery changes the reader view of speaker power',
-      cognitiveOperation: 'explain',
-      materialContext: 'Lady Lazarus rebirth imagery after harm',
+        'the watching audience turns rebirth into a display of speaker power',
+      cognitiveOperation: 'causal_explanation',
+      materialContext: 'Lady Lazarus speaker addressing the watching crowd',
     },
-    concepts: ['rebirth imagery changes reader interpretation'],
+    concepts: ['audience turns rebirth into a display of power'],
     conceptEquivalenceKeys: {
+      'audience turns rebirth into a display of speaker power':
+        'rebirth-imagery-audience-power:causal:lady-lazarus-crowd',
       'rebirth imagery changes reader interpretation':
         'rebirth-imagery-reader-power:explain:lady-lazarus',
       'rebirth imagery makes the speaker powerful':
         'rebirth-imagery-reader-power:explain:lady-lazarus',
     },
     competenceBrief:
-      'You understand that rebirth imagery can make the speaker seem powerful and defiant after harm. Explain that connection clearly in your own words without repeating the preceding lesson question verbatim.',
+      'You understand that addressing a watching crowd turns the rebirth into a deliberate public display: the speaker controls how her return is witnessed, so recovery becomes defiance and power. Explain that causal connection clearly in your own words.',
     expectedOutcome: 'verified',
   },
 ];
