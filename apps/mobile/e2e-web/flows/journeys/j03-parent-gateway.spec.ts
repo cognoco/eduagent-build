@@ -8,34 +8,6 @@ import { pressableClick } from '../../helpers/pressable';
 
 test.describe.configure({ mode: 'serial' });
 
-const LOCALIZED_SUPPORT_HUB_LABELS = fs
-  .readdirSync(
-    path.join(process.cwd(), 'apps', 'mobile', 'src', 'i18n', 'locales'),
-  )
-  .filter((file) => file.endsWith('.json'))
-  .map((file) => {
-    const catalog = JSON.parse(
-      fs.readFileSync(
-        path.join(
-          process.cwd(),
-          'apps',
-          'mobile',
-          'src',
-          'i18n',
-          'locales',
-          file,
-        ),
-        'utf8',
-      ),
-    ) as { scopeChip?: { supportHub?: unknown } };
-    const hubLabel = catalog.scopeChip?.supportHub;
-    if (typeof hubLabel !== 'string' || hubLabel.length === 0) {
-      throw new Error(`${file} is missing scopeChip.supportHub`);
-    }
-    return { code: path.basename(file, '.json'), hubLabel };
-  })
-  .sort((left, right) => left.code.localeCompare(right.code));
-
 let restoreSeedBoundary: (() => void) | undefined;
 
 test.beforeEach(() => {
@@ -381,12 +353,35 @@ test('J-03 360px long supporter scopes remain operable and clear pushed content 
 test('J-03 360px longest localized supporter labels clear native chrome and Mentor copy @smoke', async ({
   page,
 }) => {
+  const localeDirectory = path.join(
+    process.cwd(),
+    'apps',
+    'mobile',
+    'src',
+    'i18n',
+    'locales',
+  );
+  const localizedSupportHubLabels = fs
+    .readdirSync(localeDirectory)
+    .filter((file) => file.endsWith('.json'))
+    .map((file) => {
+      const catalog = JSON.parse(
+        fs.readFileSync(path.join(localeDirectory, file), 'utf8'),
+      ) as { scopeChip?: { supportHub?: unknown } };
+      const hubLabel = catalog.scopeChip?.supportHub;
+      if (typeof hubLabel !== 'string' || hubLabel.length === 0) {
+        throw new Error(`${file} is missing scopeChip.supportHub`);
+      }
+      return { code: path.basename(file, '.json'), hubLabel };
+    })
+    .sort((left, right) => left.code.localeCompare(right.code));
+
   await page.setViewportSize({ width: 360, height: 760 });
   await emulateNativeTopSafeArea(page, 47);
   await installLongSupporterScopes(page);
   await openSeededParent(page);
 
-  for (const locale of LOCALIZED_SUPPORT_HUB_LABELS) {
+  for (const locale of localizedSupportHubLabels) {
     await page.goto('/more/account', { waitUntil: 'commit' });
     await expect(page.getByTestId('more-account-scroll')).toBeVisible({
       timeout: 60_000,
