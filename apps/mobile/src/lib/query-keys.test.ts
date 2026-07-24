@@ -219,6 +219,20 @@ describe('queryKeys non-mode-scoped factories', () => {
     },
   );
 
+  it.each(['feed', 'overflow'] as const)(
+    'normalizes unloaded Now %s scope IDs',
+    (projection) => {
+      expect(
+        queryKeys.now[projection](null, undefined, 'epoch-enabled'),
+      ).toEqual([
+        projection === 'feed' ? 'now-feed' : 'now-overflow',
+        undefined,
+        undefined,
+        'epoch-enabled',
+      ]);
+    },
+  );
+
   it('[WI-2184] matches only completed-session history keys for one profile', () => {
     const matchProfileHistory = queryKeys.historySessionsMatch('prof-abc');
 
