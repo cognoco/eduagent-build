@@ -59,15 +59,13 @@ export function TopicDetailSheet({
       backdropAccessibilityLabel={t('subjectHub.sheet.close')}
       accessibilityLabel={topic.topic.title}
     >
-      <View
-        testID="subject-hub-topic-sheet"
-        className="bg-background px-5 pb-8 pt-5"
-      >
+      <View className="bg-background px-5 pb-8 pt-5">
         <View className="mb-4 items-center">
           <View className="h-1 w-10 rounded-full bg-text-secondary/30" />
         </View>
 
         <ScrollView
+          testID="subject-hub-topic-sheet"
           style={{ maxHeight: 440 }}
           showsVerticalScrollIndicator={false}
         >

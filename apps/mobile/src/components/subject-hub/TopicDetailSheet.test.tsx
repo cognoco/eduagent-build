@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react-native';
 import { Text } from 'react-native';
 
@@ -93,6 +94,22 @@ describe('TopicDetailSheet', () => {
     expect(
       renderedText.indexOf('Photosynthesis turns light into sugar.'),
     ).toBeLessThan(renderedText.indexOf('subjectHub.sheet.masteryLine'));
+  });
+
+  it('exposes the scrollable topic content as the native E2E sheet owner', () => {
+    render(
+      <TopicDetailSheet
+        topic={hubTopic('Photosynthesis turns light into sugar.')}
+        notes={[]}
+        canStudy
+        onClose={jest.fn()}
+        onStudyTopic={jest.fn()}
+      />,
+    );
+
+    const sheetOwner = screen.getByTestId('subject-hub-topic-sheet');
+    within(sheetOwner).getByText('Photosynthesis');
+    within(sheetOwner).getByText('subjectHub.sheet.study');
   });
 
   it('closes and renders nothing when the topic is null', () => {
