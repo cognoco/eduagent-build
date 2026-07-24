@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import { useParentProxy } from '../../../hooks/use-parent-proxy';
 import { useProfile } from '../../../lib/profile';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 /**
  * Owner-safe landing route for payment-failure pushes and email deep links.
@@ -38,7 +39,16 @@ export default function BillingManageLanding(): null {
     const seedManageBillingStack = (): void => {
       if (cancelled || seededRef.current) return;
       seededRef.current = true;
-      router.replace('/(app)/more' as Href);
+      // WI-2331 AC-2 (core): `/(app)/more` is dead in V2 (not one of the
+      // three tabs) — seed the owning tab first so Back from Subscription
+      // eventually resolves to a real V2 tab instead of dead-ending at the
+      // retired More tab, matching AC-1's tab-highlight contract.
+      if (FEATURE_FLAGS.MODE_NAV_V2_ENABLED) {
+        router.replace('/(app)/mentor' as Href);
+        router.push('/(app)/more' as Href);
+      } else {
+        router.replace('/(app)/more' as Href);
+      }
       router.push('/(app)/more/account' as Href);
       router.push('/(app)/subscription' as Href);
     };

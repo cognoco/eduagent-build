@@ -48,6 +48,7 @@ import {
   homeworkReturnHrefForReturnTo,
   normalizeHomeworkEntrySource,
 } from './_view-models/homework-session-params';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 type FlashMode = 'off' | 'on' | 'auto';
 
@@ -749,7 +750,13 @@ export default function CameraScreen(): React.ReactNode {
   // the explicit returnTo target makes close/back behavior deterministic
   // regardless of the underlying back-stack state.
   const handleClose = useCallback(() => {
-    router.replace(homeworkReturnHrefForReturnTo(returnTo));
+    router.replace(
+      homeworkReturnHrefForReturnTo(
+        returnTo,
+        undefined,
+        FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+      ),
+    );
   }, [returnTo, router]);
 
   // Intercept Android hardware back so it routes through handleClose too;

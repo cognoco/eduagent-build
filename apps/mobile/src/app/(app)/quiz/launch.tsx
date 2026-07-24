@@ -17,6 +17,7 @@ import {
   PRACTICE_HREF,
   PRACTICE_RETURN_TO,
 } from '../../../lib/navigation';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { resolveLoadingMotionPreset } from '../../../lib/motion-presets';
 import { useThemeColors } from '../../../lib/theme';
 import {
@@ -129,7 +130,11 @@ export default function QuizLaunchScreen(): React.ReactElement {
       ? routeReturnTo
       : (returnTo ?? null);
   const exitHref = effectiveReturnTo
-    ? homeHrefForReturnTo(effectiveReturnTo)
+    ? homeHrefForReturnTo(
+        effectiveReturnTo,
+        undefined,
+        FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+      )
     : ('/(app)/quiz' as Href);
   const handleExit = useCallback(() => {
     if (effectiveReturnTo === PRACTICE_RETURN_TO) {

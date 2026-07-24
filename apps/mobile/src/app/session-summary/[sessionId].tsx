@@ -43,6 +43,7 @@ import { useLearnerProfile } from '../../hooks/use-learner-profile';
 import { useTopicSuggestions } from '../../hooks/use-topic-suggestions';
 import { usePostSessionNotificationAsk } from '../../hooks/use-post-session-notification-ask';
 import { goBackOrReplace, homeHrefForReturnTo } from '../../lib/navigation';
+import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { platformAlert } from '../../lib/platform-alert';
 import { formatApiError, classifyApiError } from '../../lib/format-api-error';
 import { Sentry } from '../../lib/sentry';
@@ -105,7 +106,11 @@ export default function SessionSummaryScreen() {
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const summaryHomeHref = homeHrefForReturnTo(returnTo);
+  const summaryHomeHref = homeHrefForReturnTo(
+    returnTo,
+    undefined,
+    FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+  );
   const colors = useThemeColors();
   const { t } = useTranslation();
   const announce = useAnnounce();

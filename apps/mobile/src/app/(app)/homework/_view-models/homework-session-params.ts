@@ -87,13 +87,14 @@ export function normalizeHomeworkEntrySource(
 export function homeworkReturnHrefForReturnTo(
   returnTo: string | string[] | undefined,
   returnId?: string | string[] | undefined,
+  v2Enabled = false,
 ): Href {
   const value = Array.isArray(returnTo) ? returnTo[0] : returnTo;
   if (value === MENTOR_HOMEWORK_ENTRY_SOURCE) {
     return '/(app)/mentor' as Href;
   }
 
-  return homeHrefForReturnTo(returnTo, returnId);
+  return homeHrefForReturnTo(returnTo, returnId, v2Enabled);
 }
 
 export function getHomeworkProblemTruncationAlertMessage(

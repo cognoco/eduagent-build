@@ -105,6 +105,7 @@
     "notNow": "Not now",
     "active": "Active",
     "goBackAction": "Go back",
+    "backTo": "Back to {{destination}}",
     "tryAgainAction": "Try again",
     "dismiss": "Dismiss",
     "pleaseTryAgain": "Please try again.",

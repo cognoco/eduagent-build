@@ -92,7 +92,8 @@
     "tryAgainAction": "再試行",
     "dismiss": "閉じる",
     "pleaseTryAgain": "もう一度お試しください。",
-    "mentorImageAlt": "あなたのメンター"
+    "mentorImageAlt": "あなたのメンター",
+    "backTo": "{{destination}}に戻る"
   },
   "quota": {
     "parent": {

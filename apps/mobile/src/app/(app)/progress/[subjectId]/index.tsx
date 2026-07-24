@@ -138,7 +138,11 @@ export default function ProgressSubjectScreen(): React.ReactElement {
     returnTo?: string;
   }>();
   const backFallback = returnTo
-    ? homeHrefForReturnTo(returnTo)
+    ? homeHrefForReturnTo(
+        returnTo,
+        undefined,
+        FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+      )
     : ('/(app)/progress' as const);
   const inventoryQuery = useProgressInventory();
   const subjectProgressQuery = useSubjectProgress(subjectId ?? '');

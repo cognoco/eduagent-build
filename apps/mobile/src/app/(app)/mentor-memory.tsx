@@ -2,7 +2,12 @@ import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { platformAlert } from '../../lib/platform-alert';
 import { useCallback, useMemo, useState } from 'react';
-import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import {
+  Redirect,
+  useLocalSearchParams,
+  useRouter,
+  type Href,
+} from 'expo-router';
 import type { InterestContext } from '@eduagent/schemas';
 import { useProfile } from '../../lib/profile';
 import { computeAgeBracket } from '@eduagent/schemas';
@@ -17,7 +22,8 @@ import {
   getFocusAreaProgress,
 } from '../../components/mentor-memory-sections';
 import { TellMentorInput } from '../../components/tell-mentor-input';
-import { goBackOrReplace } from '../../lib/navigation';
+import { goBackOrReplace, V2_TAB_TITLE_KEYS } from '../../lib/navigation';
+import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { ErrorFallback, TimeoutLoader } from '../../components/common';
 import { formatRelativeDate } from '../../lib/format-relative-date';
 import {
@@ -211,14 +217,23 @@ export default function MentorMemoryScreen() {
   const memoryEnabled = consentStatus === 'granted';
   const resolvedReturnTo = Array.isArray(returnTo) ? returnTo[0] : returnTo;
 
+  // WI-2331 AC-2 (core): `/(app)/more` is dead in V2 (not one of the three
+  // tabs) — mentor-memory has no parent screen more specific than its owning
+  // tab (Mentor), so under V2 its Back control routes and names that tab
+  // instead, via the same owning-tab contract AC-1's tab highlight uses.
+  const v2Enabled = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+  const backFallback = v2Enabled ? '/(app)/mentor' : '/(app)/more';
+  const backLabel = v2Enabled
+    ? t('common.backTo', { destination: t(V2_TAB_TITLE_KEYS.mentor) })
+    : t('common.goBack');
   const handleBack = useCallback(() => {
-    if (resolvedReturnTo === 'more') {
+    if (resolvedReturnTo === 'more' && !v2Enabled) {
       router.replace('/(app)/more');
       return;
     }
 
-    goBackOrReplace(router, '/(app)/more' as const);
-  }, [resolvedReturnTo, router]);
+    goBackOrReplace(router, backFallback as Href);
+  }, [backFallback, resolvedReturnTo, router, v2Enabled]);
 
   const blocked = useEntryGate('mentor-memory');
 
@@ -244,7 +259,7 @@ export default function MentorMemoryScreen() {
             testID: 'mentor-memory-load-timeout-retry',
           }}
           secondaryAction={{
-            label: t('common.goBack'),
+            label: backLabel,
             onPress: handleBack,
             testID: 'mentor-memory-load-timeout-back',
           }}
@@ -271,7 +286,7 @@ export default function MentorMemoryScreen() {
             testID: 'mentor-memory-retry',
           }}
           secondaryAction={{
-            label: t('common.goBack'),
+            label: backLabel,
             onPress: handleBack,
             testID: 'mentor-memory-go-back',
           }}
@@ -292,7 +307,7 @@ export default function MentorMemoryScreen() {
           onPress={handleBack}
           className="me-3 py-2 pe-2"
           accessibilityRole="button"
-          accessibilityLabel={t('common.goBack')}
+          accessibilityLabel={backLabel}
           testID="mentor-memory-back"
         >
           <Text className="text-primary text-body font-semibold">

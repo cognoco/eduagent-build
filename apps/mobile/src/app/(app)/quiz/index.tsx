@@ -219,7 +219,13 @@ export default function QuizIndexScreen(): React.ReactElement {
     }
 
     if (returnToken) {
-      router.replace(homeHrefForReturnTo(returnToken) as Href);
+      router.replace(
+        homeHrefForReturnTo(
+          returnToken,
+          undefined,
+          FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+        ) as Href,
+      );
       return;
     }
 

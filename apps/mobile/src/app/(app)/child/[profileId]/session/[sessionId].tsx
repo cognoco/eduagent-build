@@ -13,6 +13,7 @@ import {
   goBackOrReplace,
   homeHrefForReturnTo,
 } from '../../../../../lib/navigation';
+import { FEATURE_FLAGS } from '../../../../../lib/feature-flags';
 import { firstParam } from '../../../../../lib/route-params';
 import { EngagementChip } from '../../../../../components/parent/EngagementChip';
 import { MetricInfoDot } from '../../../../../components/parent/MetricInfoDot';
@@ -63,12 +64,13 @@ export default function SessionDetailScreen() {
     refetch,
   } = useChildSessionDetail(profileId, sessionId);
   const childDetailQuery = useChildDetail(profileId);
+  const v2Enabled = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
   const backFallbackHref =
     returnTo != null
-      ? homeHrefForReturnTo(returnTo, returnId)
+      ? homeHrefForReturnTo(returnTo, returnId, v2Enabled)
       : profileId
         ? childProfileHref(profileId)
-        : ('/(app)/home' as Href);
+        : ((v2Enabled ? '/(app)/mentor' : '/(app)/home') as Href);
   const handleBack = () => goBackOrReplace(router, backFallbackHref);
 
   useEffect(() => {
