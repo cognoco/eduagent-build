@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -57,14 +57,14 @@ export default function ProgressWeeklyReportDetail(): React.ReactElement {
     ? weeklyReportId[0]
     : weeklyReportId;
   const resolvedReturnTo = Array.isArray(returnTo) ? returnTo[0] : returnTo;
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     if (resolvedReturnTo === JOURNAL_RETURN_TO) {
       router.replace(JOURNAL_HREF);
       return;
     }
 
     goBackOrReplace(router, '/(app)/progress/reports');
-  };
+  }, [resolvedReturnTo, router]);
   const {
     data: report,
     isLoading,

@@ -289,6 +289,11 @@ test('[WI-2239] v2-journal-paper-trail: transient Notes and Bookmarks API failur
   let allowArchiveRecovery = false;
 
   await page.route('**/v1/notes**', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue();
+      return;
+    }
+
     if (!allowArchiveRecovery) {
       await route.fulfill({
         status: 503,
@@ -304,6 +309,11 @@ test('[WI-2239] v2-journal-paper-trail: transient Notes and Bookmarks API failur
   });
 
   await page.route('**/v1/bookmarks**', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue();
+      return;
+    }
+
     if (!allowArchiveRecovery) {
       await route.fulfill({
         status: 503,
