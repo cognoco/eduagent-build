@@ -406,6 +406,10 @@ function SessionScreenInner() {
     string | undefined
   >();
   useEffect(() => {
+    // The module token is one-shot, but its proof is promoted into this
+    // mounted route's state before a later same-screen transcript retry.
+    // Retries therefore keep the exact Hub predecessor without making the
+    // token reusable by a later, unrelated navigation.
     if (
       subjectsTransitionId &&
       consumeHubToSessionTransition(subjectsTransitionId)

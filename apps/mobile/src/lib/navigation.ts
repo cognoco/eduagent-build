@@ -26,6 +26,40 @@ export const STUDY_PROGRESS_HREF = '/(app)/progress';
 export const FAMILY_CHILDREN_RETURN_TO = 'family-children';
 export const FAMILY_CHILDREN_HREF = '/(app)/home';
 
+type StaticHomeReturnToken =
+  | typeof OWN_LEARNING_RETURN_TO
+  | typeof LEARNER_HOME_RETURN_TO
+  | typeof PRACTICE_RETURN_TO
+  | typeof JOURNAL_RETURN_TO
+  | typeof SUBJECTS_RETURN_TO
+  | typeof FAMILY_RECAPS_RETURN_TO
+  | typeof FAMILY_HOME_RETURN_TO
+  | typeof FAMILY_CHILDREN_RETURN_TO
+  | typeof FAMILY_PROGRESS_RETURN_TO
+  | typeof STUDY_PROGRESS_RETURN_TO;
+
+const STATIC_HOME_RETURN_HREFS = {
+  [OWN_LEARNING_RETURN_TO]: OWN_LEARNING_HREF,
+  [LEARNER_HOME_RETURN_TO]: LEARNER_HOME_HREF,
+  [PRACTICE_RETURN_TO]: PRACTICE_HREF,
+  [JOURNAL_RETURN_TO]: JOURNAL_HREF,
+  [SUBJECTS_RETURN_TO]: SUBJECTS_HREF,
+  [FAMILY_RECAPS_RETURN_TO]: FAMILY_RECAPS_HREF,
+  [FAMILY_HOME_RETURN_TO]: FAMILY_HOME_PATH,
+  [FAMILY_CHILDREN_RETURN_TO]: FAMILY_CHILDREN_HREF,
+  [FAMILY_PROGRESS_RETURN_TO]: FAMILY_PROGRESS_HREF,
+  [STUDY_PROGRESS_RETURN_TO]: STUDY_PROGRESS_HREF,
+} as const satisfies Record<StaticHomeReturnToken, Href>;
+
+function isStaticHomeReturnToken(
+  token: string | undefined,
+): token is StaticHomeReturnToken {
+  return (
+    token !== undefined &&
+    Object.prototype.hasOwnProperty.call(STATIC_HOME_RETURN_HREFS, token)
+  );
+}
+
 export type V2AccountReturnToken = 'mentor' | 'subjects' | 'journal';
 
 const V2_ACCOUNT_RETURN_HREFS = {
@@ -121,30 +155,33 @@ export function homeHrefForReturnTo(
 ): Href {
   const token = firstParam(returnTo);
   const id = firstParam(returnId);
-  if (token === OWN_LEARNING_RETURN_TO) return OWN_LEARNING_HREF as Href;
-  if (token === LEARNER_HOME_RETURN_TO) return LEARNER_HOME_HREF as Href;
-  if (token === PRACTICE_RETURN_TO) return PRACTICE_HREF as Href;
-  if (token === JOURNAL_RETURN_TO) return JOURNAL_HREF as Href;
-  if (token === SUBJECTS_RETURN_TO) return SUBJECTS_HREF as Href;
-  if (token === SUBJECT_HUB_RETURN_TO && id) {
-    return {
-      pathname: '/(app)/subject-hub/[subjectId]',
-      params: { subjectId: id },
-    } as Href;
+  switch (token) {
+    case SUBJECT_HUB_RETURN_TO:
+      if (id) {
+        return {
+          pathname: '/(app)/subject-hub/[subjectId]',
+          params: { subjectId: id },
+        } as Href;
+      }
+      break;
+    case FAMILY_RECAPS_RETURN_TO:
+      if (id) {
+        return {
+          pathname: '/(app)/recaps/[recapId]',
+          params: { recapId: id },
+        } as Href;
+      }
+      break;
+    case FAMILY_CHILDREN_RETURN_TO:
+      if (id) return childProfileHref(id);
+      break;
   }
-  if (token === FAMILY_RECAPS_RETURN_TO && id) {
-    return {
-      pathname: '/(app)/recaps/[recapId]',
-      params: { recapId: id },
-    } as Href;
+
+  if (isStaticHomeReturnToken(token)) {
+    return STATIC_HOME_RETURN_HREFS[token];
   }
-  if (token === FAMILY_RECAPS_RETURN_TO) return FAMILY_RECAPS_HREF as Href;
-  if (token === FAMILY_HOME_RETURN_TO) return FAMILY_HOME_PATH as Href;
-  if (token === FAMILY_CHILDREN_RETURN_TO && id) return childProfileHref(id);
-  if (token === FAMILY_PROGRESS_RETURN_TO) return FAMILY_PROGRESS_HREF as Href;
-  if (token === STUDY_PROGRESS_RETURN_TO) return STUDY_PROGRESS_HREF as Href;
-  if (token === FAMILY_CHILDREN_RETURN_TO) return FAMILY_CHILDREN_HREF as Href;
-  return '/(app)/home' as Href;
+
+  return FAMILY_HOME_PATH as Href;
 }
 
 /**

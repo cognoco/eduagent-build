@@ -387,6 +387,7 @@ type TranscriptMockReturn = {
       escalationRung: number;
     }>;
   };
+  error?: unknown;
 };
 const mockUseSessionTranscript = jest.fn<TranscriptMockReturn, [string?]>(
   () => ({ data: null }),
@@ -1076,6 +1077,49 @@ describe('SessionScreen homework flow', () => {
       expect(mockBack).toHaveBeenCalledTimes(1);
       expect(mockReplace).not.toHaveBeenCalled();
     }
+  });
+
+  it('retains the proven Hub predecessor across a transient transcript failure and same-screen retry', async () => {
+    const mockBack = jest.fn();
+    const mockCanGoBack = jest.fn(() => true);
+    markHubToSessionTransition(SUBJECT_ID);
+    (useRouter as jest.Mock).mockReturnValue({
+      back: mockBack,
+      canGoBack: mockCanGoBack,
+      replace: mockReplace,
+      setParams: mockSetParams,
+    });
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: SUBJECT_ID,
+      subjectName: 'Math',
+      topicId: TOPIC_ID,
+      topicName: 'Linear equations',
+      sessionId: SESSION_ID,
+      returnTo: 'subjects',
+    });
+    mockUseSessionTranscript.mockReturnValue({
+      data: null,
+      error: new TypeError('Network request failed'),
+    });
+
+    const testScreen = renderSessionScreen();
+    await flushAsyncWork();
+    expect(consumeHubToSessionTransition(SUBJECT_ID)).toBe(false);
+
+    mockUseSessionTranscript.mockReturnValue({
+      data: null,
+      error: null,
+    });
+    activeRender?.result.rerender(<SessionScreen />);
+    await flushAsyncWork();
+    mockReplace.mockClear();
+
+    fireEvent.press(testScreen.getByTestId('mock-back-button'));
+
+    expect(mockCanGoBack).toHaveBeenCalledTimes(1);
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it('[F-110] engages the session-expired UI for any error the boundary classifies as not-found, not only typed NotFoundError instances', () => {

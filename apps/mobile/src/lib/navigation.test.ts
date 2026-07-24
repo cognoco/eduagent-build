@@ -129,6 +129,17 @@ describe('homeHrefForReturnTo', () => {
     expect(homeHrefForReturnTo(undefined)).toBe('/(app)/home');
   });
 
+  it.each([
+    ['an app-looking path', '/(app)/journal'],
+    ['a path-traversal-shaped token', 'subject-hub/../../journal'],
+    ['an unknown first array value', ['not-allowed', SUBJECTS_RETURN_TO]],
+  ] as Array<[caseName: string, returnTo: string | string[]]>)(
+    'treats %s as untrusted input and returns the fixed home fallback',
+    (_caseName, returnTo) => {
+      expect(homeHrefForReturnTo(returnTo)).toBe(FAMILY_HOME_PATH);
+    },
+  );
+
   // [WI-1658]
   it('resolves FAMILY_HOME_RETURN_TO to FAMILY_HOME_PATH', () => {
     expect(homeHrefForReturnTo(FAMILY_HOME_RETURN_TO)).toBe(FAMILY_HOME_PATH);

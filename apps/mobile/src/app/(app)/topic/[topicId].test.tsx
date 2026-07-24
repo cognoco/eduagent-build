@@ -122,7 +122,7 @@ jest.mock(
 );
 
 jest.mock(
-  '../../../lib/navigation' /* gc1-allow: goBackOrReplace calls router.back which requires native navigation context */,
+  '../../../lib/navigation' /* gc1-allow: pushLearningResumeTarget emits the multi-route handoff covered by navigation tests; this route suite observes only its owning Subject parameters */,
   () => ({
     ...jest.requireActual('../../../lib/navigation'),
     pushLearningResumeTarget: (...args: unknown[]) =>
