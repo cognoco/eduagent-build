@@ -7410,6 +7410,21 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         text: 'Open Photosynthesis',
       },
     };
+    const exactPhotosynthesisSession: Selector[] = [
+      {
+        extendedWaitUntil: {
+          visible: { id: 'session-screen' },
+          timeout: 45000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'first-session-greeting',
+          containsDescendants: [{ text: '.*Photosynthesis.*' }],
+        },
+      },
+      { assertVisible: { id: 'chat-shell-back' } },
+    ];
     const exactCreatedSubjectReturn: Selector[] = [
       {
         extendedWaitUntil: {
@@ -7481,6 +7496,33 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(
       hasExactCreatedSubjectIdentityReturn(subjectCreate, profileIdentity),
     ).toBe(true);
+    expect(
+      hasExactCommandSequence(subjectCreate, exactPhotosynthesisSession),
+    ).toBe(true);
+
+    for (const mutation of [
+      exactPhotosynthesisSession.filter((_, index) => index !== 1),
+      exactPhotosynthesisSession.with(1, {
+        assertVisible: {
+          id: 'first-session-greeting',
+          containsDescendants: [{ text: '.*Adjacent Science.*' }],
+        },
+      }),
+      exactPhotosynthesisSession.with(1, {
+        assertVisible: {
+          id: 'first-session-greeting',
+          containsDescendants: [{ text: '.*Photosynthesis.*' }],
+          optional: true,
+        },
+      }),
+      exactPhotosynthesisSession.with(1, {
+        assertVisible: { text: '.*Photosynthesis.*' },
+      }),
+    ]) {
+      expect(
+        hasExactCommandSequence(mutation, exactPhotosynthesisSession),
+      ).toBe(false);
+    }
 
     const replaceCreatedReturn = (
       index: number,
@@ -9385,6 +9427,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       'assertVisible:id:ready-start',
       'tapOn:id:ready-start',
       'extendedWaitUntil:id:session-screen',
+      'assertVisible:id:first-session-greeting:containsDescendants:text:.*Photosynthesis.*',
       'assertVisible:id:chat-shell-back',
       'tapOn:id:chat-shell-back',
       'extendedWaitUntil:id:subjects-screen',
@@ -9537,6 +9580,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       'assertVisible:text:Starting with Photosynthesis',
       'assertVisible:id:ready-start',
       'extendedWaitUntil:id:session-screen',
+      'assertVisible:id:first-session-greeting:containsDescendants:text:.*Photosynthesis.*',
       'assertVisible:id:chat-shell-back',
       'extendedWaitUntil:id:subjects-screen',
       exactSubjectRowWaitSignature,

@@ -171,7 +171,7 @@ describe('computeEmptyKind', () => {
 // ---------------------------------------------------------------------------
 
 describe('buildSubjectHubData', () => {
-  it('prioritizes an exact due review over a generic next-topic suggestion', () => {
+  it('preserves V0/V1 next-topic resume precedence when a due review also exists', () => {
     const data = buildSubjectHubData({
       subjectId: SUBJECT_ID,
       subjectName: 'Spanish',
@@ -194,6 +194,42 @@ describe('buildSubjectHubData', () => {
         reason: 'Start Greetings',
       },
       notes: [],
+      now: new Date('2026-06-14T00:00:00.000Z'),
+    });
+
+    expect(data.nextUp).toEqual(
+      expect.objectContaining({
+        kind: 'resume',
+        topicId: TOPIC_ACTIVE,
+        topicTitle: 'Greetings',
+      }),
+    );
+  });
+
+  it('prioritizes an exact due review over a generic next-topic suggestion in V2', () => {
+    const data = buildSubjectHubData({
+      subjectId: SUBJECT_ID,
+      subjectName: 'Spanish',
+      books: [book()],
+      bookDetails: [bookWithTopics],
+      sessionsByBookId: new Map(),
+      retentionTopics: [
+        {
+          topicId: TOPIC_ACTIVE,
+          xpStatus: 'pending',
+          masteredAt: null,
+          nextReviewAt: '2026-06-13T00:00:00.000Z',
+        },
+      ],
+      resumeTarget: {
+        ...resumeTarget,
+        sessionId: null,
+        resumeKind: 'next_topic',
+        lastActivityAt: null,
+        reason: 'Start Greetings',
+      },
+      notes: [],
+      preferDueReviewOverNextTopic: true,
       now: new Date('2026-06-14T00:00:00.000Z'),
     });
 

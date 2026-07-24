@@ -48,7 +48,10 @@ export default function SubjectHubRoute(): React.ReactElement {
   const [subjectsPredecessorId, setSubjectsPredecessorId] = useState<
     string | undefined
   >();
-  const hub = useSubjectHub(subjectId);
+  const isV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+  const hub = useSubjectHub(subjectId, {
+    preferDueReviewOverNextTopic: isV2,
+  });
   const retryCurriculum = useRetryCurriculum(subjectId);
   // Topic-scoped note authoring for the focused topic's detail sheet (felt-knowing
   // loop Flow 1). bookId is undefined because the hub spans multiple books; the
@@ -93,7 +96,6 @@ export default function SubjectHubRoute(): React.ReactElement {
   // the sheet on the 'active' fallback would show the wrong action set for a
   // deep-linked paused/archived subject (pause+archive instead of resume/restore).
   const manageReady = canManage && !!subjectsQuery.data;
-  const isV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
   const showHubHeader = isV2 || manageReady;
   const updateSubject = useUpdateSubject();
   const inventoryEnabled =

@@ -8,20 +8,6 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
-jest.mock(
-  '../../hooks/use-speech-recognition' /* gc1-allow: native speech recognition is an external device boundary for NoteInput rendering */,
-  () => ({
-    useSpeechRecognition: () => ({
-      status: 'idle',
-      transcript: '',
-      isListening: false,
-      startListening: jest.fn(),
-      stopListening: jest.fn(),
-      clearTranscript: jest.fn(),
-    }),
-  }),
-);
-
 function createProps(overrides: Record<string, unknown> = {}) {
   return {
     onHomeBack: jest.fn(),

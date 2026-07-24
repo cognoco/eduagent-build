@@ -288,6 +288,22 @@ describe('ProfileProvider', () => {
     );
   });
 
+  it('automatic removed-profile fallback clears navigation proof owned by the removed profile', async () => {
+    jest.mocked(ExpoSecureStore.getItemAsync).mockResolvedValue('deleted-id');
+    markHubToSessionTransition('removed-profile-subject');
+
+    const { result } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeProfile?.id).toBe(OWNER_PROFILE_ID);
+    });
+    expect(consumeHubToSessionTransition('removed-profile-subject')).toBe(
+      false,
+    );
+  });
+
   it('[BREAK] falls back to owner when active-profile SecureStore restore hangs', async () => {
     jest.useFakeTimers();
     jest

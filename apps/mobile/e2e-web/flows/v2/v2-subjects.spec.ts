@@ -461,7 +461,7 @@ test('WI-2238 Subjects API recovery case: a visible failure stays recoverable an
   await expectSubjectRow(page, subjectId, expected.subjectName);
 });
 
-test('WI-2238 curriculum-preparing case: exact World History empty Hub and visible Back restore the same Subjects row', async ({
+test('WI-2238 curriculum-preparing case: exact World History empty Hub and visible Back restore the same Subjects row + active learner identity', async ({
   page,
 }) => {
   const { seed: seedCase, expected } = V2_SUBJECTS_CASES.curriculumPreparing;
@@ -511,6 +511,7 @@ test('WI-2238 curriculum-preparing case: exact World History empty Hub and visib
   await pressableClick(page.getByTestId('subject-hub-preparing-back'));
   await expectSubjectsPath(page);
   await expectSubjectRow(page, subjectId, expected.subjectName);
+  await expectMeIdentity(page, expected.profileName, seed.profileId);
 });
 
 test('WI-2238 onboarding-no-subject case: Add creates exact Photosynthesis first session and visible exit returns only to V2 Subjects', async ({

@@ -164,6 +164,10 @@ tags:
       id: 'session-screen'
     timeout: 45000
 - assertVisible:
+    id: 'first-session-greeting'
+    containsDescendants:
+      - text: '.*Photosynthesis.*'
+- assertVisible:
     id: 'chat-shell-back'
 - tapOn:
     id: 'chat-shell-back'

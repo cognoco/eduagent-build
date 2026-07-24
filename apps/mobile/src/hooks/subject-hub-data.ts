@@ -60,6 +60,7 @@ interface BuildSubjectHubDataInput {
   resumeTarget: LearningResumeTarget | null | undefined;
   notes: readonly SubjectHubNote[];
   canStudy?: boolean;
+  preferDueReviewOverNextTopic?: boolean;
   now?: Date;
 }
 
@@ -218,10 +219,12 @@ function buildNextUp(input: {
   upNextTopic: CurriculumTopic | null;
   topicById: ReadonlyMap<string, CurriculumTopic>;
   topicBookIdByTopicId: ReadonlyMap<string, string>;
+  preferDueReviewOverNextTopic: boolean;
 }): SubjectHubNextUpWithResume {
   if (
     input.resumeTarget?.topicId &&
-    input.resumeTarget.resumeKind !== 'next_topic'
+    (!input.preferDueReviewOverNextTopic ||
+      input.resumeTarget.resumeKind !== 'next_topic')
   ) {
     return {
       kind: 'resume',
@@ -274,6 +277,7 @@ export function buildSubjectHubData({
   resumeTarget,
   notes,
   canStudy = true,
+  preferDueReviewOverNextTopic = false,
   now = new Date(),
 }: BuildSubjectHubDataInput): SubjectHubDataWithResume {
   const topics = bookDetails
@@ -370,6 +374,7 @@ export function buildSubjectHubData({
       upNextTopic,
       topicById,
       topicBookIdByTopicId,
+      preferDueReviewOverNextTopic,
     }),
     chapters,
     showSearchFilter:

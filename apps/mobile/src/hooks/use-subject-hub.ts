@@ -67,7 +67,10 @@ export function computeEmptyKind(
   return 'stuck';
 }
 
-export function useSubjectHub(subjectId: string | undefined): {
+export function useSubjectHub(
+  subjectId: string | undefined,
+  options: { preferDueReviewOverNextTopic?: boolean } = {},
+): {
   data: SubjectHubDataWithResume | null;
   isLoading: boolean;
   isError: boolean;
@@ -188,6 +191,8 @@ export function useSubjectHub(subjectId: string | undefined): {
       resumeTarget: resumeTargetQuery.data,
       notes: notesQuery.notes,
       canStudy: navigationContract.gates.showLearningActions,
+      preferDueReviewOverNextTopic:
+        options.preferDueReviewOverNextTopic ?? false,
     });
   }, [
     bookDetailQueries,
@@ -196,6 +201,7 @@ export function useSubjectHub(subjectId: string | undefined): {
     generatedBooks,
     navigationContract.gates.showLearningActions,
     notesQuery.notes,
+    options.preferDueReviewOverNextTopic,
     retentionQuery.data?.topics,
     resumeTargetQuery.data,
     subjectId,
