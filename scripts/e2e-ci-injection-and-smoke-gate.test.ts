@@ -8971,6 +8971,65 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     ]);
   });
 
+  it('[WI-2176] waits for persisted scope hydration after cold release relaunches', () => {
+    const geometryFlow = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/v2/v2-supporter-scope-geometry.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(geometryFlow)[1]?.toJS() as unknown;
+
+    expect(Array.isArray(commands)).toBe(true);
+    if (!Array.isArray(commands)) {
+      throw new Error('supporter scope geometry commands must be a YAML list');
+    }
+
+    const coldRelaunches = commands.flatMap((command, index) =>
+      command === 'stopApp' ? [commands.slice(index, index + 5)] : [],
+    );
+
+    expect(coldRelaunches).toEqual([
+      [
+        'stopApp',
+        { launchApp: { clearState: false } },
+        {
+          extendedWaitUntil: {
+            visible: { id: 'scope-chip-persisted-me' },
+            timeout: 120000,
+          },
+        },
+        { assertVisible: { id: 'mentor-screen' } },
+        {
+          assertVisible: {
+            id: 'scope-chip-option-me',
+            selected: true,
+          },
+        },
+      ],
+      [
+        'stopApp',
+        { launchApp: { clearState: false } },
+        {
+          extendedWaitUntil: {
+            visible: {
+              id: 'scope-chip-persisted-person-${SUPPORTEE_PERSON_ID}',
+            },
+            timeout: 120000,
+          },
+        },
+        { assertVisible: { id: 'person-scope-mentor-tab' } },
+        {
+          assertVisible: {
+            id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}',
+            selected: true,
+          },
+        },
+      ],
+    ]);
+  });
+
   it('[WI-2618] keeps Subjects active while switching directly between supportee and Me scopes', () => {
     const selfLearningFlow = readFileSync(
       join(

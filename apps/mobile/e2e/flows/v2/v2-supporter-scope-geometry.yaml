@@ -84,8 +84,10 @@ tags:
     clearState: false
 - extendedWaitUntil:
     visible:
-      id: 'mentor-screen'
-    timeout: 30000
+      id: 'scope-chip-persisted-me'
+    timeout: 120000
+- assertVisible:
+    id: 'mentor-screen'
 - assertVisible:
     id: 'scope-chip-option-me'
     selected: true
@@ -110,8 +112,10 @@ tags:
     clearState: false
 - extendedWaitUntil:
     visible:
-      id: 'person-scope-mentor-tab'
-    timeout: 30000
+      id: 'scope-chip-persisted-person-${SUPPORTEE_PERSON_ID}'
+    timeout: 120000
+- assertVisible:
+    id: 'person-scope-mentor-tab'
 - assertVisible:
     id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}'
     selected: true
