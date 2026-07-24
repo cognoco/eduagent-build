@@ -54,6 +54,7 @@ export function SpeakingPracticeActivity({
   const [feedback, setFeedback] = useState<AttemptFeedback | null>(null);
   const [attemptFailed, setAttemptFailed] = useState(false);
   const wasListeningRef = useRef(false);
+  const discardListeningCycleRef = useRef(false);
   const attemptGenerationRef = useRef(0);
   const { t } = useTranslation();
 
@@ -63,6 +64,8 @@ export function SpeakingPracticeActivity({
   // before a promise continuation can settle into stale UI.
   useLayoutEffect(() => {
     attemptGenerationRef.current += 1;
+    discardListeningCycleRef.current = true;
+    wasListeningRef.current = false;
     setFeedback(null);
     setAttemptFailed(false);
 
@@ -82,6 +85,12 @@ export function SpeakingPracticeActivity({
   // re-triggers this effect via the `transcript` dependency) does not
   // double-submit — the ref only enables the false-transition branch once.
   useEffect(() => {
+    if (discardListeningCycleRef.current) {
+      if (!isListening) discardListeningCycleRef.current = false;
+      wasListeningRef.current = false;
+      return;
+    }
+
     if (wasListeningRef.current && !isListening) {
       const trimmed = transcript.trim();
       if (trimmed && speakingPractice) {
@@ -135,6 +144,7 @@ export function SpeakingPracticeActivity({
       return;
     }
     attemptGenerationRef.current += 1;
+    discardListeningCycleRef.current = false;
     setFeedback(null);
     setAttemptFailed(false);
     void startListening();

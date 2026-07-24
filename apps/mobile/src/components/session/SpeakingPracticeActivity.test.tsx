@@ -473,6 +473,48 @@ describe('SpeakingPracticeActivity', () => {
     expect(screen.queryByTestId('speaking-practice-attempt-error')).toBeNull();
   });
 
+  it('does not submit the previous recording after navigation changes the session', async () => {
+    const { rerender } = render(activityView());
+
+    mockSttState = {
+      status: 'listening',
+      transcript: 'attempt from session 1',
+      error: null,
+      isListening: true,
+    };
+    rerender(activityView());
+
+    rerender(activityView('session-2'));
+
+    mockSttState = {
+      status: 'idle',
+      transcript: 'attempt from session 1',
+      error: null,
+      isListening: false,
+    };
+    await act(async () => {
+      rerender(activityView('session-2'));
+    });
+
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+
+    mockMutateAsync.mockResolvedValueOnce({
+      missingWords: [],
+      extraWords: [],
+      isComplete: true,
+    });
+    fireEvent.press(screen.getByTestId('speaking-practice-record'));
+    await submitTranscript(rerender, 'attempt from session 2', 'session-2');
+
+    expect(mockMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'session-2',
+        transcript: 'attempt from session 2',
+      }),
+    );
+    await screen.findByText('Matched');
+  });
+
   it('does not read or apply an outstanding response after unmount', async () => {
     const feedbackRead = jest.fn();
     const attempt = deferred<{
