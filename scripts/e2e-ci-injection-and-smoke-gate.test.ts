@@ -7292,6 +7292,78 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         },
       },
     ];
+    const exactSeededTranscriptOwnership: Selector[] = [
+      {
+        extendedWaitUntil: {
+          visible: {
+            id: 'message-bubble-user-0',
+            containsDescendants: [{ text: '^Tell me about ancient Rome$' }],
+          },
+          timeout: 30000,
+        },
+      },
+      {
+        extendedWaitUntil: {
+          visible: {
+            id: 'message-bubble-assistant-1',
+            containsDescendants: [
+              { text: '^Ancient Rome was founded in 753 BC\\.\\.\\.$' },
+            ],
+          },
+          timeout: 30000,
+        },
+      },
+    ];
+    const exactNextUpResumeTap: Selector = {
+      tapOn: {
+        id: 'subject-hub-next-up-action',
+        text: '^Resume$',
+        childOf: { id: 'subject-hub-next-up' },
+      },
+    };
+    const exactSeededSessionArrival: Selector[] = [
+      {
+        extendedWaitUntil: {
+          visible: { id: 'session-screen' },
+          timeout: 45000,
+        },
+      },
+      ...exactSeededTranscriptOwnership,
+    ];
+    const exactNextUpHardwareBackToSubjects: Selector[] = [
+      exactNextUpResumeTap,
+      ...exactSeededSessionArrival,
+      { pressKey: 'back' },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'subjects-screen' },
+          timeout: 15000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'subjects-browse-row-${SUBJECT_ID}',
+          containsDescendants: [{ text: '^World History$' }],
+        },
+      },
+    ];
+    const exactNextUpVisibleBackToSubjects: Selector[] = [
+      exactNextUpResumeTap,
+      ...exactSeededSessionArrival,
+      { tapOn: { id: 'chat-shell-back' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'subjects-screen' },
+          timeout: 15000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'subjects-browse-row-${SUBJECT_ID}',
+          containsDescendants: [{ text: '^World History$' }],
+        },
+      },
+    ];
     const exactTopicResumeToOwningHub: Selector[] = [
       ...exactTopicVisibilitySync,
       ...exactTopicSheetOwnership,
@@ -7320,18 +7392,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           timeout: 45000,
         },
       },
-      {
-        extendedWaitUntil: {
-          visible: {
-            id: 'session-screen',
-            containsDescendants: [
-              { text: '^Tell me about ancient Rome$' },
-              { text: '^Ancient Rome was founded in 753 BC\\.\\.\\.$' },
-            ],
-          },
-          timeout: 30000,
-        },
-      },
+      ...exactSeededTranscriptOwnership,
       { pressKey: 'back' },
       {
         extendedWaitUntil: {
@@ -7362,6 +7423,100 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(hasExactCommandSequence(resume, exactTopicResumeToOwningHub)).toBe(
       true,
     );
+    const exactResumePaths = [
+      exactTopicResumeToOwningHub,
+      exactNextUpHardwareBackToSubjects,
+      exactNextUpVisibleBackToSubjects,
+    ];
+    const hasEveryExactResumePath = (value: unknown): boolean =>
+      exactResumePaths.every((path) => hasExactCommandSequence(value, path));
+    const mutateExactPath = (
+      value: unknown,
+      path: Selector[],
+      offset: number,
+      replacement?: Selector,
+    ): Selector[] => {
+      if (!Array.isArray(value)) {
+        throw new Error('Subjects resume flow did not parse as commands');
+      }
+      const start = value.findIndex((_, candidateStart) =>
+        path.every((command, commandOffset) =>
+          isDeepStrictEqual(value[candidateStart + commandOffset], command),
+        ),
+      );
+      if (start < 0) {
+        throw new Error('Exact Subjects resume path is missing');
+      }
+      const target = start + offset;
+      return replacement === undefined
+        ? value.filter((_, index) => index !== target)
+        : value.with(target, replacement);
+    };
+
+    expect(hasEveryExactResumePath(resume)).toBe(true);
+    for (const path of [
+      exactNextUpHardwareBackToSubjects,
+      exactNextUpVisibleBackToSubjects,
+    ]) {
+      for (const mutation of [
+        mutateExactPath(resume, path, 2),
+        mutateExactPath(resume, path, 2, {
+          extendedWaitUntil: {
+            visible: {
+              id: 'message-bubble-user-adjacent',
+              containsDescendants: [{ text: '^Tell me about ancient Rome$' }],
+            },
+            timeout: 30000,
+          },
+        }),
+        mutateExactPath(resume, path, 2, {
+          extendedWaitUntil: {
+            visible: {
+              id: 'message-bubble-user-0',
+              containsDescendants: [
+                { text: '^Tell me about adjacent history$' },
+              ],
+              optional: true,
+            },
+            timeout: 30000,
+          },
+        }),
+        mutateExactPath(resume, path, 3),
+        mutateExactPath(resume, path, 3, {
+          extendedWaitUntil: {
+            visible: {
+              id: 'message-bubble-assistant-adjacent',
+              containsDescendants: [
+                { text: '^Ancient Rome was founded in 753 BC\\.\\.\\.$' },
+              ],
+            },
+            timeout: 30000,
+          },
+        }),
+        mutateExactPath(resume, path, 3, {
+          extendedWaitUntil: {
+            visible: {
+              id: 'message-bubble-assistant-1',
+              containsDescendants: [{ text: '^Adjacent history reply$' }],
+              optional: true,
+            },
+            timeout: 30000,
+          },
+        }),
+        mutateExactPath(resume, path, 4),
+      ]) {
+        expect(hasEveryExactResumePath(mutation)).toBe(false);
+      }
+    }
+    for (const transcriptSelector of exactSeededTranscriptOwnership) {
+      expect(
+        Array.isArray(resume)
+          ? resume.filter((command) =>
+              isDeepStrictEqual(command, transcriptSelector),
+            ).length
+          : 0,
+      ).toBe(3);
+    }
     for (const mutation of [
       exactTopicResumeToOwningHub.filter((_, index) => index !== 1),
       exactTopicResumeToOwningHub.with(1, {
@@ -7410,9 +7565,19 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       exactTopicResumeToOwningHub.with(10, {
         extendedWaitUntil: {
           visible: {
-            id: 'session-screen',
+            id: 'message-bubble-user-0',
+            containsDescendants: [{ text: '^Tell me about adjacent history$' }],
+            optional: true,
+          },
+          timeout: 30000,
+        },
+      }),
+      exactTopicResumeToOwningHub.filter((_, index) => index !== 11),
+      exactTopicResumeToOwningHub.with(11, {
+        extendedWaitUntil: {
+          visible: {
+            id: 'message-bubble-assistant-adjacent',
             containsDescendants: [
-              { text: '^Tell me about adjacent history$' },
               { text: '^Ancient Rome was founded in 753 BC\\.\\.\\.$' },
             ],
             optional: true,
@@ -7420,11 +7585,11 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           timeout: 30000,
         },
       }),
-      exactTopicResumeToOwningHub.filter((_, index) => index !== 11),
-      exactTopicResumeToOwningHub.with(13, {
+      exactTopicResumeToOwningHub.filter((_, index) => index !== 12),
+      exactTopicResumeToOwningHub.with(14, {
         assertNotVisible: { id: 'mentor-screen', optional: true },
       }),
-      exactTopicResumeToOwningHub.with(15, {
+      exactTopicResumeToOwningHub.with(16, {
         assertVisible: {
           id: 'subject-hub-title-adjacent-subject',
           text: '^World History$',

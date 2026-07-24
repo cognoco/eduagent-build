@@ -137,9 +137,14 @@ tags:
     timeout: 45000
 - extendedWaitUntil:
     visible:
-      id: 'session-screen'
+      id: 'message-bubble-user-0'
       containsDescendants:
         - text: '^Tell me about ancient Rome$'
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: 'message-bubble-assistant-1'
+      containsDescendants:
         - text: '^Ancient Rome was founded in 753 BC\.\.\.$'
     timeout: 30000
 - pressKey: back
@@ -183,9 +188,14 @@ tags:
     timeout: 45000
 - extendedWaitUntil:
     visible:
-      id: 'session-screen'
+      id: 'message-bubble-user-0'
       containsDescendants:
         - text: '^Tell me about ancient Rome$'
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: 'message-bubble-assistant-1'
+      containsDescendants:
         - text: '^Ancient Rome was founded in 753 BC\.\.\.$'
     timeout: 30000
 
@@ -222,11 +232,18 @@ tags:
     visible:
       id: 'session-screen'
     timeout: 45000
-- assertVisible:
-    id: 'session-screen'
-    containsDescendants:
-      - text: '^Tell me about ancient Rome$'
-      - text: '^Ancient Rome was founded in 753 BC\.\.\.$'
+- extendedWaitUntil:
+    visible:
+      id: 'message-bubble-user-0'
+      containsDescendants:
+        - text: '^Tell me about ancient Rome$'
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: 'message-bubble-assistant-1'
+      containsDescendants:
+        - text: '^Ancient Rome was founded in 753 BC\.\.\.$'
+    timeout: 30000
 - tapOn:
     id: 'chat-shell-back'
 - extendedWaitUntil:
