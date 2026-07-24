@@ -31,9 +31,7 @@ export function ColdStartCard({ onFill, onOpenCamera }: ColdStartCardProps) {
   const fill = (chip: (typeof CHIPS)[number]): void => {
     const text = t(chip.key);
     onFill(text);
-    if (chip.id === 'homework') {
-      setShowHomeworkReply(true);
-    }
+    setShowHomeworkReply(chip.id === 'homework');
   };
 
   return (

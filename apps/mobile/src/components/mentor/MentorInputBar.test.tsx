@@ -145,6 +145,17 @@ describe('MentorInputBar', () => {
     expect(onSubmitText).toHaveBeenCalledWith('Teach me something new');
   });
 
+  it('does not replace an existing typed draft with a starter', () => {
+    const { getByTestId } = render(
+      <MentorInputBar {...baseProps} showColdStartPrompts />,
+    );
+
+    fireEvent.changeText(getByTestId('mentor-bar-input'), 'my own question');
+    fireEvent.press(getByTestId('cold-start-chip-learn'));
+
+    expect(getByTestId('mentor-bar-input').props.value).toBe('my own question');
+  });
+
   it('keeps a selected starter unchanged when an in-flight voice capture resolves', async () => {
     const props = { ...baseProps, showColdStartPrompts: true };
     const { getByTestId, rerender } = render(<MentorInputBar {...props} />);

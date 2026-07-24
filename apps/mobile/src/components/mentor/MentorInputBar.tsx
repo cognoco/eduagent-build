@@ -202,7 +202,7 @@ export function MentorInputBar({
         clearTranscript();
         void stopListening();
       }
-      setValue(text);
+      setValue((current) => (current.trim() ? current : text));
       inputRef.current?.focus();
     },
     [clearTranscript, stopListening],

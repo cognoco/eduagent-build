@@ -53,4 +53,16 @@ describe('ColdStartCard', () => {
     ).toBe('Camera');
     expect(queryByText(/what subject/i)).toBeNull();
   });
+
+  it('hides the homework reply after selecting another starter', () => {
+    const { getByTestId, queryByTestId } = render(
+      <ColdStartCard onFill={jest.fn()} onOpenCamera={jest.fn()} />,
+    );
+
+    fireEvent.press(getByTestId('cold-start-chip-homework'));
+    expect(getByTestId('cold-start-homework-reply')).toBeTruthy();
+
+    fireEvent.press(getByTestId('cold-start-chip-learn'));
+    expect(queryByTestId('cold-start-homework-reply')).toBeNull();
+  });
 });
