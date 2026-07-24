@@ -483,13 +483,20 @@ function SessionScreenInner() {
   }, [subjectsTransitionId]);
   const hasSubjectsPredecessor =
     !!subjectsTransitionId && subjectsPredecessorId === subjectsTransitionId;
+  const [subjectsReturnReady, setSubjectsReturnReady] = useState(false);
+  const shouldGuardSubjectsRemoval =
+    hasSubjectsPredecessor && Platform.OS !== 'web' && !subjectsReturnReady;
   usePreventRemove(
-    returnTo === MENTOR_RETURN_TO &&
-      !mentorReturnReady &&
+    ((returnTo === MENTOR_RETURN_TO && !mentorReturnReady) ||
+      shouldGuardSubjectsRemoval) &&
       deferredRemovalAction === null,
     ({ data: { action } }) => {
       if (action.type !== 'GO_BACK' && action.type !== 'POP') {
         setDeferredRemovalAction(action);
+        return;
+      }
+      if (shouldGuardSubjectsRemoval) {
+        setSubjectsReturnReady(true);
         return;
       }
       startMentorReturn();
@@ -500,6 +507,11 @@ function SessionScreenInner() {
     navigation.dispatch(deferredRemovalAction);
     setDeferredRemovalAction(null);
   }, [deferredRemovalAction, navigation]);
+  useEffect(() => {
+    if (!subjectsReturnReady) return;
+    router.replace(homeBackHref as Href);
+    setSubjectsReturnReady(false);
+  }, [homeBackHref, router, subjectsReturnReady]);
   useEffect(() => {
     if (!pendingMentorReturn) return;
 
@@ -553,10 +565,6 @@ function SessionScreenInner() {
     setMentorReturnReady(false);
   }, [homeBackHref, mentorReturnReady, router]);
   const handleChatBackPress = useCallback(() => {
-    if (hasSubjectsPredecessor && Platform.OS !== 'web') {
-      goBackOrReplace(router, homeBackHref);
-      return;
-    }
     if (returnTo) {
       if (returnTo === MENTOR_RETURN_TO) {
         startMentorReturn();
@@ -575,19 +583,8 @@ function SessionScreenInner() {
       return;
     }
     router.replace('/(app)/home' as Href);
-  }, [
-    hasSubjectsPredecessor,
-    returnTo,
-    subjectId,
-    homeBackHref,
-    router,
-    startMentorReturn,
-  ]);
+  }, [returnTo, subjectId, homeBackHref, router, startMentorReturn]);
   const handleHomeBack = useCallback(() => {
-    if (hasSubjectsPredecessor && Platform.OS !== 'web') {
-      goBackOrReplace(router, homeBackHref);
-      return;
-    }
     if (returnTo) {
       if (returnTo === MENTOR_RETURN_TO) {
         startMentorReturn();
@@ -598,13 +595,7 @@ function SessionScreenInner() {
     }
 
     goBackOrReplace(router, homeBackHref);
-  }, [
-    hasSubjectsPredecessor,
-    homeBackHref,
-    returnTo,
-    router,
-    startMentorReturn,
-  ]);
+  }, [homeBackHref, returnTo, router, startMentorReturn]);
   const handleStartNewSession = useCallback(() => {
     router.replace({
       pathname: '/(app)/session',

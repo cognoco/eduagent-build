@@ -890,7 +890,7 @@ describe('SessionScreen homework flow', () => {
     }
   });
 
-  it('pops to the owning Subject Hub on native after consuming the real Topic handoff', async () => {
+  it('replaces to the exact owning Subject Hub from the visible native Back control', async () => {
     const mockBack = jest.fn();
     const mockCanGoBack = jest.fn(() => true);
     markHubToSessionTransition(SUBJECT_ID);
@@ -917,10 +917,53 @@ describe('SessionScreen homework flow', () => {
 
     fireEvent.press(testScreen.getByTestId('mock-back-button'));
 
-    expect(mockCanGoBack).toHaveBeenCalledTimes(1);
-    expect(mockBack).toHaveBeenCalledTimes(1);
-    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/subject-hub/[subjectId]',
+      params: { subjectId: SUBJECT_ID },
+    });
+    expect(mockCanGoBack).not.toHaveBeenCalled();
+    expect(mockBack).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ['Android hardware back', { type: 'GO_BACK' }],
+    ['native stack gesture', { type: 'POP' }],
+  ])(
+    'routes %s to the exact owning Subject Hub after consuming the real Topic handoff',
+    async (_exitKind, action) => {
+      markHubToSessionTransition(SUBJECT_ID);
+      (useLocalSearchParams as jest.Mock).mockReturnValue({
+        mode: 'learning',
+        subjectId: SUBJECT_ID,
+        subjectName: 'Math',
+        topicId: TOPIC_ID,
+        topicName: 'Linear equations',
+        returnTo: 'subject-hub',
+        returnId: SUBJECT_ID,
+      });
+
+      const testScreen = renderSessionScreen();
+      await flushAsyncWork();
+      expect(consumeHubToSessionTransition(SUBJECT_ID)).toBe(false);
+      expect(mockPreventRemoveEnabled).toBe(true);
+      expect(mockBeforeRemove).not.toBeNull();
+      mockReplace.mockClear();
+
+      act(() => {
+        mockBeforeRemove!({ data: { action } });
+      });
+
+      await waitFor(() =>
+        expect(mockReplace).toHaveBeenCalledWith({
+          pathname: '/(app)/subject-hub/[subjectId]',
+          params: { subjectId: SUBJECT_ID },
+        }),
+      );
+      expect(mockDispatch).not.toHaveBeenCalled();
+
+      testScreen.unmount();
+    },
+  );
 
   it('replaces to the exact owning Subject Hub on web after the same Topic handoff', async () => {
     const platformReplacement = jest.replaceProperty(Platform, 'OS', 'web');
@@ -1625,7 +1668,7 @@ describe('SessionScreen homework flow', () => {
     }
   });
 
-  it('uses Subjects history only after consuming the actual Hub-to-Session transition', () => {
+  it('returns to the exact Subjects destination after consuming the actual Hub-to-Session transition', () => {
     const mockBack = jest.fn();
     const mockCanGoBack = jest.fn(() => true);
     markHubToSessionTransition(SUBJECT_ID);
@@ -1663,9 +1706,9 @@ describe('SessionScreen homework flow', () => {
 
       fireEvent.press(goHomeAction);
 
-      expect(mockCanGoBack).toHaveBeenCalledTimes(1);
-      expect(mockBack).toHaveBeenCalledTimes(1);
-      expect(mockReplace).not.toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects');
+      expect(mockCanGoBack).not.toHaveBeenCalled();
+      expect(mockBack).not.toHaveBeenCalled();
     }
   });
 
@@ -1693,7 +1736,7 @@ describe('SessionScreen homework flow', () => {
       error: new TypeError('Network request failed'),
     });
 
-    const testScreen = renderSessionScreen();
+    renderSessionScreen();
     await flushAsyncWork();
     expect(consumeHubToSessionTransition(SUBJECT_ID)).toBe(false);
 
@@ -1703,13 +1746,19 @@ describe('SessionScreen homework flow', () => {
     });
     activeRender?.result.rerender(<SessionScreen />);
     await flushAsyncWork();
+    expect(mockPreventRemoveEnabled).toBe(true);
+    expect(mockBeforeRemove).not.toBeNull();
     mockReplace.mockClear();
 
-    fireEvent.press(testScreen.getByTestId('mock-back-button'));
+    act(() => {
+      mockBeforeRemove!({ data: { action: { type: 'GO_BACK' } } });
+    });
 
-    expect(mockCanGoBack).toHaveBeenCalledTimes(1);
-    expect(mockBack).toHaveBeenCalledTimes(1);
-    expect(mockReplace).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects'),
+    );
+    expect(mockCanGoBack).not.toHaveBeenCalled();
+    expect(mockBack).not.toHaveBeenCalled();
   });
 
   it('[F-110] engages the session-expired UI for any error the boundary classifies as not-found, not only typed NotFoundError instances', () => {
