@@ -13,6 +13,7 @@ import {
 import { Redirect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth, useReverification } from '@clerk/expo';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   useProfile,
@@ -30,6 +31,7 @@ import {
 import { useUpdateProfileName } from '../hooks/use-profiles';
 import { platformAlert } from '../lib/platform-alert';
 import { formatApiError } from '../lib/format-api-error';
+import { ErrorFallback } from '../components/common';
 
 const OWNER_ELEVATION_REQUIRED = 'OWNER_ELEVATION_REQUIRED';
 const OWNER_ELEVATION_REVERIFICATION_HINT = {
@@ -63,10 +65,17 @@ function hasOwnerElevationErrorCode(err: unknown): boolean {
 export default function ProfilesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { isLoaded, isSignedIn } = useAuth();
-  const { profiles, activeProfile, switchProfile, isLoading } = useProfile();
+  const {
+    profiles,
+    activeProfile,
+    switchProfile,
+    isLoading,
+    profileLoadError,
+  } = useProfile();
   const { data: subscription } = useSubscription();
   useFamilySubscription(
     subscription?.tier === 'family' || subscription?.tier === 'pro',
@@ -309,6 +318,25 @@ export default function ProfilesScreen() {
             accessibilityLabel={t('common.loading')}
           />
         </View>
+      ) : profileLoadError ? (
+        <ErrorFallback
+          variant="centered"
+          title={t('appShell.profileLoadErrorTitle')}
+          message={formatApiError(profileLoadError)}
+          primaryAction={{
+            label: t('common.retry'),
+            onPress: () => {
+              void queryClient.refetchQueries({ queryKey: ['profiles'] });
+            },
+            testID: 'profiles-load-error-retry',
+          }}
+          secondaryAction={{
+            label: t('common.back'),
+            onPress: handleClose,
+            testID: 'profiles-load-error-back',
+          }}
+          testID="profiles-load-error"
+        />
       ) : profiles.length === 0 ? (
         <View className="flex-1 items-center justify-center px-8">
           <Text className="text-h2 font-bold text-text-primary mb-2">
