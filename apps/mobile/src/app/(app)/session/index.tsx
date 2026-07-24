@@ -1211,7 +1211,7 @@ function SessionScreenInner() {
     messages,
     setMessages,
     setResumedBanner,
-    subjectId: effectiveSubjectId ?? undefined,
+    subjectId: effectiveSubjectId || undefined,
     effectiveMode,
     isV2MentorEntry,
     availableSubjects,
