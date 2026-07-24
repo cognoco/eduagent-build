@@ -614,7 +614,7 @@ function LearnerMentorScreen(): React.ReactElement {
   );
 }
 
-export default function MentorScreen(): React.ReactElement {
+export default function MentorScreen(): React.ReactElement | null {
   const { activeProfile } = useProfile();
   const { activeScope, availableScopes, setActiveScope } = useScopeContext();
   const router = useRouter();
@@ -665,5 +665,7 @@ export default function MentorScreen(): React.ReactElement {
     );
   }
 
-  return <LearnerMentorScreen key={activeProfile?.id ?? 'no-profile'} />;
+  if (!activeProfile) return null;
+
+  return <LearnerMentorScreen key={activeProfile.id} />;
 }

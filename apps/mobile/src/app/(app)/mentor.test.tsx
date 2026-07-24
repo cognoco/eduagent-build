@@ -4,7 +4,13 @@ import {
   Platform,
   TextInput,
 } from 'react-native';
-import { act, fireEvent, screen, within } from '@testing-library/react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native';
 import type {
   NowCard,
   NowResponse,
@@ -16,6 +22,7 @@ import { MENTOR_CAPABILITY_CASES } from '@eduagent/test-utils';
 import {
   ERROR_RESPONSES,
   NAMED_PROFILES,
+  createScreenWrapper,
   renderScreen,
   type RenderScreenOptions,
 } from '../../test-utils/screen-render';
@@ -284,6 +291,20 @@ describe('MentorScreen', () => {
       ],
       setActiveScope: jest.fn(),
     };
+  });
+
+  it('[WI-2234 review] does not mount the learner Mentor screen without an active Profile', () => {
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile: null,
+      profiles: [],
+    });
+    const rendered = render(<MentorScreen />, { wrapper });
+    cleanupRender = () => {
+      rendered.unmount();
+      queryClient.clear();
+    };
+
+    expect(screen.queryByTestId('mentor-screen')).toBeNull();
   });
 
   it('[WI-2113 AC-1] does not inject a Challenge during idle time and accepts it on the next focus boundary', async () => {
