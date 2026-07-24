@@ -1,4 +1,9 @@
-import { createLogger, type LogEntry, type LogLevel } from './logger';
+import {
+  createLogger,
+  setStructuredLogSink,
+  type LogEntry,
+  type LogLevel,
+} from './logger';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -50,6 +55,7 @@ describe('createLogger', () => {
   });
 
   afterEach(() => {
+    setStructuredLogSink(null);
     captured.restore();
   });
 
@@ -141,6 +147,48 @@ describe('createLogger', () => {
       logger.debug('trace');
 
       expect(captured.logs).toHaveLength(1);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Structured sink
+  // -------------------------------------------------------------------------
+
+  describe('structured sink', () => {
+    it('offers the emitted entry to the configured sink without replacing console output', () => {
+      const sink = jest.fn();
+      setStructuredLogSink(sink);
+      const logger = createLogger({ level: 'debug' });
+
+      logger.warn('llm.volume.daily_threshold_exceeded', {
+        provider: 'openai',
+      });
+
+      expect(captured.warns).toHaveLength(1);
+      expect(sink).toHaveBeenCalledTimes(1);
+      expect(sink).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: 'warn',
+          message: 'llm.volume.daily_threshold_exceeded',
+          context: { provider: 'openai' },
+        }),
+      );
+    });
+
+    it('contains sink failures and preserves the original console record', () => {
+      setStructuredLogSink(() => {
+        throw new Error('sink unavailable');
+      });
+      const logger = createLogger({ level: 'debug' });
+
+      expect(() => logger.warn('canonical warning')).not.toThrow();
+
+      expect(captured.warns).toHaveLength(1);
+      expect(parseEntry(captured.warns[0]!).message).toBe('canonical warning');
+      expect(captured.errors).toHaveLength(1);
+      expect(parseEntry(captured.errors[0]!).message).toBe(
+        'structured_log_sink.failed',
+      );
     });
   });
 
