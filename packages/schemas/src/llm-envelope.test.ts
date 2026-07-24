@@ -1012,6 +1012,14 @@ describe('challenge round envelope fields', () => {
             answerEventId: '00000000-0000-4000-8000-000000000001',
             learnerQuote:
               'photosynthesis stores energy in glucose and respiration releases it',
+            questionIdentity: {
+              questionText:
+                'Why does photosynthesis store energy while respiration releases it?',
+              minimalLearningClaim:
+                'photosynthesis stores energy while respiration releases it',
+              cognitiveOperation: 'causal_explanation',
+              materialContext: '',
+            },
           },
           {
             concept: 'role of ATP',
@@ -1033,6 +1041,10 @@ describe('challenge round envelope fields', () => {
       confidence: 'high',
     });
     expect(parsed.signals?.challenge_round_evaluation).toHaveLength(3);
+    expect(
+      parsed.signals?.challenge_round_evaluation?.[0]?.questionIdentity
+        ?.cognitiveOperation,
+    ).toBe('causal_explanation');
     expect(parsed.signals?.challenge_round_evaluation?.[2]?.correction).toBe(
       'occurs in chloroplasts',
     );
@@ -1226,6 +1238,12 @@ describe('challengeRoundGraderVerdictSchema (T1 — grader verdict)', () => {
     result: 'solid' as const,
     evidence: 'links speed to collision frequency and energy',
     learnerQuote: 'particles move faster and collide more often',
+    questionIdentity: {
+      questionText: 'Why does increasing temperature speed up reactions?',
+      minimalLearningClaim: 'temperature raises productive collision frequency',
+      cognitiveOperation: 'causal_explanation' as const,
+      materialContext: 'most chemical reactions',
+    },
   };
 
   // (a) a one-item verdict without answerEventId parses successfully

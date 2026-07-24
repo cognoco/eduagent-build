@@ -1,0 +1,2 @@
+ALTER TABLE "challenge_round_cooldowns" DROP CONSTRAINT "challenge_round_cooldowns_last_outcome_range";--> statement-breakpoint
+ALTER TABLE "challenge_round_cooldowns" ADD CONSTRAINT "challenge_round_cooldowns_last_outcome_range" CHECK ("challenge_round_cooldowns"."last_outcome" IS NULL OR ("challenge_round_cooldowns"."last_outcome" >= 0 AND "challenge_round_cooldowns"."last_outcome" <= 4));
