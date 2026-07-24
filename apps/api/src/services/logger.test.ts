@@ -190,6 +190,29 @@ describe('createLogger', () => {
         'structured_log_sink.failed',
       );
     });
+
+    it('contains rejected sink promises and preserves the original console record', async () => {
+      const rejectedSinkResult = Promise.reject(
+        new Error('async sink unavailable'),
+      );
+      // Keep the intentional RED phase from leaking an unhandled rejection;
+      // the logger must still attach its own handler and emit the diagnostic.
+      void rejectedSinkResult.catch(() => undefined);
+      setStructuredLogSink(() => rejectedSinkResult);
+      const logger = createLogger({ level: 'debug' });
+
+      expect(() => logger.warn('canonical async warning')).not.toThrow();
+      await rejectedSinkResult.catch(() => undefined);
+
+      expect(captured.warns).toHaveLength(1);
+      expect(parseEntry(captured.warns[0]!).message).toBe(
+        'canonical async warning',
+      );
+      expect(captured.errors).toHaveLength(1);
+      expect(parseEntry(captured.errors[0]!).message).toBe(
+        'structured_log_sink.failed',
+      );
+    });
   });
 
   // -------------------------------------------------------------------------

@@ -15,7 +15,9 @@ export interface LogEntry {
   context?: Record<string, unknown>;
 }
 
-export type StructuredLogSink = (entry: Readonly<LogEntry>) => void;
+export type StructuredLogSink = (
+  entry: Readonly<LogEntry>,
+) => void | Promise<void>;
 
 let structuredLogSink: StructuredLogSink | null = null;
 
@@ -40,6 +42,16 @@ export interface Logger {
   info(message: string, context?: Record<string, unknown>): void;
   warn(message: string, context?: Record<string, unknown>): void;
   error(message: string, context?: Record<string, unknown>): void;
+}
+
+function reportStructuredLogSinkFailure(): void {
+  console.error(
+    JSON.stringify({
+      timestamp: new Date().toISOString(),
+      level: 'error',
+      message: 'structured_log_sink.failed',
+    } satisfies LogEntry),
+  );
 }
 
 export function createLogger(config?: { level?: LogLevel }): Logger {
@@ -73,17 +85,14 @@ export function createLogger(config?: { level?: LogLevel }): Logger {
     }
 
     try {
-      structuredLogSink?.(entry);
+      const sinkResult = structuredLogSink?.(entry);
+      void sinkResult?.catch(() => {
+        reportStructuredLogSinkFailure();
+      });
     } catch {
       // A monitoring sink must never turn a successful request into an
       // application failure. Keep this diagnostic content-free.
-      console.error(
-        JSON.stringify({
-          timestamp: new Date().toISOString(),
-          level: 'error',
-          message: 'structured_log_sink.failed',
-        } satisfies LogEntry),
-      );
+      reportStructuredLogSinkFailure();
     }
   }
 

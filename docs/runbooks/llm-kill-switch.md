@@ -178,6 +178,12 @@ secret. A successful response has this shape:
 }
 ```
 
+Every authenticated invocation emits a live Sentry-backed warning. Do not use
+this endpoint as a health check or schedule it: repeated calls can create alert
+noise and consume Sentry Logs quota. If an invocation result is uncertain,
+query the narrow Sentry window below before deciding whether another probe is
+necessary.
+
 Record `emittedAt`, then open Sentry → Explore → Logs for the production API
 project, set a narrow time window around that timestamp, and run:
 
