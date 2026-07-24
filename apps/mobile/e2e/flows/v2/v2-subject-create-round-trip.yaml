@@ -164,7 +164,7 @@ tags:
       id: 'session-screen'
     timeout: 45000
 - assertVisible:
-    id: 'first-session-greeting'
+    id: 'message-bubble-assistant-0'
     containsDescendants:
       - text: '.*Photosynthesis.*'
 - assertVisible:

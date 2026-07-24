@@ -7436,7 +7436,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       },
       {
         assertVisible: {
-          id: 'first-session-greeting',
+          id: 'message-bubble-assistant-0',
           containsDescendants: [{ text: '.*Photosynthesis.*' }],
         },
       },
@@ -7521,15 +7521,21 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       exactPhotosynthesisSession.filter((_, index) => index !== 1),
       exactPhotosynthesisSession.with(1, {
         assertVisible: {
-          id: 'first-session-greeting',
+          id: 'message-bubble-assistant-0',
           containsDescendants: [{ text: '.*Adjacent Science.*' }],
         },
       }),
       exactPhotosynthesisSession.with(1, {
         assertVisible: {
-          id: 'first-session-greeting',
+          id: 'message-bubble-assistant-0',
           containsDescendants: [{ text: '.*Photosynthesis.*' }],
           optional: true,
+        },
+      }),
+      exactPhotosynthesisSession.with(1, {
+        assertVisible: {
+          id: 'message-bubble-assistant-1',
+          containsDescendants: [{ text: '.*Photosynthesis.*' }],
         },
       }),
       exactPhotosynthesisSession.with(1, {
@@ -9648,7 +9654,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       'assertVisible:id:ready-start',
       'tapOn:id:ready-start',
       'extendedWaitUntil:id:session-screen',
-      'assertVisible:id:first-session-greeting:containsDescendants:text:.*Photosynthesis.*',
+      'assertVisible:id:message-bubble-assistant-0:containsDescendants:text:.*Photosynthesis.*',
       'assertVisible:id:chat-shell-back',
       'tapOn:id:chat-shell-back',
       'extendedWaitUntil:id:subjects-screen',
@@ -9801,7 +9807,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       'assertVisible:text:Starting with Photosynthesis',
       'assertVisible:id:ready-start',
       'extendedWaitUntil:id:session-screen',
-      'assertVisible:id:first-session-greeting:containsDescendants:text:.*Photosynthesis.*',
+      'assertVisible:id:message-bubble-assistant-0:containsDescendants:text:.*Photosynthesis.*',
       'assertVisible:id:chat-shell-back',
       'extendedWaitUntil:id:subjects-screen',
       exactSubjectRowWaitSignature,
