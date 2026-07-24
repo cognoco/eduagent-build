@@ -1,0 +1,3697 @@
+[
+  {
+    "command": {
+      "tapOnElement": {
+        "selector": {
+          "idRegex": "sign-in-password",
+          "optional": false
+        },
+        "retryIfNoChange": false,
+        "waitUntilVisible": false,
+        "longPress": false,
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794425209,
+      "duration": 4497,
+      "sequenceNumber": 32,
+      "evaluatedCommand": {
+        "tapOnElement": {
+          "selector": {
+            "idRegex": "sign-in-password",
+            "optional": false
+          },
+          "retryIfNoChange": false,
+          "waitUntilVisible": false,
+          "longPress": false,
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "tapOnElement": {
+        "selector": {
+          "idRegex": "home-action-homework",
+          "optional": false
+        },
+        "retryIfNoChange": false,
+        "waitUntilVisible": false,
+        "longPress": false,
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794455195,
+      "duration": 2037,
+      "sequenceNumber": 53,
+      "evaluatedCommand": {
+        "tapOnElement": {
+          "selector": {
+            "idRegex": "home-action-homework",
+            "optional": false
+          },
+          "retryIfNoChange": false,
+          "waitUntilVisible": false,
+          "longPress": false,
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "inputTextCommand": {
+        "text": "[REDACTED]",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794429707,
+      "duration": 5428,
+      "sequenceNumber": 33,
+      "evaluatedCommand": {
+        "inputTextCommand": {
+          "text": "[REDACTED]",
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "tapOnElement": {
+        "selector": {
+          "idRegex": "grant-permission-button",
+          "optional": true
+        },
+        "retryIfNoChange": false,
+        "waitUntilVisible": false,
+        "longPress": false,
+        "optional": true
+      }
+    },
+    "metadata": {
+      "status": "WARNED",
+      "timestamp": 1784794457232,
+      "sequenceNumber": 54,
+      "evaluatedCommand": {
+        "tapOnElement": {
+          "selector": {
+            "idRegex": "grant-permission-button",
+            "optional": true
+          },
+          "retryIfNoChange": false,
+          "waitUntilVisible": false,
+          "longPress": false,
+          "optional": true
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "takeScreenshotCommand": {
+        "path": "signin-[REDACTED]2-email-keyboard-open",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794423704,
+      "duration": 205,
+      "sequenceNumber": 30,
+      "evaluatedCommand": {
+        "takeScreenshotCommand": {
+          "path": "signin-[REDACTED]2-email-keyboard-open",
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "takeScreenshotCommand": {
+        "path": "homework-gallery-[REDACTED]5-ocr-outcome",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794494547,
+      "duration": 184,
+      "sequenceNumber": 67,
+      "evaluatedCommand": {
+        "takeScreenshotCommand": {
+          "path": "homework-gallery-[REDACTED]5-ocr-outcome",
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "tapOnElement": {
+        "selector": {
+          "idRegex": "welcome-start-button",
+          "optional": false
+        },
+        "retryIfNoChange": false,
+        "waitUntilVisible": false,
+        "longPress": false,
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794402857,
+      "duration": 2487,
+      "sequenceNumber": 22,
+      "evaluatedCommand": {
+        "tapOnElement": {
+          "selector": {
+            "idRegex": "welcome-start-button",
+            "optional": false
+          },
+          "retryIfNoChange": false,
+          "waitUntilVisible": false,
+          "longPress": false,
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "assertConditionCommand": {
+        "condition": {
+          "visible": {
+            "idRegex": "gallery-button",
+            "optional": false
+          }
+        },
+        "timeout": "[REDACTED]5[REDACTED][REDACTED][REDACTED]",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794467485,
+      "duration": 229,
+      "sequenceNumber": 55,
+      "evaluatedCommand": {
+        "assertConditionCommand": {
+          "condition": {
+            "visible": {
+              "idRegex": "gallery-button",
+              "optional": false
+            }
+          },
+          "timeout": "[REDACTED]5[REDACTED][REDACTED][REDACTED]",
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "assertConditionCommand": {
+        "condition": {
+          "visible": {
+            "idRegex": "dashboard-scroll",
+            "optional": false
+          }
+        },
+        "timeout": "5[REDACTED][REDACTED][REDACTED]",
+        "optional": true
+      }
+    },
+    "metadata": {
+      "status": "WARNED",
+      "timestamp": 1784794446031,
+      "sequenceNumber": 39,
+      "evaluatedCommand": {
+        "assertConditionCommand": {
+          "condition": {
+            "visible": {
+              "idRegex": "dashboard-scroll",
+              "optional": false
+            }
+          },
+          "timeout": "5[REDACTED][REDACTED][REDACTED]",
+          "optional": true
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "hideKeyboardCommand": {
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794435289,
+      "duration": 1571,
+      "sequenceNumber": 35,
+      "evaluatedCommand": {
+        "hideKeyboardCommand": {
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "assertConditionCommand": {
+        "condition": {
+          "visible": {
+            "idRegex": "welcome-start-button",
+            "optional": false
+          }
+        },
+        "timeout": "25[REDACTED][REDACTED]",
+        "optional": true
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794402427,
+      "duration": 169,
+      "sequenceNumber": 20,
+      "evaluatedCommand": {
+        "assertConditionCommand": {
+          "condition": {
+            "visible": {
+              "idRegex": "welcome-start-button",
+              "optional": false
+            }
+          },
+          "timeout": "25[REDACTED][REDACTED]",
+          "optional": true
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "runFlowCommand": {
+        "commands": [
+          {
+            "applyConfigurationCommand": {
+              "config": {
+                "appId": "com.mentomate.app"
+              },
+              "optional": false
+            }
+          },
+          {
+            "tapOnElement": {
+              "selector": {
+                "textRegex": "Allow",
+                "optional": false
+              },
+              "retryIfNoChange": false,
+              "waitUntilVisible": false,
+              "longPress": false,
+              "optional": false
+            }
+          }
+        ],
+        "condition": {
+          "visible": {
+            "textRegex": "send you notifications",
+            "optional": false
+          }
+        },
+        "sourceDescription": "dismiss-notifications.yaml",
+        "config": {
+          "appId": "com.mentomate.app"
+        },
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "SKIPPED",
+      "timestamp": 1784794454185,
+      "sequenceNumber": 50,
+      "evaluatedCommand": {
+        "runFlowCommand": {
+          "commands": [
+            {
+              "applyConfigurationCommand": {
+                "config": {
+                  "appId": "com.mentomate.app"
+                },
+                "optional": false
+              }
+            },
+            {
+              "tapOnElement": {
+                "selector": {
+                  "textRegex": "Allow",
+                  "optional": false
+                },
+                "retryIfNoChange": false,
+                "waitUntilVisible": false,
+                "longPress": false,
+                "optional": false
+              }
+            }
+          ],
+          "condition": {
+            "visible": {
+              "textRegex": "send you notifications",
+              "optional": false
+            }
+          },
+          "sourceDescription": "dismiss-notifications.yaml",
+          "config": {
+            "appId": "com.mentomate.app"
+          },
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "assertConditionCommand": {
+        "condition": {
+          "visible": {
+            "idRegex": "welcome-chooser",
+            "optional": false
+          }
+        },
+        "timeout": "[REDACTED]2[REDACTED][REDACTED][REDACTED][REDACTED]",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794380158,
+      "duration": 306,
+      "sequenceNumber": 7,
+      "evaluatedCommand": {
+        "assertConditionCommand": {
+          "condition": {
+            "visible": {
+              "idRegex": "welcome-chooser",
+              "optional": false
+            }
+          },
+          "timeout": "[REDACTED]2[REDACTED][REDACTED][REDACTED][REDACTED]",
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "assertConditionCommand": {
+        "condition": {
+          "visible": {
+            "idRegex": "sign-in-button",
+            "optional": false
+          }
+        },
+        "timeout": "[REDACTED]2[REDACTED][REDACTED][REDACTED][REDACTED]",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794409164,
+      "duration": 220,
+      "sequenceNumber": 26,
+      "evaluatedCommand": {
+        "assertConditionCommand": {
+          "condition": {
+            "visible": {
+              "idRegex": "sign-in-button",
+              "optional": false
+            }
+          },
+          "timeout": "[REDACTED]2[REDACTED][REDACTED][REDACTED][REDACTED]",
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "assertConditionCommand": {
+        "condition": {
+          "visible": {
+            "idRegex": "com(?:\\.google)?\\.android\\.providers\\.media\\.module:id/icon_thumbnail",
+            "optional": false
+          }
+        },
+        "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794474831,
+      "duration": 489,
+      "sequenceNumber": 58,
+      "evaluatedCommand": {
+        "assertConditionCommand": {
+          "condition": {
+            "visible": {
+              "idRegex": "com(?:\\.google)?\\.android\\.providers\\.media\\.module:id/icon_thumbnail",
+              "optional": false
+            }
+          },
+          "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "tapOnElement": {
+        "selector": {
+          "idRegex": "pre-auth-bridge-secondary",
+          "optional": false
+        },
+        "retryIfNoChange": false,
+        "waitUntilVisible": false,
+        "longPress": false,
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794405520,
+      "duration": 3437,
+      "sequenceNumber": 24,
+      "evaluatedCommand": {
+        "tapOnElement": {
+          "selector": {
+            "idRegex": "pre-auth-bridge-secondary",
+            "optional": false
+          },
+          "retryIfNoChange": false,
+          "waitUntilVisible": false,
+          "longPress": false,
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "assertConditionCommand": {
+        "condition": {
+          "visible": {
+            "idRegex": "parent-home-screen",
+            "optional": false
+          }
+        },
+        "timeout": "5[REDACTED][REDACTED][REDACTED]",
+        "optional": true
+      }
+    },
+    "metadata": {
+      "status": "WARNED",
+      "timestamp": 1784794447872,
+      "sequenceNumber": 40,
+      "evaluatedCommand": {
+        "assertConditionCommand": {
+          "condition": {
+            "visible": {
+              "idRegex": "parent-home-screen",
+              "optional": false
+            }
+          },
+          "timeout": "5[REDACTED][REDACTED][REDACTED]",
+          "optional": true
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "runFlowCommand": {
+        "commands": [
+          {
+            "defineVariablesCommand": {
+              "env": {
+                "SEED_SCENARIO": "[REDACTED]",
+                "API_URL": "[REDACTED]"
+              },
+              "optional": false
+            }
+          },
+          {
+            "applyConfigurationCommand": {
+              "config": {
+                "appId": "com.mentomate.app"
+              },
+              "optional": false
+            }
+          },
+          {
+            "runFlowCommand": {
+              "commands": [
+                {
+                  "applyConfigurationCommand": {
+                    "config": {
+                      "appId": "com.mentomate.app"
+                    },
+                    "optional": false
+                  }
+                },
+                {
+                  "assertConditionCommand": {
+                    "condition": {
+                      "visible": {
+                        "idRegex": "welcome-chooser",
+                        "optional": false
+                      }
+                    },
+                    "timeout": "[REDACTED]2[REDACTED][REDACTED][REDACTED][REDACTED]",
+                    "optional": false
+                  }
+                },
+                {
+                  "tapOnElement": {
+                    "selector": {
+                      "idRegex": "welcome-chooser-learner",
+                      "optional": false
+                    },
+                    "retryIfNoChange": false,
+                    "waitUntilVisible": false,
+                    "longPress": false,
+                    "optional": false
+                  }
+                },
+                {
+                  "assertConditionCommand": {
+                    "condition": {
+                      "visible": {
+                        "idRegex": "welcome-card-[REDACTED]",
+                        "optional": false
+                      }
+                    },
+                    "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+                    "optional": false
+                  }
+                },
+                {
+                  "repeatCommand": {
+                    "times": "5",
+                    "commands": [
+                      {
+                        "tapOnElement": {
+                          "selector": {
+                            "idRegex": "welcome-next-button",
+                            "optional": true
+                          },
+                          "retryIfNoChange": false,
+                          "waitUntilVisible": false,
+                          "longPress": false,
+                          "optional": true
+                        }
+                      },
+                      {
+                        "assertConditionCommand": {
+                          "condition": {
+                            "visible": {
+                              "idRegex": "welcome-start-button",
+                              "optional": false
+                            }
+                          },
+                          "timeout": "25[REDACTED][REDACTED]",
+                          "optional": true
+                        }
+                      }
+                    ],
+                    "optional": false
+                  }
+                },
+                {
+                  "assertConditionCommand": {
+                    "condition": {
+                      "visible": {
+                        "idRegex": "welcome-start-button",
+                        "optional": false
+                      }
+                    },
+                    "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+                    "optional": false
+                  }
+                },
+                {
+                  "tapOnElement": {
+                    "selector": {
+                      "idRegex": "welcome-start-button",
+                      "optional": false
+                    },
+                    "retryIfNoChange": false,
+                    "waitUntilVisible": false,
+                    "longPress": false,
+                    "optional": false
+                  }
+                },
+                {
+                  "assertConditionCommand": {
+                    "condition": {
+                      "visible": {
+                        "idRegex": "pre-auth-bridge",
+                        "optional": false
+                      }
+                    },
+                    "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+                    "optional": false
+                  }
+                },
+                {
+                  "tapOnElement": {
+                    "selector": {
+                      "idRegex": "pre-auth-bridge-secondary",
+                      "optional": false
+                    },
+                    "retryIfNoChange": false,
+                    "waitUntilVisible": false,
+                    "longPress": false,
+                    "optional": false
+                  }
+                },
+                {
+                  "assertConditionCommand": {
+                    "condition": {
+                      "visible": {
+                        "idRegex": "sign-in-button",
+                        "optional": false
+                      }
+                    },
+                    "timeout": "3[REDACTED][REDACTED][REDACTED][REDACTED]",
+                    "optional": false
+                  }
+                }
+              ],
+              "sourceDescription": "nav-welcome-to-sign-in.yaml",
+              "config": {
+                "appId": "com.mentomate.app"
+              },
+              "optional": false
+            }
+          },
+          {
+            "assertConditionCommand": {
+              "condition": {
+                "visible": {
+                  "idRegex": "sign-in-button",
+                  "optional": false
+                }
+              },
+              "timeout": "[REDACTED]2[REDACTED][REDACTED][REDACTED][REDACTED]",
+              "optional": false
+            }
+          },
+          {
+            "takeScreenshotCommand": {
+              "path": "signin-[REDACTED][REDACTED]-screen-loaded",
+              "optional": false
+            }
+          },
+          {
+            "tapOnElement": {
+              "selector": {
+                "idRegex": "sign-in-email",
+                "optional": false
+              },
+              "retryIfNoChange": false,
+              "waitUntilVisible": false,
+              "longPress": false,
+              "optional": false
+            }
+          },
+          {
+            "inputTextCommand": {
+              "text": "[REDACTED]",
+              "optional": false
+            }
+          },
+          {
+            "takeScreenshotCommand": {
+              "path": "signin-[REDACTED]2-email-keyboard-open",
+              "optional": false
+            }
+          },
+          {
+            "hideKeyboardCommand": {
+              "optional": false
+            }
+          },
+          {
+            "tapOnElement": {
+              "selector": {
+                "idRegex": "sign-in-password",
+                "optional": false
+              },
+              "retryIfNoChange": false,
+              "waitUntilVisible": false,
+              "longPress": false,
+              "optional": false
+            }
+          },
+          {
+            "inputTextCommand": {
+              "text": "[REDACTED]",
+              "optional": false
+            }
+          },
+          {
+            "takeScreenshotCommand": {
+              "path": "signin-[REDACTED]3-password-keyboard-open",
+              "optional": false
+            }
+          },
+          {
+            "hideKeyboardCommand": {
+              "optional": false
+            }
+          },
+          {
+            "assertConditionCommand": {
+              "condition": {
+                "visible": {
+                  "idRegex": "sign-in-button",
+                  "optional": false
+                }
+              },
+              "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+              "optional": false
+            }
+          },
+          {
+            "tapOnElement": {
+              "selector": {
+                "idRegex": "sign-in-button",
+                "optional": false
+              },
+              "retryIfNoChange": false,
+              "waitUntilVisible": false,
+              "longPress": false,
+              "optional": false
+            }
+          },
+          {
+            "assertConditionCommand": {
+              "condition": {
+                "visible": {
+                  "idRegex": "learner-screen",
+                  "optional": false
+                }
+              },
+              "timeout": "3[REDACTED][REDACTED][REDACTED][REDACTED]",
+              "optional": true
+            }
+          },
+          {
+            "assertConditionCommand": {
+              "condition": {
+                "visible": {
+                  "idRegex": "dashboard-scroll",
+                  "optional": false
+                }
+              },
+              "timeout": "5[REDACTED][REDACTED][REDACTED]",
+              "optional": true
+            }
+          },
+          {
+            "assertConditionCommand": {
+              "condition": {
+                "visible": {
+                  "idRegex": "parent-home-screen",
+                  "optional": false
+                }
+              },
+              "timeout": "5[REDACTED][REDACTED][REDACTED]",
+              "optional": true
+            }
+          },
+          {
+            "runFlowCommand": {
+              "commands": [
+                {
+                  "applyConfigurationCommand": {
+                    "config": {
+                      "appId": "com.mentomate.app"
+                    },
+                    "optional": false
+                  }
+                },
+                {
+                  "tapOnElement": {
+                    "selector": {
+                      "idRegex": "post-approval-continue",
+                      "optional": false
+                    },
+                    "retryIfNoChange": false,
+                    "waitUntilVisible": false,
+                    "longPress": false,
+                    "optional": false
+                  }
+                },
+                {
+                  "assertConditionCommand": {
+                    "condition": {
+                      "visible": {
+                        "idRegex": "learner-screen",
+                        "optional": false
+                      }
+                    },
+                    "timeout": "[REDACTED]5[REDACTED][REDACTED][REDACTED]",
+                    "optional": true
+                  }
+                }
+              ],
+              "condition": {
+                "visible": {
+                  "textRegex": "You're approved!",
+                  "optional": false
+                }
+              },
+              "sourceDescription": "dismiss-post-approval.yaml",
+              "config": {
+                "appId": "com.mentomate.app"
+              },
+              "optional": false
+            }
+          },
+          {
+            "tapOnElement": {
+              "selector": {
+                "textRegex": "Skip for now",
+                "optional": true
+              },
+              "retryIfNoChange": false,
+              "waitUntilVisible": false,
+              "longPress": false,
+              "optional": true
+            }
+          },
+          {
+            "assertConditionCommand": {
+              "condition": {
+                "notVisible": {
+                  "idRegex": "profile-load-error",
+                  "optional": false
+                }
+              },
+              "optional": false
+            }
+          },
+          {
+            "runFlowCommand": {
+              "commands": [
+                {
+                  "applyConfigurationCommand": {
+                    "config": {
+                      "appId": "com.mentomate.app"
+                    },
+                    "optional": false
+                  }
+                },
+                {
+                  "runFlowCommand": {
+                    "commands": [
+                      {
+                        "runFlowCommand": {
+                          "commands": [
+                            {
+                              "runFlowCommand": {
+                                "commands": [
+                                  {
+                                    "applyConfigurationCommand": {
+                                      "config": {
+                                        "appId": "com.mentomate.app"
+                                      },
+                                      "optional": false
+                                    }
+                                  },
+                                  {
+                                    "runFlowCommand": {
+                                      "commands": [
+                                        {
+                                          "applyConfigurationCommand": {
+                                            "config": {
+                                              "appId": "com.mentomate.app"
+                                            },
+                                            "optional": false
+                                          }
+                                        },
+                                        {
+                                          "runFlowCommand": {
+                                            "commands": [
+                                              {
+                                                "applyConfigurationCommand": {
+                                                  "config": {
+                                                    "appId": "com.mentomate.app"
+                                                  },
+                                                  "optional": false
+                                                }
+                                              },
+                                              {
+                                                "pressKeyCommand": {
+                                                  "code": "BACK",
+                                                  "optional": false
+                                                }
+                                              },
+                                              {
+                                                "assertConditionCommand": {
+                                                  "condition": {
+                                                    "visible": {
+                                                      "idRegex": "learner-screen",
+                                                      "optional": false
+                                                    }
+                                                  },
+                                                  "timeout": "[REDACTED]5[REDACTED][REDACTED][REDACTED]",
+                                                  "optional": true
+                                                }
+                                              },
+                                              {
+                                                "assertConditionCommand": {
+                                                  "condition": {
+                                                    "visible": {
+                                                      "idRegex": "parent-home-screen",
+                                                      "optional": false
+                                                    }
+                                                  },
+                                                  "timeout": "5[REDACTED][REDACTED][REDACTED]",
+                                                  "optional": true
+                                                }
+                                              }
+                                            ],
+                                            "condition": {
+                                              "notVisible": {
+                                                "idRegex": "learner-screen",
+                                                "optional": false
+                                              }
+                                            },
+                                            "sourceDescription": "return-to-home.yaml",
+                                            "config": {
+                                              "appId": "com.mentomate.app"
+                                            },
+                                            "optional": false
+                                          }
+                                        }
+                                      ],
+                                      "condition": {
+                                        "notVisible": {
+                                          "idRegex": "parent-home-screen",
+                                          "optional": false
+                                        }
+                                      },
+                                      "sourceDescription": "return-to-home-check-gateway.yaml",
+                                      "config": {
+                                        "appId": "com.mentomate.app"
+                                      },
+                                      "optional": false
+                                    }
+                                  }
+                                ],
+                                "condition": {
+                                  "notVisible": {
+                                    "idRegex": "dashboard-scroll",
+                                    "optional": false
+                                  }
+                                },
+                                "sourceDescription": "return-to-home-check-parent-home.yaml",
+                                "config": {
+                                  "appId": "com.mentomate.app"
+                                },
+                                "optional": false
+                              }
+                            }
+                          ],
+                          "condition": {
+                            "notVisible": {
+                              "idRegex": "support-hub-mentor-tab",
+                              "optional": false
+                            }
+                          },
+                          "optional": false
+                        }
+                      }
+                    ],
+                    "condition": {
+                      "notVisible": {
+                        "idRegex": "mentor-screen",
+                        "optional": false
+                      }
+                    },
+                    "optional": false
+                  }
+                }
+              ],
+              "condition": {
+                "notVisible": {
+                  "idRegex": "learner-screen",
+                  "optional": false
+                }
+              },
+              "sourceDescription": "return-to-home-safe.yaml",
+              "config": {
+                "appId": "com.mentomate.app"
+              },
+              "optional": false
+            }
+          },
+          {
+            "assertConditionCommand": {
+              "condition": {
+                "visible": {
+                  "idRegex": "learner-screen",
+                  "optional": false
+                }
+              },
+              "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+              "optional": true
+            }
+          },
+          {
+            "assertConditionCommand": {
+              "condition": {
+                "visible": {
+                  "idRegex": "parent-home-screen",
+                  "optional": false
+                }
+              },
+              "timeout": "5[REDACTED][REDACTED][REDACTED]",
+              "optional": true
+            }
+          },
+          {
+            "assertConditionCommand": {
+              "condition": {
+                "visible": {
+                  "idRegex": "mentor-screen",
+                  "optional": false
+                }
+              },
+              "timeout": "5[REDACTED][REDACTED][REDACTED]",
+              "optional": true
+            }
+          },
+          {
+            "assertConditionCommand": {
+              "condition": {
+                "visible": {
+                  "idRegex": "support-hub-mentor-tab",
+                  "optional": false
+                }
+              },
+              "timeout": "5[REDACTED][REDACTED][REDACTED]",
+              "optional": true
+            }
+          },
+          {
+            "takeScreenshotCommand": {
+              "path": "signin-[REDACTED]4-home-reached",
+              "optional": false
+            }
+          },
+          {
+            "runFlowCommand": {
+              "commands": [
+                {
+                  "applyConfigurationCommand": {
+                    "config": {
+                      "appId": "com.mentomate.app"
+                    },
+                    "optional": false
+                  }
+                },
+                {
+                  "tapOnElement": {
+                    "selector": {
+                      "textRegex": "Allow",
+                      "optional": false
+                    },
+                    "retryIfNoChange": false,
+                    "waitUntilVisible": false,
+                    "longPress": false,
+                    "optional": false
+                  }
+                }
+              ],
+              "condition": {
+                "visible": {
+                  "textRegex": "send you notifications",
+                  "optional": false
+                }
+              },
+              "sourceDescription": "dismiss-notifications.yaml",
+              "config": {
+                "appId": "com.mentomate.app"
+              },
+              "optional": false
+            }
+          }
+        ],
+        "sourceDescription": "../_setup/seed-and-sign-in.yaml",
+        "config": {
+          "appId": "com.mentomate.app"
+        },
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794378820,
+      "duration": 75878,
+      "sequenceNumber": 2,
+      "evaluatedCommand": {
+        "runFlowCommand": {
+          "commands": [
+            {
+              "defineVariablesCommand": {
+                "env": {
+                  "SEED_SCENARIO": "[REDACTED]",
+                  "API_URL": "[REDACTED]"
+                },
+                "optional": false
+              }
+            },
+            {
+              "applyConfigurationCommand": {
+                "config": {
+                  "appId": "com.mentomate.app"
+                },
+                "optional": false
+              }
+            },
+            {
+              "runFlowCommand": {
+                "commands": [
+                  {
+                    "applyConfigurationCommand": {
+                      "config": {
+                        "appId": "com.mentomate.app"
+                      },
+                      "optional": false
+                    }
+                  },
+                  {
+                    "assertConditionCommand": {
+                      "condition": {
+                        "visible": {
+                          "idRegex": "welcome-chooser",
+                          "optional": false
+                        }
+                      },
+                      "timeout": "[REDACTED]2[REDACTED][REDACTED][REDACTED][REDACTED]",
+                      "optional": false
+                    }
+                  },
+                  {
+                    "tapOnElement": {
+                      "selector": {
+                        "idRegex": "welcome-chooser-learner",
+                        "optional": false
+                      },
+                      "retryIfNoChange": false,
+                      "waitUntilVisible": false,
+                      "longPress": false,
+                      "optional": false
+                    }
+                  },
+                  {
+                    "assertConditionCommand": {
+                      "condition": {
+                        "visible": {
+                          "idRegex": "welcome-card-[REDACTED]",
+                          "optional": false
+                        }
+                      },
+                      "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+                      "optional": false
+                    }
+                  },
+                  {
+                    "repeatCommand": {
+                      "times": "5",
+                      "commands": [
+                        {
+                          "tapOnElement": {
+                            "selector": {
+                              "idRegex": "welcome-next-button",
+                              "optional": true
+                            },
+                            "retryIfNoChange": false,
+                            "waitUntilVisible": false,
+                            "longPress": false,
+                            "optional": true
+                          }
+                        },
+                        {
+                          "assertConditionCommand": {
+                            "condition": {
+                              "visible": {
+                                "idRegex": "welcome-start-button",
+                                "optional": false
+                              }
+                            },
+                            "timeout": "25[REDACTED][REDACTED]",
+                            "optional": true
+                          }
+                        }
+                      ],
+                      "optional": false
+                    }
+                  },
+                  {
+                    "assertConditionCommand": {
+                      "condition": {
+                        "visible": {
+                          "idRegex": "welcome-start-button",
+                          "optional": false
+                        }
+                      },
+                      "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+                      "optional": false
+                    }
+                  },
+                  {
+                    "tapOnElement": {
+                      "selector": {
+                        "idRegex": "welcome-start-button",
+                        "optional": false
+                      },
+                      "retryIfNoChange": false,
+                      "waitUntilVisible": false,
+                      "longPress": false,
+                      "optional": false
+                    }
+                  },
+                  {
+                    "assertConditionCommand": {
+                      "condition": {
+                        "visible": {
+                          "idRegex": "pre-auth-bridge",
+                          "optional": false
+                        }
+                      },
+                      "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+                      "optional": false
+                    }
+                  },
+                  {
+                    "tapOnElement": {
+                      "selector": {
+                        "idRegex": "pre-auth-bridge-secondary",
+                        "optional": false
+                      },
+                      "retryIfNoChange": false,
+                      "waitUntilVisible": false,
+                      "longPress": false,
+                      "optional": false
+                    }
+                  },
+                  {
+                    "assertConditionCommand": {
+                      "condition": {
+                        "visible": {
+                          "idRegex": "sign-in-button",
+                          "optional": false
+                        }
+                      },
+                      "timeout": "3[REDACTED][REDACTED][REDACTED][REDACTED]",
+                      "optional": false
+                    }
+                  }
+                ],
+                "sourceDescription": "nav-welcome-to-sign-in.yaml",
+                "config": {
+                  "appId": "com.mentomate.app"
+                },
+                "optional": false
+              }
+            },
+            {
+              "assertConditionCommand": {
+                "condition": {
+                  "visible": {
+                    "idRegex": "sign-in-button",
+                    "optional": false
+                  }
+                },
+                "timeout": "[REDACTED]2[REDACTED][REDACTED][REDACTED][REDACTED]",
+                "optional": false
+              }
+            },
+            {
+              "takeScreenshotCommand": {
+                "path": "signin-[REDACTED][REDACTED]-screen-loaded",
+                "optional": false
+              }
+            },
+            {
+              "tapOnElement": {
+                "selector": {
+                  "idRegex": "sign-in-email",
+                  "optional": false
+                },
+                "retryIfNoChange": false,
+                "waitUntilVisible": false,
+                "longPress": false,
+                "optional": false
+              }
+            },
+            {
+              "inputTextCommand": {
+                "text": "[REDACTED]",
+                "optional": false
+              }
+            },
+            {
+              "takeScreenshotCommand": {
+                "path": "signin-[REDACTED]2-email-keyboard-open",
+                "optional": false
+              }
+            },
+            {
+              "hideKeyboardCommand": {
+                "optional": false
+              }
+            },
+            {
+              "tapOnElement": {
+                "selector": {
+                  "idRegex": "sign-in-password",
+                  "optional": false
+                },
+                "retryIfNoChange": false,
+                "waitUntilVisible": false,
+                "longPress": false,
+                "optional": false
+              }
+            },
+            {
+              "inputTextCommand": {
+                "text": "[REDACTED]",
+                "optional": false
+              }
+            },
+            {
+              "takeScreenshotCommand": {
+                "path": "signin-[REDACTED]3-password-keyboard-open",
+                "optional": false
+              }
+            },
+            {
+              "hideKeyboardCommand": {
+                "optional": false
+              }
+            },
+            {
+              "assertConditionCommand": {
+                "condition": {
+                  "visible": {
+                    "idRegex": "sign-in-button",
+                    "optional": false
+                  }
+                },
+                "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+                "optional": false
+              }
+            },
+            {
+              "tapOnElement": {
+                "selector": {
+                  "idRegex": "sign-in-button",
+                  "optional": false
+                },
+                "retryIfNoChange": false,
+                "waitUntilVisible": false,
+                "longPress": false,
+                "optional": false
+              }
+            },
+            {
+              "assertConditionCommand": {
+                "condition": {
+                  "visible": {
+                    "idRegex": "learner-screen",
+                    "optional": false
+                  }
+                },
+                "timeout": "3[REDACTED][REDACTED][REDACTED][REDACTED]",
+                "optional": true
+              }
+            },
+            {
+              "assertConditionCommand": {
+                "condition": {
+                  "visible": {
+                    "idRegex": "dashboard-scroll",
+                    "optional": false
+                  }
+                },
+                "timeout": "5[REDACTED][REDACTED][REDACTED]",
+                "optional": true
+              }
+            },
+            {
+              "assertConditionCommand": {
+                "condition": {
+                  "visible": {
+                    "idRegex": "parent-home-screen",
+                    "optional": false
+                  }
+                },
+                "timeout": "5[REDACTED][REDACTED][REDACTED]",
+                "optional": true
+              }
+            },
+            {
+              "runFlowCommand": {
+                "commands": [
+                  {
+                    "applyConfigurationCommand": {
+                      "config": {
+                        "appId": "com.mentomate.app"
+                      },
+                      "optional": false
+                    }
+                  },
+                  {
+                    "tapOnElement": {
+                      "selector": {
+                        "idRegex": "post-approval-continue",
+                        "optional": false
+                      },
+                      "retryIfNoChange": false,
+                      "waitUntilVisible": false,
+                      "longPress": false,
+                      "optional": false
+                    }
+                  },
+                  {
+                    "assertConditionCommand": {
+                      "condition": {
+                        "visible": {
+                          "idRegex": "learner-screen",
+                          "optional": false
+                        }
+                      },
+                      "timeout": "[REDACTED]5[REDACTED][REDACTED][REDACTED]",
+                      "optional": true
+                    }
+                  }
+                ],
+                "condition": {
+                  "visible": {
+                    "textRegex": "You're approved!",
+                    "optional": false
+                  }
+                },
+                "sourceDescription": "dismiss-post-approval.yaml",
+                "config": {
+                  "appId": "com.mentomate.app"
+                },
+                "optional": false
+              }
+            },
+            {
+              "tapOnElement": {
+                "selector": {
+                  "textRegex": "Skip for now",
+                  "optional": true
+                },
+                "retryIfNoChange": false,
+                "waitUntilVisible": false,
+                "longPress": false,
+                "optional": true
+              }
+            },
+            {
+              "assertConditionCommand": {
+                "condition": {
+                  "notVisible": {
+                    "idRegex": "profile-load-error",
+                    "optional": false
+                  }
+                },
+                "optional": false
+              }
+            },
+            {
+              "runFlowCommand": {
+                "commands": [
+                  {
+                    "applyConfigurationCommand": {
+                      "config": {
+                        "appId": "com.mentomate.app"
+                      },
+                      "optional": false
+                    }
+                  },
+                  {
+                    "runFlowCommand": {
+                      "commands": [
+                        {
+                          "runFlowCommand": {
+                            "commands": [
+                              {
+                                "runFlowCommand": {
+                                  "commands": [
+                                    {
+                                      "applyConfigurationCommand": {
+                                        "config": {
+                                          "appId": "com.mentomate.app"
+                                        },
+                                        "optional": false
+                                      }
+                                    },
+                                    {
+                                      "runFlowCommand": {
+                                        "commands": [
+                                          {
+                                            "applyConfigurationCommand": {
+                                              "config": {
+                                                "appId": "com.mentomate.app"
+                                              },
+                                              "optional": false
+                                            }
+                                          },
+                                          {
+                                            "runFlowCommand": {
+                                              "commands": [
+                                                {
+                                                  "applyConfigurationCommand": {
+                                                    "config": {
+                                                      "appId": "com.mentomate.app"
+                                                    },
+                                                    "optional": false
+                                                  }
+                                                },
+                                                {
+                                                  "pressKeyCommand": {
+                                                    "code": "BACK",
+                                                    "optional": false
+                                                  }
+                                                },
+                                                {
+                                                  "assertConditionCommand": {
+                                                    "condition": {
+                                                      "visible": {
+                                                        "idRegex": "learner-screen",
+                                                        "optional": false
+                                                      }
+                                                    },
+                                                    "timeout": "[REDACTED]5[REDACTED][REDACTED][REDACTED]",
+                                                    "optional": true
+                                                  }
+                                                },
+                                                {
+                                                  "assertConditionCommand": {
+                                                    "condition": {
+                                                      "visible": {
+                                                        "idRegex": "parent-home-screen",
+                                                        "optional": false
+                                                      }
+                                                    },
+                                                    "timeout": "5[REDACTED][REDACTED][REDACTED]",
+                                                    "optional": true
+                                                  }
+                                                }
+                                              ],
+                                              "condition": {
+                                                "notVisible": {
+                                                  "idRegex": "learner-screen",
+                                                  "optional": false
+                                                }
+                                              },
+                                              "sourceDescription": "return-to-home.yaml",
+                                              "config": {
+                                                "appId": "com.mentomate.app"
+                                              },
+                                              "optional": false
+                                            }
+                                          }
+                                        ],
+                                        "condition": {
+                                          "notVisible": {
+                                            "idRegex": "parent-home-screen",
+                                            "optional": false
+                                          }
+                                        },
+                                        "sourceDescription": "return-to-home-check-gateway.yaml",
+                                        "config": {
+                                          "appId": "com.mentomate.app"
+                                        },
+                                        "optional": false
+                                      }
+                                    }
+                                  ],
+                                  "condition": {
+                                    "notVisible": {
+                                      "idRegex": "dashboard-scroll",
+                                      "optional": false
+                                    }
+                                  },
+                                  "sourceDescription": "return-to-home-check-parent-home.yaml",
+                                  "config": {
+                                    "appId": "com.mentomate.app"
+                                  },
+                                  "optional": false
+                                }
+                              }
+                            ],
+                            "condition": {
+                              "notVisible": {
+                                "idRegex": "support-hub-mentor-tab",
+                                "optional": false
+                              }
+                            },
+                            "optional": false
+                          }
+                        }
+                      ],
+                      "condition": {
+                        "notVisible": {
+                          "idRegex": "mentor-screen",
+                          "optional": false
+                        }
+                      },
+                      "optional": false
+                    }
+                  }
+                ],
+                "condition": {
+                  "notVisible": {
+                    "idRegex": "learner-screen",
+                    "optional": false
+                  }
+                },
+                "sourceDescription": "return-to-home-safe.yaml",
+                "config": {
+                  "appId": "com.mentomate.app"
+                },
+                "optional": false
+              }
+            },
+            {
+              "assertConditionCommand": {
+                "condition": {
+                  "visible": {
+                    "idRegex": "learner-screen",
+                    "optional": false
+                  }
+                },
+                "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+                "optional": true
+              }
+            },
+            {
+              "assertConditionCommand": {
+                "condition": {
+                  "visible": {
+                    "idRegex": "parent-home-screen",
+                    "optional": false
+                  }
+                },
+                "timeout": "5[REDACTED][REDACTED][REDACTED]",
+                "optional": true
+              }
+            },
+            {
+              "assertConditionCommand": {
+                "condition": {
+                  "visible": {
+                    "idRegex": "mentor-screen",
+                    "optional": false
+                  }
+                },
+                "timeout": "5[REDACTED][REDACTED][REDACTED]",
+                "optional": true
+              }
+            },
+            {
+              "assertConditionCommand": {
+                "condition": {
+                  "visible": {
+                    "idRegex": "support-hub-mentor-tab",
+                    "optional": false
+                  }
+                },
+                "timeout": "5[REDACTED][REDACTED][REDACTED]",
+                "optional": true
+              }
+            },
+            {
+              "takeScreenshotCommand": {
+                "path": "signin-[REDACTED]4-home-reached",
+                "optional": false
+              }
+            },
+            {
+              "runFlowCommand": {
+                "commands": [
+                  {
+                    "applyConfigurationCommand": {
+                      "config": {
+                        "appId": "com.mentomate.app"
+                      },
+                      "optional": false
+                    }
+                  },
+                  {
+                    "tapOnElement": {
+                      "selector": {
+                        "textRegex": "Allow",
+                        "optional": false
+                      },
+                      "retryIfNoChange": false,
+                      "waitUntilVisible": false,
+                      "longPress": false,
+                      "optional": false
+                    }
+                  }
+                ],
+                "condition": {
+                  "visible": {
+                    "textRegex": "send you notifications",
+                    "optional": false
+                  }
+                },
+                "sourceDescription": "dismiss-notifications.yaml",
+                "config": {
+                  "appId": "com.mentomate.app"
+                },
+                "optional": false
+              }
+            }
+          ],
+          "sourceDescription": "../_setup/seed-and-sign-in.yaml",
+          "config": {
+            "appId": "com.mentomate.app"
+          },
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "assertConditionCommand": {
+        "condition": {
+          "visible": {
+            "idRegex": "learner-screen",
+            "optional": false
+          }
+        },
+        "timeout": "3[REDACTED][REDACTED][REDACTED][REDACTED]",
+        "optional": true
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794439675,
+      "duration": 6356,
+      "sequenceNumber": 38,
+      "evaluatedCommand": {
+        "assertConditionCommand": {
+          "condition": {
+            "visible": {
+              "idRegex": "learner-screen",
+              "optional": false
+            }
+          },
+          "timeout": "3[REDACTED][REDACTED][REDACTED][REDACTED]",
+          "optional": true
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "assertConditionCommand": {
+        "condition": {
+          "visible": {
+            "idRegex": "parent-home-screen",
+            "optional": false
+          }
+        },
+        "timeout": "5[REDACTED][REDACTED][REDACTED]",
+        "optional": true
+      }
+    },
+    "metadata": {
+      "status": "WARNED",
+      "timestamp": 1784794451205,
+      "sequenceNumber": 46,
+      "evaluatedCommand": {
+        "assertConditionCommand": {
+          "condition": {
+            "visible": {
+              "idRegex": "parent-home-screen",
+              "optional": false
+            }
+          },
+          "timeout": "5[REDACTED][REDACTED][REDACTED]",
+          "optional": true
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "assertConditionCommand": {
+        "condition": {
+          "visible": {
+            "idRegex": "pre-auth-bridge",
+            "optional": false
+          }
+        },
+        "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794405345,
+      "duration": 174,
+      "sequenceNumber": 23,
+      "evaluatedCommand": {
+        "assertConditionCommand": {
+          "condition": {
+            "visible": {
+              "idRegex": "pre-auth-bridge",
+              "optional": false
+            }
+          },
+          "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "tapOnElement": {
+        "selector": {
+          "idRegex": "sign-in-email",
+          "optional": false
+        },
+        "retryIfNoChange": false,
+        "waitUntilVisible": false,
+        "longPress": false,
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794413350,
+      "duration": 3484,
+      "sequenceNumber": 28,
+      "evaluatedCommand": {
+        "tapOnElement": {
+          "selector": {
+            "idRegex": "sign-in-email",
+            "optional": false
+          },
+          "retryIfNoChange": false,
+          "waitUntilVisible": false,
+          "longPress": false,
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "tapOnElement": {
+        "selector": {
+          "idRegex": "camera-use-this-button",
+          "optional": false
+        },
+        "retryIfNoChange": false,
+        "waitUntilVisible": false,
+        "longPress": false,
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794479849,
+      "duration": 2581,
+      "sequenceNumber": 63,
+      "evaluatedCommand": {
+        "tapOnElement": {
+          "selector": {
+            "idRegex": "camera-use-this-button",
+            "optional": false
+          },
+          "retryIfNoChange": false,
+          "waitUntilVisible": false,
+          "longPress": false,
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "defineVariablesCommand": {
+        "env": {
+          "SCENARIO": "[REDACTED]",
+          "API_URL": "[REDACTED]",
+          "EMAIL": "[REDACTED]",
+          "PASSWORD": "[REDACTED]",
+          "ACCOUNT_ID": "[REDACTED]",
+          "PROFILE_ID": "[REDACTED]",
+          "SUBJECT_ID": "[REDACTED]",
+          "SESSION_ID": "[REDACTED]",
+          "TOPIC_ID": "[REDACTED]",
+          "MAESTRO_PATH": "[REDACTED]",
+          "MAESTRO_FILENAME": "[REDACTED]",
+          "MAESTRO_DEVICE_UDID": "[REDACTED]",
+          "MAESTRO_SHARD_ID": "[REDACTED]",
+          "MAESTRO_SHARD_INDEX": "[REDACTED]"
+        },
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794378794,
+      "duration": 14,
+      "sequenceNumber": 0,
+      "evaluatedCommand": {
+        "defineVariablesCommand": {
+          "env": {
+            "SCENARIO": "[REDACTED]",
+            "API_URL": "[REDACTED]",
+            "EMAIL": "[REDACTED]",
+            "PASSWORD": "[REDACTED]",
+            "ACCOUNT_ID": "[REDACTED]",
+            "PROFILE_ID": "[REDACTED]",
+            "SUBJECT_ID": "[REDACTED]",
+            "SESSION_ID": "[REDACTED]",
+            "TOPIC_ID": "[REDACTED]",
+            "MAESTRO_PATH": "[REDACTED]",
+            "MAESTRO_FILENAME": "[REDACTED]",
+            "MAESTRO_DEVICE_UDID": "[REDACTED]",
+            "MAESTRO_SHARD_ID": "[REDACTED]",
+            "MAESTRO_SHARD_INDEX": "[REDACTED]"
+          },
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "tapOnElement": {
+        "selector": {
+          "idRegex": "welcome-chooser-learner",
+          "optional": false
+        },
+        "retryIfNoChange": false,
+        "waitUntilVisible": false,
+        "longPress": false,
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794380465,
+      "duration": 3760,
+      "sequenceNumber": 8,
+      "evaluatedCommand": {
+        "tapOnElement": {
+          "selector": {
+            "idRegex": "welcome-chooser-learner",
+            "optional": false
+          },
+          "retryIfNoChange": false,
+          "waitUntilVisible": false,
+          "longPress": false,
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "tapOnElement": {
+        "selector": {
+          "idRegex": "sign-in-button",
+          "optional": false
+        },
+        "retryIfNoChange": false,
+        "waitUntilVisible": false,
+        "longPress": false,
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794437053,
+      "duration": 2621,
+      "sequenceNumber": 37,
+      "evaluatedCommand": {
+        "tapOnElement": {
+          "selector": {
+            "idRegex": "sign-in-button",
+            "optional": false
+          },
+          "retryIfNoChange": false,
+          "waitUntilVisible": false,
+          "longPress": false,
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "assertConditionCommand": {
+        "condition": {
+          "visible": {
+            "idRegex": "sign-in-button",
+            "optional": false
+          }
+        },
+        "timeout": "3[REDACTED][REDACTED][REDACTED][REDACTED]",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794408958,
+      "duration": 205,
+      "sequenceNumber": 25,
+      "evaluatedCommand": {
+        "assertConditionCommand": {
+          "condition": {
+            "visible": {
+              "idRegex": "sign-in-button",
+              "optional": false
+            }
+          },
+          "timeout": "3[REDACTED][REDACTED][REDACTED][REDACTED]",
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "takeScreenshotCommand": {
+        "path": "signin-[REDACTED][REDACTED]-screen-loaded",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794409385,
+      "duration": 3965,
+      "sequenceNumber": 27,
+      "evaluatedCommand": {
+        "takeScreenshotCommand": {
+          "path": "signin-[REDACTED][REDACTED]-screen-loaded",
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "inputTextCommand": {
+        "text": "[REDACTED]",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794416834,
+      "duration": 6869,
+      "sequenceNumber": 29,
+      "evaluatedCommand": {
+        "inputTextCommand": {
+          "text": "[REDACTED]",
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "assertConditionCommand": {
+        "condition": {
+          "visible": {
+            "idRegex": "welcome-card-[REDACTED]",
+            "optional": false
+          }
+        },
+        "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794384226,
+      "duration": 206,
+      "sequenceNumber": 9,
+      "evaluatedCommand": {
+        "assertConditionCommand": {
+          "condition": {
+            "visible": {
+              "idRegex": "welcome-card-[REDACTED]",
+              "optional": false
+            }
+          },
+          "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "takeScreenshotCommand": {
+        "path": "homework-gallery-[REDACTED]3-preview",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794479552,
+      "duration": 297,
+      "sequenceNumber": 62,
+      "evaluatedCommand": {
+        "takeScreenshotCommand": {
+          "path": "homework-gallery-[REDACTED]3-preview",
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "takeScreenshotCommand": {
+        "path": "homework-gallery-[REDACTED]4-processing",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794482625,
+      "duration": 305,
+      "sequenceNumber": 65,
+      "evaluatedCommand": {
+        "takeScreenshotCommand": {
+          "path": "homework-gallery-[REDACTED]4-processing",
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "takeScreenshotCommand": {
+        "path": "homework-gallery-[REDACTED]2-before-picker",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794467714,
+      "duration": 2385,
+      "sequenceNumber": 56,
+      "evaluatedCommand": {
+        "takeScreenshotCommand": {
+          "path": "homework-gallery-[REDACTED]2-before-picker",
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "runFlowCommand": {
+        "commands": [
+          {
+            "applyConfigurationCommand": {
+              "config": {
+                "appId": "com.mentomate.app"
+              },
+              "optional": false
+            }
+          },
+          {
+            "tapOnElement": {
+              "selector": {
+                "idRegex": "post-approval-continue",
+                "optional": false
+              },
+              "retryIfNoChange": false,
+              "waitUntilVisible": false,
+              "longPress": false,
+              "optional": false
+            }
+          },
+          {
+            "assertConditionCommand": {
+              "condition": {
+                "visible": {
+                  "idRegex": "learner-screen",
+                  "optional": false
+                }
+              },
+              "timeout": "[REDACTED]5[REDACTED][REDACTED][REDACTED]",
+              "optional": true
+            }
+          }
+        ],
+        "condition": {
+          "visible": {
+            "textRegex": "You're approved!",
+            "optional": false
+          }
+        },
+        "sourceDescription": "dismiss-post-approval.yaml",
+        "config": {
+          "appId": "com.mentomate.app"
+        },
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "SKIPPED",
+      "timestamp": 1784794448833,
+      "sequenceNumber": 41,
+      "evaluatedCommand": {
+        "runFlowCommand": {
+          "commands": [
+            {
+              "applyConfigurationCommand": {
+                "config": {
+                  "appId": "com.mentomate.app"
+                },
+                "optional": false
+              }
+            },
+            {
+              "tapOnElement": {
+                "selector": {
+                  "idRegex": "post-approval-continue",
+                  "optional": false
+                },
+                "retryIfNoChange": false,
+                "waitUntilVisible": false,
+                "longPress": false,
+                "optional": false
+              }
+            },
+            {
+              "assertConditionCommand": {
+                "condition": {
+                  "visible": {
+                    "idRegex": "learner-screen",
+                    "optional": false
+                  }
+                },
+                "timeout": "[REDACTED]5[REDACTED][REDACTED][REDACTED]",
+                "optional": true
+              }
+            }
+          ],
+          "condition": {
+            "visible": {
+              "textRegex": "You're approved!",
+              "optional": false
+            }
+          },
+          "sourceDescription": "dismiss-post-approval.yaml",
+          "config": {
+            "appId": "com.mentomate.app"
+          },
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "hideKeyboardCommand": {
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794423909,
+      "duration": 1298,
+      "sequenceNumber": 31,
+      "evaluatedCommand": {
+        "hideKeyboardCommand": {
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "defineVariablesCommand": {
+        "env": {
+          "SEED_SCENARIO": "[REDACTED]",
+          "API_URL": "[REDACTED]"
+        },
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794378858,
+      "duration": 1294,
+      "sequenceNumber": 3,
+      "evaluatedCommand": {
+        "defineVariablesCommand": {
+          "env": {
+            "SEED_SCENARIO": "[REDACTED]",
+            "API_URL": "[REDACTED]"
+          },
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "assertConditionCommand": {
+        "condition": {
+          "visible": {
+            "idRegex": "photo-preview",
+            "optional": false
+          }
+        },
+        "timeout": "[REDACTED]5[REDACTED][REDACTED][REDACTED]",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794479224,
+      "duration": 179,
+      "sequenceNumber": 60,
+      "evaluatedCommand": {
+        "assertConditionCommand": {
+          "condition": {
+            "visible": {
+              "idRegex": "photo-preview",
+              "optional": false
+            }
+          },
+          "timeout": "[REDACTED]5[REDACTED][REDACTED][REDACTED]",
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "applyConfigurationCommand": {
+        "config": {
+          "appId": "com.mentomate.app",
+          "tags": ["nightly", "homework"]
+        },
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794378809,
+      "duration": 10,
+      "sequenceNumber": 1,
+      "evaluatedCommand": {
+        "applyConfigurationCommand": {
+          "config": {
+            "appId": "com.mentomate.app",
+            "tags": ["nightly", "homework"]
+          },
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "assertConditionCommand": {
+        "condition": {
+          "notVisible": {
+            "idRegex": "profile-load-error",
+            "optional": false
+          }
+        },
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794450058,
+      "duration": 781,
+      "sequenceNumber": 43,
+      "evaluatedCommand": {
+        "assertConditionCommand": {
+          "condition": {
+            "notVisible": {
+              "idRegex": "profile-load-error",
+              "optional": false
+            }
+          },
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "takeScreenshotCommand": {
+        "path": "signin-[REDACTED]3-password-keyboard-open",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794435135,
+      "duration": 154,
+      "sequenceNumber": 34,
+      "evaluatedCommand": {
+        "takeScreenshotCommand": {
+          "path": "signin-[REDACTED]3-password-keyboard-open",
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "assertConditionCommand": {
+        "condition": {
+          "visible": {
+            "idRegex": "camera-cancel-ocr",
+            "optional": false
+          }
+        },
+        "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794482430,
+      "duration": 194,
+      "sequenceNumber": 64,
+      "evaluatedCommand": {
+        "assertConditionCommand": {
+          "condition": {
+            "visible": {
+              "idRegex": "camera-cancel-ocr",
+              "optional": false
+            }
+          },
+          "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "takeScreenshotCommand": {
+        "path": "signin-[REDACTED]4-home-reached",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794453940,
+      "duration": 244,
+      "sequenceNumber": 49,
+      "evaluatedCommand": {
+        "takeScreenshotCommand": {
+          "path": "signin-[REDACTED]4-home-reached",
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "tapOnElement": {
+        "selector": {
+          "textRegex": "Skip for now",
+          "optional": true
+        },
+        "retryIfNoChange": false,
+        "waitUntilVisible": false,
+        "longPress": false,
+        "optional": true
+      }
+    },
+    "metadata": {
+      "status": "WARNED",
+      "timestamp": 1784794449307,
+      "sequenceNumber": 42,
+      "evaluatedCommand": {
+        "tapOnElement": {
+          "selector": {
+            "textRegex": "Skip for now",
+            "optional": true
+          },
+          "retryIfNoChange": false,
+          "waitUntilVisible": false,
+          "longPress": false,
+          "optional": true
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "assertConditionCommand": {
+        "condition": {
+          "visible": {
+            "idRegex": "welcome-start-button",
+            "optional": false
+          }
+        },
+        "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794402598,
+      "duration": 259,
+      "sequenceNumber": 21,
+      "evaluatedCommand": {
+        "assertConditionCommand": {
+          "condition": {
+            "visible": {
+              "idRegex": "welcome-start-button",
+              "optional": false
+            }
+          },
+          "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "assertConditionCommand": {
+        "condition": {
+          "visible": {
+            "idRegex": "support-hub-mentor-tab",
+            "optional": false
+          }
+        },
+        "timeout": "5[REDACTED][REDACTED][REDACTED]",
+        "optional": true
+      }
+    },
+    "metadata": {
+      "status": "WARNED",
+      "timestamp": 1784794453012,
+      "sequenceNumber": 48,
+      "evaluatedCommand": {
+        "assertConditionCommand": {
+          "condition": {
+            "visible": {
+              "idRegex": "support-hub-mentor-tab",
+              "optional": false
+            }
+          },
+          "timeout": "5[REDACTED][REDACTED][REDACTED]",
+          "optional": true
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "tapOnElement": {
+        "selector": {
+          "idRegex": "com(?:\\.google)?\\.android\\.providers\\.media\\.module:id/icon_thumbnail",
+          "index": "[REDACTED]",
+          "optional": false
+        },
+        "retryIfNoChange": false,
+        "waitUntilVisible": false,
+        "longPress": false,
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794475320,
+      "duration": 3904,
+      "sequenceNumber": 59,
+      "evaluatedCommand": {
+        "tapOnElement": {
+          "selector": {
+            "idRegex": "com(?:\\.google)?\\.android\\.providers\\.media\\.module:id/icon_thumbnail",
+            "index": "[REDACTED]",
+            "optional": false
+          },
+          "retryIfNoChange": false,
+          "waitUntilVisible": false,
+          "longPress": false,
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "applyConfigurationCommand": {
+        "config": {
+          "appId": "com.mentomate.app"
+        },
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794380155,
+      "duration": 2,
+      "sequenceNumber": 6,
+      "evaluatedCommand": {
+        "applyConfigurationCommand": {
+          "config": {
+            "appId": "com.mentomate.app"
+          },
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "runFlowCommand": {
+        "commands": [
+          {
+            "applyConfigurationCommand": {
+              "config": {
+                "appId": "com.mentomate.app"
+              },
+              "optional": false
+            }
+          },
+          {
+            "runFlowCommand": {
+              "commands": [
+                {
+                  "runFlowCommand": {
+                    "commands": [
+                      {
+                        "runFlowCommand": {
+                          "commands": [
+                            {
+                              "applyConfigurationCommand": {
+                                "config": {
+                                  "appId": "com.mentomate.app"
+                                },
+                                "optional": false
+                              }
+                            },
+                            {
+                              "runFlowCommand": {
+                                "commands": [
+                                  {
+                                    "applyConfigurationCommand": {
+                                      "config": {
+                                        "appId": "com.mentomate.app"
+                                      },
+                                      "optional": false
+                                    }
+                                  },
+                                  {
+                                    "runFlowCommand": {
+                                      "commands": [
+                                        {
+                                          "applyConfigurationCommand": {
+                                            "config": {
+                                              "appId": "com.mentomate.app"
+                                            },
+                                            "optional": false
+                                          }
+                                        },
+                                        {
+                                          "pressKeyCommand": {
+                                            "code": "BACK",
+                                            "optional": false
+                                          }
+                                        },
+                                        {
+                                          "assertConditionCommand": {
+                                            "condition": {
+                                              "visible": {
+                                                "idRegex": "learner-screen",
+                                                "optional": false
+                                              }
+                                            },
+                                            "timeout": "[REDACTED]5[REDACTED][REDACTED][REDACTED]",
+                                            "optional": true
+                                          }
+                                        },
+                                        {
+                                          "assertConditionCommand": {
+                                            "condition": {
+                                              "visible": {
+                                                "idRegex": "parent-home-screen",
+                                                "optional": false
+                                              }
+                                            },
+                                            "timeout": "5[REDACTED][REDACTED][REDACTED]",
+                                            "optional": true
+                                          }
+                                        }
+                                      ],
+                                      "condition": {
+                                        "notVisible": {
+                                          "idRegex": "learner-screen",
+                                          "optional": false
+                                        }
+                                      },
+                                      "sourceDescription": "return-to-home.yaml",
+                                      "config": {
+                                        "appId": "com.mentomate.app"
+                                      },
+                                      "optional": false
+                                    }
+                                  }
+                                ],
+                                "condition": {
+                                  "notVisible": {
+                                    "idRegex": "parent-home-screen",
+                                    "optional": false
+                                  }
+                                },
+                                "sourceDescription": "return-to-home-check-gateway.yaml",
+                                "config": {
+                                  "appId": "com.mentomate.app"
+                                },
+                                "optional": false
+                              }
+                            }
+                          ],
+                          "condition": {
+                            "notVisible": {
+                              "idRegex": "dashboard-scroll",
+                              "optional": false
+                            }
+                          },
+                          "sourceDescription": "return-to-home-check-parent-home.yaml",
+                          "config": {
+                            "appId": "com.mentomate.app"
+                          },
+                          "optional": false
+                        }
+                      }
+                    ],
+                    "condition": {
+                      "notVisible": {
+                        "idRegex": "support-hub-mentor-tab",
+                        "optional": false
+                      }
+                    },
+                    "optional": false
+                  }
+                }
+              ],
+              "condition": {
+                "notVisible": {
+                  "idRegex": "mentor-screen",
+                  "optional": false
+                }
+              },
+              "optional": false
+            }
+          }
+        ],
+        "condition": {
+          "notVisible": {
+            "idRegex": "learner-screen",
+            "optional": false
+          }
+        },
+        "sourceDescription": "return-to-home-safe.yaml",
+        "config": {
+          "appId": "com.mentomate.app"
+        },
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "SKIPPED",
+      "timestamp": 1784794450839,
+      "sequenceNumber": 44,
+      "evaluatedCommand": {
+        "runFlowCommand": {
+          "commands": [
+            {
+              "applyConfigurationCommand": {
+                "config": {
+                  "appId": "com.mentomate.app"
+                },
+                "optional": false
+              }
+            },
+            {
+              "runFlowCommand": {
+                "commands": [
+                  {
+                    "runFlowCommand": {
+                      "commands": [
+                        {
+                          "runFlowCommand": {
+                            "commands": [
+                              {
+                                "applyConfigurationCommand": {
+                                  "config": {
+                                    "appId": "com.mentomate.app"
+                                  },
+                                  "optional": false
+                                }
+                              },
+                              {
+                                "runFlowCommand": {
+                                  "commands": [
+                                    {
+                                      "applyConfigurationCommand": {
+                                        "config": {
+                                          "appId": "com.mentomate.app"
+                                        },
+                                        "optional": false
+                                      }
+                                    },
+                                    {
+                                      "runFlowCommand": {
+                                        "commands": [
+                                          {
+                                            "applyConfigurationCommand": {
+                                              "config": {
+                                                "appId": "com.mentomate.app"
+                                              },
+                                              "optional": false
+                                            }
+                                          },
+                                          {
+                                            "pressKeyCommand": {
+                                              "code": "BACK",
+                                              "optional": false
+                                            }
+                                          },
+                                          {
+                                            "assertConditionCommand": {
+                                              "condition": {
+                                                "visible": {
+                                                  "idRegex": "learner-screen",
+                                                  "optional": false
+                                                }
+                                              },
+                                              "timeout": "[REDACTED]5[REDACTED][REDACTED][REDACTED]",
+                                              "optional": true
+                                            }
+                                          },
+                                          {
+                                            "assertConditionCommand": {
+                                              "condition": {
+                                                "visible": {
+                                                  "idRegex": "parent-home-screen",
+                                                  "optional": false
+                                                }
+                                              },
+                                              "timeout": "5[REDACTED][REDACTED][REDACTED]",
+                                              "optional": true
+                                            }
+                                          }
+                                        ],
+                                        "condition": {
+                                          "notVisible": {
+                                            "idRegex": "learner-screen",
+                                            "optional": false
+                                          }
+                                        },
+                                        "sourceDescription": "return-to-home.yaml",
+                                        "config": {
+                                          "appId": "com.mentomate.app"
+                                        },
+                                        "optional": false
+                                      }
+                                    }
+                                  ],
+                                  "condition": {
+                                    "notVisible": {
+                                      "idRegex": "parent-home-screen",
+                                      "optional": false
+                                    }
+                                  },
+                                  "sourceDescription": "return-to-home-check-gateway.yaml",
+                                  "config": {
+                                    "appId": "com.mentomate.app"
+                                  },
+                                  "optional": false
+                                }
+                              }
+                            ],
+                            "condition": {
+                              "notVisible": {
+                                "idRegex": "dashboard-scroll",
+                                "optional": false
+                              }
+                            },
+                            "sourceDescription": "return-to-home-check-parent-home.yaml",
+                            "config": {
+                              "appId": "com.mentomate.app"
+                            },
+                            "optional": false
+                          }
+                        }
+                      ],
+                      "condition": {
+                        "notVisible": {
+                          "idRegex": "support-hub-mentor-tab",
+                          "optional": false
+                        }
+                      },
+                      "optional": false
+                    }
+                  }
+                ],
+                "condition": {
+                  "notVisible": {
+                    "idRegex": "mentor-screen",
+                    "optional": false
+                  }
+                },
+                "optional": false
+              }
+            }
+          ],
+          "condition": {
+            "notVisible": {
+              "idRegex": "learner-screen",
+              "optional": false
+            }
+          },
+          "sourceDescription": "return-to-home-safe.yaml",
+          "config": {
+            "appId": "com.mentomate.app"
+          },
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "runFlowCommand": {
+        "commands": [
+          {
+            "applyConfigurationCommand": {
+              "config": {
+                "appId": "com.mentomate.app"
+              },
+              "optional": false
+            }
+          },
+          {
+            "assertConditionCommand": {
+              "condition": {
+                "visible": {
+                  "idRegex": "welcome-chooser",
+                  "optional": false
+                }
+              },
+              "timeout": "[REDACTED]2[REDACTED][REDACTED][REDACTED][REDACTED]",
+              "optional": false
+            }
+          },
+          {
+            "tapOnElement": {
+              "selector": {
+                "idRegex": "welcome-chooser-learner",
+                "optional": false
+              },
+              "retryIfNoChange": false,
+              "waitUntilVisible": false,
+              "longPress": false,
+              "optional": false
+            }
+          },
+          {
+            "assertConditionCommand": {
+              "condition": {
+                "visible": {
+                  "idRegex": "welcome-card-[REDACTED]",
+                  "optional": false
+                }
+              },
+              "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+              "optional": false
+            }
+          },
+          {
+            "repeatCommand": {
+              "times": "5",
+              "commands": [
+                {
+                  "tapOnElement": {
+                    "selector": {
+                      "idRegex": "welcome-next-button",
+                      "optional": true
+                    },
+                    "retryIfNoChange": false,
+                    "waitUntilVisible": false,
+                    "longPress": false,
+                    "optional": true
+                  }
+                },
+                {
+                  "assertConditionCommand": {
+                    "condition": {
+                      "visible": {
+                        "idRegex": "welcome-start-button",
+                        "optional": false
+                      }
+                    },
+                    "timeout": "25[REDACTED][REDACTED]",
+                    "optional": true
+                  }
+                }
+              ],
+              "optional": false
+            }
+          },
+          {
+            "assertConditionCommand": {
+              "condition": {
+                "visible": {
+                  "idRegex": "welcome-start-button",
+                  "optional": false
+                }
+              },
+              "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+              "optional": false
+            }
+          },
+          {
+            "tapOnElement": {
+              "selector": {
+                "idRegex": "welcome-start-button",
+                "optional": false
+              },
+              "retryIfNoChange": false,
+              "waitUntilVisible": false,
+              "longPress": false,
+              "optional": false
+            }
+          },
+          {
+            "assertConditionCommand": {
+              "condition": {
+                "visible": {
+                  "idRegex": "pre-auth-bridge",
+                  "optional": false
+                }
+              },
+              "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+              "optional": false
+            }
+          },
+          {
+            "tapOnElement": {
+              "selector": {
+                "idRegex": "pre-auth-bridge-secondary",
+                "optional": false
+              },
+              "retryIfNoChange": false,
+              "waitUntilVisible": false,
+              "longPress": false,
+              "optional": false
+            }
+          },
+          {
+            "assertConditionCommand": {
+              "condition": {
+                "visible": {
+                  "idRegex": "sign-in-button",
+                  "optional": false
+                }
+              },
+              "timeout": "3[REDACTED][REDACTED][REDACTED][REDACTED]",
+              "optional": false
+            }
+          }
+        ],
+        "sourceDescription": "nav-welcome-to-sign-in.yaml",
+        "config": {
+          "appId": "com.mentomate.app"
+        },
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794380154,
+      "duration": 29010,
+      "sequenceNumber": 5,
+      "evaluatedCommand": {
+        "runFlowCommand": {
+          "commands": [
+            {
+              "applyConfigurationCommand": {
+                "config": {
+                  "appId": "com.mentomate.app"
+                },
+                "optional": false
+              }
+            },
+            {
+              "assertConditionCommand": {
+                "condition": {
+                  "visible": {
+                    "idRegex": "welcome-chooser",
+                    "optional": false
+                  }
+                },
+                "timeout": "[REDACTED]2[REDACTED][REDACTED][REDACTED][REDACTED]",
+                "optional": false
+              }
+            },
+            {
+              "tapOnElement": {
+                "selector": {
+                  "idRegex": "welcome-chooser-learner",
+                  "optional": false
+                },
+                "retryIfNoChange": false,
+                "waitUntilVisible": false,
+                "longPress": false,
+                "optional": false
+              }
+            },
+            {
+              "assertConditionCommand": {
+                "condition": {
+                  "visible": {
+                    "idRegex": "welcome-card-[REDACTED]",
+                    "optional": false
+                  }
+                },
+                "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+                "optional": false
+              }
+            },
+            {
+              "repeatCommand": {
+                "times": "5",
+                "commands": [
+                  {
+                    "tapOnElement": {
+                      "selector": {
+                        "idRegex": "welcome-next-button",
+                        "optional": true
+                      },
+                      "retryIfNoChange": false,
+                      "waitUntilVisible": false,
+                      "longPress": false,
+                      "optional": true
+                    }
+                  },
+                  {
+                    "assertConditionCommand": {
+                      "condition": {
+                        "visible": {
+                          "idRegex": "welcome-start-button",
+                          "optional": false
+                        }
+                      },
+                      "timeout": "25[REDACTED][REDACTED]",
+                      "optional": true
+                    }
+                  }
+                ],
+                "optional": false
+              }
+            },
+            {
+              "assertConditionCommand": {
+                "condition": {
+                  "visible": {
+                    "idRegex": "welcome-start-button",
+                    "optional": false
+                  }
+                },
+                "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+                "optional": false
+              }
+            },
+            {
+              "tapOnElement": {
+                "selector": {
+                  "idRegex": "welcome-start-button",
+                  "optional": false
+                },
+                "retryIfNoChange": false,
+                "waitUntilVisible": false,
+                "longPress": false,
+                "optional": false
+              }
+            },
+            {
+              "assertConditionCommand": {
+                "condition": {
+                  "visible": {
+                    "idRegex": "pre-auth-bridge",
+                    "optional": false
+                  }
+                },
+                "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+                "optional": false
+              }
+            },
+            {
+              "tapOnElement": {
+                "selector": {
+                  "idRegex": "pre-auth-bridge-secondary",
+                  "optional": false
+                },
+                "retryIfNoChange": false,
+                "waitUntilVisible": false,
+                "longPress": false,
+                "optional": false
+              }
+            },
+            {
+              "assertConditionCommand": {
+                "condition": {
+                  "visible": {
+                    "idRegex": "sign-in-button",
+                    "optional": false
+                  }
+                },
+                "timeout": "3[REDACTED][REDACTED][REDACTED][REDACTED]",
+                "optional": false
+              }
+            }
+          ],
+          "sourceDescription": "nav-welcome-to-sign-in.yaml",
+          "config": {
+            "appId": "com.mentomate.app"
+          },
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "assertConditionCommand": {
+        "condition": {
+          "visible": {
+            "idRegex": "learner-screen",
+            "optional": false
+          }
+        },
+        "timeout": "[REDACTED]5[REDACTED][REDACTED][REDACTED]",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794454698,
+      "duration": 236,
+      "sequenceNumber": 51,
+      "evaluatedCommand": {
+        "assertConditionCommand": {
+          "condition": {
+            "visible": {
+              "idRegex": "learner-screen",
+              "optional": false
+            }
+          },
+          "timeout": "[REDACTED]5[REDACTED][REDACTED][REDACTED]",
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "tapOnElement": {
+        "selector": {
+          "idRegex": "gallery-button",
+          "optional": false
+        },
+        "retryIfNoChange": false,
+        "waitUntilVisible": false,
+        "longPress": false,
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794470099,
+      "duration": 4731,
+      "sequenceNumber": 57,
+      "evaluatedCommand": {
+        "tapOnElement": {
+          "selector": {
+            "idRegex": "gallery-button",
+            "optional": false
+          },
+          "retryIfNoChange": false,
+          "waitUntilVisible": false,
+          "longPress": false,
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "assertConditionCommand": {
+        "condition": {
+          "visible": {
+            "idRegex": "sign-in-button",
+            "optional": false
+          }
+        },
+        "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794436860,
+      "duration": 192,
+      "sequenceNumber": 36,
+      "evaluatedCommand": {
+        "assertConditionCommand": {
+          "condition": {
+            "visible": {
+              "idRegex": "sign-in-button",
+              "optional": false
+            }
+          },
+          "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "assertConditionCommand": {
+        "condition": {
+          "visible": {
+            "idRegex": "camera-use-this-button",
+            "optional": false
+          }
+        },
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794479403,
+      "duration": 149,
+      "sequenceNumber": 61,
+      "evaluatedCommand": {
+        "assertConditionCommand": {
+          "condition": {
+            "visible": {
+              "idRegex": "camera-use-this-button",
+              "optional": false
+            }
+          },
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "assertConditionCommand": {
+        "condition": {
+          "visible": {
+            "idRegex": "learner-screen",
+            "optional": false
+          }
+        },
+        "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+        "optional": true
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794451013,
+      "duration": 191,
+      "sequenceNumber": 45,
+      "evaluatedCommand": {
+        "assertConditionCommand": {
+          "condition": {
+            "visible": {
+              "idRegex": "learner-screen",
+              "optional": false
+            }
+          },
+          "timeout": "[REDACTED][REDACTED][REDACTED][REDACTED][REDACTED]",
+          "optional": true
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "repeatCommand": {
+        "times": "5",
+        "commands": [
+          {
+            "tapOnElement": {
+              "selector": {
+                "idRegex": "welcome-next-button",
+                "optional": true
+              },
+              "retryIfNoChange": false,
+              "waitUntilVisible": false,
+              "longPress": false,
+              "optional": true
+            }
+          },
+          {
+            "assertConditionCommand": {
+              "condition": {
+                "visible": {
+                  "idRegex": "welcome-start-button",
+                  "optional": false
+                }
+              },
+              "timeout": "25[REDACTED][REDACTED]",
+              "optional": true
+            }
+          }
+        ],
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794384432,
+      "duration": 18165,
+      "sequenceNumber": 10,
+      "evaluatedCommand": {
+        "repeatCommand": {
+          "times": "5",
+          "commands": [
+            {
+              "tapOnElement": {
+                "selector": {
+                  "idRegex": "welcome-next-button",
+                  "optional": true
+                },
+                "retryIfNoChange": false,
+                "waitUntilVisible": false,
+                "longPress": false,
+                "optional": true
+              }
+            },
+            {
+              "assertConditionCommand": {
+                "condition": {
+                  "visible": {
+                    "idRegex": "welcome-start-button",
+                    "optional": false
+                  }
+                },
+                "timeout": "25[REDACTED][REDACTED]",
+                "optional": true
+              }
+            }
+          ],
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "takeScreenshotCommand": {
+        "path": "homework-gallery-[REDACTED][REDACTED]-home",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794454935,
+      "duration": 260,
+      "sequenceNumber": 52,
+      "evaluatedCommand": {
+        "takeScreenshotCommand": {
+          "path": "homework-gallery-[REDACTED][REDACTED]-home",
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "assertConditionCommand": {
+        "condition": {
+          "visible": {
+            "idRegex": "mentor-screen",
+            "optional": false
+          }
+        },
+        "timeout": "5[REDACTED][REDACTED][REDACTED]",
+        "optional": true
+      }
+    },
+    "metadata": {
+      "status": "WARNED",
+      "timestamp": 1784794451951,
+      "sequenceNumber": 47,
+      "evaluatedCommand": {
+        "assertConditionCommand": {
+          "condition": {
+            "visible": {
+              "idRegex": "mentor-screen",
+              "optional": false
+            }
+          },
+          "timeout": "5[REDACTED][REDACTED][REDACTED]",
+          "optional": true
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "tapOnElement": {
+        "selector": {
+          "idRegex": "welcome-next-button",
+          "optional": true
+        },
+        "retryIfNoChange": false,
+        "waitUntilVisible": false,
+        "longPress": false,
+        "optional": true
+      }
+    },
+    "metadata": {
+      "status": "WARNED",
+      "timestamp": 1784794401884,
+      "sequenceNumber": 19,
+      "evaluatedCommand": {
+        "tapOnElement": {
+          "selector": {
+            "idRegex": "welcome-next-button",
+            "optional": true
+          },
+          "retryIfNoChange": false,
+          "waitUntilVisible": false,
+          "longPress": false,
+          "optional": true
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "applyConfigurationCommand": {
+        "config": {
+          "appId": "com.mentomate.app"
+        },
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794380152,
+      "duration": 1,
+      "sequenceNumber": 4,
+      "evaluatedCommand": {
+        "applyConfigurationCommand": {
+          "config": {
+            "appId": "com.mentomate.app"
+          },
+          "optional": false
+        }
+      }
+    }
+  },
+  {
+    "command": {
+      "assertConditionCommand": {
+        "condition": {
+          "visible": {
+            "idRegex": "^(?:result-text-input|manual-input|retry-button)$",
+            "optional": false
+          }
+        },
+        "timeout": "5[REDACTED][REDACTED][REDACTED][REDACTED]",
+        "optional": false
+      }
+    },
+    "metadata": {
+      "status": "COMPLETED",
+      "timestamp": 1784794482930,
+      "duration": 11617,
+      "sequenceNumber": 66,
+      "evaluatedCommand": {
+        "assertConditionCommand": {
+          "condition": {
+            "visible": {
+              "idRegex": "^(?:result-text-input|manual-input|retry-button)$",
+              "optional": false
+            }
+          },
+          "timeout": "5[REDACTED][REDACTED][REDACTED][REDACTED]",
+          "optional": false
+        }
+      }
+    }
+  }
+]
