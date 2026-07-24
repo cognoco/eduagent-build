@@ -63,6 +63,7 @@ function makeResult(p: {
     transcript: [],
     tutorTurns: [],
     questionDiagnostics: [],
+    conceptEquivalenceKeys: {},
     evaluations: p.evaluations ?? [],
     decision: decision(p.outcome, p.marked),
     expectedOutcome: p.expected,
@@ -71,7 +72,7 @@ function makeResult(p: {
 }
 
 describe('aggregate', () => {
-  it('reports tutor parse failures, model-authored repeat rate, and exact distinct assessed-concept coverage', () => {
+  it('reports tutor parse failures, model-authored repeat rate, and semantic distinct assessed-concept coverage', () => {
     const result = makeResult({
       outcome: 'verified',
       marked: true,
@@ -80,7 +81,7 @@ describe('aggregate', () => {
       graderModel: 'gpt-oss-120b',
       evaluations: [
         evalItem('solid'),
-        { ...evalItem('solid'), concept: 'c' },
+        { ...evalItem('solid'), concept: 'cosmetic paraphrase of c' },
         { ...evalItem('partial'), concept: 'second concept' },
       ],
     });
@@ -102,6 +103,11 @@ describe('aggregate', () => {
         failure: 'envelope_parse',
       },
     ];
+    result.conceptEquivalenceKeys = {
+      c: 'same-minimal-claim:explain:same-context',
+      'cosmetic paraphrase of c': 'same-minimal-claim:explain:same-context',
+      'second concept': 'second-minimal-claim:comparison:new-context',
+    };
 
     const metrics = aggregate([result]);
     expect(metrics.tutorParseFailureRate).toBe(0.5);

@@ -44,7 +44,16 @@ export interface ChallengeSimScenario {
   precedingLessonHistory?: Array<{
     role: 'assistant' | 'user';
     content: string;
+    assessment?: QuestionAssessment;
   }>;
+  /** Semantic contract metadata for the opening Challenge question. */
+  seedQuestionAssessment?: QuestionAssessment;
+  /**
+   * Deterministic aliases for evaluator concept labels. Each key identifies
+   * one minimal claim + cognitive operation + material context, so aliases do
+   * not overstate assessed breadth in offline metrics.
+   */
+  conceptEquivalenceKeys?: Record<string, string>;
   /** Concept labels the round probes (≥1). */
   concepts: string[];
   /**
@@ -54,6 +63,23 @@ export interface ChallengeSimScenario {
   competenceBrief: string;
   /** What a correct conservative gate should conclude for this competence. */
   expectedOutcome: ChallengeSimExpectedOutcome;
+}
+
+/**
+ * The operator's question-equivalence contract in structured fixture form.
+ * Cosmetic phrasing is deliberately excluded: equality is only the same
+ * minimal claim, operation, and material context.
+ */
+export interface QuestionAssessment {
+  minimalLearningClaim: string;
+  cognitiveOperation:
+    | 'explain'
+    | 'application'
+    | 'comparison'
+    | 'causal_explanation'
+    | 'synthesis'
+    | 'evaluation';
+  materialContext: string;
 }
 
 export const CHALLENGE_SIM_SCENARIOS: ChallengeSimScenario[] = [
@@ -171,7 +197,14 @@ export const CHALLENGE_SIM_SCENARIOS: ChallengeSimScenario[] = [
     precedingLessonHistory: [
       {
         role: 'assistant',
-        content: 'How does the speaker in Lady Lazarus use rebirth imagery?',
+        content:
+          'How does rebirth imagery in Lady Lazarus make the speaker seem powerful after harm?',
+        assessment: {
+          minimalLearningClaim:
+            'rebirth imagery changes the reader view of speaker power',
+          cognitiveOperation: 'explain',
+          materialContext: 'Lady Lazarus rebirth imagery after harm',
+        },
       },
       {
         role: 'user',
@@ -179,8 +212,20 @@ export const CHALLENGE_SIM_SCENARIOS: ChallengeSimScenario[] = [
       },
     ],
     seedQuestion:
-      "How could rebirth imagery change the reader's view of the speaker's power?",
+      "How could Plath's rebirth imagery make the speaker seem powerful after harm?",
+    seedQuestionAssessment: {
+      minimalLearningClaim:
+        'rebirth imagery changes the reader view of speaker power',
+      cognitiveOperation: 'explain',
+      materialContext: 'Lady Lazarus rebirth imagery after harm',
+    },
     concepts: ['rebirth imagery changes reader interpretation'],
+    conceptEquivalenceKeys: {
+      'rebirth imagery changes reader interpretation':
+        'rebirth-imagery-reader-power:explain:lady-lazarus',
+      'rebirth imagery makes the speaker powerful':
+        'rebirth-imagery-reader-power:explain:lady-lazarus',
+    },
     competenceBrief:
       'You understand that rebirth imagery can make the speaker seem powerful and defiant after harm. Explain that connection clearly in your own words without repeating the preceding lesson question verbatim.',
     expectedOutcome: 'verified',

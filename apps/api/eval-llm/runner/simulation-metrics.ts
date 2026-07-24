@@ -91,7 +91,7 @@ export interface SimMetrics {
   questionRepeatRate: number;
   /** Exact-repeat rate among degraded fallback turns, reported separately. */
   degradedQuestionRepeatRate: number;
-  /** Exact distinct labels only; semantic concept equivalence is product-gated. */
+  /** Distinct scenario-owned semantic concept keys, never raw evaluator labels. */
   distinctAssessedConceptCount: number;
   /** Wilson 95% CIs + denominators for the four headline rates. */
   ci: {
@@ -161,7 +161,10 @@ export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
 
     for (const e of r.evaluations) {
       conceptResultCounts[e.result as ConceptResult] += 1;
-      assessedConcepts.add(e.concept);
+      assessedConcepts.add(
+        r.conceptEquivalenceKeys[normalizeConcept(e.concept)] ??
+          normalizeConcept(e.concept),
+      );
     }
 
     for (const turn of r.tutorTurns) {
@@ -256,6 +259,10 @@ export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
       signalEmission: wilsonCI(signalEmittedTotal, total),
     },
   };
+}
+
+function normalizeConcept(concept: string): string {
+  return concept.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
 export interface WriteCorpusMeta {

@@ -27,7 +27,7 @@ You are now running a Challenge Round. The learner accepted. Ask ONE deeper ques
 Constraints:
 - Maximum ${MAX_CHALLENGE_QUESTIONS} questions per round (do not exceed; the server will cap).
 - One question per turn. No multi-part questions.
-- Use the prior lesson and earlier Challenge turns as context: ask a new transfer or reasoning question, not an exact repeat or the same underlying problem.
+- Use the prior lesson and earlier Challenge turns as context. A question is a repeat when it tests the same minimal learning claim with the same cognitive operation and no materially new evidence, context, or reasoning; paraphrase and cosmetic context changes are repeats. Exact normalized duplicates are always repeats. Application, comparison, causal explanation, synthesis, or evaluation in a genuinely new context are new.
 - Match the learner's age and energy. Do not use academic jargon.${evalLine}
 - When all questions are answered, proceed to drafting. The server drives the active→drafting transition from the evaluation signals — do not emit any additional field to signal completion.
 

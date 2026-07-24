@@ -10,6 +10,7 @@ import {
 import {
   buildExchangeSourceEvidence,
   buildSystemPrompt,
+  sanitizeUserContent,
   type ExchangeContext,
 } from '../../src/services/exchanges';
 import { resolveAgeBracket } from '../../src/services/exchange-prompts';
@@ -27,7 +28,10 @@ import {
   withSafetyPreamble,
 } from '../../src/services/llm/router';
 import type { ChatMessage } from '../../src/services/llm/types';
-import type { ChallengeSimScenario } from '../fixtures/challenge-personas';
+import type {
+  ChallengeSimScenario,
+  QuestionAssessment,
+} from '../fixtures/challenge-personas';
 import type { EvalProfile } from '../fixtures/profiles';
 import { runHarnessLlm } from './llm-client';
 import { callOpenRouterModel } from './llm-bootstrap';
@@ -102,6 +106,8 @@ const GRADER_RUNG = 1 as const;
  * resolves the exact judge model the grading turn will use.
  */
 const TURN_LLM_TIER = 'standard' as const;
+/** Matches production's recent conversation source-evidence window. */
+const MAX_HISTORY_TURNS = 6;
 
 /** Fallback next-question if a tutor turn fails to parse. It is marked degraded
  *  in simulator-only diagnostics so it can never be mistaken for tutor output. */
@@ -109,23 +115,25 @@ const FALLBACK_FOLLOWUP =
   'Can you explain a bit more about why that is — what makes it work?';
 
 export type TutorTurn =
-  | { source: 'model'; question: string }
+  | { source: 'model'; question: string; assessment?: QuestionAssessment }
   | {
       source: 'degraded';
       question: string;
       failure: 'envelope_parse';
       /** Simulator diagnostic only; never used by production or user-facing paths. */
       rawOutput: string;
+      assessment?: QuestionAssessment;
     };
 
 export interface QuestionDiagnostic {
   source: 'seed' | TutorTurn['source'];
   question: string;
-  /** Text-normalized exact match only; semantic equivalence remains product-gated. */
+  /** Exact or fixture-declared semantic repetition under the operator contract. */
   repeatsPriorQuestion: boolean;
   failure?: 'envelope_parse';
   /** Simulator diagnostic only; retained for failed tutor-envelope investigation. */
   rawOutput?: string;
+  assessment?: QuestionAssessment;
 }
 
 export interface SimulatedRoundResult {
@@ -139,6 +147,8 @@ export interface SimulatedRoundResult {
   tutorTurns: TutorTurn[];
   /** Seed + generated questions, measured against prior lesson and round questions. */
   questionDiagnostics: QuestionDiagnostic[];
+  /** Scenario-owned semantic aliases; never inferred from model prose. */
+  conceptEquivalenceKeys: Record<string, string>;
   /** Accumulated across all answered turns (from the production judge). */
   evaluations: ChallengeRoundEvaluationItem[];
   decision: MasteryDecision;
@@ -314,7 +324,11 @@ export function resolveJudgeSlugProbe(): string {
 function toExchangeHistory(
   transcript: Array<{ role: 'assistant' | 'user'; content: string }>,
 ): ExchangeContext['exchangeHistory'] {
-  return transcript.map((t) => ({ role: t.role, content: t.content }));
+  return transcript.slice(-MAX_HISTORY_TURNS).map((turn) => ({
+    role: turn.role,
+    content:
+      turn.role === 'user' ? sanitizeUserContent(turn.content) : turn.content,
+  }));
 }
 
 function buildMentorContext(params: {
@@ -396,14 +410,28 @@ function normalizeQuestion(question: string): string {
     .replace(/\s+/g, ' ');
 }
 
-function hasExactQuestionRepeat(
+interface AssessedQuestion {
+  question: string;
+  assessment?: QuestionAssessment;
+}
+
+function hasQuestionRepeat(
   question: string,
-  priorQuestions: string[],
+  assessment: QuestionAssessment | undefined,
+  priorQuestions: AssessedQuestion[],
 ): boolean {
   const normalized = normalizeQuestion(question);
-  return priorQuestions.some(
-    (prior) => normalizeQuestion(prior) === normalized,
-  );
+  return priorQuestions.some((prior) => {
+    if (normalizeQuestion(prior.question) === normalized) return true;
+    if (!assessment || !prior.assessment) return false;
+    return (
+      normalizeQuestion(assessment.minimalLearningClaim) ===
+        normalizeQuestion(prior.assessment.minimalLearningClaim) &&
+      assessment.cognitiveOperation === prior.assessment.cognitiveOperation &&
+      normalizeQuestion(assessment.materialContext) ===
+        normalizeQuestion(prior.assessment.materialContext)
+    );
+  });
 }
 
 function normalizeTutorTurn(turn: TutorTurn | string): TutorTurn {
@@ -509,20 +537,28 @@ export async function runSimulatedRound(
   const transcript: Array<{ role: 'assistant' | 'user'; content: string }> = [
     ...(scenario.precedingLessonHistory ?? []),
   ];
-  const priorLessonQuestions = transcript
+  const priorLessonQuestions = (scenario.precedingLessonHistory ?? [])
     .filter((turn) => turn.role === 'assistant')
-    .map((turn) => turn.content);
+    .map((turn) => ({ question: turn.content, assessment: turn.assessment }));
   const questionDiagnostics: QuestionDiagnostic[] = [
     {
       source: 'seed',
       question: scenario.seedQuestion,
-      repeatsPriorQuestion: hasExactQuestionRepeat(
+      assessment: scenario.seedQuestionAssessment,
+      repeatsPriorQuestion: hasQuestionRepeat(
         scenario.seedQuestion,
+        scenario.seedQuestionAssessment,
         priorLessonQuestions,
       ),
     },
   ];
-  const askedQuestions = [...priorLessonQuestions, scenario.seedQuestion];
+  const askedQuestions: AssessedQuestion[] = [
+    ...priorLessonQuestions,
+    {
+      question: scenario.seedQuestion,
+      assessment: scenario.seedQuestionAssessment,
+    },
+  ];
   transcript.push({ role: 'assistant', content: scenario.seedQuestion });
   const learnerHistory: LearnerHistoryEntry[] = [];
   const allEvals: ChallengeRoundEvaluationItem[] = [];
@@ -580,13 +616,17 @@ export async function runSimulatedRound(
         currentEventId: deterministicUuid(`${scenario.id}:tutor-q${turnIndex}`),
       });
       const nextTurn = normalizeTutorTurn(await tutorTurn(ctx, learnerAnswer));
-      const repeatsPriorQuestion = hasExactQuestionRepeat(
+      const repeatsPriorQuestion = hasQuestionRepeat(
         nextTurn.question,
+        nextTurn.assessment,
         askedQuestions,
       );
       tutorTurns.push(nextTurn);
       questionDiagnostics.push({ ...nextTurn, repeatsPriorQuestion });
-      askedQuestions.push(nextTurn.question);
+      askedQuestions.push({
+        question: nextTurn.question,
+        assessment: nextTurn.assessment,
+      });
       mentorQuestion = nextTurn.question;
       transcript.push({ role: 'assistant', content: nextTurn.question });
     }
@@ -607,6 +647,7 @@ export async function runSimulatedRound(
     transcript,
     tutorTurns,
     questionDiagnostics,
+    conceptEquivalenceKeys: scenario.conceptEquivalenceKeys ?? {},
     evaluations: allEvals,
     decision,
     expectedOutcome: scenario.expectedOutcome,
