@@ -465,6 +465,176 @@ function validateClaudeCodeActionOidcPermission(
   };
 }
 
+const CLAUDE_REVIEW_WORKFLOW = '.github/workflows/claude-code-review.yml';
+const CLAUDE_REVIEW_ALL_PRS_MESSAGE =
+  'Claude review must be eligible for every pull request; remove pull_request paths and paths-ignore filters';
+const CLAUDE_REVIEW_UNAVAILABLE_RESULT_MESSAGE =
+  'Claude review must bound reviewer attempts and always upload a machine-readable fail-closed result with an executable recovery command';
+const CLAUDE_REVIEW_HEAD_BINDING_MESSAGE =
+  'Claude review verdict comments must carry and exactly match the expected pull request head SHA';
+const CLAUDE_REVIEW_FALLBACK_SEQUENCE_MESSAGE =
+  'Claude review token attempts must be an unconditional first attempt followed by fallbacks gated on all preceding failures';
+
+function normalizedStepIf(step: Record<string, unknown>): string {
+  return unwrapGithubExpression(stringify(step.if)).replace(/\s+/g, ' ').trim();
+}
+
+function validateClaudeReviewContract(
+  file: string,
+  parsed: Record<string, unknown>,
+): Violation[] {
+  if (file.replaceAll('\\', '/') !== CLAUDE_REVIEW_WORKFLOW) return [];
+
+  const violations: Violation[] = [];
+  const workflowOn = getWorkflowOn(parsed);
+  const pullRequestTrigger = isRecord(workflowOn)
+    ? workflowOn.pull_request
+    : undefined;
+  const hasPullRequestFilters =
+    isRecord(pullRequestTrigger) &&
+    (Object.hasOwn(pullRequestTrigger, 'paths') ||
+      Object.hasOwn(pullRequestTrigger, 'paths-ignore'));
+
+  if (!hasEvent(workflowOn, 'pull_request') || hasPullRequestFilters) {
+    violations.push({
+      file,
+      message: CLAUDE_REVIEW_ALL_PRS_MESSAGE,
+    });
+  }
+
+  const reviewJob =
+    isRecord(parsed.jobs) && isRecord(parsed.jobs['claude-review'])
+      ? parsed.jobs['claude-review']
+      : undefined;
+  const steps = getSteps(reviewJob);
+  const reviewStepIndexes = steps.flatMap((step, index) =>
+    typeof step.uses === 'string' && CLAUDE_CODE_ACTION.test(step.uses)
+      ? [index]
+      : [],
+  );
+  const hasThreeBoundedAttempts =
+    reviewStepIndexes.length === 3 &&
+    reviewStepIndexes.every((index) => {
+      const timeoutMinutes = steps[index]?.['timeout-minutes'];
+      return (
+        steps[index]?.['continue-on-error'] === true &&
+        typeof timeoutMinutes === 'number' &&
+        timeoutMinutes > 0 &&
+        timeoutMinutes <= 30
+      );
+    });
+  const reviewSteps = reviewStepIndexes.flatMap((index) => {
+    const step = steps[index];
+    return step ? [step] : [];
+  });
+  const [firstReviewStep, secondReviewStep, thirdReviewStep] = reviewSteps;
+  const hasRequiredFallbackSequence =
+    reviewSteps.length === 3 &&
+    firstReviewStep !== undefined &&
+    secondReviewStep !== undefined &&
+    thirdReviewStep !== undefined &&
+    !Object.hasOwn(firstReviewStep, 'if') &&
+    normalizedStepIf(secondReviewStep) ===
+      "steps.review-1.outcome == 'failure'" &&
+    normalizedStepIf(thirdReviewStep) ===
+      "steps.review-1.outcome == 'failure' && steps.review-2.outcome == 'failure'";
+
+  const initializerIndex = steps.findIndex((step) => {
+    const run = typeof step.run === 'string' ? step.run : '';
+    return (
+      run.includes('REVIEWER_UNAVAILABLE') &&
+      run.includes('merge_eligible') &&
+      run.includes('false') &&
+      run.includes('head_sha') &&
+      run.includes('run_id') &&
+      run.includes('recovery_command') &&
+      run.includes('gh run rerun') &&
+      run.includes('--failed') &&
+      run.includes('claude-review-verdict.json')
+    );
+  });
+  const firstReviewStepIndex = reviewStepIndexes[0];
+  const initializesBeforeReview =
+    initializerIndex >= 0 &&
+    firstReviewStepIndex !== undefined &&
+    initializerIndex < firstReviewStepIndex;
+
+  const hasFailClosedVerdictCheck = steps.some((step) => {
+    const run = typeof step.run === 'string' ? step.run : '';
+    return (
+      run.includes('review_json') &&
+      run.includes('Claude Code Review:') &&
+      run.includes('metadata_complete') &&
+      run.includes('merge_eligible') &&
+      run.includes('exit 1')
+    );
+  });
+  const verdictStep = steps.find((step) => {
+    const run = typeof step.run === 'string' ? step.run : '';
+    return run.includes('review_json') && run.includes('Claude Code Review:');
+  });
+  const verdictRun =
+    typeof verdictStep?.run === 'string' ? verdictStep.run : '';
+  const reviewPrompt =
+    isRecord(reviewJob?.env) &&
+    typeof reviewJob.env.CLAUDE_REVIEW_PROMPT === 'string'
+      ? reviewJob.env.CLAUDE_REVIEW_PROMPT
+      : '';
+  const expectedHeadExpression = '${{ github.event.pull_request.head.sha }}';
+  const hasExpectedHeadBinding =
+    reviewPrompt.includes(`- Reviewed head SHA: ${expectedHeadExpression}`) &&
+    isRecord(verdictStep?.env) &&
+    verdictStep.env.HEAD_SHA === expectedHeadExpression &&
+    verdictRun.includes('--arg expected_head "$HEAD_SHA"') &&
+    verdictRun.includes(
+      'select((.body | split("\\n") | index("- Reviewed head SHA: \\($expected_head)")) != null)',
+    );
+
+  const hasAlwaysUploadedResult = steps.some((step) => {
+    if (
+      typeof step.uses !== 'string' ||
+      !step.uses.startsWith('actions/upload-artifact@')
+    ) {
+      return false;
+    }
+    if (unwrapGithubExpression(stringify(step.if)) !== 'always()') {
+      return false;
+    }
+    if (!isRecord(step.with)) return false;
+    return (
+      step.with.path === 'claude-review-verdict.json' &&
+      step.with['if-no-files-found'] === 'error'
+    );
+  });
+
+  if (
+    !reviewJob ||
+    !hasThreeBoundedAttempts ||
+    !initializesBeforeReview ||
+    !hasFailClosedVerdictCheck ||
+    !hasAlwaysUploadedResult
+  ) {
+    violations.push({
+      file,
+      message: CLAUDE_REVIEW_UNAVAILABLE_RESULT_MESSAGE,
+    });
+  }
+  if (reviewStepIndexes.length === 3 && !hasRequiredFallbackSequence) {
+    violations.push({
+      file,
+      message: CLAUDE_REVIEW_FALLBACK_SEQUENCE_MESSAGE,
+    });
+  }
+  if (hasFailClosedVerdictCheck && !hasExpectedHeadBinding) {
+    violations.push({
+      file,
+      message: CLAUDE_REVIEW_HEAD_BINDING_MESSAGE,
+    });
+  }
+
+  return violations;
+}
+
 function collectFileViolations(rootDir: string, file: string): Violation[] {
   const raw = readFileSync(join(rootDir, file), 'utf8');
   const violations: Violation[] = [];
@@ -484,6 +654,8 @@ function collectFileViolations(rootDir: string, file: string): Violation[] {
   }
 
   if (!isRecord(parsed)) return violations;
+
+  violations.push(...validateClaudeReviewContract(file, parsed));
 
   const workflowOn = getWorkflowOn(parsed);
   const pullRequestWorkflow =
