@@ -1,7 +1,7 @@
 # 13+ EEA Launch Perimeter — Child Consent Ages and Country Ruling
 
 **Status:** Product/compliance ruling for launch planning; external privacy and AI-regulatory counsel sign-off still required  
-**As of:** 2026-07-23  
+**As of:** 2026-07-24 — launch/expansion split clarified
 **Scope:** EEA residents only (EU-27 + Iceland, Liechtenstein, Norway)  
 **Explicitly excluded:** United Kingdom  
 **Controller assumed:** ZWIZZLY AS, established in Norway  
@@ -20,7 +20,7 @@ MentoMate's launch age policy is:
 | Age | Product status | Consent treatment |
 |---|---|---|
 | 0–12 | **Unavailable at launch in every country.** | No account creation, guardian workaround, or store availability should enable use. |
-| 13–17 | **Minor.** | The learner may self-consent only when their age has reached the Article 8 threshold for their country of habitual residence. Below that national threshold, verified guardian authorization is required. Under-18 safety, transparency, profiling, and billing protections continue even where self-consent is valid. |
+| 13–17 | **Minor.** | At initial launch, the learner is eligible only where their age has reached a currently verified Article 8 threshold of 13 for their country of habitual residence. Higher-threshold countries remain disabled until the later expansion phase supplies verified guardian authorization. Under-18 safety, transparency, profiling, and billing protections continue even where self-consent is valid. |
 | 18+ | **Adult.** | Adult consent/capacity rules apply. |
 
 There is no single EEA-wide “teen” consent age. Within the 13–17 bracket, the
@@ -30,6 +30,10 @@ product must compute:
 guardian_authorization_required =
   learner_age < article_8_age_for_residence_country
 ```
+
+At initial launch, a `true` result means the country/age combination is
+unavailable. In the later expansion phase, it enters the jurisdiction-correct
+guardian-authorisation flow.
 
 The comparison must use exact date of birth, not birth year. The governing
 product input is habitual residence, not nationality, UI language, IP address,
@@ -41,21 +45,29 @@ teen or guardian to grant it according to consent capacity.
 
 ### Country decision
 
-MentoMate can use one **13+ product floor across all enabled EEA countries**.
-The user's country of habitual residence determines whether the 13–17 user may
-self-consent or must complete a verified guardian-authorization flow:
+MentoMate will use one **13+ product floor across all enabled countries**, but
+the initial launch and later expansion have different enablement rules.
+
+**Initial launch:** enable only EEA countries whose current, verified Article 8
+threshold is 13. A 13–17-year-old in those countries may self-consent. Every
+higher-threshold, unknown, stale, unsupported, or legally unverified country
+remains disabled.
+
+**Later expansion:** add further countries MentoMate can lawfully and
+operationally support after the country matrix and jurisdiction-correct
+guardian-authorisation flow are implemented, legally verified, tested, and
+enabled. In that phase:
 
 - threshold 13: ages 13–17 may self-consent;
 - threshold 14: age 13 requires guardian authorization;
 - threshold 15: ages 13–14 require guardian authorization; and
 - threshold 16: ages 13–15 require guardian authorization.
 
-All 30 EEA countries are therefore within the intended launch-country policy
-perimeter, subject to the common launch gates and the country caveats below.
-The nine age-13 countries are **guardian-free at 13**, not the only countries
-where a 13+ product can operate. An operational rollout may still enable
-countries in waves, but those waves are delivery sequencing rather than a
-different legal age policy.
+All 30 EEA countries remain within the **future support research perimeter**,
+subject to the common gates and country caveats below. Only the nine age-13
+countries are candidates for the **initial launch allowlist**. This is an
+operational risk-reduction decision, not a claim that a 13+ service can never
+operate in higher-threshold countries.
 
 **Portugal's current threshold is 13, but it requires a launch-day legal
 refresh.** Its Parliament is actively considering **Bill 398/XVII/1 — proposed
@@ -90,8 +102,8 @@ already production-ready.
   habitual residence.
 - Consent remains a location-blind GDPR path with a conservative guardian gate
   through age 16. There is no server-owned ISO-country allowlist implementing
-  the 30-country EEA perimeter and no Article 8 threshold lookup by habitual
-  residence.
+  either the initial threshold-13-country allowlist or the later 30-country
+  support perimeter, and no Article 8 threshold lookup by habitual residence.
 
 Therefore **no EEA country is technically enabled by this ruling alone**.
 Country-level residence capture, assurance, threshold evaluation, policy
@@ -177,12 +189,13 @@ that the country has no additional child rules.
 Count check: 30 EEA states = 9 at age 13, 6 at age 14, 5 at age 15,
 and 10 at age 16.
 
-## Implementation sequence — not the legal perimeter
+## Implementation sequence
 
-The launch-country policy covers all 30 EEA countries. Product and engineering
-may still ship the controls in waves. A country must remain technically
-disabled until the controls needed for its threshold band and its national
-review are complete; this sequencing does not change the EEA-wide 13+ ruling.
+The initial launch is limited to the verified threshold-13 countries below.
+Higher-threshold countries are later expansion waves, not members of the
+initial launch allowlist. Every country remains technically disabled until its
+common gates, national review, localisation, and applicable consent controls
+are complete.
 
 ### Wave 0 — Norway home-market pilot
 
@@ -340,12 +353,13 @@ The launch-country policy produced by this ruling is:
 
 ```text
 minimum_age = 13
-intended_eea_country_perimeter = [
+future_eea_support_research_perimeter = [
   "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR",
   "DE", "GR", "HU", "IS", "IE", "IT", "LV", "LI", "LT", "LU",
   "MT", "NL", "NO", "PL", "PT", "RO", "SK", "SI", "ES", "SE"
 ]
 enabled_eea_country_allowlist = []
+initial_launch_candidate_threshold = 13
 article_8_threshold_by_residence = {
   13: ["BE", "EE", "FI", "IS", "LV", "MT", "NO", "PT", "SE"],
   14: ["AT", "BG", "CY", "IT", "LT", "ES"],
@@ -357,11 +371,14 @@ denylist = ["GB"]
 non_eea_countries = "disabled unless separately ruled"
 ```
 
-The perimeter expresses the intended EEA-wide product scope. The empty enabled
-allowlist records the current implementation truth: no country is enabled by
-this document alone. Add a country only after its common gates, national
-review, localization, and applicable guardian flow are production-ready. The
-UK and every other non-EEA country require a separate ruling.
+The future-support perimeter expresses the intended expansion scope, not the
+initial launch. The empty enabled allowlist records the current implementation
+truth: no country is enabled by this document alone. For initial launch, add
+only threshold-13 countries after their common gates, launch-day legal review,
+and localisation are complete. Add higher-threshold countries only in the later
+expansion phase after their jurisdiction-correct guardian flow is
+production-ready. The UK and every other non-EEA country require a separate
+ruling before support.
 
 ## Primary framework sources
 
