@@ -41,6 +41,19 @@ const mockSuggestedTopicAId = '11111111-1111-4111-8111-111111111111';
 const mockSuggestedTopicBId = '33333333-3333-4333-8333-333333333333';
 const mockSuggestedTopicCId = '44444444-4444-4444-8444-444444444444';
 const mockSuggestedTopicDId = '55555555-5555-4555-8555-555555555555';
+const defaultActiveProfile = {
+  id: mockTestProfileId,
+  accountId: mockTestAccountId,
+  displayName: 'Test Learner',
+  isOwner: true,
+  hasPremiumLlm: false,
+  conversationLanguage: 'en',
+  pronouns: null,
+  consentStatus: null,
+  birthYear: 2012,
+};
+let mockActiveProfile: typeof defaultActiveProfile | null =
+  defaultActiveProfile;
 
 // [BUG-134] Test-side: Redirect stub so we can observe the auth-gate output
 // without pulling in a real navigation context.
@@ -118,17 +131,7 @@ jest.mock(
 jest.mock('../../lib/profile', /* gc1-allow: native-boundary: ProfileProvider uses SecureStore (native) */ () => ({
     ...jest.requireActual('../../lib/profile'),
     useProfile: () => ({
-      activeProfile: {
-        id: mockTestProfileId,
-        accountId: mockTestAccountId,
-        displayName: 'Test Learner',
-        isOwner: true,
-        hasPremiumLlm: false,
-        conversationLanguage: 'en',
-        pronouns: null,
-        consentStatus: null,
-        birthYear: 2012,
-      },
+      activeProfile: mockActiveProfile,
       profiles: [
         {
           id: mockTestProfileId,
@@ -506,6 +509,7 @@ describe('SessionSummaryScreen', () => {
       childProfile: null,
       parentProfile: null,
     });
+    mockActiveProfile = defaultActiveProfile;
     mockSubmitResult = null;
     mockRetryFeedbackResult = {
       summary: {
@@ -527,6 +531,7 @@ describe('SessionSummaryScreen', () => {
       },
     };
     mockParams.subjectName = 'Mathematics';
+    mockParams.sessionId = '660e8400-e29b-41d4-a716-446655440000';
     mockParams.exchangeCount = '5';
     mockParams.escalationRung = '2';
     mockParams.wallClockSeconds = undefined;
@@ -2560,6 +2565,57 @@ describe('SessionSummaryScreen', () => {
       // It must NOT fall through to the generic "Session not found"
       // catch-all — that branch is for non-404 errors.
       expect(screen.queryByTestId('session-not-found-go-home')).toBeNull();
+    });
+
+    it('dismisses an expired Journal summary to the retained Journal tab', async () => {
+      mockParams.returnTo = 'journal';
+      mockFetch.setRoute(
+        'transcript',
+        () =>
+          new Response(JSON.stringify({ message: 'Gone' }), { status: 404 }),
+      );
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('expired-session-go-home');
+      });
+      fireEvent.press(screen.getByTestId('expired-session-go-home'));
+
+      expect(mockDismissTo).toHaveBeenCalledWith(JOURNAL_HREF);
+      expect(mockBack).not.toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalledWith(JOURNAL_HREF);
+    });
+
+    it('dismisses a Journal summary with a missing session id to the retained Journal tab', () => {
+      mockParams.returnTo = 'journal';
+      mockParams.sessionId = undefined;
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      fireEvent.press(screen.getByTestId('session-summary-missing-param'));
+
+      expect(mockDismissTo).toHaveBeenCalledWith(JOURNAL_HREF);
+      expect(mockBack).not.toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalledWith(JOURNAL_HREF);
+    });
+
+    it('dismisses a settled no-data Journal summary to the retained Journal tab', async () => {
+      mockActiveProfile = null;
+      mockParams.returnTo = 'journal';
+      mockParams.exchangeCount = undefined;
+      mockParams.wallClockSeconds = undefined;
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('session-not-found-go-home');
+      });
+      fireEvent.press(screen.getByTestId('session-not-found-go-home'));
+
+      expect(mockDismissTo).toHaveBeenCalledWith(JOURNAL_HREF);
+      expect(mockBack).not.toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalledWith(JOURNAL_HREF);
     });
   });
 

@@ -449,12 +449,26 @@ export default function SessionSummaryScreen() {
     }
   };
 
-  const finishSummaryNavigation = (): void => {
+  const navigateToSummaryHome = (preferBack: boolean): void => {
     if (resolvedReturnTo === JOURNAL_RETURN_TO) {
       // Pop to the already-mounted Journal tab route. Replacing this root
       // summary route leaves the retained tab underneath and mounts a second
       // Journal screen; dismissTo also replaces safely for a direct deep link.
       router.dismissTo(JOURNAL_HREF);
+      return;
+    }
+
+    if (preferBack) {
+      goBackOrReplace(router, summaryHomeHref);
+      return;
+    }
+
+    router.replace(summaryHomeHref as Href);
+  };
+
+  const finishSummaryNavigation = (): void => {
+    if (resolvedReturnTo === JOURNAL_RETURN_TO) {
+      navigateToSummaryHome(false);
       return;
     }
 
@@ -487,11 +501,11 @@ export default function SessionSummaryScreen() {
     }
 
     if (isRevisitedPersistedSummary) {
-      goBackOrReplace(router, summaryHomeHref);
+      navigateToSummaryHome(true);
       return;
     }
 
-    router.replace(summaryHomeHref as Href);
+    navigateToSummaryHome(false);
   };
 
   // [BUG-134] Auth gate (see comment at top of component).
@@ -523,7 +537,7 @@ export default function SessionSummaryScreen() {
         message={t('sessionSummary.notFoundHeadHomeMessage')}
         primaryAction={{
           label: t('common.goHome'),
-          onPress: () => goBackOrReplace(router, summaryHomeHref),
+          onPress: () => navigateToSummaryHome(true),
           testID: 'session-summary-missing-param',
         }}
       />
@@ -554,7 +568,7 @@ export default function SessionSummaryScreen() {
         <Button
           variant="primary"
           label={t('common.goHome')}
-          onPress={() => goBackOrReplace(router, summaryHomeHref)}
+          onPress={() => navigateToSummaryHome(true)}
           testID="expired-session-go-home"
         />
       </View>
@@ -575,7 +589,7 @@ export default function SessionSummaryScreen() {
         <Button
           variant="primary"
           label={t('common.goHome')}
-          onPress={() => goBackOrReplace(router, summaryHomeHref)}
+          onPress={() => navigateToSummaryHome(true)}
           testID="session-not-found-go-home"
         />
       </View>
@@ -604,7 +618,7 @@ export default function SessionSummaryScreen() {
           }}
           secondaryAction={{
             label: t('common.goHome'),
-            onPress: () => goBackOrReplace(router, summaryHomeHref),
+            onPress: () => navigateToSummaryHome(true),
           }}
         />
       );
@@ -639,7 +653,7 @@ export default function SessionSummaryScreen() {
         <Button
           variant="primary"
           label={t('common.goHome')}
-          onPress={() => router.replace(summaryHomeHref as Href)}
+          onPress={() => navigateToSummaryHome(false)}
           testID="session-not-found-go-home"
         />
       </View>
