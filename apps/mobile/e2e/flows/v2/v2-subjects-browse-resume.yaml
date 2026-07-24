@@ -94,6 +94,70 @@ tags:
     id: 'subject-hub-title-${SUBJECT_ID}'
     text: '^World History$'
 
+# Re-enter the exact seeded topic through its Hub-owned sheet, resume its
+# seeded session from the Topic screen, and require Android Back to restore
+# that same owning Hub. A generic Hub, Home, or an adjacent session is not
+# sufficient evidence for this path.
+- scrollUntilVisible:
+    element:
+      id: 'subject-hub-topic-${TOPIC_ID}'
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: 'subject-hub-topic-${TOPIC_ID}'
+    containsDescendants:
+      - text: '^World History Topic 1$'
+- tapOn:
+    id: 'subject-hub-topic-${TOPIC_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'subject-hub-topic-sheet'
+    timeout: 10000
+- assertVisible:
+    id: 'subject-hub-topic-sheet'
+    containsDescendants:
+      - text: '^World History Topic 1$'
+- tapOn:
+    text: '^Study$'
+    childOf:
+      id: 'subject-hub-topic-sheet'
+- extendedWaitUntil:
+    visible:
+      id: 'topic-detail-scroll'
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: 'study-cta'
+    timeout: 15000
+- tapOn:
+    id: 'study-cta'
+- extendedWaitUntil:
+    visible:
+      id: 'session-screen'
+    timeout: 45000
+- extendedWaitUntil:
+    visible:
+      id: 'session-screen'
+      containsDescendants:
+        - text: '^Tell me about ancient Rome$'
+        - text: '^Ancient Rome was founded in 753 BC\.\.\.$'
+    timeout: 30000
+- pressKey: back
+- extendedWaitUntil:
+    visible:
+      id: 'subject-hub-screen'
+    timeout: 15000
+- assertNotVisible:
+    id: 'mentor-screen'
+- scrollUntilVisible:
+    element:
+      id: 'subject-hub-title-${SUBJECT_ID}'
+    direction: UP
+    timeout: 15000
+- assertVisible:
+    id: 'subject-hub-title-${SUBJECT_ID}'
+    text: '^World History$'
+
 # Next Up must resume the seed's active SESSION_ID. These transcript lines are
 # stored only on that seeded session, so their presence proves the association
 # rather than merely proving that some session screen opened.

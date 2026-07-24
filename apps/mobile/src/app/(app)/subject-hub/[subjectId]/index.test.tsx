@@ -1809,6 +1809,184 @@ describe('SubjectHubRoute — manage entry (WI-1119)', () => {
     expect(screen.queryByTestId('subject-hub-pause')).toBeNull();
   });
 
+  it.each(
+    (['paused', 'archived'] as const).flatMap((status) =>
+      (
+        [
+          {
+            emptyKind: 'pick-book',
+            blockedAction: 'subject-hub-pick-book-cta',
+          },
+          {
+            emptyKind: 'preparing',
+            blockedAction: 'subject-hub-preparing-retry',
+          },
+          {
+            emptyKind: 'stuck',
+            blockedAction: 'subject-hub-stuck-retry',
+          },
+        ] as const
+      ).map((emptyState) => ({ status, ...emptyState })),
+    ),
+  )(
+    'keeps a $status subject in the $emptyKind state management-only',
+    async ({ blockedAction, emptyKind, status }) => {
+      mockFetch.setRoute('/subjects', {
+        subjects: [
+          {
+            id: SUBJECT_ID,
+            profileId: '990e8400-e29b-41d4-a716-446655440004',
+            name: 'Spanish',
+            status,
+            curriculumStatus: emptyKind === 'preparing' ? 'preparing' : 'ready',
+            pedagogyMode: 'socratic',
+            createdAt: '2026-06-01T00:00:00.000Z',
+            updatedAt: '2026-06-01T00:00:00.000Z',
+          },
+        ],
+      });
+
+      if (emptyKind === 'pick-book') {
+        mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books`, { books: [] });
+        mockFetch.setRoute(`/subjects/${SUBJECT_ID}/retention`, {
+          topics: [],
+          reviewDueCount: 0,
+        });
+        mockFetch.setRoute('/progress/resume-target', { target: null });
+      } else if (emptyKind === 'preparing') {
+        mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books`, {
+          books: [
+            {
+              id: BOOK_ID,
+              subjectId: SUBJECT_ID,
+              title: 'Spanish 1',
+              description: null,
+              emoji: null,
+              sortOrder: 1,
+              topicsGenerated: false,
+              status: 'NOT_STARTED',
+              topicCount: 0,
+              completedTopicCount: 0,
+              masteredTopicCount: 0,
+              createdAt: '2026-06-01T00:00:00.000Z',
+              updatedAt: '2026-06-01T00:00:00.000Z',
+            },
+          ],
+        });
+        mockFetch.setRoute(`/subjects/${SUBJECT_ID}/retention`, {
+          topics: [],
+          reviewDueCount: 0,
+        });
+        mockFetch.setRoute('/progress/resume-target', { target: null });
+      } else {
+        mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books/${BOOK_ID}`, {
+          book: {
+            id: BOOK_ID,
+            subjectId: SUBJECT_ID,
+            title: 'Spanish 1',
+            description: null,
+            emoji: null,
+            sortOrder: 1,
+            topicsGenerated: true,
+            createdAt: '2026-06-01T00:00:00.000Z',
+            updatedAt: '2026-06-01T00:00:00.000Z',
+          },
+          topics: [
+            {
+              id: TOPIC_ID,
+              title: 'Greetings',
+              description: 'Say hello.',
+              sortOrder: 1,
+              relevance: 'core',
+              estimatedMinutes: 20,
+              bookId: BOOK_ID,
+              chapter: 'Basics',
+              skipped: true,
+            },
+          ],
+          connections: [],
+          status: 'IN_PROGRESS',
+          completedTopicIds: [],
+        });
+        mockFetch.setRoute(`/subjects/${SUBJECT_ID}/retention`, {
+          topics: [],
+          reviewDueCount: 0,
+        });
+        mockFetch.setRoute('/progress/resume-target', { target: null });
+      }
+
+      render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+      await waitFor(() => {
+        screen.getByTestId('subject-hub-inactive-empty');
+      });
+
+      screen.getByTestId('subject-hub-inactive-manage');
+      expect(screen.queryByTestId(blockedAction)).toBeNull();
+      expect(screen.queryByTestId('subject-hub-next-up-action')).toBeNull();
+
+      fireEvent.press(screen.getByTestId('subject-hub-inactive-manage'));
+      screen.getByTestId(
+        status === 'paused' ? 'subject-hub-resume' : 'subject-hub-restore',
+      );
+    },
+  );
+
+  it('does not infer an inactive subject from a missing status record', async () => {
+    mockFetch.setRoute('/subjects', { subjects: [] });
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books`, { books: [] });
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/retention`, {
+      topics: [],
+      reviewDueCount: 0,
+    });
+    mockFetch.setRoute('/progress/resume-target', { target: null });
+
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-pick-book');
+    });
+
+    expect(screen.queryByTestId('subject-hub-inactive-empty')).toBeNull();
+    expect(screen.queryByTestId('subject-hub-inactive-manage')).toBeNull();
+  });
+
+  it.each(['paused', 'archived'] as const)(
+    'keeps an inactive %s subject read-only in supporter scope',
+    async (status) => {
+      mockFetch.setRoute('/subjects', {
+        subjects: [
+          {
+            id: SUBJECT_ID,
+            profileId: '990e8400-e29b-41d4-a716-446655440004',
+            name: 'Spanish',
+            status,
+            curriculumStatus: 'ready',
+            pedagogyMode: 'socratic',
+            createdAt: '2026-06-01T00:00:00.000Z',
+            updatedAt: '2026-06-01T00:00:00.000Z',
+          },
+        ],
+      });
+      mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books`, { books: [] });
+      mockFetch.setRoute(`/subjects/${SUBJECT_ID}/retention`, {
+        topics: [],
+        reviewDueCount: 0,
+      });
+      mockFetch.setRoute('/progress/resume-target', { target: null });
+
+      render(<SubjectHubRoute />, { wrapper: proxyWrapper() });
+
+      await waitFor(() => {
+        screen.getByTestId('subject-hub-inactive-empty');
+      });
+
+      screen.getByTestId('subject-hub-inactive-back');
+      expect(screen.queryByTestId('subject-hub-inactive-manage')).toBeNull();
+      expect(screen.queryByTestId('subject-hub-manage-sheet')).toBeNull();
+    },
+  );
+
   it.each(['paused', 'archived'] as const)(
     'keeps a %s subject visible for management without exposing study or review actions',
     async (status) => {

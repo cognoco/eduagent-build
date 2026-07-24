@@ -19,6 +19,7 @@ import {
 import { queryKeys } from '../../../lib/query-keys';
 import { createTestProfile } from '../../../test-utils/app-hook-test-utils';
 import {
+  consumeHubToSessionTransition,
   consumeHubToTopicTransition,
   markHubToTopicTransition,
   resetNavigationTransitionProvenanceForTests,
@@ -63,7 +64,6 @@ const mockPush = jest.fn();
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockCanGoBack = jest.fn(() => true);
-const mockPushLearningResumeTarget = jest.fn();
 type TopicRouteParams = {
   subjectId: string;
   topicId: string;
@@ -118,15 +118,6 @@ jest.mock(
       warning: '#ffbb33',
       danger: '#ff4444',
     }),
-  }),
-);
-
-jest.mock(
-  '../../../lib/navigation' /* gc1-allow: pushLearningResumeTarget emits the multi-route handoff covered by navigation tests; this route suite observes only its owning Subject parameters */,
-  () => ({
-    ...jest.requireActual('../../../lib/navigation'),
-    pushLearningResumeTarget: (...args: unknown[]) =>
-      mockPushLearningResumeTarget(...args),
   }),
 );
 
@@ -401,6 +392,7 @@ describe('TopicDetailScreen action buttons', () => {
       returnTo: 'subject-hub',
     });
     setupRoutes({ completionStatus: 'not_started' });
+    markHubToTopicTransition(SUBJECT_ID, TOPIC_ID);
 
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
@@ -409,7 +401,7 @@ describe('TopicDetailScreen action buttons', () => {
     });
     fireEvent.press(screen.getByTestId('study-cta'));
 
-    expect(mockPush).toHaveBeenCalledWith({
+    expect(mockReplace).toHaveBeenCalledWith({
       pathname: '/(app)/session',
       params: {
         mode: 'learning',
@@ -420,6 +412,8 @@ describe('TopicDetailScreen action buttons', () => {
         returnId: SUBJECT_ID,
       },
     });
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(consumeHubToSessionTransition(SUBJECT_ID)).toBe(true);
   });
 
   it('preserves Subject Hub return ownership when Review starts a review session', async () => {
@@ -430,6 +424,7 @@ describe('TopicDetailScreen action buttons', () => {
       returnTo: 'subject-hub',
     });
     setupRoutes({ completionStatus: 'completed' });
+    markHubToTopicTransition(SUBJECT_ID, TOPIC_ID);
 
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
@@ -438,7 +433,7 @@ describe('TopicDetailScreen action buttons', () => {
     });
     fireEvent.press(screen.getByTestId('study-cta'));
 
-    expect(mockPush).toHaveBeenCalledWith({
+    expect(mockReplace).toHaveBeenCalledWith({
       pathname: '/(app)/session',
       params: {
         mode: 'review',
@@ -449,6 +444,8 @@ describe('TopicDetailScreen action buttons', () => {
         returnId: SUBJECT_ID,
       },
     });
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(consumeHubToSessionTransition(SUBJECT_ID)).toBe(true);
   });
 
   // [WI-2112] challenge.start deep links (Now-feed cards, mentor-bar intents,
@@ -542,11 +539,18 @@ describe('TopicDetailScreen action buttons', () => {
     });
     fireEvent.press(screen.getByTestId('study-cta'));
 
-    expect(mockPushLearningResumeTarget).toHaveBeenCalledWith(
-      expect.anything(),
-      target,
-    );
-    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenNthCalledWith(1, '/(app)/home');
+    expect(mockPush).toHaveBeenNthCalledWith(2, {
+      pathname: '/(app)/session',
+      params: {
+        mode: 'learning',
+        subjectId: SUBJECT_ID,
+        subjectName: 'Math',
+        topicId: TOPIC_ID,
+        topicName: 'Algebra',
+        resumeFromSessionId: SESSION_ID,
+      },
+    });
   });
 
   it.each([
@@ -577,6 +581,7 @@ describe('TopicDetailScreen action buttons', () => {
         ...(mode ? { mode } : {}),
         returnTo: 'subject-hub',
       });
+      markHubToTopicTransition(SUBJECT_ID, TOPIC_ID);
 
       render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
@@ -585,15 +590,70 @@ describe('TopicDetailScreen action buttons', () => {
       });
       fireEvent.press(screen.getByTestId('study-cta'));
 
-      expect(mockPushLearningResumeTarget).toHaveBeenCalledWith(
-        expect.anything(),
-        target,
-        'subject-hub',
-        SUBJECT_ID,
-      );
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(app)/session',
+        params: {
+          mode: 'learning',
+          subjectId: SUBJECT_ID,
+          subjectName: 'Math',
+          topicId: TOPIC_ID,
+          topicName: 'Algebra',
+          resumeFromSessionId: SESSION_ID,
+          returnTo: 'subject-hub',
+          returnId: SUBJECT_ID,
+        },
+      });
       expect(mockPush).not.toHaveBeenCalled();
+      expect(consumeHubToSessionTransition(SUBJECT_ID)).toBe(true);
     },
   );
+
+  it('does not trust a crafted Subject Hub return token as native history when resuming', async () => {
+    const target = {
+      subjectId: SUBJECT_ID,
+      subjectName: 'Math',
+      topicId: TOPIC_ID,
+      topicTitle: 'Algebra',
+      sessionId: null,
+      resumeFromSessionId: SESSION_ID,
+      resumeKind: 'recent_topic',
+      lastActivityAt: '2026-02-15T09:00:00.000Z',
+      reason: 'Continue Algebra',
+    };
+    setupRoutes({
+      completionStatus: 'in_progress',
+      activeSessionId: SESSION_ID,
+      resumeTarget: target,
+    });
+    mockUseLocalSearchParams.mockReturnValue({
+      subjectId: SUBJECT_ID,
+      topicId: TOPIC_ID,
+      returnTo: 'subject-hub',
+    });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('study-cta');
+    });
+    fireEvent.press(screen.getByTestId('study-cta'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: {
+        mode: 'learning',
+        subjectId: SUBJECT_ID,
+        subjectName: 'Math',
+        topicId: TOPIC_ID,
+        topicName: 'Algebra',
+        resumeFromSessionId: SESSION_ID,
+        returnTo: 'subject-hub',
+        returnId: SUBJECT_ID,
+      },
+    });
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(consumeHubToSessionTransition(SUBJECT_ID)).toBe(false);
+  });
 
   it('carries the active sessionId when a challenge.start deep link has an active session but no shared resume target', async () => {
     setupRoutes({
@@ -626,39 +686,48 @@ describe('TopicDetailScreen action buttons', () => {
     });
   });
 
-  it('preserves Subject Hub return ownership when challenge.start falls back to an active session', async () => {
-    setupRoutes({
-      completionStatus: 'in_progress',
-      activeSessionId: SESSION_ID,
-      resumeTarget: null,
-    });
-    mockUseLocalSearchParams.mockReturnValue({
-      subjectId: SUBJECT_ID,
-      topicId: TOPIC_ID,
-      mode: 'challenge',
-      returnTo: 'subject-hub',
-    });
-
-    render(<TopicDetailScreen />, { wrapper: TestWrapper });
-
-    await waitFor(() => {
-      screen.getByTestId('study-cta');
-    });
-    fireEvent.press(screen.getByTestId('study-cta'));
-
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/session',
-      params: {
-        mode: 'learning',
+  it.each([
+    ['ordinary Study', undefined],
+    ['challenge.start', 'challenge'],
+  ] as const)(
+    'preserves the owning Hub when %s falls back to an active session',
+    async (_entryPath, mode) => {
+      setupRoutes({
+        completionStatus: 'in_progress',
+        activeSessionId: SESSION_ID,
+        resumeTarget: null,
+      });
+      mockUseLocalSearchParams.mockReturnValue({
         subjectId: SUBJECT_ID,
         topicId: TOPIC_ID,
-        topicName: 'Algebra',
-        sessionId: SESSION_ID,
+        ...(mode ? { mode } : {}),
         returnTo: 'subject-hub',
-        returnId: SUBJECT_ID,
-      },
-    });
-  });
+      });
+      markHubToTopicTransition(SUBJECT_ID, TOPIC_ID);
+
+      render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('study-cta');
+      });
+      fireEvent.press(screen.getByTestId('study-cta'));
+
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(app)/session',
+        params: {
+          mode: 'learning',
+          subjectId: SUBJECT_ID,
+          topicId: TOPIC_ID,
+          topicName: 'Algebra',
+          sessionId: SESSION_ID,
+          returnTo: 'subject-hub',
+          returnId: SUBJECT_ID,
+        },
+      });
+      expect(mockPush).not.toHaveBeenCalled();
+      expect(consumeHubToSessionTransition(SUBJECT_ID)).toBe(true);
+    },
+  );
 
   it('shows "Review this topic" as CTA for in_progress topics', async () => {
     setupRoutes({
@@ -697,11 +766,18 @@ describe('TopicDetailScreen action buttons', () => {
       screen.getByTestId('study-cta');
     });
     fireEvent.press(screen.getByTestId('study-cta'));
-    expect(mockPushLearningResumeTarget).toHaveBeenCalledWith(
-      expect.anything(),
-      target,
-    );
-    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenNthCalledWith(1, '/(app)/home');
+    expect(mockPush).toHaveBeenNthCalledWith(2, {
+      pathname: '/(app)/session',
+      params: {
+        mode: 'learning',
+        subjectId: SUBJECT_ID,
+        subjectName: 'Math',
+        topicId: TOPIC_ID,
+        topicName: 'Algebra',
+        resumeFromSessionId: SESSION_ID,
+      },
+    });
   });
 
   it('shows "Review this topic" when the learner has high failure count', async () => {

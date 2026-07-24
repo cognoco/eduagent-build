@@ -890,6 +890,78 @@ describe('SessionScreen homework flow', () => {
     }
   });
 
+  it('pops to the owning Subject Hub on native after consuming the real Topic handoff', async () => {
+    const mockBack = jest.fn();
+    const mockCanGoBack = jest.fn(() => true);
+    markHubToSessionTransition(SUBJECT_ID);
+    (useRouter as jest.Mock).mockReturnValue({
+      back: mockBack,
+      canGoBack: mockCanGoBack,
+      replace: mockReplace,
+      setParams: mockSetParams,
+    });
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: SUBJECT_ID,
+      subjectName: 'Math',
+      topicId: TOPIC_ID,
+      topicName: 'Linear equations',
+      returnTo: 'subject-hub',
+      returnId: SUBJECT_ID,
+    });
+
+    const testScreen = renderSessionScreen();
+    await flushAsyncWork();
+    expect(consumeHubToSessionTransition(SUBJECT_ID)).toBe(false);
+    mockReplace.mockClear();
+
+    fireEvent.press(testScreen.getByTestId('mock-back-button'));
+
+    expect(mockCanGoBack).toHaveBeenCalledTimes(1);
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('replaces to the exact owning Subject Hub on web after the same Topic handoff', async () => {
+    const platformReplacement = jest.replaceProperty(Platform, 'OS', 'web');
+    try {
+      const mockBack = jest.fn();
+      const mockCanGoBack = jest.fn(() => true);
+      markHubToSessionTransition(SUBJECT_ID);
+      (useRouter as jest.Mock).mockReturnValue({
+        back: mockBack,
+        canGoBack: mockCanGoBack,
+        replace: mockReplace,
+        setParams: mockSetParams,
+      });
+      (useLocalSearchParams as jest.Mock).mockReturnValue({
+        mode: 'learning',
+        subjectId: SUBJECT_ID,
+        subjectName: 'Math',
+        topicId: TOPIC_ID,
+        topicName: 'Linear equations',
+        returnTo: 'subject-hub',
+        returnId: SUBJECT_ID,
+      });
+
+      const testScreen = renderSessionScreen();
+      await flushAsyncWork();
+      expect(consumeHubToSessionTransition(SUBJECT_ID)).toBe(false);
+      mockReplace.mockClear();
+
+      fireEvent.press(testScreen.getByTestId('mock-back-button'));
+
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(app)/subject-hub/[subjectId]',
+        params: { subjectId: SUBJECT_ID },
+      });
+      expect(mockCanGoBack).not.toHaveBeenCalled();
+      expect(mockBack).not.toHaveBeenCalled();
+    } finally {
+      platformReplacement.restore();
+    }
+  });
+
   describe('managed-child mentor birth moment', () => {
     const childMentorBirthKey = `mentorBirthSeen_${CHILD_PROFILE_ID}`;
 

@@ -7228,6 +7228,77 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         },
       },
     ];
+    const exactTopicSheetOwnership: Selector[] = [
+      {
+        extendedWaitUntil: {
+          visible: { id: 'subject-hub-topic-sheet' },
+          timeout: 10000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'subject-hub-topic-sheet',
+          containsDescendants: [{ text: '^World History Topic 1$' }],
+        },
+      },
+    ];
+    const exactTopicResumeToOwningHub: Selector[] = [
+      ...exactTopicVisibilitySync,
+      ...exactTopicSheetOwnership,
+      {
+        tapOn: {
+          text: '^Study$',
+          childOf: { id: 'subject-hub-topic-sheet' },
+        },
+      },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'topic-detail-scroll' },
+          timeout: 15000,
+        },
+      },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'study-cta' },
+          timeout: 15000,
+        },
+      },
+      { tapOn: { id: 'study-cta' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'session-screen' },
+          timeout: 45000,
+        },
+      },
+      {
+        extendedWaitUntil: {
+          visible: {
+            id: 'session-screen',
+            containsDescendants: [
+              { text: '^Tell me about ancient Rome$' },
+              { text: '^Ancient Rome was founded in 753 BC\\.\\.\\.$' },
+            ],
+          },
+          timeout: 30000,
+        },
+      },
+      { pressKey: 'back' },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'subject-hub-screen' },
+          timeout: 15000,
+        },
+      },
+      { assertNotVisible: { id: 'mentor-screen' } },
+      {
+        scrollUntilVisible: {
+          element: { id: 'subject-hub-title-${SUBJECT_ID}' },
+          direction: 'UP',
+          timeout: 15000,
+        },
+      },
+      exactWorldHistoryHubTitle,
+    ];
 
     expect(hasExactCommandSequence(resume, exactWorldHistoryRestore)).toBe(
       true,
@@ -7238,6 +7309,82 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(hasExactCommandSequence(resume, exactNextUpVisibilitySync)).toBe(
       true,
     );
+    expect(hasExactCommandSequence(resume, exactTopicResumeToOwningHub)).toBe(
+      true,
+    );
+    for (const mutation of [
+      exactTopicResumeToOwningHub.filter((_, index) => index !== 1),
+      exactTopicResumeToOwningHub.with(1, {
+        assertVisible: {
+          id: 'subject-hub-topic-${TOPIC_ID}',
+          containsDescendants: [
+            { text: '^World History Topic 1$', optional: true },
+          ],
+        },
+      }),
+      exactTopicResumeToOwningHub.with(1, {
+        assertVisible: {
+          id: 'subject-hub-topic-adjacent-topic',
+          containsDescendants: [{ text: '^World History Topic 1$' }],
+        },
+      }),
+      exactTopicResumeToOwningHub.with(1, {
+        assertVisible: {
+          id: 'subject-hub-topic-${TOPIC_ID}',
+          containsDescendants: [{ text: '^Adjacent History Topic$' }],
+        },
+      }),
+      exactTopicResumeToOwningHub.filter((_, index) => index !== 2),
+      exactTopicResumeToOwningHub.filter((_, index) => index !== 4),
+      exactTopicResumeToOwningHub.with(4, {
+        assertVisible: {
+          id: 'subject-hub-topic-sheet',
+          containsDescendants: [
+            { text: '^World History Topic 1$', optional: true },
+          ],
+        },
+      }),
+      exactTopicResumeToOwningHub.with(4, {
+        assertVisible: {
+          id: 'subject-hub-topic-sheet-adjacent-topic',
+          containsDescendants: [{ text: '^World History Topic 1$' }],
+        },
+      }),
+      exactTopicResumeToOwningHub.with(4, {
+        assertVisible: {
+          id: 'subject-hub-topic-sheet',
+          containsDescendants: [{ text: '^Adjacent History Topic$' }],
+        },
+      }),
+      exactTopicResumeToOwningHub.filter((_, index) => index !== 10),
+      exactTopicResumeToOwningHub.with(10, {
+        extendedWaitUntil: {
+          visible: {
+            id: 'session-screen',
+            containsDescendants: [
+              { text: '^Tell me about adjacent history$' },
+              { text: '^Ancient Rome was founded in 753 BC\\.\\.\\.$' },
+            ],
+            optional: true,
+          },
+          timeout: 30000,
+        },
+      }),
+      exactTopicResumeToOwningHub.filter((_, index) => index !== 11),
+      exactTopicResumeToOwningHub.with(13, {
+        assertNotVisible: { id: 'mentor-screen', optional: true },
+      }),
+      exactTopicResumeToOwningHub.with(15, {
+        assertVisible: {
+          id: 'subject-hub-title-adjacent-subject',
+          text: '^World History$',
+        },
+      }),
+    ]) {
+      expect(
+        hasExactCommandSequence(mutation, exactTopicResumeToOwningHub),
+      ).toBe(false);
+    }
     const titleCheckpointMutations = (checkpoint: Selector[]): Selector[][] => {
       const titleIndex = checkpoint.findIndex((command) =>
         isDeepStrictEqual(command, exactWorldHistoryHubTitle),

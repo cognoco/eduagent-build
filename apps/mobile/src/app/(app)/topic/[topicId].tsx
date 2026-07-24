@@ -52,7 +52,10 @@ import {
   pushLearningResumeTarget,
   SUBJECT_HUB_RETURN_TO,
 } from '../../../lib/navigation';
-import { consumeHubToTopicTransition } from '../../../lib/navigation-transition-provenance';
+import {
+  consumeHubToTopicTransition,
+  markHubToSessionTransition,
+} from '../../../lib/navigation-transition-provenance';
 import { TimeoutLoader } from '../../../components/common';
 import { ShimmerSkeleton } from '../../../components/common/ShimmerSkeleton';
 import { TopicHeader } from '../../../components/library/TopicHeader';
@@ -368,6 +371,34 @@ export default function TopicDetailScreen() {
     router.replace(topicBackFallback);
   }, [hasHubPredecessor, router, topicBackFallback]);
 
+  const openTopicSession = useCallback(
+    (params: {
+      mode: 'learning' | 'review';
+      subjectId?: string;
+      subjectName?: string;
+      topicId?: string;
+      topicName?: string;
+      sessionId?: string;
+      resumeFromSessionId?: string;
+    }): void => {
+      const href = {
+        pathname: '/(app)/session',
+        params: {
+          ...params,
+          ...sessionReturnParams,
+        },
+      } as Href;
+
+      if (sessionReturnId && hasHubPredecessor) {
+        markHubToSessionTransition(sessionReturnId);
+        router.replace(href);
+        return;
+      }
+
+      router.push(href);
+    },
+    [hasHubPredecessor, router, sessionReturnId, sessionReturnParams],
+  );
   const { data: resumeTarget } = useLearningResumeTarget({
     subjectId: subjectId ?? undefined,
     topicId: topicId ?? undefined,
@@ -376,17 +407,26 @@ export default function TopicDetailScreen() {
     if (!resumeTarget) return false;
 
     if (sessionReturnId) {
-      pushLearningResumeTarget(
-        router,
-        resumeTarget,
-        SUBJECT_HUB_RETURN_TO,
-        sessionReturnId,
-      );
+      openTopicSession({
+        mode: 'learning',
+        subjectId: resumeTarget.subjectId,
+        subjectName: resumeTarget.subjectName,
+        ...(resumeTarget.topicId ? { topicId: resumeTarget.topicId } : {}),
+        ...(resumeTarget.topicTitle
+          ? { topicName: resumeTarget.topicTitle }
+          : {}),
+        ...(resumeTarget.sessionId
+          ? { sessionId: resumeTarget.sessionId }
+          : {}),
+        ...(resumeTarget.resumeFromSessionId
+          ? { resumeFromSessionId: resumeTarget.resumeFromSessionId }
+          : {}),
+      });
     } else {
       pushLearningResumeTarget(router, resumeTarget);
     }
     return true;
-  }, [resumeTarget, router, sessionReturnId]);
+  }, [openTopicSession, resumeTarget, router, sessionReturnId]);
 
   const {
     data: topicProgress,
@@ -531,16 +571,12 @@ export default function TopicDetailScreen() {
     // Deep-link mode overrides: route directly to the appropriate mode entry point.
     if (deepLinkMode === 'review' && subjectId && topicId) {
       return () =>
-        router.push({
-          pathname: '/(app)/session',
-          params: {
-            mode: 'review',
-            subjectId,
-            topicId,
-            topicName,
-            ...sessionReturnParams,
-          },
-        } as Href);
+        openTopicSession({
+          mode: 'review',
+          subjectId,
+          topicId,
+          topicName,
+        });
     }
     // [WI-2112] Challenge Round is not a standalone screen — it is an
     // in-session offer/accept flow (useChallengeRound) gated server-side by
@@ -557,19 +593,15 @@ export default function TopicDetailScreen() {
       return () => {
         if (pushResumeTarget()) return;
 
-        router.push({
-          pathname: '/(app)/session',
-          params: {
-            mode: 'learning',
-            subjectId,
-            topicId,
-            topicName,
-            ...(activeSession?.sessionId && {
-              sessionId: activeSession.sessionId,
-            }),
-            ...sessionReturnParams,
-          },
-        } as Href);
+        openTopicSession({
+          mode: 'learning',
+          subjectId,
+          topicId,
+          topicName,
+          ...(activeSession?.sessionId && {
+            sessionId: activeSession.sessionId,
+          }),
+        });
       };
     }
 
@@ -578,16 +610,12 @@ export default function TopicDetailScreen() {
     const completionStatus = topicProgress.completionStatus;
     if (completionStatus === 'not_started') {
       return () =>
-        router.push({
-          pathname: '/(app)/session',
-          params: {
-            mode: 'learning',
-            subjectId,
-            topicId,
-            topicName,
-            ...sessionReturnParams,
-          },
-        } as Href);
+        openTopicSession({
+          mode: 'learning',
+          subjectId,
+          topicId,
+          topicName,
+        });
     }
 
     const isOverdue =
@@ -599,42 +627,33 @@ export default function TopicDetailScreen() {
       ['completed', 'verified', 'stable'].includes(completionStatus)
     ) {
       return () =>
-        router.push({
-          pathname: '/(app)/session',
-          params: {
-            mode: 'review',
-            subjectId,
-            topicId,
-            topicName,
-            ...sessionReturnParams,
-          },
-        } as Href);
+        openTopicSession({
+          mode: 'review',
+          subjectId,
+          topicId,
+          topicName,
+        });
     }
 
     return () => {
       if (pushResumeTarget()) return;
 
-      router.push({
-        pathname: '/(app)/session',
-        params: {
-          mode: 'learning',
-          subjectId,
-          topicId,
-          topicName,
-          ...(activeSession?.sessionId && {
-            sessionId: activeSession.sessionId,
-          }),
-          ...sessionReturnParams,
-        },
-      } as Href);
+      openTopicSession({
+        mode: 'learning',
+        subjectId,
+        topicId,
+        topicName,
+        ...(activeSession?.sessionId && {
+          sessionId: activeSession.sessionId,
+        }),
+      });
     };
   }, [
     activeSession?.sessionId,
     deepLinkMode,
+    openTopicSession,
     pushResumeTarget,
     retentionCard?.nextReviewAt,
-    router,
-    sessionReturnParams,
     subjectId,
     topicId,
     topicName,

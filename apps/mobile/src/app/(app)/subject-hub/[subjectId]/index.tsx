@@ -296,6 +296,28 @@ export default function SubjectHubRoute(): React.ReactElement {
           hub.data.canStudy && canManage && subject?.status === 'active',
       }
     : hub.data;
+  const inactiveEmptyState =
+    hubData &&
+    subject &&
+    subject.status !== 'active' &&
+    hub.emptyKind !== 'none'
+      ? {
+          title:
+            hub.emptyKind === 'preparing'
+              ? t('subjectHub.preparing.titleNamed', {
+                  subject: hubData.subjectName,
+                })
+              : hub.emptyKind === 'stuck'
+                ? t('subjectHub.stuck.title')
+                : t('subjectHub.pickBook.title'),
+          message:
+            hub.emptyKind === 'preparing'
+              ? t('subjectHub.preparing.message')
+              : hub.emptyKind === 'stuck'
+                ? t('subjectHub.stuck.message')
+                : t('subjectHub.pickBook.message'),
+        }
+      : undefined;
   const vocabulary = inventoryEnabled
     ? progressInventory.data?.subjects.find(
         (subject) =>
@@ -324,7 +346,40 @@ export default function SubjectHubRoute(): React.ReactElement {
         testID: 'subject-hub-back',
       }}
     >
-      {hubData && hub.emptyKind === 'preparing' ? (
+      {inactiveEmptyState && hubData ? (
+        <View className="flex-1">
+          <ErrorFallback
+            variant="centered"
+            testID="subject-hub-inactive-empty"
+            title={inactiveEmptyState.title}
+            message={inactiveEmptyState.message}
+            primaryAction={
+              canManage
+                ? {
+                    label: t('subjectHub.manage.open'),
+                    onPress: () => setManageOpen(true),
+                    testID: 'subject-hub-inactive-manage',
+                  }
+                : undefined
+            }
+            secondaryAction={{
+              label: t('common.goBack'),
+              onPress: goBack,
+              testID: 'subject-hub-inactive-back',
+            }}
+          />
+          {canManage ? (
+            <SubjectHubManageSheet
+              visible={manageOpen}
+              subjectName={hubData.subjectName}
+              status={subjectStatus}
+              isSaving={updateSubject.isPending}
+              onClose={() => setManageOpen(false)}
+              onChangeStatus={handleChangeStatus}
+            />
+          ) : null}
+        </View>
+      ) : hubData && hub.emptyKind === 'preparing' ? (
         <SubjectHubPreparing
           subjectName={hubData.subjectName}
           onRetry={() => {

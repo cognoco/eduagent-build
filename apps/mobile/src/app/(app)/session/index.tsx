@@ -17,6 +17,7 @@ import { platformAlert } from '../../../lib/platform-alert';
 import {
   goBackOrReplace,
   MENTOR_RETURN_TO,
+  SUBJECT_HUB_RETURN_TO,
   SUBJECTS_RETURN_TO,
 } from '../../../lib/navigation';
 import { consumeHubToSessionTransition } from '../../../lib/navigation-transition-provenance';
@@ -457,7 +458,11 @@ function SessionScreenInner() {
     setPendingMentorReturn(true);
   }, []);
   const subjectsTransitionId =
-    returnTo === SUBJECTS_RETURN_TO ? subjectId : undefined;
+    returnTo === SUBJECTS_RETURN_TO
+      ? subjectId
+      : returnTo === SUBJECT_HUB_RETURN_TO
+        ? returnId
+        : undefined;
   const [subjectsPredecessorId, setSubjectsPredecessorId] = useState<
     string | undefined
   >();
