@@ -160,11 +160,8 @@ function ScopeStateProvider({
               setPersistedScopeKey(nextScopeKey);
             }
           })
-          .catch((error: unknown) => {
-            console.warn(
-              '[scope-context] failed to persist active scope',
-              error,
-            );
+          .catch(() => {
+            console.warn('[scope-context] failed to persist active scope');
           });
       }
     },

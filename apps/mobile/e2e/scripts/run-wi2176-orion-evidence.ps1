@@ -73,6 +73,23 @@ function Invoke-Text {
   return ($output -join [Environment]::NewLine).Trim()
 }
 
+function Get-Sha256Hex {
+  param([Parameter(Mandatory = $true)][string]$LiteralPath)
+
+  $stream = [System.IO.File]::OpenRead($LiteralPath)
+  try {
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+      $digest = $sha256.ComputeHash($stream)
+      return [System.BitConverter]::ToString($digest).Replace('-', '')
+    } finally {
+      $sha256.Dispose()
+    }
+  } finally {
+    $stream.Dispose()
+  }
+}
+
 function Invoke-AdbText {
   param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
 
@@ -415,7 +432,7 @@ try {
   if ($apkBadging -notmatch "package: name='com\.mentomate\.app'") {
     throw 'Built APK does not declare com.mentomate.app'
   }
-  $apkSha256 = (Get-FileHash -LiteralPath $apkPath -Algorithm SHA256).Hash
+  $apkSha256 = Get-Sha256Hex -LiteralPath $apkPath
 
   Invoke-Checked $AdbBin -s $DeviceId install -r $apkPath
   $runAsOutput = & $AdbBin -s $DeviceId shell run-as com.mentomate.app id 2>&1
@@ -461,9 +478,7 @@ try {
   ) {
     throw 'Captured screenshot does not have a valid PNG signature'
   }
-  $screenshotSha256 = (
-    Get-FileHash -LiteralPath $screenshotPath -Algorithm SHA256
-  ).Hash
+  $screenshotSha256 = Get-Sha256Hex -LiteralPath $screenshotPath
 
   $captureOutput = & powershell.exe `
     -NoProfile `

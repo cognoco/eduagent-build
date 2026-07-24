@@ -93,6 +93,98 @@ function Assert-Equal {
   }
 }
 
+$legacyHashCommands = @(
+  $ast.FindAll(
+    {
+      param($node)
+      $node -is [System.Management.Automation.Language.CommandAst] -and
+        $node.GetCommandName() -eq 'Get-FileHash'
+    },
+    $true
+  )
+)
+if ($legacyHashCommands.Count -ne 0) {
+  throw 'Runner must not depend on the engine-specific Get-FileHash cmdlet'
+}
+
+$sha256Function = $ast.Find(
+  {
+    param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+      $node.Name -eq 'Get-Sha256Hex'
+  },
+  $true
+)
+if (-not $sha256Function) {
+  throw 'Expected Get-Sha256Hex to provide engine-independent file hashing'
+}
+Invoke-Expression $sha256Function.Extent.Text
+
+$hashTryStatements = @(
+  $sha256Function.Body.FindAll(
+    {
+      param($node)
+      $node -is [System.Management.Automation.Language.TryStatementAst]
+    },
+    $true
+  )
+)
+$streamLifetime = $hashTryStatements |
+  Where-Object {
+    $_.Finally -and $_.Finally.Extent.Text -match '\$stream\.Dispose\(\)'
+  } |
+  Select-Object -First 1
+$sha256Lifetime = $hashTryStatements |
+  Where-Object {
+    $_.Finally -and $_.Finally.Extent.Text -match '\$sha256\.Dispose\(\)'
+  } |
+  Select-Object -First 1
+if (
+  -not $streamLifetime -or
+  -not $sha256Lifetime -or
+  $streamLifetime -eq $sha256Lifetime -or
+  $sha256Lifetime.Extent.StartOffset -le
+    $streamLifetime.Body.Extent.StartOffset -or
+  $sha256Lifetime.Extent.EndOffset -ge
+    $streamLifetime.Body.Extent.EndOffset
+) {
+  throw 'SHA provider lifetime must be nested inside the file-stream lifetime'
+}
+
+$sha256Calls = @(
+  $ast.FindAll(
+    {
+      param($node)
+      $node -is [System.Management.Automation.Language.CommandAst] -and
+        $node.GetCommandName() -eq 'Get-Sha256Hex'
+    },
+    $true
+  )
+)
+Assert-Equal $sha256Calls.Count 2 'APK and screenshot hashing must use Get-Sha256Hex'
+
+$hashFixtureRoot = Join-Path (
+  [System.IO.Path]::GetTempPath()
+) "wi2176-sha-$PID-$([guid]::NewGuid().ToString('N'))"
+$hashFixturePath = Join-Path $hashFixtureRoot 'fixture.txt'
+[System.IO.Directory]::CreateDirectory($hashFixtureRoot) | Out-Null
+try {
+  [System.IO.File]::WriteAllText(
+    $hashFixturePath,
+    'abc',
+    [System.Text.UTF8Encoding]::new($false)
+  )
+  Assert-Equal (
+    Get-Sha256Hex -LiteralPath $hashFixturePath
+  ) 'BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD' (
+    'Engine-independent SHA-256 helper returned the wrong digest'
+  )
+} finally {
+  if (Test-Path -LiteralPath $hashFixtureRoot -PathType Container) {
+    Remove-Item -LiteralPath $hashFixtureRoot -Recurse -Force
+  }
+}
+
 $buildEnvironmentFunction = $ast.Find(
   {
     param($node)
