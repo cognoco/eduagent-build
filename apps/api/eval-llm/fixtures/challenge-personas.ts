@@ -226,7 +226,7 @@ export const CHALLENGE_SIM_SCENARIOS: ChallengeSimScenario[] = [
       'rebirth imagery changes reader interpretation':
         'rebirth-imagery-reader-power:explain:lady-lazarus',
       'rebirth imagery makes the speaker powerful':
-        'rebirth-imagery-reader-power:explain:lady-lazarus',
+        'rebirth-imagery-speaker-power:explain:lady-lazarus',
     },
     competenceBrief:
       'You understand that addressing a watching crowd turns the rebirth into a deliberate public display: the speaker controls how her return is witnessed, so recovery becomes defiance and power. Explain that causal connection clearly in your own words.',

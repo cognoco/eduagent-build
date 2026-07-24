@@ -206,6 +206,7 @@ export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
       r.expectedOutcome === 'verified' &&
       (r.decision.outcome === 'partial' ||
         r.decision.outcome === 'reteach' ||
+        r.decision.outcome === 'insufficient_breadth' ||
         r.decision.outcome === 'invalid')
     ) {
       underCredit += 1;

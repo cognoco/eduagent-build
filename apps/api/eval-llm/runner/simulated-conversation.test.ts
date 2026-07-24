@@ -113,6 +113,18 @@ describe('runSimulatedRound — conversation loop', () => {
     const fixtureScenario = CHALLENGE_SIM_SCENARIOS.find(
       (s) => s.id === 'CRS08-sylvia-plath-transfer',
     )!;
+    const conceptEquivalenceKeys = fixtureScenario.conceptEquivalenceKeys;
+    expect(conceptEquivalenceKeys).toBeDefined();
+    if (!conceptEquivalenceKeys) {
+      throw new Error(
+        'Sylvia Plath fixture must define concept equivalence keys',
+      );
+    }
+    expect(
+      conceptEquivalenceKeys['rebirth imagery makes the speaker powerful'],
+    ).not.toBe(
+      conceptEquivalenceKeys['rebirth imagery changes reader interpretation'],
+    );
     let tutorQuestionCount = 0;
     const result = await runSimulatedRound(
       {

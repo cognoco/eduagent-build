@@ -72,6 +72,26 @@ describe('buildChallengeRoundGraderPrompt', () => {
     expect(systemContent).toContain('"materialContext"');
   });
 
+  it('defines the semantic question-identity contract', () => {
+    const systemContent = buildChallengeRoundGraderPrompt(baseInput)[0]!
+      .content as string;
+
+    expect(systemContent).toContain(
+      'copy the question exactly into "questionText"',
+    );
+    expect(systemContent).toContain(
+      'explanation, application, comparison,\n' +
+        '     causal_explanation, synthesis, evaluation, teach_back, or other',
+    );
+    expect(systemContent).toContain(
+      'state the materially relevant scenario/evidence in "materialContext", or ""',
+    );
+    expect(systemContent).toContain(
+      'Paraphrases and cosmetic context changes must use the\n' +
+        '     same claim, operation, and material context.',
+    );
+  });
+
   it('includes min-1 items requirement', () => {
     const systemContent = buildChallengeRoundGraderPrompt(baseInput)[0]!
       .content as string;

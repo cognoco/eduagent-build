@@ -201,6 +201,21 @@ describe('aggregate', () => {
     expect(m.signalEmissionRate).toBeCloseTo(1 / 2);
   });
 
+  it('counts insufficient breadth on a verified-expected round as under-credit', () => {
+    const m = aggregate([
+      makeResult({
+        outcome: 'insufficient_breadth',
+        marked: false,
+        expected: 'verified',
+        signalEmitted: true,
+        graderModel: 'gpt-oss-120b',
+      }),
+    ]);
+
+    expect(m.underCreditRate).toBe(1);
+    expect(m.overCreditRate).toBe(0);
+  });
+
   it('does NOT count invalid on a non-verified-expected round as under-credit', () => {
     const m = aggregate([
       makeResult({
