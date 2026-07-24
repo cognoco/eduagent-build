@@ -77,9 +77,7 @@ describe('buildChallengeRoundGraderPrompt', () => {
     const systemContent = buildChallengeRoundGraderPrompt(baseInput)[0]!
       .content as string;
 
-    expect(systemContent).toContain(
-      'copy the question exactly into "questionText"',
-    );
+    expect(systemContent).toMatch(/questionText.*exact current wording/i);
     expect(systemContent).toContain(
       'explanation, application, comparison,\n' +
         '     causal_explanation, synthesis, evaluation, teach_back, or other',
@@ -87,13 +85,31 @@ describe('buildChallengeRoundGraderPrompt', () => {
     expect(systemContent).toContain(
       'state the materially relevant scenario/evidence in "materialContext", or ""',
     );
-    expect(systemContent).toContain(
-      'Paraphrases and cosmetic context changes must use the\n' +
-        '     same claim, operation, and material context.',
+    expect(systemContent).toMatch(
+      /reuse only.*minimalLearningClaim.*cognitiveOperation.*materialContext/is,
     );
     expect(systemContent).toMatch(
-      /omit "noveltyBasis" for the first question, repeats, paraphrases, and cosmetic changes/i,
+      /first question.*repeat.*paraphrase.*cosmetic context change.*uncertain.*omit.*noveltyBasis/is,
     );
+  });
+
+  it('defines an ordered fail-closed novelty algorithm over every prior identity', () => {
+    const systemContent = buildChallengeRoundGraderPrompt(baseInput)[0]!
+      .content as string;
+
+    expect(systemContent).toMatch(
+      /compare.*every prior identity.*round order/is,
+    );
+    expect(systemContent).toMatch(
+      /normalized.*questionText.*matches any prior.*repeat/is,
+    );
+    expect(systemContent).toMatch(
+      /cognitiveOperation.*not appeared.*distinct/is,
+    );
+    expect(systemContent).toMatch(
+      /same.*cognitiveOperation.*genuinely distinct from every prior/is,
+    );
+    expect(systemContent).toMatch(/uncertain.*omit.*noveltyBasis/is);
   });
 
   it('provides prior question identities for a history-relative novelty decision', () => {

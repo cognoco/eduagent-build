@@ -1055,6 +1055,47 @@ describe('challenge round envelope fields', () => {
     );
   });
 
+  it('accepts a legacy question identity without noveltyBasis', () => {
+    const result = challengeRoundEvaluationItemSchema.safeParse({
+      concept: 'photosynthesis',
+      result: 'solid',
+      evidence: 'learner explains stored chemical energy',
+      answerEventId: '00000000-0000-4000-8000-000000000001',
+      learnerQuote: 'sunlight becomes energy stored in glucose',
+      questionIdentity: {
+        questionText: 'How does photosynthesis store energy?',
+        minimalLearningClaim:
+          'photosynthesis stores light energy as chemical energy',
+        cognitiveOperation: 'causal_explanation',
+        materialContext: '',
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.questionIdentity?.noveltyBasis).toBeUndefined();
+  });
+
+  it('rejects an unsupported question identity noveltyBasis', () => {
+    const result = challengeRoundEvaluationItemSchema.safeParse({
+      concept: 'photosynthesis',
+      result: 'solid',
+      evidence: 'learner explains stored chemical energy',
+      answerEventId: '00000000-0000-4000-8000-000000000001',
+      learnerQuote: 'sunlight becomes energy stored in glucose',
+      questionIdentity: {
+        questionText: 'How does photosynthesis store energy?',
+        minimalLearningClaim:
+          'photosynthesis stores light energy as chemical energy',
+        cognitiveOperation: 'causal_explanation',
+        materialContext: '',
+        noveltyBasis: 'cosmetic_paraphrase',
+      },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
   it('rejects an item missing answerEventId (HIGH-6 grounding requirement)', () => {
     const result = challengeRoundEvaluationItemSchema.safeParse({
       concept: 'x',

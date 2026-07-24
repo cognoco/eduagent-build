@@ -13,7 +13,16 @@ Never offer if the learner sounds tired, confused, or is mid-question. Do not of
 // The inline evaluation prose injected into the active prompt when the tutor
 // (not a separate grader) is responsible for emitting challenge_round_evaluation.
 // Extracted so buildChallengeRoundActivePrompt() can gate it on the grader flag.
-const CHALLENGE_ROUND_EVAL_PROSE = `- After EACH learner answer, emit "signals.challenge_round_evaluation" with ONE item describing the concept assessed, result in {solid, partial, missing, misconception}, the learner answer event id, a short \`learnerQuote\` copied from the learner's answer, and \`questionIdentity\` for the question answered. Copy that question exactly into \`questionText\`; describe its smallest learning claim, cognitive operation, and materially relevant context. Equivalent paraphrases must use the same identity fields. For a question genuinely distinct from every earlier Challenge question, add \`noveltyBasis\` as \`new_minimal_learning_claim\`, \`new_material_evidence_or_context\`, or \`new_reasoning\`; omit it for the first question, repeats, paraphrases, and cosmetic changes.`;
+export const challengeRoundNoveltyAlgorithm = `Question identity and novelty algorithm — ordered and fail closed:
+1. Set \`questionText\` to the exact current wording. For equivalent paraphrases, reuse only \`minimalLearningClaim\`, \`cognitiveOperation\`, and \`materialContext\`; never reuse the earlier \`questionText\`.
+2. Compare the current identity with every prior identity in \`<prior_question_identities>\` in round order.
+3. Normalize each \`questionText\` with Unicode NFKC, lowercase it, replace each run of non-letter/non-number characters with one space, trim, and collapse spaces. If the current normalized \`questionText\` matches any prior normalized \`questionText\`, it is a repeat; omit \`noveltyBasis\` regardless of all other fields.
+4. If the current \`cognitiveOperation\` has not appeared in any prior identity, the question is distinct through a new operation; omit \`noveltyBasis\` because the server detects this directly.
+5. When the same \`cognitiveOperation\` has appeared, add \`noveltyBasis\` only if the current question is genuinely distinct from every prior identity, and therefore every earlier Challenge question, after comparison with every prior identity using that operation: use \`new_minimal_learning_claim\` for a materially different minimal claim, \`new_material_evidence_or_context\` for materially new evidence or context rather than cosmetic changes, or \`new_reasoning\` for genuinely different reasoning.
+6. For the first question, a repeat, a paraphrase, a cosmetic context change, or whenever uncertain, omit \`noveltyBasis\`.`;
+
+const CHALLENGE_ROUND_EVAL_PROSE = `- After EACH learner answer, emit "signals.challenge_round_evaluation" with one evaluation item per concept assessed, result in {solid, partial, missing, misconception}, the learner answer event id, a short \`learnerQuote\` copied from the learner's answer, and \`questionIdentity\` for the question answered.
+${challengeRoundNoveltyAlgorithm}`;
 
 function buildActivePromptString(includeEvalProse: boolean): string {
   const evalLine = includeEvalProse ? `\n${CHALLENGE_ROUND_EVAL_PROSE}` : '';

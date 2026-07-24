@@ -23,6 +23,7 @@ import type {
 } from '@eduagent/schemas';
 import type { ChatMessage } from '../llm';
 import { escapeXml } from '../llm/sanitize';
+import { challengeRoundNoveltyAlgorithm } from './prompts';
 
 export interface GraderPromptInput {
   /** The mentor's question that the learner was answering. */
@@ -42,15 +43,15 @@ function buildSystemPrompt(): string {
     'You are a precise grading assistant for an educational mentoring app. Your only',
     "task is to grade a learner's answer to a specific question.",
     '',
-    'Scoring rubric — assign exactly ONE result per concept:',
+    'Scoring rubric — assign exactly ONE result per assessed concept:',
     '  solid         — the answer correctly demonstrates the concept with no significant gaps.',
     '  partial       — the answer shows some understanding but has notable gaps or inaccuracies.',
     '  missing       — the answer does not address the concept at all.',
     '  misconception — the answer reveals a demonstrably incorrect understanding.',
     '',
     'Instructions:',
-    '1. Identify the ONE concept that the given question is designed to test.',
-    "2. Score the learner's answer using the rubric above.",
+    '1. Identify every concept that the given question assesses.',
+    "2. Emit one evaluation item per concept assessed and score the learner's answer using the rubric above.",
     '3. Select a short verbatim excerpt from the learner\'s answer as "learnerQuote".',
     '   Do NOT fabricate or paraphrase — use exact words from the answer.',
     '4. Write a single-sentence "evidence" justifying the score.',
@@ -61,12 +62,8 @@ function buildSystemPrompt(): string {
     '   - classify "cognitiveOperation" as one of explanation, application, comparison,',
     '     causal_explanation, synthesis, evaluation, teach_back, or other',
     '   - state the materially relevant scenario/evidence in "materialContext", or ""',
-    '     when there is none. Paraphrases and cosmetic context changes must use the',
-    '     same claim, operation, and material context.',
-    '   - when prior question identities are supplied, include "noveltyBasis" only',
-    '     when this question is genuinely distinct from EVERY prior question. Use',
-    '     new_minimal_learning_claim, new_material_evidence_or_context, or',
-    '     new_reasoning. Omit "noveltyBasis" for the first question, repeats, paraphrases, and cosmetic changes.',
+    '     when there is none.',
+    challengeRoundNoveltyAlgorithm,
     '',
     'Return ONLY a single JSON object — no prose, no explanation, no code fence, nothing',
     'before or after it. The object must have EXACTLY this shape:',
@@ -89,7 +86,8 @@ function buildSystemPrompt(): string {
     '  ]',
     '}',
     '',
-    'items MUST contain AT LEAST ONE entry. Omit "correction" when result is "solid".',
+    'items MUST contain AT LEAST ONE entry and exactly one item per concept assessed.',
+    'Omit "correction" when result is "solid".',
   ].join('\n');
 }
 
