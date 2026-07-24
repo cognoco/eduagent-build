@@ -85,7 +85,10 @@ export default function ProgressMonthlyReportDetail(): React.ReactElement {
             </Text>
           </Pressable>
           <View className="flex-1">
-            <Text className="text-h2 font-bold text-text-primary">
+            <Text
+              className="text-h2 font-bold text-text-primary"
+              testID="progress-report-title"
+            >
               {report?.reportData.month ?? t('parentView.report.monthlyReport')}
             </Text>
             <Text className="text-body-sm text-text-secondary mt-0.5">

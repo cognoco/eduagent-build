@@ -232,6 +232,9 @@ describe('ProgressMonthlyReportDetail', () => {
 
     render(<ProgressMonthlyReportDetail />);
 
+    expect(screen.getByTestId('progress-report-title')).toHaveTextContent(
+      'April 2026',
+    );
     screen.getByText('3 topics mastered');
     screen.getByText('up from 1 last month');
   });

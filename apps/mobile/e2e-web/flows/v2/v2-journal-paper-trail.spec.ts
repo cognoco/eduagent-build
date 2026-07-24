@@ -257,7 +257,9 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
   await expect(
     page.getByTestId('progress-report-metric-sessions'),
   ).toBeVisible();
-  await expect(page.getByText('July 2026')).toBeVisible();
+  await expect(page.getByTestId('progress-report-title')).toHaveText(
+    'July 2026',
+  );
   await expect(
     page.getByText('12 topics mastered', { exact: true }),
   ).toBeVisible();
