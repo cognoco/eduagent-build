@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
@@ -14,8 +14,8 @@ import { formatShortDate } from '../../../../lib/format-datetime';
 import { formatMinutes } from '../../../../lib/format-relative-date';
 import {
   goBackOrReplace,
-  JOURNAL_HREF,
   JOURNAL_RETURN_TO,
+  returnJournalReportToCaller,
 } from '../../../../lib/navigation';
 import {
   useProfileWeeklyReportDetail,
@@ -59,7 +59,10 @@ export default function ProgressWeeklyReportDetail(): React.ReactElement {
   const resolvedReturnTo = Array.isArray(returnTo) ? returnTo[0] : returnTo;
   const handleBack = useCallback(() => {
     if (resolvedReturnTo === JOURNAL_RETURN_TO) {
-      router.dismissTo(JOURNAL_HREF);
+      returnJournalReportToCaller(
+        router,
+        Platform.OS === 'web' ? 'web' : 'native',
+      );
       return;
     }
 

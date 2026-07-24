@@ -181,6 +181,25 @@ export function goBackOrReplace(
   router.replace(fallbackHref);
 }
 
+/**
+ * Return a Journal-origin report to Journal without leaving Reports behind.
+ *
+ * Web preserves the caller in browser history, so Back is the exact inverse
+ * of the report push; a direct deep-link replaces safely. Native receives a
+ * seeded cross-tab ancestor stack and must dismiss that complete stack.
+ */
+export function returnJournalReportToCaller(
+  router: Pick<Router, 'back' | 'canGoBack' | 'dismissTo' | 'replace'>,
+  platform: 'web' | 'native',
+): void {
+  if (platform === 'web') {
+    goBackOrReplace(router, JOURNAL_HREF);
+    return;
+  }
+
+  router.dismissTo(JOURNAL_HREF);
+}
+
 export function pushLearningResumeTarget(
   router: Pick<Router, 'push'>,
   target: LearningResumeTarget,
