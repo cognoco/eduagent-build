@@ -146,6 +146,116 @@ if ($nativeCapture.Output -notmatch 'expected native stderr') {
   throw "Expected native stderr was not captured: $($nativeCapture.Output)"
 }
 
+$screenshotFunction = $ast.Find(
+  {
+    param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+      $node.Name -eq 'Save-DeviceScreenshot'
+  },
+  $true
+)
+if (-not $screenshotFunction) {
+  throw 'Expected Save-DeviceScreenshot to retry transient adb pull failures'
+}
+Invoke-Expression $screenshotFunction.Extent.Text
+
+$screenshotFixtureRoot = Join-Path (
+  [System.IO.Path]::GetTempPath()
+) "wi2176-screenshot-$PID-$([guid]::NewGuid().ToString('N'))"
+$screenshotFixturePath = Join-Path $screenshotFixtureRoot 'capture.png'
+[System.IO.Directory]::CreateDirectory($screenshotFixtureRoot) | Out-Null
+$AdbBin = 'fake-adb'
+$DeviceId = 'fake-device'
+$screenshotAdbCalls = [System.Collections.Generic.List[string]]::new()
+$screenshotPullAttempts = 0
+$screenshotPullShouldAlwaysFail = $false
+function Invoke-AdbText {
+  param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
+
+  [void]$screenshotAdbCalls.Add($Arguments -join ' ')
+  return ''
+}
+function Invoke-Checked {
+  param(
+    [Parameter(Mandatory = $true)][string]$FilePath,
+    [Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments
+  )
+
+  $script:screenshotPullAttempts += 1
+  $pullShouldFail = (
+    $script:screenshotPullShouldAlwaysFail -or
+    $script:screenshotPullAttempts -eq 1
+  )
+  [System.IO.File]::WriteAllBytes(
+    $Arguments[$Arguments.Count - 1],
+    $(if ($pullShouldFail) {
+      [byte[]](0x89, 0x50)
+    } else {
+      [byte[]](0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
+    })
+  )
+  if ($pullShouldFail) {
+    throw 'transient pull failure after partial write'
+  }
+}
+try {
+  $screenshotArguments = @{
+    DevicePath = '/sdcard/wi2176-test.png'
+    LocalPath = $screenshotFixturePath
+    MaxAttempts = 3
+    RetryDelayMilliseconds = 0
+  }
+  Save-DeviceScreenshot @screenshotArguments
+  Assert-Equal $screenshotPullAttempts 2 (
+    'Screenshot capture did not retry one transient pull failure'
+  )
+  Assert-Equal (
+    @(
+      $screenshotAdbCalls |
+        Where-Object { $_ -eq 'shell screencap -p /sdcard/wi2176-test.png' }
+    ).Count
+  ) 2 'Screenshot was not freshly recaptured before the pull retry'
+  if (-not (Test-Path -LiteralPath $screenshotFixturePath -PathType Leaf)) {
+    throw 'Screenshot retry did not produce a local artifact'
+  }
+
+  Remove-Item -LiteralPath $screenshotFixturePath -Force
+  $screenshotPullAttempts = 0
+  $screenshotPullShouldAlwaysFail = $true
+  $terminalScreenshotFailure = $null
+  try {
+    $failingScreenshotArguments = @{
+      DevicePath = '/sdcard/wi2176-test.png'
+      LocalPath = $screenshotFixturePath
+      MaxAttempts = 2
+      RetryDelayMilliseconds = 0
+    }
+    Save-DeviceScreenshot @failingScreenshotArguments
+  } catch {
+    $terminalScreenshotFailure = $_
+  }
+  if (-not $terminalScreenshotFailure) {
+    throw 'Expected repeated screenshot pull failures to fail closed'
+  }
+  Assert-Equal $screenshotPullAttempts 2 (
+    'Screenshot capture exceeded its bounded retry count'
+  )
+  if (Test-Path -LiteralPath $screenshotFixturePath) {
+    throw 'Failed screenshot capture left a valid-looking local artifact'
+  }
+  if (
+    @(
+      Get-ChildItem -LiteralPath $screenshotFixtureRoot -File
+    ).Count -ne 0
+  ) {
+    throw 'Failed screenshot capture left a partial attempt artifact'
+  }
+} finally {
+  if (Test-Path -LiteralPath $screenshotFixtureRoot -PathType Container) {
+    Remove-Item -LiteralPath $screenshotFixtureRoot -Recurse -Force
+  }
+}
+
 $legacyHashCommands = @(
   $ast.FindAll(
     {

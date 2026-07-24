@@ -118,6 +118,50 @@ function Invoke-AdbText {
   return Invoke-Text $AdbBin -s $DeviceId @Arguments
 }
 
+function Save-DeviceScreenshot {
+  param(
+    [Parameter(Mandatory = $true)][string]$DevicePath,
+    [Parameter(Mandatory = $true)][string]$LocalPath,
+    [ValidateRange(1, 10)][int]$MaxAttempts = 3,
+    [ValidateRange(0, 10000)][int]$RetryDelayMilliseconds = 1000
+  )
+
+  $lastFailure = $null
+  if (Test-Path -LiteralPath $LocalPath) {
+    Remove-Item -LiteralPath $LocalPath -Force
+  }
+  for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+    $attemptPath = "$LocalPath.attempt-$PID-$attempt.tmp"
+    try {
+      if (Test-Path -LiteralPath $attemptPath) {
+        Remove-Item -LiteralPath $attemptPath -Force
+      }
+      [void](Invoke-AdbText shell rm -f $DevicePath)
+      [void](Invoke-AdbText shell screencap '-p' $DevicePath)
+      Invoke-Checked $AdbBin -s $DeviceId pull $DevicePath $attemptPath
+      if (-not (Test-Path -LiteralPath $attemptPath -PathType Leaf)) {
+        throw "Screenshot pull did not create $attemptPath"
+      }
+      Move-Item -LiteralPath $attemptPath -Destination $LocalPath
+      return
+    } catch {
+      $lastFailure = $_
+      if ($attempt -lt $MaxAttempts -and $RetryDelayMilliseconds -gt 0) {
+        Start-Sleep -Milliseconds $RetryDelayMilliseconds
+      }
+    } finally {
+      if (Test-Path -LiteralPath $attemptPath) {
+        Remove-Item -LiteralPath $attemptPath -Force
+      }
+    }
+  }
+
+  throw (
+    "Unable to capture device screenshot after $MaxAttempts attempts: " +
+    $lastFailure.Exception.Message
+  )
+}
+
 function Get-Setting {
   param([string]$Namespace, [string]$Name)
   return Invoke-AdbText shell settings get $Namespace $Name
@@ -491,8 +535,9 @@ try {
     Pop-Location
   }
 
-  [void](Invoke-AdbText shell screencap -p $deviceScreenshotPath)
-  Invoke-Checked $AdbBin -s $DeviceId pull $deviceScreenshotPath $screenshotPath
+  Save-DeviceScreenshot `
+    -DevicePath $deviceScreenshotPath `
+    -LocalPath $screenshotPath
   [void](Invoke-AdbText shell rm -f $deviceScreenshotPath)
   $pngHeader = [System.IO.File]::ReadAllBytes($screenshotPath)[0..7]
   if (
