@@ -51,6 +51,7 @@ describe('recapsResponseSchema', () => {
       verificationState: 'fresh',
       retentionStatus: 'strong',
       nextReviewDate: '2026-05-27T10:25:00.000Z',
+      evidenceAvailability: 'available',
       quote: 'Equivalent fractions name the same amount.',
     } as const;
 
@@ -59,5 +60,28 @@ describe('recapsResponseSchema', () => {
     });
 
     expect(parsed.recaps[0]?.verifiedProof).toEqual(verifiedProof);
+  });
+
+  it('rejects an unavailable proof that still carries a quote', () => {
+    const parsed = recapsResponseSchema.safeParse({
+      recaps: [
+        {
+          ...RECAP_LIST_ITEM,
+          verifiedProof: {
+            topicId: '55555555-5555-4555-8555-555555555555',
+            topicTitle: 'Fractions',
+            subjectId: '44444444-4444-4444-8444-444444444444',
+            verifiedAt: '2026-05-20T10:25:00.000Z',
+            verificationState: 'fresh',
+            retentionStatus: 'strong',
+            nextReviewDate: null,
+            evidenceAvailability: 'source_unavailable',
+            quote: 'Must not render',
+          },
+        },
+      ],
+    });
+
+    expect(parsed.success).toBe(false);
   });
 });

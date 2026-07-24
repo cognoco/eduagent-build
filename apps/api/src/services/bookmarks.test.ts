@@ -49,6 +49,8 @@ function makeDbStub(options: {
     subjectId: 'subject-id-1',
     topicId: null,
     content: '', // will be set by the capture below
+    artifactSource: 'freeform_keep' as const,
+    verificationState: 'unverified' as const,
     createdAt: new Date('2026-01-01T00:00:00Z'),
   };
 

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { isoDateField } from './common.ts';
+import { verifiedEvidenceQuoteSchema } from './evidence-links.ts';
 import { engagementSignalSchema, sessionTypeSchema } from './sessions';
 
 export const recapsQuerySchema = z.object({
@@ -8,6 +9,20 @@ export const recapsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 export type RecapsQuery = z.infer<typeof recapsQuerySchema>;
+
+const recapVerifiedProofSchema = z
+  .object({
+    topicId: z.string().uuid(),
+    topicTitle: z.string(),
+    subjectId: z.string().uuid().nullable(),
+    verifiedAt: isoDateField,
+    verificationState: z.enum(['unverified', 'fresh', 'stale']),
+    retentionStatus: z
+      .enum(['strong', 'fading', 'weak', 'forgotten'])
+      .nullable(),
+    nextReviewDate: isoDateField.nullable(),
+  })
+  .and(verifiedEvidenceQuoteSchema);
 
 export const recapListItemSchema = z.object({
   recapId: z.string().uuid(),
@@ -38,21 +53,7 @@ export const recapListItemSchema = z.object({
   // Verified proof is additive + nullable: null when this session/topic has no
   // explicitly marked Challenge-drafted note, and defaulted so older API
   // responses remain readable by newer mobile builds.
-  verifiedProof: z
-    .object({
-      topicId: z.string().uuid(),
-      topicTitle: z.string(),
-      subjectId: z.string().uuid().nullable(),
-      verifiedAt: isoDateField,
-      verificationState: z.enum(['unverified', 'fresh', 'stale']),
-      retentionStatus: z
-        .enum(['strong', 'fading', 'weak', 'forgotten'])
-        .nullable(),
-      nextReviewDate: isoDateField.nullable(),
-      quote: z.string().nullable(),
-    })
-    .nullable()
-    .default(null),
+  verifiedProof: recapVerifiedProofSchema.nullable().default(null),
 });
 export type RecapListItem = z.infer<typeof recapListItemSchema>;
 

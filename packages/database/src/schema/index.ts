@@ -5,6 +5,7 @@ export * from './subjects';
 export * from './sessions';
 export * from './support';
 export * from './bookmarks';
+export * from './evidence-links';
 export * from './assessments';
 export * from './retrieval-events';
 export * from './progress';

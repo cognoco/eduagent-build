@@ -123,7 +123,10 @@ import { shouldTriggerEvaluate } from '../evaluate';
 import { shouldTriggerTeachBack } from '../teach-back';
 import { getRetentionStatus, type RetentionState } from '../retention';
 import { extractInterestLabels } from '../graded-input-generation';
-import { createNoteForSession } from '../notes';
+import {
+  persistVerifiedChallengeArtifact,
+  persistVerifiedChallengeArtifacts,
+} from '../evidence-links';
 import type {
   EscalationRung,
   LlmProviderPolicy,
@@ -178,6 +181,7 @@ import {
 import {
   CONCEPT_CAPTURE_ENABLED,
   captureConceptMastery,
+  conceptKeyForLabel,
 } from '../concept-capture';
 import { MAX_CHALLENGE_QUESTIONS } from '../challenge-round/caps';
 import {
@@ -832,14 +836,30 @@ function buildFallbackDraft(
  * here should only happen if an answer row becomes unreadable between that
  * claim and the note-draft guard.
  */
+function wholeEventVerifiedSolidItems(
+  evaluations: ChallengeRoundEvaluationItem[],
+): ChallengeRoundEvaluationItem[] {
+  const nonSolidEventIds = new Set(
+    evaluations
+      .filter((item) => item.result !== 'solid')
+      .map((item) => item.answerEventId),
+  );
+  return evaluations.filter(
+    (item) =>
+      item.result === 'solid' && !nonSolidEventIds.has(item.answerEventId),
+  );
+}
+
 async function fetchVerifiedSolidContents(
   db: Database,
   profileId: string,
   sessionId: string,
   evaluations: ChallengeRoundEvaluationItem[],
 ): Promise<string[] | null> {
-  const solidItems = evaluations.filter((item) => item.result === 'solid');
-  if (solidItems.length === 0) return [];
+  const allSolidItems = evaluations.filter((item) => item.result === 'solid');
+  const solidItems = wholeEventVerifiedSolidItems(evaluations);
+  if (allSolidItems.length === 0) return [];
+  if (solidItems.length === 0) return null;
   try {
     const verified = await validateEvaluationEventIds(
       db,
@@ -863,9 +883,7 @@ function buildValidatedDraft(
   verifiedSolidContents: string[] | null,
 ): DraftedChallengeNote | undefined {
   const solidEventIds = new Set(
-    evaluations
-      .filter((item) => item.result === 'solid')
-      .map((item) => item.answerEventId),
+    wholeEventVerifiedSolidItems(evaluations).map((item) => item.answerEventId),
   );
   const solidAnswerEventIds = Array.from(solidEventIds);
   if (!noteDraft) {
@@ -1371,6 +1389,36 @@ export async function finalizeChallengeRoundIfReady(
     verifiedSolidContents,
   );
 
+  // Persist only DB-confirmed solid answers whose whole source event is solid.
+  // If the same event also carries partial/misconception/missing content, the
+  // unsliced event cannot safely become verified evidence.
+  if (verifiedSolidContents !== null) {
+    const solidItems = wholeEventVerifiedSolidItems(evaluations);
+    await safeWrite(
+      async () => {
+        await persistVerifiedChallengeArtifacts(db, {
+          profileId,
+          topicId,
+          sessionId: session.id,
+          artifacts: solidItems.flatMap((item, index) => {
+            const eventContent = verifiedSolidContents[index];
+            return eventContent
+              ? [
+                  {
+                    artifactSource: 'challenge_solid_quote' as const,
+                    conceptKey: conceptKeyForLabel(item.concept),
+                    sourceEventIds: [item.answerEventId],
+                  },
+                ]
+              : [];
+          }),
+        });
+      },
+      'challenge-round.finalize.solid-quote-persist',
+      { profileId, sessionId: session.id, topicId },
+    );
+  }
+
   // [WI-1658] Persist the validated draft as the durable verified-proof artifact,
   // ONLY on a fully-verified round (every evaluation item solid). This sidesteps
   // the event-grain gap the Artifact Provenance Contract flags for mixed rounds:
@@ -1381,14 +1429,16 @@ export async function finalizeChallengeRoundIfReady(
   // persistChallengeRoundMasteryEvidence above.
   if (decision.outcome === 'verified' && draftedNote?.body) {
     await safeWrite(
-      () =>
-        createNoteForSession(db, {
+      async () => {
+        await persistVerifiedChallengeArtifact(db, {
           profileId,
           topicId,
           sessionId: session.id,
           content: draftedNote.body as string,
           artifactSource: 'challenge_drafted_note',
-        }),
+          sourceEventIds: draftedNote.sourceAnswerEventIds,
+        });
+      },
       'challenge-round.finalize.note-persist',
       { profileId, sessionId: session.id, topicId },
     );
