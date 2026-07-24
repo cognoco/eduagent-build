@@ -33,6 +33,7 @@ export interface RevenuecatQuotaUpdate {
 export interface RevenueCatEvent {
   id: string;
   type: string;
+  app_id?: string;
   app_user_id: string;
   original_app_user_id?: string;
   product_id?: string;

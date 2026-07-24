@@ -79,6 +79,11 @@ const envSchema = z.object({
   // RevenueCat — webhook authentication plus REST API access for GDPR store teardown
   REVENUECAT_WEBHOOK_SECRET: z.string().min(1).optional(),
   REVENUECAT_REST_API_KEY: z.string().min(1).optional(),
+  // [WI-2705] Short-lived, exact-event authorization for one pre-observed
+  // Google Play sandbox INITIAL_PURCHASE grant or NORMAL-period EXPIRATION
+  // cleanup replay in production. The billing service validates the strict
+  // JSON shape and <=15-minute window.
+  REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION: z.string().min(1).optional(),
 
   // Inngest — webhook signing key (validates inbound calls from Inngest Cloud
   // to /v1/inngest) and event ingestion key (outbound inngest.send()). Both

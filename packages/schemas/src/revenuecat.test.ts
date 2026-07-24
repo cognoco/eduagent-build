@@ -26,6 +26,7 @@ describe('revenuecatWebhookSchema', () => {
       event: {
         id: 'evt_full',
         type: 'RENEWAL',
+        app_id: 'app_google_public_id',
         app_user_id: '$RCAnonymousID:xyz',
         product_id: 'com.app.plus_monthly',
         entitlement_ids: ['pro'],
@@ -40,6 +41,9 @@ describe('revenuecatWebhookSchema', () => {
     };
     const result = revenuecatWebhookSchema.safeParse(full);
     expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.event.app_id).toBe('app_google_public_id');
+    }
   });
 
   // [WI-988] Red-green: missing required event.id must fail validation.

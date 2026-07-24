@@ -161,6 +161,7 @@ type Bindings = {
   // RevenueCat — IAP webhook and REST API access
   REVENUECAT_WEBHOOK_SECRET?: string;
   REVENUECAT_REST_API_KEY?: string;
+  REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION?: string;
 
   // Observability
   SENTRY_DSN?: string;
