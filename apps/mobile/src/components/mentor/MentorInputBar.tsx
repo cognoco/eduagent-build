@@ -1,12 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 
 import { useSpeechRecognition } from '../../hooks/use-speech-recognition';
 import { useThemeColors } from '../../lib/theme';
 
 import type { TranslateKey } from '../../i18n';
+import { ColdStartCard } from './ColdStartCard';
 
 /**
  * Mic lifecycle as the bar exposes it to assistive tech. `processing` is the
@@ -33,6 +35,9 @@ const MIC_LABEL_KEYS: Record<MentorMicState, TranslateKey> = {
 
 export interface MentorInputBarProps {
   unavailable?: boolean;
+  showColdStartPrompts?: boolean;
+  /** Rotation cadence for cold-start placeholder examples (ms). Test seam. */
+  placeholderRotationIntervalMs?: number;
   /**
    * Voice locale for recognition, resolved by the screen from the active
    * profile's conversation language. Undefined falls back to the hook's
@@ -44,8 +49,18 @@ export interface MentorInputBarProps {
   onOpenHomework: () => void;
 }
 
+const COLD_START_PLACEHOLDER_KEYS = [
+  'mentorHome.coldStart.placeholderRotation.one',
+  'mentorHome.coldStart.placeholderRotation.two',
+  'mentorHome.coldStart.placeholderRotation.three',
+] as const;
+
+const DEFAULT_PLACEHOLDER_ROTATION_MS = 4000;
+
 export function MentorInputBar({
   unavailable = false,
+  showColdStartPrompts = false,
+  placeholderRotationIntervalMs = DEFAULT_PLACEHOLDER_ROTATION_MS,
   voiceLocale,
   onSubmitText,
   onOpenCamera,
@@ -53,8 +68,18 @@ export function MentorInputBar({
 }: MentorInputBarProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const reduceMotion = useReducedMotion();
   const [value, setValue] = useState('');
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const inputRef = useRef<TextInput>(null);
   const hasText = value.trim().length > 0;
+  const placeholder = showColdStartPrompts
+    ? t(
+        COLD_START_PLACEHOLDER_KEYS[
+          placeholderIndex
+        ] as (typeof COLD_START_PLACEHOLDER_KEYS)[number],
+      )
+    : t('mentorHome.bar.placeholder');
 
   const {
     status: speechStatus,
@@ -108,6 +133,16 @@ export function MentorInputBar({
   );
 
   useEffect(() => {
+    if (!showColdStartPrompts || reduceMotion) return;
+    const timer = setInterval(() => {
+      setPlaceholderIndex(
+        (current) => (current + 1) % COLD_START_PLACEHOLDER_KEYS.length,
+      );
+    }, placeholderRotationIntervalMs);
+    return () => clearInterval(timer);
+  }, [placeholderRotationIntervalMs, reduceMotion, showColdStartPrompts]);
+
+  useEffect(() => {
     if (!unavailable) return;
     if (captureRef.current.accepting) {
       captureRef.current.accepting = false;
@@ -159,6 +194,19 @@ export function MentorInputBar({
       onSubmitText(text);
     }
   };
+
+  const fillFromStarter = useCallback(
+    (text: string): void => {
+      if (captureRef.current.accepting) {
+        captureRef.current.accepting = false;
+        clearTranscript();
+        void stopListening();
+      }
+      setValue((current) => (current.trim() ? current : text));
+      inputRef.current?.focus();
+    },
+    [clearTranscript, stopListening],
+  );
 
   const handleChangeText = useCallback(
     (next: string): void => {
@@ -226,11 +274,13 @@ export function MentorInputBar({
       ) : null}
       <View className="flex-row items-start gap-2">
         <TextInput
+          ref={inputRef}
           testID="mentor-bar-input"
+          accessibilityLabel={t('mentorHome.bar.title')}
           value={value}
           onChangeText={handleChangeText}
           onSubmitEditing={submit}
-          placeholder={t('mentorHome.bar.placeholder')}
+          placeholder={placeholder}
           multiline
           numberOfLines={2}
           textAlignVertical="top"
@@ -321,6 +371,7 @@ export function MentorInputBar({
         <Pressable
           testID="mentor-bar-homework-chip"
           accessibilityRole="button"
+          accessibilityLabel={t('mentorHome.bar.homeworkChip')}
           onPress={onOpenHomework}
           className="rounded-full border border-border px-3 py-2"
         >
@@ -329,6 +380,9 @@ export function MentorInputBar({
           </Text>
         </Pressable>
       </View>
+      {showColdStartPrompts ? (
+        <ColdStartCard onFill={fillFromStarter} onOpenCamera={onOpenCamera} />
+      ) : null}
     </View>
   );
 }
