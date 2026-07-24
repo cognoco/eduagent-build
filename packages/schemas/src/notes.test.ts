@@ -3,6 +3,8 @@ import {
   createNoteInputSchema,
   updateNoteInputSchema,
   noteOriginSchema,
+  artifactSourceSchema,
+  noteArtifactSourceSchema,
   noteResponseSchema,
   bookNotesResponseSchema,
   topicNotesResponseSchema,
@@ -31,6 +33,8 @@ describe('topicNoteSchema', () => {
     profileId: UUID,
     sessionId: UUID,
     content: 'My note content',
+    artifactSource: 'learner_authored_note' as const,
+    verificationState: 'unverified' as const,
     createdAt: ISO,
     updatedAt: ISO,
   };
@@ -39,6 +43,8 @@ describe('topicNoteSchema', () => {
     expect(topicNoteSchema.parse(validNote)).toEqual({
       ...validNote,
       origin: 'self',
+      artifactSource: 'learner_authored_note',
+      verificationState: 'unverified',
     });
   });
 
@@ -144,6 +150,8 @@ describe('noteResponseSchema', () => {
     topicId: UUID,
     sessionId: null,
     content: 'Content',
+    artifactSource: 'learner_authored_note' as const,
+    verificationState: 'unverified' as const,
     createdAt: ISO,
     updatedAt: ISO,
   };
@@ -152,6 +160,8 @@ describe('noteResponseSchema', () => {
     expect(noteResponseSchema.parse(valid)).toEqual({
       ...valid,
       origin: 'self',
+      artifactSource: 'learner_authored_note',
+      verificationState: 'unverified',
     });
   });
 
@@ -179,6 +189,18 @@ describe('noteResponseSchema', () => {
     expect(noteResponseSchema.parse(valid).origin).toBe('self');
   });
 
+  it('defaults missing artifactSource for expand-phase API compatibility', () => {
+    const { artifactSource: _, ...rest } = valid;
+    expect(noteResponseSchema.parse(rest).artifactSource).toBe(
+      'learner_authored_note',
+    );
+  });
+
+  it('defaults missing verificationState for expand-phase API compatibility', () => {
+    const { verificationState: _, ...rest } = valid;
+    expect(noteResponseSchema.parse(rest).verificationState).toBe('unverified');
+  });
+
   it('exports the additive note origin enum', () => {
     expect(noteOriginSchema.options).toEqual(['self', 'mentor']);
   });
@@ -187,6 +209,51 @@ describe('noteResponseSchema', () => {
     expect(
       noteResponseSchema.parse({ ...valid, origin: 'mentor' }).origin,
     ).toBe('mentor');
+  });
+
+  it('distinguishes a verified Challenge artifact from an ordinary learner note', () => {
+    const verified = noteResponseSchema.safeParse({
+      ...valid,
+      artifactSource: 'challenge_drafted_note',
+      verificationState: 'verified',
+    });
+    const learnerAuthored = noteResponseSchema.safeParse({
+      ...valid,
+      artifactSource: 'learner_authored_note',
+      verificationState: 'unverified',
+    });
+
+    expect(verified).toMatchObject({
+      success: true,
+      data: {
+        artifactSource: 'challenge_drafted_note',
+        verificationState: 'verified',
+      },
+    });
+    expect(learnerAuthored).toMatchObject({
+      success: true,
+      data: {
+        artifactSource: 'learner_authored_note',
+        verificationState: 'unverified',
+      },
+    });
+  });
+
+  it('exports only sources accepted by topic_notes', () => {
+    expect(artifactSourceSchema.options).toEqual([
+      'challenge_solid_quote',
+      'challenge_drafted_note',
+      'learner_authored_note',
+      'freeform_keep',
+    ]);
+    expect(noteArtifactSourceSchema.options).toEqual([
+      'challenge_solid_quote',
+      'challenge_drafted_note',
+      'learner_authored_note',
+    ]);
+    expect(noteArtifactSourceSchema.safeParse('freeform_keep').success).toBe(
+      false,
+    );
   });
 });
 
@@ -199,6 +266,8 @@ const noteDbRow = {
   topicId: UUID,
   sessionId: null,
   content: 'Note',
+  artifactSource: 'learner_authored_note' as const,
+  verificationState: 'unverified' as const,
   createdAt: ISO,
   updatedAt: ISO,
 };
@@ -248,6 +317,8 @@ describe('noteGetResponseSchema', () => {
       id: UUID,
       topicId: UUID,
       content: 'A note',
+      artifactSource: 'learner_authored_note',
+      verificationState: 'unverified',
       updatedAt: ISO,
     };
     const parsed = noteGetResponseSchema.parse({ note: row });
@@ -256,7 +327,13 @@ describe('noteGetResponseSchema', () => {
 
   it('rejects note with missing id', () => {
     const result = noteGetResponseSchema.safeParse({
-      note: { topicId: UUID, content: 'x', updatedAt: ISO },
+      note: {
+        topicId: UUID,
+        content: 'x',
+        artifactSource: 'learner_authored_note',
+        verificationState: 'unverified',
+        updatedAt: ISO,
+      },
     });
     expect(result.success).toBe(false);
   });
@@ -367,6 +444,8 @@ describe('allNoteSchema', () => {
     subjectName: 'Subject',
     sessionId: null,
     content: 'Content',
+    artifactSource: 'learner_authored_note' as const,
+    verificationState: 'unverified' as const,
     createdAt: ISO,
     updatedAt: ISO,
   };
@@ -375,6 +454,8 @@ describe('allNoteSchema', () => {
     expect(allNoteSchema.parse(validAllNote)).toEqual({
       ...validAllNote,
       origin: 'self',
+      artifactSource: 'learner_authored_note',
+      verificationState: 'unverified',
     });
   });
 
@@ -394,6 +475,18 @@ describe('allNoteSchema', () => {
     if (!result.success) {
       expect(result.error.issues[0]!.path).toContain('subjectId');
     }
+  });
+
+  it('defaults missing artifactSource for expand-phase API compatibility', () => {
+    const { artifactSource: _, ...rest } = validAllNote;
+    expect(allNoteSchema.parse(rest).artifactSource).toBe(
+      'learner_authored_note',
+    );
+  });
+
+  it('defaults missing verificationState for expand-phase API compatibility', () => {
+    const { verificationState: _, ...rest } = validAllNote;
+    expect(allNoteSchema.parse(rest).verificationState).toBe('unverified');
   });
 
   it('rejects invalid datetime for createdAt', () => {
@@ -420,6 +513,8 @@ describe('allNotesResponseSchema', () => {
     subjectName: 'Subject',
     sessionId: null,
     content: 'Content',
+    artifactSource: 'learner_authored_note' as const,
+    verificationState: 'unverified' as const,
     createdAt: ISO,
     updatedAt: ISO,
   };
@@ -545,6 +640,8 @@ describe('[BUG-212] topicNoteSchema and noteResponseSchema share a single base',
       topicId: UUID,
       sessionId: null,
       content: 'x',
+      artifactSource: 'learner_authored_note',
+      verificationState: 'unverified',
       createdAt: new Date('2026-05-18T00:00:00.000Z'),
       updatedAt: new Date('2026-05-18T00:00:00.000Z'),
     });

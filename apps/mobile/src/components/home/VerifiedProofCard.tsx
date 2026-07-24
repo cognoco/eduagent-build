@@ -59,6 +59,7 @@ export function VerifiedProofCard({
         topicTitle={proof.topicTitle}
         verifiedAt={proof.verifiedAt}
         quote={proof.quote}
+        evidenceAvailability={proof.evidenceAvailability}
         verificationState={proof.masteryVerificationState}
         retentionStatus={proof.retentionStatus}
       />

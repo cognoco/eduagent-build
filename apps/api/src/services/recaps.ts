@@ -123,7 +123,7 @@ function toRecapVerifiedProof(
     return null;
   }
 
-  return {
+  const metadata = {
     topicId: receipt.topicId,
     topicTitle: receipt.topicTitle,
     subjectId: receipt.subjectId ?? null,
@@ -131,8 +131,18 @@ function toRecapVerifiedProof(
     verificationState: receipt.masteryVerificationState,
     retentionStatus: receipt.retentionStatus ?? null,
     nextReviewDate: receipt.nextReviewDate ?? null,
-    quote: receipt.quote,
   };
+  return receipt.evidenceAvailability === 'available'
+    ? {
+        ...metadata,
+        evidenceAvailability: receipt.evidenceAvailability,
+        quote: receipt.quote,
+      }
+    : {
+        ...metadata,
+        evidenceAvailability: receipt.evidenceAvailability,
+        quote: null,
+      };
 }
 
 /**

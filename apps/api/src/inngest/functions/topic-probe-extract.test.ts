@@ -246,6 +246,7 @@ describe('handleTopicProbeExtract — seed-retention-card rehydration [WI-577]',
     expect(mockEvaluateRecallQuality).toHaveBeenCalledWith(
       'I know atoms have protons and electrons.',
       'Atomic structure',
+      SESSION_ROW.profileId,
     );
     expect(result).toMatchObject({
       sessionId: SESSION_ROW.id,

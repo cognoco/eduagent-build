@@ -29,6 +29,14 @@ export const bookmarks = pgTable(
       onDelete: 'set null',
     }),
     content: text('content').notNull(),
+    artifactSource: text('artifact_source')
+      .$type<'freeform_keep'>()
+      .notNull()
+      .default('freeform_keep'),
+    verificationState: text('verification_state')
+      .$type<'unverified'>()
+      .notNull()
+      .default('unverified'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

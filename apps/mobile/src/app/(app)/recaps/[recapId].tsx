@@ -173,6 +173,9 @@ export default function RecapDetailScreen(): React.ReactElement {
                   topicTitle={recapQuery.data.verifiedProof.topicTitle}
                   verifiedAt={recapQuery.data.verifiedProof.verifiedAt}
                   quote={recapQuery.data.verifiedProof.quote}
+                  evidenceAvailability={
+                    recapQuery.data.verifiedProof.evidenceAvailability
+                  }
                   verificationState={
                     recapQuery.data.verifiedProof.verificationState
                   }

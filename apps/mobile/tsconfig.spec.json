@@ -11,6 +11,7 @@
     "jest.config.cjs",
     "e2e-web/helpers/e2e-defaults.d.ts",
     "e2e-web/helpers/mentor-audit-storage-state.ts",
+    "e2e-web/helpers/pressable*.ts",
     "e2e-web/helpers/runtime.ts",
     "test-utils/**/*.ts",
     "test-utils/**/*.tsx",

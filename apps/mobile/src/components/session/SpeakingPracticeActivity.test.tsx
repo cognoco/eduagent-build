@@ -96,11 +96,10 @@ describe('SpeakingPracticeActivity', () => {
     screen.getByText('I would like a cup of tea.');
   });
 
-  // WI-1777 rework: the server's activityType/speakingPractice.type
-  // (previously always 'repeat_after_me') now genuinely alternates to
-  // 'shadowing' — confirm this component renders the shadowing-specific
-  // instruction, not the repeat-after-me one, when that's what it receives.
-  it('renders the shadowing instruction when the activity selects the shadowing mode', () => {
+  // WI-1777 Option-B rework: legacy/cache events may still carry the
+  // schema-supported shadowing value, but the MVP UI must not instruct a
+  // learner to speak along when playback and recognition are independent.
+  it('renders the honest repeat-after-me instruction for a legacy shadowing event', () => {
     const shadowingActivity: LanguageLearningActivityEvent = {
       ...makeActivity(),
       activityType: 'shadowing',
@@ -116,8 +115,10 @@ describe('SpeakingPracticeActivity', () => {
         subjectId="subject-1"
       />,
     );
-    screen.getByText('Speak along with the audio, a beat behind');
-    expect(screen.queryByText('Repeat the line')).toBeNull();
+    screen.getByText('Repeat the line');
+    expect(
+      screen.queryByText('Speak along with the audio, a beat behind'),
+    ).toBeNull();
   });
 
   it('submits an attempt exactly once when recording stops with a transcript', async () => {
@@ -180,6 +181,66 @@ describe('SpeakingPracticeActivity', () => {
 
     // Server feedback rendered, not an internally-recomputed value.
     await screen.findByText('Try again: would, a, of');
+  });
+
+  it('persists legacy shadowing events as repeat-after-me attempts', async () => {
+    mockMutateAsync.mockResolvedValue({
+      attemptNumber: 1,
+      lexicalMatchScore: 1,
+      missingWords: [],
+      extraWords: [],
+      isComplete: true,
+    });
+    const shadowingActivity: LanguageLearningActivityEvent = {
+      ...makeActivity(),
+      activityType: 'shadowing',
+      speakingPractice: {
+        ...makeActivity().speakingPractice!,
+        type: 'shadowing',
+      },
+    };
+
+    const { rerender } = render(
+      <SpeakingPracticeActivity
+        activity={shadowingActivity}
+        sessionId="session-1"
+        subjectId="subject-1"
+      />,
+    );
+
+    mockSttState = {
+      status: 'listening',
+      transcript: 'I would like a cup of tea',
+      error: null,
+      isListening: true,
+    };
+    rerender(
+      <SpeakingPracticeActivity
+        activity={shadowingActivity}
+        sessionId="session-1"
+        subjectId="subject-1"
+      />,
+    );
+
+    mockSttState = {
+      status: 'idle',
+      transcript: 'I would like a cup of tea',
+      error: null,
+      isListening: false,
+    };
+    await act(async () => {
+      rerender(
+        <SpeakingPracticeActivity
+          activity={shadowingActivity}
+          sessionId="session-1"
+          subjectId="subject-1"
+        />,
+      );
+    });
+
+    expect(mockMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'repeat_after_me' }),
+    );
   });
 
   it('does not submit when recording stops with an empty transcript', async () => {

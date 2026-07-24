@@ -53,6 +53,8 @@ type ElementSelector = {
   id?: string;
   text?: string;
   enabled?: boolean;
+  below?: ElementSelector;
+  childOf?: ElementSelector;
   containsDescendants?: ElementSelector[];
 };
 
@@ -6897,6 +6899,14 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scenario: 'onboarding-no-subject',
         shard: 1,
       },
+      // [WI-2234] Returning learner release case — exact unfinished session
+      // resume, new assistant exchange, supported Mentor return, and refreshed
+      // Me-scope feed with the unfinished session and due review still present.
+      {
+        flow: 'flows/v2/v2-returning-learner-resume.yaml',
+        scenario: 'v2-returning-learner',
+        shard: 1,
+      },
       {
         flow: 'flows/v2/v2-shell-navigation.yaml',
         scenario: 'learning-active',
@@ -7870,6 +7880,210 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       ),
     ).toBeGreaterThan(mentorReturn);
     expect(containsOptionalTrue(commands)).toBe(false);
+  });
+
+  it('[WI-2234] binds the returning-learner Continue action to the unfinished-session card', () => {
+    type Command = Record<string, unknown>;
+    const returningLearner = parseAllDocuments(
+      readFileSync(
+        join(
+          repoRoot,
+          'apps/mobile/e2e/flows/v2/v2-returning-learner-resume.yaml',
+        ),
+        'utf8',
+      ),
+    )[1]?.toJS() as unknown;
+
+    expect(Array.isArray(returningLearner)).toBe(true);
+    if (!Array.isArray(returningLearner)) {
+      throw new Error(
+        'V2 returning-learner Maestro commands must be a YAML list',
+      );
+    }
+
+    const continueActions = returningLearner
+      .map((command) => (command as Command).tapOn)
+      .filter(
+        (tap): tap is Command =>
+          tap !== null &&
+          typeof tap === 'object' &&
+          (tap as Command).id === 'now-card-continue',
+      );
+
+    expect(continueActions).toEqual([
+      {
+        id: 'now-card-continue',
+        childOf: { id: 'now-card-unfinished_session' },
+      },
+    ]);
+    expect(continueActions[0]).not.toHaveProperty('index');
+  });
+
+  it('[WI-2234] binds exact turn 3 completion below exact submitted learner turn 2', () => {
+    const commands = parseMaestroCommands(
+      readFileSync(
+        join(
+          repoRoot,
+          'apps/mobile/e2e/flows/v2/v2-returning-learner-resume.yaml',
+        ),
+        'utf8',
+      ),
+    );
+
+    const exactLearnerTurn = {
+      id: 'message-bubble-user-2',
+      containsDescendants: [
+        {
+          text: '^How did Roman roads help people exchange ideas\\?$',
+        },
+      ],
+    };
+    const exactLearnerTurnIndex = commands.findIndex(
+      (command) =>
+        command.optional !== true &&
+        isDeepStrictEqual(command.assertVisible, exactLearnerTurn),
+    );
+    const completedReplyWaits = commands.filter((command) =>
+      isDeepStrictEqual(command, {
+        extendedWaitUntil: {
+          visible: {
+            id: 'assistant-response-complete-3',
+            below: {
+              id: 'message-bubble-user-2',
+            },
+          },
+          timeout: 60_000,
+        },
+      }),
+    );
+
+    expect(exactLearnerTurnIndex).toBeGreaterThanOrEqual(0);
+    expect(completedReplyWaits).toHaveLength(1);
+    expect(commands.indexOf(completedReplyWaits[0]!)).toBeGreaterThan(
+      exactLearnerTurnIndex,
+    );
+    expect(
+      completedReplyWaits[0]?.extendedWaitUntil?.visible,
+    ).not.toHaveProperty('index');
+    expect(commands.some((command) => command.optional === true)).toBe(false);
+  });
+
+  it('[WI-2234] proves the seeded transcript before submitting the new learner message', () => {
+    const commands = parseMaestroCommands(
+      readFileSync(
+        join(
+          repoRoot,
+          'apps/mobile/e2e/flows/v2/v2-returning-learner-resume.yaml',
+        ),
+        'utf8',
+      ),
+    );
+    const seededTranscriptOwner = {
+      id: 'message-bubble-assistant-1',
+      containsDescendants: [
+        {
+          text: '^They connected cities, trade, armies, and new ideas\\.$',
+        },
+      ],
+    };
+    const inputText = 'How did Roman roads help people exchange ideas?';
+    const inputIndex = (items: MaestroCommand[]): number =>
+      items.findIndex((command) => command.inputText === inputText);
+    const hardAssertionIndex = (
+      items: MaestroCommand[],
+      selector: ElementSelector,
+    ): number => {
+      const newInputIndex = inputIndex(items);
+      return items.findIndex(
+        (command, index) =>
+          index < newInputIndex &&
+          command.optional !== true &&
+          isDeepStrictEqual(command.assertVisible, selector),
+      );
+    };
+    const hasSeededTranscriptProperty = (items: MaestroCommand[]): boolean =>
+      inputIndex(items) >= 0 &&
+      hardAssertionIndex(items, seededTranscriptOwner) >= 0;
+
+    expect(hasSeededTranscriptProperty(commands)).toBe(true);
+
+    const transcriptOwnerIndex = hardAssertionIndex(
+      commands,
+      seededTranscriptOwner,
+    );
+    const replaceAssertion = (
+      assertVisible: ElementSelector,
+      optional = false,
+    ): MaestroCommand[] =>
+      commands.map((command, commandIndex) =>
+        commandIndex === transcriptOwnerIndex
+          ? { assertVisible, ...(optional ? { optional: true } : {}) }
+          : command,
+      );
+    const replaceWithIndependentAssertions = (id: string): MaestroCommand[] => [
+      ...commands.slice(0, transcriptOwnerIndex),
+      {
+        assertVisible: {
+          text: '^They connected cities, trade, armies, and new ideas\\.$',
+        },
+      },
+      { assertVisible: { id } },
+      ...commands.slice(transcriptOwnerIndex + 1),
+    ];
+    const moveOwnedIdentityAndTextAfterInput = (): MaestroCommand[] => {
+      const ownedIdentityAndText = commands[transcriptOwnerIndex];
+      const withoutEvidence = commands.filter(
+        (_, commandIndex) => commandIndex !== transcriptOwnerIndex,
+      );
+      const newInputIndex = inputIndex(withoutEvidence);
+      return [
+        ...withoutEvidence.slice(0, newInputIndex + 1),
+        ownedIdentityAndText!,
+        ...withoutEvidence.slice(newInputIndex + 1),
+      ];
+    };
+    const mutations = [
+      {
+        name: 'optional owned seeded identity and text',
+        commands: replaceAssertion(seededTranscriptOwner, true),
+      },
+      {
+        name: 'wrong seeded assistant identity',
+        commands: replaceAssertion({
+          ...seededTranscriptOwner,
+          id: 'message-bubble-assistant-0',
+        }),
+      },
+      {
+        name: 'wrong seeded transcript text',
+        commands: replaceAssertion({
+          ...seededTranscriptOwner,
+          containsDescendants: [{ text: '^They connected roads only\\.$' }],
+        }),
+      },
+      {
+        name: 'owned seeded identity and text both after new input',
+        commands: moveOwnedIdentityAndTextAfterInput(),
+      },
+      {
+        name: 'adjacent independent seeded text and identity assertions',
+        commands: replaceWithIndependentAssertions(
+          'message-bubble-assistant-1',
+        ),
+      },
+      {
+        name: 'mismatched adjacent seeded text and identity assertions',
+        commands: replaceWithIndependentAssertions(
+          'message-bubble-assistant-0',
+        ),
+      },
+    ];
+
+    for (const mutation of mutations) {
+      expect({
+        [mutation.name]: hasSeededTranscriptProperty(mutation.commands),
+      }).toEqual({ [mutation.name]: false });
+    }
   });
 
   it('[WI-2584 profile-load-error] hard-fails authenticated bootstrap errors before Back recovery', () => {
