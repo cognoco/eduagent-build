@@ -288,7 +288,13 @@ export default function SubjectHubRoute(): React.ReactElement {
   // hub data is non-null (the `!subjectId` guard above is the only null case),
   // so an empty subject still surfaces a recoverable empty state below rather
   // than handing blank data to SubjectHub.
-  const hubData = hub.data;
+  const hubData = hub.data
+    ? {
+        ...hub.data,
+        canStudy:
+          hub.data.canStudy && canManage && subject?.status === 'active',
+      }
+    : hub.data;
   const vocabulary = inventoryEnabled
     ? progressInventory.data?.subjects.find(
         (subject) =>

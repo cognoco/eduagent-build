@@ -311,6 +311,18 @@ export default function TopicDetailScreen() {
     resolveAttempt,
   );
   const subjectId = paramSubjectId || resolved?.subjectId;
+  const sessionReturnId =
+    returnTo === SUBJECT_HUB_RETURN_TO ? subjectId : undefined;
+  const sessionReturnParams = useMemo(
+    () =>
+      sessionReturnId
+        ? {
+            returnTo: SUBJECT_HUB_RETURN_TO,
+            returnId: sessionReturnId,
+          }
+        : {},
+    [sessionReturnId],
+  );
   const hubTransitionKey =
     returnTo === SUBJECT_HUB_RETURN_TO && subjectId && topicId
       ? `${subjectId}:${topicId}`
@@ -360,6 +372,21 @@ export default function TopicDetailScreen() {
     subjectId: subjectId ?? undefined,
     topicId: topicId ?? undefined,
   });
+  const pushResumeTarget = useCallback((): boolean => {
+    if (!resumeTarget) return false;
+
+    if (sessionReturnId) {
+      pushLearningResumeTarget(
+        router,
+        resumeTarget,
+        SUBJECT_HUB_RETURN_TO,
+        sessionReturnId,
+      );
+    } else {
+      pushLearningResumeTarget(router, resumeTarget);
+    }
+    return true;
+  }, [resumeTarget, router, sessionReturnId]);
 
   const {
     data: topicProgress,
@@ -506,7 +533,13 @@ export default function TopicDetailScreen() {
       return () =>
         router.push({
           pathname: '/(app)/session',
-          params: { mode: 'review', subjectId, topicId, topicName },
+          params: {
+            mode: 'review',
+            subjectId,
+            topicId,
+            topicName,
+            ...sessionReturnParams,
+          },
         } as Href);
     }
     // [WI-2112] Challenge Round is not a standalone screen — it is an
@@ -522,10 +555,8 @@ export default function TopicDetailScreen() {
     // recall quiz.
     if (deepLinkMode === 'challenge' && topicId) {
       return () => {
-        if (resumeTarget) {
-          pushLearningResumeTarget(router, resumeTarget);
-          return;
-        }
+        if (pushResumeTarget()) return;
+
         router.push({
           pathname: '/(app)/session',
           params: {
@@ -536,6 +567,7 @@ export default function TopicDetailScreen() {
             ...(activeSession?.sessionId && {
               sessionId: activeSession.sessionId,
             }),
+            ...sessionReturnParams,
           },
         } as Href);
       };
@@ -548,7 +580,13 @@ export default function TopicDetailScreen() {
       return () =>
         router.push({
           pathname: '/(app)/session',
-          params: { mode: 'learning', subjectId, topicId, topicName },
+          params: {
+            mode: 'learning',
+            subjectId,
+            topicId,
+            topicName,
+            ...sessionReturnParams,
+          },
         } as Href);
     }
 
@@ -563,15 +601,19 @@ export default function TopicDetailScreen() {
       return () =>
         router.push({
           pathname: '/(app)/session',
-          params: { mode: 'review', subjectId, topicId, topicName },
+          params: {
+            mode: 'review',
+            subjectId,
+            topicId,
+            topicName,
+            ...sessionReturnParams,
+          },
         } as Href);
     }
 
     return () => {
-      if (resumeTarget) {
-        pushLearningResumeTarget(router, resumeTarget);
-        return;
-      }
+      if (pushResumeTarget()) return;
+
       router.push({
         pathname: '/(app)/session',
         params: {
@@ -582,15 +624,17 @@ export default function TopicDetailScreen() {
           ...(activeSession?.sessionId && {
             sessionId: activeSession.sessionId,
           }),
+          ...sessionReturnParams,
         },
       } as Href);
     };
   }, [
     activeSession?.sessionId,
     deepLinkMode,
+    pushResumeTarget,
     retentionCard?.nextReviewAt,
-    resumeTarget,
     router,
+    sessionReturnParams,
     subjectId,
     topicId,
     topicName,

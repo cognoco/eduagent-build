@@ -394,6 +394,63 @@ describe('TopicDetailScreen action buttons', () => {
     });
   });
 
+  it('preserves Subject Hub return ownership when Study starts a learning session', async () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      subjectId: SUBJECT_ID,
+      topicId: TOPIC_ID,
+      returnTo: 'subject-hub',
+    });
+    setupRoutes({ completionStatus: 'not_started' });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('study-cta');
+    });
+    fireEvent.press(screen.getByTestId('study-cta'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: {
+        mode: 'learning',
+        subjectId: SUBJECT_ID,
+        topicId: TOPIC_ID,
+        topicName: 'Algebra',
+        returnTo: 'subject-hub',
+        returnId: SUBJECT_ID,
+      },
+    });
+  });
+
+  it('preserves Subject Hub return ownership when Review starts a review session', async () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      subjectId: SUBJECT_ID,
+      topicId: TOPIC_ID,
+      mode: 'review',
+      returnTo: 'subject-hub',
+    });
+    setupRoutes({ completionStatus: 'completed' });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('study-cta');
+    });
+    fireEvent.press(screen.getByTestId('study-cta'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: {
+        mode: 'review',
+        subjectId: SUBJECT_ID,
+        topicId: TOPIC_ID,
+        topicName: 'Algebra',
+        returnTo: 'subject-hub',
+        returnId: SUBJECT_ID,
+      },
+    });
+  });
+
   // [WI-2112] challenge.start deep links (Now-feed cards, mentor-bar intents,
   // and direct topic ?mode=challenge links all resolve to this same
   // /(app)/topic/:topicId?mode=challenge route — see now-deep-link.ts and
@@ -492,6 +549,52 @@ describe('TopicDetailScreen action buttons', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['ordinary Study', undefined],
+    ['challenge.start', 'challenge'],
+  ] as const)(
+    'preserves Subject Hub return ownership when %s resumes a shared session',
+    async (_entryPath, mode) => {
+      const target = {
+        subjectId: SUBJECT_ID,
+        subjectName: 'Math',
+        topicId: TOPIC_ID,
+        topicTitle: 'Algebra',
+        sessionId: null,
+        resumeFromSessionId: SESSION_ID,
+        resumeKind: 'recent_topic',
+        lastActivityAt: '2026-02-15T09:00:00.000Z',
+        reason: 'Continue Algebra',
+      };
+      setupRoutes({
+        completionStatus: 'in_progress',
+        activeSessionId: SESSION_ID,
+        resumeTarget: target,
+      });
+      mockUseLocalSearchParams.mockReturnValue({
+        subjectId: SUBJECT_ID,
+        topicId: TOPIC_ID,
+        ...(mode ? { mode } : {}),
+        returnTo: 'subject-hub',
+      });
+
+      render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('study-cta');
+      });
+      fireEvent.press(screen.getByTestId('study-cta'));
+
+      expect(mockPushLearningResumeTarget).toHaveBeenCalledWith(
+        expect.anything(),
+        target,
+        'subject-hub',
+        SUBJECT_ID,
+      );
+      expect(mockPush).not.toHaveBeenCalled();
+    },
+  );
+
   it('carries the active sessionId when a challenge.start deep link has an active session but no shared resume target', async () => {
     setupRoutes({
       completionStatus: 'in_progress',
@@ -519,6 +622,40 @@ describe('TopicDetailScreen action buttons', () => {
         topicId: TOPIC_ID,
         topicName: 'Algebra',
         sessionId: SESSION_ID,
+      },
+    });
+  });
+
+  it('preserves Subject Hub return ownership when challenge.start falls back to an active session', async () => {
+    setupRoutes({
+      completionStatus: 'in_progress',
+      activeSessionId: SESSION_ID,
+      resumeTarget: null,
+    });
+    mockUseLocalSearchParams.mockReturnValue({
+      subjectId: SUBJECT_ID,
+      topicId: TOPIC_ID,
+      mode: 'challenge',
+      returnTo: 'subject-hub',
+    });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('study-cta');
+    });
+    fireEvent.press(screen.getByTestId('study-cta'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: {
+        mode: 'learning',
+        subjectId: SUBJECT_ID,
+        topicId: TOPIC_ID,
+        topicName: 'Algebra',
+        sessionId: SESSION_ID,
+        returnTo: 'subject-hub',
+        returnId: SUBJECT_ID,
       },
     });
   });

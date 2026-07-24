@@ -17,6 +17,7 @@ import {
   JOURNAL_RETURN_TO,
   SUBJECTS_HREF,
   SUBJECTS_RETURN_TO,
+  SUBJECT_HUB_RETURN_TO,
   FAMILY_RECAPS_HREF,
   FAMILY_RECAPS_RETURN_TO,
   FAMILY_PROGRESS_HREF,
@@ -330,6 +331,29 @@ describe('pushLearningResumeTarget [BUG-977]', () => {
         topicName: 'Linear equations',
         sessionId: 'session-subjects-return',
         returnTo: SUBJECTS_RETURN_TO,
+      },
+    });
+  });
+
+  it('forwards the exact Subject Hub identity when resuming a learning session', () => {
+    const router = makeRouter();
+    const target = makeMinimalTarget();
+
+    pushLearningResumeTarget(
+      router,
+      target,
+      SUBJECT_HUB_RETURN_TO,
+      target.subjectId,
+    );
+
+    expect(router.push).toHaveBeenNthCalledWith(2, {
+      pathname: '/(app)/session',
+      params: {
+        mode: 'learning',
+        subjectId: 'subj-1',
+        subjectName: 'Math',
+        returnTo: SUBJECT_HUB_RETURN_TO,
+        returnId: 'subj-1',
       },
     });
   });

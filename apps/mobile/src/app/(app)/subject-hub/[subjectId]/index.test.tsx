@@ -1753,6 +1753,43 @@ describe('SubjectHubRoute — manage entry (WI-1119)', () => {
     expect(screen.queryByTestId('subject-hub-pause')).toBeNull();
   });
 
+  it.each(['paused', 'archived'] as const)(
+    'keeps a %s subject visible for management without exposing study or review actions',
+    async (status) => {
+      mockFetch.setRoute('/subjects', {
+        subjects: [
+          {
+            id: SUBJECT_ID,
+            profileId: '990e8400-e29b-41d4-a716-446655440004',
+            name: 'Spanish',
+            status,
+            curriculumStatus: 'ready',
+            pedagogyMode: 'socratic',
+            createdAt: '2026-06-01T00:00:00.000Z',
+            updatedAt: '2026-06-01T00:00:00.000Z',
+          },
+        ],
+      });
+
+      render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+      await waitFor(() => {
+        screen.getByTestId('subject-hub-manage');
+      });
+
+      screen.getByText('Spanish');
+      expect(screen.queryByTestId('subject-hub-next-up-action')).toBeNull();
+
+      fireEvent.press(screen.getByTestId(`subject-hub-topic-${TOPIC_ID}`));
+
+      screen.getByTestId('subject-hub-topic-sheet');
+      screen.getByText('Say hello.');
+      expect(screen.queryByText('Study')).toBeNull();
+      expect(screen.queryByText('Review')).toBeNull();
+      expect(screen.queryByTestId('subject-hub-notes-input')).toBeNull();
+    },
+  );
+
   it('hides the manage entry for a supporter-proxy scope', async () => {
     render(<SubjectHubRoute />, { wrapper: proxyWrapper() });
 

@@ -190,6 +190,7 @@ export function pushLearningResumeTarget(
   router: Pick<Router, 'push'>,
   target: LearningResumeTarget,
   returnTo?: string,
+  returnId?: string,
 ): void {
   // [BUG-977 / CCR-PR126-M-2] Replace the previous `as never` cast (which
   // silenced the typed Href system entirely) with `as Href`. The Expo Router
@@ -220,6 +221,7 @@ export function pushLearningResumeTarget(
         ? { resumeFromSessionId: target.resumeFromSessionId }
         : {}),
       ...(returnTo ? { returnTo } : {}),
+      ...(returnId ? { returnId } : {}),
     },
   } as Href);
 }
