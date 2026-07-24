@@ -4,7 +4,7 @@ import {
   screen,
   within,
 } from '@testing-library/react-native';
-import type { NowResponse } from '@eduagent/schemas';
+import type { NowResponse, RecapListItem } from '@eduagent/schemas';
 
 import { JournalTabView } from './JournalTabView';
 import { RecapRow } from './RecapRow';
@@ -146,7 +146,7 @@ const recap = {
   nextTopicTitle: null,
   nextTopicReason: null,
   verifiedProof: null,
-};
+} satisfies RecapListItem;
 
 const weeklyReport = {
   id: 'weekly-1',
