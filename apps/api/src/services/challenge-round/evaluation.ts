@@ -81,56 +81,41 @@ function normalizeIdentityPart(value: string): string {
     .replace(/\s+/g, ' ');
 }
 
-function questionsAreEquivalent(
-  left: ChallengeRoundEvaluationItem,
-  right: ChallengeRoundEvaluationItem,
-): boolean {
-  const leftIdentity = left.questionIdentity;
-  const rightIdentity = right.questionIdentity;
-  if (!leftIdentity || !rightIdentity) return false;
-
-  if (
-    normalizeIdentityPart(leftIdentity.questionText) ===
-    normalizeIdentityPart(rightIdentity.questionText)
-  ) {
-    return true;
-  }
-
-  return (
-    normalizeIdentityPart(leftIdentity.minimalLearningClaim) ===
-      normalizeIdentityPart(rightIdentity.minimalLearningClaim) &&
-    leftIdentity.cognitiveOperation === rightIdentity.cognitiveOperation &&
-    normalizeIdentityPart(leftIdentity.materialContext) ===
-      normalizeIdentityPart(rightIdentity.materialContext)
-  );
-}
-
 function countDistinctProbes(evals: ChallengeRoundEvaluationItem[]): number {
-  const identified = evals.filter((evaluation) => evaluation.questionIdentity);
-  const visited = new Set<number>();
-  let classCount = 0;
+  const identities = evals.flatMap((evaluation) =>
+    evaluation.questionIdentity ? [evaluation.questionIdentity] : [],
+  );
+  const [firstIdentity, ...remainingIdentities] = identities;
+  if (!firstIdentity) return 0;
 
-  for (let index = 0; index < identified.length; index += 1) {
-    if (visited.has(index)) continue;
-    classCount += 1;
-    visited.add(index);
+  let distinctCount = 1;
+  const priorIdentities = [firstIdentity];
 
-    const pending = [index];
-    while (pending.length > 0) {
-      const current = pending.pop()!;
-      for (let candidate = 0; candidate < identified.length; candidate += 1) {
-        if (
-          !visited.has(candidate) &&
-          questionsAreEquivalent(identified[current]!, identified[candidate]!)
-        ) {
-          visited.add(candidate);
-          pending.push(candidate);
-        }
+  for (const identity of remainingIdentities) {
+    const repeatsExactQuestion = priorIdentities.some(
+      (prior) =>
+        normalizeIdentityPart(prior.questionText) ===
+        normalizeIdentityPart(identity.questionText),
+    );
+
+    if (!repeatsExactQuestion) {
+      const introducesNewOperation = priorIdentities.every(
+        (prior) => prior.cognitiveOperation !== identity.cognitiveOperation,
+      );
+
+      // Natural-language claim/context mismatches are ambiguous: they may be
+      // synonyms rather than new evidence. They cannot create mastery breadth
+      // unless the grader supplies the explicit, history-relative novelty
+      // classification defined by the schema.
+      if (introducesNewOperation || identity.noveltyBasis) {
+        distinctCount += 1;
       }
     }
+
+    priorIdentities.push(identity);
   }
 
-  return classCount;
+  return distinctCount;
 }
 
 /**

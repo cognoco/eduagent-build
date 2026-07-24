@@ -360,6 +360,9 @@ function createBranchingLlm() {
     graderCallCount(): number {
       return calls.filter(isGraderMessages).length;
     },
+    graderMessages(): ChatMessage[][] {
+      return calls.filter(isGraderMessages);
+    },
     reset(): void {
       tutorResponse = TUTOR_ENVELOPE_NO_EVAL;
       graderResponse = GRADER_VERDICT_SOLID;
@@ -1248,6 +1251,12 @@ describeIfDb('session exchange production-path integration', () => {
 
     // Verify the grader was actually called (not the inline tutor path)
     expect(llm.graderCallCount()).toBe(2);
+    expect(
+      llm
+        .graderMessages()[1]!
+        .map((message) => message.content)
+        .join('\n'),
+    ).toContain('photosynthesis has light reactions and the Calvin cycle');
   });
 
   // -------------------------------------------------------------------------

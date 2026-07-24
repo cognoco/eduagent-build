@@ -28,6 +28,12 @@ describe('challenge-round prompts', () => {
     expect(challengeRoundActivePrompt).toMatch(
       /Application, comparison, causal explanation, synthesis, or evaluation in a genuinely new context are new/i,
     );
+    expect(challengeRoundActivePrompt).toMatch(
+      /genuinely distinct from every earlier Challenge question.*add `noveltyBasis`/i,
+    );
+    expect(challengeRoundActivePrompt).toMatch(
+      /omit it for the first question, repeats, paraphrases, and cosmetic changes/i,
+    );
   });
   it('drafting prompt forbids invention', () => {
     expect(challengeRoundDraftingPrompt).toMatch(/do not invent/i);

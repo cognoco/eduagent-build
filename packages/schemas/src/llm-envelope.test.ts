@@ -1019,6 +1019,7 @@ describe('challenge round envelope fields', () => {
                 'photosynthesis stores energy while respiration releases it',
               cognitiveOperation: 'causal_explanation',
               materialContext: '',
+              noveltyBasis: 'new_reasoning',
             },
           },
           {
@@ -1045,6 +1046,10 @@ describe('challenge round envelope fields', () => {
       parsed.signals?.challenge_round_evaluation?.[0]?.questionIdentity
         ?.cognitiveOperation,
     ).toBe('causal_explanation');
+    expect(
+      parsed.signals?.challenge_round_evaluation?.[0]?.questionIdentity
+        ?.noveltyBasis,
+    ).toBe('new_reasoning');
     expect(parsed.signals?.challenge_round_evaluation?.[2]?.correction).toBe(
       'occurs in chloroplasts',
     );
