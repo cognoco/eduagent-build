@@ -59,7 +59,8 @@ export function ScopeChip(): React.ReactElement | null {
         testID="scope-chip"
         accessibilityRole="tablist"
         className="max-w-[260px] rounded-full border border-border bg-surface shadow-sm"
-        contentContainerClassName="items-center gap-1 p-1"
+        contentContainerClassName="items-center gap-1"
+        contentContainerStyle={{ padding: 4 }}
       >
         {availableScopes.map((scope) => {
           const selected = sameScope(scope, activeScope);
@@ -72,7 +73,8 @@ export function ScopeChip(): React.ReactElement | null {
               accessibilityLabel={label}
               accessibilityState={{ selected }}
               onPress={() => setActiveScope(scope)}
-              className={`min-h-11 min-w-11 max-w-[150px] items-center justify-center rounded-full px-3 ${
+              style={{ minHeight: 44, minWidth: 44 }}
+              className={`max-w-[150px] items-center justify-center rounded-full px-3 ${
                 selected ? 'bg-primary' : 'bg-transparent'
               }`}
             >

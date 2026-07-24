@@ -62,6 +62,25 @@ describe('ScopeChip', () => {
     expect(personButton.props.accessibilityState).toEqual({ selected: true });
   });
 
+  it('[WI-2176] uses native 44dp targets and a real content inset for every scope', () => {
+    renderChip({
+      shape: 'supporter',
+      scopes: [{ kind: 'supporter-hub' }, personScope, { kind: 'me' }],
+      defaultScopeIndex: 0,
+    });
+
+    expect(screen.getByTestId('scope-chip')).toHaveProp(
+      'contentContainerStyle',
+      expect.objectContaining({ padding: 4 }),
+    );
+    for (const option of screen.getAllByTestId(/^scope-chip-option-/)) {
+      expect(option).toHaveStyle({
+        minHeight: 44,
+        minWidth: 44,
+      });
+    }
+  });
+
   it('[WI-2176] exposes the E2E persistence receipt only after SecureStore commits the selected scope', async () => {
     const previousE2E = process.env.EXPO_PUBLIC_E2E;
     let resolveWrite!: () => void;

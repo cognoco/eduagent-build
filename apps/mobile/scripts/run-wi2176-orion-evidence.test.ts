@@ -10,11 +10,19 @@ const RUNNER_PATH = path.resolve(
   'scripts',
   'run-wi2176-orion-evidence.ps1',
 );
+const CAPTURE_PATH = path.resolve(
+  __dirname,
+  '..',
+  'e2e',
+  'scripts',
+  'capture-wi2176-orion-header.ps1',
+);
 
 const POWERSHELL_HARNESS = String.raw`
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $runnerPath = [Environment]::GetEnvironmentVariable('WI2176_RUNNER_PATH')
+$capturePath = [Environment]::GetEnvironmentVariable('WI2176_CAPTURE_PATH')
 $tokens = $null
 $parseErrors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile(
@@ -92,6 +100,46 @@ function Assert-Equal {
     throw "$Message (expected '$Expected', found '$Actual')"
   }
 }
+
+$captureTokens = $null
+$captureParseErrors = $null
+$captureAst = [System.Management.Automation.Language.Parser]::ParseFile(
+  $capturePath,
+  [ref]$captureTokens,
+  [ref]$captureParseErrors
+)
+if ($captureParseErrors.Count -gt 0) {
+  throw "Capture verifier did not parse: $($captureParseErrors[0].Message)"
+}
+$densityFunction = $captureAst.Find(
+  {
+    param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+      $node.Name -eq 'Get-EffectiveDensityDpi'
+  },
+  $true
+)
+if (-not $densityFunction) {
+  throw 'Expected Get-EffectiveDensityDpi to validate physical-only density'
+}
+Invoke-Expression $densityFunction.Extent.Text
+Assert-Equal (
+  Get-EffectiveDensityDpi "Physical density: 480"
+) 480 'Physical-only density was not accepted as effective density'
+Assert-Equal (
+  Get-EffectiveDensityDpi (
+    "Physical density: 420" +
+    [Environment]::NewLine +
+    "Override density: 480"
+  )
+) 480 'Density override did not take precedence over physical density'
+Assert-Equal (
+  Get-EffectiveDensityDpi (
+    "Physical density: 480" +
+    [Environment]::NewLine +
+    "Override density: 420"
+  )
+) 420 'Physical density incorrectly overrode an explicit density override'
 
 $nativeCaptureFunction = $ast.Find(
   {
@@ -732,6 +780,7 @@ function safePowerShellEnvironment(): NodeJS.ProcessEnv {
     }
   }
   environment.WI2176_RUNNER_PATH = RUNNER_PATH;
+  environment.WI2176_CAPTURE_PATH = CAPTURE_PATH;
   return environment;
 }
 
