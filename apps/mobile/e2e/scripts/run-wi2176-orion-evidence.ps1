@@ -240,6 +240,61 @@ function Assert-ExactSourceState {
   }
 }
 
+function Set-OrionAndroidBuildEnvironment {
+  # Kotlin's daemon path cannot represent Orion's Unicode Windows user name.
+  [Environment]::SetEnvironmentVariable(
+    'ORG_GRADLE_PROJECT_kotlin.compiler.execution.strategy',
+    'in-process',
+    'Process'
+  )
+}
+
+function Set-OrionAndroidReleaseBundleEntry {
+  param([Parameter(Mandatory = $true)][string]$BuildGradlePath)
+
+  $buildGradle = [System.IO.File]::ReadAllText($BuildGradlePath)
+  $anchor = '    bundleCommand = "export:embed"'
+  # Match CI's absolute entry: Metro's monorepo root misresolves index.js.
+  $override = (
+    '    extraPackagerArgs = ["--entry-file", ' +
+    'new File(projectRoot, "index.js").getAbsolutePath()]'
+  )
+  $anchorCount = [regex]::Matches(
+    $buildGradle,
+    [regex]::Escape($anchor)
+  ).Count
+  $overrideCount = [regex]::Matches(
+    $buildGradle,
+    [regex]::Escape($override)
+  ).Count
+  $newLine = if ($buildGradle.Contains("`r`n")) { "`r`n" } else { "`n" }
+  $canonicalConfiguredBlock = $anchor + $newLine + $override
+  if (
+    $anchorCount -eq 1 -and
+    $overrideCount -eq 1 -and
+    $buildGradle.Contains($canonicalConfiguredBlock)
+  ) {
+    return
+  }
+  if ($anchorCount -ne 1 -or $overrideCount -ne 0) {
+    throw (
+      "Expected one unconfigured Expo bundle-command anchor in " +
+      "$BuildGradlePath; found anchors=$anchorCount, " +
+      "overrides=$overrideCount"
+    )
+  }
+  $configuredBuildGradle = $buildGradle.Replace(
+    $anchor,
+    $anchor + $newLine + $override
+  )
+  $utf8WithoutBom = [System.Text.UTF8Encoding]::new($false)
+  [System.IO.File]::WriteAllText(
+    $BuildGradlePath,
+    $configuredBuildGradle,
+    $utf8WithoutBom
+  )
+}
+
 foreach ($requiredExecutable in @($AdbBin, $BashBin)) {
   if (-not (Test-Path -LiteralPath $requiredExecutable -PathType Leaf)) {
     throw "Required executable not found: $requiredExecutable"
@@ -321,6 +376,7 @@ try {
   $env:EXPO_PUBLIC_API_URL = 'http://10.0.2.2:8787'
   $env:EXPO_PUBLIC_CLERK_OPENAI_SSO_SLUG = 'openai'
   $env:SENTRY_DISABLE_AUTO_UPLOAD = 'true'
+  Set-OrionAndroidBuildEnvironment
 
   Push-Location $repoRoot
   try {
@@ -329,6 +385,9 @@ try {
     try {
       Invoke-Checked pnpm exec expo prebuild --clean --platform android `
         --no-install
+      Set-OrionAndroidReleaseBundleEntry `
+        -BuildGradlePath (Join-Path $repoRoot `
+          'apps\mobile\android\app\build.gradle')
     } finally {
       Pop-Location
     }

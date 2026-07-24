@@ -1,4 +1,6 @@
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 const RUNNER_PATH = path.resolve(
@@ -89,6 +91,171 @@ function Assert-Equal {
   if ($Actual -ne $Expected) {
     throw "$Message (expected '$Expected', found '$Actual')"
   }
+}
+
+$buildEnvironmentFunction = $ast.Find(
+  {
+    param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+      $node.Name -eq 'Set-OrionAndroidBuildEnvironment'
+  },
+  $true
+)
+if (-not $buildEnvironmentFunction) {
+  throw 'Expected Set-OrionAndroidBuildEnvironment to make Kotlin compilation Unicode-safe'
+}
+Invoke-Expression $buildEnvironmentFunction.Extent.Text
+$kotlinStrategyName = 'ORG_GRADLE_PROJECT_kotlin.compiler.execution.strategy'
+$priorKotlinStrategy = [Environment]::GetEnvironmentVariable(
+  $kotlinStrategyName,
+  'Process'
+)
+try {
+  Set-OrionAndroidBuildEnvironment
+  Assert-Equal (
+    [Environment]::GetEnvironmentVariable($kotlinStrategyName, 'Process')
+  ) 'in-process' 'Kotlin compilation was not pinned to the in-process strategy'
+} finally {
+  [Environment]::SetEnvironmentVariable(
+    $kotlinStrategyName,
+    $priorKotlinStrategy,
+    'Process'
+  )
+}
+
+$bundleEntryFunction = $ast.Find(
+  {
+    param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+      $node.Name -eq 'Set-OrionAndroidReleaseBundleEntry'
+  },
+  $true
+)
+if (-not $bundleEntryFunction) {
+  throw 'Expected Set-OrionAndroidReleaseBundleEntry to use the absolute mobile entry file'
+}
+Invoke-Expression $bundleEntryFunction.Extent.Text
+$bundleEntryRoot = Join-Path (
+  [System.IO.Path]::GetTempPath()
+) "wi2176-bundle-entry-$PID-$([guid]::NewGuid().ToString('N'))"
+$bundleGradlePath = Join-Path $bundleEntryRoot 'build.gradle'
+[System.IO.Directory]::CreateDirectory($bundleEntryRoot) | Out-Null
+try {
+  [System.IO.File]::WriteAllText(
+    $bundleGradlePath,
+    @'
+react {
+    bundleCommand = "export:embed"
+}
+'@
+  )
+  Set-OrionAndroidReleaseBundleEntry -BuildGradlePath $bundleGradlePath
+  $configuredBuildGradle = [System.IO.File]::ReadAllText($bundleGradlePath)
+  $absoluteEntryOverride = 'extraPackagerArgs = ["--entry-file", new File(projectRoot, "index.js").getAbsolutePath()]'
+  Assert-Equal (
+    [regex]::Matches(
+      $configuredBuildGradle,
+      [regex]::Escape($absoluteEntryOverride)
+    ).Count
+  ) 1 'Generated Gradle did not receive exactly one absolute entry-file override'
+  if (
+    $configuredBuildGradle.IndexOf(
+      $absoluteEntryOverride,
+      [System.StringComparison]::Ordinal
+    ) -lt $configuredBuildGradle.IndexOf(
+      'bundleCommand = "export:embed"',
+      [System.StringComparison]::Ordinal
+    )
+  ) {
+    throw 'Absolute entry-file override was not appended after bundleCommand'
+  }
+  Set-OrionAndroidReleaseBundleEntry -BuildGradlePath $bundleGradlePath
+  Assert-Equal (
+    [System.IO.File]::ReadAllText($bundleGradlePath)
+  ) $configuredBuildGradle 'Canonical bundle-entry configuration was not idempotent'
+
+  $anchorLine = '    bundleCommand = "export:embed"'
+  $overrideLine = "    $absoluteEntryOverride"
+  $invalidBundleEntryShapes = [ordered]@{
+    'duplicate override' = @"
+react {
+$anchorLine
+$overrideLine
+$overrideLine
+}
+"@
+    'misplaced override' = @"
+react {
+$overrideLine
+$anchorLine
+}
+"@
+    'missing anchor' = @'
+react {
+}
+'@
+    'duplicate anchor' = @"
+react {
+$anchorLine
+$anchorLine
+}
+"@
+  }
+  foreach ($invalidShape in $invalidBundleEntryShapes.GetEnumerator()) {
+    [System.IO.File]::WriteAllText(
+      $bundleGradlePath,
+      $invalidShape.Value
+    )
+    $shapeFailure = $null
+    try {
+      Set-OrionAndroidReleaseBundleEntry -BuildGradlePath $bundleGradlePath
+    } catch {
+      $shapeFailure = $_
+    }
+    if (-not $shapeFailure) {
+      throw "Expected $($invalidShape.Key) Gradle shape to fail closed"
+    }
+  }
+} finally {
+  if (Test-Path -LiteralPath $bundleEntryRoot -PathType Container) {
+    Remove-Item -LiteralPath $bundleEntryRoot -Recurse -Force
+  }
+}
+
+$prebuildCommand = $ast.Find(
+  {
+    param($node)
+    $node -is [System.Management.Automation.Language.CommandAst] -and
+      $node.GetCommandName() -eq 'Invoke-Checked' -and
+      $node.Extent.Text -match 'expo\s+prebuild'
+  },
+  $true
+)
+$bundleEntryCall = $ast.Find(
+  {
+    param($node)
+    $node -is [System.Management.Automation.Language.CommandAst] -and
+      $node.GetCommandName() -eq 'Set-OrionAndroidReleaseBundleEntry'
+  },
+  $true
+)
+$gradleCommand = $ast.Find(
+  {
+    param($node)
+    $node -is [System.Management.Automation.Language.CommandAst] -and
+      $node.GetCommandName() -eq 'Invoke-Checked' -and
+      $node.Extent.Text -match 'gradlew\.bat'
+  },
+  $true
+)
+if (-not $prebuildCommand -or -not $bundleEntryCall -or -not $gradleCommand) {
+  throw 'Expected prebuild, bundle-entry configuration, and Gradle commands'
+}
+if (
+  $bundleEntryCall.Extent.StartOffset -le $prebuildCommand.Extent.StartOffset -or
+  $bundleEntryCall.Extent.StartOffset -ge $gradleCommand.Extent.StartOffset
+) {
+  throw 'Absolute bundle entry must be configured after prebuild and before Gradle'
 }
 
 $reverseCalls = [System.Collections.Generic.List[string]]::new()
@@ -319,34 +486,37 @@ const powershellExecutables =
 test.each(powershellExecutables)(
   'attempts every cleanup action and preserves primary failure precedence under %s',
   (powershellExecutable) => {
-    const encodedCommand = Buffer.from(POWERSHELL_HARNESS, 'utf16le').toString(
-      'base64',
+    const harnessRoot = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'wi2176-runner-contract-'),
     );
-    const result = spawnSync(
-      powershellExecutable,
-      [
-        '-NoLogo',
-        '-NoProfile',
-        '-NonInteractive',
-        '-EncodedCommand',
-        encodedCommand,
-      ],
-      {
-        encoding: 'utf8',
-        env: safePowerShellEnvironment(),
-      },
-    );
+    const harnessPath = path.join(harnessRoot, 'runner-contract.ps1');
+    try {
+      fs.writeFileSync(harnessPath, POWERSHELL_HARNESS, 'utf8');
+      const result = spawnSync(
+        powershellExecutable,
+        ['-NoLogo', '-NoProfile', '-NonInteractive', '-File', harnessPath],
+        {
+          encoding: 'utf8',
+          env: safePowerShellEnvironment(),
+        },
+      );
 
-    expect({
-      error: result.error?.message,
-      status: result.status,
-      stderr: result.stderr,
-      stdout: result.stdout,
-    }).toEqual({
-      error: undefined,
-      status: 0,
-      stderr: '',
-      stdout: expect.stringContaining('WI-2176 cleanup contract: PASS'),
-    });
+      expect({
+        error: result.error?.message,
+        status: result.status,
+        stderr: result.stderr,
+        stdout: result.stdout,
+      }).toEqual({
+        error: undefined,
+        status: 0,
+        stderr: '',
+        stdout: expect.stringContaining('WI-2176 cleanup contract: PASS'),
+      });
+    } finally {
+      fs.rmSync(harnessRoot, {
+        force: true,
+        recursive: true,
+      });
+    }
   },
 );
