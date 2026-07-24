@@ -213,8 +213,17 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
     page.getByTestId(`weekly-report-card-${weeklyReportId}`),
   );
   await expect
-    .poll(() => new URL(page.url()).pathname)
-    .toBe(`/progress/weekly-report/${weeklyReportId}`);
+    .poll(() => {
+      const url = new URL(page.url());
+      return {
+        pathname: url.pathname,
+        returnTo: url.searchParams.get('returnTo'),
+      };
+    })
+    .toEqual({
+      pathname: `/progress/weekly-report/${weeklyReportId}`,
+      returnTo: 'journal',
+    });
   await expect(
     page.getByTestId('progress-weekly-report-metric-sessions'),
   ).toBeVisible();
@@ -234,8 +243,17 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
   // Exact monthly report ID -> monthly detail -> Journal Me.
   await pressableClick(page.getByTestId(`report-card-${monthlyReportId}`));
   await expect
-    .poll(() => new URL(page.url()).pathname)
-    .toBe(`/progress/reports/${monthlyReportId}`);
+    .poll(() => {
+      const url = new URL(page.url());
+      return {
+        pathname: url.pathname,
+        returnTo: url.searchParams.get('returnTo'),
+      };
+    })
+    .toEqual({
+      pathname: `/progress/reports/${monthlyReportId}`,
+      returnTo: 'journal',
+    });
   await expect(
     page.getByTestId('progress-report-metric-sessions'),
   ).toBeVisible();

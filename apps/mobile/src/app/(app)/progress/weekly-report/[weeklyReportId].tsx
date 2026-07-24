@@ -61,6 +61,14 @@ export default function ProgressWeeklyReportDetail(): React.ReactElement {
     resolvedReturnTo === JOURNAL_RETURN_TO
       ? JOURNAL_HREF
       : '/(app)/progress/reports';
+  const handleBack = () => {
+    if (resolvedReturnTo === JOURNAL_RETURN_TO) {
+      router.replace(JOURNAL_HREF);
+      return;
+    }
+
+    goBackOrReplace(router, reportsHref);
+  };
   const {
     data: report,
     isLoading,
@@ -94,7 +102,7 @@ export default function ProgressWeeklyReportDetail(): React.ReactElement {
       >
         <View className="flex-row items-center mt-4">
           <Pressable
-            onPress={() => goBackOrReplace(router, reportsHref)}
+            onPress={handleBack}
             className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel={t('common.goBack')}
@@ -140,7 +148,7 @@ export default function ProgressWeeklyReportDetail(): React.ReactElement {
                 resolvedReturnTo === JOURNAL_RETURN_TO
                   ? t('common.goBack')
                   : t('parentView.weeklyReport.backToReports'),
-              onPress: () => goBackOrReplace(router, reportsHref),
+              onPress: handleBack,
               testID: 'progress-weekly-report-error-back',
             }}
             testID="progress-weekly-report-error"

@@ -1,12 +1,13 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 const mockGoBackOrReplace = jest.fn();
+const mockReplace = jest.fn();
 const mockRefetch = jest.fn();
 const mockUseProfileReportDetail = jest.fn();
 let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({}),
+  useRouter: () => ({ replace: mockReplace }),
   useLocalSearchParams: () => mockSearchParams,
 }));
 
@@ -216,10 +217,8 @@ describe('ProgressMonthlyReportDetail', () => {
     screen.getByText('Go back');
     expect(screen.queryByText('Back to reports')).toBeNull();
     fireEvent.press(backAction);
-    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
-      expect.anything(),
-      '/(app)/journal',
-    );
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/journal');
+    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 
   it('renders the headline stat value, label, and comparison when data loads', () => {
@@ -354,10 +353,8 @@ describe('ProgressMonthlyReportDetail', () => {
     render(<ProgressMonthlyReportDetail />);
 
     fireEvent.press(screen.getByTestId('progress-report-back'));
-    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
-      expect.anything(),
-      '/(app)/journal',
-    );
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/journal');
+    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 
   it('uses the month from reportData as the screen title when data is loaded', () => {

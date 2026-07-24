@@ -1,12 +1,13 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 const mockGoBackOrReplace = jest.fn();
+const mockReplace = jest.fn();
 const mockRefetch = jest.fn();
 const mockUseProfileWeeklyReportDetail = jest.fn();
 let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({}),
+  useRouter: () => ({ replace: mockReplace }),
   useLocalSearchParams: () => mockSearchParams,
 }));
 
@@ -216,10 +217,8 @@ describe('ProgressWeeklyReportDetail', () => {
     screen.getByText('Go back');
     expect(screen.queryByText('Back to reports')).toBeNull();
     fireEvent.press(backAction);
-    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
-      expect.anything(),
-      '/(app)/journal',
-    );
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/journal');
+    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 
   it('renders the headline stat value, label, and comparison when data loads', () => {
@@ -345,10 +344,8 @@ describe('ProgressWeeklyReportDetail', () => {
     render(<ProgressWeeklyReportDetail />);
 
     fireEvent.press(screen.getByTestId('progress-weekly-report-back'));
-    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
-      expect.anything(),
-      '/(app)/journal',
-    );
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/journal');
+    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 
   it('formats the week date range as the screen title when data is loaded', () => {
