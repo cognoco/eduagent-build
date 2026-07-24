@@ -3718,6 +3718,8 @@
     "bridge": {
       "headline": "Transforme \"Não entendi\" em \"Eu consegui.\"",
       "supporting": "Crie uma conta gratuita para que seu mentor possa lembrar seus assuntos, anotações e progresso.",
+      "parentHeadline": "Continue com sua conta para apoiar o aluno.",
+      "parentSupporting": "Entre ou crie uma conta para aceitar o convite e configurar o suporte. Sua conta não dá acesso às atividades de aprendizagem, a menos que o aluno autorize.",
       "primaryCta": "Criar conta gratuita",
       "secondaryCta": "Já tenho uma conta"
     },
