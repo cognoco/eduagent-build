@@ -4088,6 +4088,8 @@
     "bridge": {
       "headline": "Turn \"I don't get it\" into \"I've got this.\"",
       "supporting": "Create a free account so your mentor can remember your subjects, notes, and progress.",
+      "parentHeadline": "Continue with your account to support your learner.",
+      "parentSupporting": "Sign in or sign up to accept the invitation and set up support. Your account does not grant access to learning activity unless the learner authorizes it.",
       "primaryCta": "Create free account",
       "secondaryCta": "I already have an account"
     },

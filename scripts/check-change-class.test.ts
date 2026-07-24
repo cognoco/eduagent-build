@@ -529,6 +529,14 @@ describe('check-change-class.sh', () => {
         'node --test packages/database/scripts/check-db-push-target.test.mjs',
       flag: 'database_script_guards',
     },
+    {
+      name: 'identity FK script guards',
+      file: 'packages/database/scripts/check-identity-fk-drift.mjs',
+      className: 'database-script-guards',
+      command:
+        'node --test packages/database/scripts/check-identity-fk-drift.test.mjs',
+      flag: 'database_script_guards',
+    },
   ])(
     'routes the narrow $name check through its bounded input surface',
     ({ file, className, command, flag }) => {
@@ -619,8 +627,7 @@ describe('check-change-class.sh', () => {
       'GitHub workflow supply-chain check': 'workflow_security',
       'apps/api/scripts node:test guards (KV-binding verifier)':
         'api_script_guards',
-      'packages/database/scripts node:test guards (db:push guard)':
-        'database_script_guards',
+      'packages/database/scripts node:test guards': 'database_script_guards',
     };
 
     expect(Object.keys(gates)).toHaveLength(NARROW_ROUTER_FLAGS.length);

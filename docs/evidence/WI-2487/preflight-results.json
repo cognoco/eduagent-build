@@ -1,0 +1,20 @@
+{
+  "observedAtUtc": "2026-07-23T18:48:23Z",
+  "target": {
+    "projectId": "lingering-violet-30592106",
+    "branchId": "br-weathered-silence-agw4on4x"
+  },
+  "transactionReadOnly": true,
+  "foreignKeysByLegacyTarget": {
+    "accounts": 1,
+    "profiles": 51,
+    "subscriptions": 4
+  },
+  "supportMessageOrphanIds": [
+    "019f1349-8e7d-736e-bfb1-f5e7458530d1",
+    "019f1349-8e7e-7176-9f5b-3929832ec9d3",
+    "019f1349-8fea-7713-acf5-79abd7291606",
+    "019f1349-9214-704c-ba8b-d8a392a3541d",
+    "019f1349-9243-73c1-ac0d-b769666774f1"
+  ]
+}

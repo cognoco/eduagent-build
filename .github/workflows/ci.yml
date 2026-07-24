@@ -362,10 +362,14 @@ jobs:
       # WI-1874: the DB_PUSH_LOCAL_DEV=1 escape also blocks a resolved
       # DATABASE_URL whose host is not localhost/127.0.0.1 (e.g. leftover stg
       # creds from pnpm env:sync), and allows localhost/127.0.0.1.
+      # WI-2487: the identity-FK catalog guard covers the exact migration-0129
+      # predicate plus clean/drift/unavailable exits and credential redaction.
       # Lives under packages/database/scripts/ so Jest's testMatch doesn't see it.
-      - name: packages/database/scripts node:test guards (db:push guard)
+      - name: packages/database/scripts node:test guards
         if: github.event_name == 'push' || (github.event_name == 'pull_request' && steps.scope.outputs.database_script_guards == 'true')
-        run: node --test packages/database/scripts/check-db-push-target.test.mjs
+        run: |
+          node --test packages/database/scripts/check-db-push-target.test.mjs
+          node --test packages/database/scripts/check-identity-fk-drift.test.mjs
 
       # WI-536: validate the flaky-test quarantine registry. Deterministic, so
       # it gates — fails if any entry is missing an owner or a Cosmo WI-NN, or
