@@ -109,4 +109,20 @@ describe('mentor notices schema', () => {
       '<answer_event_id> IS NULL',
     );
   });
+
+  // [WI-2629 / OPQ-144 F2 Option A] answerEventId is an immutable scalar
+  // evidence identity, not a live pointer — a transcript purge must not
+  // cascade-delete or null it. This pins the FK's absence so a future change
+  // cannot silently reintroduce the WI-2500 collision class by re-adding it.
+  it('does not FK answerEventId to session_events (scalar evidence identity, not a live pointer)', () => {
+    const config = getTableConfig(mentorNotices);
+    const answerEventForeignKeys = config.foreignKeys.filter((fk) =>
+      fk
+        .reference()
+        .columns.some(
+          (column) => (column as PgColumn).name === 'answer_event_id',
+        ),
+    );
+    expect(answerEventForeignKeys).toEqual([]);
+  });
 });

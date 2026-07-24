@@ -16,6 +16,11 @@ date: '2025-12-11'
 **Date:** 2025-12-11
 **Author:** Zuzka
 
+> **Historical age assumption:** This brief's 11+ audience references predate
+> the launch ruling. Current product bands are 0–12 unavailable, 13–17 minor,
+> and 18+ adult; see
+> [`docs/compliance/2026-07-23-13-plus-eea-launch-country-ruling.md`](../compliance/2026-07-23-13-plus-eea-launch-country-ruling.md).
+
 ---
 
 ## Executive Summary

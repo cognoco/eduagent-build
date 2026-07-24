@@ -30,9 +30,19 @@ const HARNESS_FLOW_TAG = 'eval-harness';
 
 type RouteAndCallOptions = NonNullable<Parameters<typeof routeAndCall>[2]>;
 
+// WI-2624: RouteAndCallOptions is a discriminated union (capability:'judge'
+// requires judgeIndependence). A plain `Omit<Union, K>` does not distribute
+// over a union — `keyof` of a union collapses to the shared keys only — which
+// would silently widen this back to a non-discriminated shape and let a
+// judge-capability harness call through without `judgeIndependence`. This
+// distributes Omit over each union member instead, preserving the contract.
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown
+  ? Omit<T, K>
+  : never;
+
 /** Options accepted by the harness wrapper — the same shape `routeAndCall`
  *  accepts, minus `flow` (the wrapper hardcodes that). */
-export type HarnessLlmOptions = Omit<RouteAndCallOptions, 'flow'>;
+export type HarnessLlmOptions = DistributiveOmit<RouteAndCallOptions, 'flow'>;
 
 // ---------------------------------------------------------------------------
 // Candidate-model override (`--openrouter-model <slug>`)

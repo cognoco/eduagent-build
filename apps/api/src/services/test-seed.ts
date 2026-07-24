@@ -54,6 +54,7 @@ import { listSubjects } from './subject';
 import { getTierConfig } from './subscription';
 import { addMonthsClamped } from './billing/billing-shared';
 import { sleep } from './sleep';
+import { recordPracticeActivityEvent } from './practice-activity-events';
 import {
   seedV2SupporterAccepted,
   seedV2SupporterManaged,
@@ -90,6 +91,7 @@ export type SeedScenario =
   | 'onboarding-no-subject'
   | 'post-approval-ready'
   | 'learning-active'
+  | 'v2-returning-learner'
   | 'retention-due'
   | 'failed-recall-3x'
   | 'parent-with-children'
@@ -171,6 +173,7 @@ export type SeedScenario =
   | 'mentor-audit-bridge-backstack'
   // WI-2194 — stale Plus denominator repaired into one Family cycle.
   | 'wi-2194-stale-family-cycle'
+  | 'v2-journal-paper-trail'
   // [WI-2241] Supportership-aware v2 identity + accepted-visibility fixture —
   // apps/api/src/services/test-seed-v2-supporter.ts.
   | 'v2-supporter-accepted'
@@ -975,6 +978,7 @@ export async function insertSessionWithRecap(
     subjectId: string;
     topicId: string;
     recapContent?: string;
+    learnerRecap?: string;
     recapHighlight?: string;
     engagementSignal?: 'curious' | 'focused' | 'restless' | 'frustrated';
     endedDaysAgo?: number;
@@ -983,6 +987,8 @@ export async function insertSessionWithRecap(
   },
 ): Promise<{ sessionId: string; summaryId: string }> {
   const sessionId = generateUUIDv7();
+  const wallClockSeconds = opts.wallClockSeconds ?? 1080;
+  const endedAt = pastDate(opts.endedDaysAgo ?? 1);
   await db.insert(learningSessions).values({
     id: sessionId,
     profileId: opts.profileId,
@@ -991,8 +997,10 @@ export async function insertSessionWithRecap(
     sessionType: 'learning',
     status: 'completed',
     exchangeCount: opts.exchangeCount ?? 10,
-    endedAt: pastDate(opts.endedDaysAgo ?? 1),
-    wallClockSeconds: opts.wallClockSeconds ?? 1080,
+    startedAt: new Date(endedAt.getTime() - wallClockSeconds * 1000),
+    lastActivityAt: endedAt,
+    endedAt,
+    wallClockSeconds,
   });
 
   const summaryId = generateUUIDv7();
@@ -1004,6 +1012,9 @@ export async function insertSessionWithRecap(
     content:
       opts.recapContent ??
       'We worked through the topic with growing confidence and self-corrected mid-way.',
+    ...(opts.learnerRecap === undefined
+      ? {}
+      : { learnerRecap: opts.learnerRecap }),
     aiFeedback: 'Great perseverance and clear reasoning throughout.',
     highlight:
       opts.recapHighlight ??
@@ -1090,6 +1101,66 @@ async function insertBookmarks(
   }));
   await db.insert(bookmarks).values(rows);
   return { bookmarkIds: rows.map((row) => row.id) };
+}
+
+async function insertLearnerNote(
+  db: Database,
+  opts: {
+    profileId: string;
+    sessionId: string;
+    topicId: string;
+    content: string;
+  },
+): Promise<{ noteId: string }> {
+  const noteId = generateUUIDv7();
+  await db.insert(topicNotes).values({
+    id: noteId,
+    profileId: opts.profileId,
+    sessionId: opts.sessionId,
+    topicId: opts.topicId,
+    content: opts.content,
+  });
+  return { noteId };
+}
+
+async function insertMentorMemory(
+  db: Database,
+  opts: { profileId: string },
+): Promise<{ mentorMemoryId: string }> {
+  const mentorMemoryId = generateUUIDv7();
+  await db.insert(learningProfiles).values({
+    id: mentorMemoryId,
+    profileId: opts.profileId,
+    learningStyle: {
+      preferredExplanations: ['diagrams', 'examples'],
+      pacePreference: 'thorough',
+      responseToChallenge: 'motivated',
+      confidence: 'medium',
+      corroboratingSessions: 4,
+      source: 'inferred',
+    },
+    interests: ['Plant biology', 'Nature photography'],
+    strengths: [
+      {
+        subject: 'Biology',
+        topics: ['Explaining cause and effect'],
+        confidence: 'high',
+        source: 'inferred',
+      },
+    ],
+    struggles: [],
+    communicationNotes: ['Connects new ideas to real-world examples'],
+    suppressedInferences: [],
+    interestTimestamps: {
+      'Plant biology': pastDate(3).toISOString(),
+      'Nature photography': pastDate(5).toISOString(),
+    },
+    memoryEnabled: true,
+    memoryConsentStatus: 'granted',
+    memoryCollectionEnabled: true,
+    memoryInjectionEnabled: true,
+  });
+  return { mentorMemoryId };
 }
 
 // ---------------------------------------------------------------------------
@@ -1381,6 +1452,98 @@ async function seedLearningActive(
     email,
     password,
     ids: { subjectId, bookId, sessionId, topicId: firstTopicId },
+  };
+}
+
+/**
+ * V2 returning-learner release fixture.
+ *
+ * Intentionally contains one live session and one overdue retention card on
+ * different topics. Keeping the graph this small makes each Mentor card an
+ * independently guaranteed consequence of the seed rather than an incidental
+ * by-product of a broader learning-history fixture.
+ */
+async function seedV2ReturningLearner(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Returning Learner',
+    birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
+  });
+  const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'World History',
+  );
+  const sessionTopicId = topicIds[0];
+  const dueReviewTopicId = topicIds[1];
+  if (!sessionTopicId || !dueReviewTopicId) {
+    throw new Error('Returning-learner seed requires two curriculum topics');
+  }
+
+  const sessionId = generateUUIDv7();
+  await db.insert(learningSessions).values({
+    id: sessionId,
+    profileId,
+    subjectId,
+    topicId: sessionTopicId,
+    sessionType: 'learning',
+    status: 'active',
+    exchangeCount: 1,
+  });
+  await db.insert(sessionEvents).values([
+    {
+      id: generateUUIDv7(),
+      sessionId,
+      profileId,
+      subjectId,
+      topicId: sessionTopicId,
+      eventType: 'user_message',
+      content: 'Why did the Romans build so many roads?',
+    },
+    {
+      id: generateUUIDv7(),
+      sessionId,
+      profileId,
+      subjectId,
+      topicId: sessionTopicId,
+      eventType: 'ai_response',
+      content: 'They connected cities, trade, armies, and new ideas.',
+    },
+  ]);
+
+  const retentionCardId = generateUUIDv7();
+  await db.insert(retentionCards).values({
+    id: retentionCardId,
+    profileId,
+    topicId: dueReviewTopicId,
+    easeFactor: 2.5,
+    intervalDays: 7,
+    repetitions: 2,
+    nextReviewAt: pastDate(1),
+    lastReviewedAt: pastDate(8),
+  });
+
+  return {
+    scenario: 'v2-returning-learner',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: {
+      subjectId,
+      bookId,
+      sessionId,
+      sessionTopicId,
+      dueReviewTopicId,
+      retentionCardId,
+    },
   };
 }
 
@@ -1839,8 +2002,14 @@ async function seedParentMultiChild(
     defaultAppContext: 'family',
   });
 
-  // Parent also gets a subject so the inline "Learn something" view works
-  await createSubjectWithCurriculum(db, parentProfileId, 'General Knowledge');
+  // Parent also gets a subject so the inline "Learn something" view works.
+  // Expose its ID separately from the child subjects so owner-learner E2E
+  // evidence can bind content to the exact owner's row.
+  const { subjectId: ownerSubjectId } = await createSubjectWithCurriculum(
+    db,
+    parentProfileId,
+    'General Knowledge',
+  );
 
   // Child 1 — teen with active learning
   const child1ProfileId = await createBaseProfile(db, accountId, {
@@ -2008,6 +2177,7 @@ async function seedParentMultiChild(
     password,
     ids: {
       parentProfileId,
+      ownerSubjectId,
       child1ProfileId,
       child2ProfileId,
       child3ProfileId,
@@ -5310,6 +5480,140 @@ async function seedMentorAuditResumableSession(
   };
 }
 
+/** One self-owned learner graph spanning every persisted V2 Journal section.
+ *  This is deliberately separate from mentor-audit-rich-child-history: that
+ *  fixture is a Family owner reviewing a linked child, while Journal's Me
+ *  surface reads artifacts belonging to the active credentialed learner. */
+async function seedV2JournalPaperTrail(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Journal Learner',
+    birthYear: 1985,
+    isOwner: true,
+    email,
+    clerkUserId,
+  });
+
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'art6_1_a' as const,
+      granted: true,
+    })),
+  );
+
+  const { subjectId, topicIds } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Biology',
+  );
+  const topicId = topicIds[0];
+  if (!topicId) {
+    throw new Error('v2-journal-paper-trail: subject created no topics');
+  }
+
+  const { sessionId, summaryId: sessionSummaryId } =
+    await insertSessionWithRecap(db, {
+      profileId,
+      subjectId,
+      topicId,
+      recapContent:
+        'The learner connected sunlight, chlorophyll, and glucose while explaining how photosynthesis stores energy.',
+      learnerRecap:
+        'We traced how photosynthesis stores sunlight as chemical energy in glucose.',
+      recapHighlight:
+        'Connected chlorophyll, carbon dioxide, and glucose without prompting.',
+      engagementSignal: 'focused',
+      endedDaysAgo: 1,
+      exchangeCount: 8,
+      wallClockSeconds: 960,
+    });
+
+  const { noteId: learnerNoteId } = await insertLearnerNote(db, {
+    profileId,
+    sessionId,
+    topicId,
+    content:
+      'Photosynthesis stores sunlight as chemical energy in glucose for the plant.',
+  });
+  const { bookmarkIds } = await insertBookmarks(db, {
+    profileId,
+    sessionId,
+    subjectId,
+    topicId,
+    contents: ['Chlorophyll captures light energy that powers photosynthesis.'],
+  });
+  const bookmarkId = bookmarkIds[0];
+  if (!bookmarkId) {
+    throw new Error('v2-journal-paper-trail: bookmark helper returned no id');
+  }
+
+  const practiceActivity = await recordPracticeActivityEvent(db, {
+    profileId,
+    subjectId,
+    activityType: 'review',
+    activitySubtype: 'spaced_repetition',
+    completedAt: pastDate(1),
+    pointsEarned: 8,
+    score: 3,
+    total: 3,
+    sourceType: 'topic',
+    sourceId: topicId,
+    metadata: { topicId },
+  });
+  if (!practiceActivity) {
+    throw new Error('v2-journal-paper-trail: practice event was not inserted');
+  }
+
+  // Journal self-view reads reports by childProfileId. Setting both columns
+  // to this credentialed learner makes the subject and owner the same Me scope.
+  const { reportId: weeklyReportId } = await insertWeeklyReport(db, {
+    profileId,
+    childProfileId: profileId,
+    childName: 'Journal Learner',
+    reportWeek: '2026-07-13',
+  });
+  const { reportId: monthlyReportId } = await insertMonthlyReport(db, {
+    profileId,
+    childProfileId: profileId,
+    childName: 'Journal Learner',
+    reportMonth: '2026-07-01',
+    monthLabel: 'July 2026',
+  });
+  const { mentorMemoryId } = await insertMentorMemory(db, { profileId });
+
+  return {
+    scenario: 'v2-journal-paper-trail',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: {
+      learnerProfileId: profileId,
+      subjectId,
+      topicId,
+      sessionId,
+      // The recaps API identifies a recap by its learning-session id.
+      recapId: sessionId,
+      sessionSummaryId,
+      learnerNoteId,
+      bookmarkId,
+      practiceActivityEventId: practiceActivity.id,
+      weeklyReportId,
+      monthlyReportId,
+      mentorMemoryId,
+    },
+  };
+}
+
 /** Rich-history child — composes the Task 0 helpers so the audit can exercise
  *  the parent-native review surfaces (weekly report, recap, retention,
  *  vocabulary, bookmarks) against a single linked child. Deterministic — no
@@ -6253,6 +6557,7 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'onboarding-no-subject': seedOnboardingNoSubject,
   'post-approval-ready': seedPostApprovalReady,
   'learning-active': seedLearningActive,
+  'v2-returning-learner': seedV2ReturningLearner,
   'retention-due': seedRetentionDue,
   'failed-recall-3x': seedFailedRecall3x,
   'parent-with-children': seedParentWithChildren,
@@ -6363,6 +6668,7 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
     seedMentorAuditFamilyOwnerDailyQuotaWithChild,
   'mentor-audit-bridge-backstack': seedMentorAuditBridgeBackstack,
   'wi-2194-stale-family-cycle': seedWi2194StaleFamilyCycle,
+  'v2-journal-paper-trail': seedV2JournalPaperTrail,
   // [WI-2241] test-seed-v2-supporter.ts — composes test-seed-v2 owner
   // identities with the accepted-visibility fixture logic (linking-ceremony)
   // and the rich learning/report insert helpers above.

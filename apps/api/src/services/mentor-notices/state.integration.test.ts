@@ -181,71 +181,68 @@ describeIfDb(
       );
     });
 
-    // [WI-2500 CI catch] `mentor_notices_source_session_null_evidence_uq` is
-    // the OTHER partial index — it preserves the pre-existing ≤1-row/session
-    // invariant for notices with no evidence. acceptMentorNotice's
-    // onConflictDoNothing must target THIS index (not the evidence-present
-    // one) when answerEventId is null, or Postgres can't infer the conflict
-    // and raises a raw duplicate-key error instead of a silent no-op — which
-    // is exactly what CI caught in the pre-existing
-    // tests/integration/mentor-notice-lifecycle.integration.test.ts
-    // concurrency case.
-    it('stays idempotent when the same no-evidence notice is inserted concurrently', async () => {
+    // [WI-2629 AC-5 — rework of a bounced review] The write boundary must
+    // now REJECT a fresh evidence-absent write outright — it must never
+    // reach the database. This replaces the old "no-evidence write
+    // succeeds" pair of tests above, which proved the OPPOSITE of AC-5 and
+    // is exactly why the item bounced. This test fails on the merged
+    // pre-fix code (where a null answerEventId writes successfully) and
+    // passes once acceptMentorNotice's runtime guard rejects it.
+    it('rejects a fresh write with no answer-event evidence — new notices always require answerEventId', async () => {
       const fixture = await seedFixture();
 
-      const attempt = () =>
-        acceptMentorNotice(db, {
+      const notice = await acceptMentorNotice(db, {
+        profileId: fixture.profileId,
+        subjectId: fixture.subjectId,
+        topicId: null,
+        sourceSessionId: fixture.sessionId,
+        // Intentionally casting past the type system: this proves the
+        // RUNTIME guard, not just the compile-time one, rejects an
+        // absent/undefined-at-runtime answerEventId reaching the DB.
+        answerEventId: null as unknown as string,
+        concept: 'No-evidence concept',
+        correctionHint: null,
+      });
+
+      expect(notice).toBeNull();
+
+      const rows = await db
+        .select()
+        .from(mentorNotices)
+        .where(eq(mentorNotices.sourceSessionId, fixture.sessionId));
+      expect(rows).toHaveLength(0);
+    });
+
+    // [WI-2629 AC-5] A pre-existing (legacy) evidence-absent row — inserted
+    // directly, bypassing acceptMentorNotice, simulating a row written
+    // before this write-boundary tightening — must remain readable. The
+    // write boundary is the only thing that changed; reads and the schema's
+    // storage (nullable column, both partial unique indexes) are untouched.
+    it('keeps a legacy no-evidence row (inserted directly, bypassing acceptMentorNotice) readable', async () => {
+      const fixture = await seedFixture();
+
+      const [legacyRow] = await db
+        .insert(mentorNotices)
+        .values({
           profileId: fixture.profileId,
           subjectId: fixture.subjectId,
           topicId: null,
           sourceSessionId: fixture.sessionId,
           answerEventId: null,
-          concept: 'No-evidence concept',
+          concept: 'Legacy no-evidence concept',
           correctionHint: null,
-        });
-
-      const [first, second] = await Promise.all([attempt(), attempt()]);
-      const accepted = [first, second].filter((r) => r !== null);
-      expect(accepted).toHaveLength(1);
+        })
+        .returning({ id: mentorNotices.id });
+      expect(legacyRow).toBeDefined();
 
       const rows = await db
         .select()
         .from(mentorNotices)
         .where(eq(mentorNotices.sourceSessionId, fixture.sessionId));
       expect(rows).toHaveLength(1);
+      expect(rows[0]!.id).toBe(legacyRow!.id);
       expect(rows[0]!.answerEventId).toBeNull();
-    });
-
-    it('rejects a second no-evidence notice in the same session — the legacy ≤1-per-session invariant still holds when there is no evidence', async () => {
-      const fixture = await seedFixture();
-
-      const firstNotice = await acceptMentorNotice(db, {
-        profileId: fixture.profileId,
-        subjectId: fixture.subjectId,
-        topicId: null,
-        sourceSessionId: fixture.sessionId,
-        answerEventId: null,
-        concept: 'First no-evidence concept',
-        correctionHint: null,
-      });
-      expect(firstNotice).not.toBeNull();
-
-      const secondNotice = await acceptMentorNotice(db, {
-        profileId: fixture.profileId,
-        subjectId: fixture.subjectId,
-        topicId: null,
-        sourceSessionId: fixture.sessionId,
-        answerEventId: null,
-        concept: 'Second no-evidence concept',
-        correctionHint: null,
-      });
-      expect(secondNotice).toBeNull();
-
-      const rows = await db
-        .select()
-        .from(mentorNotices)
-        .where(eq(mentorNotices.sourceSessionId, fixture.sessionId));
-      expect(rows).toHaveLength(1);
+      expect(rows[0]!.concept).toBe('Legacy no-evidence concept');
     });
   },
 );

@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Launch Landscape — Age × Country Explorer</title>
+<style>
+  :root {
+    --bg: #0b1117;
+    --panel: #111a22;
+    --panel2: #16212b;
+    --fg: #e8eef4;
+    --muted: #8b98a5;
+    --border: #243240;
+    --teal: #2dd4bf;
+    --lavender: #a78bfa;
+
+    --c-adult:   #1d4a44;  /* adult — calm green-teal */
+    --c-self:    #0e6d61;  /* self-serve minor — teal */
+    --c-parent:  #8a5a13;  /* parent gate (legal) — amber */
+    --c-over:    #5b4a86;  /* parent gate by our choice — lavender */
+    --c-u13p:    #9a4a0e;  /* under-13 parent auth (non-US) — deep orange */
+    --c-vpc:     #8a2f4f;  /* under-13 US — COPPA VPC — magenta-red */
+    --c-gap:     #b91c1c;  /* compliance gap — red */
+    --c-floor:   #2a3440;  /* blocked by floor — slate */
+    --c-counsel: #3d3526;  /* counsel-gate — dark khaki */
+    --c-store:   #1c242d;  /* store-blocked — near-bg */
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg); color: var(--fg); line-height: 1.45; font-size: 14px;
+  }
+  header { padding: 18px 26px 14px; border-bottom: 1px solid var(--border); }
+  h1 { margin: 0 0 4px; font-size: 19px; font-weight: 650; letter-spacing: .2px; }
+  h1 .accent { color: var(--teal); }
+  .subtitle { color: var(--muted); font-size: 12.5px; margin: 0; max-width: 1100px; }
+  .subtitle b { color: var(--fg); font-weight: 600; }
+
+  .bar {
+    display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-end;
+    padding: 14px 26px; border-bottom: 1px solid var(--border); background: var(--panel);
+    position: sticky; top: 0; z-index: 40;
+  }
+  .ctl { display: flex; flex-direction: column; gap: 5px; }
+  .ctl > label { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+  .seg { display: flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+  .seg button {
+    background: transparent; color: var(--muted); border: none; padding: 7px 13px;
+    font-size: 12.5px; cursor: pointer; border-right: 1px solid var(--border); white-space: nowrap;
+  }
+  .seg button:last-child { border-right: none; }
+  .seg button.on { background: var(--panel2); color: var(--teal); font-weight: 600; }
+  .seg.presets button.on { color: var(--lavender); }
+  .ctl input[type=text], .ctl select {
+    background: var(--bg); color: var(--fg); border: 1px solid var(--border);
+    border-radius: 7px; padding: 7px 11px; font-size: 13px; min-width: 190px;
+  }
+  .ctl select { max-width: 340px; }
+  .ctl select option, .ctl select optgroup { background: var(--bg); color: var(--fg); }
+
+  .stats {
+    display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 26px 0;
+  }
+  .stat {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 14px; min-width: 120px;
+  }
+  .stat .v { font-size: 18px; font-weight: 650; }
+  .stat .l { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .stat.bad { border-color: #7f1d1d; background: #2a1212; }
+  .stat.bad .v { color: #f87171; }
+  .stat.over .v { color: var(--lavender); }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 7px 14px; padding: 12px 26px 4px; font-size: 12px; color: var(--muted); }
+  .li { display: flex; align-items: center; gap: 6px; }
+  .sw { width: 13px; height: 13px; border-radius: 3px; flex: 0 0 auto; }
+  .sw.striped { background-image: repeating-linear-gradient(45deg, transparent 0 3px, rgba(255,255,255,.18) 3px 5px); }
+
+  main { padding: 12px 26px 40px; }
+  .gridwrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+  table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 880px; font-size: 12px; }
+  thead th {
+    background: var(--panel2); color: var(--muted); font-weight: 600; font-size: 11px;
+    padding: 8px 6px; text-align: center; position: sticky; top: 0; z-index: 10;
+    border-bottom: 1px solid var(--border);
+  }
+  thead th:first-child { text-align: left; padding-left: 12px; z-index: 12; }
+  tbody td { border-bottom: 1px solid #18222c; }
+  td.country {
+    background: var(--panel); padding: 6px 10px 6px 12px; white-space: nowrap;
+    font-weight: 600; cursor: pointer; min-width: 220px;
+    position: sticky; left: 0; z-index: 5;
+  }
+  td.country:hover { color: var(--teal); }
+  td.country .tags { margin-left: 7px; display: inline-flex; gap: 4px; vertical-align: middle; }
+  .tag {
+    display: inline-block; font-size: 9.5px; font-weight: 600; letter-spacing: .4px;
+    padding: 1.5px 6px; border-radius: 9px; border: 1px solid var(--border); color: var(--muted);
+  }
+  .tag.loc { color: var(--teal); border-color: #1d5a52; }
+  .tag.loc.irony { color: #fca5a5; border-color: #7f1d1d; }
+  tr.ghead td {
+    background: var(--bg); color: var(--lavender); font-size: 11px; font-weight: 650;
+    text-transform: uppercase; letter-spacing: .7px; padding: 12px 12px 5px;
+    border-bottom: 1px solid var(--border); position: sticky; left: 0;
+  }
+  td.cell {
+    text-align: center; padding: 7px 4px; cursor: pointer; min-width: 58px;
+    color: rgba(255,255,255,.88); font-size: 10.5px; font-weight: 600; letter-spacing: .2px;
+    transition: filter .08s;
+  }
+  td.cell:hover { filter: brightness(1.35); }
+  td.cell.r-adult   { background: var(--c-adult); }
+  td.cell.r-self    { background: var(--c-self); }
+  td.cell.r-parent  { background: var(--c-parent); }
+  td.cell.r-over    { background: var(--c-over);
+    background-image: repeating-linear-gradient(45deg, transparent 0 4px, rgba(255,255,255,.10) 4px 7px); }
+  td.cell.r-u13p    { background: var(--c-u13p); }
+  td.cell.r-vpc     { background: var(--c-vpc); }
+  td.cell.r-gap     { background: var(--c-gap); animation: pulse 1.6s ease-in-out infinite; }
+  td.cell.r-floor   { background: var(--c-floor); color: var(--muted); font-weight: 400; }
+  td.cell.r-counsel { background: var(--c-counsel); color: #cdbf9b; }
+  td.cell.r-store   { background: var(--c-store); color: #5b6873; font-weight: 400; }
+  @keyframes pulse { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.25); } }
+
+  /* drawer */
+  .drawer {
+    position: fixed; top: 0; right: -480px; width: 460px; max-width: 94vw; height: 100vh;
+    background: var(--panel); border-left: 1px solid var(--border); z-index: 100;
+    transition: right .18s ease; overflow-y: auto; padding: 20px 22px 40px;
+    box-shadow: -18px 0 40px rgba(0,0,0,.45);
+  }
+  .drawer.open { right: 0; }
+  .drawer h2 { margin: 0 0 2px; font-size: 16px; }
+  .drawer .sub { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
+  .drawer .x {
+    position: absolute; top: 12px; right: 14px; background: none; border: none;
+    color: var(--muted); font-size: 20px; cursor: pointer;
+  }
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px;
+    font-weight: 650; margin: 0 0 12px;
+  }
+  .f { margin-bottom: 13px; }
+  .f .fl { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 3px; }
+  .f .fv { font-size: 13px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip {
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 2.5px 8px; font-size: 11px; cursor: default;
+  }
+  .chip b { color: var(--teal); font-weight: 650; }
+  .chip.b b { color: #f0a3bd; }
+  .chip.choice { border-style: dashed; }
+  .note { font-size: 12px; color: var(--muted); border-left: 3px solid var(--border); padding: 6px 10px; margin-top: 6px; }
+  .note.warn { border-color: #b91c1c; color: #fca5a5; }
+  .note.over { border-color: var(--lavender); color: #c4b5fd; }
+
+  /* 8-dimension liability rows (walkthrough corpus) */
+  .dims { margin-top: 16px; }
+  .dims > .fl { margin-bottom: 6px; }
+  .dim { border-top: 1px solid #1c2630; padding: 8px 0 7px; }
+  .dim .dh { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 650; }
+  .cdot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+  .ktag { font-size: 9px; color: var(--muted); border: 1px solid var(--border); border-radius: 8px; padding: 1px 6px; letter-spacing: .3px; }
+  .nounlock { font-size: 9px; color: #fca5a5; border: 1px solid #7f1d1d; border-radius: 8px; padding: 1px 6px; letter-spacing: .3px; }
+  .dim .dr { font-size: 11.5px; color: #b9c4cf; margin: 4px 0 2px; line-height: 1.5; }
+  .dim .dr.unknown { color: var(--muted); font-style: italic; }
+  .dim .dc { font-size: 10px; color: var(--muted); }
+  .dim .dc b { color: var(--muted); font-weight: 600; }
+  .dcr { margin-top: 6px; padding: 6px 9px 7px; background: var(--panel2); border-left: 3px solid #1d5a52; border-radius: 4px; }
+  .dcr .dh2 { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 10px; font-weight: 650; text-transform: uppercase; letter-spacing: .4px; color: var(--teal); }
+  .dcr .dr2 { font-size: 11px; color: #b9c4cf; margin: 4px 0 2px; line-height: 1.5; }
+
+  .minirow { display: flex; gap: 3px; margin-top: 4px; }
+  .minirow .m { flex: 1; text-align: center; font-size: 9.5px; padding: 5px 1px; border-radius: 3px; color: rgba(255,255,255,.85); }
+
+  footer { padding: 18px 26px 36px; color: var(--muted); font-size: 11.5px; border-top: 1px solid var(--border); margin-top: 8px; }
+  footer .always { margin-bottom: 8px; }
+  footer b { color: var(--fg); }
+  details summary { cursor: pointer; color: var(--lavender); font-size: 12px; margin: 6px 0; }
+  .reqlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 3px 18px; font-size: 11.5px; }
+  .reqlist span b { color: var(--teal); }
+  .reqlist span.b b { color: #f0a3bd; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Launch Landscape — <span class="accent">Age × Country</span> Explorer</h1>
+  <p class="subtitle">
+    Every country from the 2026-06-04 minutes' matrix × every age 10→18+. <b>Click any cell</b> for what that exact user entails
+    (who consents, how, LLM access, which requirement items switch on). <b>Click a country</b> for its row logic.
+    Historical scenario explorer, not launch authority. The floor and first
+    country perimeter were ruled on 2026-07-23; see
+    <a href="../2026-07-23-13-plus-eea-launch-country-ruling.md">the canonical 13+ EEA launch-country ruling</a>.
+  </p>
+</header>
+
+<div class="bar">
+  <div class="ctl">
+    <label>Preset</label>
+    <div class="seg presets" id="presets">
+      <button data-p="code">Today's code (11+ · blind ≤16)</button>
+      <button data-p="thirteen">13+ · blind ≤16</button>
+      <button data-p="legal">13+ · legal minimum</button>
+      <button data-p="ten">10+ · blind ≤16</button>
+    </div>
+  </div>
+  <div class="ctl">
+    <label>Age floor (the open decision)</label>
+    <div class="seg" id="floorSeg">
+      <button data-f="10">10+</button>
+      <button data-f="11">11+ (code today)</button>
+      <button data-f="13">13+</button>
+    </div>
+  </div>
+  <div class="ctl">
+    <label>Consent shape</label>
+    <div class="seg" id="shapeSeg">
+      <button data-s="blind">Parent consent ≤16, location-blind (built)</button>
+      <button data-s="legal">Legal minimum per country</button>
+    </div>
+  </div>
+  <div class="ctl">
+    <label>Grid lens — colour the map by</label>
+    <select id="lensSel"></select>
+  </div>
+  <div class="ctl">
+    <label>Find country</label>
+    <input type="text" id="search" placeholder="e.g. Germany">
+  </div>
+</div>
+
+<div class="stats" id="stats"></div>
+
+<div class="legend" id="legend"></div>
+
+<main>
+  <div class="gridwrap">
+    <table id="grid"></table>
+  </div>
+</main>
+
+<footer>
+  <div class="always">
+    <b>Always on, every cell, every toggle:</b> the company-level stack — A1 DPIA · A2 DPO · A3 ROPA · A4 breach plan ·
+    A5 privacy policy · A9 real consent · A11 provider DPA · A12 transfer check · A13 minimisation · A23 Art 9 decision.
+    Your Norwegian seat carries these into every launch shape; no toggle above can remove them.
+  </div>
+  <details>
+    <summary>Requirement ID reference (A = 13+ list · B = under-13 add-on)</summary>
+    <div class="reqlist" id="reqlist"></div>
+  </details>
+  <div style="margin-top:10px">
+    Sources — four layers: <b>(1)</b> consent/access grid: <b>docs/compliance/history/2026-06-04-age-floor-decision-minutes.md</b> country matrix §5 (historical research) ·
+    <b>(2)</b> requirement chips: <b>docs/compliance/history/2026-06-07-minors-compliance-requirements.md</b> (historical Where/Who-tagged checklist) ·
+    <b>(3)</b> dimension ceilings: same two docs + the 2026-06-03 compliance canon (two age lines; universal ceilings vs banded consent) ·
+    <b>(4)</b> per-country dimension sub-rules: <b>_wip/identity-foundation/age-consent-landscape/data.json v0.3.0-poc</b>,
+    embedded after its 2026-06-05 verification pass (70-claim adversarial verify: 26 confirmed ≥0.9, 38 corrected, 3 adjudicated, 1 refuted;
+    see verification-2026-06-05.md) — still PoC by its own README, shown with confidence + citations.
+    Generated 2026-06-05. Research pending counsel sign-off, not legal advice.
+  </div>
+</footer>
+
+<div class="drawer" id="drawer">
+  <button class="x" onclick="closeDrawer()">×</button>
+  <div id="drawerBody"></div>
+</div>
+
+<script>
+/* ---------------- data ---------------- */
+
+const REQ = {
+  A1:'DPIA — written risk assessment (launch gate)', A2:'DPO — named privacy officer',
+  A3:'ROPA — record of processing', A4:'Breach plan — 72h rule',
+  A5:'Privacy policy, child-readable', A6:'UK representative',
+  A7:'Age gate at sign-up (+ under-floor bounce counter)', A8:'Parent/guardian authorization for non-self-consenting teens',
+  A9:'Consent as a real choice, not buried in T&C', A10:'"You are talking to an AI" disclosure (EU AI Act, 2 Aug 2026)',
+  A11:'Signed DPA with each AI provider, minor-compatible route', A12:'US transfer check (DPF / SCC + TIA)',
+  A13:'Send providers as little personal data as possible', A14:'Never detect emotion from voice/face',
+  A15:'UK Children’s Code — 15 design standards', A16:'No manipulative / pressuring design at kids',
+  A17:'Real age checking, not a tick-box', A18:'Store age + compliance declarations',
+  A19:'US state age-signal APIs (TX/UT/LA…, covers ALL under-18s)', A20:'The paying account must be an adult’s',
+  A21:'Crystal-clear pricing + easy cancellation', A22:'No marketing pressure aimed at children',
+  A23:'Art 9 decision — no health/disability labels',
+  B1:'COPPA-grade verifiable parental consent (VPC vendor)', B2:'AI-provider consent scope + no-training guarantee',
+  B3:'Written information-security program', B4:'Strict child retention / delete-when-done policy',
+  B5:'Country/residence routing + decision snapshot', B6:'Stricter store child-review rules (Kids/Families)',
+  B7:'Stronger US state age-verification for under-13', B8:'Bounded COPPA legal review / Safe Harbor',
+};
+const ALWAYS_ON = ['A1','A2','A3','A4','A5','A9','A11','A12','A13','A23'];
+
+/* ---- the other liability dimensions ----
+   STRUCTURE (8 dimensions + universal-ceiling framing): verified canon —
+   2026-06-07-minors-compliance-requirements.md + 2026-06-04 minutes + the 2026-06-03 compliance session.
+   PER-COUNTRY RULE TEXT: _wip/identity-foundation/age-consent-landscape/data.json v0.3.0-poc,
+   re-embedded after its 2026-06-05 verification pass (70-claim adversarial verify + tiebreaker:
+   26 confirmed >=0.9, 38 corrected, 3 adjudicated, 1 refuted). Still PoC by its own README —
+   confidence dots + citations are rendered so nothing looks more authoritative than it is. */
+const POC = {"j":[{"c":"US","l":"United States (federal + CA AADC + state social-media laws)"},{"c":"UK","l":"United Kingdom (post-Brexit)"},{"c":"NO","l":"Norway (EEA member, not EU)"},{"c":"DE","l":"Germany (EU MS, 16-floor default)"},{"c":"FR","l":"France (EU MS, 15-floor)"},{"c":"SK","l":"Slovakia (EU MS, 16 — verified)"},{"c":"SE","l":"Sweden (EU MS, 13-floor)"},{"c":"DK","l":"Denmark (EU MS, 15 since 2024-01-01)"},{"c":"EE","l":"Estonia (EU MS, 13-floor — verified)"},{"c":"GR","l":"Greece (EU MS, 15-floor)"}],"a":[{"c":"general_data","l":"General data processing (storage, retrieval, internal use)"},{"c":"marketing","l":"Marketing / behavioural advertising"},{"c":"profiling","l":"Profiling / automated decision-making"},{"c":"third_party","l":"Third-party disclosure / data broker"},{"c":"llm_conversation","l":"LLM-conversation content (output filtering, memory, routing, crisis handling)"},{"c":"ai_behavioural","l":"AI-specific behavioural prohibitions (vulnerability exploitation, emotion inference, transparency)"},{"c":"retention","l":"Storage / retention"},{"c":"account_existence","l":"Account-existence posture (Family Sharing / Google Family Link)"}],"cells":[{"j":"US","a":"general_data","k":"unknown","r":"COPPA applies only if (a) service is 'directed to children' OR (b) controller has actual knowledge user is under 13. If neither, no COPPA jurisdiction; FTC §5 still binds unfair/deceptive practices.","t":13,"u":true,"n":"VPC unlocks processing for under-13s","s":"SOURCES.md#us--coppa-and-ftc","f":0.86},{"j":"US","a":"general_data","k":"known_under","r":"COPPA binds. Verifiable Parental Consent (VPC) required before any personal-info collection. The 'actual knowledge' trigger covers DOB, grade-level, school type, or in-app chat where a child says 'I'm 10' (all FTC-FAQ-confirmed; requires organizational awareness — likely satisfied where an AI tutor programmatically processes chat; 312.5(c) excepts limited collection made solely to obtain consent). 2025 Rule amendments (in force; compliance deadline 22 Apr 2026 passed) add a written-retention-policy duty + indefinite-retention ban (no numerical cap), separate VPC for sale/targeted advertising (312.5(a)(2)), and biometric/government-ID identifiers in 'personal information'.","t":13,"u":true,"n":"VPC unlocks; FTC-approved methods enumerated (credit card, government-ID match, knowledge-based, video conference, etc.)","s":"SOURCES.md#us--coppa-and-ftc","f":0.83},{"j":"US","a":"marketing","k":"unknown","r":"No COPPA jurisdiction. CAN-SPAM applies (commercial email only — not ads broadly, push, or in-app promos; age-neutral) + FTC §5 UDAP. Child-specific STATE layer (2026-06-05): CA AADC per 9th Cir. NetChoice v. Bonta (No. 25-2366, 12 Mar 2026) — age-estimation, high-privacy defaults, notices, monitoring-signal, privacy tools, geolocation limits presently in effect; data-use restrictions (b)(1)-(4), dark patterns (b)(7), DPIAs enjoined; severability remanded. Also NY CDPA (eff. June 2025), MD Kids Code (Oct 2025), FL HB3 (enforceable pending appeal).","t":null,"u":true,"n":"Generally yes; AADC carve-outs TBD by counsel","s":"SOURCES.md#us--california-aadc-folded","f":0.8},{"j":"US","a":"marketing","k":"known_under","r":"COPPA binds. 2025 Rule amendments (in force; compliance 22 Apr 2026 passed): separate VPC gate (16 CFR 312.5(a)(2)) before disclosure for targeted advertising/sale — disclosure is lawful WITH that consent (a consent gate, not an outright ban); consent-independent overlays: 312.10 retention limits + the FTC's 'never integral' classification for ads/monetary/AI-training disclosures (forecloses the integral-disclosure exception).","t":13,"u":true,"n":"Separate VPC required for sale/targeted ads even where general VPC exists","s":"SOURCES.md#us--coppa-and-ftc","f":0.92},{"j":"US","a":"profiling","k":"unknown","r":"No COPPA jurisdiction. FTC §5 (15 U.S.C. §45) may reach harmful-outcome profiling via the §45(n) unfairness test — a developing, case-by-case theory, not settled law. No enacted comprehensive federal child-profiling statute (KOSA, COPPA 2.0 remain bills; COPPA 2.0 Senate-passed 2026-03-05, House pending); COPPA itself already gates persistent-identifier behavioural profiling of under-13s on parental consent.","t":null,"u":true,"n":"Generally yes; FTC §5 case-by-case","s":"SOURCES.md#us--coppa-and-ftc","f":0.8},{"j":"US","a":"profiling","k":"known_under","r":"COPPA 2025 amendments: separate-VPC gate (312.5(a)(2)) for third-party disclosure for behavioural profiling; the FTC's 'never integral' classification forecloses the internal-operations route for ads/profiling uses. FTC §5 still applies. AI Act does not apply (US). CA AADC after 9th Cir. NetChoice v. Bonta (No. 25-2366, 12 Mar 2026): age-estimation/defaults/notices provisions in effect; data-use restrictions (b)(1)-(4), dark patterns (b)(7), DPIAs enjoined; severability remanded — counsel watch.","t":13,"u":true,"n":"Behavioural-profiling disclosure requires separate VPC (312.5(a)(2)); 'never integral' classification + 312.10 retention limits are consent-independent (verified 2026-06-05)","s":"SOURCES.md#us--coppa-and-ftc","f":0.8},{"j":"US","a":"third_party","k":"unknown","r":"No COPPA jurisdiction. General FTC §5 + state consumer-protection laws apply to third-party disclosure.","t":null,"u":true,"n":"Generally yes; standard data-broker / privacy-law framework","s":"SOURCES.md#us--coppa-and-ftc","f":0.86},{"j":"US","a":"third_party","k":"known_under","r":"COPPA binds. 2025 Rule amendments (16 CFR 312.5(a)(2), in force; compliance 22 Apr 2026 passed): separate VPC required before disclosure/sale for targeted advertising — disclosure lawful WITH that consent (a consent gate, not an outright ban). Consent-independent overlays: 312.10 retention limits and the FTC's 'never integral' classification for ads/monetary/AI-training disclosures.","t":13,"u":true,"n":"Separate VPC required for sale even where general VPC exists","s":"SOURCES.md#us--coppa-and-ftc","f":0.92},{"j":"US","a":"llm_conversation","k":"unknown","r":"No COPPA jurisdiction. OpenAI Model Spec Root-level U18 protections apply (platform terms, global). Gemini under-18 prohibition DOES bind even without actual knowledge — the API terms are an objective 'directed towards or likely to be accessed by under-18s' design test (corrected 2026-06-05; the actual-knowledge framing was refuted). Anthropic CSAM-reporting commitment applies (platform terms, global). FTC 6(b) orders (11 Sept 2025, seven AI companion-chatbot operators) signal that crisis handling should be structural; binding state companion-chatbot statutes now exist (CA SB 243 eff. 1 Jan 2026; NY GBL §1700 eff. 5 Nov 2025) whose definitions can reach an emotionally-supportive tutor.","t":null,"u":null,"n":"Platform terms apply regardless of consent; FTC §5 crisis-handling posture applies if user is actually a child","s":"SOURCES.md#layer-3--platform-terms-llm-providers","f":0.8},{"j":"US","a":"llm_conversation","k":"known_under","r":"COPPA binds (VPC required before personal-info collection, which includes conversation logs with PII). OpenAI Model Spec Root-level U18 protections apply. **Gemini under-18 audience prohibition binds** (objective audience test — it binds in BOTH knowledge states; the Gap-A knowledge-trigger framing was refuted 2026-06-05). Anthropic CSAM-reporting commitment applies. FTC 6(b) crisis-handling signal applies. Crisis-escalation is prompt-only (Gap C — verified real): no structural escalation channel, no guardian notification, no human-in-loop hold. OpenAI's under-18 API guidance lists 'escalation paths' as a minor-serving safety standard; CA SB 243 (eff. 1 Jan 2026) and NY GBL §1700 (eff. 5 Nov 2025) impose companion-chatbot crisis protocols whose definitions can reach an emotionally-supportive tutor.","t":13,"u":false,"n":"VPC unlocks data processing but does NOT unlock Gemini routing (Terms breach independent of consent and of knowledge state); does NOT unlock prompt-only crisis handling being sufficient (Gap C)","s":"SOURCES.md#us--coppa-and-ftc + SOURCES.md#layer-3--platform-terms-llm-providers","f":0.78},{"j":"US","a":"ai_behavioural","k":"unknown","r":"EU AI Act does not apply (US jurisdiction). OpenAI Model Spec Root-level U18 protections apply. Gemini under-18 prohibition DOES bind even without actual knowledge — the API terms are an objective 'directed towards or likely to be accessed by under-18s' design test (corrected 2026-06-05; the actual-knowledge framing was refuted). Anthropic CSAM-reporting commitment applies. FTC 6(b) orders (11 Sept 2025) target AI companion-chatbot operators; 'no specific standard yet' is no longer true — CA SB 243 (1 Jan 2026) and NY GBL §1700 (5 Nov 2025) impose companion-chatbot duties that can reach an emotionally-supportive tutor, and AI Act Art 5(1)(f) (in force Feb 2025) sets the EU education emotion-inference bar.","t":null,"u":null,"n":"Platform terms apply regardless","s":"SOURCES.md#layer-3--platform-terms-llm-providers","f":0.8},{"j":"US","a":"ai_behavioural","k":"known_under","r":"EU AI Act does not apply. **OpenAI Model Spec Root-level U18 protections bind** (dev system prompts cannot lower them — verified in synthesis). **Gemini under-18 audience prohibition binds** (verified Terms). Anthropic CSAM-reporting binds. COPPA binds the underlying personal-info collection. FTC 6(b) crisis-handling signal applies.","t":13,"u":false,"n":"VPC does NOT unlock OpenAI Root-level U18 protections; does NOT unlock Gemini under-18 prohibition; does NOT unlock Anthropic CSAM-reporting","s":"SOURCES.md#layer-3--platform-terms-llm-providers","f":0.92},{"j":"US","a":"retention","k":"unknown","r":"No COPPA jurisdiction. Standard FTC §5 + state consumer-protection retention norms apply. COPPA 2025 retention cap does not apply to unknown-age users.","t":null,"u":true,"n":"Generally yes; standard data-retention practice","s":"SOURCES.md#us--coppa-and-ftc","f":0.86},{"j":"US","a":"retention","k":"known_under","r":"COPPA binds. The 2025 Rule amendments (16 CFR 312.10) are fully in force (published 22 Apr 2025; effective 23 June 2025; compliance deadline 22 Apr 2026 — passed). They require: (1) a mandatory WRITTEN data-retention policy stating collection purposes, business need, and a specific deletion timeframe, disclosed in the privacy notice; (2) retention 'only as long as is reasonably necessary' for the collection purposes; (3) an express prohibition on INDEFINITE retention. There is NO numerical cap — operators set their own 'reasonable and specific' deletion timeframes. Scope: under-13 data only (not 13–17). Retention values deferred to counsel per data-model.md §4.9 (the `person_retain` seam).","t":13,"u":true,"n":"VPC unlocks collection but not indefinite retention; the Rule sets no numerical TTLs — operators must define their own (verified 2026-06-05)","s":"SOURCES.md#us--coppa-and-ftc + SOURCES.md#canonical-doc--data-modelmd-§49-lines-160165","f":0.95},{"j":"US","a":"account_existence","k":"unknown","r":"COPPA's actual-knowledge doctrine: account existence alone (Family Sharing / Google Family Link) is NOT a shield — but it is not a trigger either, in the unknown-knowledge state. Standard COPPA 'directed to children' / 'actual knowledge' analysis applies. Caveat (verified 2026-06-05): platform-provided age signals (Apple Declared Age Range API / Google Play Age Signals) can confer actual/constructive knowledge of a minor and so TRIGGER obligations, even though account existence does not satisfy consent verification; both vendors scope Family Sharing/Family Link consent to their own services — third-party apps must obtain their own.","t":13,"u":true,"n":"Account existence does not unlock or trigger — it's a fact-of-the-world variable, not a rule","s":"SOURCES.md#layer-5--account-existence-realities","f":0.83},{"j":"US","a":"account_existence","k":"known_under","r":"COPPA's actual-knowledge doctrine has been triggered. The '3b posture' (account existence as consent signal) is 'unclear, not no' — verified 2026-06-05: the FTC's 2025 Rule declined a broad rebuttable VPC presumption from device/account sharing (limited rebuttal only via the mixed-audience path), so Family Sharing / Family Link is not a sanctioned VPC method but not categorically barred. No-DOB/no-age-capture design maps to the actual-knowledge trigger (FTC expressly rejected a 'reason to know' standard), but actual knowledge folds in willful disregard — a posture, not a safe harbor. Wildec (2019 warning letter) and US v. TikTok (MTD largely denied 6 Nov 2025, no final judgment) show knowledge from signals operators DID collect — they prove the enforcement floor, not the no-collection escape. The Feb 2026 FTC policy statement is permissive enforcement discretion for voluntary age-verifiers, imposing no new duty on non-collectors. Dispositive risk pivot: if content/marketing reads as child-directed / mixed-audience, the engineered-ignorance posture is materially weaker. Counsel must rule.","t":13,"u":"arguable","n":"Arguable: VPC can be substituted by 'engineered ignorance' — but the shield evaporates the moment a child types 'I'm 10' in chat, and it never works if the service is classified child-directed/mixed-audience","s":"SOURCES.md#layer-5--account-existence-realities","f":0.83},{"j":"UK","a":"general_data","k":"unknown","r":"UK GDPR Art 8(1) (as amended by SI 2019/419 — 13 hard-coded on the face of Art 8; the former co-setting DPA 2018 s.9 was omitted, eff. 31 Dec 2020) sets the threshold at 13. DPA 2018 s.123 is the Children's Code enabling provision, NOT a consent-age provision. CWSA 2026 added Art 8(2A)/(2B) (SoS may adjust within 13–16 by affirmative regulations); baseline remains 13 (verified 2026-06-05). Above 13, child self-consents. Children's Code 'likely accessed by children' applies to under-18 services regardless of actual user age.","t":13,"u":true,"n":"Self-consent unlocks for 13+; below 13 needs parental consent","s":"SOURCES.md#uk--uk-gdpr--dpa-2018--childrens-code","f":0.9},{"j":"UK","a":"general_data","k":"known_under","r":"UK GDPR Art 8 binds. Below 13, parental consent required. Controller must make 'reasonable efforts' to verify. Children's Code 'best interests' duty applies. The 'actual knowledge' trigger is broader than COPPA — 'likely to be accessed by children' is a design obligation that applies regardless of controller knowledge of specific user. ICO v. TikTok (4 Apr 2023, £12.7M — under-13 access without parental consent, Arts 8/12/5(1)(a); the targeted-advertising/profiling finding was dropped from the final penalty) is the headline precedent (verified 2026-06-05).","t":13,"u":true,"n":"Parental consent unlocks data processing, but does not unlock all Children's Code standards (e.g. profiling off-by-default, no nudge techniques)","s":"SOURCES.md#uk--uk-gdpr--dpa-2018--childrens-code","f":0.86},{"j":"UK","a":"marketing","k":"unknown","r":"Children's Code applies to services 'likely to be accessed by children' — broader than COPPA. Marketing to under-18s restricted by Children's Code standards. No 'actual knowledge' gate — likely-accessed-by-children is the trigger.","t":18,"u":"partial","n":"Children's Code applies to under-18 regardless of consent posture; consent doesn't unlock the marketing standards","s":"SOURCES.md#uk--uk-gdpr--dpa-2018--childrens-code","f":0.9},{"j":"UK","a":"marketing","k":"known_under","r":"Children's Code applies (Std 8 data minimisation, Std 5 no detrimental use, Std 13 no privacy-eroding nudges). Enforcement reality (corrected 2026-06-05): the ICO issued NO finalized enforcement notices against Snap or BeReal — Snap received a preliminary notice (Oct 2023, 'My AI' chatbot DPIA), closed May 2024 finding Snap compliant; BeReal got informal geolocation/default-privacy letters (Aug 2024) and changed voluntarily; the only hard children's-data enforcement was the £12.7M TikTok fine (Apr 2023), whose targeted-ads finding was dropped.","t":18,"u":false,"n":"Consent (parental or self) does not unlock the marketing-to-minors restrictions","s":"SOURCES.md#uk--uk-gdpr--dpa-2018--childrens-code","f":0.9},{"j":"UK","a":"profiling","k":"unknown","r":"Children's Code Standard 12 (Profiling — not Std 13, which is nudge techniques): profiling off-by-default for under-18s on services likely to be accessed by children; opt-in consent is necessary but not sufficient — on-by-default additionally requires a compelling best-interests reason (e.g. safeguarding).","t":18,"u":false,"n":"Profiling off-by-default for under-18; consent cannot unlock by default","s":"SOURCES.md#uk--uk-gdpr--dpa-2018--childrens-code","f":0.9},{"j":"UK","a":"profiling","k":"known_under","r":"Children's Code Standard 12 profiling-off-by-default applies (consent necessary but not sufficient to flip the default). AI Act Annex III §3 (reaching a UK app only via EU users post-Brexit) likely does NOT classify a non-grading B2C tutor as high-risk — §3 covers institutional admission/evaluation/exam contexts; if in-scope, age-neutral; Omnibus defers standalone high-risk compliance to 2 Dec 2027.","t":18,"u":false,"n":"Profiling restrictions apply regardless of consent for under-18; AI Act Annex III obligations apply if product is high-risk-classified","s":"SOURCES.md#uk--uk-gdpr--dpa-2018--childrens-code + SOURCES.md#eu--ai-act","f":0.9},{"j":"UK","a":"third_party","k":"unknown","r":"Children's Code data minimisation + no detrimental use standards apply to third-party disclosure for under-18s.","t":18,"u":"partial","n":"Children's Code applies; specific third-party-disclosure Standard text unverified","s":"SOURCES.md#uk--uk-gdpr--dpa-2018--childrens-code","f":0.9},{"j":"UK","a":"third_party","k":"known_under","r":"Same as unknown — Children's Code applies to under-18s regardless. (Corrected 2026-06-05: 'third-party data flows to minors' is not a named ICO enforcement theme — stated priorities are defaults, geolocation, ad-profiling, recommender systems, under-13 data.)","t":18,"u":"partial","n":"Children's Code applies; specific restrictions TBD by counsel","s":"SOURCES.md#uk--uk-gdpr--dpa-2018--childrens-code","f":0.92},{"j":"UK","a":"llm_conversation","k":"unknown","r":"OpenAI Model Spec Root-level U18 protections apply (platform terms, global). Gemini under-18 prohibition DOES bind even without actual knowledge — the API terms are an objective 'directed towards or likely to be accessed by under-18s' design test (corrected 2026-06-05; the actual-knowledge framing was refuted). Anthropic CSAM-reporting applies.","t":null,"u":null,"n":"Platform terms apply regardless","s":"SOURCES.md#layer-3--platform-terms-llm-providers","f":0.85},{"j":"UK","a":"llm_conversation","k":"known_under","r":"Gemini under-18 audience prohibition binds (objective audience test, both knowledge states — Gap-A knowledge-trigger framing refuted 2026-06-05). OpenAI Root-level U18 protections apply. Anthropic CSAM-reporting applies. Children's Code 'best interests of the child' standard applies to under-18 conversations. Crisis-escalation is prompt-only (Gap C — verified real); OpenAI's under-18 API guidance lists escalation paths as a minor-serving safety standard (contract-adjacent); no instrument binds guardian notification.","t":13,"u":false,"n":"Parental consent does not unlock Gemini routing, OpenAI Root protections, or structural crisis handling","s":"SOURCES.md#layer-3--platform-terms-llm-providers + SOURCES.md#uk--uk-gdpr--dpa-2018--childrens-code","f":0.78},{"j":"UK","a":"ai_behavioural","k":"unknown","r":"No standalone UK AI Act (King's Speech 2026: sector-by-sector); SI 2026/425 (in force 12 May 2026) requires the ICO to produce an AI/ADM code with a mandatory children's-data component; DUAA 2025 reformed ADM rules. The EU AI Act still reaches a UK-based app when serving EU users (Art 2 extraterritorial): Art 5 prohibitions (since Feb 2025) + Art 50 transparency (from 2 Aug 2026); Annex III high-risk likely inapplicable to a non-grading tutor (Omnibus defers standalone high-risk to 2 Dec 2027). Children's Code best-interests applies. Platform terms apply globally.","t":18,"u":"partial","n":"UK AI regulation is in flux; Children's Code best-interests applies","s":"SOURCES.md#uk--uk-gdpr--dpa-2018--childrens-code + SOURCES.md#layer-3--platform-terms-llm-providers","f":0.86},{"j":"UK","a":"ai_behavioural","k":"known_under","r":"OpenAI Root-level U18 binds. Gemini under-18 audience prohibition binds. Anthropic CSAM-reporting binds. Children's Code best-interests applies. No standalone UK AI Act; SI 2026/425 ICO AI/ADM code (mandatory children's-data component) + DUAA 2025 + EU AI Act via EU users (Art 2 extraterritorial); plus platform terms + Children's Code.","t":13,"u":false,"n":"Consent does not unlock OpenAI Root, Gemini, or Anthropic","s":"SOURCES.md#layer-3--platform-terms-llm-providers","f":0.86},{"j":"UK","a":"retention","k":"unknown","r":"UK GDPR Article 5(1)(e) storage limitation applies. Children's Code data minimisation standard applies. No UK statute fixes child retention periods for a consumer app — DUAA 2025 s.81 (in force 5 Feb 2026) added a child-specific design duty to UK GDPR Art 25 (not a retention rule); OSA 2023 Data Preservation Notices are narrow/investigatory; education-sector retention schedules bind schools/LAs, not consumer apps (verified 2026-06-05).","t":18,"u":"partial","n":"Children's Code data minimisation applies to under-18","s":"SOURCES.md#uk--uk-gdpr--dpa-2018--childrens-code","f":0.88},{"j":"UK","a":"retention","k":"known_under","r":"UK GDPR Article 5(1)(e) + Children's Code data minimisation apply. (Corrected 2026-06-05: data-retention is not a named ICO children's enforcement theme; Art 5(1)(e) + Code data minimisation still govern.)","t":18,"u":"partial","n":"Children's Code data minimisation applies","s":"SOURCES.md#uk--uk-gdpr--dpa-2018--childrens-code","f":0.88},{"j":"UK","a":"account_existence","k":"unknown","r":"No ICO statement that Family Sharing / Google Family Link functions as a consent signal. Children's Code applies to 'likely accessed by children' services regardless of account type. Caveat (verified 2026-06-05): platform-provided age signals (Apple Declared Age Range API / Google Play Age Signals) can confer actual/constructive knowledge of a minor and so TRIGGER obligations, even though account existence does not satisfy consent verification; both vendors scope Family Sharing/Family Link consent to their own services — third-party apps must obtain their own.","t":null,"u":"no","n":"Account existence does not unlock Children's Code obligations","s":"SOURCES.md#layer-5--account-existence-realities","f":0.85},{"j":"UK","a":"account_existence","k":"known_under","r":"Best-interests duty operates at service level: a service likely to be accessed by children must either establish age with risk-appropriate certainty (Std 3) or apply the standards to all users — for an AI tutor with minors among users, in-scope is near-certain (corrected 2026-06-05: not a per-user reactive trigger). No platform-side consent signal blessed by ICO. 'Reasonable efforts' to verify (UK GDPR Art 8(2) equivalent) required; EDPB-style analysis applies by analogy.","t":13,"u":false,"n":"Account existence does not shield — best-interests duty binds regardless","s":"SOURCES.md#layer-5--account-existence-realities","f":0.86},{"j":"DE","a":"general_data","k":"unknown","r":"GDPR Art 8 default 16-floor applies (DE did not derogate). 16+: self-consent. Under-16: parental consent + Art 8(2) reasonable-efforts verification, uniformly — Germany has NO 14–16 sub-tier (corrected 2026-06-05; two-tier structures exist only in MSs that derogated to 14, e.g. AT/IT). For non-ISS/non-consent bases German doctrine applies individual Einsichtsfähigkeit, but for a consent-based consumer app the rigid 16 controls. BDSG contains only thin/procedural child text (§14(1) item 2 — an awareness duty on the Federal Commissioner); substantive child protection flows from GDPR Art 8 directly (verified 2026-06-05).","t":16,"u":true,"n":"Self-consent at 16+; below 16 needs parental consent","s":"SOURCES.md#eu--gdpr + SOURCES.md#edpb-member-state-consent-age-tracking","f":0.9},{"j":"DE","a":"general_data","k":"known_under","r":"GDPR Art 8 binds. Below 16, parental consent required. Controller must make 'reasonable efforts' to verify (Art 8(2)). EDPB Guidelines 05/2020 §7.1.3–7.1.4 (substance verified via secondaries 2026-06-05; the §3 cite was wrong) — mechanisms relying solely on the child or a platform are insufficient. AI Act Art 5(1)(b) age-vulnerability exploitation prohibition also binds (irrespective of consent — see ai_behavioural cell).","t":16,"u":true,"n":"Parental consent unlocks data processing; does not unlock AI Act Art 5(1)(b) prohibitions","s":"SOURCES.md#eu--gdpr + SOURCES.md#eu--ai-act","f":0.85},{"j":"DE","a":"marketing","k":"unknown","r":"GDPR Recital 38 specific protection for children re: marketing. UWG: Annex Nr. 28 (to §3(3)) per-se bans direct purchase exhortations to children (read ~under-14); §3(4)/§4a(2) protect vulnerable groups incl. teens 14–17 (verified 2026-06-05). AI Act Art 5(1)(b) age-vulnerability exploitation prohibition (Commission Guidelines C(2025) 5052 final, 29 July 2025, now exist — cumulative-conditions test, no tutor safe harbor; case-by-case) covers AI-driven marketing to children.","t":null,"u":"partial","n":"GDPR Recital 38 applies; UWG specific rules not researched; AI Act Art 5(1)(b) binds regardless of consent","s":"SOURCES.md#eu--gdpr + SOURCES.md#eu--ai-act","f":0.85},{"j":"DE","a":"marketing","k":"known_under","r":"Same as unknown + stricter interpretation under UWG and AI Act Art 5(1)(b) when controller has actual knowledge. German UWG specifics (verified 2026-06-05): Annex Nr. 28 per-se ban for children (~under-14); §3(4)/§4a(2) for teens 14–17.","t":null,"u":"partial","n":"AI Act Art 5(1)(b) binds regardless; UWG specifics TBD","s":"SOURCES.md#eu--ai-act","f":0.85},{"j":"DE","a":"profiling","k":"unknown","r":"GDPR Art 22(1) default-prohibits solely-automated decisions with legal/similarly-significant effects (CJEU SCHUFA C-634/21: applies without invocation); Art 22(2) exceptions (contract, law, explicit consent) + Art 22(3) safeguards exist — Recital 71's child mention is hortatory, and EDPB WP251 cautions (soft law) against relying on the exceptions for children. AI Act Annex III §3 high-risk classification for AI in education covers institutional admission/evaluation/level-assessment/exam-monitoring — a B2C tutor that does not grade or admit likely falls OUTSIDE §3; if in-scope, obligations are age-neutral (Omnibus defers standalone high-risk compliance to 2 Dec 2027, pending OJ).","t":16,"u":false,"n":"GDPR Art 22(1) default-prohibition applies; Art 22(2)(c) explicit consent is a statutory exception with safeguards (EDPB soft-law cautions against it for children); AI Act Annex III obligations apply to high-risk AI systems","s":"SOURCES.md#eu--gdpr + SOURCES.md#eu--ai-act","f":0.92},{"j":"DE","a":"profiling","k":"known_under","r":"Same as unknown + AI Act Art 5(1)(b) age-vulnerability exploitation prohibition binds (irrespective of consent). Per synthesis §2 Layer 6: 'a prompt that adopted an emotionally-bonding persona for a sub-13 user is the kind of thing Art 5(1)(b) reaches' (note: synthesis says 'sub-13' but the prohibition applies to all vulnerable ages including 13–17).","t":16,"u":false,"n":"Consent does not unlock AI Act Art 5(1)(b); GDPR Art 22 has an explicit-consent exception (Art 22(2)(c)) with safeguards — EDPB cautions against it for children","s":"SOURCES.md#eu--ai-act","f":0.85},{"j":"DE","a":"third_party","k":"unknown","r":"GDPR Art 6/9 lawful basis required for third-party disclosure. Children's data does not have a separate third-party-disclosure rule at EU level beyond general GDPR.","t":null,"u":true,"n":"Standard GDPR lawful basis applies","s":"SOURCES.md#eu--gdpr","f":0.86},{"j":"DE","a":"third_party","k":"known_under","r":"Same as unknown + AI Act Annex III deployer notification obligation (Art 26) if product is high-risk. AI Act Art 5(1)(b) binds for age-vulnerability exploitation via third-party AI integrations.","t":16,"u":false,"n":"AI Act Art 5(1)(b) binds regardless; Annex III deployer notification if high-risk","s":"SOURCES.md#eu--ai-act","f":0.85},{"j":"DE","a":"llm_conversation","k":"unknown","r":"Platform terms apply globally (OpenAI Root, Gemini under-18 prohibition — binds regardless of knowledge; objective audience test (corrected 2026-06-05), Anthropic CSAM). GDPR Recital 38 specific protection for children re: marketing/profiling within conversations. AI Act Art 50 transparency to user (you are talking to an AI) — 'obvious from context' carve-out; whether a one-on-one tutor persona qualifies is unsettled (synthesis §2 Layer 6).","t":null,"u":"partial","n":"AI Act Art 50 binds regardless of consent (transparency obligation); 'obvious from context' carve-out TBD","s":"SOURCES.md#eu--ai-act + SOURCES.md#layer-3--platform-terms-llm-providers","f":0.85},{"j":"DE","a":"llm_conversation","k":"known_under","r":"Platform terms bind: OpenAI Root-level U18 (verified), Gemini under-18 audience prohibition (verified Terms), Anthropic CSAM-reporting (verified). AI Act Art 50 transparency obligation binds. AI Act Art 5(1)(b) age-vulnerability exploitation prohibition binds. AI Act Art 5(1)(f) emotion-inference prohibition in 'educational institutions' — scope of 'educational institutions' is unsettled (synthesis §2 Layer 6). Crisis-escalation is prompt-only (Gap C — a real gap, verified): the AI Act hook is weak (Annex III likely inapplicable to a non-grading tutor; Omnibus defers standalone high-risk to 2 Dec 2027), but OpenAI's under-18 API guidance lists 'escalation paths for high-risk interactions' as a safety standard for minor-serving organizations (contract-adjacent) and Anthropic's minors guidelines push monitoring/escalation; no instrument binds guardian notification (best practice only).","t":16,"u":false,"n":"Consent (parental or self) does not unlock AI Act Art 5(1)(b), Art 5(1)(f), Art 50, OpenAI Root, Gemini under-18 prohibition, or Anthropic CSAM-reporting","s":"SOURCES.md#eu--ai-act + SOURCES.md#layer-3--platform-terms-llm-providers","f":0.78},{"j":"DE","a":"ai_behavioural","k":"unknown","r":"AI Act Art 5(1)(b) age-vulnerability exploitation prohibition applies (Commission Guidelines C(2025) 5052 final, 29 July 2025, give the cumulative-conditions test and general examples but no LLM-tutor safe harbor — what counts as 'exploitation due to age' for an LLM-tutor remains case-by-case). AI Act Art 5(1)(f) emotion-inference prohibition in 'educational institutions' — scope unsettled. AI Act Art 50 transparency to user (with 'obvious from context' carve-out).","t":null,"u":false,"n":"AI Act Art 5 prohibitions bind regardless of consent","s":"SOURCES.md#eu--ai-act","f":0.85},{"j":"DE","a":"ai_behavioural","k":"known_under","r":"AI Act Art 5(1)(b) binds — applies to all vulnerable ages, not just under-13. AI Act Art 5(1)(f) binds in 'educational institutions' (scope unsettled). AI Act Art 50 binds. OpenAI Model Spec Root-level U18 protections apply (verified). Gemini under-18 audience prohibition binds. Anthropic CSAM-reporting applies. The strongest non-statutory binding: the prohibition on age-vulnerability exploitation cannot be unlocked by any consent posture.","t":16,"u":false,"n":"AI Act Art 5 prohibitions and platform terms bind regardless","s":"SOURCES.md#eu--ai-act + SOURCES.md#layer-3--platform-terms-llm-providers","f":0.85},{"j":"DE","a":"retention","k":"unknown","r":"GDPR Art 5(1)(e) storage limitation applies. No EU-level child-specific retention statute beyond general GDPR.","t":null,"u":true,"n":"Standard GDPR lawful basis applies","s":"SOURCES.md#eu--gdpr","f":0.9},{"j":"DE","a":"retention","k":"known_under","r":"Same as unknown. IF the product were high-risk under AI Act Annex III §3 (doubtful for a B2C tutor that does not grade/admit — §3 requires an institutional admission/evaluation/exam context; the Art 6(3) filter may also exempt), record-keeping would flow from Arts 12/18/19 (logs ≥6 months; technical documentation 10 years), age-neutral; the Digital Omnibus (provisional agreement 7 May 2026) defers standalone Annex III high-risk compliance to 2 Dec 2027 (pending OJ).","t":16,"u":"partial","n":"AI Act record-keeping if high-risk","s":"SOURCES.md#eu--ai-act","f":0.55},{"j":"DE","a":"account_existence","k":"unknown","r":"GDPR Art 8(2) 'reasonable efforts to verify' applies. EDPB Guidelines 05/2020 §7.1.3–7.1.4 (substance verified via secondaries 2026-06-05) — mechanisms relying solely on the child or a platform (e.g. a parent holding an Apple ID) are insufficient. No platform-side consent signal blessed by EDPB or German DPA. Caveat (verified 2026-06-05): platform-provided age signals (Apple Declared Age Range API / Google Play Age Signals) can confer actual/constructive knowledge of a minor and so TRIGGER obligations, even though account existence does not satisfy consent verification; both vendors scope Family Sharing/Family Link consent to their own services — third-party apps must obtain their own.","t":null,"u":"no","n":"Account existence does not satisfy 'reasonable efforts' per EDPB","s":"SOURCES.md#layer-5--account-existence-realities","f":0.85},{"j":"DE","a":"account_existence","k":"known_under","r":"GDPR Art 8(2) 'reasonable efforts' triggered. Account existence does not shield. Irish DPC TikTok fine (Sept 2023, €345M, verified — incl. a €65M 'Family Pairing' component for failing to verify the pairing adult was the child's actual parent/guardian) found platform-side mechanisms (e.g. 'Family Pairing') insufficient. German DPA would likely follow Irish DPC reasoning.","t":16,"u":false,"n":"Account existence does not satisfy 'reasonable efforts'","s":"SOURCES.md#layer-5--account-existence-realities","f":0.9},{"j":"NO","a":"general_data","k":"unknown","r":"Personopplysningsloven §5 (Norway's GDPR Art 8 implementation) sets age of digital consent at 13. Above 13, child self-consents; below 13, parental consent required. Markedsføringsloven and EEA-incorporated EU acts do not add a sub-13 trigger in the unknown-knowledge state.","t":13,"u":true,"n":"Self-consent at 13+; below 13 needs parental consent under §5","s":"SOURCES.md#norway","f":0.9},{"j":"NO","a":"general_data","k":"known_under","r":"Personopplysningsloven §5 binds. Below 13, parental consent required; controller must make 'reasonable efforts' to verify (GDPR Art 8(2) applies via §5). EDPB Statement 1/2025 (followed by Datatilsynet): age assurance must be reliable/robust/bypass-resistant AND proportionate; the Art 8(2) verification burden for sub-age consent rests on the controller (verified 2026-06-05).","t":13,"u":true,"n":"Parental consent unlocks processing; 'reasonable efforts' to verify required per Datatilsynet posture","s":"SOURCES.md#norway","f":0.8},{"j":"NO","a":"marketing","k":"unknown","r":"Markedsføringsloven (2009-01-09-2) treats minors as a single special-protection category with no formal sub-bands, applied with graduated strictness — §19(2) directs weighing age/development/vulnerability (the calibration sits in §19, not §20); §21 bans children-specific aggressive practices (insecurity-exploitation, frightening means). Forbrukertilsynet enforces (§35; Markedsrådet on appeal). Verified 2026-06-05. DSA Art 28(2) bans profiling-based ads to known minors but only for 'online platforms' (public-dissemination UGC services — a private AI tutor likely out of scope; Art 19 micro/small-enterprise exemption also applies); NOT yet EEA-incorporated as of 2026-06-05 (no Joint Committee decision; Norway targets summer 2026).","t":18,"u":"partial","n":"Markedsføringsloven applies regardless of consent posture to known-minor-directed marketing; single 'minors' category","s":"SOURCES.md#norway","f":0.6},{"j":"NO","a":"marketing","k":"known_under","r":"Markedsføringsloven special protection binds: §21 children-specific aggressive-practice ban (insecurity-exploitation, frightening/aggressive means) + §19(2) graduated-vulnerability calibration; Forbrukertilsynet enforces (verified 2026-06-05). DSA Art 28(2) profiling-ad ban: scoped to 'online platforms' (likely not this product; Art 19 micro/small exemption); NOT yet EEA-incorporated as of 2026-06-05 (Norway targets summer 2026). GDPR Recital 38 specific protection re: marketing to children applies via §5.","t":18,"u":false,"n":"Consent (parental or self) does not unlock Markedsføringsloven's special-protection floor or DSA Art 28(2) ad ban","s":"SOURCES.md#norway","f":0.6},{"j":"NO","a":"profiling","k":"unknown","r":"GDPR Art 22(1) (incorporated via the EEA Agreement; Recital 71 — not 38 — is the children-specific recital) default-prohibits solely-automated decisions with legal/similarly-significant effects; Art 22(2) exceptions + safeguards exist; EDPB WP251 cautions against using them for children. AI Act Annex III §3 likely does NOT cover a non-grading B2C tutor (institutional admission/evaluation contexts only); in any case not yet EEA-incorporated as of 2026-06-05 (counsel to confirm timeline). DSA Art 28(2) profiling-ad ban — scoped to 'online platforms' (likely not this product); NOT yet EEA-incorporated as of 2026-06-05.","t":null,"u":false,"n":"GDPR Art 22(1) default-prohibition applies; Art 22(2)(c) explicit consent is a statutory exception with safeguards (EDPB soft-law cautions against it for children); AI Act Annex III obligations if high-risk-classified; DSA Art 28(2) binds in-scope online platforms only (likely not this product; not yet EEA-incorporated)","s":"SOURCES.md#norway","f":0.6},{"j":"NO","a":"profiling","k":"known_under","r":"Same as unknown + AI Act Art 5(1)(b) age-vulnerability exploitation prohibition likely binds via EEA incorporation (counsel to confirm). EDPB Statement 1/2025 posture (followed by Datatilsynet): age assurance reliable AND proportionate; controller bears the Art 8(2) verification burden for sub-13 consent (verified 2026-06-05).","t":13,"u":false,"n":"Consent does not unlock GDPR Art 22, AI Act Art 5(1)(b) (if incorporated), or DSA Art 28(2)","s":"SOURCES.md#norway","f":0.6},{"j":"NO","a":"third_party","k":"unknown","r":"Personopplysningsloven §5 + GDPR Art 6/9 lawful basis required for third-party disclosure (incorporated via EEA). No NO-specific child-targeted third-party-disclosure rule surfaced in corpus beyond general GDPR.","t":null,"u":true,"n":"Standard GDPR lawful basis applies via §5","s":"SOURCES.md#norway","f":0.86},{"j":"NO","a":"third_party","k":"known_under","r":"Personopplysningsloven §5 binds. AI Act Art 5(1)(b) likely binds via EEA incorporation (counsel to confirm) for age-vulnerability exploitation via third-party AI integrations. AI Act Annex III §3 deployer notification (Art 26) applies if product is high-risk-classified — also EEA-incorporation-pending.","t":13,"u":false,"n":"AI Act Art 5(1)(b) and Annex III Art 26 bind regardless of consent if EEA-incorporated","s":"SOURCES.md#norway","f":0.9},{"j":"NO","a":"llm_conversation","k":"unknown","r":"Platform terms apply globally (OpenAI Model Spec Root-level U18 protections, Gemini under-18 audience prohibition — binds regardless of knowledge (objective audience test; corrected 2026-06-05), Anthropic CSAM-reporting). Personopplysningsloven §5 does not activate in unknown-knowledge state.","t":null,"u":null,"n":"Platform terms apply regardless; §5 doesn't trigger","s":"SOURCES.md#layer-3--platform-terms-llm-providers","f":0.85},{"j":"NO","a":"llm_conversation","k":"known_under","r":"Personopplysningsloven §5 binds (parental consent required below 13). OpenAI Model Spec Root-level U18 protections bind (verified). Gemini under-18 audience prohibition binds (objective audience test, both knowledge states — Gap-A knowledge-trigger framing refuted 2026-06-05). Anthropic CSAM-reporting applies. AI Act Art 5(1)(b) age-vulnerability exploitation prohibition and Art 50 transparency obligation likely bind via EEA incorporation (counsel to confirm). Crisis-escalation is prompt-only (Gap C — verified real); OpenAI's under-18 API guidance lists escalation paths as a minor-serving safety standard (contract-adjacent); no instrument binds guardian notification.","t":13,"u":false,"n":"Parental consent does not unlock Gemini routing (Terms breach — binds in both knowledge states), OpenAI Root, Anthropic CSAM, or AI Act Art 5(1)(b) / Art 50 (if EEA-incorporated); does not unlock structural crisis handling (Gap C)","s":"SOURCES.md#norway + SOURCES.md#layer-3--platform-terms-llm-providers","f":0.78},{"j":"NO","a":"ai_behavioural","k":"unknown","r":"Platform terms apply globally. AI Act Art 5(1)(b) age-vulnerability exploitation prohibition, Art 5(1)(f) emotion-inference in education, and Art 50 transparency obligation likely apply via EEA incorporation (counsel to confirm timeline). Nordic DPAs' 'Oslo Declaration' on children's data in gaming/AI (adopted at the 30–31 May 2024 Oslo meeting, published early June 2024; full text public on datatilsynet.no) — non-binding inter-DPA cooperation; the 2025 Stockholm Declaration did not withdraw it (verified 2026-06-05).","t":null,"u":false,"n":"AI Act Art 5 prohibitions and Art 50 bind regardless of consent if EEA-incorporated","s":"SOURCES.md#norway","f":0.9},{"j":"NO","a":"ai_behavioural","k":"known_under","r":"AI Act Art 5(1)(b) age-vulnerability exploitation and Art 5(1)(f) emotion-inference in education likely bind via EEA incorporation (counsel to confirm). AI Act Art 50 transparency binds. OpenAI Model Spec Root-level U18 protections bind (verified). Gemini under-18 audience prohibition binds (verified Terms). Anthropic CSAM-reporting applies. Personopplysningsloven §5 binds underlying personal-info collection.","t":13,"u":false,"n":"AI Act Art 5 prohibitions, Art 50, OpenAI Root, Gemini under-18 prohibition, and Anthropic CSAM-reporting all bind regardless of consent","s":"SOURCES.md#norway + SOURCES.md#layer-3--platform-terms-llm-providers","f":0.85},{"j":"NO","a":"retention","k":"unknown","r":"GDPR Art 5(1)(e) storage limitation applies via personopplysningsloven. No NO-specific child-targeted retention statute beyond general GDPR baseline. Markedsføringsloven does not address retention.","t":null,"u":true,"n":"Standard GDPR lawful basis applies","s":"SOURCES.md#norway","f":0.9},{"j":"NO","a":"retention","k":"known_under","r":"GDPR Art 5(1)(e) storage limitation applies via personopplysningsloven. AI Act Annex III §3 record-keeping (Arts 12/18/19) would apply only if high-risk-classified (doubtful for a non-grading B2C tutor) AND once EEA-incorporated (not yet, as of 2026-06-05); Omnibus defers standalone high-risk compliance to 2 Dec 2027. Datatilsynet's general posture: data minimisation is a controller-burden, applies strictly for under-13s.","t":13,"u":"partial","n":"AI Act record-keeping if high-risk and EEA-incorporated; GDPR Art 5(1)(e) data minimisation applies","s":"SOURCES.md#norway","f":0.55},{"j":"NO","a":"account_existence","k":"unknown","r":"Datatilsynet: no platform-based age-signal guidance located. EDPB Statement 1/2025 on Age Assurance (11 Feb 2025, followed by Datatilsynet) requires age assurance be reliable/robust/bypass-resistant AND proportionate/least-intrusive; Datatilsynet's 2025–26 mapping called bypassable self-declaration 'concerning' while warning against over-intrusive verification — 'effective, not nominal' is a fair synthesis, not a stated Datatilsynet rule (verified 2026-06-05). Corrected 2026-06-05: §5 sets only the consent age (13) — it contains no actual-knowledge trigger; the verification burden lives in GDPR Art 8(2) ('rimelige tiltak', qualified by available technology), proactive for general-audience services and so stricter than COPPA's reactive actual-knowledge standard (for child-directed/mixed-audience services COPPA binds regardless of knowledge). Caveat (verified 2026-06-05): platform-provided age signals (Apple Declared Age Range API / Google Play Age Signals) can confer actual/constructive knowledge of a minor and so TRIGGER obligations, even though account existence does not satisfy consent verification; both vendors scope Family Sharing/Family Link consent to their own services — third-party apps must obtain their own.","t":null,"u":"no","n":"Account existence (Family Sharing / Google Family Link) does not satisfy 'reasonable efforts' under Datatilsynet posture","s":"SOURCES.md#norway","f":0.8},{"j":"NO","a":"account_existence","k":"known_under","r":"Personopplysningsloven §5 + GDPR Art 8(2) 'reasonable efforts' triggered. NO 3b posture is genuine regulatory silence, not a doctrine (corrected 2026-06-05): Datatilsynet has neither blessed nor rejected platform-side consent signals or 'engineered ignorance'; the 'rebuttable presumption / mirrors US 3b' framing appears in no NO or US primary source — the FTC affirmatively declined such a presumption (2024 NPRM / 2025 Rule). Soft-law pressure is modest (EDPB Statement 1/2025 disfavors self-declaration; the proposed 13→15 raise is unenacted; DSA Art 28 targets other services). Avoidance designs face GDPR Art 8(2) reasonable-efforts pressure but no prohibition; an arguable posture, not a safe harbor. Counsel must rule.","t":13,"u":"arguable","n":"Arguable: parental consent can be substituted by 'engineered ignorance' — but the shield evaporates the moment a child types 'I'm 10' in chat","s":"SOURCES.md#norway","f":0.78},{"j":"FR","a":"general_data","k":"unknown","r":"GDPR Art 8 applies with France's 15-floor (FR derogated upward from 13). Above 15, child self-consents. 13–15 parental consent required. GDPR Recital 38 specific protection for children applies. CNIL is the French DPA; its 8 children's-rights recommendations are citable (verified 2026-06-05).","t":15,"u":true,"n":"Self-consent at 15+; 13–15 needs parental consent; below 13 needs parental consent + reasonable efforts to verify","s":"SOURCES.md#eu--gdpr + SOURCES.md#edpb-member-state-consent-age-tracking","f":0.86},{"j":"FR","a":"general_data","k":"known_under","r":"GDPR Art 8 binds. Below 15, parental consent required. Controller must make 'reasonable efforts' to verify (Art 8(2)). EDPB Guidelines 05/2020 §7.1.3–7.1.4: mechanisms relying solely on the child or a platform are insufficient. AI Act Art 5(1)(b) age-vulnerability exploitation prohibition also binds (irrespective of consent).","t":15,"u":true,"n":"Parental consent unlocks data processing; does not unlock AI Act Art 5(1)(b) prohibitions","s":"SOURCES.md#eu--gdpr + SOURCES.md#eu--ai-act","f":0.85},{"j":"FR","a":"marketing","k":"unknown","r":"GDPR Recital 38 specific protection for children re: marketing. AI Act Art 5(1)(b) age-vulnerability exploitation prohibition (live legal-uncertainty — no Commission guidance yet) covers AI-driven marketing to children. Code de la consommation Art. L121-7(5°) lists as a per-se aggressive practice advertising that directly incites children to buy or to persuade their parents (L121-6 adds a vulnerable-group test) — FR codification of UCPD Annex I(28), i.e. the EU baseline FR-enforced, not gold-plating; CNIL's 8 children's-rights recommendations are citable (verified 2026-06-05).","t":null,"u":"partial","n":"GDPR Recital 38 applies; AI Act Art 5(1)(b) binds regardless of consent; Code de la consommation specifics not researched","s":"SOURCES.md#eu--gdpr + SOURCES.md#eu--ai-act","f":0.85},{"j":"FR","a":"marketing","k":"known_under","r":"Same as unknown + stricter interpretation when controller has actual knowledge of under-15 user. AI Act Art 5(1)(b) binds regardless of consent posture. Code de la consommation Art. L121-7(5°) per-se ban (direct purchase incitement to children) + L121-6 vulnerable-group test apply — = EU UCPD baseline, FR-codified (verified 2026-06-05).","t":null,"u":"partial","n":"AI Act Art 5(1)(b) binds regardless; Code de la consommation specifics TBD by counsel","s":"SOURCES.md#eu--ai-act","f":0.86},{"j":"FR","a":"profiling","k":"unknown","r":"GDPR Art 22(1) default-prohibits solely-automated decisions with legal/similarly-significant effects (CJEU SCHUFA C-634/21: applies without invocation); Art 22(2) exceptions (contract, law, explicit consent) + Art 22(3) safeguards exist — Recital 71's child mention is hortatory, and EDPB WP251 cautions (soft law) against relying on the exceptions for children. AI Act Annex III §3 high-risk classification for AI in education covers institutional admission/evaluation/level-assessment/exam-monitoring — a B2C tutor that does not grade or admit likely falls OUTSIDE §3; if in-scope, obligations are age-neutral (Omnibus defers standalone high-risk compliance to 2 Dec 2027, pending OJ).","t":15,"u":false,"n":"GDPR Art 22(1) default-prohibition applies; Art 22(2)(c) explicit consent is a statutory exception with safeguards (EDPB soft-law cautions against it for children); AI Act Annex III obligations apply to high-risk AI systems","s":"SOURCES.md#eu--gdpr + SOURCES.md#eu--ai-act","f":0.92},{"j":"FR","a":"profiling","k":"known_under","r":"Same as unknown + AI Act Art 5(1)(b) age-vulnerability exploitation prohibition binds (irrespective of consent). Per synthesis §2 Layer 6: a prompt that adopted an emotionally-bonding persona for a sub-13 user is the kind of thing Art 5(1)(b) reaches (the prohibition applies to all vulnerable ages including 13–17).","t":15,"u":false,"n":"Consent does not unlock AI Act Art 5(1)(b); GDPR Art 22 has an explicit-consent exception (Art 22(2)(c)) with safeguards — EDPB cautions against it for children","s":"SOURCES.md#eu--ai-act","f":0.85},{"j":"FR","a":"third_party","k":"unknown","r":"GDPR Art 6/9 lawful basis required for third-party disclosure. Children's data does not have a separate third-party-disclosure rule at EU level beyond general GDPR. CNIL guidance on third-party disclosure not researched in this corpus.","t":null,"u":true,"n":"Standard GDPR lawful basis applies","s":"SOURCES.md#eu--gdpr","f":0.86},{"j":"FR","a":"third_party","k":"known_under","r":"Same as unknown + AI Act Annex III deployer notification obligation (Art 26) if product is high-risk. AI Act Art 5(1)(b) binds for age-vulnerability exploitation via third-party AI integrations. CNIL enforcement on third-party data flows to minors not researched in this corpus.","t":15,"u":false,"n":"AI Act Art 5(1)(b) binds regardless; Annex III deployer notification if high-risk","s":"SOURCES.md#eu--ai-act","f":0.92},{"j":"FR","a":"llm_conversation","k":"unknown","r":"Platform terms apply globally (OpenAI Root, Gemini under-18 prohibition — binds regardless of knowledge; objective audience test (corrected 2026-06-05), Anthropic CSAM). GDPR Recital 38 specific protection for children re: marketing/profiling within conversations. AI Act Art 50 transparency to user (you are talking to an AI) — 'obvious from context' carve-out; whether a one-on-one tutor persona qualifies is unsettled.","t":null,"u":"partial","n":"AI Act Art 50 binds regardless of consent (transparency obligation); 'obvious from context' carve-out TBD","s":"SOURCES.md#eu--ai-act + SOURCES.md#layer-3--platform-terms-llm-providers","f":0.85},{"j":"FR","a":"llm_conversation","k":"known_under","r":"Platform terms bind: OpenAI Root-level U18 (verified), Gemini under-18 audience prohibition (verified Terms), Anthropic CSAM-reporting (verified). AI Act Art 50 transparency obligation binds. AI Act Art 5(1)(b) age-vulnerability exploitation prohibition binds. AI Act Art 5(1)(f) emotion-inference prohibition in 'educational institutions' — scope of 'educational institutions' is unsettled. Crisis-escalation is prompt-only (Gap C — a real gap, verified): the AI Act hook is weak (Annex III likely inapplicable to a non-grading tutor; Omnibus defers standalone high-risk to 2 Dec 2027), but OpenAI's under-18 API guidance lists 'escalation paths for high-risk interactions' as a safety standard for minor-serving organizations (contract-adjacent) and Anthropic's minors guidelines push monitoring/escalation; no instrument binds guardian notification (best practice only).","t":15,"u":false,"n":"Consent (parental or self) does not unlock AI Act Art 5(1)(b), Art 5(1)(f), Art 50, OpenAI Root, Gemini under-18 prohibition, or Anthropic CSAM-reporting","s":"SOURCES.md#eu--ai-act + SOURCES.md#layer-3--platform-terms-llm-providers","f":0.78},{"j":"FR","a":"ai_behavioural","k":"unknown","r":"AI Act Art 5(1)(b) age-vulnerability exploitation prohibition applies (Commission Guidelines C(2025) 5052 final, 29 July 2025, give the cumulative-conditions test and general examples but no LLM-tutor safe harbor — what counts as 'exploitation due to age' for an LLM-tutor remains case-by-case). AI Act Art 5(1)(f) emotion-inference prohibition in 'educational institutions' — scope unsettled. AI Act Art 50 transparency to user (with 'obvious from context' carve-out).","t":null,"u":false,"n":"AI Act Art 5 prohibitions bind regardless of consent","s":"SOURCES.md#eu--ai-act","f":0.85},{"j":"FR","a":"ai_behavioural","k":"known_under","r":"AI Act Art 5(1)(b) binds — applies to all vulnerable ages, not just under-13. AI Act Art 5(1)(f) binds in 'educational institutions' (scope unsettled). AI Act Art 50 binds. OpenAI Model Spec Root-level U18 protections apply (verified). Gemini under-18 audience prohibition binds. Anthropic CSAM-reporting applies. The strongest non-statutory binding: the prohibition on age-vulnerability exploitation cannot be unlocked by any consent posture.","t":15,"u":false,"n":"AI Act Art 5 prohibitions and platform terms bind regardless","s":"SOURCES.md#eu--ai-act + SOURCES.md#layer-3--platform-terms-llm-providers","f":0.85},{"j":"FR","a":"retention","k":"unknown","r":"GDPR Art 5(1)(e) storage limitation applies. No EU-level child-specific retention statute beyond general GDPR. CNIL retention guidance for children's data not researched in this corpus.","t":null,"u":true,"n":"Standard GDPR lawful basis applies","s":"SOURCES.md#eu--gdpr","f":0.9},{"j":"FR","a":"retention","k":"known_under","r":"Same as unknown. IF the product were high-risk under AI Act Annex III §3 (doubtful for a B2C tutor that does not grade/admit — §3 requires an institutional admission/evaluation/exam context; the Art 6(3) filter may also exempt), record-keeping would flow from Arts 12/18/19 (logs ≥6 months; technical documentation 10 years), age-neutral; the Digital Omnibus (provisional agreement 7 May 2026) defers standalone Annex III high-risk compliance to 2 Dec 2027 (pending OJ). CNIL enforcement on data retention for minors not researched in this corpus.","t":15,"u":"partial","n":"AI Act record-keeping if high-risk; CNIL retention guidance not researched","s":"SOURCES.md#eu--ai-act","f":0.55},{"j":"FR","a":"account_existence","k":"unknown","r":"GDPR Art 8(2) 'reasonable efforts to verify' applies. EDPB Guidelines 05/2020 §7.1.3–7.1.4: mechanisms relying solely on the child or a platform (e.g. a parent holding an Apple ID) are insufficient. No platform-side consent signal blessed by EDPB or CNIL. Caveat (verified 2026-06-05): platform-provided age signals (Apple Declared Age Range API / Google Play Age Signals) can confer actual/constructive knowledge of a minor and so TRIGGER obligations, even though account existence does not satisfy consent verification; both vendors scope Family Sharing/Family Link consent to their own services — third-party apps must obtain their own.","t":null,"u":"no","n":"Account existence does not satisfy 'reasonable efforts' per EDPB; CNIL has not blessed platform-side signals","s":"SOURCES.md#layer-5--account-existence-realities","f":0.85},{"j":"FR","a":"account_existence","k":"known_under","r":"GDPR Art 8(2) 'reasonable efforts' triggered. Account existence does not shield. Irish DPC TikTok fine (Sept 2023, €345M, verified — incl. a €65M 'Family Pairing' component for failing to verify the pairing adult was the child's actual parent/guardian) found platform-side mechanisms (e.g. 'Family Pairing') insufficient. CNIL would likely follow Irish DPC reasoning given EDPB alignment, but CNIL-specific enforcement on account-existence for under-15 users not researched in this corpus.","t":15,"u":false,"n":"Account existence does not satisfy 'reasonable efforts'; CNIL-specific enforcement TBD","s":"SOURCES.md#layer-5--account-existence-realities","f":0.9},{"j":"SE","a":"general_data","k":"unknown","r":"GDPR Art 8 applies to SE. SE consent age 13 (Dataskyddslagen 2018:218 Ch. 2 §4 — verified 2026-06-05) — a child 13+ can self-consent; below 13, parental consent required. No actual-knowledge trigger activated. SE adds nothing on top of the EU baseline other than the 13-floor choice (vs DE's 16-default).","t":13,"u":true,"n":"Self-consent unlocks at 13+; below 13 needs parental consent","s":"SOURCES.md#eu--gdpr + SOURCES.md#edpb-member-state-consent-age-tracking","f":0.9},{"j":"SE","a":"general_data","k":"known_under","r":"GDPR Art 8 binds. Below 13, parental consent required. Art 8(2) 'reasonable efforts to verify' applies. EDPB Guidelines 05/2020 §7.1.3–7.1.4 (substance verified via secondaries 2026-06-05) — controller, not platform, bears verification. AI Act Art 5(1)(b) age-vulnerability exploitation prohibition binds (irrespective of consent).","t":13,"u":true,"n":"Parental consent unlocks data processing; does not unlock AI Act Art 5(1)(b)","s":"SOURCES.md#eu--gdpr + SOURCES.md#edpb-member-state-consent-age-tracking + SOURCES.md#eu--ai-act","f":0.85},{"j":"SE","a":"marketing","k":"unknown","r":"GDPR Recital 38 specific protection for children re: marketing. AI Act Art 5(1)(b) age-vulnerability exploitation prohibition applies (C(2025) 5052 guidance exists; LLM-tutor application case-by-case). SE specifics (verified 2026-06-05): Marknadsföringslagen (2008:486) §7 child rules largely transpose the UCPD blacklist (direct-exhortation/credulity-exploitation bans); the under-12 TV/radio ad ban lives in radio- och tv-lagen (2010:696) Ch. 8 §§7–9 — broadcast-scoped, does not reach an app; IMY lists children/young people as a 2026 supervision priority. App-relevant duties flow mainly from GDPR-as-applied.","t":null,"u":"partial","n":"GDPR Recital 38 + AI Act Art 5(1)(b) bind regardless; SE Marknadsföringslagen not researched","s":"SOURCES.md#eu--gdpr + SOURCES.md#eu--ai-act","f":0.8},{"j":"SE","a":"marketing","k":"known_under","r":"Same as unknown + AI Act Art 5(1)(b) age-vulnerability exploitation binds once controller has actual knowledge. SE add (verified 2026-06-05): Marknadsföringslagen §7 ≈ UCPD baseline (direct-exhortation/credulity bans); no SE gold-plating reaches an AI-tutor app — the broadcast under-12 ad ban (radio- och tv-lagen Ch. 8) is out of scope.","t":null,"u":"partial","n":"AI Act Art 5(1)(b) binds regardless; SE Marknadsföringslagen specifics not in corpus","s":"SOURCES.md#eu--ai-act","f":0.8},{"j":"SE","a":"profiling","k":"unknown","r":"GDPR Art 22(1) default-prohibits solely-automated decisions with legal/similarly-significant effects (CJEU SCHUFA C-634/21); Art 22(2) exceptions + Art 22(3) safeguards exist; Recital 71's child mention is hortatory — EDPB WP251 cautions against the exceptions for children. AI Act Annex III §3 high-risk classification for AI in education covers institutional admission/evaluation/level-assessment/exam-monitoring — a B2C tutor that does not grade or admit likely falls OUTSIDE §3; if in-scope, obligations are age-neutral (Omnibus defers standalone high-risk compliance to 2 Dec 2027, pending OJ).","t":13,"u":false,"n":"GDPR Art 22(1) default-prohibition applies; Art 22(2)(c) explicit consent is a statutory exception with safeguards (EDPB soft-law cautions against it for children); AI Act Annex III obligations apply to high-risk AI systems","s":"SOURCES.md#eu--gdpr + SOURCES.md#eu--ai-act","f":0.92},{"j":"SE","a":"profiling","k":"known_under","r":"AI Act Art 5(1)(b) age-vulnerability exploitation prohibition binds (irrespective of consent). AI Act Art 5(1)(b) applies to all vulnerable ages, not just under-13. AI Act Annex III §3 deployer notification (Art 26) if high-risk.","t":13,"u":false,"n":"Consent does not unlock AI Act Art 5(1)(b); GDPR Art 22 has an explicit-consent exception (Art 22(2)(c)) with safeguards — EDPB cautions against it for children","s":"SOURCES.md#eu--ai-act","f":0.85},{"j":"SE","a":"third_party","k":"unknown","r":"GDPR Art 6/9 lawful basis required for third-party disclosure. No child-specific EU third-party-disclosure rule beyond general GDPR. SE adds nothing on top of the EU baseline in the corpus.","t":null,"u":true,"n":"Standard GDPR lawful basis applies","s":"SOURCES.md#eu--gdpr","f":0.86},{"j":"SE","a":"third_party","k":"known_under","r":"Same as unknown + AI Act Annex III deployer notification (Art 26) if product is high-risk. AI Act Art 5(1)(b) binds for age-vulnerability exploitation via third-party AI integrations.","t":13,"u":false,"n":"AI Act Art 5(1)(b) binds regardless; Annex III deployer notification if high-risk","s":"SOURCES.md#eu--ai-act","f":0.92},{"j":"SE","a":"llm_conversation","k":"unknown","r":"Platform terms apply globally (OpenAI Root, Gemini under-18 — binds regardless of knowledge (objective audience test; corrected 2026-06-05), Anthropic CSAM). AI Act Art 50 transparency to user (you are talking to an AI) — 'obvious from context' carve-out; whether a one-on-one tutor persona qualifies is unsettled. GDPR Recital 38 children's specific protection re: profiling/marketing within conversations.","t":null,"u":"partial","n":"AI Act Art 50 binds regardless of consent (transparency); 'obvious from context' carve-out TBD","s":"SOURCES.md#eu--ai-act + SOURCES.md#layer-3--platform-terms-llm-providers","f":0.85},{"j":"SE","a":"llm_conversation","k":"known_under","r":"Platform terms bind: OpenAI Root-level U18 (verified), Gemini under-18 audience prohibition (verified Terms), Anthropic CSAM-reporting (verified). AI Act Art 50 transparency obligation binds. AI Act Art 5(1)(b) age-vulnerability exploitation binds. AI Act Art 5(1)(f) emotion-inference in 'educational institutions' — scope unsettled. Crisis-escalation is prompt-only (Gap C — a real gap, verified): the AI Act hook is weak (Annex III likely inapplicable to a non-grading tutor; Omnibus defers standalone high-risk to 2 Dec 2027), but OpenAI's under-18 API guidance lists 'escalation paths for high-risk interactions' as a safety standard for minor-serving organizations (contract-adjacent) and Anthropic's minors guidelines push monitoring/escalation; no instrument binds guardian notification (best practice only).","t":13,"u":false,"n":"Consent (parental) does not unlock AI Act Art 5(1)(b), Art 5(1)(f), Art 50, OpenAI Root, Gemini under-18, or Anthropic CSAM-reporting","s":"SOURCES.md#eu--ai-act + SOURCES.md#layer-3--platform-terms-llm-providers","f":0.78},{"j":"SE","a":"ai_behavioural","k":"unknown","r":"AI Act Art 5(1)(b) age-vulnerability exploitation prohibition applies (Commission Guidelines C(2025) 5052 final, 29 July 2025, give the cumulative-conditions test and general examples but no LLM-tutor safe harbor — what counts as 'exploitation due to age' for an LLM-tutor remains case-by-case). AI Act Art 5(1)(f) emotion-inference in 'educational institutions' — scope unsettled. AI Act Art 50 transparency with 'obvious from context' carve-out.","t":null,"u":false,"n":"AI Act Art 5 prohibitions bind regardless of consent","s":"SOURCES.md#eu--ai-act","f":0.92},{"j":"SE","a":"ai_behavioural","k":"known_under","r":"AI Act Art 5(1)(b) binds — applies to all vulnerable ages, not just under-13. AI Act Art 5(1)(f) binds in 'educational institutions' (scope unsettled). AI Act Art 50 binds. OpenAI Model Spec Root-level U18 protections apply (verified). Gemini under-18 audience prohibition binds. Anthropic CSAM-reporting applies. SE adds nothing specific on top of EU AI Act — the binding surface is identical for any EU MS.","t":13,"u":false,"n":"AI Act Art 5 prohibitions and platform terms bind regardless","s":"SOURCES.md#eu--ai-act + SOURCES.md#layer-3--platform-terms-llm-providers","f":0.85},{"j":"SE","a":"retention","k":"unknown","r":"GDPR Art 5(1)(e) storage limitation applies. No EU-level child-specific retention statute beyond general GDPR. SE adds nothing specific in the corpus.","t":null,"u":true,"n":"Standard GDPR lawful basis applies","s":"SOURCES.md#eu--gdpr","f":0.9},{"j":"SE","a":"retention","k":"known_under","r":"Same as unknown. IF the product were high-risk under AI Act Annex III §3 (doubtful for a B2C tutor that does not grade/admit), record-keeping would flow from Arts 12/18/19, age-neutral; Digital Omnibus defers standalone high-risk compliance to 2 Dec 2027 (pending OJ). No SE-specific retention rule surfaced in corpus.","t":13,"u":"partial","n":"AI Act record-keeping if high-risk","s":"SOURCES.md#eu--ai-act","f":0.55},{"j":"SE","a":"account_existence","k":"unknown","r":"GDPR Art 8(2) 'reasonable efforts to verify' applies. EDPB Guidelines 05/2020 §7.1.3–7.1.4 (substance verified via secondaries 2026-06-05) — mechanisms relying solely on the child or a platform (e.g. parent holding an Apple ID) are insufficient. No platform-side consent signal blessed by EDPB. SE-specific: no IMY (Integritetsskyddsmyndigheten) statement on platform-based age signals is in the corpus. Caveat (verified 2026-06-05): platform-provided age signals (Apple Declared Age Range API / Google Play Age Signals) can confer actual/constructive knowledge of a minor and so TRIGGER obligations, even though account existence does not satisfy consent verification; both vendors scope Family Sharing/Family Link consent to their own services — third-party apps must obtain their own.","t":null,"u":"no","n":"Account existence does not satisfy 'reasonable efforts' per EDPB; IMY not in corpus","s":"SOURCES.md#layer-5--account-existence-realities","f":0.8},{"j":"SE","a":"account_existence","k":"known_under","r":"GDPR Art 8(2) 'reasonable efforts' triggered. Account existence does not shield. Irish DPC TikTok fine (Sept 2023, €345M, verified — incl. the €65M 'Family Pairing' component) found platform-side mechanisms insufficient. SE-specific: IMY has not surfaced guidance in this corpus; IMY would likely follow EDPB / Irish DPC reasoning but cannot be cited from a verified source.","t":13,"u":false,"n":"Account existence does not satisfy 'reasonable efforts'; IMY position not in corpus","s":"SOURCES.md#layer-5--account-existence-realities","f":0.8},{"j":"DK","a":"general_data","k":"unknown","r":"GDPR Art 8 applies; Denmark's threshold is 15 — RAISED from 13 by LOV nr 1783 af 28/12/2023 (amending Databeskyttelsesloven §6 stk. 2–3), effective 1 January 2024, consolidated as LBK No. 289 of 8 March 2024. A child 15+ self-consents; below 15, consent/approval by the holder of parental authority is required, with Art 8(2) 'reasonable efforts' verification. Tracker sites (incl. the EDPB tracker and Datatilsynet's stale English PDF) still show the pre-2024 '13' — do not rely on them.","t":15,"u":true,"n":"Self-consent at 15+; below 15 needs parental consent","s":"SOURCES.md#eu--gdpr","f":0.95},{"j":"DK","a":"general_data","k":"known_under","r":"GDPR Art 8 binds with Denmark's 15-threshold (Databeskyttelsesloven §6 stk. 2, as amended by LOV nr 1783 af 28/12/2023, eff. 2024-01-01). Below 15, parental consent required + Art 8(2) 'reasonable efforts' to verify. EDPB Guidelines 05/2020 §7.1.3–7.1.4 — controller bears the verification burden. The Danish Datatilsynet is a distinct, active children's-data authority (Nordic Oslo Declaration, May 2024; DPIA templates).","t":15,"u":true,"n":"Parental consent unlocks data processing; AI Act Art 5(1)(b) prohibitions apply regardless","s":"SOURCES.md#eu--gdpr + SOURCES.md#eu--ai-act","f":0.92},{"j":"DK","a":"marketing","k":"unknown","r":"GDPR Recital 38 specific protection for children re: marketing. AI Act Art 5(1)(b) age-vulnerability exploitation prohibition covers AI-driven marketing. Danish Markedsføringsloven §11 (LBK nr 1420 af 02/12/2024; children's rules via LOV nr 2192 af 30/11/2021, in force 1 Jan 2022): stk. 1 bans under-18-directed marketing encouraging violence/dangerous conduct or exploiting fear/superstition; stk. 2 bans intoxicant references; stk. 3 prohibits commercial practices on/via social-media profiles of (or appearing to be of) under-15s. Forbrugerombudsmanden enforces (verified 2026-06-05).","t":null,"u":"partial","n":"GDPR Recital 38 applies; Markedsføringsloven §11 cited (verified 2026-06-05); AI Act Art 5(1)(b) binds regardless","s":"SOURCES.md#eu--gdpr + SOURCES.md#eu--ai-act","f":0.95},{"j":"DK","a":"marketing","k":"known_under","r":"Same as unknown + AI Act Art 5(1)(b) age-vulnerability exploitation prohibition binds (irrespective of consent). Danish Markedsføringsloven §11 (see unknown cell: stk. 1–3 children's rules, LOV nr 2192/2021) applies with full force given actual knowledge; Forbrugerombudsmanden enforces (verified 2026-06-05).","t":null,"u":"partial","n":"AI Act Art 5(1)(b) binds regardless; Markedsføringsloven §11 cited; application detail for counsel","s":"SOURCES.md#eu--ai-act","f":0.95},{"j":"DK","a":"profiling","k":"unknown","r":"GDPR Art 22(1) default-prohibits solely-automated decisions with legal/similarly-significant effects (CJEU SCHUFA C-634/21: applies without invocation); Art 22(2) exceptions (contract, law, explicit consent) + Art 22(3) safeguards exist — Recital 71's child mention is hortatory, and EDPB WP251 cautions (soft law) against relying on the exceptions for children. AI Act Annex III §3 high-risk classification for AI in education covers institutional admission/evaluation/level-assessment/exam-monitoring — a B2C tutor that does not grade or admit likely falls OUTSIDE §3; if in-scope, obligations are age-neutral (Omnibus defers standalone high-risk compliance to 2 Dec 2027, pending OJ).","t":15,"u":false,"n":"GDPR Art 22(1) default-prohibition applies; Art 22(2)(c) explicit consent is a statutory exception with safeguards (EDPB soft-law cautions against it for children); AI Act Annex III obligations apply to high-risk AI systems","s":"SOURCES.md#eu--gdpr + SOURCES.md#eu--ai-act","f":0.92},{"j":"DK","a":"profiling","k":"known_under","r":"Same as unknown + AI Act Art 5(1)(b) age-vulnerability exploitation prohibition binds (irrespective of consent). Applies to all vulnerable ages, not just under-13.","t":15,"u":false,"n":"Consent does not unlock AI Act Art 5(1)(b); GDPR Art 22 has an explicit-consent exception (Art 22(2)(c)) with safeguards — EDPB cautions against it for children","s":"SOURCES.md#eu--ai-act","f":0.85},{"j":"DK","a":"third_party","k":"unknown","r":"GDPR Art 6/9 lawful basis required for third-party disclosure. No DK-specific child-relevant third-party-disclosure rule in corpus beyond general GDPR.","t":null,"u":true,"n":"Standard GDPR lawful basis applies","s":"SOURCES.md#eu--gdpr","f":0.86},{"j":"DK","a":"third_party","k":"known_under","r":"Same as unknown + AI Act Annex III deployer notification obligation (Art 26) if product is high-risk. AI Act Art 5(1)(b) binds for age-vulnerability exploitation via third-party AI integrations.","t":15,"u":false,"n":"AI Act Art 5(1)(b) binds regardless; Annex III deployer notification if high-risk","s":"SOURCES.md#eu--ai-act","f":0.92},{"j":"DK","a":"llm_conversation","k":"unknown","r":"Platform terms apply globally (OpenAI Root, Gemini under-18 prohibition — binds regardless of knowledge; objective audience test (corrected 2026-06-05), Anthropic CSAM). GDPR Recital 38 specific protection for children. AI Act Art 50 transparency to user (you are talking to an AI) — 'obvious from context' carve-out; whether a one-on-one tutor persona qualifies is unsettled.","t":null,"u":"partial","n":"AI Act Art 50 binds regardless of consent (transparency obligation); 'obvious from context' carve-out TBD","s":"SOURCES.md#eu--ai-act + SOURCES.md#layer-3--platform-terms-llm-providers","f":0.85},{"j":"DK","a":"llm_conversation","k":"known_under","r":"Platform terms bind: OpenAI Root-level U18 (verified), Gemini under-18 audience prohibition (verified Terms), Anthropic CSAM-reporting (verified). AI Act Art 50 transparency obligation binds. AI Act Art 5(1)(b) age-vulnerability exploitation prohibition binds. AI Act Art 5(1)(f) emotion-inference prohibition in 'educational institutions' — scope unsettled. Crisis-escalation is prompt-only (Gap C — a real gap, verified): the AI Act hook is weak (Annex III likely inapplicable to a non-grading tutor; Omnibus defers standalone high-risk to 2 Dec 2027), but OpenAI's under-18 API guidance lists 'escalation paths for high-risk interactions' as a safety standard for minor-serving organizations (contract-adjacent) and Anthropic's minors guidelines push monitoring/escalation; no instrument binds guardian notification (best practice only).","t":15,"u":false,"n":"Consent (parental or self) does not unlock AI Act Art 5(1)(b), Art 5(1)(f), Art 50, OpenAI Root, Gemini under-18 prohibition, or Anthropic CSAM-reporting","s":"SOURCES.md#eu--ai-act + SOURCES.md#layer-3--platform-terms-llm-providers","f":0.78},{"j":"DK","a":"ai_behavioural","k":"unknown","r":"AI Act Art 5(1)(b) age-vulnerability exploitation prohibition applies (Commission Guidelines C(2025) 5052 final, 29 July 2025, give the cumulative-conditions test and general examples but no LLM-tutor safe harbor — what counts as 'exploitation due to age' for an LLM-tutor remains case-by-case). AI Act Art 5(1)(f) emotion-inference prohibition in 'educational institutions' — scope unsettled. AI Act Art 50 transparency to user (with 'obvious from context' carve-out).","t":null,"u":false,"n":"AI Act Art 5 prohibitions bind regardless of consent","s":"SOURCES.md#eu--ai-act","f":0.92},{"j":"DK","a":"ai_behavioural","k":"known_under","r":"AI Act Art 5(1)(b) binds — applies to all vulnerable ages, not just under-13. AI Act Art 5(1)(f) binds in 'educational institutions' (scope unsettled). AI Act Art 50 binds. OpenAI Model Spec Root-level U18 protections apply (verified). Gemini under-18 audience prohibition binds. Anthropic CSAM-reporting applies.","t":15,"u":false,"n":"AI Act Art 5 prohibitions and platform terms bind regardless","s":"SOURCES.md#eu--ai-act + SOURCES.md#layer-3--platform-terms-llm-providers","f":0.85},{"j":"DK","a":"retention","k":"unknown","r":"GDPR Art 5(1)(e) storage limitation applies. No DK-specific child retention statute beyond general GDPR.","t":null,"u":true,"n":"Standard GDPR lawful basis applies","s":"SOURCES.md#eu--gdpr","f":0.9},{"j":"DK","a":"retention","k":"known_under","r":"Same as unknown. IF the product were high-risk under AI Act Annex III §3 (doubtful for a B2C tutor that does not grade/admit — §3 requires an institutional admission/evaluation/exam context; the Art 6(3) filter may also exempt), record-keeping would flow from Arts 12/18/19 (logs ≥6 months; technical documentation 10 years), age-neutral; the Digital Omnibus (provisional agreement 7 May 2026) defers standalone Annex III high-risk compliance to 2 Dec 2027 (pending OJ).","t":15,"u":"partial","n":"AI Act record-keeping if high-risk","s":"SOURCES.md#eu--ai-act","f":0.55},{"j":"DK","a":"account_existence","k":"unknown","r":"GDPR Art 8(2) 'reasonable efforts to verify' applies. EDPB Guidelines 05/2020 §7.1.3–7.1.4 (substance verified via secondaries 2026-06-05) — mechanisms relying solely on the child or a platform are insufficient. The Danish Datatilsynet is a distinct, active children's-data authority (Nordic Oslo Declaration, May 2024; DPIA templates) — verified 2026-06-05. Caveat (verified 2026-06-05): platform-provided age signals (Apple Declared Age Range API / Google Play Age Signals) can confer actual/constructive knowledge of a minor and so TRIGGER obligations, even though account existence does not satisfy consent verification; both vendors scope Family Sharing/Family Link consent to their own services — third-party apps must obtain their own.","t":null,"u":"no","n":"Account existence does not satisfy 'reasonable efforts' per EDPB","s":"SOURCES.md#layer-5--account-existence-realities","f":0.85},{"j":"DK","a":"account_existence","k":"known_under","r":"GDPR Art 8(2) 'reasonable efforts' triggered. Account existence does not shield. Irish DPC TikTok fine (Sept 2023, €345M, verified — incl. the €65M 'Family Pairing' component) found platform-side mechanisms insufficient. Danish DPA would likely follow EDPB/Irish DPC reasoning — but no Danish-specific enforcement on this point in corpus.","t":15,"u":false,"n":"Account existence does not satisfy 'reasonable efforts'","s":"SOURCES.md#layer-5--account-existence-realities","f":0.98},{"j":"EE","a":"general_data","k":"unknown","r":"GDPR Art 8 applies. Estonia's derogation is SETTLED, not unknown: Isikuandmete kaitse seadus (PDPA) §8(1) (RT I, 04.01.2019, 11; in force 15 Jan 2019) sets the digital-consent age for information society services at 13 — the Art 8 minimum. A child 13+ self-consents; below 13, parental consent required. EDPB Guidelines 05/2020 govern interpretation. AKI (Andmekaitse Inspektsioon) is the Estonian DPA.","t":13,"u":true,"n":"Self-consent unlocks at 13+; below 13 needs parental consent with reasonable-efforts-to-verify per Art 8(2)","s":"SOURCES.md#eu--gdpr","f":0.95},{"j":"EE","a":"general_data","k":"known_under","r":"GDPR Art 8 binds with Estonia's 13-threshold (PDPA §8(1), in force 15.01.2019). Below 13, parental consent required; Art 8(2) reasonable-efforts-to-verify applies. EDPB Guidelines 05/2020 §7.1.3–7.1.4 — self-declaration relying on the child's goodwill is insufficient for risk-bearing processing. AKI-specific verification guidance not researched.","t":13,"u":true,"n":"Parental consent unlocks data processing; does not unlock AI Act Art 5(1)(b) prohibitions (see ai_behavioural cells)","s":"SOURCES.md#eu--gdpr","f":0.9},{"j":"EE","a":"marketing","k":"unknown","r":"POPULATED 2026-06-05 (was '?'): the load-bearing EE-specific marketing statute is the Advertising Act (Reklaamiseadus) §8 — prohibitions on advertising that solicits minors or exploits their trust/inexperience (under-18 protections) — with the Consumer Protection Act (Tarbijakaitseseadus) §125(4) secondary; both enforced by TTJA (Tarbijakaitse ja Tehnilise Järelevalve Amet), with AKI on the data side. EU baseline (GDPR Recital 38, AI Act Art 5(1)(b)) applies on top but is not EE-specific.","t":18,"u":"partial","n":"Reklaamiseadus §8 advertising protections bind regardless of consent posture; GDPR consent governs the data side","s":"SOURCES.md#eu--gdpr + SOURCES.md#eu--ai-act","f":0.8},{"j":"EE","a":"marketing","k":"known_under","r":"POPULATED 2026-06-05 (was '?'): Reklaamiseadus §8 (under-18 solicitation/trust-exploitation prohibitions) applies with full force given actual knowledge of a minor; Tarbijakaitseseadus §125(4) secondary; TTJA enforces. AI Act Art 5(1)(b) age-vulnerability exploitation prohibition binds regardless of consent. GDPR Recital 38 marketing protection applies via Art 8 (EE threshold 13, PDPA §8(1)).","t":18,"u":false,"n":"Consent does not unlock Reklaamiseadus §8 advertising prohibitions or AI Act Art 5(1)(b)","s":"SOURCES.md#eu--gdpr + SOURCES.md#eu--ai-act","f":0.8},{"j":"EE","a":"profiling","k":"unknown","r":"GDPR Art 22(1) default-prohibits solely-automated decisions with legal/similarly-significant effects (CJEU SCHUFA C-634/21); Art 22(2) exceptions (contract, law, explicit consent) + Art 22(3) safeguards exist — Recital 71's child mention is hortatory; EDPB WP251 cautions against relying on the exceptions for children (soft law). AI Act Annex III §3 (verified) high-risk classification for AI in education covers institutional admission/evaluation/level-assessment/exam-monitoring — a B2C tutor that does not grade or admit likely falls OUTSIDE §3; if in-scope, obligations are age-neutral (Omnibus defers standalone high-risk compliance to 2 Dec 2027, pending OJ). DSA Art 28 (unverified) profiling-ad ban for minors. Estonian specifics not researched.","t":null,"u":false,"n":"GDPR Art 22(1) default-prohibition applies; Art 22(2)(c) explicit consent is a statutory exception with safeguards (EDPB soft-law cautions against it for children); AI Act Annex III obligations apply to high-risk AI systems","s":"SOURCES.md#eu--gdpr + SOURCES.md#eu--ai-act","f":0.6},{"j":"EE","a":"profiling","k":"known_under","r":"Same as unknown + AI Act Art 5(1)(b) (verified) age-vulnerability exploitation prohibition binds for all vulnerable ages, not just under-13. AI Act Art 5(1)(f) (verified) emotion-inference prohibition applies in 'educational institutions' (scope unsettled — synthesis §2 Layer 6). AI Act Annex III §3 deployer notification (Art 26) if product is high-risk.","t":null,"u":false,"n":"Consent does not unlock AI Act Art 5(1)(b), Art 5(1)(f), or Art 22","s":"SOURCES.md#eu--ai-act","f":0.85},{"j":"EE","a":"third_party","k":"unknown","r":"GDPR Art 6/9 (verified) lawful basis required for third-party disclosure. No child-specific EU-level third-party-disclosure rule beyond general GDPR. Estonian specifics not researched.","t":null,"u":true,"n":"Standard GDPR lawful basis applies","s":"SOURCES.md#eu--gdpr","f":0.86},{"j":"EE","a":"third_party","k":"known_under","r":"Same as unknown + AI Act Annex III §3 (verified) deployer notification obligation (Art 26) if product is high-risk. AI Act Art 5(1)(b) (verified) binds for age-vulnerability exploitation via third-party AI integrations.","t":null,"u":false,"n":"AI Act Art 5(1)(b) binds regardless; Annex III deployer notification if high-risk","s":"SOURCES.md#eu--ai-act","f":0.92},{"j":"EE","a":"llm_conversation","k":"unknown","r":"Platform terms apply globally: OpenAI Model Spec Root-level U18 protections (verified), Gemini under-18 prohibition DOES bind even without actual knowledge — the API terms are an objective 'directed towards or likely to be accessed by under-18s' design test (corrected 2026-06-05; the actual-knowledge framing was refuted), Anthropic CSAM-reporting commitment (verified). AI Act Art 50 (verified) transparency to user (you are talking to an AI) — 'obvious from context' carve-out; whether a one-on-one tutor persona qualifies is unsettled (synthesis §2 Layer 6).","t":null,"u":"partial","n":"AI Act Art 50 binds regardless of consent (transparency obligation); 'obvious from context' carve-out TBD","s":"SOURCES.md#layer-3--platform-terms-llm-providers + SOURCES.md#eu--ai-act","f":0.85},{"j":"EE","a":"llm_conversation","k":"known_under","r":"Platform terms bind: OpenAI Root-level U18 (verified), Gemini under-18 audience prohibition (verified Terms), Anthropic CSAM-reporting (verified). AI Act Art 50 (verified) transparency obligation binds. AI Act Art 5(1)(b) (verified) age-vulnerability exploitation prohibition binds. AI Act Art 5(1)(f) (verified) emotion-inference prohibition in 'educational institutions' — scope unsettled. Crisis-escalation is prompt-only (Gap C — a real gap, verified): the AI Act hook is weak (Annex III likely inapplicable; Omnibus defers high-risk to Dec 2027), but OpenAI's under-18 API guidance lists 'escalation paths for high-risk interactions' as a minor-serving safety standard (contract-adjacent) and Anthropic's minors guidelines push monitoring/escalation; no instrument binds guardian notification.","t":13,"u":false,"n":"Consent (parental or self) does not unlock AI Act Art 5(1)(b), Art 5(1)(f), Art 50, OpenAI Root, Gemini under-18 prohibition, or Anthropic CSAM-reporting","s":"SOURCES.md#eu--ai-act + SOURCES.md#layer-3--platform-terms-llm-providers","f":0.78},{"j":"EE","a":"ai_behavioural","k":"unknown","r":"AI Act Art 5(1)(b) (verified) age-vulnerability exploitation prohibition applies — Commission Guidelines C(2025) 5052 exist but give no LLM-tutor safe harbor; case-by-case (synthesis §2 Layer 6). AI Act Art 5(1)(f) (verified) emotion-inference prohibition in 'educational institutions' — scope unsettled. AI Act Art 50 (verified) transparency to user with 'obvious from context' carve-out. Estonia references AI sandboxes in its Kratt Action Plan 2024–2026 and plans an AI Competence Centre, but is NOT confirmed running an active AI Act Art 57 sandbox (corrected 2026-06-05; the Art 57 national-sandbox deadline was postponed to 2 Aug 2027 by the Digital Omnibus); no EE-published position on AI-for-minors has surfaced.","t":null,"u":false,"n":"AI Act Art 5 prohibitions bind regardless of consent","s":"SOURCES.md#eu--ai-act","f":0.82},{"j":"EE","a":"ai_behavioural","k":"known_under","r":"AI Act Art 5(1)(b) (verified) binds — applies to all vulnerable ages. AI Act Art 5(1)(f) (verified) binds in 'educational institutions' (scope unsettled). AI Act Art 50 (verified) binds. OpenAI Model Spec Root-level U18 protections (verified) apply. Gemini under-18 audience prohibition (verified Terms) binds. Anthropic CSAM-reporting (verified) applies. The strongest non-statutory binding: the prohibition on age-vulnerability exploitation cannot be unlocked by any consent posture.","t":13,"u":false,"n":"AI Act Art 5 prohibitions and platform terms bind regardless","s":"SOURCES.md#eu--ai-act + SOURCES.md#layer-3--platform-terms-llm-providers","f":0.85},{"j":"EE","a":"retention","k":"unknown","r":"GDPR Art 5(1)(e) (verified) storage limitation applies. No EU-level child-specific retention statute beyond general GDPR. Estonian AKI retention guidance not researched in our corpus.","t":null,"u":true,"n":"Standard GDPR lawful basis applies","s":"SOURCES.md#eu--gdpr","f":0.9},{"j":"EE","a":"retention","k":"known_under","r":"Same as unknown. IF the product were high-risk under AI Act Annex III §3 (doubtful for a B2C tutor that does not grade/admit), record-keeping would flow from Arts 12/18/19 (logs ≥6 months; tech docs 10 years), age-neutral; Digital Omnibus defers standalone high-risk compliance to 2 Dec 2027 (pending OJ).","t":null,"u":"partial","n":"AI Act record-keeping if high-risk","s":"SOURCES.md#eu--ai-act","f":0.55},{"j":"EE","a":"account_existence","k":"unknown","r":"GDPR Art 8(2) (verified) 'reasonable efforts to verify' applies. EDPB Guidelines 05/2020 §7.1.3–7.1.4 (substance verified via secondaries 2026-06-05) — mechanisms relying solely on the child or a platform are insufficient. Apple Family Sharing (verified) and Google Family Link (verified) are platform-side mechanisms that the EDPB §7.1.3–7.1.4 analysis would likely address. No platform-side consent signal blessed by AKI (not researched) or EDPB. Caveat (verified 2026-06-05): platform-provided age signals (Apple Declared Age Range API / Google Play Age Signals) can confer actual/constructive knowledge of a minor and so TRIGGER obligations, even though account existence does not satisfy consent verification; both vendors scope Family Sharing/Family Link consent to their own services — third-party apps must obtain their own.","t":null,"u":"no","n":"Account existence does not satisfy 'reasonable efforts' per EDPB §7.1.3–7.1.4 (inference from primary principles — no named EDPB ruling on platform accounts); AKI position not researched","s":"SOURCES.md#layer-5--account-existence-realities","f":0.85},{"j":"EE","a":"account_existence","k":"known_under","r":"GDPR Art 8(2) 'reasonable efforts' triggered. Account existence does not shield. Irish DPC TikTok fine (Sept 2023, €345M, verified — incl. a €65M 'Family Pairing' component for failing to verify the pairing adult was the child's actual parent/guardian) found platform-side mechanisms (Family Pairing) insufficient. Estonian DPA (AKI) would likely follow EDPB / Irish DPC reasoning but not researched in our corpus.","t":13,"u":false,"n":"Account existence does not satisfy 'reasonable efforts'; AKI position inferred from EDPB/Irish DPC but not researched","s":"SOURCES.md#layer-5--account-existence-realities","f":0.9}]};
+const JMAP = { 'United States':'US', 'United Kingdom':'UK', 'Norway':'NO', 'Germany':'DE', 'France':'FR',
+               'Slovakia':'SK', 'Sweden':'SE', 'Denmark':'DK', 'Estonia':'EE', 'Greece':'GR' };
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function confColor(f) {
+  if (f >= 0.8) return '#3fb950';
+  if (f >= 0.6) return '#79c0ff';
+  if (f >= 0.4) return '#d29922';
+  return '#484f58';
+}
+
+/* this country's verified-corpus rule for one dimension, knowledge-state matched to the cell age */
+function corpusRule(jc, actCode, age, ca) {
+  const kn = POC.cells.find(x => x.j === jc && x.a === actCode && x.k === 'known_under');
+  const un = POC.cells.find(x => x.j === jc && x.a === actCode && x.k === 'unknown');
+  const thr = (kn && kn.t != null) ? kn.t : ((un && un.t != null) ? un.t : ca);
+  const under = thr != null && age < thr;
+  const cell = under ? (kn || un) : (un || kn);
+  const ktag = under ? `known under ${thr}` : 'baseline';
+  if (!cell || cell.r === '?') {
+    return `<div class="dcr"><div class="dh2"><span class="cdot" style="background:#484f58"></span>this country <span class="ktag">${ktag}</span></div>
+      <div class="dr2" style="color:var(--muted);font-style:italic">? — not populated in the corpus for this jurisdiction yet.</div></div>`;
+  }
+  return `<div class="dcr">
+    <div class="dh2"><span class="cdot" style="background:${confColor(cell.f)}" title="confidence ${cell.f.toFixed(2)}"></span>this country
+      <span class="ktag">${ktag}</span>
+      ${cell.u === false ? '<span class="nounlock" title="prohibition floor — parental consent cannot unlock this">consent does NOT unlock</span>' : ''}</div>
+    <div class="dr2">${esc(cell.r)}</div>
+    ${cell.n ? `<div class="dc">${esc(cell.n)}</div>` : ''}
+    <div class="dc"><b>conf ${cell.f.toFixed(2)}</b> · ${esc(cell.s)}</div>
+  </div>`;
+}
+
+function dimsHtml(c, age, r) {
+  if (age >= 18 || r === 'store' || r === 'counsel') return '';
+  const u13 = age < 13;
+  const D = [
+    ['General data processing', 'A9 · A13',
+      'Lawful basis is the consent shown above — an active, separate choice, never bundled into T&C (A9). Minimum fields before consent; learning features and LLM stay blocked until the gate passes (consent middleware fails closed).',
+      'general_data'],
+    ['Marketing / advertising', 'A22 · A16',
+      'Universal under-18 ceiling — identical in every country: no behavioural/targeted advertising, no purchase pressure aimed at the minor; upgrade copy faces the adult only. EU consumer law blacklists direct exhortations to children; Norway, the UK and the US FTC enforce the same line.',
+      'marketing'],
+    ['Profiling / automated decisions', 'A23 · A9',
+      'Personalisation stays advisory and reversible — no automated decision with legal or similarly significant effect on the learner without human override. Never infer health or learning-disability labels (the Art 9 decision, A23). Profiling rests on consent, not on contract.',
+      'profiling'],
+    ['Third-party disclosure', 'A11 · A12 · A13',
+      'Only contracted processors under DPAs (auth, telemetry, billing, email, the LLM provider) with transfer checks. No data brokers, no selling, no training on user content. Minors route only through a minor-compatible provider — Gemini API excluded under default terms.'
+      + (u13 ? ' Under-13 adds the disclosure-scope consent decision with a no-training guarantee (B2) and a zero-data-retention-grade provider posture.' : ''),
+      'third_party'],
+    ['LLM-conversation content', 'A10 · A13',
+      '“You are talking to an AI” disclosure in the tutor UI (A10 — hard deadline 2 Aug 2026 for EU users; shown globally). Payloads minimised: no real names or stray identifiers (A13). Safety filters plus reporting/escalation; a spontaneous sensitive disclosure (health, family, location) is a minimisation-and-safety event, not ordinary content.',
+      'llm_conversation'],
+    ['AI-behavioural prohibitions', 'A14 · A16',
+      'Voice is transcription-only — never infer emotion from voice or face. Art 5(1)(f) is layered: reading tone from TEXT is fine; biometric emotion inference is the prohibited/high-risk zone. The manipulation floor comes from DSA/AADC dark-pattern rules (A16), not from a blanket AI-Act ban.',
+      'ai_behavioural'],
+    ['Retention / deletion', u13 ? 'B4 · A13' : 'A13',
+      'Separate clocks per data class: pending-consent data cleaned up, raw audio never retained, transcripts and summaries on a schedule, support payloads minimised; consent withdrawal fails closed and purges.'
+      + (u13 ? ' Under-13 adds the written COPPA retention schedule with provable deletion (B4).' : ''),
+      'retention'],
+    ['Account existence / family structure', u13 ? 'A20 · B1' : 'A20',
+      'A parent-created profile is consent UX, not a legal bypass — the adult owns billing (A20) and the consent receipt is stored, policy-versioned.'
+      + (u13 ? ' For under-13, the profile may exist only as a pending shell until COPPA-grade VPC completes (B1).' : ''),
+      'account_existence'],
+  ];
+  const jc = POC ? JMAP[c.n] : undefined;
+  const rows = D.map(([l, ids, txt, code]) => `<div class="dim">
+      <div class="dh">${l} <span class="ktag">${ids}</span></div>
+      <div class="dr">${txt}</div>
+      ${jc ? corpusRule(jc, code, age, c.ca) : ''}
+    </div>`).join('');
+  return `<div class="dims"><div class="fl">The other liability dimensions for this user</div>${rows}
+    <div class="note">Ceiling text = verified canon. Two age lines: the <b>consent line</b> (13–16, varies by country — that is the grid)
+    and the <b>child-protection line</b> (18, everywhere — ceilings identical in every country).${jc
+      ? ' “This country” sub-rules = landscape corpus v0.3.0, verified 2026-06-05 (70-claim adversarial pass: 26 confirmed ≥0.9, 38 corrected) — PoC status by its own README; confidence + citations shown.'
+      : ` Per-country rule text is not yet in the corpus for ${c.n} (it covers US, UK, NO, DE, FR, SE, DK, EE + SK/GR skeletons).`}</div></div>`;
+}
+
+/* groups in display order */
+const GROUPS = [
+  { id:'g13',   label:'Self-serve at 13',  ca:13 },
+  { id:'g14',   label:'Self-serve at 14',  ca:14 },
+  { id:'g15',   label:'Self-serve at 15',  ca:15 },
+  { id:'g16',   label:'Self-serve at 16',  ca:16 },
+  { id:'gcons', label:'Conservative 16 — no clean statutory age, counsel later', ca:16 },
+  { id:'gcounsel', label:'Counsel-gate before any launch', ca:null },
+  { id:'gblock',   label:'Store-block until a country-specific plan exists', ca:null },
+];
+
+/* region: eu | eea (non-EU EEA) | uk | us | other
+   loc: UI locale that serves this market ('' = none of the 7)
+   posture: open | counsel | block
+   reason: the minutes' "reason to care", condensed */
+const COUNTRIES = [
+  /* ---- 13 group ---- */
+  { n:'United States', g:'g13', ca:13, region:'us', loc:'en', posture:'open',
+    reason:'COPPA is a binary cliff at under-13 (VPC territory). State App-Store-Accountability laws (A19) cover ALL under-18s and are expanding.' },
+  { n:'United Kingdom', g:'g13', ca:13, region:'uk', loc:'en', posture:'open',
+    reason:'UK GDPR sets the consent age at 13, but the Children’s Code (A15) binds for every under-18 user, and a UK representative (A6) is required.' },
+  { n:'Norway', g:'g13', ca:13, region:'eea', loc:'nb', posture:'open',
+    reason:'Home market. Current age 13; monitor proposals to raise online consent / age-assurance thresholds.' },
+  { n:'Belgium', g:'g13', ca:13, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 13.' },
+  { n:'Estonia', g:'g13', ca:13, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 13.' },
+  { n:'Finland', g:'g13', ca:13, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 13.' },
+  { n:'Iceland', g:'g13', ca:13, region:'eea', loc:'', posture:'open', reason:'GDPR (EEA) threshold = 13.' },
+  { n:'Latvia', g:'g13', ca:13, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 13.' },
+  { n:'Malta', g:'g13', ca:13, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 13.' },
+  { n:'Portugal', g:'g13', ca:13, region:'eu', loc:'pt', posture:'open', reason:'GDPR Art 8 national threshold = 13.' },
+  { n:'Sweden', g:'g13', ca:13, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 13.' },
+  { n:'New Zealand', g:'g13', ca:13, region:'other', loc:'en', posture:'open',
+    reason:'No fixed digital-consent age; 13+ is the practical self-serve assumption, with child-readable notices, minimisation, PIA, AI safeguards.' },
+  { n:'Singapore', g:'g13', ca:13, region:'other', loc:'en', posture:'open',
+    reason:'PDPC guidance: parent/guardian consent below 13.' },
+
+  /* ---- 14 group ---- */
+  { n:'Austria', g:'g14', ca:14, region:'eu', loc:'de', posture:'open', reason:'GDPR Art 8 national threshold = 14.' },
+  { n:'Bulgaria', g:'g14', ca:14, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 14.' },
+  { n:'Cyprus', g:'g14', ca:14, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 14.' },
+  { n:'Italy', g:'g14', ca:14, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 14.' },
+  { n:'Lithuania', g:'g14', ca:14, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 14.' },
+  { n:'Spain', g:'g14', ca:14, region:'eu', loc:'es', posture:'open', reason:'GDPR Art 8 national threshold = 14.' },
+  { n:'South Korea', g:'g14', ca:14, region:'other', loc:'', posture:'open',
+    reason:'PIPA: legal-representative consent required for children under 14.' },
+  { n:'Canada', g:'g14', ca:14, region:'other', loc:'en', posture:'open',
+    reason:'OPC: under-13 generally cannot meaningfully consent; Quebec Law 25 requires parent/tutor consent under 14 — and the store country cannot see Quebec, so the practical Canada-wide rule is 14.' },
+
+  /* ---- 15 group ---- */
+  { n:'Czechia', g:'g15', ca:15, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 15. (Czech is a conversation language, not a UI locale.)' },
+  { n:'Denmark', g:'g15', ca:15, region:'eu', loc:'', posture:'open', reason:'Now 15 — older trackers showing 13 are stale.' },
+  { n:'France', g:'g15', ca:15, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 15. (French is a conversation language, not a UI locale.)' },
+  { n:'Greece', g:'g15', ca:15, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 15.' },
+  { n:'Slovenia', g:'g15', ca:15, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 15.' },
+  { n:'Australia', g:'g15', ca:15, region:'other', loc:'en', posture:'open',
+    reason:'OAIC: capacity is case-by-case; if not assessing individually, presume capacity at 15+. Draft Children’s Online Privacy Code points the same way.' },
+  { n:'Ecuador', g:'g15', ca:15, region:'other', loc:'es', posture:'open',
+    reason:'Legal-representative involvement below 15; children’s/adolescents’ data specially protected — sensitive/automated processing needs counsel.' },
+
+  /* ---- 16 group ---- */
+  { n:'Croatia', g:'g16', ca:16, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 16.' },
+  { n:'Germany', g:'g16', ca:16, region:'eu', loc:'de', posture:'open', reason:'GDPR Art 8 national threshold = 16.' },
+  { n:'Hungary', g:'g16', ca:16, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 16.' },
+  { n:'Ireland', g:'g16', ca:16, region:'eu', loc:'en', posture:'open', reason:'GDPR Art 8 national threshold = 16.' },
+  { n:'Liechtenstein', g:'g16', ca:16, region:'eea', loc:'de', posture:'open', reason:'GDPR (EEA) threshold = 16.' },
+  { n:'Luxembourg', g:'g16', ca:16, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 16.' },
+  { n:'Netherlands', g:'g16', ca:16, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 16.' },
+  { n:'Poland', g:'g16', ca:16, region:'eu', loc:'pl', posture:'open', reason:'GDPR Art 8 national threshold = 16.' },
+  { n:'Romania', g:'g16', ca:16, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 16.' },
+  { n:'Slovakia', g:'g16', ca:16, region:'eu', loc:'', posture:'open', reason:'GDPR Art 8 national threshold = 16.' },
+  { n:'Paraguay', g:'g16', ca:16, region:'other', loc:'es', posture:'open',
+    reason:'2025 data-protection law: self-serve at 16 for ordinary data; sensitive data for 16–17 needs teen + parent/guardian authorization.' },
+
+  /* ---- conservative 16 ---- */
+  { n:'Switzerland', g:'gcons', ca:16, region:'other', loc:'de', posture:'open',
+    reason:'No fixed statutory digital-consent age; Swiss law does not map onto GDPR Art 8. Use 16 as the safe product rule unless Swiss counsel approves lower.' },
+  { n:'Japan', g:'gcons', ca:16, region:'other', loc:'ja', posture:'open',
+    reason:'PPC guidance: legal-representative consent generally needed around 12–15; a 2026 APPI bill would add explicit under-16 child-data rules. Conservative 16 until counsel.' },
+
+  /* ---- counsel-gate ---- */
+  { n:'Chile', g:'gcounsel', ca:null, region:'other', loc:'es', posture:'counsel',
+    reason:'Law 21.719 (effective 2026-12-01): under 14 parent/legal rep; 14–15 parent for sensitive data. Transition + free-text/AI-tutor sensitivity makes 13+ self-serve unattractive without counsel.' },
+  { n:'Peru', g:'gcounsel', ca:null, region:'other', loc:'es', posture:'counsel',
+    reason:'Under 14: parent/tutor consent; 14–17 may consent only if maturity/language conditions are met — needs implementation detail before launch.' },
+
+  /* ---- store-block ---- */
+  { n:'Brazil', g:'gblock', ca:null, region:'other', loc:'pt', posture:'block',
+    reason:'LGPD Art 14 + ECA Digital (2026): broad duties for products likely accessed by minors — age assurance, parental supervision, profiling/ads limits, gen-AI transparency. Needs a Brazil-specific plan despite the pt locale.' },
+  { n:'India', g:'gblock', ca:null, region:'other', loc:'', posture:'block',
+    reason:'DPDP treats anyone under 18 as a child: verifiable parent consent before processing. Do not launch as 13+ self-serve.' },
+  { n:'Mainland China', g:'gblock', ca:null, region:'other', loc:'', posture:'block',
+    reason:'PIPL (<14 guardian consent) + minors-online + GenAI filings, content rules, data export, local distribution. Not just an age gate. HK/Macau/Taiwan separate checks.' },
+  { n:'Russia', g:'gblock', ca:null, region:'other', loc:'', posture:'block',
+    reason:'Data localization for Russian citizens, cross-border transfer rules, child harmful-information law, enforcement/sanctions risk.' },
+  { n:'Mexico', g:'gblock', ca:null, region:'other', loc:'es', posture:'block',
+    reason:'No clean GDPR/COPPA-style age map; treat under-18 as parent/legal-representative territory until counsel maps it.' },
+  { n:'Colombia', g:'gblock', ca:null, region:'other', loc:'es', posture:'block',
+    reason:'No clean age map; SIC reads legal-representative authorization broadly. Counsel-map before teen self-serve.' },
+  { n:'Costa Rica', g:'gblock', ca:null, region:'other', loc:'es', posture:'block', reason:'No clean teen self-consent path mapped.' },
+  { n:'Uruguay', g:'gblock', ca:null, region:'other', loc:'es', posture:'block', reason:'No clean teen self-consent path mapped.' },
+  { n:'Argentina', g:'gblock', ca:null, region:'other', loc:'es', posture:'block', reason:'Unmapped — do not rely on regional analogy.' },
+  { n:'Panama', g:'gblock', ca:null, region:'other', loc:'es', posture:'block', reason:'Unmapped — map before enabling downloads.' },
+  { n:'Dominican Republic', g:'gblock', ca:null, region:'other', loc:'es', posture:'block', reason:'Unmapped.' },
+  { n:'Guatemala', g:'gblock', ca:null, region:'other', loc:'es', posture:'block', reason:'Unmapped.' },
+  { n:'Bolivia', g:'gblock', ca:null, region:'other', loc:'es', posture:'block', reason:'Unmapped.' },
+  { n:'Venezuela', g:'gblock', ca:null, region:'other', loc:'es', posture:'block', reason:'Unmapped.' },
+  { n:'El Salvador', g:'gblock', ca:null, region:'other', loc:'es', posture:'block', reason:'Unmapped.' },
+];
+
+const AGES = [10, 11, 12, 13, 14, 15, 16, 17, 18];   // 18 rendered as "18+"
+
+/* ---------------- state ---------------- */
+let floor = 11;          // 10 | 11 | 13
+let shape = 'blind';     // 'blind' | 'legal'
+let lens = 'access';     // 'access' | a requirement id (A6, A8, B1, …)
+
+/* ---------------- regime engine ---------------- */
+function regimeFor(c, age) {
+  if (c.posture === 'block')   return 'store';
+  if (c.posture === 'counsel') return 'counsel';
+  if (age >= 18) return 'adult';
+  if (age < floor) return 'floor';
+  if (age < 13) {
+    if (c.region === 'us') return (shape === 'blind') ? 'gap' : 'vpc';
+    return 'u13p';
+  }
+  if (shape === 'blind') {
+    if (age <= 16) return (age >= c.ca) ? 'over' : 'parent';
+    return 'self';
+  }
+  return (age < c.ca) ? 'parent' : 'self';
+}
+
+const REGIME_META = {
+  adult:   { cls:'r-adult',   short:'adult',   label:'Adult — self-serve' },
+  self:    { cls:'r-self',    short:'self',    label:'Self-consenting teen' },
+  parent:  { cls:'r-parent',  short:'parent',  label:'Parent gate — required by law (A8)' },
+  over:    { cls:'r-over',    short:'parent↑', label:'Parent gate — our choice, law allows self-serve' },
+  u13p:    { cls:'r-u13p',    short:'u13 par', label:'Under-13 — parent authorization (GDPR-style)' },
+  vpc:     { cls:'r-vpc',     short:'VPC',     label:'Under-13 US — COPPA VPC required (List B)' },
+  gap:     { cls:'r-gap',     short:'GAP!',    label:'⚠ Admitted by code, COPPA VPC not built' },
+  floor:   { cls:'r-floor',   short:'—',       label:'Blocked by the age floor' },
+  counsel: { cls:'r-counsel', short:'counsel', label:'Counsel-gate before launch' },
+  store:   { cls:'r-store',   short:'blocked', label:'Store-blocked country' },
+};
+
+/* requirement chips for a cell */
+function reqsFor(c, age, r) {
+  if (r === 'store' || r === 'counsel' || r === 'floor') return [];
+  if (r === 'adult') return ['A21'];
+  const base = ['A7','A16','A17','A20','A21','A22'];
+  if (c.region === 'uk') base.push('A6','A15');
+  if (c.region === 'eu' || c.region === 'eea') base.push('A10','A14');
+  if (c.region === 'us') base.push('A19');
+  if (r === 'parent' || r === 'over') base.push('A8');
+  if (r === 'vpc' || r === 'gap') base.push('B1','B2','B3','B4','B5','B6','B7','B8');
+  if (r === 'u13p') base.push('B5','B6');
+  return base;
+}
+
+/* ---------------- requirement lenses ----------------
+   Colour the grid by ONE requirement: where does it bind by law, where do we apply it
+   anyway (our choice / single global product rule), where is it simply not applicable. */
+const LENS_VARIES  = ['A6','A7','A8','A10','A14','A15','A16','A17','A19','A20','A21','A22',
+                      'B1','B2','B3','B4','B5','B6','B7','B8'];
+const LENS_COMPANY = ['A1','A2','A3','A4','A5','A9','A11','A12','A13','A18','A23'];
+
+function lensApplies(id, c, age, r) {
+  const minor = age < 18;
+  const u13cell = (r === 'u13p' || r === 'vpc' || r === 'gap');
+  if (LENS_COMPANY.includes(id)) return 'law';   // company-level: identical everywhere
+  switch (id) {
+    case 'A6':  return c.region === 'uk' ? 'law' : 'off';
+    case 'A7':  return 'law';                                              // every sign-up passes the gate
+    case 'A8':  return r === 'parent' ? 'law' : (r === 'over' ? 'choice' : 'off');
+    case 'A10': return (c.region === 'eu' || c.region === 'eea') ? 'law' : 'choice';  // built once, shown globally
+    case 'A14': return (c.region === 'eu' || c.region === 'eea') ? 'law' : 'choice';  // global product rule
+    case 'A15': return minor ? (c.region === 'uk' ? 'law' : 'choice') : 'off';        // UK code applied globally by design
+    case 'A16': return minor ? 'law' : 'off';
+    case 'A17': return 'law';
+    case 'A19': return (c.region === 'us' && minor) ? 'law' : 'off';      // specific US states only
+    case 'A20': return minor ? 'law' : 'off';
+    case 'A21': return 'law';                                              // protects every subscriber
+    case 'A22': return minor ? 'law' : 'off';
+    case 'B1': case 'B2': case 'B3': case 'B4': case 'B7': case 'B8':
+      return (r === 'vpc' || r === 'gap') ? 'law' : 'off';                // COPPA: US under-13 cells
+    case 'B5': case 'B6':
+      return u13cell ? 'law' : 'off';                                     // infra/store: all under-13 cells
+  }
+  return 'off';
+}
+
+/* ---------------- render ---------------- */
+function render() {
+  document.querySelectorAll('#floorSeg button').forEach(b => b.classList.toggle('on', +b.dataset.f === floor));
+  document.querySelectorAll('#shapeSeg button').forEach(b => b.classList.toggle('on', b.dataset.s === shape));
+  const presetKey = (floor===11 && shape==='blind') ? 'code'
+                  : (floor===13 && shape==='blind') ? 'thirteen'
+                  : (floor===13 && shape==='legal') ? 'legal'
+                  : (floor===10 && shape==='blind') ? 'ten' : null;
+  document.querySelectorAll('#presets button').forEach(b => b.classList.toggle('on', b.dataset.p === presetKey));
+  renderGrid();
+  renderStats();
+  renderLegend();
+}
+
+function renderGrid() {
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  let html = '<thead><tr><th>Country / region</th>';
+  AGES.forEach(a => html += `<th>${a === 18 ? '18+' : a}</th>`);
+  html += '</tr></thead><tbody>';
+
+  GROUPS.forEach(g => {
+    const rows = COUNTRIES.filter(c => c.g === g.id && (!q || c.n.toLowerCase().includes(q)));
+    if (!rows.length) return;
+    html += `<tr class="ghead"><td colspan="${AGES.length + 1}">${g.label}</td></tr>`;
+    rows.forEach(c => {
+      const idx = COUNTRIES.indexOf(c);
+      const irony = (c.posture !== 'open' && c.loc);
+      const locTag = c.loc ? `<span class="tag loc ${irony ? 'irony' : ''}" title="${irony ? 'UI locale exists but market is not open — locale ≠ launch' : 'served by UI locale'}">${c.loc}</span>` : '';
+      const regTag = { eu:'EU', eea:'EEA', uk:'UK', us:'US', other:'' }[c.region];
+      html += `<tr><td class="country" onclick="openCountry(${idx})">${c.n}<span class="tags">${regTag ? `<span class="tag">${regTag}</span>` : ''}${locTag}</span></td>`;
+      AGES.forEach(a => {
+        const r = regimeFor(c, a);
+        const m = REGIME_META[r];
+        let cls = m.cls, short = m.short, title = `${c.n}, age ${a === 18 ? '18+' : a}: ${m.label}`;
+        if (lens !== 'access' && r !== 'store' && r !== 'counsel' && r !== 'floor') {
+          const st = lensApplies(lens, c, a, r);
+          cls = st === 'law' ? 'r-self' : st === 'choice' ? 'r-over' : 'r-floor';
+          short = st === 'law' ? 'law' : st === 'choice' ? 'choice' : '—';
+          title = `${c.n}, age ${a === 18 ? '18+' : a}: ${lens} ${REQ[lens]} — ${st === 'law' ? 'applies (law)' : st === 'choice' ? 'applies by our choice / global product rule' : 'not applicable'}`;
+        }
+        html += `<td class="cell ${cls}" onclick="openCell(${idx}, ${a})" title="${title}">${short}</td>`;
+      });
+      html += '</tr>';
+    });
+  });
+  html += '</tbody>';
+  document.getElementById('grid').innerHTML = html;
+}
+
+function renderStats() {
+  const open = COUNTRIES.filter(c => c.posture === 'open').length;
+  const counsel = COUNTRIES.filter(c => c.posture === 'counsel').length;
+  const block = COUNTRIES.filter(c => c.posture === 'block').length;
+  let html = `
+    <div class="stat"><div class="v">${open}</div><div class="l">countries open</div></div>
+    <div class="stat"><div class="v">${counsel}</div><div class="l">counsel-gate</div></div>
+    <div class="stat"><div class="v">${block}</div><div class="l">store-blocked</div></div>`;
+  if (lens === 'access') {
+    let parentCells = 0, overCells = 0, gapCells = 0, vpcCells = 0;
+    COUNTRIES.forEach(c => AGES.forEach(a => {
+      const r = regimeFor(c, a);
+      if (r === 'parent') parentCells++;
+      if (r === 'over') overCells++;
+      if (r === 'gap') gapCells++;
+      if (r === 'vpc') vpcCells++;
+    }));
+    html += `
+    <div class="stat"><div class="v">${parentCells}</div><div class="l">parent-gate cells (law)</div></div>
+    <div class="stat over"><div class="v">${overCells}</div><div class="l">parent-gate by choice</div></div>`;
+    if (vpcCells) html += `<div class="stat"><div class="v">${vpcCells}</div><div class="l">COPPA VPC cells</div></div>`;
+    html += gapCells
+      ? `<div class="stat bad"><div class="v">${gapCells}</div><div class="l">⚠ gap cells (US u13, no VPC)</div></div>`
+      : `<div class="stat"><div class="v">0</div><div class="l">gap cells</div></div>`;
+  } else {
+    let law = 0, choice = 0;
+    COUNTRIES.forEach(c => AGES.forEach(a => {
+      const r = regimeFor(c, a);
+      if (r === 'store' || r === 'counsel' || r === 'floor') return;
+      const st = lensApplies(lens, c, a, r);
+      if (st === 'law') law++;
+      if (st === 'choice') choice++;
+    }));
+    html += `
+    <div class="stat"><div class="v">${law}</div><div class="l">cells where it binds (law)</div></div>
+    <div class="stat over"><div class="v">${choice}</div><div class="l">by our choice / global rule</div></div>`;
+    if (LENS_COMPANY.includes(lens)) html += `<div class="stat"><div class="v">all</div><div class="l">company-level — identical everywhere</div></div>`;
+    if (!law && !choice) html += `<div class="stat bad"><div class="v">0</div><div class="l">nothing at this floor — try 11+ / 10+</div></div>`;
+  }
+  document.getElementById('stats').innerHTML = html;
+}
+
+function renderLegend() {
+  let items, prefix = '';
+  if (lens === 'access') {
+    items = [
+      ['var(--c-adult)',   'adult'],
+      ['var(--c-self)',    'self-consenting teen'],
+      ['var(--c-parent)',  'parent gate — law (A8)'],
+      ['var(--c-over)',    'parent gate — our choice (law allows self-serve)', true],
+      ['var(--c-u13p)',    'under-13: parent auth (non-US)'],
+      ['var(--c-vpc)',     'under-13 US: COPPA VPC (List B)'],
+      ['var(--c-gap)',     '⚠ gap: code admits, VPC missing'],
+      ['var(--c-floor)',   'blocked by age floor'],
+      ['var(--c-counsel)', 'counsel-gate'],
+      ['var(--c-store)',   'store-blocked'],
+    ];
+  } else {
+    prefix = `<div class="li" style="color:var(--fg)"><b style="color:var(--teal)">${lens}</b>&nbsp;${REQ[lens]} →</div>`;
+    items = [
+      ['var(--c-self)',  'applies — law'],
+      ['var(--c-over)',  'applies — our choice / single global product rule', true],
+      ['var(--c-floor)', 'not applicable to this cell (or no user: under floor)'],
+      ['var(--c-counsel)', 'counsel-gate'],
+      ['var(--c-store)', 'store-blocked'],
+    ];
+  }
+  document.getElementById('legend').innerHTML = prefix + items.map(([c, l, striped]) =>
+    `<div class="li"><span class="sw ${striped ? 'striped' : ''}" style="background:${c}"></span>${l}</div>`).join('');
+}
+
+/* ---------------- drawers ---------------- */
+function chipHtml(ids, over) {
+  return `<div class="chips">${ids.map(id =>
+    `<span class="chip ${id[0] === 'B' ? 'b' : ''} ${over && id === 'A8' ? 'choice' : ''}" title="${REQ[id]}"><b>${id}</b> ${REQ[id].split(' — ')[0].split(' (')[0]}</span>`).join('')}</div>`;
+}
+
+function openCell(idx, age) {
+  const c = COUNTRIES[idx];
+  const r = regimeFor(c, age);
+  const m = REGIME_META[r];
+  const ageLabel = age === 18 ? '18+' : age;
+  const colors = { adult:'var(--c-adult)', self:'var(--c-self)', parent:'var(--c-parent)', over:'var(--c-over)',
+    u13p:'var(--c-u13p)', vpc:'var(--c-vpc)', gap:'var(--c-gap)', floor:'var(--c-floor)',
+    counsel:'var(--c-counsel)', store:'var(--c-store)' };
+
+  let consent = '', llm = '', note = '';
+  switch (r) {
+    case 'adult':
+      consent = 'Their own consent / contract. Can own billing (A20 payer).';
+      llm = 'Yes — via the minor-compatible provider route (one route for the whole app).'; break;
+    case 'self':
+      consent = `Teen consents alone — at or above ${c.n}’s consent age (${c.ca}). All under-18 design/marketing/billing protections stay on.`;
+      llm = 'Yes, once their own consent is given — minor-compatible provider only.'; break;
+    case 'parent':
+      consent = `Parent/guardian authorization required by law — age ${ageLabel} is below ${c.n}’s consent age (${c.ca}). GDPR-style “reasonable efforts”: parent email-link is acceptable.`;
+      llm = 'Blocked until the parent approves (consent middleware). Then minor-compatible provider only.'; break;
+    case 'over':
+      consent = `The LAW lets a ${ageLabel}-year-old consent alone here (consent age ${c.ca}) — but the built shape asks a parent for everyone ≤16, location-blind.`;
+      llm = 'Blocked until parent approves — by our choice, not legal necessity.';
+      note = '<div class="note over">Over-compliance cell: zero legal cost, real UX friction. The consent-gate abandonment counter is what would justify relaxing this per-country later.</div>'; break;
+    case 'u13p':
+      consent = 'Under-13 outside the US: parent/guardian authorization (GDPR “reasonable efforts” — email-link can suffice). Highest minimization: age band + parent contact only before consent.';
+      llm = 'No LLM until consent + provider controls. Then minor-compatible route only.';
+      note = '<div class="note">Lighter than US VPC, but the under-13 product duties (child safety tuning, retention, parent rights surface) still apply.</div>'; break;
+    case 'vpc':
+      consent = 'US under-13: COPPA-grade verifiable parental consent (B1) BEFORE any collection — payment-card / ID / signed form via a VPC vendor. A bare email link is NOT sufficient.';
+      llm = 'No LLM until VPC completes + provider posture is child-compatible (B2: no-training, retention limits).';
+      note = '<div class="note">The full List B stack switches on: B1–B8.</div>'; break;
+    case 'gap':
+      consent = 'Today’s code (floor 11) admits this user with email-link parent consent. COPPA requires VPC — which is not built.';
+      llm = 'Code would allow it after email consent — COPPA would not.';
+      note = '<div class="note warn">⚠ Compliance gap cell. Two exits: raise the floor to 13 (cheap — this cell becomes “blocked”), or build List B before serving it. This is exactly why the floor decision matters.</div>'; break;
+    case 'floor':
+      consent = `Blocked at the age gate — below the ${floor}+ floor. Politely refuse; never collect more than needed to refuse.`;
+      llm = 'None.';
+      note = '<div class="note">The under-floor bounce counter (A7) records this attempt — that count is the demand evidence for ever building the under-13 phase.</div>'; break;
+    case 'counsel':
+      consent = 'Do not open this market until counsel maps it.'; llm = 'n/a — market not open.';
+      note = `<div class="note">${c.reason}</div>`; break;
+    case 'store':
+      consent = 'Country must be excluded in App Store Connect / Play Console country lists.'; llm = 'n/a — not downloadable.';
+      note = `<div class="note">${c.reason}</div>`; break;
+  }
+
+  const reqs = reqsFor(c, age, r);
+  document.getElementById('drawerBody').innerHTML = `
+    <h2>${c.n} — age ${ageLabel}</h2>
+    <div class="sub">${GROUPS.find(g => g.id === c.g).label}${c.loc ? ` · UI locale: ${c.loc}` : ''}</div>
+    <span class="badge" style="background:${colors[r]}">${m.label}</span>
+    <div class="f"><div class="fl">Who consents &amp; how</div><div class="fv">${consent}</div></div>
+    <div class="f"><div class="fl">LLM access</div><div class="fv">${llm}</div></div>
+    ${reqs.length ? `<div class="f"><div class="fl">Requirement items active for this cell</div>${chipHtml(reqs, r === 'over')}</div>` : ''}
+    ${note}
+    <div class="f" style="margin-top:14px"><div class="fl">Why this country is in this group</div><div class="fv" style="color:var(--muted); font-size:12.5px">${c.reason}</div></div>
+    <div class="note">Plus the always-on company stack: ${ALWAYS_ON.join(' · ')} — identical in every cell.</div>
+    ${dimsHtml(c, age, r)}`;
+  document.getElementById('drawer').classList.add('open');
+}
+
+function openCountry(idx) {
+  const c = COUNTRIES[idx];
+  const postureLabel = { open:'Open (with the gates shown per age)', counsel:'Counsel-gate before any launch', block:'Store-block until a country-specific plan' }[c.posture];
+  const adds = [];
+  if (c.region === 'uk') adds.push('A6 UK representative', 'A15 UK Children’s Code');
+  if (c.region === 'eu' || c.region === 'eea') adds.push('A10 AI disclosure (AI Act)', 'A14 no voice-emotion (AI Act)', c.ca > 13 ? 'A8 teen parent gate (consent age ' + c.ca + ')' : null);
+  if (c.region === 'us') adds.push('A19 state age-signal APIs', 'List B if under-13 ever admitted');
+  const mini = AGES.map(a => {
+    const r = regimeFor(c, a);
+    return `<div class="m ${REGIME_META[r].cls}" style="background:var(--c-${ {adult:'adult',self:'self',parent:'parent',over:'over',u13p:'u13p',vpc:'vpc',gap:'gap',floor:'floor',counsel:'counsel',store:'store'}[r] })" title="age ${a === 18 ? '18+' : a}: ${REGIME_META[r].label}">${a === 18 ? '18+' : a}</div>`;
+  }).join('');
+  document.getElementById('drawerBody').innerHTML = `
+    <h2>${c.n}</h2>
+    <div class="sub">${GROUPS.find(g => g.id === c.g).label}</div>
+    <div class="f"><div class="fl">Launch posture</div><div class="fv">${postureLabel}</div></div>
+    ${c.ca ? `<div class="f"><div class="fl">Self-consent age</div><div class="fv">${c.ca} — below it: parent/guardian authorization; at/above it: teen consents alone.</div></div>` : ''}
+    <div class="f"><div class="fl">Ages under current toggles</div><div class="minirow">${mini}</div></div>
+    <div class="f"><div class="fl">Why</div><div class="fv">${c.reason}</div></div>
+    ${adds.filter(Boolean).length ? `<div class="f"><div class="fl">What opening this market adds</div><div class="fv">${adds.filter(Boolean).join(' · ')}</div></div>` : ''}
+    ${c.loc ? `<div class="f"><div class="fl">UI locale</div><div class="fv">${c.loc}${c.posture !== 'open' ? ' — <span style="color:#fca5a5">locale exists but market is not open; translation ≠ launch decision</span>' : ' — served by the shipped UI translations'}</div></div>` : ''}`;
+  document.getElementById('drawer').classList.add('open');
+}
+
+function closeDrawer() { document.getElementById('drawer').classList.remove('open'); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+document.addEventListener('click', e => {
+  const d = document.getElementById('drawer');
+  if (d.classList.contains('open') && !d.contains(e.target) && !e.target.closest('td')) closeDrawer();
+});
+
+/* ---------------- controls ---------------- */
+document.querySelectorAll('#floorSeg button').forEach(b => b.addEventListener('click', () => { floor = +b.dataset.f; render(); }));
+document.querySelectorAll('#shapeSeg button').forEach(b => b.addEventListener('click', () => { shape = b.dataset.s; render(); }));
+document.querySelectorAll('#presets button').forEach(b => b.addEventListener('click', () => {
+  const p = b.dataset.p;
+  if (p === 'code')     { floor = 11; shape = 'blind'; }
+  if (p === 'thirteen') { floor = 13; shape = 'blind'; }
+  if (p === 'legal')    { floor = 13; shape = 'legal'; }
+  if (p === 'ten')      { floor = 10; shape = 'blind'; }
+  render();
+}));
+document.getElementById('search').addEventListener('input', renderGrid);
+
+/* lens selector */
+{
+  const sel = document.getElementById('lensSel');
+  const o0 = document.createElement('option');
+  o0.value = 'access'; o0.textContent = 'Consent / access (default)';
+  sel.appendChild(o0);
+  const g1 = document.createElement('optgroup');
+  g1.label = 'Requirement lenses — vary by cell';
+  LENS_VARIES.forEach(id => {
+    const o = document.createElement('option');
+    o.value = id; o.textContent = `${id} · ${REQ[id]}`;
+    g1.appendChild(o);
+  });
+  const g2 = document.createElement('optgroup');
+  g2.label = 'Always-on, company-level — lights every cell';
+  LENS_COMPANY.forEach(id => {
+    const o = document.createElement('option');
+    o.value = id; o.textContent = `${id} · ${REQ[id]}`;
+    g2.appendChild(o);
+  });
+  sel.appendChild(g1); sel.appendChild(g2);
+  sel.addEventListener('change', () => { lens = sel.value; render(); });
+}
+
+/* requirement reference list */
+document.getElementById('reqlist').innerHTML = Object.entries(REQ).map(([id, t]) =>
+  `<span class="${id[0] === 'B' ? 'b' : ''}"><b>${id}</b> — ${t}</span>`).join('');
+
+render();
+</script>
+
+</body>
+</html>

@@ -2,14 +2,15 @@
 
 Date: 2026-05-15
 
-Refreshed: 2026-07-17 (WI-1561) — minimum age, Data Categories identity-v2 schema citations, and homework-image/audio retention open questions re-verified against current source.
+Refreshed: 2026-07-23 — minimum age, privacy URL/controller identity, seven-day deletion grace, Data Categories identity-v2 schema citations, and homework-image/audio retention open questions re-verified against current source.
 
 Status: repo-evidence draft for Apple App Privacy and Google Play Data Safety. Do not paste this into store consoles without legal/admin review.
 
 ## Submission Blockers
 
 - [x] Minimum age (13+), Data Categories legacy-table citations (email/name/age/parent-child/consent rows), and the homework-image and raw-audio retention open questions were stale as of 2026-05-15 and are refreshed against current source below (WI-1561, 2026-07-17).
-- [ ] Live privacy URL and legal entity are not confirmed.
+- [x] Repository configuration and notices identify `https://mentomate.com/privacy` and ZWIZZLY AS as controller.
+- [ ] DPO-approved final notice publication and matching store-console privacy metadata are not confirmed.
 - [ ] Store account access/status is not confirmed.
 - [ ] Final third-party processor list is not confirmed against production configuration.
 - [ ] Final tracking/advertising answers require legal/admin review.
@@ -22,10 +23,10 @@ Status: repo-evidence draft for Apple App Privacy and Google Play Data Safety. D
 | App name | `MentoMate` in `apps/mobile/app.json` and store description draft. |
 | iOS bundle ID | `com.mentomate.app` in `apps/mobile/app.json`. |
 | Android package | `com.mentomate.app` in `apps/mobile/app.json`. |
-| Privacy URL configured | `https://mentomate.app/privacy` in `apps/mobile/app.json`; triage says DNS lookup failed on 2026-05-15. |
+| Privacy URL configured | `https://mentomate.com/privacy` in `apps/mobile/app.json`; the repository HTML notice remains a pre-launch draft pending the evidence and approvals listed below. |
 | Store category draft | Education in `docs/screenshots_and_store_info/store description.md`. |
-| Minimum age | 13+ (the v1 launch floor) via `PROFILE_MINIMUM_AGE = 13` in `packages/schemas/src/age.ts:10` and create-profile copy (`apps/mobile/src/app/create-profile.tsx`). Non-US 10-12 expansion outside COPPA remains roadmap, not shipped (2026-07-10 MVP ratification). |
-| Parental consent | Consent required through age 16 using the GDPR-everywhere model in `apps/api/src/services/consent.ts`. |
+| Minimum age | 13+ (the v1 launch floor) via `PROFILE_MINIMUM_AGE = 13` in `packages/schemas/src/age.ts:10` and create-profile copy (`apps/mobile/src/app/create-profile.tsx`). Under-13 access is unavailable in every country; any later under-13 phase requires a separate ruling. |
+| Parental consent | Current code uses a conservative, location-blind guardian gate through age 16 in `apps/api/src/services/consent.ts`. This is implementation evidence, not the final country policy: launch also requires EEA-country habitual-residence capture and the server/store allowlist in `docs/compliance/2026-07-23-13-plus-eea-launch-country-ruling.md`. |
 | Data export | More -> Privacy & Data -> Export my data; schema in `packages/schemas/src/account.ts`. |
 | Account deletion | More -> Privacy & Data -> Delete account; typed `DELETE` confirmation and 7-day grace period. |
 | Permissions | Camera, photo library, microphone, notifications; see `apps/mobile/app.json` and related hooks/screens. |
@@ -117,4 +118,3 @@ This worksheet must be reviewed and signed off before either the Apple App Priva
 
 - [ ] Reviewed by: ______________________ (name/role)  Date: __________
 - [ ] Legal/Compliance sign-off: ______________________  Date: __________
-

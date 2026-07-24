@@ -15,6 +15,7 @@ import type {
   HomeworkCaptureSource,
   HomeworkProblem,
   InputMode,
+  LearningSession,
   PendingCelebration,
   ChallengeRoundSessionState,
 } from '@eduagent/schemas';
@@ -96,6 +97,7 @@ import { BookmarkNudgeTooltip } from '../../../components/session/BookmarkNudgeT
 import {
   SessionToolAccessory,
   SessionAccessory,
+  HomeworkFirstResponseCompleteMarker,
   MentorHomeworkFirstResponse,
 } from '../../../components/session/SessionAccessories';
 import {
@@ -147,6 +149,42 @@ function isChallengeRoundInFlight(
     round?.state === 'accepted' ||
     round?.state === 'active' ||
     round?.state === 'drafting'
+  );
+}
+
+function isExactManualHomeworkSessionAssociated({
+  isE2EBuild,
+  isMentorHomeworkFrame,
+  allocatedSessionIds,
+  activeSessionId,
+  activeSession,
+  effectiveSubjectId,
+  initialProblemText,
+}: {
+  isE2EBuild: boolean;
+  isMentorHomeworkFrame: boolean;
+  allocatedSessionIds: readonly string[];
+  activeSessionId: string | null;
+  activeSession: LearningSession | null | undefined;
+  effectiveSubjectId: string | undefined;
+  initialProblemText: string | undefined;
+}): boolean {
+  const persistedHomework = activeSession?.metadata?.homework;
+  const persistedProblem = persistedHomework?.problems[0];
+
+  return (
+    isE2EBuild &&
+    isMentorHomeworkFrame &&
+    allocatedSessionIds.length === 1 &&
+    allocatedSessionIds[0] === activeSessionId &&
+    activeSession?.id === activeSessionId &&
+    activeSession?.subjectId === effectiveSubjectId &&
+    activeSession?.sessionType === 'homework' &&
+    persistedHomework?.problemCount === 1 &&
+    persistedHomework?.currentProblemIndex === 0 &&
+    persistedHomework?.problems.length === 1 &&
+    persistedProblem?.source === 'manual' &&
+    persistedProblem?.text.trim() === initialProblemText?.trim()
   );
 }
 
@@ -258,6 +296,7 @@ export default function SessionScreen() {
 }
 
 function SessionScreenInner() {
+  const isE2EBuild = process.env.EXPO_PUBLIC_E2E === 'true';
   const {
     mode,
     subjectId,
@@ -447,6 +486,12 @@ function SessionScreenInner() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(
     routeSessionId ?? null,
   );
+  const [e2eAllocatedSessionIds, setE2EAllocatedSessionIds] = useState<
+    string[]
+  >([]);
+  const handleE2ESessionCreated = useCallback((createdSessionId: string) => {
+    setE2EAllocatedSessionIds((current) => [...current, createdSessionId]);
+  }, []);
   const [showMentorBirthMoment, setShowMentorBirthMoment] = useState(false);
   const [pendingClassification, setPendingClassification] = useState(false);
   const [classifyError, setClassifyError] = useState<string | null>(null);
@@ -490,10 +535,11 @@ function SessionScreenInner() {
   const [homeworkMode, setHomeworkMode] = useState<
     'help_me' | 'check_answer' | undefined
   >(undefined);
-  // T23: V2 mentor-homework round-trip. The captured photo lands back in the
-  // session thread as the learner's image bubble with two deterministic
-  // first-response actions (help me solve / check my answer). Once the learner
-  // picks one, the deterministic block is consumed and the tutoring turn begins.
+  // T23: V2 mentor-homework round-trip. The captured photo or manually entered
+  // problem lands back in the session thread as the learner's own bubble with
+  // two deterministic first-response actions (help me solve / check my answer).
+  // Once the learner picks one, the deterministic block is consumed and the
+  // tutoring turn begins.
   const isMentorHomeworkFrame = mentorHomeworkWrapUpFrame === 'mentor-homework';
   const [mentorHomeworkChoice, setMentorHomeworkChoice] = useState<
     'help_me' | 'check_answer' | null
@@ -1027,6 +1073,7 @@ function SessionScreenInner() {
     trigger,
     createLocalMessageId,
     responseHistory,
+    onSessionCreated: isE2EBuild ? handleE2ESessionCreated : undefined,
   });
 
   // BUG-373: Exclude auto-sent messages (homework OCR, queued multi-problem)
@@ -1184,7 +1231,7 @@ function SessionScreenInner() {
     // T23: For the V2 mentor-homework frame the deterministic help/check
     // buttons are the first actionable response — defer the OCR auto-send
     // until the learner picks one (mentorHomeworkChoice set). This keeps the
-    // image bubble + buttons as the genuine first turn with no LLM/subject
+    // learner problem bubble + buttons as the genuine first turn with no LLM/subject
     // preamble. For every other entry the auto-send fires as before.
     if (isMentorHomeworkFrame && !mentorHomeworkChoice) {
       return undefined;
@@ -1700,12 +1747,13 @@ function SessionScreenInner() {
 
   // T23: Render the deterministic homework first-response only for the V2
   // mentor-homework frame and only until the learner picks help/check. It is
-  // the FIRST actionable response in-thread — image bubble + two buttons, with
-  // no subject-picking preamble.
+  // the FIRST actionable response in-thread — learner problem bubble + two
+  // buttons, with no subject-picking preamble.
   const mentorHomeworkFirstResponse =
     isMentorHomeworkFrame && !mentorHomeworkChoice ? (
       <MentorHomeworkFirstResponse
         imageUri={imageUri}
+        problemText={initialProblemText}
         disabled={isStreaming || isClosing || !!quotaError}
         onHelpMeSolve={handleMentorHomeworkHelpMeSolve}
         onCheckMyAnswer={handleMentorHomeworkCheckMyAnswer}
@@ -1763,6 +1811,19 @@ function SessionScreenInner() {
         handleReconnect,
       },
     });
+
+  const exactManualHomeworkSessionAssociated =
+    isExactManualHomeworkSessionAssociated({
+      isE2EBuild,
+      isMentorHomeworkFrame,
+      allocatedSessionIds: e2eAllocatedSessionIds,
+      activeSessionId,
+      activeSession: activeSession.data,
+      effectiveSubjectId,
+      initialProblemText,
+    });
+  const multipleHomeworkSessionsCreated =
+    isE2EBuild && isMentorHomeworkFrame && e2eAllocatedSessionIds.length > 1;
 
   return (
     <View className="flex-1" testID="session-screen">
@@ -1823,6 +1884,27 @@ function SessionScreenInner() {
         rightAction={headerRight}
         inputAccessory={
           <>
+            {exactManualHomeworkSessionAssociated ? (
+              <View
+                testID="homework-session-associated-once"
+                style={{ width: 1, height: 1 }}
+              />
+            ) : null}
+            {multipleHomeworkSessionsCreated ? (
+              <View
+                testID="homework-session-created-more-than-once"
+                style={{ width: 1, height: 1 }}
+              />
+            ) : null}
+            <HomeworkFirstResponseCompleteMarker
+              active={
+                isE2EBuild && isMentorHomeworkFrame && !!mentorHomeworkChoice
+              }
+              problemText={initialProblemText}
+              messages={messages}
+              isStreaming={isStreaming}
+              hasFailure={sessionExpired || !!quotaError}
+            />
             {challengeBanner}
             {drillStrip}
             {mentorHomeworkFirstResponse}

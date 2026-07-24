@@ -129,6 +129,41 @@ describe('ScopeContextProvider', () => {
     });
   });
 
+  it('warns when the active scope cannot be persisted', async () => {
+    const persistenceError = new Error('synthetic persistence failure');
+    const setItemSpy = jest
+      .spyOn(SecureStore, 'setItemAsync')
+      .mockRejectedValueOnce(persistenceError);
+    const warnSpy = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+
+    try {
+      const { result } = renderHook(() => useScopeContext(), {
+        wrapper: wrapperFor(
+          {
+            shape: 'supporter',
+            scopes: [{ kind: 'supporter-hub' }, personScope, { kind: 'me' }],
+            defaultScopeIndex: 0,
+          },
+          '00000000-0000-4000-8000-000000000903',
+        ),
+      });
+
+      act(() => result.current.setActiveScope(personScope));
+
+      await waitFor(() => {
+        expect(warnSpy).toHaveBeenCalledWith(
+          '[scope-context] failed to persist active scope',
+          persistenceError,
+        );
+      });
+    } finally {
+      setItemSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+  });
+
   // [WI-2243] AC-3 — THE tricky correctness clause. A test that only checks
   // the settled state (Me selected, scopeList already lists Me) would pass
   // green while leaving the actual guarantee — no flash/fall-back to

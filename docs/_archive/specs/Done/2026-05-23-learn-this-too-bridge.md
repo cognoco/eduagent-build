@@ -4,7 +4,7 @@
 **Date:** 2026-05-23
 **Related:**
 - [`docs/specs/2026-05-21-navigation-contract.md`](./2026-05-21-navigation-contract.md) — defines PR 6c slot and the `topic/relearn` route.
-- [`docs/audience-matrix.md`](../audience-matrix.md) — current state of parent/child surfaces.
+- [`docs/compliance/audience-matrix.md`](../../../compliance/audience-matrix.md) — current state of parent/child surfaces.
 - `CLAUDE.md` → "Profile Shapes" — Family-mode and parent-native review context.
 
 ---

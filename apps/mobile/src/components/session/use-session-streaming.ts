@@ -12,7 +12,7 @@ import type {
   FluencyDrillEvent,
   LanguageLearningActivityEvent,
 } from '../../lib/sse';
-import type { ChatMessage } from './ChatShell';
+import type { ChatMessage } from './session-types';
 import type {
   useStreamMessage,
   useStartSession,
@@ -232,6 +232,8 @@ export interface UseSessionStreamingOptions {
   // Helpers
   createLocalMessageId: (prefix: 'user' | 'ai') => string;
   responseHistory: Array<{ actualSeconds: number; expectedMinutes: number }>;
+  /** Optional route-owned callback for reporting each allocated session. */
+  onSessionCreated?: (sessionId: string) => void;
 }
 
 export function useSessionStreaming(opts: UseSessionStreamingOptions) {
@@ -304,6 +306,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     trigger,
     createLocalMessageId,
     responseHistory,
+    onSessionCreated,
   } = opts;
 
   const activeSessionIdRef = useRef(activeSessionId);
@@ -485,6 +488,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       // up pair; React state does not re-render until this async turn yields.
       activeSessionIdRef.current = newId;
       setActiveSessionId(newId);
+      onSessionCreated?.(newId);
       if (effectiveMode === 'homework' && homeworkProblemsState.length > 0) {
         try {
           await syncHomeworkMetadata(
@@ -521,6 +525,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       normalizedOcrText,
       homeworkCaptureSource,
       syncHomeworkMetadata,
+      onSessionCreated,
     ],
   );
 

@@ -23,7 +23,17 @@ const DOPPLER_SECRET_KEYS = [
 ] as const;
 type DopplerSecretKey = (typeof DOPPLER_SECRET_KEYS)[number];
 
-const ISOLATED_ENV_KEYS = [...DOPPLER_SECRET_KEYS, 'DOPPLER_CLI'] as const;
+const DOPPLER_SOURCE_KEYS = [
+  'DOPPLER_PROJECT',
+  'DOPPLER_CONFIG',
+  'DOPPLER_ENVIRONMENT',
+] as const;
+
+const ISOLATED_ENV_KEYS = [
+  ...DOPPLER_SECRET_KEYS,
+  ...DOPPLER_SOURCE_KEYS,
+  'DOPPLER_CLI',
+] as const;
 type IsolatedEnvKey = (typeof ISOLATED_ENV_KEYS)[number];
 const SNAPSHOTTED_ENV_KEYS = [...ISOLATED_ENV_KEYS, 'PATH'] as const;
 type SnapshottedEnvKey = (typeof SNAPSHOTTED_ENV_KEYS)[number];
@@ -39,6 +49,9 @@ const HOST_ENV_SENTINELS: Record<IsolatedEnvKey, string> = {
   INNGEST_EVENT_KEY: 'fake-host-inngest-event',
   INNGEST_SIGNING_KEY: 'fake-host-inngest-signing',
   TEST_SEED_SECRET: 'fake-host-test-seed',
+  DOPPLER_PROJECT: 'fake-host-doppler-project',
+  DOPPLER_CONFIG: 'fake-host-doppler-config',
+  DOPPLER_ENVIRONMENT: 'fake-host-doppler-environment',
   DOPPLER_CLI: 'fake-host-doppler-cli',
 };
 
@@ -49,6 +62,9 @@ const RESTORATION_SENTINELS: Record<SnapshottedEnvKey, string> = {
   INNGEST_EVENT_KEY: 'fake-restoration-inngest-event',
   INNGEST_SIGNING_KEY: 'fake-restoration-inngest-signing',
   TEST_SEED_SECRET: 'fake-restoration-test-seed',
+  DOPPLER_PROJECT: 'fake-restoration-doppler-project',
+  DOPPLER_CONFIG: 'fake-restoration-doppler-config',
+  DOPPLER_ENVIRONMENT: 'fake-restoration-doppler-environment',
   DOPPLER_CLI: 'fake-restoration-doppler-cli',
   PATH: 'fake-restoration-path',
 };
@@ -60,6 +76,27 @@ const DOPPLER_OUTPUT_SENTINELS: Record<DopplerSecretKey, string> = {
   INNGEST_EVENT_KEY: 'fake-doppler-inngest-event',
   INNGEST_SIGNING_KEY: 'fake-doppler-inngest-signing',
   TEST_SEED_SECRET: 'fake-doppler-test-seed',
+};
+
+const LOCAL_DOPPLER_OUTPUT = {
+  ...DOPPLER_OUTPUT_SENTINELS,
+  DOPPLER_PROJECT: 'mentomate',
+  DOPPLER_CONFIG: 'dev_personal',
+  DOPPLER_ENVIRONMENT: 'dev',
+};
+
+const SHARED_DOPPLER_OUTPUT = {
+  ...DOPPLER_OUTPUT_SENTINELS,
+  DOPPLER_PROJECT: 'mentomate',
+  DOPPLER_CONFIG: 'stg',
+  DOPPLER_ENVIRONMENT: 'dev',
+};
+
+const SHARED_ENVIRONMENT_DOPPLER_OUTPUT = {
+  ...DOPPLER_OUTPUT_SENTINELS,
+  DOPPLER_PROJECT: 'mentomate',
+  DOPPLER_CONFIG: 'dev_personal',
+  DOPPLER_ENVIRONMENT: 'stg',
 };
 
 const EXPECTED_TRUE_BY_SECRET_KEY = Object.fromEntries(
@@ -236,12 +273,130 @@ describe('loadDatabaseEnv', () => {
     expect(invocationCount(invocationMarker)).toBe(0);
   });
 
+  it('refuses a shared Doppler fallback before a database connection can be attempted', () => {
+    expectHostEnvironmentIsolated();
+    const invocationMarker = join(binDir, 'doppler-invocations');
+    const connectionAttemptMarker = join(binDir, 'database-connection-attempt');
+    process.env.DOPPLER_CLI = writePortableNodeDoppler(
+      binDir,
+      SHARED_DOPPLER_OUTPUT,
+      invocationMarker,
+    );
+    process.env.PATH = binDir;
+
+    const runWithDatabaseConnection = () =>
+      withWorkingDirectory(binDir, () => {
+        loadDatabaseEnv(workspaceRoot);
+        writeFileSync(
+          connectionAttemptMarker,
+          process.env.DATABASE_URL ?? 'missing',
+        );
+      });
+
+    expect(runWithDatabaseConnection).toThrow(
+      /project=mentomate, config=stg, environment=dev/,
+    );
+
+    expect(invocationCount(invocationMarker)).toBe(1);
+    expect(existsSync(connectionAttemptMarker)).toBe(false);
+    expect(process.env.DATABASE_URL).toBeUndefined();
+  });
+
+  it('refuses a development config whose Doppler environment is shared', () => {
+    expectHostEnvironmentIsolated();
+    const invocationMarker = join(binDir, 'doppler-invocations');
+    const connectionAttemptMarker = join(binDir, 'database-connection-attempt');
+    process.env.DOPPLER_CLI = writePortableNodeDoppler(
+      binDir,
+      SHARED_ENVIRONMENT_DOPPLER_OUTPUT,
+      invocationMarker,
+    );
+    process.env.PATH = binDir;
+
+    const runWithDatabaseConnection = () =>
+      withWorkingDirectory(binDir, () => {
+        loadDatabaseEnv(workspaceRoot);
+        writeFileSync(
+          connectionAttemptMarker,
+          process.env.DATABASE_URL ?? 'missing',
+        );
+      });
+
+    expect(runWithDatabaseConnection).toThrow(
+      /project=mentomate, config=dev_personal, environment=stg/,
+    );
+
+    expect(invocationCount(invocationMarker)).toBe(1);
+    expect(existsSync(connectionAttemptMarker)).toBe(false);
+    expect(process.env.DATABASE_URL).toBeUndefined();
+  });
+
+  it('refuses a shared Doppler-generated env file before a database connection can be attempted', () => {
+    expectHostEnvironmentIsolated();
+    const connectionAttemptMarker = join(binDir, 'database-connection-attempt');
+    writeFileSync(
+      join(workspaceRoot, '.env.development.local'),
+      [
+        `DATABASE_URL=${DOPPLER_OUTPUT_SENTINELS.DATABASE_URL}`,
+        'DOPPLER_PROJECT=mentomate',
+        'DOPPLER_CONFIG=stg',
+        'DOPPLER_ENVIRONMENT=stg',
+        '',
+      ].join('\n'),
+    );
+
+    expect(() => {
+      loadDatabaseEnv(workspaceRoot);
+      writeFileSync(
+        connectionAttemptMarker,
+        process.env.DATABASE_URL ?? 'missing',
+      );
+    }).toThrow(/project=mentomate, config=stg, environment=stg/);
+
+    expect(existsSync(connectionAttemptMarker)).toBe(false);
+    expect(process.env.DATABASE_URL).toBeUndefined();
+  });
+
+  it('allows a local Doppler fallback to reach the database connection boundary', () => {
+    expectHostEnvironmentIsolated();
+    const invocationMarker = join(binDir, 'doppler-invocations');
+    const connectionAttemptMarker = join(binDir, 'database-connection-attempt');
+    process.env.DOPPLER_CLI = writePortableNodeDoppler(
+      binDir,
+      LOCAL_DOPPLER_OUTPUT,
+      invocationMarker,
+    );
+    process.env.PATH = binDir;
+    const logSpy = jest.spyOn(console, 'log').mockImplementation();
+
+    try {
+      withWorkingDirectory(binDir, () => {
+        loadDatabaseEnv(workspaceRoot);
+        writeFileSync(
+          connectionAttemptMarker,
+          process.env.DATABASE_URL ?? 'missing',
+        );
+      });
+
+      expect(readFileSync(connectionAttemptMarker, 'utf-8')).toBe(
+        DOPPLER_OUTPUT_SENTINELS.DATABASE_URL,
+      );
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'project=mentomate, config=dev_personal, environment=dev',
+        ),
+      );
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
   it('loads every projected secret through DOPPLER_CLI', () => {
     expectHostEnvironmentIsolated();
     const invocationMarker = join(binDir, 'doppler-invocations');
     const dopplerCli = writePortableNodeDoppler(
       binDir,
-      DOPPLER_OUTPUT_SENTINELS,
+      LOCAL_DOPPLER_OUTPUT,
       invocationMarker,
     );
     const repoRoot = resolve(__dirname, '../../../..');
@@ -284,7 +439,7 @@ describe('loadDatabaseEnv', () => {
 
   itOnNonWindows('loads every projected secret from PATH Doppler', () => {
     expectHostEnvironmentIsolated();
-    writeFakeDoppler(binDir, DOPPLER_OUTPUT_SENTINELS);
+    writeFakeDoppler(binDir, LOCAL_DOPPLER_OUTPUT);
     const repoRoot = resolve(__dirname, '../../../..');
     const tsxCli = createRequire(__filename).resolve('tsx/cli');
     const output = execFileSync(

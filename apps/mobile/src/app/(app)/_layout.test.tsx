@@ -361,11 +361,24 @@ describe('AppLayout', () => {
     });
     mockUseProfile.mockReturnValue({
       profiles: [
-        { id: 'p1', isOwner: true, consentStatus: null, birthYear: 1990 },
-        { id: 'c1', isOwner: false, consentStatus: null, birthYear: 2014 },
+        {
+          id: 'p1',
+          displayName: 'Parent',
+          isOwner: true,
+          consentStatus: null,
+          birthYear: 1990,
+        },
+        {
+          id: 'c1',
+          displayName: 'Child',
+          isOwner: false,
+          consentStatus: null,
+          birthYear: 2014,
+        },
       ],
       activeProfile: {
         id: 'p1',
+        displayName: 'Parent',
         isOwner: true,
         consentStatus: null,
         birthYear: 1990,
@@ -706,6 +719,39 @@ describe('AppLayout', () => {
     mockUseProfile.mockReturnValue({
       profiles: [],
       activeProfile: null,
+      isLoading: true,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+
+    renderLayout();
+
+    screen.getByTestId('profile-loading');
+    expect(screen.queryByTestId('tabs')).toBeNull();
+    expect(screen.queryByTestId('redirect')).toBeNull();
+  });
+
+  it('[WI-2240] does not render Account navigation while a restored child proxy state is unresolved', () => {
+    mockUsePathname.mockReturnValue('/account/privacy');
+    mockUseProfile.mockReturnValue({
+      profiles: [
+        {
+          id: 'c1',
+          displayName: 'Child',
+          isOwner: false,
+          consentStatus: null,
+          birthYear: 2014,
+        },
+      ],
+      activeProfile: {
+        id: 'c1',
+        displayName: 'Child',
+        isOwner: false,
+        consentStatus: null,
+        birthYear: 2014,
+      },
+      isExplicitProxyMode: false,
       isLoading: true,
       profileWasRemoved: false,
       acknowledgeProfileRemoval: jest.fn(),
@@ -1948,6 +1994,7 @@ describe('HIDDEN_TAB_ROUTES — tab-bar leak guard (QA-07 / Bug 763)', () => {
   it('hides every dynamic / non-tab route that Bug 763 surfaced into the tab bar', () => {
     const hidden = new Set<string>(HIDDEN_TAB_ROUTES);
     for (const route of [
+      'account',
       'shelf',
       'subject',
       'subject-hub',
@@ -1977,6 +2024,12 @@ describe('HIDDEN_TAB_ROUTES — tab-bar leak guard (QA-07 / Bug 763)', () => {
 });
 
 describe('FULL_SCREEN_ROUTES — nested ceremony route guard', () => {
+  it('keeps the Account-owned stack and its nested leaves out of tab chrome', () => {
+    expect(FULL_SCREEN_ROUTES.has('account')).toBe(true);
+    expect(HIDDEN_TAB_ROUTES).toContain('account');
+    expect(HIDDEN_TAB_ROUTES).not.toContain('account/profiles');
+  });
+
   it('hides chrome for every visibility link ceremony screen', () => {
     for (const route of ['link', 'link/initiate', 'link/[contractId]']) {
       expect(FULL_SCREEN_ROUTES.has(route)).toBe(true);
