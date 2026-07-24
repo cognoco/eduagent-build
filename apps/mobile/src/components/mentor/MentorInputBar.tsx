@@ -380,9 +380,7 @@ export function MentorInputBar({
           </Text>
         </Pressable>
       </View>
-      {showColdStartPrompts ? (
-        <ColdStartCard onFill={fillFromStarter} onOpenCamera={onOpenCamera} />
-      ) : null}
+      {showColdStartPrompts ? <ColdStartCard onFill={fillFromStarter} /> : null}
     </View>
   );
 }

@@ -38,6 +38,17 @@ tags:
 - assertVisible:
     id: 'mentor-bar-homework-chip'
 
+# The homework starter reuses the composer's Camera action instead of mounting
+# a second control with the same accessible name and callback.
+- tapOn:
+    id: 'cold-start-chip-homework'
+- assertVisible:
+    id: 'cold-start-homework-reply'
+- assertNotVisible:
+    id: 'cold-start-homework-camera'
+- assertVisible:
+    id: 'mentor-bar-camera'
+
 # Starter selection fills and focuses the primary field. inputText would be a
 # no-op without focus, so the appended word covers the Android keyboard path.
 - tapOn:
