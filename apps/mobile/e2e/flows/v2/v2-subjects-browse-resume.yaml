@@ -60,9 +60,10 @@ tags:
 - assertVisible:
     id: 'subject-hub-title-${SUBJECT_ID}'
     text: '^World History$'
-- extendedWaitUntil:
-    visible:
+- scrollUntilVisible:
+    element:
       id: 'subject-hub-topic-${TOPIC_ID}'
+    direction: DOWN
     timeout: 15000
 - assertVisible:
     id: 'subject-hub-topic-${TOPIC_ID}'
@@ -84,6 +85,11 @@ tags:
     id: 'subject-hub-topic-sheet'
 - assertVisible:
     id: 'subject-hub-screen'
+- scrollUntilVisible:
+    element:
+      id: 'subject-hub-title-${SUBJECT_ID}'
+    direction: UP
+    timeout: 15000
 - assertVisible:
     id: 'subject-hub-title-${SUBJECT_ID}'
     text: '^World History$'
@@ -91,6 +97,11 @@ tags:
 # Next Up must resume the seed's active SESSION_ID. These transcript lines are
 # stored only on that seeded session, so their presence proves the association
 # rather than merely proving that some session screen opened.
+- scrollUntilVisible:
+    element:
+      id: 'subject-hub-next-up'
+    direction: DOWN
+    timeout: 15000
 - assertVisible:
     id: 'subject-hub-next-up'
     containsDescendants:

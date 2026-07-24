@@ -7181,14 +7181,61 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       },
       exactWorldHistoryHubTitle,
     ];
+    const exactTopicVisibilitySync: Selector[] = [
+      {
+        scrollUntilVisible: {
+          element: { id: 'subject-hub-topic-${TOPIC_ID}' },
+          direction: 'DOWN',
+          timeout: 15000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'subject-hub-topic-${TOPIC_ID}',
+          containsDescendants: [{ text: '^World History Topic 1$' }],
+        },
+      },
+      { tapOn: { id: 'subject-hub-topic-${TOPIC_ID}' } },
+    ];
     const exactPostSheetCloseHub: Selector[] = [
       { tapOn: { id: 'subject-hub-topic-sheet-close' } },
       { assertNotVisible: { id: 'subject-hub-topic-sheet' } },
       { assertVisible: { id: 'subject-hub-screen' } },
+      {
+        scrollUntilVisible: {
+          element: { id: 'subject-hub-title-${SUBJECT_ID}' },
+          direction: 'UP',
+          timeout: 15000,
+        },
+      },
       exactWorldHistoryHubTitle,
+    ];
+    const exactNextUpVisibilitySync: Selector[] = [
+      {
+        scrollUntilVisible: {
+          element: { id: 'subject-hub-next-up' },
+          direction: 'DOWN',
+          timeout: 15000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'subject-hub-next-up',
+          containsDescendants: [
+            { text: '^World History Topic 1$' },
+            { id: 'subject-hub-next-up-action', text: '^Resume$' },
+          ],
+        },
+      },
     ];
 
     expect(hasExactCommandSequence(resume, exactWorldHistoryRestore)).toBe(
+      true,
+    );
+    expect(hasExactCommandSequence(resume, exactTopicVisibilitySync)).toBe(
+      true,
+    );
+    expect(hasExactCommandSequence(resume, exactNextUpVisibilitySync)).toBe(
       true,
     );
     const titleCheckpointMutations = (checkpoint: Selector[]): Selector[][] => {
@@ -7391,8 +7438,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         .with(2, exactPostSheetCloseHub[1]!),
       // Exact title reordering before Subject Hub readiness.
       exactPostSheetCloseHub
-        .with(2, exactPostSheetCloseHub[3]!)
-        .with(3, exactPostSheetCloseHub[2]!),
+        .with(2, exactPostSheetCloseHub[4]!)
+        .with(4, exactPostSheetCloseHub[2]!),
     ]) {
       expect(hasExactCommandSequence(mutation, exactPostSheetCloseHub)).toBe(
         false,
