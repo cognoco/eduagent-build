@@ -94,7 +94,7 @@ runtime artifact; never edit this tracker to preserve stale runtime prose.
 ## Units / slice
 
 **Observed snapshot only — not membership authority.** Direct live-relation
-query at `2026-07-24T14:35:08Z`: eight rows, `has_more=false`. Re-query before
+query at `2026-07-24T14:49:08Z`: eight rows, `has_more=false`. Re-query before
 acting.
 
 | WI | Altitude | Observed lifecycle / ownership | Evidence and current gate | Next ordinary action |
@@ -106,7 +106,7 @@ acting.
 | [WI-2704 — Accept RevenueCat Google base-plan identifiers](https://www.notion.so/3a78bce91f7c81a58916ecf441ad4823) | Item | Executing/Active; `codex:builder:WI-2704-r1`; worktree `WI-2704`; claim live at observation | WI discussion and branch/PR at exact head; Adversarial review tier | Builder delivers a strict-green PR and stops at the merge boundary; after authorized landing, continue completion/review before the colliding WI-2705 slice |
 | [WI-2705 — Bounded RevenueCat sandbox-to-entitlement verification](https://www.notion.so/3a78bce91f7c818c8f6de2e582c1bc77) | Item | Ready/Active; unclaimed | Live AC and discussion; Adversarial review tier; overlaps the RevenueCat webhook surface | Once WI-2704 clears the collision and lane WIP has capacity, claim and dispatch a typed Builder; land/Close before resuming WI-1328's sandbox proof |
 | [WI-2706 — Daily LLM-volume threshold alert delivery](https://www.notion.so/3a78bce91f7c8195839ce635aa8bc9ab) | Item | Executing/Active; `codex:general:WI-2706-r1`; workspace recorded as `cognoco/eduagent-build@main`; claim live to 17:10Z | WI discussion and `executors/WI-2706/`; live evidence exposed the missing source-to-alert transport captured as WI-2717 | Preserve the partial hand-back and hold the alert-rule proof until WI-2717 lands source-to-sink evidence; then resume bounded rule/read-back/firing/delivery/cleanup proof |
-| [WI-2717 — Route the daily LLM-volume threshold signal into an alertable production sink](https://www.notion.so/3a78bce91f7c81118c70db2e05bef41e) | Item | Executing/Active; `codex:builder:WI-2717-r1`; workspace recorded as `cognoco/eduagent-build@main`, violating the mandatory Builder worktree boundary | Live AC/discussion; Adversarial review tier; hard prerequisite for WI-2706 and WI-1588; no implementation from the recorded shared checkout is valid | Shepherd stops further implementation, applies the sanctioned claim/worktree recovery path, and re-establishes the Builder in `.worktrees/WI-2717`; only then may the Builder implement and return landed/deployment/synthetic evidence |
+| [WI-2717 — Route the daily LLM-volume threshold signal into an alertable production sink](https://www.notion.so/3a78bce91f7c81118c70db2e05bef41e) | Item | Executing/Active; `codex:builder:WI-2717-r1`; worktree `WI-2717`; claim live to 17:47Z | Live AC/discussion; Adversarial review tier; hard prerequisite for WI-2706 and WI-1588 | Builder preserves the canonical PII-free signal, proves and deploys one authorized source-to-sink transport, and returns landed/deployment/synthetic evidence before either dependent resumes |
 
 Slice scan: the live relation currently contains the original three release
 members plus five formally admitted execution findings. Rows named as excluded
@@ -149,22 +149,22 @@ changes.
 - WI-1328 and WI-1588 have expired claim tuples plus durable executor hand-backs.
   Do not infer liveness from `Stage=Executing`, and do not redispatch until the
   Shepherd applies the sanctioned liveness/recovery path.
-- WI-2717's live claim records the shared `@main` checkout rather than its
-  mandatory `.worktrees/WI-2717` boundary. Stop that dispatch and recover it
-  before accepting any implementation, commit, or hand-back.
+- WI-2717's same-owner renewal records the mandatory `WI-2717` worktree and a
+  live claim through 17:47Z. Its Adversarial review and production-transport
+  authority boundaries still apply.
 - Executors never merge, review, or close. They run lifecycle completion only
   after the artifact lands and the governing execute flow reaches that gate.
 
 ## Current position
 
-At `2026-07-24T14:35:08Z`, WI-2686, WI-2704, WI-2706, and WI-2717 have live
+At `2026-07-24T14:49:08Z`, WI-2686, WI-2704, WI-2706, and WI-2717 have live
 executor claims; WI-2705 is Ready/unclaimed; WI-1328 and WI-1588 have partial
 durable hand-backs but expired claims; WI-1337 is Closed/Done. WI-2706 is
 downstream of WI-2717 and must not resume its alert-delivery proof until the
-transport evidence exists. WI-2717's recorded shared-checkout claim requires
-worktree recovery before its execution can continue. The next lane checkpoint
-is the first of: an active executor hand-back, a live Stage/State/claim change,
-a PR transition, or a Brief/relation membership amendment.
+transport evidence exists. WI-2717 is executing from its isolated `WI-2717`
+worktree with a live claim through 17:47Z. The next lane checkpoint is the first
+of: an active executor hand-back, a live Stage/State/claim change, a PR
+transition, or a Brief/relation membership amendment.
 
 Before the next dispatch, re-query the relation, reconcile the two expired
 claims, enforce the lane WIP/collision rules, and use each member's live
