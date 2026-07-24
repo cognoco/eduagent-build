@@ -15,14 +15,15 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock(
-  '../../../../lib/navigation' /* gc1-allow: navigation stub captures goBackOrReplace calls; real impl requires expo-router Router which is also mocked at this boundary */,
-  () => ({
+jest.mock('../../../../lib/navigation', () => {
+  const actual = jest.requireActual(
+    '../../../../lib/navigation',
+  ) as typeof import('../../../../lib/navigation');
+  return {
+    ...actual,
     goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-    JOURNAL_HREF: '/(app)/journal',
-    JOURNAL_RETURN_TO: 'journal',
-  }),
-);
+  };
+});
 
 const mockMarkViewed = {
   mutateAsync: jest.fn().mockResolvedValue({ viewed: true }),
