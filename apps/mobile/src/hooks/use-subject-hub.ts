@@ -81,7 +81,10 @@ export function useSubjectHub(
   const client = useApiClient();
   const { activeProfile } = useProfile();
   const navigationContract = useNavigationContract();
-  const subjectsQuery = useSubjects({ enabled: !!subjectId });
+  const subjectsQuery = useSubjects({
+    includeInactive: true,
+    enabled: !!subjectId,
+  });
   const curriculumStatus = subjectId
     ? (subjectsQuery.data?.find((subject) => subject.id === subjectId)
         ?.curriculumStatus ?? null)

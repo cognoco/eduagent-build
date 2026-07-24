@@ -1723,6 +1723,58 @@ describe('SubjectHubRoute — manage entry (WI-1119)', () => {
     });
   });
 
+  it('waits for definitive subject status before exposing an active hub', async () => {
+    const activeSubjects = {
+      subjects: [
+        {
+          id: SUBJECT_ID,
+          profileId: '990e8400-e29b-41d4-a716-446655440004',
+          name: 'Spanish',
+          status: 'active' as const,
+          curriculumStatus: 'ready' as const,
+          pedagogyMode: 'socratic' as const,
+          createdAt: '2026-06-01T00:00:00.000Z',
+          updatedAt: '2026-06-01T00:00:00.000Z',
+        },
+      ],
+    };
+    let resolveSubjectStatus!: (value: typeof activeSubjects) => void;
+    const pendingSubjectStatus = new Promise<typeof activeSubjects>(
+      (resolve) => {
+        resolveSubjectStatus = resolve;
+      },
+    );
+    mockFetch.setRoute('/subjects', (url: string) =>
+      url.includes('includeInactive=true')
+        ? pendingSubjectStatus
+        : activeSubjects,
+    );
+
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    await waitFor(() => {
+      expect(
+        fetchCallsMatching(
+          mockFetch,
+          `/subjects/${SUBJECT_ID}/books/${BOOK_ID}`,
+        ).length,
+      ).toBeGreaterThan(0);
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByTestId('subject-hub-screen')).toBeNull();
+
+    await act(async () => {
+      resolveSubjectStatus(activeSubjects);
+    });
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-next-up-action');
+    });
+  });
+
   it('shows the resume action set for a paused subject', async () => {
     // Deep-linked paused subject: the manage entry must reflect the real status
     // (resume + archive), not the 'active' fallback (pause + archive).

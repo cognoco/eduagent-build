@@ -3,7 +3,7 @@ import React from 'react';
 import { Alert, Platform } from 'react-native';
 import { fireEvent, waitFor, act, within } from '@testing-library/react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { QuotaExceededError } from '../../../lib/api-client';
+import { NotFoundError, QuotaExceededError } from '../../../lib/api-client';
 import {
   consumeHubToSessionTransition,
   markHubToSessionTransition,
@@ -969,11 +969,10 @@ describe('SessionScreen homework flow', () => {
       topicName: 'Linear equations',
       sessionId: 'expired-session',
     });
-    const { NotFoundError } = require('../../../lib/api-client');
     mockUseSessionTranscript.mockReturnValue({
       data: null,
       error: new NotFoundError('Session not found'),
-    } as never);
+    });
 
     const testScreen = renderSessionScreen();
 
@@ -1009,11 +1008,10 @@ describe('SessionScreen homework flow', () => {
       sessionId: 'expired-session',
       returnTo: 'subjects',
     });
-    const { NotFoundError } = require('../../../lib/api-client');
     mockUseSessionTranscript.mockReturnValue({
       data: null,
       error: new NotFoundError('Session not found'),
-    } as never);
+    });
 
     const testScreen = renderSessionScreen();
     mockReplace.mockClear();
@@ -1053,11 +1051,10 @@ describe('SessionScreen homework flow', () => {
       sessionId: 'expired-session',
       returnTo: 'subjects',
     });
-    const { NotFoundError } = require('../../../lib/api-client');
     mockUseSessionTranscript.mockReturnValue({
       data: null,
       error: new NotFoundError('Session not found'),
-    } as never);
+    });
 
     const testScreen = renderSessionScreen();
     expect(consumeHubToSessionTransition(SUBJECT_ID)).toBe(false);
@@ -1140,7 +1137,7 @@ describe('SessionScreen homework flow', () => {
     mockUseSessionTranscript.mockReturnValue({
       data: null,
       error: Object.assign(new Error('Session not found'), { status: 404 }),
-    } as never);
+    });
 
     const testScreen = renderSessionScreen();
 

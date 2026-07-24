@@ -13,6 +13,8 @@ type NavigationTransition =
       subjectId: string;
     };
 
+// A JS runtime has one active route transition at a time. The newest mark
+// deliberately replaces stale proof; browser tabs have isolated runtimes.
 let pendingTransition: NavigationTransition | undefined;
 
 function consumeTransition(expected: NavigationTransition): boolean {
