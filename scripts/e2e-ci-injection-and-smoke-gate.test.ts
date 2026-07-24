@@ -6890,6 +6890,13 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scenario: 'trial-active',
         shard: 1,
       },
+      // [WI-2129] Mentor cold start exposes one composer before and after
+      // selecting a starter prompt.
+      {
+        flow: 'flows/v2/v2-mentor-single-composer.yaml',
+        scenario: 'onboarding-no-subject',
+        shard: 1,
+      },
       {
         flow: 'flows/v2/v2-shell-navigation.yaml',
         scenario: 'learning-active',

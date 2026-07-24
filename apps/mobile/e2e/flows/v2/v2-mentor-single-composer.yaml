@@ -1,0 +1,51 @@
+# WI-2129: V2 zero-state Mentor has one free-form composer.
+#
+# The starter chips fill and focus MentorInputBar; they never introduce a
+# second input/send surface. Camera, microphone, and homework remain secondary
+# actions on the same primary composer.
+appId: com.mentomate.app
+tags:
+  - v2
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: 'onboarding-no-subject'
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-cold-start-card'
+    timeout: 30000
+- assertVisible:
+    id: 'mentor-bar-input'
+    enabled: true
+
+- assertVisible:
+    id: 'cold-start-chip-homework'
+- assertVisible:
+    id: 'cold-start-chip-learn'
+- assertVisible:
+    id: 'cold-start-chip-ask'
+- assertVisible:
+    id: 'mentor-bar-camera'
+- assertVisible:
+    id: 'mentor-bar-mic'
+- assertVisible:
+    id: 'mentor-bar-homework-chip'
+
+# Starter selection fills and focuses the primary field. inputText would be a
+# no-op without focus, so the appended word covers the Android keyboard path.
+- tapOn:
+    id: 'cold-start-chip-learn'
+- inputText: ' please'
+- assertVisible:
+    id: 'mentor-bar-input'
+    text: 'Teach me something new please'
+- assertVisible:
+    id: 'mentor-bar-send'
+    enabled: true

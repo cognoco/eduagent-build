@@ -11,7 +11,10 @@
 import type { Database } from '@eduagent/database';
 import { createMockDb, TEST_PROFILE_ID } from '@eduagent/test-utils';
 import { seedConsentState } from '../../test-utils/consent-seed';
-import { isLlmExchangeConsentAllowed } from './consent-status-v2';
+import {
+  getConsentAccountabilityV2,
+  isLlmExchangeConsentAllowed,
+} from './consent-status-v2';
 
 describe('isLlmExchangeConsentAllowed', () => {
   it('denies when child parental consent is WITHDRAWN', async () => {
@@ -89,5 +92,102 @@ describe('isLlmExchangeConsentAllowed', () => {
     await expect(
       isLlmExchangeConsentAllowed(db, TEST_PROFILE_ID),
     ).resolves.toBe(true);
+  });
+});
+
+describe('getConsentAccountabilityV2 [WI-2413]', () => {
+  function databaseReturning(rows: unknown[]): Database {
+    const db = createMockDb() as { execute: jest.Mock };
+    db.execute.mockResolvedValue(rows);
+    return db as unknown as Database;
+  }
+
+  it('does not substitute grant or withdrawal timestamps for absent acceptance', async () => {
+    const report = await getConsentAccountabilityV2(
+      databaseReturning([
+        {
+          purpose: 'platform_use',
+          lawful_basis: 'art6_1_a',
+          granted: true,
+          granted_at: '2026-07-24T06:00:00.000Z',
+          withdrawn_at: '2026-07-24T07:00:00.000Z',
+          audit_fact: null,
+        },
+      ]),
+      TEST_PROFILE_ID,
+      'test-account-id',
+    );
+
+    expect(report[0]?.termsAcceptedAt).toBeNull();
+    expect(report[0]?.termsVersion).toBeNull();
+    expect(report[0]?.withdrawnAt).toEqual(
+      new Date('2026-07-24T07:00:00.000Z'),
+    );
+  });
+
+  it('preserves a captured versioned acceptance fact', async () => {
+    const report = await getConsentAccountabilityV2(
+      databaseReturning([
+        {
+          purpose: 'platform_use',
+          lawful_basis: 'art6_1_a',
+          granted: true,
+          granted_at: '2026-07-24T06:00:00.000Z',
+          withdrawn_at: null,
+          audit_fact: {
+            termsAcceptedAt: '2026-07-23T10:00:00.000Z',
+            termsVersion: '2026-07-23',
+          },
+        },
+      ]),
+      TEST_PROFILE_ID,
+      'test-account-id',
+    );
+
+    expect(report[0]?.termsAcceptedAt).toEqual(
+      new Date('2026-07-23T10:00:00.000Z'),
+    );
+    expect(report[0]?.termsVersion).toBe('2026-07-23');
+  });
+
+  it.each([
+    ['timestamp only', { termsAcceptedAt: '2026-07-23T10:00:00.000Z' }],
+    ['version only', { termsVersion: '2026-07-23' }],
+    [
+      'empty version',
+      {
+        termsAcceptedAt: '2026-07-23T10:00:00.000Z',
+        termsVersion: '',
+      },
+    ],
+    [
+      'null version',
+      {
+        termsAcceptedAt: '2026-07-23T10:00:00.000Z',
+        termsVersion: null,
+      },
+    ],
+    [
+      'invalid timestamp',
+      { termsAcceptedAt: 'not-a-date', termsVersion: '2026-07-23' },
+    ],
+  ])('treats a %s audit fact as wholly absent', async (_case, auditFact) => {
+    const report = await getConsentAccountabilityV2(
+      databaseReturning([
+        {
+          purpose: 'platform_use',
+          lawful_basis: 'art6_1_a',
+          granted: true,
+          granted_at: '2026-07-24T06:00:00.000Z',
+          withdrawn_at: null,
+          audit_fact: auditFact,
+        },
+      ]),
+      TEST_PROFILE_ID,
+      'test-account-id',
+    );
+
+    expect(report[0]?.termsAcceptedAt).toBeNull();
+    expect(report[0]?.termsVersion).toBeNull();
   });
 });
