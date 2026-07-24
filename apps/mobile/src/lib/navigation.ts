@@ -181,6 +181,25 @@ export function goBackOrReplace(
   router.replace(fallbackHref);
 }
 
+/**
+ * Return a Journal-origin report to Journal without leaving Reports behind.
+ *
+ * Web replaces the report with Journal because Expo Router's stack can point
+ * at the hidden Progress ancestor instead of the visible Journal caller.
+ * Native dismisses the complete cross-tab Progress ancestry to Journal.
+ */
+export function returnJournalReportToCaller(
+  router: Pick<Router, 'dismissTo' | 'replace'>,
+  platform: 'web' | 'native',
+): void {
+  if (platform === 'web') {
+    router.replace(JOURNAL_HREF);
+    return;
+  }
+
+  router.dismissTo(JOURNAL_HREF);
+}
+
 export function pushLearningResumeTarget(
   router: Pick<Router, 'push'>,
   target: LearningResumeTarget,

@@ -41,6 +41,25 @@ import { parse as parseYaml, parseAllDocuments } from 'yaml';
 
 const repoRoot = join(__dirname, '..');
 
+function assertCommandsInOrder(
+  commands: unknown[],
+  expectedCommands: unknown[],
+): void {
+  let cursor = -1;
+  for (const expected of expectedCommands) {
+    const serializedExpected = JSON.stringify(expected);
+    cursor = commands.findIndex(
+      (command, index) =>
+        index > cursor && isDeepStrictEqual(command, expected),
+    );
+    if (cursor < 0) {
+      throw new Error(
+        `Missing ordered Maestro property: ${serializedExpected}`,
+      );
+    }
+  }
+}
+
 function loadWorkflowRaw(name: string): string {
   return readFileSync(join(repoRoot, '.github', 'workflows', name), 'utf8');
 }
@@ -6892,6 +6911,12 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scenario: 'trial-active',
         shard: 1,
       },
+      // [WI-2239] Sole native Journal journey: exact Practice round trip.
+      {
+        flow: 'flows/v2/v2-journal-paper-trail.yaml',
+        scenario: 'v2-journal-paper-trail',
+        shard: 1,
+      },
       // [WI-2129] Mentor cold start exposes one composer before and after
       // selecting a starter prompt.
       {
@@ -8514,6 +8539,130 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         ),
       ).toBe(false);
     }
+  });
+
+  it('[WI-2239] registers one Practice-only native Journal round trip with exact identity and Me-scope evidence', () => {
+    const manifest = JSON.parse(
+      readFileSync(
+        join(repoRoot, 'apps/mobile/e2e/ci-maestro-manifest.json'),
+        'utf8',
+      ),
+    ) as {
+      v2: Array<{ flow: string; scenario: string | null }>;
+    };
+    expect(
+      manifest.v2.filter(({ flow }) => flow.includes('/v2-journal-')),
+    ).toEqual([
+      {
+        flow: 'flows/v2/v2-journal-paper-trail.yaml',
+        scenario: 'v2-journal-paper-trail',
+      },
+    ]);
+    expect(
+      existsSync(
+        join(
+          repoRoot,
+          'apps/mobile/e2e/flows/v2/v2-journal-empty-recovery.yaml',
+        ),
+      ),
+    ).toBe(false);
+
+    const journalFlow = parseAllDocuments(
+      readFileSync(
+        join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-journal-paper-trail.yaml'),
+        'utf8',
+      ),
+    )[1]?.toJS() as unknown;
+    expect(Array.isArray(journalFlow)).toBe(true);
+    if (!Array.isArray(journalFlow)) {
+      throw new Error(
+        'Journal paper-trail Maestro commands must be a YAML list',
+      );
+    }
+
+    const exactPracticeEvidence = [
+      {
+        assertVisible: {
+          id: 'journal-activity-${PRACTICE_ACTIVITY_EVENT_ID}',
+        },
+      },
+      {
+        assertVisible: {
+          id: 'journal-activity-headline-${PRACTICE_ACTIVITY_EVENT_ID}',
+          text: '^Biology Topic 1$',
+        },
+      },
+      {
+        assertVisible: {
+          id: 'journal-activity-meta-${PRACTICE_ACTIVITY_EVENT_ID}',
+          text: '^Review · Biology · .+$',
+        },
+      },
+    ];
+    expect(() =>
+      assertCommandsInOrder(journalFlow, [
+        { tapOn: { id: 'tab-journal', retryTapIfNoChange: true } },
+        {
+          extendedWaitUntil: {
+            visible: { id: 'journal-screen' },
+            timeout: 15000,
+          },
+        },
+        { assertNotVisible: { id: 'scope-chip' } },
+        { tapOn: { id: 'journal-tab-practice' } },
+        {
+          scrollUntilVisible: {
+            element: {
+              id: 'journal-activity-${PRACTICE_ACTIVITY_EVENT_ID}',
+            },
+            direction: 'DOWN',
+            timeout: 10000,
+          },
+        },
+        ...exactPracticeEvidence,
+        { tapOn: { id: 'journal-practice-open-hub' } },
+        {
+          extendedWaitUntil: {
+            visible: { id: 'practice-screen' },
+            timeout: 15000,
+          },
+        },
+        { tapOn: { id: 'practice-back' } },
+        {
+          extendedWaitUntil: {
+            visible: { id: 'journal-screen' },
+            timeout: 15000,
+          },
+        },
+        { assertNotVisible: { id: 'scope-chip' } },
+        {
+          scrollUntilVisible: {
+            element: {
+              id: 'journal-activity-${PRACTICE_ACTIVITY_EVENT_ID}',
+            },
+            direction: 'DOWN',
+            timeout: 10000,
+          },
+        },
+        ...exactPracticeEvidence,
+      ]),
+    ).not.toThrow();
+
+    const tapIds = journalFlow.flatMap((command) => {
+      if (!command || typeof command !== 'object') return [];
+      const tapOn = (command as { tapOn?: unknown }).tapOn;
+      if (!tapOn || typeof tapOn !== 'object') return [];
+      const id = (tapOn as { id?: unknown }).id;
+      return typeof id === 'string' ? [id] : [];
+    });
+    expect(tapIds).toEqual([
+      'tab-journal',
+      'journal-tab-practice',
+      'journal-practice-open-hub',
+      'practice-back',
+    ]);
+    expect(JSON.stringify(journalFlow)).not.toContain('"optional":true');
+    expect(JSON.stringify(journalFlow)).not.toContain('"containsDescendants"');
   });
 
   it('[WI-2506 / WI-2608] binds resolver actions and requires the exact stable Photosynthesis round trip', () => {

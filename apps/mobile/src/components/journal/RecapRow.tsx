@@ -8,8 +8,10 @@ import { buildSessionDetailHref } from '../../lib/session-detail-navigation';
 
 export function RecapRow({
   recap,
+  returnTo,
 }: {
   recap: RecapListItem;
+  returnTo: string;
 }): React.ReactElement {
   const router = useRouter();
   const { t } = useTranslation();
@@ -29,6 +31,7 @@ export function RecapRow({
             sessionId: recap.sessionId,
             subjectId: recap.subjectId,
             topicId: recap.topicId,
+            returnTo,
           }),
         )
       }

@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef } from 'react';
+import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
@@ -11,7 +11,11 @@ import {
 } from '../../../../components/progress';
 import { classifyApiError } from '../../../../lib/format-api-error';
 import { formatMinutes } from '../../../../lib/format-relative-date';
-import { goBackOrReplace } from '../../../../lib/navigation';
+import {
+  goBackOrReplace,
+  JOURNAL_RETURN_TO,
+  returnJournalReportToCaller,
+} from '../../../../lib/navigation';
 import {
   useProfileReportDetail,
   useMarkProfileReportViewed,
@@ -21,8 +25,23 @@ export default function ProgressMonthlyReportDetail(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { reportId } = useLocalSearchParams<{ reportId: string }>();
+  const { reportId, returnTo } = useLocalSearchParams<{
+    reportId: string;
+    returnTo?: string | string[];
+  }>();
   const resolvedReportId = Array.isArray(reportId) ? reportId[0] : reportId;
+  const resolvedReturnTo = Array.isArray(returnTo) ? returnTo[0] : returnTo;
+  const handleBack = useCallback(() => {
+    if (resolvedReturnTo === JOURNAL_RETURN_TO) {
+      returnJournalReportToCaller(
+        router,
+        Platform.OS === 'web' ? 'web' : 'native',
+      );
+      return;
+    }
+
+    goBackOrReplace(router, '/(app)/progress/reports');
+  }, [resolvedReturnTo, router]);
   const {
     data: report,
     isLoading,
@@ -58,7 +77,7 @@ export default function ProgressMonthlyReportDetail(): React.ReactElement {
       >
         <View className="flex-row items-center mt-4">
           <Pressable
-            onPress={() => goBackOrReplace(router, '/(app)/progress/reports')}
+            onPress={handleBack}
             className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel={t('common.goBack')}
@@ -69,7 +88,10 @@ export default function ProgressMonthlyReportDetail(): React.ReactElement {
             </Text>
           </Pressable>
           <View className="flex-1">
-            <Text className="text-h2 font-bold text-text-primary">
+            <Text
+              className="text-h2 font-bold text-text-primary"
+              testID="progress-report-title"
+            >
               {report?.reportData.month ?? t('parentView.report.monthlyReport')}
             </Text>
             <Text className="text-body-sm text-text-secondary mt-0.5">
@@ -94,8 +116,11 @@ export default function ProgressMonthlyReportDetail(): React.ReactElement {
               testID: 'progress-report-error-retry',
             }}
             secondaryAction={{
-              label: t('parentView.report.backToReports'),
-              onPress: () => goBackOrReplace(router, '/(app)/progress/reports'),
+              label:
+                resolvedReturnTo === JOURNAL_RETURN_TO
+                  ? t('common.goBack')
+                  : t('parentView.report.backToReports'),
+              onPress: handleBack,
               testID: 'progress-report-error-back',
             }}
             testID="progress-report-error"

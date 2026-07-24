@@ -1,12 +1,15 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { JOURNAL_HREF } from '../../../../lib/navigation';
 
 const mockGoBackOrReplace = jest.fn();
+const mockReplace = jest.fn();
+const mockDismissTo = jest.fn();
 const mockRefetch = jest.fn();
 const mockUseProfileReportDetail = jest.fn();
 let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({}),
+  useRouter: () => ({ replace: mockReplace, dismissTo: mockDismissTo }),
   useLocalSearchParams: () => mockSearchParams,
 }));
 
@@ -14,12 +17,15 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock(
-  '../../../../lib/navigation' /* gc1-allow: navigation stub captures goBackOrReplace calls; real impl requires expo-router Router which is also mocked at this boundary */,
-  () => ({
+jest.mock('../../../../lib/navigation', () => {
+  const actual = jest.requireActual(
+    '../../../../lib/navigation',
+  ) as typeof import('../../../../lib/navigation');
+  return {
+    ...actual,
     goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-  }),
-);
+  };
+});
 
 const mockMarkViewed = {
   mutateAsync: jest.fn().mockResolvedValue({ viewed: true }),
@@ -189,11 +195,34 @@ describe('ProgressMonthlyReportDetail', () => {
 
     render(<ProgressMonthlyReportDetail />);
 
+    screen.getByText('Back to reports');
+    expect(screen.queryByText('Go back')).toBeNull();
     fireEvent.press(screen.getByTestId('progress-report-error-back'));
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
       expect.anything(),
       '/(app)/progress/reports',
     );
+  });
+
+  it('labels and routes Journal error recovery to the exact Journal caller', () => {
+    mockSearchParams = { reportId: 'report-uuid-1', returnTo: 'journal' };
+    mockUseProfileReportDetail.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('Network failure'),
+      refetch: mockRefetch,
+    });
+
+    render(<ProgressMonthlyReportDetail />);
+
+    const backAction = screen.getByTestId('progress-report-error-back');
+    screen.getByText('Go back');
+    expect(screen.queryByText('Back to reports')).toBeNull();
+    fireEvent.press(backAction);
+    expect(mockDismissTo).toHaveBeenCalledWith(JOURNAL_HREF);
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 
   it('renders the headline stat value, label, and comparison when data loads', () => {
@@ -207,6 +236,9 @@ describe('ProgressMonthlyReportDetail', () => {
 
     render(<ProgressMonthlyReportDetail />);
 
+    expect(screen.getByTestId('progress-report-title')).toHaveTextContent(
+      'April 2026',
+    );
     screen.getByText('3 topics mastered');
     screen.getByText('up from 1 last month');
   });
@@ -313,6 +345,24 @@ describe('ProgressMonthlyReportDetail', () => {
       expect.anything(),
       '/(app)/progress/reports',
     );
+  });
+
+  it('returns the exact Journal caller when the report was opened from Journal', () => {
+    mockSearchParams = { reportId: 'report-uuid-1', returnTo: 'journal' };
+    mockUseProfileReportDetail.mockReturnValue({
+      data: MONTHLY_REPORT,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+
+    render(<ProgressMonthlyReportDetail />);
+
+    fireEvent.press(screen.getByTestId('progress-report-back'));
+    expect(mockDismissTo).toHaveBeenCalledWith(JOURNAL_HREF);
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 
   it('uses the month from reportData as the screen title when data is loaded', () => {

@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef } from 'react';
+import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
@@ -12,7 +12,11 @@ import {
 import { classifyApiError } from '../../../../lib/format-api-error';
 import { formatShortDate } from '../../../../lib/format-datetime';
 import { formatMinutes } from '../../../../lib/format-relative-date';
-import { goBackOrReplace } from '../../../../lib/navigation';
+import {
+  goBackOrReplace,
+  JOURNAL_RETURN_TO,
+  returnJournalReportToCaller,
+} from '../../../../lib/navigation';
 import {
   useProfileWeeklyReportDetail,
   useMarkProfileWeeklyReportViewed,
@@ -45,12 +49,25 @@ export default function ProgressWeeklyReportDetail(): React.ReactElement {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { weeklyReportId } = useLocalSearchParams<{
+  const { weeklyReportId, returnTo } = useLocalSearchParams<{
     weeklyReportId: string;
+    returnTo?: string | string[];
   }>();
   const reportId = Array.isArray(weeklyReportId)
     ? weeklyReportId[0]
     : weeklyReportId;
+  const resolvedReturnTo = Array.isArray(returnTo) ? returnTo[0] : returnTo;
+  const handleBack = useCallback(() => {
+    if (resolvedReturnTo === JOURNAL_RETURN_TO) {
+      returnJournalReportToCaller(
+        router,
+        Platform.OS === 'web' ? 'web' : 'native',
+      );
+      return;
+    }
+
+    goBackOrReplace(router, '/(app)/progress/reports');
+  }, [resolvedReturnTo, router]);
   const {
     data: report,
     isLoading,
@@ -84,7 +101,7 @@ export default function ProgressWeeklyReportDetail(): React.ReactElement {
       >
         <View className="flex-row items-center mt-4">
           <Pressable
-            onPress={() => goBackOrReplace(router, '/(app)/progress/reports')}
+            onPress={handleBack}
             className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel={t('common.goBack')}
@@ -126,8 +143,11 @@ export default function ProgressWeeklyReportDetail(): React.ReactElement {
               testID: 'progress-weekly-report-error-retry',
             }}
             secondaryAction={{
-              label: t('parentView.weeklyReport.backToReports'),
-              onPress: () => goBackOrReplace(router, '/(app)/progress/reports'),
+              label:
+                resolvedReturnTo === JOURNAL_RETURN_TO
+                  ? t('common.goBack')
+                  : t('parentView.weeklyReport.backToReports'),
+              onPress: handleBack,
               testID: 'progress-weekly-report-error-back',
             }}
             testID="progress-weekly-report-error"
