@@ -1,4 +1,5 @@
 import { render, fireEvent, act } from '@testing-library/react-native';
+import * as reanimated from 'react-native-reanimated';
 
 import { MentorInputBar } from './MentorInputBar';
 
@@ -107,9 +108,139 @@ beforeEach(() => {
 
 describe('MentorInputBar', () => {
   it('renders the "Ask anything" box title', () => {
-    const { getByText } = render(<MentorInputBar {...baseProps} />);
+    const { getByText, getByTestId } = render(
+      <MentorInputBar {...baseProps} />,
+    );
 
     expect(getByText('Ask anything')).toBeTruthy();
+    expect(getByTestId('mentor-bar-input').props.accessibilityLabel).toBe(
+      'Ask anything',
+    );
+  });
+
+  it('fills the sole primary draft from cold-start suggestions without submitting', () => {
+    const onSubmitText = jest.fn();
+    const { getByTestId, queryByTestId } = render(
+      <MentorInputBar
+        {...baseProps}
+        showColdStartPrompts
+        onSubmitText={onSubmitText}
+      />,
+    );
+
+    expect(queryByTestId('cold-start-input')).toBeNull();
+    expect(queryByTestId('cold-start-send')).toBeNull();
+
+    fireEvent.press(getByTestId('cold-start-chip-learn'));
+
+    expect(getByTestId('mentor-bar-input').props.value).toBe(
+      'Teach me something new',
+    );
+    expect(getByTestId('mentor-bar-send').props.accessibilityState).toEqual({
+      disabled: false,
+    });
+    expect(onSubmitText).not.toHaveBeenCalled();
+
+    fireEvent.press(getByTestId('mentor-bar-send'));
+    expect(onSubmitText).toHaveBeenCalledWith('Teach me something new');
+  });
+
+  it('does not replace an existing typed draft with a starter', () => {
+    const { getByTestId } = render(
+      <MentorInputBar {...baseProps} showColdStartPrompts />,
+    );
+
+    fireEvent.changeText(getByTestId('mentor-bar-input'), 'my own question');
+    fireEvent.press(getByTestId('cold-start-chip-learn'));
+
+    expect(getByTestId('mentor-bar-input').props.value).toBe('my own question');
+  });
+
+  it('keeps a selected starter unchanged when an in-flight voice capture resolves', async () => {
+    const props = { ...baseProps, showColdStartPrompts: true };
+    const { getByTestId, rerender } = render(<MentorInputBar {...props} />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('mentor-bar-mic'));
+    });
+    speechListening();
+    rerender(<MentorInputBar {...props} />);
+
+    fireEvent.press(getByTestId('cold-start-chip-learn'));
+
+    expect(mockSpeech.stopListening).toHaveBeenCalledTimes(1);
+    expect(mockSpeech.clearTranscript).toHaveBeenCalledTimes(2);
+
+    speechFinal('explain fractions');
+    await act(async () => {
+      rerender(<MentorInputBar {...props} />);
+    });
+
+    expect(getByTestId('mentor-bar-input').props.value).toBe(
+      'Teach me something new',
+    );
+  });
+
+  it('rotates cold-start examples in the primary input placeholder', () => {
+    jest.useFakeTimers();
+    try {
+      const { getByTestId } = render(
+        <MentorInputBar
+          {...baseProps}
+          showColdStartPrompts
+          placeholderRotationIntervalMs={1000}
+        />,
+      );
+      const seen = new Set<string>([
+        getByTestId('mentor-bar-input').props.placeholder,
+      ]);
+
+      for (let i = 0; i < 3; i += 1) {
+        act(() => {
+          jest.advanceTimersByTime(1000);
+        });
+        seen.add(getByTestId('mentor-bar-input').props.placeholder);
+      }
+
+      expect(seen).toEqual(
+        new Set([
+          'Type a question or paste homework...',
+          'Ask me to explain something...',
+          'Try: show my progress',
+        ]),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('keeps the cold-start placeholder still when reduced motion is enabled', () => {
+    const reducedMotion = jest
+      .spyOn(reanimated, 'useReducedMotion')
+      .mockReturnValue(true);
+    jest.useFakeTimers();
+    try {
+      const { getByTestId } = render(
+        <MentorInputBar
+          {...baseProps}
+          showColdStartPrompts
+          placeholderRotationIntervalMs={1000}
+        />,
+      );
+      const initialPlaceholder =
+        getByTestId('mentor-bar-input').props.placeholder;
+
+      act(() => {
+        jest.advanceTimersByTime(4000);
+      });
+
+      expect(getByTestId('mentor-bar-input').props.placeholder).toBe(
+        initialPlaceholder,
+      );
+    } finally {
+      jest.useRealTimers();
+      reducedMotion.mockRestore();
+    }
   });
 
   it('fires camera and homework callbacks', () => {
