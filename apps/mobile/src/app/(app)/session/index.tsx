@@ -1181,7 +1181,7 @@ function SessionScreenInner() {
     exchangeCount,
   });
 
-  const hasSubject = !!(classifiedSubject?.subjectId || subjectId);
+  const hasSubject = !!(classifiedSubject?.subjectId || effectiveSubjectId);
   const conversationStage = getConversationStage(
     learnerTurnCount,
     hasSubject,
@@ -1213,7 +1213,7 @@ function SessionScreenInner() {
     messages,
     setMessages,
     setResumedBanner,
-    subjectId: subjectId ?? undefined,
+    subjectId: effectiveSubjectId ?? undefined,
     effectiveMode,
     isV2MentorEntry,
     availableSubjects,

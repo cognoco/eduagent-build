@@ -378,6 +378,8 @@ type TranscriptMockReturn = {
     archived: false;
     session: {
       sessionId: string;
+      subjectId?: string;
+      topicId?: string;
       exchangeCount: number;
       inputMode: string;
       milestonesReached: unknown[];
@@ -2281,6 +2283,64 @@ describe('SessionScreen homework flow', () => {
         testScreen.queryByText('Africa is the second-largest continent.'),
       ).toBeTruthy();
     });
+  });
+
+  it('[WI-2234] continues a resumed transcript-scoped subject without reclassifying the next learner turn', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      sessionId: SESSION_ID,
+    });
+    mockUseSessionTranscript.mockReturnValue({
+      data: {
+        archived: false,
+        session: {
+          sessionId: SESSION_ID,
+          subjectId: SUBJECT_ID,
+          topicId: TOPIC_ID,
+          exchangeCount: 1,
+          inputMode: 'text',
+          milestonesReached: [],
+          verificationType: undefined,
+        },
+        exchanges: [
+          {
+            role: 'user',
+            content: 'Why did the Romans build so many roads?',
+            timestamp: '2026-04-25T10:00:00Z',
+            eventId: 'evt-1',
+            isSystemPrompt: false,
+            escalationRung: 1,
+          },
+          {
+            role: 'assistant',
+            content: 'They connected cities, trade, armies, and new ideas.',
+            timestamp: '2026-04-25T10:00:05Z',
+            eventId: 'evt-2',
+            isSystemPrompt: false,
+            escalationRung: 1,
+          },
+        ],
+      },
+    });
+
+    const testScreen = renderSessionScreen();
+    await flushAsyncWork();
+    await waitFor(() => {
+      expect(
+        testScreen.queryByText(
+          'They connected cities, trade, armies, and new ideas.',
+        ),
+      ).toBeTruthy();
+    });
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
+    await flushAsyncWork();
+
+    expect(fetchCallsMatching(mockFetch, '/subjects/classify')).toHaveLength(0);
+    expect(testScreen.queryByTestId('session-subject-resolution')).toBeNull();
+    await waitFor(() => {
+      expect(mockStream).toHaveBeenCalled();
+    });
+    expect(mockStream.mock.calls[0]?.[0]).toBe('Solve 2x + 5 = 17');
   });
 
   it('preserves Mentor opener context while its allocated session ID is backfilled into the focused route', async () => {
