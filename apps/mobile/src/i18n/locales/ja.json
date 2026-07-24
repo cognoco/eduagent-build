@@ -319,8 +319,8 @@
       "emptySubjectsMessage": "今すぐ始めてもいいし、必要なときだけ宿題ヘルプを使っても大丈夫です。",
       "addSubject": "科目を追加",
       "momentum": {
-        "topicLearned": "{{n}} topic learned",
-        "topicsLearned": "{{n}} topics learned"
+        "topicLearned": "{{n}}個のトピックを学習済み",
+        "topicsLearned": "{{n}}個のトピックを学習済み"
       },
       "intentActions": {
         "homework": {
@@ -358,9 +358,9 @@
       "coachBandRevisitTopic": "{{topic}}をもう一度 — サクッと復習しよう。"
     },
     "notices": {
-      "consentArchivedTitle": "{{name}}'s account was archived",
+      "consentArchivedTitle": "{{name}}さんのアカウントはアーカイブされました",
       "consentArchivedBody": "データは30日間保持され、その後削除されます。",
-      "consentDeletedTitle": "{{name}}'s account was deleted",
+      "consentDeletedTitle": "{{name}}さんのアカウントは削除されました",
       "consentDeletedBody": "撤回猶予期間が終了しました。"
     },
     "parent": {
@@ -394,7 +394,7 @@
       "childCard": {
         "statusPending": "確認中",
         "reportsAction": "レポート",
-        "nudgeAction": "Nudge",
+        "nudgeAction": "促す",
         "learnTogetherAction": "一緒に学ぶ"
       },
       "card": {
@@ -503,15 +503,15 @@
   "family": {
     "orientationCueDismiss": "OK",
     "withdrawal": {
-      "bannerTitleSingle": "{{name}}'s account closes in {{days}} {{daysWord}}",
-      "bannerTitleMulti": "{{count}} accounts closing soon",
+      "bannerTitleSingle": "{{name}}さんのアカウントは{{days}}{{daysWord}}後に閉鎖されます",
+      "bannerTitleMulti": "{{count}}個のアカウントがまもなく閉鎖されます",
       "bannerCta": "取り消す",
-      "bannerCtaShort": "Undo",
-      "daysOne": "day",
-      "daysOther": "days",
+      "bannerCtaShort": "取り消し",
+      "daysOne": "日",
+      "daysOther": "日",
       "restoreErrorTitle": "閉鎖を取り消せませんでした",
       "restoreErrorBody": "しばらくしてからもう一度お試しください。",
-      "restoreSuccessToast": "Withdrawal reversed for {{name}}"
+      "restoreSuccessToast": "{{name}}さんの同意撤回を取り消しました"
     }
   },
   "more": {
@@ -642,7 +642,7 @@
       "notNow": "今はやめておく",
       "dontAskAgain": "もう聞かない",
       "banner": {
-        "question": "Question {{index}} of {{total}}"
+        "question": "{{total}}問中{{index}}問目"
       },
       "draft": {
         "title": "今わかっていること",
@@ -2152,7 +2152,7 @@
     "register": {
       "child": {
         "growthSubtitle": "あなたの週ごとの成果",
-        "masteredTopicsHero": "You learned {{count}} topics. Steady wins.",
+        "masteredTopicsHero": "{{count}}個のトピックを学習しました。継続は力なり。",
         "retentionStrong": "今週思い出したこと。",
         "retentionFading": "軽く復習する価値あり。",
         "retentionWeak": "復習する価値あり。"
@@ -2366,14 +2366,14 @@
         "label": "もう一度取り組みましょう"
       },
       "elapsed": {
-        "remembered_one": "Remembered after {{count}} day",
-        "remembered_other": "Remembered after {{count}} days",
-        "fading_one": "Getting fuzzy after {{count}} day",
-        "fading_other": "Getting fuzzy after {{count}} days",
-        "weak_one": "Ready for a refresh after {{count}} day",
-        "weak_other": "Ready for a refresh after {{count}} days",
-        "forgotten_one": "Last seen {{count}} day ago",
-        "forgotten_other": "Last seen {{count}} days ago"
+        "remembered_one": "{{count}}日後も覚えていました",
+        "remembered_other": "{{count}}日後も覚えていました",
+        "fading_one": "{{count}}日後、記憶が薄れています",
+        "fading_other": "{{count}}日後、記憶が薄れています",
+        "weak_one": "{{count}}日経過、復習のタイミングです",
+        "weak_other": "{{count}}日経過、復習のタイミングです",
+        "forgotten_one": "最終学習日：{{count}}日前",
+        "forgotten_other": "最終学習日：{{count}}日前"
       }
     },
     "previousReports": {
@@ -2384,24 +2384,24 @@
     "latestReport": {
       "title": "最新レポート",
       "open": "レポートを開く",
-      "openWithDate": "Open report for {{date}}",
+      "openWithDate": "{{date}}のレポートを開く",
       "empty": "学習量がまとまるほどになると、次回の週次または月次レポートがここに表示されます。",
       "error": "現在、最新のレポートを読み込めませんでした。",
       "sessions": "セッション",
-      "time": "Time",
+      "time": "時間",
       "topics": "トピック",
-      "words": "Words",
-      "practiceLessons_one": "{{count}} practice lesson",
-      "practiceLessons_other": "{{count}} practice lessons",
-      "practicePoints_one": "{{count}} practice point",
-      "practicePoints_other": "{{count}} practice points"
+      "words": "単語",
+      "practiceLessons_one": "練習レッスン{{count}}回",
+      "practiceLessons_other": "練習レッスン{{count}}回",
+      "practicePoints_one": "練習ポイント{{count}}点",
+      "practicePoints_other": "練習ポイント{{count}}点"
     },
     "recentFocus": {
       "title": "最近のセッション",
       "showAll": "すべてのセッションを表示",
       "empty": "学習が始まると、最近のセッションがここに表示されます。",
       "error": "現在、最近のセッションを読み込めませんでした。",
-      "sessionFallback": "Studied {{date}}"
+      "sessionFallback": "{{date}}に学習"
     },
     "guardian": {
       "summaryFallback": "概要はまだありません。次のセッションの後に表示されます。",
@@ -2520,10 +2520,10 @@
     },
     "ready": {
       "title": "準備が整いました。",
-      "introWithLearner": "For {{learner}}:",
+      "introWithLearner": "{{learner}}さん向け：",
       "intro": "設定内容はこちら：",
       "rowTone": "メンターが適切な方法で話しかけます",
-      "rowSubject": "Starting with {{subject}}",
+      "rowSubject": "{{subject}}から始めましょう",
       "rowSubjectNoSubject": "最初のトピックの準備ができました",
       "rowPace": "ペースはあなたの速度に合わせます — 急かされることはありません",
       "reassurance": "ほとんどの学習者は最初のセッションで違いを感じます。",
@@ -2583,7 +2583,7 @@
       "progressNudgeStartSubtitle": "{{subject}}を開いて次にできることを見て、あなたも短いレッスンを試してみましょう。",
       "openProgressNudgeAction": "{{subject}}を開く",
       "subjects": "科目",
-      "subjectsDescription": "{{name}}'s active subjects, with the most recent activity first.",
+      "subjectsDescription": "{{name}}さんが学習中の科目です。最近アクティビティがあった順に表示されます。",
       "subjectRawInputAudit": "お子さまは「{{rawInput}}」を検索しました",
       "openSubjectProgress": "{{subject}}の進捗を開く",
       "recentSessions": "最近のセッション",
@@ -2607,7 +2607,7 @@
       "cancelDeletion": "削除をキャンセル",
       "withdrawConsent": "同意を撤回",
       "withdrawConsentConfirmTitle": "同意を撤回しますか？",
-      "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
+      "withdrawConsentBody": "{{childName}}さんのアカウントと学習データは、7日間の猶予期間の後に削除されます。（13歳未満のアカウントの場合、プライバシー法に準拠するため、猶予期間が終了すると直ちに削除されます。）",
       "confirmWithdrawConsent": "確認 — 同意を撤回",
       "curriculumTitle": "カリキュラム",
       "curriculumSubtitle": "{{name}}さんの科目とトピックを閲覧",
@@ -2752,9 +2752,9 @@
       "topicsNewLearnerBody": "これは初期のセッション後や自由な閲覧後に発生する可能性があります。以下の最近のセッションには何が起こったかが表示されます。",
       "noTopicsYetTitle": "まだレッスントピックはありません",
       "noTopicsYetBody": "メンターが十分なレッスンレベルの進捗状況を示す前に、ここにセッションが存在する場合があります。",
-      "description": "This is your child's progress in {{subject}}. Topics appear once sessions connect to a lesson step.",
-      "recentSubjectSessions": "Recent {{subject}} sessions",
-      "viewSessionFrom": "View session from {{date}}"
+      "description": "お子様の{{subject}}の進捗状況です。セッションがレッスンのステップに関連付けられると、トピックが表示されます。",
+      "recentSubjectSessions": "最近の{{subject}}セッション",
+      "viewSessionFrom": "{{date}}のセッションを見る"
     },
     "topic": {
       "topic": "トピック",
@@ -3030,15 +3030,15 @@
     "childPaywall": {
       "headline": "ここまでよく頑張りました！",
       "greatStart": "探求し、学習してきましたね — 素晴らしいスタートです！",
-      "xpStats_one": "You learned {{count}} topic and earned {{xp}} XP — great work!",
-      "xpStats_other": "You learned {{count}} topics and earned {{xp}} XP — great work!",
+      "xpStats_one": "トピックを{{count}}個学習し、{{xp}} XPを獲得しました。よくできました！",
+      "xpStats_other": "トピックを{{count}}個学習し、{{xp}} XPを獲得しました。よくできました！",
       "usedAllQuestions": "無料の質問をすべて使い切りました。学習を続けるには、保護者の方にアップグレードをお願いしてください。",
       "quotaUsedAllQuestions": "今使える質問は使い切りました。{{resetAt}}以降にもう一度試すか、もっと使いたいときは保護者に通知できます。",
       "notifyButton": "保護者に通知",
       "notifyButtonNotified": "保護者に通知済み",
       "notifyButtonAccessibilityNotified": "保護者にすでに通知済み",
       "notifyButtonAccessibilityNotify": "保護者に通知する",
-      "cooldownReminder": "You can remind them again in {{label}}.",
+      "cooldownReminder": "{{label}}後にもう一度リマインドできます。",
       "notifiedExploreText": "保護者の方に通知しました！お待ちの間、引き続き以下を探索できます:",
       "waitText": "お待ちの間、ライブラリを閲覧したり、進捗状況を確認したりできます。",
       "browseLibrary": "ライブラリを閲覧",
@@ -3047,10 +3047,10 @@
       "seeProgressAccessibilityLabel": "進捗状況を確認",
       "goHome": "ホームへ",
       "goHomeAccessibilityLabel": "ホームへ",
-      "back": "Back",
+      "back": "戻る",
       "backAccessibilityLabel": "戻る",
       "alerts": {
-        "sentTitle": "Sent!",
+        "sentTitle": "送信しました！",
         "sentBody": "保護者の方にお知らせしました！",
         "askParentTitle": "保護者の方にお願い",
         "askParentBody": "保護者の方にアプリを開いてサブスクライブするようお願いしてください。",
@@ -3083,7 +3083,7 @@
       "alerts": {
         "successTitle": "ウェイティングリスト",
         "successBody": "BYOKウェイティングリストに追加されました。",
-        "errorTitle": "Error",
+        "errorTitle": "エラー",
         "errorBody": "ウェイティングリストに参加できませんでした。もう一度お試しください。"
       }
     },
@@ -3398,7 +3398,7 @@
     "detailLoadErrorMessage": "もう一度お試しいただくか、まとめリストに戻ってください。",
     "notFoundTitle": "まとめが見つかりません",
     "notFoundMessage": "このまとめは利用できません。",
-    "exchangesCount": "{{count}} exchanges",
+    "exchangesCount": "{{count}}回のやり取り",
     "whatHappened": "何が起こったか",
     "detailPending": "このまとめはまだ準備中です。",
     "tryAsking": "質問してみる",
@@ -3665,7 +3665,7 @@
         },
         "card2": {
           "subjects": {
-            "math": "Math",
+            "math": "数学",
             "history": "歴史",
             "spanish": "スペイン語"
           },
@@ -3722,12 +3722,12 @@
       "primaryCta": "無料アカウントを作成",
       "secondaryCta": "すでにアカウントをお持ちの方"
     },
-    "next": "Next",
+    "next": "次へ",
     "letsStart": "始めましょう",
     "a11y": {
       "previous": "前のカード",
       "next": "次のカード",
-      "dots": "Page {{current}} of {{total}}",
+      "dots": "{{total}}ページ中{{current}}ページ目",
       "bridgePrimary": "無料アカウントを作成",
       "bridgeSecondary": "既存のアカウントにサインイン"
     }

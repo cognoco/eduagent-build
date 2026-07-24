@@ -322,8 +322,8 @@
       "proxySessionSummariesBody": "{{name}}s Notizen bleiben privat, aber du kannst elterngeeignete Sitzungszusammenfassungen im Profil sehen.",
       "proxySessionSummariesCta": "{{name}}s Sitzungszusammenfassungen ansehen",
       "momentum": {
-        "topicLearned": "{{n}} topic learned",
-        "topicsLearned": "{{n}} topics learned"
+        "topicLearned": "{{n}} Thema gelernt",
+        "topicsLearned": "{{n}} Themen gelernt"
       },
       "intentActions": {
         "homework": {
@@ -339,7 +339,7 @@
           "subtitle": "Starte ein Thema oder erstelle ein Fach"
         }
       },
-      "greeting": "Hey {{name}}!",
+      "greeting": "Hallo {{name}}!",
       "greetingNoName": "Hallo!",
       "myNotes": "Meine Notizen",
       "subjectsLoadError": "Wir konnten deine Fächer gerade nicht laden",
@@ -358,9 +358,9 @@
       "coachBandRevisitTopic": "Wiederhole {{topic}} – bereit für eine schnelle Auffrischung."
     },
     "notices": {
-      "consentArchivedTitle": "{{name}}'s account was archived",
+      "consentArchivedTitle": "Das Konto von {{name}} wurde archiviert",
       "consentArchivedBody": "Daten werden 30 Tage lang aufbewahrt und dann gelöscht.",
-      "consentDeletedTitle": "{{name}}'s account was deleted",
+      "consentDeletedTitle": "Das Konto von {{name}} wurde gelöscht",
       "consentDeletedBody": "Die Widerrufsfrist ist abgelaufen."
     },
     "parent": {
@@ -394,7 +394,7 @@
       "childCard": {
         "statusPending": "Überprüfen",
         "reportsAction": "Berichte",
-        "nudgeAction": "Nudge",
+        "nudgeAction": "Anstupsen",
         "learnTogetherAction": "Gemeinsam lernen"
       },
       "card": {
@@ -503,15 +503,15 @@
   "family": {
     "orientationCueDismiss": "Verstanden",
     "withdrawal": {
-      "bannerTitleSingle": "{{name}}'s account closes in {{days}} {{daysWord}}",
-      "bannerTitleMulti": "{{count}} accounts closing soon",
+      "bannerTitleSingle": "Das Konto von {{name}} wird in {{days}} {{daysWord}} geschlossen",
+      "bannerTitleMulti": "{{count}} Konten werden bald geschlossen",
       "bannerCta": "Rückgängig machen",
-      "bannerCtaShort": "Undo",
-      "daysOne": "day",
-      "daysOther": "days",
+      "bannerCtaShort": "Rückgängig",
+      "daysOne": "Tag",
+      "daysOther": "Tagen",
       "restoreErrorTitle": "Rücknahme konnte nicht rückgängig gemacht werden",
       "restoreErrorBody": "Versuche es gleich noch einmal.",
-      "restoreSuccessToast": "Withdrawal reversed for {{name}}"
+      "restoreSuccessToast": "Der Widerruf der Einwilligung für {{name}} wurde rückgängig gemacht"
     }
   },
   "more": {
@@ -642,7 +642,7 @@
       "notNow": "Nicht jetzt",
       "dontAskAgain": "Nicht mehr fragen",
       "banner": {
-        "question": "Question {{index}} of {{total}}"
+        "question": "Frage {{index}} von {{total}}"
       },
       "draft": {
         "title": "Das weißt du jetzt",
@@ -829,7 +829,7 @@
       "retryWithMissingWords": "Versuch es nochmal: {{words}}",
       "retry": "Nochmal",
       "retryLabel": "Sprechversuch wiederholen",
-      "extraWords": "Extra: {{words}}",
+      "extraWords": "Zusätzlich: {{words}}",
       "attemptError": "Dieser Versuch konnte nicht gespeichert werden. Nimm erneut auf."
     },
     "chatShell": {
@@ -1135,7 +1135,7 @@
       "loadingAlmost": "Fast fertig...",
       "challengeTitle": "Herausforderungsrunde",
       "challengeBody": "Du hast einen Streak. Diese Runde ist schwieriger.",
-      "challengeStart": "Start",
+      "challengeStart": "Starten",
       "challengeLabel": "Herausforderungsrunde. Diese Runde ist schwieriger als sonst.",
       "challengeStartLabel": "Herausforderungsrunde starten",
       "hardTimeoutTitle": "Quiz dauert zu lange",
@@ -2152,7 +2152,7 @@
     "register": {
       "child": {
         "growthSubtitle": "Deine wöchentlichen Erfolge",
-        "masteredTopicsHero": "You learned {{count}} topics. Steady wins.",
+        "masteredTopicsHero": "Gelernte Themen: {{count}}. Weiter so.",
         "retentionStrong": "Was dir diese Woche wieder eingefallen ist.",
         "retentionFading": "Einen schnellen Auffrischer wert.",
         "retentionWeak": "Sollte wiederholt werden."
@@ -2366,14 +2366,14 @@
         "label": "Braucht einen neuen Durchgang"
       },
       "elapsed": {
-        "remembered_one": "Remembered after {{count}} day",
-        "remembered_other": "Remembered after {{count}} days",
-        "fading_one": "Getting fuzzy after {{count}} day",
-        "fading_other": "Getting fuzzy after {{count}} days",
-        "weak_one": "Ready for a refresh after {{count}} day",
-        "weak_other": "Ready for a refresh after {{count}} days",
-        "forgotten_one": "Last seen {{count}} day ago",
-        "forgotten_other": "Last seen {{count}} days ago"
+        "remembered_one": "Nach {{count}} Tag erinnert",
+        "remembered_other": "Nach {{count}} Tagen erinnert",
+        "fading_one": "Wird nach {{count}} Tag unklar",
+        "fading_other": "Wird nach {{count}} Tagen unklar",
+        "weak_one": "Bereit für eine Auffrischung nach {{count}} Tag",
+        "weak_other": "Bereit für eine Auffrischung nach {{count}} Tagen",
+        "forgotten_one": "Zuletzt vor {{count}} Tag gesehen",
+        "forgotten_other": "Zuletzt vor {{count}} Tagen gesehen"
       }
     },
     "previousReports": {
@@ -2384,24 +2384,24 @@
     "latestReport": {
       "title": "Neuester Bericht",
       "open": "Bericht öffnen",
-      "openWithDate": "Open report for {{date}}",
+      "openWithDate": "Bericht für {{date}} öffnen",
       "empty": "Dein nächster Wochen- oder Monatsbericht erscheint hier, sobald genügend Lernfortschritt zusammengefasst werden kann.",
       "error": "Der neueste Bericht konnte gerade nicht geladen werden.",
       "sessions": "Sitzungen",
-      "time": "Time",
+      "time": "Zeit",
       "topics": "Themen",
-      "words": "Words",
-      "practiceLessons_one": "{{count}} practice lesson",
-      "practiceLessons_other": "{{count}} practice lessons",
-      "practicePoints_one": "{{count}} practice point",
-      "practicePoints_other": "{{count}} practice points"
+      "words": "Wörter",
+      "practiceLessons_one": "{{count}} Übungslektion",
+      "practiceLessons_other": "{{count}} Übungslektionen",
+      "practicePoints_one": "{{count}} Übungspunkt",
+      "practicePoints_other": "{{count}} Übungspunkte"
     },
     "recentFocus": {
       "title": "Letzte Sitzungen",
       "showAll": "Alle Sitzungen anzeigen",
       "empty": "Letzte Sitzungen erscheinen hier, sobald du mit dem Lernen beginnst.",
       "error": "Die letzten Sitzungen konnten gerade nicht geladen werden.",
-      "sessionFallback": "Studied {{date}}"
+      "sessionFallback": "Gelernt am {{date}}"
     },
     "guardian": {
       "summaryFallback": "Noch keine Zusammenfassung verfügbar. Eine erscheint nach der nächsten Sitzung.",
@@ -2520,10 +2520,10 @@
     },
     "ready": {
       "title": "Alles ist bereit.",
-      "introWithLearner": "For {{learner}}:",
+      "introWithLearner": "Für {{learner}}:",
       "intro": "Das ist eingerichtet:",
       "rowTone": "Dein Mentor spricht mit dir auf die richtige Weise",
-      "rowSubject": "Starting with {{subject}}",
+      "rowSubject": "Start mit {{subject}}",
       "rowSubjectNoSubject": "Dein erstes Thema ist bereit",
       "rowPace": "Das Tempo passt sich deiner Geschwindigkeit an – nie gehetzt",
       "reassurance": "Die meisten Lernenden spüren den Unterschied in der ersten Sitzung.",
@@ -2583,7 +2583,7 @@
       "progressNudgeStartSubtitle": "Öffne {{subject}}, sieh, was bereit ist, und probiere selbst eine kurze Lektion, damit du helfen kannst.",
       "openProgressNudgeAction": "{{subject}} öffnen",
       "subjects": "Fächer",
-      "subjectsDescription": "{{name}}'s active subjects, with the most recent activity first.",
+      "subjectsDescription": "Die aktiven Fächer von {{name}}, mit der letzten Aktivität zuerst.",
       "subjectRawInputAudit": "Dein Kind hat nach \"{{rawInput}}\" gesucht",
       "openSubjectProgress": "Fortschritt in {{subject}} öffnen",
       "recentSessions": "Letzte Sitzungen",
@@ -2607,7 +2607,7 @@
       "cancelDeletion": "Löschung abbrechen",
       "withdrawConsent": "Zustimmung widerrufen",
       "withdrawConsentConfirmTitle": "Zustimmung widerrufen?",
-      "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
+      "withdrawConsentBody": "Das Konto und die Lerndaten von {{childName}} werden nach einer 7-tägigen Frist gelöscht. (Bei Konten von unter 13-Jährigen erfolgt die Löschung aus Datenschutzgründen sofort nach Ablauf der Frist.)",
       "confirmWithdrawConsent": "Bestätigen – Zustimmung widerrufen",
       "curriculumTitle": "Lehrplan",
       "curriculumSubtitle": "Entdecke die Fächer und Themen von {{name}}",
@@ -2730,7 +2730,7 @@
       "openTopicWithTitle": "{{title}} öffnen",
       "backToChildProfile": "Zurück zum Kinderprofil",
       "engagementChip": {
-        "accessibilityLabel": "Engagement: {{label}}",
+        "accessibilityLabel": "Lernverhalten: {{label}}",
         "labels": {
           "curious": "Neugierig",
           "stuck": "Arbeite mich durch",
@@ -2752,9 +2752,9 @@
       "topicsNewLearnerBody": "Dies kann nach frühen Sitzungen oder freiem Stöbern vorkommen. Die letzten Sitzungen unten zeigen weiterhin, was passiert ist.",
       "noTopicsYetTitle": "Noch keine Lernthemen",
       "noTopicsYetBody": "Sitzungen können hier noch existieren, bevor der Mentor genügend Fortschritt auf Lektionsebene hat, um ihn anzuzeigen.",
-      "description": "This is your child's progress in {{subject}}. Topics appear once sessions connect to a lesson step.",
-      "recentSubjectSessions": "Recent {{subject}} sessions",
-      "viewSessionFrom": "View session from {{date}}"
+      "description": "Dies ist der Fortschritt deines Kindes in {{subject}}. Themen erscheinen, sobald Sitzungen mit einem Lektionsschritt verbunden sind.",
+      "recentSubjectSessions": "Letzte {{subject}}-Sitzungen",
+      "viewSessionFrom": "Sitzung vom {{date}} ansehen"
     },
     "topic": {
       "topic": "Thema",
@@ -3030,15 +3030,15 @@
     "childPaywall": {
       "headline": "Bisher tolle Arbeit!",
       "greatStart": "Du hast viel entdeckt und gelernt – ein toller Start!",
-      "xpStats_one": "You learned {{count}} topic and earned {{xp}} XP — great work!",
-      "xpStats_other": "You learned {{count}} topics and earned {{xp}} XP — great work!",
+      "xpStats_one": "Du hast {{count}} Thema gelernt und {{xp}} XP verdient – tolle Arbeit!",
+      "xpStats_other": "Du hast {{count}} Themen gelernt und {{xp}} XP verdient – tolle Arbeit!",
       "usedAllQuestions": "Du hast alle deine kostenlosen Fragen aufgebraucht. Bitte deine Eltern, ein Upgrade durchzuführen, damit du weiterlernen kannst.",
       "quotaUsedAllQuestions": "Du hast deine Fragen fürs Erste aufgebraucht. Du kannst es nach {{resetAt}} erneut versuchen oder deine Eltern benachrichtigen, wenn du mehr Spielraum brauchst.",
       "notifyButton": "Eltern benachrichtigen",
       "notifyButtonNotified": "Eltern benachrichtigt",
       "notifyButtonAccessibilityNotified": "Eltern bereits benachrichtigt",
       "notifyButtonAccessibilityNotify": "Eltern benachrichtigen",
-      "cooldownReminder": "You can remind them again in {{label}}.",
+      "cooldownReminder": "Du kannst sie in {{label}} erneut erinnern.",
       "notifiedExploreText": "Deine Eltern wurden benachrichtigt! Während du wartest, kannst du noch Folgendes erkunden:",
       "waitText": "Während du wartest, kannst du deine Bibliothek durchsuchen und deinen Fortschritt sehen.",
       "browseLibrary": "Bibliothek durchsuchen",
@@ -3047,10 +3047,10 @@
       "seeProgressAccessibilityLabel": "Fortschritt ansehen",
       "goHome": "Startseite",
       "goHomeAccessibilityLabel": "Zur Startseite",
-      "back": "Back",
+      "back": "Zurück",
       "backAccessibilityLabel": "Zurückgehen",
       "alerts": {
-        "sentTitle": "Sent!",
+        "sentTitle": "Gesendet!",
         "sentBody": "Wir haben deine Eltern informiert!",
         "askParentTitle": "Frage deine Eltern",
         "askParentBody": "Bitte deine Eltern, die App zu öffnen und zu abonnieren.",
@@ -3083,7 +3083,7 @@
       "alerts": {
         "successTitle": "Warteliste",
         "successBody": "Du wurdest der BYOK-Warteliste hinzugefügt.",
-        "errorTitle": "Error",
+        "errorTitle": "Fehler",
         "errorBody": "Beitritt zur Warteliste fehlgeschlagen. Erneut versuchen."
       }
     },
@@ -3398,7 +3398,7 @@
     "detailLoadErrorMessage": "Versuche es erneut oder kehre zur Rückblicksliste zurück.",
     "notFoundTitle": "Rückblick nicht gefunden",
     "notFoundMessage": "Dieser Rückblick ist nicht mehr verfügbar.",
-    "exchangesCount": "{{count}} exchanges",
+    "exchangesCount": "Austausche: {{count}}",
     "whatHappened": "Was geschah",
     "detailPending": "Dieser Rückblick wird noch vorbereitet.",
     "tryAsking": "Versuche zu fragen",
@@ -3665,7 +3665,7 @@
         },
         "card2": {
           "subjects": {
-            "math": "Math",
+            "math": "Mathe",
             "history": "Geschichte",
             "spanish": "Spanisch"
           },
@@ -3722,12 +3722,12 @@
       "primaryCta": "Kostenloses Konto erstellen",
       "secondaryCta": "Ich habe bereits ein Konto"
     },
-    "next": "Next",
+    "next": "Weiter",
     "letsStart": "Los geht's",
     "a11y": {
       "previous": "Vorherige Karte",
       "next": "Nächste Karte",
-      "dots": "Page {{current}} of {{total}}",
+      "dots": "Seite {{current}} von {{total}}",
       "bridgePrimary": "Kostenloses Konto erstellen",
       "bridgeSecondary": "Bei bestehendem Konto anmelden"
     }
@@ -4581,7 +4581,7 @@
       "message": "Hilf {{name}} beim Einstieg.",
       "hint": "Die Zusammenfassungen und Fortschritte erscheinen hier, sobald es losgeht.",
       "cta": "{{name}} ermutigen",
-      "nudgeStep1": "Deine Ermutigung hat {{name}} erreicht. {{name}} hat noch nicht angefangen – die meisten Lernenden starten in der ersten Woche.",
+      "nudgeStep1": "Deine Ermutigung hat {{name}} erreicht. Der Lernstart steht noch aus – die meisten Lernenden starten in der ersten Woche.",
       "nudgeStep2": "Wenn du das nächste Mal bei {{name}} bist, startet gemeinsam die erste Sitzung.",
       "nudgeStep3": "Probiere die Lernerfahrung selbst aus – und hilf {{name}} beim Einstieg.",
       "nudgeStep4": "Lerne selbst weiter, während {{name}} den richtigen Moment findet."
