@@ -588,24 +588,16 @@ function pickRepeatAfterMeSentence(
   return sentences[index] ?? sentences[0];
 }
 
-// WI-1777: one shape serves both `repeat_after_me` and `shadowing` — `mode`
-// selection alternates deterministically by fluency-turn index so every
-// beginner learner exercises both modes across a session: even turns get
-// `repeat_after_me`, odd turns get `shadowing`. No randomness — same turn
-// index always yields the same mode (mirrors `pickRepeatAfterMeSentence`'s
-// `Math.abs(turnIndex) % ...` pattern above).
-function selectSpeakingPracticeMode(
-  turnIndex: number,
-): 'repeat_after_me' | 'shadowing' {
-  return Math.abs(turnIndex) % 2 === 0 ? 'repeat_after_me' : 'shadowing';
-}
-
 function buildSpeakingPracticeArtifact(input: {
   languageCode?: string;
   fluencyTurnIndex?: number;
 }): LanguageSpeakingPracticeArtifact {
   return {
-    type: selectSpeakingPracticeMode(input.fluencyTurnIndex ?? 0),
+    // OPQ-93 Option B: MVP implements honest repeat-after-me only. True
+    // shadowing needs simultaneous playback/recognition plus device QA and is
+    // tracked separately; keep the schema value available without selecting
+    // it from the production activity path.
+    type: 'repeat_after_me',
     targetText: pickRepeatAfterMeSentence(
       input.languageCode,
       input.fluencyTurnIndex ?? 0,
@@ -756,7 +748,7 @@ export async function buildLanguageActivityTelemetry(input: {
     input.strand === 'fluency' &&
     (input.cefrLevel === 'A1' || input.cefrLevel === 'A2');
   const activityType: LanguageActivityType = isBeginnerFluency
-    ? selectSpeakingPracticeMode(input.fluencyTurnIndex ?? 0)
+    ? 'repeat_after_me'
     : activityTypeByStrand[input.strand];
   const modality =
     activityType === 'repeat_after_me' || activityType === 'shadowing'

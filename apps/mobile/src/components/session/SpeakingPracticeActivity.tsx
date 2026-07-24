@@ -21,7 +21,7 @@ interface AttemptFeedback {
   isComplete: boolean;
 }
 
-// WI-1777: renders the repeat-after-me/shadowing artifact via the existing
+// WI-1777: renders the repeat-after-me artifact via the existing
 // SpeakingPracticeCard, wiring the existing TTS/STT hooks (same pattern as
 // GradedInputCard/MeaningOutputCard) and posting a completed recording as an
 // attempt. The server's response is the single source of feedback rendered
@@ -126,7 +126,6 @@ export function SpeakingPracticeActivity({
     <>
       <SpeakingPracticeCard
         targetText={speakingPractice.targetText}
-        mode={speakingPractice.type}
         transcript={transcript}
         isListening={isListening}
         isSpeaking={isSpeaking}

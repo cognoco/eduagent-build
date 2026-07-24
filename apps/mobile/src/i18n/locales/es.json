@@ -764,7 +764,6 @@
     "speakingPractice": {
       "title": "Repítelo",
       "subtitle": "Repite la frase",
-      "subtitleShadowing": "Habla junto con el audio, un poco por detrás",
       "playAudioLabel": "Reproducir frase objetivo",
       "stopAudioLabel": "Detener audio",
       "startRecordingLabel": "Empezar intento hablado",

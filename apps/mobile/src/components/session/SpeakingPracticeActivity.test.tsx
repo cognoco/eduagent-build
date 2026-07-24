@@ -96,11 +96,10 @@ describe('SpeakingPracticeActivity', () => {
     screen.getByText('I would like a cup of tea.');
   });
 
-  // WI-1777 rework: the server's activityType/speakingPractice.type
-  // (previously always 'repeat_after_me') now genuinely alternates to
-  // 'shadowing' — confirm this component renders the shadowing-specific
-  // instruction, not the repeat-after-me one, when that's what it receives.
-  it('renders the shadowing instruction when the activity selects the shadowing mode', () => {
+  // WI-1777 Option-B rework: legacy/cache events may still carry the
+  // schema-supported shadowing value, but the MVP UI must not instruct a
+  // learner to speak along when playback and recognition are independent.
+  it('renders the honest repeat-after-me instruction for a legacy shadowing event', () => {
     const shadowingActivity: LanguageLearningActivityEvent = {
       ...makeActivity(),
       activityType: 'shadowing',
@@ -116,8 +115,10 @@ describe('SpeakingPracticeActivity', () => {
         subjectId="subject-1"
       />,
     );
-    screen.getByText('Speak along with the audio, a beat behind');
-    expect(screen.queryByText('Repeat the line')).toBeNull();
+    screen.getByText('Repeat the line');
+    expect(
+      screen.queryByText('Speak along with the audio, a beat behind'),
+    ).toBeNull();
   });
 
   it('submits an attempt exactly once when recording stops with a transcript', async () => {

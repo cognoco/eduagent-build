@@ -764,7 +764,6 @@
     "speakingPractice": {
       "title": "Si det tilbake",
       "subtitle": "Gjenta setningen",
-      "subtitleShadowing": "Snakk sammen med lyden, litt bak",
       "playAudioLabel": "Spill av målsetningen",
       "stopAudioLabel": "Stopp lyd",
       "startRecordingLabel": "Start taleforsøk",
