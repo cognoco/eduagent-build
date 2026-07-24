@@ -193,6 +193,7 @@ function isExactManualHomeworkSessionAssociated({
 }
 
 const MENTOR_BIRTH_SESSION_TIME_SCALE = 0.35;
+// Bound a failed policy-epoch hydration without claiming a refreshed projection.
 const MENTOR_RETURN_EPOCH_WAIT_MS = 2_000;
 
 interface FirstSessionWrapUpCardProps {

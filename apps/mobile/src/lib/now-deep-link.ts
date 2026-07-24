@@ -6,12 +6,13 @@ import {
   type NowDeepLinkRoute,
   type ScopeDescriptor,
 } from '@eduagent/schemas';
+import type { MENTOR_RETURN_TO } from './navigation';
 
 export type SubjectHubTarget = 'legacy-shelf' | 'v2-subject-hub';
 
 interface NowPathOptions {
   subjectHubTarget?: SubjectHubTarget;
-  returnTo?: string;
+  returnTo?: typeof MENTOR_RETURN_TO;
 }
 
 export interface PushNowDeepLinkOptions extends NowPathOptions {
@@ -24,7 +25,7 @@ export interface PushNowDeepLinkOptions extends NowPathOptions {
 
 type ResolvedNowPathOptions = {
   subjectHubTarget: SubjectHubTarget;
-  returnTo?: string;
+  returnTo?: typeof MENTOR_RETURN_TO;
 };
 
 type PathBuilder = (
