@@ -3406,6 +3406,7 @@
     "emptyCtaStartSession": "Sitzung starten",
     "verifiedProof": {
       "holdsStrong": "ist stichhaltig",
+      "lookupUnavailable": "Der verifizierte Nachweis ist vorübergehend nicht verfügbar",
       "recheckDue": "Erneute Prüfung fällig am {{date}}"
     }
   },

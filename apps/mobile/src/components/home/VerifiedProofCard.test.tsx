@@ -75,6 +75,36 @@ describe('VerifiedProofCard', () => {
     ).toBeNull();
   });
 
+  it('renders lookup unavailable when the verified-proof request fails', async () => {
+    active = renderScreen(
+      <VerifiedProofCard
+        childProfileId={CHILD_PROFILE_ID}
+        accentColor="#123456"
+      />,
+      {
+        profile: PARENT,
+        profiles: [PARENT, CHILD],
+        routes: {
+          '/verified-proof': () =>
+            new Response(JSON.stringify({ message: 'database query detail' }), {
+              status: 500,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+        },
+      },
+    );
+
+    await active.result.findByTestId(
+      `parent-home-child-verified-proof-unavailable-${CHILD_PROFILE_ID}`,
+    );
+    expect(
+      active.result.queryByTestId(
+        `parent-home-child-verified-proof-${CHILD_PROFILE_ID}`,
+      ),
+    ).toBeNull();
+    expect(active.result.queryByText(/database|query|detail/i)).toBeNull();
+  });
+
   it('renders topic/date/quote when a verified proof exists', async () => {
     active = renderScreen(
       <VerifiedProofCard
