@@ -99,9 +99,7 @@ describe('SpeakingPracticeCard', () => {
     expect(screen.queryByTestId('speaking-practice-extra')).toBeNull();
   });
 
-  // WI-1777 rework: shadowing must read as its own exercise, not a relabeled
-  // repeat-after-me — the mode prop selects distinct instruction copy.
-  it('shows the repeat-after-me instruction by default', () => {
+  it('shows the repeat-after-me instruction', () => {
     render(
       <SpeakingPracticeCard
         targetText={targetText}
@@ -114,20 +112,6 @@ describe('SpeakingPracticeCard', () => {
     expect(
       screen.queryByText('Speak along with the audio, a beat behind'),
     ).toBeNull();
-  });
-
-  it('shows the shadowing instruction when mode is shadowing', () => {
-    render(
-      <SpeakingPracticeCard
-        targetText={targetText}
-        mode="shadowing"
-        onPlayTarget={jest.fn()}
-        onRecordPress={jest.fn()}
-      />,
-    );
-
-    screen.getByText('Speak along with the audio, a beat behind');
-    expect(screen.queryByText('Repeat the line')).toBeNull();
   });
 
   it('displays server-supplied missing words with a retry prompt', () => {

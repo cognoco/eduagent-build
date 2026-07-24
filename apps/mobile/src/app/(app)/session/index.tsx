@@ -1,4 +1,10 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@clerk/expo';
+import {
+  usePreventRemove,
+  type NavigationAction,
+} from '@react-navigation/native';
 import {
   Platform,
   Pressable,
@@ -8,12 +14,17 @@ import {
   View,
 } from 'react-native';
 import { platformAlert } from '../../../lib/platform-alert';
-import { goBackOrReplace, SUBJECTS_RETURN_TO } from '../../../lib/navigation';
+import {
+  goBackOrReplace,
+  MENTOR_RETURN_TO,
+  SUBJECTS_RETURN_TO,
+} from '../../../lib/navigation';
 import { consumeHubToSessionTransition } from '../../../lib/navigation-transition-provenance';
 import { shouldShowBookLink } from '../../../lib/show-book-link';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import {
   useRouter,
+  useNavigation,
   useLocalSearchParams,
   useFocusEffect,
   type Href,
@@ -67,6 +78,7 @@ import {
   useIsFirstSession,
 } from '../../../hooks/use-session-context';
 import { useNetworkStatus } from '../../../hooks/use-network-status';
+import { useObservedPolicyEpoch } from '../../../hooks/use-now-feed';
 import { useApiReachability } from '../../../hooks/use-api-reachability';
 import { useCelebrationLevel } from '../../../hooks/use-settings';
 import { useLearnerProfile } from '../../../hooks/use-learner-profile';
@@ -79,6 +91,7 @@ import {
   useApiClient,
   type QuotaExceededDetails,
 } from '../../../lib/api-client';
+import { queryKeys } from '../../../lib/query-keys';
 import { classifyApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
 import { useCreateNote } from '../../../hooks/use-notes';
@@ -197,6 +210,8 @@ function isExactManualHomeworkSessionAssociated({
 }
 
 const MENTOR_BIRTH_SESSION_TIME_SCALE = 0.35;
+// Bound a failed policy-epoch hydration without claiming a refreshed projection.
+const MENTOR_RETURN_EPOCH_WAIT_MS = 2_000;
 
 interface FirstSessionWrapUpCardProps {
   value: string;
@@ -349,6 +364,7 @@ function SessionScreenInner() {
     imageMimeType?: string;
   }>();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
   const navigationContract = useNavigationContract();
@@ -400,16 +416,55 @@ function SessionScreenInner() {
       subjectId,
     ],
   );
+  // [BUG-867] String-templated dynamic paths (`/(app)/shelf/${subjectId}`)
+  // don't always resolve on web — the chevron looked clickable but the URL
+  // never changed. Supplying an explicit handler that uses Expo Router's
+  // typed object form makes the navigation reliable across web + native.
+  const { userId } = useAuth();
+  const { epoch: observedNowFeedEpoch, hydrated: nowFeedEpochHydrated } =
+    useObservedPolicyEpoch(userId, activeProfile?.id);
+  const [pendingMentorReturn, setPendingMentorReturn] = useState(false);
+  const [mentorReturnReady, setMentorReturnReady] = useState(false);
+  const [deferredRemovalAction, setDeferredRemovalAction] =
+    useState<NavigationAction | null>(null);
+  const navigation = useNavigation();
+  const canRefreshMentorFeed =
+    returnTo === MENTOR_RETURN_TO &&
+    !!userId &&
+    !!activeProfile?.id &&
+    nowFeedEpochHydrated;
+  const refreshMentorFeedBeforeReturn = useCallback(async () => {
+    if (!userId || !activeProfile?.id) return;
+
+    // The Mentor feed was warm before this session opened. Refetch its exact
+    // actor/profile/epoch projection (including an inactive cache entry) and
+    // wait for that projection before remounting Mentor.
+    await queryClient.invalidateQueries(
+      {
+        queryKey: queryKeys.now.feed(
+          userId,
+          activeProfile.id,
+          observedNowFeedEpoch,
+        ),
+        exact: true,
+        refetchType: 'all',
+      },
+      { throwOnError: true },
+    );
+  }, [activeProfile?.id, observedNowFeedEpoch, queryClient, userId]);
+  const startMentorReturn = useCallback(() => {
+    setMentorReturnReady(false);
+    setPendingMentorReturn(true);
+  }, []);
   const subjectsTransitionId =
     returnTo === SUBJECTS_RETURN_TO ? subjectId : undefined;
   const [subjectsPredecessorId, setSubjectsPredecessorId] = useState<
     string | undefined
   >();
   useEffect(() => {
-    // The module token is one-shot, but its proof is promoted into this
-    // mounted route's state before a later same-screen transcript retry.
-    // Retries therefore keep the exact Hub predecessor without making the
-    // token reusable by a later, unrelated navigation.
+    // Promote the one-shot transition proof into this mounted route's state.
+    // A same-screen transcript retry keeps that exact predecessor without
+    // making the token reusable by a later, unrelated navigation.
     if (
       subjectsTransitionId &&
       consumeHubToSessionTransition(subjectsTransitionId)
@@ -423,17 +478,86 @@ function SessionScreenInner() {
   }, [subjectsTransitionId]);
   const hasSubjectsPredecessor =
     !!subjectsTransitionId && subjectsPredecessorId === subjectsTransitionId;
-  // [BUG-867] String-templated dynamic paths (`/(app)/shelf/${subjectId}`)
-  // don't always resolve on web — the chevron looked clickable but the URL
-  // never changed. Supplying an explicit handler that uses Expo Router's
-  // typed object form makes the navigation reliable across web + native.
+  usePreventRemove(
+    returnTo === MENTOR_RETURN_TO &&
+      !mentorReturnReady &&
+      deferredRemovalAction === null,
+    ({ data: { action } }) => {
+      if (action.type !== 'GO_BACK' && action.type !== 'POP') {
+        setDeferredRemovalAction(action);
+        return;
+      }
+      startMentorReturn();
+    },
+  );
+  useEffect(() => {
+    if (!deferredRemovalAction) return;
+    navigation.dispatch(deferredRemovalAction);
+    setDeferredRemovalAction(null);
+  }, [deferredRemovalAction, navigation]);
+  useEffect(() => {
+    if (!pendingMentorReturn) return;
+
+    // An epoch read can fail to settle (for example, a storage failure during
+    // cold start). We must not call that an exact refreshed projection, but a
+    // back action also must not strand the learner in the session forever.
+    if (!nowFeedEpochHydrated) {
+      const timer = setTimeout(() => {
+        setPendingMentorReturn(false);
+        setMentorReturnReady(true);
+      }, MENTOR_RETURN_EPOCH_WAIT_MS);
+      return () => clearTimeout(timer);
+    }
+    // An absent actor/profile cannot identify a scoped Mentor projection.
+    // Leave without invalidating rather than claiming evidence or stranding
+    // the learner behind a binding that may never appear on this screen.
+    if (!userId || !activeProfile?.id) {
+      setPendingMentorReturn(false);
+      setMentorReturnReady(true);
+      return;
+    }
+    if (!canRefreshMentorFeed) return;
+
+    let cancelled = false;
+    async function returnAfterMentorRefresh(): Promise<void> {
+      try {
+        await refreshMentorFeedBeforeReturn();
+        if (cancelled) return;
+        setPendingMentorReturn(false);
+        setMentorReturnReady(true);
+      } catch {
+        if (cancelled) return;
+        setPendingMentorReturn(false);
+      }
+    }
+    void returnAfterMentorRefresh();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeProfile?.id,
+    canRefreshMentorFeed,
+    nowFeedEpochHydrated,
+    pendingMentorReturn,
+    refreshMentorFeedBeforeReturn,
+    userId,
+  ]);
+  useEffect(() => {
+    if (!mentorReturnReady) return;
+    router.replace(homeBackHref as Href);
+    setMentorReturnReady(false);
+  }, [homeBackHref, mentorReturnReady, router]);
   const handleChatBackPress = useCallback(() => {
     if (hasSubjectsPredecessor && Platform.OS !== 'web') {
       goBackOrReplace(router, homeBackHref);
       return;
     }
     if (returnTo) {
-      // Without consumed runtime provenance, a named destination is only a
+      if (returnTo === MENTOR_RETURN_TO) {
+        startMentorReturn();
+        return;
+      }
+      // A named destination without consumed runtime provenance is only a
       // deterministic replacement fallback, never permission to pop history.
       router.replace(homeBackHref as Href);
       return;
@@ -446,19 +570,36 @@ function SessionScreenInner() {
       return;
     }
     router.replace('/(app)/home' as Href);
-  }, [hasSubjectsPredecessor, returnTo, subjectId, homeBackHref, router]);
+  }, [
+    hasSubjectsPredecessor,
+    returnTo,
+    subjectId,
+    homeBackHref,
+    router,
+    startMentorReturn,
+  ]);
   const handleHomeBack = useCallback(() => {
     if (hasSubjectsPredecessor && Platform.OS !== 'web') {
       goBackOrReplace(router, homeBackHref);
       return;
     }
     if (returnTo) {
+      if (returnTo === MENTOR_RETURN_TO) {
+        startMentorReturn();
+        return;
+      }
       router.replace(homeBackHref as Href);
       return;
     }
 
     goBackOrReplace(router, homeBackHref);
-  }, [hasSubjectsPredecessor, homeBackHref, returnTo, router]);
+  }, [
+    hasSubjectsPredecessor,
+    homeBackHref,
+    returnTo,
+    router,
+    startMentorReturn,
+  ]);
   const handleStartNewSession = useCallback(() => {
     router.replace({
       pathname: '/(app)/session',
@@ -1132,7 +1273,7 @@ function SessionScreenInner() {
     exchangeCount,
   });
 
-  const hasSubject = !!(classifiedSubject?.subjectId || subjectId);
+  const hasSubject = !!(classifiedSubject?.subjectId || effectiveSubjectId);
   const conversationStage = getConversationStage(
     learnerTurnCount,
     hasSubject,
@@ -1164,7 +1305,7 @@ function SessionScreenInner() {
     messages,
     setMessages,
     setResumedBanner,
-    subjectId: subjectId ?? undefined,
+    subjectId: effectiveSubjectId || undefined,
     effectiveMode,
     isV2MentorEntry,
     availableSubjects,

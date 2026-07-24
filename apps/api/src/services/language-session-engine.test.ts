@@ -292,15 +292,11 @@ describe('buildLanguageActivityTelemetry', () => {
     );
   });
 
-  // WI-1777 rework (reviewer bounce): the AC promises Four Strands can
-  // select BOTH repeat_after_me AND shadowing, but selectSpeakingPracticeMode
-  // was hardcoded to always return repeat_after_me — shadowing was defined
-  // in the schema but unreachable. This exercises the real production
-  // selection path (buildLanguageActivityTelemetry, not a stub) and asserts
-  // it alternates deterministically by fluency-turn index, so both modes
-  // — top-level activityType and the nested speakingPractice.type must
-  // agree — are genuinely reachable across a session.
-  it('alternates speaking-practice mode by fluency turn index: even turns select repeat_after_me, odd turns select shadowing', async () => {
+  // WI-1777 Option-B rework: true speak-along shadowing requires native
+  // playback/recognition concurrency and device QA, so MVP activity selection
+  // must stay honest and emit repeat-after-me at every turn index. Target-text
+  // rotation remains independently deterministic.
+  it('selects repeat_after_me at every fluency turn index', async () => {
     const evenTurn = await buildLanguageActivityTelemetry({
       strand: 'fluency',
       languageCode: 'es',
@@ -329,8 +325,8 @@ describe('buildLanguageActivityTelemetry', () => {
     expect(evenTurn.activityType).toBe('repeat_after_me');
     expect(evenTurn.speakingPractice?.type).toBe('repeat_after_me');
 
-    expect(oddTurn.activityType).toBe('shadowing');
-    expect(oddTurn.speakingPractice?.type).toBe('shadowing');
+    expect(oddTurn.activityType).toBe('repeat_after_me');
+    expect(oddTurn.speakingPractice?.type).toBe('repeat_after_me');
 
     expect(nextEvenTurn.activityType).toBe('repeat_after_me');
     expect(nextEvenTurn.speakingPractice?.type).toBe('repeat_after_me');

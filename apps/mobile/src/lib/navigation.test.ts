@@ -88,6 +88,10 @@ describe('homeHrefForReturnTo', () => {
     expect(homeHrefForReturnTo(JOURNAL_RETURN_TO)).toBe(JOURNAL_HREF);
   });
 
+  it('[WI-2234] returns the Mentor href only for the Mentor session token', () => {
+    expect(homeHrefForReturnTo('mentor')).toBe('/(app)/mentor');
+  });
+
   it('returns the V2 Subjects tab for the subjects return token', () => {
     expect(homeHrefForReturnTo(SUBJECTS_RETURN_TO)).toBe(SUBJECTS_HREF);
   });

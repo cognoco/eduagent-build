@@ -852,7 +852,6 @@
     "speakingPractice": {
       "title": "Powtórz na głos",
       "subtitle": "Powtórz zdanie",
-      "subtitleShadowing": "Mów razem z nagraniem, odrobinę z opóźnieniem",
       "playAudioLabel": "Odtwórz zdanie docelowe",
       "stopAudioLabel": "Zatrzymaj audio",
       "startRecordingLabel": "Zacznij próbę mówienia",

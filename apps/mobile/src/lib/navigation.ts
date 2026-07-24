@@ -13,6 +13,8 @@ export const PRACTICE_RETURN_TO = 'practice';
 export const PRACTICE_HREF = '/(app)/practice';
 export const JOURNAL_RETURN_TO = 'journal';
 export const JOURNAL_HREF = '/(app)/journal';
+export const MENTOR_RETURN_TO = 'mentor';
+export const MENTOR_HREF = '/(app)/mentor';
 export const SUBJECTS_RETURN_TO = 'subjects';
 export const SUBJECTS_HREF = '/(app)/subjects';
 export const SUBJECT_HUB_RETURN_TO = 'subject-hub';
@@ -31,6 +33,7 @@ type StaticHomeReturnToken =
   | typeof LEARNER_HOME_RETURN_TO
   | typeof PRACTICE_RETURN_TO
   | typeof JOURNAL_RETURN_TO
+  | typeof MENTOR_RETURN_TO
   | typeof SUBJECTS_RETURN_TO
   | typeof FAMILY_RECAPS_RETURN_TO
   | typeof FAMILY_HOME_RETURN_TO
@@ -43,6 +46,7 @@ const STATIC_HOME_RETURN_HREFS = {
   [LEARNER_HOME_RETURN_TO]: LEARNER_HOME_HREF,
   [PRACTICE_RETURN_TO]: PRACTICE_HREF,
   [JOURNAL_RETURN_TO]: JOURNAL_HREF,
+  [MENTOR_RETURN_TO]: MENTOR_HREF,
   [SUBJECTS_RETURN_TO]: SUBJECTS_HREF,
   [FAMILY_RECAPS_RETURN_TO]: FAMILY_RECAPS_HREF,
   [FAMILY_HOME_RETURN_TO]: FAMILY_HOME_PATH,
@@ -181,6 +185,8 @@ export function homeHrefForReturnTo(
     return STATIC_HOME_RETURN_HREFS[token];
   }
 
+  // FAMILY_HOME_PATH is the canonical /(app)/home fallback. Unknown or
+  // incomplete tokens never become paths.
   return FAMILY_HOME_PATH as Href;
 }
 

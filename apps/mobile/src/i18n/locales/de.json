@@ -819,7 +819,6 @@
     "speakingPractice": {
       "title": "Sprich es nach",
       "subtitle": "Wiederhole den Satz",
-      "subtitleShadowing": "Sprich mit der Audioaufnahme mit, einen Schlag dahinter",
       "playAudioLabel": "Zielsatz abspielen",
       "stopAudioLabel": "Audio stoppen",
       "startRecordingLabel": "Sprechversuch starten",

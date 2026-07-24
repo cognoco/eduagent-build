@@ -440,6 +440,30 @@ export const queryKeys = {
   },
 
   // ------------------------------------------------------------------
+  // Now projections
+  // ------------------------------------------------------------------
+  now: {
+    feed: (
+      actorId: QueryScopeId,
+      profileId: QueryScopeId,
+      policyEpoch: string,
+    ) =>
+      ['now-feed', scopeId(actorId), scopeId(profileId), policyEpoch] as const,
+
+    overflow: (
+      actorId: QueryScopeId,
+      profileId: QueryScopeId,
+      policyEpoch: string,
+    ) =>
+      [
+        'now-overflow',
+        scopeId(actorId),
+        scopeId(profileId),
+        policyEpoch,
+      ] as const,
+  },
+
+  // ------------------------------------------------------------------
   // subscription / usage domains
   // ------------------------------------------------------------------
   subscription: (profileId: QueryScopeId) =>

@@ -487,32 +487,36 @@ test('WI-2238 curriculum-preparing case: exact World History empty Hub and visib
     });
   });
 
-  const seed = await seedAndOpenSubjects(page, seedCase);
-  const subjectId = seed.ids.subjectId;
-  if (!subjectId) {
-    throw new Error('learning-active seed did not return subjectId');
-  }
-  await expectSubjectRow(page, subjectId, expected.subjectName);
-  await page.route(`**/v1/subjects/${subjectId}/books`, async (route) => {
-    if (route.request().method() !== 'GET') {
-      await route.continue();
-      return;
+  try {
+    const seed = await seedAndOpenSubjects(page, seedCase);
+    const subjectId = seed.ids.subjectId;
+    if (!subjectId) {
+      throw new Error('learning-active seed did not return subjectId');
     }
-    await fulfillJson(route, { books: [] });
-  });
+    await expectSubjectRow(page, subjectId, expected.subjectName);
+    await page.route(`**/v1/subjects/${subjectId}/books`, async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+      await fulfillJson(route, { books: [] });
+    });
 
-  await pressableClick(page.getByTestId(`subjects-browse-row-${subjectId}`));
-  const preparing = page.getByTestId('subject-hub-preparing');
-  await expect(preparing).toBeVisible({ timeout: 60_000 });
-  await expect(
-    preparing.getByText(expected.preparingMessage, {
-      exact: true,
-    }),
-  ).toBeVisible();
-  await pressableClick(page.getByTestId('subject-hub-preparing-back'));
-  await expectSubjectsPath(page);
-  await expectSubjectRow(page, subjectId, expected.subjectName);
-  await expectMeIdentity(page, expected.profileName, seed.profileId);
+    await pressableClick(page.getByTestId(`subjects-browse-row-${subjectId}`));
+    const preparing = page.getByTestId('subject-hub-preparing');
+    await expect(preparing).toBeVisible({ timeout: 60_000 });
+    await expect(
+      preparing.getByText(expected.preparingMessage, {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await pressableClick(page.getByTestId('subject-hub-preparing-back'));
+    await expectSubjectsPath(page);
+    await expectSubjectRow(page, subjectId, expected.subjectName);
+    await expectMeIdentity(page, expected.profileName, seed.profileId);
+  } finally {
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
+  }
 });
 
 test('WI-2238 onboarding-no-subject case: Add creates exact Photosynthesis first session and visible exit returns only to V2 Subjects', async ({
