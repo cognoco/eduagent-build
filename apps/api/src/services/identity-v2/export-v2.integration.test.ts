@@ -50,6 +50,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import { generateExportV2 } from './export-v2';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
@@ -151,14 +152,17 @@ describeIfPostDrop('generateExportV2 (integration)', () => {
     });
 
     // A granted GDPR consent for the child (current GDPR state = CONSENTED).
-    await db.insert(consentGrant).values({
-      chargePersonId: child!.id,
-      organizationId: org!.id,
-      purpose: 'platform_use',
-      lawfulBasis: 'gdpr_parental_consent',
-      granted: true,
-      grantedAt: new Date(),
-    });
+    const grantedAt = new Date();
+    await db.insert(consentGrant).values(
+      CONSENT_PURPOSES.map((purpose) => ({
+        chargePersonId: child!.id,
+        organizationId: org!.id,
+        purpose,
+        lawfulBasis: 'gdpr_parental_consent' as const,
+        granted: true,
+        grantedAt,
+      })),
+    );
 
     // A learning-data row keyed on a person id — proves the legacy learning half
     // still runs via the passed learningOnlyProfileIds.

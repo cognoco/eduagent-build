@@ -11,6 +11,9 @@ When the user asks to "test" a feature or flow (e.g. "test all the new quiz func
 
 **How to apply:**
 - Work silently through the flow — click, navigate, verify — without writing prose between each tool call.
-- Keep a private todo/tracker of: (a) flows exercised, (b) bugs/issues found.
+- Keep a private todo/tracker of flows exercised, but capture every confirmed
+  distinct bug in Cosmo promptly so it cannot be lost in the conversation.
+  Diagnosis may continue after capture; update/refine the item later rather than
+  leaving a confirmed defect only in chat.
 - At the end, produce one consolidated output: list of flows tested + list of bugs with severity and repro steps.
 - If you hit a blocker that stops testing entirely, you may surface it mid-run — otherwise stay quiet.

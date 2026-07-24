@@ -4,6 +4,17 @@
 
 > **Placement.** Global L2 from birth; lockstep canon partner is `docs/canon/identity/data-model.md` §3.2 (the retain-tier split diagram) + §6.1 (deletion failure-modes), edited in the same change-set.
 
+> **Amendment — WI-1985 (2026-07-17).** This ADR's original scoping boundary — that the
+> *person-granularity* delete paths are unchanged and leave `guardianship`/`supportership` edges
+> surviving — was narrowed. WI-1985 extended the same incident-scoped, bidirectional edge teardown to
+> the four person-scoped delete functions (`deletePersonV2` + the three consent-gated erasure sweeps),
+> because the statutory auto-erasure of a managed child (who always sits on a guardianship edge as the
+> charge) otherwise FK-violates on the RESTRICT. The **Decision below is unchanged in substance** — the
+> RESTRICT FKs remain load-bearing (they are what *force* the teardown), cross-org counterparts are still
+> preserved, and edges still carry no retain-tier obligation; only the "person-granularity paths are
+> unchanged" boundary moves. The Decision and Consequences sentences that stated that boundary are
+> annotated inline below.
+
 ## Context
 
 The ratified retain-tier split (`data-model.md` §3.2, realized in MMT-ADR-0011) defines deletion at **person granularity**: when a single `person` is hard-deleted, its `consent_grant` rows re-home to `consent_receipt`, learning data cascades away, and the audit/financial retain rows are written — while `subscription`, `guardianship`, and `supportership` are drawn as **surviving** the delete. The `*_person_id ON DELETE RESTRICT` FKs on those three edges are **load-bearing**: they make "delete a person still anchoring a live edge" fail by design, forcing the caller to re-home/tear-down first. §6.1's failure-mode table encodes the same person-granularity rule ("the RESTRICT is the schema's way of saying you forgot to move the records first").
@@ -14,7 +25,7 @@ A subtlety the whole-org path must get right: an edge can be **cross-org** — a
 
 ## Decision
 
-**A whole-org/whole-account erasure (`executeDeletionV2`) tears down every guardianship and supportership edge *incident to the erased org's persons*, in the same transaction, before the person rows drop. The person-granularity delete paths are unchanged: there, the edges still survive and the RESTRICT FKs remain load-bearing.**
+**A whole-org/whole-account erasure (`executeDeletionV2`) tears down every guardianship and supportership edge *incident to the erased org's persons*, in the same transaction, before the person rows drop. The person-granularity delete paths were originally left unchanged here — but WI-1985 later brought them into line: they now tear down the *erased person's* incident edges too, and the RESTRICT FKs remain load-bearing on every path (they are what force the teardown). See the Amendment above.**
 
 - **Edge teardown is incident-scoped and bidirectional.** For the set `P` of persons in the org being erased, delete every `guardianship` row where `guardian_person_id ∈ P OR charge_person_id ∈ P`, and every `supportership` row where `supporter_person_id ∈ P OR supportee_person_id ∈ P`. Active and revoked rows alike (a revoked row still carries a RESTRICT FK).
 - **Cross-org edges drop the edge, never the counterpart person.** When only one endpoint is in `P`, only the **edge row** is deleted; the out-of-org counterpart `person` and their own org are untouched. The relationship to an erased person ceases to exist; the other human does not.
@@ -29,7 +40,7 @@ A subtlety the whole-org path must get right: an edge can be **cross-org** — a
 
 - **GDPR Art-17 erasure succeeds for family/supporter accounts** (the common real case) instead of aborting on a RESTRICT FK — this closes the erasure-abort failure mode.
 - **The edge rows do not leak into the retain tier.** Unlike `consent_grant` (which re-homes to `consent_receipt` because the consent receipt must outlive the person for audit), guardianship/supportership carry no retain-tier obligation — the relationship is extinguished by the erasure, so a hard delete is correct. (If a future legal/audit requirement names a retain duty for relationship history, that is a new additive decision, not a change here.)
-- **Two deletion granularities now coexist explicitly** in canon: person-granularity (edges survive; RESTRICT load-bearing) and whole-org erasure (incident edges torn down). §3.2 / §6.1 are updated to name both.
+- **Two deletion granularities now coexist explicitly** in canon: person-granularity and whole-org erasure. Both tear down the incident `guardianship`/`supportership` edges before the person drops — the person-granularity teardown was added by WI-1985 (the original "edges survive a single-person delete" wording is superseded); the RESTRICT FKs stay load-bearing on both. §3.2 / §6.1 are updated to name both.
 - **No schema change**, so no migration, no rollback surface, and the person-granularity guarantees are untouched.
 - **A subscribed-account erasure now succeeds** (DB-row teardown inside the transaction). Store-side subscription cancellation (Stripe/RevenueCat API) is intentionally out of scope of this decision and is tracked as separate billing work.
 

@@ -27,6 +27,7 @@ import {
   assertChargeNotCredentialed,
   assertOwnerAndParentAccess,
   assertOwnerProfile,
+  assertCallerIsAccountOwner,
 } from '../services/family-access';
 import { notFound } from '../errors';
 import {
@@ -52,6 +53,9 @@ type OnboardingRouteEnv = {
     // [CR-2026-05-19-H1] Required by assertOwnerAndParentAccess to gate
     // parent-admin routes to owner profiles only.
     profileMeta: ProfileMeta | undefined;
+    // [WI-1989] The authenticated caller's own person id, resolved server-side
+    // by accountMiddleware — required by assertCallerIsAccountOwner.
+    callerPersonId: string | undefined;
   };
 };
 
@@ -97,6 +101,11 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
         c,
         'Only the account owner can change the conversation language.',
       );
+      // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+      await assertCallerIsAccountOwner(
+        c,
+        'Only the account owner can change the conversation language.',
+      );
       const { conversationLanguage } = c.req.valid('json');
       try {
         await dispatchUpdateConversationLanguage(
@@ -125,6 +134,11 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] isOwner gate + IDOR guard (see learner-profile.ts)
       await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+      // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+      await assertCallerIsAccountOwner(
+        c,
+        'Only the account owner can perform administrative actions on child profiles.',
+      );
       await assertChargeNotCredentialed(db, childProfileId);
       const { conversationLanguage } = c.req.valid('json');
       try {
@@ -167,7 +181,7 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       // [WI-160 / DS-071] Self-edit must be from an owner-profile session.
       // A parent in proxy mode (active profile = child, but old enough) should
       // use the /onboarding/:profileId/pronouns route instead.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { pronouns } = c.req.valid('json');
       try {
         await dispatchUpdatePronouns(db, profileId, account.id, pronouns);
@@ -191,6 +205,11 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] isOwner gate + IDOR guard (see learner-profile.ts)
       await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+      // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+      await assertCallerIsAccountOwner(
+        c,
+        'Only the account owner can perform administrative actions on child profiles.',
+      );
       await assertChargeNotCredentialed(db, childProfileId);
       const { pronouns } = c.req.valid('json');
       try {
@@ -218,7 +237,7 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       // /onboarding/:profileId/interests/context route instead, not the
       // self-edit path. (The prior "interests are personal" comment described
       // child-as-owner self-editing, which assertNotProxyMode preserves.)
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { interests } = c.req.valid('json');
       try {
         await updateInterestsContext(db, profileId, account.id, interests);
@@ -242,6 +261,11 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] isOwner gate + IDOR guard (see learner-profile.ts)
       await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+      // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+      await assertCallerIsAccountOwner(
+        c,
+        'Only the account owner can perform administrative actions on child profiles.',
+      );
       await assertChargeNotCredentialed(db, childProfileId);
       const { interests } = c.req.valid('json');
       try {

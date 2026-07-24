@@ -169,6 +169,20 @@ const envSchema = z.object({
   // See docs/plans/2026-05-18-challenge-round-targets.md "Rollout Gate".
   CHALLENGE_ROUND_RUNTIME_ENABLED: z.enum(['true', 'false']).default('false'),
 
+  ANSWER_EVALUATION_RUNTIME_ENABLED: z.enum(['true', 'false']).default('false'),
+
+  // Homework notice felt moments — single default-off kill switch covering
+  // prompt proposals, durable acceptance, read surfaces, routes, and jobs.
+  MENTOR_NOTICE_ENABLED: z.enum(['true', 'false']).default('false'),
+
+  // [WI-2573] Post-MVP mentor-notice PUSH boundary — separate from the in-app
+  // kill switch above. MMT-ADR-0036 §3.1 makes the MVP in-app only; the nudge
+  // scan/send path stays dormant behind this binding, which no MVP deployment
+  // configuration sets. See isMentorNoticePushPostMvpEnabled.
+  MENTOR_NOTICE_PUSH_POST_MVP_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false'),
+
   // Launch-cohort allowlist for Challenge Round (WI-1754 AC2). Comma-
   // separated profile ids. Narrows CHALLENGE_ROUND_RUNTIME_ENABLED to an
   // explicit cohort instead of the whole environment — see
@@ -199,11 +213,10 @@ const envSchema = z.object({
 
   // Suitability-judge framework (MMT-ADR-0016 §7 phase 4). Default-OFF: while
   // 'false', the exchange path dispatches NO post-display judge — zero behavior
-  // change. Flipped to 'true' in STAGING first to calibrate flag rates from the
-  // judge.verdict / judge.degraded metrics before any phase-5 pre-display
-  // gating. Production stays off until the vendor/DPA gates in
-  // docs/registers/llm-models/master.md clear. The judge is post-display and
-  // fail-open, so the flag only controls whether the calibration dispatch fires.
+  // change. The schema default is 'false'; deployed values are external runtime
+  // configuration. Enablement evidence, including vendor/DPA gates, lives in
+  // docs/registers/llm-models/master.md. The judge is post-display and fail-open,
+  // so the flag only controls whether the calibration dispatch fires.
   JUDGE_FRAMEWORK_ENABLED: z.enum(['true', 'false']).default('false'),
 
   // Suitability-judge ENFORCING output gate for minors (MMT-ADR-0016 §3
@@ -212,9 +225,9 @@ const envSchema = z.object({
   // latency/cost. When 'true', a minor's reply is judged synchronously and a
   // verdict==='violation' (on a non-allowlisted category) is blocked-and-replaced
   // via the sourceReplacement rail; a 'concern' never blocks; an unavailable
-  // judge fails OPEN with a structured operator alarm. MUST NOT be flipped on
-  // until the calibration-gated threshold is harvested from real minor-traffic
-  // judge.verdict data — pre-launch we have none, so it stays off.
+  // judge fails OPEN with a structured operator alarm. The schema default is
+  // 'false'; deployed values are external runtime configuration and require
+  // calibration-gated evidence from real minor-traffic judge.verdict data.
   JUDGE_ENFORCEMENT_ENABLED: z.enum(['true', 'false']).default('false'),
 
   // Challenge Round grader (MMT-ADR-0016 §2 / plan 2026-06-26). Sources
@@ -343,6 +356,36 @@ export function isChallengeRoundRuntimeEnabled(
   return value === 'true';
 }
 
+export function isMentorNoticeEnabled(value: string | undefined): boolean {
+  return value === 'true';
+}
+
+/**
+ * [WI-2573] Post-MVP mentor-notice push boundary.
+ *
+ * MMT-ADR-0036 §3.1 makes the mentor-notice MVP in-app only: no push, no
+ * primer, no scheduled nudge, no background notification fan-out. The nudge
+ * scan/send machinery merged before that ruling is retained dormant behind
+ * this boundary rather than deleted (§Consequences: "may be retained dormant
+ * or removed, but it is not an MVP delivery dependency and must not execute
+ * as though it were").
+ *
+ * This is a SEPARATE gate from {@link isMentorNoticeEnabled}: turning the
+ * in-app mentor-notice capability on (MENTOR_NOTICE_ENABLED=true) — or any
+ * learner notification preference such as `reviewReminders` / `pushEnabled` —
+ * cannot activate delivery. Only the dedicated
+ * MENTOR_NOTICE_PUSH_POST_MVP_ENABLED binding can, and it exists in no MVP
+ * deployment configuration.
+ *
+ * Default-closed: undefined / anything-other-than 'true' returns false, so a
+ * missing or unset binding contains delivery rather than releasing it.
+ */
+export function isMentorNoticePushPostMvpEnabled(
+  value: string | undefined,
+): boolean {
+  return value === 'true';
+}
+
 /**
  * Challenge Round launch-cohort gate (WI-1754 AC2). Per-profile allowlist
  * check for CHALLENGE_ROUND_COHORT_PROFILE_IDS, analogous in shape to
@@ -392,6 +435,18 @@ export function isChallengeRoundEnabledForProfile(
  * REVIEW transition copy. See docs/specs/2026-06-27-rr1-rr13-warm-review-callback.md.
  */
 export function isReviewCallbackOpenerEnabled(
+  value: string | undefined,
+): boolean {
+  return value === 'true';
+}
+
+/**
+ * Per-turn answer-evaluation gate. Read at the session route boundary and
+ * threaded through prompt construction, parsing, persistence, and bounded
+ * downscaffolding. Default-closed so an absent or malformed binding preserves
+ * the legacy exchange path.
+ */
+export function isAnswerEvaluationRuntimeEnabled(
   value: string | undefined,
 ): boolean {
   return value === 'true';

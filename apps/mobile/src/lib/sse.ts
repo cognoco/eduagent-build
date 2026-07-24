@@ -14,6 +14,7 @@
  */
 import {
   maybeReplayResponseSchema,
+  mentorNoticeAcceptedSchema,
   type ChallengeRoundSessionState,
   type StreamLanguageMeaningOutput,
   type StreamLanguageSpeakingPractice,
@@ -142,6 +143,10 @@ export interface StreamDoneEvent {
   draftedNote?: DraftedChallengeNoteEvent;
   /** F6: LLM self-reported confidence. Absent or 'medium'/'high' = no indicator. Only 'low' shows a UI prompt. */
   confidence?: 'low' | 'medium' | 'high';
+  /** [WI-2107] LLM opened a topic without delivering content or a question this turn. */
+  topicOpenedPendingContent?: boolean;
+  /** Server-accepted homework observation; never present on token/fallback frames. */
+  mentorNotice?: import('@eduagent/schemas').MentorNoticeAccepted;
 }
 
 export interface StreamErrorEvent {
@@ -171,7 +176,23 @@ function isValidStreamEvent(obj: Record<string, unknown>): boolean {
     );
   }
   if (obj.type === 'replay') return obj.replayed === true;
-  if (obj.type === 'done') return typeof obj.exchangeCount === 'number';
+  if (obj.type === 'done') {
+    if (typeof obj.exchangeCount !== 'number') return false;
+    // [WI-2500] Mobile trust boundary: the server validates a mentorNotice
+    // before emitting it, but this parser must not forward a malformed one to
+    // use-stream-message.ts / UI consumers as if it were a canonical accepted
+    // notice (invalid UUID, empty concept, non-string correctionHint). Runtime-
+    // parse the field with the shared schema and DROP an invalid notice rather
+    // than the whole done frame — the notice is a non-core adornment, and
+    // "only a committed server acceptance may enter UI output".
+    if (
+      obj.mentorNotice !== undefined &&
+      !mentorNoticeAcceptedSchema.safeParse(obj.mentorNotice).success
+    ) {
+      delete obj.mentorNotice;
+    }
+    return true;
+  }
   if (obj.type === 'error') return typeof obj.message === 'string';
   return false;
 }
@@ -347,7 +368,7 @@ export function streamSSEViaXHR(
   // sending data for IDLE_TIMEOUT_MS. The server may take 20s+ for LLM
   // streaming then another 10s for post-stream DB writes — the total easily
   // exceeds a fixed 30s timeout, but the stream is never truly idle.
-  const IDLE_TIMEOUT_MS = 45_000;
+  const IDLE_TIMEOUT_MS = 90_000;
   let idleTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
     if (done) return;
     const timeoutError = new Error(

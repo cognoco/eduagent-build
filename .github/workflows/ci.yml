@@ -181,7 +181,7 @@ jobs:
       # script can silently read secrets from the CI environment. Catches
       # supply-chain attacks via malicious postinstall hooks before they ship.
       - name: Verify postinstall safety
-        if: steps.scope.outputs.docs_only != 'true'
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && steps.scope.outputs.postinstall_safety == 'true')
         run: pnpm run verify:postinstall-safety
 
       # Forbid mobile-only deps in root package.json. Root + apps/mobile both
@@ -189,7 +189,7 @@ jobs:
       # peer-dep contexts that silently break NativeWind className styling on
       # native bundles. See .claude/memory/feedback_nativewind_root_pkg_split.md.
       - name: Root package.json — no mobile-only deps
-        if: steps.scope.outputs.docs_only != 'true'
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && steps.scope.outputs.root_deps == 'true')
         run: pnpm run check:root-deps
 
       # Fail fast on missing/typo'd t('key') calls — i18next renders unknown
@@ -206,7 +206,7 @@ jobs:
       # complementary read-side guard.
       # Existing literals are grandfathered in scripts/i18n-jsx-literals-baseline.json.
       - name: i18n hardcoded-JSX-literal check
-        if: steps.scope.outputs.docs_only != 'true'
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && steps.scope.outputs.i18n_jsx_literals == 'true')
         run: pnpm exec tsx scripts/check-i18n-jsx-literals.ts
 
       # Liveness guard for scripts/i18n-keep.ts: every KEEP_PATTERNS reason
@@ -228,14 +228,14 @@ jobs:
       # cancel functions without corrupting profile-owned data. This guard
       # keeps the annotation coverage complete as new functions are added.
       - name: Inngest @inngest-admin annotation guard (WI-1075)
-        if: steps.scope.outputs.docs_only != 'true'
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && steps.scope.outputs.inngest_admin == 'true')
         run: pnpm exec tsx scripts/check-inngest-admin.ts
 
       # Forbid [MARKER] tokens in LLM prompt builders. State-machine signals
       # must use the structured `signals` envelope (services/llm/envelope.ts),
       # not free-text marker tokens. See AGENTS.md → "LLM Response Envelope".
       - name: Prompt marker-token check
-        if: steps.scope.outputs.docs_only != 'true'
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && steps.scope.outputs.prompt_markers == 'true')
         run: bash scripts/check-prompt-markers.sh
 
       # [G11 / WI-452] No-clinical-copy ratchet previously ran ONLY in the
@@ -243,7 +243,7 @@ jobs:
       # committer that skips Husky. CI is the backstop. Baseline ratchet:
       # existing offenses are grandfathered, only NEW ones fail.
       - name: No-clinical-copy ratchet (G11)
-        if: steps.scope.outputs.docs_only != 'true'
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && steps.scope.outputs.no_clinical_copy == 'true')
         run: pnpm run check:no-clinical-copy
 
       # [Gemini-retirement Phase A / T-A1] Forward-only ratchet: block NEW
@@ -253,8 +253,15 @@ jobs:
       # {file,token} pairs fail. Phase B shrinks the baseline as the legacy
       # path is deleted.
       - name: No-Gemini-runtime ratchet (Phase A)
-        if: steps.scope.outputs.docs_only != 'true'
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && steps.scope.outputs.no_gemini_runtime == 'true')
         run: pnpm run check:no-gemini-runtime
+
+      # WI-2386: guardian/non-adult whole-consent paths consume the canonical
+      # typed purpose set. Historical migration literals are narrowly
+      # allowlisted inside the executable guard.
+      - name: Consent purpose-set contract guard (WI-2386)
+        if: steps.scope.outputs.docs_only != 'true'
+        run: pnpm run check:consent-purpose-contract
 
       # [R9 / WI-1304 / WS-37 M1 "Seam Hardening"] Forward-only ratchet:
       # pins the build-time MODE_NAV_V0/V1/V2 flag triple in
@@ -265,7 +272,7 @@ jobs:
       # combo; drift to a different combo (esp. toward the V2=on/V1=off
       # dead zone) is unbaselined and fails.
       - name: MODE_NAV flag-combo ratchet (R9)
-        if: steps.scope.outputs.docs_only != 'true'
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && steps.scope.outputs.mode_nav_flag_combo == 'true')
         run: pnpm run check:mode-nav-flag-combo
 
       # [G11 / WI-452] Test-only-exports ratchet (D-TTL-6: *ForTesting/__test*
@@ -275,7 +282,7 @@ jobs:
       # the red check name the violation class. (The bundle still includes it;
       # the ~seconds of overlap buys a legible failure surface.)
       - name: Test-only-exports ratchet (G11)
-        if: steps.scope.outputs.docs_only != 'true'
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && steps.scope.outputs.test_only_exports == 'true')
         run: pnpm exec jest --config scripts/jest.config.cjs scripts/check-test-only-exports.test.ts --no-coverage
 
       # GC1 ratchet (Tier 1): block PRs that add NEW relative-path jest.mock()
@@ -304,7 +311,7 @@ jobs:
         run: pnpm exec tsx scripts/check-migration-immutability.ts
 
       - name: GitHub workflow supply-chain check
-        if: steps.scope.outputs.docs_only != 'true'
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && steps.scope.outputs.workflow_security == 'true')
         run: pnpm run check:github-workflow-security
 
       # Structural-regression guards under scripts/ (BUG-979 / BUG-974). Nx
@@ -313,6 +320,18 @@ jobs:
       - name: scripts/* tests
         if: steps.scope.outputs.docs_only != 'true'
         run: pnpm exec jest --config scripts/jest.config.cjs --no-coverage
+
+      # Same rationale as scripts/* tests above (WI-2120): tools/scripts/ EAS
+      # build hooks live outside any Nx project too.
+      - name: tools/scripts/* tests
+        if: steps.scope.outputs.docs_only != 'true'
+        run: pnpm exec jest --config tools/scripts/jest.config.cjs --no-coverage
+
+      # WI-2458: lane resolver + expiry/quarantine contract. tools/quarantine
+      # is outside Nx project inference, so invoke its focused Jest config.
+      - name: tools/quarantine/* tests
+        if: steps.scope.outputs.docs_only != 'true'
+        run: pnpm exec jest --config tools/quarantine/jest.config.cjs --no-coverage
 
       # Optional advisory: detect .claude/skills/ entries whose .agents/skills/
       # master was removed but the generated copy was left behind. continue-on-error
@@ -331,7 +350,7 @@ jobs:
       # lock the concrete-vs-placeholder behaviour. Lives under apps/api/scripts/,
       # so the scripts/ jest config above does not see it.
       - name: apps/api/scripts node:test guards (KV-binding verifier)
-        if: steps.scope.outputs.docs_only != 'true'
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && steps.scope.outputs.api_script_guards == 'true')
         run: node --test apps/api/scripts/verify-wrangler-kv-binding.test.mjs
 
       # WI-795: regression guard for the db:push stg/prod guard
@@ -340,10 +359,17 @@ jobs:
       # DOPPLER_CONFIG without DB_PUSH_LOCAL_DEV, guard allows dev config and
       # the DB_PUSH_LOCAL_DEV opt-in, credential redaction in error output, and
       # the wiring of predb:push + -c dev in package.json scripts.
+      # WI-1874: the DB_PUSH_LOCAL_DEV=1 escape also blocks a resolved
+      # DATABASE_URL whose host is not localhost/127.0.0.1 (e.g. leftover stg
+      # creds from pnpm env:sync), and allows localhost/127.0.0.1.
+      # WI-2487: the identity-FK catalog guard covers the exact migration-0129
+      # predicate plus clean/drift/unavailable exits and credential redaction.
       # Lives under packages/database/scripts/ so Jest's testMatch doesn't see it.
-      - name: packages/database/scripts node:test guards (db:push guard)
-        if: steps.scope.outputs.docs_only != 'true'
-        run: node --test packages/database/scripts/check-db-push-target.test.mjs
+      - name: packages/database/scripts node:test guards
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && steps.scope.outputs.database_script_guards == 'true')
+        run: |
+          node --test packages/database/scripts/check-db-push-target.test.mjs
+          node --test packages/database/scripts/check-identity-fk-drift.test.mjs
 
       # WI-536: validate the flaky-test quarantine registry. Deterministic, so
       # it gates — fails if any entry is missing an owner or a Cosmo WI-NN, or
@@ -393,8 +419,9 @@ jobs:
       # Run API integration tests against real PostgreSQL.
       # PRs: routed by the change-class router (WI-452) — runs whenever the
       # matrix maps any touched class to integration tests (db-schema,
-      # db-migrations, inngest, api-routes, api-middleware, shared-schemas,
-      # shared-database, security-sensitive, test-infra, dependencies).
+      # db-migrations, inngest, api-routes, api-middleware, api-services,
+      # shared-schemas, shared-database, security-sensitive, test-infra,
+      # dependencies).
       # Push to main: keeps the original dorny paths-filter gate unchanged.
       - name: API integration tests
         if: >-

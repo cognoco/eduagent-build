@@ -140,7 +140,7 @@ _This document is **L1 canon** — the authoritative *what* of how the system is
 | **Data privacy & compliance** | **Consent state machine**: `PENDING → PARENTAL_CONSENT_REQUESTED → CONSENTED → WITHDRAWN`, enforced at repository layer (no data access without CONSENTED). **Deletion orchestrator**: knows every table and external system, anonymizes immediately, full deletion within 30 days, idempotent/retryable steps. | Full stack |
 | **Error boundaries & graceful degradation** | Per-dependency circuit breakers with specific thresholds: **LLM providers** — trip after 3 consecutive 5xx/timeouts within 30-second window, half-open after 60s (one probe request). Tight window intentional — 30s wait is already bad UX in tutoring. **OCR** — no circuit breaker; single-request 5s timeout, immediate text input fallback (failures are per-image, not systemic). **Stripe** — no circuit breaker; webhook delays are normal. Check subscription from local DB (webhook-synced), never call Stripe during learning session. 3-day grace period per PRD. **Neon** — if DB is down, almost nothing works. Cache coaching card + Library on client after each successful load, show with "limited mode" banner. Don't build elaborate fallbacks — invest in Neon reliability instead. | Full stack |
 | **Observability** | Structured JSON logging via `services/logger.ts`, compatible with Workers Logpush and `wrangler tail`. No Axiom SDK integration. Every LLM call logged: model, tokens in/out, latency, context hash, routing decision, cost. SM-2 decisions logged: card, interval, ease factor, grade. | Backend |
-| **i18n** | English-only UI for v1.0 — no i18n framework implemented. Multi-language UI deferred. Backend: English only. Learning languages: any (via LLM). RTL deferred. | Frontend |
+| **i18n** | Seven UI locales are implemented (`en`, `de`, `es`, `ja`, `nb`, `pl`, `pt`); tutor-prose languages are an intentional ten-language superset. Locale availability is not country launch clearance. RTL is deferred. | Frontend |
 
 ### Consumer Family Compliance Boundary
 
@@ -358,6 +358,16 @@ Research noted pnpm symlink issues with Expo in some Nx setups. If encountered d
 - **Library**: Full fetch per subject, filter/sort client-side with TanStack Query. Ceiling is a few hundred topics per power user — single query, under 10ms. Cursor pagination adds unnecessary client complexity for a dataset that fits in one response.
 - **Session history**: Cursor-based (`WHERE (created_at, id) < ($cursor_time, $cursor_id) ORDER BY created_at DESC, id DESC LIMIT $n`). Grows unbounded, pagination justified.
 
+**Mentor-notice authority and state boundary (`MMT-ADR-0036`):**
+- Creation is eligible only for homework and ordinary single-subject learning sessions. The MVP LLM proposal carries a bounded concept, optional correction hint, and durable answer-event evidence reference; it carries no interleaved `topicId`.
+- The LLM proposes; one server-owned service authorizes. It derives the learner and subject/topic from authenticated session data, validates durable same-session evidence, scrubs stored context, applies idempotency/concurrency rules, and returns the only result API, SSE, cache, and UI consumers may use. `learnerQuote` is optional transient validation input and is never persisted.
+- Streaming and non-streaming completion call that same service. Re-check sessions are creation-ineligible. Re-check verdicts are absent from the tutor envelope: after persisting the learner event, both transports call one server evaluator whose judge routing explicitly excludes the tutor's producer vendor. Every LLM, event, API, SSE, and mobile boundary validates the canonical runtime payload before use.
+- The dedicated store holds minimal learner-safe context and lifecycle state, never verbatim learner evidence, clinical labels, model reasoning, or confidence. `answerEventId` is an immutable scalar with no event-table foreign key: creation validates the extant same-learner, same-session `user_message`; transcript purge removes the event but preserves the active notice and identifier. Profile and source-session deletion keep their notice cascades.
+- Every notice, note, session-analysis Learning Profile field, memory fact/backfill/dedup record, and Needs-Deepening text crosses one shared async multilingual clinical-persistence gate. Unicode-normalized deterministic rules cover every supported Conversation Language and cross-language phrase. Only ambiguous LLM-authored educational-reference text may consult an independent judge; every unavailable, malformed, missing-producer, user-authored, or migration ambiguity fails closed.
+- The centralized state machine owns offer, local-04:00 learning-day defer in the learner's IANA zone, a re-check capped at three learner responses, independently judged `locked_in`/`not_yet`/explicit-dismissal completion, 21-day fade, and actor=subject visibility. Clients never create optimistic notice state.
+- The server emits one rollout-policy observation—non-negative monotonic revision, enabled value, and revision-bound opaque projection epoch—on every notice-bearing response or mutation result. One actor/profile mobile store orders observations across all surfaces and restart: lower revisions are ignored, disabled wins ties, enabled requires a higher revision after disable, and missing/malformed or failed hydration stays hidden.
+- The MVP has no mentor-notice push or scheduled nudge path. Flag-off stops prompt eligibility, mutations, projections, deep links, and observed cached surfaces while preserving rows for normal retention/deletion and possible re-enable. Fade still runs while off, and reads apply the same 21-day cutoff. Flag and revision change atomically in versioned configuration; this ADR amendment does not authorize changing deployed values, OTA, release, or deployment.
+
 **Prerequisite Graph (Epic 7, v1.1):**
 - New `topic_prerequisites` join table in `packages/database/src/schema/subjects.ts`: `prerequisite_topic_id` → `dependent_topic_id` with `relationship_type` enum (`REQUIRED | RECOMMENDED`)
 - Unique constraint on `(prerequisiteTopicId, dependentTopicId)`, check constraint prevents self-references
@@ -452,6 +462,26 @@ One mobile client, one error handling path. RFC 7807 overengineered for this. Bo
 /v1/inngest                 # Inngest webhook — NOT behind Clerk auth.
                             # Verify Inngest signing key, skip JWT middleware.
 ```
+
+**Family usage response contract (`MMT-ADR-0035`):** For an owner-visible Family/Pro breakdown,
+`GET /v1/usage` returns `familyAggregate: { used, limit, formerMemberUsed? }`.
+`used` is the full current-cycle total. `byProfile` contains active members
+only; `formerMemberUsed` is the non-negative bucket retained from profiles
+removed during that cycle. Therefore
+`sum(byProfile.used) + (formerMemberUsed ?? 0) === familyAggregate.used`.
+The bucket is omitted by older servers and treated as zero for rolling-client
+compatibility. It never changes an active member's attributed usage. It does
+participate in the family aggregate and in the repaired plan-funded monthly
+enforcement counter.
+
+All Family/Pro quota-bearing routes assemble one effective-access and locked
+quota snapshot. The subscription period start anchors the current cycle, the
+quota-pool reset is its public token, and the event ledger supplies consumption.
+`GET /v1/subscription/family` returns that exact reset token as `cycleResetAt`;
+routes and clients never calculate a second Family reset date. RevenueCat
+activation and renewal align both persisted anchors to the provider period.
+Incoherent or unanchored snapshots fail closed, and any bounded retry or
+enforcement repair emits structured observability.
 
 ### Frontend Architecture
 
@@ -1428,7 +1458,7 @@ Different concerns: rate limiting protects infrastructure, quota metering enforc
 
 **i18n — two distinct concerns:**
 
-1. **UI translations**: English only for v1.0 — no i18n framework implemented. Multi-language UI (react-i18next + locale files) is deferred. The original architecture planned `apps/mobile/assets/locales/{en,de}/*.json` via react-i18next, but this was not built for the MVP market pivot to English-only.
+1. **UI translations**: react-i18next and seven UI locales are implemented (`en`, `de`, `es`, `ja`, `nb`, `pl`, `pt`). Tutor-prose supports three additional languages (`cs`, `fr`, `it`). The current launch-country allowlist is governed separately by `docs/compliance/2026-07-23-13-plus-eea-launch-country-ruling.md`; a UI locale never authorizes a market.
 2. **LLM language preference**: NOT i18n infrastructure. The learner's preferred language is a field on their profile (`preferredLanguage`), injected into the system prompt during prompt assembly in `services/exchanges.ts`. The LLM responds in the learner's language naturally. This is a prompt construction concern, not a translation file concern.
 
 **Test data co-location:**

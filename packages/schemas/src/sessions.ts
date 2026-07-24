@@ -7,6 +7,7 @@ import {
   pendingCelebrationSchema,
 } from './progress.ts';
 import { languageSessionSummarySchema } from './language.ts';
+import { mentorNoticeAcceptedSchema } from './mentor-notices.ts';
 
 export const orphanReasonSchema = z.enum([
   'llm_stream_error',
@@ -91,6 +92,11 @@ export type InputMode = z.infer<typeof inputModeSchema>;
 
 export const homeworkModeSchema = z.enum(['help_me', 'check_answer']);
 export type HomeworkMode = z.infer<typeof homeworkModeSchema>;
+
+/** Active app nav shell (WI-2220). V1 maps to 'v0' client-side — see
+ *  apps/api/src/services/app-help-map.ts for the shell-to-map contract. */
+export const appShellSchema = z.enum(['v0', 'v2']);
+export type AppShell = z.infer<typeof appShellSchema>;
 
 export const homeworkProblemSourceSchema = z.enum(['ocr', 'manual']);
 export type HomeworkProblemSource = z.infer<typeof homeworkProblemSourceSchema>;
@@ -237,6 +243,10 @@ export const sessionMetadataSchema = z
      * reflects via session-streaming. Absent = no round has been offered.
      */
     challengeRound: challengeRoundSessionStateSchema.optional(),
+    /** Open mentor-notice re-check attached to this session. */
+    recheckNoticeId: z.string().uuid().optional(),
+    /** Exchange count when a natural re-check offer was attached. */
+    recheckOfferExchangeCount: z.number().int().min(0).optional(),
   })
   .strip();
 export type SessionMetadata = z.infer<typeof sessionMetadataSchema>;
@@ -339,6 +349,10 @@ export const sessionMessageSchema = z
     imageBase64: z.string().max(IMAGE_BASE64_MAX).optional(),
     /** MIME type of the attached image */
     imageMimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']).optional(),
+    /** [WI-2220] Active app nav shell, sourced client-side from
+     *  FEATURE_FLAGS.MODE_NAV_V2_ENABLED at send time — drives which app-help
+     *  destination map the mentor answers app-navigation questions from. */
+    shell: appShellSchema.optional(),
   })
   .strict()
   .refine((data) => !!data.imageBase64 === !!data.imageMimeType, {
@@ -556,11 +570,17 @@ export type SummarySubmitInput = z.infer<typeof summarySubmitSchema>;
 
 // Summary response
 
+export const summaryFeedbackStatusSchema = z.enum(['available', 'unavailable']);
+export type SummaryFeedbackStatus = z.infer<typeof summaryFeedbackStatusSchema>;
+
 export const sessionSummarySchema = z.object({
   id: z.string().uuid(),
   sessionId: z.string().uuid(),
   content: z.string(),
   aiFeedback: z.string().nullable(),
+  // Optional for backwards-compatible parsing of cached pre-WI-2183 payloads;
+  // current API mappers always emit the field.
+  feedbackStatus: summaryFeedbackStatusSchema.optional(),
   status: summaryStatusSchema,
   closingLine: z.string().nullable(),
   learnerRecap: z.string().nullable(),
@@ -573,6 +593,7 @@ export const sessionSummarySchema = z.object({
   // WI-1553: four_strands session-end learning summary. Additive — absent on
   // legacy rows and non-language sessions, where it parses to null.
   languageLearningSummary: languageSessionSummarySchema.nullable().optional(),
+  mentorNotice: mentorNoticeAcceptedSchema.optional(),
 });
 export type SessionSummary = z.infer<typeof sessionSummarySchema>;
 
@@ -790,14 +811,32 @@ export type SessionSummaryGetResponse = z.infer<
 // SubmitSummaryResult — POST /sessions/:sessionId/summary → 200
 // Picks only the fields returned by the submit endpoint (not the full summary).
 export const submitSummaryResultSchema = z.object({
-  summary: sessionSummarySchema.pick({
-    id: true,
-    sessionId: true,
-    content: true,
-    aiFeedback: true,
-    status: true,
-    baseXp: true,
-    reflectionBonusXp: true,
-  }),
+  summary: sessionSummarySchema
+    .pick({
+      id: true,
+      sessionId: true,
+      content: true,
+      aiFeedback: true,
+      status: true,
+      baseXp: true,
+      reflectionBonusXp: true,
+    })
+    .extend({ feedbackStatus: summaryFeedbackStatusSchema }),
 });
 export type SubmitSummaryResult = z.infer<typeof submitSummaryResultSchema>;
+
+// RetrySummaryFeedbackResult — POST /sessions/:sessionId/summary/retry-feedback → 200
+export const retrySummaryFeedbackResultSchema = z.object({
+  summary: sessionSummarySchema
+    .pick({
+      id: true,
+      sessionId: true,
+      content: true,
+      aiFeedback: true,
+      status: true,
+    })
+    .extend({ feedbackStatus: summaryFeedbackStatusSchema }),
+});
+export type RetrySummaryFeedbackResult = z.infer<
+  typeof retrySummaryFeedbackResultSchema
+>;

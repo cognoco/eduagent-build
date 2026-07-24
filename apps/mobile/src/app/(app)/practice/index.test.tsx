@@ -1,8 +1,14 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import {
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react-native';
 import {
   renderScreen,
   type RenderScreenResult,
 } from '../../../test-utils/screen-render';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 // ─── Boundary mocks (external / native runtime only) ────────────────────────
 //
@@ -280,18 +286,49 @@ describe('PracticeScreen', () => {
     screen.getByText('Your next review is in 3 hours');
   });
 
-  it('lets the learner browse topics from the empty state', async () => {
-    mount({
-      reviewSummary: {
-        totalOverdue: 0,
-        nextReviewTopic: null,
-        nextUpcomingReviewAt: null,
-      },
+  describe('review-empty browse CTA destination [WI-2219]', () => {
+    let originalV2: boolean;
+
+    beforeEach(() => {
+      originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
     });
 
-    await waitFor(() => screen.getByTestId('review-empty-browse'));
-    fireEvent.press(screen.getByTestId('review-empty-browse'));
-    expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+    afterEach(() => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        originalV2;
+    });
+
+    it('lets the learner browse topics from the empty state, going to library when V2 nav is off', async () => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        false;
+      mount({
+        reviewSummary: {
+          totalOverdue: 0,
+          nextReviewTopic: null,
+          nextUpcomingReviewAt: null,
+        },
+      });
+
+      await waitFor(() => screen.getByTestId('review-empty-browse'));
+      fireEvent.press(screen.getByTestId('review-empty-browse'));
+      expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+    });
+
+    it('lets the learner browse topics from the empty state, going to V2 Subjects when V2 nav is on', async () => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        true;
+      mount({
+        reviewSummary: {
+          totalOverdue: 0,
+          nextReviewTopic: null,
+          nextUpcomingReviewAt: null,
+        },
+      });
+
+      await waitFor(() => screen.getByTestId('review-empty-browse'));
+      fireEvent.press(screen.getByTestId('review-empty-browse'));
+      expect(mockPush).toHaveBeenCalledWith('/(app)/subjects');
+    });
   });
 
   it('shows quiz XP in the header and quick quiz cue before any XP is earned', async () => {
@@ -340,28 +377,85 @@ describe('PracticeScreen', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('routes the quiz parent to index and nested options to direct launch', async () => {
+  it('[WI-2191] has no quick-quiz button ancestor containing Capitals or Guess Who buttons', async () => {
     mount();
     await waitFor(() => screen.getByTestId('practice-quiz'));
 
-    fireEvent.press(screen.getByTestId('practice-quiz'));
-    fireEvent.press(screen.getByTestId('practice-quiz-capitals'));
-    fireEvent.press(screen.getByTestId('practice-quiz-guess-who'));
+    const quizAction = screen.getByTestId('practice-quiz');
+    const nestedQuizButtons = quizAction
+      .findAll(
+        (node: { props?: Record<string, unknown> }) =>
+          node.props?.accessibilityRole === 'button' &&
+          typeof node.props?.testID === 'string' &&
+          node.props.testID !== 'practice-quiz',
+      )
+      .map(
+        (node: { props?: Record<string, unknown> }) =>
+          node.props?.testID as string,
+      );
 
-    expect(mockPush).toHaveBeenCalledTimes(3);
-    expect(mockPush).toHaveBeenNthCalledWith(1, {
-      pathname: '/(app)/quiz',
-      params: { returnTo: 'practice' },
-    });
-    expect(mockPush).toHaveBeenNthCalledWith(2, {
-      pathname: '/(app)/quiz/launch',
-      params: { activityType: 'capitals', returnTo: 'practice' },
-    });
-    expect(mockPush).toHaveBeenNthCalledWith(3, {
-      pathname: '/(app)/quiz/launch',
-      params: { activityType: 'guess_who', returnTo: 'practice' },
-    });
+    expect([...new Set(nestedQuizButtons)]).toEqual([]);
   });
+
+  it('[WI-2191] exposes a labelled group with three separate actions in logical read order', async () => {
+    mount();
+    await waitFor(() => screen.getByTestId('practice-quiz-group'));
+
+    const quizGroup = screen.getByTestId('practice-quiz-group');
+    const quizActionOrder = quizGroup
+      .findAll(
+        (node: { props?: Record<string, unknown> }) =>
+          node.props?.accessibilityRole === 'button' &&
+          typeof node.props?.testID === 'string',
+      )
+      .map(
+        (node: { props?: Record<string, unknown> }) =>
+          node.props?.testID as string,
+      );
+
+    expect(quizGroup.props.role).toBe('group');
+    expect(quizGroup.props.accessibilityLabel).toBe('Quick quiz');
+    expect([...new Set(quizActionOrder)]).toEqual([
+      'practice-quiz',
+      'practice-quiz-capitals',
+      'practice-quiz-guess-who',
+    ]);
+  });
+
+  it.each([
+    {
+      testID: 'practice-quiz',
+      expectedRoute: {
+        pathname: '/(app)/quiz',
+        params: { returnTo: 'practice' },
+      },
+    },
+    {
+      testID: 'practice-quiz-capitals',
+      expectedRoute: {
+        pathname: '/(app)/quiz/launch',
+        params: { activityType: 'capitals', returnTo: 'practice' },
+      },
+    },
+    {
+      testID: 'practice-quiz-guess-who',
+      expectedRoute: {
+        pathname: '/(app)/quiz/launch',
+        params: { activityType: 'guess_who', returnTo: 'practice' },
+      },
+    },
+  ])(
+    '[WI-2191] native accessibility activation of $testID launches only its chosen route once',
+    async ({ testID, expectedRoute }) => {
+      mount();
+      await waitFor(() => screen.getByTestId(testID));
+
+      fireEvent.press(screen.getByTestId(testID));
+
+      expect(mockPush).toHaveBeenCalledTimes(1);
+      expect(mockPush).toHaveBeenCalledWith(expectedRoute);
+    },
+  );
 
   it('routes vocabulary, recitation, dictation, and quiz history to their flows', async () => {
     mount();
@@ -398,6 +492,32 @@ describe('PracticeScreen', () => {
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/quiz/history',
       params: { returnTo: 'practice' },
+    });
+  });
+
+  it('[WI-1864] forwards the Practice upstream return destination into Dictation', async () => {
+    mockSearchParams = { returnTo: 'journal' };
+    mount();
+    await waitFor(() => screen.getByTestId('practice-dictation'));
+
+    fireEvent.press(screen.getByTestId('practice-dictation'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/dictation',
+      params: { returnTo: 'practice', practiceReturnTo: 'journal' },
+    });
+  });
+
+  it('[WI-1864] forwards the Practice upstream return destination into Quiz History', async () => {
+    mockSearchParams = { returnTo: 'journal' };
+    mount();
+    await waitFor(() => screen.getByTestId('practice-quiz-history'));
+
+    fireEvent.press(screen.getByTestId('practice-quiz-history'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/quiz/history',
+      params: { returnTo: 'practice', practiceReturnTo: 'journal' },
     });
   });
 
@@ -561,6 +681,19 @@ describe('PracticeScreen', () => {
       'practice-recitation',
       'practice-quiz-history',
     ]);
+  });
+
+  it('exposes a non-scrollable Other practice heading for outer-viewport navigation', async () => {
+    mount();
+
+    await waitFor(() => {
+      screen.getByTestId('practice-other-practice-heading');
+    });
+    const slider = screen.getByTestId('practice-other-practice-slider');
+    within(slider).getByTestId('practice-recitation');
+    expect(
+      within(slider).queryByTestId('practice-other-practice-heading'),
+    ).toBeNull();
   });
 
   it('renders quiz history as a quiet recent-progress row', async () => {

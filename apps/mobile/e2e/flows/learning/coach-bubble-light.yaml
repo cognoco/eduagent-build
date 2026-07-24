@@ -1,3 +1,8 @@
+# PARKED (WI-1864): Scheduled release CI has neither a deterministic LLM
+# response fixture nor per-flow UI_MODE application, so this visual flow cannot
+# prove light-mode coach-bubble readability. Owner: WI-2548.
+# UNBLOCK: route the nightly worker through a deterministic coaching response,
+# apply UI_MODE=light before launch, and wait on a response-complete oracle.
 # Flow: Coach Bubble Visibility (Light Mode)
 # Validates: AI/coach message text is visible in light mode chat bubbles.
 # Regression guard for invisible-ink bug — verifies the fix doesn't break light mode.
@@ -12,6 +17,7 @@ tags:
   - smoke
   - learning
   - visual
+  - blocked
 ---
 # 1. Seed & sign in
 - runFlow:

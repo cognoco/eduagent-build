@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { platformAlert } from '../../lib/platform-alert';
 import { useCallback, useMemo, useState } from 'react';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { InterestContext } from '@eduagent/schemas';
 import { useProfile } from '../../lib/profile';
 import { computeAgeBracket } from '@eduagent/schemas';
@@ -34,11 +33,12 @@ import { MemoryConsentPrompt } from '../../components/memory-consent-prompt';
 import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { useEntryGate } from '../../hooks/use-entry-gate';
 import { useUpdateInterestsContext } from '../../hooks/use-onboarding-dimensions';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function MentorMemoryScreen() {
   const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { returnTo } = useLocalSearchParams<{
     returnTo?: string | string[];
   }>();
@@ -228,7 +228,11 @@ export default function MentorMemoryScreen() {
 
   if (isLoading) {
     return (
-      <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+      <View
+        className="flex-1 bg-background"
+        style={{ paddingTop: insets.top }}
+        testID="mentor-memory-loading-screen"
+      >
         <TimeoutLoader
           isLoading
           title={t('session.mentorMemory.loadTimeout.title')}
@@ -253,7 +257,11 @@ export default function MentorMemoryScreen() {
 
   if (isError && !profile) {
     return (
-      <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+      <View
+        className="flex-1 bg-background"
+        style={{ paddingTop: insets.top }}
+        testID="mentor-memory-error-screen"
+      >
         <ErrorFallback
           variant="centered"
           message={t('session.mentorMemory.loadError')}
@@ -274,13 +282,18 @@ export default function MentorMemoryScreen() {
   }
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+    <View
+      className="flex-1 bg-background"
+      style={{ paddingTop: insets.top }}
+      testID="mentor-memory-screen"
+    >
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
           onPress={handleBack}
           className="me-3 py-2 pe-2"
           accessibilityRole="button"
           accessibilityLabel={t('common.goBack')}
+          testID="mentor-memory-back"
         >
           <Text className="text-primary text-body font-semibold">
             {'\u2190'}

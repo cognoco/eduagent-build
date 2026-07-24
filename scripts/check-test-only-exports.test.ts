@@ -58,6 +58,13 @@ const ALLOWLIST = new Set([
   // import it — no production code does — so it is tree-shaken out of the
   // shipped Worker; it is test scaffolding, not a runtime call site.
   ['apps', 'api', 'src', 'services', 'llm', 'test-utils.ts'].join(sep),
+  // The Maestro-only API worker registers a deterministic email transport so
+  // hosted native flows can assert email receipts without contacting a vendor.
+  // It is imported only by test-utils/maestro-e2e-worker.ts, never by the
+  // production worker entry point.
+  ['apps', 'api', 'src', 'test-utils', 'maestro-e2e-email-provider.ts'].join(
+    sep,
+  ),
 ]);
 
 function isAllowed(relPath: string): boolean {

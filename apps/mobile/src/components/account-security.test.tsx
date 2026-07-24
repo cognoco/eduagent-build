@@ -58,6 +58,41 @@ describe('AccountSecurity', () => {
     screen.getByTestId('manage-devices-row');
   });
 
+  it('visibly and accessibly names the owner on every security mutation', () => {
+    active = renderWithProviders(
+      <AccountSecurity visible targetName="Owner" />,
+    );
+
+    expect(screen.getAllByText('Owner')).toHaveLength(3);
+    expect(
+      screen.getByTestId('change-password-row').props.accessibilityLabel,
+    ).toBe('Change Password. Owner');
+    expect(
+      screen.getByTestId('change-email-row').props.accessibilityLabel,
+    ).toBe('Change email. Owner');
+    expect(
+      screen.getByTestId('manage-devices-row').props.accessibilityLabel,
+    ).toBe('Manage devices. Owner');
+  });
+
+  it('keeps a long owner name in a shrinking column beside the row indicator', () => {
+    const longOwnerName =
+      'Alexandria Montgomery-Worthington the Third of Västra Götaland';
+
+    active = renderWithProviders(
+      <AccountSecurity visible targetName={longOwnerName} />,
+    );
+
+    const labelColumn = screen.getByTestId('change-password-row-label-column');
+    const indicator = screen.getByTestId('change-password-row-indicator');
+
+    expect(screen.getAllByText(longOwnerName)).toHaveLength(3);
+    expect(labelColumn.props.className).toContain('flex-1');
+    expect(labelColumn.props.className).toContain('min-w-0');
+    expect(labelColumn.props.className).toContain('pr-3');
+    expect(indicator.props.className).toContain('shrink-0');
+  });
+
   it('[auth-3] shows Add password row for SSO users instead of only a provider note', () => {
     mockUser = {
       passwordEnabled: false,

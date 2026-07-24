@@ -1,5 +1,8 @@
 import type { Database } from '@eduagent/database';
-import { streamSessionResponse } from './session-stream-response';
+import {
+  buildDoneFramePayload,
+  streamSessionResponse,
+} from './session-stream-response';
 
 type StreamSessionResponseParams = Parameters<typeof streamSessionResponse>[0];
 
@@ -45,10 +48,11 @@ function baseParams(overrides = {}) {
       quotaRemainingTurns: 3,
       quotaFractionRemaining: 0.5,
       voyageApiKey: undefined,
-      clientId: undefined,
+      clientId: undefined as string | undefined,
       memoryFactsReadEnabled: false,
       memoryFactsRelevanceEnabled: false,
       challengeRoundRuntimeEnabled: false,
+      answerEvaluationEnabled: true,
       reviewCallbackOpenerEnabled: false,
       judgeFrameworkEnabled: false,
       judgeEnforcementEnabled: false,
@@ -72,6 +76,54 @@ function baseParams(overrides = {}) {
 }
 
 describe('streamSessionResponse', () => {
+  it('preserves answerEvaluation in the canonical done-frame builder', () => {
+    const frame = buildDoneFramePayload({
+      exchangeCount: 3,
+      escalationRung: 2,
+      answerEvaluation: {
+        correctness: 'partial',
+        concept: 'fractions',
+      },
+    });
+
+    expect(frame).toEqual(
+      expect.objectContaining({
+        answerEvaluation: {
+          correctness: 'partial',
+          concept: 'fractions',
+        },
+      }),
+    );
+  });
+
+  it('emits answerEvaluation on the normal streaming done frame', async () => {
+    const { frames, createSseResponse } = makeCreateSseResponse();
+    const params = baseParams({ createSseResponse });
+    params.deps.streamMessage.mockResolvedValueOnce({
+      stream: (async function* () {
+        yield 'Streamed response';
+      })(),
+      onComplete: jest.fn().mockResolvedValue({
+        response: 'Streamed response',
+        exchangeCount: 3,
+        escalationRung: 2,
+        answerEvaluation: { correctness: 'correct', concept: 'gravity' },
+      }),
+    });
+
+    await streamSessionResponse(
+      params as unknown as StreamSessionResponseParams,
+    );
+
+    const done = frames
+      .map((frame) => JSON.parse(frame))
+      .find((frame) => frame.type === 'done');
+    expect(done.answerEvaluation).toEqual({
+      correctness: 'correct',
+      concept: 'gravity',
+    });
+  });
+
   it('replaces partial stream output with non-streaming fallback without refunding quota', async () => {
     const { frames, createSseResponse } = makeCreateSseResponse();
     const params = baseParams({ createSseResponse });
@@ -88,6 +140,7 @@ describe('streamSessionResponse', () => {
       escalationRung: 2,
       expectedResponseMinutes: 1,
       aiEventId: AI_EVENT_ID,
+      answerEvaluation: { correctness: 'partial', concept: 'gravity' },
     });
 
     await streamSessionResponse(
@@ -98,7 +151,100 @@ describe('streamSessionResponse', () => {
     expect(frames.join('\n')).toContain('"type":"replace"');
     expect(frames.join('\n')).toContain('Recovered response');
     expect(frames.join('\n')).toContain('"type":"done"');
+    const done = frames
+      .map((frame) => JSON.parse(frame))
+      .find((frame) => frame.type === 'done');
+    expect(done.answerEvaluation).toEqual({
+      correctness: 'partial',
+      concept: 'gravity',
+    });
     expect(params.deps.refundQuotaOrEscalate).not.toHaveBeenCalled();
+    expect(params.deps.processMessage).toHaveBeenCalledWith(
+      params.db,
+      PROFILE_ID,
+      SESSION_ID,
+      params.input,
+      expect.objectContaining({ answerEvaluationEnabled: true }),
+    );
+  });
+
+  it('preserves answer-evaluation enablement in the pre-stream non-streaming fallback', async () => {
+    const { frames, createSseResponse } = makeCreateSseResponse();
+    const params = baseParams({ createSseResponse });
+    params.deps.streamMessage.mockRejectedValueOnce(
+      new Error('stream setup failed'),
+    );
+    params.deps.processMessage.mockResolvedValueOnce({
+      response: 'Recovered before streaming',
+      exchangeCount: 3,
+      escalationRung: 2,
+      expectedResponseMinutes: 1,
+      aiEventId: AI_EVENT_ID,
+      answerEvaluation: { correctness: 'incorrect', concept: 'gravity' },
+    });
+
+    await streamSessionResponse(
+      params as unknown as StreamSessionResponseParams,
+    );
+
+    expect(frames.join('\n')).toContain('Recovered before streaming');
+    const done = frames
+      .map((frame) => JSON.parse(frame))
+      .find((frame) => frame.type === 'done');
+    expect(done.answerEvaluation).toEqual({
+      correctness: 'incorrect',
+      concept: 'gravity',
+    });
+    expect(params.deps.processMessage).toHaveBeenCalledWith(
+      params.db,
+      PROFILE_ID,
+      SESSION_ID,
+      params.input,
+      expect.objectContaining({ answerEvaluationEnabled: true }),
+    );
+  });
+
+  it('preserves the recitation idempotency key across stream fallback and persistence marking', async () => {
+    const { createSseResponse } = makeCreateSseResponse();
+    const clientId = 'recitation-turn-1';
+    const params = baseParams({ createSseResponse });
+    params.streamOptions.clientId = clientId;
+    params.deps.streamMessage.mockResolvedValueOnce({
+      stream: (async function* () {
+        yield 'partial';
+        throw new Error('stream failed');
+      })(),
+      onComplete: jest.fn(),
+    });
+    params.deps.processMessage.mockResolvedValueOnce({
+      response: 'Recovered response',
+      exchangeCount: 3,
+      escalationRung: 2,
+      expectedResponseMinutes: 1,
+      aiEventId: AI_EVENT_ID,
+    });
+
+    await streamSessionResponse(
+      params as unknown as StreamSessionResponseParams,
+    );
+
+    expect(params.deps.streamMessage).toHaveBeenCalledWith(
+      params.db,
+      PROFILE_ID,
+      SESSION_ID,
+      params.input,
+      expect.objectContaining({ clientId }),
+    );
+    expect(params.deps.processMessage).toHaveBeenCalledWith(
+      params.db,
+      PROFILE_ID,
+      SESSION_ID,
+      params.input,
+      expect.objectContaining({ clientId }),
+    );
+    expect(params.deps.markPersisted).toHaveBeenCalledWith(
+      expect.objectContaining({ key: clientId }),
+    );
   });
 
   it('emits fallback frames, refunds quota, and dispatches observability when onComplete reports fallback', async () => {

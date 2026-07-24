@@ -113,6 +113,35 @@ jest.mock(
 const mockGetChildrenForParent = jest.fn().mockResolvedValue([]);
 const mockGetChildDetail = jest.fn().mockResolvedValue(null);
 const mockGetChildSubjectTopics = jest.fn().mockResolvedValue([]);
+const mockGetChildInventory = jest.fn().mockResolvedValue({
+  profileId: TEST_PROFILE_ID,
+  snapshotDate: '2026-07-21',
+  currentlyWorkingOn: [],
+  global: {
+    topicsAttempted: 0,
+    topicsMastered: 0,
+    vocabularyTotal: 0,
+    vocabularyMastered: 0,
+    totalSessions: 0,
+    totalActiveMinutes: 0,
+    totalWallClockMinutes: 0,
+    currentStreak: 0,
+    longestStreak: 0,
+  },
+  subjects: [],
+});
+const mockGetChildProgressHistory = jest.fn().mockResolvedValue({
+  profileId: TEST_PROFILE_ID,
+  from: '2026-07-01',
+  to: '2026-07-21',
+  granularity: 'daily',
+  dataPoints: [],
+});
+const mockGetChildSessions = jest.fn().mockResolvedValue([]);
+const mockGetChildSessionDetail = jest.fn().mockResolvedValue(null);
+const mockGetChildReports = jest.fn().mockResolvedValue([]);
+const mockGetChildReportDetail = jest.fn().mockResolvedValue(null);
+const mockMarkChildReportViewed = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('../services/dashboard', () => {
   const actual = jest.requireActual(
@@ -125,6 +154,17 @@ jest.mock('../services/dashboard', () => {
     getChildDetail: (...args: unknown[]) => mockGetChildDetail(...args),
     getChildSubjectTopics: (...args: unknown[]) =>
       mockGetChildSubjectTopics(...args),
+    getChildInventory: (...args: unknown[]) => mockGetChildInventory(...args),
+    getChildProgressHistory: (...args: unknown[]) =>
+      mockGetChildProgressHistory(...args),
+    getChildSessions: (...args: unknown[]) => mockGetChildSessions(...args),
+    getChildSessionDetail: (...args: unknown[]) =>
+      mockGetChildSessionDetail(...args),
+    getChildReports: (...args: unknown[]) => mockGetChildReports(...args),
+    getChildReportDetail: (...args: unknown[]) =>
+      mockGetChildReportDetail(...args),
+    markChildReportViewed: (...args: unknown[]) =>
+      mockMarkChildReportViewed(...args),
   };
 });
 
@@ -194,6 +234,24 @@ jest.mock('../services/weekly-report', () => {
   };
 });
 
+// [WI-1989] assertCallerIsAccountOwner calls verifyPersonIsOrgAdminV2, which
+// runs a raw membership query the fully-mocked DB module cannot satisfy.
+// Every scenario in this file that currently reaches assertCallerIsAccountOwner
+// is a caller-owner scenario (the non-owner break tests are rejected earlier by
+// assertOwnerProfile's / assertOwnerAndParentAccess's X-Profile-Id-resolved
+// isOwner check, before this guard runs) — the caller-vs-X-Profile-Id-spoof
+// distinction this guard exists to enforce is covered by the real-DB break
+// test in tests/integration/wi1989-owner-idor.integration.test.ts.
+jest.mock('../services/identity-v2/ownership-v2', () => {
+  const actual = jest.requireActual(
+    '../services/identity-v2/ownership-v2',
+  ) as typeof import('../services/identity-v2/ownership-v2');
+  return {
+    ...actual,
+    verifyPersonIsOrgAdminV2: jest.fn().mockResolvedValue(true),
+  };
+});
+
 import { app } from '../index';
 import { ForbiddenError } from '../errors';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
@@ -209,6 +267,7 @@ const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
 const PROFILE_ID = TEST_PROFILE_ID;
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
+const REPORT_ID = '880e8400-e29b-41d4-a716-446655440000';
 
 describe('dashboard routes', () => {
   beforeAll(() => {
@@ -252,6 +311,12 @@ describe('dashboard routes', () => {
       const body = await res.json();
       expect(body.children).toEqual([]);
       expect(body.demoMode).toBe(false);
+      expect(mockGetChildrenForParent).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        'test-profile-id',
+        'test-account-id',
+      );
     });
 
     it('returns 400 when authenticated but missing X-Profile-Id header', async () => {
@@ -290,6 +355,13 @@ describe('dashboard routes', () => {
 
       const body = await res.json();
       expect(body.child).toBeNull();
+      expect(mockGetChildDetail).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        PROFILE_ID,
+        'test-profile-id',
+        'test-account-id',
+      );
     });
 
     it('returns 401 without auth header', async () => {
@@ -359,6 +431,7 @@ describe('dashboard routes', () => {
         const redactedChild = {
           profileId: PROFILE_ID,
           displayName: 'Timmy',
+          organizationTimezone: null,
           consentStatus: status,
           respondedAt: null,
           summary,
@@ -392,6 +465,7 @@ describe('dashboard routes', () => {
         expect(body.child).toMatchObject({
           profileId: PROFILE_ID,
           displayName: 'Timmy',
+          organizationTimezone: null,
           consentStatus: status,
           sessionsThisWeek: 0,
           totalSessions: 0,
@@ -416,6 +490,14 @@ describe('dashboard routes', () => {
 
       const body = await res.json();
       expect(body.topics).toEqual([]);
+      expect(mockGetChildSubjectTopics).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        PROFILE_ID,
+        SUBJECT_ID,
+        'test-profile-id',
+        'test-account-id',
+      );
     });
 
     it('returns 401 without auth header', async () => {
@@ -426,6 +508,150 @@ describe('dashboard routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  describe('GET /v1/dashboard/children/:profileId/progress-summary', () => {
+    it('passes the server-resolved caller and organization to the service', async () => {
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/progress-summary`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockGetProgressSummary).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        PROFILE_ID,
+        'test-profile-id',
+        'test-account-id',
+      );
+    });
+  });
+
+  describe('[WI-2519] server caller identity threading', () => {
+    it('passes caller and organization to getChildInventory', async () => {
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/inventory`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockGetChildInventory).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        PROFILE_ID,
+        'test-profile-id',
+        'test-account-id',
+      );
+    });
+
+    it('passes caller and organization to getChildProgressHistory', async () => {
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/progress-history`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockGetChildProgressHistory).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        PROFILE_ID,
+        'test-profile-id',
+        'test-account-id',
+        {},
+      );
+    });
+
+    it('passes caller and organization to getChildSessions', async () => {
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/sessions`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockGetChildSessions).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        PROFILE_ID,
+        'test-profile-id',
+        'test-account-id',
+      );
+    });
+
+    it('passes caller and organization to getChildSessionDetail', async () => {
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/sessions/${TEST_SESSION_ID}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(404);
+      expect(mockGetChildSessionDetail).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        PROFILE_ID,
+        TEST_SESSION_ID,
+        'test-profile-id',
+        'test-account-id',
+      );
+    });
+
+    it('passes caller and organization to getChildReports', async () => {
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/reports`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockGetChildReports).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        PROFILE_ID,
+        'test-profile-id',
+        'test-account-id',
+      );
+    });
+
+    it('passes caller and organization to getChildReportDetail', async () => {
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/reports/${REPORT_ID}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(404);
+      expect(mockGetChildReportDetail).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        PROFILE_ID,
+        REPORT_ID,
+        'test-profile-id',
+        'test-account-id',
+      );
+    });
+
+    it('passes caller and organization to markChildReportViewed', async () => {
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/reports/${REPORT_ID}/view`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockMarkChildReportViewed).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        PROFILE_ID,
+        REPORT_ID,
+        'test-profile-id',
+        'test-account-id',
+      );
     });
   });
 

@@ -58,6 +58,7 @@ import {
   generateUUIDv7,
   learningSessions,
   membership,
+  mentorNotices,
   organization,
   person,
   retentionCards,
@@ -72,6 +73,7 @@ import {
   insertRetentionCardIfAbsent,
 } from '../apply-retention-update';
 import { deleteV2IdentitiesForTest } from '../../test-utils/legacy-identity-anchors';
+import { getProfileTimeZone } from '../mentor-notices';
 import {
   _resetCircuits,
   registerProvider,
@@ -88,9 +90,14 @@ import type { StopReason } from '../llm/stop-reason';
 import { MAX_CHALLENGE_QUESTIONS } from '../challenge-round/caps';
 import {
   processMessage,
+  streamMessage,
   finalizeChallengeRoundIfReady,
 } from './session-exchange';
 import { mapSessionRow } from './session-events';
+import {
+  streamSessionResponse,
+  type CreateSseResponse,
+} from './session-stream-response';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 
@@ -124,6 +131,94 @@ const TUTOR_ENVELOPE_NO_EVAL = JSON.stringify({
   },
 });
 
+// ---------------------------------------------------------------------------
+// [WI-2557] Mentor-notice recheck defer — learning-day boundary across an
+// offset transition. Chile moves -04 to -03 at 2026-09-06T04:00:00Z, so at
+// 07:30Z the learner's clock reads 04:30 on 2026-09-06 and the learning day
+// began at 2026-09-06T07:00:00Z; subtracting four ABSOLUTE hours lands at
+// 03:30Z, before the transition, reading 23:30 on 2026-09-05 — 23 hours early.
+// Defer is idempotent per learning day, so a notice deferred at local 03:00
+// (previous learning day) must be deferrable again at local 04:30.
+// ---------------------------------------------------------------------------
+const NOTICE_SANTIAGO_NOW = new Date('2026-09-06T07:30:00.000Z'); // local 04:30
+const NOTICE_PREVIOUS_DAY_DEFER = new Date('2026-09-06T06:00:00.000Z'); // local 03:00
+// Re-offered after yesterday's defer, so resolveMentorNoticeRecheckContext does
+// not treat the notice as already-deferred-for-this-offer.
+const NOTICE_OFFERED_AT = new Date('2026-09-06T07:20:00.000Z');
+const NOTICE_LEARNER_ANSWER =
+  'I move the negative three to the other side by adding three to both sides.';
+
+// Everything jest's modern fake timers can fake EXCEPT Date. Faking the clock
+// alone keeps timers and socket IO real, so the live pg connection is unaffected.
+const NOTICE_DO_NOT_FAKE = [
+  'hrtime',
+  'nextTick',
+  'performance',
+  'queueMicrotask',
+  'requestAnimationFrame',
+  'cancelAnimationFrame',
+  'requestIdleCallback',
+  'cancelIdleCallback',
+  'setImmediate',
+  'clearImmediate',
+  'setInterval',
+  'clearInterval',
+  'setTimeout',
+  'clearTimeout',
+] as const;
+
+function tutorEnvelopeDeferringNotice(
+  noticeId: string,
+  answerEventId: string,
+): string {
+  return JSON.stringify({
+    reply: 'Let us come back to that one another time.',
+    signals: {
+      partial_progress: false,
+      needs_deepening: false,
+      understanding_check: false,
+      ready_to_finish: false,
+      notice_recheck: {
+        noticeId,
+        verdict: 'deferred',
+        answerEventId,
+        learnerQuote: NOTICE_LEARNER_ANSWER,
+      },
+    },
+    ui_hints: {
+      note_prompt: { show: false, post_session: false },
+    },
+    private_sources: {
+      relied_on: ['conversation_history'],
+      insufficient: false,
+      reason: 'test envelope',
+    },
+  });
+}
+
+const TUTOR_ENVELOPE_WITH_ANSWER_EVALUATION = JSON.stringify({
+  reply: 'The product is 42. What factor pair gives the same result?',
+  signals: {
+    partial_progress: false,
+    needs_deepening: false,
+    understanding_check: true,
+    ready_to_finish: false,
+    answer_evaluation: {
+      correctness: 'correct',
+      concept: 'multiplication',
+    },
+  },
+  ui_hints: {
+    note_prompt: { show: false, post_session: false },
+  },
+  private_sources: {
+    relied_on: ['current_topic'],
+    insufficient: false,
+    reason: 'The seeded current topic supports this deterministic question.',
+  },
+  confidence: 'high',
+});
+
 /** Solid grader verdict — matches the `challengeRoundGraderVerdictSchema`. */
 const GRADER_VERDICT_SOLID = JSON.stringify({
   items: [
@@ -152,6 +247,7 @@ const GRADER_VERDICT_EMPTY = JSON.stringify({ items: [] });
 
 const GRADER_SYSTEM_MARKER = 'You are a precise grading assistant';
 const FALLBACK_PROVIDER_IDS = ['gemini', 'anthropic', 'cerebras', 'openai'];
+type TutorStreamFailurePhase = 'setup' | 'pre-first-byte' | 'mid-stream';
 
 function isGraderMessages(messages: ChatMessage[]): boolean {
   return messages.some(
@@ -163,6 +259,9 @@ function isGraderMessages(messages: ChatMessage[]): boolean {
 function createBranchingLlm() {
   let tutorResponse = TUTOR_ENVELOPE_NO_EVAL;
   let graderResponse = GRADER_VERDICT_SOLID;
+  let streamFailurePhase: TutorStreamFailurePhase | undefined;
+  let tutorChatCalls = 0;
+  let tutorChatStreamCalls = 0;
   const calls: ChatMessage[][] = [];
 
   function respond(messages: ChatMessage[]): string {
@@ -176,16 +275,30 @@ function createBranchingLlm() {
       messages: ChatMessage[],
       _config: ModelConfig,
     ): Promise<ChatResult> {
+      if (!isGraderMessages(messages)) tutorChatCalls++;
       return { content: respond(messages), stopReason: 'stop' };
     },
     chatStream(messages: ChatMessage[], _config: ModelConfig) {
+      const graderCall = isGraderMessages(messages);
+      if (!graderCall) tutorChatStreamCalls++;
       const content = respond(messages);
+      const tutorStreamFailure = graderCall ? undefined : streamFailurePhase;
+      if (tutorStreamFailure === 'setup') {
+        throw new Error('injected provider setup failure');
+      }
       let resolveStopReason!: (reason: StopReason) => void;
       const stopReasonPromise = new Promise<StopReason>((res) => {
         resolveStopReason = res;
       });
       async function* streamChunks(): AsyncIterable<string> {
         try {
+          if (tutorStreamFailure === 'pre-first-byte') {
+            throw new Error('injected pre-first-byte provider failure');
+          }
+          if (tutorStreamFailure === 'mid-stream') {
+            yield '{"reply":"partial visible reply';
+            throw new Error('injected mid-stream provider failure');
+          }
           yield content;
         } finally {
           resolveStopReason('stop');
@@ -210,12 +323,24 @@ function createBranchingLlm() {
     setGraderResponse(content: string): void {
       graderResponse = content;
     },
+    setStreamFailurePhase(phase: TutorStreamFailurePhase | undefined): void {
+      streamFailurePhase = phase;
+    },
+    tutorChatCallCount(): number {
+      return tutorChatCalls;
+    },
+    tutorChatStreamCallCount(): number {
+      return tutorChatStreamCalls;
+    },
     graderCallCount(): number {
       return calls.filter(isGraderMessages).length;
     },
     reset(): void {
       tutorResponse = TUTOR_ENVELOPE_NO_EVAL;
       graderResponse = GRADER_VERDICT_SOLID;
+      streamFailurePhase = undefined;
+      tutorChatCalls = 0;
+      tutorChatStreamCalls = 0;
       calls.length = 0;
     },
     // Unregister ONLY our own provider ids — never _clearProviders(), which
@@ -346,6 +471,39 @@ async function seedActiveSession(
   return mapSessionRow(row!);
 }
 
+async function seedOrdinarySession(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  topicId: string,
+): Promise<ReturnType<typeof mapSessionRow>> {
+  const [row] = await db
+    .insert(learningSessions)
+    .values({
+      profileId,
+      subjectId,
+      topicId,
+      sessionType: 'learning',
+      inputMode: 'text',
+      status: 'active',
+      escalationRung: 1,
+      exchangeCount: 1,
+      metadata: {},
+    })
+    .returning();
+
+  const session = mapSessionRow(row!);
+  await seedPriorAiResponse(
+    db,
+    profileId,
+    subjectId,
+    session.id,
+    topicId,
+    'What is 6 multiplied by 7?',
+  );
+  return session;
+}
+
 /**
  * Seed a session already in `drafting` state with one solid evaluation.
  * Used for the finalizeChallengeRoundIfReady mastery-verification test.
@@ -459,11 +617,37 @@ async function readAssessmentsForSession(
     );
 }
 
+async function readAiEventById(
+  db: Database,
+  profileId: string,
+  aiEventId: string,
+): Promise<{ content: string; metadata: Record<string, unknown> } | undefined> {
+  const [row] = await db
+    .select({
+      content: sessionEvents.content,
+      metadata: sessionEvents.metadata,
+    })
+    .from(sessionEvents)
+    .where(
+      and(
+        eq(sessionEvents.id, aiEventId),
+        eq(sessionEvents.profileId, profileId),
+        eq(sessionEvents.eventType, 'ai_response'),
+      ),
+    );
+  return row
+    ? {
+        content: row.content,
+        metadata: row.metadata as Record<string, unknown>,
+      }
+    : undefined;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-describeIfDb('Challenge Round grader integration (T7)', () => {
+describeIfDb('session exchange production-path integration', () => {
   let db: Database;
 
   beforeAll(() => {
@@ -490,6 +674,154 @@ describeIfDb('Challenge Round grader integration (T7)', () => {
     llm.reset();
     _resetCircuits();
   });
+
+  async function seedAnswerEvaluationTurn() {
+    const { profileId, subjectId } = await seedProfileAndSubject(db);
+    const topicId = await seedCurriculumTopic(db, subjectId);
+    const session = await seedOrdinarySession(
+      db,
+      profileId,
+      subjectId,
+      topicId,
+    );
+    llm.setTutorResponse(TUTOR_ENVELOPE_WITH_ANSWER_EVALUATION);
+    return { profileId, session };
+  }
+
+  async function expectPersistedAnswerEvaluation(
+    profileId: string,
+    aiEventId: string | undefined,
+  ) {
+    expect(aiEventId).toEqual(expect.any(String));
+    const row = await readAiEventById(db, profileId, aiEventId!);
+    expect(row).toBeDefined();
+    expect(row?.content).toBe(
+      'The product is 42. What factor pair gives the same result?',
+    );
+    expect(row?.metadata.answerEvaluation).toEqual({
+      correctness: 'correct',
+      concept: 'multiplication',
+    });
+    expect(row?.metadata.correctAnswer).toBe(true);
+  }
+
+  function captureSseFrames(): {
+    frames: Array<Record<string, unknown>>;
+    createSseResponse: CreateSseResponse;
+  } {
+    const frames: Array<Record<string, unknown>> = [];
+    const createSseResponse: CreateSseResponse = async (handler) => {
+      await handler({
+        async writeSSE({ data }) {
+          frames.push(JSON.parse(data) as Record<string, unknown>);
+        },
+      });
+      return new Response(null, { status: 200 });
+    };
+    return { frames, createSseResponse };
+  }
+
+  it('[WI-1443] processMessage persists canonical answer evaluation by its returned aiEventId', async () => {
+    const { profileId, session } = await seedAnswerEvaluationTurn();
+
+    const result = await processMessage(
+      db,
+      profileId,
+      session.id,
+      { message: '42' },
+      {
+        semanticMemoryRetrievalEnabled: false,
+        answerEvaluationEnabled: true,
+      },
+    );
+
+    expect(result.answerEvaluation).toEqual({
+      correctness: 'correct',
+      concept: 'multiplication',
+    });
+    await expectPersistedAnswerEvaluation(profileId, result.aiEventId);
+  });
+
+  it('[WI-1443] drained streamMessage.onComplete persists canonical answer evaluation by its returned aiEventId', async () => {
+    const { profileId, session } = await seedAnswerEvaluationTurn();
+
+    const result = await streamMessage(
+      db,
+      profileId,
+      session.id,
+      { message: '42' },
+      {
+        semanticMemoryRetrievalEnabled: false,
+        answerEvaluationEnabled: true,
+      },
+    );
+    let visible = '';
+    for await (const chunk of result.stream) visible += chunk;
+    const completed = await result.onComplete();
+
+    expect(visible).toContain('The product is 42.');
+    expect(completed.answerEvaluation).toEqual({
+      correctness: 'correct',
+      concept: 'multiplication',
+    });
+    await expectPersistedAnswerEvaluation(profileId, completed.aiEventId);
+  });
+
+  it.each([
+    {
+      phase: 'setup',
+      expectedFrameType: 'chunk',
+      expectedStreamCalls: 1,
+    },
+    {
+      phase: 'pre-first-byte',
+      expectedFrameType: 'chunk',
+      expectedStreamCalls: 2,
+    },
+    {
+      phase: 'mid-stream',
+      expectedFrameType: 'replace',
+      expectedStreamCalls: 1,
+    },
+  ] as const)(
+    '[WI-1443] $phase provider failure uses real processMessage fallback and persists its done aiEventId',
+    async ({ phase, expectedFrameType, expectedStreamCalls }) => {
+      const { profileId, session } = await seedAnswerEvaluationTurn();
+      const { frames, createSseResponse } = captureSseFrames();
+      llm.setStreamFailurePhase(phase);
+
+      await streamSessionResponse({
+        db,
+        profileId,
+        sessionId: session.id,
+        input: { message: '42' },
+        session: { exchangeCount: session.exchangeCount },
+        subscriptionId: undefined,
+        quota: {
+          source: undefined,
+          quotaModel: undefined,
+          topUpCreditId: undefined,
+        },
+        streamOptions: {
+          semanticMemoryRetrievalEnabled: false,
+          answerEvaluationEnabled: true,
+        },
+        createSseResponse,
+      });
+
+      const done = frames.find((frame) => frame.type === 'done');
+      expect(done).toBeDefined();
+      expect(frames.some((frame) => frame.type === expectedFrameType)).toBe(
+        true,
+      );
+      expect(llm.tutorChatStreamCallCount()).toBe(expectedStreamCalls);
+      expect(llm.tutorChatCallCount()).toBe(1);
+      await expectPersistedAnswerEvaluation(
+        profileId,
+        done?.aiEventId as string | undefined,
+      );
+    },
+  );
 
   // -------------------------------------------------------------------------
   // Mastery path (via finalizeChallengeRoundIfReady, no LLM call needed)
@@ -916,5 +1248,387 @@ describeIfDb('Challenge Round grader integration (T7)', () => {
     // questionsAsked === evaluations.length → no stall (all graded)
     expect(result.challengeRound?.questionsAsked).toBe(1);
     expect(result.challengeRound?.evaluations).toHaveLength(1);
+  });
+
+  // [WI-2557] Both exchange defer call sites — processMessage and streamMessage
+  // carry the same twelve-line recheck-outcome block, each deriving its own
+  // learning-day boundary. Covering one would leave the other free to drift.
+  describe('mentor-notice defer derives the learning day from local 04:00', () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    async function seedMentorNoticeDeferTurn() {
+      const { profileId, subjectId } = await seedProfileAndSubject(db);
+      const topicId = await seedCurriculumTopic(db, subjectId);
+      const session = await seedOrdinarySession(
+        db,
+        profileId,
+        subjectId,
+        topicId,
+      );
+
+      // getProfileTimeZone resolves through organization.timezone, which is
+      // nullable with no default — an unset fixture resolves to UTC and these
+      // tests would pass while proving nothing.
+      const [link] = await db
+        .select({ organizationId: membership.organizationId })
+        .from(membership)
+        .where(eq(membership.personId, profileId))
+        .limit(1);
+      if (!link) throw new Error('membership lookup failed');
+      await db
+        .update(organization)
+        .set({ timezone: 'America/Santiago' })
+        .where(eq(organization.id, link.organizationId));
+      expect(await getProfileTimeZone(db, profileId)).toBe('America/Santiago');
+
+      // The learner turn the notice_recheck signal must cite as evidence.
+      const [answerEvent] = await db
+        .insert(sessionEvents)
+        .values({
+          profileId,
+          subjectId,
+          sessionId: session.id,
+          topicId,
+          eventType: 'user_message',
+          content: NOTICE_LEARNER_ANSWER,
+          metadata: {},
+        })
+        .returning({ id: sessionEvents.id });
+      if (!answerEvent) throw new Error('answer event insert failed');
+
+      const [notice] = await db
+        .insert(mentorNotices)
+        .values({
+          profileId,
+          subjectId,
+          sourceSessionId: session.id,
+          concept: 'Changing signs across the equals sign',
+          correctionHint: 'Apply the inverse operation to both sides.',
+          status: 'open',
+          lastDeferredAt: NOTICE_PREVIOUS_DAY_DEFER,
+          lastRecheckOutcome: 'deferred',
+          lastOfferedSessionId: session.id,
+          lastOfferedAt: NOTICE_OFFERED_AT,
+        })
+        .returning({ id: mentorNotices.id });
+      if (!notice) throw new Error('mentor notice insert failed');
+
+      await db
+        .update(learningSessions)
+        .set({ metadata: { recheckNoticeId: notice.id } })
+        .where(eq(learningSessions.id, session.id));
+
+      llm.setTutorResponse(
+        tutorEnvelopeDeferringNotice(notice.id, answerEvent.id),
+      );
+      return { profileId, session, noticeId: notice.id };
+    }
+
+    async function readLastDeferredAt(noticeId: string): Promise<Date | null> {
+      const [row] = await db
+        .select({ lastDeferredAt: mentorNotices.lastDeferredAt })
+        .from(mentorNotices)
+        .where(eq(mentorNotices.id, noticeId));
+      return row?.lastDeferredAt ?? null;
+    }
+
+    it('processMessage re-defers a notice deferred in the previous learning day', async () => {
+      const { profileId, session, noticeId } =
+        await seedMentorNoticeDeferTurn();
+
+      jest.useFakeTimers({
+        now: NOTICE_SANTIAGO_NOW,
+        doNotFake: [...NOTICE_DO_NOT_FAKE] as never,
+      });
+      await processMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+      );
+
+      // A new learning day began at local 04:00, so the defer TAKES and stamps
+      // the current instant. Under the four-absolute-hour boundary yesterday's
+      // 03:00 defer still counts as "today", the update is skipped, and
+      // lastDeferredAt stays at 2026-09-06T06:00:00.000Z.
+      expect(await readLastDeferredAt(noticeId)).toEqual(NOTICE_SANTIAGO_NOW);
+    });
+
+    it('streamMessage re-defers a notice deferred in the previous learning day', async () => {
+      const { profileId, session, noticeId } =
+        await seedMentorNoticeDeferTurn();
+
+      jest.useFakeTimers({
+        now: NOTICE_SANTIAGO_NOW,
+        doNotFake: [...NOTICE_DO_NOT_FAKE] as never,
+      });
+      const result = await streamMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+      );
+      for await (const chunk of result.stream) void chunk;
+      await result.onComplete();
+
+      expect(await readLastDeferredAt(noticeId)).toEqual(NOTICE_SANTIAGO_NOW);
+    });
+  });
+
+  // [WI-2501 AC-5] Both exchange recheck-outcome call sites — processMessage
+  // and streamMessage — must terminalize a completed 'not_yet' re-check, not
+  // just the 'deferred' branch covered above. The regression in
+  // `tests/integration/mentor-notice-lifecycle.integration.test.ts` calls
+  // `applyMentorNoticeOutcome` directly and would pass even if one of these
+  // two call sites regressed to leaving the notice 'open'.
+  describe('mentor-notice not_yet terminalization through the exchange call sites', () => {
+    function tutorEnvelopeNotYetNotice(
+      noticeId: string,
+      answerEventId: string,
+    ): string {
+      return JSON.stringify({
+        reply: "Let's keep practicing that one.",
+        signals: {
+          partial_progress: false,
+          needs_deepening: false,
+          understanding_check: false,
+          ready_to_finish: false,
+          notice_recheck: {
+            noticeId,
+            verdict: 'not_yet',
+            answerEventId,
+            learnerQuote: NOTICE_LEARNER_ANSWER,
+          },
+        },
+        ui_hints: {
+          note_prompt: { show: false, post_session: false },
+        },
+        private_sources: {
+          relied_on: ['conversation_history'],
+          insufficient: false,
+          reason: 'test envelope',
+        },
+      });
+    }
+
+    async function seedMentorNoticeNotYetTurn() {
+      const { profileId, subjectId } = await seedProfileAndSubject(db);
+      const topicId = await seedCurriculumTopic(db, subjectId);
+      const session = await seedOrdinarySession(
+        db,
+        profileId,
+        subjectId,
+        topicId,
+      );
+
+      // The learner turn the notice_recheck signal must cite as evidence.
+      const [answerEvent] = await db
+        .insert(sessionEvents)
+        .values({
+          profileId,
+          subjectId,
+          sessionId: session.id,
+          topicId,
+          eventType: 'user_message',
+          content: NOTICE_LEARNER_ANSWER,
+          metadata: {},
+        })
+        .returning({ id: sessionEvents.id });
+      if (!answerEvent) throw new Error('answer event insert failed');
+
+      const [notice] = await db
+        .insert(mentorNotices)
+        .values({
+          profileId,
+          subjectId,
+          sourceSessionId: session.id,
+          concept: 'Changing signs across the equals sign',
+          correctionHint: 'Apply the inverse operation to both sides.',
+          status: 'open',
+          lastOfferedSessionId: session.id,
+          lastOfferedAt: NOTICE_OFFERED_AT,
+        })
+        .returning({ id: mentorNotices.id });
+      if (!notice) throw new Error('mentor notice insert failed');
+
+      await db
+        .update(learningSessions)
+        .set({ metadata: { recheckNoticeId: notice.id } })
+        .where(eq(learningSessions.id, session.id));
+
+      llm.setTutorResponse(
+        tutorEnvelopeNotYetNotice(notice.id, answerEvent.id),
+      );
+      return { profileId, session, noticeId: notice.id };
+    }
+
+    async function readNoticeStatus(
+      noticeId: string,
+    ): Promise<{ status: string; lastRecheckOutcome: string | null } | null> {
+      const [row] = await db
+        .select({
+          status: mentorNotices.status,
+          lastRecheckOutcome: mentorNotices.lastRecheckOutcome,
+        })
+        .from(mentorNotices)
+        .where(eq(mentorNotices.id, noticeId));
+      return row ?? null;
+    }
+
+    it('processMessage terminalizes a completed not_yet re-check to a non-open status', async () => {
+      const { profileId, session, noticeId } =
+        await seedMentorNoticeNotYetTurn();
+
+      await processMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+      );
+
+      const row = await readNoticeStatus(noticeId);
+      expect(row?.status).toBe('not_yet');
+      expect(row?.status).not.toBe('open');
+      expect(row?.lastRecheckOutcome).toBe('not_yet');
+    });
+
+    it('streamMessage terminalizes a completed not_yet re-check to a non-open status', async () => {
+      const { profileId, session, noticeId } =
+        await seedMentorNoticeNotYetTurn();
+
+      const result = await streamMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+      );
+      for await (const chunk of result.stream) void chunk;
+      await result.onComplete();
+
+      const row = await readNoticeStatus(noticeId);
+      expect(row?.status).toBe('not_yet');
+      expect(row?.status).not.toBe('open');
+      expect(row?.lastRecheckOutcome).toBe('not_yet');
+    });
+  });
+
+  // [WI-2500] Exchange-level mentor-notice CREATION — proves each call site
+  // (processMessage, streamMessage) actually PRODUCES an accepted notice, not
+  // merely that they are wired to the same function. `creation.test.ts`'s
+  // "shared creation boundary" test already proves the latter; this is the
+  // former, one named case per path.
+  describe('mentor-notice creation (WI-2500)', () => {
+    const CREATION_LEARNER_SLIP =
+      'I moved minus three to the other side and kept it negative, so x equals two.';
+
+    function tutorEnvelopeObservingGap(answerEventId: string): string {
+      return JSON.stringify({
+        reply: 'Watch the sign when you move a term across the equals sign.',
+        signals: {
+          partial_progress: false,
+          needs_deepening: false,
+          understanding_check: false,
+          noticed_gap: {
+            observed: true,
+            concept: 'Sign changes when moving terms',
+            correctionHint: 'Reverse the operation across the equals sign.',
+            answerEventId,
+            learnerQuote: CREATION_LEARNER_SLIP,
+          },
+        },
+        ui_hints: {
+          note_prompt: { show: false, post_session: false },
+        },
+        private_sources: {
+          relied_on: ['conversation_history'],
+          insufficient: false,
+          reason: 'test envelope',
+        },
+      });
+    }
+
+    // The evidence event is seeded directly (mirrors the defer describe
+    // block's `answerEvent` pattern above) rather than relied on being the
+    // CURRENT turn's persisted message — evidence.ts validates the CITED
+    // event against the session, not that it is the latest one.
+    async function seedMentorNoticeCreationTurn() {
+      const { profileId, subjectId } = await seedProfileAndSubject(db);
+      const topicId = await seedCurriculumTopic(db, subjectId);
+      const session = await seedOrdinarySession(
+        db,
+        profileId,
+        subjectId,
+        topicId,
+      );
+
+      const [answerEvent] = await db
+        .insert(sessionEvents)
+        .values({
+          profileId,
+          subjectId,
+          sessionId: session.id,
+          topicId,
+          eventType: 'user_message',
+          content: CREATION_LEARNER_SLIP,
+          metadata: {},
+        })
+        .returning({ id: sessionEvents.id });
+      if (!answerEvent) throw new Error('answer event insert failed');
+
+      llm.setTutorResponse(tutorEnvelopeObservingGap(answerEvent.id));
+      return { profileId, session, answerEventId: answerEvent.id };
+    }
+
+    async function readMentorNoticeForSession(sessionId: string) {
+      const [row] = await db
+        .select()
+        .from(mentorNotices)
+        .where(eq(mentorNotices.sourceSessionId, sessionId));
+      return row ?? null;
+    }
+
+    it('processMessage produces an accepted mentor notice from a genuine slip', async () => {
+      const { profileId, session, answerEventId } =
+        await seedMentorNoticeCreationTurn();
+
+      await processMessage(
+        db,
+        profileId,
+        session.id,
+        { message: 'ok, next question' },
+        { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+      );
+
+      const notice = await readMentorNoticeForSession(session.id);
+      expect(notice).not.toBeNull();
+      expect(notice?.concept).toBe('Sign changes when moving terms');
+      expect(notice?.answerEventId).toBe(answerEventId);
+    });
+
+    it('streamMessage produces an accepted mentor notice from a genuine slip', async () => {
+      const { profileId, session, answerEventId } =
+        await seedMentorNoticeCreationTurn();
+
+      const result = await streamMessage(
+        db,
+        profileId,
+        session.id,
+        { message: 'ok, next question' },
+        { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+      );
+      for await (const chunk of result.stream) void chunk;
+      await result.onComplete();
+
+      const notice = await readMentorNoticeForSession(session.id);
+      expect(notice).not.toBeNull();
+      expect(notice?.concept).toBe('Sign changes when moving terms');
+      expect(notice?.answerEventId).toBe(answerEventId);
+    });
   });
 });

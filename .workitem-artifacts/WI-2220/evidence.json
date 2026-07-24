@@ -1,0 +1,36 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "An authoritative shell value ('v0'|'v2') is added end-to-end: appShellSchema on sessionMessageSchema (client request), ExchangeContext.shell (threaded exactly like the existing effectiveMode field), and buildAppHelpPromptBlock(context.shell) at the exchange-prompts.ts call site. buildSystemPromptSegments emits the V2 map when ctx.shell='v2' and the V0 map when ctx.shell='v0'.",
+      "pointer": "apps/api/src/services/exchange-prompts.test.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "ExchangeContext carries shell?: AppShell alongside effectiveMode?: string, and the client request schema (sessionMessageSchema) accepts the same two-value shell, sourced by the mobile client from FEATURE_FLAGS.MODE_NAV_V2_ENABLED at send time.",
+      "pointer": "apps/api/src/services/exchange-types.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "appShellSchema ('v0'|'v2') added to @eduagent/schemas and threaded onto sessionMessageSchema.shell — the shared contract the client and API both parse against.",
+      "pointer": "packages/schemas/src/sessions.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Production composition boundary (buildExchangeSystemMessage via processExchange, not the isolated app-help eval): a V2-shell request produces a system prompt containing the V2 map and none of the retired V0 labels (Home >, Library >, More >, Progress >).",
+      "pointer": "apps/api/src/services/exchanges.test.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Missing shell, an invalid/garbage shell value, and a shell value that changes between turns of the same session all resolve safely: absent/invalid falls to the V0 map (matching prod V0-on), and a genuine mid-session flip is honored per exchange rather than stuck on the first-seen value.",
+      "pointer": "apps/api/src/services/exchange-prompts.test.ts"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "pnpm eval:llm (Tier-1, no live call) was re-run after the shell plumbing landed: 37 flows / 479 snapshots, zero drift. No existing eval fixture supplies ctx.shell (the pre-existing app-help-v2 flow is the isolated eval the AC explicitly distinguishes from the production boundary, and it already passes shell explicitly), so composed prompt output is byte-identical for every current scenario and the harness wrote its zero-drift receipt rather than a snapshot diff.",
+      "pointer": "apps/api/eval-llm/flows/app-help-v2.ts"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-19",
+  "redGreenPointer": "apps/api/src/services/exchanges.test.ts"
+}

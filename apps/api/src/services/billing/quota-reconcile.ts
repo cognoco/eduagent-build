@@ -7,6 +7,7 @@ import {
 import type { SubscriptionTier } from '@eduagent/schemas';
 
 import { getTierConfig } from '../subscription';
+import { addMonthsClamped } from './billing-shared';
 
 // [WI-1239 / 779-strip] The per-profile branch of
 // reconcileQuotaStateForEffectiveTier (legacy profiles×subscriptions join)
@@ -21,12 +22,6 @@ import { getTierConfig } from '../subscription';
 // from subscription-core.ts's createSubscription/ensureFreeSubscription,
 // which are in turn only reachable from services/account.ts's
 // findOrCreateAccount (out of WI-1239's scope; tracked as WI-1254 follow-up).
-
-function nextMonthlyReset(now: Date): Date {
-  const cycleResetAt = new Date(now);
-  cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
-  return cycleResetAt;
-}
 
 type ReconcileQuotaOptions = {
   resetExpiredSharedPoolUsage?: boolean;
@@ -49,7 +44,7 @@ export async function reconcileQuotaStateForEffectiveTier(
   const config = getTierConfig(tier);
   if (config.quotaModel !== 'shared-pool') return;
 
-  const nextReset = nextMonthlyReset(now);
+  const nextReset = addMonthsClamped(now, 1);
   const resetExpiredUsage = options?.resetExpiredSharedPoolUsage ?? true;
   const sharedPoolUpdateSet = {
     monthlyLimit: config.monthlyQuota,

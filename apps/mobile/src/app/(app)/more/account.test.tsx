@@ -9,11 +9,6 @@ import {
 // ─── Boundary mocks (external runtime only) ────────────────────────────
 
 jest.mock(
-  'react-i18next' /* gc1-allow: i18n boundary — returns en.json strings */,
-  () => require('../../../test-utils/mock-i18n').i18nMock,
-);
-
-jest.mock(
   'expo-localization' /* gc1-allow: native-boundary — used by i18n init */,
   () => ({
     getLocales: () => [{ languageTag: 'en-US', languageCode: 'en' }],
@@ -138,6 +133,17 @@ describe('AccountScreen', () => {
     active.result.getByTestId('change-password-row');
   });
 
+  it('leaves native top-inset ownership to the pushed root scene', () => {
+    active = renderScreen(<AccountScreen />, {
+      profile: ownerProfile,
+      routes: defaultRoutes,
+    });
+
+    const scroll = active.result.getByTestId('more-account-scroll');
+    expect(scroll.props.contentContainerStyle).toEqual({ paddingBottom: 24 });
+    expect(scroll.props.contentContainerStyle.paddingTop).toBeUndefined();
+  });
+
   it('navigates to /profiles when profile row is pressed', () => {
     active = renderScreen(<AccountScreen />, {
       profile: ownerProfile,
@@ -196,7 +202,9 @@ describe('AccountScreen', () => {
       }),
       routes: defaultRoutes,
     });
-    active.result.getByText('Jordan');
+    expect(
+      active.result.getByTestId('more-row-profile').props.accessibilityLabel,
+    ).toContain('Jordan');
   });
 
   it('falls back to Clerk user fullName when displayName is undefined', () => {
@@ -209,8 +217,11 @@ describe('AccountScreen', () => {
       }),
       routes: defaultRoutes,
     });
-    // Clerk mock returns fullName='Alex Test'
-    active.result.getByText('Alex Test');
+    // Clerk mock returns fullName='Alex Test'. The account destination must
+    // carry that exact target into its accessible row name.
+    expect(
+      active.result.getByTestId('more-row-profile').props.accessibilityLabel,
+    ).toContain('Alex Test');
   });
 
   // WI-1496 — mentor language row (profiles.conversationLanguage), distinct

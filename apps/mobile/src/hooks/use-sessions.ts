@@ -25,6 +25,7 @@ import type {
   TranscriptResponse,
   SessionType,
   RecallBridgeResult,
+  RetrySummaryFeedbackResult,
   VerificationType,
   SystemPromptIntent,
 } from '@eduagent/schemas';
@@ -35,6 +36,7 @@ import {
   parkingLotAddResponseSchema,
   parkingLotItemsResponseSchema,
   recallBridgeResultSchema,
+  retrySummaryFeedbackResultSchema,
   sessionStartResultSchema,
   sessionSummaryGetResponseSchema,
   skipSummaryResponseSchema,
@@ -47,12 +49,17 @@ import { parseJson } from '../lib/parse-json';
 import { useProfile } from '../lib/profile';
 import { useAppContext } from '../lib/app-context';
 import { FEATURE_FLAGS } from '../lib/feature-flags';
-import { combinedSignal } from '../lib/query-timeout';
+import { combinedSignal, createTimeoutSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { queryKeys } from '../lib/query-keys';
+import { useAuth } from '@clerk/expo';
+
 import { useNavigationDataScopeContract } from './use-navigation-contract';
+import { useObservedPolicyEpoch } from './use-now-feed';
 
 export { useStreamMessage } from './use-stream-message';
+
+const SUBMIT_SUMMARY_TIMEOUT_MS = 35_000;
 
 function invalidateSessionDerivedQueries(
   queryClient: ReturnType<typeof useQueryClient>,
@@ -69,6 +76,16 @@ function invalidateSessionDerivedQueries(
   void queryClient.invalidateQueries({ queryKey: ['retention'] });
   void queryClient.invalidateQueries({ queryKey: ['language-progress'] });
   void queryClient.invalidateQueries({ queryKey: ['resume-nudge'] });
+}
+
+function invalidateSessionHistoryQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+  profileId: string | undefined,
+): void {
+  void queryClient.invalidateQueries({
+    predicate: ({ queryKey }) =>
+      queryKeys.historySessionsMatch(profileId)(queryKey),
+  });
 }
 
 function useSessionNavigationScope(): {
@@ -98,6 +115,10 @@ type FilingStatus =
   | 'filing_kept_out'
   | null
   | undefined;
+
+interface SessionDerivedMutationContext {
+  profileId: string | undefined;
+}
 
 export function computeFilingRefetchInterval(
   filingStatus: FilingStatus,
@@ -250,10 +271,15 @@ export function useClearContinuationDepth(
         'PATCH /sessions/:sessionId/clear-continuation-depth',
       );
     },
-    onSuccess: () => {
+    onMutate: (): SessionDerivedMutationContext => ({ profileId }),
+    onSuccess: (_data, _variables, mutationContext) => {
+      const mutationProfileId = mutationContext?.profileId;
       void queryClient.invalidateQueries({
         predicate: (query) =>
-          queryKeys.sessions.matchAnyMode(sessionId, profileId)(query.queryKey),
+          queryKeys.sessions.matchAnyMode(
+            sessionId,
+            mutationProfileId,
+          )(query.queryKey),
       });
       invalidateSessionDerivedQueries(queryClient);
     },
@@ -326,6 +352,7 @@ export function useCloseSession(sessionId: string): UseMutationResult<
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
+  const { profileId } = useSessionNavigationScope();
 
   return useMutation({
     mutationFn: async (input = {}) => {
@@ -340,8 +367,10 @@ export function useCloseSession(sessionId: string): UseMutationResult<
         'POST /sessions/:sessionId/close',
       );
     },
-    onSuccess: () => {
+    onMutate: (): SessionDerivedMutationContext => ({ profileId }),
+    onSuccess: (_data, _variables, mutationContext) => {
       invalidateSessionDerivedQueries(queryClient);
+      invalidateSessionHistoryQueries(queryClient, mutationContext?.profileId);
     },
   });
 }
@@ -561,9 +590,23 @@ export function useSessionSummary(
 ): UseQueryResult<SessionSummary | null> {
   const client = useApiClient();
   const { activeProfile, mode, profileId } = useSessionNavigationScope();
+  // [WI-2504] The summary carries the mentor-notice RECEIPT, and the app's
+  // global staleTime is 5 minutes — so without this a warm summary would keep
+  // painting a receipt for minutes after the client observed flag-off. Binding
+  // the key to the observed epoch drops it at the moment of observation. The
+  // segment is appended to the shared factory's key rather than added to the
+  // factory, so every existing prefix invalidation still matches.
+  // Actor = the authenticated account identity, exactly as the now-feed hook
+  // stores it; anything else would read a key nothing writes.
+  const { userId } = useAuth();
+  const { epoch: policyEpoch, hydrated: epochHydrated } =
+    useObservedPolicyEpoch(userId, profileId);
 
   return useQuery({
-    queryKey: queryKeys.sessions.summary(mode, sessionId, profileId),
+    queryKey: [
+      ...queryKeys.sessions.summary(mode, sessionId, profileId),
+      policyEpoch,
+    ],
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -582,7 +625,7 @@ export function useSessionSummary(
         cleanup();
       }
     },
-    enabled: !!activeProfile && !!sessionId,
+    enabled: !!activeProfile && !!sessionId && epochHydrated,
     refetchInterval: options?.refetchInterval
       ? (query) => options.refetchInterval?.(query.state.data ?? null) ?? false
       : undefined,
@@ -591,33 +634,88 @@ export function useSessionSummary(
 
 export function useSubmitSummary(
   sessionId: string,
-): UseMutationResult<SubmitSummaryResult, Error, { content: string }> {
+): UseMutationResult<
+  SubmitSummaryResult,
+  Error,
+  { content: string; signal?: AbortSignal }
+> {
   const client = useApiClient();
   const queryClient = useQueryClient();
   const { profileId } = useSessionNavigationScope();
 
   return useMutation({
-    mutationFn: async (input: { content: string }) => {
-      const res = await client.sessions[':sessionId'].summary.$post({
-        param: { sessionId },
-        json: input,
-      });
-      await assertOk(res);
-      return parseJson(
-        res,
-        submitSummaryResultSchema,
-        'POST /sessions/:sessionId/summary',
+    mutationFn: async (input: { content: string; signal?: AbortSignal }) => {
+      const { signal, cleanup } = combinedSignal(
+        input.signal,
+        SUBMIT_SUMMARY_TIMEOUT_MS,
       );
+      try {
+        const res = await client.sessions[':sessionId'].summary.$post(
+          {
+            param: { sessionId },
+            json: { content: input.content },
+          },
+          { init: { signal } },
+        );
+        await assertOk(res);
+        return parseJson(
+          res,
+          submitSummaryResultSchema,
+          'POST /sessions/:sessionId/summary',
+        );
+      } finally {
+        cleanup();
+      }
     },
-    onSuccess: () => {
+    onMutate: (): SessionDerivedMutationContext => ({ profileId }),
+    onSuccess: (_data, _variables, mutationContext) => {
+      const mutationProfileId = mutationContext?.profileId;
       void queryClient.invalidateQueries({
         predicate: (query) =>
           queryKeys.sessions.matchSummaryAnyMode(
             sessionId,
-            profileId,
+            mutationProfileId,
           )(query.queryKey),
       });
       invalidateSessionDerivedQueries(queryClient);
+      invalidateSessionHistoryQueries(queryClient, mutationProfileId);
+    },
+  });
+}
+
+export function useRetrySummaryFeedback(
+  sessionId: string,
+): UseMutationResult<RetrySummaryFeedbackResult, Error, void> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+  const { profileId } = useSessionNavigationScope();
+
+  return useMutation({
+    mutationFn: async () => {
+      const { signal, cleanup } = createTimeoutSignal(15_000);
+      try {
+        const res = await client.sessions[':sessionId'].summary[
+          'retry-feedback'
+        ].$post({ param: { sessionId } }, { init: { signal } });
+        await assertOk(res);
+        return parseJson(
+          res,
+          retrySummaryFeedbackResultSchema,
+          'POST /sessions/:sessionId/summary/retry-feedback',
+        );
+      } finally {
+        cleanup();
+      }
+    },
+    onMutate: (): SessionDerivedMutationContext => ({ profileId }),
+    onSuccess: (_data, _variables, mutationContext) => {
+      void queryClient.invalidateQueries({
+        predicate: (query) =>
+          queryKeys.sessions.matchSummaryAnyMode(
+            sessionId,
+            mutationContext?.profileId,
+          )(query.queryKey),
+      });
     },
   });
 }
@@ -641,15 +739,18 @@ export function useSkipSummary(
         'POST /sessions/:sessionId/summary/skip',
       );
     },
-    onSuccess: () => {
+    onMutate: (): SessionDerivedMutationContext => ({ profileId }),
+    onSuccess: (_data, _variables, mutationContext) => {
+      const mutationProfileId = mutationContext?.profileId;
       void queryClient.invalidateQueries({
         predicate: (query) =>
           queryKeys.sessions.matchSummaryAnyMode(
             sessionId,
-            profileId,
+            mutationProfileId,
           )(query.queryKey),
       });
       invalidateSessionDerivedQueries(queryClient);
+      invalidateSessionHistoryQueries(queryClient, mutationProfileId);
     },
   });
 }

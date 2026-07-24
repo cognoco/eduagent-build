@@ -3,6 +3,10 @@ import i18next from 'i18next';
 import { conversationLanguageSchema } from '@eduagent/schemas';
 
 import { useProfile } from '../lib/profile';
+import {
+  beginAutomaticMentorLanguageUpdate,
+  shouldSuppressMentorLanguageAutoSync,
+} from '../lib/mentor-language-coordination';
 import { useUpdateConversationLanguage } from './use-onboarding-dimensions';
 
 type SyncKey = { profileId: string; language: string };
@@ -16,8 +20,12 @@ export function useMentorLanguageSync(): void {
 
   useEffect(() => {
     if (!activeProfile || isPending) return;
+    let cancelled = false;
 
-    const sync = () => {
+    const sync = async () => {
+      if (await shouldSuppressMentorLanguageAutoSync(activeProfile.id)) return;
+      if (cancelled) return;
+
       const parsed = conversationLanguageSchema.safeParse(i18next.language);
       if (!parsed.success) return;
       if (parsed.data === activeProfile.conversationLanguage) return;
@@ -35,8 +43,12 @@ export function useMentorLanguageSync(): void {
         profileId: activeProfile.id,
         language: parsed.data,
       };
+      const languageOperation = beginAutomaticMentorLanguageUpdate(
+        activeProfile.id,
+      );
+      if (!languageOperation) return;
       mutate(
-        { conversationLanguage: parsed.data },
+        { conversationLanguage: parsed.data, languageOperation },
         {
           onSuccess: () => {
             lastSyncedRef.current = syncKey;
@@ -45,8 +57,15 @@ export function useMentorLanguageSync(): void {
       );
     };
 
-    sync();
-    i18next.on('languageChanged', sync);
-    return () => i18next.off('languageChanged', sync);
+    const handleLanguageChanged = () => {
+      void sync();
+    };
+
+    void sync();
+    i18next.on('languageChanged', handleLanguageChanged);
+    return () => {
+      cancelled = true;
+      i18next.off('languageChanged', handleLanguageChanged);
+    };
   }, [activeProfile, isPending, mutate]);
 }

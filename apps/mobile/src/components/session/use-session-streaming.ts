@@ -12,13 +12,16 @@ import type {
   FluencyDrillEvent,
   LanguageLearningActivityEvent,
 } from '../../lib/sse';
-import type { ChatMessage } from './ChatShell';
+import type { ChatMessage } from './session-types';
 import type {
   useStreamMessage,
   useStartSession,
   useRecordSystemPrompt,
 } from '../../hooks/use-sessions';
-import { useApiClient, type QuotaExceededDetails } from '../../lib/api-client';
+import {
+  type useApiClient,
+  type QuotaExceededDetails,
+} from '../../lib/api-client';
 import { assertOk } from '../../lib/assert-ok';
 import { formatApiError } from '../../lib/format-api-error';
 import { Sentry } from '../../lib/sentry';
@@ -50,6 +53,16 @@ import {
 const FIRST_TOPIC_ACK_PATTERN =
   /^(ok(?:ay)?|yes|yep|yeah|ready|start|go ahead|sure|sounds good|let'?s go)[.!?\s]*$/i;
 
+/**
+ * [WI-2107] Synthetic learner-voice trigger sent when the server signals
+ * `topicOpenedPendingContent` — the mentor opened a topic but delivered no
+ * content or question. Mirrors the mentor-opener pattern: `continueWithMessage`
+ * itself never renders a user-visible bubble for this call (only the
+ * `handleSend` layer above does that), so this text is never shown live, but
+ * it is persisted server-side and would render on a transcript reload.
+ */
+export const AUTO_CONTINUATION_TRIGGER_TEXT = 'Yes, please continue.';
+
 type ImageMimeType = 'image/jpeg' | 'image/png' | 'image/webp';
 export type SessionImageAttachment = {
   base64: string;
@@ -59,9 +72,17 @@ export type ContinueMessageOptions = {
   sessionSubjectId?: string;
   sessionSubjectName?: string;
   existingEntry?: OutboxEntry;
+  /** The route-level Mentor input that must become canonical turn one. */
+  initialMentorOpener?: boolean;
   attachImage?: boolean;
   imageAttachment?: SessionImageAttachment;
+  /** [WI-2107] This send is an auto-fired follow-up, not direct learner input. */
+  isAutoContinuation?: boolean;
 };
+
+export function mentorOpenerIdempotencyKey(sessionId: string): string {
+  return `mentor-opener:${sessionId}`;
+}
 
 function getStreamErrorCode(error: unknown): string | undefined {
   if (error == null || typeof error !== 'object' || !('code' in error)) {
@@ -113,6 +134,8 @@ export interface UseSessionStreamingOptions {
   topicName: string | undefined;
   inputMode: InputMode;
   rawInput: string | undefined;
+  hasInitialMentorOpener?: boolean;
+  mentorOpenerAlreadyPersisted?: boolean;
   resumeFromSessionId: string | undefined;
   gaps: string[] | undefined;
   verificationType: string | undefined; // 3E.1/3E.2: teach_back or evaluate
@@ -178,6 +201,7 @@ export interface UseSessionStreamingOptions {
   // Refs (passed directly so the hook doesn't create its own)
   animationCleanupRef: React.MutableRefObject<(() => void) | null>;
   silenceTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
+  sessionEndedRef: React.MutableRefObject<boolean>;
   lastAiAtRef: React.MutableRefObject<number | null>;
   lastExpectedMinutesRef: React.MutableRefObject<number>;
   lastRetryPayloadRef: React.MutableRefObject<{
@@ -208,6 +232,8 @@ export interface UseSessionStreamingOptions {
   // Helpers
   createLocalMessageId: (prefix: 'user' | 'ai') => string;
   responseHistory: Array<{ actualSeconds: number; expectedMinutes: number }>;
+  /** Optional route-owned callback for reporting each allocated session. */
+  onSessionCreated?: (sessionId: string) => void;
 }
 
 export function useSessionStreaming(opts: UseSessionStreamingOptions) {
@@ -230,6 +256,8 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     messages,
     inputMode,
     rawInput,
+    hasInitialMentorOpener = false,
+    mentorOpenerAlreadyPersisted,
     resumeFromSessionId,
     gaps,
     verificationType,
@@ -262,6 +290,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     draftText,
     notePromptOffered,
     silenceTimerRef,
+    sessionEndedRef,
     lastAiAtRef,
     lastExpectedMinutesRef,
     lastRetryPayloadRef,
@@ -277,7 +306,25 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     trigger,
     createLocalMessageId,
     responseHistory,
+    onSessionCreated,
   } = opts;
+
+  const activeSessionIdRef = useRef(activeSessionId);
+  activeSessionIdRef.current = activeSessionId;
+  const handledMentorOpenersRef = useRef<Set<string>>(new Set());
+  if (mentorOpenerAlreadyPersisted && activeSessionId) {
+    handledMentorOpenersRef.current.add(
+      mentorOpenerIdempotencyKey(activeSessionId),
+    );
+  }
+  const continueWithMessageRef = useRef<
+    (text: string, options?: ContinueMessageOptions) => Promise<void>
+  >(async () => undefined);
+  // [WI-2107] Hard cap: at most one auto-fired follow-up per learner turn.
+  // No server loop exists for this signal (each auto-continuation is a
+  // discrete client-initiated request), so termination is guaranteed here.
+  // Re-armed only when the learner (not an auto-continuation) sends a turn.
+  const autoContinuationFiredRef = useRef(false);
 
   // WI-306: Mirror draftText into a ref so the silence-timer callback reads the
   // value at fire time rather than the stale closure value at schedule time.
@@ -341,7 +388,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       overrideSubjectId?: string,
       initialRawInput?: string,
     ): Promise<string | null> => {
-      if (activeSessionId) return activeSessionId;
+      if (activeSessionIdRef.current) return activeSessionIdRef.current;
 
       const sid = overrideSubjectId ?? effectiveSubjectId;
       if (!sid) return null;
@@ -354,7 +401,11 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       // Session-creation errors propagate to the sendMessage catch block,
       // which classifies quota / reconnectable / fatal errors properly.
       // Previously swallowed here, collapsing all failures to a generic message. [IMP-3]
-      const sessionRawInput = initialRawInput ?? rawInput;
+      // The Mentor route owns the original learner intent. A later message is
+      // only a fallback for non-Mentor entry paths that have no route opener.
+      const sessionRawInput = hasInitialMentorOpener
+        ? (rawInput ?? initialRawInput)
+        : (initialRawInput ?? rawInput);
 
       let newId: string;
       if (overrideSubjectId) {
@@ -433,7 +484,11 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           });
         newId = result.session.id;
       }
+      // Make the allocated ID visible synchronously to a queued opener/follow-
+      // up pair; React state does not re-render until this async turn yields.
+      activeSessionIdRef.current = newId;
       setActiveSessionId(newId);
+      onSessionCreated?.(newId);
       if (effectiveMode === 'homework' && homeworkProblemsState.length > 0) {
         try {
           await syncHomeworkMetadata(
@@ -449,7 +504,6 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       return newId;
     },
     [
-      activeSessionId,
       // BUG-339: Removed activeProfile?.id — it is not read inside
       // ensureSession. Including it caused the callback (and every downstream
       // dependency like continueWithMessage) to be recreated on every profile
@@ -459,6 +513,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       effectiveMode,
       inputMode,
       verificationType,
+      hasInitialMentorOpener,
       rawInput,
       apiClient,
       startSession,
@@ -470,6 +525,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       normalizedOcrText,
       homeworkCaptureSource,
       syncHomeworkMetadata,
+      onSessionCreated,
     ],
   );
 
@@ -477,7 +533,9 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     (sessionIdToUse: string, expectedResponseMinutes: number) => {
       if (silenceTimerRef.current) {
         clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
       }
+      if (sessionEndedRef.current) return;
 
       const thresholdMinutes = Math.min(
         20,
@@ -489,7 +547,8 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
 
       silenceTimerRef.current = setTimeout(
         async () => {
-          if (draftTextRef.current.trim()) return;
+          silenceTimerRef.current = null;
+          if (sessionEndedRef.current || draftTextRef.current.trim()) return;
 
           const prompt =
             "Still working on it? Take your time - I'm here when you're ready.";
@@ -518,6 +577,13 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             // Best effort only.
           }
 
+          if (sessionEndedRef.current) {
+            setMessages((prev) =>
+              prev.filter((message) => message.id !== 'silence-prompt'),
+            );
+            return;
+          }
+
           await writeSessionRecoveryMarker(
             {
               sessionId: sessionIdToUse,
@@ -543,6 +609,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       effectiveSubjectName,
       recordSystemPrompt,
       responseHistory,
+      sessionEndedRef,
       setMessages,
       silenceTimerRef,
       topicId,
@@ -553,6 +620,45 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
 
   const continueWithMessage = useCallback(
     async (text: string, options?: ContinueMessageOptions) => {
+      // [WI-2107] A genuine learner turn re-arms the one-shot auto-continuation
+      // budget; the auto-fired turn itself must not reset it.
+      if (!options?.isAutoContinuation) {
+        autoContinuationFiredRef.current = false;
+      }
+      const currentOpenerKey = activeSessionIdRef.current
+        ? mentorOpenerIdempotencyKey(activeSessionIdRef.current)
+        : null;
+      if (
+        hasInitialMentorOpener &&
+        rawInput &&
+        !options?.initialMentorOpener &&
+        (!currentOpenerKey ||
+          !handledMentorOpenersRef.current.has(currentOpenerKey))
+      ) {
+        await continueWithMessageRef.current(rawInput, {
+          initialMentorOpener: true,
+          ...(options?.sessionSubjectId
+            ? { sessionSubjectId: options.sessionSubjectId }
+            : {}),
+          ...(options?.sessionSubjectName
+            ? { sessionSubjectName: options.sessionSubjectName }
+            : {}),
+        });
+
+        const resolvedOpenerKey = activeSessionIdRef.current
+          ? mentorOpenerIdempotencyKey(activeSessionIdRef.current)
+          : null;
+        // The opener itself has now been handled, or it failed and the later
+        // turn must wait so canonical ordering cannot invert.
+        if (
+          text === rawInput ||
+          !resolvedOpenerKey ||
+          !handledMentorOpenersRef.current.has(resolvedOpenerKey)
+        ) {
+          return;
+        }
+      }
+
       // ATOMIC chain-tail swap — see `continueChainTailRef` doc above for
       // why this replaced the prior `while (activeContinueRef.current)` poll.
       // Read predecessor and install our own tail in a single sync block; do
@@ -569,9 +675,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       await predecessor.catch(() => undefined);
 
       let streamId: string | null = null;
-      let resolvedSessionId: string | null = activeSessionId;
-      // [H6] SSE freeze watchdog — hoisted so finally can always clear it.
-      let sseWatchdogTimerId: ReturnType<typeof setInterval> | null = null;
+      let resolvedSessionId: string | null = activeSessionIdRef.current;
       let doneCalled = false;
       try {
         const sessionSubjectId = options?.sessionSubjectId;
@@ -615,6 +719,9 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
                   : {}),
                 ...(options?.sessionSubjectName
                   ? { sessionSubjectName: options.sessionSubjectName }
+                  : {}),
+                ...(options?.initialMentorOpener
+                  ? { initialMentorOpener: true }
                   : {}),
                 ...(options?.attachImage ? { attachImage: true } : {}),
                 ...(imageAttachment ? { imageAttachment } : {}),
@@ -702,37 +809,6 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
         ]);
         setIsStreaming(true);
         let chunkCount = 0;
-        let watchdogConverted = false;
-
-        // [H6] SSE freeze watchdog: if no token arrives for 45s while
-        // streaming, classify as a connection drop, surface a retry card.
-        const SSE_WATCHDOG_MS = 45_000;
-        let lastSseEventAt = Date.now();
-        sseWatchdogTimerId = setInterval(() => {
-          if (Date.now() - lastSseEventAt >= SSE_WATCHDOG_MS) {
-            if (sseWatchdogTimerId !== null) {
-              clearInterval(sseWatchdogTimerId);
-              sseWatchdogTimerId = null;
-            }
-            setIsStreaming(false);
-            const frozenStreamId = streamId;
-            if (frozenStreamId) {
-              watchdogConverted = true;
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === frozenStreamId
-                    ? {
-                        ...m,
-                        content: 'Connection dropped — Try again',
-                        streaming: false,
-                        kind: 'reconnect_prompt' as const,
-                      }
-                    : m,
-                ),
-              );
-            }
-          }
-        }, 5_000);
 
         const outboxEntry =
           activeProfileId && sid
@@ -742,6 +818,9 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
                 flow: 'session',
                 surfaceKey: sid,
                 content: apiMessage,
+                ...(options?.initialMentorOpener
+                  ? { id: mentorOpenerIdempotencyKey(sid) }
+                  : {}),
                 metadata: {
                   sessionId: sid,
                   ...(effectiveMode === 'homework' && homeworkMode
@@ -785,8 +864,16 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
         if (outboxEntry) {
           streamOptions.idempotencyKey = outboxEntry.id;
           streamOptions.onReplay = (replay) => {
+            if (options?.initialMentorOpener && replay.assistantTurnReady) {
+              handledMentorOpenersRef.current.add(
+                mentorOpenerIdempotencyKey(sid),
+              );
+            }
             void (async () => {
-              if (activeProfileId) {
+              if (
+                activeProfileId &&
+                (!options?.initialMentorOpener || replay.assistantTurnReady)
+              ) {
                 await markConfirmed(activeProfileId, 'session', outboxEntry.id);
               }
             })();
@@ -811,8 +898,6 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
         await streamMessage(
           apiMessage,
           (accumulated) => {
-            // [H6] Reset watchdog timestamp on each token.
-            lastSseEventAt = Date.now();
             chunkCount += 1;
             setMessages((prev) =>
               prev.map((m) =>
@@ -823,7 +908,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           async (result) => {
             doneCalled = true;
             const shouldConvertToReconnect =
-              watchdogConverted || !!result.fallback || chunkCount === 0;
+              !!result.fallback || chunkCount === 0;
             const trackedExchange = shouldConvertToReconnect
               ? null
               : trackExchange({
@@ -863,6 +948,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
                   streaming: false,
                   eventId: result.aiEventId,
                   escalationRung: result.escalationRung,
+                  mentorNotice: result.mentorNotice,
                 };
               }),
             );
@@ -884,6 +970,11 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
 
             if (activeProfileId && outboxEntry) {
               await markConfirmed(activeProfileId, 'session', outboxEntry.id);
+            }
+            if (options?.initialMentorOpener) {
+              handledMentorOpenersRef.current.add(
+                mentorOpenerIdempotencyKey(sid),
+              );
             }
 
             // Handle note prompt triggers
@@ -914,6 +1005,22 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             }
             if (result.draftedNote) {
               setDraftedNote(result.draftedNote);
+            }
+
+            // [WI-2107] The mentor opened a topic but delivered no content or
+            // question this turn — immediately request the next turn rather
+            // than leaving the learner with a bare promise. Hard-capped to
+            // one auto-fired follow-up per learner turn (see
+            // autoContinuationFiredRef doc comment above).
+            if (
+              result.topicOpenedPendingContent &&
+              !autoContinuationFiredRef.current
+            ) {
+              autoContinuationFiredRef.current = true;
+              void continueWithMessageRef.current(
+                AUTO_CONTINUATION_TRIGGER_TEXT,
+                { isAutoContinuation: true },
+              );
             }
 
             // F6: Surface low-confidence indicator below the AI message
@@ -1064,11 +1171,6 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           },
         ]);
       } finally {
-        // [H6] Always clear the SSE watchdog when the stream settles.
-        if (sseWatchdogTimerId !== null) {
-          clearInterval(sseWatchdogTimerId);
-          sseWatchdogTimerId = null;
-        }
         setIsStreaming(false);
         if (streamId) {
           setMessages((prev) => {
@@ -1107,7 +1209,6 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     },
     [
       activeHomeworkProblem,
-      activeSessionId,
       activeProfileId,
       classifiedSubject,
       createLocalMessageId,
@@ -1118,6 +1219,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       ensureSession,
       homeworkMode,
       homeworkProblemsState,
+      hasInitialMentorOpener,
       imageBase64Ref,
       imageMimeTypeRef,
       inputMode,
@@ -1126,6 +1228,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       lastRetryPayloadRef,
       messages,
       notePromptOffered,
+      rawInput,
       scheduleSilencePrompt,
       setExchangeCount,
       setEscalationRung,
@@ -1206,6 +1309,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       setMessages,
     ],
   );
+  continueWithMessageRef.current = continueWithMessage;
 
   const fetchFastCelebrations = useCallback(async (): Promise<
     PendingCelebration[]

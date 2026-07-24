@@ -11,9 +11,14 @@ import {
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 
-import { captureException } from './services/sentry';
+import {
+  captureException,
+  scrubSentryEvent,
+  dropConsoleBreadcrumb,
+} from './services/sentry';
 import { CircuitOpenError } from './services/llm';
 import { isTransientDatabaseError } from './services/transient-db-retry';
+import { ConsentWithdrawnError } from './services/session';
 import {
   ForbiddenError,
   ConsentRequiredError,
@@ -57,6 +62,7 @@ import { curriculumRoutes } from './routes/curriculum';
 import { bookRoutes } from './routes/books';
 import { noteRoutes } from './routes/notes';
 import { sessionRoutes } from './routes/sessions';
+import { mentorNoticeRoutes } from './routes/mentor-notices';
 import { bookmarkRoutes } from './routes/bookmarks';
 import { parkingLotRoutes } from './routes/parking-lot';
 import { homeworkRoutes } from './routes/homework';
@@ -184,6 +190,9 @@ type Bindings = {
   ALLOW_MISSING_IDEMPOTENCY_KV?: string;
   ADULT_OWNER_GATE_ENABLED?: string;
   CHALLENGE_ROUND_RUNTIME_ENABLED?: string;
+  ANSWER_EVALUATION_RUNTIME_ENABLED?: string;
+  MENTOR_NOTICE_ENABLED?: string;
+  MENTOR_NOTICE_PUSH_POST_MVP_ENABLED?: string;
   CHALLENGE_ROUND_COHORT_PROFILE_IDS?: string;
   CHALLENGE_ROUND_GRADER_ENABLED?: string;
   JUDGE_FRAMEWORK_ENABLED?: string;
@@ -371,6 +380,7 @@ const routes = api
   .route('/', bookRoutes)
   .route('/', noteRoutes)
   .route('/', sessionRoutes)
+  .route('/', mentorNoticeRoutes)
   .route('/', bookmarkRoutes)
   .route('/', parkingLotRoutes)
   .route('/', homeworkRoutes)
@@ -420,6 +430,16 @@ const routes = api
 // The mobile client sets the base URL to include `/v1`.
 // ---------------------------------------------------------------------------
 const app = new Hono<Env>().basePath('/v1');
+const PHASE_PROBE_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+app.use('*', async (c, next) => {
+  const probeId = c.req.header('x-mentomate-probe-id');
+  if (probeId && PHASE_PROBE_ID_PATTERN.test(probeId)) {
+    c.header('x-mentomate-worker-probe-id', probeId);
+  }
+  await next();
+});
 app.route('/', routes);
 
 // Global error handler — catches unhandled exceptions and returns ApiErrorSchema envelope
@@ -451,6 +471,18 @@ app.onError((err, c) => {
   if (err instanceof ConsentRequiredError) {
     return c.json(
       { code: ERROR_CODES.CONSENT_REQUIRED, message: err.message },
+      403,
+    );
+  }
+  // [WI-2396] `assertLlmConsent` (consent-status-v2.ts) throws this from the
+  // six request-time LLM routes outside the exchange pipeline. Centralizing
+  // the mapping here (rather than a per-route try/catch) follows the same
+  // EP15-I5 boundary-classification pattern as ConsentRequiredError above.
+  // sessions.ts's two existing local catches for this error still work
+  // unchanged — a local catch intercepts before the error reaches onError.
+  if (err instanceof ConsentWithdrawnError) {
+    return c.json(
+      { code: ERROR_CODES.CONSENT_WITHDRAWN, message: err.message },
       403,
     );
   }
@@ -633,6 +665,31 @@ export default Sentry.withSentry(
     dsn: (env as unknown as Bindings).SENTRY_DSN,
     tracesSampleRate:
       (env as unknown as Bindings).ENVIRONMENT === 'production' ? 0.1 : 1.0,
+    // [WI-2339] @sentry/cloudflare's sdk.js already defaults
+    // sendDefaultPii to false (verified: sdk.js:14, `options.sendDefaultPii
+    // ?? false`) — this line changes no runtime behavior. Set explicitly so
+    // the PII-attachment posture is asserted in code, not inherited from an
+    // SDK default that could change on a future upgrade.
+    sendDefaultPii: false,
+    // [WI-1990] Defense-in-depth PII backstop — strips denylisted keys
+    // (learner free-text, names, etc.) from extra/contexts before an event
+    // leaves the API. Not a substitute for call-site discipline.
+    beforeSend: scrubSentryEvent,
+    // [WI-2353 rework] beforeSend only fires on error events — with
+    // tracesSampleRate non-zero, requestDataIntegration attaches the same
+    // event.request.headers (including Authorization) to sampled
+    // TRANSACTION events too, and those bypass beforeSend entirely. Wire
+    // the same scrub to beforeSendTransaction so the Authorization
+    // redaction (and the pre-existing cookie exclusion) applies uniformly
+    // to both event types. Mirrors the two-hook pattern already used by
+    // apps/mobile/src/lib/sentry.ts.
+    beforeSendTransaction: scrubSentryEvent,
+    // [WI-1990 rework] The SDK's default consoleIntegration() turns every
+    // console.* call into a breadcrumb with the raw args embedded in a
+    // string (message / data.arguments) — content a key-based scrubber
+    // can't reach. Drop console breadcrumbs entirely; see
+    // dropConsoleBreadcrumb's doc comment in services/sentry.ts.
+    beforeBreadcrumb: dropConsoleBreadcrumb,
   }),
   // Hono's app.fetch signature is compatible but not structurally identical
   // to ExportedHandler — cast via unknown to bridge the gap.

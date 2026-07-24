@@ -1,15 +1,32 @@
 import React from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import {
+  BackHandler,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+  type Href,
+} from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { IntentCard } from '../../../components/home/IntentCard';
 import { useQuizStats } from '../../../hooks/use-quiz';
 import { useSubjects } from '../../../hooks/use-subjects';
 import { useVocabulary } from '../../../hooks/use-vocabulary';
-import { homeHrefForReturnTo } from '../../../lib/navigation';
+import {
+  homeHrefForReturnTo,
+  PRACTICE_HREF,
+  PRACTICE_RETURN_TO,
+} from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { useQuizFlow } from './_layout';
 
 // [BUG-891] Below this threshold the quiz draws from a generic seed list,
@@ -94,7 +111,14 @@ function getLanguageDisplayName(
 export default function QuizIndexScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
-  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const { returnTo, practiceReturnTo } = useLocalSearchParams<{
+    returnTo?: string | string[];
+    practiceReturnTo?: string | string[];
+  }>();
+  const returnToken = Array.isArray(returnTo) ? returnTo[0] : returnTo;
+  const practiceReturnToken = Array.isArray(practiceReturnTo)
+    ? practiceReturnTo[0]
+    : practiceReturnTo;
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const {
@@ -123,8 +147,14 @@ export default function QuizIndexScreen(): React.ReactElement {
         subject.languageCode &&
         subject.status === 'active',
     ) ?? [];
-  const isPracticeReturn = returnTo === 'practice';
-  const returnTarget = returnTo ?? null;
+  const isPracticeReturn = returnToken === PRACTICE_RETURN_TO;
+  const returnTarget = returnToken ?? null;
+  const childReturnParams = {
+    ...(returnToken ? { returnTo: returnToken } : {}),
+    ...(isPracticeReturn && practiceReturnToken
+      ? { practiceReturnTo: practiceReturnToken }
+      : {}),
+  };
 
   const capitalsStats = stats?.find((stat) => stat.activityType === 'capitals');
   const capitalsSubtitle =
@@ -171,23 +201,47 @@ export default function QuizIndexScreen(): React.ReactElement {
         activityType: 'vocabulary',
         subjectId,
         languageName,
-        ...(returnTarget ? { returnTo: returnTarget } : {}),
+        ...childReturnParams,
       },
     } as Href);
   };
-  const handleBack = () => {
+  const handleBack = React.useCallback(() => {
     if (isPracticeReturn) {
-      router.replace('/(app)/practice' as Href);
+      if (practiceReturnToken) {
+        router.navigate({
+          pathname: PRACTICE_HREF,
+          params: { returnTo: practiceReturnToken },
+        } as Href);
+        return;
+      }
+      router.navigate(PRACTICE_HREF as Href);
       return;
     }
 
-    if (returnTo) {
-      router.replace(homeHrefForReturnTo(returnTo) as Href);
+    if (returnToken) {
+      router.replace(homeHrefForReturnTo(returnToken) as Href);
       return;
     }
 
-    router.replace('/(app)/practice' as Href);
-  };
+    router.replace(PRACTICE_HREF as Href);
+  }, [isPracticeReturn, practiceReturnToken, returnToken, router]);
+
+  // Quiz index is another cross-tab root. Consume native Back only for the
+  // Practice entry path; nested Quiz children retain their own stack Back.
+  useFocusEffect(
+    React.useCallback(() => {
+      if (Platform.OS === 'web' || !isPracticeReturn) return undefined;
+
+      const subscription = BackHandler.addEventListener(
+        'hardwareBackPress',
+        () => {
+          handleBack();
+          return true;
+        },
+      );
+      return () => subscription.remove();
+    }, [handleBack, isPracticeReturn]),
+  );
 
   return (
     <ScrollView
@@ -272,7 +326,7 @@ export default function QuizIndexScreen(): React.ReactElement {
                 pathname: '/(app)/quiz/launch',
                 params: {
                   activityType: 'capitals',
-                  ...(returnTarget ? { returnTo: returnTarget } : {}),
+                  ...childReturnParams,
                 },
               } as Href);
             }}
@@ -328,7 +382,7 @@ export default function QuizIndexScreen(): React.ReactElement {
                 pathname: '/(app)/quiz/launch',
                 params: {
                   activityType: 'guess_who',
-                  ...(returnTarget ? { returnTo: returnTarget } : {}),
+                  ...childReturnParams,
                 },
               } as Href);
             }}
@@ -343,7 +397,13 @@ export default function QuizIndexScreen(): React.ReactElement {
               <IntentCard
                 title={t('quiz.index.vocabLockedTitle')}
                 subtitle={t('quiz.index.vocabLockedSubtitle')}
-                onPress={() => router.push('/(app)/library' as Href)}
+                onPress={() =>
+                  router.push(
+                    (FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+                      ? '/(app)/subjects'
+                      : '/(app)/library') as Href,
+                  )
+                }
                 testID="quiz-vocab-locked"
               />
             </View>

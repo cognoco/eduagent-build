@@ -19,6 +19,7 @@ import type {
   VerificationType,
   SessionMetadata,
 } from '@eduagent/schemas';
+import { hasAvailableSummaryFeedback } from '../summaries';
 
 // ---------------------------------------------------------------------------
 // Mappers — Drizzle Date → API ISO string
@@ -67,11 +68,13 @@ export function mapSessionRow(
 export function mapSummaryRow(
   row: typeof sessionSummaries.$inferSelect,
 ): SessionSummary {
+  const feedbackAvailable = hasAvailableSummaryFeedback(row.aiFeedback);
   return {
     id: row.id,
     sessionId: row.sessionId,
     content: row.content ?? '',
-    aiFeedback: row.aiFeedback ?? null,
+    aiFeedback: feedbackAvailable ? row.aiFeedback : null,
+    feedbackStatus: feedbackAvailable ? 'available' : 'unavailable',
     status: row.status,
     closingLine: row.closingLine ?? null,
     learnerRecap: row.learnerRecap ?? null,
@@ -154,40 +157,51 @@ export async function setSessionInputMode(
   sessionId: string,
   input: SessionInputModeInput,
 ): Promise<LearningSession> {
-  const repo = createScopedRepository(db, profileId);
-  const row = await repo.sessions.findFirst(eq(learningSessions.id, sessionId));
-  if (!row) {
-    throw new NotFoundError('Session');
-  }
+  return db.transaction(async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+        ),
+      )
+      .for('update')
+      .limit(1);
+    if (!current) {
+      throw new NotFoundError('Session');
+    }
 
-  const existingMetadata =
-    row.metadata &&
-    typeof row.metadata === 'object' &&
-    !Array.isArray(row.metadata)
-      ? (row.metadata as SessionMetadata)
-      : {};
+    const existingMetadata =
+      current.metadata &&
+      typeof current.metadata === 'object' &&
+      !Array.isArray(current.metadata)
+        ? (current.metadata as SessionMetadata)
+        : {};
 
-  const [updated] = await db
-    .update(learningSessions)
-    .set({
-      inputMode: input.inputMode,
-      metadata: {
-        ...existingMetadata,
+    const [updated] = await tx
+      .update(learningSessions)
+      .set({
         inputMode: input.inputMode,
-      },
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId),
-      ),
-    )
-    .returning();
+        metadata: {
+          ...existingMetadata,
+          inputMode: input.inputMode,
+        },
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+        ),
+      )
+      .returning();
 
-  if (!updated) {
-    throw new NotFoundError('Session');
-  }
+    if (!updated) {
+      throw new NotFoundError('Session');
+    }
 
-  return mapSessionRow(updated);
+    return mapSessionRow(updated);
+  });
 }

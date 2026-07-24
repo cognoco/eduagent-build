@@ -45,9 +45,14 @@ import { safeSend } from '../safe-non-core';
 import { inngest } from '../../inngest/client';
 import { computeTrialEndDate } from '../trial';
 import { getTierConfig } from '../subscription';
+import { addMonthsClamped } from '../billing/billing-shared';
 import { resolveIdentityV2, type ResolvedIdentityV2 } from './identity-resolve';
 import { checkConsentRequiredFromDate } from '../consent';
 import { ProfileValidationError } from '../profile';
+import {
+  createPendingConsentRequest,
+  recordAdultSelfConsentV2,
+} from './consent-v2';
 
 const logger = createLogger();
 
@@ -191,6 +196,15 @@ export interface CreateIdentityGraphInput {
   timezone?: string | null;
   /** Organization display name; derived as today when absent. */
   organizationName?: string;
+  /**
+   * [WI-1193 AC1] The consent-policy version in force when the adult accepts,
+   * stored as the versioned half of the durable terms-acceptance fact on the
+   * owner's self-consent grants (adults age >= 18 only). Sourced from
+   * CONSENT_POLICY_VERSION by the production caller (profiles.ts). Optional so
+   * pre-version test callers still compile; absent → the grant records a null
+   * terms version, which the accountability report surfaces as such.
+   */
+  consentPolicyVersion?: string;
 }
 
 /**
@@ -313,6 +327,29 @@ export async function createIdentityGraph(
         roles: ['admin', 'learner'],
       });
 
+      // (6a) [WI-1864] A self-registered owner aged 13-16 still requires the
+      // same GDPR parental-consent workflow as any other learner. Persist its
+      // PENDING request inside this graph transaction so the response cannot
+      // expose an ungated profile whose consent row failed to land.
+      if (consentCheck.required && consentCheck.consentType) {
+        await createPendingConsentRequest(
+          txDb,
+          personRow.id,
+          orgRow.id,
+          consentCheck.consentType,
+        );
+      } else if (consentCheck.age >= 18) {
+        // [WI-1193 AC1] A true adult has no guardian to consent on their
+        // behalf, so bootstrap records their own lawful basis and accepted
+        // terms. Age 17 needs neither parental nor adult self-consent here.
+        await recordAdultSelfConsentV2(
+          txDb,
+          personRow.id,
+          orgRow.id,
+          input.consentPolicyVersion,
+        );
+      }
+
       // (7) subscription — FR108 14-day plus trial, end-of-day in the org tz.
       const trialEndsAt = computeTrialEndDate(new Date(), orgRow.timezone);
       const [subRow] = await txDb
@@ -335,8 +372,7 @@ export async function createIdentityGraph(
       });
 
       const plusTier = getTierConfig('plus');
-      const cycleResetAt = new Date();
-      cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
+      const cycleResetAt = addMonthsClamped(new Date(), 1);
 
       // (9) owner profile_quota_usage — written unconditionally against the v2
       // graph (profile_quota_usage.profile_id references person.id after the

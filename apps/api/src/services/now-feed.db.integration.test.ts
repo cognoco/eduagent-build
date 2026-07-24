@@ -11,6 +11,10 @@ import {
   curriculumTopics,
   generateUUIDv7,
   learningSessions,
+  membership,
+  mentorActivityLedger,
+  mentorNotices,
+  organization,
   progressSnapshots,
   retentionCards,
   sessionSummaries,
@@ -22,11 +26,16 @@ import {
   deleteV2IdentitiesForTest,
   ensureV2IdentityForLegacyProfileTest,
 } from '../test-utils/legacy-identity-anchors';
+import { getProfileTimeZone } from './mentor-notices';
 import {
   buildNowFeed,
   buildNowOverflow,
   LEDGER_PROJECTION_RECENCY_DAYS,
 } from './now-feed';
+
+type FakeableAPI = NonNullable<
+  NonNullable<Parameters<typeof jest.useFakeTimers>[0]>['doNotFake']
+>[number];
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -134,6 +143,45 @@ async function seedFixture(
   };
 }
 
+// Everything jest's modern fake timers can fake EXCEPT Date. Faking the clock
+// alone keeps timers and socket IO real, so the live pg connection is unaffected.
+const DO_NOT_FAKE_EXCEPT_DATE = [
+  'hrtime',
+  'nextTick',
+  'performance',
+  'queueMicrotask',
+  'requestAnimationFrame',
+  'cancelAnimationFrame',
+  'requestIdleCallback',
+  'cancelIdleCallback',
+  'setImmediate',
+  'clearImmediate',
+  'setInterval',
+  'clearInterval',
+  'setTimeout',
+  'clearTimeout',
+] as const satisfies readonly Exclude<FakeableAPI, 'Date'>[];
+
+// getProfileTimeZone resolves the learner's zone through organization.timezone,
+// which is nullable with no default — tests that depend on a specific zone must
+// set it explicitly and assert the resolved value.
+async function setOrganizationTimeZone(
+  database: Database,
+  profileId: string,
+  timeZone: string,
+): Promise<void> {
+  const [row] = await database
+    .select({ organizationId: membership.organizationId })
+    .from(membership)
+    .where(eq(membership.personId, profileId))
+    .limit(1);
+  if (!row) throw new Error('membership lookup failed');
+  await database
+    .update(organization)
+    .set({ timezone: timeZone })
+    .where(eq(organization.id, row.organizationId));
+}
+
 async function cleanupByPrefix(database: Database): Promise<void> {
   await deleteV2IdentitiesForTest(database, {
     accountIds: seededAccountIds,
@@ -174,6 +222,200 @@ afterAll(async () => {
 });
 
 describe('now-feed derive-on-read projections — real DB (WI-1121)', () => {
+  it('surfaces an eligible open mentor notice only when the feature is enabled', async () => {
+    const fixture = await seedFixture(db, 'mentor-notice-open');
+    const sessionId = await seedSession(db, fixture);
+    const [notice] = await db
+      .insert(mentorNotices)
+      .values({
+        profileId: fixture.profileId,
+        subjectId: fixture.subjectId,
+        topicId: fixture.topicId,
+        sourceSessionId: sessionId,
+        concept: 'Changing signs across the equals sign',
+      })
+      .returning({ id: mentorNotices.id });
+    if (!notice) throw new Error('mentor notice insert failed');
+
+    const hidden = await buildNowFeed(db, fixture.profileId, 'self');
+    expect(hidden.cards.some((card) => card.kind === 'mentor_notice')).toBe(
+      false,
+    );
+
+    const visible = await buildNowFeed(db, fixture.profileId, 'self', {
+      mentorNoticeEnabled: true,
+    });
+    expect(visible.cards).toContainEqual(
+      expect.objectContaining({
+        kind: 'mentor_notice',
+        templateKey: 'now.mentor_notice.default',
+        params: expect.objectContaining({
+          noticeId: notice.id,
+          subjectId: fixture.subjectId,
+        }),
+        deepLink: {
+          route: 'notice.recheck',
+          params: { noticeId: notice.id, subjectId: fixture.subjectId },
+          chain: [],
+        },
+      }),
+    );
+  });
+
+  it('hides a mentor notice deferred during the current shifted learning day', async () => {
+    const fixture = await seedFixture(db, 'mentor-notice-deferred');
+    const sessionId = await seedSession(db, fixture);
+    await db.insert(mentorNotices).values({
+      profileId: fixture.profileId,
+      subjectId: fixture.subjectId,
+      topicId: fixture.topicId,
+      sourceSessionId: sessionId,
+      concept: 'Changing signs across the equals sign',
+      lastDeferredAt: new Date(),
+      lastRecheckOutcome: 'deferred',
+    });
+
+    const feed = await buildNowFeed(db, fixture.profileId, 'self', {
+      mentorNoticeEnabled: true,
+    });
+    expect(feed.cards.some((card) => card.kind === 'mentor_notice')).toBe(
+      false,
+    );
+  });
+
+  // [WI-2557] Both tests above use an ordinary current-time boundary, where the
+  // local-04:00 definition and a four-absolute-hour subtraction agree — neither
+  // would notice this consumer drifting off the shared primitive. Chile moves
+  // -04 to -03 at 2026-09-06T04:00:00Z: at 07:30Z the learner's clock reads
+  // 04:30 on 2026-09-06 and the learning day began at 2026-09-06T07:00:00Z,
+  // while subtracting four absolute hours lands at 03:30Z, before the
+  // transition, reading 23:30 on 2026-09-05 — a boundary 23 hours early.
+  it('surfaces a notice deferred in the previous learning day across an offset transition', async () => {
+    const fixture = await seedFixture(db, 'mentor-notice-transition');
+    await setOrganizationTimeZone(db, fixture.profileId, 'America/Santiago');
+    // organization.timezone is nullable with no default and the seed helper does
+    // not set it — an unset fixture resolves to UTC and this test would pass
+    // while proving nothing.
+    expect(await getProfileTimeZone(db, fixture.profileId)).toBe(
+      'America/Santiago',
+    );
+
+    const sessionId = await seedSession(db, fixture);
+    const [notice] = await db
+      .insert(mentorNotices)
+      .values({
+        profileId: fixture.profileId,
+        subjectId: fixture.subjectId,
+        topicId: fixture.topicId,
+        sourceSessionId: sessionId,
+        concept: 'Changing signs across the equals sign',
+        // Local 03:00 on 2026-09-06 — the tail of the PREVIOUS learning day.
+        lastDeferredAt: new Date('2026-09-06T06:00:00.000Z'),
+        lastRecheckOutcome: 'deferred',
+      })
+      .returning({ id: mentorNotices.id });
+    if (!notice) throw new Error('mentor notice insert failed');
+
+    // buildNowFeed reads the wall clock, so pin Date only — timers and socket
+    // IO stay real so the live pg connection keeps working.
+    jest.useFakeTimers({
+      now: new Date('2026-09-06T07:30:00.000Z'),
+      doNotFake: DO_NOT_FAKE_EXCEPT_DATE,
+    });
+    try {
+      const feed = await buildNowFeed(db, fixture.profileId, 'self', {
+        mentorNoticeEnabled: true,
+      });
+      // A new learning day has begun, so yesterday's deferral no longer
+      // suppresses the card. Under the four-absolute-hour boundary the deferral
+      // still counts as "today" and the card stays hidden.
+      expect(feed.cards).toContainEqual(
+        expect.objectContaining({
+          kind: 'mentor_notice',
+          params: expect.objectContaining({ noticeId: notice.id }),
+        }),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('projects a recent locked-in notice without writing a learning-ledger row', async () => {
+    const fixture = await seedFixture(db, 'mentor-notice-locked');
+    const sessionId = await seedSession(db, fixture);
+    const [notice] = await db
+      .insert(mentorNotices)
+      .values({
+        profileId: fixture.profileId,
+        subjectId: fixture.subjectId,
+        topicId: fixture.topicId,
+        sourceSessionId: sessionId,
+        concept: 'Changing signs across the equals sign',
+        status: 'locked_in',
+        lastRecheckOutcome: 'locked_in',
+        resolvedAt: RECENT,
+      })
+      .returning({ id: mentorNotices.id });
+    if (!notice) throw new Error('mentor notice insert failed');
+    const ledgerBefore = await db
+      .select({ id: mentorActivityLedger.id })
+      .from(mentorActivityLedger)
+      .where(eq(mentorActivityLedger.profileId, fixture.profileId));
+
+    const feed = await buildNowFeed(db, fixture.profileId, 'self', {
+      mentorNoticeEnabled: true,
+    });
+    const card = feed.cards.find(
+      (candidate) => candidate.params.noticeId === notice.id,
+    );
+
+    expect(card).toMatchObject({
+      kind: 'ledger_moment',
+      templateKey: 'now.ledger_moment.notice_locked_in',
+      params: {
+        ledgerKind: 'notice_locked_in',
+        noticeId: notice.id,
+        subjectId: fixture.subjectId,
+      },
+      deepLink: {
+        route: 'subject.hub',
+        params: { subjectId: fixture.subjectId },
+        chain: [],
+      },
+    });
+    const ledgerAfter = await db
+      .select({ id: mentorActivityLedger.id })
+      .from(mentorActivityLedger)
+      .where(eq(mentorActivityLedger.profileId, fixture.profileId));
+    expect(ledgerAfter).toEqual(ledgerBefore);
+  });
+
+  it('does not project a locked-in notice outside the three-day window', async () => {
+    const fixture = await seedFixture(db, 'mentor-notice-locked-stale');
+    const sessionId = await seedSession(db, fixture);
+    const [notice] = await db
+      .insert(mentorNotices)
+      .values({
+        profileId: fixture.profileId,
+        subjectId: fixture.subjectId,
+        topicId: fixture.topicId,
+        sourceSessionId: sessionId,
+        concept: 'Changing signs across the equals sign',
+        status: 'locked_in',
+        lastRecheckOutcome: 'locked_in',
+        resolvedAt: STALE,
+      })
+      .returning({ id: mentorNotices.id });
+    if (!notice) throw new Error('mentor notice insert failed');
+
+    const feed = await buildNowFeed(db, fixture.profileId, 'self', {
+      mentorNoticeEnabled: true,
+    });
+    expect(
+      feed.cards.some((candidate) => candidate.params.noticeId === notice.id),
+    ).toBe(false);
+  });
+
   it('surfaces a recently mastered retention card as a topic_mastered ledger_moment', async () => {
     const fixture = await seedFixture(db, 'topic-mastered');
     await db.insert(retentionCards).values({

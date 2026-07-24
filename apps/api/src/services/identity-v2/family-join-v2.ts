@@ -338,20 +338,32 @@ export async function acceptFamilyJoin(
       );
 
       // (10) Teardown the emptied org-of-one — mirrors executeDeletionV2 MINUS the
-      // person-delete (the teen SURVIVES). Fail-closed: a genuine solo org-of-one
-      // holds no consent_grant rows (createIdentityGraph creates none; grants only
-      // arise from a guardian/request context the teen lacks), so we ASSERT zero
-      // rather than re-home. Person-scoped edges (any supportership) are NOT torn
-      // down — they follow the surviving teen.
-      const strandedGrants = await tx.query.consentGrant.findMany({
-        where: eq(consentGrant.organizationId, orgOfOneId),
-        columns: { id: true },
-      });
-      if (strandedGrants.length > 0) {
-        throw new ConflictError(
-          'Org-of-one has consent grants; not a clean solo teardown.',
+      // person-delete (the teen SURVIVES). Person-scoped edges (any
+      // supportership) are NOT torn down — they follow the surviving teen.
+      //
+      // [WI-1193] createIdentityGraph now writes 'art6_1_a'
+      // consent_grant rows for a self-registered adult owner (age >= 18) at
+      // signup, and this accept path's self-consent-capable gate (17+, above)
+      // admits real 18+ adults, not only 13-17 teens — so the accepting person
+      // CAN arrive here holding their own consent_grant rows. Those rows are
+      // that person's OWN GDPR/CCPA accountability record (Art 5(2)/7(1),
+      // consent-status-v2.ts `getConsentAccountabilityV2`) and must survive the
+      // org change, not be asserted-away as an error — so point them at the
+      // family org (organization_id is the FK-RESTRICT column on consent_grant;
+      // this satisfies it) rather than asserting zero rows. This is NOT the same
+      // operation as deletion-v2.ts's `rehomeGrantsTx` (which migrates a DELETED
+      // person's grants to the retain-tier consent_receipt) — the teen/adult
+      // here SURVIVES, so their grants stay live in consent_grant, just under
+      // the new organization_id.
+      await tx
+        .update(consentGrant)
+        .set({ organizationId: familyOrgId })
+        .where(
+          and(
+            eq(consentGrant.organizationId, orgOfOneId),
+            eq(consentGrant.chargePersonId, teenPersonId),
+          ),
         );
-      }
       // DELETE the org-of-one subscription (satisfies its payer + org RESTRICT;
       // subscription_payers + profile_quota_usage + quota_pools cascade off it).
       await tx

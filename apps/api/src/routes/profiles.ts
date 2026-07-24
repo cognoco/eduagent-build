@@ -27,6 +27,7 @@ import {
   updateProfileV2,
 } from '../services/identity-v2/profile-v2';
 import { verifyPersonIsOrgAdminV2 } from '../services/identity-v2/ownership-v2';
+import { repairOrSignalAdultSelfConsentV2 } from '../services/identity-v2/consent-v2';
 import { assertChargeNotCredentialed } from '../services/family-access';
 
 import {
@@ -41,8 +42,10 @@ import {
   ProfileValidationError,
   ProfileLimitError,
 } from '../services/profile';
-import { recordActivationEvent } from '../services/activation-events';
-import { safeWrite } from '../services/safe-non-core';
+import { recordActivationEventSafely } from '../services/activation-events';
+import { createLogger } from '../services/logger';
+
+const logger = createLogger();
 
 type ProfileEnv = {
   Bindings: {
@@ -54,6 +57,10 @@ type ProfileEnv = {
     // [WI-301] Kill switch for non-owner -> owner profile elevation.
     // Default-on; set to 'false' for emergency rollback.
     OWNER_ELEVATION_GATE_ENABLED?: string;
+    // [WI-1193 AC1] Consent-policy version recorded as the versioned half of the
+    // adult owner's durable terms-acceptance fact at graph bootstrap. Same
+    // binding the consent routes read (config default '2026-05-31').
+    CONSENT_POLICY_VERSION: string;
   };
   Variables: {
     user: AuthUser;
@@ -113,46 +120,6 @@ async function isCallerAlreadyOwner(
   return verifyPersonIsOrgAdminV2(db, callerPersonId, organizationId);
 }
 
-/**
- * [CUT-B1] Map the v2 bootstrap result + the create input to the byte-identical
- * `Profile` response shape the mobile onboarding flow expects. The owner is
- * always isOwner=true with a fresh graph: no family links yet, consent status
- * resolves to null pre-consent-write (the consent request/grant machine is
- * CUT-B2), `hasPremiumLlm` is the derived value (false; §1.3). Presentation
- * fields come from the validated input (the same values the graph persisted).
- */
-function buildBootstrapProfile(
-  graph: { personId: string; account: { id: string } },
-  input: {
-    displayName: string;
-    avatarUrl?: string;
-    birthYear: number;
-    location?: 'EU' | 'US' | 'OTHER';
-    conversationLanguage?: string;
-    pronouns?: string | null;
-  },
-) {
-  const now = new Date().toISOString();
-  return {
-    id: graph.personId,
-    accountId: graph.account.id,
-    displayName: input.displayName,
-    avatarUrl: input.avatarUrl ?? null,
-    birthYear: input.birthYear,
-    location: input.location ?? null,
-    isOwner: true,
-    hasPremiumLlm: false,
-    defaultAppContext: null,
-    hasFamilyLinks: false,
-    conversationLanguage: input.conversationLanguage ?? 'en',
-    pronouns: input.pronouns ?? null,
-    consentStatus: null,
-    linkCreatedAt: null,
-    createdAt: now,
-    updatedAt: now,
-  };
-}
-
 export const profileRoutes = new Hono<ProfileEnv>()
   .get('/profiles', async (c) => {
     const db = c.get('db');
@@ -161,8 +128,37 @@ export const profileRoutes = new Hono<ProfileEnv>()
     }
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const account = requireAccount(c.get('account'));
+    // [WI-1193 AC1] First-use adult self-consent repair-or-signal. Runs once per
+    // session bootstrap for the authenticated OWNER (callerPersonId is
+    // server-derived, never request-supplied). Case (a) writes an art6_1_a
+    // repair record derived from a captured versioned terms fact; case (c)
+    // writes nothing and surfaces `needsAdultConsent` so the client drives a
+    // (re-)consent write. Non-owners / minors / already-recorded adults → false.
+    const callerPersonId = c.get('callerPersonId');
+    let needsAdultConsent = false;
+    if (callerPersonId) {
+      // Best-effort: the repair-or-signal enhances the bootstrap but must never
+      // block it. A failure is logged (observable, not silent) and defaults the
+      // signal off — the caller re-evaluates on the next session (the check is
+      // idempotent; case (a) writes only on success, so no partial state).
+      try {
+        const outcome = await repairOrSignalAdultSelfConsentV2(
+          db,
+          callerPersonId,
+          account.id,
+        );
+        needsAdultConsent = outcome === 'needs_consent';
+      } catch (err) {
+        logger.error('adult self-consent repair-or-signal failed', {
+          error: err instanceof Error ? err.message : String(err),
+          callerPersonId,
+        });
+      }
+    }
     const profiles = await listProfilesV2(db, account.id);
-    return c.json(profileListResponseSchema.parse({ profiles }));
+    return c.json(
+      profileListResponseSchema.parse({ profiles, needsAdultConsent }),
+    );
   })
   .post('/profiles', zValidator('json', profileCreateSchema), async (c) => {
     const db = c.get('db');
@@ -306,18 +302,27 @@ export const profileRoutes = new Hono<ProfileEnv>()
           pronouns: input.pronouns ?? null,
           avatarUrl: input.avatarUrl ?? null,
           timezone: null,
+          consentPolicyVersion: c.env.CONSENT_POLICY_VERSION,
         });
-        const profile = buildBootstrapProfile(graph, input);
+        // The graph writer is idempotent and can return a graph persisted by a
+        // competing request. Read the canonical owner after commit so response
+        // fields (especially consent) never come from a losing request payload.
+        const profile = await getOwnerProfileV2(db, graph.account.id);
+        if (!profile) {
+          throw new Error(
+            'Identity graph bootstrap did not produce an owner profile.',
+          );
+        }
         // WI-1504: launch activation instrumentation — signup_completed
         // fires once, at owner-graph creation. Never blocks the response.
-        await safeWrite(
-          () =>
-            recordActivationEvent(db, {
-              eventType: 'signup_completed',
-              profileId: graph.personId,
-              profileShape: 'solo_owner',
-              route: 'POST /profiles',
-            }),
+        await recordActivationEventSafely(
+          db,
+          {
+            eventType: 'signup_completed',
+            profileId: graph.personId,
+            profileShape: 'solo_owner',
+            route: 'POST /profiles',
+          },
           'profiles.create.signup_completed',
           { profileId: graph.personId },
         );

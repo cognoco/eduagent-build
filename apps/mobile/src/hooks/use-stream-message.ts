@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useAuth } from '@clerk/expo';
 import type {
   ChallengeRoundSessionState,
+  MentorNoticeAccepted,
   SessionMessageInput,
 } from '@eduagent/schemas';
 import {
@@ -11,6 +12,7 @@ import {
 } from '../lib/api-client';
 import { getApiUrl } from '../lib/api';
 import { NetworkError, UpstreamError } from '../lib/api-errors';
+import { FEATURE_FLAGS } from '../lib/feature-flags';
 import { useProfile } from '../lib/profile';
 import {
   streamSSEViaXHR,
@@ -28,11 +30,14 @@ type StreamMessageDoneResult = {
   aiEventId?: string;
   notePrompt?: boolean;
   notePromptPostSession?: boolean;
+  /** [WI-2107] LLM opened a topic without delivering content or a question this turn. */
+  topicOpenedPendingContent?: boolean;
   fluencyDrill?: FluencyDrillEvent;
   languageLearning?: LanguageLearningActivityEvent;
   challengeRound?: ChallengeRoundSessionState;
   challengeOffer?: ChallengeRoundOfferEvent;
   draftedNote?: DraftedChallengeNoteEvent;
+  mentorNotice?: MentorNoticeAccepted;
   confidence?: 'low' | 'medium' | 'high';
   fallback?: {
     reason: StreamFallbackReason;
@@ -154,6 +159,10 @@ export function useStreamMessage(sessionId: string): {
           const url = `${getApiUrl()}/v1/sessions/${effectiveSessionId}/stream`;
           const body: SessionMessageInput = {
             message,
+            // [WI-2220] Active app shell — lets production app-help prompt
+            // composition answer from the correct destination map instead of
+            // silently defaulting to V0 for V2 clients.
+            shell: FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? 'v2' : 'v0',
             ...(options?.homeworkMode
               ? { homeworkMode: options.homeworkMode }
               : {}),
@@ -210,11 +219,13 @@ export function useStreamMessage(sessionId: string): {
                     aiEventId: (event as { aiEventId?: string }).aiEventId,
                     notePrompt: event.notePrompt,
                     notePromptPostSession: event.notePromptPostSession,
+                    topicOpenedPendingContent: event.topicOpenedPendingContent,
                     fluencyDrill: event.fluencyDrill,
                     languageLearning: event.languageLearning,
                     challengeRound: event.challengeRound,
                     challengeOffer: event.challengeOffer,
                     draftedNote: event.draftedNote,
+                    mentorNotice: event.mentorNotice,
                     confidence: event.confidence,
                     fallback,
                   });

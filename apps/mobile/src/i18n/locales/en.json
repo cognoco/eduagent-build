@@ -1,4 +1,58 @@
 {
+  "celebrationEarnedContext": {
+    "polar_star": {
+      "child": "Polar Star - first independent answer",
+      "adult": "Polar Star - first independent answer."
+    },
+    "twin_stars": {
+      "child": "Twin Stars - three strong answers in a row",
+      "adult": "Twin Stars - three strong answers in a row."
+    },
+    "comet": {
+      "child": "Comet - you had a breakthrough!",
+      "adult": "Comet - a concept clicked."
+    },
+    "orions_belt": {
+      "child": "Orion's Belt - 5 in a row without help!",
+      "adult": "Orion's Belt - five independent answers in a row."
+    },
+    "deep_diver": {
+      "child": "Deep Diver - great thoughtful responses!",
+      "adult": "Deep Diver - thoughtful responses earned this milestone."
+    },
+    "persistent": {
+      "child": "Persistent - you kept going after a correction!",
+      "adult": "Persistent - kept going after a correction."
+    },
+    "topic_mastered": {
+      "child": "Comet - you mastered this topic!",
+      "adult": "Comet - topic mastered."
+    },
+    "evaluate_success": {
+      "child": "Twin Stars - you spotted the flaw!",
+      "adult": "Twin Stars - accurately evaluated the answer."
+    },
+    "teach_back_success": {
+      "child": "Twin Stars - you taught it clearly!",
+      "adult": "Twin Stars - clear teach-back completed."
+    },
+    "streak_7": {
+      "child": "Comet - a 7-day learning streak!",
+      "adult": "Comet - seven-day learning streak."
+    },
+    "streak_30": {
+      "child": "Orion's Belt - a 30-day learning streak!",
+      "adult": "Orion's Belt - thirty-day learning streak."
+    },
+    "curriculum_complete": {
+      "child": "Comet - you completed the curriculum!",
+      "adult": "Comet - curriculum completed."
+    },
+    "default": {
+      "child": "Milestone earned - nice work!",
+      "adult": "Milestone earned."
+    }
+  },
   "time": {
     "relative": {
       "today": "Today",
@@ -113,7 +167,9 @@
   },
   "accountAdmin": {
     "title": "Account",
-    "openAccount": "Open account settings",
+    "openAccount": "Open account settings for {{name}}",
+    "openAccountNoName": "Open account settings",
+    "backTo": "Back to {{destination}}",
     "security": "Account security",
     "familySettings": "Family settings"
   },
@@ -234,7 +290,8 @@
       "emailPlaceholder": "you@example.com",
       "passwordPlaceholder": "Create a password",
       "signUpButton": "Sign up",
-      "signInButton": "Sign in"
+      "signInButton": "Sign in",
+      "captchaHint": "If a verification check appears above, please complete it — we'll continue automatically."
     },
     "forgotPassword": {
       "title": "Forgot password?",
@@ -855,6 +912,7 @@
       "guidedResponse": "Guided response",
       "pendingSync": "Message pending sync",
       "sending": "Sending…",
+      "mentorNotice": "Noticed along the way: {{concept}}",
       "escalation": {
         "stepByStep": "Step-by-step",
         "letMeShowYou": "Let me show you",
@@ -1775,6 +1833,7 @@
       "openingMessage": "What comes to mind about this topic? Just share what you remember — anything you recall helps us start.",
       "successMessage": "Great work — your memory of this is solid! Head back to your Library whenever you're ready.",
       "partialResult": "Good effort! Think about the key concepts and try explaining again. What stands out most to you?",
+      "reTeach": "Let's try this a different way — take another look, then give it another go whenever you're ready. No rush.",
       "needsReview": "Almost there — a little more practice will lock this in. Let's find a better approach for you.",
       "dontRemember": "I don't remember",
       "stillStuck": "Still stuck",
@@ -1939,33 +1998,37 @@
   "legal": {
     "privacy": {
       "title": "Privacy Policy",
-      "lastUpdated": "Last updated: March 2026",
+      "lastUpdated": "Last updated: July 2026",
       "s1Title": "1. Who We Are",
-      "s1Body": "MentoMate is an AI-powered mentoring platform operated by Zwizzly (\"we\", \"us\", \"our\"). We are committed to protecting the privacy of all our users, especially children aged 11–17. We process personal data in accordance with the EU General Data Protection Regulation (GDPR).",
+      "s1Body": "MentoMate is an AI-powered tutoring platform operated by ZWIZZLY AS, Norwegian organisation number 811 696 072, registered at Fiskekroken 3B, 0139 Oslo, Norway (\"we\", \"us\", \"our\"). MentoMate is for learners aged 13 and older. Because some of our users are minors, we apply additional protections to children's data as described below.",
       "s2Title": "2. Data We Collect",
-      "s2Body1": "Account data: email address, display name, and profile information you provide during registration.",
-      "s2Body2": "Learning data: subjects, interview responses, curriculum progress, session exchanges, assessment results, retention scores, and XP.",
+      "s2Body1": "Account data: email address, display name, date of birth, and language and pronoun preferences you provide during registration.",
+      "s2Body2": "Learning data: the subjects you study, your interview and onboarding responses, curriculum and topic progress, the messages exchanged during learning sessions, assessment and mastery results, review scores, and XP. Some of this data builds a persistent learning memory so the tutor can remember what you have already studied (see Section 8).",
       "s2Body3": "Device data: push notification tokens, device type, and app version for delivering notifications and maintaining service quality.",
-      "s2Body4": "We do NOT collect location data, contacts, photos (except homework images you explicitly capture), or browsing history.",
+      "s2Body4": "Camera and microphone: the app requests camera access for homework images and microphone access for voice-based learning. Microphone input is converted to text on your device; MentoMate does not receive or retain the audio recording. We use these inputs only when you explicitly activate them.",
+      "s2Body5": "We do not collect location data, contacts, your photo library other than homework images you explicitly select, or browsing history.",
       "s3Title": "3. How We Use Your Data",
-      "s3Body": "To provide personalised AI mentoring using Socratic dialogue and spaced repetition. To generate curricula, learning insights, and progress reports. To send review reminders and notifications you have opted into. To improve our service through anonymised, aggregated analytics.",
-      "s4Title": "4. Parental Consent",
-      "s4Body1": "For users under 16, we require verifiable parental consent before processing personal data. A parent or guardian must approve the child's account via email before any learning data is collected.",
-      "s4Body2": "Parents can withdraw consent at any time from the parent dashboard. Upon withdrawal, the child's data enters a 7-day grace period and is then permanently deleted.",
+      "s3Body": "We use your data to provide personalised AI tutoring, explain concepts, check your understanding, schedule review using spaced repetition, generate curricula and progress reports, and tailor tuition to you. This profiling is used only to personalise your teaching; it does not produce legal or similarly significant effects about you. We also use data to send notifications you have opted into and to maintain and improve the service through error and performance monitoring. We do not use your data for advertising and we do not sell it.",
+      "s4Title": "4. Parental Consent (GDPR and COPPA)",
+      "s4Body1": "Where a user is below the applicable age of digital consent—which is between 13 and 16 in the EU/EEA depending on the country, and 13 in the United Kingdom and under COPPA in the United States—we require verifiable parental consent before processing the child's personal data. A parent or guardian must approve the child's account before any learning data is collected.",
+      "s4Body2": "Parents can withdraw consent at any time. Consent can be restored during a 7-day grace period. At the end of that period, profiles aged 13 or younger are deleted; older child profiles may instead be archived for 30 days, according to the account owner's retention preference, and are then deleted.",
       "s5Title": "5. AI Processing",
-      "s5Body": "Learning sessions are processed by third-party AI model providers to generate educational responses. Session content may be sent to AI providers for processing but is not used to train their models. We do not share personally identifiable information with AI providers — only learning content.",
+      "s5Body": "Learning-session content is processed by third-party AI model providers to generate educational responses. We send only the content and context needed to generate a response. For minors, we exclude names and account identifiers from content sent to AI providers. For unambiguously adult account owners, a display name may be included for personalisation. We require providers not to use customer content to train their general-purpose models; the provider contracts and settings supporting this requirement are reviewed as part of our launch compliance process.",
       "s6Title": "6. Data Sharing",
-      "s6Body1": "We do not sell your data. We share data only with: authentication provider (Clerk) for sign-in; AI providers for learning sessions; email provider (Resend) for notifications; error tracking (Sentry) for app stability; in-app purchase management (RevenueCat) for subscription processing; payment processors for subscription management.",
-      "s6Body2": "For users under 13, error tracking (Sentry) is disabled until parental consent is granted. It is re-disabled if consent is withdrawn.",
-      "s7Title": "7. Data Retention",
-      "s7Body": "We retain your data for as long as your account is active. When you delete your account, your data enters a 7-day grace period (during which you can cancel deletion), after which it is permanently removed.",
-      "s8Title": "8. Your Rights",
-      "s8Body1": "You have the right to: access your data (via the Export feature in Settings); correct inaccurate data; delete your account and all associated data; withdraw consent for data processing; object to processing; data portability.",
-      "s8Body2": "To exercise these rights, use the in-app settings or contact us at privacy@mentomate.com.",
-      "s9Title": "9. Security",
-      "s9Body": "We use industry-standard security measures including encrypted connections (TLS), secure authentication, and profile-scoped data isolation ensuring each user can only access their own data.",
-      "s10Title": "10. Contact Us",
-      "s10Body": "For privacy questions or concerns, contact our Data Protection Officer at privacy@mentomate.com."
+      "s6Body1": "We do not sell your data. We share data only with service providers needed to run MentoMate.",
+      "s6Body2": "These providers include Clerk for sign-in; AI model and embedding providers for learning responses and learning memory; Neon and Cloudflare for database and application hosting; Resend for email; Sentry for error and performance monitoring; Expo, Apple, and Google for push notifications; and Apple, Google, and RevenueCat for payments and subscriptions.",
+      "s7Title": "7. International Data Transfers",
+      "s7Body": "Some processors are located outside the EU/EEA and the United Kingdom, including in the United States. Where data is transferred internationally, we rely on appropriate safeguards under the GDPR and UK GDPR, such as the EU Standard Contractual Clauses, the UK International Data Transfer Addendum, or an applicable adequacy mechanism.",
+      "s8Title": "8. Data Retention",
+      "s8Body1": "Chat transcripts: the full text of your learning-session messages is retained for 30 days after the learning summary is generated and then automatically deleted. If summary processing is delayed, operational safeguards flag the delay for resolution.",
+      "s8Body2": "Learning memory: summaries of what you have studied—including subjects, progress, mastery results, notes, recaps, and sometimes short quotations from your messages—are kept while your account is active so the tutor can remember your learning over time. This learning memory is used only to provide tutoring continuity; it is not used for advertising, marketing profiles, or training third-party AI models.",
+      "s8Body3": "Account deletion: when you delete your account, deletion enters a 7-day grace period during which you can cancel. After the grace period, your account and associated personal and learning data are permanently removed, except for limited records retained for legal, security, fraud-prevention, or accounting reasons.",
+      "s9Title": "9. Your Rights",
+      "s9Body": "You have the right to access your data; correct inaccurate data; request deletion of your account and associated personal and learning data, subject to the limited retention exceptions described in Section 8; withdraw consent; object to processing; and request data portability. To exercise these rights, use the in-app settings or contact support@mentomate.com.",
+      "s10Title": "10. Security",
+      "s10Body": "We use industry-standard security measures including encrypted connections (TLS), secure authentication, and profile-scoped data isolation designed to ensure each user can access only their own data.",
+      "s11Title": "11. Contact",
+      "s11Body": "ZWIZZLY AS is the controller of your personal data. For privacy questions or to exercise your data-protection rights, email support@mentomate.com or write to ZWIZZLY AS, Fiskekroken 3B, 0139 Oslo, Norway."
     },
     "terms": {
       "title": "Terms of Service",
@@ -1973,7 +2036,7 @@
       "s1Title": "1. Acceptance of Terms",
       "s1Body": "By creating an account or using MentoMate, you agree to these Terms of Service. If you are under 18, your parent or guardian must agree on your behalf.",
       "s2Title": "2. Description of Service",
-      "s2Body": "MentoMate is an AI-powered mentoring platform that provides personalised learning through Socratic dialogue, spaced repetition, and adaptive curricula. The service is designed for students aged 11-15 with parental oversight.",
+      "s2Body": "MentoMate is an AI-powered mentoring platform that provides personalised learning through Socratic dialogue, spaced repetition, and adaptive curricula. The service is designed for learners aged 13 and older, with parental oversight for minors.",
       "s3Title": "3. Account Responsibilities",
       "s3Body": "You are responsible for maintaining the confidentiality of your account credentials. You must provide accurate information during registration. You must not share your account with others or create multiple accounts.",
       "s4Title": "4. Acceptable Use",
@@ -2614,7 +2677,6 @@
       "profileRemovedOrNoAccess": "The profile may have been removed or you no longer have access",
       "backToDashboard": "Back to dashboard",
       "noAccessToProfile": "You don't have access to this profile",
-      "firstReportSoon": "The first report will arrive at the end of the month",
       "progressNudgeFreshTitle": "Ask about {{focus}} while it is fresh",
       "progressNudgeFreshSubtitle": "{{name}} studied {{focus}} {{time}}. Try a quick pass yourself, then ask what clicked.",
       "progressNudgeRecentTitle": "Keep {{focus}} warm",
@@ -2726,8 +2788,7 @@
       "checkConnectionRetry": "Check your connection and try again",
       "weekOf": "Week of",
       "retryReports": "Retry reports",
-      "firstReportArriveOn": "{{name}}'s first report will arrive on {{date}}",
-      "firstReportTimeContext": "{{name}}'s first report {{timeContext}}"
+      "firstCombinedReportOn": "{{name}}'s first weekly or monthly report can arrive as soon as {{date}}, once there is enough learning to summarize."
     },
     "report": {
       "sessions": "Sessions",
@@ -2973,6 +3034,23 @@
       "switchProfile": "Switch profile",
       "signOut": "Sign out"
     },
+    "adultSelfConsent": {
+      "title": "Confirm how we use your data",
+      "intro": "Before you continue, we need your agreement to two things about your own account.",
+      "platformUseHeading": "Using MentoMate",
+      "platformUseBody": "We process your account and learning data so the app works for you — your subjects, sessions, and progress.",
+      "llmDisclosureHeading": "AI tutoring",
+      "llmDisclosureBody": "Your messages to your AI mentor are sent to an AI model provider so it can reply and teach. We never sell your data.",
+      "legalIntro": "Review the full details before you agree:",
+      "termsLink": "Terms of Service",
+      "privacyLink": "Privacy Policy",
+      "accept": "I agree",
+      "submitting": "Saving…",
+      "errorTitle": "We couldn't save your agreement",
+      "errorBody": "That didn't go through on our end. Please try again.",
+      "retry": "Try again",
+      "signOut": "Sign out instead"
+    },
     "consentPending": {
       "linkSentTitle": "Link sent to {{email}}",
       "linkSentMessage": "Ask your parent to check their email and approve your account",
@@ -3049,6 +3127,14 @@
         "arcAdvancing": "You are moving this forward",
         "arcMastered": "Session wrapped"
       },
+      "mentor_notice": {
+        "title": "A small idea worth checking",
+        "cta": "Check it now",
+        "notNow": "Not now",
+        "arcDue": "Ready when you are",
+        "arcAdvancing": "Opening a quick check",
+        "arcMastered": "Locked in"
+      },
       "retention_due": {
         "title": "Review what is due",
         "cta": "Review",
@@ -3092,6 +3178,9 @@
       "session_filed": {
         "title": "Saved {{topicTitle}} to your learning record."
       },
+      "notice_locked_in": {
+        "title": "You locked in {{concept}}."
+      },
       "quota": {
         "title": "A learning moment was saved."
       }
@@ -3105,6 +3194,17 @@
       "cameraLabel": "Camera",
       "placeholder": "Ask, paste, or describe what you want to learn.",
       "micLabel": "Mic",
+      "micIdleLabel": "Start voice input",
+      "micRequestingLabel": "Asking for microphone access",
+      "micListeningLabel": "Stop voice input",
+      "micProcessingLabel": "Finishing voice input",
+      "micErrorLabel": "Try voice input again",
+      "micDisabledLabel": "Voice input unavailable",
+      "listening": "Listening…",
+      "voiceError": "Voice input didn't work. You can still type.",
+      "voicePermissionError": "Microphone access is off. You can still type.",
+      "voiceAllow": "Allow microphone",
+      "voiceRetry": "Try voice again",
       "homeworkChip": "Homework"
     },
     "onTrack": {
@@ -3288,6 +3388,7 @@
       "topic_mastered": "Marked {{topicTitle}} as mastered.",
       "recap_ready": "A recap is ready.",
       "snapshot_ready": "A learning snapshot is ready.",
+      "notice_locked_in": "Locked in {{concept}} in {{subjectName}}.",
       "reflection_bonus": "Reflection bonus saved.",
       "quiz_personal_best": "Personal best saved."
     },
@@ -3486,6 +3587,7 @@
       "yourShare": "Your share",
       "yourUsage": "Your usage",
       "questionsUsed": "{{count}} questions",
+      "formerMembers": "Former members",
       "familyAggregate": "Family aggregate",
       "quotaResets": "Quota resets {{date}}",
       "renews": "Subscription renews {{date}}",
@@ -3520,8 +3622,13 @@
     "notificationPrimer": {
       "title": "Want a daily nudge?",
       "message": "We can send a gentle reminder so you don't lose your streak. You can turn it off anytime in Settings.",
+      "noticeTitle": "Want a gentle follow-up?",
+      "noticeMessage": "We can remind you to revisit what your mentor noticed today. You can turn this off anytime in Settings.",
       "allow": "Allow",
       "notNow": "Not now"
+    },
+    "mentorNotice": {
+      "title": "Noticed along the way"
     },
     "masteredRow": {
       "title": "You mastered:"
@@ -3562,6 +3669,11 @@
     "doneHeadHome": "Done — head home",
     "yourWords": "Your Words",
     "mateFeedback": "Mate feedback",
+    "feedbackUnavailableTitle": "Feedback isn't available yet",
+    "feedbackUnavailableMessage": "Your summary is saved. You can retry the feedback without submitting it again.",
+    "feedbackStillUnavailable": "Feedback still isn't available, but your summary is safe. You can retry or continue whenever you're ready.",
+    "retryFeedback": "Retry feedback",
+    "retryingFeedback": "Retrying feedback...",
     "skippedNotice": "You skipped writing a summary for this session.",
     "resumeReflectionBanner": "You started a reflection but didn't submit it last time. Finish it below and submit to save your words.",
     "writePrompt": "Write a short summary of what you learned. This helps you remember and helps me plan what comes next.",
@@ -3975,6 +4087,8 @@
     "bridge": {
       "headline": "Turn \"I don't get it\" into \"I've got this.\"",
       "supporting": "Create a free account so your mentor can remember your subjects, notes, and progress.",
+      "parentHeadline": "Continue with your account to support your learner.",
+      "parentSupporting": "Sign in or sign up to accept the invitation and set up support. Your account does not grant access to learning activity unless the learner authorizes it.",
       "primaryCta": "Create free account",
       "secondaryCta": "I already have an account"
     },
@@ -4348,8 +4462,8 @@
     "methodPracticeDesc": "Learn by working through guided exercises",
     "methodPracticeLabelYoung": "Let Me Try It",
     "methodPracticeDescYoung": "Learn by solving problems with help",
-    "copyTopicIntro": "Pick a topic that feels the shakiest right now.",
-    "copyTopicIntroYoung": "Pick the topic you want to try again.",
+    "copyTopicIntro": "We've ranked these by what needs review most — tap any topic to switch.",
+    "copyTopicIntroYoung": "We've put these in order to start with — you can pick a different one.",
     "copyMethodIntro": "Choose a teaching style that feels like your best next step.",
     "copyMethodIntroYoung": "How would you like to learn this time?",
     "copySubjectIntro": "Which subject would you like to review first?",

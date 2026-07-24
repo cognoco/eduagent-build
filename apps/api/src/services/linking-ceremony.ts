@@ -1,6 +1,7 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 
 import {
+  person,
   supportVisibilityAuditEvents,
   supportVisibilityContracts,
   supportership,
@@ -96,7 +97,8 @@ export async function initiateLink(
       })
       .returning();
     const contract = contractRows[0];
-    if (!contract) throw new Error('Visibility contract insert returned no row');
+    if (!contract)
+      throw new Error('Visibility contract insert returned no row');
 
     await writeVisibilityAuditEvent(txDb, {
       supportershipId: edge.id,
@@ -189,6 +191,50 @@ export async function getContractForVisibleLink(
   return contract;
 }
 
+/**
+ * [WI-2237] The single default-deny predicate for "this supporter may see
+ * this supportee's data right now." Requires the caller to have already
+ * joined `supportership`, `supportVisibilityContracts` (on
+ * `supportVisibilityContracts.supportershipId = supportership.id`), and
+ * `person` (on `person.id = supportership.supporteePersonId`) into the
+ * query — it is query-composable, not a standalone lookup, so it can be
+ * embedded in a list query (scope-resolution), a structural join
+ * (supporter-structural-mask), or a single-row check (this file's own
+ * helpers below) alike.
+ *
+ * Per-leg AC-variant mapping:
+ *  - `isNull(supportership.revokedAt)`              -> revoked edge
+ *  - `eq(status, 'accepted')`                        -> missing / pending /
+ *    one-sided / restamped / lapsed. Restamp is an in-place UPDATE
+ *    (`graduation-narration.ts`'s `restampGraduationContracts` sets
+ *    `status='restamped'` and bumps `contractVersion` on the *same row*
+ *    without clearing the prior acceptance timestamps), so `status` is the
+ *    only thing that changes on restamp and is therefore load-bearing here.
+ *  - `isNotNull(supporterAcceptedAt) && isNotNull(supporteeAcceptedAt)`
+ *    -> one-sided acceptance. Redundant with `status='accepted'` under every
+ *    current write path, kept as an explicit belt-and-suspenders leg because
+ *    the AC names "all required acceptances" as its own criterion, separate
+ *    from "accepted status".
+ *  - `isNull(person.archivedAt)`                     -> archived person
+ *
+ * No separate "current contract version" filter is needed: the partial
+ * unique index `support_visibility_contracts_supportership_active_unique`
+ * (schema `visibility-contract.ts`) guarantees at most one row per
+ * `supportershipId` with status IN ('pending','accepted','restamped') at a
+ * time, so an `accepted`-status row is structurally always the only (hence
+ * current) one for that `supportershipId` — no write path ever inserts a
+ * second contract row for an existing `supportershipId`.
+ */
+export function acceptedVisibilityCondition() {
+  return and(
+    isNull(supportership.revokedAt),
+    isNull(person.archivedAt),
+    eq(supportVisibilityContracts.status, 'accepted'),
+    isNotNull(supportVisibilityContracts.supporterAcceptedAt),
+    isNotNull(supportVisibilityContracts.supporteeAcceptedAt),
+  );
+}
+
 export async function assertAcceptedSupportership(
   db: Database,
   input: { supportershipId: string; supporterPersonId: string },
@@ -200,6 +246,7 @@ export async function assertAcceptedSupportership(
       supportership,
       eq(supportVisibilityContracts.supportershipId, supportership.id),
     )
+    .innerJoin(person, eq(person.id, supportership.supporteePersonId))
     .where(
       and(
         eq(supportVisibilityContracts.supportershipId, input.supportershipId),
@@ -207,8 +254,7 @@ export async function assertAcceptedSupportership(
           supportVisibilityContracts.supporterPersonId,
           input.supporterPersonId,
         ),
-        eq(supportVisibilityContracts.status, 'accepted'),
-        isNull(supportership.revokedAt),
+        acceptedVisibilityCondition(),
       ),
     )
     .limit(1);
@@ -228,6 +274,7 @@ export async function findAcceptedContractForSupportee(
       supportership,
       eq(supportVisibilityContracts.supportershipId, supportership.id),
     )
+    .innerJoin(person, eq(person.id, supportership.supporteePersonId))
     .where(
       and(
         eq(
@@ -238,8 +285,7 @@ export async function findAcceptedContractForSupportee(
           supportVisibilityContracts.supporteePersonId,
           input.supporteePersonId,
         ),
-        eq(supportVisibilityContracts.status, 'accepted'),
-        isNull(supportership.revokedAt),
+        acceptedVisibilityCondition(),
       ),
     )
     .limit(1);

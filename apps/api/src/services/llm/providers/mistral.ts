@@ -99,6 +99,7 @@ export function createMistralProvider(apiKey: string): LLMProvider {
     async chat(
       messages: ChatMessage[],
       config: ModelConfig,
+      signal?: AbortSignal,
     ): Promise<ChatResult> {
       const res = await fetch(MISTRAL_BASE_URL, {
         method: 'POST',
@@ -107,7 +108,9 @@ export function createMistralProvider(apiKey: string): LLMProvider {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify(buildBody(messages, config, false)),
-        signal: AbortSignal.timeout(MISTRAL_TIMEOUT_MS),
+        signal: signal
+          ? AbortSignal.any([signal, AbortSignal.timeout(MISTRAL_TIMEOUT_MS)])
+          : AbortSignal.timeout(MISTRAL_TIMEOUT_MS),
       });
 
       if (!res.ok) {
@@ -219,8 +222,8 @@ export function createMistralProvider(apiKey: string): LLMProvider {
                     logger.warn('[llm:mistral] malformed SSE chunk discarded', {
                       event: 'mistral.sse.malformed',
                       site: 'stream_loop',
-                      chunk: jsonStr.slice(0, 200),
-                      error: chunkParsed.error.message,
+                      chunkLength: jsonStr.length,
+                      errorKind: 'schema_validation',
                     });
                     continue;
                   }
@@ -233,8 +236,8 @@ export function createMistralProvider(apiKey: string): LLMProvider {
                   logger.warn('[llm:mistral] malformed SSE chunk discarded', {
                     event: 'mistral.sse.malformed',
                     site: 'stream_loop',
-                    chunk: jsonStr.slice(0, 200),
-                    error: err instanceof Error ? err.message : String(err),
+                    chunkLength: jsonStr.length,
+                    errorKind: 'json_parse',
                   });
                 }
               }
@@ -256,8 +259,8 @@ export function createMistralProvider(apiKey: string): LLMProvider {
                         {
                           event: 'mistral.sse.malformed',
                           site: 'flush_buffer',
-                          chunk: jsonStr.slice(0, 200),
-                          error: chunkParsed.error.message,
+                          chunkLength: jsonStr.length,
+                          errorKind: 'schema_validation',
                         },
                       );
                     } else {
@@ -271,8 +274,8 @@ export function createMistralProvider(apiKey: string): LLMProvider {
                     logger.warn('[llm:mistral] malformed SSE chunk discarded', {
                       event: 'mistral.sse.malformed',
                       site: 'flush_buffer',
-                      chunk: jsonStr.slice(0, 200),
-                      error: err instanceof Error ? err.message : String(err),
+                      chunkLength: jsonStr.length,
+                      errorKind: 'json_parse',
                     });
                   }
                 }

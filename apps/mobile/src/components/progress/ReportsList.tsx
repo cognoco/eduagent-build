@@ -25,6 +25,11 @@ export interface ReportsListProps {
   /** Whether to show "New" badge for unviewed reports. Defaults to false. */
   showNewBadge?: boolean;
   /**
+   * Whether this list owns the empty-state copy. Disable when an enclosing
+   * report card already presents the same combined weekly/monthly expectation.
+   */
+  showEmptyState?: boolean;
+  /**
    * Restricts the "New" badge to a single report row. Pass null to suppress
    * row badges while keeping showNewBadge available for a highlighted summary.
    */
@@ -164,6 +169,7 @@ export function ReportsList({
   onPressWeekly,
   testID,
   showNewBadge = false,
+  showEmptyState = true,
   newReportId,
   scrollEnabled = true,
 }: ReportsListProps): React.ReactElement {
@@ -221,12 +227,15 @@ export function ReportsList({
   if (isEmpty) {
     return (
       <View testID={testID ?? 'reports-list'}>
-        <Text
-          className="text-body-sm text-text-secondary mt-2"
-          testID="reports-list-empty"
-        >
-          {t('parentView.index.firstReportSoon')}
-        </Text>
+        {showEmptyState ? (
+          <Text
+            className="text-body-sm text-text-secondary mt-2"
+            accessibilityRole="summary"
+            testID="reports-list-empty"
+          >
+            {t('progress.latestReport.empty')}
+          </Text>
+        ) : null}
       </View>
     );
   }

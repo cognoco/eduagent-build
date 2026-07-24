@@ -1,4 +1,58 @@
 {
+  "celebrationEarnedContext": {
+    "polar_star": {
+      "child": "Polarstjernen – ditt første selvstendige svar!",
+      "adult": "Polarstjernen – første selvstendige svar."
+    },
+    "twin_stars": {
+      "child": "Tvillingstjernene – tre sterke svar på rad!",
+      "adult": "Tvillingstjernene – tre sterke svar på rad."
+    },
+    "comet": {
+      "child": "Kometen – nå løsnet det!",
+      "adult": "Kometen – et konsept falt på plass."
+    },
+    "orions_belt": {
+      "child": "Orions belte – fem på rad uten hjelp!",
+      "adult": "Orions belte – fem selvstendige svar på rad."
+    },
+    "deep_diver": {
+      "child": "Dypdykkeren – skikkelig gjennomtenkte svar!",
+      "adult": "Dypdykkeren – oppnådd med gjennomtenkte svar."
+    },
+    "persistent": {
+      "child": "Utholdende – du fortsatte etter en rettelse!",
+      "adult": "Utholdende – fortsatte etter en rettelse."
+    },
+    "topic_mastered": {
+      "child": "Kometen – du har mestret dette emnet!",
+      "adult": "Kometen – emnet er mestret."
+    },
+    "evaluate_success": {
+      "child": "Tvillingstjernene – du oppdaget feilen!",
+      "adult": "Tvillingstjernene – svaret ble vurdert riktig."
+    },
+    "teach_back_success": {
+      "child": "Tvillingstjernene – du forklarte det tydelig!",
+      "adult": "Tvillingstjernene – tydelig gjenfortelling fullført."
+    },
+    "streak_7": {
+      "child": "Kometen – sju dager med læring på rad!",
+      "adult": "Kometen – sju dagers læringsrekke."
+    },
+    "streak_30": {
+      "child": "Orions belte – 30 dager med læring på rad!",
+      "adult": "Orions belte – tretti dagers læringsrekke."
+    },
+    "curriculum_complete": {
+      "child": "Kometen – du har fullført læreplanen!",
+      "adult": "Kometen – læreplanen er fullført."
+    },
+    "default": {
+      "child": "Milepæl nådd – godt jobbet!",
+      "adult": "Milepæl nådd."
+    }
+  },
   "common": {
     "cancel": "Avbryt",
     "ok": "OK",
@@ -212,7 +266,8 @@
       "emailPlaceholder": "du@eksempel.com",
       "passwordPlaceholder": "Lag et passord",
       "signUpButton": "Registrer deg",
-      "signInButton": "Logg inn"
+      "signInButton": "Logg inn",
+      "captchaHint": "Hvis en verifisering vises ovenfor, fullfør den – vi fortsetter automatisk."
     },
     "forgotPassword": {
       "title": "Glemt passord?",
@@ -886,7 +941,8 @@
       "verificationBadge": {
         "evaluate": "TENK-DYPERE GODKJENT",
         "teachBack": "GJENFORTALT GODKJENT"
-      }
+      },
+      "mentorNotice": "Lagt merke til underveis: {{concept}}"
     },
     "noteInput": {
       "cancel": "Avbryt",
@@ -1693,7 +1749,8 @@
       "dontRememberFallbackHint": "Det går fint — la oss se hva du husker. Her er et lite hint: Tenk på hovedideen eller det første steget knyttet til dette emnet. Kommer noe tilbake?",
       "dontRememberReviewPrompt": "Takk for at du sier det ærlig. La oss gå over til repetisjon, så dette føles overkommelig igjen.",
       "gradingUnavailableTitle": "Svaret ditt er mottatt.",
-      "gradingUnavailableMessage": "Jeg kunne ikke sjekke det akkurat nå – svaret ditt er trygt. Prøv igjen, eller kom tilbake til det senere."
+      "gradingUnavailableMessage": "Jeg kunne ikke sjekke det akkurat nå – svaret ditt er trygt. Prøv igjen, eller kom tilbake til det senere.",
+      "reTeach": "La oss prøve dette på en annen måte – se over det en gang til, og prøv igjen når du er klar. Ingen hast."
     },
     "lastStudied": "Sist studert {{when}}",
     "neverStudied": "Aldri studert",
@@ -1841,33 +1898,37 @@
   "legal": {
     "privacy": {
       "title": "Personvernerklæring",
-      "lastUpdated": "Sist oppdatert: Mars 2026",
+      "lastUpdated": "Sist oppdatert: juli 2026",
       "s1Title": "1. Hvem vi er",
-      "s1Body": "MentoMate er en AI-drevet veiledningsplattform drevet av Zwizzly (\"vi\", \"oss\", \"vår\"). Vi er forpliktet til å beskytte personvernet til alle våre brukere, spesielt barn i alderen 11–17. Vi behandler personopplysninger i samsvar med EUs personvernforordning (GDPR).",
+      "s1Body": "MentoMate er en AI-drevet veiledningsplattform som drives av ZWIZZLY AS, norsk organisasjonsnummer 811 696 072, registrert i Fiskekroken 3B, 0139 Oslo, Norge («vi», «oss», «vår»). MentoMate er for elever fra 13 år og eldre. Fordi noen av brukerne våre er mindreårige, bruker vi ekstra beskyttelse for barns data som beskrevet nedenfor.",
       "s2Title": "2. Data vi samler inn",
-      "s2Body1": "Kontodata: e-postadresse, visningsnavn og profilinformasjon du oppgir under registrering.",
-      "s2Body2": "Læringsdata: emner, intervjusvar, fremgang i læreplanen, øktutvekslinger, vurderingsresultater, bevaringspoeng og XP.",
+      "s2Body1": "Kontodata: e-postadresse, visningsnavn, fødselsdato, og språk- og pronomenpreferanser du oppgir under registrering.",
+      "s2Body2": "Læringsdata: fagene du studerer, dine svar fra intervju og onboarding, fremdrift i pensum og emner, meldingene som utveksles under læringsøkter, vurderings- og mestringsresultater, repetisjonspoeng og XP. Noe av denne dataen bygger et varig læringsminne slik at mentoren kan huske hva du allerede har studert (se avsnitt 8).",
       "s2Body3": "Enhetsdata: push-varslingstokener, enhetstype og appversjon for å levere varsler og opprettholde tjenestekvaliteten.",
-      "s2Body4": "Vi samler IKKE inn posisjonsdata, kontakter, bilder (unntatt leksebilder du eksplisitt tar) eller nettleserhistorikk.",
+      "s2Body4": "Kamera og mikrofon: appen ber om kameratilgang for leksebilder og mikrofontilgang for stemmebasert læring. Mikrofoninndata konverteres til tekst på enheten din; MentoMate mottar eller lagrer ikke lydopptaket. Vi bruker disse inndataene kun når du eksplisitt aktiverer dem.",
       "s3Title": "3. Hvordan vi bruker dine data",
-      "s3Body": "For å tilby personlig AI-veiledning ved hjelp av sokratisk dialog og repetisjon med mellomrom. For å generere læreplaner, læringsinnsikt og fremdriftsrapporter. For å sende påminnelser om gjennomgang og varsler du har valgt å motta. For å forbedre tjenesten vår gjennom anonymisert, aggregert analyse.",
-      "s4Title": "4. Foreldresamtykke",
-      "s4Body1": "For brukere under 16 år krever vi verifiserbart foreldresamtykke før vi behandler personopplysninger. En forelder eller verge må godkjenne barnets konto via e-post før noen læringsdata samles inn.",
-      "s4Body2": "Foreldre kan trekke tilbake samtykket når som helst fra foreldredashbordet. Ved tilbaketrekking går barnets data inn i en 7-dagers angrefrist og blir deretter permanent slettet.",
+      "s3Body": "Vi bruker dataene dine til å tilby personlig tilpasset AI-veiledning, forklare konsepter, sjekke din forståelse, planlegge repetisjon ved hjelp av repetisjon med mellomrom, generere pensum og fremdriftsrapporter, og skreddersy undervisningen til deg. Denne profileringen brukes kun til å tilpasse undervisningen din; den gir ikke juridiske eller tilsvarende betydelige virkninger for deg. Vi bruker også data til å sende varsler du har godtatt, og til å vedlikeholde og forbedre tjenesten gjennom feil- og ytelsesovervåking. Vi bruker ikke dataene dine til reklame, og vi selger dem ikke.",
+      "s4Title": "4. Foreldresamtykke (GDPR og COPPA)",
+      "s4Body1": "Der en bruker er under den gjeldende alderen for digitalt samtykke – som er mellom 13 og 16 i EU/EØS avhengig av land, og 13 i Storbritannia og under COPPA i USA – krever vi verifiserbart foreldresamtykke før vi behandler barnets personopplysninger. En forelder eller verge må godkjenne barnets konto før læringsdata samles inn.",
+      "s4Body2": "Foreldre kan trekke tilbake samtykket når som helst. Samtykket kan gjenopprettes i løpet av en 7-dagers frist. Ved slutten av den perioden slettes profiler som er 13 år eller yngre; eldre barneprofiler kan i stedet arkiveres i 30 dager, i henhold til kontoeierens preferanse for oppbevaring, og blir deretter slettet.",
       "s5Title": "5. AI-behandling",
-      "s5Body": "Læringsøkter behandles av tredjeparts AI-modellleverandører for å generere pedagogiske svar. Øktinnhold kan sendes til AI-leverandører for behandling, men brukes ikke til å trene deres modeller. Vi deler ikke personlig identifiserbar informasjon med AI-leverandører – kun læringsinnhold.",
+      "s5Body": "Innhold fra læringsøkter behandles av tredjepartsleverandører av AI-modeller for å generere pedagogiske svar. Vi sender kun innholdet og konteksten som trengs for å generere et svar. For mindreårige ekskluderer vi navn og kontoidentifikatorer fra innhold som sendes til AI-leverandører. For kontoeiere som utvetydig er voksne, kan et visningsnavn inkluderes for personalisering. Vi krever at leverandørene ikke bruker kundeinnhold til å trene sine generelle modeller; leverandørkontraktene og innstillingene som støtter dette kravet, blir gjennomgått som en del av vår samsvarsprosess ved lansering.",
       "s6Title": "6. Datadeling",
-      "s6Body1": "Vi selger ikke dataene dine. Vi deler kun data med: autentiseringsleverandør (Clerk) for pålogging; AI-leverandører for læringsøkter; e-postleverandør (Resend) for varsler; feilsporing (Sentry) for appstabilitet; administrasjon av kjøp i appen (RevenueCat) for abonnementsbehandling; betalingsbehandlere for abonnementsadministrasjon.",
-      "s6Body2": "For brukere under 13 år er feilsporing (Sentry) deaktivert til foreldresamtykke er gitt. Det deaktiveres på nytt hvis samtykket trekkes tilbake.",
-      "s7Title": "7. Datalagring",
-      "s7Body": "Vi lagrer dataene dine så lenge kontoen din er aktiv. Når du sletter kontoen din, går dataene dine inn i en 7-dagers angrefrist (der du kan avbryte slettingen), hvoretter de blir permanent fjernet.",
-      "s8Title": "8. Dine rettigheter",
-      "s8Body1": "Du har rett til å: få tilgang til dataene dine (via eksportfunksjonen i Innstillinger); korrigere unøyaktige data; slette kontoen din og alle tilknyttede data; trekke tilbake samtykke til databehandling; protestere mot behandling; dataportabilitet.",
-      "s8Body2": "For å utøve disse rettighetene, bruk innstillingene i appen eller kontakt oss på privacy@mentomate.com.",
-      "s9Title": "9. Sikkerhet",
-      "s9Body": "Vi bruker bransjestandard sikkerhetstiltak, inkludert krypterte tilkoblinger (TLS), sikker autentisering og profilsentrert dataisolasjon som sikrer at hver bruker kun har tilgang til sine egne data.",
-      "s10Title": "10. Kontakt oss",
-      "s10Body": "For spørsmål eller bekymringer om personvern, kontakt vår personvernansvarlig på privacy@mentomate.com."
+      "s6Body1": "Vi selger ikke dataene dine. Vi deler kun data med tjenesteleverandører som er nødvendige for å drive MentoMate.",
+      "s6Body2": "Disse leverandørene inkluderer Clerk for pålogging; leverandører av AI-modeller og «embedding» for læringsresponser og læringsminne; Neon og Cloudflare for database- og applikasjonshosting; Resend for e-post; Sentry for feil- og ytelsesovervåking; Expo, Apple og Google for push-varsler; og Apple, Google og RevenueCat for betalinger og abonnementer.",
+      "s7Title": "7. Internasjonale dataoverføringer",
+      "s7Body": "Noen databehandlere er lokalisert utenfor EU/EØS og Storbritannia, inkludert i USA. Der data overføres internasjonalt, baserer vi oss på passende garantier i henhold til GDPR og UK GDPR, slik som EUs standard personvernbestemmelser, UK International Data Transfer Addendum, eller en gjeldende beslutning om tilstrekkelig beskyttelsesnivå.",
+      "s8Title": "8. Datalagring",
+      "s8Body1": "Chat-utskrifter: den fullstendige teksten fra meldingene i læringsøkten din beholdes i 30 dager etter at læringssammendraget er generert, og slettes deretter automatisk. Hvis behandlingen av sammendraget blir forsinket, vil operasjonelle sikkerhetstiltak flagge forsinkelsen for løsning.",
+      "s8Body2": "Læringsminne: sammendrag av hva du har studert – inkludert fag, fremdrift, mestringsresultater, notater, oppsummeringer og noen ganger korte sitater fra meldingene dine – beholdes mens kontoen din er aktiv, slik at mentoren kan huske læringen din over tid. Dette læringsminnet brukes kun for å gi kontinuitet i veiledningen; det brukes ikke til reklame, markedsføringsprofiler eller trening av tredjeparts AI-modeller.",
+      "s9Title": "9. Dine rettigheter",
+      "s9Body": "Du har rett til å få tilgang til dataene dine; korrigere unøyaktige data; be om sletting av kontoen din og tilhørende person- og læringsdata, underlagt de begrensede unntakene for oppbevaring som er beskrevet i avsnitt 8; trekke tilbake samtykke; protestere mot behandling; og be om dataportabilitet. For å utøve disse rettighetene, bruk innstillingene i appen eller kontakt support@mentomate.com.",
+      "s10Title": "10. Sikkerhet",
+      "s10Body": "Vi bruker bransjestandard sikkerhetstiltak, inkludert krypterte tilkoblinger (TLS), sikker autentisering og profildataisolering designet for å sikre at hver bruker kun har tilgang til sine egne data.",
+      "s2Body5": "Vi samler ikke inn posisjonsdata, kontakter, bildebiblioteket ditt (annet enn leksebilder du eksplisitt velger), eller nettleserhistorikk.",
+      "s8Body3": "Kontosletting: når du sletter kontoen din, starter en 7-dagers angrefrist der du kan avbryte. Etter angrefristen blir kontoen din og tilhørende person- og læringsdata permanent fjernet, med unntak av begrensede data som beholdes av juridiske, sikkerhetsmessige, svindelforebyggende eller regnskapsmessige årsaker.",
+      "s11Title": "11. Kontakt",
+      "s11Body": "ZWIZZLY AS er behandlingsansvarlig for dine personopplysninger. For personvernspørsmål eller for å utøve dine personvernrettigheter, send e-post til support@mentomate.com eller skriv til ZWIZZLY AS, Fiskekroken 3B, 0139 Oslo, Norge."
     },
     "terms": {
       "title": "Tjenestevilkår",
@@ -1875,7 +1936,7 @@
       "s1Title": "1. Aksept av vilkår",
       "s1Body": "Ved å opprette en konto eller bruke MentoMate, godtar du disse tjenestevilkårene. Hvis du er under 18 år, må din forelder eller verge godta på dine vegne.",
       "s2Title": "2. Beskrivelse av tjenesten",
-      "s2Body": "MentoMate er en AI-drevet veiledningsplattform som gir personlig læring gjennom sokratisk dialog, repetisjon med mellomrom og adaptive læreplaner. Tjenesten er designet for elever i alderen 11-15 år med foreldretilsyn.",
+      "s2Body": "MentoMate er en AI-drevet mentorplattform som tilbyr personlig tilpasset læring gjennom sokratisk dialog, repetisjon med mellomrom og adaptive pensum. Tjenesten er designet for elever fra 13 år og eldre, med foreldretilsyn for mindreårige.",
       "s3Title": "3. Kontoansvar",
       "s3Body": "Du er ansvarlig for å holde kontoinformasjonen din konfidensiell. Du må oppgi nøyaktig informasjon under registrering. Du må ikke dele kontoen din med andre eller opprette flere kontoer.",
       "s4Title": "4. Akseptabel bruk",
@@ -2512,7 +2573,6 @@
       "profileRemovedOrNoAccess": "Profilen kan ha blitt fjernet, eller du har ikke lenger tilgang",
       "backToDashboard": "Tilbake til dashbordet",
       "noAccessToProfile": "Du har ikke tilgang til denne profilen",
-      "firstReportSoon": "Den første rapporten kommer på slutten av måneden",
       "progressNudgeFreshTitle": "Spør om {{focus}} mens det er ferskt",
       "progressNudgeFreshSubtitle": "{{name}} øvde på {{focus}} {{time}}. Prøv en kort runde selv, og spør så hva som klikket.",
       "progressNudgeRecentTitle": "Hold {{focus}} varmt",
@@ -2628,8 +2688,7 @@
       "checkConnectionRetry": "Sjekk tilkoblingen din og prøv igjen",
       "weekOf": "Uke",
       "retryReports": "Prøv rapporter på nytt",
-      "firstReportArriveOn": "{{name}}s første rapport kommer den {{date}}",
-      "firstReportTimeContext": "{{name}}s første rapport {{timeContext}}"
+      "firstCombinedReportOn": "{{name}}s første ukentlige eller månedlige rapport kan komme allerede {{date}}, når det er nok læring å oppsummere."
     },
     "report": {
       "sessions": "Økter",
@@ -2922,7 +2981,24 @@
     "subjects": "Fag",
     "subjectsLabel": "Fag",
     "journal": "Logg",
-    "journalLabel": "Logg"
+    "journalLabel": "Logg",
+    "adultSelfConsent": {
+      "title": "Bekreft hvordan vi bruker dataene dine",
+      "intro": "Før du fortsetter, må vi ha ditt samtykke til to ting som gjelder kontoen din.",
+      "platformUseHeading": "Bruk av MentoMate",
+      "platformUseBody": "Vi behandler konto- og læringsdataene dine slik at appen fungerer for deg – dine emner, økter og fremgang.",
+      "llmDisclosureHeading": "AI-veiledning",
+      "llmDisclosureBody": "Meldingene dine til AI-mentoren din sendes til en leverandør av AI-modeller slik at den kan svare og undervise. Vi selger aldri dataene dine.",
+      "legalIntro": "Les gjennom alle detaljene før du godtar:",
+      "termsLink": "Tjenestevilkår",
+      "privacyLink": "Personvernerklæring",
+      "accept": "Jeg godtar",
+      "submitting": "Lagrer …",
+      "errorTitle": "Vi kunne ikke lagre samtykket ditt",
+      "errorBody": "Det gikk ikke gjennom hos oss. Prøv igjen.",
+      "retry": "Prøv igjen",
+      "signOut": "Logg ut i stedet"
+    }
   },
   "subscription": {
     "trial": {
@@ -3044,6 +3120,7 @@
       "yourShare": "Din andel",
       "yourUsage": "Ditt forbruk",
       "questionsUsed": "{{count}} spørsmål",
+      "formerMembers": "Tidligere medlemmer",
       "familyAggregate": "Familiesum",
       "quotaResets": "Kvoten nullstilles {{date}}",
       "renews": "Abonnementet fornyes {{date}}",
@@ -3062,7 +3139,9 @@
       "title": "Vil du ha en daglig påminnelse?",
       "message": "Vi kan sende deg en forsiktig påminnelse så du ikke mister streaken din. Du kan slå den av når som helst i Innstillinger.",
       "allow": "Tillat",
-      "notNow": "Ikke nå"
+      "notNow": "Ikke nå",
+      "noticeTitle": "Vil du ha en liten oppfølging?",
+      "noticeMessage": "Vi kan minne deg på å se over det mentoren din la merke til i dag. Du kan slå av dette når som helst i Innstillinger."
     },
     "masteredRow": {
       "title": "Du mestret:"
@@ -3175,6 +3254,14 @@
         "language_focus": "Neste gang: vi jobber med grammatikkmønstre",
         "fluency": "Neste gang: en rask flytsprint"
       }
+    },
+    "feedbackUnavailableTitle": "Tilbakemelding er ikke tilgjengelig ennå",
+    "feedbackUnavailableMessage": "Sammendraget ditt er lagret. Du kan prøve å hente tilbakemeldingen på nytt uten å sende inn igjen.",
+    "feedbackStillUnavailable": "Tilbakemelding er fortsatt ikke tilgjengelig, men sammendraget ditt er trygt. Du kan prøve på nytt eller fortsette når du er klar.",
+    "retryFeedback": "Gjenta tilbakemelding",
+    "retryingFeedback": "Gjentar tilbakemelding ...",
+    "mentorNotice": {
+      "title": "Lagt merke til underveis"
     }
   },
   "sessionTranscript": {
@@ -3630,6 +3717,8 @@
     "bridge": {
       "headline": "Gjør «Jeg forstår det ikke» til «Dette har jeg.»",
       "supporting": "Opprett en gratis konto så mentoren kan huske fagene, notatene og fremgangen din.",
+      "parentHeadline": "Fortsett med kontoen din for å støtte eleven.",
+      "parentSupporting": "Logg inn eller registrer deg for å godta invitasjonen og konfigurere støtte. Kontoen din gir ikke tilgang til læringsaktivitet med mindre eleven godkjenner det.",
       "primaryCta": "Opprett gratis konto",
       "secondaryCta": "Jeg har allerede en konto"
     },
@@ -3864,8 +3953,8 @@
     "methodPracticeDesc": "Lær ved å jobbe deg gjennom veiledede øvelser",
     "methodPracticeLabelYoung": "La meg prøve",
     "methodPracticeDescYoung": "Lær ved å løse problemer med hjelp",
-    "copyTopicIntro": "Velg et emne du føler deg mest usikker på akkurat nå.",
-    "copyTopicIntroYoung": "Velg emnet du vil prøve igjen.",
+    "copyTopicIntro": "Vi har rangert disse etter hva som trenger mest repetisjon – trykk på et annet emne for å bytte.",
+    "copyTopicIntroYoung": "Vi har foreslått en rekkefølge å starte med – du kan også velge et annet emne.",
     "copyMethodIntro": "Velg en undervisningsstil som føles som ditt beste neste steg.",
     "copyMethodIntroYoung": "Hvordan vil du lære denne gangen?",
     "copySubjectIntro": "Hvilket fag vil du gjennomgå først?",
@@ -3993,6 +4082,14 @@
         "currentAccess": "Din betalte tilgang er aktiv frem til {{deadline}}.",
         "freeFallback": "Kontoen din bruker nå gratis tilgang. Oppdater betalingen for å gjenopprette abonnementet ditt.",
         "currentAccessNoDeadline": "Din betalte tilgang er fortsatt aktiv."
+      },
+      "mentor_notice": {
+        "title": "En liten idé verdt å sjekke ut",
+        "cta": "Sjekk det nå",
+        "notNow": "Ikke nå",
+        "arcDue": "Klar når du er det",
+        "arcAdvancing": "Åpner en rask sjekk",
+        "arcMastered": "Sikret"
       }
     },
     "ledger": {
@@ -4005,6 +4102,9 @@
       },
       "quota": {
         "title": "Et læringsøyeblikk ble lagret."
+      },
+      "notice_locked_in": {
+        "title": "Du sikret {{concept}}."
       }
     },
     "overflow": {
@@ -4016,7 +4116,18 @@
       "placeholder": "Spør, lim inn eller beskriv hva du vil lære.",
       "micLabel": "Mikrofon",
       "homeworkChip": "Lekser",
-      "title": "Spør om hva som helst"
+      "title": "Spør om hva som helst",
+      "micIdleLabel": "Start stemmeinndata",
+      "micRequestingLabel": "Ber om mikrofontilgang",
+      "micListeningLabel": "Stopp stemmeinndata",
+      "micProcessingLabel": "Fullfører stemmeinndata",
+      "micErrorLabel": "Prøv taleinndata igjen",
+      "micDisabledLabel": "Stemmeinndata utilgjengelig",
+      "listening": "Lytter …",
+      "voiceError": "Stemmeinndata fungerte ikke. Du kan fortsatt skrive.",
+      "voicePermissionError": "Mikrofontilgang er av. Du kan fortsatt skrive.",
+      "voiceAllow": "Tillat mikrofon",
+      "voiceRetry": "Prøv stemme igjen"
     },
     "onTrack": {
       "label": "I rute",
@@ -4211,7 +4322,8 @@
       "recap_ready": "En oppsummering er klar.",
       "snapshot_ready": "Et læringsøyeblikksbilde er klart.",
       "reflection_bonus": "Refleksjonsbonus lagret.",
-      "quiz_personal_best": "Personlig rekord lagret."
+      "quiz_personal_best": "Personlig rekord lagret.",
+      "notice_locked_in": "Sikret {{concept}} i {{subjectName}}."
     },
     "recaps": {
       "error": "Kunne ikke laste inn sammendragene dine.",
@@ -4254,7 +4366,9 @@
   },
   "accountAdmin": {
     "title": "Konto",
-    "openAccount": "Åpne kontoinnstillinger",
+    "openAccount": "Åpne kontoinnstillingene for {{name}}",
+    "openAccountNoName": "Åpne kontoinnstillingene",
+    "backTo": "Tilbake til {{destination}}",
     "security": "Kontosikkerhet",
     "familySettings": "Familieinnstillinger"
   },

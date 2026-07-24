@@ -11,7 +11,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react-native';
-import { ChatShell, animateResponse, type ChatMessage } from './ChatShell';
+import { ChatShell, animateResponse } from './ChatShell';
+import type { ChatMessage } from './session-types';
 
 // ---------------------------------------------------------------------------
 // Native-boundary mocks (same set ChatShell.test.tsx uses). These are platform

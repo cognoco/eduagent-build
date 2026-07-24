@@ -1,0 +1,108 @@
+# [WI-2240] V2 credentialed learner-only Account row contract.
+# WHICH case: a real synthetic login whose membership roles are ['learner']
+# reaches Account from Subjects. This native flow proves every permitted
+# personal row and the exact Subjects round trip. Owner-only row absence stays
+# hard-gated in Playwright and the component contract because an off-screen
+# Maestro assertNotVisible cannot prove that property.
+appId: com.mentomate.app
+tags:
+  - v2
+  - account
+  - navigation
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: 'v2-account-non-owner-child'
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 30000
+- tapOn:
+    id: 'tab-subjects'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'subjects-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'tab-subjects'
+    selected: true
+- assertVisible:
+    id: 'account-avatar-button'
+    text: '^Open account settings for Test Child$'
+- assertVisible:
+    id: 'subjects-browse-row-${SUBJECT_ID}'
+    containsDescendants:
+      - text: '^Child Learning Data$'
+- tapOn:
+    id: 'account-avatar-button'
+- extendedWaitUntil:
+    visible:
+      id: 'account-screen'
+    timeout: 15000
+- assertVisible:
+    text: '^Test Child$'
+
+- assertVisible:
+    id: 'account-admin-learning-preferences'
+- assertVisible:
+    id: 'account-admin-mentor-memory'
+- scrollUntilVisible:
+    element:
+      id: 'account-admin-mentor-language'
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: 'account-admin-mentor-language'
+- scrollUntilVisible:
+    element:
+      id: 'account-admin-profile'
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: 'account-admin-profile'
+- assertVisible:
+    id: 'account-admin-notifications'
+- scrollUntilVisible:
+    element:
+      id: 'account-admin-privacy'
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: 'account-admin-privacy'
+- scrollUntilVisible:
+    element:
+      id: 'account-admin-help'
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: 'account-admin-help'
+- scrollUntilVisible:
+    element:
+      id: 'account-admin-sign-out'
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: 'account-admin-sign-out'
+
+- tapOn:
+    id: 'account-back'
+- extendedWaitUntil:
+    visible:
+      id: 'subjects-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'tab-subjects'
+    selected: true
+- assertVisible:
+    id: 'account-avatar-button'
+    text: '^Open account settings for Test Child$'
+- assertVisible:
+    id: 'subjects-browse-row-${SUBJECT_ID}'
+    containsDescendants:
+      - text: '^Child Learning Data$'
+- assertNotVisible:
+    id: 'learner-screen'

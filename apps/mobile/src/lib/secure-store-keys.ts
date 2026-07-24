@@ -35,6 +35,9 @@ export const PRE_AUTH_INTRO_KEY = 'preAuthIntroSeen.v1';
  */
 export const ACTIVATION_ANONYMOUS_ID_KEY = 'activationAnonymousId.v1';
 
+/** Durable handoff for a first-profile Mentor-born ceremony. */
+export const MENTOR_BORN_PENDING_KEY = 'mentorBornPending.v1';
+
 // ---------------------------------------------------------------------------
 // Per-profile key constructors — take a profileId and return the full key.
 // ---------------------------------------------------------------------------
@@ -116,6 +119,10 @@ export const guardianNotificationAskKey = (profileId: string): string =>
 export const mentorBirthSeenKey = (profileId: string): string =>
   sanitizeSecureStoreKey(`mentorBirthSeen_${profileId}`);
 
+/** Explicit Mentor-language selection marker (per-profile, device-local). */
+export const mentorLanguageExplicitOverrideKey = (profileId: string): string =>
+  sanitizeSecureStoreKey(`mentorLanguageExplicitOverride_${profileId}`);
+
 /**
  * Summary draft key prefix.
  * Full key: `summary-draft-<profileId>-<sessionId>`.
@@ -166,3 +173,15 @@ export const AUTH_EXPIRY_REVOKED_STORAGE_KEY = 'mentomate_session_revoked_at';
  * Key prefix: `now-feed-cache`
  */
 export const NOW_FEED_CACHE_KEY_PREFIX = 'now-feed-cache';
+
+/**
+ * [WI-2504] Last mentor-notice policy epoch this device OBSERVED from the
+ * server, per actor+profile. AsyncStorage (same backend as the Now-feed cache
+ * above), same double-colon construction in the consumer.
+ *
+ * Stored separately from the cached feed on purpose: it must survive the
+ * feed entry it invalidates, and it must be readable on a cold, offline
+ * launch before any cache key is built.
+ * Full key: `now-feed-policy-epoch::<actorId>::<profileId>`
+ */
+export const NOW_FEED_POLICY_EPOCH_KEY_PREFIX = 'now-feed-policy-epoch';

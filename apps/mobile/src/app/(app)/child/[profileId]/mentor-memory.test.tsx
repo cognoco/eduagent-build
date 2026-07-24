@@ -95,8 +95,19 @@ const linkedChildProfile = {
   hasFamilyLinks: true,
 };
 
+type MemoryCategory = {
+  label: string;
+  items: Array<{
+    category: string;
+    value: string;
+    statement: string;
+    confidence?: 'low' | 'medium' | 'high';
+  }>;
+};
+
 function setRoutes(
   profileOverrides: Partial<typeof childProfileBase> = {},
+  memoryCategories: MemoryCategory[] = [],
 ): void {
   // /dashboard/children/:profileId branches: detail GET vs memory vs sessions.
   mockFetch.setRoute(
@@ -104,7 +115,18 @@ function setRoutes(
     (url: string, init?: RequestInit) => {
       // Memory endpoint — hook unwraps `data.memory`.
       if (url.includes('/memory')) {
-        return { memory: { categories: [] } };
+        return {
+          memory: {
+            categories: memoryCategories,
+            parentContributions: [],
+            settings: {
+              memoryEnabled: true,
+              collectionEnabled: true,
+              injectionEnabled: true,
+              accommodationMode: null,
+            },
+          },
+        };
       }
       // Sessions endpoint — hook returns `data.sessions`.
       if (url.includes('/sessions')) return { sessions: [] };
@@ -114,6 +136,7 @@ function setRoutes(
         child: {
           profileId: '20000000-0000-4000-8000-000000000012',
           displayName: 'Emma',
+          organizationTimezone: null,
           consentStatus: null,
           respondedAt: null,
           summary: '',
@@ -179,6 +202,40 @@ describe('ChildMentorMemoryScreen — interest context rows', () => {
 
   afterEach(() => {
     mockFetch.mockClear();
+  });
+
+  it('exposes stable screen and empty-state selectors for native journeys', async () => {
+    const { result, cleanup } = renderWithGuardian();
+
+    await waitFor(() => {
+      result.getByTestId('child-mentor-memory-screen');
+      result.getByTestId('child-mentor-memory-empty-state');
+    });
+
+    cleanup();
+  });
+
+  it('exposes a positive selector only when populated memory categories load', async () => {
+    setRoutes({}, [
+      {
+        label: 'Learning pace & notes',
+        items: [
+          {
+            category: 'communicationNotes',
+            value: 'short-visual-start',
+            statement: 'Short visual examples help Emma get started.',
+          },
+        ],
+      },
+    ]);
+    const { result, cleanup } = renderWithGuardian();
+
+    await waitFor(() => {
+      result.getByTestId('child-mentor-memory-populated-category');
+    });
+    expect(result.queryByTestId('child-mentor-memory-empty-state')).toBeNull();
+
+    cleanup();
   });
 
   it('renders a context row for each child interest', async () => {
@@ -328,7 +385,13 @@ describe('ChildMentorMemoryScreen — consent-withdrawn empty state (WI-264)', (
         if (url.includes('/memory')) return { memory: { categories: [] } };
         if (url.includes('/sessions')) return { sessions: [] };
         if (init?.method && init.method !== 'GET') return {};
-        return { child: { displayName: 'Emma', profileId: 'child-001' } };
+        return {
+          child: {
+            displayName: 'Emma',
+            profileId: 'child-001',
+            organizationTimezone: null,
+          },
+        };
       },
     );
   }

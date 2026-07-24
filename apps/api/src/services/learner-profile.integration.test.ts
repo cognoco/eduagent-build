@@ -17,7 +17,7 @@
  */
 
 import { resolve } from 'path';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import {
   createDatabase,
   generateUUIDv7,
@@ -42,6 +42,8 @@ import {
   getLearningProfile,
   getOrCreateLearningProfile,
   grantMemoryConsent,
+  toggleMemoryCollection,
+  toggleMemoryInjection,
   type MemoryBlockProfile,
 } from './learner-profile';
 
@@ -143,6 +145,169 @@ function buildAnalysis(
   };
 }
 
+function rowsFromExecute<T>(raw: unknown): T[] {
+  return Array.isArray(raw)
+    ? (raw as T[])
+    : ((raw as { rows?: T[] }).rows ?? []);
+}
+
+async function waitForTaggedLock(
+  db: Database,
+  applicationName: string,
+): Promise<void> {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const raw = (await db.execute(sql`
+      SELECT wait_event_type
+      FROM pg_stat_activity
+      WHERE application_name = ${applicationName}
+    `)) as unknown;
+    const rows = rowsFromExecute<{ wait_event_type: string | null }>(raw);
+    if (rows.some((row) => row.wait_event_type === 'Lock')) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(`Timed out waiting for tagged DB lock: ${applicationName}`);
+}
+
+async function runTaggedTransaction(
+  db: Database,
+  applicationName: string,
+  operation: (tx: Database) => Promise<void>,
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT set_config('application_name', ${applicationName}, true)`,
+    );
+    await operation(tx as unknown as Database);
+  });
+}
+
+interface MemoryToggleState {
+  memoryCollectionEnabled: boolean;
+  memoryInjectionEnabled: boolean;
+  memoryEnabled: boolean;
+}
+
+type MemoryToggleOperation =
+  | { channel: 'collection'; enabled: boolean }
+  | { channel: 'injection'; enabled: boolean };
+
+async function seedMemoryToggleState(
+  own: SeedAccount,
+  state: MemoryToggleState,
+): Promise<void> {
+  const db = createIntegrationDb();
+  await grantMemoryConsent(db, own.profileId, own.accountId, 'granted', {
+    callerPersonId: own.profileId,
+  });
+  await db
+    .update(learningProfiles)
+    .set(state)
+    .where(eq(learningProfiles.profileId, own.profileId));
+}
+
+async function runMemoryToggle(
+  db: Database,
+  own: SeedAccount,
+  operation: MemoryToggleOperation,
+): Promise<void> {
+  if (operation.channel === 'collection') {
+    await toggleMemoryCollection(
+      db,
+      own.profileId,
+      own.accountId,
+      operation.enabled,
+      { callerPersonId: own.profileId },
+    );
+    return;
+  }
+
+  await toggleMemoryInjection(
+    db,
+    own.profileId,
+    own.accountId,
+    operation.enabled,
+    { callerPersonId: own.profileId },
+  );
+}
+
+async function runQueuedMemoryToggles(
+  own: SeedAccount,
+  first: MemoryToggleOperation,
+  second: MemoryToggleOperation,
+): Promise<MemoryToggleState> {
+  const controlDb = createIntegrationDb();
+  const firstDb = createIntegrationDb();
+  const secondDb = createIntegrationDb();
+  const observerDb = createIntegrationDb();
+  const lockTag = own.profileId.slice(-12);
+  const firstTag = `wi2012-first-${first.channel}-${lockTag}`;
+  const secondTag = `wi2012-second-${second.channel}-${lockTag}`;
+
+  let signalControlReady!: () => void;
+  const controlReady = new Promise<void>((resolve) => {
+    signalControlReady = resolve;
+  });
+  let releaseControl!: () => void;
+  const controlRelease = new Promise<void>((resolve) => {
+    releaseControl = resolve;
+  });
+  const controlPromise = controlDb.transaction(async (tx) => {
+    const [locked] = await tx
+      .select({ profileId: learningProfiles.profileId })
+      .from(learningProfiles)
+      .where(eq(learningProfiles.profileId, own.profileId))
+      .for('update')
+      .limit(1);
+    if (!locked) throw new Error('Seeded learning profile was not found');
+    signalControlReady();
+    await controlRelease;
+  });
+  await controlReady;
+
+  let firstPromise: Promise<void> | undefined;
+  let secondPromise: Promise<void> | undefined;
+  let barrierFailure: unknown;
+  try {
+    firstPromise = runTaggedTransaction(firstDb, firstTag, (tx) =>
+      runMemoryToggle(tx, own, first),
+    );
+    await waitForTaggedLock(observerDb, firstTag);
+
+    secondPromise = runTaggedTransaction(secondDb, secondTag, (tx) =>
+      runMemoryToggle(tx, own, second),
+    );
+    await waitForTaggedLock(observerDb, secondTag);
+  } catch (error) {
+    barrierFailure = error;
+  } finally {
+    releaseControl();
+  }
+
+  const operations = [
+    controlPromise,
+    ...(firstPromise ? [firstPromise] : []),
+    ...(secondPromise ? [secondPromise] : []),
+  ];
+  const settled = await Promise.allSettled(operations);
+  if (barrierFailure) throw barrierFailure;
+  const rejected = settled.find(
+    (result): result is PromiseRejectedResult => result.status === 'rejected',
+  );
+  if (rejected) throw rejected.reason;
+
+  const [committed] = await observerDb
+    .select({
+      memoryCollectionEnabled: learningProfiles.memoryCollectionEnabled,
+      memoryInjectionEnabled: learningProfiles.memoryInjectionEnabled,
+      memoryEnabled: learningProfiles.memoryEnabled,
+    })
+    .from(learningProfiles)
+    .where(eq(learningProfiles.profileId, own.profileId));
+  if (!committed) throw new Error('Committed learning profile was not found');
+  return committed;
+}
+
 // ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
@@ -190,6 +355,58 @@ describe('getOrCreateLearningProfile (integration)', () => {
 
     const fetched = await getLearningProfile(db, own.profileId);
     expect(fetched).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Memory-channel toggles — concurrent read/derive/write serialization
+// ---------------------------------------------------------------------------
+
+describe('[WI-2012] memory channel toggle concurrency (integration)', () => {
+  it('serializes injection=true before collection=false and preserves injection in memoryEnabled', async () => {
+    const own = await seedAccountAndProfile(0);
+    await seedMemoryToggleState(own, {
+      memoryCollectionEnabled: true,
+      memoryInjectionEnabled: false,
+      memoryEnabled: true,
+    });
+    const committed = await runQueuedMemoryToggles(
+      own,
+      { channel: 'injection', enabled: true },
+      { channel: 'collection', enabled: false },
+    );
+
+    expect(committed).toEqual({
+      memoryCollectionEnabled: false,
+      memoryInjectionEnabled: true,
+      memoryEnabled: true,
+    });
+    expect(committed.memoryEnabled).toBe(
+      committed.memoryCollectionEnabled || committed.memoryInjectionEnabled,
+    );
+  });
+
+  it('serializes collection=true before injection=false and preserves collection in memoryEnabled', async () => {
+    const own = await seedAccountAndProfile(0);
+    await seedMemoryToggleState(own, {
+      memoryCollectionEnabled: false,
+      memoryInjectionEnabled: true,
+      memoryEnabled: true,
+    });
+    const committed = await runQueuedMemoryToggles(
+      own,
+      { channel: 'collection', enabled: true },
+      { channel: 'injection', enabled: false },
+    );
+
+    expect(committed).toEqual({
+      memoryCollectionEnabled: true,
+      memoryInjectionEnabled: false,
+      memoryEnabled: true,
+    });
+    expect(committed.memoryEnabled).toBe(
+      committed.memoryCollectionEnabled || committed.memoryInjectionEnabled,
+    );
   });
 });
 

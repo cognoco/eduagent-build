@@ -1,0 +1,154 @@
+# [WI-2243] V2 native supporter self-learning doorway + Me-scope persistence.
+#
+# Runs only in the explicit `v2` workflow-dispatch suite (same posture as
+# v2-shell-navigation.yaml / v2-supporter-scope-journey.yaml — the V2 shell
+# flag is baked into the release bundle, so this is not part of the ordinary
+# PR/nightly APK posture).
+#
+# Seeded with `v2-supporter-self-learning-active`
+# (test-seed-v2-supporter.ts's seedV2SupporterSelfLearningActive) — an
+# accepted supportee edge PLUS a real subject+session already on the
+# supporter's own personId, so `resolveScopesForPerson` already lists 'me'
+# and the scope chip's Me option is reachable from the very first render
+# (V2 shell spec §4.2 "becomes an equal scope thereafter"). That also means
+# SupporterSelfLearningDoorway itself must NOT render here (AC-1's gate:
+# `!availableScopes.some(s => s.kind === 'me')`) — its own activation flow
+# (first tap, no prior learning) is covered by
+# `SupporterSelfLearningDoorway.test.tsx` (RTL, real component, executed)
+# and the coexistence seam by `SupportHubMentorTab.test.tsx`'s
+# `[WI-2243] SupporterColdStart + SupporterSelfLearningDoorway coexistence`
+# suite (RTL, real mounted tree, executed — red/green evidence in
+# apps/mobile/src/components/support/wi2243-rgr-evidence.md). This flow
+# instead proves the state those unit tests can't reach: real device
+# navigation, a real app relaunch, and the scope-isolation walls, end to end.
+#
+# Persistence-after-relaunch note: SecureStore scope persistence is
+# fire-and-forget, so a cold launch's very FIRST frame may not yet reflect
+# the hydrated persisted scope — the wait below is generous (30s) to absorb
+# that hydration lag. Critically, this flow does NOT tap the scope chip
+# after relaunch — asserting the restored screen only after a fresh
+# re-selection would prove "the own subject is available once Me is
+# reselected," not that the persisted key restored Me across a real cold
+# start (AC-3/AC-6). The mentor-screen wait below must be satisfied by the
+# app's own restored state alone.
+#
+# [Disclosure] No Android emulator or staging DB is reachable in this build
+# environment, so the actual Maestro walk (this file's tapOn/assertVisible
+# steps against a real app) has not been executed — do not read a passing CI
+# run into this file until the `v2` workflow-dispatch suite has actually run
+# it. What IS proven against a real DB here: the seed itself and the
+# scope-isolation walls this flow asserts, by
+# test-seed-v2-supporter.integration.test.ts's
+# `[WI-2243] v2-supporter-self-learning-active seed — Me-scope isolation`
+# suite (real Neon DB, executed). AC-3's no-flash convergence-window
+# property is proven directly by scope-context.test.tsx's
+# `AC-3 no-flash convergence window` suite (RTL, executed, drives the
+# transient interval itself). Registered in ci-maestro-manifest.json's `v2`
+# array; the exhaustive v2-suite plan consistency check
+# (scripts/e2e-ci-injection-and-smoke-gate.test.ts) IS runnable without an
+# emulator and was run locally against this registration.
+#
+# SEED_SCENARIO: 'v2-supporter-self-learning-active'
+appId: com.mentomate.app
+tags:
+  - v2
+  - navigation
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: 'v2-supporter-self-learning-active'
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: 'support-hub-mentor-tab'
+    timeout: 30000
+
+# The doorway is a first-time entry point only — with 'me' already in
+# scopes (own learning exists), it must not render, and Me is reachable as
+# an ordinary, equal scope-chip option instead.
+- assertNotVisible:
+    id: 'supporter-self-learning-doorway'
+- assertVisible:
+    id: 'scope-chip-option-me'
+
+# Switch to Me: the ordinary learner Mentor screen renders (reused learner
+# flow, not a bespoke doorway destination).
+- tapOn:
+    id: 'scope-chip-option-me'
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 15000
+- assertNotVisible:
+    id: 'support-hub-mentor-tab'
+
+# Subjects tab: the supporter's own seeded subject is there to resume
+# (AC-2's "create or resume" — resume path, since it already exists).
+- tapOn:
+    id: 'tab-subjects'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'subjects-screen'
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: 'subjects-browse-row-${OWN_SUBJECT_ID}'
+    direction: DOWN
+    timeout: 15000
+
+# Relaunch — see the persistence note in the file header. NO scope-chip tap
+# here: mentor-screen must appear on its own, restored from the persisted
+# scope key, before any interaction proves it.
+- stopApp
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 30000
+- tapOn:
+    id: 'tab-subjects'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'subjects-screen'
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: 'subjects-browse-row-${OWN_SUBJECT_ID}'
+    direction: DOWN
+    timeout: 15000
+
+# Switch to the accepted supportee: ScopeChip preserves the active Subjects
+# tab, so wait for the person-scope structural surface, then its completed
+# empty-state sentinel.
+# Strict separation direction 1 — the supporter's exact own Me-scope subject
+# never appears in the supportee's empty Subjects state.
+- tapOn:
+    id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-structural-subjects'
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-subjects-empty-state'
+    timeout: 15000
+- assertNotVisible:
+    id: 'person-scope-subject-${OWN_SUBJECT_ID}'
+- assertNotVisible:
+    text: 'Supporter Own Subject'
+
+# Switch back to Me: ScopeChip still preserves Subjects. Direction 2 — the
+# exact own subject returns after the person-to-Me scope transition.
+- tapOn:
+    id: 'scope-chip-option-me'
+- extendedWaitUntil:
+    visible:
+      id: 'subjects-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'subjects-browse-row-${OWN_SUBJECT_ID}'

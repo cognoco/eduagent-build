@@ -73,6 +73,34 @@ jest.mock(
   },
 );
 
+// [WI-2398] assertNotProxyMode now also calls assertCanWriteProfile, which
+// calls verifyPersonOwnershipV2 — a raw db.select() membership query the
+// stub `db` ({}) in this file cannot satisfy. Every isOwner:true scenario in
+// this file is a caller-self write (makeApp sets callerPersonId equal to
+// profileId); the cross-account write attack this guard exists to close is
+// covered by the real-DB break test in
+// tests/integration/wi2398-write-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's stub-db environment.
+jest.mock('../services/identity-v2/ownership-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/ownership-v2'),
+  verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+}));
+
+// [WI-2396] assertLlmConsent (called by POST /subjects, /subjects/resolve,
+// /subjects/classify) runs isLlmExchangeConsentAllowed, which reads
+// db.query.membership — the stub `db` ({}) in this file has no `.query`
+// property. Defaults to allowed (resolves undefined = no throw); individual
+// tests override with mockRejectedValueOnce(new ConsentWithdrawnError()) to
+// exercise the refusal path.
+// gc1-allow: isLlmExchangeConsentAllowed runs real db.query.membership /
+// consentGrant reads with no real implementation available in this file's
+// stub-db environment (same class as verifyPersonOwnershipV2 above).
+jest.mock('../services/identity-v2/consent-status-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/consent-status-v2'),
+  assertLlmConsent: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { Hono } from 'hono';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -86,9 +114,11 @@ import {
 } from '../services/subject';
 import { resolveSubjectName } from '../services/subject-resolve';
 import { classifySubject } from '../services/subject-classify';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { subjectRoutes } from './subjects';
 import { ERROR_CODES, SubjectNotFoundError } from '@eduagent/schemas';
 import { TEST_PROFILE_ID, TEST_PROFILE_ID_2 } from '@eduagent/test-utils';
+import { ConsentWithdrawnError } from '../services/session';
 
 // ---------------------------------------------------------------------------
 // Test constants
@@ -111,6 +141,9 @@ type TestEnv = {
     profileMeta:
       | { isOwner: boolean; resolvedVia: 'auto' | 'explicit-header' }
       | undefined;
+    // [WI-2398] Required by assertCanWriteProfile (see makeApp below).
+    account: { id: string } | undefined;
+    callerPersonId: string | undefined;
   };
 };
 
@@ -121,16 +154,30 @@ function makeApp(opts?: {
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
     c.set('db', {} as Database);
-    c.set('profileId', opts?.profileId ?? PROFILE_ID);
+    const profileId = opts?.profileId ?? PROFILE_ID;
+    c.set('profileId', profileId);
     c.set(
       'profileMeta',
       opts?.profileMeta ?? { isOwner: true, resolvedVia: 'explicit-header' },
     );
+    // [WI-2398] Caller-self identity — assertNotProxyMode now also calls
+    // assertCanWriteProfile, which requires account + callerPersonId.
+    // verifyPersonOwnershipV2 is mocked to succeed at file scope regardless
+    // of the stub `db`, so any non-null callerPersonId satisfies the guard.
+    c.set('account', { id: 'test-account-id' });
+    c.set('callerPersonId', profileId);
     await next();
   });
-  app.onError((err, c) =>
-    c.json({ code: 'INTERNAL_ERROR', message: err.message }, 500),
-  );
+  app.onError((err, c) => {
+    // [WI-2396] Mirrors index.ts's global ConsentWithdrawnError -> 403 mapping.
+    if (err instanceof ConsentWithdrawnError) {
+      return c.json(
+        { code: ERROR_CODES.CONSENT_WITHDRAWN, message: err.message },
+        403,
+      );
+    }
+    return c.json({ code: 'INTERNAL_ERROR', message: err.message }, 500);
+  });
   app.route('/v1', subjectRoutes);
   return app;
 }
@@ -142,6 +189,7 @@ const updateSubjectMock = jest.mocked(updateSubject);
 const retryCurriculumForSubjectMock = jest.mocked(retryCurriculumForSubject);
 const resolveSubjectNameMock = jest.mocked(resolveSubjectName);
 const classifySubjectMock = jest.mocked(classifySubject);
+const assertLlmConsentMock = jest.mocked(assertLlmConsent);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -621,6 +669,114 @@ describe('POST /v1/subjects/classify', () => {
 });
 
 // ---------------------------------------------------------------------------
+// [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5)
+// ---------------------------------------------------------------------------
+
+describe('[WI-2396] subjects consent-withdrawal gate', () => {
+  it('POST /subjects refuses with 403 CONSENT_WITHDRAWN and never calls createSubjectWithStructure when consent is withdrawn', async () => {
+    assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+
+    const res = await makeApp().request('/v1/subjects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Chemistry' }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
+    expect(createSubjectWithStructureMock).not.toHaveBeenCalled();
+  });
+
+  it('POST /subjects proceeds (LLM dispatched) when consent is active', async () => {
+    createSubjectWithStructureMock.mockResolvedValue({
+      subject: makeSubjectRecord(),
+      structureType: 'narrow',
+    });
+
+    const res = await makeApp().request('/v1/subjects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Chemistry' }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(assertLlmConsentMock).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID,
+    );
+    expect(createSubjectWithStructureMock).toHaveBeenCalled();
+  });
+
+  it('POST /subjects/resolve refuses with 403 CONSENT_WITHDRAWN and never calls resolveSubjectName when consent is withdrawn', async () => {
+    assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+
+    const res = await makeApp().request('/v1/subjects/resolve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rawInput: 'chem' }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
+    expect(resolveSubjectNameMock).not.toHaveBeenCalled();
+  });
+
+  it('POST /subjects/resolve proceeds (LLM dispatched) when consent is active', async () => {
+    resolveSubjectNameMock.mockResolvedValue({
+      status: 'resolved',
+      resolvedName: 'Chemistry',
+      suggestions: [],
+      displayMessage: 'Found: Chemistry',
+    });
+
+    const res = await makeApp().request('/v1/subjects/resolve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rawInput: 'chem' }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(resolveSubjectNameMock).toHaveBeenCalled();
+  });
+
+  it('POST /subjects/classify refuses with 403 CONSENT_WITHDRAWN and never calls classifySubject when consent is withdrawn', async () => {
+    assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+
+    const res = await makeApp().request('/v1/subjects/classify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: 'what is an atom?' }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
+    expect(classifySubjectMock).not.toHaveBeenCalled();
+  });
+
+  it('POST /subjects/classify proceeds (LLM dispatched) when consent is active', async () => {
+    classifySubjectMock.mockResolvedValue({
+      candidates: [
+        { subjectId: SUBJECT_ID, subjectName: 'Chemistry', confidence: 0.9 },
+      ],
+      needsConfirmation: false,
+      suggestedSubjectName: null,
+    });
+
+    const res = await makeApp().request('/v1/subjects/classify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: 'what is an atom?' }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(classifySubjectMock).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // PUT /v1/subjects/:id/language-setup — cross-profile scoping
 // ---------------------------------------------------------------------------
 
@@ -692,13 +848,13 @@ function makeSubjectRecord(overrides?: Partial<{ name: string }>) {
 //  PATCH /subjects/:id; POST /subjects already had a guard pre-PR)
 // ---------------------------------------------------------------------------
 describe('[WI-177 / DS-088] subjects proxy-mode guard', () => {
-  function makeProxyApp() {
+  function makeProxyApp(resolvedVia: 'auto' | 'explicit-header' = 'auto') {
     const proxyApp = new Hono();
     proxyApp.use('*', async (c, next) => {
       c.set('db' as never, {});
       c.set('profileId' as never, PROFILE_ID);
       c.set('user' as never, { id: 'test-user' });
-      c.set('profileMeta' as never, { isOwner: false, resolvedVia: 'auto' });
+      c.set('profileMeta' as never, { isOwner: false, resolvedVia });
       await next();
     });
     proxyApp.route('/', subjectRoutes);
@@ -708,6 +864,18 @@ describe('[WI-177 / DS-088] subjects proxy-mode guard', () => {
   const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 
   beforeEach(() => jest.clearAllMocks());
+
+  it('POST /subjects rejects proxy-mode creation before calling the subject service', async () => {
+    const res = await makeProxyApp('explicit-header').request('/subjects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Chemistry' }),
+    });
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ code: 'PROXY_MODE' });
+    expect(createSubjectWithStructureMock).not.toHaveBeenCalled();
+  });
 
   it('PUT /subjects/:id/language-setup returns 403 in proxy mode', async () => {
     const res = await makeProxyApp().request(

@@ -15,7 +15,7 @@ an ADR-audit deliverable to `main`:
   (Originally `docs/plans/2026-06-03-adr-register-cleanup-wrong-decisions.md`.)
 
 It also pushed stale-fact "citation fixes" to `docs/architecture.md`,
-`docs/project_context.md`, `docs/audience-matrix.md`, `CLAUDE.md`, `AGENTS.md`
+`docs/project_context.md`, `docs/compliance/audience-matrix.md`, `CLAUDE.md`, `AGENTS.md`
 (commits `944d87a`, `1039bb217`).
 
 ## Why it is quarantined, not adopted

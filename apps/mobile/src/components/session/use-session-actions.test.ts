@@ -28,6 +28,9 @@ jest
   .mockResolvedValue(undefined);
 
 function createMockOpts(overrides: Record<string, unknown> = {}) {
+  const silenceTimerRef = {
+    current: null as ReturnType<typeof setTimeout> | null,
+  };
   return {
     activeSessionId: 'session-1',
     isStreaming: false,
@@ -45,6 +48,7 @@ function createMockOpts(overrides: Record<string, unknown> = {}) {
     setShowWrongSubjectChip: jest.fn(),
     setShowTopicSwitcher: jest.fn(),
     setShowParkingLot: jest.fn(),
+    setMessages: jest.fn(),
     filing: { mutate: jest.fn(), mutateAsync: jest.fn(), isPending: false },
     setConsumedQuickChipMessageId: jest.fn(),
     setMessageFeedback: jest.fn(),
@@ -58,6 +62,8 @@ function createMockOpts(overrides: Record<string, unknown> = {}) {
     parkingLotDraft: '',
     setParkingLotDraft: jest.fn(),
     closedSessionRef: { current: null },
+    silenceTimerRef,
+    sessionEndedRef: { current: false },
     queuedProblemTextRef: { current: null },
     activeProfileId: 'profile-1',
     closeSession: {
@@ -94,6 +100,79 @@ describe('useSessionActions', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCaptureException.mockClear();
+  });
+
+  it('[WI-2103 AC-1] cancels a scheduled silence prompt before closing the session', async () => {
+    jest.useFakeTimers();
+    const latePrompt = jest.fn();
+    const opts = createMockOpts();
+    opts.silenceTimerRef.current = setTimeout(
+      latePrompt,
+      2 * 60 * 1000,
+    ) as unknown as NonNullable<typeof opts.silenceTimerRef.current>;
+    const { result } = renderHook(() => useSessionActions(opts as any));
+
+    try {
+      await act(async () => {
+        await result.current.handleEndSession();
+        await confirmEndSession();
+      });
+
+      expect(opts.sessionEndedRef.current).toBe(true);
+      expect(opts.silenceTimerRef.current).toBeNull();
+
+      act(() => {
+        jest.advanceTimersByTime(2 * 60 * 1000 + 1);
+      });
+      expect(latePrompt).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('[WI-2103 AC-2] retracts a rendered silence prompt before close persistence settles', async () => {
+    let resolveClose!: (value: {
+      sessionId: string;
+      wallClockSeconds: number;
+      summaryStatus: string;
+    }) => void;
+    const closeRequest = new Promise<{
+      sessionId: string;
+      wallClockSeconds: number;
+      summaryStatus: string;
+    }>((resolve) => {
+      resolveClose = resolve;
+    });
+    const opts = createMockOpts({
+      closeSession: { mutateAsync: jest.fn(() => closeRequest) },
+    });
+    const { result } = renderHook(() => useSessionActions(opts as any));
+
+    await act(async () => {
+      await result.current.handleEndSession();
+    });
+
+    let closeCompletion!: Promise<void>;
+    act(() => {
+      closeCompletion = confirmEndSession();
+    });
+
+    expect(opts.setMessages).toHaveBeenCalledTimes(1);
+    const retract = opts.setMessages.mock.calls[0]?.[0] as (
+      messages: Array<{ id: string }>,
+    ) => Array<{ id: string }>;
+    expect(
+      retract([{ id: 'learner-message' }, { id: 'silence-prompt' }]),
+    ).toEqual([{ id: 'learner-message' }]);
+
+    resolveClose({
+      sessionId: 'session-1',
+      wallClockSeconds: 120,
+      summaryStatus: 'pending',
+    });
+    await act(async () => {
+      await closeCompletion;
+    });
   });
 
   it('navigates to summary for freeform sessions after close without filing prompt', async () => {

@@ -2,13 +2,13 @@
 
 ## Snapshot
 
-- Mobile: ~88 screens, 470 test suites, ~5130 tests
-- API: 50 route groups, 329 test suites, ~7608 tests, 69 Inngest functions
-- Cross-package integration tests: 57 suites in `tests/integration/`, ~290 cases
+- Mobile: ~88 screens, 494 test suites, ~5644 tests
+- API: 53 route groups, 329 test suites, ~8380 tests, 78 Inngest functions
+- Cross-package integration tests: 70 suites in `tests/integration/`, ~290 cases
 - Monorepo: `apps/api`, `apps/mobile`, shared packages in `packages/`
 - Core docs: `docs/project_context.md`, `docs/architecture.md`, relevant spec/plan under `docs/plans/` or `docs/specs/`
 
-> Counts verified 2026-07-07. Test-case totals are a heuristic grep of `it(` / `test(` line starts; jest-reported totals may be slightly higher due to `it.each(...)` expansion at runtime. Re-verify with `git ls-files | grep '\.test\.'` for suite counts.
+> Counts verified 2026-07-21. Test-case totals are a heuristic grep of `it(` / `test(` line starts; jest-reported totals may be slightly higher due to `it.each(...)` expansion at runtime. Re-verify with `git ls-files | grep '\.test\.'` for suite counts.
 
 ## How to Work
 
@@ -211,7 +211,7 @@ Skills under a **group directory** (currently `tech/`) are an exception to the 1
 
 > **Scope.** This section describes the **current** nav/gating system (live in `apps/mobile/src/lib/navigation-contract.ts`). The **target** identity model being designed in the identity-foundation runway (6-persona set, capability split, "charge" terminology) is **not** this — it lives in `docs/canon/identity/` + `_wip/identity-foundation/CANONICAL-SET.md`. Don't conflate the two.
 
-**For full audience matrix** (which screens/APIs/Inngest jobs serve which user mode, with file:line citations and known gating gaps F1-F14), see `docs/audience-matrix.md`. For the *target* state — one `resolveNavigationContract()` function owning all UI gating — see the now-implemented contract in `apps/mobile/src/lib/navigation-contract.ts` (design rationale archived at `docs/_archive/specs/Done/2026-05-21-navigation-contract.md`). The short version is below.
+**For the reconstructed audience-gating inventory** (screens/APIs/Inngest jobs by user mode, with historical file:line citations and scaffolded findings F1-F14), see `docs/compliance/audience-matrix.md`; verify its leads against current code before relying on them. For the implemented contract — one `resolveNavigationContract()` function owning UI gating — see `apps/mobile/src/lib/navigation-contract.ts` (design rationale archived at `docs/_archive/specs/Done/2026-05-21-navigation-contract.md`). The current short version is below.
 
 > **Nav mode is per-environment — check it whenever the environment under discussion changes; never assume a global default.** The flags are **build-time** (`MODE_NAV_V0_ENABLED` / `MODE_NAV_V1_ENABLED` from `EXPO_PUBLIC_ENABLE_MODE_NAV` / `..._V1`, resolved in `apps/mobile/src/lib/feature-flags.ts:30-31`) and intentionally differ by environment — as of 2026-06-09: production build V0=on/V1=off (`apps/mobile/eas.json`), dev/preview builds and the preview-channel OTA both-on → V1 (`eas.json`, `.github/workflows/ci.yml` OTA env), local `.env.example` flags-off. These can change — read the flag values for the environment in question before making any nav/tab/mode claim, and use the audience × flag-state "Navigation shell matrix" in `docs/flows/mobile-app-flow-inventory.md`. Do not write any flag state into docs or memory as "the default."
 >
@@ -356,6 +356,7 @@ These deviations from the rules above exist in the codebase as of 2026-05-01. Th
 - **The global unscoped `@tanstack/query-core` pin in root `package.json` `pnpm.overrides` is load-bearing**, not hygiene debt — it dedupes query-core to one version across `@clerk/shared` (declares `5.87.4`) and the `@tanstack/*` consumers (react-query, query-async-storage-persister, query-persist-client-core). Scoping it to the react-query edge (`@tanstack/react-query>@tanstack/query-core`) regresses to 3 separate query-core versions in the tree (verified WI-1043). Keep it global, and bump its version **in lockstep** whenever `@tanstack/react-query` is bumped.
 - **Account-level Inngest events omit `profileId`** — `app/account.reclaim_attempt` and similar events that fire at account-creation time (before any profile exists) legitimately carry no `profileId`. This is a sanctioned deviation from the "payloads always include `profileId`" rule for events scoped to the accounts table by `clerkUserId` or `accountId`. The `@inngest-admin: event-profile` annotation documents the scoping mechanism in place. Do not attempt to add a dummy `profileId: null` to satisfy the rule textually — it would be misleading.
 - **`teachingPreferenceSchema.analogyDomain` (request) keeps `.nullable().optional()`** — a documented carve-out (WI-1160, operator-ruled) from the "never `.nullable().optional()`; request → `.optional()`, response → `.nullable()`" canon (`docs/project_context.md`, `docs/architecture.md`). This **request** field is genuinely tri-state: a value = set, `null` = explicitly clear, absent = leave unchanged. `null`-as-clear is established, tested product behavior (`apps/api/src/routes/retention.test.ts` → "accepts null analogyDomain to clear preference"), so both `.nullable()` and `.optional()` are required; the canon's "pick one" wrongly assumes null and absent are interchangeable here. The ban is docs-only (no automated checker), so no escape annotation is needed. The **response** fields (`teachingPreferenceResponseDataSchema.analogyDomain` / `nativeLanguage`) DO conform to `.nullable()` — the carve-out is request-side only.
+- **`signals.topic_opened_pending_content`'s hard cap lives client-side, not server-side** — a documented deviation (WI-2107) from the "every envelope signal needs a server-side hard cap" rule. This signal has no server-side loop to cap (unlike `MAX_INTERVIEW_EXCHANGES`, which bounds an in-request loop): each auto-continuation is a discrete client-initiated request, so the termination guarantee is enforced in `apps/mobile/src/components/session/use-session-streaming.ts`'s `autoContinuationFiredRef` (capped at one auto-fired follow-up per learner turn) instead. The rule's intent — bound the flow so it terminates even if the LLM never stops emitting the signal — is preserved; only the enforcement layer differs because the control-flow shape differs.
 
 ## Schema And Deploy Safety
 
@@ -380,7 +381,7 @@ Local hooks are fast feedback; **CI is the authoritative gate that protects `mai
 
 ## Repo-Specific Guardrails
 
-- Default exports are only for Expo Router page components.
+- Default exports are only for runtime-mandated entrypoints: Expo Router page components and Cloudflare Worker module entrypoints.
 - Tests are co-located with source files. Do not create `__tests__/` folders.
 - Package imports go through the package barrel, enforced by `@nx/enforce-module-boundaries`.
 - SecureStore keys must use Expo-safe characters only: letters, numbers, `.`, `-`, `_`.

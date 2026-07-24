@@ -29,7 +29,10 @@ import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireAccount } from '../middleware/profile-scope';
 import { withProfile } from '../route-utils/route-context';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
-import { assertOwnerProfile } from '../services/family-access';
+import {
+  assertOwnerProfile,
+  assertCallerIsAccountOwner,
+} from '../services/family-access';
 import {
   getNotificationPrefs,
   upsertNotificationPrefs,
@@ -88,7 +91,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     zValidator('json', notificationPrefsSchema),
     async (c) => {
       // [WI-173 / DS-084] Server-derived proxy-mode write guard.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;
@@ -118,6 +121,8 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       // links today, but gating only on the link diverges from the pattern.
       if (query.childProfileId) {
         assertOwnerProfile(c);
+        // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+        await assertCallerIsAccountOwner(c);
       }
       const celebrationLevel = query.childProfileId
         ? await getChildCelebrationLevel(db, profileId, query.childProfileId)
@@ -133,7 +138,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     zValidator('json', celebrationLevelUpdateSchema),
     async (c) => {
       // [WI-173 / DS-084] Server-derived proxy-mode write guard.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;
@@ -143,6 +148,8 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       // routes.
       if (body.childProfileId) {
         assertOwnerProfile(c);
+        // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+        await assertCallerIsAccountOwner(c);
       }
       const result = body.childProfileId
         ? await upsertChildCelebrationLevel(
@@ -170,6 +177,8 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     // owner predicate ever changes (an inline isOwner read could be quietly
     // removed by a future refactor thinking it's duplicative).
     assertOwnerProfile(c);
+    // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(c);
     const { db, profileId } = withProfile(c);
     const value = await getWithdrawalArchivePreference(db, profileId);
     return c.json(
@@ -182,7 +191,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     zValidator('json', withdrawalArchivePreferenceUpdateSchema),
     async (c) => {
       // [WI-173 / DS-084] Server-derived proxy-mode write guard.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;
@@ -240,7 +249,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     zValidator('json', familyPoolBreakdownSharingUpdateSchema),
     async (c) => {
       // [WI-173 / DS-084] Server-derived proxy-mode write guard.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;
@@ -274,7 +283,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     zValidator('json', pushTokenRegisterSchema),
     async (c) => {
       // [WI-173 / DS-084] Server-derived proxy-mode write guard.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;
@@ -295,7 +304,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     // child hits a paywall; a parent-proxy session reaching it means the
     // parent is impersonating the child rather than the child themselves
     // asking — block.
-    assertNotProxyMode(c);
+    await assertNotProxyMode(c);
     const { db, profileId } = withProfile(c);
     // API_ORIGIN must be set — falling back to c.req.url would allow Host header
     // injection (OWASP A03) since Cloudflare Workers populate it from the
@@ -335,7 +344,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     zValidator('json', analogyDomainUpdateSchema),
     async (c) => {
       // [WI-173 / DS-084] Server-derived proxy-mode write guard.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const { subjectId } = c.req.valid('param');
       const body = c.req.valid('json');
@@ -372,7 +381,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     zValidator('json', nativeLanguageUpdateSchema),
     async (c) => {
       // [WI-173 / DS-084] Server-derived proxy-mode write guard.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const { subjectId } = c.req.valid('param');
       const body = c.req.valid('json');

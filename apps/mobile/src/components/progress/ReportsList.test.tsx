@@ -4,7 +4,12 @@ import { ReportsList } from './ReportsList';
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => {
-      if (key === 'parentView.index.firstReportSoon') return 'No reports yet';
+      if (key === 'parentView.index.firstReportSoon') {
+        return 'The first report will arrive at the end of the month';
+      }
+      if (key === 'progress.latestReport.empty') {
+        return 'Your next weekly or monthly report will appear here once there is enough learning to summarize.';
+      }
       if (key === 'parentView.reports.weekOf') return 'Week of';
       if (key === 'parentView.reports.newBadge') return 'New';
       return key;
@@ -43,7 +48,7 @@ const viewedMonthlyReport = {
 };
 
 describe('ReportsList — empty state', () => {
-  it('renders empty state copy when both arrays are empty', () => {
+  it('[WI-2186] does not promise month-end when a weekly report can arrive first', () => {
     render(
       <ReportsList
         monthlyReports={[]}
@@ -53,8 +58,30 @@ describe('ReportsList — empty state', () => {
       />,
     );
 
-    screen.getByTestId('reports-list-empty');
-    screen.getByText('No reports yet');
+    screen.getByRole('summary');
+    screen.getByText(
+      'Your next weekly or monthly report will appear here once there is enough learning to summarize.',
+    );
+    expect(
+      screen.queryByText(
+        'The first report will arrive at the end of the month',
+      ),
+    ).toBeNull();
+  });
+
+  it('[WI-2186] keeps compact-screen empty copy screen-reader discoverable and untruncated', () => {
+    render(
+      <ReportsList
+        monthlyReports={[]}
+        weeklyReports={[]}
+        onPressMonthly={jest.fn()}
+        onPressWeekly={jest.fn()}
+      />,
+    );
+
+    const summary = screen.getByRole('summary');
+    expect(summary).toHaveProp('testID', 'reports-list-empty');
+    expect(summary.props.numberOfLines).toBeUndefined();
   });
 
   it('does NOT render empty state when only weekly is populated', () => {

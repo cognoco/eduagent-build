@@ -185,6 +185,15 @@ function LibraryScreenContent({
     }, 300);
   }, []);
 
+  const handleSearchClear = useCallback(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    setSearchQuery('');
+    setDebouncedQuery('');
+  }, []);
+
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -895,7 +904,7 @@ function LibraryScreenContent({
                 onTopicPress={handleTopicPress}
                 onNotePress={handleNotePress}
                 onSessionPress={handleSessionPress}
-                onClear={() => setSearchQuery('')}
+                onClear={handleSearchClear}
                 onRetry={() => void searchResult.refetch()}
               />
             )}

@@ -6,7 +6,8 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import { AccessibilityInfo, Alert, AppState, Linking } from 'react-native';
-import { ChatShell, type ChatMessage } from './ChatShell';
+import { ChatShell } from './ChatShell';
+import type { ChatMessage } from './session-types';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -155,6 +156,12 @@ describe('ChatShell', () => {
   // -----------------------------------------------------------------------
   // Basic rendering (regression — existing behaviour)
   // -----------------------------------------------------------------------
+
+  it('does not request microphone permission when mounted in text mode', () => {
+    renderChatShell();
+
+    expect(mockRequestMicrophonePermission).not.toHaveBeenCalled();
+  });
 
   // [BUG-887] On small phones (Galaxy S10e ~5.8") the Text/Voice mode
   // toggle eats vertical space the composer needs when the soft keyboard
@@ -408,14 +415,15 @@ describe('ChatShell', () => {
   // -----------------------------------------------------------------------
 
   describe('voice recording', () => {
-    it('calls startListening when mic button is pressed', async () => {
+    it('starts listening once without a duplicate permission request on mic press', async () => {
       renderChatShell({ verificationType: 'teach_back' });
 
       await act(async () => {
         fireEvent.press(screen.getByTestId('voice-record-button'));
       });
 
-      expect(mockStartListening).toHaveBeenCalled();
+      expect(mockStartListening).toHaveBeenCalledTimes(1);
+      expect(mockRequestMicrophonePermission).not.toHaveBeenCalled();
     });
 
     it('enables voice mode and starts listening from the compact mic button', async () => {
@@ -1261,10 +1269,6 @@ describe('ChatShell', () => {
       const actionButton = buttons?.find((b) => b.style !== 'cancel');
       expect(actionButton).toBeDefined();
 
-      // ChatShell pre-warms requestMicrophonePermission on mount — clear that
-      // call so we measure only the button tap.
-      mockRequestMicrophonePermission.mockClear();
-
       await act(async () => {
         actionButton?.onPress?.();
         await Promise.resolve();
@@ -1456,6 +1460,118 @@ describe('ChatShell', () => {
     it('does not show animations during normal conversation', () => {
       renderChatShell({ isStreaming: false });
       expect(screen.queryByTestId('thinking-bulb-animation')).toBeNull();
+      expect(screen.queryByTestId('idle-pen-animation')).toBeNull();
+    });
+
+    it('[WI-2108 AC-1] mounts only the shell waiting indicator while the mentor is writing', () => {
+      renderChatShell({
+        isStreaming: true,
+        messages: [
+          { id: 'ai-writing', role: 'assistant', content: '', streaming: true },
+        ],
+      });
+
+      screen.getByTestId('thinking-bulb-animation');
+      expect(screen.queryByTestId('thinking-indicator')).toBeNull();
+      expect(screen.queryByTestId('streaming-cursor')).toBeNull();
+      expect(screen.queryByTestId('idle-pen-animation')).toBeNull();
+    });
+
+    it('[WI-2108 AC-2] keeps one indicator owner across idle, thinking, streaming, and done boundaries', () => {
+      jest.useFakeTimers();
+      try {
+        const { rerender, props } = renderChatShell({
+          messages: [
+            { id: 'ai-done', role: 'assistant', content: 'Your turn.' },
+          ],
+        });
+
+        act(() => {
+          jest.advanceTimersByTime(20_000);
+        });
+        screen.getByTestId('idle-pen-animation');
+        expect(screen.queryByTestId('thinking-bulb-animation')).toBeNull();
+        expect(screen.queryByTestId('thinking-indicator')).toBeNull();
+        expect(screen.queryByTestId('streaming-cursor')).toBeNull();
+
+        rerender(
+          <ChatShell
+            {...props}
+            isStreaming
+            messages={[
+              {
+                id: 'ai-stream',
+                role: 'assistant',
+                content: '',
+                streaming: true,
+              },
+            ]}
+          />,
+        );
+        screen.getByTestId('thinking-bulb-animation');
+        expect(screen.queryByTestId('idle-pen-animation')).toBeNull();
+        expect(screen.queryByTestId('thinking-indicator')).toBeNull();
+        expect(screen.queryByTestId('streaming-cursor')).toBeNull();
+
+        rerender(
+          <ChatShell
+            {...props}
+            isStreaming
+            messages={[
+              {
+                id: 'ai-stream',
+                role: 'assistant',
+                content: 'A partial reply',
+                streaming: true,
+              },
+            ]}
+          />,
+        );
+        expect(screen.queryByTestId('thinking-bulb-animation')).toBeNull();
+        screen.getByTestId('streaming-cursor');
+        expect(screen.queryByTestId('idle-pen-animation')).toBeNull();
+        expect(screen.queryByTestId('thinking-indicator')).toBeNull();
+
+        rerender(
+          <ChatShell
+            {...props}
+            isStreaming={false}
+            messages={[
+              {
+                id: 'ai-stream',
+                role: 'assistant',
+                content: 'A complete reply',
+                streaming: false,
+              },
+            ]}
+          />,
+        );
+        expect(screen.queryByTestId('thinking-bulb-animation')).toBeNull();
+        expect(screen.queryByTestId('idle-pen-animation')).toBeNull();
+        expect(screen.queryByTestId('thinking-indicator')).toBeNull();
+        expect(screen.queryByTestId('streaming-cursor')).toBeNull();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('[WI-2108 AC-3] clears the sole waiting indicator when writing is aborted', () => {
+      const messages: ChatMessage[] = [
+        { id: 'ai-abort', role: 'assistant', content: '', streaming: true },
+      ];
+      const { rerender, props } = renderChatShell({
+        isStreaming: true,
+        messages,
+      });
+      screen.getByTestId('thinking-bulb-animation');
+
+      rerender(
+        <ChatShell {...props} isStreaming={false} messages={messages} />,
+      );
+
+      expect(screen.queryByTestId('thinking-bulb-animation')).toBeNull();
+      expect(screen.queryByTestId('thinking-indicator')).toBeNull();
+      expect(screen.queryByTestId('streaming-cursor')).toBeNull();
       expect(screen.queryByTestId('idle-pen-animation')).toBeNull();
     });
   });

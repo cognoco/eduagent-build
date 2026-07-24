@@ -3,13 +3,16 @@ import {
   asc,
   desc,
   eq,
+  exists,
   gt,
   gte,
   isNotNull,
   isNull,
   lt,
+  lte,
   or,
   sql,
+  type SQL,
 } from 'drizzle-orm';
 
 import {
@@ -18,6 +21,7 @@ import {
   curriculumBooks,
   curriculumTopics,
   learningSessions,
+  mentorNotices,
   mentorActivityLedger,
   needsDeepeningTopics,
   parkingLotItems,
@@ -26,6 +30,7 @@ import {
   retentionCards,
   sessionSummaries,
   subjects,
+  supportVisibilityContracts,
   supportership,
   subscription,
   type Database,
@@ -48,8 +53,13 @@ import {
 } from '@eduagent/schemas';
 
 import { markMomentSurfaced } from './activity-ledger';
+import {
+  acceptedVisibilityCondition,
+  findAcceptedContractForSupportee,
+} from './linking-ceremony';
 import { getAssessmentEligibleTopics } from './retention-data';
 import { resolveEffectiveAccessTier } from './subscription';
+import { getLearningDayStart, getProfileTimeZone } from './mentor-notices';
 
 export const PARKED_AGING_WINDOW_DAYS = 7;
 export const DEEPENING_SURFACE_LEAD_DAYS = 2;
@@ -63,6 +73,7 @@ export const LEDGER_PROJECTION_RECENCY_DAYS = 3;
 export const RANKING = {
   BILLING_ALERT: -1,
   UNFINISHED_SESSION: 0,
+  MENTOR_NOTICE: 0.5,
   RETENTION_DUE: 1,
   PROMOTED_AGING: 1.5,
   NEEDS_DEEPENING: 2,
@@ -86,6 +97,7 @@ export const ROUTE_CATALOG = {
   // rows) — distinct from 'session.resume', which reopens the LIVE session
   // chat and is wrong for a "recap is ready" moment on an ended session.
   'session.summary': { params: ['sessionId'], chain: [] },
+  'notice.recheck': { params: ['noticeId', 'subjectId'], chain: [] },
   'subject.hub': { params: ['subjectId'], chain: [] },
   'subject.topic': {
     params: ['subjectId', 'bookId', 'topicId'],
@@ -149,6 +161,8 @@ function basePriority(kind: NowCardKind): number {
       return RANKING.BILLING_ALERT;
     case 'unfinished_session':
       return RANKING.UNFINISHED_SESSION;
+    case 'mentor_notice':
+      return RANKING.MENTOR_NOTICE;
     case 'retention_due':
       return RANKING.RETENTION_DUE;
     case 'needs_deepening':
@@ -298,6 +312,7 @@ export async function buildNowFeed(
   db: Database,
   profileId: string,
   query: NowScope | NowQuery = 'self',
+  options: { mentorNoticeEnabled?: boolean } = {},
 ): Promise<NowResponse> {
   const now = new Date();
   const request = normalizeNowQuery(query);
@@ -308,6 +323,8 @@ export async function buildNowFeed(
     request,
     now,
     target.edgeId,
+    profileId,
+    options.mentorNoticeEnabled === true,
   );
   const sorted =
     request.scope === 'supporter-hub'
@@ -334,6 +351,7 @@ export async function buildNowOverflow(
   db: Database,
   profileId: string,
   query: NowScope | NowQuery = 'self',
+  options: { mentorNoticeEnabled?: boolean } = {},
 ): Promise<NowOverflowResponse> {
   const now = new Date();
   const request = normalizeNowQuery(query);
@@ -344,6 +362,8 @@ export async function buildNowOverflow(
     request,
     now,
     target.edgeId,
+    profileId,
+    options.mentorNoticeEnabled === true,
   );
   if (request.scope === 'supporter-hub') {
     return {
@@ -360,7 +380,12 @@ function normalizeNowQuery(query: NowScope | NowQuery): NowQuery {
 
 // `person`/`supportership` reads here are S4-scoped and were shipped early
 // inside the S0 service; ruled correct, not a tier leak
-// (docs/plans/v2-plan/2026-06-10-s0-backend-primitives.md).
+// (docs/plans/v2-plan/2026-06-10-s0-backend-primitives.md). That ruling is
+// about S0-vs-S4 layering only — it does not cover accepted-visibility
+// gating, which is a separate axis. [WI-2237] added the
+// `supportVisibilityContracts` join below because a client-supplied
+// `personId` on a merely-created (never accepted) supportership previously
+// still returned real Now-feed data.
 async function resolveNowTarget(
   db: Database,
   profileId: string,
@@ -378,12 +403,15 @@ async function resolveNowTarget(
     .select({ edgeId: supportership.id })
     .from(supportership)
     .innerJoin(person, eq(person.id, supportership.supporteePersonId))
+    .innerJoin(
+      supportVisibilityContracts,
+      eq(supportVisibilityContracts.supportershipId, supportership.id),
+    )
     .where(
       and(
         eq(supportership.supporterPersonId, profileId),
         eq(supportership.supporteePersonId, query.personId),
-        isNull(supportership.revokedAt),
-        isNull(person.archivedAt),
+        acceptedVisibilityCondition(),
       ),
     )
     .limit(1);
@@ -396,12 +424,21 @@ async function resolveNowTarget(
   return { personId: query.personId, edgeId };
 }
 
-async function collectCandidatesForRequest(
+/**
+ * @internal - exported for testing only. [WI-2237] Also the seam the
+ * revoke-race regression test calls directly, bypassing `resolveNowTarget`'s
+ * pre-check, to prove the candidate reads below are self-authorizing even
+ * when a caller reaches them without (or with a stale) pre-check result —
+ * the exact intra-call TOCTOU window Codex's review flagged.
+ */
+export async function collectCandidatesForRequest(
   db: Database,
   personId: string,
   request: NowQuery,
   now: Date,
-  edgeId?: string,
+  edgeId: string | undefined,
+  viewerPersonId: string,
+  mentorNoticeEnabled = false,
 ): Promise<NowFeedCandidate[]> {
   if (request.scope === 'supporter-hub') {
     return collectSupporterHubCandidates(db, personId, now);
@@ -414,6 +451,8 @@ async function collectCandidatesForRequest(
     now,
     request.scope === 'self' ? 'self' : 'supporter',
     edgeId,
+    request.scope === 'self' ? undefined : viewerPersonId,
+    mentorNoticeEnabled,
   );
 
   if (request.scope !== 'self') return candidates;
@@ -438,7 +477,10 @@ async function collectCandidatesForRequest(
 
 // `person`/`supportership` reads here are S4-scoped and were shipped early
 // inside the S0 service; ruled correct, not a tier leak
-// (docs/plans/v2-plan/2026-06-10-s0-backend-primitives.md).
+// (docs/plans/v2-plan/2026-06-10-s0-backend-primitives.md). That ruling is
+// about S0-vs-S4 layering only — see the `resolveNowTarget` note above for
+// why the `supportVisibilityContracts` join [WI-2237] is a separate,
+// necessary axis.
 async function collectSupporterHubCandidates(
   db: Database,
   supporterPersonId: string,
@@ -451,11 +493,14 @@ async function collectSupporterHubCandidates(
     })
     .from(supportership)
     .innerJoin(person, eq(person.id, supportership.supporteePersonId))
+    .innerJoin(
+      supportVisibilityContracts,
+      eq(supportVisibilityContracts.supportershipId, supportership.id),
+    )
     .where(
       and(
         eq(supportership.supporterPersonId, supporterPersonId),
-        isNull(supportership.revokedAt),
-        isNull(person.archivedAt),
+        acceptedVisibilityCondition(),
       ),
     )
     .orderBy(asc(supportership.id))
@@ -472,6 +517,7 @@ async function collectSupporterHubCandidates(
         now,
         'supporter',
         edge.edgeId,
+        supporterPersonId,
       ),
     ),
   );
@@ -486,10 +532,26 @@ async function collectNowCandidates(
   now: Date,
   visibility: 'self' | 'supporter' = 'self',
   edgeId?: string,
+  supporterPersonId?: string,
+  mentorNoticeEnabled = false,
 ): Promise<NowFeedCandidate[]> {
+  // [WI-2237] Self-authorizing re-check embedded directly in every
+  // supporter-scoped candidate read below, mirroring
+  // readSupporteeStructuralSubjects's correlated EXISTS
+  // (supporter-structural-mask.ts). resolveNowTarget /
+  // collectSupporterHubCandidates already gate the caller before this
+  // function runs, but that gate and these reads are separate queries — a
+  // revoke/restamp/lapse landing between them previously could still
+  // surface Now-feed data. See acceptedSupporterAccessExists.
+  const accessGuard =
+    visibility === 'supporter' && supporterPersonId
+      ? acceptedSupporterAccessExists(db, supporterPersonId, profileId)
+      : undefined;
+
   const [
     billing,
     unfinished,
+    mentorNotice,
     dueRetention,
     needsDeepening,
     challengeReady,
@@ -498,14 +560,23 @@ async function collectNowCandidates(
     topicMastered,
     recapReady,
     snapshotReady,
+    noticeLockedIn,
   ] = await Promise.all([
     visibility === 'self' && scope === 'self'
       ? collectBillingAlertCandidates(db, profileId, now)
       : Promise.resolve([]),
-    collectUnfinishedSessionCandidates(db, profileId, scope),
-    collectRetentionDueCandidates(db, profileId, scope, now),
-    collectNeedsDeepeningCandidates(db, profileId, scope, now),
-    collectChallengeReadyCandidates(db, profileId, scope),
+    collectUnfinishedSessionCandidates(db, profileId, scope, accessGuard),
+    mentorNoticeEnabled && visibility === 'self' && scope === 'self'
+      ? collectMentorNoticeCandidates(db, profileId, scope, now)
+      : Promise.resolve([]),
+    collectRetentionDueCandidates(db, profileId, scope, now, accessGuard),
+    collectNeedsDeepeningCandidates(db, profileId, scope, now, accessGuard),
+    collectChallengeReadyCandidates(
+      db,
+      profileId,
+      scope,
+      visibility === 'supporter' ? supporterPersonId : undefined,
+    ),
     visibility === 'self'
       ? collectParkedItemCandidates(db, profileId, scope)
       : Promise.resolve([]),
@@ -521,11 +592,15 @@ async function collectNowCandidates(
     visibility === 'self'
       ? collectSnapshotReadyCandidates(db, profileId, scope, now)
       : Promise.resolve([]),
+    mentorNoticeEnabled && visibility === 'self' && scope === 'self'
+      ? collectNoticeLockedInCandidates(db, profileId, scope, now)
+      : Promise.resolve([]),
   ]);
 
   return [
     ...billing,
     ...unfinished,
+    ...mentorNotice,
     ...dueRetention,
     ...needsDeepening,
     ...challengeReady,
@@ -534,10 +609,119 @@ async function collectNowCandidates(
     ...topicMastered,
     ...recapReady,
     ...snapshotReady,
+    ...noticeLockedIn,
   ].map((candidate) => ({
     ...candidate,
     ...(scope === 'person' ? { personId: profileId } : {}),
     ...(edgeId ? { edgeId } : {}),
+  }));
+}
+
+async function collectNoticeLockedInCandidates(
+  db: Database,
+  profileId: string,
+  scope: NowScope,
+  now: Date,
+): Promise<NowFeedCandidate[]> {
+  const cutoff = new Date(
+    now.getTime() - LEDGER_PROJECTION_RECENCY_DAYS * DAY_MS,
+  );
+  const rows = await db
+    .select({
+      id: mentorNotices.id,
+      subjectId: mentorNotices.subjectId,
+      subjectName: subjects.name,
+      concept: mentorNotices.concept,
+      resolvedAt: mentorNotices.resolvedAt,
+    })
+    .from(mentorNotices)
+    .innerJoin(subjects, eq(subjects.id, mentorNotices.subjectId))
+    .where(
+      and(
+        eq(mentorNotices.profileId, profileId),
+        eq(subjects.profileId, profileId),
+        eq(mentorNotices.status, 'locked_in'),
+        isNotNull(mentorNotices.resolvedAt),
+        gt(mentorNotices.resolvedAt, cutoff),
+      ),
+    )
+    .orderBy(desc(mentorNotices.resolvedAt), asc(mentorNotices.id))
+    .limit(10);
+
+  return rows.flatMap((row) =>
+    row.resolvedAt
+      ? [
+          {
+            id: `notice-locked-in:${row.id}`,
+            kind: 'ledger_moment' as const,
+            createdAt: row.resolvedAt,
+            sortAt: row.resolvedAt,
+            templateKey: 'now.ledger_moment.notice_locked_in',
+            params: {
+              ledgerKind: 'notice_locked_in',
+              noticeId: row.id,
+              subjectId: row.subjectId,
+              subjectName: row.subjectName,
+              concept: row.concept,
+            },
+            deepLink: resolveDeepLink('subject.hub', {
+              subjectId: row.subjectId,
+            }),
+            scope,
+          },
+        ]
+      : [],
+  );
+}
+
+async function collectMentorNoticeCandidates(
+  db: Database,
+  profileId: string,
+  scope: NowScope,
+  now: Date,
+): Promise<NowFeedCandidate[]> {
+  const timezone = await getProfileTimeZone(db, profileId);
+  const learningDayStart = getLearningDayStart(now, timezone);
+  const rows = await db
+    .select({
+      id: mentorNotices.id,
+      subjectId: mentorNotices.subjectId,
+      subjectName: subjects.name,
+      concept: mentorNotices.concept,
+      createdAt: mentorNotices.createdAt,
+    })
+    .from(mentorNotices)
+    .innerJoin(subjects, eq(subjects.id, mentorNotices.subjectId))
+    .where(
+      and(
+        eq(mentorNotices.profileId, profileId),
+        eq(subjects.profileId, profileId),
+        eq(mentorNotices.status, 'open'),
+        or(
+          isNull(mentorNotices.lastDeferredAt),
+          lt(mentorNotices.lastDeferredAt, learningDayStart),
+        ),
+      ),
+    )
+    .orderBy(asc(mentorNotices.createdAt), asc(mentorNotices.id))
+    .limit(1);
+
+  return rows.map((row) => ({
+    id: row.id,
+    kind: 'mentor_notice' as const,
+    createdAt: row.createdAt,
+    templateKey: 'now.mentor_notice.default',
+    params: {
+      noticeId: row.id,
+      subjectId: row.subjectId,
+      subjectName: row.subjectName,
+      concept: row.concept,
+    },
+    deepLink: resolveDeepLink('notice.recheck', {
+      noticeId: row.id,
+      subjectId: row.subjectId,
+    }),
+    scope,
   }));
 }
 
@@ -599,14 +783,45 @@ async function collectBillingAlertCandidates(
   });
 }
 
+// [WI-2237] The correlated EXISTS embedded by every supporter-scoped
+// candidate read in this file — reuses `acceptedVisibilityCondition()`
+// (linking-ceremony.ts), the same predicate `resolveNowTarget` and
+// `readSupporteeStructuralSubjects` (supporter-structural-mask.ts) use, so a
+// revoke/restamp/lapse is honored by the read itself rather than trusting an
+// earlier, separate pre-check query.
+function acceptedSupporterAccessExists(
+  db: Database,
+  supporterPersonId: string,
+  supporteePersonId: string,
+): SQL {
+  return exists(
+    db
+      .select({ _: sql`1` })
+      .from(supportership)
+      .innerJoin(
+        supportVisibilityContracts,
+        eq(supportVisibilityContracts.supportershipId, supportership.id),
+      )
+      .innerJoin(person, eq(person.id, supportership.supporteePersonId))
+      .where(
+        and(
+          eq(supportership.supporterPersonId, supporterPersonId),
+          eq(supportership.supporteePersonId, supporteePersonId),
+          acceptedVisibilityCondition(),
+        ),
+      ),
+  );
+}
+
 async function collectUnfinishedSessionCandidates(
   db: Database,
   profileId: string,
   scope: NowScope,
+  accessGuard?: SQL,
 ): Promise<NowFeedCandidate[]> {
   const repo = createScopedRepository(db, profileId);
   const rows = await repo.sessions.findMany(
-    eq(learningSessions.status, 'active'),
+    and(eq(learningSessions.status, 'active'), accessGuard),
     1,
     desc(learningSessions.lastActivityAt),
   );
@@ -632,6 +847,7 @@ async function collectRetentionDueCandidates(
   profileId: string,
   scope: NowScope,
   now: Date,
+  accessGuard?: SQL,
 ): Promise<NowFeedCandidate[]> {
   const rows = await db
     .select({
@@ -655,14 +871,15 @@ async function collectRetentionDueCandidates(
         eq(retentionCards.profileId, profileId),
         eq(subjects.profileId, profileId),
         isNotNull(retentionCards.nextReviewAt),
-        lt(retentionCards.nextReviewAt, now),
+        lte(retentionCards.nextReviewAt, now),
+        accessGuard,
       ),
     )
     .orderBy(asc(retentionCards.nextReviewAt), asc(retentionCards.id))
     .limit(20);
 
   return rows
-    .filter((row) => row.nextReviewAt)
+    .filter((row) => isRetentionDueAt(row.nextReviewAt, now))
     .map((row) => ({
       id: row.id,
       kind: 'retention_due',
@@ -683,11 +900,19 @@ async function collectRetentionDueCandidates(
     }));
 }
 
+export function isRetentionDueAt(
+  nextReviewAt: Date | null,
+  now: Date,
+): boolean {
+  return nextReviewAt !== null && nextReviewAt.getTime() <= now.getTime();
+}
+
 async function collectNeedsDeepeningCandidates(
   db: Database,
   profileId: string,
   scope: NowScope,
   now: Date,
+  accessGuard?: SQL,
 ): Promise<NowFeedCandidate[]> {
   const rows = await db
     .select({
@@ -717,6 +942,7 @@ async function collectNeedsDeepeningCandidates(
           isNull(needsDeepeningTopics.pendingExpiresAt),
           gt(needsDeepeningTopics.pendingExpiresAt, now),
         ),
+        accessGuard,
       ),
     )
     .orderBy(
@@ -752,12 +978,65 @@ async function collectNeedsDeepeningCandidates(
   }));
 }
 
-async function collectChallengeReadyCandidates(
+// [WI-2237] Test-only seam. Fires once, synchronously, at the exact point
+// between the (now-removed) standalone accepted-visibility pre-check and the
+// challenge-ready authorization+eligibility transaction below — so the
+// revoke-race regression test can commit a revoke into the precise
+// between-reads TOCTOU window and prove the TRANSACTION, not an earlier
+// separate pre-check, is what closes it. Null (a no-op) in production; only
+// now.integration.test.ts ever sets it. See __setChallengeReadyRaceHook.
+let challengeReadyRaceHook: (() => Promise<void>) | null = null;
+
+/**
+ * @internal test-only. Install (or clear with `null`) the seam that fires
+ * immediately before {@link collectChallengeReadyCandidates} opens its
+ * accepted-visibility + eligibility transaction. Used exclusively by the
+ * WI-2237 revoke-race regression test; never set in production.
+ */
+export function __setChallengeReadyRaceHook(
+  hook: (() => Promise<void>) | null,
+): void {
+  challengeReadyRaceHook = hook;
+}
+
+/**
+ * @internal exported for testing only. [WI-2237] The supporter-scoped path
+ * asserts accepted visibility AND performs every one of
+ * getAssessmentEligibleTopics's reads (learningSessions, findOwnedCurriculumTopics,
+ * assessments) inside ONE `repeatable read` transaction. A revoke/restamp/lapse
+ * committed mid-flight is therefore either already visible to the
+ * in-transaction authorization read (which then throws ForbiddenError, denying
+ * the whole read) or invisible to the entire atomic snapshot — closing the
+ * multi-read TOCTOU that a separate, earlier pre-check left open. The
+ * self-scope path (no supporterPersonId) is a single owner-scoped read and
+ * needs no transaction.
+ */
+export async function collectChallengeReadyCandidates(
   db: Database,
   profileId: string,
   scope: NowScope,
+  supporterPersonId?: string,
 ): Promise<NowFeedCandidate[]> {
-  const rows = await getAssessmentEligibleTopics(db, profileId);
+  let rows: Awaited<ReturnType<typeof getAssessmentEligibleTopics>>;
+  if (supporterPersonId) {
+    if (challengeReadyRaceHook) await challengeReadyRaceHook();
+    rows = await db.transaction(
+      async (tx) => {
+        const txDb = tx as unknown as Database;
+        // Authorization and the eligibility reads share one snapshot: the
+        // accepted-visibility assertion is never checked against one committed
+        // state and then served data from another.
+        await findAcceptedContractForSupportee(txDb, {
+          supporterPersonId,
+          supporteePersonId: profileId,
+        });
+        return getAssessmentEligibleTopics(txDb, profileId);
+      },
+      { isolationLevel: 'repeatable read' },
+    );
+  } else {
+    rows = await getAssessmentEligibleTopics(db, profileId);
+  }
 
   return rows.slice(0, 20).map((row) => ({
     id: row.topicId,

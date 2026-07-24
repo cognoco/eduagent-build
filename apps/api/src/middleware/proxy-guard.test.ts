@@ -3,6 +3,23 @@ import { assertNotProxyMode } from './proxy-guard';
 import { bookmarkRoutes } from '../routes/bookmarks';
 import { noteRoutes } from '../routes/notes';
 
+// [WI-2398] assertNotProxyMode now also calls assertCanWriteProfile, which
+// calls verifyPersonOwnershipV2 — a raw db.select() membership query this
+// file's bare `Hono()` test apps (no @eduagent/database mock at all) cannot
+// satisfy. Every "allow" scenario in this file is a caller-self write (the
+// header profile equals the authenticated caller's own person id, set
+// explicitly in each app's middleware below); the cross-account write attack
+// this guard exists to close is covered by the real-DB break test in
+// tests/integration/wi2398-write-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's mock-free environment.
+jest.mock('../services/identity-v2/ownership-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/ownership-v2'),
+  verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+}));
+
+const CALLER_PERSON_ID = 'test-caller-person-id';
+
 function createApp(): InstanceType<typeof Hono> {
   const app = new Hono();
   // [CR-PROXY-GUARD-FAIL-CLOSED] profileScopeMiddleware always sets
@@ -17,10 +34,17 @@ function createApp(): InstanceType<typeof Hono> {
       isOwner: true,
       resolvedVia: 'explicit-header',
     });
+    // [WI-2398] Caller-self identity — assertCanWriteProfile requires
+    // account + callerPersonId; profileId equal to callerPersonId mirrors
+    // the legitimate owner-acting-as-self flow (verifyPersonOwnershipV2's
+    // self branch is mocked to succeed above regardless of DB).
+    c.set('account' as never, { id: 'test-account-id' });
+    c.set('callerPersonId' as never, CALLER_PERSON_ID);
+    c.set('profileId' as never, CALLER_PERSON_ID);
     await next();
   });
-  app.post('/test', (c) => {
-    assertNotProxyMode(c);
+  app.post('/test', async (c) => {
+    await assertNotProxyMode(c);
     return c.json({ ok: true });
   });
   return app;
@@ -69,10 +93,17 @@ function createAppWithProfileMeta(meta: {
   const app = new Hono();
   app.use('*', async (c, next) => {
     c.set('profileMeta' as never, meta);
+    // [WI-2398] Caller-self identity — see createApp's comment above. Only
+    // exercised on the paths that reach assertCanWriteProfile (isOwner:true
+    // + resolvedVia:'explicit-header' + no X-Proxy-Mode:true); the BREAK
+    // tests below reject earlier and never touch these.
+    c.set('account' as never, { id: 'test-account-id' });
+    c.set('callerPersonId' as never, CALLER_PERSON_ID);
+    c.set('profileId' as never, CALLER_PERSON_ID);
     await next();
   });
-  app.post('/test', (c) => {
-    assertNotProxyMode(c);
+  app.post('/test', async (c) => {
+    await assertNotProxyMode(c);
     return c.json({ ok: true });
   });
   return app;
@@ -147,8 +178,8 @@ describe('assertNotProxyMode — server-derived proxy mode [BUG-718]', () => {
 describe('assertNotProxyMode — fail-closed when profileMeta is absent [BUG-975]', () => {
   function createAppNoMeta() {
     const app = new Hono();
-    app.post('/test', (c) => {
-      assertNotProxyMode(c);
+    app.post('/test', async (c) => {
+      await assertNotProxyMode(c);
       return c.json({ ok: true });
     });
     return app;

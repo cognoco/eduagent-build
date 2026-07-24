@@ -4,6 +4,7 @@ import {
   fireEvent,
   waitFor,
   act,
+  renderHook,
 } from '@testing-library/react-native';
 import React from 'react';
 import { Alert } from 'react-native';
@@ -13,12 +14,19 @@ import {
   __resetMentorBornCeremonyForTests,
   getMentorBornCeremonySnapshot,
 } from '../lib/mentor-born-ceremony';
-import { mentorBirthSeenKey } from '../lib/secure-store-keys';
+import {
+  MENTOR_BORN_PENDING_KEY,
+  mentorBirthSeenKey,
+} from '../lib/secure-store-keys';
 
 import {
   resolveNavigationContract,
   type NavigationProfile,
 } from '../lib/navigation-contract';
+import { AppContextProvider } from '../lib/app-context';
+import { FEATURE_FLAGS } from '../lib/feature-flags';
+import { ProfileContext, type ProfileContextValue } from '../lib/profile';
+import { useNavigationContract as usePreviewNavigationContract } from '../hooks/use-navigation-contract';
 
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
@@ -88,11 +96,18 @@ jest.mock('../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'reac
 
 // BUG-301: Made per-test overridable so isParentAddingChild can be tested.
 const mockUseProfile = jest.fn();
+// The screen suite keeps its narrow hook stubs. WI-2123 flips this only after
+// the creation surface unmounts so its shell leg traverses the real
+// ProfileContext -> AppContextProvider -> navigation-hook chain.
+let mockUseProductionShellHooks = false;
 jest.mock(
   '../lib/profile' /* gc1-allow: pattern-a conversion; useProfile depends on ProfileContext; pattern-a spy controls active-profile shape per-test */,
   () => ({
     ...jest.requireActual('../lib/profile'),
-    useProfile: () => mockUseProfile(),
+    useProfile: () =>
+      mockUseProductionShellHooks
+        ? jest.requireActual('../lib/profile').useProfile()
+        : mockUseProfile(),
   }),
 );
 
@@ -102,7 +117,12 @@ let mockActiveProfileRole: 'owner' | 'child' | 'impersonated-child' | null =
 jest.mock(
   '../hooks/use-active-profile-role', // gc1-allow: hooks depend on ProfileProvider + useParentProxy which require SecureStore; mocking the final hook is cleaner than reconstructing the full context chain
   () => ({
-    useActiveProfileRole: () => mockActiveProfileRole,
+    useActiveProfileRole: () =>
+      mockUseProductionShellHooks
+        ? jest
+            .requireActual('../hooks/use-active-profile-role')
+            .useActiveProfileRole()
+        : mockActiveProfileRole,
   }),
 );
 
@@ -111,18 +131,26 @@ let mockIsParentProxy = false;
 jest.mock(
   '../hooks/use-navigation-contract' /* gc1-allow: pins isParentProxy for proxy access-gate tests */,
   () => ({
-    useNavigationContract: () => ({
-      isParentProxy: mockIsParentProxy,
-      gates: {},
-    }),
+    useNavigationContract: () =>
+      mockUseProductionShellHooks
+        ? jest
+            .requireActual('../hooks/use-navigation-contract')
+            .useNavigationContract()
+        : {
+            isParentProxy: mockIsParentProxy,
+            gates: {},
+          },
   }),
 );
 
 // Audience carried from the pre-auth chooser. Default 'learner' = clean solo
 // setup (matches the bulk of these first-profile tests). Set to 'parent' to
-// exercise the family + add-child redirect path. Pattern A — real module with
-// the two readers overridden so each test controls the carried value.
-let mockAudience: 'learner' | 'parent' | null = 'learner';
+// exercise the family + add-child redirect path. Set to 'supporter' (WI-2225,
+// non-authorizing pre-auth intent) to verify it falls through the same
+// learner-shaped path as 'parent' does NOT — see "audience-driven
+// first-profile setup" below. Pattern A — real module with the two readers
+// overridden so each test controls the carried value.
+let mockAudience: 'learner' | 'parent' | 'supporter' | null = 'learner';
 jest.mock(
   '../lib/pre-auth-audience' /* gc1-allow: pattern-a conversion; pre-auth-audience reads SecureStore which is a native storage boundary */,
   () => ({
@@ -205,6 +233,7 @@ describe('CreateProfileScreen', () => {
     datePickerOnChange = null;
     mockCanGoBack.mockReturnValue(true);
     mockIsParentProxy = false;
+    mockUseProductionShellHooks = false;
     mockAudience = 'learner';
     // Default: non-parent flow (first-time user / child self-registering)
     mockUseProfile.mockReturnValue({
@@ -418,7 +447,7 @@ describe('CreateProfileScreen', () => {
     }
   });
 
-  it('calls POST and navigates back on successful submit (adult, no consent needed)', async () => {
+  it('[WI-2105 AC-1] durably queues the ceremony after successful first-profile creation', async () => {
     const newProfile = makeProfileResponse({
       id: PROFILE_IDS.new,
       displayName: 'Sam',
@@ -459,6 +488,14 @@ describe('CreateProfileScreen', () => {
       },
       requestCount: 1,
     });
+    expect(
+      JSON.parse(
+        expoSecureStoreMock.__store.get(MENTOR_BORN_PENDING_KEY) ?? 'null',
+      ),
+    ).toMatchObject({
+      profileId: PROFILE_IDS.new,
+      reason: 'first-profile-created',
+    });
   });
 
   it('optimistically writes the new profile into scoped profiles cache', async () => {
@@ -497,8 +534,10 @@ describe('CreateProfileScreen', () => {
   // longer pushes /consent itself (that raced with the layout ConsentPendingGate
   // on web). It now switches to the pending child and lets the gate own the
   // single consent surface. This test asserts the deterministic behavior:
-  // switchProfile fires, and create-profile does NOT also navigate to /consent.
-  it('switches to the pending child and does NOT push /consent (gate owns the surface) for a child under 16', async () => {
+  // create-profile dismisses before switchProfile fires, and does NOT also
+  // navigate to /consent. Dismissing first is required on the native stack so
+  // the modal cannot remain above the switch-induced layout gate.
+  it('dismisses before switching to the pending child without pushing /consent for a child under 16', async () => {
     const newProfile = makeProfileResponse({
       id: PROFILE_IDS.child,
       displayName: 'Kid',
@@ -538,9 +577,12 @@ describe('CreateProfileScreen', () => {
     expect(mockReplace).not.toHaveBeenCalledWith(
       expect.objectContaining({ pathname: '/consent' }),
     );
-    // And must NOT close the modal (handleClose) on the consent path — the
-    // switch-induced gate is the destination, not home/back.
-    expect(mockBack).not.toHaveBeenCalled();
+    // Close the native modal before the profile switch remounts navigation;
+    // the layout gate then becomes the one visible consent surface.
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockBack.mock.invocationCallOrder[0]).toBeLessThan(
+      mockSwitchProfile.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
   });
 
   it('auto-detects persona from birthdate (no picker shown)', async () => {
@@ -1232,6 +1274,11 @@ describe('CreateProfileScreen', () => {
   });
 
   describe('parent adding child', () => {
+    const previewV1NavigationFlags = {
+      MODE_NAV_V0_ENABLED: true,
+      MODE_NAV_V1_ENABLED: true,
+    } as const;
+
     const parentProfile: NavigationProfile = {
       id: PROFILE_IDS.parent,
       accountId: TEST_ACCOUNT_ID,
@@ -1462,7 +1509,229 @@ describe('CreateProfileScreen', () => {
       }
     });
 
-    it('[WI-1611] keeps the owner active and updates owner family context when adding another child', async () => {
+    it('[WI-2123 AC-1/2/3] restores the preview family shell from the refreshed profiles cache after first-child creation and relaunch', async () => {
+      const patchedOwner: NavigationProfile = {
+        ...parentProfile,
+        defaultAppContext: 'family',
+        hasFamilyLinks: true,
+      };
+      (useAuth as jest.Mock).mockReturnValue({
+        isLoaded: true,
+        isSignedIn: true,
+        userId: 'clerk-user-test',
+      });
+      queryClient.setQueryDefaults(['profiles', 'clerk-user-test'], {
+        gcTime: Infinity,
+      });
+      queryClient.setQueryData(
+        ['profiles', 'clerk-user-test'],
+        [parentProfile],
+      );
+      let nativeAlertVisible = false;
+      let dismissNativeAlert: (() => void) | null = null;
+      (Alert.alert as jest.Mock).mockImplementationOnce(() => {
+        nativeAlertVisible = true;
+        // Model the user closing the native modal as a separate action; merely
+        // presenting Alert.alert is not evidence that dismissal occurred.
+        dismissNativeAlert = () => {
+          nativeAlertVisible = false;
+        };
+      });
+      mockFetch
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ profile: childProfile }), {
+            status: 200,
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ profile: patchedOwner }), {
+            status: 200,
+          }),
+        );
+
+      const creation = render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Lily');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(() => {
+        datePickerOnChange?.({ type: 'set' }, birthDateAtMinimumAge());
+      });
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+      });
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith(
+          'Profile created',
+          "Lily's profile is ready. You can open it from Family mode.",
+          undefined,
+          undefined,
+        );
+      });
+      expect(nativeAlertVisible).toBe(true);
+      expect(dismissNativeAlert).not.toBeNull();
+
+      const refreshedProfiles = queryClient.getQueryData<NavigationProfile[]>([
+        'profiles',
+        'clerk-user-test',
+      ]);
+      expect(refreshedProfiles).toEqual([
+        expect.objectContaining({
+          id: PROFILE_IDS.parent,
+          defaultAppContext: 'family',
+          hasFamilyLinks: true,
+          isOwner: true,
+        }),
+        expect.objectContaining({
+          id: PROFILE_IDS.childNew,
+          hasFamilyLinks: true,
+          isOwner: false,
+        }),
+      ]);
+
+      const makePreviewShellWrapper = (
+        client: QueryClient,
+        profiles: NavigationProfile[],
+      ) => {
+        const profileValue: ProfileContextValue = {
+          profiles,
+          activeProfile: profiles[0] ?? null,
+          isExplicitProxyMode: false,
+          switchProfile: async () => ({ success: true }),
+          isLoading: false,
+          profileLoadError: null,
+          profileWasRemoved: false,
+          acknowledgeProfileRemoval: () => undefined,
+        };
+        return function PreviewShellWrapper({
+          children,
+        }: {
+          children: React.ReactNode;
+        }) {
+          return (
+            <QueryClientProvider client={client}>
+              <ProfileContext.Provider value={profileValue}>
+                <AppContextProvider>{children}</AppContextProvider>
+              </ProfileContext.Provider>
+            </QueryClientProvider>
+          );
+        };
+      };
+
+      const mutableFlags = FEATURE_FLAGS as unknown as {
+        MODE_NAV_V0_ENABLED: boolean;
+        MODE_NAV_V1_ENABLED: boolean;
+        MODE_NAV_V2_ENABLED: boolean;
+      };
+      const originalFlags = {
+        v0: mutableFlags.MODE_NAV_V0_ENABLED,
+        v1: mutableFlags.MODE_NAV_V1_ENABLED,
+        v2: mutableFlags.MODE_NAV_V2_ENABLED,
+      };
+      let unmountPostDismissalShell: (() => void) | undefined;
+      let unmountColdRelaunchShell: (() => void) | undefined;
+      const coldRelaunchClient = new QueryClient({
+        defaultOptions: { queries: { retry: false, gcTime: 0 } },
+      });
+
+      try {
+        act(() => {
+          dismissNativeAlert?.();
+        });
+        expect(nativeAlertVisible).toBe(false);
+        creation.unmount();
+
+        mutableFlags.MODE_NAV_V0_ENABLED = true;
+        mutableFlags.MODE_NAV_V1_ENABLED = true;
+        mutableFlags.MODE_NAV_V2_ENABLED = false;
+        mockUseProductionShellHooks = true;
+        queryClient.setQueryData(['subscription-status', PROFILE_IDS.parent], {
+          tier: 'family',
+          effectiveAccessTier: 'family',
+          billingAccess: null,
+        });
+
+        const postDismissalShell = renderHook(
+          () => usePreviewNavigationContract(),
+          {
+            wrapper: makePreviewShellWrapper(
+              queryClient,
+              refreshedProfiles ?? [],
+            ),
+          },
+        );
+        unmountPostDismissalShell = postDismissalShell.unmount;
+        await waitFor(() => {
+          expect(postDismissalShell.result.current.home.screen).toBe(
+            'FamilyHome',
+          );
+        });
+        expect(postDismissalShell.result.current.isFamilyCapable).toBe(true);
+        expect(postDismissalShell.result.current.effectiveAppContext).toBe(
+          'family',
+        );
+        expect(refreshedProfiles?.[0]?.id).toBe(PROFILE_IDS.parent);
+        expect(
+          postDismissalShell.result.current.canEnter('child/[profileId]', {
+            profileId: PROFILE_IDS.childNew,
+          }),
+        ).toBe(true);
+        postDismissalShell.unmount();
+        unmountPostDismissalShell = undefined;
+
+        const coldServerResponse: { profiles: NavigationProfile[] } = {
+          profiles: [
+            {
+              ...parentProfile,
+              defaultAppContext: 'family',
+              hasFamilyLinks: true,
+            },
+            { ...childProfile },
+          ],
+        };
+        coldRelaunchClient.setQueryData(
+          ['subscription-status', PROFILE_IDS.parent],
+          {
+            tier: 'family',
+            effectiveAccessTier: 'family',
+            billingAccess: null,
+          },
+        );
+        const mutationsBeforeRelaunch = mockFetch.mock.calls.length;
+        const coldRelaunchShell = renderHook(
+          () => usePreviewNavigationContract(),
+          {
+            wrapper: makePreviewShellWrapper(
+              coldRelaunchClient,
+              coldServerResponse.profiles,
+            ),
+          },
+        );
+        unmountColdRelaunchShell = coldRelaunchShell.unmount;
+        await waitFor(() => {
+          expect(coldRelaunchShell.result.current.home.screen).toBe(
+            'FamilyHome',
+          );
+        });
+        expect(
+          coldRelaunchShell.result.current.canEnter('child/[profileId]', {
+            profileId: PROFILE_IDS.childNew,
+          }),
+        ).toBe(true);
+        expect(mockFetch).toHaveBeenCalledTimes(mutationsBeforeRelaunch);
+      } finally {
+        unmountPostDismissalShell?.();
+        unmountColdRelaunchShell?.();
+        coldRelaunchClient.clear();
+        mockUseProductionShellHooks = false;
+        mutableFlags.MODE_NAV_V0_ENABLED = originalFlags.v0;
+        mutableFlags.MODE_NAV_V1_ENABLED = originalFlags.v1;
+        mutableFlags.MODE_NAV_V2_ENABLED = originalFlags.v2;
+      }
+    });
+
+    it('[WI-2123 AC-4 / WI-1611] keeps the family shell when the owner adds a second child', async () => {
       const existingChild: NavigationProfile = {
         id: PROFILE_IDS.childExisting,
         accountId: TEST_ACCOUNT_ID,
@@ -1497,6 +1766,18 @@ describe('CreateProfileScreen', () => {
         activeProfile: familyOwner,
         profiles: [familyOwner, existingChild],
       });
+      (useAuth as jest.Mock).mockReturnValue({
+        isLoaded: true,
+        isSignedIn: true,
+        userId: 'clerk-user-test',
+      });
+      queryClient.setQueryDefaults(['profiles', 'clerk-user-test'], {
+        gcTime: Infinity,
+      });
+      queryClient.setQueryData(
+        ['profiles', 'clerk-user-test'],
+        [familyOwner, existingChild],
+      );
       mockFetch
         .mockResolvedValueOnce(
           new Response(JSON.stringify({ profile: childProfile }), {
@@ -1528,6 +1809,50 @@ describe('CreateProfileScreen', () => {
       );
       expect(mockSwitchProfile).not.toHaveBeenCalled();
       expect(mockSwitchProfile).not.toHaveBeenCalledWith(PROFILE_IDS.childNew);
+
+      const refreshedProfiles = queryClient.getQueryData<NavigationProfile[]>([
+        'profiles',
+        'clerk-user-test',
+      ]);
+      expect(refreshedProfiles).toEqual([
+        expect.objectContaining({
+          id: PROFILE_IDS.parent,
+          defaultAppContext: 'family',
+          hasFamilyLinks: true,
+          isOwner: true,
+        }),
+        existingChild,
+        expect.objectContaining({
+          id: PROFILE_IDS.childNew,
+          hasFamilyLinks: true,
+          isOwner: false,
+        }),
+      ]);
+      const contract = resolveNavigationContract({
+        activeProfile: refreshedProfiles?.[0] ?? null,
+        appContext: 'family',
+        flags: previewV1NavigationFlags,
+        isParentProxy: false,
+        profiles: refreshedProfiles ?? [],
+        role: 'owner',
+        subscription: {
+          status: 'ready',
+          tier: 'family',
+          effectiveAccessTier: 'family',
+          billingAccess: null,
+        },
+      });
+      expect(contract.home.screen).toBe('FamilyHome');
+      expect(
+        contract.canEnter('child/[profileId]', {
+          profileId: PROFILE_IDS.childExisting,
+        }),
+      ).toBe(true);
+      expect(
+        contract.canEnter('child/[profileId]', {
+          profileId: PROFILE_IDS.childNew,
+        }),
+      ).toBe(true);
     });
 
     it('[WI-1611] preserves child creation and shows a family-mode recovery action when owner context PATCH fails', async () => {
@@ -2026,6 +2351,40 @@ describe('CreateProfileScreen', () => {
           reason: 'first-profile-created',
         },
         requestCount: 1,
+      });
+    });
+
+    // [WI-2225] 'supporter' is a non-authorizing pre-auth intent — it must
+    // NOT get the 'parent' family-context/add-child treatment. A zero-edge
+    // supporter's first profile is created exactly like a zero-edge adult
+    // learner's: no family-context PATCH, no add-child redirect, no person
+    // scope granted. This is the client-side half of the WI's no-leak
+    // guarantee (the server-side Support-Hub zero-edge routing is WI-2237's).
+    it('supporter audience (adult): no PATCH, no add-child redirect, remains learner-shaped', async () => {
+      mockAudience = 'supporter';
+      mockFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify({ profile: adultOwner }), { status: 200 }),
+      );
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Sam');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(() => {
+        datePickerOnChange?.({ type: 'set' }, new Date(2000, 5, 15));
+      });
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(mockSwitchProfile).toHaveBeenCalledWith(PROFILE_IDS.adult);
+      });
+      // Single POST only — no family PATCH (no person scope, no family
+      // context granted from a bare supporter intent).
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      // handleClose → back (canGoBack true); NOT the add-child redirect.
+      expect(mockBack).toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalledWith({
+        pathname: '/create-profile',
+        params: { for: 'child' },
       });
     });
 

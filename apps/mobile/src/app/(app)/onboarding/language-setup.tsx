@@ -17,7 +17,13 @@ import { useConfigureLanguageSubject } from '../../../hooks/use-subjects';
 import { useStartFirstCurriculumSession } from '../../../hooks/use-sessions';
 import { formatApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
-import { goBackOrReplace } from '../../../lib/navigation';
+import {
+  goBackOrReplace,
+  homeHrefForReturnTo,
+  isSessionForwardableReturnTo,
+  SETTINGS_RETURN_TO,
+  SUBJECTS_RETURN_TO,
+} from '../../../lib/navigation';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 
 const NATIVE_LANGUAGE_OPTIONS = [
@@ -133,11 +139,11 @@ export default function LanguageSetup() {
     // BUG-692-FOLLOWUP: Mark the mutation as cancelled so the post-await
     // router.replace in handleContinue does not fire after back-navigation.
     cancelledRef.current = true;
-    if (returnTo === 'settings') {
+    if (returnTo === SETTINGS_RETURN_TO) {
       goBackOrReplace(router, '/(app)/more' as Href);
       return;
     }
-    goBackOrReplace(router, '/(app)/home' as Href);
+    goBackOrReplace(router, homeHrefForReturnTo(returnTo));
   }, [returnTo, router]);
 
   const handleContinue = async () => {
@@ -161,7 +167,7 @@ export default function LanguageSetup() {
       // don't navigate to session from a screen the user has already left.
       if (cancelledRef.current) return;
       // ACCOUNT-29: Settings re-entry saves and routes back to More.
-      if (returnTo === 'settings') {
+      if (returnTo === SETTINGS_RETURN_TO) {
         goBackOrReplace(router, '/(app)/more' as Href);
         return;
       }
@@ -178,6 +184,7 @@ export default function LanguageSetup() {
           sessionId: result.session.id,
           topicId: result.session.topicId ?? undefined,
           subjectName: subjectName ?? languageName ?? '',
+          ...(isSessionForwardableReturnTo(returnTo) ? { returnTo } : {}),
         },
       } as Href);
     } catch (err: unknown) {
@@ -187,6 +194,11 @@ export default function LanguageSetup() {
     }
   };
 
+  const guardActionLabel =
+    returnTo === SETTINGS_RETURN_TO || returnTo === SUBJECTS_RETURN_TO
+      ? t('common.goBack')
+      : t('common.goHome');
+
   if (!subjectId) {
     return (
       <View className="flex-1 bg-background items-center justify-center px-5">
@@ -194,14 +206,14 @@ export default function LanguageSetup() {
           {t('onboarding.languageSetup.noSubjectSelected')}
         </Text>
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          onPress={handleBack}
           className="bg-primary rounded-button px-6 py-3 items-center"
           accessibilityRole="button"
-          accessibilityLabel={t('common.goHome')}
+          accessibilityLabel={guardActionLabel}
           testID="language-setup-guard-home"
         >
           <Text className="text-text-inverse text-body font-semibold">
-            {t('common.goHome')}
+            {guardActionLabel}
           </Text>
         </Pressable>
       </View>

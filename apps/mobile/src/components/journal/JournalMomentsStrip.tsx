@@ -8,7 +8,12 @@ import type { NowCard } from '@eduagent/schemas';
 import { ErrorFallback, TimeoutLoader } from '../common';
 import { BookPageFlipAnimation } from '../common/BookPageFlipAnimation';
 import { useNowFeed } from '../../hooks/use-now-feed';
-import { pushNowDeepLink } from '../../lib/now-deep-link';
+import { renderMilestoneMomentText } from '../../lib/milestone-moment-copy';
+import {
+  pushNowDeepLink,
+  withJournalSectionIntent,
+} from '../../lib/now-deep-link';
+import { useScopeContext } from '../../lib/scope-context';
 import { useSectionErrorActions } from './journal-shared';
 
 function ledgerKind(card: NowCard): string {
@@ -23,45 +28,6 @@ function ledgerCopyKey(card: NowCard): string {
   return `journal.moments.${kind}`;
 }
 
-function stringParam(
-  params: Record<string, unknown>,
-  key: string,
-): string | undefined {
-  const value = params[key];
-  return typeof value === 'string' && value.length > 0 ? value : undefined;
-}
-
-function numberParam(
-  params: Record<string, unknown>,
-  key: string,
-): number | undefined {
-  const value = params[key];
-  return typeof value === 'number' && Number.isFinite(value)
-    ? value
-    : undefined;
-}
-
-function renderMilestoneMomentText(card: NowCard, t: TFunction): string {
-  const milestoneType = stringParam(card.params, 'milestoneType');
-  const threshold = numberParam(card.params, 'threshold');
-  if (!milestoneType || threshold == null) {
-    return t('journal.moments.generic', card.params);
-  }
-
-  switch (milestoneType) {
-    case 'vocabulary_count':
-      return t('milestoneCard.wordCount', { count: threshold });
-    case 'topic_mastered_count':
-      return t('milestoneCard.topicCount', { count: threshold });
-    case 'session_count':
-      return t('milestoneCard.sessionCount', { count: threshold });
-    case 'learning_time':
-      return t('milestoneCard.hourCount', { count: threshold });
-    default:
-      return t('journal.moments.generic', card.params);
-  }
-}
-
 function renderLedgerMomentText(card: NowCard, t: TFunction): string {
   switch (ledgerCopyKey(card)) {
     case 'journal.moments.session_filed':
@@ -72,8 +38,10 @@ function renderLedgerMomentText(card: NowCard, t: TFunction): string {
       return t('journal.moments.recap_ready', card.params);
     case 'journal.moments.snapshot_ready':
       return t('journal.moments.snapshot_ready', card.params);
+    case 'journal.moments.notice_locked_in':
+      return t('journal.moments.notice_locked_in', card.params);
     case 'journal.moments.milestone_reached':
-      return renderMilestoneMomentText(card, t);
+      return renderMilestoneMomentText(card.params, t);
     case 'journal.moments.reflection_bonus':
       return t('journal.moments.reflection_bonus', card.params);
     case 'journal.moments.quiz_personal_best':
@@ -86,6 +54,7 @@ function renderLedgerMomentText(card: NowCard, t: TFunction): string {
 export function JournalMomentsStrip(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
+  const { setActiveScope } = useScopeContext();
   const nowFeed = useNowFeed();
   const moments =
     nowFeed.data?.cards.filter((card) => card.kind === 'ledger_moment') ?? [];
@@ -159,9 +128,14 @@ export function JournalMomentsStrip(): React.ReactElement {
             testID={`journal-moment-${ledgerKind(moment)}`}
             className="rounded-card border border-border bg-surface p-4"
             onPress={() =>
-              pushNowDeepLink(router, moment.deepLink, {
-                subjectHubTarget: 'v2-subject-hub',
-              })
+              pushNowDeepLink(
+                router,
+                withJournalSectionIntent(moment).deepLink,
+                {
+                  subjectHubTarget: 'v2-subject-hub',
+                  setActiveScope,
+                },
+              )
             }
           >
             <Text className="text-body-sm text-text-primary">

@@ -21,9 +21,12 @@ import {
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
+import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
+import { assertCanReadProfile } from '../services/family-access';
 import { validationError, VocabularyContextError } from '../errors';
 import {
   checkQuizAnswerWithCorrect,
@@ -35,6 +38,7 @@ import {
   getRoundByIdOrThrow,
   listRecentCompletedRounds,
   markMissedItemsSurfaced,
+  normalizeCompletedRoundResults,
 } from '../services/quiz';
 import { inngest } from '../inngest/client';
 import { safeSend } from '../services/safe-non-core';
@@ -47,6 +51,10 @@ type QuizRouteEnv = {
   Variables: {
     user: AuthUser;
     db: Database;
+    account: Account;
+    // [WI-2416] The authenticated caller's own person id, resolved
+    // server-side by accountMiddleware — required by assertCanReadProfile.
+    callerPersonId: string | undefined;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
   };
@@ -142,6 +150,16 @@ async function generateRoundFromInput(
   if (!profileMeta) {
     throw new Error('profileMeta not set — profile middleware must run first');
   }
+  // [WI-2396] Consent-withdrawal gate — immediately before LLM dispatch
+  // (canon R5). 'capitals' rounds are fully deterministic (static
+  // CAPITALS_DATA bank, no LLM dispatch — see generateQuizRound); only
+  // 'vocabulary'/'guess_who' dispatch the LLM. Gate every activityType EXCEPT
+  // the proven-deterministic 'capitals', and fail closed — any future
+  // activityType (or an absent one) is gated. Shared by /quiz/rounds and
+  // /quiz/rounds/prefetch via this helper.
+  if (input.activityType !== 'capitals') {
+    await assertLlmConsent(db, profileId);
+  }
 
   try {
     const round = await buildAndGenerateRound(
@@ -171,7 +189,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       );
     }),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const input = c.req.valid('json');
       const result = await generateRoundFromInput(c, input);
       if ('error' in result) return result.error;
@@ -202,7 +220,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       );
     }),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const input = c.req.valid('json');
       const result = await generateRoundFromInput(c, input);
       if ('error' in result) return result.error;
@@ -216,6 +234,9 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
   .get('/quiz/rounds/recent', async (c) => {
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
+    // [WI-2416] Header-resolved profileId is only org-checked; verify
+    // caller authority (self or guardian of an uncredentialed charge).
+    await assertCanReadProfile(c, profileId);
 
     const rounds = await listRecentCompletedRounds(db, profileId, 10);
 
@@ -242,6 +263,9 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
     async (c) => {
       const profileId = requireProfileId(c.get('profileId'));
       const db = c.get('db');
+      // [WI-2416] Header-resolved profileId is only org-checked; verify
+      // caller authority (self or guardian of an uncredentialed charge).
+      await assertCanReadProfile(c, profileId);
       const { id: roundId } = c.req.valid('param');
 
       // Throws NotFoundError if the round doesn't exist OR belongs to a
@@ -284,7 +308,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
                       : undefined,
               };
             }),
-            results: round.results,
+            results: normalizeCompletedRoundResults(round.results, questions),
           }),
           200,
         );
@@ -308,7 +332,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
     zValidator('param', roundIdParamSchema),
     zValidator('json', questionCheckInputSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const profileId = requireProfileId(c.get('profileId'));
       const db = c.get('db');
       const { id: roundId } = c.req.valid('param');
@@ -349,7 +373,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
     zValidator('param', roundIdParamSchema),
     zValidator('json', completeRoundInputSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const profileId = requireProfileId(c.get('profileId'));
       const db = c.get('db');
       const { id: roundId } = c.req.valid('param');
@@ -382,7 +406,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       );
     }),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const profileId = requireProfileId(c.get('profileId'));
       const db = c.get('db');
       const { activityType } = c.req.valid('json');
@@ -399,6 +423,9 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
   .get('/quiz/stats', async (c) => {
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
+    // [WI-2416] Header-resolved profileId is only org-checked; verify
+    // caller authority (self or guardian of an uncredentialed charge).
+    await assertCanReadProfile(c, profileId);
 
     const stats = await computeRoundStats(db, profileId);
     return c.json(quizStatsListResponseSchema.parse(stats), 200);

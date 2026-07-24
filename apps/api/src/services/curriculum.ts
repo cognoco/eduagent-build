@@ -56,7 +56,7 @@ import {
   type IncompleteBookGenerationClaimRepairResult,
 } from '@eduagent/schemas';
 
-import { NotFoundError } from '../errors';
+import { ConflictError, NotFoundError } from '../errors';
 import {
   extractFirstJsonArray,
   extractFirstJsonObject,
@@ -70,7 +70,10 @@ import { getPersonAge } from './identity-v2/helpers';
 
 const logger = createLogger();
 import { regenerateLanguageCurriculum } from './language-curriculum';
-import { ensureDefaultBook } from './curriculum-core';
+import {
+  assertBookTopicWriteAvailable,
+  ensureDefaultBook,
+} from './curriculum-core';
 import {
   addTopicCompletion,
   isAcceptedSummaryStatus,
@@ -858,6 +861,7 @@ export { ensureDefaultBook };
  */
 export async function persistNarrowTopics(
   db: Database,
+  profileId: string,
   subjectId: string,
   topics: GeneratedTopic[],
   subjectName?: string,
@@ -873,26 +877,30 @@ export async function persistNarrowTopics(
     : topics;
   if (cleanedTopics.length === 0) return;
 
-  const curriculum = await ensureCurriculum(db, subjectId);
-  const bookId = await ensureDefaultBook(db, subjectId, subjectName);
-  await db
-    .insert(curriculumTopics)
-    .values(
-      cleanedTopics.map((topic, index) => ({
-        curriculumId: curriculum.id,
-        bookId,
-        title: topic.title,
-        description: topic.description,
-        sortOrder: index,
-        relevance: topic.relevance,
-        estimatedMinutes: topic.estimatedMinutes,
-        cefrLevel: topic.cefrLevel ?? null,
-        cefrSublevel: topic.cefrSublevel ?? null,
-        targetWordCount: topic.targetWordCount ?? null,
-        targetChunkCount: topic.targetChunkCount ?? null,
-      })),
-    )
-    .onConflictDoNothing();
+  await db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+    const bookId = await ensureDefaultBook(txDb, subjectId, subjectName);
+    await assertBookTopicWriteAvailable(tx, profileId, subjectId, bookId);
+    const curriculum = await ensureCurriculum(txDb, subjectId);
+    await tx
+      .insert(curriculumTopics)
+      .values(
+        cleanedTopics.map((topic, index) => ({
+          curriculumId: curriculum.id,
+          bookId,
+          title: topic.title,
+          description: topic.description,
+          sortOrder: index,
+          relevance: topic.relevance,
+          estimatedMinutes: topic.estimatedMinutes,
+          cefrLevel: topic.cefrLevel ?? null,
+          cefrSublevel: topic.cefrSublevel ?? null,
+          targetWordCount: topic.targetWordCount ?? null,
+          targetChunkCount: topic.targetChunkCount ?? null,
+        })),
+      )
+      .onConflictDoNothing();
+  });
 }
 
 /**
@@ -949,6 +957,75 @@ export async function claimBookForGeneration(
     });
 
   return updated[0] ?? null;
+}
+
+/**
+ * Claims an already-generated thin book for topic expansion.
+ *
+ * Expansion uses the same stale-reclaim marker as first generation, but the
+ * guarded update targets topicsGenerated=true. That keeps explicit expansion
+ * single-flight without holding a database lock across the LLM call.
+ */
+export async function claimBookForTopicExpansion(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  bookId: string,
+): Promise<Date | null> {
+  const staleCutoff = new Date(Date.now() - BOOK_GENERATION_STALE_MS);
+  const claimedAt = new Date();
+  const updated = await db
+    .update(curriculumBooks)
+    .set({ topicsGenerationStartedAt: claimedAt, updatedAt: claimedAt })
+    .where(
+      and(
+        eq(curriculumBooks.id, bookId),
+        eq(curriculumBooks.subjectId, subjectId),
+        eq(curriculumBooks.topicsGenerated, true),
+        or(
+          isNull(curriculumBooks.topicsGenerationStartedAt),
+          lt(curriculumBooks.topicsGenerationStartedAt, staleCutoff),
+        ),
+        sql`EXISTS (
+          SELECT 1 FROM subjects
+          WHERE subjects.id = ${subjectId}
+          AND subjects.profile_id = ${profileId}
+        )`,
+      ),
+    )
+    .returning({
+      claimedAt: curriculumBooks.topicsGenerationStartedAt,
+    });
+
+  return updated[0]?.claimedAt ?? null;
+}
+
+export async function releaseBookTopicExpansionClaim(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  bookId: string,
+  claimedAt: Date,
+): Promise<boolean> {
+  const released = await db
+    .update(curriculumBooks)
+    .set({ topicsGenerationStartedAt: null, updatedAt: new Date() })
+    .where(
+      and(
+        eq(curriculumBooks.id, bookId),
+        eq(curriculumBooks.subjectId, subjectId),
+        eq(curriculumBooks.topicsGenerated, true),
+        eq(curriculumBooks.topicsGenerationStartedAt, claimedAt),
+        sql`EXISTS (
+          SELECT 1 FROM subjects
+          WHERE subjects.id = ${subjectId}
+          AND subjects.profile_id = ${profileId}
+        )`,
+      ),
+    )
+    .returning({ id: curriculumBooks.id });
+
+  return released.length > 0;
 }
 
 export async function releaseBookGenerationClaimIfEmpty(
@@ -1493,10 +1570,11 @@ export async function repairIncompleteBookGenerationClaim(
   const activeTopicCount = existing.topics.filter(
     (topic) => !topic.skipped,
   ).length;
-  if (
-    !existing.book.topicsGenerated ||
-    activeTopicCount >= MIN_GENERATED_BOOK_TOPICS
-  ) {
+  // Current-order generation keeps topicsGenerated=false until every topic
+  // row is persisted. A generated book with even one active topic is therefore
+  // complete (filed books intentionally start with one); only zero-topic
+  // legacy rows can represent the old interrupted-claim shape repaired here.
+  if (!existing.book.topicsGenerated || activeTopicCount > 0) {
     return { status: 'not_incomplete' };
   }
 
@@ -1504,18 +1582,65 @@ export async function repairIncompleteBookGenerationClaim(
     return { status: 'in_progress' };
   }
 
-  // [WI-867] v2 always: learner age from `person`.
-  const learnerAge = await getPersonAge(db, profileId);
-  const book = await expandExistingBookTopics(
+  const expansionClaimStartedAt = await claimBookForTopicExpansion(
     db,
     profileId,
     subjectId,
     bookId,
-    existing,
-    priorKnowledge,
-    { learnerAge, ...deps },
   );
-  return { status: 'repaired', book };
+  if (!expansionClaimStartedAt) {
+    return { status: 'in_progress' };
+  }
+
+  try {
+    // The eligibility decision above came from a caller-owned snapshot. Re-read
+    // after acquiring the expansion marker so a topic filed between the route
+    // read and this claim wins: filed books with any active topic are complete
+    // and must not be auto-expanded by the legacy zero-topic repair path.
+    const latestCurriculum = await getLatestCurriculumRow(db, subjectId);
+    const activeTopic = latestCurriculum
+      ? await db.query.curriculumTopics.findFirst({
+          where: and(
+            eq(curriculumTopics.curriculumId, latestCurriculum.id),
+            eq(curriculumTopics.bookId, bookId),
+            eq(curriculumTopics.skipped, false),
+          ),
+          columns: { id: true },
+        })
+      : undefined;
+    if (activeTopic) {
+      await releaseBookTopicExpansionClaim(
+        db,
+        profileId,
+        subjectId,
+        bookId,
+        expansionClaimStartedAt,
+      );
+      return { status: 'not_incomplete' };
+    }
+
+    // [WI-867] v2 always: learner age from `person`.
+    const learnerAge = await getPersonAge(db, profileId);
+    const book = await expandExistingBookTopics(
+      db,
+      profileId,
+      subjectId,
+      bookId,
+      existing,
+      priorKnowledge,
+      { learnerAge, expansionClaimStartedAt, ...deps },
+    );
+    return { status: 'repaired', book };
+  } catch (error) {
+    await releaseBookTopicExpansionClaim(
+      db,
+      profileId,
+      subjectId,
+      bookId,
+      expansionClaimStartedAt,
+    );
+    throw error;
+  }
 }
 
 function buildConflictRepairBookTopics(
@@ -1717,7 +1842,10 @@ export async function persistBookTopics(
   bookId: string,
   topics: GeneratedBookTopic[],
   connections: GeneratedConnection[],
-  options: { appendToExisting?: boolean } = {},
+  options: {
+    appendToExisting?: boolean;
+    expansionClaimStartedAt?: Date;
+  } = {},
 ): Promise<BookWithTopics> {
   // Verify subject ownership
   const repo = createScopedRepository(db, profileId);
@@ -1737,13 +1865,54 @@ export async function persistBookTopics(
     throw new NotFoundError('Book');
   }
 
+  const assertExpansionClaim = async (
+    executor: Pick<Database, 'update'>,
+  ): Promise<void> => {
+    if (!options.expansionClaimStartedAt) return;
+
+    const ownedClaim = await executor
+      .update(curriculumBooks)
+      .set({ updatedAt: new Date() })
+      .where(
+        and(
+          eq(curriculumBooks.id, bookId),
+          eq(curriculumBooks.subjectId, subjectId),
+          eq(curriculumBooks.topicsGenerated, true),
+          eq(
+            curriculumBooks.topicsGenerationStartedAt,
+            options.expansionClaimStartedAt,
+          ),
+          sql`EXISTS (
+            SELECT 1 FROM subjects
+            WHERE subjects.id = ${subjectId}
+            AND subjects.profile_id = ${profileId}
+          )`,
+        ),
+      )
+      .returning({ id: curriculumBooks.id });
+    if (ownedClaim.length === 0) {
+      throw new ConflictError(
+        'Book topic expansion claim is no longer owned by this request.',
+      );
+    }
+  };
+
   // Deterministic backstop: never persist a topic that merely restates the
   // book title (orphan topic). The BOOK_TOPICS_PROMPT forbids it; this makes
   // it a guarantee. If stripping drops the active set below the minimum, the
   // existing count guards throw and the caller regenerates.
   const cleanedTopics = stripOrphanTitles(topics, book.title);
 
-  const curriculum = await ensureCurriculum(db, subjectId);
+  // Expansion owners must prove their exact token before *any* mutation.
+  // ensureCurriculum can insert, so run it behind the same transactional fence
+  // rather than creating an empty curriculum row for a stale owner that will
+  // be rejected by the later topic-write transaction.
+  const curriculum = options.expansionClaimStartedAt
+    ? await db.transaction(async (tx) => {
+        await assertExpansionClaim(tx);
+        return ensureCurriculum(tx as unknown as Database, subjectId);
+      })
+    : await ensureCurriculum(db, subjectId);
   const existingTopics = await db.query.curriculumTopics.findMany({
     where: and(
       eq(curriculumTopics.curriculumId, curriculum.id),
@@ -1787,6 +1956,8 @@ export async function persistBookTopics(
         );
 
         await db.transaction(async (tx) => {
+          await assertExpansionClaim(tx);
+
           await tx
             .insert(curriculumTopics)
             .values(
@@ -1889,24 +2060,46 @@ export async function persistBookTopics(
     // Partial or skipped-only rows are not a generated book and must continue
     // into the insert path so the post-transaction count guard can validate it.
     if (existingActiveTopics.length >= MIN_GENERATED_BOOK_TOPICS) {
-      await db
-        .update(curriculumBooks)
-        .set({
-          topicsGenerated: true,
-          // Success clears any prior terminal failure ("ready" is derived from
-          // topics_generated, not persisted separately).
-          failedReason: null,
-          failedAt: null,
-          // [books topicsGenerated ordering] clear the in-flight claim marker.
-          topicsGenerationStartedAt: null,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(curriculumBooks.id, bookId),
-            eq(curriculumBooks.subjectId, subjectId),
-          ),
-        );
+      if (options.expansionClaimStartedAt) {
+        await db.transaction(async (tx) => {
+          await assertExpansionClaim(tx);
+
+          await tx
+            .update(curriculumBooks)
+            .set({
+              topicsGenerated: true,
+              failedReason: null,
+              failedAt: null,
+              topicsGenerationStartedAt: null,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(curriculumBooks.id, bookId),
+                eq(curriculumBooks.subjectId, subjectId),
+              ),
+            );
+        });
+      } else {
+        await db
+          .update(curriculumBooks)
+          .set({
+            topicsGenerated: true,
+            // Success clears any prior terminal failure ("ready" is derived from
+            // topics_generated, not persisted separately).
+            failedReason: null,
+            failedAt: null,
+            // [books topicsGenerated ordering] clear the in-flight claim marker.
+            topicsGenerationStartedAt: null,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(curriculumBooks.id, bookId),
+              eq(curriculumBooks.subjectId, subjectId),
+            ),
+          );
+      }
 
       const existing = await getBookWithTopics(
         db,
@@ -1948,6 +2141,8 @@ export async function persistBookTopics(
   // Wrap topic + connection inserts + flag update in a transaction
   // so a partial failure doesn't leave a half-generated book.
   await db.transaction(async (tx) => {
+    await assertExpansionClaim(tx);
+
     if (topicsToInsert.length > 0) {
       await tx
         .insert(curriculumTopics)
@@ -2141,6 +2336,7 @@ export async function expandExistingBookTopics(
       error: unknown,
       context?: { profileId?: string; extra?: Record<string, unknown> },
     ) => void;
+    expansionClaimStartedAt?: Date;
   },
 ): Promise<BookWithTopics> {
   const existingTopicTitles = existing.topics
@@ -2191,7 +2387,10 @@ export async function expandExistingBookTopics(
     bookId,
     expansion.topics,
     expansion.connections,
-    { appendToExisting: true },
+    {
+      appendToExisting: true,
+      expansionClaimStartedAt: deps.expansionClaimStartedAt,
+    },
   );
 }
 
@@ -2221,27 +2420,32 @@ export async function addCurriculumTopic(
 
   const bookId = await ensureDefaultBook(db, subjectId, subject.name);
 
-  // BD-08: atomic sortOrder allocation — uses INSERT ... SELECT COALESCE(MAX + 1, 0)
-  // to prevent concurrent add-topic calls from getting duplicate sort orders.
-  const [createdTopic] = await db
-    .insert(curriculumTopics)
-    .values({
-      curriculumId: curriculum.id,
-      bookId,
-      title: input.title.trim(),
-      description: input.description.trim(),
-      sortOrder: sql`COALESCE((SELECT MAX(${curriculumTopics.sortOrder}) + 1 FROM ${curriculumTopics} WHERE ${curriculumTopics.curriculumId} = ${curriculum.id}), 0)`,
-      relevance: 'recommended',
-      source: 'user',
-      estimatedMinutes: input.estimatedMinutes,
-    })
-    .returning();
+  const createdTopic = await db.transaction(async (tx) => {
+    await assertBookTopicWriteAvailable(tx, profileId, subjectId, bookId);
 
-  // scope-allow: curriculum row was created in the scoped subject/book flow above.
-  await db
-    .update(curricula)
-    .set({ updatedAt: new Date() })
-    .where(eq(curricula.id, curriculum.id));
+    // BD-08: atomic sortOrder allocation — uses INSERT ... SELECT COALESCE(MAX + 1, 0)
+    // to prevent concurrent add-topic calls from getting duplicate sort orders.
+    const [created] = await tx
+      .insert(curriculumTopics)
+      .values({
+        curriculumId: curriculum.id,
+        bookId,
+        title: input.title.trim(),
+        description: input.description.trim(),
+        sortOrder: sql`COALESCE((SELECT MAX(${curriculumTopics.sortOrder}) + 1 FROM ${curriculumTopics} WHERE ${curriculumTopics.curriculumId} = ${curriculum.id}), 0)`,
+        relevance: 'recommended',
+        source: 'user',
+        estimatedMinutes: input.estimatedMinutes,
+      })
+      .returning();
+
+    // scope-allow: curriculum row was created in the scoped subject/book flow above.
+    await tx
+      .update(curricula)
+      .set({ updatedAt: new Date() })
+      .where(eq(curricula.id, curriculum.id));
+    return created;
+  });
 
   if (!createdTopic)
     throw new Error('Insert into curriculumTopics did not return a row');
@@ -2437,6 +2641,8 @@ export async function unskipTopic(
 
   // [L10-002] Topic restore + adaptation audit row must be atomic — see skipTopic.
   await db.transaction(async (tx) => {
+    await assertBookTopicWriteAvailable(tx, profileId, subjectId, topic.bookId);
+
     await tx
       .update(curriculumTopics)
       .set({
@@ -2506,7 +2712,7 @@ export async function moveTopicToBook(
 
   // Verify topic belongs to the source book
   const [topic] = await db
-    .select({ id: curriculumTopics.id })
+    .select({ id: curriculumTopics.id, skipped: curriculumTopics.skipped })
     .from(curriculumTopics)
     .where(
       and(
@@ -2517,10 +2723,20 @@ export async function moveTopicToBook(
     .limit(1);
   if (!topic) throw new NotFoundError('Topic');
 
-  await db
-    .update(curriculumTopics)
-    .set({ bookId: targetBookId })
-    .where(eq(curriculumTopics.id, topicId));
+  await db.transaction(async (tx) => {
+    if (!topic.skipped) {
+      await assertBookTopicWriteAvailable(
+        tx,
+        profileId,
+        subjectId,
+        targetBookId,
+      );
+    }
+    await tx
+      .update(curriculumTopics)
+      .set({ bookId: targetBookId })
+      .where(eq(curriculumTopics.id, topicId));
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -2640,6 +2856,13 @@ export async function challengeCurriculum(
   // is preserved. The LLM call above is intentionally outside the transaction
   // so we never delete until we already have the replacement topics.
   await db.transaction(async (tx) => {
+    const bookId = await ensureDefaultBook(
+      tx as unknown as Database,
+      subjectId,
+      subject.name,
+    );
+    await assertBookTopicWriteAvailable(tx, profileId, subjectId, bookId);
+
     await tx.delete(curricula).where(eq(curricula.subjectId, subjectId));
 
     const [newCurriculum] = await tx
@@ -2652,12 +2875,6 @@ export async function challengeCurriculum(
 
     if (!newCurriculum)
       throw new Error('Insert into curricula did not return a row');
-    // Known Drizzle pattern: PgTransaction → Database cast (see feedback_drizzle_transaction_cast.md)
-    const bookId = await ensureDefaultBook(
-      tx as unknown as Database,
-      subjectId,
-      subject.name,
-    );
 
     if (topics.length > 0) {
       await tx
@@ -2807,6 +3024,12 @@ export async function adaptCurriculumFromPerformance(
         case 'too_easy':
           reordered.splice(Math.max(targetIndex - 2, 0), 0, topic);
           break;
+        default: {
+          const exhaustive: never = request.signal;
+          throw new Error(
+            `Unexpected curriculum adaptation signal: ${exhaustive}`,
+          );
+        }
       }
     }
   }

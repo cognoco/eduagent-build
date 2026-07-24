@@ -27,6 +27,7 @@ import {
   person,
   weeklyReports,
 } from '@eduagent/database';
+import { isWeeklyProgressPushLocalHour9 } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { INNGEST_PLAN_CONCURRENCY_CAP } from '../plan-limits';
 import { getStepDatabase, getStepResendApiKey } from '../helpers';
@@ -119,19 +120,7 @@ type PreparedWeeklyProgressDigest =
 // cron to `0 9 * * 1` would constrain delivery to UTC parents only and break
 // timezone-aware morning delivery for everyone else. See test:
 // "fires for each parent exactly once across the 24 Monday-UTC hours".
-export function isLocalHour9(timezone: string | null, nowUtc: Date): boolean {
-  if (!timezone) return nowUtc.getUTCHours() === 9;
-  try {
-    const localTimeStr = nowUtc.toLocaleString('en-US', {
-      timeZone: timezone,
-      hour: 'numeric',
-      hour12: false,
-    });
-    return parseInt(localTimeStr, 10) === 9;
-  } catch {
-    return nowUtc.getUTCHours() === 9;
-  }
-}
+export const isLocalHour9 = isWeeklyProgressPushLocalHour9;
 
 function startOfCurrentWeek(date: Date): Date {
   const day = date.getUTCDay();
@@ -812,21 +801,26 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             // the send-weekly-progress-push step above). The notificationLog
             // `weekly_progress` slot is shared across channels — a parent
             // receives at most one weekly-progress notification per 24h
-            // regardless of push/email. The push step runs first; if it sent,
-            // its log makes this count > 0 and the email is suppressed (push
-            // preferred). If push was skipped/failed (no log written), the email
-            // still goes out as the fallback channel. Reading inside this step
-            // (not the prepare step) keeps the gate retry-safe: an email-step
-            // retry re-reads the log written by its own first attempt and skips
-            // the re-send, matching the [WI-998] rationale on the push side.
+            // regardless of push/email. The push step runs first; its `sent`
+            // result suppresses email even if its own log write failed. If push
+            // was skipped/failed, email remains the fallback channel. Reading
+            // the ledger inside this step (not prepare) also keeps the gate
+            // retry-safe: an email-step retry re-reads the row written by its
+            // own first attempt and skips the re-send.
             const recentEmailCount = await getRecentNotificationCount(
               db,
               parentId,
               'weekly_progress',
               24,
             );
-            if (recentEmailCount > 0) {
-              return { sent: false, reason: 'dedup_24h' as const };
+            if (pushResult?.sent === true || recentEmailCount > 0) {
+              return {
+                sent: false,
+                reason:
+                  pushResult?.sent === true
+                    ? ('push_sent' as const)
+                    : ('dedup_24h' as const),
+              };
             }
             const emailPayload = formatWeeklyProgressEmail(
               parentEmail,

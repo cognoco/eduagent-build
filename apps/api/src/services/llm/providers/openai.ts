@@ -143,6 +143,7 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
     async chat(
       messages: ChatMessage[],
       config: ModelConfig,
+      signal?: AbortSignal,
     ): Promise<ChatResult> {
       const body: OpenAIRequest = {
         model: mapModel(config),
@@ -163,7 +164,9 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS),
+        signal: signal
+          ? AbortSignal.any([signal, AbortSignal.timeout(OPENAI_TIMEOUT_MS)])
+          : AbortSignal.timeout(OPENAI_TIMEOUT_MS),
       });
 
       if (!res.ok) {
@@ -290,8 +293,8 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
                     logger.warn('[llm:openai] malformed SSE chunk discarded', {
                       event: 'openai.sse.malformed',
                       site: 'stream_loop',
-                      chunk: jsonStr.slice(0, 200),
-                      error: chunkParsed.error.message,
+                      chunkLength: jsonStr.length,
+                      errorKind: 'schema_validation',
                     });
                     continue;
                   }
@@ -306,13 +309,13 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
                   // invisible. Log structurally so we can query
                   // "openai.sse.malformed count over 24h" — discard still
                   // happens (one bad chunk should not kill the stream) but
-                  // it is now observable. Truncate the chunk to avoid
-                  // bloating logs with multi-KB payloads.
+                  // it is now observable. Content and parser messages are
+                  // omitted because either can echo learner text.
                   logger.warn('[llm:openai] malformed SSE chunk discarded', {
                     event: 'openai.sse.malformed',
                     site: 'stream_loop',
-                    chunk: jsonStr.slice(0, 200),
-                    error: err instanceof Error ? err.message : String(err),
+                    chunkLength: jsonStr.length,
+                    errorKind: 'json_parse',
                   });
                 }
               }
@@ -334,8 +337,8 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
                         {
                           event: 'openai.sse.malformed',
                           site: 'flush_buffer',
-                          chunk: jsonStr.slice(0, 200),
-                          error: chunkParsed.error.message,
+                          chunkLength: jsonStr.length,
+                          errorKind: 'schema_validation',
                         },
                       );
                     } else {
@@ -350,8 +353,8 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
                     logger.warn('[llm:openai] malformed SSE chunk discarded', {
                       event: 'openai.sse.malformed',
                       site: 'flush_buffer',
-                      chunk: jsonStr.slice(0, 200),
-                      error: err instanceof Error ? err.message : String(err),
+                      chunkLength: jsonStr.length,
+                      errorKind: 'json_parse',
                     });
                   }
                 }

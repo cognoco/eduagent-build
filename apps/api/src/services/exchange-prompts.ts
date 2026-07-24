@@ -49,6 +49,14 @@ const LANGUAGE_FACTUALITY_RULE =
 const REVIEW_OVERRIDE_RULE =
   'REVIEW OVERRIDE: During review, prefer source wording first. Use outside examples or analogies only when they are ordinary, helpful, and pass the 0.88 factual-confidence gate.';
 
+// WI-2100: extends the same "don't invent" family as ANTI-FABRICATION, but for
+// source identity rather than learner background. Staging observed the mentor
+// assume a specific well-known title (The Bell Jar) when a learner said only
+// "her book" — the model treated a vague description as enough signal to
+// pattern-match a plausible famous work from general knowledge.
+const SOURCE_IDENTITY_CLARIFICATION_RULE =
+  'SOURCE IDENTITY — ASK, DO NOT ASSUME: When the learner references a specific book, story, poem, article, or other text they are reading or working from, but does not name its title or author, and no title/author is stated in the <source_pack> or the loaded topic (e.g. "her book", "his poems", "the story we are reading", "that article"), do not guess which work they mean, even if a well-known title seems to plausibly fit the description. Ask a short, direct question naming what you need (the title, the author, or a photo/excerpt) before analyzing, summarizing, or teaching content specific to that work. Once the learner names it, or a title/author is already present in the <source_pack> or loaded topic, proceed normally without asking again.';
+
 // First-turn rule for a new (first-encounter) topic.
 const FIRST_TURN_NEW_TOPIC_RULE =
   'FIRST TURN RULE (new topic): Before composing this reply, identify the most natural starting concept for this topic from the topic description, source material, or 0.88+ general knowledge. ' +
@@ -315,9 +323,12 @@ function getExchangeEnvelopeInstruction(context: {
   isLanguageMode: boolean;
   includeRetrievalScore: boolean;
   isChallengeRoundActive: boolean;
+  includeAnswerEvaluation: boolean;
   /** When true the grader owns challenge_round_evaluation — omit the field
    *  from the envelope template so the tutor does not also emit it. */
   graderEnabled?: boolean;
+  includeMentorNotice?: boolean;
+  includeNoticeRecheck?: boolean;
 }): string {
   // During an active Challenge Round the mastery pipeline reads
   // `signals.challenge_round_evaluation` inline from this envelope. It MUST be
@@ -330,12 +341,21 @@ function getExchangeEnvelopeInstruction(context: {
     context.isChallengeRoundActive && !context.graderEnabled
       ? ', "challenge_round_evaluation": [ { "concept": "<concept assessed>", "result": "<solid|partial|missing|misconception>", "evidence": "<what the learner demonstrated>", "answerEventId": "<the CURRENT CHALLENGE ANSWER EVENT ID for the learner answer judged>", "learnerQuote": "<short verbatim quote from the learner answer>", "correction": "<optional; the correct idea, only when result is not solid>" } ]'
       : '';
+  const answerEvaluationField = context.includeAnswerEvaluation
+    ? ', "answer_evaluation": { "correctness": "<correct|partial|incorrect|na>", "concept": "<optional; concept just assessed; omit key when absent>" }'
+    : '';
+  const mentorNoticeField = context.includeMentorNotice
+    ? `, "noticed_gap": { "observed": <bool>, "concept": "<one concrete concept or empty string>", "correctionHint": "<short correction hint or empty string>", "answerEventId": "<CURRENT LEARNER EVENT ID or empty string>", "learnerQuote": "<short verbatim quote or empty string>" }`
+    : '';
+  const noticeRecheckField = context.includeNoticeRecheck
+    ? ', "notice_recheck": { "noticeId": "<ACTIVE NOTICE ID>", "verdict": "<locked_in|not_yet|dismissed|deferred>", "answerEventId": "<CURRENT LEARNER EVENT ID>", "learnerQuote": "<short verbatim quote from that learner message>" }'
+    : '';
 
   const signals = context.isRecitation
-    ? `  "signals": { "understanding_check": <bool>, "crisis_redirect": <bool>${challengeEvalField} },`
+    ? `  "signals": { "understanding_check": <bool>, "crisis_redirect": <bool>${answerEvaluationField}${challengeEvalField}${mentorNoticeField}${noticeRecheckField} },`
     : context.includeRetrievalScore
-      ? `  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>, "retrieval_score": <0.0-1.0>${challengeEvalField} },`
-      : `  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>${challengeEvalField} },`;
+      ? `  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>, "retrieval_score": <0.0-1.0>, "topic_opened_pending_content": <bool>${answerEvaluationField}${challengeEvalField}${mentorNoticeField}${noticeRecheckField} },`
+      : `  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>, "topic_opened_pending_content": <bool>${answerEvaluationField}${challengeEvalField}${mentorNoticeField}${noticeRecheckField} },`;
 
   const uiHints = context.isLanguageMode
     ? '  "ui_hints": { "note_prompt": { "show": <bool>, "post_session": <bool> }, "fluency_drill": { "active": <bool>, "duration_s": <15-90>, "score": { "correct": <int>, "total": <int> } } },'
@@ -350,12 +370,22 @@ function getExchangeEnvelopeInstruction(context: {
       'Set `signals.needs_deepening` to true on the final turn of a rung-5 exit (learner still stuck after three exchanges at the Teaching-Mode Pivot rung). The system will queue the topic for remediation.',
     );
   }
+  if (context.includeAnswerEvaluation) {
+    signalGuidance.push(
+      'ANSWER EVALUATION: classify the CURRENT learner message only against the immediately preceding ordinary learning question. This signal evaluates the learner message you are responding to — never your own reply or the new question in it. If the learner message directly and fully answers the preceding question, you MUST use `correct`, even when your reply acknowledges it and moves on. Use `partial` or `incorrect` only when the message is a substantive but incomplete or wrong answer; set `correctness` to `na` when there is no gradable learner answer, including the first turn, a question or request from the learner, a learner acknowledgement, or any turn without an immediately preceding ordinary learning question. `concept` is optional; when present, name only the concept just assessed. Omit `concept` entirely rather than returning an empty string.',
+    );
+  }
   signalGuidance.push(
     'Set `signals.understanding_check` to true when your reply asks the learner to explain, paraphrase, or otherwise confirm they understood — observational only.',
   );
   signalGuidance.push(
     'Set `signals.crisis_redirect` to true when the SAFETY crisis rule fired this turn — the learner expressed distress, self-harm ideation, bullying, abuse, or another safeguarding concern and your reply redirected them to a parent, guardian, trusted adult, or helpline. Observational only — it never changes what you say to the learner. Do NOT set it for ordinary frustration with the schoolwork itself.',
   );
+  if (!context.isRecitation) {
+    signalGuidance.push(
+      'NEVER end your `reply` with only a forward promise like "Let\'s talk about X" or "We\'ll explore Y next" and nothing else — the learner is left with no content and no question. Every reply must either deliver substantive content (an explanation, a fact, an example) or ask the learner a specific question. If you genuinely cannot deliver content this turn (e.g. you are only acknowledging a topic switch), set `signals.topic_opened_pending_content` to true so the app immediately gives you another turn to deliver it — never leave the learner hanging on a bare promise.',
+    );
+  }
   if (context.includeRetrievalScore) {
     signalGuidance.push(
       'For this continuation opener scoring turn, set `signals.retrieval_score` from 0.0 (no recall) to 1.0 (perfect recall). Do not mention the score to the learner.',
@@ -364,6 +394,16 @@ function getExchangeEnvelopeInstruction(context: {
   if (context.isChallengeRoundActive && !context.graderEnabled) {
     signalGuidance.push(
       'CHALLENGE ROUND ACTIVE: after each learner answer you MUST include `signals.challenge_round_evaluation` with one item per concept assessed — set `result` to one of solid/partial/missing/misconception, copy a short verbatim `learnerQuote` from their answer, and use the provided CURRENT CHALLENGE ANSWER EVENT ID as `answerEventId`. Omitting this field blocks mastery verification entirely.',
+    );
+  }
+  if (context.includeMentorNotice) {
+    signalGuidance.push(
+      "MENTOR NOTICE OBSERVATION: Always emit `signals.noticed_gap` as a decision. Set `observed` to false when the answer is correct or no concrete durable gap appears; in that case the other fields may be empty strings. A possible follow-up check or extra practice is not evidence of a gap. Set `observed` to true only when the latest learner message proves a concrete durable gap. Signal binding: If your visible reply corrects the learner's answer or reasoning, `observed` must be true. When `observed` is true, copy a short verbatim `learnerQuote`, use the supplied CURRENT LEARNER EVENT ID exactly, name one concrete `concept`, and keep `correctionHint` short. Finish the learner's immediate goal first. Do not quiz or re-check the learner now. Do not promise a future check-in in visible prose.",
+    );
+  }
+  if (context.includeNoticeRecheck) {
+    signalGuidance.push(
+      'MENTOR NOTICE RE-CHECK: include `signals.notice_recheck` only with the active notice ID, supplied current learner event ID, and a verbatim learner quote. `dismissed` requires an explicit never-ask-again request; ordinary reluctance is `deferred`.',
     );
   }
 
@@ -801,6 +841,7 @@ export function buildSystemPromptSegments(
       '- If the learner says "I am a complete beginner", "I do not know anything about this", "I have never studied this", or similar, that is GROUND TRUTH. Do not contradict it, do not assume hidden prior knowledge, and do not flatter them with implied competence ("you already know …", "as you know …").\n' +
       '- When a fact would help your teaching but you do not have it, either ask one short question or proceed without that fact. Never confabulate.',
   );
+  sections.push(SOURCE_IDENTITY_CLARIFICATION_RULE);
   sections.push(buildPrivateSourceContractBlock());
   sections.push(buildFinalGroundingCheckBlock());
   // Volatile: the <source_pack> embeds the current learner turn — tail it.
@@ -832,7 +873,11 @@ export function buildSystemPromptSegments(
   // asks about app navigation, but expensive and distracting on ordinary
   // learning turns.
   if (includeAppHelpMap) {
-    sections.push(buildAppHelpPromptBlock());
+    // [WI-2220] context.shell is the client-supplied active shell; absent or
+    // anything other than 'v2' falls to buildAppHelpPromptBlock's own 'v0'
+    // default, so production never confidently invents V2-only navigation
+    // for a non-V2 client (or vice versa).
+    sections.push(buildAppHelpPromptBlock(context.shell));
   }
 
   // Default tone — applied to every session post-sunset
@@ -974,16 +1019,68 @@ export function buildSystemPromptSegments(
 
   // Recitation mode — overrides teaching/escalation behaviour
   if (isRecitation) {
+    const recitationSetupInstruction = (() => {
+      switch (context.recitationSetup?.action) {
+        case 'invite_to_begin':
+          return (
+            'SERVER-OWNED SETUP ACTION: INVITE TO BEGIN\n' +
+            'The server has accepted the current learner message as their recitation selection. Acknowledge it briefly and invite them to begin. Do not ask for the title, author, or description again. Do NOT provide any of the recitation, a model answer, polished wording, or a starting line.'
+          );
+        case 'clarify_selection':
+          return (
+            'SERVER-OWNED SETUP ACTION: CLARIFY SELECTION\n' +
+            "Acknowledge the learner's message. Ask exactly one focused question for the title, author, or a short description. This is the only allowed setup clarification; do not teach or provide recitation content."
+          );
+        case 'invite_after_cap':
+          return (
+            'SERVER-OWNED SETUP ACTION: CLARIFICATION CAP\n' +
+            'The one allowed setup clarification has already been used. Do not ask another setup question. Say you are ready, and invite them to begin whenever they are ready without guessing or supplying recitation content.'
+          );
+        case 'invite_recitation':
+          return (
+            'SERVER-OWNED SETUP ACTION: INVITE RECITATION\n' +
+            'The learner has acknowledged readiness. Briefly invite the learner to perform the actual recitation now. Do not give feedback, a cue, a starting line, suggested wording, or any recitation content.'
+          );
+        case 'clarify_edit':
+          return (
+            'SERVER-OWNED SETUP ACTION: CLARIFY EDIT\n' +
+            'The learner wants to change the setup but has not supplied a replacement. Briefly ask what selection they want instead. Do not supply recitation content, a cue, or a model answer.'
+          );
+        case 'handle_non_recitation':
+          return (
+            'SERVER-OWNED SETUP ACTION: HANDLE NON-RECITATION\n' +
+            'The current message requires the applicable global rules, including SAFETY — NON-NEGOTIABLE RULES when relevant. Follow those rules first. Do not treat this message as a selection or recitation, do not provide recitation content, and do not advance or restart setup.'
+          );
+        case 'coach_recitation':
+          return (
+            'SERVER-OWNED SETUP ACTION: COACH RECITATION\n' +
+            'Setup is complete. Treat the current learner message as recitation or a recitation-related request, and do not restart the title/author question. Follow the feedback and no-recall rules below.'
+          );
+        case 'leave_recitation':
+          return (
+            'SERVER-OWNED SETUP ACTION: LEAVE RECITATION\n' +
+            'The learner explicitly wants to stop or leave recitation. Acknowledge that briefly. Do not ask another setup question. Do not provide recitation content, feedback, or invented navigation instructions.'
+          );
+        default:
+          return '';
+      }
+    })();
+    if (recitationSetupInstruction) {
+      volatile.push(recitationSetupInstruction);
+    }
     const recitationFeedbackScope =
       context.inputMode === 'voice'
         ? '   - Because this is voice input, comment briefly on delivery: pace, confidence, expression.\n'
         : '   - Because this is text input, do NOT claim to hear pace, confidence, expression, pronunciation, or delivery. Comment only on wording, structure, completeness, and clarity of the written recitation.\n';
+    const recitationSetupStep = context.recitationSetup
+      ? '1. Follow the turn-specific SERVER-OWNED SETUP ACTION; it determines the current step and must not be overridden by the general flow.\n'
+      : '1. Ask what they would like to recite (title, author, or description).\n';
     sections.push(
       'Session type: RECITATION PRACTICE (BETA)\n' +
         'The learner wants to recite something from memory — a poem, song lyrics, multiplication tables, or other memorised text.\n' +
         'Your role is to LISTEN and give feedback. Do NOT teach, quiz, or use the escalation ladder.\n\n' +
         'Flow:\n' +
-        '1. Ask what they would like to recite (title, author, or description).\n' +
+        recitationSetupStep +
         '2. Once they tell you, say you are ready and encourage them to begin. Do NOT provide a model answer, polished version, or suggested wording before the learner has recited.\n' +
         '3. After they recite, provide honest but kind feedback:\n' +
         '   - Quote the parts that came through clearly.\n' +
@@ -1467,6 +1564,25 @@ export function buildSystemPromptSegments(
   const cr = context.challengeRound;
   const challengeEligible = context.challengeEligible ?? false;
   const challengeRuntimeEnabled = context.challengeRuntimeEnabled === true;
+  const mentorNoticeEnabled =
+    context.mentorNoticeEnabled === true &&
+    Boolean(context.currentUserMessageEventId) &&
+    !context.mentorNoticeRecheck &&
+    // [WI-2500] Interleaved sessions are out of MVP scope for mentor notices —
+    // the proposal schema no longer carries a topicId to target one of the
+    // session's several topics, so the LLM is never asked for a notice here.
+    context.sessionType !== 'interleaved';
+  if (mentorNoticeEnabled) {
+    volatile.push(
+      `MENTOR NOTICE OBSERVATION\nCURRENT LEARNER EVENT ID: Use "${context.currentUserMessageEventId}" exactly as answerEventId when signals.noticed_gap.observed is true.\nFinish the learner's immediate goal first. A noticed gap is a quiet observation, not a new activity. Always emit \`signals.noticed_gap\` as a decision. Set \`observed\` to false when the answer is correct or no concrete durable gap appears; the other fields may be empty strings. A possible follow-up check or extra practice is not evidence of a gap. Set \`observed\` to true only for a concrete durable gap in the latest learner message. Signal binding: If your visible reply corrects the learner's answer or reasoning, \`observed\` must be true. Do not quiz or re-check the learner now. Do not promise a future check-in in the visible reply. When \`observed\` is true, emit one concrete concept with a short correction hint and an exact learner quote.`,
+    );
+  }
+  if (context.mentorNoticeRecheck && context.currentUserMessageEventId) {
+    const notice = context.mentorNoticeRecheck;
+    volatile.push(
+      `MENTOR NOTICE RE-CHECK — exchange ${notice.exchangeNumber} of at most 3\nThe learner previously showed a wobble around: ${notice.concept}. ${notice.correctionHint ? `Helpful anchor: ${notice.correctionHint}` : ''}\nRespond to what the learner is doing now; do not launch an unsolicited opener. Work in one focused, lightweight check over 2–3 exchanges. Emit signals.notice_recheck with noticeId "${notice.id}", the CURRENT LEARNER EVENT ID "${context.currentUserMessageEventId}", and an exact learnerQuote. Use verdict locked_in only when the learner demonstrates the concept, not_yet when evidence remains weak, deferred when they say not now, and dismissed only for an explicit request never to bring it up again. Do not mention internal notice machinery.`,
+    );
+  }
   // Volatile: challenge-round state transitions across turns and the answer
   // event id is per-turn.
   if (challengeRuntimeEnabled) {
@@ -1523,7 +1639,15 @@ export function buildSystemPromptSegments(
       isChallengeRoundActive:
         challengeRuntimeEnabled &&
         (cr?.state === 'accepted' || cr?.state === 'active'),
+      includeAnswerEvaluation:
+        context.answerEvaluationEnabled === true &&
+        !isRecitation &&
+        !includeAppHelpMap &&
+        cr?.state !== 'accepted' &&
+        cr?.state !== 'active',
       graderEnabled,
+      includeMentorNotice: mentorNoticeEnabled,
+      includeNoticeRecheck: Boolean(context.mentorNoticeRecheck),
     }),
   );
 

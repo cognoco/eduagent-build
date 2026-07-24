@@ -219,7 +219,10 @@ describe('useDashboard', () => {
 describe('useChildDetail', () => {
   it('returns child detail data', async () => {
     const childData = {
-      child: createDashboardChild(),
+      child: {
+        ...createDashboardChild(),
+        organizationTimezone: null,
+      },
     };
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify(childData), { status: 200 }),

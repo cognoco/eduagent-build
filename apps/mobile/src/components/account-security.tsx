@@ -23,11 +23,13 @@ function SecurityRow({
   onPress,
   testID,
   expanded,
+  targetName,
 }: {
   label: string;
   onPress: () => void;
   testID: string;
   expanded?: boolean;
+  targetName?: string;
 }): React.JSX.Element {
   return (
     <Pressable
@@ -37,12 +39,22 @@ function SecurityRow({
         ...(pressed ? { opacity: 0.6 } : {}),
         ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
       })}
-      accessibilityLabel={label}
+      accessibilityLabel={[label, targetName].filter(Boolean).join('. ')}
       accessibilityRole="button"
       testID={testID}
     >
-      <Text className="text-body text-text-primary">{label}</Text>
-      <Text className="text-body text-text-secondary">
+      <View className="flex-1 min-w-0 pr-3" testID={`${testID}-label-column`}>
+        <Text className="text-body text-text-primary">{label}</Text>
+        {targetName ? (
+          <Text className="text-body-sm text-text-secondary mt-0.5">
+            {targetName}
+          </Text>
+        ) : null}
+      </View>
+      <Text
+        className="text-body text-text-secondary shrink-0"
+        testID={`${testID}-indicator`}
+      >
         {expanded ? 'v' : '>'}
       </Text>
     </Pressable>
@@ -52,12 +64,14 @@ function SecurityRow({
 // NOTE: 2FA toggle commented out — original implementation conflated Clerk's
 // email verification (prepareVerification) with TOTP 2FA (disableTOTP).
 // These are independent Clerk APIs. Needs proper spec before re-implementing.
-// See: docs/superpowers/plans/2026-04-04-account-security.md
+// See: docs/_archive/specs/deferred/2026-04-04-account-security-design-deferred.md
 
 export function AccountSecurity({
   visible = true,
+  targetName,
 }: {
   visible?: boolean;
+  targetName?: string;
 }): React.JSX.Element | null {
   const { user } = useUser();
   const router = useRouter();
@@ -93,6 +107,7 @@ export function AccountSecurity({
           onPress={() => setShowAddPasswordForm((v) => !v)}
           testID="add-password-row"
           expanded={showAddPasswordForm}
+          targetName={targetName}
         />
         {showAddPasswordForm ? (
           <View className="bg-surface rounded-card px-4 py-3 mb-2">
@@ -109,6 +124,7 @@ export function AccountSecurity({
           onPress={() => setShowEmailForm((v) => !v)}
           testID="change-email-row"
           expanded={showEmailForm}
+          targetName={targetName}
         />
         {showEmailForm ? (
           <View className="bg-surface rounded-card px-4 py-3 mb-2">
@@ -119,6 +135,7 @@ export function AccountSecurity({
           label={t('accountSecurity.manageDevicesLabel')}
           onPress={() => router.push('/(app)/more/security-sessions' as Href)}
           testID="manage-devices-row"
+          targetName={targetName}
         />
       </>
     );
@@ -133,6 +150,7 @@ export function AccountSecurity({
         onPress={() => setShowPasswordForm((v) => !v)}
         testID="change-password-row"
         expanded={showPasswordForm}
+        targetName={targetName}
       />
 
       {showPasswordForm && (
@@ -145,6 +163,7 @@ export function AccountSecurity({
         onPress={() => setShowEmailForm((v) => !v)}
         testID="change-email-row"
         expanded={showEmailForm}
+        targetName={targetName}
       />
       {showEmailForm ? (
         <View className="bg-surface rounded-card px-4 py-3 mb-2">
@@ -155,6 +174,7 @@ export function AccountSecurity({
         label={t('accountSecurity.manageDevicesLabel')}
         onPress={() => router.push('/(app)/more/security-sessions' as Href)}
         testID="manage-devices-row"
+        targetName={targetName}
       />
     </>
   );

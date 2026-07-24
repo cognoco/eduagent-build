@@ -12,6 +12,9 @@ export const PRACTICE_RETURN_TO = 'practice';
 export const PRACTICE_HREF = '/(app)/practice';
 export const JOURNAL_RETURN_TO = 'journal';
 export const JOURNAL_HREF = '/(app)/journal';
+export const SUBJECTS_RETURN_TO = 'subjects';
+export const SUBJECTS_HREF = '/(app)/subjects';
+export const SETTINGS_RETURN_TO = 'settings';
 export const FAMILY_RECAPS_RETURN_TO = 'family-recaps';
 export const FAMILY_RECAPS_HREF = '/(app)/recaps';
 export const FAMILY_PROGRESS_RETURN_TO = 'family-progress';
@@ -21,8 +24,80 @@ export const STUDY_PROGRESS_HREF = '/(app)/progress';
 export const FAMILY_CHILDREN_RETURN_TO = 'family-children';
 export const FAMILY_CHILDREN_HREF = '/(app)/home';
 
+export type V2AccountReturnToken = 'mentor' | 'subjects' | 'journal';
+
+const V2_ACCOUNT_RETURN_HREFS = {
+  mentor: '/(app)/mentor',
+  subjects: '/(app)/subjects',
+  journal: '/(app)/journal',
+} as const satisfies Record<V2AccountReturnToken, Href>;
+
+export function isSessionForwardableReturnTo(
+  returnTo: string | undefined,
+): returnTo is
+  | typeof SUBJECTS_RETURN_TO
+  | typeof LEARNER_HOME_RETURN_TO
+  | typeof OWN_LEARNING_RETURN_TO {
+  return (
+    returnTo === SUBJECTS_RETURN_TO ||
+    returnTo === LEARNER_HOME_RETURN_TO ||
+    returnTo === OWN_LEARNING_RETURN_TO
+  );
+}
+
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
+}
+
+// Pin Account to three V2 tab roots; unknown pushed routes return to Mentor, not retired Home.
+export function accountReturnTokenForPathname(
+  pathname: string,
+): V2AccountReturnToken {
+  const isChildSubjectsRoute =
+    /^\/child\/[^/]+\/(?:curriculum|(?:subjects|topic)\/[^/]+)\/?$/.test(
+      pathname,
+    );
+
+  if (
+    isChildSubjectsRoute ||
+    pathname === '/subjects' ||
+    pathname.startsWith('/subjects/') ||
+    pathname === '/subject' ||
+    pathname.startsWith('/subject/') ||
+    pathname === '/subject-hub' ||
+    pathname.startsWith('/subject-hub/') ||
+    pathname === '/topic' ||
+    pathname.startsWith('/topic/') ||
+    pathname === '/pick-book' ||
+    pathname.startsWith('/pick-book/') ||
+    pathname === '/vocabulary' ||
+    pathname.startsWith('/vocabulary/') ||
+    pathname === '/shelf' ||
+    pathname.startsWith('/shelf/')
+  ) {
+    return 'subjects';
+  }
+  if (pathname === '/journal' || pathname.startsWith('/journal/')) {
+    return 'journal';
+  }
+  return 'mentor';
+}
+
+export function accountReturnToken(
+  returnTo: string | string[] | undefined,
+): V2AccountReturnToken {
+  const token = firstParam(returnTo);
+  return token === 'subjects' || token === 'journal' ? token : 'mentor';
+}
+
+/** Resolve Account's empty-history fallback without trusting arbitrary URLs. */
+export function accountReturnHref(
+  returnTo: string | string[] | undefined,
+  v2Enabled: boolean,
+): Href {
+  if (!v2Enabled) return FAMILY_HOME_PATH as Href;
+
+  return V2_ACCOUNT_RETURN_HREFS[accountReturnToken(returnTo)] as Href;
 }
 
 export function childProfileHref(
@@ -48,6 +123,7 @@ export function homeHrefForReturnTo(
   if (token === LEARNER_HOME_RETURN_TO) return LEARNER_HOME_HREF as Href;
   if (token === PRACTICE_RETURN_TO) return PRACTICE_HREF as Href;
   if (token === JOURNAL_RETURN_TO) return JOURNAL_HREF as Href;
+  if (token === SUBJECTS_RETURN_TO) return SUBJECTS_HREF as Href;
   if (token === FAMILY_RECAPS_RETURN_TO && id) {
     return {
       pathname: '/(app)/recaps/[recapId]',

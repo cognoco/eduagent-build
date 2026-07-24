@@ -20,12 +20,11 @@ import { useRouter, type Href } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MessageBubble, type VerificationBadge } from './MessageBubble';
+import { MessageBubble } from './MessageBubble';
 import { VoiceRecordButton, VoiceTranscriptPreview } from './VoiceRecordButton';
 import { VoiceToggle } from './VoiceToggle';
 import { VoicePlaybackBar } from './VoicePlaybackBar';
 import { useSpeechRecognition } from '../../hooks/use-speech-recognition';
-import { useStickyLoading } from '../../hooks/use-sticky-loading';
 import { useTextToSpeech } from '../../hooks/use-text-to-speech';
 import { useAnnounce } from '../../hooks/use-announce';
 import { stripEnvelopeJson } from '../../lib/strip-envelope';
@@ -34,25 +33,7 @@ import { goBackOrReplace } from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
 import { DeskLampAnimation, MagicPenAnimation } from '../common';
 import Animated, { FadeOut } from 'react-native-reanimated';
-
-export interface ChatMessage {
-  id: string;
-  role: 'assistant' | 'user';
-  content: string;
-  streaming?: boolean;
-  outboxStatus?: 'pending' | 'permanently-failed';
-  kind?: 'reconnect_prompt' | 'session_expired' | 'quota_exceeded';
-  escalationRung?: number;
-  verificationBadge?: VerificationBadge;
-  eventId?: string;
-  isSystemPrompt?: boolean;
-  /** BUG-373: True for programmatically auto-sent messages (homework OCR, queued
-   *  multi-problem). Used to exclude from userMessageCount so the voice/text
-   *  toggle stays visible until the user deliberately sends a message. */
-  isAutoSent?: boolean;
-  /** Local file URI of a homework image attached to this message */
-  imageUri?: string;
-}
+import type { ChatMessage } from './session-types';
 
 interface ChatShellProps {
   title: string;
@@ -251,6 +232,8 @@ const ChatMessageRow = memo(function ChatMessageRow({
         outboxStatus={msg.outboxStatus}
         escalationRung={msg.escalationRung}
         verificationBadge={msg.verificationBadge}
+        mentorNotice={msg.mentorNotice}
+        showInlineThinkingIndicator={false}
         actions={renderMessageActions?.(msg)}
         testID={`message-bubble-${msg.role}-${index}`}
       />
@@ -315,10 +298,16 @@ export function ChatShell({
   const [input, setInput] = useState('');
   const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
 
-  // Hold the desk-lamp "thinking" indicator long enough to perceive even
-  // when streaming is fast. The streamed reply renders alongside it for a
-  // beat — that's intentional and cheaper than a flicker.
-  const showThinking = useStickyLoading(isStreaming, 800);
+  const hasStreamingContent = messages.some(
+    (message) =>
+      message.role === 'assistant' &&
+      message.streaming === true &&
+      message.content.length > 0,
+  );
+  // ChatShell owns pre-token thinking; the message cursor owns token delivery.
+  // Transport streaming stays active across sparse chunks, so these mutually
+  // exclusive predicates clear synchronously on completion or interruption.
+  const showThinking = isStreaming && !hasStreamingContent;
 
   // [PERF-10 safeguard] FlatList virtualisation only kicks in when its
   // `data`, `renderItem`, and `keyExtractor` keep stable references across
@@ -372,15 +361,6 @@ export function ChatShell({
     requestMicrophonePermission,
     getMicrophonePermissionStatus,
   } = useSpeechRecognition({ lang: speechRecognitionLanguage });
-
-  // Proactively prompt for microphone on session entry so voice input is
-  // ready without the user hunting for a toggle. Android forbids silent
-  // grants for RECORD_AUDIO, so this system dialog on first launch is the
-  // closest thing to "allowed by default". Once the user taps Allow, the
-  // grant sticks until they explicitly revoke it in Settings.
-  useEffect(() => {
-    void requestMicrophonePermission();
-  }, [requestMicrophonePermission]);
 
   // BUG-141: STT permission detection must classify-before-format. Previously
   // this branch string-matched `sttError.toLowerCase().includes('permission')`,

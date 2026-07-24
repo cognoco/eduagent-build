@@ -6,6 +6,7 @@ export type NowScope = z.infer<typeof nowScopeSchema>;
 export const nowCardKindSchema = z.enum([
   'billing_alert',
   'unfinished_session',
+  'mentor_notice',
   'retention_due',
   'parked_item',
   'needs_deepening',
@@ -21,6 +22,7 @@ export const nowDeepLinkRouteSchema = z.enum([
   'billing.manage',
   'session.resume',
   'session.summary',
+  'notice.recheck',
   'subject.topic',
   'subject.hub',
   'retention.review',
@@ -47,6 +49,7 @@ export const nowCardParamsSchema = z.record(z.string(), z.unknown()).and(
     subjectId: z.string().uuid().optional(),
     bookId: z.string().uuid().optional(),
     topicId: z.string().uuid().optional(),
+    noticeId: z.string().uuid().optional(),
   }),
 );
 export type NowCardParams = z.infer<typeof nowCardParamsSchema>;
@@ -97,16 +100,37 @@ export const nowQuerySchema = z
   });
 export type NowQuery = z.infer<typeof nowQuerySchema>;
 
+/**
+ * [WI-2504] Server-authoritative mentor-notice policy epoch.
+ *
+ * Opaque to the client: it stores whichever value it last OBSERVED and binds
+ * its persisted Now-feed projection to it, so a rollout flag-off (or a consent
+ * withdrawal, or an actor/subject change) makes every already-persisted entry
+ * unreachable. Derived server-side alongside the visibility predicate V —
+ * `apps/api/src/services/mentor-notices/visibility.ts`.
+ *
+ * `.optional()` rather than the usual response-side `.nullable()`: absence is
+ * not a value the server ever sends (both `/now` routes always set it), it is
+ * how a client recognises a response that carries NO observation at all — an
+ * older worker, or a cache entry persisted before this field existed. Treating
+ * that as "no policy change observed" is exactly the acceptance rule that a
+ * device must not be claimed to know a change it never saw; `null` would
+ * instead assert an observed absence of policy.
+ */
+const mentorNoticePolicyEpochField = z.string().min(1).optional();
+
 export const nowResponseSchema = z.object({
   scope: nowScopeSchema,
   cards: z.array(nowCardSchema).max(3),
   overflowCount: z.number().int().min(0),
   generatedAt: z.string(),
+  mentorNoticePolicyEpoch: mentorNoticePolicyEpochField,
 });
 export type NowResponse = z.infer<typeof nowResponseSchema>;
 
 export const nowOverflowResponseSchema = z.object({
   scope: nowScopeSchema,
   items: z.array(nowOverflowItemSchema),
+  mentorNoticePolicyEpoch: mentorNoticePolicyEpochField,
 });
 export type NowOverflowResponse = z.infer<typeof nowOverflowResponseSchema>;

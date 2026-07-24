@@ -20,6 +20,8 @@ interface CelestialCelebrationProps {
   children?: ReactNode;
 }
 
+const REDUCED_MOTION_CONFIRMATION_MS = 1200;
+
 export function CelestialCelebration({
   color,
   accentColor,
@@ -36,8 +38,10 @@ export function CelestialCelebration({
 
   useEffect(() => {
     if (reduceMotion) {
-      onCompleteRef.current?.();
-      return;
+      const confirmationTimer = setTimeout(() => {
+        onCompleteRef.current?.();
+      }, REDUCED_MOTION_CONFIRMATION_MS);
+      return () => clearTimeout(confirmationTimer);
     }
 
     opacity.value = withSequence(
@@ -60,6 +64,7 @@ export function CelestialCelebration({
       withTiming(-6, { duration: 220 }),
       withTiming(0, { duration: 200 }),
     );
+    return undefined;
   }, [opacity, reduceMotion, scale, translateY]);
 
   const animatedStyle = useAnimatedStyle(() => ({

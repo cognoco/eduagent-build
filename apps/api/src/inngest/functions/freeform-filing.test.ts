@@ -478,9 +478,17 @@ describe('freeformFilingRetry', () => {
 
     it('[WI-550/F-019] skips transcript and filing work when GDPR consent is withdrawn between Inngest steps', async () => {
       // WI-867: source reads isGdprProcessingAllowedV2 (v2, IDENTITY_V2_ENABLED=true).
-      // First step = CONSENTED (proceed to transcript), second step = WITHDRAWN (skip filing).
+      // [WI-2396/WI-2386] Each gate reads the two-purpose parental set and then
+      // the two adult self-consent purposes. The first gate must fully pass
+      // (four CONSENTED entries) before retry-filing sees WITHDRAWN.
       seedConsentState(mockDb as unknown as Record<string, unknown>, {
-        state: ['CONSENTED', 'WITHDRAWN'],
+        state: [
+          'CONSENTED',
+          'CONSENTED',
+          'CONSENTED',
+          'CONSENTED',
+          'WITHDRAWN',
+        ],
       });
       mockGetSessionTranscript.mockResolvedValue({
         session: { sessionId: 'session-001' },
@@ -503,6 +511,43 @@ describe('freeformFilingRetry', () => {
       expect(runNames).toContain('check-gdpr-consent');
       expect(runNames).toContain('retry-filing');
       expect(mockGetSessionTranscript).not.toHaveBeenCalled();
+      expect(mockBuildLibraryIndex).not.toHaveBeenCalled();
+      expect(mockFileToLibrary).not.toHaveBeenCalled();
+      expect(mockResolveFilingResult).not.toHaveBeenCalled();
+      expect(sendEventCalls).toHaveLength(0);
+    });
+
+    // [WI-2396] Basis-inclusive gate: switched from isGdprProcessingAllowedV2
+    // (parental basis only) to isLlmExchangeConsentAllowed, which ALSO honors
+    // an adult's independently-withdrawable self-consent (art6_1_a). Sequence
+    // is [gdpr platform_use, gdpr llm_disclosure,
+    // art6_1_a-platform_use] — CONSENTED, CONSENTED, then WITHDRAWN within
+    // the FIRST (check-gdpr-consent) gate call — proving
+    // the adult leg alone (parental leg passes) now blocks before retry-filing
+    // even runs, which isGdprProcessingAllowedV2 alone would have missed.
+    it('[WI-2396] skips filing and LLM work when GDPR consent is granted but adult self-consent (art6_1_a) is withdrawn', async () => {
+      seedConsentState(mockDb as unknown as Record<string, unknown>, {
+        state: ['CONSENTED', 'CONSENTED', 'WITHDRAWN'],
+      });
+      mockGetSessionTranscript.mockResolvedValue({
+        session: { sessionId: 'session-001' },
+        exchanges: [
+          {
+            role: 'user',
+            content: 'What is gravity?',
+            timestamp: '2026-01-01T00:00:00Z',
+          },
+        ],
+      });
+
+      const { result, sendEventCalls, runNames } =
+        await executeSteps(createEventData());
+
+      expect(result).toEqual({
+        status: 'skipped',
+        reason: 'consent_not_granted',
+      });
+      expect(runNames).not.toContain('retry-filing');
       expect(mockBuildLibraryIndex).not.toHaveBeenCalled();
       expect(mockFileToLibrary).not.toHaveBeenCalled();
       expect(mockResolveFilingResult).not.toHaveBeenCalled();

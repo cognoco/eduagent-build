@@ -32,103 +32,115 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "retention-due"
+      SEED_SCENARIO: 'retention-due'
       API_URL: ${API_URL}
 
 # 2. Home screen
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 15000
 
 # 3. Navigate to Library tab
 # BUG-10/BUG-30: Dev-client shows extra tabs, breaking point-tap positions.
 # Use testID — survives i18n + copy edits and avoids matching the "Library" heading.
 - tapOn:
-    id: "tab-library"
+    id: 'tab-library'
 
 # 4. Wait for Library to load
 - extendedWaitUntil:
     visible:
-      text: "Library"
+      text: 'Library'
     timeout: 10000
 
 # 5. Wait for topic list to finish loading (loading spinner disappears)
 - extendedWaitUntil:
     notVisible:
-      id: "library-loading"
+      id: 'library-loading'
     timeout: 10000
-    optional: true  # justified: library-loading spinner may already be dismissed before this step runs
+    optional: true # justified: library-loading spinner may already be dismissed before this step runs
 
 # 6. Verify shelves are loaded (not empty state).
 #    library-empty is removed from Library; check shelves-list is visible.
 - assertVisible:
-    id: "shelves-list"
+    id: 'shelves-list'
 
-# 7. Tap the first visible topic row. Topic rows in book.tsx show:
-#    - topic.name (e.g., "Biology Topic 1")
-#    - subjectName + "{N} sessions" (separate <Text> nodes)
-#    The retention-due seed creates 3 topics under "Biology" subject.
-#    Tap the first topic by name — "Biology Topic 1" is always present.
-#    NOTE: tapOn text: "sessions" fails — Maestro can't find text inside
-#    nested <Text> children of a <Pressable> with testID.
+# 7. Open the exact subject and book injected by retention-due.
 - tapOn:
-    text: "Biology Topic 1"
+    id: 'shelf-row-header-${SUBJECT_ID}'
 
-# 8. Wait for topic detail screen to load (navigation from book to topic/[topicId])
 - extendedWaitUntil:
     visible:
-      id: "topic-retention-card"
+      id: 'shelf-screen'
+    timeout: 10000
+
+- extendedWaitUntil:
+    visible:
+      id: 'book-card-${BOOK_ID}'
+    timeout: 10000
+
+- tapOn:
+    id: 'book-card-${BOOK_ID}'
+
+- extendedWaitUntil:
+    visible:
+      id: 'book-screen'
+    timeout: 10000
+
+# 8. The seeded topic is the book's scoped resume target.
+- scrollUntilVisible:
+    element:
+      id: 'continue-now-row-${TOPIC_ID}'
+    direction: DOWN
+    timeout: 10000
+    visibilityPercentage: 100
+    centerElement: true
+
+- tapOn:
+    id: 'continue-now-row-${TOPIC_ID}'
+
+# 9. Wait for topic detail and its learner retention receipts.
+- extendedWaitUntil:
+    visible:
+      id: 'topic-detail-scroll'
     timeout: 15000
 
-# 9. Verify retention card shows memory strength label
 - assertVisible:
-    text: "Memory strength"
+    id: 'retention-pill-elapsed'
 
-# 10. Verify retention card shows interval info
 - assertVisible:
-    text: "Interval"
-    optional: true  # justified: Interval field only renders when retention card has interval data; retention-due seed may not populate this field
+    id: 'topic-strong-reviews'
 
-# 11. Verify retention card shows review count
-- assertVisible:
-    text: "Reviews"
-    optional: true  # justified: Reviews field only renders when session history exists; retention-due seed may not include reviews
-
-# 12. Verify progress section shows mastery or status
-- assertVisible:
-    text: "Progress"
-
-# 13. Verify the study CTA renders the not_started label.
+# 10. Verify the study CTA renders the not_started label.
 # retention-due seed has no sessions/assessments -> completionStatus = not_started,
 # so deriveStudyCTA returns label "Start studying". Asserting the exact label
 # pins the derivation: a regression that returns "Review this topic" or any
 # other label for not_started would fail this step.
 - assertVisible:
-    id: "study-cta"
+    id: 'study-cta'
 - assertVisible:
-    text: "Start studying"
+    text: 'Start studying'
 
-# 14. Negative assertion: the in_progress / completed labels must NOT appear
+# 11. Negative assertion: the in_progress / completed labels must NOT appear
 # for a not_started topic. If deriveStudyCTA accidentally falls through to
 # the default branch ("Review this topic"), this catches it.
 - assertNotVisible:
-    text: "Review this topic"
+    text: 'Review this topic'
 - assertNotVisible:
-    text: "Practice again"
+    text: 'Practice again'
 
-# 15. Screenshot of topic detail with study CTA
+# 12. Screenshot of topic detail with study CTA
 - takeScreenshot: topic-detail-study-cta-not-started
 
-# 16. Screenshot of full topic detail with retention metrics
+# 13. Screenshot of full topic detail with retention metrics
 - takeScreenshot: topic-detail-retention
 
-# 17. Tap back to return to Library
+# 14. Tap back to return to the seeded book
 - tapOn:
-    id: "topic-detail-back"
+    id: 'topic-detail-back'
 
-# 18. Verify we're back on Library
+# 15. Verify we're back on the book screen
 - extendedWaitUntil:
     visible:
-      text: "Library"
+      id: 'book-screen'
     timeout: 5000

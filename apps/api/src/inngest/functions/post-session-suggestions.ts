@@ -10,7 +10,7 @@ import {
   subjects,
 } from '@eduagent/database';
 import { routeAndCall, parseConversationLanguage } from '../../services/llm';
-import { isGdprProcessingAllowedV2 } from '../../services/identity-v2/consent-status-v2';
+import { isLlmExchangeConsentAllowed } from '../../services/identity-v2/consent-status-v2';
 import { getPersonLlmContext } from '../../services/identity-v2/helpers';
 import { extractFirstJsonObject } from '../../services/llm/extract-json';
 import { sanitizeXmlValue } from '../../services/llm/sanitize';
@@ -106,14 +106,16 @@ export const postSessionSuggestions = inngest.createFunction(
       if (!ownerSubject)
         return { status: 'skipped' as const, reason: 'ownership mismatch' };
 
-      // [WI-116] Re-check current GDPR consent at execution time. This job runs
+      // [WI-116] Re-check current consent at execution time. This job runs
       // on the Inngest endpoint, outside the HTTP consent middleware, so a
       // filing event queued before consent withdrawal (or a replay) must not
       // send learner curriculum data to the LLM or persist derived suggestions
       // for a profile whose consent is no longer granted.
       // [CUT-B1 §2.5(i)] v2 seam: the GDPR gate reads the consent_grant/request
       // resolver (basis-pinned GDPR); legacy reads consent_states.
-      const gdprAllowed = await isGdprProcessingAllowedV2(db, profileId);
+      // [WI-2396] isLlmExchangeConsentAllowed also honors adult self-consent
+      // (art6_1_a) withdrawal, not only the parental basis.
+      const gdprAllowed = await isLlmExchangeConsentAllowed(db, profileId);
       if (!gdprAllowed) {
         return { status: 'skipped' as const, reason: 'consent_not_granted' };
       }
@@ -218,7 +220,9 @@ Suggest exactly 2 new topic titles that would be natural next steps within this 
           extra: {
             surface: 'post-session-suggestions',
             reason: 'invalid_json',
-            jsonStrSample: jsonStr.slice(0, 200),
+            // [WI-1990] Length only — a slice of the LLM's suggestions JSON
+            // can echo learner-entered content. Never send raw content.
+            jsonStrLength: jsonStr.length,
           },
         });
         return {

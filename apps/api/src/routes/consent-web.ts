@@ -12,9 +12,8 @@ import {
   getPersonDisplayNameV2,
   getGdprGrantWithdrawalStateV2,
   withdrawConsentByToken,
-  restoreConsentByToken,
   ConsentRecordNotFoundError,
-  ConsentGracePeriodExpiredError,
+  ConsentReconsentRequiredError,
 } from '../services/identity-v2/consent-v2';
 import {
   signWithdrawalToken,
@@ -124,7 +123,7 @@ function withdrawConfirmBody(
 ): string {
   const safeName = escapeHtml(childName);
   return `<h1>Withdraw consent for ${safeName}?</h1>
-    <p>Withdrawing stops MentoMate from processing ${safeName}'s data right away. The account is paused, and the data is permanently deleted after a 7-day grace period.</p>
+    <p>Withdrawing stops ${safeName}'s learning sessions right away. The account is paused, and the data is permanently deleted after a 7-day grace period.</p>
     <p>You can undo this within those 7 days — we'll show you how on the next screen.</p>
     <form method="POST" action="${withdrawActionUrl}" style="display:contents">
       <input type="hidden" name="token" value="${escapeHtml(token)}" />
@@ -134,20 +133,14 @@ function withdrawConfirmBody(
     <p class="info">To keep your consent, just close this tab — nothing changes.</p>`;
 }
 
-/** Post-withdrawal landing with the undo (restore) button (in grace). */
-function withdrawnLandingBody(
-  childName: string,
-  token: string,
-  restoreActionUrl: string,
-): string {
+/** Post-withdrawal landing (in grace). [WI-2348 / OPQ-114] The link can no
+ * longer restore — restoring now requires signing in to the account, so this
+ * page informs rather than offers an "Undo" form. */
+function withdrawnLandingBody(childName: string): string {
   const safeName = escapeHtml(childName);
   return `<h1>Consent withdrawn</h1>
-    <p>You've withdrawn consent for ${safeName}. We've stopped processing their data, and it will be permanently deleted after a 7-day grace period.</p>
-    <p>Changed your mind? You can restore consent any time within those 7 days.</p>
-    <form method="POST" action="${restoreActionUrl}" style="display:contents">
-      <input type="hidden" name="token" value="${escapeHtml(token)}" />
-      <button type="submit" class="btn btn-primary">Undo — restore consent</button>
-    </form>
+    <p>You've withdrawn consent for ${safeName}. Their learning sessions have stopped, and their data will be permanently deleted after a 7-day grace period.</p>
+    <p>Changed your mind? Restoring consent now requires signing in to the MentoMate account, within those 7 days.</p>
     <p class="info">After 7 days the data is permanently removed and can no longer be restored. You may now close this tab.</p>`;
 }
 
@@ -159,19 +152,13 @@ function nothingToWithdrawBody(childName: string): string {
     ${errorActionHtml()}`;
 }
 
-/** Successful restore (undo) landing. */
-function consentRestoredBody(childName: string): string {
-  const safeName = escapeHtml(childName);
-  return `<h1>Consent restored</h1>
-    <p>${safeName}'s MentoMate account is active again. Nothing was deleted.</p>
-    <p class="info">You can manage or withdraw your consent again at any time using the link in your confirmation email. You may now close this tab.</p>`;
-}
-
-/** Restore attempted after the 7-day grace — the data is already gone. */
-function graceExpiredBody(childName: string): string {
-  const safeName = escapeHtml(childName);
-  return `<h1 class="error">Grace period has expired</h1>
-    <p>The 7-day grace period for ${safeName}'s account has passed, so the data has already been permanently removed and can no longer be restored.</p>
+/** [WI-2348 / OPQ-114] Response for any POST to the (now non-mutating)
+ * restore link: possession of the withdrawal link no longer authorizes
+ * restore. Static — carries no grace/child-state detail, so it also leaks
+ * nothing about the underlying grant. */
+function restoreRequiresSignInBody(): string {
+  return `<h1>Sign in to restore consent</h1>
+    <p>Restoring a withdrawn consent now requires signing in to the MentoMate account — this link can no longer do it on its own.</p>
     ${errorActionHtml()}`;
 }
 
@@ -538,11 +525,12 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
       if (approved && v2Result) {
         const secret = c.env.CONSENT_WITHDRAWAL_TOKEN_SECRET;
         const apiOrigin = c.env.API_ORIGIN;
-        if (secret && apiOrigin) {
+        if (secret && apiOrigin && v2Result.withdrawalTokenId) {
           const withdrawalToken = signWithdrawalToken(
             v2Result.chargePersonId,
             v2Result.organizationId,
             secret,
+            { tokenId: v2Result.withdrawalTokenId },
           );
           const basePath = c.req.path.replaceAll('/consent-page/confirm', '');
           withdrawalUrl = `${apiOrigin}${basePath}/consent-page/withdraw?token=${encodeURIComponent(
@@ -666,6 +654,19 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
         );
       }
 
+      if (error instanceof ConsentReconsentRequiredError) {
+        return c.html(
+          pageLayout(
+            'New Request Needed',
+            `<h1 class="error">A new consent request is needed</h1>
+             <p>This link predates the current consent choices and cannot authorize them.</p>
+             <p>Ask your child to send a new consent request from the app.</p>
+             ${errorActionHtml()}`,
+          ),
+          409,
+        );
+      }
+
       throw error;
     }
   })
@@ -699,6 +700,10 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
       db,
       payload.chargePersonId,
       payload.organizationId,
+      // [WI-2347] `?? null`: a cw1 token has no tokenId (undefined); the
+      // service layer treats `undefined` as "skip the check" (edge-only
+      // callers), so a bearer-token call must always pass a defined value.
+      payload.tokenId ?? null,
     );
 
     // No current grant (never approved, or already deleted past grace) →
@@ -712,17 +717,10 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
 
     const basePath = c.req.path.replaceAll('/consent-page/withdraw', '');
 
-    // Already withdrawn (in grace) → the undo (restore) landing.
+    // Already withdrawn (in grace) → the informational landing.
     if (state.withdrawnAt) {
       return c.html(
-        pageLayout(
-          'Consent Withdrawn',
-          withdrawnLandingBody(
-            childName,
-            token,
-            `${basePath}/consent-page/restore`,
-          ),
-        ),
+        pageLayout('Consent Withdrawn', withdrawnLandingBody(childName)),
       );
     }
 
@@ -778,6 +776,8 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
         payload.chargePersonId,
         payload.organizationId,
         audit,
+        // [WI-2347] see the GET-withdraw call site above for the `?? null` rationale.
+        payload.tokenId ?? null,
       );
 
       // Durable grace→delete via Inngest (engine rule: durable async →
@@ -803,16 +803,8 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
         void dispatch;
       }
 
-      const basePath = c.req.path.replaceAll('/consent-page/withdraw', '');
       return c.html(
-        pageLayout(
-          'Consent Withdrawn',
-          withdrawnLandingBody(
-            childName,
-            token,
-            `${basePath}/consent-page/restore`,
-          ),
-        ),
+        pageLayout('Consent Withdrawn', withdrawnLandingBody(childName)),
       );
     } catch (error) {
       // Stale link / never approved → safe no-op page.
@@ -828,8 +820,14 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
   /**
    * POST /consent-page/restore
    *
-   * The undo: re-grant within the 7-day grace. Outside grace the data is
-   * already permanently removed → friendly "grace expired" page.
+   * [WI-2348 / OPQ-114] Possession of the withdrawal link no longer
+   * authorizes restore (MMT-ADR-0029, amended). This route never mutates —
+   * it verifies the token only to distinguish a malformed/forged request
+   * (400) from a well-formed one, and always responds with the "sign in to
+   * restore" informational page for the latter, regardless of the
+   * underlying grant's state. Restore itself is `restoreConsentV2` /
+   * `PUT /consent/:childProfileId/restore`, gated on an authenticated,
+   * account-owner session.
    */
   .post('/consent-page/restore', async (c) => {
     const limited = consentPageRateLimit(c);
@@ -844,41 +842,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
       return c.html(pageLayout('Invalid Link', withdrawInvalidLinkBody()), 400);
     }
 
-    const db = c.get('db');
-    const childName =
-      (await getPersonDisplayNameV2(db, payload.chargePersonId)) ??
-      'your child';
-    const audit = {
-      requestIp:
-        c.req.header('cf-connecting-ip') ??
-        c.req.header('x-forwarded-for') ??
-        undefined,
-      userAgent: c.req.header('user-agent') ?? undefined,
-    };
-
-    try {
-      await restoreConsentByToken(
-        db,
-        payload.chargePersonId,
-        payload.organizationId,
-        audit,
-      );
-      return c.html(
-        pageLayout('Consent Restored', consentRestoredBody(childName)),
-      );
-    } catch (error) {
-      if (error instanceof ConsentGracePeriodExpiredError) {
-        return c.html(
-          pageLayout('Grace Period Expired', graceExpiredBody(childName)),
-          410,
-        );
-      }
-      // No grant to restore (already deleted, or never withdrawn) → safe page.
-      if (error instanceof ConsentRecordNotFoundError) {
-        return c.html(
-          pageLayout('Nothing to Restore', nothingToWithdrawBody(childName)),
-        );
-      }
-      throw error;
-    }
+    return c.html(
+      pageLayout('Sign In to Restore', restoreRequiresSignInBody()),
+    );
   });

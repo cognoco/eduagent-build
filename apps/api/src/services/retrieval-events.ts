@@ -14,6 +14,7 @@ import {
   retrievalVerdictEnum,
   type Database,
 } from '@eduagent/database';
+import type { RecallFeedback } from '@eduagent/schemas';
 
 // Single-source the union types from the pgEnum tuples so adding a value to the
 // schema can never silently drift from this service (the old hand-typed copies
@@ -43,10 +44,17 @@ export type RecallGrade =
       rationale: string | null;
       misconception: string | null;
       rung: number | null;
+      // [WI-2114] Answer-specific learner-facing feedback (mentor-prose in the
+      // learner's conversation_language). null when the grader omitted it — the
+      // caller then leaves response.feedback unset and the client falls back to
+      // its generic copy.
+      feedback: RecallFeedback | null;
     }
   | { graded: false; gradedBy: 'fallback_heuristic' };
 
 export interface RecordRetrievalEventInput {
+  /** Deterministic first-party receipt id for retry-safe call sites. */
+  receiptId?: string;
   profileId: string;
   subjectId: string;
   topicId: string;
@@ -68,15 +76,18 @@ export interface RecordRetrievalEventInput {
 }
 
 /**
- * Append one row to the recall log. Caller-facing failures are the caller's
- * responsibility: at non-core sites wrap this in `safeWrite` so a log failure
- * never breaks the learner's action.
+ * Append one row to the recall log. Retry-safe callers may provide a receiptId;
+ * the return is false when that receipt already exists and true when this call
+ * inserted the row. Caller-facing failures are the caller's responsibility: at
+ * non-core sites wrap this in `safeWrite` so a log failure never breaks the
+ * learner's action.
  */
 export async function recordRetrievalEvent(
   db: Database,
   input: RecordRetrievalEventInput,
-): Promise<void> {
-  await db.insert(retrievalEvents).values({
+): Promise<boolean> {
+  const values = {
+    ...(input.receiptId ? { id: input.receiptId } : {}),
     profileId: input.profileId,
     subjectId: input.subjectId,
     topicId: input.topicId,
@@ -92,5 +103,17 @@ export async function recordRetrievalEvent(
     misconception: input.misconception ?? null,
     evidenceUsed: input.evidenceUsed ?? [],
     llmRoutingRung: input.llmRoutingRung ?? null,
-  });
+  };
+
+  if (!input.receiptId) {
+    await db.insert(retrievalEvents).values(values);
+    return true;
+  }
+
+  const inserted = await db
+    .insert(retrievalEvents)
+    .values(values)
+    .onConflictDoNothing({ target: retrievalEvents.id })
+    .returning({ id: retrievalEvents.id });
+  return inserted.length === 1;
 }

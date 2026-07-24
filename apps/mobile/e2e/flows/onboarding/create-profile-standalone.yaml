@@ -75,10 +75,10 @@ tags:
 - tapOn:
     id: "profiles-add-button"
 
-# 9. Wait for "New profile" screen
+# 9. Wait for the create-profile form by its stable name control.
 - extendedWaitUntil:
     visible:
-      text: "New profile"
+      id: "create-profile-name"
     timeout: 10000
 
 - takeScreenshot: create-profile-empty

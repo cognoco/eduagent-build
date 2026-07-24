@@ -574,11 +574,17 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       llmOutput = vocabularyLlmOutputSchema.parse(
         JSON.parse(extractJsonObject(raw)),
       );
-    } catch (parseErr) {
+    } catch {
+      // [WI-1990 rework] Do NOT pass the raw JSON.parse/Zod error to
+      // captureException — V8's SyntaxError message embeds a literal
+      // snippet of the malformed text (`Unexpected token 'S', "Sure! Here"
+      // ...`), and `raw` here is the learner-facing quiz LLM response.
+      // Synthesize a content-free error carrying only length metadata,
+      // matching the services/llm/providers/errors.ts pattern.
       captureException(
-        parseErr instanceof Error
-          ? parseErr
-          : new Error('Quiz LLM parse failed'),
+        new Error('Quiz LLM parse failed', {
+          cause: { rawLength: raw.length },
+        }),
         {
           userId: undefined,
           profileId,
@@ -644,11 +650,17 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       llmOutput = guessWhoLlmOutputSchema.parse(
         JSON.parse(extractJsonObject(raw)),
       );
-    } catch (parseErr) {
+    } catch {
+      // [WI-1990 rework] Do NOT pass the raw JSON.parse/Zod error to
+      // captureException — V8's SyntaxError message embeds a literal
+      // snippet of the malformed text (`Unexpected token 'S', "Sure! Here"
+      // ...`), and `raw` here is the learner-facing quiz LLM response.
+      // Synthesize a content-free error carrying only length metadata,
+      // matching the services/llm/providers/errors.ts pattern.
       captureException(
-        parseErr instanceof Error
-          ? parseErr
-          : new Error('Quiz LLM parse failed'),
+        new Error('Quiz LLM parse failed', {
+          cause: { rawLength: raw.length },
+        }),
         {
           userId: undefined,
           profileId,

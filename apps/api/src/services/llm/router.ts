@@ -18,15 +18,46 @@ import type { LLMTier } from '../subscription';
 import { createLogger } from '../logger';
 import {
   resolveExchangeRouter,
-  resolveJudgeConfig,
   NoEligibleModelError,
   type ExchangeRouterRow,
 } from '../policy-engine';
+import {
+  getLlmRequestEnvironment,
+  getLlmRequestKillSwitchSnapshot,
+  getLlmRequestRoutingV2Enabled,
+  readLlmRequestKillSwitch,
+} from './request-context';
 const logger = createLogger();
 
 export type PreferredLlmProvider = 'gemini' | 'openai' | 'anthropic';
 export type LlmProviderPolicy = 'default' | 'gemini_only';
 export type LlmCapability = 'text' | 'vision' | 'judge';
+
+// ---------------------------------------------------------------------------
+// JudgeIndependence (WI-2624 — MMT-ADR-0016 §2 vendor-independence contract).
+//
+// Every `capability:'judge'` routeAndCall site must declare ONE of these.
+// This replaces the old "preselect the opposite vendor and pass it in as
+// `preferredProvider`" hack (judge-suitability.ts's former `selectJudgeProvider`),
+// which double-flipped through the legacy `getModelConfig` judge branch: that
+// branch re-derived a "tutorConfig" via a recursive `getModelConfig(...,
+// 'text')` call using the ALREADY-FLIPPED `preferredProvider` as its own
+// preferred-provider hint, so `tutorConfig.provider` resolved to the flipped
+// vendor rather than the real producer; `resolveGraderConfig` then excluded
+// THAT vendor, flipping back to the real producer — defeating independence.
+//
+// - 'model-output': the judge is grading a specific tutor/model reply.
+//   `producerVendor` MUST be the vendor that actually produced that reply —
+//   never a preselected/derived stand-in. The router excludes this vendor
+//   (normalized) from judge selection.
+// - 'not-applicable': the judge is grading the LEARNER's input (an answer,
+//   an explanation), not any model's output — there is no producer vendor to
+//   exclude. The router still never selects Gemini/Vertex for a judge (§10.1)
+//   but applies no producer exclusion.
+// ---------------------------------------------------------------------------
+export type JudgeIndependence =
+  | { mode: 'model-output'; producerVendor: string }
+  | { mode: 'not-applicable' };
 
 function getMessageCapability(messages: ChatMessage[]): LlmCapability {
   return messages.some(
@@ -116,7 +147,7 @@ async function captureLlmFallbackSignal(input: {
 //
 // One structured line per successful LLM call, written to the same logger
 // pipeline all other router observability goes through. Downstream dashboard
-// query (docs/superpowers/plans/2026-04-23-llm-never-truncate.md appendix A):
+// query (docs/_archive/plans/done/2026-04-23-llm-never-truncate-phase1-implemented.md appendix A):
 //
 //   count by stop_reason, flow over 24h
 //   rate(stop_reason="length") / rate(*) by flow
@@ -209,7 +240,7 @@ function logStopReason(fields: {
     response_chars: fields.responseChars,
     // WI-1505 — environment tag so an external log/metrics pipeline can sum
     // this line by (provider, environment) for aggregate daily spend/volume.
-    environment: llmEnvironment,
+    environment: getLlmRequestEnvironment(llmEnvironment),
     // WI-1827 — cache-usage tokens (only when present).
     ...usageLogFields(fields.usage),
   });
@@ -274,18 +305,19 @@ const SAFETY_RULES =
   'If a request touches these areas, politely decline and redirect to the learning topic.';
 
 // BKT-C.1 — ISO 639-1 → English name for the preamble line.
-const CONVERSATION_LANGUAGE_NAMES: Record<ConversationLanguage, string> = {
-  en: 'English',
-  cs: 'Czech',
-  es: 'Spanish',
-  fr: 'French',
-  de: 'German',
-  it: 'Italian',
-  pt: 'Portuguese',
-  pl: 'Polish',
-  ja: 'Japanese',
-  nb: 'Norwegian',
-};
+export const CONVERSATION_LANGUAGE_NAMES: Record<ConversationLanguage, string> =
+  {
+    en: 'English',
+    cs: 'Czech',
+    es: 'Spanish',
+    fr: 'French',
+    de: 'German',
+    it: 'Italian',
+    pt: 'Portuguese',
+    pl: 'Polish',
+    ja: 'Japanese',
+    nb: 'Norwegian',
+  };
 
 function getSafetyPreamble(ageBracket?: AgeBracket): string {
   // Unknown age: stay neutral on identity and let per-flow prompts handle
@@ -477,16 +509,12 @@ export function setOpenAIAdvancedModel(
 export const _setOpenAIAdvancedModelForTesting = setOpenAIAdvancedModel;
 
 // ---------------------------------------------------------------------------
-// LLM_ROUTING_V2_ENABLED — module-level cutover flag (MMT-ADR-0016 §1.5).
+// LLM_ROUTING_V2_ENABLED — request-local cutover flag (MMT-ADR-0016 §1.5).
 //
-// The router is a pure module with no Hono context, so the flag is injected at
-// worker boot from middleware/llm.ts (mirrors `setOpenAIAdvancedModel`), read
-// from the Doppler-sourced `LLM_ROUTING_V2_ENABLED` env var. Default `false`:
-// EVERY routing change in this PR is inert until middleware flips it on, so the
-// Gemini-default path (and its equivalence snapshot) stays byte-identical while
-// the flag is off. Kept module-level (not a per-call option) so
-// getModelConfig/getFallbackConfig can read it without threading a flag through
-// every call site.
+// middleware/llm.ts establishes the request context from the Doppler-sourced
+// env var. AsyncLocalStorage keeps overlapping Worker requests isolated without
+// threading a flag through every call site. The module value below remains an
+// explicit no-context/test fallback; production requests read their own value.
 // ---------------------------------------------------------------------------
 let routingV2Enabled = false;
 
@@ -496,21 +524,19 @@ export function setLlmRoutingV2Enabled(enabled: boolean): void {
 
 /** Exported for testing only — read/reset the V2 routing flag. */
 export function _getLlmRoutingV2Enabled(): boolean {
-  return routingV2Enabled;
+  return getLlmRequestRoutingV2Enabled(routingV2Enabled);
 }
 
 // ---------------------------------------------------------------------------
 // WI-1505 — Aggregate LLM traffic kill switch (operator override).
 //
-// Mirrors the routingV2Enabled pattern above: router.ts is a pure module with
-// no Hono context, so the flag is injected at the TOP of every request by
-// middleware/llm.ts, which does a per-request KV read
-// (services/kv.ts readLlmKillSwitch, backed by SUBSCRIPTION_KV, key
-// `llm:kill-switch`). Because the read happens on every request (not once at
-// worker boot), a KV write takes effect on the NEXT request with no mobile
-// release and no Worker redeploy. Default `false` (off) so this is inert
-// until an operator explicitly flips the KV key — see
-// docs/runbooks/llm-kill-switch.md.
+// middleware/llm.ts carries SUBSCRIPTION_KV in request-local state without
+// reading it. The first routeAndCall/routeAndStream choke point lazily reads
+// `llm:kill-switch` once for that request, so non-LLM traffic performs no KV
+// I/O and an operator write takes effect on the next LLM request without a
+// release or redeploy. The module value below is an explicit no-context/test
+// fallback only; production requests default fail-open when the binding is
+// absent. See docs/runbooks/llm-kill-switch.md.
 // ---------------------------------------------------------------------------
 let llmKillSwitchActive = false;
 
@@ -520,7 +546,7 @@ export function setLlmKillSwitchActive(active: boolean): void {
 
 /** Exported for testing only — read the kill-switch flag. */
 export function _getLlmKillSwitchActive(): boolean {
-  return llmKillSwitchActive;
+  return getLlmRequestKillSwitchSnapshot(llmKillSwitchActive);
 }
 
 /**
@@ -536,8 +562,8 @@ export function _getLlmKillSwitchActive(): boolean {
  * operator-triggered block from an organic provider circuit trip in
  * Sentry/logs.
  */
-function checkLlmKillSwitch(): void {
-  if (!llmKillSwitchActive) return;
+async function checkLlmKillSwitch(): Promise<void> {
+  if (!(await readLlmRequestKillSwitch(llmKillSwitchActive))) return;
   logger.warn('llm.kill_switch.active', {
     event: 'llm.kill_switch.blocked',
   });
@@ -547,8 +573,9 @@ function checkLlmKillSwitch(): void {
 // ---------------------------------------------------------------------------
 // WI-1505 — Aggregate LLM spend/request-volume observability.
 //
-// `environment` is injected the same way as the kill switch (per-request, via
-// middleware/llm.ts) purely for metric tagging — it does not affect routing.
+// `environment` is carried in the same request-local context as the kill
+// switch, purely for metric tagging — it does not affect routing. The module
+// value below is an explicit no-context/test fallback.
 // The primary aggregate signal is the environment-tagged `llm.stop_reason`
 // structured log line (see logStopReason below): an external log/metrics
 // pipeline sums that line by (provider, environment) for the authoritative
@@ -584,7 +611,8 @@ function currentUtcDate(): string {
 }
 
 function recordVolumeMetric(provider: string): void {
-  const key = `${provider}:${llmEnvironment}`;
+  const environment = getLlmRequestEnvironment(llmEnvironment);
+  const key = `${provider}:${environment}`;
   const today = currentUtcDate();
   let counter = volumeCounters.get(key);
   if (!counter || counter.utcDate !== today) {
@@ -607,7 +635,7 @@ function recordVolumeMetric(provider: string): void {
       event: 'llm.volume.daily_threshold_exceeded',
       surface: 'llm_volume_alert',
       provider,
-      environment: llmEnvironment,
+      environment,
       count: counter.count,
       threshold: LLM_DAILY_VOLUME_ALERT_THRESHOLD,
       utc_date: today,
@@ -645,33 +673,120 @@ const V2_ADVANCED_MODEL_MIN_RUNG = 4;
 const FALLBACK_FORBIDDEN: ReadonlySet<string> = new Set(['gemini', 'vertex']);
 
 /**
- * Resolve the ModelConfig for the judge/grader capability (ADR-0016 §2).
- * Vendor-independent: grader never shares provider with the tutor.
- * Non-reasoning: `reasoningEffort` is absent so the Anthropic adapter
- * passes the model verbatim without extended-thinking headers.
- *
- * The logic mirrors `selectJudgeProvider()` in judge-suitability.ts —
- * inlined here to avoid a circular dependency (judge-suitability.ts imports
- * `routeAndCall` from this module, so router.ts cannot import from it).
- * `resolveJudgeConfig` from policy-engine is safe to import because
- * policy-engine/judge.ts has no dependency on router.ts.
+ * Judge/grader vendor pool (ADR-0016 §2). Gemini/Vertex is never a candidate
+ * (§10.1 — under-18 ban, and the judge role never wants Gemini regardless of
+ * age). Order matters: Anthropic first, OpenAI second (spec + WI-2624).
  */
-function resolveGraderConfig(tutorVendor: string): ModelConfig {
-  const { vendorConstraint } = resolveJudgeConfig({ tutorVendor });
-  const excluded = vendorConstraint.replace(/^!/, '').trim().toLowerCase();
-  // Prefer anthropic; fall to openai only when anthropic IS the excluded
-  // vendor.  Never Gemini (under-18 compliance, ADR-0016 §10.1).
-  const graderProvider: ModelConfig['provider'] =
-    excluded === 'anthropic' ? 'openai' : 'anthropic';
+const JUDGE_VENDOR_ORDER: ReadonlyArray<'anthropic' | 'openai'> = [
+  'anthropic',
+  'openai',
+];
+
+/**
+ * Normalize a producer vendor string for exclusion comparison. "google" and
+ * "vertex" are the Gemini family under different naming — normalized so a
+ * Gemini-family producer maps onto the same exclusion key the router already
+ * uses elsewhere (`FALLBACK_FORBIDDEN`'s 'gemini'/'vertex' pair, §10.1).
+ * Gemini is never in `JUDGE_VENDOR_ORDER` anyway, so this normalization only
+ * matters for correctly recognizing a Gemini-family producer as "not
+ * anthropic/openai" — it can never accidentally match/exclude one of the two
+ * real judge candidates.
+ */
+function normalizeVendorForExclusion(vendor: string): string {
+  const normalized = vendor.trim().toLowerCase();
+  return normalized === 'google' || normalized === 'vertex'
+    ? 'gemini'
+    : normalized;
+}
+
+/**
+ * Resolve the eligible judge vendor pool for this independence declaration,
+ * in preference order (Anthropic first, OpenAI second). Always excludes
+ * Gemini/Vertex (they are simply never in `JUDGE_VENDOR_ORDER`). Under
+ * 'model-output', additionally excludes the declared producer vendor. Never
+ * returns an empty array from a single exclusion — the pool has 2 members
+ * and a producer can match at most 1.
+ */
+function resolveJudgeEligibleVendors(
+  independence: JudgeIndependence | undefined,
+): ReadonlyArray<'anthropic' | 'openai'> {
+  if (independence?.mode !== 'model-output') return JUDGE_VENDOR_ORDER;
+  const excluded = normalizeVendorForExclusion(independence.producerVendor);
+  return JUDGE_VENDOR_ORDER.filter((vendor) => vendor !== excluded);
+}
+
+function judgeVendorModelConfig(
+  vendor: 'anthropic' | 'openai',
+  shared?: Pick<ModelConfig, 'responseFormat' | 'conversationLanguage'>,
+): ModelConfig {
   return {
-    provider: graderProvider,
-    // GRADER_MODEL is the anthropic occupant.  If the vendor guard forces
-    // openai, use the V2 lightweight secondary (OPENAI_MINI_MODEL) which is
-    // the smallest available OpenAI model in the V2 matrix.
-    model: graderProvider === 'anthropic' ? GRADER_MODEL : OPENAI_MINI_MODEL,
+    provider: vendor,
+    // GRADER_MODEL is the anthropic occupant. When the vendor guard forces
+    // openai, use the V2 lightweight secondary (OPENAI_MINI_MODEL) — the
+    // smallest available OpenAI model in the V2 matrix.
+    model: vendor === 'anthropic' ? GRADER_MODEL : OPENAI_MINI_MODEL,
     maxTokens: MIN_REPLY_MAX_TOKENS,
+    ...shared,
     // reasoningEffort intentionally absent — non-reasoning per ADR-0016 §2.
   };
+}
+
+/**
+ * Resolve the PRIMARY ModelConfig for the judge/grader capability (ADR-0016
+ * §2). Vendor-independent: grader never shares a producer vendor with the
+ * declared `JudgeIndependence`. Non-reasoning: `reasoningEffort` is absent so
+ * the Anthropic adapter passes the model verbatim without extended-thinking
+ * headers. Never returns Gemini/Vertex (§10.1).
+ */
+function resolveGraderConfig(
+  independence: JudgeIndependence | undefined,
+): ModelConfig {
+  const eligible = resolveJudgeEligibleVendors(independence);
+  const primaryVendor = eligible[0];
+  if (!primaryVendor) {
+    // Unreachable: JUDGE_VENDOR_ORDER has 2 members and a single producer
+    // exclusion removes at most 1, so this always resolves. Guarded (rather
+    // than a non-null assertion) so a future change to JUDGE_VENDOR_ORDER
+    // fails loudly instead of silently routing an unservable config.
+    throw new Error(
+      'resolveGraderConfig: no eligible judge vendor (unreachable)',
+    );
+  }
+  return judgeVendorModelConfig(primaryVendor);
+}
+
+/**
+ * Resolve the FALLBACK ModelConfig for the judge/grader capability when the
+ * primary judge provider's circuit is open or the primary call failed
+ * (WI-2624 AC-2/AC-4 — closes the fallback leak: `getFallbackConfig`/
+ * `getFallbackConfigV2` previously fell through to their generic,
+ * vendor-agnostic candidate ladder for a failed judge primary, which could
+ * silently fail back onto the excluded producer vendor).
+ *
+ * Excludes both the declared producer vendor (model-output mode) AND the
+ * primary's own vendor (the one that just failed). When that leaves no
+ * eligible vendor — the decisive case: producer=Anthropic → primary=OpenAI
+ * → OpenAI's circuit trips → the only remaining candidate is Anthropic, the
+ * excluded producer — there is no safe fallback. Surfaces via the SAME
+ * mapping `pickThroughExchangeRouter` uses for an emptied eligible set, so
+ * callers do not need a new error type to handle.
+ */
+function resolveGraderFallbackConfig(
+  primary: ModelConfig,
+  independence: JudgeIndependence | undefined,
+): ModelConfig {
+  const shared = {
+    responseFormat: primary.responseFormat,
+    conversationLanguage: primary.conversationLanguage,
+  } satisfies Pick<ModelConfig, 'responseFormat' | 'conversationLanguage'>;
+
+  const fallbackVendor = resolveJudgeEligibleVendors(independence).find(
+    (vendor) => vendor !== primary.provider,
+  );
+  if (!fallbackVendor) {
+    throw new CircuitOpenError('policy-engine', 'policy:no-eligible-model');
+  }
+  return judgeVendorModelConfig(fallbackVendor, shared);
 }
 
 /**
@@ -683,13 +798,16 @@ function getModelConfigV2(
   rung: EscalationRung,
   llmTier: LLMTier,
   capability: LlmCapability,
+  judgeIndependence?: JudgeIndependence,
 ): ModelConfig {
   // Judge capability: tier/age/region-blind, vendor-independent (ADR-0016 §2).
-  // Derive the tutor vendor from the V2 text matrix (same rung/tier) so the
-  // grader is always on a different vendor.
+  // WI-2624: the caller declares the JudgeIndependence explicitly (which
+  // vendor produced the output under review, or 'not-applicable') instead of
+  // this function re-deriving a "tutor vendor" from the V2 text matrix — that
+  // re-derivation was a guess, not the real producer, and could silently
+  // agree with a preselected/flipped `preferredProvider` hint from the caller.
   if (capability === 'judge') {
-    const tutorConfig = getModelConfigV2Matrix(rung, llmTier, 'text');
-    return resolveGraderConfig(tutorConfig.provider);
+    return resolveGraderConfig(judgeIndependence);
   }
   return pickThroughExchangeRouter(
     getModelConfigV2Matrix(rung, llmTier, capability),
@@ -866,32 +984,31 @@ function getModelConfig(
   providerPolicy: LlmProviderPolicy = 'default',
   capability: LlmCapability = 'text',
   ageBracket?: AgeBracket,
+  judgeIndependence?: JudgeIndependence,
 ): ModelConfig {
   // V2 cutover: the §1.5 matrix is authoritative for ALL tiers/policies. It is
   // checked before every legacy branch (including gemini_only and
   // preferredProvider) so no flag-on request can resolve to a banned vendor.
   // The judge capability is passed through to getModelConfigV2 which handles
   // it independently, keeping V2 and legacy paths in sync.
-  if (routingV2Enabled) {
-    return getModelConfigV2(rung, llmTier, capability);
+  if (getLlmRequestRoutingV2Enabled(routingV2Enabled)) {
+    return getModelConfigV2(rung, llmTier, capability, judgeIndependence);
   }
 
   // Legacy path: judge capability is tier/age/region-blind (ADR-0016 §2), and
   // resolveGraderConfig never returns Gemini by construction (§10.1) — so it
   // is exempt from (evaluated before) the under-18 gate below. A minor's
   // Challenge Round grading call must resolve to the vetted grader, not the
-  // generic text fallback (WI-1800). Derive tutor vendor via a recursive
-  // text-routing call (not circular — the recursive call uses 'text'
-  // capability, never re-enters this branch).
+  // generic text fallback (WI-1800).
+  //
+  // WI-2624: this branch used to re-derive a "tutor vendor" via a recursive
+  // `getModelConfig(..., 'text')` call using the caller's (already-flipped,
+  // for judge-suitability.ts) `preferredProvider` as ITS preferred-provider
+  // hint — so the derived tutorConfig.provider was the flipped vendor, not
+  // the real producer, and excluding it flipped back to the real producer.
+  // The caller now declares `judgeIndependence` explicitly; no re-derivation.
   if (capability === 'judge') {
-    const tutorConfig = getModelConfig(
-      rung,
-      llmTier,
-      preferredProvider,
-      providerPolicy,
-      'text',
-    );
-    return resolveGraderConfig(tutorConfig.provider);
+    return resolveGraderConfig(judgeIndependence);
   }
 
   // [WI-1052] Under-18 learners are policy-banned from Gemini (MMT-ADR-0016
@@ -1028,17 +1145,25 @@ function getFallbackConfig(
   providerPolicy: LlmProviderPolicy = 'default',
   llmTier: LLMTier = 'standard',
   capability: LlmCapability = 'text',
+  ageBracket?: AgeBracket,
+  judgeIndependence?: JudgeIndependence,
 ): ModelConfig | null {
+  // WI-2624 (AC-2/AC-4 fallback leak): judge capability never falls through
+  // to the generic vendor-agnostic candidate ladder below — that ladder does
+  // not know about (and cannot re-apply) the producer-vendor exclusion, so a
+  // judge whose primary tripped could silently fail back onto the excluded
+  // producer. `resolveGraderFallbackConfig` re-applies the same exclusion and
+  // throws the standard no-eligible-model CircuitOpenError when exhausted.
+  if (capability === 'judge') {
+    return resolveGraderFallbackConfig(primary, judgeIndependence);
+  }
+
   // V2 cutover: compliance-driven, allow-list fallback (MMT-ADR-0016 §1.5 +
   // §10.1). Never returns Gemini/Vertex; fails closed when no compliant
   // provider is registered. providerPolicy is not consulted under V2 (its
   // gemini_only target is banned).
-  if (routingV2Enabled) {
+  if (getLlmRequestRoutingV2Enabled(routingV2Enabled)) {
     return getFallbackConfigV2(primary, llmTier, capability);
-  }
-
-  if (providerPolicy === 'gemini_only') {
-    return null;
   }
 
   const shared = {
@@ -1048,6 +1173,29 @@ function getFallbackConfig(
     // the same way the primary would.
     conversationLanguage: primary.conversationLanguage,
   } satisfies Pick<ModelConfig, 'responseFormat' | 'conversationLanguage'>;
+
+  // [WI-1986] Under-18 learners are policy-banned from Gemini (MMT-ADR-0016
+  // §1.5) — the same gate getModelConfig applies to the PRIMARY selection
+  // (see isUnder18AgeBracket above). This legacy fallback selector took no
+  // ageBracket parameter and returned Gemini unconditionally when the primary
+  // failed, so a minor whose Anthropic/OpenAI primary errored was routed to
+  // Gemini on every environment with V2 off (the default — config.ts). Gate
+  // BEFORE the gemini_only check and every Gemini-selecting branch below, so
+  // no policy or provider combination can route a minor to Gemini/Vertex on
+  // this path. Fails closed (throws) if no approved text provider is
+  // registered — mirrors the primary-path gate exactly. [WI-1986 rework]
+  // `shared` is defined above this gate (was below it) and spread LAST so the
+  // under-18 fallback preserves responseFormat/conversationLanguage from the
+  // primary exactly like every other branch below — the original fix
+  // returned approvedTextFallbackConfig(...) raw, silently dropping the JSON
+  // envelope flag and the tutor-prose language for a minor's fallback.
+  if (isUnder18AgeBracket(ageBracket)) {
+    return { ...approvedTextFallbackConfig(rung, llmTier), ...shared };
+  }
+
+  if (providerPolicy === 'gemini_only') {
+    return null;
+  }
 
   if (primary.provider === 'anthropic' && providers.has('gemini')) {
     const isLight = rung <= 2;
@@ -1192,6 +1340,8 @@ export function getFallbackConfigForTest(
     providerPolicy?: LlmProviderPolicy;
     llmTier?: LLMTier;
     capability?: LlmCapability;
+    ageBracket?: AgeBracket;
+    judgeIndependence?: JudgeIndependence;
   },
 ): ModelConfig | null {
   return getFallbackConfig(
@@ -1200,6 +1350,8 @@ export function getFallbackConfigForTest(
     opts?.providerPolicy,
     opts?.llmTier,
     opts?.capability,
+    opts?.ageBracket,
+    opts?.judgeIndependence,
   );
 }
 
@@ -1217,6 +1369,7 @@ export function getModelConfigForTest(
     providerPolicy?: LlmProviderPolicy;
     capability?: LlmCapability;
     ageBracket?: AgeBracket;
+    judgeIndependence?: JudgeIndependence;
   },
 ): ModelConfig {
   return getModelConfig(
@@ -1226,6 +1379,7 @@ export function getModelConfigForTest(
     opts?.providerPolicy,
     opts?.capability,
     opts?.ageBracket,
+    opts?.judgeIndependence,
   );
 }
 
@@ -1488,16 +1642,42 @@ export class CircuitOpenError extends Error {
 const MAX_RETRIES = 3; // Up to 4 total attempts
 const INITIAL_RETRY_DELAY_MS = 500;
 
+async function waitForRetryDelay(
+  delayMs: number,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (!signal) {
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    return;
+  }
+  signal.throwIfAborted();
+  await new Promise<void>((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timeout);
+      signal.removeEventListener('abort', onAbort);
+      reject(signal.reason);
+    };
+    const timeout = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, delayMs);
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
 async function withRetry<T>(
   fn: () => Promise<T>,
   label: string,
   maxRetries: number = MAX_RETRIES,
+  signal?: AbortSignal,
 ): Promise<T> {
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    signal?.throwIfAborted();
     try {
       return await fn();
     } catch (err) {
+      signal?.throwIfAborted();
       lastError = err;
       if (!isTransientError(err)) {
         throw err;
@@ -1510,7 +1690,7 @@ async function withRetry<T>(
           delayMs: Math.round(delay),
           error: err instanceof Error ? err.message : String(err),
         });
-        await new Promise((resolve) => setTimeout(resolve, delay));
+        await waitForRetryDelay(delay, signal);
       }
     }
   }
@@ -1521,37 +1701,56 @@ async function withRetry<T>(
 // Core orchestrator — all LLM calls go through here (MMT-ADR-0017)
 // ---------------------------------------------------------------------------
 
+interface RouteAndCallBaseOptions {
+  correlationId?: string;
+  llmTier?: LLMTier;
+  preferredProvider?: PreferredLlmProvider;
+  providerPolicy?: LlmProviderPolicy;
+  ageBracket?: AgeBracket;
+  // BKT-C.1 — profile-level personalization. Optional so existing callers
+  // compile unchanged; wired through session-exchange.ts from the active
+  // profile's conversation_language and pronouns.
+  conversationLanguage?: ConversationLanguage;
+  pronouns?: string | null;
+  // [LLM-TRUNCATE-01] Flow label + session id — used for the llm.stop_reason
+  // metric dashboard query (count by stop_reason, flow over 24h). Optional
+  // so existing callers compile; callers wanting per-flow dashboards pass
+  // both. Phase 1 Task 3.
+  flow?: string;
+  sessionId?: string;
+  responseFormat?: 'json';
+  /** Cancels provider work and suppresses retry/fallback after caller timeout. */
+  signal?: AbortSignal;
+}
+
+// Explicit capability override for judge routing (ADR-0016 §2 T3). Only
+// 'judge' is valid as an explicit override; 'text' and 'vision' are always
+// derived from message content (inline_data detection) and must not be set
+// explicitly — callers do not need to thread image detection.
+//
+// WI-2624: a `capability:'judge'` call MUST declare `judgeIndependence` — the
+// discriminated union below makes this a compile-time requirement rather
+// than a convention. There is no default: a judge call site that cannot
+// state whether it is grading model output (and whose) or learner input is
+// exactly the ambiguity that produced the double-flip bug.
+export type RouteAndCallOptions =
+  | (RouteAndCallBaseOptions & {
+      capability?: never;
+      judgeIndependence?: never;
+    })
+  | (RouteAndCallBaseOptions & {
+      capability: 'judge';
+      judgeIndependence: JudgeIndependence;
+    });
+
 export async function routeAndCall(
   messages: ChatMessage[],
   rung: EscalationRung = 1,
-  _options?: {
-    correlationId?: string;
-    llmTier?: LLMTier;
-    preferredProvider?: PreferredLlmProvider;
-    providerPolicy?: LlmProviderPolicy;
-    ageBracket?: AgeBracket;
-    // BKT-C.1 — profile-level personalization. Optional so existing callers
-    // compile unchanged; wired through session-exchange.ts from the active
-    // profile's conversation_language and pronouns.
-    conversationLanguage?: ConversationLanguage;
-    pronouns?: string | null;
-    // [LLM-TRUNCATE-01] Flow label + session id — used for the llm.stop_reason
-    // metric dashboard query (count by stop_reason, flow over 24h). Optional
-    // so existing callers compile; callers wanting per-flow dashboards pass
-    // both. Phase 1 Task 3.
-    flow?: string;
-    sessionId?: string;
-    responseFormat?: 'json';
-    // Explicit capability override for judge routing (ADR-0016 §2 T3).
-    // Only 'judge' is valid as an explicit override; 'text' and 'vision' are
-    // always derived from message content (inline_data detection) and must not
-    // be set explicitly — callers do not need to thread image detection.
-    capability?: 'judge';
-  },
+  _options?: RouteAndCallOptions,
 ): Promise<RouteResult> {
   // WI-1505 — kill switch is the FIRST thing routeAndCall does: before the
   // i18n tripwire, before getModelConfig, before any provider is touched.
-  checkLlmKillSwitch();
+  await checkLlmKillSwitch();
   // i18n Phase 1 — runtime tripwire. The static ratchet test is the primary
   // defence; this warn catches any call site that ships with `flow:` but
   // without `conversationLanguage:` (e.g. via a partial revert).
@@ -1569,6 +1768,12 @@ export async function routeAndCall(
   // Explicit capability option overrides content-derived value.  Currently
   // only 'judge' is a valid explicit override (see option JSDoc above).
   const capability: LlmCapability = _options?.capability ?? messageCapability;
+  // WI-2624: only present (and only meaningful) when capability === 'judge' —
+  // the discriminated RouteAndCallOptions union guarantees it was supplied.
+  const judgeIndependence: JudgeIndependence | undefined =
+    _options && _options.capability === 'judge'
+      ? _options.judgeIndependence
+      : undefined;
   const safeMessages = withSafetyPreamble(messages, _options?.ageBracket, {
     conversationLanguage: _options?.conversationLanguage,
     pronouns: _options?.pronouns,
@@ -1581,6 +1786,7 @@ export async function routeAndCall(
       _options?.providerPolicy,
       capability,
       _options?.ageBracket,
+      judgeIndependence,
     ),
     ...(_options?.responseFormat ? { responseFormat: 'json' as const } : {}),
     // [BUG-895] Thread the learner's tutor-prose language onto the provider
@@ -1600,8 +1806,10 @@ export async function routeAndCall(
     const start = Date.now();
     try {
       const raw = await withRetry(
-        () => provider.chat(safeMessages, config),
+        () => provider.chat(safeMessages, config, _options?.signal),
         config.provider,
+        MAX_RETRIES,
+        _options?.signal,
       );
       const result = normalizeChatResult(raw);
       recordSuccess(circuitKey);
@@ -1626,6 +1834,12 @@ export async function routeAndCall(
         stopReason: result.stopReason,
       };
     } catch (err) {
+      if (_options?.signal?.aborted) {
+        // Caller cancellation is not a provider failure. In HALF_OPEN it must
+        // also release the single probe slot so the provider can recover.
+        getCircuit(circuitKey).probeInFlight = false;
+        _options.signal.throwIfAborted();
+      }
       // R-02: only count transient errors toward circuit trips
       const transient = isTransientError(err);
       if (transient) {
@@ -1652,6 +1866,8 @@ export async function routeAndCall(
         _options?.providerPolicy,
         _options?.llmTier,
         capability,
+        _options?.ageBracket,
+        judgeIndependence,
       );
       if (!fallbackConfig) throw err;
 
@@ -1681,6 +1897,7 @@ export async function routeAndCall(
         conversationLanguage: _options?.conversationLanguage,
         flow: _options?.flow,
         sessionId: _options?.sessionId,
+        signal: _options?.signal,
       });
     }
   }
@@ -1692,6 +1909,8 @@ export async function routeAndCall(
     _options?.providerPolicy,
     _options?.llmTier,
     capability,
+    _options?.ageBracket,
+    judgeIndependence,
   );
   if (fallbackConfig) {
     logger.warn('[llm] Primary provider circuit open, using fallback', {
@@ -1716,6 +1935,7 @@ export async function routeAndCall(
       conversationLanguage: _options?.conversationLanguage,
       flow: _options?.flow,
       sessionId: _options?.sessionId,
+      signal: _options?.signal,
     });
   }
 
@@ -1732,6 +1952,7 @@ async function attemptProvider(
     conversationLanguage?: ConversationLanguage;
     flow?: string;
     sessionId?: string;
+    signal?: AbortSignal;
   },
 ): Promise<RouteResult> {
   const provider = providers.get(config.provider);
@@ -1746,8 +1967,10 @@ async function attemptProvider(
   const start = Date.now();
   try {
     const raw = await withRetry(
-      () => provider.chat(messages, config),
+      () => provider.chat(messages, config, metricContext.signal),
       `${config.provider} (fallback)`,
+      MAX_RETRIES,
+      metricContext.signal,
     );
     const result = normalizeChatResult(raw);
     recordSuccess(circuitKey);
@@ -1772,6 +1995,12 @@ async function attemptProvider(
       stopReason: result.stopReason,
     };
   } catch (err) {
+    if (metricContext.signal?.aborted) {
+      // A cancelled caller must not count against the fallback provider or
+      // strand its HALF_OPEN probe slot.
+      getCircuit(circuitKey).probeInFlight = false;
+      metricContext.signal.throwIfAborted();
+    }
     const transient = isTransientError(err);
     if (transient) {
       recordFailure(circuitKey);
@@ -2033,7 +2262,7 @@ export async function routeAndStream(
   // WI-1505 — same kill-switch check as routeAndCall, duplicated here because
   // routeAndStream is a separate entry point (does not call routeAndCall)
   // that the highest-traffic learner-facing flow (exchanges.ts) uses.
-  checkLlmKillSwitch();
+  await checkLlmKillSwitch();
   // i18n Phase 1 — same tripwire as routeAndCall. Streaming flows go through
   // their own entry point, so the warn block has to be duplicated here to
   // cover learner-facing surfaces that stream (e.g. exchange.process) from
@@ -2083,6 +2312,7 @@ export async function routeAndStream(
       options?.providerPolicy,
       options?.llmTier,
       capability,
+      options?.ageBracket,
     );
     // NOTE: recordSuccess/recordFailure fire during iteration, not here,
     // because chatStream() returns a lazy AsyncIterable — the actual HTTP
@@ -2164,6 +2394,7 @@ export async function routeAndStream(
     options?.providerPolicy,
     options?.llmTier,
     capability,
+    options?.ageBracket,
   );
   if (fallbackConfig) {
     logger.warn('[llm] Primary stream circuit open, using fallback', {

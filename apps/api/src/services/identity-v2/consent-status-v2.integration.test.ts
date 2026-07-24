@@ -21,10 +21,16 @@ import {
 } from '@eduagent/database';
 import {
   consentedExistsSql,
+  getConsentAccountabilityV2,
+  resolveConsentSetStatus,
+  resolveConsentSetStatusesForBasis,
+  resolveLatestConsentSetStatusAnyBasis,
+  resolveLatestConsentSetStatusesAnyBasis,
   resolveConsentStatus,
   resolveLatestConsentStatusAnyBasis,
   resolveLatestConsentStatusesAnyBasis,
 } from './consent-status-v2';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
@@ -103,6 +109,149 @@ const COPPA = 'coppa_parental_consent';
       expect(
         await resolveLatestConsentStatusAnyBasis(db, personId, orgId, PURPOSE),
       ).toBeNull();
+    });
+
+    it('[WI-2386] fails a guardian purpose set closed until every purpose is granted', async () => {
+      const { personId, orgId } = await seedPersonOrg();
+      await db.insert(consentGrant).values({
+        chargePersonId: personId,
+        organizationId: orgId,
+        purpose: CONSENT_PURPOSES[0],
+        lawfulBasis: GDPR,
+        granted: true,
+      });
+
+      expect(await resolveConsentSetStatus(db, personId, orgId, GDPR)).toBe(
+        'PENDING',
+      );
+      expect(
+        await resolveLatestConsentSetStatusAnyBasis(db, personId, orgId),
+      ).toBe('PENDING');
+
+      await db.insert(consentGrant).values({
+        chargePersonId: personId,
+        organizationId: orgId,
+        purpose: CONSENT_PURPOSES[1],
+        lawfulBasis: GDPR,
+        granted: true,
+      });
+
+      expect(await resolveConsentSetStatus(db, personId, orgId, GDPR)).toBe(
+        'CONSENTED',
+      );
+      expect(
+        await resolveLatestConsentSetStatusAnyBasis(db, personId, orgId),
+      ).toBe('CONSENTED');
+    });
+
+    it('[WI-2386] fails closed when approved request rows have no auditable grants', async () => {
+      const { personId, orgId } = await seedPersonOrg();
+      await db.insert(consentRequest).values(
+        CONSENT_PURPOSES.map((purpose) => ({
+          chargePersonId: personId,
+          organizationId: orgId,
+          purpose,
+          requestedBasis: GDPR,
+          status: 'approved' as const,
+        })),
+      );
+
+      expect(await resolveConsentSetStatus(db, personId, orgId, GDPR)).toBe(
+        'PENDING',
+      );
+    });
+
+    it('[WI-2386] one withdrawn purpose cannot be masked by another consented purpose', async () => {
+      const { personId, orgId } = await seedPersonOrg();
+      const withdrawnAt = new Date();
+      await db.insert(consentGrant).values(
+        CONSENT_PURPOSES.map((purpose) => ({
+          chargePersonId: personId,
+          organizationId: orgId,
+          purpose,
+          lawfulBasis: GDPR,
+          granted: true,
+          withdrawnAt: purpose === 'llm_disclosure' ? withdrawnAt : null,
+        })),
+      );
+
+      expect(await resolveConsentSetStatus(db, personId, orgId, GDPR)).toBe(
+        'WITHDRAWN',
+      );
+    });
+
+    it('[WI-2386] batched purpose-set reads preserve person isolation', async () => {
+      const { personId, orgId } = await seedPersonOrg();
+      const incompleteId = await seedPersonInOrg();
+      await db.insert(consentGrant).values([
+        ...CONSENT_PURPOSES.map((purpose) => ({
+          chargePersonId: personId,
+          organizationId: orgId,
+          purpose,
+          lawfulBasis: GDPR,
+          granted: true,
+        })),
+        {
+          chargePersonId: incompleteId,
+          organizationId: orgId,
+          purpose: CONSENT_PURPOSES[0],
+          lawfulBasis: GDPR,
+          granted: true,
+        },
+      ]);
+
+      const statuses = await resolveLatestConsentSetStatusesAnyBasis(
+        db,
+        [personId, incompleteId],
+        orgId,
+      );
+      expect(statuses.get(personId)).toBe('CONSENTED');
+      expect(statuses.get(incompleteId)).toBe('PENDING');
+    });
+
+    it('[WI-2386] basis-explicit purpose-set batch uses four round trips independent of family size', async () => {
+      const { personId: firstId, orgId } = await seedPersonOrg();
+      const ids = [firstId];
+      for (let i = 0; i < 3; i++) ids.push(await seedPersonInOrg());
+      await db.insert(consentGrant).values(
+        ids.flatMap((chargePersonId) =>
+          CONSENT_PURPOSES.map((purpose) => ({
+            chargePersonId,
+            organizationId: orgId,
+            purpose,
+            lawfulBasis: GDPR,
+            granted: true,
+          })),
+        ),
+      );
+
+      const client = (db as unknown as { $client: { query: unknown } }).$client;
+      const original = client.query.bind(client) as (
+        ...args: unknown[]
+      ) => unknown;
+      let roundTrips = 0;
+      (client as { query: unknown }).query = (...args: unknown[]) => {
+        roundTrips++;
+        return original(...args);
+      };
+
+      let resolved: Map<string, { status: string }>;
+      try {
+        resolved = (await resolveConsentSetStatusesForBasis(
+          db,
+          ids,
+          orgId,
+          GDPR,
+        )) as Map<string, { status: string }>;
+      } finally {
+        (client as { query: unknown }).query = original;
+      }
+
+      expect(roundTrips).toBeLessThanOrEqual(CONSENT_PURPOSES.length * 2);
+      expect(resolved.size).toBe(ids.length);
+      for (const personId of ids) {
+        expect(resolved.get(personId)?.status).toBe('CONSENTED');
+      }
     });
 
     it('PENDING / PARENTAL_CONSENT_REQUESTED map from request status', async () => {
@@ -533,6 +682,82 @@ const COPPA = 'coppa_parental_consent';
       // The regression net: batched form is a fixed ≤2 round-trips, independent
       // of family size. The fan-out would be 2N–3N (= 20 here).
       expect(roundTrips).toBeLessThanOrEqual(2);
+    });
+
+    // -------------------------------------------------------------------------
+    // [WI-1193 AC3] Accountability report — one query, lawful basis + terms-
+    // accepted timestamp + accepted purposes (GDPR Art 5(2)/7(1)).
+    // -------------------------------------------------------------------------
+    describe('getConsentAccountabilityV2', () => {
+      it('returns lawful basis + terms-accepted timestamp for EACH purpose in one query', async () => {
+        const { personId, orgId } = await seedPersonOrg();
+        const grantedAt = new Date();
+        await db.insert(consentGrant).values([
+          {
+            chargePersonId: personId,
+            organizationId: orgId,
+            purpose: PURPOSE,
+            lawfulBasis: 'art6_1_a',
+            granted: true,
+            grantedAt,
+          },
+          {
+            chargePersonId: personId,
+            organizationId: orgId,
+            purpose: CONSENT_PURPOSES[1],
+            lawfulBasis: 'art6_1_a',
+            granted: true,
+            grantedAt,
+          },
+        ]);
+
+        const report = await getConsentAccountabilityV2(db, personId, orgId);
+
+        expect(report).toHaveLength(2);
+        const byPurpose = new Map(report.map((r) => [r.purpose, r]));
+        expect(byPurpose.get(PURPOSE)?.lawfulBasis).toBe('art6_1_a');
+        expect(byPurpose.get(PURPOSE)?.termsAcceptedAt).toEqual(grantedAt);
+        expect(byPurpose.get(PURPOSE)?.withdrawnAt).toBeNull();
+        expect(byPurpose.get(CONSENT_PURPOSES[1])?.lawfulBasis).toBe(
+          'art6_1_a',
+        );
+      });
+
+      it('reports only the CURRENT grant per (purpose, basis) — an older superseded row is not double-counted', async () => {
+        const { personId, orgId } = await seedPersonOrg();
+        const older = new Date(Date.now() - 60_000);
+        const newer = new Date();
+        await db.insert(consentGrant).values({
+          chargePersonId: personId,
+          organizationId: orgId,
+          purpose: PURPOSE,
+          lawfulBasis: GDPR,
+          granted: true,
+          grantedAt: older,
+        });
+        await db.insert(consentGrant).values({
+          chargePersonId: personId,
+          organizationId: orgId,
+          purpose: PURPOSE,
+          lawfulBasis: GDPR,
+          granted: true,
+          grantedAt: newer,
+          withdrawnAt: newer,
+        });
+
+        const report = await getConsentAccountabilityV2(db, personId, orgId);
+
+        expect(report).toHaveLength(1);
+        expect(report[0]?.termsAcceptedAt).toEqual(newer);
+        expect(report[0]?.withdrawnAt).toEqual(newer);
+      });
+
+      it('returns an empty array for a person with no consent rows', async () => {
+        const { personId, orgId } = await seedPersonOrg();
+        expect(await getConsentAccountabilityV2(db, personId, orgId)).toEqual(
+          [],
+        );
+      });
     });
   },
 );

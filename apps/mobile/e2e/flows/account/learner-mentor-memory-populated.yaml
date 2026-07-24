@@ -1,11 +1,15 @@
+# RETIRED (WI-1864): This duplicate uses a parent-authenticated seed and the
+# child-detail helper, so it can never reach the learner shell it asserts.
+# Scheduled coverage lives in parent/child-mentor-memory-populated.yaml, which
+# follows the supported parent-native child-memory journey.
 # Learner mentor memory - populated with seeded memory data
-# Tags: nightly, account
+# Tags: manual, account
 # Seed: mentor-memory-populated
 # Covers: switch to child profile and verify populated learner memory sections
 # Usage: ./scripts/seed-and-run.sh mentor-memory-populated flows/account/learner-mentor-memory-populated.yaml
 appId: com.mentomate.app
 tags:
-  - nightly
+  - manual
   - account
 ---
 - runFlow:

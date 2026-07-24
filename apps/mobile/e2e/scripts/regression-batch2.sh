@@ -40,7 +40,7 @@ run_seeded "multi-subject" "flows/subjects/multi-subject.yaml"
 run_seeded "onboarding-no-subject" "flows/edge/empty-first-user.yaml"
 
 run_seeded "consent-withdrawn-solo" "flows/consent/consent-withdrawn-gate.yaml"
-run_seeded "onboarding-complete"    "flows/consent/post-approval-landing.yaml"
+run_seeded "post-approval-ready"    "flows/consent/post-approval-landing.yaml"
 run_seeded "consent-pending"        "flows/consent/consent-pending-gate.yaml"
 
 log_result "SKIP" "flows/onboarding/sign-up-flow.yaml" "(manual-only: requires Clerk email verification)"

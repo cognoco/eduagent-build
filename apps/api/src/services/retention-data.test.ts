@@ -44,6 +44,7 @@ jest.mock(
   },
 );
 
+import { z } from 'zod';
 import type { Database } from '@eduagent/database';
 import {
   createScopedRepository,
@@ -53,7 +54,11 @@ import {
   xpLedger,
 } from '@eduagent/database';
 import { UpstreamLlmError } from '../errors';
-import { processRecallResult, getRetentionStatus } from './retention';
+import {
+  processRecallResult,
+  getRetentionStatus,
+  canRetestTopic,
+} from './retention';
 import {
   canExitNeedsDeepening,
   checkNeedsDeepeningCapacity,
@@ -83,6 +88,8 @@ import {
   updateNeedsDeepeningProgress,
   updateRetentionFromSession,
   evaluateRecallQuality,
+  buildRecallGradeMessages,
+  getOpenTopicWeakConcepts,
   ensureRetentionCard,
   getProfileOverdueCount,
   getAssessmentEligibleTopics,
@@ -255,6 +262,7 @@ function setupScopedRepo({
     consecutiveSuccessCount: number;
     pendingExpiresAt?: Date | null;
     profileId?: string;
+    concept?: string | null;
   }>,
   assessmentsFindMany = [] as Array<{
     id: string;
@@ -956,7 +964,269 @@ describe('processRecallTest', () => {
     expect(result.hint).toContain("That's okay");
   });
 
-  it('returns redirect_to_library with remediation on 3+ failures', async () => {
+  // [WI-2114 / AC-1 / AC-6] The Sylvia Plath preview-device exchange: a typed
+  // recall that fails under 3 times surfaces the grader's answer-specific
+  // feedback (right / missing / next step) on the result, instead of relying on
+  // fixed client copy.
+  it('[WI-2114] surfaces grader feedback on a sub-3-failure typed answer (Sylvia Plath)', async () => {
+    registerJsonGrader(
+      JSON.stringify({
+        quality: 2,
+        verdict: 'partial',
+        rationale: 'Recalled the novel but missed the poetry.',
+        misconception: null,
+        feedback: {
+          strengths:
+            'You correctly recalled that The Bell Jar is her only novel.',
+          gaps: 'You did not mention that Ariel was published after her death.',
+          nextStep:
+            'Next, note when Ariel appeared and why that timing matters.',
+        },
+      }),
+    );
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: false,
+      newState: {
+        topicId,
+        easeFactor: 2.3,
+        intervalDays: 1,
+        repetitions: 0,
+        failureCount: 1,
+        consecutiveSuccesses: 0,
+        xpStatus: 'decayed',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'decayed',
+      failureAction: 'feedback_only',
+    });
+
+    const result = await processRecallTest(createMockDb(), profileId, {
+      topicId,
+      answer: 'The Bell Jar is her only novel.',
+    });
+
+    expect(result.failureAction).toBe('feedback_only');
+    expect(result.feedback).toEqual({
+      strengths: 'You correctly recalled that The Bell Jar is her only novel.',
+      gaps: 'You did not mention that Ariel was published after her death.',
+      nextStep: 'Next, note when Ariel appeared and why that timing matters.',
+    });
+  });
+
+  // [WI-2114 / AC-7] The graded answer's feedback is persisted to the retention
+  // card so a later cooldown-blocked follow-up can echo it — but the learner's
+  // RAW answer text must never be written (ropa.md row 7 / MMT-ADR-0036 line 43).
+  // Reverting the persist line (the `lastRecallFeedback` write) makes the first
+  // assertion fail.
+  it('[WI-2114 / AC-7] persists structured feedback to the card, never the raw answer', async () => {
+    registerJsonGrader(
+      JSON.stringify({
+        quality: 2,
+        verdict: 'partial',
+        rationale: 'Recalled the novel but missed the poetry.',
+        misconception: null,
+        feedback: {
+          strengths:
+            'You correctly recalled that The Bell Jar is her only novel.',
+          gaps: 'You did not mention that Ariel was published after her death.',
+          nextStep:
+            'Next, note when Ariel appeared and why that timing matters.',
+        },
+      }),
+    );
+    setupScopedRepo({ retentionCardFindFirst: mockRetentionCardRow() });
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: false,
+      newState: {
+        topicId,
+        easeFactor: 2.3,
+        intervalDays: 1,
+        repetitions: 0,
+        failureCount: 1,
+        consecutiveSuccesses: 0,
+        xpStatus: 'decayed',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'decayed',
+      failureAction: 'feedback_only',
+    });
+
+    // A verbose raw answer we can search for across every card write.
+    const rawAnswer =
+      'The Bell Jar is her only novel and I really enjoyed reading it last year.';
+    const db = createMockDb();
+    await processRecallTest(db, profileId, { topicId, answer: rawAnswer });
+
+    // createMockDb returns one shared `set` mock across every db.update(...), so
+    // ALL update payloads live in that single fn's calls.
+    const setFn = (db.update as jest.Mock).mock.results[0]?.value
+      ?.set as jest.Mock;
+    const cardWrites = (setFn?.mock.calls ?? [])
+      .map((call) => call[0])
+      .filter(
+        (payload): payload is Record<string, unknown> =>
+          payload != null && typeof payload === 'object',
+      );
+
+    // The post-grade write carries exactly the grader's structured feedback.
+    const withFeedback = cardWrites.find((w) => 'lastRecallFeedback' in w);
+    expect(withFeedback).toBeDefined();
+    expect(withFeedback?.lastRecallFeedback).toEqual({
+      strengths: 'You correctly recalled that The Bell Jar is her only novel.',
+      gaps: 'You did not mention that Ariel was published after her death.',
+      nextStep: 'Next, note when Ariel appeared and why that timing matters.',
+    });
+    // AC-7: no card write may contain the learner's raw answer text.
+    expect(JSON.stringify(cardWrites)).not.toContain(rawAnswer);
+  });
+
+  // [WI-2114 / AC-2 / AC-6 / AC-9] The full Sylvia Plath exchange as ONE flow:
+  // submission 1 (a real graded answer) persists its feedback; submission 2
+  // ("what is wrong with what I said?") arrives inside the 24h anti-cramming
+  // cooldown, is NEVER re-graded, and — pre-fix — fell through to the generic
+  // "Good effort" copy. This proves the two halves are CONNECTED: the value the
+  // cooldown-blocked follow-up echoes is the exact object submission 1 wrote to
+  // the card (reference identity), not a hand-duplicated literal. Reverting the
+  // persist line breaks the capture; reverting the cooldown-branch line drops
+  // the echo — either revert turns this red.
+  //
+  // AC-9 permits faking ONLY the LLM-router boundary. The file-level
+  // jest.mock('./retention') stays in place for the other ~113 tests in this
+  // file (25 of them depend on its deterministic processRecallResult output
+  // for SM-2/XP scenarios — removing it wholesale would reshape the whole
+  // suite, not fix this guard). Inside THIS test only, both canRetestTopic
+  // AND processRecallResult are overridden per-call to their REAL
+  // implementations via mockImplementationOnce — submission 2's card carries
+  // a genuine recent lastReviewedAt so the real 24h cooldown check is what
+  // blocks re-grading, and submission 1's SM-2 transition is computed for
+  // real from the real card state, not a fabricated fixture. routeAndCall
+  // (the LLM-router external boundary, via registerJsonGrader) is the only
+  // remaining fake.
+  it('[WI-2114 / AC-9] two-submission round-trip: the follow-up echoes the feedback the graded answer persisted', async () => {
+    const {
+      canRetestTopic: actualCanRetestTopic,
+      processRecallResult: actualProcessRecallResult,
+    } = jest.requireActual('./retention') as typeof import('./retention');
+    const graderFeedback = {
+      strengths: 'You correctly recalled that The Bell Jar is her only novel.',
+      gaps: 'You did not mention that Ariel was published after her death.',
+      nextStep: 'Next, note when Ariel appeared and why that timing matters.',
+    };
+    registerJsonGrader(
+      JSON.stringify({
+        quality: 2,
+        verdict: 'partial',
+        rationale: 'Recalled the novel but missed the poetry.',
+        misconception: null,
+        feedback: graderFeedback,
+      }),
+    );
+    setupScopedRepo({ retentionCardFindFirst: mockRetentionCardRow() });
+
+    // --- Submission 1: the real grading path persists its feedback. ---
+    (canRetestTopic as jest.Mock).mockImplementationOnce(actualCanRetestTopic);
+    (processRecallResult as jest.Mock).mockImplementationOnce(
+      actualProcessRecallResult,
+    );
+    const db1 = createMockDb();
+    const graded = await processRecallTest(db1, profileId, {
+      topicId,
+      answer: 'The Bell Jar is her only novel.',
+    });
+    expect(graded.feedback).toEqual(graderFeedback);
+
+    // Capture exactly what submission 1 wrote to the card (not a re-typed copy).
+    const setFn1 = (db1.update as jest.Mock).mock.results[0]?.value
+      ?.set as jest.Mock;
+    const persistedWrite = (setFn1?.mock.calls ?? [])
+      .map((call) => call[0])
+      .find(
+        (w) => w != null && typeof w === 'object' && 'lastRecallFeedback' in w,
+      );
+    expect(persistedWrite).toBeDefined();
+    const persistedFeedback = (persistedWrite as Record<string, unknown>)
+      .lastRecallFeedback;
+
+    // --- Submission 2: that persisted value now lives on the card. The
+    // follow-up is inside cooldown, so it is never re-graded. lastReviewedAt
+    // is set to a genuinely recent timestamp (1h ago, real wall clock) so the
+    // REAL canRetestTopic computes cooldown-active — not a forced mock return.
+    const cardAfterSub1 = {
+      ...mockRetentionCardRow(),
+      lastReviewedAt: new Date(Date.now() - 60 * 60 * 1000),
+      lastRecallFeedback: persistedFeedback,
+    };
+    (canRetestTopic as jest.Mock).mockImplementationOnce(actualCanRetestTopic);
+    const followUp = await processRecallTest(
+      createMockDb({ retentionCardFindFirstQuery: cardAfterSub1 }),
+      profileId,
+      { topicId, answer: 'What is wrong with what I said?' },
+    );
+
+    expect(followUp.cooldownActive).toBe(true);
+    // The meta-question is never graded → no fresh feedback of its own...
+    expect(followUp.feedback).toBeUndefined();
+    // ...but it echoes the SAME object submission 1 persisted (reference
+    // identity — proves the read is connected to the write, not a coincidence).
+    expect(followUp.priorFeedback).toBe(persistedFeedback);
+  });
+
+  // [WI-2114 / AC-5] A cooldown-blocked follow-up on a card with NO stored
+  // feedback stays honest — no fabricated priorFeedback, client keeps generic
+  // copy.
+  it('[WI-2114 / AC-5] cooldown with no stored feedback surfaces no priorFeedback', async () => {
+    const card = mockRetentionCardRow(); // lastRecallFeedback absent
+    setupScopedRepo({ retentionCardFindFirst: card });
+    (canRetestTopic as jest.Mock).mockReturnValueOnce(false);
+
+    const result = await processRecallTest(
+      createMockDb({ retentionCardFindFirstQuery: card }),
+      profileId,
+      { topicId, answer: 'What is wrong with what I said?' },
+    );
+
+    expect(result.cooldownActive).toBe(true);
+    expect(result.priorFeedback).toBeUndefined();
+  });
+
+  // [WI-2114 / AC-5] dont_remember is a deterministic learner signal, not a
+  // graded answer — it must carry no fabricated answer-specific feedback.
+  it('[WI-2114] does not attach feedback on the dont_remember path', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: false,
+      newState: {
+        topicId,
+        easeFactor: 2.3,
+        intervalDays: 1,
+        repetitions: 0,
+        failureCount: 1,
+        consecutiveSuccesses: 0,
+        xpStatus: 'decayed',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'decayed',
+      failureAction: 'feedback_only',
+    });
+
+    const result = await processRecallTest(createMockDb(), profileId, {
+      topicId,
+      answer: '',
+      attemptMode: 'dont_remember',
+    });
+
+    expect(result.feedback).toBeUndefined();
+  });
+
+  it('returns re_teach with a hint and no remediation on the 3rd failure (WI-1462 / RR-4)', async () => {
     const card = mockRetentionCardRow();
     setupScopedRepo({ retentionCardFindFirst: card });
 
@@ -974,7 +1244,48 @@ describe('processRecallTest', () => {
         lastReviewedAt: NOW.toISOString(),
       },
       xpChange: 'decayed',
-      failureAction: 'redirect_to_library',
+      failureAction: 're_teach',
+    });
+
+    const db = createMockDb();
+    const result = await processRecallTest(db, profileId, {
+      topicId,
+      answer: 'Short',
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.failureCount).toBe(3);
+    // [WI-1462] Wire-compatible failureAction stays 'feedback_only' (backward
+    // compat with a client on the pre-WI-1462 schema); the new offRampStage
+    // discriminator carries the re_teach distinction for a client that reads it.
+    expect(result.failureAction).toBe('feedback_only');
+    expect(result.offRampStage).toBe('re_teach');
+    // Bounded off-ramp, same flow — no library/relearn navigation yet.
+    expect(result.remediation).toBeUndefined();
+    // Same-flow re-teach in a different style (AC-2): a topic-specific hint,
+    // not just a generic retry prompt.
+    expect(result.hint).toContain("That's okay");
+  });
+
+  it('returns topic_parked with remediation on the 2nd consecutive failure after re-teach (4+ failures)', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: false,
+      newState: {
+        topicId,
+        easeFactor: 2.1,
+        intervalDays: 1,
+        repetitions: 0,
+        failureCount: 4,
+        consecutiveSuccesses: 0,
+        xpStatus: 'decayed',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'decayed',
+      failureAction: 'topic_parked',
     });
 
     (getRetentionStatus as jest.Mock).mockReturnValue('weak');
@@ -986,22 +1297,105 @@ describe('processRecallTest', () => {
     });
 
     expect(result.passed).toBe(false);
-    expect(result.failureCount).toBe(3);
+    expect(result.failureCount).toBe(4);
+    // [WI-1462] Wire-compatible failureAction stays 'redirect_to_library'
+    // (backward compat); offRampStage carries the topic_parked distinction.
     expect(result.failureAction).toBe('redirect_to_library');
+    expect(result.offRampStage).toBe('topic_parked');
     expect(result.remediation).toEqual(expect.objectContaining({}));
     expect(result.remediation!.action).toBe('redirect_to_library');
     expect(result.remediation!.topicId).toBe(topicId);
     expect(result.remediation!.topicTitle).toBe('Topic 1');
     expect(result.remediation!.retentionStatus).toBe('weak');
-    expect(result.remediation!.failureCount).toBe(3);
+    expect(result.remediation!.failureCount).toBe(4);
     expect(typeof result.remediation!.cooldownEndsAt).toBe('string');
+    // Review-and-retest/relearn remain explicit fallback choices (AC-4).
     expect(result.remediation!.options).toEqual([
       'review_and_retest',
       'relearn_topic',
     ]);
     expect(getRetentionStatus).toHaveBeenCalledWith(
-      expect.objectContaining({ failureCount: 3 }),
+      expect.objectContaining({ failureCount: 4 }),
     );
+  });
+
+  // [WI-1462] Backward-compat regression: a mobile client built against the
+  // pre-WI-1462 contract still has this schema shape frozen in its bundle.
+  // Assert the NEW response validates against it — proves an old client can
+  // still parse a 3rd/4th-failure response instead of throwing
+  // ApiResponseShapeError (parseJson's failure mode on a schema mismatch).
+  it('remains parseable by the pre-WI-1462 response schema (re_teach and topic_parked)', async () => {
+    const preWi1462Schema = z.object({
+      passed: z.boolean(),
+      masteryScore: z.number(),
+      xpChange: z.string(),
+      nextReviewAt: z.string(),
+      failureCount: z.number().int(),
+      hint: z.string().optional(),
+      failureAction: z
+        .enum(['feedback_only', 'redirect_to_library'])
+        .optional(),
+      remediation: z
+        .object({
+          action: z.literal('redirect_to_library'),
+          topicId: z.string().uuid(),
+          topicTitle: z.string(),
+          retentionStatus: z.string(),
+          failureCount: z.number().int(),
+          cooldownEndsAt: z.string(),
+          options: z.array(z.enum(['review_and_retest', 'relearn_topic'])),
+        })
+        .optional(),
+      cooldownActive: z.boolean().optional(),
+      cooldownEndsAt: z.string().optional(),
+    });
+
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: false,
+      newState: {
+        topicId,
+        easeFactor: 2.1,
+        intervalDays: 1,
+        repetitions: 0,
+        failureCount: 3,
+        consecutiveSuccesses: 0,
+        xpStatus: 'decayed',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'decayed',
+      failureAction: 're_teach',
+    });
+    const reTeachResult = await processRecallTest(createMockDb(), profileId, {
+      topicId,
+      answer: 'Short',
+    });
+    expect(preWi1462Schema.safeParse(reTeachResult).success).toBe(true);
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: false,
+      newState: {
+        topicId,
+        easeFactor: 2.1,
+        intervalDays: 1,
+        repetitions: 0,
+        failureCount: 4,
+        consecutiveSuccesses: 0,
+        xpStatus: 'decayed',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'decayed',
+      failureAction: 'topic_parked',
+    });
+    (getRetentionStatus as jest.Mock).mockReturnValue('weak');
+    const parkedResult = await processRecallTest(createMockDb(), profileId, {
+      topicId,
+      answer: 'Short',
+    });
+    expect(preWi1462Schema.safeParse(parkedResult).success).toBe(true);
   });
 
   it('persists failureCount: 0 on successful recall (FR52-58 reset)', async () => {
@@ -1062,7 +1456,7 @@ describe('processRecallTest', () => {
         lastReviewedAt: NOW.toISOString(),
       },
       xpChange: 'decayed',
-      failureAction: 'redirect_to_library',
+      failureAction: 'topic_parked',
     });
 
     (getRetentionStatus as jest.Mock).mockReturnValue('forgotten');
@@ -1076,6 +1470,7 @@ describe('processRecallTest', () => {
     expect(result.remediation).toEqual(expect.objectContaining({}));
     expect(result.remediation!.topicId).toBe(topicId);
     expect(result.remediation!.topicTitle).toBe('Topic 1');
+    // [WI-1462] Wire-compatible action value — backward compat.
     expect(result.remediation!.action).toBe('redirect_to_library');
     expect(result.remediation!.retentionStatus).toBe('forgotten');
     expect(result.remediation!.failureCount).toBe(4);
@@ -2409,6 +2804,40 @@ describe('ensureRetentionCard', () => {
 });
 
 // ---------------------------------------------------------------------------
+// buildRecallGradeMessages — [WI-2114] mentor-language feedback directive (AC-4)
+// ---------------------------------------------------------------------------
+
+describe('buildRecallGradeMessages [WI-2114]', () => {
+  it('appends a language directive for a non-English mentor language', () => {
+    const messages = buildRecallGradeMessages(
+      'Some answer',
+      'Sylvia Plath',
+      undefined,
+      undefined,
+      'de',
+    );
+    const user = messages[1]?.content as string;
+    expect(user).toContain('strengths, gaps, nextStep');
+    expect(user).toContain('in German');
+    // Classification values + keys stay English so parsing is unaffected.
+    expect(user).toContain('classification values in English');
+  });
+
+  it('appends no language directive for English / undefined (snapshot-stable)', () => {
+    const en = buildRecallGradeMessages(
+      'a',
+      'Topic',
+      undefined,
+      undefined,
+      'en',
+    )[1]?.content as string;
+    const none = buildRecallGradeMessages('a', 'Topic')[1]?.content as string;
+    expect(en).not.toMatch(/Write the "feedback" strings/);
+    expect(en).toBe(none);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // evaluateRecallQuality
 // ---------------------------------------------------------------------------
 
@@ -2456,6 +2885,8 @@ describe('evaluateRecallQuality', () => {
       rationale: 'Strong recall of the light reactions.',
       misconception: null,
       rung: 1,
+      // [WI-2114] Grader response above omits feedback → null passthrough.
+      feedback: null,
     });
   });
 
@@ -2953,5 +3384,223 @@ describe('getAssessmentEligibleTopics', () => {
     expect(result[0]!.activeAssessmentId).toBe('assessment-owned');
     expect(JSON.stringify(result)).not.toContain('Foreign Topic');
     expect(JSON.stringify(result)).not.toContain('assessment-foreign');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-1454] Concept-targeted review — focus a due topic's recall on its open
+// weak concepts (needs_deepening_topics) while keeping SM-2 topic-grained.
+// ---------------------------------------------------------------------------
+
+describe('buildRecallGradeMessages — concept focus [WI-1454]', () => {
+  it('appends a focus_concepts block naming the weak concepts when focusConcepts is non-empty (AC-2)', () => {
+    const messages = buildRecallGradeMessages(
+      'my recall answer',
+      'Photosynthesis',
+      'How plants convert light to energy',
+      ['Calvin cycle', 'light-dependent reactions'],
+    );
+    const user = messages.find((m) => m.role === 'user');
+    expect(user).toBeDefined();
+    expect(user!.content).toContain('<focus_concepts>');
+    expect(user!.content).toContain('Calvin cycle');
+    expect(user!.content).toContain('light-dependent reactions');
+    // The grader is told to focus on those concepts rather than the whole topic.
+    expect(user!.content).toMatch(/focus your evaluation/i);
+    // Whole-topic signal is not dropped — title still present.
+    expect(user!.content).toContain('Photosynthesis');
+  });
+
+  it('is byte-identical to the whole-topic call when focusConcepts is empty or omitted (AC-3, eval no-drift)', () => {
+    const base = buildRecallGradeMessages('a', 'T', 'D');
+    expect(buildRecallGradeMessages('a', 'T', 'D', [])).toEqual(base);
+    expect(buildRecallGradeMessages('a', 'T', 'D', undefined)).toEqual(base);
+    const user = base.find((m) => m.role === 'user');
+    expect(user!.content).not.toContain('focus_concepts');
+  });
+
+  it('drops labels that sanitize to empty and keeps the rest', () => {
+    const messages = buildRecallGradeMessages('a', 'T', 'D', [
+      '   ',
+      'Osmosis',
+    ]);
+    const user = messages.find((m) => m.role === 'user');
+    expect(user!.content).toContain('<focus_concepts>Osmosis</focus_concepts>');
+  });
+});
+
+describe('getOpenTopicWeakConcepts [WI-1454]', () => {
+  // The scoped-repo boundary mock returns the injected rows verbatim, so these
+  // tests inject rows as already status/TTL-filtered (that predicate lives in
+  // the query, correct-by-construction, and is exercised by integration tests)
+  // and verify the JS concept extraction: distinct, trimmed, null-dropped.
+  const dbStub = {} as Database;
+
+  it('returns distinct, trimmed concept labels from the open rows (AC-1/AC-2)', async () => {
+    setupScopedRepo({
+      needsDeepeningFindMany: [
+        {
+          topicId,
+          subjectId,
+          status: 'pending_review',
+          consecutiveSuccessCount: 0,
+          concept: 'Calvin cycle',
+        },
+        {
+          topicId,
+          subjectId,
+          status: 'active',
+          consecutiveSuccessCount: 0,
+          concept: '  Calvin cycle  ', // duplicate after trim
+        },
+        {
+          topicId,
+          subjectId,
+          status: 'active',
+          consecutiveSuccessCount: 0,
+          concept: 'Osmosis',
+        },
+      ],
+    });
+    const concepts = await getOpenTopicWeakConcepts(dbStub, profileId, topicId);
+    expect(concepts).toEqual(['Calvin cycle', 'Osmosis']);
+  });
+
+  it('ignores rows with no concept label — topic-level signals yield no focus (AC-3)', async () => {
+    setupScopedRepo({
+      needsDeepeningFindMany: [
+        {
+          topicId,
+          subjectId,
+          status: 'active',
+          consecutiveSuccessCount: 0,
+          concept: null,
+        },
+        {
+          topicId,
+          subjectId,
+          status: 'active',
+          consecutiveSuccessCount: 0,
+        },
+      ],
+    });
+    expect(await getOpenTopicWeakConcepts(dbStub, profileId, topicId)).toEqual(
+      [],
+    );
+  });
+
+  it('returns [] when the topic has no open needs_deepening rows (AC-3)', async () => {
+    setupScopedRepo({ needsDeepeningFindMany: [] });
+    expect(await getOpenTopicWeakConcepts(dbStub, profileId, topicId)).toEqual(
+      [],
+    );
+  });
+
+  it('falls back to [] (whole-topic recall) when the lookup fails, never throwing — the caller has already claimed the cooldown', async () => {
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      needsDeepeningTopics: {
+        findMany: jest.fn().mockRejectedValue(new Error('db unavailable')),
+      },
+    });
+    await expect(
+      getOpenTopicWeakConcepts(dbStub, profileId, topicId),
+    ).resolves.toEqual([]);
+  });
+});
+
+describe('processRecallTest — concept-targeted review [WI-1454]', () => {
+  // Capture the messages the grader receives so we can assert the recall scope,
+  // while returning a valid grade so processRecallTest proceeds past the gate.
+  function registerCapturingGrader(): { messages: ChatMessage[] | null } {
+    const captured: { messages: ChatMessage[] | null } = { messages: null };
+    const body =
+      '{"quality": 4, "verdict": "solid", "rationale": "ok", "misconception": null}';
+    const provider: LLMProvider = {
+      id: 'gemini',
+      async chat(messages: ChatMessage[]): Promise<ChatResult> {
+        captured.messages = messages;
+        return { content: body, stopReason: 'stop' };
+      },
+      chatStream(messages: ChatMessage[]): ChatStreamResult {
+        captured.messages = messages;
+        return makeChatStreamResult(
+          (async function* () {
+            yield body;
+          })(),
+          Promise.resolve<StopReason>('stop'),
+        );
+      },
+    };
+    registerProvider(provider);
+    return captured;
+  }
+
+  function mockPassingSm2(): void {
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: true,
+      newState: {
+        topicId,
+        easeFactor: 2.6,
+        intervalDays: 10,
+        repetitions: 4,
+        failureCount: 0,
+        consecutiveSuccesses: 3,
+        xpStatus: 'verified',
+        nextReviewAt: '2026-02-25T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'verified',
+    });
+  }
+
+  it('focuses the recall grader on the topic’s open weak concepts when present (AC-1/AC-2), SM-2 still runs (AC-4)', async () => {
+    setupScopedRepo({
+      retentionCardFindFirst: mockRetentionCardRow(),
+      needsDeepeningFindMany: [
+        {
+          topicId,
+          subjectId,
+          status: 'pending_review',
+          consecutiveSuccessCount: 0,
+          concept: 'Light-dependent reactions',
+        },
+      ],
+    });
+    mockPassingSm2();
+    const captured = registerCapturingGrader();
+    const db = createMockDb();
+
+    await processRecallTest(db, profileId, {
+      topicId,
+      answer: 'the light reactions happen in the thylakoid membrane',
+    });
+
+    // SM-2 scheduling still runs on the topic-grained card (AC-4).
+    expect(processRecallResult).toHaveBeenCalled();
+    // The grader was told to focus on the open weak concept (AC-1 ran the
+    // needs_deepening lookup before constructing the grade scope; AC-2 folded
+    // the concept into it).
+    const user = captured.messages?.find((m) => m.role === 'user');
+    expect(user?.content).toContain('<focus_concepts>');
+    expect(user?.content).toContain('Light-dependent reactions');
+  });
+
+  it('grades against the whole topic when there are no open weak concepts (AC-3)', async () => {
+    setupScopedRepo({
+      retentionCardFindFirst: mockRetentionCardRow(),
+      needsDeepeningFindMany: [],
+    });
+    mockPassingSm2();
+    const captured = registerCapturingGrader();
+    const db = createMockDb();
+
+    await processRecallTest(db, profileId, {
+      topicId,
+      answer: 'a whole-topic recall answer',
+    });
+
+    const user = captured.messages?.find((m) => m.role === 'user');
+    expect(user?.content).not.toContain('focus_concepts');
+    expect(user?.content).toContain('<topic_title>');
   });
 });

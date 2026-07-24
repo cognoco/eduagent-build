@@ -438,14 +438,14 @@ describe('Integration: POST /v1/retention/recall-test', () => {
     expect(card!.failureCount).toBe(1);
   });
 
-  it('returns remediation after 3+ failures (FR52-58)', async () => {
+  it('offers a bounded re-teach off-ramp on the 3rd failure, no remediation yet (WI-1462 / RR-4)', async () => {
     const profileId = await createOwnerProfile();
 
     const subjectId = await createSubject(profileId, 'Calculus');
     const { topicIds } = await seedCurriculumWithTopics(subjectId, [
       'Introduction to Calculus',
     ]);
-    // Seed card with 2 existing failures — next failure triggers remediation
+    // Seed card with 2 existing failures — next failure is the 3rd.
     await seedRetentionCard(profileId, topicIds[0]!, { failureCount: 2 });
 
     // A thin answer grades `partial` (quality 2) → SM-2 fail → 3rd failure.
@@ -469,11 +469,59 @@ describe('Integration: POST /v1/retention/recall-test', () => {
     const body = await res.json();
     expect(body.result.passed).toBe(false);
     expect(body.result.failureCount).toBe(3);
+    // [WI-1462] failureAction stays wire-compatible ('feedback_only') for a
+    // client on the pre-WI-1462 schema; offRampStage is the new additive
+    // discriminator a client on the new schema reads for the off-ramp.
+    expect(body.result.failureAction).toBe('feedback_only');
+    expect(body.result.offRampStage).toBe('re_teach');
+    // Bounded, same-flow off-ramp — no forced library/relearn navigation yet.
+    expect(body.result.remediation).toBeUndefined();
+  });
+
+  it('parks the topic warmly on the 2nd consecutive failure after re-teach (4th failure, RR-4)', async () => {
+    const profileId = await createOwnerProfile();
+
+    const subjectId = await createSubject(profileId, 'Calculus');
+    const { topicIds } = await seedCurriculumWithTopics(subjectId, [
+      'Introduction to Calculus',
+    ]);
+    // Seed card with 3 existing failures (already offered re-teach) — the
+    // next failure is the 2nd consecutive failure after re-teach.
+    await seedRetentionCard(profileId, topicIds[0]!, { failureCount: 3 });
+
+    // A thin answer grades `partial` (quality 2) → SM-2 fail → 4th failure.
+    const res = await app.request(
+      '/v1/retention/recall-test',
+      {
+        method: 'POST',
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId,
+        ),
+        body: JSON.stringify({
+          topicId: topicIds[0],
+          answer: 'No idea',
+        }),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.result.passed).toBe(false);
+    // Honest SM-2 state — the park is a warm exit, not a synthetic override.
+    expect(body.result.failureCount).toBe(4);
+    // [WI-1462] failureAction stays wire-compatible ('redirect_to_library')
+    // for backward compat; offRampStage carries the new distinction.
     expect(body.result.failureAction).toBe('redirect_to_library');
+    expect(body.result.offRampStage).toBe('topic_parked');
     expect(body.result.remediation).toMatchObject({
+      action: 'redirect_to_library',
       topicTitle: 'Introduction to Calculus',
     });
+    // Review-and-retest/relearn remain explicit fallback choices (AC-4).
     expect(body.result.remediation.options).toContain('relearn_topic');
+    expect(body.result.remediation.options).toContain('review_and_retest');
     expect(body.result.remediation.topicTitle).toBe('Introduction to Calculus');
   });
 

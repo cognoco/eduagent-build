@@ -73,6 +73,35 @@ jest.mock(
   }),
 );
 
+// [WI-2416] assertCanReadProfile (GET /quiz/rounds/recent, /quiz/rounds/:id,
+// /quiz/stats) calls verifyPersonOwnershipV2, which — like getPersonScope
+// above — runs a raw db.select() membership query unrunnable on this unit
+// mock DB. Every scenario in this file is a caller-self read (the header
+// profile equals the authenticated caller's own person id); the
+// cross-account read attack this guard exists to close is covered by the
+// real-DB break test in tests/integration/wi2416-read-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's mock DB environment.
+jest.mock('../services/identity-v2/ownership-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/ownership-v2'),
+  verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+}));
+
+// [WI-2396] assertLlmConsent (called by POST /quiz/rounds and
+// /quiz/rounds/prefetch) runs isLlmExchangeConsentAllowed, which reads
+// db.query.membership / consentGrant — real queries with no controllable
+// behavior on this file's mock DB. Defaults to allowed (resolves undefined =
+// no throw); the consent-withdrawal test suite below overrides with
+// mockRejectedValueOnce(new ConsentWithdrawnError()) to exercise the refusal
+// path. Mirrors the subjects.test.ts pattern.
+// gc1-allow: isLlmExchangeConsentAllowed runs real db.query.membership /
+// consentGrant reads with no real implementation available in this file's
+// mock-DB environment (same class as verifyPersonOwnershipV2 above).
+jest.mock('../services/identity-v2/consent-status-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/consent-status-v2'),
+  assertLlmConsent: jest.fn().mockResolvedValue(undefined),
+}));
+
 // [WI-867] billing-v2 seam — metering middleware calls ensureFreeSubscriptionV2
 // unconditionally post-collapse; account middleware calls ensureInitialTrialSubscriptionV2.
 // Both use db.execute()/db.transaction() paths the unit mock DB cannot satisfy.
@@ -208,6 +237,9 @@ import { app } from '../index';
 import { routeAndCall } from '../services/llm';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { inngest } from '../inngest/client';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
+import { ConsentWithdrawnError } from '../services/session';
+import { ERROR_CODES } from '@eduagent/schemas';
 
 const mockInngestSend = inngest.send as jest.Mock;
 
@@ -697,6 +729,189 @@ describe('Quiz routes', () => {
     });
   });
 
+  // -------------------------------------------------------------------------
+  // [WI-2396] Consent-withdrawal gate — refuses immediately before LLM
+  // dispatch (canon R5). Both routes share generateRoundFromInput, which gates
+  // every activityType EXCEPT the deterministic 'capitals' round (static
+  // CAPITALS_DATA bank, no routeAndCall). 'vocabulary'/'guess_who' dispatch the
+  // LLM and are gated; 'capitals' is not (see the deterministic-branch control
+  // at the end of this block).
+  // -------------------------------------------------------------------------
+  describe('[WI-2396] quiz-round consent-withdrawal gate', () => {
+    const assertLlmConsentMock = jest.mocked(assertLlmConsent);
+
+    // 'capitals' rounds are fully deterministic (static CAPITALS_DATA bank —
+    // see generateQuizRound); only 'vocabulary'/'guess_who' dispatch the LLM.
+    // Seed a minimal vocabulary subject so the "active consent" tests below
+    // actually reach routeAndCall. Mirrors the "generates a vocabulary round
+    // with a valid language subject" fixture above.
+    function seedVocabularySubject() {
+      (mockDb as any).query.subjects.findFirst = jest.fn().mockResolvedValue({
+        id: '01933b3c-0000-7000-8000-000000000111',
+        profileId: 'test-profile-id',
+        name: "Emma's German",
+        status: 'active',
+        pedagogyMode: 'four_strands',
+        languageCode: 'de',
+      });
+      (mockDb as any).query.vocabulary.findMany = jest.fn().mockResolvedValue([
+        {
+          id: '01933b3c-0000-7000-8000-000000000211',
+          profileId: 'test-profile-id',
+          subjectId: '01933b3c-0000-7000-8000-000000000111',
+          term: 'der Hund',
+          translation: 'dog',
+          cefrLevel: 'A1',
+        },
+      ]);
+      (mockDb as any).query.vocabularyRetentionCards.findMany = jest
+        .fn()
+        .mockResolvedValue([]);
+    }
+
+    const VOCAB_BODY = JSON.stringify({
+      activityType: 'vocabulary',
+      subjectId: '01933b3c-0000-7000-8000-000000000111',
+    });
+
+    const VOCAB_LLM_RESPONSE = {
+      response: JSON.stringify({
+        theme: 'German Animals',
+        targetLanguage: 'German',
+        questions: [
+          {
+            term: 'das Pferd',
+            correctAnswer: 'horse',
+            acceptedAnswers: ['horse'],
+            distractors: ['dog', 'cat', 'bird'],
+            funFact: 'Pferd comes from an old High German root.',
+            cefrLevel: 'A1',
+          },
+          {
+            term: 'die Maus',
+            correctAnswer: 'mouse',
+            acceptedAnswers: ['mouse'],
+            distractors: ['fish', 'cat', 'dog'],
+            funFact: 'Maus is also used for computer mouse.',
+            cefrLevel: 'A1',
+          },
+        ],
+      }),
+      provider: 'mock',
+      model: 'mock',
+      latencyMs: 50,
+    };
+
+    it('POST /quiz/rounds refuses with 403 CONSENT_WITHDRAWN and never calls routeAndCall when consent is withdrawn', async () => {
+      seedVocabularySubject();
+      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+
+      const res = await app.request(
+        '/v1/quiz/rounds',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: VOCAB_BODY,
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
+      expect(routeAndCall).not.toHaveBeenCalled();
+    });
+
+    it('POST /quiz/rounds proceeds (LLM dispatched) when consent is active', async () => {
+      seedVocabularySubject();
+      (routeAndCall as jest.Mock).mockResolvedValueOnce(VOCAB_LLM_RESPONSE);
+
+      const res = await app.request(
+        '/v1/quiz/rounds',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: VOCAB_BODY,
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(assertLlmConsentMock.mock.calls[0]?.[1]).toBe('test-profile-id');
+      expect(routeAndCall).toHaveBeenCalled();
+    });
+
+    it('POST /quiz/rounds/prefetch refuses with 403 CONSENT_WITHDRAWN and never calls routeAndCall when consent is withdrawn', async () => {
+      seedVocabularySubject();
+      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+
+      const res = await app.request(
+        '/v1/quiz/rounds/prefetch',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: VOCAB_BODY,
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
+      expect(routeAndCall).not.toHaveBeenCalled();
+    });
+
+    it('POST /quiz/rounds/prefetch proceeds (LLM dispatched) when consent is active', async () => {
+      seedVocabularySubject();
+      (routeAndCall as jest.Mock).mockResolvedValueOnce(VOCAB_LLM_RESPONSE);
+
+      const res = await app.request(
+        '/v1/quiz/rounds/prefetch',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: VOCAB_BODY,
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(assertLlmConsentMock.mock.calls[0]?.[1]).toBe('test-profile-id');
+      expect(routeAndCall).toHaveBeenCalled();
+    });
+
+    // Deterministic-branch control: a 'capitals' round dispatches no LLM, so
+    // the consent gate must NOT run for it. Even with consent withdrawn (mock
+    // set to reject), the request must succeed and assertLlmConsent must never
+    // be called — proving the WI-2396 over-gate on the deterministic branch is
+    // removed while the LLM paths above stay gated.
+    it('POST /quiz/rounds does NOT gate the deterministic capitals round (no 403, no consent check) even when consent is withdrawn', async () => {
+      // Persistent reject: assertLlmConsent would throw if the capitals path
+      // reached it. It must not.
+      assertLlmConsentMock.mockRejectedValue(new ConsentWithdrawnError());
+      try {
+        const res = await app.request(
+          '/v1/quiz/rounds',
+          {
+            method: 'POST',
+            headers: AUTH_HEADERS,
+            body: JSON.stringify({ activityType: 'capitals' }),
+          },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(200);
+        expect(assertLlmConsentMock).not.toHaveBeenCalled();
+        expect(routeAndCall).not.toHaveBeenCalled();
+      } finally {
+        // beforeEach only clearAllMocks (clears calls, not implementations), so
+        // restore the file-wide default here to keep this persistent rejection
+        // from leaking into sibling tests.
+        assertLlmConsentMock.mockResolvedValue(undefined);
+      }
+    });
+  });
+
   describe('POST /v1/quiz/rounds (guess_who)', () => {
     it('generates a guess_who round with topic titles', async () => {
       // Mock the select().from().innerJoin()... chain used by getGuessWhoRoundContext
@@ -915,6 +1130,73 @@ describe('Quiz routes', () => {
       // reason to leak them. The only answer fields exposed are the
       // correct answer + its aliases.
       expect(body.questions[0].distractors).toBeUndefined();
+    });
+
+    it('[WI-2190] reconstructs a legacy completed result answer from the server-owned question', async () => {
+      (mockDb as any).query.quizRounds.findFirst = jest.fn().mockResolvedValue({
+        ...COMPLETED_ROUND,
+        results: [
+          {
+            questionIndex: 0,
+            correct: false,
+            answerGiven: 'Salzburg',
+            timeMs: 5000,
+            disputed: true,
+          },
+        ],
+      });
+
+      const res = await app.request(
+        `/v1/quiz/rounds/${ROUND_ID_COMPLETED}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({
+        results: [
+          {
+            questionIndex: 0,
+            correct: false,
+            correctAnswer: 'Vienna',
+            answerGiven: 'Salzburg',
+            disputed: true,
+          },
+        ],
+      });
+    });
+
+    it('[WI-2190] returns typed 409 conflict for an unreconstructable malformed completed result', async () => {
+      (mockDb as any).query.quizRounds.findFirst = jest.fn().mockResolvedValue({
+        ...COMPLETED_ROUND,
+        results: [{ totallyMadeUpField: 'nope' }],
+      });
+
+      const res = await app.request(
+        `/v1/quiz/rounds/${ROUND_ID_COMPLETED}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(409);
+      expect(await res.json()).toMatchObject({
+        code: 'CONFLICT',
+      });
+    });
+
+    it('[WI-2190] returns an empty typed result list for a completed round without grades', async () => {
+      (mockDb as any).query.quizRounds.findFirst = jest
+        .fn()
+        .mockResolvedValue({ ...COMPLETED_ROUND, results: [] });
+
+      const res = await app.request(
+        `/v1/quiz/rounds/${ROUND_ID_COMPLETED}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ results: [] });
     });
 
     it('does NOT expose correctAnswer or acceptedAliases for in-progress rounds [F-032 break test]', async () => {

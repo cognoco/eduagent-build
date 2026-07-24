@@ -26,14 +26,21 @@
       "purpose": "Catch WS-31 shepherd → orchestrator Clacks traffic. Armed pre-launch.",
       "command": "tail -n0 -f _quartet/working/lanes/safety-eval/_state/outbox.jsonl  (persistent)",
       "task-id": "bj10kh3t0"
+    },
+    {
+      "target": "WS-34 Platform Hardening — Cosmo Stage/State (page id 3918bce9-1f7c-8142-9b75-dfcafbc94d65)",
+      "purpose": "Lifecycle backstop for PRG-34: catch review verdicts, holds, stale-ready corrections, and graduation signal.",
+      "command": "node .cosmo-watch/platform-hardening/stage-watch.mjs  (persistent)",
+      "task-id": "pid:29888"
+    },
+    {
+      "target": "platform-hardening lane outbox.jsonl (_quartet/working/lanes/platform-hardening/_state/outbox.jsonl)",
+      "purpose": "Catch WS-34 shepherd → orchestrator Clacks traffic. Armed at activation before operator launches shepherd.",
+      "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File .cosmo-watch/platform-hardening/outbox-watch.ps1  (persistent)",
+      "task-id": "pid:30820",
+      "expected_activity_by": "2026-07-08T11:37:38.245Z",
+      "margin_minutes": 15
     }
   ],
-  "_parked": [
-    {
-      "target": "WS-34 Platform Hardening (page id 3918bce9-1f7c-8142-9b75-dfcafbc94d65)",
-      "purpose": "PARKED — no watchers armed while parked. Arm a Cosmo-Stage + outbox pair here on activation.",
-      "command": "(deferred until WS-34 released)",
-      "task-id": null
-    }
-  ]
+  "_parked": []
 }

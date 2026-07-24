@@ -39,15 +39,15 @@ tags:
 - assertNotVisible:
     id: 'tab-more'
 
-# Mentor action: open homework capture, verify its native body, then return.
+# Mentor action: open E2E manual homework entry, cancel it, then return.
 - tapOn:
     id: 'mentor-bar-homework-chip'
 - extendedWaitUntil:
     visible:
-      id: 'camera-view'
+      id: 'homework-entry-mode-manual'
     timeout: 15000
 - tapOn:
-    id: 'close-button'
+    id: 'manual-entry-cancel'
 - extendedWaitUntil:
     visible:
       id: 'mentor-screen'
@@ -92,9 +92,10 @@ tags:
     timeout: 15000
 - tapOn:
     id: 'journal-tab-practice'
-- extendedWaitUntil:
-    visible:
+- scrollUntilVisible:
+    element:
       id: 'journal-practice-section'
+    direction: DOWN
     timeout: 15000
 - tapOn:
     id: 'journal-practice-open-hub'

@@ -136,6 +136,12 @@ appId: com.mentomate.app
     text: 'Skip for now'
     optional: true
 
+# An authenticated profile bootstrap error is terminal for setup. Assert the
+# guaranteed property after the legitimate landing probes have allowed
+# bootstrap to settle, immediately before Back recovery could hide the failure.
+- assertNotVisible:
+    id: 'profile-load-error'
+
 # BUG-43: After PostApproval dismiss, the coaching card may auto-navigate to
 # a Practice Session (for scenarios with active sessions like retention-due,
 # homework-ready, failed-recall-3x). The session screen hides the tab bar,
@@ -170,6 +176,16 @@ appId: com.mentomate.app
 - extendedWaitUntil:
     visible:
       id: 'mentor-screen'
+    timeout: 5000
+    optional: true
+
+# [WI-2241] A supporter persona lands on the Support hub Mentor tab instead
+# of the learner's mentor-screen — mentor.tsx branches on activeScope.kind,
+# rendering SupportHubMentorTab (testID support-hub-mentor-tab) rather than
+# LearnerMentorScreen (testID mentor-screen) for a scope-having supporter.
+- extendedWaitUntil:
+    visible:
+      id: 'support-hub-mentor-tab'
     timeout: 5000
     optional: true
 

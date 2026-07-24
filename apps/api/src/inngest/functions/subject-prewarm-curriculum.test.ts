@@ -471,6 +471,45 @@ describe('subjectPrewarmCurriculum', () => {
       expect(persistBookTopicsSpy).toHaveBeenCalled();
     });
 
+    // [WI-2396] Basis-inclusive gate: switched from isGdprProcessingAllowedV2
+    // (parental basis only) to isLlmExchangeConsentAllowed, which ALSO honors
+    // an adult's independently-withdrawable self-consent (art6_1_a). Sequence
+    // is [gdpr platform_use, gdpr llm_disclosure,
+    // art6_1_a-platform_use] — both parental purposes CONSENTED, then adult
+    // platform_use WITHDRAWN within the FIRST gate call — proving
+    // the adult leg alone (parental leg passes) now blocks, which
+    // isGdprProcessingAllowedV2 alone would have missed.
+    it('[WI-2396] skips LLM when GDPR consent is granted but adult self-consent (art6_1_a) is withdrawn', async () => {
+      mockDb.query.curriculumBooks.findFirst.mockResolvedValue(
+        createBook({ topicsGenerated: false }),
+      );
+      mockDb.query.consentGrant.findFirst
+        .mockResolvedValueOnce({
+          granted: true,
+          withdrawnAt: null,
+          grantedAt: now,
+        })
+        .mockResolvedValueOnce({
+          granted: true,
+          withdrawnAt: null,
+          grantedAt: now,
+        })
+        .mockResolvedValueOnce({
+          granted: true,
+          withdrawnAt: now,
+          grantedAt: now,
+        });
+
+      const { result } = await execute(createEventData());
+
+      expect(result).toEqual({
+        status: 'skipped',
+        reason: 'consent_not_granted',
+      });
+      expect(generateBookTopicsSpy).not.toHaveBeenCalled();
+      expect(persistBookTopicsSpy).not.toHaveBeenCalled();
+    });
+
     // [WI-82] Cross-step memoization regression: consent granted when
     // load-prewarm-context ran, then withdrawn before generate-and-persist-topics.
     // The re-check INSIDE the generate step must catch the withdrawal.
@@ -479,9 +518,25 @@ describe('subjectPrewarmCurriculum', () => {
         .mockResolvedValueOnce(createBook({ topicsGenerated: false }))
         .mockResolvedValueOnce(createBook({ topicsGenerated: false }))
         .mockResolvedValueOnce(createBook({ topicsGenerated: false }));
-      // First call (load-prewarm-context): CONSENTED → context becomes 'pending'.
-      // Second call (generate-and-persist-topics): WITHDRAWN → LLM must be skipped.
+      // [WI-2396/WI-2386] The first gate must fully pass its two-purpose
+      // parental set and both adult purposes (four CONSENTED reads) before the
+      // generate step sees WITHDRAWN.
       mockDb.query.consentGrant.findFirst
+        .mockResolvedValueOnce({
+          granted: true,
+          withdrawnAt: null,
+          grantedAt: now,
+        })
+        .mockResolvedValueOnce({
+          granted: true,
+          withdrawnAt: null,
+          grantedAt: now,
+        })
+        .mockResolvedValueOnce({
+          granted: true,
+          withdrawnAt: null,
+          grantedAt: now,
+        })
         .mockResolvedValueOnce({
           granted: true,
           withdrawnAt: null,

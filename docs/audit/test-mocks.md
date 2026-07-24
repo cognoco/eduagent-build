@@ -1,6 +1,10 @@
 # Test Mock Audit
 
-> **STATUS (2026-06-27):** A4/A5 done; A1 partial; A2 (~76 unit files using createMockDb) highest-risk item still open; A3 not done.
+> **STATUS (code-rechecked 2026-07-14):** Keep active. A4/A5 are done; A1 is
+> partial; A2/A3 remain live. Counts below are historical and must be regenerated
+> before planning a remediation slice. `createMockDb()` remains in
+> `packages/test-utils/src/lib/neon-mock.ts`; the GC1 guard prevents new debt but
+> does not remove existing internal mocks.
 
 **Date**: 2026-05-12
 **Scope**: `apps/api`, `apps/mobile`, `tests/integration`, `packages/*`

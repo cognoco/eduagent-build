@@ -8,7 +8,7 @@ import {
 import { useApiQuery } from './use-api-query';
 import type {
   CuratedMemoryView,
-  DashboardChild,
+  DashboardChildDetail,
   DashboardData,
   TopicProgress,
   VerifiedProofResponse,
@@ -147,11 +147,14 @@ export function useAckNotice(): UseMutationResult<
 
 export function useChildDetail(
   childProfileId: string | undefined,
-): UseQueryResult<DashboardChild | null> {
+): UseQueryResult<DashboardChildDetail | null> {
   const client = useApiClient();
   const { mode, canAccessFamilyChildData } = useDashboardNavigationScope();
 
-  return useApiQuery<{ child: DashboardChild | null }, DashboardChild | null>({
+  return useApiQuery<
+    { child: DashboardChildDetail | null },
+    DashboardChildDetail | null
+  >({
     queryKey: queryKeys.dashboard.childDetail(mode, childProfileId),
     enabled: canAccessFamilyChildData && !!childProfileId,
     schema: childDetailResponseSchema,

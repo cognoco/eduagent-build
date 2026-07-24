@@ -2,16 +2,20 @@ import {
   childProfileHref,
   FAMILY_HOME_PATH,
   homeHrefForReturnTo,
+  isSessionForwardableReturnTo,
   goBackOrReplace,
   pushLearningResumeTarget,
   pushChildReport,
   pushChildWeeklyReport,
   LEARNER_HOME_HREF,
   LEARNER_HOME_RETURN_TO,
+  OWN_LEARNING_RETURN_TO,
   PRACTICE_HREF,
   PRACTICE_RETURN_TO,
   JOURNAL_HREF,
   JOURNAL_RETURN_TO,
+  SUBJECTS_HREF,
+  SUBJECTS_RETURN_TO,
   FAMILY_RECAPS_HREF,
   FAMILY_RECAPS_RETURN_TO,
   FAMILY_PROGRESS_HREF,
@@ -21,6 +25,8 @@ import {
   FAMILY_CHILDREN_HREF,
   FAMILY_CHILDREN_RETURN_TO,
   FAMILY_HOME_RETURN_TO,
+  accountReturnHref,
+  accountReturnTokenForPathname,
 } from './navigation';
 import type { LearningResumeTarget } from '@eduagent/schemas';
 import type { Router } from 'expo-router';
@@ -28,6 +34,20 @@ import type { Router } from 'expo-router';
 describe('navigation constants', () => {
   it('exports FAMILY_HOME_PATH for family-facing navigation', () => {
     expect(FAMILY_HOME_PATH).toBe('/(app)/home');
+  });
+});
+
+describe('isSessionForwardableReturnTo', () => {
+  it('accepts each return token that session entry points may forward', () => {
+    expect(isSessionForwardableReturnTo(SUBJECTS_RETURN_TO)).toBe(true);
+    expect(isSessionForwardableReturnTo(LEARNER_HOME_RETURN_TO)).toBe(true);
+    expect(isSessionForwardableReturnTo(OWN_LEARNING_RETURN_TO)).toBe(true);
+  });
+
+  it('rejects unrelated and absent return tokens', () => {
+    expect(isSessionForwardableReturnTo(PRACTICE_RETURN_TO)).toBe(false);
+    expect(isSessionForwardableReturnTo('settings')).toBe(false);
+    expect(isSessionForwardableReturnTo(undefined)).toBe(false);
   });
 });
 
@@ -60,6 +80,10 @@ describe('homeHrefForReturnTo', () => {
 
   it('returns the journal href when returnTo is journal', () => {
     expect(homeHrefForReturnTo(JOURNAL_RETURN_TO)).toBe(JOURNAL_HREF);
+  });
+
+  it('returns the V2 Subjects tab for the subjects return token', () => {
+    expect(homeHrefForReturnTo(SUBJECTS_RETURN_TO)).toBe(SUBJECTS_HREF);
   });
 
   it('resolves Family and Study context return tokens', () => {
@@ -121,6 +145,20 @@ describe('goBackOrReplace', () => {
     expect(router.replace).toHaveBeenCalledWith('/(app)/home');
   });
 
+  it('replaces with Subjects when a Subjects-origin screen has no browser history', () => {
+    const router = {
+      back: jest.fn(),
+      canGoBack: jest.fn().mockReturnValue(false),
+      replace: jest.fn(),
+    } satisfies Pick<Router, 'back' | 'canGoBack' | 'replace'>;
+
+    goBackOrReplace(router, SUBJECTS_HREF);
+
+    expect(router.canGoBack).toHaveBeenCalledTimes(1);
+    expect(router.back).not.toHaveBeenCalled();
+    expect(router.replace).toHaveBeenCalledWith('/(app)/subjects');
+  });
+
   // ---------------------------------------------------------------------------
   // [BUG-552] goBackOrReplace fallback contract lock-down
   //
@@ -149,6 +187,58 @@ describe('goBackOrReplace', () => {
     expect(router.back).not.toHaveBeenCalled();
     expect(router.replace).toHaveBeenCalledTimes(1);
     expect(router.replace).toHaveBeenCalledWith(parentHref);
+  });
+});
+
+describe('V2 account return contract [WI-2240]', () => {
+  it.each([
+    ['/mentor', 'mentor'],
+    ['/subjects', 'subjects'],
+    ['/subjects/subject-1', 'subjects'],
+    ['/subject/subject-1', 'subjects'],
+    ['/subject-hub/subject-1', 'subjects'],
+    ['/topic/topic-1', 'subjects'],
+    ['/pick-book/subject-1', 'subjects'],
+    ['/vocabulary/subject-1', 'subjects'],
+    ['/shelf/subject-1/book/book-1', 'subjects'],
+    ['/child/child-1/curriculum', 'subjects'],
+    ['/child/child-1/subjects/subject-1', 'subjects'],
+    ['/child/child-1/topic/topic-1', 'subjects'],
+    ['/journal', 'journal'],
+    ['/journal/practice', 'journal'],
+  ] as const)('maps %s to the initiating V2 tab token', (pathname, token) => {
+    expect(accountReturnTokenForPathname(pathname)).toBe(token);
+  });
+
+  it('uses Mentor as the strict V2 fallback for an unknown initiating path', () => {
+    expect(accountReturnTokenForPathname('/unexpected')).toBe('mentor');
+    expect(accountReturnTokenForPathname('/child/child-1')).toBe('mentor');
+    expect(accountReturnTokenForPathname('/child/child-1/reports')).toBe(
+      'mentor',
+    );
+    expect(
+      accountReturnTokenForPathname('/child/child-1/session/session-1'),
+    ).toBe('mentor');
+    expect(accountReturnTokenForPathname('/child/child-1/subjects')).toBe(
+      'mentor',
+    );
+    expect(
+      accountReturnTokenForPathname('/child/child-1/subject/subject-1'),
+    ).toBe('mentor');
+    expect(accountReturnHref(undefined, true)).toBe('/(app)/mentor');
+    expect(accountReturnHref('unexpected', true)).toBe('/(app)/mentor');
+  });
+
+  it.each([
+    ['mentor', '/(app)/mentor'],
+    ['subjects', '/(app)/subjects'],
+    ['journal', '/(app)/journal'],
+  ] as const)('resolves %s to its exact V2 tab root', (token, href) => {
+    expect(accountReturnHref(token, true)).toBe(href);
+  });
+
+  it('preserves the legacy home fallback when V2 is disabled', () => {
+    expect(accountReturnHref('journal', false)).toBe('/(app)/home');
   });
 });
 

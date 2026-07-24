@@ -27,6 +27,12 @@ date: '2025-12-11'
 **Date:** 2025-12-11
 **Version:** 1.0 (BMAD Standard)
 
+> **Current age/compliance overlay (2026-07-23):** Product bands and launch
+> geography are governed by
+> [`docs/compliance/2026-07-23-13-plus-eea-launch-country-ruling.md`](compliance/2026-07-23-13-plus-eea-launch-country-ruling.md).
+> Any older 11+ floor, UK/US launch scope, or jurisdiction-neutral consent
+> wording in this PRD is superseded.
+
 ---
 
 ## Executive Summary
@@ -35,7 +41,7 @@ date: '2025-12-11'
 
 *"A teacher who grows with you."*
 
-MentoMate is a premium AI tutoring platform that teaches through conversation—using research-backed methodologies to guide motivated learners aged 11+ to understanding, remembering what they've learned across sessions, and verifying retention.
+MentoMate is a premium AI tutoring platform that teaches through conversation—using research-backed methodologies to guide motivated learners aged 13+ to understanding, remembering what they've learned across sessions, and verifying retention.
 
 ### The Problem
 
@@ -61,7 +67,7 @@ MentoMate delivers personalized AI tutoring through tiered subscriptions—combi
 
 ### Target Users
 
-Motivated learners aged 11+ who really want to learn—not casual browsers:
+Motivated learners aged 13+ who really want to learn—not casual browsers:
 
 - **Parents of struggling students** (primary): Kid needs to pass, catch up, get into good school. Affordable subscription tiers cheaper than tutor, available anytime
 - **Career changers**: Need new skills for hiring/promotion. Investment in earning potential
@@ -132,7 +138,7 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 
 | Feature Category | Included Features |
 |------------------|-------------------|
-| **Authentication** | Email + password, Google OAuth, Apple Sign-in, OpenAI OAuth (implemented via Clerk custom OAuth), multi-profile (family), GDPR parental consent (11-15, EU) |
+| **Authentication** | Email + password, Google OAuth, Apple Sign-in, OpenAI OAuth (implemented via Clerk custom OAuth), multi-profile (family), GDPR guardian authorization where a 13–17-year-old is below the habitual-residence Article 8 threshold |
 | **Onboarding** | Subject selection (any topic), conversational interview, dynamic curriculum generation, homework help quick entry |
 | **Learning Experience** | Real-time AI chat, prior knowledge context, adaptive explanations, mandatory user summaries, homework integrity mode |
 | **Assessments** | In-lesson quizzes, topic completion tests, re-testing from summaries |
@@ -159,7 +165,7 @@ Ask Anything starts without a required topic. It can resolve or ask for a subjec
 | Cohorts, buddy matching, study groups | Needs user volume | v1.5 |
 | Human coaching add-on | New business model | v2.0 |
 | Portfolio projects | Complexity, needs curriculum stability | v2.0 |
-| Multi-language UI (beyond English) | English only for v1.0 | v2.0 |
+| Additional UI locales beyond the seven shipped languages | Current UI set is en, de, es, ja, nb, pl, pt | Post-v1 |
 | Offline mode | Significant caching complexity | v2.0 |
 | Age 6-10 mode | Different UX, stricter COPPA requirements | v2.0 |
 | B2B/Team licensing | Focus on B2C first | v2.0 |
@@ -183,7 +189,7 @@ Ask Anything starts without a required topic. It can resolve or ask for a subjec
    - Downloads app or visits web app
    - Creates account (email/Google/Apple)
    - Completes profile (name, birthdate, country)
-   - If 11-15 in EU: Parent receives consent email
+   - If aged 13–17 and below the Article 8 threshold for habitual residence: guardian receives consent email
    - Parent approves consent (if applicable)
 
 2. **Intent Selection**
@@ -389,13 +395,15 @@ Ask Anything starts without a required topic. It can resolve or ask for a subjec
 
 ### Age & Compliance Requirements
 
-**Minimum Age:** 11 years old
+**Minimum Age:** 13 years old at launch
 - Conversational AI works better with older learners
 - Can sustain 20-30 minute sessions
 - Can learn independently (parents don't need to hover)
 
-**GDPR Compliance (Ages 11-15 in EU):**
-- Parental consent required for users aged 11-15 in EU countries
+**GDPR Compliance (Minors aged 13–17 in enabled EEA countries):**
+- Block every user under 13
+- Apply the national Article 8 threshold for the user's habitual-residence country
+- Require verified guardian authorization only where the learner is below that national threshold
 - Parent email collection during registration
 - Consent email with approve/decline links
 - Pending consent state (child cannot start until parent approves)
@@ -403,17 +411,15 @@ Ask Anything starts without a required topic. It can resolve or ask for a subjec
 - Account deletion flow (GDPR right to erasure)
 - Data export capability
 
-**COPPA Compliance (Ages 11-12 in US):**
-- Verifiable parental consent required for users aged 11-12 in US
-- Same consent workflow as GDPR (email verification)
-- Cannot collect personal data before consent obtained
-- Parent must be able to review and delete child's data
+**COPPA posture:**
+- Dormant at launch because all under-13 users and every non-EEA country are disabled
+- Any later US or under-13 launch requires a separate country/product ruling and COPPA-grade implementation
 - Clear privacy policy in child-accessible language
 
 **Consent Decline Flow:**
 - If parent declines consent → Account deleted immediately
 - No data retained (child's registration data purged)
-- Child notified: "Your parent declined. You can register again when you're [16 in EU / 13 in US]."
+- Child notified: "Your guardian declined. You can register again when you reach the digital-consent age for your country of habitual residence."
 - Email not blocked (can re-register at appropriate age)
 
 **Consent Timeout & Non-Response:**
@@ -468,7 +474,7 @@ Ask Anything starts without a required topic. It can resolve or ask for a subjec
 
 **Family Member Removal:**
 - **Parent removes child:**
-  - Child's profile becomes standalone Free account (if child is 16+ EU / 13+ US)
+  - Child's profile becomes standalone Free account only if they have reached the Article 8 threshold for their country of habitual residence
   - Child's profile deleted if under consent age (data can't exist without consent)
   - All progress preserved for eligible standalone accounts
   - Child notified: "You've been removed from family. Your account is now Free tier."
@@ -894,7 +900,7 @@ Ask Anything starts without a required topic. It can resolve or ask for a subjec
 **Authentication & Authorization:**
 - System must support multiple authentication methods including social login and email/password
 - System must manage multiple learner profiles under single subscription (family accounts)
-- System must implement parental consent workflow for users aged 11-15 in EU
+- System must implement verified guardian authorization for 13–17-year-olds below the Article 8 threshold for their EEA country of habitual residence
 - System must maintain user sessions with automatic expiration for security
 
 **Payment Processing:**
@@ -947,9 +953,10 @@ Ask Anything starts without a required topic. It can resolve or ask for a subjec
 
 **Privacy:**
 - System must comply with GDPR (account deletion, data export, parental consent)
-- System must verify user age (11+ minimum)
-- System must require parental consent for users aged 11-15 in EU
-- System must not collect PII from minors without parental consent
+- System must verify exact age against the 13+ launch floor
+- System must record and enforce the enabled-country allowlist
+- System must require verified guardian authorization when a 13–17-year-old is below the national Article 8 threshold
+- System must not collect consent-gated PII from minors without applicable self-consent or guardian authorization. Age, residence, security, registration, account-enforcement, and retention-only data may be processed where necessary for legal compliance, safety, or accountability.
 
 **API Security:**
 - System must implement rate limiting per user and IP address
@@ -973,8 +980,8 @@ Ask Anything starts without a required topic. It can resolve or ask for a subjec
 - FR4: Users can create multiple learner profiles under single subscription (family accounts)
 - FR5: Users can switch between learner profiles
 - FR6: Parents can switch into child's profile for full access to learning history
-- FR7: Users aged 11-15 in EU can request parental consent during registration
-- FR8: Users aged 11-12 in US can request parental consent during registration (COPPA)
+- FR7: Users aged 13–17 below the Article 8 threshold for their EEA country of habitual residence can request guardian authorization during registration
+- FR8: US registration and COPPA flows are dormant because the United States and all under-13 users are outside the launch perimeter
 - FR9: Parents can approve or decline consent via email link
 - FR10: If parent declines consent, child account is deleted immediately with no data retained
 - FR11: Users can delete their accounts and all associated data (GDPR)
@@ -1109,6 +1116,20 @@ AI maintains lesson focus while respecting learner curiosity through tiered resp
 - FR40: Users can have AI reference prior learning in new lessons
 - FR41: Users can receive understanding checks during lessons
 - FR42: Users can choose in-app or push notifications for review reminders
+
+### Mentor Notices (MVP)
+
+Mentor notices are the learner-only, low-stakes loop defined by [`MMT-ADR-0036`](adr/MMT-ADR-0036-mentor-notice-mvp-boundaries-and-server-authority.md): the Mentor may record one concrete, evidence-backed gap from homework or an ordinary learning session and offer a short in-app re-check later.
+
+- The capability applies to learners of every age under the same age-neutral rules. Interleaved sessions are excluded from the MVP.
+- The learner sees at most one actionable notice at a time and never a queue of shortcomings. Guardians, supporters, payers, and proxy views receive no notice details or projections.
+- `Continue` starts or resumes a re-check capped at three learner responses. The tutor guides but never grades its own re-check; an independent server-side judge produces the only transition the client may render. Only validated learner evidence may produce a `locked_in` result; `not_yet` ends the current offer without claiming mastery, and explicit dismissal is terminal.
+- `Not now` defers for the current learning day, which begins at local 04:00 in the learner's IANA time zone. An inactive open notice fades after 21 days, including while the feature is off.
+- MVP delivery is in-app only: no notice push, primer, scheduled nudge, or notification-family budget. Rollout is internal QA followed by all friendly-user MVP testers.
+- Rollout observations carry a monotonic server revision: lower revisions are ignored, disabled wins at the same revision, and re-enable requires a higher revision. Missing or malformed policy is fail-closed.
+- Flag-off removes all observed in-app and cached behavior without deleting notice rows; ordinary retention and deletion rules still apply. This work does not authorize production activation, percentage rollout, OTA, release, deployment, or push delivery.
+- The durable notice keeps an immutable `answerEventId` scalar after transcript purge, without a foreign key to the purged event. The server validates the event at creation; optional `learnerQuote` is transient validation input and is never stored.
+- All persisted learning text passes one shared multilingual clinical-safety gate. Person-attributed clinical inference is blocked, and ambiguity fails closed unless an independent judge strictly identifies LLM-authored text as an educational reference.
 
 ### Learning Verification
 
@@ -1677,8 +1698,8 @@ BYOK allows power users who already have AI subscriptions (Claude Pro, ChatGPT P
 | Requirement | Implementation |
 |-------------|---------------|
 | GDPR Compliance | Account deletion, data export, parental consent |
-| Age Verification | 11+ minimum, birthdate validation |
-| Parental Consent | Required for ages 11-15 in EU |
+| Age Verification | 13+ minimum, exact birth-date validation |
+| Parental Consent | Required when a 13–17-year-old is below the enabled residence country's Article 8 threshold |
 | Data Retention | User data deleted within 30 days of account deletion request |
 | Cookie Consent | EU cookie banner (web only) |
 | Privacy Policy | Available during registration |

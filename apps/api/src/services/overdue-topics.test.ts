@@ -225,6 +225,7 @@ describe('getOverdueTopicsGrouped', () => {
             overdueDays: 2,
             failureCount: 2,
             reason: 'overdue',
+            retentionStatus: 'forgotten',
           },
         ],
       },
@@ -239,6 +240,7 @@ describe('getOverdueTopicsGrouped', () => {
             overdueDays: 1,
             failureCount: 1,
             reason: 'overdue',
+            retentionStatus: 'forgotten',
           },
         ],
       },
@@ -623,6 +625,10 @@ describe('getOverdueTopicsGrouped', () => {
       expect(topic?.reason).toBe('flagged_weak');
       expect(topic?.overdueDays).toBe(0);
       expect(topic?.concept).toBe('Mitochondria');
+      // [WI-1463] Flagged-only rows have no SM-2 schedule to derive a band
+      // from — always exposed as 'forgotten' so mobile's cross-subject
+      // urgency sort ranks them alongside genuinely forgotten overdue cards.
+      expect(topic?.retentionStatus).toBe('forgotten');
     });
 
     it('orders topics by retention band (forgotten before strong) ahead of raw overdue days', async () => {
@@ -668,6 +674,11 @@ describe('getOverdueTopicsGrouped', () => {
       expect(result.subjects[0]?.topics.map((t) => t.topicId)).toEqual([
         'topic-forgotten',
         'topic-strong',
+      ]);
+      // [WI-1463] retentionStatus reflects the same band the sort ran on.
+      expect(result.subjects[0]?.topics.map((t) => t.retentionStatus)).toEqual([
+        'forgotten',
+        'strong',
       ]);
     });
 

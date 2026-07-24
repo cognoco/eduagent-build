@@ -36,6 +36,61 @@ function feed(
 }
 
 describe('NowCardStack', () => {
+  it('[WI-2111 AC-1] renders action cards before a learning-moment receipt', () => {
+    const receipt = card('ledger_moment', 'receipt-1', {
+      templateKey: 'now.ledger_moment.session_filed',
+      params: { ledgerKind: 'session_filed' },
+    });
+    const { getByTestId } = render(
+      <NowCardStack
+        feed={feed([
+          receipt,
+          card('unfinished_session', 'topic-1'),
+          card('retention_due', 'topic-2'),
+        ])}
+        dismissedKeys={new Set()}
+        onContinue={jest.fn()}
+        onDecline={jest.fn()}
+        onShowOverflow={jest.fn()}
+      />,
+    );
+
+    const stack = getByTestId('now-card-stack');
+    expect(
+      stack.children.map(
+        (child: { props: { testID?: string } }) => child.props.testID,
+      ),
+    ).toEqual([
+      'now-card-slot-anchor',
+      'now-card-slot-module-0',
+      'now-card-slot-receipt-0',
+    ]);
+  });
+
+  it('[WI-2111 AC-2] renders a duplicated receipt in only its dedicated slot', () => {
+    const receipt = card('ledger_moment', 'receipt-1', {
+      templateKey: 'now.ledger_moment.session_filed',
+      params: { ledgerKind: 'session_filed' },
+    });
+    const { getAllByTestId, queryByTestId } = render(
+      <NowCardStack
+        feed={feed([
+          receipt,
+          card('unfinished_session', 'topic-1'),
+          { ...receipt },
+        ])}
+        dismissedKeys={new Set()}
+        onContinue={jest.fn()}
+        onDecline={jest.fn()}
+        onShowOverflow={jest.fn()}
+      />,
+    );
+
+    expect(getAllByTestId('now-ledger-moment')).toHaveLength(1);
+    expect(queryByTestId('now-card-slot-receipt-0')).toBeTruthy();
+    expect(queryByTestId('now-card-slot-receipt-1')).toBeNull();
+  });
+
   it('renders one anchor and up to two module cards', () => {
     const { getByTestId, queryByTestId } = render(
       <NowCardStack
@@ -298,5 +353,70 @@ describe('NowCardStack', () => {
     expect(getByText('Getting stronger')).toBeTruthy();
     fireEvent.press(getByTestId('now-card-complete'));
     expect(onCompleted).toHaveBeenCalledWith(anchor);
+  });
+
+  it('[WI-2109 AC-1] renders duplicate learning moments once by dismiss key', () => {
+    const moment = card('ledger_moment', 'moment-1', {
+      templateKey: 'now.ledger_moment.session_filed',
+      params: { ledgerKind: 'session_filed' },
+    });
+    const { getAllByTestId } = render(
+      <NowCardStack
+        feed={feed([moment, { ...moment }])}
+        dismissedKeys={new Set()}
+        onContinue={jest.fn()}
+        onDecline={jest.fn()}
+        onShowOverflow={jest.fn()}
+      />,
+    );
+
+    expect(getAllByTestId('now-ledger-moment')).toHaveLength(1);
+  });
+
+  it('[WI-2109 AC-2] keeps learning moments with distinct dismiss keys', () => {
+    const first = card('ledger_moment', 'moment-1', {
+      templateKey: 'now.ledger_moment.session_filed',
+      params: { ledgerKind: 'session_filed' },
+    });
+    const second = card('ledger_moment', 'moment-2', {
+      templateKey: 'now.ledger_moment.notice_locked_in',
+      params: { ledgerKind: 'notice_locked_in' },
+    });
+    const { getAllByTestId } = render(
+      <NowCardStack
+        feed={feed([first, second])}
+        dismissedKeys={new Set()}
+        onContinue={jest.fn()}
+        onDecline={jest.fn()}
+        onShowOverflow={jest.fn()}
+      />,
+    );
+
+    expect(getAllByTestId('now-ledger-moment')).toHaveLength(2);
+  });
+
+  it('[WI-2109 AC-3] keeps one learning moment during cached-to-fresh overlap', () => {
+    const cachedMoment = card('ledger_moment', 'moment-1', {
+      templateKey: 'now.ledger_moment.session_filed',
+      params: { ledgerKind: 'session_filed' },
+    });
+    const props = {
+      dismissedKeys: new Set<string>(),
+      onContinue: jest.fn(),
+      onDecline: jest.fn(),
+      onShowOverflow: jest.fn(),
+    };
+    const { getAllByTestId, rerender } = render(
+      <NowCardStack feed={feed([cachedMoment])} {...props} />,
+    );
+
+    rerender(
+      <NowCardStack
+        feed={feed([cachedMoment, { ...cachedMoment }])}
+        {...props}
+      />,
+    );
+
+    expect(getAllByTestId('now-ledger-moment')).toHaveLength(1);
   });
 });

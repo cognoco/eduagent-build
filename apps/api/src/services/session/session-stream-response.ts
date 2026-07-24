@@ -7,6 +7,7 @@ import {
   streamFallbackFrameSchema,
   UpstreamLlmError,
   type QuotaModel,
+  type AnswerEvaluation,
   type SubscriptionTier,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -35,6 +36,8 @@ interface DoneFrameSource {
   aiEventId?: string;
   notePrompt?: boolean;
   notePromptPostSession?: boolean;
+  /** [WI-2107] LLM opened a topic without delivering content or a question this turn. */
+  topicOpenedPendingContent?: boolean;
   fluencyDrill?: unknown;
   languageLearning?: unknown;
   confidence?: 'low' | 'medium' | 'high';
@@ -42,6 +45,8 @@ interface DoneFrameSource {
   challengeRound?: unknown;
   challengeOffer?: { pitch: string };
   draftedNote?: unknown;
+  mentorNotice?: unknown;
+  answerEvaluation?: AnswerEvaluation;
 }
 
 type SessionMessageInput = Parameters<typeof processMessage>[3];
@@ -103,6 +108,7 @@ export function buildDoneFramePayload(source: DoneFrameSource) {
     aiEventId: source.aiEventId,
     notePrompt: source.notePrompt || undefined,
     notePromptPostSession: source.notePromptPostSession || undefined,
+    topicOpenedPendingContent: source.topicOpenedPendingContent || undefined,
     fluencyDrill: source.fluencyDrill || undefined,
     languageLearning: source.languageLearning || undefined,
     confidence: source.confidence || undefined,
@@ -110,6 +116,8 @@ export function buildDoneFramePayload(source: DoneFrameSource) {
     challengeRound: source.challengeRound,
     challengeOffer: source.challengeOffer,
     draftedNote: source.draftedNote,
+    mentorNotice: source.mentorNotice,
+    answerEvaluation: source.answerEvaluation,
   });
 }
 
@@ -166,6 +174,8 @@ function buildProcessOptions(
     memoryFactsReadEnabled: options.memoryFactsReadEnabled,
     memoryFactsRelevanceEnabled: options.memoryFactsRelevanceEnabled,
     challengeRoundRuntimeEnabled: options.challengeRoundRuntimeEnabled,
+    answerEvaluationEnabled: options.answerEvaluationEnabled,
+    mentorNoticeEnabled: options.mentorNoticeEnabled,
     reviewCallbackOpenerEnabled: options.reviewCallbackOpenerEnabled,
     judgeFrameworkEnabled: options.judgeFrameworkEnabled,
     judgeEnforcementEnabled: options.judgeEnforcementEnabled,

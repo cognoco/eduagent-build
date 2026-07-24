@@ -10,11 +10,27 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { parse as parseYaml } from 'yaml';
 
 const BASH =
   process.platform === 'win32'
     ? 'C:\\Program Files\\Git\\bin\\bash.exe'
     : 'bash';
+
+const NARROW_ROUTER_FLAGS = [
+  'postinstall_safety',
+  'root_deps',
+  'i18n_jsx_literals',
+  'inngest_admin',
+  'prompt_markers',
+  'no_clinical_copy',
+  'no_gemini_runtime',
+  'mode_nav_flag_combo',
+  'test_only_exports',
+  'workflow_security',
+  'api_script_guards',
+  'database_script_guards',
+] as const;
 
 /**
  * Clones the given base env (default: process.env) with every GIT_* key
@@ -318,6 +334,31 @@ describe('check-change-class.sh', () => {
     expect(flags.integration).toBe('true');
   });
 
+  // WI-1992: a service-only diff (apps/api/src/services/**, non-prompt) only
+  // ever scheduled test:api:unit, so the CI change-class router's `integration`
+  // output stayed false for exactly the class the audit's security-fix break
+  // tests need (tests/integration/ + apps/api/src/**/*.integration.test.ts
+  // never ran). Sibling classes (api-routes, api-middleware) already schedule
+  // both; api-services was the gap.
+  it('routes a service-only diff through the API integration suites (api-services class)', () => {
+    mkdirSync(join(repo, 'apps', 'api', 'src', 'services'), {
+      recursive: true,
+    });
+    writeFileSync(
+      join(repo, 'apps', 'api', 'src', 'services', 'streak.ts'),
+      'export const s = 1;\n',
+    );
+    git(repo, ['add', '.']);
+
+    const output = runChangeClass(repo, ['--branch'], { encoding: 'utf8' });
+    expect(output).toContain('api-services');
+    expect(output).toContain('pnpm test:api:integration');
+
+    const flags = runRouter(repo);
+    expect(flags.classes).toContain('api-services');
+    expect(flags.integration).toBe('true');
+  });
+
   it('emits false flags for an unclassified-only change', () => {
     writeFileSync(join(repo, 'notes.txt'), 'hello\n');
     git(repo, ['add', '.']);
@@ -327,6 +368,277 @@ describe('check-change-class.sh', () => {
     expect(flags.eval).toBe('false');
     expect(flags.database).toBe('false');
     expect(flags.docs_only).toBe('false');
+    for (const flag of NARROW_ROUTER_FLAGS) {
+      expect(flags[flag]).toBe('false');
+    }
+  });
+
+  it('routes API TypeScript changes through the no-Gemini-runtime ratchet', () => {
+    mkdirSync(join(repo, 'apps', 'api', 'src', 'services'), {
+      recursive: true,
+    });
+    writeFileSync(
+      join(repo, 'apps', 'api', 'src', 'services', 'provider-policy.ts'),
+      'export const providerPolicy = true;\n',
+    );
+    git(repo, ['add', '.']);
+
+    const output = runChangeClass(repo, ['--branch'], { encoding: 'utf8' });
+    expect(output).toContain('no-gemini-runtime');
+    expect(output).toContain('pnpm check:no-gemini-runtime');
+
+    const flags = runRouter(repo);
+    expect(flags.no_gemini_runtime).toBe('true');
+  });
+
+  it.each([
+    'scripts/provider-tool.ts',
+    'scripts/no-gemini-runtime-baseline.json',
+  ])('routes %s through the no-Gemini-runtime ratchet', (file) => {
+    const fullPath = join(repo, file);
+    mkdirSync(join(fullPath, '..'), { recursive: true });
+    writeFileSync(fullPath, 'fixture\n');
+    git(repo, ['add', '.']);
+
+    const output = runChangeClass(repo, ['--branch'], { encoding: 'utf8' });
+    expect(output).toContain('pnpm check:no-gemini-runtime');
+    expect(runRouter(repo).no_gemini_runtime).toBe('true');
+  });
+
+  it('does not route unrelated mobile TypeScript through the no-Gemini-runtime ratchet', () => {
+    mkdirSync(join(repo, 'apps', 'mobile', 'src', 'lib'), { recursive: true });
+    writeFileSync(
+      join(repo, 'apps', 'mobile', 'src', 'lib', 'theme.ts'),
+      'export const theme = true;\n',
+    );
+    git(repo, ['add', '.']);
+
+    const output = runChangeClass(repo, ['--branch'], { encoding: 'utf8' });
+    expect(output).not.toContain('no-gemini-runtime');
+    expect(output).not.toContain('pnpm check:no-gemini-runtime');
+    expect(runRouter(repo).no_gemini_runtime).toBe('false');
+  });
+
+  it('routes deletion of the no-Gemini baseline through the ratchet', () => {
+    const baseline = join(repo, 'scripts', 'no-gemini-runtime-baseline.json');
+    writeFileSync(baseline, '[]\n');
+    git(repo, ['add', '.']);
+    git(repo, ['commit', '-m', 'add baseline']);
+    rmSync(baseline);
+
+    const output = runChangeClass(repo, ['--branch'], { encoding: 'utf8' });
+    expect(output).toContain('no-gemini-runtime');
+    expect(runRouter(repo).no_gemini_runtime).toBe('true');
+  });
+
+  it('routes both sides of a no-Gemini baseline rename instead of treating the destination as docs-only', () => {
+    const baseline = join(repo, 'scripts', 'no-gemini-runtime-baseline.json');
+    mkdirSync(join(repo, 'docs'), { recursive: true });
+    writeFileSync(baseline, '[]\n');
+    git(repo, ['add', '.']);
+    git(repo, ['commit', '-m', 'add baseline']);
+    git(repo, [
+      'mv',
+      'scripts/no-gemini-runtime-baseline.json',
+      'docs/renamed-baseline.json',
+    ]);
+
+    const flags = runRouter(repo);
+    expect(flags.no_gemini_runtime).toBe('true');
+    expect(flags.docs_only).toBe('false');
+  });
+
+  it.each([
+    {
+      name: 'postinstall safety',
+      file: 'package.json',
+      className: 'postinstall-safety',
+      command: 'pnpm verify:postinstall-safety',
+      flag: 'postinstall_safety',
+    },
+    {
+      name: 'root dependencies',
+      file: 'package.json',
+      className: 'root-deps',
+      command: 'pnpm check:root-deps',
+      flag: 'root_deps',
+    },
+    {
+      name: 'hardcoded JSX literals',
+      file: 'apps/mobile/src/components/Card.tsx',
+      className: 'i18n-jsx-literals',
+      command: 'pnpm check:i18n:jsx-literals',
+      flag: 'i18n_jsx_literals',
+    },
+    {
+      name: 'Inngest admin annotations',
+      file: 'apps/api/src/inngest/functions/refresh.ts',
+      className: 'inngest-admin',
+      command: 'pnpm exec tsx scripts/check-inngest-admin.ts',
+      flag: 'inngest_admin',
+    },
+    {
+      name: 'prompt markers',
+      file: 'apps/api/src/services/exchange-prompts.ts',
+      className: 'prompt-markers',
+      command: 'bash scripts/check-prompt-markers.sh',
+      flag: 'prompt_markers',
+    },
+    {
+      name: 'clinical copy',
+      file: 'apps/mobile/src/i18n/locales/en.json',
+      className: 'no-clinical-copy',
+      command: 'pnpm check:no-clinical-copy',
+      flag: 'no_clinical_copy',
+    },
+    {
+      name: 'MODE_NAV flag combinations',
+      file: 'apps/mobile/eas.json',
+      className: 'mode-nav-flag-combo',
+      command: 'pnpm check:mode-nav-flag-combo',
+      flag: 'mode_nav_flag_combo',
+    },
+    {
+      name: 'test-only exports',
+      file: 'packages/example/src/index.ts',
+      className: 'test-only-exports',
+      command:
+        'pnpm exec jest --config scripts/jest.config.cjs scripts/check-test-only-exports.test.ts --no-coverage',
+      flag: 'test_only_exports',
+    },
+    {
+      name: 'workflow security',
+      file: '.github/actions/local/action.yml',
+      className: 'workflow-security',
+      command: 'pnpm check:github-workflow-security',
+      flag: 'workflow_security',
+    },
+    {
+      name: 'API script guards',
+      file: 'apps/api/scripts/verify-wrangler-kv-binding.mjs',
+      className: 'api-script-guards',
+      command:
+        'node --test apps/api/scripts/verify-wrangler-kv-binding.test.mjs',
+      flag: 'api_script_guards',
+    },
+    {
+      name: 'database script guards',
+      file: 'packages/database/scripts/check-db-push-target.mjs',
+      className: 'database-script-guards',
+      command:
+        'node --test packages/database/scripts/check-db-push-target.test.mjs',
+      flag: 'database_script_guards',
+    },
+    {
+      name: 'identity FK script guards',
+      file: 'packages/database/scripts/check-identity-fk-drift.mjs',
+      className: 'database-script-guards',
+      command:
+        'node --test packages/database/scripts/check-identity-fk-drift.test.mjs',
+      flag: 'database_script_guards',
+    },
+  ])(
+    'routes the narrow $name check through its bounded input surface',
+    ({ file, className, command, flag }) => {
+      const fullPath = join(repo, file);
+      mkdirSync(join(fullPath, '..'), { recursive: true });
+      writeFileSync(fullPath, 'fixture\n');
+      git(repo, ['add', '.']);
+
+      const output = runChangeClass(repo, ['--branch'], { encoding: 'utf8' });
+      expect(output).toContain(className);
+      expect(output).toContain(command);
+      expect(runRouter(repo)[flag]).toBe('true');
+    },
+  );
+
+  it('routes root package script wiring through every package-script-backed ratchet', () => {
+    writeFileSync(join(repo, 'package.json'), '{"scripts":{}}\n');
+    git(repo, ['add', 'package.json']);
+
+    const flags = runRouter(repo);
+    expect(flags.i18n_jsx_literals).toBe('true');
+    expect(flags.no_clinical_copy).toBe('true');
+    expect(flags.no_gemini_runtime).toBe('true');
+    expect(flags.mode_nav_flag_combo).toBe('true');
+    expect(flags.workflow_security).toBe('true');
+  });
+
+  it('routes the CI workflow bootstrap through every narrow guard', () => {
+    const workflow = join(repo, '.github', 'workflows', 'ci.yml');
+    mkdirSync(join(workflow, '..'), { recursive: true });
+    writeFileSync(workflow, 'name: CI\n');
+    git(repo, ['add', '.github/workflows/ci.yml']);
+
+    const flags = runRouter(repo);
+    for (const flag of NARROW_ROUTER_FLAGS) {
+      expect(flags[flag]).toBe('true');
+    }
+  });
+
+  it.each([
+    ['scripts/verify-no-secret-postinstall.cjs', 'postinstall_safety'],
+    ['scripts/check-no-mobile-deps-at-root.cjs', 'root_deps'],
+    ['scripts/i18n-jsx-literals-baseline.json', 'i18n_jsx_literals'],
+    ['scripts/check-inngest-admin.ts', 'inngest_admin'],
+    ['scripts/check-prompt-markers.sh', 'prompt_markers'],
+    ['scripts/no-clinical-copy-baseline.json', 'no_clinical_copy'],
+    ['scripts/mode-nav-flag-combo-baseline.json', 'mode_nav_flag_combo'],
+    ['scripts/check-test-only-exports.test.ts', 'test_only_exports'],
+    ['scripts/jest.config.cjs', 'test_only_exports'],
+    ['scripts/check-github-workflow-security.ts', 'workflow_security'],
+    [
+      'apps/api/scripts/verify-wrangler-kv-binding.test.mjs',
+      'api_script_guards',
+    ],
+    [
+      'packages/database/scripts/verify-db-target-lib.mjs',
+      'database_script_guards',
+    ],
+  ])('routes narrow-check maintenance input %s', (file, flag) => {
+    const fullPath = join(repo, file);
+    mkdirSync(join(fullPath, '..'), { recursive: true });
+    writeFileSync(fullPath, 'fixture\n');
+    git(repo, ['add', '.']);
+
+    expect(runRouter(repo)[flag]).toBe('true');
+  });
+
+  it('gates every narrow PR check on the early scope output while preserving push behavior', () => {
+    const workflow = parseYaml(
+      readFileSync(
+        join(__dirname, '..', '.github', 'workflows', 'ci.yml'),
+        'utf8',
+      ),
+    ) as {
+      jobs?: { main?: { steps?: Array<{ name?: string; if?: string }> } };
+    };
+    const steps = workflow.jobs?.main?.steps ?? [];
+    const gates: Record<string, string> = {
+      'Verify postinstall safety': 'postinstall_safety',
+      'Root package.json — no mobile-only deps': 'root_deps',
+      'i18n hardcoded-JSX-literal check': 'i18n_jsx_literals',
+      'Inngest @inngest-admin annotation guard (WI-1075)': 'inngest_admin',
+      'Prompt marker-token check': 'prompt_markers',
+      'No-clinical-copy ratchet (G11)': 'no_clinical_copy',
+      'No-Gemini-runtime ratchet (Phase A)': 'no_gemini_runtime',
+      'MODE_NAV flag-combo ratchet (R9)': 'mode_nav_flag_combo',
+      'Test-only-exports ratchet (G11)': 'test_only_exports',
+      'GitHub workflow supply-chain check': 'workflow_security',
+      'apps/api/scripts node:test guards (KV-binding verifier)':
+        'api_script_guards',
+      'packages/database/scripts node:test guards': 'database_script_guards',
+    };
+
+    expect(Object.keys(gates)).toHaveLength(NARROW_ROUTER_FLAGS.length);
+    for (const [name, flag] of Object.entries(gates)) {
+      const step = steps.find((candidate) => candidate.name === name);
+      expect(step).toBeDefined();
+      expect(step?.if).toBe(
+        `github.event_name == 'push' || (github.event_name == 'pull_request' && steps.scope.outputs.${flag} == 'true')`,
+      );
+      expect(step?.if).not.toContain('steps.change-class.outputs');
+    }
   });
 
   it('emits docs_only=true for docs and editor metadata changes', () => {
@@ -347,6 +659,9 @@ describe('check-change-class.sh', () => {
     expect(flags.integration).toBe('false');
     expect(flags.eval).toBe('false');
     expect(flags.unit).toBe('false');
+    for (const flag of NARROW_ROUTER_FLAGS) {
+      expect(flags[flag]).toBe('false');
+    }
     expect(flags.docs_only).toBe('true');
   });
 
@@ -376,6 +691,9 @@ describe('check-change-class.sh', () => {
       expect(flags.eval).toBe('true');
       expect(flags.unit).toBe('true');
       expect(flags.database).toBe('true');
+      for (const flag of NARROW_ROUTER_FLAGS) {
+        expect(flags[flag]).toBe('true');
+      }
       expect(flags.docs_only).toBe('false');
     } finally {
       removeTempRepo(orphan);

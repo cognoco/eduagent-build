@@ -45,7 +45,7 @@ vendor is one adapter file.
 | **Deep reasoning — Family** (rungs 4–5) | gpt-oss-120b `high` | Cerebras | US | Family tier (gpt-5.4 carve-out, owner ruling 2026-06-07) | active | 2026-06-06 iter-1 |
 | **Rung 4–5 fallback** | Sonnet 4.6 | Anthropic | — | Plus / Pro / add-on | active (fallback) | 2026-06-06 iter-1 |
 | **Async deep jobs** (recaps, curriculum, assessment eval) | gpt-oss-120b `high` | Cerebras | US | all | active (shares primary path) | 2026-06-06 iter-1 |
-| **Judge** (envelope evaluator) | **Sonnet 4.6 non-reasoning — retained.** T10 bake-off resolved 2026-07-11: Haiku 4.5 and GPT-5-mini (minimal reasoning) failed the judgment axis (CGR02 misconception mislabeled `partial`); GPT-5-mini (default reasoning) was clean on both axes but rejected on latency (~12.9s/call vs the 25s Workers wall); Sonnet 4.6 retained as the only candidate both axis-clean AND within the latency budget. No `GRADER_MODEL` change. Post-launch N=3-5 reevaluation tracked as WI-1799. | Anthropic | — | all | **Callable for grader flow** (`CHALLENGE_ROUND_GRADER_ENABLED`); first tier/age-blind `capability: 'judge'` routing path — see ADR Amendment 2026-06-26. Suitability judge adopts same capability next. | [`2026-07-11 T10 bake-off`](vetting/2026-07-11-challenge-grader-bakeoff.md) |
+| **Judge** (envelope evaluator) | **Sonnet 4.6 non-reasoning — retained.** T10 bake-off resolved 2026-07-11: Haiku 4.5 and GPT-5-mini (minimal reasoning) failed the judgment axis (CGR02 misconception mislabeled `partial`); GPT-5-mini (default reasoning) was clean on both axes but rejected on latency (~12.9s/call vs the 25s Workers wall); Sonnet 4.6 retained as the only candidate both axis-clean AND within the latency budget. No `GRADER_MODEL` change. Post-launch N=3-5 reevaluation tracked as WI-1799. | Anthropic | — | all | **Live for both judge call sites** — the Challenge-Round grader (`CHALLENGE_ROUND_GRADER_ENABLED`) and the suitability judge (adopted in WI-1826); tier/age-blind `capability: 'judge'` routing path — see ADR Amendment 2026-06-26. | [`2026-07-11 T10 bake-off`](vetting/2026-07-11-challenge-grader-bakeoff.md) |
 
 **Roles in one line:** gpt-oss is everyone's default text brain. When the
 business-rule layer routes away from US-hosted Cerebras — EU-residency required
@@ -112,11 +112,15 @@ The layered safety model (① input sanitization → ② router safety preamble 
 `MMT-ADR-0016`. These are the **still-open** operational gates lifted from the
 2026-06-05 safety audit; H1/H2/H3 are **closed** on `ongoing` (Gemini block-reason
 leak mapped terminal; crisis-redirect now emits a structured Inngest event;
-adversarial safety battery wired into `eval-llm`).
+adversarial safety battery wired into `eval-llm`). **H4 is closed** as of
+**WI-1826**: `runSuitabilityJudge()` (`apps/api/src/services/policy-engine/judge-suitability.ts`)
+now passes `capability: 'judge'` to `routeAndCall`, so both live judge call
+sites (Challenge-Round grader and the suitability judge) resolve the vetted
+judge/grader routing path (`resolveGraderConfig`, `router.ts`) — the
+capability-adoption step the register itself flagged as H4's last open item.
 
 | Gate | What's owed | Why it's open now |
 |---|---|---|
-| **H4 — provider safety net** | The judge (layer ③ replacement) must be live before flag-flip. Removing Gemini deletes the only configured provider-side classifier; OpenAI is detection-only, Anthropic/Cerebras/Mistral are prompt-only. | **Partially advanced (2026-06-26):** a tier/age-blind `capability: 'judge'` routing path is now callable for the grader flow (`CHALLENGE_ROUND_GRADER_ENABLED`). The judge is no longer scaffold-only. H4 remains open until the judge is on in production ahead of the V2 minor-traffic cutover. Suitability judge adopts the same capability next, completing H4. **2026-07-11 cutover:** `JUDGE_FRAMEWORK_ENABLED` + `JUDGE_ENFORCEMENT_ENABLED` set alongside `LLM_ROUTING_V2_ENABLED` in prd (WI-1685/WI-1686), so the judge is live in production at the same instant V2 goes live — no uncovered window. `runSuitabilityJudge()` (`apps/api/src/services/policy-engine/judge-suitability.ts`) still calls `routeAndCall` without `capability: 'judge'` — the capability-adoption step from the register's own "next" framing remains the open completion item, tracked as **WI-1826**. |
 | **H5 — output moderation** | A final output-content check (moderation pass or lightweight classifier) on the displayed reply. | Deferrable while Gemini's classifier guarded the main lane; **launch-relevant once Gemini is removed**. Scope after the judge lands. |
 | **H7 — safety observability** | A queryable safety-incident metric/dashboard (blocks per day, crisis redirects per week). | Crisis-redirect events now fire (H2); the aggregate dashboard does not exist yet. |
 | **Self-harm escalation** | **Ruled 2026-06-23: log-only.** Crisis redirect → structured `app/safety.crisis_redirect_fired` Inngest event (already shipped); **no guardian notification.** Option (b) guardian-notify is not foreclosed but is not being built. | Settled — no further decision owed; H7 dashboard surfaces these events. |

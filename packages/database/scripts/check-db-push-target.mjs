@@ -15,6 +15,7 @@
  *   DOPPLER_CONFIG = "stg" or "prd" →  push is BLOCKED with a clear error
  *   DOPPLER_CONFIG = anything else  →  push is BLOCKED (unknown config = err on safe side)
  *   DOPPLER_CONFIG absent           →  push is BLOCKED unless DB_PUSH_LOCAL_DEV=1
+ *                                      AND DATABASE_URL is set to a local host
  *                                      (see "No-Doppler escape" below)
  *
  * This approach is stronger than hostname-substring matching because it does not
@@ -27,18 +28,34 @@
  *
  * No-Doppler escape
  * -----------------
- * `pnpm env:sync` (`scripts/setup-env.js`) writes stg secrets to
+ * `pnpm env:sync` (`scripts/setup-env.js`) writes stg secrets to the repo-root
  * `.env.development.local` (DOPPLER_CONFIG = 'stg' is hard-coded in that
- * script). Drizzle-kit auto-loads `.env*` files from ancestor directories, so a
- * bare `drizzle-kit push` without Doppler would pick up stg credentials and
- * reach staging. Allowing `DOPPLER_CONFIG=undefined` silently would therefore
- * be unsafe. Instead, the no-Doppler case requires an explicit opt-in:
+ * script). Allowing `DOPPLER_CONFIG=undefined` silently would be unsafe if
+ * `DATABASE_URL` were already present in the process environment pointing at
+ * stg/prd — from a leftover `doppler run` shell, a manually exported var, or a
+ * bare `.env` file placed in `packages/database/` (drizzle-kit's bundled
+ * dotenv auto-loads a bare `.env` from its cwd, which is `packages/database`
+ * for every `db:push` invocation path in this repo — it does NOT read the
+ * root `.env.development.local`; verified WI-1874). Instead, the no-Doppler
+ * case requires an explicit opt-in:
  *
  *   DB_PUSH_LOCAL_DEV=1 pnpm --filter @eduagent/database run db:push
  *
  * This escape exists only for development setups that do not use Doppler at all
  * (e.g. a clean checkout with a manually written .env.local pointing at a local
  * Postgres). It is NOT for bypassing the check when Doppler is configured.
+ *
+ * The opt-in alone is not sufficient. Two ways the escape is still refused
+ * (fail-closed, WI-1874):
+ *   - `DATABASE_URL` absent from the process env → BLOCKED. The target cannot
+ *     be verified, so the guard refuses rather than print an unverified accept.
+ *     This also closes the hand-placed bare-`.env` vector: drizzle-kit would
+ *     load such a file afterwards, but at guard time DATABASE_URL is still
+ *     absent, so the guard never has to read any file to be safe.
+ *   - `DATABASE_URL` set but its host is not localhost/127.0.0.1 (in particular
+ *     a `*.neon.tech` stg/prd host) → BLOCKED.
+ * Only a `DATABASE_URL` present AND resolving to localhost/127.0.0.1 is
+ * accepted under this escape.
  *
  * Historical context
  * ------------------
@@ -52,8 +69,13 @@
  *
  * Exit codes:
  *   0 — DOPPLER_CONFIG="dev"; or DOPPLER_CONFIG absent AND DB_PUSH_LOCAL_DEV=1
- *   1 — DOPPLER_CONFIG is stg/prd/unknown; or absent without DB_PUSH_LOCAL_DEV=1
+ *       AND DATABASE_URL is set AND its host is localhost/127.0.0.1
+ *   1 — DOPPLER_CONFIG is stg/prd/unknown; or absent without DB_PUSH_LOCAL_DEV=1;
+ *       or absent with DB_PUSH_LOCAL_DEV=1 but DATABASE_URL is absent from the
+ *       process env (fail-closed) or resolves to a non-local host
  */
+
+import { extractHost, hostMatchesEnvironment } from './verify-db-target-lib.mjs';
 
 const dopplerConfig = process.env.DOPPLER_CONFIG;
 
@@ -97,8 +119,9 @@ function blocked(reason) {
 }
 
 if (dopplerConfig === undefined || dopplerConfig === '') {
-  // No Doppler — could be a bare invocation that auto-loaded .env.development.local
-  // (which contains stg credentials via pnpm env:sync). Require an explicit opt-in.
+  // No Doppler — DATABASE_URL could already be set in the process env from a
+  // leftover doppler-run shell, an exported var, or a bare packages/database/.env
+  // file (which drizzle-kit's bundled dotenv does auto-load). Require an explicit opt-in.
   if (!process.env.DB_PUSH_LOCAL_DEV) {
     blocked(
       'DOPPLER_CONFIG is not set. pnpm env:sync writes stg credentials to\n' +
@@ -107,6 +130,49 @@ if (dopplerConfig === undefined || dopplerConfig === '') {
         '   DB_PUSH_LOCAL_DEV=1 if you are on a local Postgres with no Doppler.',
     );
   }
+
+  // The opt-in alone doesn't prove the target is local. Fail closed (WI-1874):
+  // if DATABASE_URL is absent from the process env, the push target cannot be
+  // verified, so the guard BLOCKS — it must never print an acceptance for a
+  // target it did not check. (This also closes the hand-placed bare-`.env`
+  // vector without the guard reading any file: drizzle-kit would load such a
+  // file later, but at guard time DATABASE_URL is still absent, so we refuse.)
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    blocked(
+      'DB_PUSH_LOCAL_DEV=1 is set, but DATABASE_URL is not present in the\n' +
+        '   process environment, so the push target cannot be verified as local.\n' +
+        '   Export a local DATABASE_URL (host localhost or 127.0.0.1) first:\n' +
+        '     DATABASE_URL=postgres://postgres:postgres@localhost:5432/<db> \\\n' +
+        '       DB_PUSH_LOCAL_DEV=1 pnpm --filter @eduagent/database run db:push',
+    );
+  }
+
+  // DATABASE_URL is set: its host must be localhost/127.0.0.1 — anything else
+  // (in particular *.neon.tech) is blocked. The `if` is retained so that
+  // removing the fail-closed clause above cleanly reproduces the pre-WI-1874
+  // accept-on-unset behavior for red-green verification.
+  if (databaseUrl) {
+    const host = extractHost(databaseUrl);
+    const isLocalHost =
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      Boolean(host?.startsWith('localhost:')) ||
+      Boolean(host?.startsWith('127.0.0.1:'));
+
+    if (!isLocalHost) {
+      const neonCheck = hostMatchesEnvironment({ host: host ?? '', wrongEnvSubstring: 'neon.tech' });
+      blocked(
+        'DB_PUSH_LOCAL_DEV=1 is set, but DATABASE_URL resolves to host "' +
+          (host ?? '(unparseable)') +
+          '", not localhost/127.0.0.1.' +
+          (neonCheck.status === 'mismatch' ? ' ' + neonCheck.reason + '.' : '') +
+          ' DATABASE_URL is already set in the process environment and does not\n' +
+          '   point at a local database. Point DATABASE_URL at your local Postgres instance.',
+      );
+    }
+  }
+
   console.log('✓ drizzle-kit push: no Doppler config — DB_PUSH_LOCAL_DEV=1 override accepted');
   process.exit(0);
 }

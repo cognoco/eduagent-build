@@ -1,4 +1,5 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QueryClient } from '@tanstack/react-query';
 import type { LearningSession } from '@eduagent/schemas';
 import {
@@ -21,6 +22,7 @@ import {
   useSessionSummary,
   useSkipSummary,
   useSubmitSummary,
+  useRetrySummaryFeedback,
   useTopicParkingLot,
   useAddParkingLotItem,
   computeFilingRefetchInterval,
@@ -131,6 +133,34 @@ describe('useStartSession', () => {
     expect(body.topicId).toBe('topic-1');
     expect(body.sessionType).toBe('homework');
     expect(body.inputMode).toBe('voice');
+  });
+
+  it('[WI-2184] does not invalidate completed-session history when starting a session', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ session: makeLearningSession() }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const wrapper = createWrapper();
+    const topicHistoryKey = queryKeys.topicSessions(
+      'subject-1',
+      'topic-1',
+      'test-profile-id',
+    );
+    queryClient.setQueryDefaults(topicHistoryKey, { gcTime: Infinity });
+    queryClient.setQueryData(topicHistoryKey, []);
+    const { result } = renderHook(() => useStartSession('subject-1'), {
+      wrapper,
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({ subjectId: 'subject-1' });
+    });
+
+    expect(queryClient.getQueryState(topicHistoryKey)?.isInvalidated).toBe(
+      false,
+    );
   });
 
   it('starts the first curriculum session through the scoped fast-path endpoint', async () => {
@@ -370,6 +400,121 @@ describe('useCloseSession', () => {
     });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['resume-nudge'] });
   });
+
+  it('[WI-2184] invalidates each session-history list only for the active profile after close', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          message: 'Session closed',
+          sessionId: 'session-1',
+          wallClockSeconds: 600,
+          summaryStatus: 'pending',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    const { result } = renderHook(() => useCloseSession('session-1'), {
+      wrapper: createWrapper(),
+    });
+    const activeProfileKeys = [
+      queryKeys.topicSessions('subject-1', 'topic-1', 'test-profile-id'),
+      queryKeys.bookSessions('subject-1', 'book-1', 'test-profile-id'),
+      queryKeys.subjectSessions('subject-1', 'test-profile-id'),
+    ];
+    const otherProfileKeys = [
+      queryKeys.topicSessions('subject-1', 'topic-1', 'other-profile-id'),
+      queryKeys.bookSessions('subject-1', 'book-1', 'other-profile-id'),
+      queryKeys.subjectSessions('subject-1', 'other-profile-id'),
+    ];
+
+    for (const key of [...activeProfileKeys, ...otherProfileKeys]) {
+      queryClient.setQueryDefaults(key, { gcTime: Infinity });
+      queryClient.setQueryData(key, []);
+    }
+
+    await act(async () => {
+      await result.current.mutateAsync({ reason: 'user_ended' });
+    });
+
+    for (const key of activeProfileKeys) {
+      expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
+    }
+    for (const key of otherProfileKeys) {
+      expect(queryClient.getQueryState(key)?.isInvalidated).toBe(false);
+    }
+  });
+
+  it('[WI-2184] keeps a deferred close bound to the profile active at invocation', async () => {
+    let resolveClose!: (response: Response) => void;
+    mockFetch.mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveClose = resolve;
+        }),
+    );
+
+    const profileA = createTestProfile({ id: 'profile-A' });
+    const profileB = createTestProfile({ id: 'profile-B' });
+    const hookHarness = createHookWrapper({
+      activeProfile: profileA,
+      profiles: [profileA, profileB],
+    });
+    queryClient = hookHarness.queryClient;
+    const profileAHistory = queryKeys.topicSessions(
+      'subject-1',
+      'topic-1',
+      profileA.id,
+    );
+    const profileBHistory = queryKeys.topicSessions(
+      'subject-1',
+      'topic-1',
+      profileB.id,
+    );
+    for (const key of [profileAHistory, profileBHistory]) {
+      queryClient.setQueryDefaults(key, { gcTime: Infinity });
+      queryClient.setQueryData(key, []);
+    }
+
+    const { result, rerender } = renderHook(
+      () => useCloseSession('session-1'),
+      { wrapper: hookHarness.wrapper },
+    );
+    act(() => {
+      result.current.mutate({ reason: 'user_ended' });
+    });
+    await waitFor(() => {
+      expect(result.current.isPending).toBe(true);
+    });
+
+    hookHarness.profileContextValue.activeProfile = profileB;
+    setActiveProfileId(profileB.id);
+    rerender(undefined);
+
+    await act(async () => {
+      resolveClose(
+        new Response(
+          JSON.stringify({
+            message: 'Session closed',
+            sessionId: 'session-1',
+            wallClockSeconds: 600,
+            summaryStatus: 'pending',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+    });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(queryClient.getQueryState(profileAHistory)?.isInvalidated).toBe(
+      true,
+    );
+    expect(queryClient.getQueryState(profileBHistory)?.isInvalidated).toBe(
+      false,
+    );
+  });
 });
 
 describe('useSyncHomeworkState', () => {
@@ -517,6 +662,99 @@ describe('useSessionSummary', () => {
 
     expect(result.current.data).toBeNull();
   });
+
+  // -------------------------------------------------------------------------
+  // [WI-2504] The summary carries the mentor-notice RECEIPT. The app's global
+  // staleTime is 5 minutes, so without binding this query to the observed
+  // policy epoch a warm summary would keep painting a receipt for minutes
+  // after the client observed flag-off.
+  // -------------------------------------------------------------------------
+  describe('observed mentor-notice policy epoch', () => {
+    const ACTOR = 'wi2504-summary-actor';
+    const EPOCH_KEY = `now-feed-policy-epoch::${ACTOR}::test-profile-id`;
+    const ENABLED_EPOCH = 'notice-policy-v1:on:self:consented';
+    const DISABLED_EPOCH = 'notice-policy-v1:off';
+
+    const clerk = require('@clerk/expo') as {
+      useAuth: () => unknown;
+    };
+    let useAuthBefore: typeof clerk.useAuth;
+
+    beforeEach(async () => {
+      useAuthBefore = clerk.useAuth;
+      clerk.useAuth = () => ({
+        userId: ACTOR,
+        isLoaded: true,
+        isSignedIn: true,
+        getToken: jest.fn().mockResolvedValue('mock-token'),
+      });
+      await AsyncStorage.clear();
+    });
+
+    afterEach(() => {
+      clerk.useAuth = useAuthBefore;
+    });
+
+    function summaryResponse(withNotice: boolean): Response {
+      return new Response(
+        JSON.stringify({
+          summary: {
+            id: '880e8400-e29b-41d4-a716-446655440001',
+            sessionId: '660e8400-e29b-41d4-a716-446655440000',
+            content: 'I learned about gravity',
+            aiFeedback: 'Good summary',
+            status: 'accepted',
+            closingLine: null,
+            learnerRecap: null,
+            nextTopicId: null,
+            nextTopicTitle: null,
+            nextTopicReason: null,
+            ...(withNotice
+              ? {
+                  mentorNotice: {
+                    id: '11111111-1111-4111-8111-111111111111',
+                    concept: 'sign flip',
+                    correctionHint: null,
+                  },
+                }
+              : {}),
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+
+    it('refetches instead of serving the warm receipt once the observed epoch changes', async () => {
+      await AsyncStorage.setItem(EPOCH_KEY, ENABLED_EPOCH);
+      mockFetch.mockResolvedValueOnce(summaryResponse(true));
+      const wrapper = createWrapper();
+
+      const first = renderHook(() => useSessionSummary('session-1'), {
+        wrapper,
+      });
+      await waitFor(() => expect(first.result.current.isSuccess).toBe(true));
+      // Precondition/positive control — the receipt really did render while
+      // the observed policy was enabled.
+      expect(first.result.current.data?.mentorNotice?.concept).toBe(
+        'sign flip',
+      );
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      first.unmount();
+
+      // The client observes flag-off, and the server now answers without a
+      // receipt. The warm entry from before must not be served.
+      await AsyncStorage.setItem(EPOCH_KEY, DISABLED_EPOCH);
+      mockFetch.mockResolvedValueOnce(summaryResponse(false));
+
+      const second = renderHook(() => useSessionSummary('session-1'), {
+        wrapper,
+      });
+      await waitFor(() => expect(second.result.current.isSuccess).toBe(true));
+
+      expect(second.result.current.data?.mentorNotice).toBeUndefined();
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+  });
 });
 
 describe('useSubmitSummary', () => {
@@ -529,6 +767,7 @@ describe('useSubmitSummary', () => {
             sessionId: '660e8400-e29b-41d4-a716-446655440000',
             content: 'Gravity pulls objects toward Earth',
             aiFeedback: 'Clear and accurate summary.',
+            feedbackStatus: 'available',
             status: 'accepted',
           },
         }),
@@ -539,6 +778,13 @@ describe('useSubmitSummary', () => {
     const { result } = renderHook(() => useSubmitSummary('session-1'), {
       wrapper: createWrapper(),
     });
+    const topicHistoryKey = queryKeys.topicSessions(
+      'subject-1',
+      'topic-1',
+      'test-profile-id',
+    );
+    queryClient.setQueryDefaults(topicHistoryKey, { gcTime: Infinity });
+    queryClient.setQueryData(topicHistoryKey, []);
 
     await act(async () => {
       result.current.mutate({ content: 'Gravity pulls objects toward Earth' });
@@ -553,9 +799,12 @@ describe('useSubmitSummary', () => {
       'Clear and accurate summary.',
     );
     expect(result.current.data?.summary.status).toBe('accepted');
+    expect(queryClient.getQueryState(topicHistoryKey)?.isInvalidated).toBe(
+      true,
+    );
   });
 
-  it('invalidates progress after accepting a summary', async () => {
+  it('[WI-2184] invalidates history after a saved-summary feedback soft failure', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -563,8 +812,9 @@ describe('useSubmitSummary', () => {
             id: '880e8400-e29b-41d4-a716-446655440001',
             sessionId: '660e8400-e29b-41d4-a716-446655440000',
             content: 'Gravity pulls objects toward Earth',
-            aiFeedback: 'Clear and accurate summary.',
-            status: 'accepted',
+            aiFeedback: null,
+            feedbackStatus: 'unavailable',
+            status: 'submitted',
           },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -575,6 +825,13 @@ describe('useSubmitSummary', () => {
       wrapper: createWrapper(),
     });
     const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+    const topicHistoryKey = queryKeys.topicSessions(
+      'subject-1',
+      'topic-1',
+      'test-profile-id',
+    );
+    queryClient.setQueryDefaults(topicHistoryKey, { gcTime: Infinity });
+    queryClient.setQueryData(topicHistoryKey, []);
 
     await act(async () => {
       await result.current.mutateAsync({
@@ -586,13 +843,16 @@ describe('useSubmitSummary', () => {
       expect.objectContaining({ predicate: expect.any(Function) }),
     );
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
+    expect(queryClient.getQueryState(topicHistoryKey)?.isInvalidated).toBe(
+      true,
+    );
   });
 
-  it('handles submission error', async () => {
+  it('[WI-2095] settles isPending after a 5xx response', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response('API error 422', {
-        status: 422,
-        statusText: 'Unprocessable Entity',
+      new Response('API error 500', {
+        status: 500,
+        statusText: 'Internal Server Error',
       }),
     );
 
@@ -608,7 +868,294 @@ describe('useSubmitSummary', () => {
       expect(result.current.isError).toBe(true);
     });
 
+    expect(result.current.isPending).toBe(false);
     expect(result.current.error).toBeInstanceOf(Error);
+  });
+
+  it('[WI-2095] aborts a stalled request after 35 seconds and settles isPending', async () => {
+    jest.useFakeTimers();
+    let requestSignal: AbortSignal | undefined;
+    mockFetch.mockImplementationOnce(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          requestSignal = init?.signal ?? undefined;
+          requestSignal?.addEventListener('abort', () => {
+            reject(new DOMException('The operation was aborted', 'AbortError'));
+          });
+        }),
+    );
+
+    const { result } = renderHook(() => useSubmitSummary('session-1'), {
+      wrapper: createWrapper(),
+    });
+
+    act(() => {
+      result.current.mutate({ content: 'A reflection long enough to save' });
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(result.current.isPending).toBe(true);
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(35_000);
+    });
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true);
+    });
+
+    expect(requestSignal?.aborted).toBe(true);
+    expect(result.current.isPending).toBe(false);
+    jest.useRealTimers();
+  });
+
+  it('[WI-2095] settles isPending after an unparseable raw response', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response('{not valid json', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    const { result } = renderHook(() => useSubmitSummary('session-1'), {
+      wrapper: createWrapper(),
+    });
+
+    act(() => {
+      result.current.mutate({ content: 'A reflection long enough to save' });
+    });
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true);
+    });
+
+    expect(result.current.isPending).toBe(false);
+  });
+
+  it('[WI-2095] propagates a caller abort to the summary request', async () => {
+    const caller = new AbortController();
+    let requestSignal: AbortSignal | undefined;
+    mockFetch.mockImplementationOnce(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          requestSignal = init?.signal ?? undefined;
+          requestSignal?.addEventListener('abort', () => {
+            reject(new DOMException('The operation was aborted', 'AbortError'));
+          });
+        }),
+    );
+
+    const { result } = renderHook(() => useSubmitSummary('session-1'), {
+      wrapper: createWrapper(),
+    });
+
+    act(() => {
+      result.current.mutate({
+        content: 'A reflection long enough to save',
+        signal: caller.signal,
+      });
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    caller.abort();
+    await waitFor(() => {
+      expect(result.current.isPending).toBe(false);
+    });
+
+    expect(requestSignal?.aborted).toBe(true);
+  });
+
+  it('[WI-2095] settles a timeout before retrying without overlap or a late result win', async () => {
+    jest.useFakeTimers();
+    let activeRequests = 0;
+    let maxActiveRequests = 0;
+    let requestCount = 0;
+    mockFetch.mockImplementation(
+      (_input: RequestInfo | URL, init?: RequestInit) => {
+        requestCount += 1;
+        activeRequests += 1;
+        maxActiveRequests = Math.max(maxActiveRequests, activeRequests);
+        if (requestCount === 2) {
+          activeRequests -= 1;
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                summary: {
+                  id: '880e8400-e29b-41d4-a716-446655440002',
+                  sessionId: '660e8400-e29b-41d4-a716-446655440000',
+                  content: 'The retry wins',
+                  aiFeedback: null,
+                  feedbackStatus: 'available',
+                  status: 'accepted',
+                },
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } },
+            ),
+          );
+        }
+
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            activeRequests -= 1;
+            reject(new DOMException('The operation was aborted', 'AbortError'));
+          });
+        });
+      },
+    );
+
+    const { result } = renderHook(() => useSubmitSummary('session-1'), {
+      wrapper: createWrapper(),
+    });
+
+    act(() => {
+      result.current.mutate({ content: 'The first reflection stalls' });
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(35_000);
+    });
+    await waitFor(() => {
+      expect(result.current.isPending).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({ content: 'The retry wins' });
+    });
+
+    expect(requestCount).toBe(2);
+    expect(maxActiveRequests).toBe(1);
+    expect(result.current.data?.summary.content).toBe('The retry wins');
+    jest.useRealTimers();
+  });
+});
+
+describe('useRetrySummaryFeedback', () => {
+  it('[WI-2183] retries only feedback and returns the available evaluation', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          summary: {
+            id: '880e8400-e29b-41d4-a716-446655440001',
+            sessionId: '660e8400-e29b-41d4-a716-446655440000',
+            content: 'Gravity pulls objects toward Earth',
+            aiFeedback: 'Clear and accurate summary.',
+            feedbackStatus: 'available',
+            status: 'accepted',
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    const { result } = renderHook(
+      () => useRetrySummaryFeedback('660e8400-e29b-41d4-a716-446655440000'),
+      { wrapper: createWrapper() },
+    );
+
+    await act(async () => {
+      await result.current.mutateAsync();
+    });
+
+    expect(result.current.data?.summary.feedbackStatus).toBe('available');
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/summary/retry-feedback'),
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('[WI-2184] keeps deferred feedback retry invalidation bound to its invocation profile', async () => {
+    let resolveRetry!: (response: Response) => void;
+    mockFetch.mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveRetry = resolve;
+        }),
+    );
+
+    const profileA = createTestProfile({ id: 'profile-A' });
+    const profileB = createTestProfile({ id: 'profile-B' });
+    const hookHarness = createHookWrapper({
+      activeProfile: profileA,
+      profiles: [profileA, profileB],
+    });
+    queryClient = hookHarness.queryClient;
+    const sessionId = '660e8400-e29b-41d4-a716-446655440000';
+    const profileASummary = queryKeys.sessions.summary(
+      'study',
+      sessionId,
+      profileA.id,
+    );
+    const profileBSummary = queryKeys.sessions.summary(
+      'study',
+      sessionId,
+      profileB.id,
+    );
+    const profileAHistory = queryKeys.topicSessions(
+      'subject-1',
+      'topic-1',
+      profileA.id,
+    );
+    const profileBHistory = queryKeys.topicSessions(
+      'subject-1',
+      'topic-1',
+      profileB.id,
+    );
+    for (const key of [profileASummary, profileBSummary]) {
+      queryClient.setQueryDefaults(key, { gcTime: Infinity });
+      queryClient.setQueryData(key, null);
+    }
+    for (const key of [profileAHistory, profileBHistory]) {
+      queryClient.setQueryDefaults(key, { gcTime: Infinity });
+      queryClient.setQueryData(key, []);
+    }
+
+    const { result, rerender } = renderHook(
+      () => useRetrySummaryFeedback(sessionId),
+      { wrapper: hookHarness.wrapper },
+    );
+    act(() => {
+      result.current.mutate();
+    });
+    await waitFor(() => {
+      expect(result.current.isPending).toBe(true);
+    });
+
+    hookHarness.profileContextValue.activeProfile = profileB;
+    setActiveProfileId(profileB.id);
+    rerender(undefined);
+
+    await act(async () => {
+      resolveRetry(
+        new Response(
+          JSON.stringify({
+            summary: {
+              id: '880e8400-e29b-41d4-a716-446655440001',
+              sessionId,
+              content: 'Gravity pulls objects toward Earth',
+              aiFeedback: 'Clear and accurate summary.',
+              feedbackStatus: 'available',
+              status: 'accepted',
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+    });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(queryClient.getQueryState(profileASummary)?.isInvalidated).toBe(
+      true,
+    );
+    expect(queryClient.getQueryState(profileBSummary)?.isInvalidated).toBe(
+      false,
+    );
+    expect(queryClient.getQueryState(profileAHistory)?.isInvalidated).toBe(
+      false,
+    );
+    expect(queryClient.getQueryState(profileBHistory)?.isInvalidated).toBe(
+      false,
+    );
   });
 });
 
@@ -663,6 +1210,13 @@ describe('useSkipSummary', () => {
       wrapper: createWrapper(),
     });
     const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+    const topicHistoryKey = queryKeys.topicSessions(
+      'subject-1',
+      'topic-1',
+      'test-profile-id',
+    );
+    queryClient.setQueryDefaults(topicHistoryKey, { gcTime: Infinity });
+    queryClient.setQueryData(topicHistoryKey, []);
 
     await act(async () => {
       await result.current.mutateAsync();
@@ -672,6 +1226,9 @@ describe('useSkipSummary', () => {
       expect.objectContaining({ predicate: expect.any(Function) }),
     );
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
+    expect(queryClient.getQueryState(topicHistoryKey)?.isInvalidated).toBe(
+      true,
+    );
   });
 });
 
@@ -934,6 +1491,7 @@ describe('useStreamMessage', () => {
     ];
     expect(JSON.parse(init.body)).toEqual({
       message: 'Hello',
+      shell: 'v0',
       imageBase64: 'base64-homework-image',
       imageMimeType: 'image/jpeg',
     });

@@ -1,5 +1,5 @@
 import { resolve } from 'path';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   createDatabase,
@@ -11,7 +11,7 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
-import { NotFoundError } from '@eduagent/schemas';
+import { ConflictError, NotFoundError } from '@eduagent/schemas';
 import {
   deleteV2IdentitiesForTest,
   ensureV2IdentityForLegacyProfileTest,
@@ -78,6 +78,139 @@ async function cleanupSeededAccounts(): Promise<void> {
   });
   seededAccountIds.length = 0;
   seededProfileIds.length = 0;
+}
+
+function rowsFromExecute<T>(raw: unknown): T[] {
+  return Array.isArray(raw)
+    ? (raw as T[])
+    : ((raw as { rows?: T[] }).rows ?? []);
+}
+
+async function waitForTaggedLock(
+  observerDb: Database,
+  applicationName: string,
+): Promise<void> {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const raw = (await observerDb.execute(sql`
+      SELECT wait_event_type
+      FROM pg_stat_activity
+      WHERE application_name = ${applicationName}
+    `)) as unknown;
+    const rows = rowsFromExecute<{ wait_event_type: string | null }>(raw);
+    if (rows.some((row) => row.wait_event_type === 'Lock')) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(`Timed out waiting for tagged DB lock: ${applicationName}`);
+}
+
+async function runTaggedTransaction<T>(
+  taggedDb: Database,
+  applicationName: string,
+  operation: (tx: Database) => Promise<T>,
+): Promise<T> {
+  return taggedDb.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT set_config('application_name', ${applicationName}, true)`,
+    );
+    return operation(tx as unknown as Database);
+  });
+}
+
+async function queueCloseAndSilencePrompt(
+  profileId: string,
+  sessionId: string,
+  first: 'prompt' | 'close',
+): Promise<{
+  prompt: PromiseSettledResult<void>;
+  close: PromiseSettledResult<Awaited<ReturnType<typeof closeSession>>>;
+}> {
+  const tagSuffix = `${first}-${sessionId.slice(-12)}`;
+  const promptTag = `wi2103-prompt-${tagSuffix}`;
+  const closeTag = `wi2103-close-${tagSuffix}`;
+
+  let signalControlReady!: () => void;
+  let rejectControlReady!: (error: unknown) => void;
+  const controlReady = new Promise<void>((resolve, reject) => {
+    signalControlReady = resolve;
+    rejectControlReady = reject;
+  });
+  let releaseControl!: () => void;
+  const controlRelease = new Promise<void>((resolve) => {
+    releaseControl = resolve;
+  });
+
+  const controlPromise = db
+    .transaction(async (tx) => {
+      const [locked] = await tx
+        .select({ id: learningSessions.id })
+        .from(learningSessions)
+        .where(
+          and(
+            eq(learningSessions.id, sessionId),
+            eq(learningSessions.profileId, profileId),
+          ),
+        )
+        .for('update')
+        .limit(1);
+      if (!locked) throw new Error('Seeded learning session was not found');
+      signalControlReady();
+      await controlRelease;
+    })
+    .catch((error) => {
+      rejectControlReady(error);
+      throw error;
+    });
+
+  let promptPromise: Promise<void> | undefined;
+  let closePromise:
+    | Promise<Awaited<ReturnType<typeof closeSession>>>
+    | undefined;
+  let barrierFailure: unknown;
+
+  const startPrompt = () =>
+    runTaggedTransaction(db, promptTag, (tx) =>
+      recordSystemPrompt(tx, profileId, sessionId, {
+        kind: 'silence_nudge',
+      }),
+    );
+  const startClose = () =>
+    runTaggedTransaction(db, closeTag, (tx) =>
+      closeSession(tx, profileId, sessionId, { reason: 'user_initiated' }),
+    );
+
+  try {
+    await controlReady;
+    if (first === 'prompt') {
+      promptPromise = startPrompt();
+      await waitForTaggedLock(db, promptTag);
+      closePromise = startClose();
+      await waitForTaggedLock(db, closeTag);
+    } else {
+      closePromise = startClose();
+      await waitForTaggedLock(db, closeTag);
+      promptPromise = startPrompt();
+      await waitForTaggedLock(db, promptTag);
+    }
+  } catch (error) {
+    barrierFailure = error;
+  } finally {
+    releaseControl();
+  }
+
+  const [controlResult, promptResult, closeResult] = await Promise.allSettled([
+    controlPromise,
+    promptPromise ?? Promise.resolve(),
+    closePromise ?? Promise.resolve(undefined as never),
+  ]);
+
+  if (barrierFailure) throw barrierFailure;
+  if (controlResult.status === 'rejected') throw controlResult.reason;
+  if (!promptPromise || !closePromise) {
+    throw new Error('Both queued operations must start before lock release');
+  }
+
+  return { prompt: promptResult, close: closeResult };
 }
 
 describeIfDb('listProfileSessions (integration)', () => {
@@ -444,6 +577,126 @@ describeIfDb('session-crud ownership gate (integration IDOR breaks)', () => {
       action: 'helpful',
       eventId: 'evt_abc',
     });
+  });
+
+  it('[WI-2103 AC-2] removes the prompt when the prompt transaction locks first', async () => {
+    const owner = await seedProfileWithSubject('WI-2103-prompt-first');
+    const [session] = await db
+      .insert(learningSessions)
+      .values({
+        profileId: owner.profileId,
+        subjectId: owner.subjectId,
+        exchangeCount: 1,
+        status: 'active',
+      })
+      .returning({ id: learningSessions.id });
+
+    const settled = await queueCloseAndSilencePrompt(
+      owner.profileId,
+      session!.id,
+      'prompt',
+    );
+
+    expect(settled.prompt.status).toBe('fulfilled');
+    expect(settled.close.status).toBe('fulfilled');
+
+    const silencePrompts = await db.query.sessionEvents.findMany({
+      where: and(
+        eq(sessionEvents.sessionId, session!.id),
+        eq(sessionEvents.eventType, 'system_prompt'),
+      ),
+    });
+    expect(silencePrompts).toHaveLength(0);
+  });
+
+  it('[WI-2103 AC-2] rejects the prompt when the close transaction locks first', async () => {
+    const owner = await seedProfileWithSubject('WI-2103-close-first');
+    const [session] = await db
+      .insert(learningSessions)
+      .values({
+        profileId: owner.profileId,
+        subjectId: owner.subjectId,
+        exchangeCount: 1,
+        status: 'active',
+      })
+      .returning({ id: learningSessions.id });
+
+    const settled = await queueCloseAndSilencePrompt(
+      owner.profileId,
+      session!.id,
+      'close',
+    );
+
+    expect(settled.close.status).toBe('fulfilled');
+    expect(settled.prompt.status).toBe('rejected');
+    if (settled.prompt.status === 'rejected') {
+      expect(settled.prompt.reason).toBeInstanceOf(ConflictError);
+    }
+
+    const silencePrompts = await db.query.sessionEvents.findMany({
+      where: and(
+        eq(sessionEvents.sessionId, session!.id),
+        eq(sessionEvents.eventType, 'system_prompt'),
+      ),
+    });
+    expect(silencePrompts).toHaveLength(0);
+  });
+
+  it('[WI-2103 AC-2] preserves answered nudges and removes every trailing unanswered nudge', async () => {
+    const owner = await seedProfileWithSubject('WI-2103-unanswered-only');
+    const [session] = await db
+      .insert(learningSessions)
+      .values({
+        profileId: owner.profileId,
+        subjectId: owner.subjectId,
+        exchangeCount: 1,
+        status: 'active',
+      })
+      .returning({ id: learningSessions.id });
+
+    await recordSystemPrompt(db, owner.profileId, session!.id, {
+      kind: 'silence_nudge',
+    });
+    await db.insert(sessionEvents).values({
+      sessionId: session!.id,
+      profileId: owner.profileId,
+      subjectId: owner.subjectId,
+      eventType: 'user_message',
+      content: 'The learner returned after the first nudge.',
+    });
+    await recordSystemPrompt(db, owner.profileId, session!.id, {
+      kind: 'silence_nudge',
+    });
+    await recordSystemPrompt(db, owner.profileId, session!.id, {
+      kind: 'message_feedback',
+      action: 'helpful',
+      eventId: 'wi-2103-feedback',
+    });
+    await recordSystemPrompt(db, owner.profileId, session!.id, {
+      kind: 'silence_nudge',
+    });
+
+    await closeSession(db, owner.profileId, session!.id, {
+      reason: 'user_initiated',
+    });
+
+    const systemPrompts = await db.query.sessionEvents.findMany({
+      where: and(
+        eq(sessionEvents.sessionId, session!.id),
+        eq(sessionEvents.eventType, 'system_prompt'),
+      ),
+    });
+    const promptKinds = systemPrompts.map(
+      (event) =>
+        (event.metadata as { intent?: { kind?: string } } | null)?.intent?.kind,
+    );
+    expect(promptKinds).toEqual(
+      expect.arrayContaining(['silence_nudge', 'message_feedback']),
+    );
+    expect(promptKinds.filter((kind) => kind === 'silence_nudge')).toHaveLength(
+      1,
+    );
+    expect(systemPrompts).toHaveLength(2);
   });
 
   // [CCR PR #266 / bug 275 verification] The book-ownership gate inside

@@ -1,0 +1,21 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Assessment (decided GATE NEEDED): at current origin/main (WI-2416 + WI-2398 landed), root GET /dashboard (apps/api/src/routes/dashboard.ts:86-102, pre-fix) called only withProfile(c) with no caller-ownership check, unlike every sibling /dashboard/children/* route (dashboard.ts:105-518), which all carry the WI-1989 assertCallerIsAccountOwner gate. WI-2416's read-authority gate (assertCanReadProfile, services/family-access.ts:315-347) is applied at-route to consent.ts/learner-profile.ts/notes.ts/progress.ts/quiz.ts/recaps.ts/sessions.ts only — grep confirms it was never wired into dashboard.ts. profileScopeMiddleware (apps/api/src/middleware/profile-scope.ts) verifies X-Profile-Id belongs to the caller's org (blocking cross-ORG reads) but not that it is the caller's OWN identity, so the residual — a same-account non-owner spoofing X-Profile-Id=owner's profile id to read the owner's children list + pending notices via getChildrenForParent/listPendingNotices — was live.",
+      "pointer": "apps/api/src/routes/dashboard.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Fix: added the same assertCallerIsAccountOwner(c, message) call used by every sibling /dashboard/children/* route, immediately after withProfile(c) in the root GET /dashboard handler — chosen over assertCanReadProfile because the route returns the guardian's OWN children+notices (mirrors the sibling reads that already gate on caller-is-account-owner, not self-or-guardian read authority) and because the WI's ratified AC text names the assertCallerIsAccountOwner pattern explicitly.",
+      "pointer": "apps/api/src/routes/dashboard.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "AC-2 negative-path break test: a same-account non-owner (real distinct login/person, same org, per MMT-ADR-0007) sending X-Profile-Id=owner's profile id to GET /v1/dashboard is denied 403; a control test proves the real owner (no spoof) still gets 200. Placed in the real-DB WI-1989 integration suite rather than the route-unit dashboard.test.ts because that unit file blanket-mocks verifyPersonIsOrgAdminV2 to always return true (see its own in-file comment), so it cannot distinguish caller-owner vs caller-non-owner for assertCallerIsAccountOwner — only the real-DB integration suite exercises the caller-identity distinction.",
+      "pointer": "tests/integration/wi1989-owner-idor.integration.test.ts"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-20",
+  "redGreenPointer": ".workitem-artifacts/WI-2397/red-green.md"
+}

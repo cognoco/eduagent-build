@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { ChatMessage } from './ChatShell';
+import type { ChatMessage } from './session-types';
 import type { useClassifySubject } from '../../hooks/use-classify-subject';
 import type { useResolveSubject } from '../../hooks/use-resolve-subject';
 import type { useCreateSubject } from '../../hooks/use-subjects';
@@ -75,13 +75,19 @@ export interface UseSubjectClassificationOptions {
   setIsStreaming: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-function getPendingImageOptions(
+function getPendingContinueOptions(
   pendingSubjectResolution: PendingSubjectResolution,
-): Pick<ContinueMessageOptions, 'attachImage' | 'imageAttachment'> {
+): Pick<
+  ContinueMessageOptions,
+  'attachImage' | 'imageAttachment' | 'initialMentorOpener'
+> {
   return {
     ...(pendingSubjectResolution.attachImage ? { attachImage: true } : {}),
     ...(pendingSubjectResolution.imageAttachment
       ? { imageAttachment: pendingSubjectResolution.imageAttachment }
+      : {}),
+    ...(pendingSubjectResolution.initialMentorOpener
+      ? { initialMentorOpener: true }
       : {}),
   };
 }
@@ -134,7 +140,7 @@ export function useSubjectClassification(
       }>,
       imageOptions?: Pick<
         PendingSubjectResolution,
-        'attachImage' | 'imageAttachment'
+        'attachImage' | 'imageAttachment' | 'initialMentorOpener'
       >,
     ) => {
       const dedupedCandidates = candidates.filter(
@@ -153,6 +159,9 @@ export function useSubjectClassification(
         ...(imageOptions?.attachImage ? { attachImage: true } : {}),
         ...(imageOptions?.imageAttachment
           ? { imageAttachment: imageOptions.imageAttachment }
+          : {}),
+        ...(imageOptions?.initialMentorOpener
+          ? { initialMentorOpener: true }
           : {}),
         suggestedSubjectName,
         resolveSuggestions,
@@ -183,7 +192,7 @@ export function useSubjectClassification(
       await continueWithMessage(pendingSubjectResolution.originalText, {
         sessionSubjectId: candidate.subjectId,
         sessionSubjectName: candidate.subjectName,
-        ...getPendingImageOptions(pendingSubjectResolution),
+        ...getPendingContinueOptions(pendingSubjectResolution),
       });
     },
     [
@@ -236,7 +245,7 @@ export function useSubjectClassification(
         await continueWithMessage(originalText, {
           sessionSubjectId: result.subject.id,
           sessionSubjectName: result.subject.name,
-          ...getPendingImageOptions(pendingSubjectResolution),
+          ...getPendingContinueOptions(pendingSubjectResolution),
         });
       } catch {
         showConfirmation(
@@ -298,7 +307,7 @@ export function useSubjectClassification(
       await continueWithMessage(originalText, {
         sessionSubjectId: result.subject.id,
         sessionSubjectName: result.subject.name,
-        ...getPendingImageOptions(pendingSubjectResolution),
+        ...getPendingContinueOptions(pendingSubjectResolution),
       });
     } catch {
       showConfirmation(
@@ -380,7 +389,7 @@ export function useSubjectClassification(
           await continueWithMessage(originalText, {
             sessionSubjectId: result.subject.id,
             sessionSubjectName: result.subject.name,
-            ...getPendingImageOptions(pendingSubjectResolution),
+            ...getPendingContinueOptions(pendingSubjectResolution),
           });
           return;
         }
@@ -435,6 +444,10 @@ export function useSubjectClassification(
         imageUri?: string;
         attachImage?: boolean;
         imageAttachment?: SessionImageAttachment;
+        initialMentorOpener?: boolean;
+        sessionSubjectId?: string;
+        sessionSubjectName?: string;
+        existingEntry?: ContinueMessageOptions['existingEntry'];
       },
     ): Promise<void> => {
       if (navigationContract.isParentProxy) return;
@@ -466,12 +479,13 @@ export function useSubjectClassification(
 
       const imageResolutionOptions: Pick<
         PendingSubjectResolution,
-        'attachImage' | 'imageAttachment'
+        'attachImage' | 'imageAttachment' | 'initialMentorOpener'
       > = {
         ...(opts?.attachImage ? { attachImage: true } : {}),
         ...(opts?.imageAttachment
           ? { imageAttachment: opts.imageAttachment }
           : {}),
+        ...(opts?.initialMentorOpener ? { initialMentorOpener: true } : {}),
       };
       const openSubjectResolutionForTurn = (
         originalText: string,
@@ -517,8 +531,8 @@ export function useSubjectClassification(
 
       // Classify subject from first message when none was provided.
       // Freeform sessions auto-pick the best match silently (no picker).
-      let sessionSubjectId: string | undefined;
-      let sessionSubjectName: string | undefined;
+      let sessionSubjectId = opts?.sessionSubjectId;
+      let sessionSubjectName = opts?.sessionSubjectName;
 
       // T25: V2 silent subject creation. Creates the subject, sets it as the
       // session subject, posts a tentative ack, and keeps the override chip
@@ -573,7 +587,12 @@ export function useSubjectClassification(
         });
         sessionSubjectId = first.id;
         sessionSubjectName = first.name;
-      } else if (!subjectId && !classifiedSubject && userMessageCount <= 2) {
+      } else if (
+        !subjectId &&
+        !classifiedSubject &&
+        !sessionSubjectId &&
+        userMessageCount <= 2
+      ) {
         setPendingClassification(true);
         setClassifyError(null);
         try {
@@ -951,10 +970,12 @@ export function useSubjectClassification(
       await continueWithMessage(text, {
         sessionSubjectId,
         sessionSubjectName,
+        ...(opts?.existingEntry ? { existingEntry: opts.existingEntry } : {}),
         ...(opts?.attachImage ? { attachImage: true } : {}),
         ...(opts?.imageAttachment
           ? { imageAttachment: opts.imageAttachment }
           : {}),
+        ...(opts?.initialMentorOpener ? { initialMentorOpener: true } : {}),
       });
     },
     [

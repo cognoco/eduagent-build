@@ -13,6 +13,13 @@ This document is the **canonical spec** for all epics and stories. It describes 
 
 Detailed design specs for later epics live in `docs/specs/`.
 
+> **Age/compliance overlay (2026-07-23):** The canonical product bands and
+> launch geography now live in
+> [`docs/compliance/2026-07-23-13-plus-eea-launch-country-ruling.md`](../compliance/2026-07-23-13-plus-eea-launch-country-ruling.md).
+> Older epic requirements that say 11+, US/UK/Australia, English-only, or
+> GDPR-everywhere describe historical implementation decisions; they are not
+> current launch authority.
+
 ## Requirements Inventory
 
 ### Functional Requirements
@@ -688,7 +695,7 @@ Add native Apple/Google in-app purchases for mobile billing via RevenueCat. The 
 
 ### Epic 10: Pre-Launch UX Polish (PRE-LAUNCH — before public release)
 
-Eliminate UX gaps that risk user abandonment, support volume, or regulatory confusion. Focused on copy clarity, confirmation dialogs, consent unification (GDPR-everywhere), App Store compliance, and persona-appropriate language for English-speaking markets (US/UK/AU, ages 11-15). Identified from user testing / UX gap analysis + market strategy pivot (2026-03-23).
+Eliminate UX gaps that risk user abandonment, support volume, or regulatory confusion. This epic was scoped under the now-historical GDPR-everywhere / US-UK-Australia / ages 11–15 assumption. Current age bands and country clearance live in `docs/compliance/2026-07-23-13-plus-eea-launch-country-ruling.md`; the implementation history below is not launch authority.
 
 **Items addressed:** Topic skip undo (#4), child-friendly consent text (#9), profile removal alert (#15), actionable error messages (#10), curriculum label jargon (#2, #3), relearn method descriptions (#8), consent unification (GDPR-everywhere), App Store compliance audit, age-gated Sentry, offline action gating, parent email delivery feedback, App Store rating prompt, curriculum completion celebration.
 
@@ -4124,14 +4131,14 @@ The original architecture (docs/architecture.md) specified "Payments | Stripe" w
 
 ## Epic 10: Pre-Launch UX Polish (PRE-LAUNCH) — Stories
 
-**Goal:** Eliminate UX gaps that risk user abandonment, support volume, or regulatory confusion before first public release. Focused on copy clarity, confirmation dialogs, persona-appropriate language, consent unification, and App Store compliance for English-speaking markets (US, UK, Australia) targeting ages 11-15.
+**Goal (historical scope):** Eliminate UX gaps that risk user abandonment, support volume, or regulatory confusion before first public release. This epic originally targeted English-speaking US/UK/Australia users aged 11–15; that market and age posture is superseded by the current compliance ruling.
 **Stories:** 24 | **Priority:** Must-ship (10.1–10.7, 10.10–10.14, 10.16, 10.19-10.22), should-ship (10.15, 10.17, 10.18, 10.23, 10.24), fast-follow (10.8–10.9)
 24 story slices covering child-friendly copy, consent polish, curriculum labels, Living Book animations, session summary prompts, offline gating, App Store compliance, subject classification, and account security.
 **FRs:** FR7, FR8 (consent unification), FR18 (topic skip — undo gap), FR20 (relevance labels), FR19 (challenge naming), FR56 (relearn method descriptions), plus new NFR for actionable errors and child-friendly consent copy.
 **Dependencies:** Epics 0-5 complete (all screens and services exist). No new infrastructure needed.
 **Persona scope:** Items marked UNIVERSAL apply to all personas. Items marked LEARNER-ONLY apply only when persona is `learner` (ages ~10-12). See persona-conditional notes per story.
 
-**Market context (decided 2026-03-23):** Launch is English-only, targeting US/UK/AU. GDPR's under-16 parental consent threshold is applied globally ("GDPR-everywhere" strategy). This is the strictest standard and automatically satisfies US COPPA (under 13), UK GDPR + AADC (under 13 consent + under-18 design obligations), and Australia's Privacy Act. The location picker is removed — birth date alone drives consent. See Story 10.19 for consent unification.
+**Historical market context (superseded 2026-07-23):** The 2026-03-23 decision targeted an English-only US/UK/Australia launch and applied a location-blind under-16 guardian gate. It does **not** authorize launch or automatically satisfy local law. Current product bands, the 30-country EEA policy perimeter, and the requirement for exact age plus habitual-residence-based consent are governed by `docs/compliance/2026-07-23-13-plus-eea-launch-country-ruling.md`.
 
 **Story status (all stories, updated 2026-04-03):**
 
@@ -4155,7 +4162,7 @@ The original architecture (docs/architecture.md) specified "Payments | Stripe" w
 | 10.16 — Offline action gating | | Button disabling on consent + session screens |
 | **10.17 — Parent email delivery feedback** | **✅ Built** | API returns email delivery status and consent UI handles resend/failure states |
 | 10.18 — App Store rating prompt | | Rating hook is integrated into session-summary close flow after successful recall sessions |
-| 10.19 — Consent unification (GDPR-everywhere) | | Age-only logic, no location param, jurisdiction-neutral copy |
+| 10.19 — Consent unification (GDPR-everywhere) | | Historical implementation; age-only, locationless logic cannot enforce the current launch-country ruling |
 | 10.20 — Subject classification service | | `subject-classify.ts` with LLM + confidence scoring |
 | 10.21 — Camera/homework auto-detection | | `use-classify-subject.ts` hook wired in camera flow |
 | 10.22 — Chat/session subject inference | | First-message classification now pauses for subject resolution when confidence is ambiguous |
@@ -4788,7 +4795,7 @@ So that I know the AI is coaching my child through difficulty, not just giving a
 **What:**
 Determine whether MentoMate submits under Apple's **Kids Category** or **Education** category, execute the compliance checklist, and implement age-gated Sentry initialization.
 
-**Context:** The app targets ages 11-17+ across US/UK/AU. Under-16 users require parental consent (GDPR-everywhere, see Story 10.19). Apple's Kids Category imposes strict rules: no third-party analytics/tracking, no behavioral profiling, no ads, restricted data collection, and a parental gate on purchases. The Education category is less restrictive but still subject to COPPA for under-13 users.
+**Historical context:** This story was written for ages 11–17 across US/UK/Australia. The planned launch perimeter is 13+ and EEA-only, with the UK and US disabled. No EEA country is technically enabled until habitual-residence capture, national-threshold evaluation, and server/store allowlist enforcement are implemented; store classification and disclosures must be rechecked against the eventual enabled wave. Apple's Kids Category imposes strict rules: no third-party analytics/tracking, no behavioral profiling, no ads, restricted data collection, and a parental gate on purchases.
 
 **Recommendation:** **Education category** for v1. Kids Category readiness documented for v2 (when Age 6-10 mode ships). Rationale: Kids Category prohibits all third-party analytics — Sentry would need full conditional disable. Education category permits analytics when parental consent is obtained, which the app already requires for under-16.
 
@@ -4971,7 +4978,11 @@ Prompt for App Store rating at the psychologically optimal moment — immediatel
 
 ### Story 10.19: Consent Unification — GDPR-Everywhere
 
-_Priority: Must-ship (launch blocker). Scope: UNIVERSAL. **Status: Implemented** — age-only consent logic, no location param, jurisdiction-neutral copy._
+_Priority: Must-ship under the historical plan. Scope: UNIVERSAL. **Status: Implemented historically, but superseded as launch policy** — age-only consent logic and removal of residence cannot enforce the current country allowlist._
+
+> **Current gap:** the 2026-07-23 ruling requires exact age, habitual residence,
+> and a server-owned EEA allowlist. The acceptance criteria below preserve what
+> Story 10.19 built; they are not current compliance requirements.
 
 As a user in any country,
 I want a single, consistent consent experience based on my age,
@@ -5313,7 +5324,7 @@ Story 10.19 is the only sequencing dependency — it changes the consent data mo
 
 ### Why This Epic Exists
 
-User testing identified 15 UX gaps across the app. The first nine (10.1–10.9) were identified by a child-focused UX audit. A subsequent parent-perspective audit identified four additional gaps (10.10–10.13) that represent actual launch blockers: the consent flow is the single biggest onboarding funnel leak (10.10), accidental consent denial causes irreversible data loss (10.11), parents can't see why their child is studying a subject (10.12), and "Guided" labels in transcripts erode parent trust without context (10.13). An external strategic review then identified five more gaps (10.14–10.18) spanning App Store compliance, curriculum completion dead-ends, offline resilience, parent email delivery validation, and App Store rating optimization. A market strategy pivot (2026-03-23) to English-only launch (US/UK/AU) with GDPR-everywhere consent added Story 10.19 (consent unification) as a prerequisite for consent-related stories. The must-ship items (10.1–10.7, 10.10–10.14, 10.16, 10.19) fix issues that risk user abandonment, data loss, regulatory rejection, or trust erosion. The should-ship items (10.15, 10.17, 10.18) address retention cliffs and onboarding funnel leaks. The fast-follow items (10.8–10.9) address second-session experiences. Story 10.8 is deliberately data-gated. German localization (NFR36) deferred — English-only launch means it's no longer a v1 requirement. The cost of not shipping the must-ship items is disproportionately high; the rest are scheduled by measured impact, not guesswork.
+User testing identified 15 UX gaps across the app. The first nine (10.1–10.9) were identified by a child-focused UX audit. A subsequent parent-perspective audit identified four additional gaps (10.10–10.13) that represent actual launch blockers: the consent flow is the single biggest onboarding funnel leak (10.10), accidental consent denial causes irreversible data loss (10.11), parents can't see why their child is studying a subject (10.12), and "Guided" labels in transcripts erode parent trust without context (10.13). An external strategic review then identified five more gaps (10.14–10.18) spanning App Store compliance, curriculum completion dead-ends, offline resilience, parent email delivery validation, and App Store rating optimization. A historical market strategy pivot (2026-03-23) to English-only launch (US/UK/Australia) with GDPR-everywhere consent added Story 10.19 (consent unification) as a prerequisite for consent-related stories; that geography and consent policy is now superseded by the 2026-07-23 compliance ruling. The must-ship items (10.1–10.7, 10.10–10.14, 10.16, 10.19) fixed issues that risk user abandonment, data loss, regulatory rejection, or trust erosion under the original epic. The should-ship items (10.15, 10.17, 10.18) address retention cliffs and onboarding funnel leaks. The fast-follow items (10.8–10.9) address second-session experiences. Story 10.8 is deliberately data-gated. The original German-localization deferral is also historical; seven UI locales now ship. Current country enablement remains independent of UI locale coverage.
 
 ---
 
@@ -6278,3 +6289,34 @@ Web-adjacent ideas explicitly considered and deferred with no epic placeholder:
 - **School / district admin shell:** different product shape, needs its own discovery cycle
 - **Web push notifications:** deferred indefinitely
 - **Concept map visualization on web:** belongs to v1.1 concept map epic, not the web port
+
+## Annex A.5 — V2 Supersession Annotations
+
+This is the additive follow-up required by
+[`Mentor-Is-The-App` Annex A.5](2026-06-09-mentor-is-the-app-shell-redesign.md#a5--needs-annotation-not-parking).
+It is a cross-reference ledger, not permission to rewrite or delete the historical
+requirements above. A statement belongs here only where it prescribes a legacy
+identity/access rule or a destination/shell behavior that conflicts with the
+current V2 direction. The underlying learning data and behavior survive unless a
+row says otherwise.
+
+| Exact source anchor in this document | Conflicting behavioral property | Current successor source |
+|---|---|---|
+| **Requirements Inventory → User Management → FR6**; **Story 0.4: Family Profiles & Profile Switching**, third scenario and Phase 2 deferral | A parent switches into a child's profile for full access/read access. V2 access to another person's learning is edge-scoped, never profile impersonation or bundled family-wide access; ambient supporter access stops at allow-listed structural facts. The promised full-history access explicitly breaches the artifact wall: notes, Journal artifacts, mentor memory, and raw chats/transcripts have no ambient supporter read path. | [`identity/ontology.md`](../canon/identity/ontology.md) §2.1–2.3 and invariants 8, 9, 14, 19; [`identity/prd.md`](../canon/identity/prd.md) “Supporter ceiling & notes wall”; [`MMT-ADR-0027`](../adr/MMT-ADR-0027-supporter-visibility-contract.md) Decisions 1–5; [`Mentor-Is-The-App` §4 and §6.1](2026-06-09-mentor-is-the-app-shell-redesign.md#4-scope-model--the-chip). |
+| **UX-13 and UX-18**; **Epic 4: Progress, Motivation & Parent Dashboard**, summary and Parent Dashboard cluster; **Epic 13** dashboard summary; **Stories 2.3, 3.4, 3.18, 4.11, 10.12, 13.1, 13.7, and 14.12**; **Epic 15** parent-dashboard enhancement | A dedicated parent dashboard provides traffic-light drill-down and feature-specific child history. V2 re-homes the surviving structural progress, receipts, and reports into Support-hub and named person scopes on the common shell; every read is edge-scoped, server-masked, fact-classed, and mirrored to the supportee. Story 4.11's transcript rule is separately superseded below. | [`Mentor-Is-The-App` §4.2 and §6.1–6.3](2026-06-09-mentor-is-the-app-shell-redesign.md#42-supporter-lifecycle-three-states); [`MMT-ADR-0027`](../adr/MMT-ADR-0027-supporter-visibility-contract.md) Decisions 1–5; [`S6 cutover plan`](../plans/v2-plan/2026-06-10-s6-cutover-deletions.md) “Replacement-live precondition” rows for `ParentHomeScreen` and `child/[profileId]/*`. |
+| **Story 4.11: Parent Dashboard** — “full session transcript access is age-gated”; **Story 10.13: ‘Guided’ Label Explanation in Parent Transcript** | The parent-facing surface renders session transcripts, including full transcripts for learners aged 11–14. This directly violates the supporter ceiling: raw chats/transcripts are artifacts with no ambient supporter read path at any age or reporting tier. | [`identity/prd.md`](../canon/identity/prd.md) “Supporter ceiling & notes wall”; [`MMT-ADR-0027`](../adr/MMT-ADR-0027-supporter-visibility-contract.md) Decisions 2 and 4; [`Mentor-Is-The-App` §6.1](2026-06-09-mentor-is-the-app-shell-redesign.md#61-the-contract). |
+| **Story 4.9: Three-Persona Theming & Profile Switch** — “parent viewing child's Library” | Viewing a child's Library is treated as ordinary same-screen/profile access. A V2 person scope is a supporter relationship lens, not a redacted copy of the supportee's app: Subjects exposes structural data and Journal exposes only the shared report record. | [`Mentor-Is-The-App` §4 and §6.3](2026-06-09-mentor-is-the-app-shell-redesign.md#63-what-the-three-tabs-render-per-scope); [`MMT-ADR-0027`](../adr/MMT-ADR-0027-supporter-visibility-contract.md). |
+| **UX-6**; **Story 4.9: Three-Persona Theming & Profile Switch**, persona-theme clauses | Theme selection is coupled to teen/learner/parent persona and changes on profile switch. The resolved theme contract has one semantic light/dark system, follows the OS unless the user overrides it, and has no persona-based default or persona parameter in token resolution. | [**Epic 11: Brand Identity**](#epic-11-brand-identity--fixed-teal--lavender-system-theme-toggle-phase-1) “System theme toggle”; [**Story 12.3: Theme decoupled from persona**](#story-123-theme-decoupled-from-persona). |
+| **FR33, FR52, FR67, FR78–FR82, FR85 and NFR45**; **Epic 3** failed-recall redirect; **Epic 4** Library/Progress and Multi-Subject clusters; **Stories 2.5, 2.8, 3.3, 3.5, 4.1–4.4, 4.6, 4.12–4.14, 10.9, 10.15, 10.22, 12.7, and 14.12**; **WEB-B.4** | `Home Screen` and `Library` are prescribed as destination tabs/routes for stored results, progress, subject switching, remediation, offline reads, completion, and cross-navigation. V2 re-homes structure/progress in Subjects and recaps/saved-item browse in Journal; the Library tab dies, not the learning records, offline-data requirement, or browse capability. A future web implementation must target those successor concepts rather than revive `/(learn)/library` by inheritance. | [`Mentor-Is-The-App` §3, §5, and §7](2026-06-09-mentor-is-the-app-shell-redesign.md#3-the-shell--three-tabs-every-scope-no-exceptions); [`S6 cutover plan`](../plans/v2-plan/2026-06-10-s6-cutover-deletions.md) gate (c), “Replacement-live precondition,” and T6. |
+| **FR160–FR171 coverage rows**; **Epic 7: The Self-Building Library** summary; **Stories 7.2, 7.3, and 7.6–7.9**; **Epic 7 Execution Order** | Library is a destination/tab with Shelves/Books/Topics and route-owned drill-down. Its curriculum hierarchy, progress, and learner-owned notes remain valuable, but the V2 host is Subjects; cross-subject saved-item browse moves to Journal. | [`Mentor-Is-The-App` §3, §5, and §7](2026-06-09-mentor-is-the-app-shell-redesign.md#5-the-subjects-tab--hub-anatomy); [`S6 cutover plan`](../plans/v2-plan/2026-06-10-s6-cutover-deletions.md) `library.tsx` heir row and T6. |
+| **Story 7.9: Topic Notes — Voice & Text Capture** — parent read-only note display; Library Topics “Has notes” view | The learner's note is rendered to a parent, even read-only. Notes are artifacts: they remain available to the learner in Subjects/Journal but never become ambient supporter UI. | [`identity/prd.md`](../canon/identity/prd.md) “Supporter ceiling & notes wall”; [`MMT-ADR-0027`](../adr/MMT-ADR-0027-supporter-visibility-contract.md) Decisions 2 and 4; [`Mentor-Is-The-App` §5.4 and §6.1](2026-06-09-mentor-is-the-app-shell-redesign.md#61-the-contract). |
+| **Epic 12: Remove Persona Enum** identity summary; **Stories 12.1 and 12.4–12.6** | Identity is modeled as Profiles with `birthYear` and parent capability derived from `familyLinks`. Current identity canon uses Person + Organization + Membership roles `{admin, learner}`, separate Guardianship/Supportership edges, and `birth_date`; `family_links` is legacy. | [`identity/ontology.md`](../canon/identity/ontology.md) §1–3; [`identity/data-model.md`](../canon/identity/data-model.md) §2 and §4.1–4.7; [`identity/prd.md`](../canon/identity/prd.md) Parts 2–5. |
+| **Epic 12** intent-as-cards and stable-tab decisions; **Stories 12.2, 12.5, and 12.7** | A three-screen parent gateway and stable `Home \| Book \| More` shell own navigation. The current V2 target is `Mentor \| Subjects \| Journal`, with relationship scope selected by the chip, admin behind the avatar, and the deterministic `/now` feed replacing the old gateway/home-card target. | [`MVP Definition` §12](../plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md#12-platform--quality-floor) “Shell disambiguation”; [`Mentor-Is-The-App` §3, §4, and §7](2026-06-09-mentor-is-the-app-shell-redesign.md#3-the-shell--three-tabs-every-scope-no-exceptions); [`S6 cutover plan`](../plans/v2-plan/2026-06-10-s6-cutover-deletions.md) heir map and T2–T10. |
+| **Epic WEB-A: Parent Control Center**, especially WEB-A.4–A.8 and the `family_links` forward-compatibility rule | A future parent-only `(parent)` shell owns learner-profile management, dashboard, progress, and report screens, authorized through `family_links`. A future web surface must use canonical Membership/Supportership authorization and cannot revive profile impersonation, family-wide visibility, raw reports, or artifact access. | [`identity/ontology.md`](../canon/identity/ontology.md) §2.1–2.3; [`MMT-ADR-0027`](../adr/MMT-ADR-0027-supporter-visibility-contract.md); [`Mentor-Is-The-App` §3, §4, and §6](2026-06-09-mentor-is-the-app-shell-redesign.md#3-the-shell--three-tabs-every-scope-no-exceptions). |
+
+**Boundary of this annotation.** FR4/FR5's multiple-person/context capability,
+the curriculum hierarchy, learner-owned notes, and the progress/reporting inputs
+remain useful; this annex supersedes their legacy identity, access, and host-surface
+shape only. Epics 15/16 remain V2 inputs. Nothing here authorizes S6 deletion:
+V0/V1 stay as the rollback channel until the protection-gated retirement plan
+receives its explicit human confirmation.

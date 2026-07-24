@@ -89,6 +89,13 @@ filter_files() {
 #   database=<bool>      matrix demands the @eduagent/database package suite
 #                        (db-migrations class — nx affected can't see a
 #                        drizzle-only diff as affecting packages/database)
+#   no_gemini_runtime=<bool>
+#                        matrix demands the whole-tree Gemini runtime ratchet
+#   postinstall_safety, root_deps, i18n_jsx_literals, inngest_admin,
+#   prompt_markers, no_clinical_copy, mode_nav_flag_combo,
+#   test_only_exports, workflow_security, api_script_guards,
+#   database_script_guards=<bool>
+#                        matrix demands the named narrow whole-tree check
 #   docs_only=<bool>     PR diff is limited to docs/editor metadata paths
 # Fail-open invariant: if no diff base resolves, the router cannot prove a
 # slow suite unaffected, so it demands them ALL — never silently skips.
@@ -103,11 +110,28 @@ emit_github_output() {
       echo "eval=true"
       echo "unit=true"
       echo "database=true"
+      echo "no_gemini_runtime=true"
+      echo "postinstall_safety=true"
+      echo "root_deps=true"
+      echo "i18n_jsx_literals=true"
+      echo "inngest_admin=true"
+      echo "prompt_markers=true"
+      echo "no_clinical_copy=true"
+      echo "mode_nav_flag_combo=true"
+      echo "test_only_exports=true"
+      echo "workflow_security=true"
+      echo "api_script_guards=true"
+      echo "database_script_guards=true"
       echo "docs_only=false"
     } >> "$out"
     return 0
   fi
   local classes integration=false eval_needed=false unit=false database=false docs_only=true entry cmd f
+  local no_gemini_runtime=false postinstall_safety=false root_deps=false
+  local i18n_jsx_literals=false inngest_admin=false prompt_markers=false
+  local no_clinical_copy=false mode_nav_flag_combo=false
+  local test_only_exports=false workflow_security=false
+  local api_script_guards=false database_script_guards=false
   classes=$(join_unique_classes | tr ' ' ',')
   while IFS= read -r f; do
     [[ -z "$f" ]] && continue
@@ -125,6 +149,42 @@ emit_github_output() {
   esac
   case ",${classes}," in
     *,db-migrations,*) database=true ;;
+  esac
+  case ",${classes}," in
+    *,no-gemini-runtime,*) no_gemini_runtime=true ;;
+  esac
+  case ",${classes}," in
+    *,postinstall-safety,*) postinstall_safety=true ;;
+  esac
+  case ",${classes}," in
+    *,root-deps,*) root_deps=true ;;
+  esac
+  case ",${classes}," in
+    *,i18n-jsx-literals,*) i18n_jsx_literals=true ;;
+  esac
+  case ",${classes}," in
+    *,inngest-admin,*) inngest_admin=true ;;
+  esac
+  case ",${classes}," in
+    *,prompt-markers,*) prompt_markers=true ;;
+  esac
+  case ",${classes}," in
+    *,no-clinical-copy,*) no_clinical_copy=true ;;
+  esac
+  case ",${classes}," in
+    *,mode-nav-flag-combo,*) mode_nav_flag_combo=true ;;
+  esac
+  case ",${classes}," in
+    *,test-only-exports,*) test_only_exports=true ;;
+  esac
+  case ",${classes}," in
+    *,workflow-security,*) workflow_security=true ;;
+  esac
+  case ",${classes}," in
+    *,api-script-guards,*) api_script_guards=true ;;
+  esac
+  case ",${classes}," in
+    *,database-script-guards,*) database_script_guards=true ;;
   esac
   if [[ ${#SLOW_CMDS[@]} -gt 0 ]]; then
     for entry in "${SLOW_CMDS[@]}"; do
@@ -151,6 +211,18 @@ emit_github_output() {
     echo "eval=${eval_needed}"
     echo "unit=${unit}"
     echo "database=${database}"
+    echo "no_gemini_runtime=${no_gemini_runtime}"
+    echo "postinstall_safety=${postinstall_safety}"
+    echo "root_deps=${root_deps}"
+    echo "i18n_jsx_literals=${i18n_jsx_literals}"
+    echo "inngest_admin=${inngest_admin}"
+    echo "prompt_markers=${prompt_markers}"
+    echo "no_clinical_copy=${no_clinical_copy}"
+    echo "mode_nav_flag_combo=${mode_nav_flag_combo}"
+    echo "test_only_exports=${test_only_exports}"
+    echo "workflow_security=${workflow_security}"
+    echo "api_script_guards=${api_script_guards}"
+    echo "database_script_guards=${database_script_guards}"
     echo "docs_only=${docs_only}"
   } >> "$out"
 }
@@ -192,7 +264,7 @@ done
 # ── Detect changed files ────────────────────────────────────────────────
 case "$SOURCE" in
   staged)
-    FILES=$(git diff --cached --name-only --diff-filter=d)
+    FILES=$(git diff --cached --no-renames --name-only)
     ;;
   branch)
     # In CI, BASE_REF (the PR base branch) is explicit; locally fall back to
@@ -206,16 +278,18 @@ case "$SOURCE" in
       BASE=""
       BASE_UNRESOLVED=1
     fi
-    FILES=$([[ -n "$BASE" ]] && git diff --name-only --diff-filter=d "$BASE" || true)
+    # Include deletions: removing a guard or baseline file must still route the
+    # whole-tree check that proves the remaining tree is safe.
+    FILES=$([[ -n "$BASE" ]] && git diff --no-renames --name-only "$BASE" || true)
     ;;
   auto)
-    FILES=$(git diff --cached --name-only --diff-filter=d)
+    FILES=$(git diff --cached --no-renames --name-only)
     if [[ -z "$FILES" ]]; then
-      FILES=$(git diff --name-only --diff-filter=d)
+      FILES=$(git diff --no-renames --name-only)
     fi
     if [[ -z "$FILES" ]]; then
       BASE=$(git merge-base HEAD main 2>/dev/null || echo "main")
-      FILES=$(git diff --name-only --diff-filter=d "$BASE" 2>/dev/null || true)
+      FILES=$(git diff --no-renames --name-only "$BASE" 2>/dev/null || true)
     fi
     ;;
 esac
@@ -243,6 +317,18 @@ fi
 # Commands are deduplicated — a file matching multiple classes won't
 # produce duplicate commands.
 # ═════════════════════════════════════════════════════════════════════════
+
+# ── Package lifecycle safety ──────────────────────────────────────────────
+if hit '^(package\.json|apps/(api|mobile|web)/package\.json|scripts/verify-no-secret-postinstall\.cjs|\.github/workflows/ci\.yml)$'; then
+  CLASSES+=("postinstall-safety")
+  add_cmd fast "pnpm verify:postinstall-safety" "Install-hook secret safety guard"
+fi
+
+# ── Root dependency boundary ──────────────────────────────────────────────
+if hit '^(package\.json|scripts/check-no-mobile-deps-at-root\.cjs|\.github/workflows/ci\.yml)$'; then
+  CLASSES+=("root-deps")
+  add_cmd fast "pnpm check:root-deps" "Root package mobile-dependency guard"
+fi
 
 # ── DB Schema ────────────────────────────────────────────────────────────
 if hit '^packages/database/src/schema/'; then
@@ -297,6 +383,19 @@ if hit '^apps/api/src/inngest/'; then
   note "inngest: Verify Inngest dashboard sync after deploy (/v1/inngest)"
 fi
 
+# ── Inngest admin annotation guard ────────────────────────────────────────
+if hit '(^apps/api/src/inngest/functions/[^/]+\.ts$|^scripts/check-inngest-admin\.ts$|^\.github/workflows/ci\.yml$)'; then
+  CLASSES+=("inngest-admin")
+  add_cmd fast "pnpm exec tsx scripts/check-inngest-admin.ts" "Inngest admin annotation guard"
+fi
+
+# ── Prompt marker-token guard ─────────────────────────────────────────────
+PROMPT_MARKER_HITS=$(filter_files '^apps/api/src/services/.*\.ts$' | grep -vE '\.(test|spec)\.ts$' || true)
+if [[ -n "$PROMPT_MARKER_HITS" ]] || hit '^(scripts/check-prompt-markers\.sh|\.github/workflows/ci\.yml)$'; then
+  CLASSES+=("prompt-markers")
+  add_cmd fast "bash scripts/check-prompt-markers.sh" "Structured-envelope marker-token guard"
+fi
+
 # ── API Routes ───────────────────────────────────────────────────────────
 if hit '^apps/api/src/routes/'; then
   CLASSES+=("api-routes")
@@ -317,6 +416,7 @@ API_SVC=$(filter_files '^apps/api/src/services/' | grep -vE '(-prompts\.ts$|/llm
 if [[ -n "$API_SVC" ]]; then
   CLASSES+=("api-services")
   add_cmd fast  "pnpm test:api:unit"         "API unit tests"
+  add_cmd slow  "pnpm test:api:integration"  "API co-located integration tests"
 fi
 
 # ── Identity-v2 Seam (WI-1305 / R6) ──────────────────────────────────────
@@ -355,6 +455,27 @@ if i18n_delta_needs_checks "$FILES"; then
   add_cmd fast  "pnpm check:i18n:orphans"    "Orphan i18n key check"
   add_cmd fast  "pnpm check:i18n"            "i18n staleness check"
   note "i18n: Runs for mobile source changes because new t() calls can stale locale files"
+fi
+
+# ── Hardcoded JSX literal ratchet ─────────────────────────────────────────
+if hit '(^apps/mobile/src/.*\.tsx$|^scripts/(check-i18n-jsx-literals(\.test)?\.ts|i18n-jsx-literals-baseline\.json)$|^(package\.json|\.github/workflows/ci\.yml)$)'; then
+  CLASSES+=("i18n-jsx-literals")
+  add_cmd fast "pnpm check:i18n:jsx-literals" "Hardcoded JSX literal ratchet"
+fi
+
+# ── Clinical-copy ratchet ─────────────────────────────────────────────────
+if hit '(^apps/mobile/src/i18n/locales/en\.json$|^scripts/(check-no-clinical-copy(\.test)?\.ts|no-clinical-copy-baseline\.json)$|^(package\.json|\.github/workflows/ci\.yml)$)'; then
+  CLASSES+=("no-clinical-copy")
+  add_cmd fast "pnpm check:no-clinical-copy" "Clinical-copy ratchet"
+fi
+
+# ── Gemini runtime ratchet ────────────────────────────────────────────────
+# The guard walks API runtime and scripts TypeScript as a whole-tree baseline
+# ratchet. Run it when any scanned source, the guard itself, or its baseline
+# changes; unrelated and docs-only changes do not need the scan.
+if hit '(^apps/api/src/.*\.tsx?$|^scripts/.*\.tsx?$|^scripts/no-gemini-runtime-baseline\.json$|^(package\.json|\.github/workflows/ci\.yml)$)'; then
+  CLASSES+=("no-gemini-runtime")
+  add_cmd fast "pnpm check:no-gemini-runtime" "Whole-tree Gemini runtime ratchet"
 fi
 
 # ── i18n cross-package ────────────────────────────────────────────────────
@@ -409,11 +530,23 @@ if hit '(^\.github/workflows/|wrangler\.toml$|^deploy\.yml$)'; then
   note "ci-deploy: Verify deploy targets match intended environment"
 fi
 
+# ── GitHub workflow security ──────────────────────────────────────────────
+if hit '(^\.github/(workflows|actions)/.*\.ya?ml$|^scripts/check-github-workflow-security(\.test)?\.ts$|^package\.json$)'; then
+  CLASSES+=("workflow-security")
+  add_cmd fast "pnpm check:github-workflow-security" "GitHub workflow supply-chain guard"
+fi
+
 # ── Expo Config ──────────────────────────────────────────────────────────
 if hit '(^apps/mobile/app\.config\.|^eas\.json$)'; then
   CLASSES+=("expo-config")
   note "expo-config: May require a new EAS native build (check fingerprint)"
   note "expo-config: OTA updates cannot ship native config changes"
+fi
+
+# ── MODE_NAV build-profile ratchet ────────────────────────────────────────
+if hit '(^apps/mobile/eas\.json$|^(package\.json|\.github/workflows/ci\.yml)$|^scripts/(check-mode-nav-flag-combo(\.test)?\.ts|mode-nav-flag-combo-baseline\.json)$)'; then
+  CLASSES+=("mode-nav-flag-combo")
+  add_cmd fast "pnpm check:mode-nav-flag-combo" "MODE_NAV flag-combination ratchet"
 fi
 
 # ── E2E Tests ────────────────────────────────────────────────────────────
@@ -436,6 +569,12 @@ TS_SRC=$(filter_files '\.(ts|tsx)$' | grep -vE '\.test\.(ts|tsx)$|\.spec\.(ts|ts
 if [[ -n "$TS_SRC" ]]; then
   CLASSES+=("typescript")
   add_cmd fast  "pnpm exec tsc --build"      "Full incremental typecheck"
+fi
+
+# ── Test-only exports ratchet ─────────────────────────────────────────────
+if hit '(^apps/(api|mobile)/src/.*\.tsx?$|^packages/[^/]+/src/.*\.tsx?$|^scripts/(check-test-only-exports\.test\.ts|jest\.config\.cjs)$|^\.github/workflows/ci\.yml$)'; then
+  CLASSES+=("test-only-exports")
+  add_cmd fast "pnpm exec jest --config scripts/jest.config.cjs scripts/check-test-only-exports.test.ts --no-coverage" "Test-only exports ratchet"
 fi
 
 # ── Retention Package ────────────────────────────────────────────────────
@@ -461,6 +600,18 @@ if hit '^packages/test-utils/src/'; then
   add_cmd fast  "pnpm test:api:unit"         "API unit tests (test helper consumer)"
   add_cmd fast  "pnpm test:mobile:unit"      "Mobile unit tests (test helper consumer)"
   add_cmd slow  "pnpm test:api:integration"  "API co-located integration tests"
+fi
+
+# ── Narrow script guard suites ────────────────────────────────────────────
+if hit '(^apps/api/scripts/verify-wrangler-kv-binding(\.test)?\.mjs$|^\.github/workflows/ci\.yml$)'; then
+  CLASSES+=("api-script-guards")
+  add_cmd fast "node --test apps/api/scripts/verify-wrangler-kv-binding.test.mjs" "API KV-binding script guard tests"
+fi
+
+if hit '^(package\.json|packages/database/package\.json|packages/database/scripts/(check-db-push-target(\.test)?|check-identity-fk-drift(\.test)?|verify-db-target-lib)\.mjs|\.github/workflows/ci\.yml)$'; then
+  CLASSES+=("database-script-guards")
+  add_cmd fast "node --test packages/database/scripts/check-db-push-target.test.mjs" "Database push-target guard tests"
+  add_cmd fast "node --test packages/database/scripts/check-identity-fk-drift.test.mjs" "Identity FK catalog guard tests"
 fi
 
 # ═════════════════════════════════════════════════════════════════════════

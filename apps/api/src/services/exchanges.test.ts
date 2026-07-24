@@ -1481,6 +1481,193 @@ describe('buildSystemPrompt', () => {
 // ---------------------------------------------------------------------------
 
 describe('processExchange', () => {
+  it('forces legacy partial progress when an enabled answer evaluation is partial', async () => {
+    const partialEvaluationProvider: LLMProvider = {
+      id: 'cerebras',
+      async chat() {
+        return {
+          content: JSON.stringify({
+            reply: 'You have the first step; now finish the calculation.',
+            signals: {
+              partial_progress: false,
+              answer_evaluation: {
+                correctness: 'partial',
+                concept: 'quadratic formula',
+              },
+            },
+          }),
+          stopReason: 'stop' as StopReason,
+        };
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield '';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+    registerProvider(partialEvaluationProvider);
+
+    try {
+      const result = await processExchange(
+        { ...baseContext, answerEvaluationEnabled: true },
+        'I can substitute a, b, and c, but I am not sure what comes next.',
+      );
+
+      expect(result.answerEvaluation).toEqual({
+        correctness: 'partial',
+        concept: 'quadratic formula',
+      });
+      expect(result.partialProgress).toBe(true);
+    } finally {
+      registerProvider(createMockProvider('cerebras'));
+    }
+  });
+
+  it('surfaces enabled ordinary answer evaluation and discards it when disabled or excluded', async () => {
+    const evaluationProvider: LLMProvider = {
+      id: 'cerebras',
+      async chat() {
+        return {
+          content: JSON.stringify({
+            reply: 'That is the right product.',
+            signals: {
+              answer_evaluation: {
+                correctness: 'correct',
+                concept: 'multiplication',
+              },
+            },
+          }),
+          stopReason: 'stop' as StopReason,
+        };
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield '';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+    registerProvider(evaluationProvider);
+
+    const enabled = await processExchange(
+      { ...baseContext, answerEvaluationEnabled: true },
+      '42',
+    );
+    const disabled = await processExchange(baseContext, '42');
+    const recitation = await processExchange(
+      {
+        ...baseContext,
+        answerEvaluationEnabled: true,
+        effectiveMode: 'recitation',
+      },
+      '42',
+    );
+    const challenge = await processExchange(
+      {
+        ...baseContext,
+        answerEvaluationEnabled: true,
+        challengeRuntimeEnabled: true,
+        challengeRound: {
+          state: 'active',
+          offerCount: 0,
+          declinedDontAskAgain: false,
+          evaluations: [],
+        },
+      },
+      '42',
+    );
+
+    expect(enabled.answerEvaluation).toEqual({
+      correctness: 'correct',
+      concept: 'multiplication',
+    });
+    expect(disabled.answerEvaluation).toBeUndefined();
+    expect(recitation.answerEvaluation).toBeUndefined();
+    expect(challenge.answerEvaluation).toBeUndefined();
+
+    registerProvider(createMockProvider('gemini'));
+  });
+
+  it.each([
+    ['disabled', baseContext, '42', true],
+    [
+      'app-help',
+      { ...baseContext, answerEvaluationEnabled: true },
+      'Where do I find my notes?',
+      false,
+    ],
+    [
+      'recitation',
+      {
+        ...baseContext,
+        answerEvaluationEnabled: true,
+        effectiveMode: 'recitation' as const,
+      },
+      '42',
+      true,
+    ],
+    ...(['accepted', 'active'] as const).flatMap((state) =>
+      [false, true].map(
+        (challengeRuntimeEnabled) =>
+          [
+            `challenge-${state}-runtime-${challengeRuntimeEnabled}`,
+            {
+              ...baseContext,
+              answerEvaluationEnabled: true,
+              challengeRuntimeEnabled,
+              challengeRound: {
+                state,
+                offerCount: 0,
+                declinedDontAskAgain: false,
+                evaluations: [],
+              },
+            },
+            '42',
+            true,
+          ] as const,
+      ),
+    ),
+  ] as const)(
+    'ignores malformed answer evaluation on excluded %s process path',
+    async (_label, context, message, expectPartialProgress) => {
+      const malformedEvaluationProvider: LLMProvider = {
+        id: 'cerebras',
+        async chat() {
+          return {
+            content: JSON.stringify({
+              reply: "Let's continue with the next step.",
+              signals: {
+                partial_progress: true,
+                understanding_check: true,
+                answer_evaluation: {
+                  correctness: 'correct',
+                  concept: 'x'.repeat(201),
+                },
+              },
+            }),
+            stopReason: 'stop' as StopReason,
+          };
+        },
+        chatStream() {
+          const s = (async function* () {
+            yield '';
+          })();
+          return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+        },
+      };
+      registerProvider(malformedEvaluationProvider);
+
+      const result = await processExchange(context as ExchangeContext, message);
+
+      expect(result.response).toBe("Let's continue with the next step.");
+      expect(result.answerEvaluation).toBeUndefined();
+      expect(result.envelopeParseFailed).toBeUndefined();
+      expect(result.partialProgress).toBe(expectPartialProgress);
+      expect(result.isUnderstandingCheck).toBe(expectPartialProgress);
+    },
+  );
+
   it('returns a response from the LLM', async () => {
     const result = await processExchange(
       baseContext,
@@ -1569,6 +1756,7 @@ describe('processExchange', () => {
               understanding_check: true,
               partial_progress: true,
               needs_deepening: true,
+              answer_evaluation: { correctness: 'correct' },
             },
             ui_hints: {
               note_prompt: {
@@ -1600,6 +1788,7 @@ describe('processExchange', () => {
     expect(result.needsDeepening).toBe(false);
     expect(result.notePrompt).toBeUndefined();
     expect(result.notePromptPostSession).toBeUndefined();
+    expect(result.answerEvaluation).toBeUndefined();
 
     registerProvider(createMockProvider('gemini'));
   });
@@ -1642,6 +1831,55 @@ describe('processExchange', () => {
     expect(systemPrompts[0]).not.toContain('APP HELP');
     expect(systemPrompts[1]).toContain('APP HELP');
     expect(systemPrompts[1]).toContain('Mentor memory');
+  });
+
+  it('[WI-2220] answers from the V2 map — never the retired V0 labels — when ctx.shell is v2', async () => {
+    // Production composition boundary: exercises buildExchangeSystemMessage
+    // via processExchange, not the isolated app-help eval. Before the fix,
+    // production always defaulted to V0 regardless of the client's shell.
+    const systemPrompts: string[] = [];
+    const capturingProvider: LLMProvider = {
+      id: 'cerebras',
+      async chat(messages: ChatMessage[], _config: ModelConfig) {
+        systemPrompts.push(String(messages[0]?.content ?? ''));
+        return {
+          content: JSON.stringify({
+            reply: 'Got it.',
+            signals: {
+              understanding_check: false,
+              partial_progress: false,
+              needs_deepening: false,
+            },
+          }),
+          stopReason: 'stop' as StopReason,
+        };
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield '';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+    registerProvider(capturingProvider);
+
+    try {
+      await processExchange(
+        { ...baseContext, shell: 'v2' },
+        'Where do I find my notes?',
+      );
+    } finally {
+      registerProvider(createMockProvider('gemini'));
+    }
+
+    expect(systemPrompts).toHaveLength(1);
+    expect(systemPrompts[0]).toContain(
+      'APP HELP (map version 2026-06-27, V2 shell)',
+    );
+    expect(systemPrompts[0]).not.toContain('Home >');
+    expect(systemPrompts[0]).not.toContain('Library >');
+    expect(systemPrompts[0]).not.toContain('More >');
+    expect(systemPrompts[0]).not.toContain('Progress >');
   });
 
   it('answers ordinary freeform facts from 0.88+ general knowledge', async () => {
@@ -1932,6 +2170,33 @@ describe('MAX_INTERVIEW_EXCHANGES', () => {
 
 describe('classifyExchangeOutcome', () => {
   const ctx = { sessionId: 's1', profileId: 'p1', flow: 'streamMessage' };
+
+  it('ignores malformed answer evaluation before validating an excluded stream envelope', () => {
+    const raw = JSON.stringify({
+      reply: 'Use the product from the previous step.',
+      signals: {
+        partial_progress: true,
+        understanding_check: true,
+        answer_evaluation: {
+          correctness: 'correct',
+          concept: 'x'.repeat(201),
+        },
+      },
+    });
+
+    const result = classifyExchangeOutcome(raw, {
+      ...ctx,
+      acceptAnswerEvaluation: false,
+    });
+
+    expect(result.fallback).toBeUndefined();
+    expect(result.parsed.cleanResponse).toBe(
+      'Use the product from the previous step.',
+    );
+    expect(result.parsed.answerEvaluation).toBeUndefined();
+    expect(result.parsed.partialProgress).toBe(true);
+    expect(result.parsed.understandingCheck).toBe(true);
+  });
 
   it('does not return fallback when reply is non-empty', () => {
     const raw = JSON.stringify({
@@ -2660,6 +2925,114 @@ describe('source provenance audit', () => {
     expect(safe.response).toMatch(/source-check question/i);
     expect(safe.response).toMatch(/should not answer it from memory/i);
     expect(safe.sourceAudit.reason).toMatch(/no-source safety fallback/i);
+  });
+
+  // [WI-2100] Reproduces staging session 019f675d-64a9-7d87-ae22-01f5a97a77e7:
+  // a learner referenced "her book" with no title given, and the mentor
+  // assumed a specific well-known work (The Bell Jar) instead of asking which
+  // one. The no-source hard fallback must ask for the title/author instead of
+  // falling through to the generic "share your textbook/worksheet/photo"
+  // template — the generic template doesn't ask which work is meant.
+  it('asks which source instead of the generic template for an unnamed book', () => {
+    const audit = auditExchangeSources(
+      { relied_on: ['learner_message'], insufficient: false },
+      buildExchangeSourceEvidence(
+        { ...baseContext, topicTitle: undefined, topicDescription: undefined },
+        "I'm reading her book for my English assignment. Can you help me figure out what to say about the main character?",
+      ),
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Here is an unsupported claim about the main character.',
+      audit,
+    );
+
+    expect(safe.response).toMatch(/which one you mean/i);
+    expect(safe.response).toMatch(/title.*author|author.*title/i);
+    expect(safe.response).not.toMatch(/share the textbook passage/i);
+  });
+
+  it('asks which source instead of the generic template for unnamed poems', () => {
+    const audit = auditExchangeSources(
+      { relied_on: ['learner_message'], insufficient: false },
+      buildExchangeSourceEvidence(
+        { ...baseContext, topicTitle: undefined, topicDescription: undefined },
+        "I have to write about his poems for homework. I don't know how to start analyzing the imagery in the second stanza.",
+      ),
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Here is an unsupported claim about the imagery.',
+      audit,
+    );
+
+    expect(safe.response).toMatch(/which one you mean/i);
+    expect(safe.response).not.toMatch(/share the textbook passage/i);
+  });
+
+  it('does not ask which source when the work is already named', () => {
+    const audit = auditExchangeSources(
+      { relied_on: ['learner_message'], insufficient: false },
+      buildExchangeSourceEvidence(
+        { ...baseContext, topicTitle: undefined, topicDescription: undefined },
+        'I am reading The Great Gatsby by F. Scott Fitzgerald and need help with the green light symbolism.',
+      ),
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Here is an unsupported claim about the green light.',
+      audit,
+    );
+
+    expect(safe.response).not.toMatch(/which one you mean/i);
+  });
+
+  // [WI-2100 rework, bounce 2] Reviewer finding: AMBIGUOUS_SOURCE_REFERENCE
+  // matched possessive/demonstrative wording ("her book") but never checked
+  // whether the SAME message also names a title/author later on. A learner
+  // opening with the possessive phrasing and then naming the work in full
+  // must NOT be asked which one they mean — the named-work negative path has
+  // to win over the possessive-only positive path when both are present in
+  // one message. This is distinct from the "already named" test above, whose
+  // input ("I am reading The Great Gatsby...") never exercises the overlap
+  // because it never uses possessive wording in the first place.
+  it('does not ask which source when possessive wording is followed by a named title and author', () => {
+    const audit = auditExchangeSources(
+      { relied_on: ['learner_message'], insufficient: false },
+      buildExchangeSourceEvidence(
+        { ...baseContext, topicTitle: undefined, topicDescription: undefined },
+        "I'm reading her book, The Great Gatsby by F. Scott Fitzgerald, and need help with the green light symbolism.",
+      ),
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Here is an unsupported claim about the green light.',
+      audit,
+    );
+
+    expect(safe.response).not.toMatch(/which one you mean/i);
+  });
+
+  // [WI-2100 rework, bounce 2] Same overlap as above, but with only a title
+  // named and no author byline — the "or" in the reviewer's finding ("a
+  // title or author appearing later") covers this case too, and it needs
+  // its own regression: a fix that only recognizes "by <Author>" would pass
+  // the byline test above while still over-asking here.
+  it('does not ask which source when possessive wording is followed by a named title with no author', () => {
+    const audit = auditExchangeSources(
+      { relied_on: ['learner_message'], insufficient: false },
+      buildExchangeSourceEvidence(
+        { ...baseContext, topicTitle: undefined, topicDescription: undefined },
+        "I'm reading her book, The Great Gatsby, for my English assignment and need help with the green light symbolism.",
+      ),
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Here is an unsupported claim about the green light.',
+      audit,
+    );
+
+    expect(safe.response).not.toMatch(/which one you mean/i);
   });
 
   // [BREAK] A learner's first message of bare "yes" / "yeah" / "good" used to
@@ -3544,6 +3917,86 @@ describe('buildUserContent', () => {
     expect(parts[0]).toEqual(
       expect.objectContaining({ mimeType: 'image/png' }),
     );
+  });
+});
+
+describe('parseExchangeEnvelope answer evaluation pass-through [WI-1443]', () => {
+  const ctx = { sessionId: 's1', profileId: 'p1', flow: 'processExchange' };
+
+  it.each(['correct', 'partial', 'incorrect', 'na'] as const)(
+    'surfaces canonical %s evaluation',
+    (correctness) => {
+      const result = parseExchangeEnvelope(
+        JSON.stringify({
+          reply: 'Keep going.',
+          signals: {
+            answer_evaluation: { correctness, concept: 'fractions' },
+          },
+        }),
+        ctx,
+      );
+
+      expect(result.answerEvaluation).toEqual({
+        correctness,
+        concept: 'fractions',
+      });
+    },
+  );
+
+  it('drops the signal when its schema makes the envelope invalid', () => {
+    const result = parseExchangeEnvelope(
+      JSON.stringify({
+        reply: 'Keep going.',
+        signals: {
+          answer_evaluation: { correctness: 'almost' },
+        },
+      }),
+      ctx,
+    );
+
+    expect(result.envelopeParseFailed).toBe(true);
+    expect(result.answerEvaluation).toBeUndefined();
+  });
+
+  it('ignores only answer evaluation before validation on an excluded path', () => {
+    const result = parseExchangeEnvelope(
+      JSON.stringify({
+        reply: 'Use the product from the previous step.',
+        signals: {
+          partial_progress: true,
+          understanding_check: true,
+          answer_evaluation: {
+            correctness: 'correct',
+            concept: 'x'.repeat(201),
+          },
+        },
+      }),
+      { ...ctx, acceptAnswerEvaluation: false },
+    );
+
+    expect(result.cleanResponse).toBe(
+      'Use the product from the previous step.',
+    );
+    expect(result.answerEvaluation).toBeUndefined();
+    expect(result.partialProgress).toBe(true);
+    expect(result.understandingCheck).toBe(true);
+    expect(result.envelopeParseFailed).toBeUndefined();
+  });
+
+  it('keeps unrelated signal validation strict while answer evaluation is ignored', () => {
+    const result = parseExchangeEnvelope(
+      JSON.stringify({
+        reply: 'Use the product from the previous step.',
+        signals: {
+          retrieval_score: 2,
+          answer_evaluation: { correctness: 'almost' },
+        },
+      }),
+      { ...ctx, acceptAnswerEvaluation: false },
+    );
+
+    expect(result.envelopeParseFailed).toBe(true);
+    expect(result.answerEvaluation).toBeUndefined();
   });
 });
 

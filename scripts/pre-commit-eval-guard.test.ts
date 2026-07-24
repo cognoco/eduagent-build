@@ -191,6 +191,25 @@ describe('pre-commit eval-snapshot guard behavior', () => {
     expect(result.ok).toBe(true);
   });
 
+  it('passes when the staged snapshot evidence is a deletion', () => {
+    writeRepoFile(
+      repo,
+      'apps/api/src/services/session/session-prompts.ts',
+      'export const prompt = "removed obsolete scenario";\n',
+    );
+    rmSync(join(repo, 'apps/api/eval-llm/snapshots/session/12yo-dinosaurs.md'));
+    git(repo, ['add', 'apps/api/src/services/session/session-prompts.ts']);
+    git(repo, [
+      'add',
+      '-u',
+      'apps/api/eval-llm/snapshots/session/12yo-dinosaurs.md',
+    ]);
+
+    const result = evaluatePrecommitEvalSnapshotGuard(repo);
+
+    expect(result.ok).toBe(true);
+  });
+
   it('passes a zero-drift prompt change with a receipt from the evaluated file contents', () => {
     writeRepoFile(
       repo,

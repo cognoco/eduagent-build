@@ -264,7 +264,10 @@ describe('GET /v1/profiles', () => {
     const res = await makeApp().request('/v1/profiles');
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ profiles: [] });
+    await expect(res.json()).resolves.toEqual({
+      profiles: [],
+      needsAdultConsent: false,
+    });
   });
 
   // [CUT-B1] v2 pre-graph: a freshly signed-up user under IDENTITY_V2_ENABLED
@@ -314,7 +317,10 @@ describe('GET /v1/profiles', () => {
     );
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ profiles: [] });
+    await expect(res.json()).resolves.toEqual({
+      profiles: [],
+      needsAdultConsent: false,
+    });
   });
 
   it('propagates service errors to 500', async () => {
@@ -445,6 +451,146 @@ describe('POST /v1/profiles', () => {
     expect(res.status).toBe(409);
     const body = await res.json();
     expect(body).toMatchObject({ code: ERROR_CODES.CONFLICT });
+  });
+
+  it('[WI-1864] returns PENDING consent for a graphless 14-year-old owner bootstrap', async () => {
+    const birthYear = new Date().getUTCFullYear() - 14;
+    createIdentityGraphMock.mockResolvedValue({
+      personId: PROFILE_ID_A,
+      account: { id: ACCOUNT_ID },
+    } as Awaited<ReturnType<typeof createIdentityGraph>>);
+    getOwnerProfileV2Mock.mockResolvedValue({
+      ...makeProfileRow({ id: PROFILE_ID_A }),
+      birthYear,
+      consentStatus: 'PENDING',
+    });
+
+    type PreGraphEnv = {
+      Bindings: { CONSENT_POLICY_VERSION?: string };
+      Variables: {
+        db: Database;
+        account: Account | undefined;
+        profileId: string | undefined;
+        profileMeta: ProfileMeta | undefined;
+        clerkIdentity:
+          | { clerkUserId: string; verifiedEmail: string }
+          | undefined;
+      };
+    };
+    const app = new Hono<PreGraphEnv>();
+    app.use('*', async (c, next) => {
+      c.set('db', {} as Database);
+      c.set('account', undefined);
+      c.set('clerkIdentity', {
+        clerkUserId: 'user_pre_graph_14',
+        verifiedEmail: 'owner14@example.com',
+      });
+      c.set('profileId', undefined);
+      c.set('profileMeta', undefined);
+      await next();
+    });
+    app.onError((err, c) =>
+      c.json({ code: 'INTERNAL_ERROR', message: err.message }, 500),
+    );
+    app.route('/v1', profileRoutes);
+
+    const res = await app.request(
+      '/v1/profiles',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          displayName: 'Owner 14',
+          birthYear,
+          birthMonth: 1,
+          birthDay: 1,
+          location: 'EU',
+        }),
+      },
+      { CONSENT_POLICY_VERSION: 'test-v1' },
+    );
+
+    const response = await res.json();
+    expect({ status: res.status, response }).toMatchObject({
+      status: 201,
+      response: {
+        profile: {
+          id: PROFILE_ID_A,
+          consentStatus: 'PENDING',
+        },
+      },
+    });
+  });
+
+  it('[WI-1864] returns canonical persisted consent when graph bootstrap replays a competing request', async () => {
+    const canonicalBirthYear = new Date().getUTCFullYear() - 14;
+    const replayBirthYear = new Date().getUTCFullYear() - 17;
+    createIdentityGraphMock.mockResolvedValue({
+      personId: PROFILE_ID_A,
+      account: { id: ACCOUNT_ID },
+    } as Awaited<ReturnType<typeof createIdentityGraph>>);
+    getOwnerProfileV2Mock.mockResolvedValue({
+      ...makeProfileRow({ id: PROFILE_ID_A }),
+      birthYear: canonicalBirthYear,
+      consentStatus: 'PENDING',
+    });
+
+    type PreGraphEnv = {
+      Bindings: { CONSENT_POLICY_VERSION?: string };
+      Variables: {
+        db: Database;
+        account: Account | undefined;
+        profileId: string | undefined;
+        profileMeta: ProfileMeta | undefined;
+        clerkIdentity:
+          | { clerkUserId: string; verifiedEmail: string }
+          | undefined;
+      };
+    };
+    const app = new Hono<PreGraphEnv>();
+    app.use('*', async (c, next) => {
+      c.set('db', {} as Database);
+      c.set('account', undefined);
+      c.set('clerkIdentity', {
+        clerkUserId: 'user_pre_graph_replay',
+        verifiedEmail: 'owner-replay@example.com',
+      });
+      c.set('profileId', undefined);
+      c.set('profileMeta', undefined);
+      await next();
+    });
+    app.onError((err, c) =>
+      c.json({ code: 'INTERNAL_ERROR', message: err.message }, 500),
+    );
+    app.route('/v1', profileRoutes);
+
+    const res = await app.request(
+      '/v1/profiles',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          displayName: 'Losing Replay',
+          birthYear: replayBirthYear,
+          birthMonth: 1,
+          birthDay: 1,
+          location: 'EU',
+        }),
+      },
+      { CONSENT_POLICY_VERSION: 'test-v1' },
+    );
+
+    const response = await res.json();
+    expect({ status: res.status, response }).toMatchObject({
+      status: 201,
+      response: {
+        profile: {
+          id: PROFILE_ID_A,
+          birthYear: canonicalBirthYear,
+          consentStatus: 'PENDING',
+        },
+      },
+    });
   });
 
   it('returns 400 when required fields are missing', async () => {

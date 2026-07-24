@@ -17,6 +17,8 @@ export {
   setLlmKillSwitchActive,
   setLlmEnvironment,
 } from './router';
+export { CONVERSATION_LANGUAGE_NAMES } from './router';
+export { runWithLlmRequestContext } from './request-context';
 export { parseConversationLanguage } from './conversation-language';
 // Test-only helpers (createMockProvider, mockProvider, getFallbackConfigForTest,
 // getModelConfigForTest, _setOpenAIAdvancedModelForTesting, _getLlmRoutingV2Enabled)
@@ -36,6 +38,7 @@ export type {
   LlmProviderPolicy,
   OpenAIAdvancedModel,
   PreferredLlmProvider,
+  JudgeIndependence,
 } from './router';
 export {
   parseEnvelope,
@@ -62,3 +65,4 @@ export type {
   TextPart,
   InlineDataPart,
 } from './types';
+export { escapeXml } from './sanitize';

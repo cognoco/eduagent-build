@@ -250,12 +250,19 @@ async function loadNextTopicMap(
 export async function listRecapsForParent(
   db: Database,
   parentProfileId: string,
+  callerPersonId: string | undefined,
+  organizationId: string | undefined,
   options: {
     childProfileId?: string;
     limit?: number;
   } = {},
 ): Promise<RecapListItem[]> {
-  const children = await getChildrenForParent(db, parentProfileId);
+  const children = await getChildrenForParent(
+    db,
+    parentProfileId,
+    callerPersonId,
+    organizationId,
+  );
   const selectedChildren = options.childProfileId
     ? children.filter((child) => child.profileId === options.childProfileId)
     : children;
@@ -274,6 +281,10 @@ export async function listRecapsForParent(
   // individual child and must not poison sibling lookups — Promise.all would
   // reject the whole parent dashboard when any one child has hidden data.
   // Other errors (DB, etc.) still propagate via the outer await.
+  // Each exported leaf deliberately repeats the admin assertion so it remains
+  // safe when called independently. The extra lookups are bounded by this
+  // household's family-linked child count; that defense-in-depth cost is
+  // accepted at the current household-scale cardinality.
   const sessionsByChild = await Promise.all(
     selectedChildren.map(async (child) => {
       try {
@@ -281,6 +292,8 @@ export async function listRecapsForParent(
           db,
           parentProfileId,
           child.profileId,
+          callerPersonId,
+          organizationId,
         );
         return { child, sessions };
       } catch (err) {
@@ -442,8 +455,15 @@ export async function getRecapForParent(
   db: Database,
   parentProfileId: string,
   recapId: string,
+  callerPersonId: string | undefined,
+  organizationId: string | undefined,
 ): Promise<RecapListItem | null> {
-  const children = await getChildrenForParent(db, parentProfileId);
+  const children = await getChildrenForParent(
+    db,
+    parentProfileId,
+    callerPersonId,
+    organizationId,
+  );
 
   // [L7-F2] Parallelize per-child lookups instead of awaiting in series. A
   // single-query refactor (fetch session by recapId, then assert membership
@@ -455,6 +475,10 @@ export async function getRecapForParent(
   // individual child and must not block the lookup against siblings — the
   // recap may belong to a visible child even if a sibling is hidden. Other
   // errors still propagate via the outer await.
+  // Each exported leaf deliberately repeats the admin assertion so it remains
+  // safe when called independently. The extra lookups are bounded by this
+  // household's family-linked child count; that defense-in-depth cost is
+  // accepted at the current household-scale cardinality.
   const sessions = await Promise.all(
     children.map(async (child) => {
       try {
@@ -463,6 +487,8 @@ export async function getRecapForParent(
           parentProfileId,
           child.profileId,
           recapId,
+          callerPersonId,
+          organizationId,
         );
       } catch (err) {
         if (err instanceof ForbiddenError) return null;

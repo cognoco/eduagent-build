@@ -27,6 +27,11 @@ date: '2026-02-14'
 **Author:** Zuzka
 **Date:** 2026-02-14
 
+> **Historical age/compliance assumptions:** The UX concepts remain useful,
+> but this document's 11+ floor and location-neutral consent examples are
+> superseded by
+> [`docs/compliance/2026-07-23-13-plus-eea-launch-country-ruling.md`](compliance/2026-07-23-13-plus-eea-launch-country-ruling.md).
+
 ---
 
 ## Project Understanding
@@ -1121,6 +1126,20 @@ A real coach manages your energy, not just your curriculum. Sessions have a ceil
 | Language learner | 20 minutes | 25 minutes | "Good session. New vocab sticks better with a break." |
 
 Not a hard cutoff — a coach-initiated wind-down. If the user chooses to continue, the cap extends by 10 minutes before the next nudge. The coach never forces a stop, but always advocates for quality over quantity.
+
+**Mentor Notice Pattern (MVP):**
+
+A mentor notice is a quiet, learner-only acknowledgement that the Mentor recorded one evidence-backed gap from homework or ordinary learning. It appears only after server acceptance; streaming Mentor prose never promises the future interaction. The learner sees at most one actionable notice, not a remediation queue.
+
+| State | Primary action | Secondary behavior |
+|---|---|---|
+| Eligible open notice | `Continue` starts or resumes a focused re-check capped at three learner responses | `Not now` defers until the next learning day, measured from local 04:00 in the learner's IANA time zone |
+| Independent server judge commits `locked_in` | Show concise acknowledgement from the committed server transition | The tutor's prose never self-certifies understanding; do not inflate into a diagnosis or expose it to a proxy viewer |
+| Independent server judge commits `not_yet` | End the current offer with encouraging copy | Do not claim mastery; a later notice requires new evidence |
+| Learner explicitly asks to stop | Dismiss terminally | Do not resurface the record |
+| No notice activity for 21 days | Fade silently | No guilt copy, badge, or queue remains |
+
+The MVP is in-app only. It has no lock-screen copy, notification permission primer, or scheduled nudge. All ages use the same calm, age-neutral interaction. Every surface follows one learner-scoped rollout observation: a stale lower revision cannot resurrect UI, disabled wins a same-revision tie, and re-enable requires a higher revision. Missing or malformed policy remains hidden. The amendment authorizes no production activation, percentage rollout, OTA, release, deployment, or push delivery. See [`MMT-ADR-0036`](adr/MMT-ADR-0036-mentor-notice-mvp-boundaries-and-server-authority.md).
 
 **Socratic Escalation Ladder (Child Profiles):**
 

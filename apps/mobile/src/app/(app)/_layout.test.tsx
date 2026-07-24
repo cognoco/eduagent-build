@@ -42,14 +42,24 @@ const mockClerkSignOut = jest.fn();
 const mockTabs = Object.assign(
   ({
     children,
+    screenOptions,
     ...props
   }: {
     children?: React.ReactNode;
-    screenOptions?: unknown;
+    screenOptions?: (input: { route: { name: string } }) => {
+      sceneStyle?: unknown;
+    };
   }) => {
     const { View } = require('react-native');
+    const pathname =
+      String(mockUsePathname() ?? '/mentor').split('?')[0] ?? '/mentor';
+    const activeRootRoute = pathname.split('/').filter(Boolean)[0] ?? 'mentor';
+    const activeOptions = screenOptions?.({
+      route: { name: activeRootRoute },
+    });
     return (
-      <View testID="tabs" {...props}>
+      <View testID="tabs" screenOptions={screenOptions} {...props}>
+        <View testID="active-root-scene" style={activeOptions?.sceneStyle} />
         {children}
       </View>
     );
@@ -195,7 +205,14 @@ jest.mock(
 // Route: GET /subjects → { subjects: [] }
 
 const AppLayout = require('./_layout').default;
-const { FULL_SCREEN_ROUTES, HIDDEN_TAB_ROUTES } = require('./_layout');
+const {
+  FULL_SCREEN_ROUTES,
+  HIDDEN_TAB_ROUTES,
+  V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP,
+  V2_ROOT_SAFE_AREA_EXCEPTIONS,
+  assertV2SafeAreaOwnershipInvariant,
+  resolveV2PushedScenePaddingTop,
+} = require('./_layout');
 const {
   computeModeVisibleTabs,
   computeVisibleTabs,
@@ -344,11 +361,24 @@ describe('AppLayout', () => {
     });
     mockUseProfile.mockReturnValue({
       profiles: [
-        { id: 'p1', isOwner: true, consentStatus: null, birthYear: 1990 },
-        { id: 'c1', isOwner: false, consentStatus: null, birthYear: 2014 },
+        {
+          id: 'p1',
+          displayName: 'Parent',
+          isOwner: true,
+          consentStatus: null,
+          birthYear: 1990,
+        },
+        {
+          id: 'c1',
+          displayName: 'Child',
+          isOwner: false,
+          consentStatus: null,
+          birthYear: 2014,
+        },
       ],
       activeProfile: {
         id: 'p1',
+        displayName: 'Parent',
         isOwner: true,
         consentStatus: null,
         birthYear: 1990,
@@ -694,6 +724,39 @@ describe('AppLayout', () => {
     expect(screen.queryByTestId('redirect')).toBeNull();
   });
 
+  it('[WI-2240] does not render Account navigation while a restored child proxy state is unresolved', () => {
+    mockUsePathname.mockReturnValue('/account/privacy');
+    mockUseProfile.mockReturnValue({
+      profiles: [
+        {
+          id: 'c1',
+          displayName: 'Child',
+          isOwner: false,
+          consentStatus: null,
+          birthYear: 2014,
+        },
+      ],
+      activeProfile: {
+        id: 'c1',
+        displayName: 'Child',
+        isOwner: false,
+        consentStatus: null,
+        birthYear: 2014,
+      },
+      isExplicitProxyMode: false,
+      isLoading: true,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+
+    renderLayout();
+
+    screen.getByTestId('profile-loading');
+    expect(screen.queryByTestId('tabs')).toBeNull();
+    expect(screen.queryByTestId('redirect')).toBeNull();
+  });
+
   it('[WI-1849] exposes retry and sign-out recovery after profile loading times out', async () => {
     jest.useFakeTimers();
     mockUseProfile.mockReturnValue({
@@ -972,6 +1035,301 @@ describe('AppLayout', () => {
     }
   });
 
+  it.each(
+    [
+      '/dashboard',
+      '/billing/manage',
+      '/subject-hub/subject-1',
+      '/progress/saved',
+    ].flatMap((pathname) => [
+      { pathname, surface: '360x760 web', safeAreaTop: 0 },
+      { pathname, surface: 'native safe area', safeAreaTop: 47 },
+    ]),
+  )(
+    'renders $pathname below the complete fixed v2 chrome once on $surface',
+    async ({ pathname, safeAreaTop }) => {
+      const flags = require('../../lib/feature-flags') as {
+        FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+      };
+      const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      try {
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = true;
+        mockSafeAreaInsets = {
+          top: safeAreaTop,
+          bottom: 0,
+          left: 0,
+          right: 0,
+        };
+        mockUsePathname.mockReturnValue(pathname);
+
+        renderLayout();
+
+        const activeScene = await screen.findByTestId('active-root-scene');
+        const avatarShell = screen.getByTestId('account-avatar-shell', {
+          includeHiddenElements: true,
+        });
+        const avatarTop = Math.max(safeAreaTop, 24) + 8;
+        expect(avatarShell).toHaveStyle({ top: avatarTop });
+
+        const expectedPushedPadding = avatarTop + 44;
+        expect(activeScene).toHaveStyle({
+          paddingTop: expectedPushedPadding,
+        });
+      } finally {
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = original;
+      }
+    },
+  );
+
+  it.each([
+    '/mentor-memory',
+    '/more/accommodation',
+    '/subscription',
+    '/more/account',
+    '/subject/subject-1',
+    '/topic/topic-1',
+    '/my-notes',
+  ])(
+    'composes root chrome clearance with child-owned safe area exactly once for %s',
+    async (pathname) => {
+      const flags = require('../../lib/feature-flags') as {
+        FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+      };
+      const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      try {
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = true;
+        const safeAreaTop = 47;
+        mockSafeAreaInsets = {
+          top: safeAreaTop,
+          bottom: 0,
+          left: 0,
+          right: 0,
+        };
+        mockUsePathname.mockReturnValue(pathname);
+
+        renderLayout();
+
+        const activeScene = await screen.findByTestId('active-root-scene');
+        const rootPadding = (activeScene.props.style as { paddingTop: number })
+          .paddingTop;
+        const completeChromeClearance = Math.max(safeAreaTop, 24) + 8 + 44;
+
+        expect(rootPadding + safeAreaTop).toBe(completeChromeClearance);
+      } finally {
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = original;
+      }
+    },
+  );
+
+  it.each(
+    [
+      { pathname: '/mentor', routeKind: 'Mentor tab', ownsChrome: true },
+      { pathname: '/subjects', routeKind: 'Subjects tab', ownsChrome: true },
+      { pathname: '/journal', routeKind: 'Journal tab', ownsChrome: true },
+      {
+        pathname: '/account',
+        routeKind: 'full-screen account',
+        ownsChrome: false,
+      },
+      {
+        pathname: '/session',
+        routeKind: 'full-screen session',
+        ownsChrome: false,
+      },
+    ].flatMap(({ pathname, routeKind, ownsChrome }) => [
+      {
+        pathname,
+        routeKind,
+        ownsChrome,
+        surface: '360x760 web',
+        safeAreaTop: 0,
+      },
+      {
+        pathname,
+        routeKind,
+        ownsChrome,
+        surface: 'native safe area',
+        safeAreaTop: 47,
+      },
+    ]),
+  )(
+    'keeps $routeKind content below floating v2 controls on $surface',
+    async ({ pathname, ownsChrome, safeAreaTop }) => {
+      const flags = require('../../lib/feature-flags') as {
+        FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+      };
+      const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      try {
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = true;
+        mockSafeAreaInsets = {
+          top: safeAreaTop,
+          bottom: 0,
+          left: 0,
+          right: 0,
+        };
+        mockUsePathname.mockReturnValue(pathname);
+
+        renderLayout();
+
+        expect(await screen.findByTestId('active-root-scene')).toHaveStyle({
+          paddingTop: ownsChrome ? Math.max(safeAreaTop, 24) + 8 + 44 : 0,
+        });
+      } finally {
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = original;
+      }
+    },
+  );
+
+  it('moves visible Subjects content below a scope chip that grows for font scaling', async () => {
+    const flags = require('../../lib/feature-flags') as {
+      FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+    };
+    const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    try {
+      (
+        flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+      ).MODE_NAV_V2_ENABLED = true;
+      mockSafeAreaInsets = { top: 47, bottom: 0, left: 0, right: 0 };
+      mockUsePathname.mockReturnValue('/subjects');
+
+      renderLayout();
+
+      const scopeShell = await screen.findByTestId('scope-chip-shell', {
+        includeHiddenElements: true,
+      });
+      fireEvent(scopeShell, 'layout', {
+        nativeEvent: { layout: { height: 64 } },
+      });
+
+      expect(await screen.findByTestId('active-root-scene')).toHaveStyle({
+        paddingTop: 119,
+      });
+    } finally {
+      (
+        flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+      ).MODE_NAV_V2_ENABLED = original;
+    }
+  });
+
+  it.each([
+    { surface: '360x760 web', safeAreaTop: 0, expectedPadding: 76 },
+    { surface: 'native safe area', safeAreaTop: 47, expectedPadding: 52 },
+  ])(
+    'preserves top-level More safe-area ownership on $surface',
+    async ({ safeAreaTop, expectedPadding }) => {
+      const flags = require('../../lib/feature-flags') as {
+        FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+      };
+      const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      try {
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = true;
+        mockSafeAreaInsets = {
+          top: safeAreaTop,
+          bottom: 0,
+          left: 0,
+          right: 0,
+        };
+        mockUsePathname.mockReturnValue('/more');
+
+        renderLayout();
+
+        expect(await screen.findByTestId('active-root-scene')).toHaveStyle({
+          paddingTop: expectedPadding,
+        });
+      } finally {
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = original;
+      }
+    },
+  );
+
+  it('keeps pushed content below chrome that grows for font scaling or long scope labels', async () => {
+    const flags = require('../../lib/feature-flags') as {
+      FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+    };
+    const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    try {
+      (
+        flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+      ).MODE_NAV_V2_ENABLED = true;
+      mockSafeAreaInsets = { top: 47, bottom: 0, left: 0, right: 0 };
+      mockUsePathname.mockReturnValue('/more/accommodation');
+
+      renderLayout();
+
+      const scopeShell = await screen.findByTestId('scope-chip-shell', {
+        includeHiddenElements: true,
+      });
+      fireEvent(scopeShell, 'layout', {
+        nativeEvent: { layout: { height: 64 } },
+      });
+
+      expect(await screen.findByTestId('active-root-scene')).toHaveStyle({
+        // 119px complete measured chrome minus the child's 47px safe inset.
+        paddingTop: 72,
+      });
+    } finally {
+      (
+        flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+      ).MODE_NAV_V2_ENABLED = original;
+    }
+  });
+
+  it.each([
+    { caseName: 'flags-off', v0: false, v1: false },
+    { caseName: 'V0', v0: true, v1: false },
+    { caseName: 'V1', v0: true, v1: true },
+  ])(
+    'does not add v2 pushed-scene clearance to the $caseName shell',
+    async ({ v0, v1 }) => {
+      const flags = require('../../lib/feature-flags') as {
+        FEATURE_FLAGS: {
+          MODE_NAV_V0_ENABLED: boolean;
+          MODE_NAV_V1_ENABLED: boolean;
+          MODE_NAV_V2_ENABLED: boolean;
+        };
+      };
+      const original = { ...flags.FEATURE_FLAGS };
+      try {
+        Object.assign(flags.FEATURE_FLAGS, {
+          MODE_NAV_V0_ENABLED: v0,
+          MODE_NAV_V1_ENABLED: v1,
+          MODE_NAV_V2_ENABLED: false,
+        });
+        mockSafeAreaInsets = { top: 47, bottom: 34, left: 0, right: 0 };
+        mockUsePathname.mockReturnValue('/mentor-memory');
+
+        renderLayout();
+
+        expect(await screen.findByTestId('active-root-scene')).toHaveStyle({
+          paddingTop: 0,
+        });
+        expect(
+          screen.queryByTestId('account-avatar-shell', {
+            includeHiddenElements: true,
+          }),
+        ).toBeNull();
+      } finally {
+        Object.assign(flags.FEATURE_FLAGS, original);
+      }
+    },
+  );
+
   it('shows proxy banner and switches back to the owner profile', async () => {
     const switchProfile = jest.fn();
     mockUseProfile.mockReturnValue({
@@ -997,6 +1355,15 @@ describe('AppLayout', () => {
 
     // await: probe-state effect must resolve before the tabs+banner render.
     await screen.findByTestId('proxy-banner');
+    const tabs = await screen.findByTestId('tabs');
+    const screenOptions = tabs.props.screenOptions as ({
+      route,
+    }: {
+      route: { name: string };
+    }) => { sceneStyle: { paddingTop: number } };
+    expect(
+      screenOptions({ route: { name: 'mentor-memory' } }).sceneStyle.paddingTop,
+    ).toBe(0);
     // Exact match — a regression that breaks the {{name}} interpolation
     // ("Viewing as " with an empty/literal name) would slip past the broader
     // /Viewing as/ regex. test-setup.ts initializes i18next synchronously
@@ -1547,6 +1914,7 @@ describe('HIDDEN_TAB_ROUTES — tab-bar leak guard (QA-07 / Bug 763)', () => {
   it('hides every dynamic / non-tab route that Bug 763 surfaced into the tab bar', () => {
     const hidden = new Set<string>(HIDDEN_TAB_ROUTES);
     for (const route of [
+      'account',
       'shelf',
       'subject',
       'subject-hub',
@@ -1576,10 +1944,140 @@ describe('HIDDEN_TAB_ROUTES — tab-bar leak guard (QA-07 / Bug 763)', () => {
 });
 
 describe('FULL_SCREEN_ROUTES — nested ceremony route guard', () => {
+  it('keeps the Account-owned stack and its nested leaves out of tab chrome', () => {
+    expect(FULL_SCREEN_ROUTES.has('account')).toBe(true);
+    expect(HIDDEN_TAB_ROUTES).toContain('account');
+    expect(HIDDEN_TAB_ROUTES).not.toContain('account/profiles');
+  });
+
   it('hides chrome for every visibility link ceremony screen', () => {
     for (const route of ['link', 'link/initiate', 'link/[contractId]']) {
       expect(FULL_SCREEN_ROUTES.has(route)).toBe(true);
     }
+  });
+});
+
+describe('V2 pushed-route safe-area ownership invariant', () => {
+  it('audits every chrome-bearing hidden route by root route name', () => {
+    expect(V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP).toEqual({
+      home: 'child',
+      'own-learning': 'child',
+      library: 'child',
+      recaps: 'child',
+      progress: 'path-specific',
+      more: 'child',
+      dashboard: 'root',
+      subscription: 'child',
+      billing: 'root',
+      'mentor-memory': 'child',
+      subject: 'child',
+      'subject-hub': 'root',
+      'pick-book': 'child',
+      child: 'child',
+      'my-notes': 'child',
+      vocabulary: 'child',
+      topic: 'child',
+    });
+
+    for (const route of HIDDEN_TAB_ROUTES) {
+      if (!FULL_SCREEN_ROUTES.has(route)) {
+        expect(V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP).toHaveProperty(route);
+      }
+    }
+  });
+
+  it('keeps the root-full exception set narrow and path-bound', () => {
+    expect(V2_ROOT_SAFE_AREA_EXCEPTIONS).toEqual([
+      { routeName: 'dashboard', pathPrefix: '/dashboard' },
+      { routeName: 'billing', pathPrefix: '/billing' },
+      { routeName: 'subject-hub', pathPrefix: '/subject-hub' },
+      { routeName: 'progress', pathPrefix: '/progress/saved' },
+    ]);
+
+    expect(
+      resolveV2PushedScenePaddingTop({
+        routeName: 'billing/manage',
+        pathname: '/billing/manage',
+        pushedSceneTopInset: 99,
+        safeAreaTop: 47,
+      }),
+    ).toBe(99);
+    expect(
+      resolveV2PushedScenePaddingTop({
+        routeName: 'subject/[subjectId]',
+        pathname: '/subject/subject-1',
+        pushedSceneTopInset: 99,
+        safeAreaTop: 47,
+      }),
+    ).toBe(52);
+    expect(
+      resolveV2PushedScenePaddingTop({
+        routeName: 'progress/[subjectId]',
+        pathname: '/progress/subject-1',
+        pushedSceneTopInset: 99,
+        safeAreaTop: 47,
+      }),
+    ).toBe(52);
+    expect(
+      resolveV2PushedScenePaddingTop({
+        routeName: 'billing/manage',
+        pathname: '/billingish/manage',
+        pushedSceneTopInset: 99,
+        safeAreaTop: 47,
+      }),
+    ).toBe(52);
+  });
+
+  it('binds root and path-specific ownership values to audited exceptions', () => {
+    expect(() =>
+      assertV2SafeAreaOwnershipInvariant(
+        {
+          ...V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP,
+          'future-route': 'root',
+        },
+        V2_ROOT_SAFE_AREA_EXCEPTIONS,
+      ),
+    ).toThrow(/future-route.*root ownership.*path-bound exception/);
+
+    expect(() =>
+      assertV2SafeAreaOwnershipInvariant(
+        {
+          ...V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP,
+          'future-route': 'root',
+        },
+        [
+          ...V2_ROOT_SAFE_AREA_EXCEPTIONS,
+          { routeName: 'future-route', pathPrefix: '/future-route/special' },
+        ],
+      ),
+    ).toThrow(/future-route.*root ownership.*complete route prefix/);
+
+    expect(() =>
+      assertV2SafeAreaOwnershipInvariant(V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP, [
+        ...V2_ROOT_SAFE_AREA_EXCEPTIONS,
+        { routeName: 'subject', pathPrefix: '/subject' },
+      ]),
+    ).toThrow(/subject.*child ownership.*root exception/);
+  });
+
+  it('refuses to silently assign ownership to a future pushed route', () => {
+    expect(() =>
+      resolveV2PushedScenePaddingTop({
+        routeName: 'future-route',
+        pathname: '/future-route',
+        pushedSceneTopInset: 99,
+        safeAreaTop: 47,
+      }),
+    ).toThrow(/future-route.*safe-area ownership audit/);
+
+    expect(
+      resolveV2PushedScenePaddingTop({
+        routeName: '_lib/proxy-chrome',
+        pathname: '/mentor',
+        pushedSceneTopInset: 99,
+        safeAreaTop: 47,
+      }),
+    ).toBe(52);
   });
 });
 

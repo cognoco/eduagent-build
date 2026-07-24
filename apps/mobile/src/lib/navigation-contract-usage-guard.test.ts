@@ -334,6 +334,13 @@ const NON_NAV_DOMAIN_FILES: readonly LegitimateRawNavigationGateFile[] = [
       'React.memo comparator read (WI-964): prev/next.isOwner are compared only to re-render the QuotaExceededCard owner-vs-non-owner copy on the quota_exceeded message branch. Not a navigation/tab gate — active-user nav gating is unaffected.',
     expectedFindings: { 'profile-owner-read': 2 },
   },
+  {
+    file: 'apps/mobile/src/hooks/use-adult-self-consent.ts',
+    category: 'non-nav-domain-read',
+    reason:
+      'transport identity pin (WI-2547): p.isOwner locates the canonical account owner so the self-consent mutation can preset X-Profile-Id on its own request, keeping the server anti-spoof check satisfied when a managed child is the restored active profile. This classifies a domain entity (which loaded profile is the owner) to bind request identity — it renders nothing and gates no navigation, and the navigation contract is not an identity/write-subject source, so it must not replace this lookup.',
+    expectedFindings: { 'profile-owner-read': 1 },
+  },
 ];
 
 const LEGITIMATE_RAW_NAV_GATE_FILES: readonly LegitimateRawNavigationGateFile[] =

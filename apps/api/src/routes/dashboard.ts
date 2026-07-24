@@ -22,6 +22,7 @@ import {
   verifiedProofResponseSchema,
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
+import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { withProfile } from '../route-utils/route-context';
 import {
@@ -49,6 +50,7 @@ import {
   assertOwnerAndParentAccess,
   assertOwnerProfile,
   assertParentAccess,
+  assertCallerIsAccountOwner,
 } from '../services/family-access';
 import { ForbiddenError, notFound } from '../errors';
 import { createLogger } from '../services/logger';
@@ -70,6 +72,10 @@ type DashboardRouteEnv = {
   Variables: {
     user: AuthUser;
     db: Database;
+    account: Account;
+    // [WI-1989] The authenticated caller's own person id, resolved server-side
+    // by accountMiddleware — required by assertCallerIsAccountOwner.
+    callerPersonId: string | undefined;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
   };
@@ -82,8 +88,24 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
   .get('/dashboard', async (c) => {
     const { db, profileId } = withProfile(c);
 
+    // [WI-2397] Caller-identity gate — mirrors the WI-1989 gate already on
+    // every sibling /dashboard/children/* route. Without this, a same-account
+    // non-owner could send X-Profile-Id = the owner's profile id and read the
+    // owner's children list + pending notices (cross-ORG reads are already
+    // blocked by profileScopeMiddleware's account-scoped resolution — this
+    // closes the same-account residual).
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can view the family dashboard.',
+    );
+
     const [children, pendingNotices] = await Promise.all([
-      getChildrenForParent(db, profileId),
+      getChildrenForParent(
+        db,
+        profileId,
+        c.get('callerPersonId'),
+        c.get('account').id,
+      ),
       listPendingNotices(db, profileId),
     ]);
     return c.json(
@@ -103,6 +125,11 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // [BUG-834] Defense-in-depth: assert parent->child link at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can perform administrative actions on child profiles.',
+    );
 
     // [BUG-62] No consent-visibility gate here. The mobile child-detail screen
     // renders a dedicated consent-restricted panel for PENDING / REQUESTED /
@@ -113,7 +140,13 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // Sub-routes (inventory, progress-history, sessions, memory, reports) keep
     // their own assertChildDashboardDataVisible guards because they don't have
     // a "restricted view" -- they should not return data at all.
-    const child = await getChildDetail(db, parentProfileId, childProfileId);
+    const child = await getChildDetail(
+      db,
+      parentProfileId,
+      childProfileId,
+      c.get('callerPersonId'),
+      c.get('account').id,
+    );
     return c.json(childDetailResponseSchema.parse({ child }));
   })
 
@@ -124,11 +157,18 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can perform administrative actions on child profiles.',
+    );
 
     const inventory = await getChildInventory(
       db,
       parentProfileId,
       childProfileId,
+      c.get('callerPersonId'),
+      c.get('account').id,
     );
     return c.json(childInventoryResponseSchema.parse({ inventory }));
   })
@@ -139,12 +179,19 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can perform administrative actions on child profiles.',
+    );
     await assertChildDashboardDataVisible(db, childProfileId);
 
     const summary = await getProgressSummary(
       db,
       parentProfileId,
       childProfileId,
+      c.get('callerPersonId'),
+      c.get('account').id,
     );
     return c.json(progressSummarySchema.parse(summary));
   })
@@ -160,11 +207,18 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       // [BUG-834] Defense-in-depth at route entry.
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
       await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+      // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+      await assertCallerIsAccountOwner(
+        c,
+        'Only the account owner can perform administrative actions on child profiles.',
+      );
 
       const history = await getChildProgressHistory(
         db,
         parentProfileId,
         childProfileId,
+        c.get('callerPersonId'),
+        c.get('account').id,
         query,
       );
       return c.json(childProgressHistoryResponseSchema.parse({ history }));
@@ -180,12 +234,19 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can perform administrative actions on child profiles.',
+    );
 
     const topics = await getChildSubjectTopics(
       db,
       parentProfileId,
       childProfileId,
       subjectId,
+      c.get('callerPersonId'),
+      c.get('account').id,
     );
     return c.json(childSubjectTopicsResponseSchema.parse({ topics }));
   })
@@ -203,12 +264,17 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // Source: docs/specs/2026-05-23-learn-this-too-bridge.md §Authorization
     // ("404, never 403, never reveal whether the topic ID exists").
     assertOwnerProfile(c);
+    // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc. Kept
+    // outside the try below for the same reason as assertOwnerProfile: a
+    // non-owner-caller spoof must surface as 403, not fold into the 404 IDOR
+    // contract.
+    await assertCallerIsAccountOwner(c);
 
     try {
-      // GUARD: Do NOT move assertOwnerProfile() inside this try — every
-      // ForbiddenError thrown here is converted to 404 below to preserve the
-      // IDOR contract. Non-owners must continue to surface as 403 via the
-      // global error handler, not as 404.
+      // GUARD: Do NOT move assertOwnerProfile() / assertCallerIsAccountOwner()
+      // inside this try — every ForbiddenError thrown here is converted to 404
+      // below to preserve the IDOR contract. Non-owners must continue to
+      // surface as 403 via the global error handler, not as 404.
       // Defense-in-depth: route-entry parent-link check before the service.
       // getChildTopicSnapshotForParent also runs the same guard.
       await assertParentAccess(db, parentProfileId, childProfileId);
@@ -251,11 +317,18 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can perform administrative actions on child profiles.',
+    );
 
     const sessions = await getChildSessions(
       db,
       parentProfileId,
       childProfileId,
+      c.get('callerPersonId'),
+      c.get('account').id,
     );
     return c.json(childSessionsResponseSchema.parse({ sessions }));
   })
@@ -269,12 +342,19 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can perform administrative actions on child profiles.',
+    );
 
     const session = await getChildSessionDetail(
       db,
       parentProfileId,
       childProfileId,
       sessionId,
+      c.get('callerPersonId'),
+      c.get('account').id,
     );
     if (!session) {
       return notFound(c, 'Session not found');
@@ -289,6 +369,11 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [BUG-834] Defense-in-depth at route entry.
     await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can perform administrative actions on child profiles.',
+    );
 
     const proof = await getLatestVerifiedProofForChild(
       db,
@@ -305,6 +390,11 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can perform administrative actions on child profiles.',
+    );
     await assertChargeNotCredentialed(db, childProfileId);
     await assertChildDashboardDataVisible(db, childProfileId);
 
@@ -344,8 +434,19 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can perform administrative actions on child profiles.',
+    );
 
-    const reports = await getChildReports(db, parentProfileId, childProfileId);
+    const reports = await getChildReports(
+      db,
+      parentProfileId,
+      childProfileId,
+      c.get('callerPersonId'),
+      c.get('account').id,
+    );
     return c.json(childReportsResponseSchema.parse({ reports }));
   })
 
@@ -357,12 +458,19 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can perform administrative actions on child profiles.',
+    );
 
     const report = await getChildReportDetail(
       db,
       parentProfileId,
       childProfileId,
       reportId,
+      c.get('callerPersonId'),
+      c.get('account').id,
     );
     if (!report) {
       return notFound(c, 'Report not found');
@@ -378,8 +486,20 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can perform administrative actions on child profiles.',
+    );
 
-    await markChildReportViewed(db, parentProfileId, childProfileId, reportId);
+    await markChildReportViewed(
+      db,
+      parentProfileId,
+      childProfileId,
+      reportId,
+      c.get('callerPersonId'),
+      c.get('account').id,
+    );
     return c.json(reportViewedResponseSchema.parse({ viewed: true }));
   })
 
@@ -391,6 +511,11 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can perform administrative actions on child profiles.',
+    );
     await assertChildDashboardDataVisible(db, childProfileId);
 
     const reports = await listWeeklyReportsForParentChild(
@@ -409,6 +534,11 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // [BUG-834] Defense-in-depth at route entry.
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can perform administrative actions on child profiles.',
+    );
     await assertChildDashboardDataVisible(db, childProfileId);
 
     const report = await getWeeklyReportForParentChild(
@@ -433,6 +563,11 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       // [BUG-834] Defense-in-depth at route entry.
       // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
       await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+      // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+      await assertCallerIsAccountOwner(
+        c,
+        'Only the account owner can perform administrative actions on child profiles.',
+      );
       await assertChildDashboardDataVisible(db, childProfileId);
 
       await markWeeklyReportViewed(

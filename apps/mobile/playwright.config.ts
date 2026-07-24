@@ -40,6 +40,15 @@ function quarantineIgnore(): RegExp[] {
 const e2eWebDir = path.join(process.cwd(), 'apps', 'mobile', 'e2e-web');
 const mobileDir = path.join(process.cwd(), 'apps', 'mobile');
 const shouldStartLocalApi = process.env.PLAYWRIGHT_SKIP_LOCAL_API !== '1';
+const artifactLane = process.env.PLAYWRIGHT_ARTIFACT_LANE;
+const legacyArtifactLanes = new Set(['legacy-core', 'legacy-advisory']);
+if (artifactLane && !legacyArtifactLanes.has(artifactLane)) {
+  throw new Error(
+    'PLAYWRIGHT_ARTIFACT_LANE must be "legacy-core" or "legacy-advisory" when set; received ' +
+      JSON.stringify(artifactLane),
+  );
+}
+const artifactSuffix = artifactLane ? '-' + artifactLane : '';
 
 // [BUG-325] Worker-count discriminator. We previously inferred "is this the
 // shared *.workers.dev staging API?" by substring-matching the API URL —
@@ -87,7 +96,7 @@ export default defineConfig({
   testDir: e2eWebDir,
   // WI-536 flaky-test quarantine: exclude registered flaky specs from the gate.
   testIgnore: quarantineIgnore(),
-  outputDir: path.join(e2eWebDir, 'test-results'),
+  outputDir: path.join(e2eWebDir, `test-results${artifactSuffix}`),
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
@@ -96,16 +105,11 @@ export default defineConfig({
   // Shared *.workers.dev throttles parallel bursts → 1 worker; everything
   // else (custom-domain staging, local API) gets the full 4 workers.
   workers: process.env.CI ? (usesRateLimitedApi ? 1 : 4) : undefined,
-  reporter: [
-    ['line'],
-    [
-      'html',
-      {
-        open: 'never',
-        outputFolder: path.join(e2eWebDir, 'playwright-report'),
-      },
-    ],
-  ],
+  // WI-2594: the 'html' reporter was removed here. It embeds a base64
+  // payload that records Playwright fill-step values (including seeded
+  // login credentials) in clear text — see WI-2593. 'line' remains as the
+  // debuggable failure signal; its output survives in the CI job log.
+  reporter: [['line']],
   timeout: 90_000,
   expect: {
     timeout: 15_000,
@@ -121,9 +125,17 @@ export default defineConfig({
       args: ['--disable-quic'],
     },
     navigationTimeout: 120_000,
-    screenshot: 'only-on-failure',
-    trace: 'retain-on-failure',
-    video: 'retain-on-failure',
+    // WI-2594: screenshot/trace/video were all 'retain-on-failure' (screenshot
+    // was 'only-on-failure'). All three record fill-step values (including
+    // seeded login credentials) — see WI-2593. Turned off entirely so nothing
+    // credential-bearing is generated. Trade-off: scripts/playwright-staging-gate.cjs's
+    // trace-corroborated `infra-signalled` classification (a mid-run staging
+    // outage auto-passing CI) is no longer reachable without trace zips; its
+    // resultText-based classification (product/unknown) is unaffected. See
+    // PR body for the full reasoning.
+    screenshot: 'off',
+    trace: 'off',
+    video: 'off',
     viewport: { width: 1440, height: 1080 },
   },
   globalSetup: path.join(e2eWebDir, 'helpers', 'global-setup.ts'),
@@ -188,8 +200,23 @@ export default defineConfig({
     },
     {
       name: 'smoke-learner',
+      retries: 0,
       dependencies: ['setup'],
       testMatch: /flows[\\/]journeys[\\/]j01-.*\.spec\.ts/,
+      use: {
+        storageState: path.join(e2eWebDir, '.auth', 'solo-learner.json'),
+      },
+    },
+    {
+      // WI-2228 V2 release gate: keep the stable J-01 learner-home baseline
+      // and future batch flows isolated from legacy smoke projects.
+      name: 'v2-release',
+      dependencies: ['setup'],
+      testMatch:
+        /flows[\\/](?:v2[\\/].+|journeys[\\/]j01-learner-home)\.spec\.ts/,
+      // Config F requires its own flag-built export; WI-2385 owns the final
+      // expanded-lane/full-suite verification, so this isolated V2 project excludes it.
+      testIgnore: [...quarantineIgnore(), /flows[\\/]config-f[\\/]/],
       use: {
         storageState: path.join(e2eWebDir, '.auth', 'solo-learner.json'),
       },
@@ -201,6 +228,21 @@ export default defineConfig({
       use: {
         storageState: path.join(e2eWebDir, '.auth', 'owner-with-children.json'),
       },
+    },
+    {
+      name: 'smoke-accessibility',
+      dependencies: ['setup'],
+      testMatch: /flows[\\/]accessibility[\\/]quiz-results-exits\.spec\.ts/,
+      fullyParallel: false,
+      use: {
+        storageState: path.join(e2eWebDir, '.auth', 'solo-learner.json'),
+      },
+    },
+    {
+      name: 'smoke-transport-recovery',
+      dependencies: ['setup'],
+      testMatch: /flows[\\/]transport[\\/]api-transport-recovery\.spec\.ts/,
+      fullyParallel: false,
     },
     {
       name: 'role-transitions',

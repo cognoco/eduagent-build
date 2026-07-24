@@ -34,6 +34,11 @@ import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
 import { clearTransitionState } from './auth-transition';
 import { clearPendingAuthRedirect } from './pending-auth-redirect';
 import {
+  buildPersisterKey,
+  purgePersisterKeys,
+  removeAllScopedPersisterCaches,
+} from './query-persister';
+import {
   setActiveProfileId,
   setProxyMode,
   resetAuthExpiredGuard,
@@ -67,12 +72,12 @@ export interface SignOutWithCleanupParams {
    */
   profileIds: ReadonlyArray<string>;
   /**
-   * Clerk userId of the account being signed out. Currently unused by this
-   * function (the welcome intro moved pre-auth and is device-scoped, so its
-   * flag intentionally survives sign-out — see lib/intro-state.ts). The
-   * parameter is retained so existing call sites compile without churn and
-   * so a future user-scoped sign-out cleanup hook can plug back in without
-   * a signature change.
+   * Clerk userId of the account being signed out. [WI-1987] Used to derive
+   * and deterministically remove the scoped query-persister AsyncStorage key
+   * (`buildPersisterKey(clerkUserId)`) — see the removal step below. When
+   * omitted (identity not yet loaded, e.g. an early auth-expired path), the
+   * scoped key cannot be targeted and is left for the persister's own
+   * throttled write to eventually catch up, same as before this fix.
    */
   clerkUserId?: string;
 }
@@ -86,7 +91,7 @@ export interface SignOutWithCleanupParams {
 export async function signOutWithCleanup(
   params: SignOutWithCleanupParams,
 ): Promise<void> {
-  const { clerkSignOut, queryClient, profileIds } = params;
+  const { clerkSignOut, queryClient, profileIds, clerkUserId } = params;
 
   // Reset in-memory api-client identity FIRST so any request that fires
   // between here and the Clerk signOut resolution cannot ship a stale
@@ -106,6 +111,48 @@ export async function signOutWithCleanup(
   // check (profile.ts) can match a previous user's profile and propagate
   // their id back into the api-client module.
   queryClient.clear();
+
+  // [WI-1987] Deterministically remove the on-disk scoped persister cache.
+  // queryClient.clear() only empties the in-memory cache — the AsyncStorage
+  // mirror (query-persister.ts's createScopedPersister) only picks up the
+  // now-empty cache via its throttled (2s) subscription. Relying on that
+  // throttle to fire was the bug: a crash/force-quit within the ~2s window
+  // left the full pre-sign-out cache — including session transcripts — on
+  // disk permanently. Removing the key directly here closes that window;
+  // cleanup completing means the scoped blob is gone, independent of the
+  // persister's throttle timer.
+  //
+  // [WI-1987 rework] The no-clerkUserId branch used to skip this entirely
+  // and fall back to the racy queryClient.clear() + persister-throttle path
+  // — the exact crash window this fix exists to close, left open on the
+  // auth-expired / profile-load-timeout paths. It now sweeps every scoped
+  // persister key on disk via `removeAllScopedPersisterCaches` — we can't
+  // compute the one targeted key without a clerkUserId, so we remove them
+  // all instead of leaving any of them to the throttle.
+  if (clerkUserId) {
+    // [WI-1987] Escalate-on-failure purge (see purgePersisterKeys in
+    // query-persister.ts). A swallowed removal here would leave a plaintext
+    // learner-content cache on disk while sign-out reported success — the
+    // silent recovery the Fix Development Rule bans in auth code. purge never
+    // throws (sign-out always completes — session teardown is the primary
+    // boundary) and Sentry-reports the KEY NAME on failure; the survivor is
+    // re-swept at the next definitively-signed-out moment (app start / before
+    // next sign-in) by reattemptPersisterPurgeIfSignedOut in the app shell.
+    await purgePersisterKeys([buildPersisterKey(clerkUserId)]);
+  } else {
+    // [WI-1987] clerkUserId is unavailable (identity not yet loaded — e.g.
+    // auth-expired 401 handler, profile-load-timeout). Breadcrumb so this
+    // fallback path is observable in production.
+    Sentry.addBreadcrumb({
+      category: 'auth',
+      level: 'warning',
+      message:
+        'sign-out: scoped persister removal used full-sweep fallback (no clerkUserId)',
+    });
+    // Escalate-on-failure full sweep — also never throws; Sentry-reports the
+    // surviving key names rather than swallowing the failure.
+    await removeAllScopedPersisterCaches();
+  }
 
   // [SEC-SENTRY-SCOPE] Wipe the Sentry scope so that any crash between
   // sign-out and the next sign-in does not carry the previous user's

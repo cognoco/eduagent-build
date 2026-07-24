@@ -6,7 +6,7 @@
 
 > **What this is / is not.** This note is **engineering evidence feeding the DPO/counsel launch decision** — it is not itself the C-5 launch gate. The go/no-go below is an engineering-readiness verdict; the legal go/no-go is the DPO's on a signed DPIA.
 
-**Artifacts reviewed:** `docs/compliance/dpia.md`, `docs/compliance/ropa.md`, `docs/compliance/identity-compliance-register.md`, `docs/privacy-policy.html`, `docs/screenshots_and_store_info/app-privacy-data-safety-worksheet.md`, `docs/audit/2026-06-07-data-retention-and-erasure-audit.md`. Code: `apps/api/src/services/identity-v2/*`, `apps/api/src/services/llm/router.ts`, `apps/api/src/middleware/account.ts`, `apps/api/src/routes/{account,homework}.ts`, `packages/schemas/src/age.ts`, `packages/database/src/schema/*`, mobile hooks.
+**Artifacts reviewed:** `docs/compliance/dpia.md`, `docs/compliance/ropa.md`, `docs/compliance/identity-compliance-register.md`, `docs/compliance/privacy-policy.html`, `docs/screenshots_and_store_info/app-privacy-data-safety-worksheet.md`, `docs/compliance/history/2026-06-07-data-retention-and-erasure-audit.md`. Code: `apps/api/src/services/identity-v2/*`, `apps/api/src/services/llm/router.ts`, `apps/api/src/middleware/account.ts`, `apps/api/src/routes/{account,homework}.ts`, `packages/schemas/src/age.ts`, `packages/database/src/schema/*`, mobile hooks.
 
 ---
 
@@ -49,7 +49,7 @@ These are already in the DPIA/ROPA/privacy-policy as launch gates; status confir
 
 1. **DPO appointed + DPIA signed** (C-5, DPIA #1). — legal/process. **HARD BLOCKER.**
 2. **Provider DPAs signed** on business tier + US-transfer checks (DPIA #2). Gemini *enforcement* is done in code; DPA *signatures* are process, unverifiable from the repo.
-3. **Privacy-policy pre-publish TODOs** (DPIA #4): DPO name, controller registered address, EU Art 27 rep, UK rep, final age-floor confirmation — open in the `PRE-PUBLISH TODO` HTML comment (`privacy-policy.html:67-73`).
+3. **Privacy-policy pre-publish TODOs** (DPIA #4): controller identity and registered address are resolved. DPO name, a UK representative if MentoMate serves the UK, and final age-floor confirmation remain open in the `PRE-PUBLISH TODO` HTML comment.
 4. **`person_retain.*.retention_period` values set** (not placeholder) — counsel-owned (DPIA #7, ROPA open items).
 5. **Policy-engine jurisdiction content populated** for launch jurisdictions — PM-owned compliance-population workstream (DPIA #8). **Status unknown — confirm before go-live.**
 
@@ -63,11 +63,13 @@ Route to the named owner; presented as open, not pre-resolved:
 
 - **C2 — DPIA A13 name-minimization claim vs code.** DPIA §4 / A13 claim identifiers are *"stripped from LLM requests."* The learner's **first name is sent verbatim** to the LLM (`exchange-prompts.ts:734`). For a children's product, an affirmative false minimization claim in a legal doc is the material issue. **Decision (product + counsel):** *tokenize/strip* the name before the prompt (name in UI, token in prompt may preserve pedagogy) **or** *amend the DPIA* to disclose that the first name is sent to processors. Do not foreclose the strip option.
 
-- **C3 — Controller-entity mismatch.** Privacy policy names the controller **"Cognoco s.r.o."** (`privacy-policy.html:21,66`); DPIA + ROPA say controller *"[legal entity name — TODO], established in Norway."* Clean factual contradiction. **Decision (counsel):** reconcile the controlling legal entity across all three before publish.
+- **C3 — Controller identity — RESOLVED (WI-1559, 2026-07-21).** The privacy policy, DPIA, ROPA, filled EDPB DPIA, and breach plan consistently name **ZWIZZLY AS**, org.nr **811696072**, Fiskekroken 3B, 0139 Oslo, Norway, as controller and **Norwegian Datatilsynet** as lead supervisory authority.
 
 - **C4 — Privacy-policy profiling disclosure (C-1 canon / GDPR Art 13(2)(f)).** Adaptive profiling is real (`learning_profiles`, mastery, `needs_deepening_topics`). The canon requires copy to disclose profiling **as present and lawful** and never claim ADM is engineered out. The policy discloses "personalised tutoring / coaching insights" but not profiling explicitly. **Decision (policy-owner):** add an explicit profiling-present-and-lawful disclosure line.
 
-- **C5 — Store data-safety worksheet is stale** (dated 2026-05-15). Says minimum age **11** (`MINIMUM_AGE=11`); code is **13** (`packages/schemas/src/age.ts:10`). Cites **legacy** tables (`accounts.email`, `profiles.display_name`, `consent_states`, `family_links`); production identity/consent is v2 (`person`/`login`/`consent_grant`). Its "homework image retention" and "raw audio" open questions are now resolved (transient / transcript-only). **Action (before store submission = the FINAL GATE):** refresh the worksheet against current code.
+### Follow-up addendum — 2026-07-23
+
+- **C5 — Store data-safety worksheet was stale at this early pass; RESOLVED 2026-07-23.** The worksheet now records the 13+ floor, identity-v2 tables, and resolved homework-image/raw-audio retention facts. **Remaining final gate:** revalidate it against the production provider list, the EEA country allowlist implementation, and the then-current privacy notice before store submission.
 
 ---
 

@@ -1,0 +1,203 @@
+import { expect, test, type Page } from '@playwright/test';
+
+import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
+
+test.use({ storageState: { cookies: [], origins: [] } });
+
+const OWNER_ROWS = [
+  'account-admin-profile',
+  'account-admin-privacy',
+  'account-admin-notifications',
+  'account-admin-security',
+  'account-admin-subscription',
+  'account-admin-add-child',
+  'account-admin-family-settings',
+] as const;
+
+const ENTRY_CASES = [
+  {
+    name: 'Mentor',
+    path: '/mentor',
+    screen: 'mentor-screen',
+    tab: 'tab-mentor',
+    token: 'mentor',
+    leafRow: 'account-admin-profile',
+    leafScreen: 'profiles-screen',
+  },
+  {
+    name: 'Subjects',
+    path: '/subjects',
+    screen: 'subjects-screen',
+    tab: 'tab-subjects',
+    token: 'subjects',
+    leafRow: 'account-admin-privacy',
+    leafScreen: 'more-privacy-scroll',
+  },
+  {
+    name: 'Journal',
+    path: '/journal',
+    screen: 'journal-screen',
+    tab: 'tab-journal',
+    token: 'journal',
+    leafRow: 'account-admin-notifications',
+    leafScreen: 'more-notifications-scroll',
+  },
+] as const;
+
+async function signInFreshOwner(
+  page: Page,
+  { alias }: { alias: string },
+): Promise<void> {
+  await seedAndSignIn(page, {
+    scenario: 'parent-multi-child',
+    alias,
+    landingPath: '/mentor',
+    landingTestId: 'mentor-screen',
+  });
+}
+
+async function expectOwnerLearnerEntry(
+  page: Page,
+  entry: (typeof ENTRY_CASES)[number],
+): Promise<void> {
+  const screen = page.getByTestId(entry.screen);
+
+  await expect(screen).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(page.getByTestId(entry.tab)).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(page.getByTestId('account-avatar-button')).toHaveAttribute(
+    'aria-label',
+    'Open account settings for Test Parent',
+  );
+  if (entry.token === 'subjects') {
+    const subject = screen.getByRole('button', {
+      name: 'Open General Knowledge',
+      exact: true,
+    });
+    await expect(subject).toBeVisible();
+    await expect(
+      subject.getByText('General Knowledge', { exact: true }),
+    ).toBeVisible();
+  } else if (entry.token === 'journal') {
+    await expect(screen.getByText('Journal', { exact: true })).toBeVisible();
+  }
+}
+
+test('V2 owner learner Account returns its exact self scope to each initiating tab', async ({
+  page,
+}) => {
+  await signInFreshOwner(page, { alias: 'v2-account-owner-return' });
+
+  for (const entry of ENTRY_CASES) {
+    await test.step(`${entry.name} avatar -> ${entry.leafRow} -> ${entry.name}`, async () => {
+      await page.goto(entry.path, { waitUntil: 'commit' });
+      await expectOwnerLearnerEntry(page, entry);
+
+      await page.getByTestId('account-avatar-button').click();
+      await expect(page).toHaveURL(
+        new RegExp(`/account\\?returnTo=${entry.token}(?:&.*)?$`),
+      );
+      await expect(page.getByTestId('account-screen')).toBeVisible();
+      await expect(
+        page.getByText('Account', { exact: true }).first(),
+      ).toBeVisible();
+      for (const row of OWNER_ROWS) {
+        await expect(page.getByTestId(row)).toBeVisible();
+      }
+
+      await page.getByTestId(entry.leafRow).click();
+      await expect(page.getByTestId(entry.leafScreen)).toBeVisible({
+        timeout: 60_000,
+      });
+      await page.goBack({ waitUntil: 'commit' });
+      await expect(page.getByTestId('account-screen')).toBeVisible({
+        timeout: 60_000,
+      });
+
+      await page.getByTestId('account-back').click();
+      await expect(page).toHaveURL(new RegExp(`${entry.path}(?:\\?.*)?$`));
+      await expectOwnerLearnerEntry(page, entry);
+    });
+  }
+});
+
+test('V2 Account empty history falls back to Journal and never legacy Home', async ({
+  page,
+}) => {
+  await signInFreshOwner(page, { alias: 'v2-account-owner-empty-history' });
+
+  const journalEntry = ENTRY_CASES.find((entry) => entry.name === 'Journal');
+  if (!journalEntry) {
+    throw new Error('Journal entry case is required');
+  }
+
+  await page.goto('/journal', { waitUntil: 'commit' });
+  await expectOwnerLearnerEntry(page, journalEntry);
+
+  const context = page.context();
+  await page.close();
+  const directPage = await context.newPage();
+  await directPage.goto('/account?returnTo=journal', { waitUntil: 'commit' });
+  await expect(directPage.getByTestId('account-screen')).toBeVisible({
+    timeout: 60_000,
+  });
+
+  await directPage.getByTestId('account-back').click();
+
+  await expect(directPage).toHaveURL(/\/journal(?:\?.*)?$/);
+  await expectOwnerLearnerEntry(directPage, journalEntry);
+  await expect(directPage).not.toHaveURL(/\/home(?:\?.*)?$/);
+});
+
+async function expectSignedOutWithoutTestParentData(page: Page): Promise<void> {
+  await expect(page.getByTestId('sign-in-button')).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(page.getByTestId('account-screen')).toHaveCount(0);
+  await expect(page.getByTestId('account-avatar-button')).toHaveCount(0);
+  await expect(page.getByTestId('mentor-screen')).toHaveCount(0);
+  await expect(page.getByTestId('subjects-screen')).toHaveCount(0);
+  await expect(page.getByTestId('journal-screen')).toHaveCount(0);
+  await expect(page.getByText('Test Parent', { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByText('General Knowledge', { exact: true }),
+  ).toHaveCount(0);
+}
+
+test('V2 Test Parent sign-out keeps its General Knowledge row behind the unauthenticated boundary after Back and a fresh protected page', async ({
+  page,
+}) => {
+  await signInFreshOwner(page, { alias: 'v2-account-owner-sign-out' });
+
+  const subjectsEntry = ENTRY_CASES.find((entry) => entry.name === 'Subjects');
+  if (!subjectsEntry) {
+    throw new Error('Subjects entry case is required');
+  }
+
+  await page.goto('/subjects', { waitUntil: 'commit' });
+  await expectOwnerLearnerEntry(page, subjectsEntry);
+
+  await page.getByTestId('account-avatar-button').click();
+  const signOutButton = page.getByRole('button', {
+    name: 'Sign out. Test Parent',
+    exact: true,
+  });
+  await expect(signOutButton).toBeVisible();
+
+  await signOutButton.click();
+  await expectSignedOutWithoutTestParentData(page);
+
+  await page.goBack({ waitUntil: 'commit' });
+  await expect(page).toHaveURL(/\/sign-in(?:\?.*)?$/);
+  await expectSignedOutWithoutTestParentData(page);
+
+  const context = page.context();
+  await page.close();
+  const freshPage = await context.newPage();
+  await freshPage.goto('/subjects', { waitUntil: 'commit' });
+  await expectSignedOutWithoutTestParentData(freshPage);
+});

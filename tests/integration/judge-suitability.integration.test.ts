@@ -70,9 +70,12 @@ const VERDICT_JSON = JSON.stringify({
 });
 
 // ---------------------------------------------------------------------------
-// Judge provider — the judge routes vendor-independent of a `gemini` tutor →
-// `anthropic`. Register an `anthropic` provider so routeAndCall resolves to it.
-// Per test overrides the canned response (valid verdict vs non-JSON degraded).
+// Judge provider — grader routing (`resolveGraderConfig`, router.ts) picks a
+// vendor opposite the tutor's, and only ever anthropic-or-openai (never
+// gemini, ADR-0016 §2/§10.1). Register stubs for BOTH non-gemini vendors so
+// routeAndCall resolves to a provider regardless of which one the grader
+// picks. Per test overrides the canned response (valid verdict vs non-JSON
+// degraded).
 // ---------------------------------------------------------------------------
 
 let judgeResponse = VERDICT_JSON;
@@ -80,6 +83,15 @@ let judgeResponse = VERDICT_JSON;
 function registerJudgeProvider(): void {
   registerProvider({
     id: 'anthropic',
+    async chat() {
+      return { content: judgeResponse, stopReason: 'stop' };
+    },
+    async *chatStream() {
+      yield judgeResponse;
+    },
+  });
+  registerProvider({
+    id: 'openai',
     async chat() {
       return { content: judgeResponse, stopReason: 'stop' };
     },

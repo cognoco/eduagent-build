@@ -264,6 +264,33 @@ jest.mock('../inngest/client', () => {
   };
 });
 
+// [WI-1989] assertCallerIsAccountOwner calls verifyPersonIsOrgAdminV2, which
+// runs a raw membership query the fully-mocked DB module cannot satisfy.
+// Every scenario in this file that currently reaches assertCallerIsAccountOwner
+// is a caller-owner scenario (the non-owner break tests are rejected earlier by
+// assertOwnerProfile's X-Profile-Id-resolved isOwner check, before this guard
+// runs) — the caller-vs-X-Profile-Id-spoof distinction this guard exists to
+// enforce is covered by the real-DB break test in
+// tests/integration/wi1989-owner-idor.integration.test.ts.
+// [WI-2398] assertNotProxyMode (curriculum skip/unskip/challenge/topics/adapt)
+// now also calls assertCanWriteProfile, which calls this same
+// verifyPersonOwnershipV2 — the same raw db.select() membership query, same
+// unmockable-DB reason. Every scenario in this file that reaches
+// assertNotProxyMode's allow path is a caller-self write (the header profile
+// equals the authenticated caller's own person id, both 'test-profile-id');
+// the cross-account write attack this guard exists to close is covered by the
+// real-DB break test in tests/integration/wi2398-write-idor.integration.test.ts.
+jest.mock('../services/identity-v2/ownership-v2', () => {
+  const actual = jest.requireActual(
+    '../services/identity-v2/ownership-v2',
+  ) as typeof import('../services/identity-v2/ownership-v2');
+  return {
+    ...actual,
+    verifyPersonIsOrgAdminV2: jest.fn().mockResolvedValue(true),
+    verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
@@ -274,6 +301,7 @@ import { curriculumRoutes } from './curriculum';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { NotFoundError, TopicNotSkippedError } from '../errors';
 import { TEST_PROFILE_ID } from '@eduagent/test-utils';
+import { seedConsentState } from '../test-utils/consent-seed';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -307,6 +335,27 @@ const MOCK_CURRICULUM_OBJECT = {
   ],
   generatedAt: new Date().toISOString(),
 };
+
+// [WI-2396] seedConsentState replaces mockDatabaseModule.db.query with a new
+// Proxy; since that db is a single shared module-level object, the override
+// persists past jest.clearAllMocks() (which only clears call history, not
+// this raw property reassignment) and would leak WITHDRAWN state into
+// subsequent tests. Snapshot + restore db.query around the seeded call.
+async function withWithdrawnConsent(fn: () => Promise<void>): Promise<void> {
+  const originalQuery = mockDatabaseModule.db.query;
+  seedConsentState(
+    mockDatabaseModule.db as unknown as Record<string, unknown>,
+    {
+      state: 'WITHDRAWN',
+      personId: 'test-profile-id',
+    },
+  );
+  try {
+    await fn();
+  } finally {
+    mockDatabaseModule.db.query = originalQuery;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -941,6 +990,26 @@ describe('curriculum routes', () => {
       );
       expect(res.status).toBe(401);
     });
+
+    // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5).
+    it('refuses with 403 CONSENT_WITHDRAWN and never calls challengeCurriculum when consent is withdrawn', async () => {
+      await withWithdrawnConsent(async () => {
+        const res = await app.request(
+          `/v1/subjects/${SUBJECT_ID}/curriculum/challenge`,
+          {
+            method: 'POST',
+            headers: AUTH_HEADERS,
+            body: JSON.stringify({ feedback: 'Make it harder' }),
+          },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { code?: string };
+        expect(body.code).toBe('CONSENT_WITHDRAWN');
+        expect(mockChallengeCurriculum).not.toHaveBeenCalled();
+      });
+    });
   });
 
   // ---- POST /v1/subjects/:subjectId/curriculum/topics ----------------------
@@ -1025,6 +1094,61 @@ describe('curriculum routes', () => {
         TEST_ENV,
       );
       expect(res.status).toBe(401);
+    });
+
+    // [WI-2396] Consent-withdrawal gate — refuses immediately before LLM
+    // dispatch (canon R5). The gate is branched on mode: 'preview' dispatches
+    // the LLM (previewCurriculumTopic) and is gated; 'create' is a DB-only
+    // insert and is not (see the deterministic-branch control below).
+    it('refuses with 403 CONSENT_WITHDRAWN and never calls addCurriculumTopic when consent is withdrawn', async () => {
+      await withWithdrawnConsent(async () => {
+        const res = await app.request(
+          `/v1/subjects/${SUBJECT_ID}/curriculum/topics`,
+          {
+            method: 'POST',
+            headers: AUTH_HEADERS,
+            body: JSON.stringify({ mode: 'preview', title: 'New topic' }),
+          },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { code?: string };
+        expect(body.code).toBe('CONSENT_WITHDRAWN');
+        expect(mockAddCurriculumTopic).not.toHaveBeenCalled();
+      });
+    });
+
+    // Deterministic-branch control: mode='create' is a pure DB insert (no
+    // LLM), so the consent gate must NOT run for it. Even with consent
+    // withdrawn, a create request must succeed and reach addCurriculumTopic —
+    // proving the WI-2396 over-gate on the deterministic branch is removed
+    // while the 'preview' path above stays gated.
+    it('does NOT gate the deterministic create mode (no 403) even when consent is withdrawn', async () => {
+      mockAddCurriculumTopic.mockResolvedValueOnce({
+        mode: 'create',
+        topic: MOCK_CURRICULUM_OBJECT.topics[0],
+      });
+
+      await withWithdrawnConsent(async () => {
+        const res = await app.request(
+          `/v1/subjects/${SUBJECT_ID}/curriculum/topics`,
+          {
+            method: 'POST',
+            headers: AUTH_HEADERS,
+            body: JSON.stringify({
+              mode: 'create',
+              title: 'New topic',
+              description: 'A description for the created topic',
+              estimatedMinutes: 30,
+            }),
+          },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(200);
+        expect(mockAddCurriculumTopic).toHaveBeenCalledTimes(1);
+      });
     });
   });
 
@@ -1145,6 +1269,22 @@ describe('curriculum routes', () => {
         TEST_ENV,
       );
       expect(res.status).toBe(401);
+    });
+
+    // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5).
+    it('refuses with 403 CONSENT_WITHDRAWN and never calls explainTopicOrdering when consent is withdrawn', async () => {
+      await withWithdrawnConsent(async () => {
+        const res = await app.request(
+          `/v1/subjects/${SUBJECT_ID}/curriculum/topics/${TOPIC_ID}/explain`,
+          { headers: AUTH_HEADERS },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { code?: string };
+        expect(body.code).toBe('CONSENT_WITHDRAWN');
+        expect(mockExplainTopicOrdering).not.toHaveBeenCalled();
+      });
     });
   });
 });

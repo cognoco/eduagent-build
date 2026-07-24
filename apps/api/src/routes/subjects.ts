@@ -38,12 +38,9 @@ import { classifySubject } from '../services/subject-classify';
 import { notFound, apiError, SubjectNotFoundError } from '../errors';
 import { parseConversationLanguage } from '../services/llm';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { withProfile } from '../route-utils/route-context';
-import {
-  recordActivationEvent,
-  deriveActivationProfileShape,
-} from '../services/activation-events';
-import { safeWrite } from '../services/safe-non-core';
+import { recordActivationEventSafely } from '../services/activation-events';
 
 type SubjectRouteEnv = {
   Bindings: {
@@ -78,8 +75,10 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
       // /subjects/resolve in LLM_ROUTE_PATTERNS_POST_ONLY in
       // middleware/metering.ts.
       const profileId = requireProfileId(c.get('profileId'));
-      assertNotProxyMode(c);
-      void profileId;
+      const db = c.get('db');
+      await assertNotProxyMode(c);
+      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+      await assertLlmConsent(db, profileId);
       const { rawInput } = c.req.valid('json');
       const result = await resolveSubjectName(rawInput);
       return c.json(subjectResolveResultSchema.parse(result));
@@ -92,7 +91,9 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
       const { text } = c.req.valid('json');
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
+      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+      await assertLlmConsent(db, profileId);
       const result = await classifySubject(db, profileId, text);
       return c.json(subjectClassifyResultSchema.parse(result));
     },
@@ -109,7 +110,12 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     const db = c.get('db');
     const input = c.req.valid('json');
     const profileId = requireProfileId(c.get('profileId'));
-    assertNotProxyMode(c);
+    await assertNotProxyMode(c);
+    // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+    // Gated unconditionally — createSubjectWithStructure's default path
+    // dispatches the LLM (detectSubjectType); the four_strands/focused-book
+    // paths are deterministic but share this same creation endpoint.
+    await assertLlmConsent(db, profileId);
     // [FIX-API-1] Let errors propagate to the global onError handler in index.ts
     // which converts UpstreamLlmError → 502 LLM_UNAVAILABLE and captures all
     // others to Sentry. The old try/catch was masking quota and LLM errors
@@ -127,17 +133,15 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
       // (or first-curriculum-lesson) a profile starts, not every subject
       // creation, so the default profile-scoped dedupeKey (no occurrence
       // suffix) lets onConflictDoNothing keep only the earliest row.
-      await safeWrite(
-        () =>
-          recordActivationEvent(db, {
-            eventType: 'first_subject_or_lesson_started',
-            profileId,
-            profileShape: subjectProfileMeta
-              ? deriveActivationProfileShape(subjectProfileMeta)
-              : null,
-            route: 'POST /subjects',
-            metadata: { subjectId: result.subject.id },
-          }),
+      await recordActivationEventSafely(
+        db,
+        {
+          eventType: 'first_subject_or_lesson_started',
+          profileId,
+          profileMeta: subjectProfileMeta,
+          route: 'POST /subjects',
+          metadata: { subjectId: result.subject.id },
+        },
         'subjects.create.first_subject_or_lesson_started',
         { profileId },
       );
@@ -166,7 +170,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     zValidator('json', languageSetupSchema),
     async (c) => {
       // [WI-177 / DS-088] Server-derived proxy-mode write guard.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { id } = c.req.valid('param');
@@ -197,7 +201,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     zValidator('param', subjectIdParamSchema),
     async (c) => {
       // [WI-177 / DS-088] Server-derived proxy-mode write guard.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { id } = c.req.valid('param');
@@ -231,7 +235,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     async (c) => {
       // [learn-3] Server-derived proxy-mode write guard; subject delete is
       // irreversible and must never be available from parent proxy sessions.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const { id } = c.req.valid('param');
       try {
@@ -252,7 +256,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     zValidator('json', subjectUpdateSchema),
     async (c) => {
       // [WI-177 / DS-088] Server-derived proxy-mode write guard.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const db = c.get('db');
       const input = c.req.valid('json');
       const profileId = requireProfileId(c.get('profileId'));

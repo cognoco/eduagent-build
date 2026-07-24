@@ -503,6 +503,16 @@ export const consentGrant = pgTable(
     assuranceMethod: text('assurance_method'),
     snapshotAgeAtGrant: smallint('snapshot_age_at_grant'),
     snapshotJurisdictionAtGrant: text('snapshot_jurisdiction_at_grant'),
+    /**
+     * [WI-2347] The `tokenId` embedded in the `cw2` consent-withdrawal bearer
+     * token minted at approval time. Copied forward onto every new row
+     * `appendRestoreGrant` inserts on restore, so the single emailed link
+     * keeps matching `currentGrant` across withdraw/restore cycles. A token
+     * whose embedded id doesn't match this column is superseded — unusable.
+     * Null for grants predating this column (legacy `cw1` tokens carry no id
+     * and are checked without this comparison).
+     */
+    withdrawalTokenId: uuid('withdrawal_token_id'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -829,7 +839,7 @@ export const consentRequest = pgTable(
     organizationId: uuid('organization_id')
       .notNull()
       .references(() => organization.id, { onDelete: 'cascade' }),
-    purpose: text('purpose').notNull().default('platform_use'),
+    purpose: text('purpose').notNull(),
     requestedBasis: text('requested_basis').notNull(),
     /**
      * Nullable: in the child-self-signup flow the responding parent exists only

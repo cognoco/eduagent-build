@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { platformAlert } from '../../lib/platform-alert';
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import type {
   PurchasesPackage,
@@ -19,12 +18,17 @@ import type {
 } from 'react-native-purchases';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { subscriptionResponseSchema } from '@eduagent/schemas';
+import {
+  subscriptionResponseSchema,
+  type FamilySubscription,
+  type Usage,
+} from '@eduagent/schemas';
 import { useThemeColors } from '../../lib/theme';
 import { useProfile } from '../../lib/profile';
 import { useApiClient } from '../../lib/api-client';
 import { assertOk } from '../../lib/assert-ok';
 import { queryKeys } from '../../lib/query-keys';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TimeoutLoader } from '../../components/common';
 import {
@@ -77,6 +81,43 @@ import { useByokJoinedFlag } from './_subscription/_hooks/use-byok-joined-flag';
 // Main Subscription Screen
 // ---------------------------------------------------------------------------
 
+function sharedPoolQuotaSnapshotsAgree(
+  usage: Usage | undefined,
+  family: FamilySubscription | null | undefined,
+  expectedTier: FamilySubscription['tier'],
+): boolean {
+  if (!usage || !family || family.tier !== expectedTier) return false;
+
+  const aggregate = usage.familyAggregate;
+  const rows = usage.byProfile;
+  if (!aggregate || !rows) return false;
+
+  const memberTotal = rows.reduce((sum, row) => sum + row.used, 0);
+  const formerMemberUsed = aggregate.formerMemberUsed ?? 0;
+  const usageProfileIds = rows.map((row) => row.profile_id).sort();
+  const familyProfileIds = family.members
+    .map((member) => member.profileId)
+    .sort();
+  const sameProfileSet = usageProfileIds.every(
+    (profileId, index) => profileId === familyProfileIds[index],
+  );
+  const planRemaining = Math.max(family.monthlyLimit - family.usedThisMonth, 0);
+
+  return (
+    family.monthlyLimit === usage.monthlyLimit &&
+    aggregate.limit === usage.monthlyLimit &&
+    aggregate.used === usage.usedThisMonth &&
+    family.usedThisMonth === usage.usedThisMonth &&
+    usage.remainingQuestions === planRemaining &&
+    memberTotal + formerMemberUsed === aggregate.used &&
+    rows.length === family.profileCount &&
+    family.members.length === family.profileCount &&
+    sameProfileSet &&
+    family.remainingQuestions === planRemaining &&
+    family.cycleResetAt === usage.cycleResetAt
+  );
+}
+
 /**
  * SubscriptionScreen renders SubscriptionContent for all users.
  *
@@ -95,9 +136,9 @@ export default function SubscriptionScreen() {
 }
 
 function SubscriptionContent(): React.ReactElement | null {
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const { activeProfile, profiles = [] } = useProfile();
   const navigationContract = useNavigationContract();
   const activeProfileRole = useActiveProfileRole();
@@ -114,6 +155,12 @@ function SubscriptionContent(): React.ReactElement | null {
     refetch: refetchSub,
     isRefetching: subRefetching,
   } = useSubscription();
+  const effectiveTier = subscription?.effectiveAccessTier ?? subscription?.tier;
+  const sharedPoolTier =
+    effectiveTier === 'family' || effectiveTier === 'pro'
+      ? effectiveTier
+      : null;
+  const isSharedPoolTier = sharedPoolTier !== null;
   const {
     data: usage,
     isLoading: usageLoading,
@@ -121,10 +168,18 @@ function SubscriptionContent(): React.ReactElement | null {
     refetch: refetchUsage,
     isRefetching: usageRefetching,
   } = useUsage();
-  const { data: familySubscription, refetch: refetchFamilySubscription } =
-    useFamilySubscription(
-      subscription?.tier === 'family' || subscription?.tier === 'pro',
-    );
+  const {
+    data: cachedFamilySubscription,
+    isLoading: familySubscriptionLoading,
+    isError: familySubscriptionError,
+    isRefetching: familySubscriptionRefetching,
+    refetch: refetchFamilySubscription,
+  } = useFamilySubscription(isSharedPoolTier);
+  // A disabled TanStack Query can still expose cached data. Gate the value as
+  // well as the request so a Family/Pro cache cannot leak into a downgrade.
+  const familySubscription = isSharedPoolTier
+    ? cachedFamilySubscription
+    : undefined;
   const byokWaitlist = useJoinByokWaitlist();
   const removeFamilyProfile = useRemoveFamilyProfile();
   const canUseOwnerBillingGates = navigationContract.gates.showBilling;
@@ -236,6 +291,26 @@ function SubscriptionContent(): React.ReactElement | null {
 
   const isLoading =
     subLoading || usageLoading || offeringsLoading || customerInfoLoading;
+
+  // Shared-pool quota arithmetic is assembled from three independently cached
+  // requests. Never compose them unless the server-provided denominator,
+  // aggregate, member rows, and plan-cycle remaining value all agree. This
+  // also covers a Plus -> Family transition where the old 700 usage query can
+  // briefly outlive the new subscription query.
+  const sharedPoolQuotaIsCoherent = sharedPoolTier
+    ? sharedPoolQuotaSnapshotsAgree(usage, familySubscription, sharedPoolTier)
+    : true;
+  const sharedPoolQuotaLoading =
+    isSharedPoolTier &&
+    (familySubscriptionLoading ||
+      subRefetching ||
+      usageRefetching ||
+      familySubscriptionRefetching);
+  const sharedPoolQuotaUnavailable =
+    isSharedPoolTier &&
+    !sharedPoolQuotaLoading &&
+    !familySubscriptionLoading &&
+    (familySubscriptionError || !sharedPoolQuotaIsCoherent);
 
   const activeEntitlement = getActiveEntitlement(customerInfo);
   const hasActiveSubscription = activeEntitlement !== null;
@@ -730,6 +805,7 @@ function SubscriptionContent(): React.ReactElement | null {
               onPress: () => {
                 void refetchSub();
                 void refetchUsage();
+                void refetchFamilySubscription();
                 void refetchOfferings();
               },
               testID: 'subscription-loading-timeout-retry',
@@ -754,14 +830,19 @@ function SubscriptionContent(): React.ReactElement | null {
             onPress={() => {
               void refetchSub();
               void refetchUsage();
+              void refetchFamilySubscription();
             }}
-            disabled={subRefetching || usageRefetching}
+            disabled={
+              subRefetching || usageRefetching || familySubscriptionRefetching
+            }
             className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
             testID="subscription-retry-button"
             accessibilityLabel={t('subscription.loadError.retryAccessibility')}
             accessibilityRole="button"
           >
-            {subRefetching || usageRefetching ? (
+            {subRefetching ||
+            usageRefetching ||
+            familySubscriptionRefetching ? (
               <ActivityIndicator
                 size="small"
                 color="white"
@@ -946,15 +1027,57 @@ function SubscriptionContent(): React.ReactElement | null {
           )}
 
           {/* Usage meter */}
-          {usage && (
+          {sharedPoolQuotaLoading ? (
+            <View
+              className="bg-surface rounded-card px-4 py-4 mt-4 items-center"
+              testID="family-quota-loading"
+            >
+              <ActivityIndicator
+                size="small"
+                color={colors.primary}
+                accessibilityLabel={t('common.loading')}
+              />
+            </View>
+          ) : sharedPoolQuotaUnavailable ? (
+            <View
+              className="bg-surface rounded-card px-4 py-4 mt-4"
+              testID="family-quota-error"
+            >
+              <Text className="text-body-sm text-text-secondary text-center mb-3">
+                {t('subscription.loadError.message')}
+              </Text>
+              <Pressable
+                onPress={() => {
+                  void refetchSub();
+                  void refetchUsage();
+                  void refetchFamilySubscription();
+                }}
+                disabled={
+                  subRefetching ||
+                  usageRefetching ||
+                  familySubscriptionRefetching
+                }
+                className="bg-primary rounded-button px-5 py-3 min-h-[48px] items-center justify-center"
+                accessibilityRole="button"
+                accessibilityLabel={t(
+                  'subscription.loadError.retryAccessibility',
+                )}
+                testID="family-quota-retry"
+              >
+                <Text className="text-text-inverse text-body font-semibold">
+                  {t('common.retry')}
+                </Text>
+              </Pressable>
+            </View>
+          ) : usage ? (
             <SubscriptionUsageCard
               usage={usage}
               canUseOwnerBillingGates={canUseOwnerBillingGates}
               breakdownAnalytics={breakdownAnalytics}
             />
-          )}
+          ) : null}
 
-          {familySubscription && (
+          {familySubscription && sharedPoolQuotaIsCoherent && (
             <View className="mt-4" testID="family-pool-section">
               <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2">
                 {t('subscription.familyPool')}

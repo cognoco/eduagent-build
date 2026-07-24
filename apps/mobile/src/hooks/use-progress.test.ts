@@ -21,6 +21,7 @@ import {
   useTopicProgress,
   useProfileWeeklyReports,
   useChildWeeklyReports,
+  useProgressInventory,
   useRefreshProgressSnapshot,
 } from './use-progress';
 import { queryKeys } from '../lib/query-keys';
@@ -407,6 +408,7 @@ describe('useOverdueTopics', () => {
                   topicTitle: 'Algebra',
                   overdueDays: 3,
                   failureCount: 1,
+                  retentionStatus: 'forgotten',
                 },
               ],
             },
@@ -801,6 +803,20 @@ describe('invalidateProgressSnapshotQueries', () => {
 // ---------------------------------------------------------------------------
 
 describe('profile-switch cache isolation', () => {
+  it('useProgressInventory — enabled false does not request inventory', async () => {
+    const { result } = renderHook(
+      () => useProgressInventory({ enabled: false }),
+      { wrapper: createWrapper() },
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   it('useOverallProgress — profile A and B have different query keys', () => {
     const keyA = queryKeys.progress.overview('study', 'profile-A');
     const keyB = queryKeys.progress.overview('study', 'profile-B');

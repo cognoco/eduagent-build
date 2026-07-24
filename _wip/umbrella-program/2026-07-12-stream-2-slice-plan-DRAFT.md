@@ -41,6 +41,65 @@ HITL is ordinary review-gate traffic.
 > Assisted/Auto. Each decision below arrives at the gate with its Wave-0 prep artifact
 > and a recommendation; you rule, we execute.
 
+### RULINGS — consolidated status (2026-07-14 + sitting-1 2026-07-15)
+
+**Wave-0 dispatch — APPROVED** (Zuzka, 2026-07-14, OQ Approval row):
+> "dispatch Wave-0 now for the three paper-only artifacts: S2-01 controlled decision
+> census, S2-02 docs-tree mapping, and S2-03 principles.md extraction draft. No Cosmo
+> Work Item creation, no canon edits, and the quarantined register remains sealed. This
+> ruling explicitly resolves the PRG-20 activation-gate rider as START NOW for this
+> read-only preparation; it does not authorize Waves 1–4 or any irreversible change."
+
+**D-gate — PARTIAL RULING** (Zuzka, 2026-07-14, OQ Decision row — row remains **Open**):
+> "D5 YES — land the ADR-governance amendments before bulk ADR backfill so approximately
+> 70 records are authored once under corrected rules. D6 — row 1 human_override belongs in
+> ux-design-specification.md; row 8 language_assessments belongs in the main PRD.md; row 5
+> brand placement remains deferred into D2. D7 — perform the docs-tree reorganization after
+> the ADR-backfill batches to avoid citation churn. D1–D4 remain explicitly unruled pending
+> the approved Wave-0 artifacts from OPQ-94; this OPQ remains Open."
+
+**Sitting-1 additions** (operator, 2026-07-15, mvp-plan session — see
+`_wip/mvp-roadmap/2026-07-15-consolidated-scope-inventory.md` § SITTING-1 RULING RECORD):
+D4 ruled Option 1 (2026-07-14, mvp-plan session): extract rule catalogs to
+`docs/canon/principles.md` with trigger-bearing pointers left in AGENTS.md — captured
+as **WI-2051** (S2-03 draft) + **WI-2052** (S2-04 land); WI-1856 reconciled
+Closed/Duplicate, its two constraints carried on the WIs. R5 re-confirmed D5/D6/D7
+identically to the 2026-07-14 partial ruling. R6 re-confirmed PRG-20 = Wave 0 ONLY and
+minted Cosmo tracking: S2-01 → **WI-2065**, S2-02 → **WI-2066**. The MVP docs bar was
+ruled tiered (R1): compliance/safety canon strict as-built (DPIA, ROPA, privacy policy,
+identity/deletion canon, LLM-safety register, age/consent gating docs); all else
+directional with tracked drift — the census classifies docs against this bar. OWD drain
+**T10/T11 dissolve into S2-01** (collision C1).
+
+| Decision | Status |
+|---|---|
+| **D1** MoSCoW ruling | ✅ **RULED 2026-07-15 (sitting 2): census accepted as proposed** (strict-rule table stands, contested rows resolved at D2) + riders: ARCH-N promote rows fold into the S2-06/07 authoring batches; UX-1..19/AD1..7 follow-up sweep rides WI-2065 |
+| **D2** borderline significance calls | ✅ **RULED 2026-07-15 (sitting 2): all nine as the annex recommends.** Rows 53+54 → MUST (working count 21/29); row 21 → prose-NICE, row 25 → dropped; 0.88 gate = parameter inside ONE envelope ADR (overrides this plan's older pre-baked rec); brand → verification WI (WI-2080) before any drafting, home = UX-spec canon section (resolves D6 row 5); ADR-0002 overlap check before row-36 drafting; ADR-0020 corrected in place via WI-752; ARCH-3 = third "wrong pointer" case; MoSCoW tie-break clause + Part III third case + §I.4 diagram (+compliance/+audit/) amendments ride WI-757 |
+| **D3** docs-tree mapping approval | ✅ **RULED 2026-07-15 (sitting 2): mapping approved** — bulk as tabled + all 7 judgment calls as recommended: audience-matrix → `registers/audience-matrix/`, flows → `registers/flows/` (lockstep), project_context.md stays at root (named exception), screenshots→`compliance/store/` whole, visual-artefacts scripts bundled with outputs, 4 small unhomed per §5, spine-frontmatter rot folds into S2-11, jest-config dangling citations → WI-2081 |
+| **D4** principles.md boundary | ✅ **RULED Option 1** (approach: extract + trigger-bearing pointers → WI-2051/2052); **4 boundary calls RULED 2026-07-15 (sitting 2), all as drafted**: B1 Known Exceptions MOVE, B2 Schema/Deploy STAY (next lever), B3 three rule-lists STAY (follow-on candidates), B4 Profile Shapes = future-slice candidate; rider: standing routing rule (canon-shaped content → principles.md first) written into AGENTS.md preamble at WI-2052 landing |
+| **D5** governance before backfill | ✅ **RULED YES** |
+| **D6** WI-387 "or"-targets | ✅ **RULED** — row 1 → `ux-design-specification.md`; row 8 → `PRD.md`; row 5 → per D2: UX-spec canon section, after WI-2080 verification |
+| **D7** reorg timing | ✅ **RULED** — reorg **after** the ADR-backfill batches |
+
+**D-gate CLOSED 2026-07-15 (sitting 2, mvp-plan session).** All seven decisions ruled; PRG-20
+now open for all waves. Wave WIs minted: S2-05..S2-16 → **WI-2068..2079** (in order), plus
+**WI-2080** (brand-preset verification spike, D2 annex #2) and **WI-2081** (jest-config
+dangling-citation fix, D3 §6). With Wave 0 (WI-2065/2066), S2-03/04 (WI-2051/2052), and the
+Wave-1 folds (WI-752/757/895–900), every slice-plan row now has a Cosmo owner. Sequencing
+unchanged: Wave 1 (757/896 first per D5) → Wave 2 → Wave 3 → Wave 4.
+
+**Wave-0 artifacts (delivered 2026-07-14, this repo):**
+`_wip/umbrella-program/2026-07-14-s2-01-decision-census.md` ·
+`…-s2-02-docs-tree-mapping.md` · `…-s2-03-principles-extraction-draft.md`
+
+> **Cross-session reconciliation note (2026-07-15):** WI-2065/WI-2066 were captured
+> before this session learned the 2026-07-14 paper artifacts already existed. Read
+> their ACs against those artifacts: the WIs track **verification + finalization +
+> docs-bar classification** of the existing census/mapping (and the T10/T11
+> absorption for WI-2065), not greenfield authoring. Same for WI-2051 vs the
+> existing S2-03 extraction draft. **Sitting 2 (D1/D2/D3 + D4 boundary calls) is
+> unblocked NOW** — its prep artifacts exist.
+
 | # | Decision | Prep artifact (Wave 0) | Recommendation |
 |---|---|---|---|
 | **D1** | **MoSCoW ruling over the decision census** — approve/adjust each row's MUST/SHOULD/NICE/SKIP class; MUST+SHOULD rows become ADR-authoring batches | S2-01 census table (each row: decision, sources, drift evidence, proposed class, significance-gate verdict) | Rule the table as a batch; contest only rows you disagree with — silence = proposed class stands |
@@ -146,12 +205,48 @@ Assisted, subagent-executable, with mechanical ACs.
 
 ## 5 · Open items the operator should know (not decisions, just facts)
 
-- **PRG-20 activation gate** ("IF clean-cut tail done") — cutover landed 06-18 but
-  PRG-06 wasn't yet graduated at last roster update. Slicing (this plan) is Phase-P
-  work and legitimate now; *execution start* of Waves 0+ should be checked against the
-  gate at slice time — or treated as an implicit D-gate rider ("start now vs hold").
-- The AGENTS.md overage is growing (~45.5k → 52.9k in a month). If Waves are delayed,
-  S2-04 is separable: it could run as an early standalone after only D4.
+- ~~**PRG-20 activation gate** rider~~ — ✅ **RESOLVED 2026-07-14**: the Wave-0 approval
+  explicitly rules the rider **START NOW** for read-only preparation. Waves 1–4 remain
+  unauthorized.
+- The AGENTS.md overage keeps growing — **now measured 53,740 chars** (the home doc's
+  45.5k is stale; +8.2k in a month). S2-03 proves the trim lands at **38,304** (1.7k
+  margin), but that margin erodes without discipline on where new canon-shaped content
+  goes. S2-04 is separable: it can run as an early standalone after only D4.
 - Effort totals: roughly 2 XS · 5 S · 7 M · 4 L across ~18 WIs (incl. folds) — a
-  multi-week workstream at typical shepherd throughput, highly parallelizable after
-  the D-gate.
+  multi-week workstream, highly parallelizable after the D-gate.
+
+## 6 · What Wave-0 changed in this plan (corrections from the artifacts)
+
+The artifacts falsified or sharpened several assumptions the plan made on 2026-07-12.
+Recorded so the plan and the evidence do not fork:
+
+- **The borderline set is 9, not 2.** S2-01 §3 surfaces nine D2 entries, incl. two
+  *recommended MUST-overrides* the plan did not anticipate: the **crisis-disclosure
+  no-guardian-notification** ruling and the **age-floor / launch-posture** ruling (four
+  independent non-ADR docs agree; all four self-flag as ADR-candidates; the decision is
+  stated by its own source to be **one-way irreversible**). Safety/compliance decisions
+  outside the ADR layer are the sharpest instance of the drift this drain exists to fix.
+- **Brand theming (D2) is a fact conflict, not a placement question.** S2-01 finds a
+  genuine **three-way contradiction** — memory says no-accent-picker, `architecture.md`
+  says otherwise, and shipped code carries **five accent presets**. D2 must rule *what is
+  true* before ruling *where it lives*.
+- **Two undiscovered sibling registers.** `UX-1..19` and `AD1..7` in `docs/specs/epics.md`
+  are structurally identical to `ARCH-N` but are named nowhere in MMT-ADR-0000 Part III.
+  S2-05's scope must widen, or they need their own disposition.
+- **`ARCH-3` fits neither Part III resolution.** It is a mislabeled code citation, not a
+  doc-vs-code factual conflict — a third case the standard does not cover. S2-01
+  recommends amending Part III; that is governance work and therefore belongs with the
+  **D5-ruled** amendment batch (WI-757/896), not with S2-05.
+- **Two WI-387 drain rows are already done.** `project_eas_update_ota` is already a pure
+  pointer; `project_freeform_library_filing_decision` is already `MMT-ADR-0021`. Both
+  drop to SKIP — S2-09's scope shrinks from 9 rows to 7.
+- **S2-02 found live doc-rot and CI coupling**, which sharpen S2-11: the J3-cited
+  `prd.md:319` audience-matrix citation has already drifted to **:325**; the spine trio's
+  frontmatter cites two `docs/analysis/` files archived back in April; and three
+  CI/tooling surfaces hardcode doc paths (`claude-review` action + workflow →
+  `docs/project_context.md`; `package.json` guard strings → `docs/E2Edocs/e2e-runbook.md`;
+  `.gitignore` → `docs/visual-artefacts/exports/*`). Any bulk move must change code, not
+  just files.
+- **The docs tree is ~77% already conformant** (790 files under `docs/` + 18 root-loose;
+  32 moves proposed). The reorg is smaller than feared — but `docs/flows/` was
+  *miscategorised by J3* as an assets-bucket item when it is 100% markdown.

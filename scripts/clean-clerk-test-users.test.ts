@@ -1,5 +1,9 @@
-const { classifyClerkTestUserForCleanup } =
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
+const { PROTECTED_REUSABLE_EMAILS, classifyClerkTestUserForCleanup } =
   require('./clean-clerk-test-users-lib') as {
+    PROTECTED_REUSABLE_EMAILS: Set<string>;
     classifyClerkTestUserForCleanup: (
       user: {
         id: string;
@@ -13,6 +17,28 @@ const { classifyClerkTestUserForCleanup } =
 
 describe('[WI-1771] clean-clerk-test-users classification', () => {
   const now = Date.parse('2026-07-10T12:00:00Z');
+
+  it('protects every native seed slot declared by the seed API', () => {
+    const routeSource = fs.readFileSync(
+      path.join(__dirname, '../apps/api/src/routes/test-seed.ts'),
+      'utf8',
+    );
+    const slotDeclaration = routeSource.match(
+      /const NATIVE_SEED_SLOTS = \[([\s\S]*?)\] as const;/,
+    );
+    expect(slotDeclaration).not.toBeNull();
+
+    const slots = [...slotDeclaration![1].matchAll(/'([^']+)'/g)].map(
+      ([, slot]) => slot,
+    );
+    expect(slots).not.toHaveLength(0);
+
+    for (const slot of slots) {
+      expect(PROTECTED_REUSABLE_EMAILS).toContain(
+        `test-e2e-${slot}+clerk_test@example.com`,
+      );
+    }
+  });
 
   it('deletes only seed-tagged users in owned stale namespaces', () => {
     const decision = classifyClerkTestUserForCleanup(
@@ -57,6 +83,21 @@ describe('[WI-1771] clean-clerk-test-users classification', () => {
 
     expect(decision.eligible).toBe(false);
     expect(decision.reason).toBe('not-seed-managed');
+  });
+
+  it('preserves stale seed users outside owned cleanup namespaces', () => {
+    const decision = classifyClerkTestUserForCleanup(
+      {
+        id: 'user_unowned',
+        email: 'external-test-user@example.com',
+        externalId: 'clerk_seed_unowned',
+        createdAt: '2026-07-01T00:00:00Z',
+      },
+      { nowMs: now, olderThanHours: 24 },
+    );
+
+    expect(decision.eligible).toBe(false);
+    expect(decision.reason).toBe('not-owned-stale-namespace');
   });
 
   it('preserves fresh seed users until the stale threshold elapses', () => {

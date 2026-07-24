@@ -1,4 +1,5 @@
 import { nowDeepLinkRouteSchema } from '@eduagent/schemas';
+import { MENTOR_CAPABILITY_CASES } from '@eduagent/test-utils';
 
 import { matchBarIntent, type BarIntentResult } from './bar-intent-match';
 import { pushNowDeepLink } from './now-deep-link';
@@ -43,9 +44,9 @@ const UNSUPPORTED = [
   'show my progress',
   'open journal',
   'go to subjects',
-  'take me to the library',
   'open more',
   'show settings',
+  'show subject list',
 ];
 
 const QUESTIONS = [
@@ -93,7 +94,12 @@ function buildCorpus(): string[] {
     out.push(`review subject ${id}`); // topic missing → must not be a review jump
     out.push(`open book ${id} topic ${id}`); // subject missing
   }
-  out.push(...UNSUPPORTED, ...QUESTIONS, ...HOSTILE);
+  out.push(
+    ...MENTOR_CAPABILITY_CASES.map(({ input }) => input),
+    ...UNSUPPORTED,
+    ...QUESTIONS,
+    ...HOSTILE,
+  );
   return out;
 }
 
@@ -110,6 +116,21 @@ function isValidShape(result: BarIntentResult): boolean {
 }
 
 describe('matchBarIntent — adversarial corpus invariants', () => {
+  it.each(MENTOR_CAPABILITY_CASES)(
+    '$id retains its mapped result inside the adversarial corpus',
+    ({ input, expectedMatcher, expectedRawInput }) => {
+      const result = matchBarIntent(input);
+      if (expectedMatcher.kind === 'jump') {
+        expect(result).toEqual(expectedMatcher);
+        return;
+      }
+      expect(result).toEqual({
+        kind: expectedMatcher.kind,
+        text: expectedRawInput,
+      });
+    },
+  );
+
   it('the corpus is large enough to be meaningful', () => {
     expect(CORPUS.length).toBeGreaterThan(80);
   });

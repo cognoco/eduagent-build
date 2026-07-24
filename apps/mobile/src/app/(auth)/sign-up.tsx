@@ -41,6 +41,16 @@ const SCREEN_HEIGHT =
     ? Math.min(Dimensions.get('screen').height, 812)
     : Dimensions.get('screen').height;
 
+// [WI-2119] signUp.create() can trigger Clerk's Smart CAPTCHA as a real,
+// user-clickable Cloudflare Turnstile challenge rendered into the
+// clerk-captcha mount point below — not just an invisible auto-pass. The
+// shared CLERK_REQUEST_TIMEOUT_MS (20s) assumes a pure network round-trip and
+// budgets no time for a human to notice and complete that challenge, so this
+// call gets its own longer ceiling. CAPTCHA_HINT_DELAY_MS surfaces a cue
+// telling the user to look for the check well before that ceiling hits.
+export const SIGN_UP_CAPTCHA_TIMEOUT_MS = 45_000;
+const CAPTCHA_HINT_DELAY_MS = 5_000;
+
 export default function SignUpScreen() {
   const { t } = useTranslation();
   const { isLoaded, signUp, setActive } = useSignUp();
@@ -60,6 +70,7 @@ export default function SignUpScreen() {
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
+  const [showCaptchaHint, setShowCaptchaHint] = useState(false);
   const [pendingSessionActivationId, setPendingSessionActivationId] = useState<
     string | null
   >(null);
@@ -288,6 +299,16 @@ export default function SignUpScreen() {
     setError('');
     setLoading(true);
 
+    // [WI-2119] signUp.create() may surface an interactive CAPTCHA challenge
+    // (see the clerk-captcha mount point below). Nothing else in this flow
+    // tells the user that happened, so give them a nudge partway through the
+    // longer SIGN_UP_CAPTCHA_TIMEOUT_MS window rather than leaving them
+    // staring at a plain spinner. Web-only — native never renders a captcha.
+    const captchaHintTimer =
+      Platform.OS === 'web'
+        ? setTimeout(() => setShowCaptchaHint(true), CAPTCHA_HINT_DELAY_MS)
+        : undefined;
+
     try {
       if (__DEV__)
         console.log(
@@ -296,6 +317,12 @@ export default function SignUpScreen() {
       await withClerkTimeout(
         signUp.create({ emailAddress, password }),
         'signUp.create',
+        // [WI-2119] The longer CAPTCHA ceiling only applies on web — native
+        // never renders Clerk's Smart CAPTCHA, so it keeps the standard
+        // CLERK_REQUEST_TIMEOUT_MS rather than silently waiting 45s.
+        Platform.OS === 'web'
+          ? SIGN_UP_CAPTCHA_TIMEOUT_MS
+          : CLERK_REQUEST_TIMEOUT_MS,
       );
       if (__DEV__)
         console.log(
@@ -313,6 +340,8 @@ export default function SignUpScreen() {
       if (__DEV__) console.warn('[AUTH-DEBUG] signUp flow threw:', err);
       setError(formatSignUpError(err));
     } finally {
+      if (captchaHintTimer) clearTimeout(captchaHintTimer);
+      setShowCaptchaHint(false);
       setLoading(false);
     }
   }, [
@@ -681,6 +710,19 @@ export default function SignUpScreen() {
            * Clerk's signUp.create() needs this element present in the form
            * view to attach the widget. On iOS/Android this is a no-op View. */}
           <View nativeID="clerk-captcha" testID="clerk-captcha" />
+
+          {/* [WI-2119] The captcha above can silently turn into a real,
+           * clickable challenge once signUp.create() fires — the button's
+           * spinner alone gives no sign of that. Nudge the user to look for
+           * it well before SIGN_UP_CAPTCHA_TIMEOUT_MS runs out. */}
+          {showCaptchaHint && (
+            <Text
+              className="text-body-sm text-text-secondary text-center mb-3"
+              testID="sign-up-captcha-hint"
+            >
+              {t('auth.signUp.captchaHint')}
+            </Text>
+          )}
 
           <Button
             variant="primary"
