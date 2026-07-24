@@ -32,8 +32,8 @@ Out of scope:
 
 ## Tasks
 
-- [ ] T1: Narrow the server selection contract to repeat-after-me — done when a regression test first fails against the alternating selector and then proves all beginner fluency turn indices emit `repeat_after_me` while target sentences still rotate.
-- [ ] T2: Remove the misleading shadowing instruction surface — done when mobile tests first fail against the mode-specific UI and then prove live activity rendering always uses the honest repeat-after-me instruction without a shadowing-copy key.
-- [ ] T3: Synchronize i18n artifacts — done when the removed key is absent from all locale files and the repository i18n staleness/orphan checks pass with a regenerated baseline.
-- [ ] T4: Align Cosmo scope and future work — done when `WI-1777` carries the operator-approved repeat-after-me-only acceptance criteria and true speak-along shadowing exists as a separate captured work item with device-audio concurrency and device-QA scope.
-- [ ] T5: Verify and hand off — done when targeted API/mobile tests, type/lint/change-class checks pass; the diff contains only the listed scope; and lifecycle evidence is prepared for normal review.
+- [x] T1: Narrow the server selection contract to repeat-after-me — done when a regression test first fails against the alternating selector and then proves all beginner fluency turn indices emit `repeat_after_me` while target sentences still rotate.
+- [x] T2: Remove the misleading shadowing instruction surface — done when mobile tests first fail against the mode-specific UI and then prove live activity rendering always uses the honest repeat-after-me instruction without a shadowing-copy key.
+- [x] T3: Synchronize i18n artifacts — done when the removed key is absent from all locale files and the repository i18n staleness/orphan checks pass with a regenerated baseline.
+- [x] T4: Align Cosmo scope and future work — done when `WI-1777` carries the operator-approved repeat-after-me-only acceptance criteria and true speak-along shadowing exists as a separate captured work item with device-audio concurrency and device-QA scope.
+- [x] T5: Verify and hand off — done when targeted API/mobile tests, type/lint/change-class checks pass; the diff contains only the listed scope; and lifecycle evidence is prepared for normal review.
