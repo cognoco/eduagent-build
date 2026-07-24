@@ -153,11 +153,62 @@ and drops every unrelated direct SDK log. `beforeSend`,
 installed; enabling Sentry Logs does not opt into
 `consoleLoggingIntegration()`.
 
-The source-to-sink proof is a separate authorized operation: emit one bounded
-synthetic through the deployed Worker path, query the record and seven fields
-above in Sentry Logs, then let WI-2706 configure and verify the alert without
-changing unrelated rules. Do not simulate the transport by calling Sentry
-directly—the proof must originate from the repository logger path.
+#### Approved one-shot production trigger
+
+After the commit containing this route is deployed through the authorized
+production workflow, an authorized operator may invoke the protected
+`POST /v1/maintenance/llm-volume-alert-probe` endpoint once. It accepts no
+payload, requires the existing `MAINTENANCE_SECRET`, calls no LLM provider, and
+emits exactly one canonical repository `logger.warn` record with
+`provider=synthetic-operator-probe`, `count=1`, and `threshold=1`. Run:
+
+```bash
+node scripts/doppler-run.mjs run --project mentomate --config prd -- node --input-type=module --eval 'const secret = process.env.MAINTENANCE_SECRET; if (!secret) throw new Error("MAINTENANCE_SECRET is unavailable"); const response = await fetch("https://api.mentomate.com/v1/maintenance/llm-volume-alert-probe", { method: "POST", headers: { "X-Maintenance-Secret": secret }, redirect: "error" }); const body = await response.text(); if (!response.ok) throw new Error(`probe failed (${response.status}): ${body}`); console.log(body);'
+```
+
+The command performs one HTTP request with no retry and does not print the
+secret. A successful response has this shape:
+
+```json
+{
+  "emitted": true,
+  "provider": "synthetic-operator-probe",
+  "emittedAt": "<UTC ISO-8601 timestamp>",
+  "utcDate": "<YYYY-MM-DD>"
+}
+```
+
+Record `emittedAt`, then open Sentry → Explore → Logs for the production API
+project, set a narrow time window around that timestamp, and run:
+
+```text
+message:"llm.volume.daily_threshold_exceeded" provider:"synthetic-operator-probe" environment:"production" count:1 threshold:1
+```
+
+Confirm one row in that invocation window. Its custom-attribute set must be
+exactly these seven values (Sentry-owned timestamp, SDK, release, and trace
+metadata are not custom attributes):
+
+| Attribute | Expected value |
+|---|---|
+| `event` | `llm.volume.daily_threshold_exceeded` |
+| `surface` | `llm_volume_alert` |
+| `provider` | `synthetic-operator-probe` |
+| `environment` | `production` |
+| `count` | `1` |
+| `threshold` | `1` |
+| `utc_date` | the response's `utcDate` |
+
+Capture the query, row, seven fields, and response timestamp as the
+source-to-sink evidence for WI-2717 and the input to WI-2706.
+
+Cleanup is deliberately empty: the trigger writes no database/KV/provider
+state and creates no Sentry rule or saved query. Leave the retained probe log
+under the normal Sentry Logs retention policy as evidence; do not mutate or
+delete unrelated monitoring rules. A direct Sentry API/SDK call and the
+separate `/maintenance/sentry-smoke` error probe do not prove this logger
+transport and must not substitute for the command above. Alert-rule creation,
+test notification, and cleanup remain WI-2706's separate authorized work.
 
 ## 6. Rollback / recovery
 

@@ -1,5 +1,4 @@
-import worker, { app } from './index';
-import { createLogger } from './services/logger';
+import worker from './index';
 
 interface CapturedLog {
   level: string;
@@ -7,7 +6,6 @@ interface CapturedLog {
   attributes?: Record<string, unknown>;
 }
 
-const TEST_ROUTE = '/health/wi2717-llm-volume-alert-transport';
 const ALERT_ATTRIBUTE_KEYS = [
   'count',
   'environment',
@@ -50,32 +48,24 @@ function findCapturedLogs(envelopeBodies: string[]): CapturedLog[] {
   return logs;
 }
 
+function unwrapSentryAttributes(
+  attributes: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(attributes ?? {}).map(([key, attribute]) => [
+      key,
+      typeof attribute === 'object' &&
+      attribute !== null &&
+      'value' in attribute
+        ? attribute.value
+        : attribute,
+    ]),
+  );
+}
+
 describe('production Worker LLM volume-alert transport', () => {
   let originalFetch: typeof fetch;
   let envelopeBodies: string[];
-
-  beforeAll(() => {
-    app.get(TEST_ROUTE, (c) => {
-      const logger = createLogger();
-      logger.warn('llm.volume.daily_threshold_exceeded', {
-        event: 'llm.volume.daily_threshold_exceeded',
-        surface: 'llm_volume_alert',
-        provider: 'openai',
-        environment: 'production',
-        count: 5000,
-        threshold: 5000,
-        utc_date: '2026-07-24',
-        rawInput: 'LEARNER_RAW_INPUT_SENTINEL',
-        content: 'MODEL_OUTPUT_SENTINEL',
-        sessionId: 'SESSION_ID_SENTINEL',
-      });
-      logger.warn('llm.provider.fallback', {
-        event: 'llm.provider.fallback',
-        rawInput: 'UNRELATED_LOG_SENTINEL',
-      });
-      return c.text('ok');
-    });
-  });
 
   beforeEach(() => {
     originalFetch = globalThis.fetch;
@@ -99,34 +89,72 @@ describe('production Worker LLM volume-alert transport', () => {
       .mockImplementation(() => undefined);
     const { ctx, drain } = createTestExecutionContext();
 
-    const response = await worker.fetch(
-      new Request(`https://api.example.com/v1${TEST_ROUTE}`),
-      {
-        SENTRY_DSN: 'https://public@o0.ingest.sentry.io/1',
-        ENVIRONMENT: 'production',
-      } as never,
-      ctx as never,
-    );
-    const responseBody = await response.text();
-    await drain();
-    warnSpy.mockRestore();
+    try {
+      const response = await worker.fetch(
+        new Request(
+          'https://api.example.com/v1/maintenance/llm-volume-alert-probe',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Maintenance-Secret': 'maintenance-secret',
+            },
+            body: JSON.stringify({
+              rawInput: 'LEARNER_RAW_INPUT_SENTINEL',
+              content: 'MODEL_OUTPUT_SENTINEL',
+              sessionId: 'SESSION_ID_SENTINEL',
+            }),
+          },
+        ),
+        {
+          SENTRY_DSN: 'https://public@o0.ingest.sentry.io/1',
+          ENVIRONMENT: 'production',
+          MAINTENANCE_SECRET: 'maintenance-secret',
+        } as never,
+        ctx as never,
+      );
+      const responseBody = (await response.json()) as {
+        emitted: boolean;
+        provider: string;
+        emittedAt: string;
+        utcDate: string;
+      };
+      await drain();
 
-    expect(response.status).toBe(200);
-    expect(responseBody).toBe('ok');
-    expect(envelopeBodies.length).toBeGreaterThan(0);
+      expect(response.status).toBe(200);
+      expect(responseBody).toEqual({
+        emitted: true,
+        provider: 'synthetic-operator-probe',
+        emittedAt: expect.stringMatching(
+          /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+        ),
+        utcDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      });
+      expect(envelopeBodies.length).toBeGreaterThan(0);
 
-    const logs = findCapturedLogs(envelopeBodies);
-    expect(logs).toHaveLength(1);
-    expect(logs[0]?.level).toBe('warn');
-    expect(logs[0]?.body).toBe('llm.volume.daily_threshold_exceeded');
-    expect(Object.keys(logs[0]?.attributes ?? {}).sort()).toEqual(
-      ALERT_ATTRIBUTE_KEYS,
-    );
+      const logs = findCapturedLogs(envelopeBodies);
+      expect(logs).toHaveLength(1);
+      expect(logs[0]?.level).toBe('warn');
+      expect(logs[0]?.body).toBe('llm.volume.daily_threshold_exceeded');
+      expect(Object.keys(logs[0]?.attributes ?? {}).sort()).toEqual(
+        ALERT_ATTRIBUTE_KEYS,
+      );
+      expect(unwrapSentryAttributes(logs[0]?.attributes)).toEqual({
+        event: 'llm.volume.daily_threshold_exceeded',
+        surface: 'llm_volume_alert',
+        provider: 'synthetic-operator-probe',
+        environment: 'production',
+        count: 1,
+        threshold: 1,
+        utc_date: responseBody.utcDate,
+      });
 
-    const shippedPayload = JSON.stringify(envelopeBodies);
-    expect(shippedPayload).not.toContain('LEARNER_RAW_INPUT_SENTINEL');
-    expect(shippedPayload).not.toContain('MODEL_OUTPUT_SENTINEL');
-    expect(shippedPayload).not.toContain('SESSION_ID_SENTINEL');
-    expect(shippedPayload).not.toContain('UNRELATED_LOG_SENTINEL');
+      const shippedPayload = JSON.stringify(envelopeBodies);
+      expect(shippedPayload).not.toContain('LEARNER_RAW_INPUT_SENTINEL');
+      expect(shippedPayload).not.toContain('MODEL_OUTPUT_SENTINEL');
+      expect(shippedPayload).not.toContain('SESSION_ID_SENTINEL');
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });
