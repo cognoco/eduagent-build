@@ -73,6 +73,28 @@ function Invoke-Text {
   return ($output -join [Environment]::NewLine).Trim()
 }
 
+function Invoke-NativeCapture {
+  param(
+    [Parameter(Mandatory = $true)][string]$FilePath,
+    [Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments
+  )
+
+  $previousErrorActionPreference = $ErrorActionPreference
+  try {
+    $ErrorActionPreference = 'Continue'
+    $output = @(& $FilePath @Arguments 2>&1)
+    $exitCode = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+  }
+
+  return [pscustomobject]@{
+    ExitCode = $exitCode
+    Output = (($output | ForEach-Object { $_.ToString() }) -join `
+      [Environment]::NewLine).Trim()
+  }
+}
+
 function Get-Sha256Hex {
   param([Parameter(Mandatory = $true)][string]$LiteralPath)
 
@@ -435,12 +457,13 @@ try {
   $apkSha256 = Get-Sha256Hex -LiteralPath $apkPath
 
   Invoke-Checked $AdbBin -s $DeviceId install -r $apkPath
-  $runAsOutput = & $AdbBin -s $DeviceId shell run-as com.mentomate.app id 2>&1
-  if ($LASTEXITCODE -eq 0) {
+  $runAsResult = Invoke-NativeCapture `
+    $AdbBin -s $DeviceId shell run-as com.mentomate.app id
+  if ($runAsResult.ExitCode -eq 0) {
     throw 'Installed release APK is debuggable; run-as unexpectedly succeeded'
   }
-  if (($runAsOutput -join [Environment]::NewLine) -notmatch 'not debuggable') {
-    throw "Unable to prove non-debuggable APK: $($runAsOutput -join [Environment]::NewLine)"
+  if ($runAsResult.Output -notmatch 'not debuggable') {
+    throw "Unable to prove non-debuggable APK: $($runAsResult.Output)"
   }
 
   $profilePrepared = $true

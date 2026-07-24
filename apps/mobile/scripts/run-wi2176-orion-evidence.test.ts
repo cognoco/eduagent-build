@@ -93,6 +93,59 @@ function Assert-Equal {
   }
 }
 
+$nativeCaptureFunction = $ast.Find(
+  {
+    param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+      $node.Name -eq 'Invoke-NativeCapture'
+  },
+  $true
+)
+if (-not $nativeCaptureFunction) {
+  throw 'Expected Invoke-NativeCapture to preserve expected native failures'
+}
+$nativeCapturePreferenceRestore = @(
+  $nativeCaptureFunction.Body.FindAll(
+    {
+      param($node)
+      $node -is [System.Management.Automation.Language.TryStatementAst] -and
+        $node.Finally -and
+        $node.Finally.Extent.Text -match (
+          '\$ErrorActionPreference\s*=\s*' +
+          '\$previousErrorActionPreference'
+        )
+    },
+    $true
+  )
+)
+if ($nativeCapturePreferenceRestore.Count -ne 1) {
+  throw 'Expected native capture to restore ErrorActionPreference in finally'
+}
+Invoke-Expression $nativeCaptureFunction.Extent.Text
+
+$expectedErrorActionPreference = $ErrorActionPreference
+if (
+  [Environment]::OSVersion.Platform -eq
+    [System.PlatformID]::Win32NT
+) {
+  $nativeCapture = Invoke-NativeCapture $env:ComSpec /d /s /c (
+    'echo expected native stderr 1>&2 & exit /b 23'
+  )
+} else {
+  $nativeCapture = Invoke-NativeCapture /bin/sh -c (
+    'printf "expected native stderr\n" >&2; exit 23'
+  )
+}
+Assert-Equal $nativeCapture.ExitCode 23 (
+  'Expected native non-zero exit code was not preserved'
+)
+Assert-Equal $ErrorActionPreference $expectedErrorActionPreference (
+  'Native capture did not restore ErrorActionPreference'
+)
+if ($nativeCapture.Output -notmatch 'expected native stderr') {
+  throw "Expected native stderr was not captured: $($nativeCapture.Output)"
+}
+
 $legacyHashCommands = @(
   $ast.FindAll(
     {
