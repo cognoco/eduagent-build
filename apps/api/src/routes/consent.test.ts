@@ -1230,6 +1230,136 @@ describe('consent routes', () => {
       expect(res.status).toBe(401);
     });
   });
+
+  describe('GET /v1/consent/self/accountability [WI-2413]', () => {
+    const execute = (mockDatabaseModule.db as { execute: jest.Mock }).execute;
+
+    it('returns null acceptance fields for a legacy grant without an acceptance fact', async () => {
+      execute.mockResolvedValueOnce([
+        {
+          purpose: 'platform_use',
+          lawful_basis: 'art6_1_a',
+          granted: true,
+          granted_at: '2026-07-24T06:00:00.000Z',
+          withdrawn_at: '2026-07-24T07:00:00.000Z',
+          audit_fact: null,
+        },
+      ]);
+
+      const res = await app.request(
+        '/v1/consent/self/accountability',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({
+        records: [
+          {
+            purpose: 'platform_use',
+            lawfulBasis: 'art6_1_a',
+            granted: true,
+            termsAcceptedAt: null,
+            termsVersion: null,
+            withdrawnAt: '2026-07-24T07:00:00.000Z',
+          },
+        ],
+      });
+    });
+
+    it('returns a genuine captured acceptance timestamp and terms version', async () => {
+      execute.mockResolvedValueOnce([
+        {
+          purpose: 'platform_use',
+          lawful_basis: 'art6_1_a',
+          granted: true,
+          granted_at: '2026-07-24T06:00:00.000Z',
+          withdrawn_at: null,
+          audit_fact: {
+            termsAcceptedAt: '2026-07-23T10:00:00.000Z',
+            termsVersion: '2026-07-23',
+          },
+        },
+      ]);
+
+      const res = await app.request(
+        '/v1/consent/self/accountability',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({
+        records: [
+          {
+            purpose: 'platform_use',
+            lawfulBasis: 'art6_1_a',
+            granted: true,
+            termsAcceptedAt: '2026-07-23T10:00:00.000Z',
+            termsVersion: '2026-07-23',
+            withdrawnAt: null,
+          },
+        ],
+      });
+    });
+
+    it.each([
+      ['timestamp only', { termsAcceptedAt: '2026-07-23T10:00:00.000Z' }],
+      ['version only', { termsVersion: '2026-07-23' }],
+      [
+        'empty version',
+        {
+          termsAcceptedAt: '2026-07-23T10:00:00.000Z',
+          termsVersion: '',
+        },
+      ],
+      [
+        'null version',
+        {
+          termsAcceptedAt: '2026-07-23T10:00:00.000Z',
+          termsVersion: null,
+        },
+      ],
+      [
+        'invalid timestamp',
+        { termsAcceptedAt: 'not-a-date', termsVersion: '2026-07-23' },
+      ],
+    ])(
+      'returns null acceptance fields for a %s audit fact',
+      async (_case, auditFact) => {
+        execute.mockResolvedValueOnce([
+          {
+            purpose: 'platform_use',
+            lawful_basis: 'art6_1_a',
+            granted: true,
+            granted_at: '2026-07-24T06:00:00.000Z',
+            withdrawn_at: null,
+            audit_fact: auditFact,
+          },
+        ]);
+
+        const res = await app.request(
+          '/v1/consent/self/accountability',
+          { headers: AUTH_HEADERS },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(200);
+        await expect(res.json()).resolves.toEqual({
+          records: [
+            {
+              purpose: 'platform_use',
+              lawfulBasis: 'art6_1_a',
+              granted: true,
+              termsAcceptedAt: null,
+              termsVersion: null,
+              withdrawnAt: null,
+            },
+          ],
+        });
+      },
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

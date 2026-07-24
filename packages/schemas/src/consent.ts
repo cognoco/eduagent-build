@@ -103,10 +103,9 @@ export interface ConsentAccountabilityRecord {
   /**
    * [WI-1193 AC1] The durable terms-acceptance moment, recorded as its own fact
    * (consent_grant.audit_fact.termsAcceptedAt) at signup — NOT a rename of
-   * granted_at. Falls back to granted_at for grants written before the fact was
-   * captured, so pre-existing rows still resolve.
+   * granted_at. Null for grants written before the fact was captured.
    */
-  termsAcceptedAt: Date;
+  termsAcceptedAt: Date | null;
   /**
    * [WI-1193 AC1] The consent-policy version accepted at that moment
    * (consent_grant.audit_fact.termsVersion). The versioned half of the
@@ -126,7 +125,7 @@ export const consentAccountabilityRecordSchema = z.object({
   purpose: consentPurposeSchema,
   lawfulBasis: z.string(),
   granted: z.boolean(),
-  termsAcceptedAt: isoDateField,
+  termsAcceptedAt: isoDateField.nullable(),
   termsVersion: z.string().nullable(),
   withdrawnAt: isoDateField.nullable(),
 });
