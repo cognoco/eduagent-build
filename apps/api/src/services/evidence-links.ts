@@ -146,7 +146,13 @@ export async function getArtifactEvidenceAvailability(
       eq(evidenceLinks.fromId, artifactId),
     ),
   );
-  if (links.length === 0) return 'source_unavailable';
+  if (links.length === 0) {
+    // Migration 0154 marks historical Challenge-drafted notes verified but
+    // cannot reconstruct their grounding events. Keep those legacy artifacts
+    // fail-closed: proof consumers suppress the quote instead of inventing
+    // provenance or falling back to raw transcript content.
+    return 'source_unavailable';
+  }
   const states = await Promise.all(
     links.map((link) =>
       resolveEvidenceLink(db, {

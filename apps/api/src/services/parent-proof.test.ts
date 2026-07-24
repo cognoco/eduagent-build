@@ -148,7 +148,7 @@ describe('getVerifiedProofForSessionTopic', () => {
     ).resolves.toEqual({ hasProof: false, quote: null });
   });
 
-  it('keeps the verified fact but suppresses a fresh note with no evidence link', async () => {
+  it('keeps the verified fact but suppresses a migrated legacy challenge note with no evidence link', async () => {
     const db = fakeDbByTable(
       new Map<unknown, unknown[]>([
         [assessments, verifiedAssessmentRows()],
@@ -157,7 +157,9 @@ describe('getVerifiedProofForSessionTopic', () => {
           [
             {
               id: ARTIFACT_ID,
-              content: 'Fresh but ungrounded note text.',
+              content: 'Historical note without reconstructable provenance.',
+              artifactSource: 'challenge_drafted_note',
+              verificationState: 'verified',
               createdAt: new Date(),
             },
           ],
