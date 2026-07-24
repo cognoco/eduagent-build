@@ -7912,7 +7912,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(continueActions[0]).not.toHaveProperty('index');
   });
 
-  it('[WI-2234] binds the new completed reply below the exact submitted learner message', () => {
+  it('[WI-2234] binds exact turn 3 completion below exact submitted learner turn 2', () => {
     const commands = parseMaestroCommands(
       readFileSync(
         join(
@@ -7923,14 +7923,26 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       ),
     );
 
+    const exactLearnerTurn = {
+      id: 'message-bubble-user-2',
+      containsDescendants: [
+        {
+          text: '^How did Roman roads help people exchange ideas\\?$',
+        },
+      ],
+    };
+    const exactLearnerTurnIndex = commands.findIndex(
+      (command) =>
+        command.optional !== true &&
+        isDeepStrictEqual(command.assertVisible, exactLearnerTurn),
+    );
     const completedReplyWaits = commands.filter((command) =>
       isDeepStrictEqual(command, {
         extendedWaitUntil: {
           visible: {
-            id: 'assistant-response-complete-.*',
+            id: 'assistant-response-complete-3',
             below: {
-              id: 'message-bubble-user-.*',
-              text: '^How did Roman roads help people exchange ideas\\?$',
+              id: 'message-bubble-user-2',
             },
           },
           timeout: 60_000,
@@ -7938,7 +7950,11 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       }),
     );
 
+    expect(exactLearnerTurnIndex).toBeGreaterThanOrEqual(0);
     expect(completedReplyWaits).toHaveLength(1);
+    expect(commands.indexOf(completedReplyWaits[0]!)).toBeGreaterThan(
+      exactLearnerTurnIndex,
+    );
     expect(
       completedReplyWaits[0]?.extendedWaitUntil?.visible,
     ).not.toHaveProperty('index');

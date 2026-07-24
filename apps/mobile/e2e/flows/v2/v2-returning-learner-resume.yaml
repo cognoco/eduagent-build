@@ -47,15 +47,19 @@ tags:
 - tapOn:
     id: 'send-button'
 
-# The completed assistant reply below the exact new learner message proves this
-# resumed session received a non-empty reply; the seeded assistant reply is
-# above that message and cannot satisfy this relational assertion.
+# The seeded turns occupy indexes 0 and 1. Prove the exact submitted learner
+# turn owns the question, then wait for its exact successor to become a
+# completed, non-empty assistant response. The `below` relation additionally
+# prevents an earlier seeded response from satisfying the receipt.
+- assertVisible:
+    id: 'message-bubble-user-2'
+    containsDescendants:
+      - text: '^How did Roman roads help people exchange ideas\?$'
 - extendedWaitUntil:
     visible:
-      id: 'assistant-response-complete-.*'
+      id: 'assistant-response-complete-3'
       below:
-        id: 'message-bubble-user-.*'
-        text: '^How did Roman roads help people exchange ideas\?$'
+        id: 'message-bubble-user-2'
     timeout: 60000
 
 - tapOn:
