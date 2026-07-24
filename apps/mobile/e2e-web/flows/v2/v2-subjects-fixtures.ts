@@ -53,6 +53,7 @@ export const V2_SUBJECTS_CASES = {
   curriculumPreparing: {
     seed: { scenario: 'learning-active', alias: 'v2-subjects-preparing' },
     expected: {
+      profileName: 'Active Learner',
       subjectName: 'World History',
       preparingMessage: 'Building your World History curriculum…',
     },

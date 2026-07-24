@@ -465,12 +465,6 @@ test('WI-2238 curriculum-preparing case: exact World History empty Hub and visib
   page,
 }) => {
   const { seed: seedCase, expected } = V2_SUBJECTS_CASES.curriculumPreparing;
-  const seed = await seedAndOpenSubjects(page, seedCase);
-  const subjectId = seed.ids.subjectId;
-  if (!subjectId) {
-    throw new Error('learning-active seed did not return subjectId');
-  }
-  await expectSubjectRow(page, subjectId, expected.subjectName);
 
   await page.route(/\/v1\/subjects(?:\?.*)?$/, async (route) => {
     const request = route.request();
@@ -485,13 +479,20 @@ test('WI-2238 curriculum-preparing case: exact World History empty Hub and visib
       response,
       json: {
         subjects: payload.subjects.map((subject) =>
-          subject.id === subjectId
+          subject.name === expected.subjectName
             ? { ...subject, curriculumStatus: 'preparing' as const }
             : subject,
         ),
       },
     });
   });
+
+  const seed = await seedAndOpenSubjects(page, seedCase);
+  const subjectId = seed.ids.subjectId;
+  if (!subjectId) {
+    throw new Error('learning-active seed did not return subjectId');
+  }
+  await expectSubjectRow(page, subjectId, expected.subjectName);
   await page.route(`**/v1/subjects/${subjectId}/books`, async (route) => {
     if (route.request().method() !== 'GET') {
       await route.continue();
