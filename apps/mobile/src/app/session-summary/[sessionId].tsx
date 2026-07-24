@@ -451,7 +451,7 @@ export default function SessionSummaryScreen() {
 
   const finishSummaryNavigation = (): void => {
     if (resolvedReturnTo === JOURNAL_RETURN_TO) {
-      goBackOrReplace(router, JOURNAL_HREF);
+      router.replace(JOURNAL_HREF);
       return;
     }
 

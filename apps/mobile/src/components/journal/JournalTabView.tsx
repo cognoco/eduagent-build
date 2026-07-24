@@ -110,7 +110,11 @@ function JournalRecapsSection(): React.ReactElement {
   return (
     <View className="gap-3" testID="journal-recaps-section">
       {rows.map((recap) => (
-        <RecapRow key={recap.recapId} recap={recap} />
+        <RecapRow
+          key={recap.recapId}
+          recap={recap}
+          returnTo={JOURNAL_RETURN_TO}
+        />
       ))}
     </View>
   );

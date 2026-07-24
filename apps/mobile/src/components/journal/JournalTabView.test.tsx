@@ -1,7 +1,13 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native';
 import type { NowResponse } from '@eduagent/schemas';
 
 import { JournalTabView } from './JournalTabView';
+import { RecapRow } from './RecapRow';
 
 const mockPush = jest.fn();
 const mockSetActiveScope = jest.fn();
@@ -478,6 +484,22 @@ describe('JournalTabView', () => {
     });
   });
 
+  it('uses the recap caller return destination instead of silently forcing Journal', () => {
+    render(<RecapRow recap={recap} returnTo="learner-home" />);
+
+    fireEvent.press(screen.getByTestId(`journal-recap-row-${recap.recapId}`));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/session-summary/[sessionId]',
+      params: {
+        sessionId: recap.sessionId,
+        subjectId: recap.subjectId,
+        topicId: recap.topicId,
+        returnTo: 'learner-home',
+      },
+    });
+  });
+
   it('switches to reports and routes report rows to existing report details', () => {
     render(<JournalTabView />);
 
@@ -591,6 +613,14 @@ describe('JournalTabView', () => {
     });
 
     fireEvent.press(screen.getByTestId('journal-tab-practice'));
+    const practiceMotif = screen.getByTestId('journal-practice-empty-motif', {
+      includeHiddenElements: true,
+    });
+    expect(
+      within(practiceMotif).getAllByTestId(/^journal-practice-empty-motif-.+/, {
+        includeHiddenElements: true,
+      }),
+    ).toHaveLength(1);
     screen.getByTestId('journal-practice-empty-motif-pen', {
       includeHiddenElements: true,
     });
@@ -606,6 +636,14 @@ describe('JournalTabView', () => {
     ).toBeNull();
 
     fireEvent.press(screen.getByTestId('journal-tab-reports'));
+    const reportsMotif = screen.getByTestId('journal-reports-empty-motif', {
+      includeHiddenElements: true,
+    });
+    expect(
+      within(reportsMotif).getAllByTestId(/^journal-reports-empty-motif-.+/, {
+        includeHiddenElements: true,
+      }),
+    ).toHaveLength(1);
     screen.getByTestId('journal-reports-empty-motif-pen', {
       includeHiddenElements: true,
     });

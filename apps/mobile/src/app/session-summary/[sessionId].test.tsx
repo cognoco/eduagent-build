@@ -2200,6 +2200,7 @@ describe('SessionSummaryScreen', () => {
     });
 
     it('returns a persisted Journal recap to Journal without swapping to its topic', async () => {
+      mockCanGoBack.mockReturnValue(true);
       mockSessionSummaryData = {
         id: '880e8400-e29b-41d4-a716-446655440005',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
@@ -2221,6 +2222,7 @@ describe('SessionSummaryScreen', () => {
       await waitFor(() => {
         expect(mockReplace).toHaveBeenCalledWith('/(app)/journal');
       });
+      expect(mockBack).not.toHaveBeenCalled();
       expect(mockReplace).not.toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/(app)/topic/[topicId]',
@@ -2229,6 +2231,7 @@ describe('SessionSummaryScreen', () => {
     });
 
     it('keeps Journal precedence when duplicate returnTo parameters produce an array', async () => {
+      mockCanGoBack.mockReturnValue(true);
       mockSessionSummaryData = {
         id: '880e8400-e29b-41d4-a716-446655440005',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
@@ -2250,6 +2253,7 @@ describe('SessionSummaryScreen', () => {
       await waitFor(() => {
         expect(mockReplace).toHaveBeenCalledWith('/(app)/journal');
       });
+      expect(mockBack).not.toHaveBeenCalled();
       expect(mockReplace).not.toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/(app)/topic/[topicId]',
