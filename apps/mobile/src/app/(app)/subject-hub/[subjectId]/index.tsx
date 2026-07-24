@@ -82,9 +82,9 @@ export default function SubjectHubRoute(): React.ReactElement {
   const navigationContract = useNavigationContract();
   const canManage = !navigationContract.isParentProxy;
   const [manageOpen, setManageOpen] = useState(false);
-  // Every nav mode renders the Manage control, so every mode needs the real
-  // status. Including inactive subjects also keeps paused/archived deep links
-  // fail-closed until that status has settled.
+  // Every Navigation Shape renders the Manage control, so each shape needs
+  // the real status. Including inactive subjects also keeps paused/archived
+  // deep links fail-closed until that status has settled.
   const subjectsQuery = useSubjects({
     includeInactive: true,
     enabled: canManage && !!subjectId,
