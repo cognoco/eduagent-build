@@ -18,8 +18,9 @@
 | [`breach-response-plan.md`](breach-response-plan.md) | A4 | 72-hour data-breach procedure (Datatilsynet). | DPO | Yes |
 | [`art9-special-category-decision.md`](art9-special-category-decision.md) | A23 | Decision: we do **not** process health/disability (Art 9) data. | DPO + counsel | Yes (gates DPIA weight) |
 | [`2026-07-23-13-plus-eea-launch-country-ruling.md`](2026-07-23-13-plus-eea-launch-country-ruling.md) | Country gate | Product age brackets, the 30-country EEA perimeter, national Article 8 consent thresholds, implementation waves, and UK exclusion. | Product + DPO/counsel | **Yes** |
-| [`2026-07-23-dpia-review-response-draft.md`](2026-07-23-dpia-review-response-draft.md) | DPIA evidence response | Draft answers to the current DPIA evidence request, reconciled with the EEA country ruling; identifies evidence and sign-off still required. | Management + DPO/counsel + eng | **Yes** |
-| [`DPO exchanges/`](DPO%20exchanges/) | External-review provenance | Dated working materials prepared for DPO or specialist-counsel review; not signed approvals or binding canon. | Management + DPO/counsel | Evidence only |
+| [`DPO exchanges/2026-07-23-dpia-review-response-draft.md`](DPO%20exchanges/2026-07-23-dpia-review-response-draft.md) | DPIA evidence response | Current ten-question working response, reconciled with code, production evidence, and the launch-country ruling; identifies evidence and sign-off still required. | Management + DPO/counsel + eng | **Yes** |
+| [`2026-07-23-dpia-review-response-draft.md`](2026-07-23-dpia-review-response-draft.md) | Superseded DPIA response snapshot | Retains the earlier incomplete six-question draft for provenance; explicitly marked do not send. | Management + DPO/counsel | Evidence only |
+| [`DPO exchanges/`](DPO%20exchanges/) | External-review working set | Dated materials prepared for DPO or specialist-counsel review; not signed approvals or binding canon. | Management + DPO/counsel | Evidence only |
 | [`privacy-policy.html`](privacy-policy.html) | A5 | Public-facing privacy notice draft, now colocated with its source compliance records. | DPO + counsel | **Yes** |
 | [`audience-matrix.md`](audience-matrix.md) | Supporting inventory | Historical/reconstructed product-audience gating evidence; not the country matrix and not current line-map authority. | Product + eng | No |
 

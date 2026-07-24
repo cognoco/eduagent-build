@@ -20,10 +20,26 @@ import type {
   StopReason,
 } from '../../services/llm/types';
 
+jest.mock(
+  '../client', // gc1-allow: Inngest transport boundary
+  () => {
+    const actual = jest.requireActual(
+      '../client',
+    ) as typeof import('../client');
+    const { createInngestTransportCapture } = jest.requireActual(
+      '../../test-utils/inngest-transport-capture',
+    ) as typeof import('../../test-utils/inngest-transport-capture');
+    return {
+      ...actual,
+      inngest: createInngestTransportCapture().inngest,
+    };
+  },
+);
+
 // Register a grader provider that returns a fixed body. The LLM is the only
-// external boundary the in-step closure touches; everything else (topic join,
-// session-event read, recordRetrievalEvent, EU-7 cap read) runs against the
-// mock db below. No internal module is mocked.
+// variable external boundary the in-step closure touches; Inngest transport is
+// captured above, and everything else (topic join, session-event read,
+// recordRetrievalEvent, EU-7 cap read) runs against the mock db below.
 function registerGrader(body: string): void {
   const provider: LLMProvider = {
     id: 'gemini',

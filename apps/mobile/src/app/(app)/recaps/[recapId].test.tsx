@@ -139,6 +139,7 @@ const VERIFIED_PROOF = {
   verificationState: 'fresh',
   retentionStatus: 'strong',
   nextReviewDate: '2026-07-17T10:00:00.000Z',
+  evidenceAvailability: 'available',
   quote: 'Equivalent fractions name the same amount.',
 } as const;
 
@@ -251,11 +252,15 @@ describe('RecapDetailScreen', () => {
       expect(screen.queryByTestId('recap-detail-verified-proof')).toBeNull();
     });
 
-    it('renders the abstracted line when an aged proof has no quote', () => {
+    it('renders the abstracted line when proof evidence was purged', () => {
       mockUseRecap.mockReturnValue({
         data: {
           ...RECAP_DATA,
-          verifiedProof: { ...VERIFIED_PROOF, quote: null },
+          verifiedProof: {
+            ...VERIFIED_PROOF,
+            evidenceAvailability: 'source_unavailable',
+            quote: null,
+          },
         },
         isLoading: false,
         isError: false,

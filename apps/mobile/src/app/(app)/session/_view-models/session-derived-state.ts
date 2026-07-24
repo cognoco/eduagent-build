@@ -67,17 +67,17 @@ export function deriveSessionSubjectState(args: {
   noteTopicId: string | undefined;
 } {
   const effectiveSubjectId =
-    args.classifiedSubject?.subjectId ?? args.routeSubjectId ?? '';
+    args.classifiedSubject?.subjectId ??
+    args.routeSubjectId ??
+    args.transcriptSubjectId ??
+    args.activeSessionSubjectId ??
+    '';
 
   return {
     effectiveSubjectId,
     effectiveSubjectName:
       args.classifiedSubject?.subjectName ?? args.routeSubjectName,
-    noteSubjectId:
-      effectiveSubjectId ||
-      args.transcriptSubjectId ||
-      args.activeSessionSubjectId ||
-      undefined,
+    noteSubjectId: effectiveSubjectId || undefined,
     noteTopicId:
       args.routeTopicId ??
       args.transcriptTopicId ??

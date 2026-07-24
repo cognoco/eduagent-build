@@ -669,6 +669,7 @@ describe('dashboard routes', () => {
         sessionId: TEST_SESSION_ID,
         verifiedAt: new Date().toISOString(),
         quote: 'Plants convert light into chemical energy.',
+        evidenceAvailability: 'available',
         masteryVerificationState: 'fresh',
         retentionStatus: 'strong',
       });
@@ -685,6 +686,7 @@ describe('dashboard routes', () => {
         hasProof: true,
         topicTitle: 'Photosynthesis',
         quote: 'Plants convert light into chemical energy.',
+        evidenceAvailability: 'available',
         masteryVerificationState: 'fresh',
         retentionStatus: 'strong',
       });

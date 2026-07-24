@@ -10,6 +10,7 @@ import {
 import {
   buildExchangeSourceEvidence,
   buildSystemPrompt,
+  sanitizeUserContent,
   type ExchangeContext,
 } from '../../src/services/exchanges';
 import { resolveAgeBracket } from '../../src/services/exchange-prompts';
@@ -27,7 +28,10 @@ import {
   withSafetyPreamble,
 } from '../../src/services/llm/router';
 import type { ChatMessage } from '../../src/services/llm/types';
-import type { ChallengeSimScenario } from '../fixtures/challenge-personas';
+import type {
+  ChallengeSimScenario,
+  QuestionAssessment,
+} from '../fixtures/challenge-personas';
 import type { EvalProfile } from '../fixtures/profiles';
 import { runHarnessLlm } from './llm-client';
 import { callOpenRouterModel } from './llm-bootstrap';
@@ -102,12 +106,35 @@ const GRADER_RUNG = 1 as const;
  * resolves the exact judge model the grading turn will use.
  */
 const TURN_LLM_TIER = 'standard' as const;
+/** Matches production's recent conversation source-evidence window. */
+const MAX_HISTORY_TURNS = 6;
 
-/** Fallback next-question if a tutor turn fails to parse — keeps the loop alive
- *  (the tutor is not the measured component, so a parse miss must not strand the
- *  round or corrupt the signal-emission measurement). */
+/** Fallback next-question if a tutor turn fails to parse. It is marked degraded
+ *  in simulator-only diagnostics so it can never be mistaken for tutor output. */
 const FALLBACK_FOLLOWUP =
   'Can you explain a bit more about why that is — what makes it work?';
+
+export type TutorTurn =
+  | { source: 'model'; question: string; assessment?: QuestionAssessment }
+  | {
+      source: 'degraded';
+      question: string;
+      failure: 'envelope_parse';
+      /** Simulator diagnostic only; never used by production or user-facing paths. */
+      rawOutput: string;
+      assessment?: QuestionAssessment;
+    };
+
+export interface QuestionDiagnostic {
+  source: 'seed' | TutorTurn['source'];
+  question: string;
+  /** Exact or fixture-declared semantic repetition under the operator contract. */
+  repeatsPriorQuestion: boolean;
+  failure?: 'envelope_parse';
+  /** Simulator diagnostic only; retained for failed tutor-envelope investigation. */
+  rawOutput?: string;
+  assessment?: QuestionAssessment;
+}
 
 export interface SimulatedRoundResult {
   scenarioId: string;
@@ -116,6 +143,12 @@ export interface SimulatedRoundResult {
   graderModel: string;
   learnerModel: string;
   transcript: Array<{ role: 'assistant' | 'user'; content: string }>;
+  /** Generated tutor questions only, with provenance and parse diagnostics. */
+  tutorTurns: TutorTurn[];
+  /** Seed + generated questions, measured against prior lesson and round questions. */
+  questionDiagnostics: QuestionDiagnostic[];
+  /** Scenario-owned semantic aliases; never inferred from model prose. */
+  conceptEquivalenceKeys: Record<string, string>;
   /** Accumulated across all answered turns (from the production judge). */
   evaluations: ChallengeRoundEvaluationItem[];
   decision: MasteryDecision;
@@ -153,8 +186,11 @@ export interface GraderTurnArgs {
  */
 export interface SimulatedRoundOverrides {
   learnerTurn?: (args: LearnerTurnArgs) => Promise<string>;
-  /** Returns the tutor's next question (clean prose). */
-  tutorTurn?: (ctx: ExchangeContext, learnerAnswer: string) => Promise<string>;
+  /** Returns a provenance-labelled tutor turn. A string remains supported for existing test seams. */
+  tutorTurn?: (
+    ctx: ExchangeContext,
+    learnerAnswer: string,
+  ) => Promise<TutorTurn | string>;
   /** Returns the production judge's evaluation items ([] on any drop/parse-fail). */
   graderTurn?: (
     args: GraderTurnArgs,
@@ -288,7 +324,11 @@ export function resolveJudgeSlugProbe(): string {
 function toExchangeHistory(
   transcript: Array<{ role: 'assistant' | 'user'; content: string }>,
 ): ExchangeContext['exchangeHistory'] {
-  return transcript.map((t) => ({ role: t.role, content: t.content }));
+  return transcript.slice(-MAX_HISTORY_TURNS).map((turn) => ({
+    role: turn.role,
+    content:
+      turn.role === 'user' ? sanitizeUserContent(turn.content) : turn.content,
+  }));
 }
 
 function buildMentorContext(params: {
@@ -336,7 +376,7 @@ function buildMentorContext(params: {
 async function defaultTutorTurn(
   ctx: ExchangeContext,
   learnerAnswer: string,
-): Promise<string> {
+): Promise<TutorTurn> {
   const sourceEvidence = buildExchangeSourceEvidence(ctx, learnerAnswer);
   const system = buildSystemPrompt({ ...ctx, sourceEvidence });
   const messages = withSafetyPreamble(
@@ -352,7 +392,50 @@ async function defaultTutorTurn(
     reasoningEffort: 'low',
   });
   const parsed = parseEnvelope(raw, 'exchange.session');
-  return parsed.ok ? parsed.envelope.reply : FALLBACK_FOLLOWUP;
+  return parsed.ok
+    ? { source: 'model', question: parsed.envelope.reply }
+    : {
+        source: 'degraded',
+        question: FALLBACK_FOLLOWUP,
+        failure: 'envelope_parse',
+        rawOutput: raw,
+      };
+}
+
+function normalizeQuestion(question: string): string {
+  return question
+    .trim()
+    .toLowerCase()
+    .replace(/[?!.,;:]+$/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+interface AssessedQuestion {
+  question: string;
+  assessment?: QuestionAssessment;
+}
+
+function hasQuestionRepeat(
+  question: string,
+  assessment: QuestionAssessment | undefined,
+  priorQuestions: AssessedQuestion[],
+): boolean {
+  const normalized = normalizeQuestion(question);
+  return priorQuestions.some((prior) => {
+    if (normalizeQuestion(prior.question) === normalized) return true;
+    if (!assessment || !prior.assessment) return false;
+    return (
+      normalizeQuestion(assessment.minimalLearningClaim) ===
+        normalizeQuestion(prior.assessment.minimalLearningClaim) &&
+      assessment.cognitiveOperation === prior.assessment.cognitiveOperation &&
+      normalizeQuestion(assessment.materialContext) ===
+        normalizeQuestion(prior.assessment.materialContext)
+    );
+  });
+}
+
+function normalizeTutorTurn(turn: TutorTurn | string): TutorTurn {
+  return typeof turn === 'string' ? { source: 'model', question: turn } : turn;
 }
 
 /**
@@ -456,10 +539,34 @@ export async function runSimulatedRound(
   });
 
   const transcript: Array<{ role: 'assistant' | 'user'; content: string }> = [
-    { role: 'assistant', content: scenario.seedQuestion },
+    ...(scenario.precedingLessonHistory ?? []),
   ];
+  const priorLessonQuestions = (scenario.precedingLessonHistory ?? [])
+    .filter((turn) => turn.role === 'assistant')
+    .map((turn) => ({ question: turn.content, assessment: turn.assessment }));
+  const questionDiagnostics: QuestionDiagnostic[] = [
+    {
+      source: 'seed',
+      question: scenario.seedQuestion,
+      assessment: scenario.seedQuestionAssessment,
+      repeatsPriorQuestion: hasQuestionRepeat(
+        scenario.seedQuestion,
+        scenario.seedQuestionAssessment,
+        priorLessonQuestions,
+      ),
+    },
+  ];
+  const askedQuestions: AssessedQuestion[] = [
+    ...priorLessonQuestions,
+    {
+      question: scenario.seedQuestion,
+      assessment: scenario.seedQuestionAssessment,
+    },
+  ];
+  transcript.push({ role: 'assistant', content: scenario.seedQuestion });
   const learnerHistory: LearnerHistoryEntry[] = [];
   const allEvals: ChallengeRoundEvaluationItem[] = [];
+  const tutorTurns: TutorTurn[] = [];
 
   let mentorQuestion = scenario.seedQuestion;
   let signalEmitted = true;
@@ -512,9 +619,20 @@ export async function runSimulatedRound(
         exchangeHistory: toExchangeHistory(transcript),
         currentEventId: deterministicUuid(`${scenario.id}:tutor-q${turnIndex}`),
       });
-      const nextQuestion = await tutorTurn(ctx, learnerAnswer);
-      mentorQuestion = nextQuestion;
-      transcript.push({ role: 'assistant', content: nextQuestion });
+      const nextTurn = normalizeTutorTurn(await tutorTurn(ctx, learnerAnswer));
+      const repeatsPriorQuestion = hasQuestionRepeat(
+        nextTurn.question,
+        nextTurn.assessment,
+        askedQuestions,
+      );
+      tutorTurns.push(nextTurn);
+      questionDiagnostics.push({ ...nextTurn, repeatsPriorQuestion });
+      askedQuestions.push({
+        question: nextTurn.question,
+        assessment: nextTurn.assessment,
+      });
+      mentorQuestion = nextTurn.question;
+      transcript.push({ role: 'assistant', content: nextTurn.question });
     }
   }
 
@@ -531,6 +649,9 @@ export async function runSimulatedRound(
     graderModel: graderModelLabel,
     learnerModel,
     transcript,
+    tutorTurns,
+    questionDiagnostics,
+    conceptEquivalenceKeys: scenario.conceptEquivalenceKeys ?? {},
     evaluations: allEvals,
     decision,
     expectedOutcome: scenario.expectedOutcome,

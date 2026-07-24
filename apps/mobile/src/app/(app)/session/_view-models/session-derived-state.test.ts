@@ -178,7 +178,7 @@ describe('session-derived-state', () => {
     });
   });
 
-  it('falls note subject back to transcript then active session', () => {
+  it('falls effective and note subject back to transcript then active session', () => {
     expect(
       deriveSessionSubjectState({
         classifiedSubject: null,
@@ -189,8 +189,11 @@ describe('session-derived-state', () => {
         routeTopicId: undefined,
         transcriptTopicId: 'transcript-topic',
         activeSessionTopicId: 'active-topic',
-      }).noteSubjectId,
-    ).toBe('transcript-subject');
+      }),
+    ).toMatchObject({
+      effectiveSubjectId: 'transcript-subject',
+      noteSubjectId: 'transcript-subject',
+    });
 
     expect(
       deriveSessionSubjectState({
@@ -204,6 +207,7 @@ describe('session-derived-state', () => {
         activeSessionTopicId: 'active-topic',
       }),
     ).toMatchObject({
+      effectiveSubjectId: 'active-subject',
       noteSubjectId: 'active-subject',
       noteTopicId: 'active-topic',
     });

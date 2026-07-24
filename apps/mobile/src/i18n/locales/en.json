@@ -853,7 +853,6 @@
     "speakingPractice": {
       "title": "Say it back",
       "subtitle": "Repeat the line",
-      "subtitleShadowing": "Speak along with the audio, a beat behind",
       "playAudioLabel": "Play target sentence",
       "stopAudioLabel": "Stop target audio",
       "startRecordingLabel": "Start speaking attempt",

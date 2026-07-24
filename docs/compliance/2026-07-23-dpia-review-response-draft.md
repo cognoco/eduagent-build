@@ -1,5 +1,10 @@
 # Draft response to DPIA evidence request
 
+> **Superseded snapshot — do not send.** This retained draft is incomplete
+> (questions 7–10 are absent) and contains production and launch-policy claims
+> corrected on 24 July 2026. Use the
+> [current working response](DPO%20exchanges/2026-07-23-dpia-review-response-draft.md).
+
 **Review date:** 23 July 2026  
 **Status:** Draft for management, DPO/counsel, Engineering, Operations, and Product completion  
 **Purpose:** Answer the questions that current evidence supports, identify what cannot yet be supplied, and define the close artifact for each gap.

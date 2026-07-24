@@ -1,399 +1,542 @@
-# Draft response to DPIA evidence request
+# Draft response to Stephan’s DPIA review
 
-**Review date:** 23 July 2026<br>
-**Status:** Draft for management, DPO/counsel, Engineering, Operations, and Product completion<br>
-**Purpose:** Answer the questions that current evidence supports, identify what cannot yet be supplied, and define the close artifact for each gap.
+**Review received:** 23 July 2026<br>
+**Response revised:** 24 July 2026<br>
+**Status:** Draft for management attestation and DPO/counsel review<br>
+**Source review:** [Stephan’s complete ten-point review](2026-07-23-dpo-dpia-review-findings.md)<br>
+**Decision annex:** [Management and DPO sign-off annex](2026-07-24-stephan-decision-annex.md)<br>
+**Current configuration evidence:** [Privacy surface evidence refresh — 24 July 2026](../privacy-surface-evidence-2026-07-24.md)
 
-> This is an evidence response, not legal advice or a management attestation. The operator has confirmed that the historical “Cognoco s.r.o.” reference was fabricated, that no such entity exists in this context, and that it has no role in MentoMate processing. Item 6 of the request supplied to us contained only the heading “Retention and deletion”; this draft gives the evidence presently available and flags that the reviewer's complete item 6 must still be obtained.
+Hi Stephan,
+
+Thank you for the detailed cross-read. We agree with your central conclusion:
+the DPIA is not ready for signature and production processing involving
+children should not begin until the material blockers are closed and evidenced.
+
+We will send the OpenAI DPA pack separately as a rolling submission. We are
+collecting the equivalent executed terms, annexes, configuration, retention,
+subprocessor, transfer, incident, and rights-support evidence for Anthropic and
+Cerebras. We will not treat a vendor’s public privacy page, an API key, or a
+repository description as a substitute for the applicable executed contract
+and account configuration.
+
+This response distinguishes four evidence states:
+
+- **Verified in current code** means the behaviour is present on current
+  `origin/main` and was inspected against source and tests.
+- **Observed in production** means a dated configuration, deployment, runtime,
+  database, or request-trace artefact exists.
+- **Management decision** means the controller has chosen a product posture; it
+  is not a legal conclusion or DPO approval.
+- **Open** means the response cannot responsibly claim completion.
 
 ## Executive response
 
-| Item | Present answer | Status |
+| Review item | Present answer | State |
 |---|---|---|
-| 1. Controller | The intended controller is **ZWIZZLY AS**, organisation number **811 696 072**, Fiskekroken 3B, 0139 Oslo, Norway. “Cognoco s.r.o.” was a historical fabricated reference, not an entity with any role in MentoMate processing. | **Identity supplied; establishment and management attestation required** |
-| 2. Production architecture | The 22 July 2026 production evidence shows routing v2 enabled and active credentials for Cerebras, Mistral, OpenAI, Anthropic, and Voyage. Gemini/Vertex is excluded from every production routing-v2 selection, not only from routes for minors. | **Substantially answerable; contractual and console evidence missing** |
-| 3. Scope and launch | The ratified launch product is consumer-only, credentialised, and 13+; under-13 support is built but dormant. A closed beta of 5–10 families with 13+ teenagers is planned. The implementation will represent every EEA country plus the UK. Initial launch enablement will be limited to countries whose verified national Article 8 self-consent threshold is 13 and whose other launch gates pass; all other represented countries remain blocked for fast follow. Exact enabled countries, public-launch volume, and the current production child-user count are not yet established by evidence. | **Launch rule supplied; country verification and operational attestation required** |
-| 4. Legal bases | A working purpose-by-purpose matrix can be supplied. It is not yet a final legal-basis determination. The country matrix will cover every EEA country plus the UK, fail closed for unknown residence, and distinguish initial threshold-13 candidates from higher-threshold fast-follow countries. | **DPO/counsel approval and verified country data required** |
-| 5. Special-category data | The categorical statement that no Article 9 data can be collected or inferred is not supportable for an open-text AI service. Current controls are useful but too narrow to close this risk. | **DPIA correction and engineering/legal remediation required** |
-| 6. Retention and deletion | Raw-transcript purge and account-deletion mechanics can be evidenced. Dormancy, survivor-record periods, provider retention, and complete special-category deletion cannot. | **Partial; complete reviewer wording and further evidence required** |
+| 1. Controller | ZWIZZLY AS, organisation number 811 696 072, Fiskekroken 3B, 0139 Oslo, Norway is the intended controller. Main establishment, accountable executive, lead authority, and cross-surface consistency still require signed evidence. | **Partial** |
+| 2. Production architecture | Routing v2 is enabled in the production-source configuration. The live Worker is 332 commits behind current main and has Gemini registered. Current routing-v2 code excludes Gemini/Vertex, but key absence, current-code deployment, serving region, and request-level route evidence cannot be claimed. | **Material production gap** |
+| 3. Scope and countries | Launch is consumer-only and 13+. Only jurisdictions whose current Article 8 self-consent threshold is verified as 13 may be enabled. Higher-threshold countries are a later expansion after jurisdiction-aware guardian authorisation is implemented and approved. Unknown or unverified residence fails closed. | **Management decision; implementation and legal verification open** |
+| 4. Legal bases and consent | A proposed purpose matrix can be supplied, but counsel/DPO must approve it. Current code is not country-aware and does not consistently require an affirmative adult `llm_disclosure` grant before AI use. | **Open blocker** |
+| 5. Article 9 | We withdraw any categorical claim that special-category data cannot be processed. The service does not intentionally solicit or use it, but incidental disclosure, inference, and storage are foreseeable; current suppression is narrow. | **Open blocker** |
+| 6. Retention | Transcript purge and account/consent-deletion workflows exist, but configuration is not proof of execution. Derived records, dormancy, provider retention, backups/caches, monitoring coverage, and end-to-end erasure evidence remain incomplete. | **Open blocker** |
+| 7. Other providers/transfers | The code can identify functions and likely data flows. Legal roles, contracting entities, executed terms, locations, retention, transfer mechanisms, and TIAs require a vendor-by-vendor evidence pack. | **Open blocker** |
+| 8. Rights/access | Owner export and deletion exist, and guardian views are designed not to expose raw private chats by default. Export completeness, correction/restriction/objection, external erasure, staff access, identity verification, and cross-profile testing remain incomplete. | **Partial** |
+| 9. Transparency/consultation | An in-chat AI disclosure exists. The adult and child notices remain drafts and need accurate controller/DPO, memory, profiling, retention, recipient, transfer, and store information. Article 35(9) consultation needs a documented decision and evidence. | **Open blocker** |
+| 10. Approval | We accept your proposed sequence. Management will make the final proceed/no-proceed decision after receiving your separate opinion. Article 36 will be decided after residual-risk reassessment. | **Agreed process** |
 
-No final DPIA approval should be requested until the establishment, accountable-manager, launch-country, Article 8, provider-contract, and Article 9 matters below are closed.
+## Provider-contract submission
+
+For each LLM provider pack we will supply, where applicable:
+
+1. the complete executed DPA and evidence of acceptance, version, and date;
+2. all annexes, security terms, product terms, and incorporated documents;
+3. contracting entity, account/product tier, and configured service;
+4. models and data flows actually used;
+5. subprocessor list and change-notification mechanism;
+6. processing locations and remote-access posture;
+7. SCC, Data Privacy Framework, adequacy, or other transfer mechanism;
+8. retention/deletion and training/service-improvement terms;
+9. special privacy/retention settings and dated console evidence;
+10. incident and data-subject-rights assistance terms.
+
+OpenAI, Anthropic, and Cerebras will be submitted on a rolling basis. No provider
+may receive children’s data merely because its adapter exists or its credential
+is present.
 
 ## 1. Controller identity and establishment
 
-### What can be supplied now
+### Evidence supported now
 
-The operator has confirmed that the intended controller is:
+The intended controller is:
 
 > **ZWIZZLY AS**<br>
 > Norwegian organisation number **811 696 072**<br>
 > Fiskekroken 3B, 0139 Oslo, Norway
 
-This identity is currently repeated in the:
+The official
+[Brønnøysund Register Centre entry](https://virksomhet.brreg.no/en/oppslag/enheter/811696072)
+confirms that legal name, organisation number, form, and registered address.
+Repository-held DPIA, RoPA, notices, breach plan, and store-review drafts use
+ZWIZZLY AS.
 
-- [main DPIA](dpia.md);
-- [RoPA](ropa.md);
-- [filled EDPB DPIA companion](edpb_dpia_filled_2026_v1.md);
-- [breach-response plan](breach-response-plan.md);
-- adult privacy notice, child-readable summary, and all repository-held translations in the mobile application;
-- repository-held app-store reviewer notes and compliance checklist.
+### Challenge and limitation
 
-The official [Brønnøysund Register Centre entry for organisation number 811 696 072](https://virksomhet.brreg.no/en/oppslag/enheter/811696072) confirms the legal name, organisation form, number, and registered business address. A digitally signed company certificate or registered-information extract should be downloaded from that official entry and placed in the approval evidence pack.
+A Norwegian registered address does not by itself prove main establishment or
+the lead supervisory authority. The decision must be based on where decisions
+about the purposes and essential means are made and can be implemented. The
+[Datatilsynet cross-border guidance](https://www.datatilsynet.no/regelverk-og-verktoy/internasjonalt/grenseoverskridende-behandling-av-personopplysninger/)
+supports that factual analysis.
 
-The repository contains no current compliance artifact naming Cognoco s.r.o. as controller. The operator has confirmed that the name came from a historical hallucination, does not identify an entity involved with MentoMate, and should be removed from any external material where it survives. It does not create a joint-controller or group-company question.
+The repository cannot prove:
 
-### What cannot yet be supplied
+- where the relevant decision-makers work and exercise authority;
+- the accountable executive’s identity and role;
+- executed contracts and live Apple/Google console identity;
+- that the historical “Cognoco s.r.o.” reference is absent from every external
+  system;
+- the final competent or lead supervisory authority.
 
-We cannot yet confirm:
+We therefore do **not** ask you to accept the earlier unsupported conclusion
+that the fabricated reference creates no controller or joint-controller issue.
+Management must attest the underlying facts and external search.
 
-- where the people who actually decide the purposes and essential means of processing are based;
-- which establishment has authority to make and implement those decisions;
-- the accountable management decision-maker by name and role;
-- the final competent or lead supervisory authority;
-- consistency with executed contracts or the live Apple and Google store-console records, because those records are not in the repository.
+### Close artefact
 
-The current documents name the Norwegian Datatilsynet as lead supervisory authority. That conclusion is conditional, not established merely by a Norwegian registered address. The [Datatilsynet’s cross-border-processing guidance](https://www.datatilsynet.no/regelverk-og-verktoy/internasjonalt/grenseoverskridende-behandling-av-personopplysninger/) explains that the main establishment turns on where decisions about the purposes and means are made and can be implemented. If those facts point elsewhere, the supervisory-authority analysis must be revised.
-
-### Close action
-
-Management and DPO/counsel should produce one signed **controller and establishment memorandum** containing:
-
-1. the selected controller’s full legal name, number, legal form, and registered address;
-2. a current digitally signed registry extract;
-3. a factual account of where decisions about purposes and essential means are made, by whom, and which establishment can implement them;
-4. the named accountable executive and their role;
-5. the reasoned competent/lead-supervisory-authority conclusion;
-6. a recorded correction that “Cognoco s.r.o.” was fabricated and has no controller, processor, joint-controller, or group-company role;
-7. an appendix reconciling the signed conclusion against the DPIA, RoPA, privacy notices, child notice, processor contracts, terms, breach plan, support/rights workflow, and both live app-store consoles, including removal of any surviving fabricated reference.
-
-Compliance should now search external contracts, publication systems, and both live app-store consoles for the fabricated name, remove it wherever found, and retain dated screenshots or exports. The **controller identity** is resolved as ZWIZZLY AS; the **main-establishment, accountable-manager, lead-authority, and cross-surface verification** evidence remains open.
+A signed controller/main-establishment memorandum, registry extract, named
+accountable executive, reasoned supervisory-authority conclusion, and dated
+reconciliation across the DPIA, RoPA, notices, terms, contracts, rights
+workflow, support system, and both app-store consoles.
 
 ## 2. Current production architecture and LLM routing
 
-### Authoritative engineering snapshot available now
+### Production facts observed on 24 July
 
-The following is the current engineering inventory as of the production evidence check on **22 July 2026**. That check found `LLM_ROUTING_V2_ENABLED=true`, `CHALLENGE_ROUND_GRADER_ENABLED=true`, and credentials present for Cerebras, Mistral, OpenAI, Anthropic, and Voyage without exposing the credential values. The code authority is the [LLM model register](../registers/llm-models/master.md), `apps/api/src/services/llm/router.ts`, and the routing tests named below.
+The `mentomate/prd` source configuration had:
 
-| Provider and model | Production role | Route status | Can receive children’s data? |
-|---|---|---|---|
-| Cerebras — `gpt-oss-120b` | Default text route for all tiers and asynchronous deep jobs | **Active primary** | **Yes**, including eligible 13+ learners |
-| Mistral — `mistral-small-2603` | Free-tier text fallback and free vision/OCR | **Active primary for free vision; active fallback for text** | **Yes** |
-| OpenAI — `gpt-5-mini` | Paid vision/OCR and paid/free text fallback | **Active primary for paid vision; active fallback for text** | **Yes** |
-| OpenAI — `gpt-5.4` | Plus/Pro/add-on deep reasoning at routing rungs 4–5 | **Active primary for eligible deep-reasoning calls** | **Yes**, for eligible 13+ paid learners |
-| Anthropic — `claude-sonnet-4-6` | Challenge/suitability judge and final text fallback | **Active primary for judge calls; active fallback for text** | **Yes** |
-| Voyage AI — `voyage-3.5`, 1,024 dimensions | Persistent-memory embeddings | **Active processor outside the conversational fallback chain** | **Yes** |
-| Google Gemini / Vertex | Adapter and legacy-path code remain, but routing v2 excludes both providers from every candidate set | **Production-disabled under the enabled routing-v2 policy** | **No under current production policy** |
-| DeepSeek/DeepInfra candidates | Recorded as dormant possibilities; no pinned active route | **Configured in planning material only / inactive** | **No current production route** |
+- `LLM_ROUTING_V2_ENABLED=true`;
+- `CHALLENGE_ROUND_GRADER_ENABLED=true`;
+- credentials present for Cerebras, Mistral, OpenAI, Anthropic, Voyage **and
+  Gemini**.
 
-Cerebras’s role needs to be stated precisely. **`gpt-oss-120b` is an OpenAI-authored open-weight model, while Cerebras is the inference host and the recipient/processor for this route.** OpenAI states that gpt-oss can run through third-party hosting providers and is not served through the OpenAI API. A request routed to `gpt-oss-120b` at Cerebras therefore goes to Cerebras, not to OpenAI. The direct OpenAI API relationship in this inventory is separate and covers `gpt-5-mini` and `gpt-5.4`.
+The scheduled Doppler-to-Worker sync completed successfully shortly before the
+check. The live production health endpoint reported:
 
-The current code supplies routing v2 with `rung`, `llmTier`, and `capability`; it supplies no residence, jurisdiction, or geographic-region input. `pickThroughExchangeRouter()` labels every candidate with the placeholder `servingRegion: 'global'`. For ordinary text, `getModelConfigV2Matrix()` returns Cerebras `gpt-oss-120b` as the universal primary—including for 13+ children—unless the paid deep-reasoning rung selects direct OpenAI instead. The code therefore does not currently enforce regional routing. That control cannot yet be supplied as production evidence; the following paragraph records the implementation commitment rather than describing current behavior.
+- deploy SHA `23951a69` from 14 July 2026;
+- registered providers Gemini, OpenAI, Anthropic, Cerebras, and Mistral.
 
-Cosmo workstream **`WS-32` — Supporter & Linking; owns the jurisdiction-correct consent and family-linking launch path; Open** contains **`WI-2690` — EEA/UK country matrix and consent resolver; supplies the effective-dated canonical jurisdiction result; Ready**. The refined item now covers the stable processing-location policy class and version needed by downstream consumers while explicitly prohibiting provider/model selection inside the country matrix. **`WI-2697` — gate all AI egress on the canonical jurisdiction and processing-location policy; Ready but blocked by `WI-2690`** is the linked implementation item under **`WS-29` — Compliance — Engineering; owns launch-critical compliance engineering; Open**. It covers text, vision/OCR, deep and asynchronous jobs, judge calls, direct embeddings, persistent-memory processing, regional fallback, no-provider-call assertions, and no-partial-persistence behavior.
+That deployed SHA was 332 commits behind current `origin/main`. This corrects
+two overstatements in the earlier draft: Gemini’s production credential is
+present, and current main cannot be described as the currently deployed
+production code. See the
+[dated evidence refresh](../privacy-surface-evidence-2026-07-24.md).
 
-We will implement a separate, linked AI processing-location policy using that authoritative habitual-residence decision. The implementation will support every EEA country plus the UK from the outset rather than encoding a temporary MVP-country list in the router. The launch posture will be: **EEA and UK residents use only routes evidenced as serving in the EEA; unknown or unresolved residence is blocked; unsupported, stale, blocked, legally unverified, or insufficiently assured residence is also blocked; other countries use only the routes and transfer posture approved for their country group.** This is a controller risk-reduction policy, not a claim that GDPR always requires data localisation. The country matrix will return a policy class rather than naming a provider or model; the vetted `allowed_models` rows will map that class to effective model, service, and serving-region choices. This keeps the legal country rules independent of the current vendor set. An EEA serving-region claim will not be treated as proof of end-to-end localisation: provider logging, abuse monitoring, remote support, subprocessors, and administrative access must each remain within the approved transfer posture and supporting evidence.
+### Current-main routing inventory
 
-The control must cover every AI egress path—not only ordinary tutor text—including vision/OCR, premium and asynchronous deep reasoning, judge calls, embeddings, persistent-memory processing, and every fallback. Fallback may select only another route inside the already-approved regional set. If no region-compliant candidate is available, the request must fail closed without AI-provider egress or partial AI-derived persistence. Until this is implemented and evidenced, the DPIA and notices must describe the actual cross-border processing and must not claim EU-resident routing.
+When routing v2 is enabled, current main selects:
 
-Gemini/Vertex is therefore blocked for the **entire current application routing-v2 path**, not merely for minors. The production configuration check did not report a Gemini credential as present. The adapter remains in source for legacy compatibility, so the final deployment evidence should also prove key absence and prevent an unreviewed routing-v2 rollback. Independently, the legacy policy excludes Gemini for minors.
+| Provider/model | Current-main role | Children’s data possible? |
+|---|---|---|
+| Cerebras `gpt-oss-120b` | Default conversational text; deep/asynchronous routes where called through the same router | Yes |
+| Mistral `mistral-small-2603` | Free vision/OCR and free text fallback | Yes |
+| OpenAI `gpt-5-mini` | Paid vision/OCR and text fallback | Yes |
+| OpenAI `gpt-5.4` | Eligible premium/deep rungs | Yes |
+| Anthropic `claude-sonnet-4-6` | Challenge/suitability judge and fallback | Yes |
+| Voyage `voyage-3.5`, 1,024 dimensions | Embeddings outside the conversational fallback chain | Yes |
+| Gemini/Vertex | Excluded from routing-v2 candidates; Gemini adapter is registered when its key exists and legacy code remains | Not under routing v2; regression exposure remains |
 
-### Fallback candidates, effective behavior, and triggers
+Code authority:
+[router](../../../apps/api/src/services/llm/router.ts),
+[provider registration](../../../apps/api/src/middleware/llm.ts), and
+[configuration validation](../../../apps/api/src/config.ts).
 
-The routing-v2 selector contains these candidate preference lists:
+### Fallback behaviour and defects
 
-| Failed starting route | Ordered candidates considered |
-|---|---|
-| Free vision/OCR | Mistral → Anthropic |
-| Paid vision/OCR | OpenAI `gpt-5-mini` → Anthropic |
-| Cerebras, free text | Mistral → Anthropic |
-| Cerebras, paid text | OpenAI `gpt-5-mini` → Anthropic |
-| Mistral text | OpenAI `gpt-5-mini` → Anthropic |
-| OpenAI text | Anthropic |
-| Anthropic text | OpenAI `gpt-5-mini` |
+The implementation does not execute a multi-hop cascade. After the primary
+route exhausts its retry policy, it selects one eligible fallback and makes one
+fallback call. Streaming can fall back only before the first response bytes.
+Transient network/timeout, 408, 429, and 5xx failures are eligible; policy,
+validation, safety, and ordinary client errors are not treated as availability
+failures. Circuit state opens after three recorded failures for 60 seconds, but
+that state is process/isolate-local rather than a durable global control.
 
-These are **not a multi-hop runtime cascade**. The implementation returns the first registered, permitted candidate and makes one fallback call. If that selected fallback also fails, the same request does not continue to the next candidate in the list.
+There is a current same-primary defect:
 
-There is also a current vision-path defect that must be disclosed rather than obscured by the intended list: because the free vision primary is already Mistral and the paid vision primary is already OpenAI `gpt-5-mini`, the selector can choose the same provider/model again as its single “fallback” before Anthropic. Existing routing tests prove that Gemini/Vertex is excluded and that a vision fallback remains vision-capable, but they do not cover this same-primary reselection case.
+- free vision can select Mistral as “fallback” after Mistral failed;
+- paid vision can select `gpt-5-mini` as “fallback” after that same route failed.
 
-Fallback is considered after transient failure: timeout/network failure, HTTP 408, HTTP 429, or HTTP 5xx. Non-transient client, safety, validation, or policy failures are not retried as if they were availability failures. A provider circuit opens after three recorded failures and remains open for 60 seconds. Non-streaming calls allow the initial attempt plus three retries before the single fallback route is considered. Streaming may fall back only before any response bytes have been emitted; a mid-stream failure is surfaced to the caller.
+The code therefore cannot support a statement that vision always fails over to
+a different provider. Nor can the preference list be described as a complete
+runtime chain.
 
-Only registered, permitted providers are eligible. If no approved candidate is available, the router raises an error; it does not select a prohibited route. The fail-closed behavior is covered by:
+### Data sent and identifiers
 
-- `apps/api/src/services/llm/router.fallback-compliance.test.ts`;
-- `apps/api/src/services/llm/router.policy-wiring.test.ts`;
-- `apps/api/src/services/llm/router.v2-matrix.test.ts`.
+Providers receive the learner’s authored conversation content and, for vision,
+the submitted image. System context can include learning state, safety context,
+and persistent-memory material. A minor’s profile display name is excluded;
+an adult’s sanitised first name may be supplied.
 
-### Data sent and minimisation
+`sanitizeUserContent()` removes a server-note marker. It is not a general PII
+or Article 9 egress filter. The minor PII-echo control evaluates provider output
+after provider processing; it does not prevent sensitive input reaching the
+provider. We therefore cannot claim that direct identifiers or sensitive text
+are comprehensively removed before transmission.
 
-Depending on the route, the provider payload may contain:
+### Geography, retention, and fail-closed limits
 
-- the learner’s current message and recent in-session transcript;
-- tutor system instructions;
-- topic and subject titles;
-- conversation language, pronouns, and a derived age band rather than raw date of birth;
-- consent-gated learning context such as interests, strengths, struggles, learning style, onboarding signals, and limited vocabulary context;
-- selected homework-image bytes for an explicit OCR request;
-- tutor output and necessary evaluation context for a judge call;
-- session text selected for embedding, including user and AI text, for Voyage AI.
+The router currently labels candidates with `servingRegion: 'global'`; it
+receives no habitual-residence or jurisdiction input. Provider-side retention,
+training restrictions, remote support, subprocessors, and processing location
+are contractual/account-configuration facts, not established by code.
 
-The application does not intentionally put account, person, organisation, or session database identifiers into conversational provider messages. A minor’s name is excluded at prompt construction and by a second fail-closed egress guard. An unambiguously adult learner’s sanitised first name may be included. Provider outputs return to the API, are safety/structure checked as applicable, and may be stored as the AI response and distilled into summaries, notes, mastery state, or memory. Raw transcripts are subject to the first-party retention process described in section 6.
+Routing v2 excludes Gemini/Vertex and throws if no permitted registered
+candidate exists. That is useful design evidence. It is not sufficient
+production proof while:
 
-### Evidence not yet available
+- production runs an older deployment;
+- Gemini is credentialled and registered;
+- legacy routing and a reversible feature flag remain;
+- there are no retained representative production route traces;
+- the country/processing-location policy is not implemented.
 
-Code cannot establish the following for any provider:
+### Close artefact
 
-- the executed contracting entity, data processing agreement (DPA), service tier, or incorporated security terms;
-- provider-side prompt/output retention and deletion;
-- no-training or zero-data-retention (ZDR) status;
-- actual processing and support-access locations;
-- subprocessors, transfer mechanism, or transfer impact assessment;
-- the exact OpenAI residency configuration—the code uses the standard API endpoint;
-- provider support for data-subject requests and incident notification;
-- whether all production-console settings still match the intended policy;
-- representative production request traces showing the effective provider, model, minimised payload fields, and fallback outcome.
-
-### Close action
-
-Engineering and Operations should issue a versioned **production AI-routing evidence bundle** containing:
-
-1. the deployed commit and deployment identifier;
-2. key-presence and feature-flag attestations with values redacted;
-3. the generated allowlist and model matrix;
-4. passing routing, forbidden-provider, age-policy, retry, and fail-closed tests;
-5. controlled synthetic canary traces for each primary and fallback path—never real child data—including payload-field manifests and the effective provider/model;
-6. proof that prohibited-provider credentials are absent or unusable and that a routing-v2 rollback cannot expose child data;
-7. for every provider, executed DPA/terms, account tier, retention/no-training/ZDR settings, region evidence, subprocessors, transfer mechanism, transfer impact assessment, and deletion/rights support;
-8. the approved AI processing-location policy and completion evidence for `WI-2697`, which consumes the authoritative habitual-residence decision, filters the vetted `allowed_models` set by the applicable policy class, applies the rule to every AI capability and fallback, and fails closed without provider egress when no region-compliant route is available;
-9. passing evidence for the EEA/UK, rest-of-world, unknown-residence, residence-change, provider-outage, fallback-exhaustion, and expired-policy cases.
-
-Engineering must first rule whether the supported policy is a single failover or a true ordered cascade. In either case it must exclude the failed provider/model from candidate selection, add regression tests for free and paid vision, and make the inventory describe effective—not aspirational—behavior.
-
-If every approved route is unavailable, the documented product behavior should be a temporary unavailable/retry response with no prohibited-provider egress. That user-visible behavior and the absence of partial persistence must be covered by an integration test.
+Deploy the approved current code; retain the production workflow and resulting
+health SHA; remove or formally control the dormant Gemini credential; fix and
+test the vision fallback defect; and run synthetic text, vision, deep,
+asynchronous, judge, embedding, outage, and fail-closed traces for adult and
+13–17 profiles. The trace pack must record effective provider, model, region,
+fallback, and persistence result without using real children’s data.
 
 ## 3. Scope, launch countries, and current processing status
 
-### What can be supplied now
+### Management decision
 
-The current ratified product scope in the [MVP definition](../plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md) and [launch runway](../plans/2026-07-10-mvp-roadmap/RUNWAY.md) is:
+The launch perimeter is:
 
-- a direct-to-consumer, credentialised MentoMate service;
-- launch age floor of **13+**;
-- family use at launch means an adult with self-consenting 13+ teenagers;
-- managed under-13 capability is built but dormant and must not be activated at launch;
-- no advertising, emotion recognition, or training of general-purpose models on MentoMate user content;
-- a planned closed beta of **5–10 families with 13+ teenagers** before public launch;
-- school, institutional, and business licensing are future possibilities, not part of the current consumer launch.
+- direct-to-consumer only;
+- credentialled accounts;
+- minimum age 13;
+- no school or institutional deployment;
+- only countries whose **current, verified Article 8 digital self-consent
+  threshold is 13**;
+- unknown, unsupported, stale, or legally unverified residence blocked;
+- under-13 access blocked.
 
-The broader compliance material discusses the EU/EEA, United Kingdom, and United States as possible legal regimes. That is not an approved list of launch countries. Older planning material referring to other country combinations should not be relied on.
+The present candidate set is Belgium, Estonia, Finland, Iceland, Latvia, Malta,
+Norway, Portugal, and Sweden. It is not a final launch allowlist. Each country
+must pass the common launch gates and a launch-day legal check. Norway has a
+pending threshold-change proposal; Portugal has pending legislative change and
+must not be enabled without current counsel confirmation. The sourced working
+matrix is in the
+[13+ EEA country ruling](../2026-07-23-13-plus-eea-launch-country-ruling.md).
 
-Management has now set the implementation and rollout rule. The country-policy implementation will include **every EEA country plus the UK from its first release**. Initial service and store enablement will be limited to countries where current national law has been verified to allow a 13-year-old to provide their own Article 8 consent **and** every other legal, safety, provider, product, store, and operational launch gate has passed. Countries with a higher threshold will remain represented but blocked as fast follow until the required guardian-authorisation flow and other gates are approved. The UK remains separately blocked pending UK-specific legal and Children's Code readiness. Unknown or unresolved habitual residence is blocked.
+After launch, MentoMate intends to add every country it can lawfully and
+operationally support. A higher-threshold country may be enabled only after the
+country matrix and jurisdiction-specific guardian-authorisation flow are
+implemented, legally verified, tested, and activated. That is expansion work,
+not part of the initial launch claim.
 
-This does not describe any country as “risk-free.” The [European Commission's Article 8 guidance](https://commission.europa.eu/law/law-topic/data-protection/rules-business-and-organisations/legal-grounds-processing-data/are-there-any-specific-safeguards-data-about-children_en) confirms that Member States set the parental-consent threshold between 13 and 16 and that the relevant national rule must be checked. A threshold of 13 is therefore one launch condition, not a complete legal-risk determination. The exact initially enabled country list cannot be supplied until each candidate row has current legal provenance and the remaining launch gates have been signed off.
+### Current code gap
 
-### What cannot yet be supplied
+Current code has a minimum profile age of 13 and rejects the under-13 creation
+path. Some family/guardian scaffolding exists, but it is inaccurate to describe
+under-13 support as “built but dormant.”
 
-Current evidence does not establish:
+The implemented residence model collapses geography to `EU`, `US`, or `OTHER`;
+the consent service applies a global guardian rule at age 16 or below. It does
+not resolve national Article 8 thresholds, habitual residence, effective dates,
+or launch-country enablement. Store availability is therefore a
+compliance-load-bearing control until server-side country enforcement exists.
 
-- the exact countries enabled at launch;
-- a public-launch user forecast or age distribution beyond the 13+ floor;
-- anticipated daily/monthly tutoring turns, images, transcript volume, learning-memory volume, or provider token volume;
-- whether the production database currently contains real children’s data;
-- whether the earlier “no production users” statement remains correct on 23 July 2026.
+### Operational facts still required
 
-Repository evidence cannot prove the contents of a live database or distinguish real users from staff, seeds, and test accounts.
+Management/Operations must attest:
 
-### Close action
+- exact enabled Apple and Google countries on the proposed launch date;
+- expected closed-beta and public-launch user counts and age distribution;
+- anticipated transcript, image, memory, assessment, and telemetry volumes;
+- whether any live production processing involving 13–17-year-olds has begun;
+- the current count and age bands of production profiles, including test and
+  staff accounts;
+- that school/institutional use is not being marketed or enabled.
 
-Product and management should sign a **launch-scope statement** recording the rule above, the exact countries that passed it, platform availability, age range, consumer/institutional scope, beta and 12-month user forecasts, and expected processing volumes. Engineering must implement all EEA/UK rows but fail closed unless the effective canonical result says that the country is launch-enabled and the individual is authorised. Unknown or unresolved habitual residence must fail closed.
+The repository cannot prove “no production child users.” That needs a dated
+database query and accountable operational attestation.
 
-The same versioned approved launch-country output must control App Store Connect and Google Play country/territory availability. Blocked, unsupported, or legally unverified countries must not be enabled in a storefront. Storefront, billing, account, device, or app-store country may corroborate a residence assertion but must not replace the reasonably assured habitual residence used for Article 8 or AI-processing decisions. The final evidence bundle should include dated store-console exports tied to the country-policy version.
+The DPIA must be reopened before younger children, additional jurisdictions,
+school/institutional use, grading or placement decisions, advertising, emotion
+recognition, or model training on user data.
 
-Operations should produce a dated, privacy-preserving **production-processing attestation** that:
+## 4. Legal bases, consent, and Article 8
 
-- reports aggregate real-person counts by adult/minor launch-age band and country, excluding documented staff/test/seed records;
-- states the earliest timestamp, if any, at which a real child’s data was processed;
-- checks relevant database, authentication, job, and AI-egress records;
-- records the query or method without exporting children’s personal data;
-- expressly confirms or withdraws the earlier “no production users” statement.
+### Working matrix for legal review
 
-The DPIA change-control section should require reassessment **before** enabling younger children, a new jurisdiction, school/institutional use, grading or placement decisions, advertising, emotion recognition, or model training on user data.
+| Purpose | Data/role | Proposed basis requiring DPO/counsel confirmation |
+|---|---|---|
+| Adult account administration | Account, authentication, profile, service settings | Article 6(1)(b); security/legal records separated below |
+| Child tutoring conversations | Child prompts, images, outputs, session context | Consent under Article 6(1)(a) and Article 8 where the service is offered directly to the child |
+| Persistent learning memory | Summaries, notes, concepts, misconceptions, quotes, embeddings | Consent, separate and as granular as required; necessity and minimisation to be justified |
+| Assessment/progress profiling | Mastery, progress, recommendations, derived learning state | Consent unless counsel establishes another suitable basis; profiling transparency required |
+| Guardian/supporter access | Link, authority, recap/progress visibility | Contract/consent split by actor and purpose; best-interests/necessity assessment |
+| Age/residence/authority | Date of birth, habitual residence, assurance, guardian evidence | Legal obligation and/or legitimate interests as advised; retention minimised |
+| Security and abuse prevention | Logs, identifiers, rate limits, incident records | Article 6(1)(f), with balancing assessment; Article 6(1)(c) where a specific obligation applies |
+| Billing | Purchaser, subscription, transaction and tax records | Articles 6(1)(b) and 6(1)(c), activity by activity |
+| Transactional communications | Verification, receipts, service and safety messages | Article 6(1)(b)/(c)/(f), message by message |
+| Optional communications/waitlist | Email, preferences, provenance | Article 6(1)(a), with independent withdrawal |
 
-## 4. Legal bases, consent, and Article 8 GDPR
+This is a proposal, not the final legal-basis determination.
 
-### Working matrix available now
+### Current consent evidence and challenge
 
-This is a working allocation for counsel review, not a final legal conclusion:
+Current code records `platform_use` and `llm_disclosure` purposes and exposes
+authenticated accept, withdraw, and accountability-history endpoints. A
+parental authorisation path exists for minors.
 
-| Purpose | Data subjects / data | Proposed Article 6 basis | Open legal or implementation point |
-|---|---|---|---|
-| Adult account administration | Adult identity, authentication, settings, support | Art. 6(1)(b), contract | Reconcile contract basis with the product’s separately recorded platform and LLM consents; do not describe necessary service processing as freely withdrawable unless it is |
-| Child tutoring conversations | Child messages, context, AI replies | Art. 6(1)(a), consent | Article 8 capacity/parental authorisation by country; Article 9 handling for incidental disclosures |
-| Persistent learning memory | Summaries, notes, facts, quotations, embeddings | Art. 6(1)(a), consent | Granularity, special-category exclusion, dormancy period, and withdrawal consequence |
-| Learning assessments and progress profiling | Answers, scores, mastery, misconceptions, reports | Art. 6(1)(a), consent | Confirm necessity, access/correction, and that no legally or similarly significant decision is made |
-| Guardian and mentor access | Relationship edges and disclosed learner progress | Art. 6(1)(a), consent, subject to counsel confirmation | Separate authority to consent from authority to view data; approve field-level access and best-interests analysis |
-| Age and residence determination | Birth date, residence, knowledge/assertion history | Arts. 6(1)(c) and/or 6(1)(f), subject to counsel confirmation | Identify the concrete legal obligation and complete a legitimate-interests assessment where used |
-| Security, abuse prevention, and telemetry | Security events, identifiers, errors, limited diagnostics | Art. 6(1)(f), legitimate interests | Complete a legitimate-interests assessment (LIA); prove minimisation, scrubbing, access, and retention |
-| Billing | Payer, subscription, transaction/store identifiers | Art. 6(1)(b), contract; Art. 6(1)(c) for statutory retention | State tax/accounting periods and distinguish active billing from survivor records |
-| Transactional communications | Email/push destination and service/security content | Art. 6(1)(b) and/or 6(1)(c), depending on message | Classify each message; push-notification basis remains open in the RoPA |
-| Optional communications and waitlist | Email, preference, waitlist status | Art. 6(1)(a), consent | Separate from service consent; define proof, withdrawal, suppression, and deletion |
+However, `isLlmExchangeConsentAllowed()` allows AI exchange when there is no
+consent row and denies only an explicit withdrawn state. It is therefore an
+explicit-withdrawal block, not proof of prior affirmative consent for every
+user. The global age-16 rule is not a national Article 8 implementation. The
+code also cannot yet enforce the launch allowlist by habitual residence.
 
-The current implementation records versioned, purpose-specific **`platform_use` — core service-processing consent purpose** and **`llm_disclosure` — AI-provider disclosure consent purpose**, and exposes authenticated self-service acceptance, withdrawal, and accountability endpoints. Code evidence also shows fail-closed consent checks at the conversational route and several asynchronous processing boundaries. That is meaningful evidence, but it is not yet a complete test of every purpose and downstream job.
+### Close artefact
 
-### Article 8 position
-
-A global “13+” label is insufficient to establish valid consent in every EEA country. Article 8 permits Member States to set the child-consent threshold between 13 and 16. For Norway, the [Datatilsynet’s consent guidance](https://www.datatilsynet.no/rettigheter-og-plikter/virksomhetenes-plikter/om-behandlingsgrunnlag/samtykke/) states that parental consent is required below 13 for an information-society service and warns that other EEA states use higher thresholds.
-
-The implementation scope is now fixed at every EEA country plus the UK, with the initial-launch rule described in section 3. The exact initially enabled set still cannot be completed until counsel verifies the national rows and management approves the other launch gates. For each country, counsel must record:
-
-- the applicable Article 8 threshold and source;
-- whether the service is offered directly to a child;
-- the required parental-authorisation method and reasonable verification;
-- the treatment of cross-border families and uncertain residence;
-- the minimum product age, even where legal consent capacity is lower;
-- any rules beyond GDPR, including consumer, education, or child-safety law.
-
-The matrix must keep every higher-threshold country as a resolvable, auditable fast-follow row rather than omitting it. It must also allow a threshold-13 country to remain blocked for a separate reason. No AI provider call may occur when habitual residence is unknown or unresolved, when the country row is not legally verified or launch-enabled, or when the individual lacks the required self-consent or guardian-authorisation result.
-
-### Refusal and withdrawal
-
-Before approval, test and document:
-
-1. refusal at sign-up for each optional and necessary purpose;
-2. withdrawal of `platform_use` without preventing access to rights, export, or deletion;
-3. withdrawal of `llm_disclosure` stopping new LLM and embedding egress, including queued/background work;
-4. restoration, grace-period, archive, and final deletion behavior;
-5. guardian withdrawal and the learner’s changing consent capacity;
-6. residence or age corrections that move the person into a stricter regime;
-7. proof that no consent-dependent derived memory is newly created after withdrawal.
-
-The notice must explain, purpose by purpose, whether refusal means that a feature is unavailable, an optional communication stops, existing data is deleted, or a narrowly defined record must be retained.
+1. DPO/counsel-approved purpose/role/data/basis matrix.
+2. Effective-dated country threshold matrix with primary-law provenance.
+3. Fail-closed habitual-residence and launch-country enforcement.
+4. Affirmative, versioned, purpose-specific consent before applicable AI use.
+5. Jurisdiction-correct guardian authority for later expansion.
+6. Tests for refusal, withdrawal, re-consent, ageing across a threshold,
+   residence change, disputed authority, and deletion/archive consequences.
+7. Notices and product behaviour consistent with the approved matrix.
 
 ## 5. Special-category data
 
-### Corrected present position
+We withdraw the categorical statement that no Article 9 data are collected or
+inferred. For open-text tutoring, incidental disclosure or model-generated
+inference concerning health, disability, religion, politics, ethnicity, sexual
+orientation, or other special-category matters is foreseeable.
 
-We agree that the unqualified statement “no Article 9 data are collected or inferred” is not supportable for an open-text AI tutoring service. A learner can disclose sensitive facts without being asked, an AI provider can generate an inference, and that text can enter a transcript or derived field before a control acts.
+The intended product rule is narrower:
 
-The defensible current position is narrower:
+> MentoMate does not intentionally ask for, infer for product purposes, or use
+> special-category data to personalise tutoring, assess the learner, advertise,
+> or train models. Incidental processing remains a risk that must be minimised,
+> suppressed from durable learning records, and given short retention.
 
-> MentoMate does not intend to solicit, infer, or use special-category data for tutoring or profiling. Incidental disclosure and model-generated sensitive content are foreseeable risks. Such content must be prevented from entering persistent learning memory and handled under a documented short-retention, deletion, safeguarding, and legal process.
+### Current controls and their limit
 
-The final Article 9 conclusion—including whether any remaining operation constitutes processing of special-category data and, if so, the applicable Article 9(2) condition—belongs to DPO/counsel. Explicit consent should not be assumed to solve the issue, especially for children.
+The
+[persisted-learning-text guard](../../../apps/api/src/services/persisted-learning-text-guard.ts)
+blocks a small English-language list of explicit health/disability
+characterisations in selected learning fields. It does not cover all Article 9
+categories, languages, paraphrases, contextual inferences, raw transcripts,
+summaries, or every derived record. `sanitizeUserContent()` is not a sensitive
+data filter. These controls cannot support an “Article 9 out” implementation
+claim.
 
-### Controls that can be evidenced now
+The crisis path records limited event metadata and directs the user toward
+external help. It does not notify a guardian. Whether that is an appropriate
+safeguarding posture requires a documented legal, clinical/safeguarding, and
+best-interests review; code cannot decide it.
 
-- A central persisted-learning-text guard rejects or removes a narrow set of explicit health/disability attributions before selected LLM-written memory facts, topic notes, and misconception text are stored.
-- A guard test checks that the control remains wired into the identified persistence boundaries.
-- Prompting discourages requests for unnecessary personally identifying information.
-- Crisis handling can produce a structured redirect and metadata-only safety event; the event does not include the child’s disclosure and does not automatically notify a guardian.
-- Raw transcripts have a first-party 30-day purge mechanism after summary generation.
+### Close artefact
 
-### Why the present controls are insufficient
+- child-readable discouragement and just-in-time notices;
+- prompt and server controls against solicitation/unnecessary inference;
+- multilingual detection/suppression tests across every memory and derived
+  field;
+- prohibition on durable storage and profiling use;
+- short, explicit retention and deletion rules, including provider handling;
+- safeguarding/crisis procedure, escalation boundaries, and ownership;
+- documented Article 9 legal conclusion addressing incidental processing and
+  any applicable condition or prohibition.
 
-The persisted-learning guard:
-
-- mainly recognises a narrow English-language health/disability vocabulary;
-- does not comprehensively cover racial or ethnic origin, political opinions, religion or beliefs, trade-union membership, genetic/biometric identification, health, sex life, or sexual orientation;
-- does not establish coverage for every supported conversation language;
-- does not remove sensitive content from the raw transcript;
-- does not prove coverage across summaries, recaps, assessment evidence, challenge-round quotations, learning-profile fields, embeddings, and every other derived free-text field;
-- cannot reliably distinguish all sensitive disclosures or model-generated inferences.
-
-Current evidence also does not show:
-
-- a child-readable instruction not to share sensitive information;
-- a comprehensive prompt rule against soliciting or unnecessarily inferring Article 9 information;
-- a tested server-side, multilingual suppression policy at every persistence and embedding boundary;
-- a complete safeguarding/mandatory-reporting procedure, legal escalation owner, or localised crisis-resource workflow;
-- a signed Article 9 legal memorandum.
-
-### Close action
-
-Before approval:
-
-1. inventory every user-authored, provider-generated, derived, quoted, summarised, and embedded text field and its retention path;
-2. add age-appropriate pre-chat and contextual warnings that do not blame the child;
-3. prohibit solicitation and unnecessary inference in system prompts;
-4. implement a central, server-side, multilingual special-category policy that fails closed for persistent memory and embeddings;
-5. prevent flagged content from being embedded and delete any corresponding vectors;
-6. define whether and how sensitive raw-transcript segments are redacted or deleted earlier than the ordinary transcript window;
-7. test all Article 9 categories, supported languages, paraphrases, indirect inference, quotations, summaries, and every persistent-memory field;
-8. finish the safeguarding/crisis runbook, including human ownership, response times, mandatory-reporting analysis, confidentiality, and country-appropriate resources;
-9. have DPO/counsel approve a revised [Article 9 decision](art9-special-category-decision.md) and synchronise the DPIA, RoPA, notices, retention schedule, and processor instructions.
-
-The present DPIA and RoPA statements that special-category processing is absent should be amended now, rather than waiting for the controls to be completed.
+The internal product decision not to use Article 9 data is useful risk intent;
+it is not legal or technical closure.
 
 ## 6. Retention and deletion
 
-### Scope caveat
+### Current code evidence
 
-The received request stops after the heading “6. Retention and deletion.” The following answers the likely evidence question without inventing the reviewer’s missing sub-questions. The complete wording should be requested and appended before this response is finalised.
+The daily transcript-purge job is gated by `RETENTION_PURGE_ENABLED`, which was
+`true` in the 24 July production-source configuration. It selects completed
+sessions 30 days after `summaryGeneratedAt`, requires complete summary fields,
+and processes at most 100 eligible sessions per run. A delayed/incomplete check
+starts at day 37 and processes at most 50 records.
 
-### Evidence available now
+Important gaps:
 
-| Data/process | Current evidence | Qualification |
+- sessions with `summaryGeneratedAt=null` are not covered by the delayed query;
+- backlogs beyond the batch caps are not proved absent;
+- Voyage embedding creation occurs before transcript deletion and a Voyage
+  failure can delay deletion;
+- configuration and cron registration do not prove execution or deletion;
+- summaries, assessments, mastery, misconceptions, notes, quotes, and
+  replacement embeddings survive according to separate or undefined periods.
+
+The account-deletion workflow has a seven-day grace period and coordinates
+database erasure with Clerk and external billing teardown, with retries and
+terminal alerting. Consent withdrawal also uses a seven-day grace period;
+eligible older profiles may choose a 30-day archive. The archive-cleanup path
+does not have equivalent dedicated terminal-failure evidence. There is no
+complete general dormancy sweep.
+
+### Retention schedule still required
+
+The approved schedule must separately cover:
+
+- account/profile and identity/authority evidence;
+- raw conversation events, images, and attachments;
+- summaries, recaps, notes, quotes, assessments, mastery, misconceptions,
+  recommendations, and embeddings;
+- consent grants/withdrawals and accountability evidence;
+- billing, tax, and transaction records;
+- security, telemetry, Sentry/error, support, and incident records;
+- waitlist and optional communications;
+- deletion-job logs and legal holds;
+- caches, queues, vector stores, replicas, backups, and provider copies.
+
+### Close artefact
+
+Production scheduler history, backlog metrics, failure/terminal alerts,
+representative database sampling, a null-summary/backlog remediation test,
+provider deletion evidence, backup/restore-deletion policy, and an end-to-end
+erasure test covering the database, vector data, Clerk, billing, messaging,
+observability, queues, caches, and each processor.
+
+## 7. Other providers and international transfers
+
+The provider register must include more than the three LLM vendors:
+
+| Provider/category | Processing function evidenced in the product | Evidence not established by code |
 |---|---|---|
-| Raw tutoring transcript | Daily purge selects transcripts 30 days after summary generation; production `RETENTION_PURGE_ENABLED` was verified enabled on 22 July 2026 | Delayed or incomplete summaries are detected from day 37; monitoring evidence should accompany the claim |
-| Persistent learning memory | Summaries, memory facts, notes, mastery, and some short quotations persist for teaching continuity | No implemented general dormancy sweep is presently proved; quotation age-out remains open |
-| Account deletion | Seven-day cancellable grace period, then deletion workflow removes person and learning data and requests deletion of the external Clerk identity | Limited consent, financial, and deletion-audit records are deliberately re-homed before deletion |
-| Consent withdrawal | Seven-day restoration window followed by deletion or an optional 30-day archive path in defined cases | DPO must approve the best-interests, eligibility, notice, and retention policy |
-| Bring-your-own-key (BYOK) waitlist | Delete flow includes removal of the waitlist email | Confirm whether the waitlist is live and include it in the final purpose/retention matrix |
-| Provider-held prompts, outputs, and images | Application code shows what is transmitted but not provider-side deletion | DPA, account-setting, retention, and deletion evidence required per provider |
+| Clerk | Authentication and account identity | Contracting entity, executed DPA, locations, retention, transfer/TIA |
+| Voyage AI | Learning-memory embeddings | Executed terms, retention/training, locations, subprocessors, transfer/TIA |
+| Stripe/RevenueCat | Payments, subscriptions, entitlements, webhooks | Activity-specific role, terms, retention, transfers, erasure limits |
+| Resend | Transactional email | Executed terms, locations, retention, subprocessors, transfer/TIA |
+| Sentry | Error and performance observability | Scrubbing effectiveness, retention, locations, terms, transfer/TIA |
+| Inngest | Durable workflow/event orchestration | Payload inventory, terms, retention, locations, transfer/TIA |
+| Neon/AWS | Primary database and underlying infrastructure | Contract chain, region, backups, subprocessors, transfer/TIA |
+| Cloudflare | API execution, network/security, KV and operational metadata | Activity-specific role, locations, logs, terms, transfer/TIA |
+| Expo/EAS | Build/update and mobile operational services | Payload boundary, role, terms, locations, retention, transfer/TIA |
+| APNs/FCM | Push delivery | Payload minimisation, role, terms, retention, transfer analysis |
+| Apple/Google | Store distribution, payments, device/platform services | Controller/processor role per activity, notices, terms, transfers |
 
-### What cannot yet be supplied
+For each row the pack must contain the function, data fields, data-subject
+groups, legal role, contracting entity, executed agreement, subprocessors,
+processing/remote-access locations, retention/deletion, security evidence,
+transfer mechanism, and TIA where required.
 
-- final retention periods for **`person_retain` — survivor-record tier outside the deleted person; holds minimal consent, financial, and deletion-audit evidence**;
-- the dormancy period and an implemented, monitored dormancy deletion job;
-- a field-complete retention schedule for all identity, learning, assessment, support, telemetry, notification, security, and waitlist data;
-- proof that sensitive content and its embeddings are deleted from every copy;
-- provider-side retention/deletion and backup-expiry evidence;
-- a legal-hold procedure and clear suspension/resumption of deletion;
-- end-to-end deletion evidence across all processors and subprocessors;
-- the reviewer’s actual item 6 questions.
+Apple and Google will be assessed activity by activity; we will not assume one
+role covers store distribution, payment, analytics, notifications, and device
+services.
 
-### Close action
+## 8. Rights, access controls, and guardian visibility
 
-Create a DPO-approved retention schedule at field/system/processor level with trigger, active period, grace period, backup period, legal basis for any survivor, deletion method, verification method, and owner. Populate the currently provisional survivor-record periods, implement and monitor dormancy deletion, and run synthetic end-to-end deletion exercises across MentoMate and each processor. Record request, execution, provider confirmation, exception, and final verification timestamps without retaining the deleted content as evidence.
+### What current code supports
 
-## Consolidated close-artifact register
+Authenticated account owners can request export and account deletion. Export
+includes substantial profile, session/event, summary, assessment, and embedding
+data. Owner-only controls hide export/delete, billing, and account security from
+non-owner child profiles.
 
-| Priority | Owner | Required artifact | Gate |
-|---|---|---|---|
-| 1 | Management + DPO/counsel | Signed controller and establishment memorandum, registry evidence, accountable executive, supervisory-authority analysis | Before DPIA finalisation |
-| 2 | Product + management + Store owner | Signed launch-scope statement applying the verified threshold-13-plus-other-gates rule; complete EEA/UK matrix with higher-threshold countries blocked for fast follow; matching versioned App Store/Play country-territory availability export | Before store distribution and DPIA finalisation |
-| 3 | Operations | Dated production-user/child-processing attestation | Before any claim that no production child processing has occurred |
-| 4 | Engineering + Operations | Versioned deployed routing inventory, tests, synthetic traces, fail-closed and rollback evidence | Before provider-risk approval |
-| 5 | Vendor owner + DPO/counsel | DPA, tier, retention/no-training/ZDR, residency, subprocessor, transfer, rights, and deletion evidence for every active AI processor | Before child data is sent to that processor |
-| 6 | DPO/counsel | Final purpose/data-subject/legal-basis matrix, LIAs, country-specific Article 8 matrix, and refusal/withdrawal consequences | Before DPIA sign-off |
-| 7 | Engineering + Safety + DPO/counsel | Special-category field inventory, suppression controls/tests, safeguarding runbook, and signed Article 9 conclusion | Before DPIA sign-off |
-| 8 | DPO/counsel + Engineering + Operations | Complete retention schedule and end-to-end deletion evidence | Before DPIA sign-off |
-| 9 | Compliance + Store owner | Reconciled DPIA, RoPA, notices, contracts, support material, and live app-store exports | Immediately after decisions 1–8 |
+The guardian/supporter design exposes recaps and progress rather than raw
+private conversations, notes, or memory by default. That is the intended
+least-visibility posture.
 
-## Sources and evidence boundary
+### Gaps
 
-Primary repository sources:
+The export is not demonstrably complete; at least topic-note and
+concept-mastery coverage needs reconciliation. End-to-end evidence is also
+missing for:
 
-- [Privacy-surface engineering evidence — 22 July 2026](privacy-surface-evidence-2026-07-22.md)
-- [DPIA](dpia.md)
-- [RoPA](ropa.md)
-- [Article 9 decision draft](art9-special-category-decision.md)
-- [LLM model register](../registers/llm-models/master.md)
-- [MVP definition](../plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md)
-- [Launch runway](../plans/2026-07-10-mvp-roadmap/RUNWAY.md)
-- `apps/api/src/services/llm/router.ts`
-- `apps/api/src/services/embeddings.ts`
-- `apps/api/src/services/persisted-learning-text-guard.ts`
-- `apps/api/src/inngest/functions/transcript-purge-cron.ts`
-- `apps/api/src/services/identity-v2/deletion-v2.ts`
-- `apps/api/src/inngest/functions/account-deletion.ts`
-- `apps/api/src/inngest/functions/consent-revocation.ts`
+- correction of date of birth, residence, authority, and inferred learning
+  data, including disputed inferences;
+- restriction and objection;
+- consent withdrawal consequences;
+- portability format and completeness;
+- external-provider deletion;
+- identity and authority verification for rights requests;
+- staff/privileged access and audit;
+- cross-profile and cross-tenant isolation;
+- guardian/supporter unlink, expiry, and access revocation.
 
-External primary sources:
+Application-level scoping tests are useful. The controller’s separate risk
+acceptance of application-layer rather than database-native row-level security
+is a management risk decision, not evidence that cross-tenant access is
+impossible or DPO-approved.
 
-- [EU General Data Protection Regulation](https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng), including Articles 6, 8, 9, 30, 35, and 56
-- [Brønnøysund Register Centre — ZWIZZLY AS, organisation number 811 696 072](https://virksomhet.brreg.no/en/oppslag/enheter/811696072)
-- [Norwegian Datatilsynet — cross-border processing and lead authority](https://www.datatilsynet.no/regelverk-og-verktoy/internasjonalt/grenseoverskridende-behandling-av-personopplysninger/)
-- [Norwegian Datatilsynet — consent and children](https://www.datatilsynet.no/rettigheter-og-plikter/virksomhetenes-plikter/om-behandlingsgrunnlag/samtykke/)
-- [OpenAI — open-weight gpt-oss models and third-party hosting](https://help.openai.com/en/articles/11870455-openai-open-weight-models-gpt-oss)
+### Close artefact
 
-The final evidence pack should identify the exact deployed commit and attach machine-generated results. Repository paths and dates in this draft are evidence pointers, not substitutes for signed legal decisions, live-console exports, provider contracts, or production attestations.
+A rights test matrix using adult owner, 13–17 learner, guardian/supporter,
+former guardian, and staff roles; complete export schema reconciliation; and
+end-to-end access, correction, withdrawal, restriction, objection, portability,
+and erasure tests across internal and external systems.
+
+Guardian access to raw child conversations must remain off by default unless a
+documented necessity, proportionality, best-interests, transparency, and
+authorisation assessment supports a specific exception.
+
+## 9. Transparency, child consultation, and AI disclosure
+
+The chat UI shows the message “You’re talking to an AI mentor.” That is useful
+point-of-interaction disclosure. It does not complete the transparency package.
+
+The repository-held adult notice and child-readable summary remain drafts. They
+must accurately and consistently explain:
+
+- controller and working DPO/rights contact details;
+- AI interaction and relevant limitations;
+- persistent memory, assessment, profiling, derived records, and guardian
+  visibility;
+- purposes, legal bases, recipients, processing locations, transfers, and
+  retention;
+- consent/refusal/withdrawal and rights;
+- crisis/safeguarding limits;
+- actual launch countries and age rules;
+- app-store declarations.
+
+We agree that use of the UK Children’s Code as a design reference does not
+replace the Article 35(9) assessment. Management must choose and document one of:
+
+1. age-appropriate comprehension/usability consultation with children and
+   guardians before public child processing; or
+2. a reasoned conclusion that consultation is not appropriate, with an
+   alternative evidence method and your review.
+
+The recommended route is consultation using prototypes and synthetic content,
+without recruiting participants into live child-data processing before the
+DPIA gate is closed.
+
+## 10. Approval process
+
+We accept your proposed sequence and role separation.
+
+No public child processing should begin until the launch blockers are closed
+and evidenced. A tightly controlled non-child synthetic production test does
+not change that rule. If management proposes any child beta before final
+approval, it must be presented as a separate, specifically assessed decision
+with its own lawful basis, notices, safeguards, data minimisation, stopping
+rules, and DPO advice; this draft does not authorise it.
+
+The closure sequence is:
+
+1. reconcile the DPIA and Technical Companion to verified production facts;
+2. approve and implement the legal-basis and Article 8 position;
+3. complete the Article 9 and safeguarding conclusion;
+4. review all provider contracts, locations, transfers, retention, and TIAs;
+5. verify the controls, rights, retention, deletion, and route traces;
+6. publish consistent adult, child, just-in-time, and store transparency;
+7. reassess every residual risk;
+8. decide whether Article 36 prior consultation is required;
+9. obtain and record the DPO’s separate opinion and recommendations;
+10. have accountable management make and sign the proceed/no-proceed decision.
+
+Your signature would record independent DPO advice and review. It would not
+constitute the controller’s approval. The accompanying
+[decision annex](2026-07-24-stephan-decision-annex.md) is structured to preserve
+that distinction.
+
+Best regards,<br>
+Zuzana
