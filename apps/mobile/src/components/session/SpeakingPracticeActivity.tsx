@@ -65,7 +65,7 @@ export function SpeakingPracticeActivity({
             const result = await recordAttempt.mutateAsync({
               sessionId,
               subjectId,
-              mode: speakingPractice.type,
+              mode: 'repeat_after_me',
               targetText: speakingPractice.targetText,
               transcript: trimmed,
               locale: speakingPractice.locale,

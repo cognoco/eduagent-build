@@ -183,6 +183,66 @@ describe('SpeakingPracticeActivity', () => {
     await screen.findByText('Try again: would, a, of');
   });
 
+  it('persists legacy shadowing events as repeat-after-me attempts', async () => {
+    mockMutateAsync.mockResolvedValue({
+      attemptNumber: 1,
+      lexicalMatchScore: 1,
+      missingWords: [],
+      extraWords: [],
+      isComplete: true,
+    });
+    const shadowingActivity: LanguageLearningActivityEvent = {
+      ...makeActivity(),
+      activityType: 'shadowing',
+      speakingPractice: {
+        ...makeActivity().speakingPractice!,
+        type: 'shadowing',
+      },
+    };
+
+    const { rerender } = render(
+      <SpeakingPracticeActivity
+        activity={shadowingActivity}
+        sessionId="session-1"
+        subjectId="subject-1"
+      />,
+    );
+
+    mockSttState = {
+      status: 'listening',
+      transcript: 'I would like a cup of tea',
+      error: null,
+      isListening: true,
+    };
+    rerender(
+      <SpeakingPracticeActivity
+        activity={shadowingActivity}
+        sessionId="session-1"
+        subjectId="subject-1"
+      />,
+    );
+
+    mockSttState = {
+      status: 'idle',
+      transcript: 'I would like a cup of tea',
+      error: null,
+      isListening: false,
+    };
+    await act(async () => {
+      rerender(
+        <SpeakingPracticeActivity
+          activity={shadowingActivity}
+          sessionId="session-1"
+          subjectId="subject-1"
+        />,
+      );
+    });
+
+    expect(mockMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'repeat_after_me' }),
+    );
+  });
+
   it('does not submit when recording stops with an empty transcript', async () => {
     const { rerender } = render(
       <SpeakingPracticeActivity
