@@ -6936,6 +6936,14 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scenario: 'v2-supporter-pending-link',
         shard: 1,
       },
+      // [WI-2176] Orion-small-phone Support-hub geometry — exact Support
+      // hub + one supportee + Me shape, Account action, separate cold-launch
+      // persistence checks for Me/person, and deterministic hierarchy endpoint.
+      {
+        flow: 'flows/v2/v2-supporter-scope-geometry.yaml',
+        scenario: 'v2-supporter-self-learning-active',
+        shard: 1,
+      },
       // [WI-2241] Supporter scope journey — Support hub -> person scope ->
       // Mentor -> Subjects -> Journal -> Support hub, structural/negative
       // walls, empty-record honest-empty-state, revoked-edge affordance
@@ -9181,6 +9189,65 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           id: 'visibility-shared-record',
         },
       },
+    ]);
+  });
+
+  it('[WI-2176] waits for persisted scope hydration after cold release relaunches', () => {
+    const geometryFlow = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/v2/v2-supporter-scope-geometry.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(geometryFlow)[1]?.toJS() as unknown;
+
+    expect(Array.isArray(commands)).toBe(true);
+    if (!Array.isArray(commands)) {
+      throw new Error('supporter scope geometry commands must be a YAML list');
+    }
+
+    const coldRelaunches = commands.flatMap((command, index) =>
+      command === 'stopApp' ? [commands.slice(index, index + 5)] : [],
+    );
+
+    expect(coldRelaunches).toEqual([
+      [
+        'stopApp',
+        { launchApp: { clearState: false } },
+        {
+          extendedWaitUntil: {
+            visible: { id: 'scope-chip-persisted-me' },
+            timeout: 120000,
+          },
+        },
+        { assertVisible: { id: 'mentor-screen' } },
+        {
+          assertVisible: {
+            id: 'scope-chip-option-me',
+            selected: true,
+          },
+        },
+      ],
+      [
+        'stopApp',
+        { launchApp: { clearState: false } },
+        {
+          extendedWaitUntil: {
+            visible: {
+              id: 'scope-chip-persisted-person-${SUPPORTEE_PERSON_ID}',
+            },
+            timeout: 120000,
+          },
+        },
+        { assertVisible: { id: 'person-scope-mentor-tab' } },
+        {
+          assertVisible: {
+            id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}',
+            selected: true,
+          },
+        },
+      ],
     ]);
   });
 

@@ -215,10 +215,16 @@ export function SupportHubMentorTab({
     >
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1">
-          <Text className="text-h2 font-semibold text-text-primary">
+          <Text
+            className="text-h2 font-semibold text-text-primary"
+            testID="support-hub-mentor-heading"
+          >
             {title}
           </Text>
-          <Text className="mt-1 text-body-sm text-text-secondary">
+          <Text
+            className="mt-1 text-body-sm text-text-secondary"
+            testID="support-hub-mentor-subtitle"
+          >
             {activePersonScope
               ? t('supportHub.mentor.personSubtitle')
               : t('supportHub.mentor.subtitle')}

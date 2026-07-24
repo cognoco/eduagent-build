@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -26,6 +27,7 @@ interface ScopeContextValue {
   scopeList: SupporterScopeList;
   availableScopes: ScopeDescriptor[];
   activeScope: ScopeDescriptor;
+  isActiveScopePersisted: boolean;
   setActiveScope: (scope: ScopeDescriptor) => void;
   isLoading: boolean;
   error: Error | null;
@@ -77,18 +79,30 @@ function ScopeStateProvider({
 }): React.ReactElement {
   const [userScopeKey, setUserScopeKey] = useState<string | null>(null);
   const [storedScopeKey, setStoredScopeKey] = useState<string | null>(null);
+  const [persistedScopeKey, setPersistedScopeKey] = useState<string | null>(
+    null,
+  );
+  const persistenceRequestIdRef = useRef(0);
 
   useEffect(() => {
+    const requestId = ++persistenceRequestIdRef.current;
     setStoredScopeKey(null);
+    setPersistedScopeKey(null);
     if (!profileId) return;
 
     let cancelled = false;
     void SecureStore.getItemAsync(getLastActiveScopeStorageKey(profileId))
       .then((value) => {
-        if (!cancelled) setStoredScopeKey(value);
+        if (!cancelled && persistenceRequestIdRef.current === requestId) {
+          setStoredScopeKey(value);
+          setPersistedScopeKey(value);
+        }
       })
       .catch(() => {
-        if (!cancelled) setStoredScopeKey(null);
+        if (!cancelled && persistenceRequestIdRef.current === requestId) {
+          setStoredScopeKey(null);
+          setPersistedScopeKey(null);
+        }
       });
 
     return () => {
@@ -136,9 +150,19 @@ function ScopeStateProvider({
       if (scope.kind !== 'me' && !isKnownScope(scope, scopeList.scopes)) return;
       const nextScopeKey = scopeKey(scope);
       setUserScopeKey(nextScopeKey);
+      const requestId = ++persistenceRequestIdRef.current;
+      setPersistedScopeKey(null);
       if (profileId) {
         const key = getLastActiveScopeStorageKey(profileId);
-        void SecureStore.setItemAsync(key, nextScopeKey).catch(() => undefined);
+        void SecureStore.setItemAsync(key, nextScopeKey)
+          .then(() => {
+            if (persistenceRequestIdRef.current === requestId) {
+              setPersistedScopeKey(nextScopeKey);
+            }
+          })
+          .catch(() => {
+            console.warn('[scope-context] failed to persist active scope');
+          });
       }
     },
     [profileId, scopeList],
@@ -149,11 +173,22 @@ function ScopeStateProvider({
       scopeList,
       availableScopes,
       activeScope,
+      isActiveScopePersisted:
+        persistedScopeKey !== null &&
+        persistedScopeKey === scopeKey(activeScope),
       setActiveScope,
       isLoading,
       error,
     }),
-    [activeScope, availableScopes, error, isLoading, scopeList, setActiveScope],
+    [
+      activeScope,
+      availableScopes,
+      error,
+      isLoading,
+      persistedScopeKey,
+      scopeList,
+      setActiveScope,
+    ],
   );
 
   return (

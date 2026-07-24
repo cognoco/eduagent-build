@@ -1,7 +1,10 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { installSeededProfileBootstrap } from '../../helpers/profile-bootstrap';
 import { emulateNativeTopSafeArea } from '../../helpers/native-safe-area';
+import { pressableClick } from '../../helpers/pressable';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -345,4 +348,162 @@ test('J-03 360px long supporter scopes remain operable and clear pushed content 
       headingClearsChrome: true,
       tallerThanAvatar: true,
     });
+});
+
+test('J-03 360px longest localized supporter labels clear native chrome and Mentor copy @smoke', async ({
+  page,
+}) => {
+  const localeDirectory = path.join(
+    process.cwd(),
+    'apps',
+    'mobile',
+    'src',
+    'i18n',
+    'locales',
+  );
+  const localizedSupportHubLabels = fs
+    .readdirSync(localeDirectory)
+    .filter((file) => file.endsWith('.json'))
+    .map((file) => {
+      const catalog = JSON.parse(
+        fs.readFileSync(path.join(localeDirectory, file), 'utf8'),
+      ) as { scopeChip?: { supportHub?: unknown } };
+      const hubLabel = catalog.scopeChip?.supportHub;
+      if (typeof hubLabel !== 'string' || hubLabel.length === 0) {
+        throw new Error(`${file} is missing scopeChip.supportHub`);
+      }
+      return { code: path.basename(file, '.json'), hubLabel };
+    })
+    .sort((left, right) => left.code.localeCompare(right.code));
+
+  await page.setViewportSize({ width: 360, height: 760 });
+  await emulateNativeTopSafeArea(page, 47);
+  await installLongSupporterScopes(page);
+  await openSeededParent(page);
+
+  for (const locale of localizedSupportHubLabels) {
+    await page.goto('/more/account', { waitUntil: 'commit' });
+    await expect(page.getByTestId('more-account-scroll')).toBeVisible({
+      timeout: 60_000,
+    });
+    await pressableClick(page.getByTestId('settings-app-language'));
+    await expect(page.getByTestId('app-language-backdrop')).toBeVisible({
+      timeout: 15_000,
+    });
+    await pressableClick(page.getByTestId(`language-option-${locale.code}`));
+    await expect(page.getByTestId('app-language-backdrop')).not.toBeVisible({
+      timeout: 15_000,
+    });
+
+    await page.goto('/mentor', { waitUntil: 'commit' });
+    await applyScopeTextScale(page);
+
+    const hubOption = page.getByTestId('scope-chip-option-supporter-hub');
+    await expect(hubOption).toBeVisible({ timeout: 60_000 });
+    await expect(hubOption).toHaveAccessibleName(locale.hubLabel);
+    await expect(hubOption).toContainText(locale.hubLabel);
+    await pressableClick(hubOption);
+
+    const scopeShell = page.getByTestId('scope-chip-shell');
+    const avatarShell = page.getByTestId('account-avatar-shell');
+    const heading = page.getByTestId('support-hub-mentor-heading');
+    const subtitle = page.getByTestId('support-hub-mentor-subtitle');
+    await expect(heading).toBeVisible({ timeout: 60_000 });
+    await expect(subtitle).toBeVisible();
+
+    await expect
+      .poll(async () => {
+        const [scopeBox, avatarBox, hubBox, headingBox, subtitleBox] =
+          await Promise.all([
+            scopeShell.boundingBox(),
+            avatarShell.boundingBox(),
+            hubOption.boundingBox(),
+            heading.boundingBox(),
+            subtitle.boundingBox(),
+          ]);
+        if (!scopeBox || !avatarBox || !hubBox || !headingBox || !subtitleBox) {
+          return null;
+        }
+        const chromeBottom = Math.max(
+          scopeBox.y + scopeBox.height,
+          avatarBox.y + avatarBox.height,
+        );
+        return {
+          headingClearsChrome: headingBox.y >= chromeBottom - 0.5,
+          hubClearsAvatar: hubBox.x + hubBox.width <= avatarBox.x - 8,
+          hubTargetHeight: hubBox.height >= 44,
+          subtitleClearsHeading:
+            subtitleBox.y >= headingBox.y + headingBox.height - 0.5,
+        };
+      })
+      .toEqual({
+        headingClearsChrome: true,
+        hubClearsAvatar: true,
+        hubTargetHeight: true,
+        subtitleClearsHeading: true,
+      });
+  }
+});
+
+test('J-03 normal-width tablet and desktop scope strips remain one vertically-contained row @smoke', async ({
+  page,
+}) => {
+  const viewports = [
+    { height: 1024, surface: 'tablet', width: 768 },
+    { height: 1080, surface: 'desktop', width: 1440 },
+  ];
+  await page.setViewportSize(viewports[0]);
+  await installLongSupporterScopes(page);
+  await openSeededParent(page);
+
+  const scopeChip = page.getByTestId('scope-chip');
+  const scopeShell = page.getByTestId('scope-chip-shell');
+  const avatarShell = page.getByTestId('account-avatar-shell');
+  const options = page.locator('[data-testid^="scope-chip-option-"]');
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    await expect(scopeChip).toBeVisible({ timeout: 60_000 });
+    await expect(options).toHaveCount(5);
+
+    const rowGeometry = await options.evaluateAll((elements) => {
+      const boxes = elements.map((element) => element.getBoundingClientRect());
+      const top = Math.min(...boxes.map((box) => box.top));
+      const bottom = Math.max(...boxes.map((box) => box.bottom));
+      return {
+        bottomSpread:
+          Math.max(...boxes.map((box) => box.bottom)) -
+          Math.min(...boxes.map((box) => box.bottom)),
+        rowHeight: bottom - top,
+        topSpread:
+          Math.max(...boxes.map((box) => box.top)) -
+          Math.min(...boxes.map((box) => box.top)),
+      };
+    });
+    expect(rowGeometry.topSpread, viewport.surface).toBeLessThanOrEqual(1);
+    expect(rowGeometry.bottomSpread, viewport.surface).toBeLessThanOrEqual(1);
+
+    const chipGeometry = await scopeChip.evaluate((element) => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+    }));
+    expect(
+      chipGeometry.scrollHeight - chipGeometry.clientHeight,
+      viewport.surface,
+    ).toBeLessThanOrEqual(1);
+    expect(rowGeometry.rowHeight, viewport.surface).toBeLessThanOrEqual(
+      chipGeometry.clientHeight + 1,
+    );
+
+    const [scopeBox, avatarBox] = await Promise.all([
+      scopeShell.boundingBox(),
+      avatarShell.boundingBox(),
+    ]);
+    expect(scopeBox, viewport.surface).not.toBeNull();
+    expect(avatarBox, viewport.surface).not.toBeNull();
+    expect(scopeBox!.y, viewport.surface).toBeCloseTo(avatarBox!.y, 0);
+    expect(scopeBox!.x + scopeBox!.width, viewport.surface).toBeLessThanOrEqual(
+      avatarBox!.x - 8,
+    );
+    await expectTopmostAtCenter(options.first());
+  }
 });

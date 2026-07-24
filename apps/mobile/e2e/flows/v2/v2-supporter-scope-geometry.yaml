@@ -1,0 +1,147 @@
+# [WI-2176] Orion-native Support-hub scope geometry and persistence evidence.
+#
+# The `v2-supporter-self-learning-active` seed yields exactly three options:
+# Support hub, one accepted supportee (`Test Supportee`), and Me. This journey
+# proves each option and Account remain actionable, then proves Me and person
+# selection survive separate cold relaunches without a compensating re-tap.
+#
+# Run on Orion's API-34 emulator with the V2 release APK at 1080x2280/480 dpi
+# (360x760 logical dp), font_scale=1.0. After the final screenshot, run:
+#   powershell -NoProfile -ExecutionPolicy Bypass `
+#     -File apps/mobile/e2e/scripts/capture-wi2176-orion-header.ps1
+# That capture's UIAutomator verifier owns numeric safe-area, 8dp separation,
+# 44x44 target, exact-option, accessible-label, heading, and subtitle bounds.
+#
+# SEED_SCENARIO: 'v2-supporter-self-learning-active'
+appId: com.mentomate.app
+tags:
+  - v2
+  - navigation
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: 'v2-supporter-self-learning-active'
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: 'support-hub-mentor-tab'
+    timeout: 30000
+- assertVisible:
+    id: 'scope-chip-option-supporter-hub'
+    enabled: true
+    selected: true
+- assertVisible:
+    id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}'
+    enabled: true
+- assertVisible:
+    id: 'scope-chip-option-me'
+    enabled: true
+- assertVisible:
+    id: 'account-avatar-button'
+    enabled: true
+- assertVisible:
+    id: 'support-hub-mentor-heading'
+- assertVisible:
+    id: 'support-hub-mentor-subtitle'
+
+# Account round-trip from the populated Support-hub header.
+- tapOn:
+    id: 'account-avatar-button'
+    point: '50%,50%'
+- extendedWaitUntil:
+    visible:
+      id: 'account-screen'
+    timeout: 15000
+- tapOn:
+    id: 'account-back'
+- extendedWaitUntil:
+    visible:
+      id: 'support-hub-mentor-tab'
+    timeout: 15000
+- assertVisible:
+    id: 'scope-chip-option-supporter-hub'
+    selected: true
+
+# Persisted Me: cold relaunch and require the learner Mentor surface plus the
+# selected Me option before any scope control is tapped.
+- tapOn:
+    id: 'scope-chip-option-me'
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'scope-chip-option-me'
+    selected: true
+- extendedWaitUntil:
+    visible:
+      id: 'scope-chip-persisted-me'
+    timeout: 15000
+- stopApp
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible:
+      id: 'scope-chip-persisted-me'
+    timeout: 120000
+- assertVisible:
+    id: 'mentor-screen'
+- assertVisible:
+    id: 'scope-chip-option-me'
+    selected: true
+
+# Persisted person: select the only supportee, cold relaunch, and require the
+# person Mentor surface plus selected state before any scope control is tapped.
+- tapOn:
+    id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-mentor-tab'
+    timeout: 15000
+- assertVisible:
+    id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}'
+    selected: true
+- extendedWaitUntil:
+    visible:
+      id: 'scope-chip-persisted-person-${SUPPORTEE_PERSON_ID}'
+    timeout: 15000
+- stopApp
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible:
+      id: 'scope-chip-persisted-person-${SUPPORTEE_PERSON_ID}'
+    timeout: 120000
+- assertVisible:
+    id: 'person-scope-mentor-tab'
+- assertVisible:
+    id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}'
+    selected: true
+
+# Deterministic final endpoint for structured hierarchy capture. Return the
+# horizontal scope strip to its start edge before selecting Support hub.
+- swipe:
+    from:
+      id: 'scope-chip'
+    direction: RIGHT
+    duration: 400
+- extendedWaitUntil:
+    visible:
+      id: 'scope-chip-option-supporter-hub'
+    timeout: 5000
+- tapOn:
+    id: 'scope-chip-option-supporter-hub'
+- extendedWaitUntil:
+    visible:
+      id: 'support-hub-mentor-tab'
+    timeout: 15000
+- assertVisible:
+    id: 'scope-chip-option-supporter-hub'
+    selected: true
+- assertVisible:
+    id: 'support-hub-mentor-heading'
+- assertVisible:
+    id: 'support-hub-mentor-subtitle'
+- takeScreenshot: wi2176-orion-360x760-support-hub-header
