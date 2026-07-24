@@ -3718,6 +3718,8 @@
     "bridge": {
       "headline": "Gjør «Jeg forstår det ikke» til «Dette har jeg.»",
       "supporting": "Opprett en gratis konto så mentoren kan huske fagene, notatene og fremgangen din.",
+      "parentHeadline": "Fortsett med kontoen din for å støtte eleven.",
+      "parentSupporting": "Logg inn eller registrer deg for å godta invitasjonen og konfigurere støtte. Kontoen din gir ikke tilgang til læringsaktivitet med mindre eleven godkjenner det.",
       "primaryCta": "Opprett gratis konto",
       "secondaryCta": "Jeg har allerede en konto"
     },

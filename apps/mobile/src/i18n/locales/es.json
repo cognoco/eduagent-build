@@ -3718,6 +3718,8 @@
     "bridge": {
       "headline": "Convierte el \"No lo entiendo\" en \"Lo tengo claro\".",
       "supporting": "Crea una cuenta gratuita para que tu mentor pueda recordar tus materias, notas y progreso.",
+      "parentHeadline": "Continúa con tu cuenta para apoyar al estudiante.",
+      "parentSupporting": "Inicia sesión o regístrate para aceptar la invitación y configurar el apoyo. Tu cuenta no da acceso a la actividad de aprendizaje, a menos que el estudiante lo autorice.",
       "primaryCta": "Crear cuenta gratuita",
       "secondaryCta": "Ya tengo una cuenta"
     },
