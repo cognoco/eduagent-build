@@ -10,7 +10,7 @@ const { join } = require('path');
 module.exports = {
   displayName: '@eduagent/api:integration',
   rootDir: '../..',
-  testEnvironment: 'node',
+  testEnvironment: join(__dirname, '../../tests/unit/api-test-environment.cjs'),
   transform: {
     '^.+\\.ts$': [
       'ts-jest',

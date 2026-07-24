@@ -14,7 +14,6 @@ import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import type { NowCard, NowDeepLink, NowResponse } from '@eduagent/schemas';
 
 import {
-  ColdStartCard,
   LightPracticeAffordance,
   MentorCelebration,
   MentorInputBar,
@@ -275,6 +274,10 @@ function LearnerMentorScreen(): React.ReactElement {
   const rewardReceipt = rewardReceiptFromFeed(feed);
   const reviewsDue = countReviewsDue(feed);
   const showHomeworkPrompt = isSchoolDayEvening() && firstRealState;
+  const showColdStartPrompts =
+    !firstRealState &&
+    !(nowFeed.isLoading && !feed) &&
+    !(nowFeed.isError && !feed);
 
   const setArcState = (card: NowCard, arcState: NowCardArcState): void => {
     const key = getNowCardDismissKey(card);
@@ -447,13 +450,7 @@ function LearnerMentorScreen(): React.ReactElement {
       />
     );
   } else if (!firstRealState) {
-    renderedFeed = (
-      <ColdStartCard
-        onFill={() => undefined}
-        onSubmitText={handleSubmitText}
-        onOpenCamera={() => pushMentorHomeworkCamera(router)}
-      />
-    );
+    renderedFeed = null;
   } else if (feed) {
     // Error with a populated cache: keep the cached cards AND synthesize a
     // client-side "continue where you left off" card so this branch is never a
@@ -569,6 +566,7 @@ function LearnerMentorScreen(): React.ReactElement {
               the keyboard no longer covers it while typing. */}
           <MentorInputBar
             unavailable={nowFeed.isError && !feed}
+            showColdStartPrompts={showColdStartPrompts}
             onSubmitText={handleSubmitText}
             onOpenCamera={() => pushMentorHomeworkCamera(router)}
             onOpenHomework={() => pushMentorHomework(router, homeworkSubject)}

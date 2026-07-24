@@ -28,7 +28,7 @@ const ciDefaults = process.env.CI
 module.exports = {
   displayName: '@eduagent/api',
   rootDir: '../..',
-  testEnvironment: 'node',
+  testEnvironment: join(__dirname, '../../tests/unit/api-test-environment.cjs'),
   ...ciDefaults,
   transform: {
     '^.+\\.ts$': [
