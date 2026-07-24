@@ -2,7 +2,8 @@ import type { InputMode } from '@eduagent/schemas';
 import React from 'react';
 import { Alert } from 'react-native';
 import { fireEvent, waitFor, act, within } from '@testing-library/react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { usePreventRemove } from '@react-navigation/native';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { QuotaExceededError } from '../../../lib/api-client';
 import * as Sentry from '@sentry/react-native';
@@ -368,6 +369,11 @@ const mockSetSessionInputMode = jest.fn();
 const mockFlagSessionContent = jest.fn();
 const mockReplace = jest.fn();
 const mockSetParams = jest.fn();
+const mockDispatch = jest.fn();
+let mockPreventRemoveEnabled = false;
+let mockBeforeRemove:
+  | ((options: { data: { action: { type: string } } }) => void)
+  | null = null;
 const mockUseSession = jest.fn<
   { data: null | Record<string, unknown> },
   [string?]
@@ -502,11 +508,17 @@ const mockReadAsStringAsync = (
 
 jest.mock('expo-router', () => ({
   useRouter: jest.fn(),
+  useNavigation: jest.fn(),
   useLocalSearchParams: jest.fn(),
   useFocusEffect: (callback: () => void) => {
     const { useEffect } = require('react');
     useEffect(() => callback(), [callback]);
   },
+}));
+
+jest.mock('@react-navigation/native', () => ({
+  ...jest.requireActual('@react-navigation/native'),
+  usePreventRemove: jest.fn(),
 }));
 
 jest.mock(
@@ -724,6 +736,18 @@ describe('SessionScreen homework flow', () => {
       replace: mockReplace,
       setParams: mockSetParams,
     });
+    (useNavigation as jest.Mock).mockReturnValue({
+      dispatch: mockDispatch,
+    });
+    (usePreventRemove as jest.Mock).mockImplementation(
+      (
+        preventRemove: boolean,
+        callback: (options: { data: { action: { type: string } } }) => void,
+      ) => {
+        mockPreventRemoveEnabled = preventRemove;
+        mockBeforeRemove = callback;
+      },
+    );
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'homework',
       subjectId: SUBJECT_ID,
@@ -999,6 +1023,203 @@ describe('SessionScreen homework flow', () => {
     testScreen.unmount();
   });
 
+  it.each([
+    ['Android hardware back', { type: 'GO_BACK' }],
+    ['native stack gesture', { type: 'POP' }],
+  ])(
+    '[WI-2234] routes %s through the exact Mentor feed projection before leaving',
+    async (_exitKind, action) => {
+      (useLocalSearchParams as jest.Mock).mockReturnValue({
+        mode: 'learning',
+        subjectId: SUBJECT_ID,
+        subjectName: 'Math',
+        topicId: TOPIC_ID,
+        topicName: 'Linear equations',
+        returnTo: 'mentor',
+      });
+
+      const testScreen = renderSessionScreen();
+      const queryClient = activeRender!.queryClient;
+      const exactKey = queryKeys.now.feed(
+        NOW_FEED_ACTOR_ID,
+        ACTIVE_PROFILE_ID,
+        NOW_FEED_POLICY_EPOCH,
+      );
+      const wrongKeys = [
+        ['now-feed', ACTIVE_PROFILE_ID, NOW_FEED_POLICY_EPOCH],
+        ['now-feed', 'other-actor', ACTIVE_PROFILE_ID, NOW_FEED_POLICY_EPOCH],
+        [
+          'now-feed',
+          NOW_FEED_ACTOR_ID,
+          CHILD_PROFILE_ID,
+          NOW_FEED_POLICY_EPOCH,
+        ],
+        ['now-feed', NOW_FEED_ACTOR_ID, ACTIVE_PROFILE_ID, 'other-epoch'],
+      ] as const;
+      let releaseExactRefresh!: (value: { cards: never[] }) => void;
+      const exactRefresh = new Promise<{ cards: never[] }>((resolve) => {
+        releaseExactRefresh = resolve;
+      });
+      const exactQuery = jest
+        .fn()
+        .mockResolvedValueOnce({ cards: [] })
+        .mockReturnValueOnce(exactRefresh);
+      const descendantQuery = jest.fn().mockResolvedValue({ cards: [] });
+      const wrongQueries = wrongKeys.map(() =>
+        jest.fn().mockResolvedValue({ cards: [] }),
+      );
+
+      await act(async () => {
+        await queryClient.fetchQuery({
+          queryKey: exactKey,
+          queryFn: exactQuery,
+          staleTime: Infinity,
+        });
+        await queryClient.fetchQuery({
+          queryKey: [...exactKey, 'descendant'],
+          queryFn: descendantQuery,
+          staleTime: Infinity,
+        });
+        await Promise.all(
+          wrongKeys.map((queryKey, index) =>
+            queryClient.fetchQuery({
+              queryKey,
+              queryFn: wrongQueries[index]!,
+              staleTime: Infinity,
+            }),
+          ),
+        );
+      });
+
+      expect(mockPreventRemoveEnabled).toBe(true);
+      expect(mockBeforeRemove).not.toBeNull();
+
+      act(() => {
+        mockBeforeRemove!({ data: { action } });
+      });
+
+      await waitFor(() => expect(exactQuery).toHaveBeenCalledTimes(2));
+      expect(mockReplace).not.toHaveBeenCalled();
+      expect(mockPreventRemoveEnabled).toBe(true);
+      expect(descendantQuery).toHaveBeenCalledTimes(1);
+      for (const wrongQuery of wrongQueries) {
+        expect(wrongQuery).toHaveBeenCalledTimes(1);
+      }
+
+      await act(async () => {
+        releaseExactRefresh({ cards: [] });
+        await exactRefresh;
+      });
+
+      await waitFor(() =>
+        expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor'),
+      );
+      await waitFor(() => expect(mockPreventRemoveEnabled).toBe(true));
+      expect(mockReplace).toHaveBeenCalledTimes(1);
+
+      testScreen.unmount();
+    },
+  );
+
+  it('[WI-2234] leaves non-Mentor native removal behavior unguarded', () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: SUBJECT_ID,
+      subjectName: 'Math',
+      returnTo: 'learner-home',
+    });
+
+    const testScreen = renderSessionScreen();
+    const invalidateSpy = jest.spyOn(
+      activeRender!.queryClient,
+      'invalidateQueries',
+    );
+
+    expect(mockPreventRemoveEnabled).toBe(false);
+    expect(invalidateSpy).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+
+    testScreen.unmount();
+  });
+
+  it('[WI-2234] re-arms after replaying an intentional Session replacement exactly once', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: SUBJECT_ID,
+      subjectName: 'Math',
+      returnTo: 'mentor',
+    });
+    const replacementAction = {
+      type: 'REPLACE',
+      payload: { name: 'session-summary' },
+    };
+
+    const testScreen = renderSessionScreen();
+    const invalidateSpy = jest.spyOn(
+      activeRender!.queryClient,
+      'invalidateQueries',
+    );
+
+    expect(mockPreventRemoveEnabled).toBe(true);
+    act(() => {
+      mockBeforeRemove!({ data: { action: replacementAction } });
+    });
+
+    await waitFor(() =>
+      expect(mockDispatch).toHaveBeenCalledWith(replacementAction),
+    );
+    await waitFor(() => expect(mockPreventRemoveEnabled).toBe(true));
+    expect(mockDispatch).toHaveBeenCalledTimes(1);
+    expect(invalidateSpy).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+
+    testScreen.unmount();
+  });
+
+  it.each([
+    ['Android hardware back', { type: 'GO_BACK' }],
+    ['native stack gesture', { type: 'POP' }],
+  ])(
+    '[WI-2234] re-arms %s after a failed Mentor refresh and retries without a navigation loop',
+    async (_exitKind, action) => {
+      (useLocalSearchParams as jest.Mock).mockReturnValue({
+        mode: 'learning',
+        subjectId: SUBJECT_ID,
+        subjectName: 'Math',
+        topicId: TOPIC_ID,
+        topicName: 'Linear equations',
+        returnTo: 'mentor',
+      });
+
+      const testScreen = renderSessionScreen();
+      const invalidateSpy = jest
+        .spyOn(activeRender!.queryClient, 'invalidateQueries')
+        .mockRejectedValueOnce(new Error('Now feed unavailable'))
+        .mockResolvedValueOnce(undefined);
+
+      act(() => {
+        mockBeforeRemove!({ data: { action } });
+      });
+
+      await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(1));
+      expect(mockReplace).not.toHaveBeenCalled();
+      expect(mockPreventRemoveEnabled).toBe(true);
+
+      act(() => {
+        mockBeforeRemove!({ data: { action } });
+      });
+
+      await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(2));
+      await waitFor(() =>
+        expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor'),
+      );
+      await waitFor(() => expect(mockPreventRemoveEnabled).toBe(true));
+      expect(mockReplace).toHaveBeenCalledTimes(1);
+
+      testScreen.unmount();
+    },
+  );
+
   it('[WI-2234] keeps the learner in Session when the Mentor refresh fails and allows a successful retry', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
@@ -1180,7 +1401,7 @@ describe('SessionScreen homework flow', () => {
     testScreen.unmount();
   });
 
-  it('[WI-2234] does not use the unhydrated-epoch escape when the actor binding is missing', async () => {
+  it('[WI-2234] falls back to Mentor without claiming a scoped refresh when the actor binding is missing', async () => {
     (useAuth as jest.Mock).mockReturnValue({
       userId: null,
       getToken: jest.fn().mockResolvedValue(null),
@@ -1213,12 +1434,10 @@ describe('SessionScreen homework flow', () => {
       within(expiredMessage).getByTestId('session-expired-go-home'),
     );
 
-    await act(async () => {
-      jest.advanceTimersByTime(2000);
-    });
-
     expect(invalidateSpy).not.toHaveBeenCalled();
-    expect(mockReplace).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor'),
+    );
 
     testScreen.unmount();
   });

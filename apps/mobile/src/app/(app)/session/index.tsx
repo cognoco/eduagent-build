@@ -1,6 +1,10 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@clerk/expo';
+import {
+  usePreventRemove,
+  type NavigationAction,
+} from '@react-navigation/native';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { platformAlert } from '../../../lib/platform-alert';
 import { goBackOrReplace, MENTOR_RETURN_TO } from '../../../lib/navigation';
@@ -8,6 +12,7 @@ import { shouldShowBookLink } from '../../../lib/show-book-link';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import {
   useRouter,
+  useNavigation,
   useLocalSearchParams,
   useFocusEffect,
   type Href,
@@ -407,6 +412,10 @@ function SessionScreenInner() {
   const { epoch: observedNowFeedEpoch, hydrated: nowFeedEpochHydrated } =
     useObservedPolicyEpoch(userId, activeProfile?.id);
   const [pendingMentorReturn, setPendingMentorReturn] = useState(false);
+  const [mentorReturnReady, setMentorReturnReady] = useState(false);
+  const [deferredRemovalAction, setDeferredRemovalAction] =
+    useState<NavigationAction | null>(null);
+  const navigation = useNavigation();
   const canRefreshMentorFeed =
     returnTo === MENTOR_RETURN_TO &&
     !!userId &&
@@ -431,6 +440,27 @@ function SessionScreenInner() {
       { throwOnError: true },
     );
   }, [activeProfile?.id, observedNowFeedEpoch, queryClient, userId]);
+  const startMentorReturn = useCallback(() => {
+    setMentorReturnReady(false);
+    setPendingMentorReturn(true);
+  }, []);
+  usePreventRemove(
+    returnTo === MENTOR_RETURN_TO &&
+      !mentorReturnReady &&
+      deferredRemovalAction === null,
+    ({ data: { action } }) => {
+      if (action.type !== 'GO_BACK' && action.type !== 'POP') {
+        setDeferredRemovalAction(action);
+        return;
+      }
+      startMentorReturn();
+    },
+  );
+  useEffect(() => {
+    if (!deferredRemovalAction) return;
+    navigation.dispatch(deferredRemovalAction);
+    setDeferredRemovalAction(null);
+  }, [deferredRemovalAction, navigation]);
   useEffect(() => {
     if (!pendingMentorReturn) return;
 
@@ -440,13 +470,18 @@ function SessionScreenInner() {
     if (!nowFeedEpochHydrated) {
       const timer = setTimeout(() => {
         setPendingMentorReturn(false);
-        router.replace(homeBackHref as Href);
+        setMentorReturnReady(true);
       }, MENTOR_RETURN_EPOCH_WAIT_MS);
       return () => clearTimeout(timer);
     }
-    // A hydrated epoch without an actor/profile binding cannot identify the
-    // scoped Mentor projection. Wait for the authenticated screen to reload
-    // instead of claiming an unscoped refresh.
+    // An absent actor/profile cannot identify a scoped Mentor projection.
+    // Leave without invalidating rather than claiming evidence or stranding
+    // the learner behind a binding that may never appear on this screen.
+    if (!userId || !activeProfile?.id) {
+      setPendingMentorReturn(false);
+      setMentorReturnReady(true);
+      return;
+    }
     if (!canRefreshMentorFeed) return;
 
     let cancelled = false;
@@ -455,7 +490,7 @@ function SessionScreenInner() {
         await refreshMentorFeedBeforeReturn();
         if (cancelled) return;
         setPendingMentorReturn(false);
-        router.replace(homeBackHref as Href);
+        setMentorReturnReady(true);
       } catch {
         if (cancelled) return;
         setPendingMentorReturn(false);
@@ -466,16 +501,18 @@ function SessionScreenInner() {
       cancelled = true;
     };
   }, [
+    activeProfile?.id,
     canRefreshMentorFeed,
-    homeBackHref,
     nowFeedEpochHydrated,
     pendingMentorReturn,
     refreshMentorFeedBeforeReturn,
-    router,
+    userId,
   ]);
-  const startMentorReturn = useCallback(() => {
-    setPendingMentorReturn(true);
-  }, []);
+  useEffect(() => {
+    if (!mentorReturnReady) return;
+    router.replace(homeBackHref as Href);
+    setMentorReturnReady(false);
+  }, [homeBackHref, mentorReturnReady, router]);
   const handleChatBackPress = useCallback(() => {
     if (returnTo) {
       if (returnTo === MENTOR_RETURN_TO) {

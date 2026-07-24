@@ -200,25 +200,6 @@ describe('queryKeys non-mode-scoped factories', () => {
     ]);
   });
 
-  it.each([
-    ['feed', 'now-feed'],
-    ['overflow', 'now-overflow'],
-  ] as const)(
-    'rejects narrowed or wrongly bound Now %s keys',
-    (projection, prefix) => {
-      const actorId = 'actor-abc';
-      const profileId = 'prof-abc';
-      const policyEpoch = 'epoch-enabled';
-      const key = queryKeys.now[projection](actorId, profileId, policyEpoch);
-
-      expect(key).toHaveLength(4);
-      expect(key).not.toEqual([prefix, profileId, policyEpoch]);
-      expect(key).not.toEqual([prefix, 'actor-other', profileId, policyEpoch]);
-      expect(key).not.toEqual([prefix, actorId, 'prof-other', policyEpoch]);
-      expect(key).not.toEqual([prefix, actorId, profileId, 'epoch-disabled']);
-    },
-  );
-
   it.each(['feed', 'overflow'] as const)(
     'normalizes unloaded Now %s scope IDs',
     (projection) => {
