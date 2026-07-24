@@ -69,6 +69,13 @@ const SOLID_VERDICT_JSON = JSON.stringify({
       result: 'solid',
       evidence: 'links speed to collision frequency and energy',
       learnerQuote: 'particles move faster and collide more often',
+      questionIdentity: {
+        questionText: 'model-supplied text is overwritten',
+        minimalLearningClaim:
+          'higher temperature raises productive collision frequency',
+        cognitiveOperation: 'causal_explanation',
+        materialContext: 'most chemical reactions',
+      },
     },
   ],
 });
@@ -118,6 +125,9 @@ describe('runChallengeRoundGrader', () => {
       expect(items[0]!.result).toBe('solid');
       // answerEventId is server-injected; the model never saw or supplied it.
       expect(items[0]!.answerEventId).toBe(BASE_INPUT.answerEventId);
+      expect(items[0]!.questionIdentity?.questionText).toBe(
+        BASE_INPUT.askedQuestion,
+      );
     });
 
     it('maps the concept and evidence fields from the verdict', async () => {

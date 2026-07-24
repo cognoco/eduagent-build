@@ -223,10 +223,35 @@ const TUTOR_ENVELOPE_WITH_ANSWER_EVALUATION = JSON.stringify({
 const GRADER_VERDICT_SOLID = JSON.stringify({
   items: [
     {
+      concept: 'photosynthesis stages',
+      result: 'solid',
+      evidence: 'Learner correctly identified both main stages.',
+      learnerQuote: 'The light reactions and the Calvin cycle.',
+      questionIdentity: {
+        questionText: 'What are the two main stages of photosynthesis?',
+        minimalLearningClaim:
+          'photosynthesis has light reactions and the Calvin cycle',
+        cognitiveOperation: 'comparison',
+        materialContext: 'the two main stages of photosynthesis',
+      },
+    },
+  ],
+});
+
+const GRADER_VERDICT_SOLID_INPUTS = JSON.stringify({
+  items: [
+    {
       concept: 'photosynthesis inputs',
       result: 'solid',
       evidence: 'Learner correctly identified CO2, water, and sunlight.',
       learnerQuote: 'Plants use CO2, water, and sunlight.',
+      questionIdentity: {
+        questionText: 'What inputs does photosynthesis require?',
+        minimalLearningClaim:
+          'photosynthesis uses carbon dioxide water and sunlight',
+        cognitiveOperation: 'explanation',
+        materialContext: '',
+      },
     },
   ],
 });
@@ -432,14 +457,15 @@ async function seedCurriculumTopic(
 
 /**
  * Seed a session with a challenge round already in `active` state.
- * `questionIndex=0, totalQuestions=1` so the NEXT answer_complete fires
- * immediately transitions to `drafting`.
+ * `questionIndex=0`; callers choose how many successful answers are required
+ * before the round transitions to `drafting`.
  */
 async function seedActiveSession(
   db: Database,
   profileId: string,
   subjectId: string,
   topicId: string,
+  totalQuestions = 1,
 ): Promise<ReturnType<typeof mapSessionRow>> {
   const [row] = await db
     .insert(learningSessions)
@@ -459,7 +485,7 @@ async function seedActiveSession(
           topicId,
           declinedDontAskAgain: false,
           questionIndex: 0,
-          totalQuestions: 1,
+          totalQuestions,
           startedAt: new Date().toISOString(),
           evaluations: [],
           questionsAsked: 0,
@@ -505,7 +531,8 @@ async function seedOrdinarySession(
 }
 
 /**
- * Seed a session already in `drafting` state with one solid evaluation.
+ * Seed a session already in `drafting` state with two non-equivalent solid
+ * evaluations.
  * Used for the finalizeChallengeRoundIfReady mastery-verification test.
  */
 async function seedDraftingSession(
@@ -515,6 +542,7 @@ async function seedDraftingSession(
   topicId: string,
   answerEventId: string,
 ): Promise<ReturnType<typeof mapSessionRow>> {
+  const comparisonAnswerEventId = generateUUIDv7();
   const [row] = await db
     .insert(learningSessions)
     .values({
@@ -532,10 +560,10 @@ async function seedDraftingSession(
           offerCount: 1,
           topicId,
           declinedDontAskAgain: false,
-          questionIndex: 1,
-          totalQuestions: 1,
+          questionIndex: 2,
+          totalQuestions: 2,
           startedAt: new Date().toISOString(),
-          questionsAsked: 1,
+          questionsAsked: 2,
           evaluations: [
             {
               concept: 'photosynthesis',
@@ -543,6 +571,31 @@ async function seedDraftingSession(
               evidence: 'Clear explanation of the light reactions.',
               answerEventId,
               learnerQuote: 'Plants use sunlight to split water.',
+              questionIdentity: {
+                questionText:
+                  'Why does a plant use sunlight during photosynthesis?',
+                minimalLearningClaim:
+                  'photosynthesis converts light into chemical energy',
+                cognitiveOperation: 'causal_explanation',
+                materialContext: 'a plant in sunlight',
+              },
+            },
+            {
+              concept: 'energy capture in darkness',
+              result: 'solid',
+              evidence:
+                'Correctly compared energy capture in sunlight and darkness.',
+              answerEventId: comparisonAnswerEventId,
+              learnerQuote:
+                'In darkness the plant cannot capture new light energy.',
+              questionIdentity: {
+                questionText:
+                  'Compare a plant capturing energy in sunlight and darkness.',
+                minimalLearningClaim:
+                  'photosynthesis converts light into chemical energy',
+                cognitiveOperation: 'comparison',
+                materialContext: 'a plant in sunlight and darkness',
+              },
             },
           ],
         },
@@ -550,16 +603,28 @@ async function seedDraftingSession(
     })
     .returning();
 
-  await db.insert(sessionEvents).values({
-    id: answerEventId,
-    profileId,
-    subjectId,
-    sessionId: row!.id,
-    topicId,
-    eventType: 'user_message',
-    content: 'Plants use sunlight to split water.',
-    metadata: { source: 'test' },
-  });
+  await db.insert(sessionEvents).values([
+    {
+      id: answerEventId,
+      profileId,
+      subjectId,
+      sessionId: row!.id,
+      topicId,
+      eventType: 'user_message',
+      content: 'Plants use sunlight to split water.',
+      metadata: { source: 'test' },
+    },
+    {
+      id: comparisonAnswerEventId,
+      profileId,
+      subjectId,
+      sessionId: row!.id,
+      topicId,
+      eventType: 'user_message',
+      content: 'In darkness the plant cannot capture new light energy.',
+      metadata: { source: 'test' },
+    },
+  ]);
 
   return mapSessionRow(row!);
 }
@@ -892,8 +957,8 @@ describeIfDb('session exchange production-path integration', () => {
     const meta = await readSessionChallengeRound(db, session.id);
     expect(meta?.state).toBe('drafting');
 
-    // seedDraftingSession's evaluation is a single solid item → outcome
-    // 'verified' (lastOutcome 2). Finalize must overwrite the stale decline
+    // seedDraftingSession's evaluations are two non-equivalent solid probes →
+    // outcome 'verified' (lastOutcome 2). Finalize must overwrite the stale decline
     // row via onConflictDoUpdate, not throw a unique-constraint violation.
     const result = await finalizeChallengeRoundIfReady(
       db,
@@ -973,13 +1038,18 @@ describeIfDb('session exchange production-path integration', () => {
         ),
       );
 
-    expect(noteRows).toHaveLength(2);
+    expect(noteRows).toHaveLength(3);
     expect(noteRows).toEqual(
       expect.arrayContaining([
         {
           artifactSource: 'challenge_solid_quote',
           content: 'photosynthesis',
           artifactConceptKey: 'photosynthesis',
+        },
+        {
+          artifactSource: 'challenge_solid_quote',
+          content: 'energy capture in darkness',
+          artifactConceptKey: 'energy capture in darkness',
         },
         {
           artifactSource: 'challenge_drafted_note',
@@ -1102,10 +1172,16 @@ describeIfDb('session exchange production-path integration', () => {
   // This test verifies the branch now fires on `currentUserMessage` instead.
   // -------------------------------------------------------------------------
 
-  it('[T7 RED→GREEN] flag=ON: grader provides solid evaluation → challenge round completes', async () => {
+  it('[T7 RED→GREEN] flag=ON: two distinct solid grader probes complete the challenge round', async () => {
     const { profileId, subjectId } = await seedProfileAndSubject(db);
     const topicId = await seedCurriculumTopic(db, subjectId);
-    const session = await seedActiveSession(db, profileId, subjectId, topicId);
+    const session = await seedActiveSession(
+      db,
+      profileId,
+      subjectId,
+      topicId,
+      2,
+    );
 
     // Seed a prior ai_response so exchangeHistory has at least one assistant turn
     // (T6: askedQuestion sourced from last assistant message).
@@ -1118,8 +1194,9 @@ describeIfDb('session exchange production-path integration', () => {
       'What are the two main stages of photosynthesis?',
     );
 
-    // Defaults: tutor → envelope WITHOUT eval; grader → solid verdict.
-    const result = await processMessage(
+    // First distinct probe: the grader fires, but one solid answer cannot
+    // verify mastery under WI-2464's breadth contract.
+    const firstResult = await processMessage(
       db,
       profileId,
       session.id,
@@ -1130,26 +1207,47 @@ describeIfDb('session exchange production-path integration', () => {
       },
     );
 
-    // The challenge round must have advanced through drafting into terminal
-    // completion once the solid grader evaluation satisfies finalization.
+    expect(firstResult.challengeRound?.state).toBe('active');
+    expect(firstResult.challengeRound?.evaluations).toHaveLength(1);
+    expect(firstResult.challengeRound?.questionsAsked).toBe(1);
+    expect(
+      await readAssessmentsForSession(db, profileId, session.id),
+    ).toHaveLength(0);
+
+    // Second probe assesses a different minimal claim and operation.
+    llm.setGraderResponse(GRADER_VERDICT_SOLID_INPUTS);
+    const result = await processMessage(
+      db,
+      profileId,
+      session.id,
+      { message: 'Plants use CO2, water, and sunlight.' },
+      {
+        challengeRoundRuntimeEnabled: true,
+        challengeRoundGraderEnabled: true,
+      },
+    );
+
     expect(result.challengeRound).toBeDefined();
     expect(result.challengeRound?.state).toBe('complete');
-    expect(result.challengeRound?.evaluations).toHaveLength(1);
-    expect(result.challengeRound?.evaluations[0]?.result).toBe('solid');
-    // T9: questionsAsked must be incremented
-    expect(result.challengeRound?.questionsAsked).toBe(1);
+    expect(result.challengeRound?.evaluations).toHaveLength(2);
+    expect(
+      result.challengeRound?.evaluations.every(
+        (evaluation) => evaluation.result === 'solid',
+      ),
+    ).toBe(true);
+    expect(result.challengeRound?.questionsAsked).toBe(2);
 
     // Verify DB state matches the returned state
     const persisted = await readSessionChallengeRound(db, session.id);
     expect(persisted?.state).toBe('complete');
-    expect((persisted?.evaluations as unknown[])?.length).toBe(1);
+    expect((persisted?.evaluations as unknown[])?.length).toBe(2);
 
     const rows = await readAssessmentsForSession(db, profileId, session.id);
     expect(rows).toHaveLength(1);
     expect(rows[0]!.masteryChallengeVerifiedAt).not.toBeNull();
 
     // Verify the grader was actually called (not the inline tutor path)
-    expect(llm.graderCallCount()).toBe(1);
+    expect(llm.graderCallCount()).toBe(2);
   });
 
   // -------------------------------------------------------------------------

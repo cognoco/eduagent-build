@@ -73,6 +73,14 @@ const PRODUCT_TIER_MAP: Record<string, 'plus' | 'family' | 'pro'> = {
   'com.eduagent.family.yearly.android': 'family',
   'com.eduagent.pro.monthly.android': 'pro',
   'com.eduagent.pro.yearly.android': 'pro',
+  // RevenueCat Google subscription webhooks append `:<base_plan_id>`.
+  // Keep every qualified identifier explicit so unknown plans remain denied.
+  'com.eduagent.plus.monthly.android:monthly': 'plus',
+  'com.eduagent.plus.yearly.android:yearly': 'plus',
+  'com.eduagent.family.monthly.android:monthly': 'family',
+  'com.eduagent.family.yearly.android:yearly': 'family',
+  'com.eduagent.pro.monthly.android:monthly': 'pro',
+  'com.eduagent.pro.yearly.android:yearly': 'pro',
 };
 
 /**
@@ -107,5 +115,6 @@ export function extractTierFromProductId(
 
   // Authoritative lookup only — no regex fallback.
   // Unknown products must be added to PRODUCT_TIER_MAP explicitly.
+  if (!Object.hasOwn(PRODUCT_TIER_MAP, productId)) return null;
   return PRODUCT_TIER_MAP[productId] ?? null;
 }

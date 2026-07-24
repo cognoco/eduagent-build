@@ -463,6 +463,7 @@ export function buildCorrectStreakOfferTelemetry(
 }
 
 export interface ChallengeRoundVerdict {
+  outcome: MasteryOutcome;
   solidCount: number;
   partialCount: number;
   missingCount: number;
@@ -788,9 +789,11 @@ export async function persistActiveChallengeRoundTransition(
 
 function verdictFromEvaluations(
   evaluations: ChallengeRoundEvaluationItem[],
+  outcome: MasteryOutcome,
 ): ChallengeRoundVerdict {
   const summary = summarizeEvaluation(evaluations);
   return {
+    outcome,
     solidCount: summary.solid,
     partialCount: summary.partial,
     missingCount: summary.missing,
@@ -1219,6 +1222,7 @@ const COMPLETION_COOLDOWN_OUTCOME_CODE: Record<
   verified: 2,
   partial: 1,
   reteach: 3,
+  insufficient_breadth: 4,
 };
 
 export async function finalizeChallengeRoundIfReady(
@@ -1453,7 +1457,10 @@ export async function finalizeChallengeRoundIfReady(
 
   return {
     challengeRound: complete,
-    challengeRoundVerdict: verdictFromEvaluations(evaluations),
+    challengeRoundVerdict: verdictFromEvaluations(
+      evaluations,
+      decision.outcome,
+    ),
     ...(draftedNote ? { draftedNote } : {}),
   };
 }
@@ -1524,6 +1531,24 @@ async function validateChallengeRoundEvaluationItems(
     }
     return validated;
   });
+}
+
+function bindAskedQuestionToEvaluationIdentities(
+  evaluations: ChallengeRoundEvaluationItem[],
+  askedQuestion: string | undefined,
+): ChallengeRoundEvaluationItem[] {
+  if (!askedQuestion?.trim()) return evaluations;
+  return evaluations.map((evaluation) =>
+    evaluation.questionIdentity
+      ? {
+          ...evaluation,
+          questionIdentity: {
+            ...evaluation.questionIdentity,
+            questionText: askedQuestion,
+          },
+        }
+      : evaluation,
+  );
 }
 
 async function applyChallengeRoundRuntimeSignals(
@@ -1635,7 +1660,10 @@ async function applyChallengeRoundRuntimeSignals(
         db,
         profileId,
         session.id,
-        graderEvaluation,
+        bindAskedQuestionToEvaluationIdentities(
+          graderEvaluation,
+          payload.askedQuestion,
+        ),
         payload.currentUserMessage,
       );
     } catch (err) {
@@ -1703,7 +1731,10 @@ async function applyChallengeRoundRuntimeSignals(
         db,
         profileId,
         session.id,
-        payload.challengeRoundEvaluation,
+        bindAskedQuestionToEvaluationIdentities(
+          payload.challengeRoundEvaluation,
+          payload.askedQuestion,
+        ),
         payload.currentUserMessage,
       );
     } catch (err) {

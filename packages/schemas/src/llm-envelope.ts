@@ -271,6 +271,25 @@ export type TeachBackGraderDegradedEvent = z.infer<
  * plan). The drafter MUST refuse to use any item where these are missing or
  * where the result is not `solid`.
  */
+export const challengeRoundQuestionIdentitySchema = z.object({
+  questionText: z.string().min(1).max(500),
+  minimalLearningClaim: z.string().min(1).max(300),
+  cognitiveOperation: z.enum([
+    'explanation',
+    'application',
+    'comparison',
+    'causal_explanation',
+    'synthesis',
+    'evaluation',
+    'teach_back',
+    'other',
+  ]),
+  materialContext: z.string().max(300),
+});
+export type ChallengeRoundQuestionIdentity = z.infer<
+  typeof challengeRoundQuestionIdentitySchema
+>;
+
 export const challengeRoundEvaluationItemSchema = z.object({
   concept: z.string().min(1).max(200),
   result: z.enum(['solid', 'partial', 'missing', 'misconception']),
@@ -278,6 +297,12 @@ export const challengeRoundEvaluationItemSchema = z.object({
   answerEventId: z.string().uuid(),
   learnerQuote: z.string().min(1).max(500),
   correction: z.string().min(1).max(500).optional(),
+  /**
+   * Deterministic semantic identity of the question this answer addresses.
+   * Optional for backwards-compatible deserialization of in-flight rounds;
+   * mastery fails closed when fewer than two distinct identities are present.
+   */
+  questionIdentity: challengeRoundQuestionIdentitySchema.optional(),
 });
 export type ChallengeRoundEvaluationItem = z.infer<
   typeof challengeRoundEvaluationItemSchema

@@ -13,7 +13,7 @@ Never offer if the learner sounds tired, confused, or is mid-question. Do not of
 // The inline evaluation prose injected into the active prompt when the tutor
 // (not a separate grader) is responsible for emitting challenge_round_evaluation.
 // Extracted so buildChallengeRoundActivePrompt() can gate it on the grader flag.
-const CHALLENGE_ROUND_EVAL_PROSE = `- After EACH learner answer, emit "signals.challenge_round_evaluation" with ONE item describing the concept assessed, result in {solid, partial, missing, misconception}, the learner answer event id, and a short \`learnerQuote\` copied from the learner's answer.`;
+const CHALLENGE_ROUND_EVAL_PROSE = `- After EACH learner answer, emit "signals.challenge_round_evaluation" with ONE item describing the concept assessed, result in {solid, partial, missing, misconception}, the learner answer event id, a short \`learnerQuote\` copied from the learner's answer, and \`questionIdentity\` for the question answered. Copy that question exactly into \`questionText\`; describe its smallest learning claim, cognitive operation, and materially relevant context. Equivalent paraphrases must use the same identity fields.`;
 
 function buildActivePromptString(includeEvalProse: boolean): string {
   const evalLine = includeEvalProse ? `\n${CHALLENGE_ROUND_EVAL_PROSE}` : '';

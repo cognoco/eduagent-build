@@ -22,17 +22,57 @@ describe('extractTierFromProductId', () => {
     ['com.eduagent.pro.monthly', 'pro'],
     ['com.eduagent.pro.yearly', 'pro'],
     ['com.eduagent.plus.monthly.android', 'plus'],
+    ['com.eduagent.plus.yearly.android', 'plus'],
+    ['com.eduagent.family.monthly.android', 'family'],
     ['com.eduagent.family.yearly.android', 'family'],
     ['com.eduagent.pro.monthly.android', 'pro'],
+    ['com.eduagent.pro.yearly.android', 'pro'],
   ])('maps %s to tier %s', (productId, expectedTier) => {
     expect(extractTierFromProductId(productId)).toBe(expectedTier);
   });
+
+  it.each([
+    ['com.eduagent.plus.monthly.android:monthly', 'plus'],
+    ['com.eduagent.plus.yearly.android:yearly', 'plus'],
+    ['com.eduagent.family.monthly.android:monthly', 'family'],
+    ['com.eduagent.family.yearly.android:yearly', 'family'],
+    ['com.eduagent.pro.monthly.android:monthly', 'pro'],
+    ['com.eduagent.pro.yearly.android:yearly', 'pro'],
+  ])(
+    '[WI-2704] maps qualified Google subscription %s to tier %s',
+    (productId, expectedTier) => {
+      expect(extractTierFromProductId(productId)).toBe(expectedTier);
+    },
+  );
 
   // [BUG-444] No regex fallback — an unmapped product must return null, not
   // guess a tier from a `com.eduagent.<tier>.*` prefix match.
   it('[BUG-444] returns null for an unmapped product id (no regex fallback)', () => {
     expect(extractTierFromProductId('com.eduagent.trial.monthly')).toBeNull();
   });
+
+  it('[WI-2704] rejects an unknown Google base plan', () => {
+    expect(
+      extractTierFromProductId(
+        'com.eduagent.plus.monthly.android:monthly-promo',
+      ),
+    ).toBeNull();
+  });
+
+  it('[WI-2704] rejects a lookalike Google subscription prefix', () => {
+    expect(
+      extractTierFromProductId(
+        'com.eduagent.plus.monthly.android.preview:monthly',
+      ),
+    ).toBeNull();
+  });
+
+  it.each(['constructor', 'toString', '__proto__'])(
+    '[BUG-444] rejects inherited object key %s',
+    (productId) => {
+      expect(extractTierFromProductId(productId)).toBeNull();
+    },
+  );
 
   it('returns null when productId is undefined', () => {
     expect(extractTierFromProductId(undefined)).toBeNull();
@@ -45,6 +85,12 @@ describe('getTopUpCreditsForProduct', () => {
     expect(getTopUpCreditsForProduct('com.eduagent.topup.500.android')).toBe(
       500,
     );
+  });
+
+  it('does not treat a qualified subscription-style product as a consumable', () => {
+    expect(
+      getTopUpCreditsForProduct('com.eduagent.topup.500.android:monthly'),
+    ).toBeNull();
   });
 
   it('returns null for a non-top-up product id', () => {

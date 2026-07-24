@@ -1,7 +1,13 @@
-# Decision: Special-Category (Art 9) Data — We Do Not Process It
+# Superseded decision: Special-Category (Art 9) Data — We Do Not Process It
 
 **Checklist item:** A23 · **Law:** GDPR Article 9 · **Status:** DECIDED 2026-06-08 (user-ruled), pending DPO/counsel confirmation.
 **Posture:** liability-minimizing — declare and enforce non-collection so we stay in the lighter processing lane.
+
+> **Superseded on 24 July 2026.** This categorical position is not supportable
+> for an open-text AI service because incidental disclosure, inference, and
+> temporary storage are foreseeable. It is retained only as decision
+> provenance. Use the current
+> [`Article 9 position`](../art9-special-category-position.md).
 
 ---
 

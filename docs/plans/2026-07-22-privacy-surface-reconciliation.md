@@ -20,7 +20,7 @@ In scope:
 - `apps/mobile/src/i18n/locales/*.json`
 - `apps/mobile/src/i18n/source-baseline.json`
 - `docs/compliance/privacy-policy.html`
-- `docs/compliance/privacy-surface-evidence-2026-07-22.md`
+- `docs/compliance/history/2026-07-22-privacy-surface-evidence.md`
 - `docs/compliance/child-readable-privacy-summary-draft.md`
 
 Out of scope:

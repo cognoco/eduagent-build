@@ -151,6 +151,7 @@ const TOPIC_ID = TEST_TOPIC_ID;
 const SESSION_ID = TEST_SESSION_ID;
 const PROFILE_ID = TEST_PROFILE_ID;
 const ANSWER_EVENT_ID = '00000000-0000-4000-8000-000000000005';
+const SECOND_ANSWER_EVENT_ID = '00000000-0000-4000-8000-000000000006';
 const CHALLENGE_ROUND_EVALUATION_LIMIT = 10;
 
 function defaultSessionEventRows(): SessionEventRow[] {
@@ -161,6 +162,13 @@ function defaultSessionEventRows(): SessionEventRow[] {
       sessionId: SESSION_ID,
       eventType: 'user_message',
       content: 'Plants convert light into chemical energy.',
+    },
+    {
+      id: SECOND_ANSWER_EVENT_ID,
+      profileId: PROFILE_ID,
+      sessionId: SESSION_ID,
+      eventType: 'user_message',
+      content: 'In darkness the leaf cannot capture new light energy.',
     },
   ];
 }
@@ -495,6 +503,43 @@ const SOLID_EVALS: ChallengeRoundEvaluationItem[] = [
     evidence: 'Correctly described light-to-chemical energy conversion.',
     answerEventId: ANSWER_EVENT_ID,
     learnerQuote: 'Plants convert light into chemical energy.',
+    questionIdentity: {
+      questionText: 'Why does a leaf convert light into chemical energy?',
+      minimalLearningClaim:
+        'photosynthesis converts light into chemical energy',
+      cognitiveOperation: 'causal_explanation',
+      materialContext: 'a leaf in sunlight',
+    },
+  },
+  {
+    concept: 'photosynthesis',
+    result: 'solid',
+    evidence: 'Correctly compared photosynthesis with darkness.',
+    answerEventId: SECOND_ANSWER_EVENT_ID,
+    learnerQuote: 'In darkness the leaf cannot capture new light energy.',
+    questionIdentity: {
+      questionText:
+        'Compare what happens to energy capture in a leaf in sunlight and darkness.',
+      minimalLearningClaim:
+        'photosynthesis converts light into chemical energy',
+      cognitiveOperation: 'comparison',
+      materialContext: 'a leaf in sunlight and darkness',
+    },
+  },
+];
+
+const DUPLICATE_SOLID_EVALS: ChallengeRoundEvaluationItem[] = [
+  SOLID_EVALS[0]!,
+  {
+    ...SOLID_EVALS[1]!,
+    questionIdentity: {
+      questionText:
+        'How does a leaf turn sunlight into stored chemical energy?',
+      minimalLearningClaim:
+        'photosynthesis converts light into chemical energy',
+      cognitiveOperation: 'causal_explanation',
+      materialContext: 'a leaf in sunlight',
+    },
   },
 ];
 
@@ -528,8 +573,8 @@ function draftingState(
     topicId: TOPIC_ID,
     offerCount: 1,
     declinedDontAskAgain: false,
-    questionIndex: 1,
-    totalQuestions: 1,
+    questionIndex: evaluations.length,
+    totalQuestions: Math.max(1, evaluations.length),
     evaluations,
   } as ChallengeRoundSessionState;
 }
@@ -886,8 +931,9 @@ describe('finalizeChallengeRoundIfReady — idempotent under concurrent/retry fi
 
 // ---------------------------------------------------------------------------
 // [WI-1804] Completion cooldown — finalize now upserts challengeRoundCooldowns
-// for all three completion outcomes (verified→2, accepted_partial→1,
-// reteach→3), gated by the same 24h window decline already uses. `invalid`
+// for all four completion outcomes (verified→2, accepted_partial→1,
+// reteach→3, insufficient_breadth→4), gated by the same 24h window decline
+// already uses. `invalid`
 // (empty evaluations) writes nothing. The write sits inside the existing
 // mastery/deepening try/catch, so a cooldown-write failure takes the same
 // release-and-retry path.
@@ -898,6 +944,11 @@ describe('finalizeChallengeRoundIfReady — completion cooldown (WI-1804)', () =
     { label: 'verified', evals: SOLID_EVALS, expectedOutcome: 2 },
     { label: 'accepted_partial', evals: PARTIAL_EVALS, expectedOutcome: 1 },
     { label: 'reteach', evals: RETEACH_EVALS, expectedOutcome: 3 },
+    {
+      label: 'insufficient_breadth',
+      evals: DUPLICATE_SOLID_EVALS,
+      expectedOutcome: 4,
+    },
   ])(
     'writes challengeRoundCooldowns exactly once for $label (lastOutcome $expectedOutcome) under double-finalize',
     async ({ evals, expectedOutcome }) => {
@@ -936,6 +987,30 @@ describe('finalizeChallengeRoundIfReady — completion cooldown (WI-1804)', () =
       );
     },
   );
+
+  it('[WI-2464] reports insufficient breadth and never writes mastery for equivalent all-solid probes', async () => {
+    const challengeRound = draftingState(DUPLICATE_SOLID_EVALS);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+    };
+
+    const outcome = await finalizeChallengeRoundIfReady(
+      makeFakeDb(state),
+      PROFILE_ID,
+      makeSession(state.sessionMetadata),
+      challengeRound,
+      null,
+    );
+
+    expect(outcome?.challengeRoundVerdict?.outcome).toBe(
+      'insufficient_breadth',
+    );
+    expect(state.masteryInserts).toEqual([]);
+    expect(state.cooldownUpserts?.[0]?.lastOutcome).toBe(4);
+  });
 
   it('writes no cooldown row for the invalid outcome (empty evaluations)', async () => {
     const challengeRound = draftingState([]);
@@ -1517,11 +1592,17 @@ describe('finalizeChallengeRoundIfReady — verified-proof persistence', () => {
         verificationState: 'verified',
       },
       {
+        artifactConceptKey: 'photosynthesis',
+        artifactSource: 'challenge_solid_quote',
+        content: 'photosynthesis',
+        verificationState: 'verified',
+      },
+      {
         artifactSource: 'challenge_drafted_note',
         verificationState: 'verified',
       },
     ]);
-    expect(state.evidenceLinkRows).toHaveLength(2);
+    expect(state.evidenceLinkRows).toHaveLength(3);
   });
 
   it('persists only the verified solid quote when the outcome is partial', async () => {
@@ -1707,8 +1788,12 @@ describe('finalizeChallengeRoundIfReady — verified-proof persistence', () => {
         artifactSource: 'challenge_solid_quote',
         verificationState: 'verified',
       },
+      {
+        artifactSource: 'challenge_solid_quote',
+        verificationState: 'verified',
+      },
     ]);
-    expect(state.evidenceLinkRows).toHaveLength(1);
+    expect(state.evidenceLinkRows).toHaveLength(2);
   });
 
   it('does not throw when artifact persistence fails', async () => {
@@ -1752,8 +1837,27 @@ describe('finalizeChallengeRoundIfReady — verified-proof persistence', () => {
       evidence: 'Clinical inference must not become a learning record.',
       answerEventId: ANSWER_EVENT_ID,
       learnerQuote: clinicalText,
+      questionIdentity: {
+        questionText: 'What condition does the learner report?',
+        minimalLearningClaim: 'the learner reports an attention condition',
+        cognitiveOperation: 'explanation',
+        materialContext: 'the learner report',
+      },
     };
-    const challengeRound = draftingState([evaluation]);
+    const secondEvaluation: ChallengeRoundEvaluationItem = {
+      concept: 'attention strategies',
+      result: 'solid',
+      evidence: 'Identified a relevant strategy.',
+      answerEventId: SECOND_ANSWER_EVENT_ID,
+      learnerQuote: 'A quiet workspace can reduce distractions.',
+      questionIdentity: {
+        questionText: 'Apply an attention strategy to a study environment.',
+        minimalLearningClaim: 'environmental changes can support attention',
+        cognitiveOperation: 'application',
+        materialContext: 'a study environment',
+      },
+    };
+    const challengeRound = draftingState([evaluation, secondEvaluation]);
     const state: FakeDbState = {
       sessionMetadata: { challengeRound },
       masteryInserts: [],
@@ -1766,6 +1870,13 @@ describe('finalizeChallengeRoundIfReady — verified-proof persistence', () => {
           sessionId: SESSION_ID,
           eventType: 'user_message',
           content: clinicalText,
+        },
+        {
+          id: SECOND_ANSWER_EVENT_ID,
+          profileId: PROFILE_ID,
+          sessionId: SESSION_ID,
+          eventType: 'user_message',
+          content: 'A quiet workspace can reduce distractions.',
         },
       ],
     };
@@ -1790,8 +1901,13 @@ describe('finalizeChallengeRoundIfReady — verified-proof persistence', () => {
         artifactSource: 'challenge_solid_quote',
         content: 'attention',
       },
+      {
+        artifactConceptKey: 'attention strategies',
+        artifactSource: 'challenge_solid_quote',
+        content: 'attention strategies',
+      },
     ]);
-    expect(state.evidenceLinkRows ?? []).toHaveLength(1);
+    expect(state.evidenceLinkRows ?? []).toHaveLength(2);
     const clinicalGuardCaptures = mockCaptureException.mock.calls.filter(
       ([error]) =>
         error instanceof Error &&

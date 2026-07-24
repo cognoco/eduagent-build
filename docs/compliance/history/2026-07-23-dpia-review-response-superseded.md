@@ -3,7 +3,7 @@
 > **Superseded snapshot — do not send.** This retained draft is incomplete
 > (questions 7–10 are absent) and contains production and launch-policy claims
 > corrected on 24 July 2026. Use the
-> [current working response](DPO%20exchanges/2026-07-23-dpia-review-response-draft.md).
+> [current working response](../DPO%20exchanges/2026-07-23-dpia-review-response-draft.md).
 
 **Review date:** 23 July 2026  
 **Status:** Draft for management, DPO/counsel, Engineering, Operations, and Product completion  
@@ -36,10 +36,10 @@ The operator has confirmed that the intended controller is:
 
 This identity is currently repeated in the:
 
-- [main DPIA](dpia.md);
-- [RoPA](ropa.md);
-- [filled EDPB DPIA companion](edpb_dpia_filled_2026_v1.md);
-- [breach-response plan](breach-response-plan.md);
+- [main DPIA](../dpia.md);
+- [RoPA](../ropa.md);
+- [filled EDPB DPIA companion](../edpb_dpia_filled_2026_v1.md);
+- [breach-response plan](../breach-response-plan.md);
 - adult privacy notice, child-readable summary, and all repository-held translations in the mobile application;
 - repository-held app-store reviewer notes and compliance checklist.
 
@@ -77,7 +77,7 @@ Compliance should now search external contracts, publication systems, and both l
 
 ### Authoritative engineering snapshot available now
 
-The following is the current engineering inventory as of the production evidence check on **22 July 2026**. That check found `LLM_ROUTING_V2_ENABLED=true`, `CHALLENGE_ROUND_GRADER_ENABLED=true`, and credentials present for Cerebras, Mistral, OpenAI, Anthropic, and Voyage without exposing the credential values. The code authority is the [LLM model register](../registers/llm-models/master.md), `apps/api/src/services/llm/router.ts`, and the routing tests named below.
+The following is the current engineering inventory as of the production evidence check on **22 July 2026**. That check found `LLM_ROUTING_V2_ENABLED=true`, `CHALLENGE_ROUND_GRADER_ENABLED=true`, and credentials present for Cerebras, Mistral, OpenAI, Anthropic, and Voyage without exposing the credential values. The code authority is the [LLM model register](../../registers/llm-models/master.md), `apps/api/src/services/llm/router.ts`, and the routing tests named below.
 
 | Provider and model | Production role | Route status | Can receive children’s data? |
 |---|---|---|---|
@@ -171,7 +171,7 @@ If every approved route is unavailable, the documented product behavior should b
 
 ### What can be supplied now
 
-The current ratified product scope in the [MVP definition](../plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md) and [launch runway](../plans/2026-07-10-mvp-roadmap/RUNWAY.md) is:
+The current ratified product scope in the [MVP definition](../../plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md) and [launch runway](../../plans/2026-07-10-mvp-roadmap/RUNWAY.md) is:
 
 - a direct-to-consumer, credentialised MentoMate service;
 - launch age floor of **13+**;
@@ -183,7 +183,7 @@ The current ratified product scope in the [MVP definition](../plans/2026-07-10-m
 - a planned closed beta of **5–10 families with 13+ teenagers** before public launch;
 - school, institutional, and business licensing are future possibilities, not part of the current consumer launch.
 
-The [`13+ EEA launch-country ruling`](2026-07-23-13-plus-eea-launch-country-ruling.md)
+The [`13+ EEA launch-country ruling`](../2026-07-23-13-plus-eea-launch-country-ruling.md)
 sets the intended policy perimeter as all 30 EEA countries. It requires exact
 age and habitual residence, applies the national Article 8 threshold to trigger
 guardian authorization where needed, and excludes the United Kingdom and every
@@ -255,7 +255,7 @@ states that parental consent is required below 13 for an information-society
 service and warns that other EEA states use higher thresholds.
 
 The
-[`13+ EEA launch-country ruling`](2026-07-23-13-plus-eea-launch-country-ruling.md)
+[`13+ EEA launch-country ruling`](../2026-07-23-13-plus-eea-launch-country-ruling.md)
 now supplies a sourced matrix for all 30 EEA countries: 9 at age 13, 6 at age
 14, 5 at age 15, and 10 at age 16. Before enablement, counsel must approve or
 correct each country's entry, including:
@@ -332,7 +332,7 @@ Before approval:
 6. define whether and how sensitive raw-transcript segments are redacted or deleted earlier than the ordinary transcript window;
 7. test all Article 9 categories, supported languages, paraphrases, indirect inference, quotations, summaries, and every persistent-memory field;
 8. finish the safeguarding/crisis runbook, including human ownership, response times, mandatory-reporting analysis, confidentiality, and country-appropriate resources;
-9. have DPO/counsel approve a revised [Article 9 decision](art9-special-category-decision.md) and synchronise the DPIA, RoPA, notices, retention schedule, and processor instructions.
+9. have DPO/counsel approve the revised [Article 9 position](../art9-special-category-position.md) and synchronise the DPIA, RoPA, notices, retention schedule, and processor instructions.
 
 The present DPIA and RoPA statements that special-category processing is absent should be amended now, rather than waiting for the controls to be completed.
 
@@ -386,14 +386,14 @@ Create a DPO-approved retention schedule at field/system/processor level with tr
 
 Primary repository sources:
 
-- [Privacy-surface engineering evidence — 22 July 2026](privacy-surface-evidence-2026-07-22.md)
-- [13+ EEA launch-country ruling](2026-07-23-13-plus-eea-launch-country-ruling.md)
-- [DPIA](dpia.md)
-- [RoPA](ropa.md)
-- [Article 9 decision draft](art9-special-category-decision.md)
-- [LLM model register](../registers/llm-models/master.md)
-- [MVP definition](../plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md)
-- [Launch runway](../plans/2026-07-10-mvp-roadmap/RUNWAY.md)
+- [Privacy-surface engineering evidence — 22 July 2026](2026-07-22-privacy-surface-evidence.md)
+- [13+ EEA launch-country ruling](../2026-07-23-13-plus-eea-launch-country-ruling.md)
+- [DPIA](../dpia.md)
+- [RoPA](../ropa.md)
+- [Current Article 9 position](../art9-special-category-position.md)
+- [LLM model register](../../registers/llm-models/master.md)
+- [MVP definition](../../plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md)
+- [Launch runway](../../plans/2026-07-10-mvp-roadmap/RUNWAY.md)
 - `apps/api/src/services/llm/router.ts`
 - `apps/api/src/services/embeddings.ts`
 - `apps/api/src/services/persisted-learning-text-guard.ts`

@@ -49,3 +49,20 @@ tags:
 - assertVisible:
     id: 'mentor-bar-send'
     enabled: true
+
+# The homework starter preserves the learner's existing draft while the
+# composer's canonical Camera action remains available and no second Camera
+# accessibility target appears. Component and web E2E coverage additionally
+# prove the removed duplicate testID stays absent.
+- tapOn:
+    id: 'cold-start-chip-homework'
+- assertVisible:
+    id: 'cold-start-homework-reply'
+- assertVisible:
+    id: 'mentor-bar-camera'
+- assertNotVisible:
+    text: '^Camera$'
+    index: 1
+- assertVisible:
+    id: 'mentor-bar-input'
+    text: 'Teach me something new please'
