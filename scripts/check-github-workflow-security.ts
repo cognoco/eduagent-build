@@ -470,6 +470,14 @@ const CLAUDE_REVIEW_ALL_PRS_MESSAGE =
   'Claude review must be eligible for every pull request; remove pull_request paths and paths-ignore filters';
 const CLAUDE_REVIEW_UNAVAILABLE_RESULT_MESSAGE =
   'Claude review must bound reviewer attempts and always upload a machine-readable fail-closed result with an executable recovery command';
+const CLAUDE_REVIEW_HEAD_BINDING_MESSAGE =
+  'Claude review verdict comments must carry and exactly match the expected pull request head SHA';
+const CLAUDE_REVIEW_FALLBACK_SEQUENCE_MESSAGE =
+  'Claude review token attempts must be an unconditional first attempt followed by fallbacks gated on all preceding failures';
+
+function normalizedStepIf(step: Record<string, unknown>): string {
+  return unwrapGithubExpression(stringify(step.if)).replace(/\s+/g, ' ').trim();
+}
 
 function validateClaudeReviewContract(
   file: string,
@@ -515,6 +523,21 @@ function validateClaudeReviewContract(
         timeoutMinutes <= 30
       );
     });
+  const reviewSteps = reviewStepIndexes.flatMap((index) => {
+    const step = steps[index];
+    return step ? [step] : [];
+  });
+  const [firstReviewStep, secondReviewStep, thirdReviewStep] = reviewSteps;
+  const hasRequiredFallbackSequence =
+    reviewSteps.length === 3 &&
+    firstReviewStep !== undefined &&
+    secondReviewStep !== undefined &&
+    thirdReviewStep !== undefined &&
+    !Object.hasOwn(firstReviewStep, 'if') &&
+    normalizedStepIf(secondReviewStep) ===
+      "steps.review-1.outcome == 'failure'" &&
+    normalizedStepIf(thirdReviewStep) ===
+      "steps.review-1.outcome == 'failure' && steps.review-2.outcome == 'failure'";
 
   const initializerIndex = steps.findIndex((step) => {
     const run = typeof step.run === 'string' ? step.run : '';
@@ -546,6 +569,26 @@ function validateClaudeReviewContract(
       run.includes('exit 1')
     );
   });
+  const verdictStep = steps.find((step) => {
+    const run = typeof step.run === 'string' ? step.run : '';
+    return run.includes('review_json') && run.includes('Claude Code Review:');
+  });
+  const verdictRun =
+    typeof verdictStep?.run === 'string' ? verdictStep.run : '';
+  const reviewPrompt =
+    isRecord(reviewJob?.env) &&
+    typeof reviewJob.env.CLAUDE_REVIEW_PROMPT === 'string'
+      ? reviewJob.env.CLAUDE_REVIEW_PROMPT
+      : '';
+  const expectedHeadExpression = '${{ github.event.pull_request.head.sha }}';
+  const hasExpectedHeadBinding =
+    reviewPrompt.includes(`- Reviewed head SHA: ${expectedHeadExpression}`) &&
+    isRecord(verdictStep?.env) &&
+    verdictStep.env.HEAD_SHA === expectedHeadExpression &&
+    verdictRun.includes('--arg expected_head "$HEAD_SHA"') &&
+    verdictRun.includes(
+      'select((.body | split("\\n") | index("- Reviewed head SHA: \\($expected_head)")) != null)',
+    );
 
   const hasAlwaysUploadedResult = steps.some((step) => {
     if (
@@ -574,6 +617,18 @@ function validateClaudeReviewContract(
     violations.push({
       file,
       message: CLAUDE_REVIEW_UNAVAILABLE_RESULT_MESSAGE,
+    });
+  }
+  if (reviewStepIndexes.length === 3 && !hasRequiredFallbackSequence) {
+    violations.push({
+      file,
+      message: CLAUDE_REVIEW_FALLBACK_SEQUENCE_MESSAGE,
+    });
+  }
+  if (hasFailClosedVerdictCheck && !hasExpectedHeadBinding) {
+    violations.push({
+      file,
+      message: CLAUDE_REVIEW_HEAD_BINDING_MESSAGE,
     });
   }
 

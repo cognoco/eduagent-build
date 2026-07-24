@@ -85,6 +85,104 @@ function messages(root: string): string {
     .join('\n');
 }
 
+interface ClaudeReviewContractFixtureOptions {
+  bindExpectedHead?: boolean;
+  firstAttemptIf?: string;
+  secondAttemptIf?: string;
+  thirdAttemptIf?: string;
+}
+
+function writeClaudeReviewContractFixture(
+  root: string,
+  {
+    bindExpectedHead = true,
+    firstAttemptIf,
+    secondAttemptIf = "steps.review-1.outcome == 'failure'",
+    thirdAttemptIf = "steps.review-1.outcome == 'failure' && steps.review-2.outcome == 'failure'",
+  }: ClaudeReviewContractFixtureOptions = {},
+) {
+  const ifLine = (condition: string | undefined) =>
+    condition === undefined ? '' : `              if: ${condition}\n`;
+  const promptHeadMarker = bindExpectedHead
+    ? '                - Reviewed head SHA: ${{ github.event.pull_request.head.sha }}\n'
+    : '';
+  const selectorHeadArgument = bindExpectedHead
+    ? '                  --arg expected_head "$HEAD_SHA" \\\n'
+    : '';
+  const selectorHeadFilter = bindExpectedHead
+    ? '                    | select((.body | split("\\n") | index("- Reviewed head SHA: \\($expected_head)")) != null)\n'
+    : '';
+
+  writeFixture(
+    root,
+    '.github/workflows/claude-code-review.yml',
+    `
+      name: Claude Code Review
+      on:
+        pull_request:
+          types: [opened, synchronize, ready_for_review, reopened]
+      permissions: {}
+      jobs:
+        claude-review:
+          runs-on: ubuntu-latest
+          permissions:
+            id-token: write
+          env:
+            CLAUDE_REVIEW_PROMPT: |
+              Review comment metadata:
+${promptHeadMarker}          steps:
+            - name: Initialize fail-closed review result
+              run: |
+                jq -n '{
+                  status: "REVIEWER_UNAVAILABLE",
+                  merge_eligible: false,
+                  head_sha: "abc123",
+                  run_id: "123",
+                  recovery_command: "gh run rerun 123 --failed --repo example/repo"
+                }' > claude-review-verdict.json
+            - id: review-1
+${ifLine(firstAttemptIf)}              uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              continue-on-error: true
+              timeout-minutes: 20
+            - id: review-2
+${ifLine(secondAttemptIf)}              uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              continue-on-error: true
+              timeout-minutes: 20
+            - id: review-3
+${ifLine(thirdAttemptIf)}              uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              continue-on-error: true
+              timeout-minutes: 20
+            - name: Evaluate review verdict
+              env:
+                HEAD_SHA: \${{ github.event.pull_request.head.sha }}
+              run: |
+                comments_json="$(gh api "repos/\${REPO}/issues/\${PR_NUMBER}/comments" --paginate)"
+                review_json="$(
+                  jq -c \\
+${selectorHeadArgument}                    '[
+                      .[]
+                      | select(.user.login == "claude[bot]")
+                      | select(.user.type == "Bot")
+                      | select(.body | contains("## Claude Code Review:"))
+${selectorHeadFilter}                    ] | last // empty' <<< "$comments_json"
+                )"
+                if [[ -z "$review_json" ]]; then
+                  exit 1
+                fi
+                metadata_complete=true
+                jq -n --argjson metadata_complete "$metadata_complete" '{
+                  merge_eligible: $metadata_complete
+                }' > claude-review-verdict.json
+            - name: Upload review verdict artifact
+              if: always()
+              uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+              with:
+                path: claude-review-verdict.json
+                if-no-files-found: error
+    `,
+  );
+}
+
 describe('checkGithubWorkflowSecurity', () => {
   let root: string;
 
@@ -739,60 +837,40 @@ describe('checkGithubWorkflowSecurity', () => {
   });
 
   it('allows the bounded fail-closed Claude review contract', () => {
-    writeFixture(
-      root,
-      '.github/workflows/claude-code-review.yml',
-      `
-      name: Claude Code Review
-      on:
-        pull_request:
-          types: [opened, synchronize, ready_for_review, reopened]
-      permissions: {}
-      jobs:
-        claude-review:
-          runs-on: ubuntu-latest
-          permissions:
-            id-token: write
-          steps:
-            - name: Initialize fail-closed review result
-              run: |
-                jq -n '{
-                  status: "REVIEWER_UNAVAILABLE",
-                  merge_eligible: false,
-                  head_sha: "abc123",
-                  run_id: "123",
-                  recovery_command: "gh run rerun 123 --failed --repo example/repo"
-                }' > claude-review-verdict.json
-            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
-              continue-on-error: true
-              timeout-minutes: 20
-            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
-              continue-on-error: true
-              timeout-minutes: 20
-            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
-              continue-on-error: true
-              timeout-minutes: 20
-            - name: Evaluate review verdict
-              run: |
-                comments_json="$(gh api "repos/\${REPO}/issues/\${PR_NUMBER}/comments" --paginate)"
-                review_json="$(jq -c '[ .[] | select(.user.login == "claude[bot]") | select(.user.type == "Bot") | select(.body | contains("## Claude Code Review:")) ] | last' <<< "$comments_json")"
-                if [[ -z "$review_json" ]]; then
-                  exit 1
-                fi
-                metadata_complete=true
-                jq -n --argjson metadata_complete "$metadata_complete" '{
-                  merge_eligible: $metadata_complete
-                }' > claude-review-verdict.json
-            - name: Upload review verdict artifact
-              if: always()
-              uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
-              with:
-                path: claude-review-verdict.json
-                if-no-files-found: error
-      `,
-    );
+    writeClaudeReviewContractFixture(root);
 
     expect(checkGithubWorkflowSecurity(root)).toEqual([]);
+  });
+
+  it('rejects a Claude review selector that could accept a stale cross-head comment', () => {
+    writeClaudeReviewContractFixture(root, { bindExpectedHead: false });
+
+    expect(messages(root)).toContain(
+      'Claude review verdict comments must carry and exactly match the expected pull request head SHA',
+    );
+  });
+
+  it('rejects a conditional first Claude review attempt', () => {
+    writeClaudeReviewContractFixture(root, {
+      firstAttemptIf: 'false',
+      secondAttemptIf: 'false',
+      thirdAttemptIf: 'false',
+    });
+
+    expect(messages(root)).toContain(
+      'Claude review token attempts must be an unconditional first attempt followed by fallbacks gated on all preceding failures',
+    );
+  });
+
+  it('rejects Claude review fallbacks not gated on all preceding failures', () => {
+    writeClaudeReviewContractFixture(root, {
+      secondAttemptIf: "steps.review-1.outcome == 'success'",
+      thirdAttemptIf: "steps.review-2.outcome == 'failure'",
+    });
+
+    expect(messages(root)).toContain(
+      'Claude review token attempts must be an unconditional first attempt followed by fallbacks gated on all preceding failures',
+    );
   });
 
   // [F-132] The review-verdict gate must not parse a comment as the verdict

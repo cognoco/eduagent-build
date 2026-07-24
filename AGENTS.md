@@ -467,7 +467,7 @@ PRs that modify `.github/workflows/claude-code-review.yml` are a special self-re
 ```bash
 pr=<pr-number>
 head="$(gh pr view "$pr" --json headRefOid --jq .headRefOid)"
-gh pr comment "$pr" --body "@claude Perform the final exact-head review for ${head}. Review the full diff against the trusted repository instructions. Post the canonical Claude Code Review verdict; do not modify the branch."
+gh pr comment "$pr" --body "@claude Perform the final exact-head review for ${head}. Review the full diff against the trusted repository instructions. Post the canonical Claude Code Review verdict, including the exact metadata line '- Reviewed head SHA: ${head}'; do not modify the branch."
 ```
 
 Neither recovery route weakens the armed gate. Do not merge until a fresh `claude[bot]` exact clean verdict exists for the current head.

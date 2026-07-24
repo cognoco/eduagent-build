@@ -151,6 +151,7 @@ jobs:
         <details><summary>Review metadata</summary>
 
         - Verdict: {VERDICT}
+        - Reviewed head SHA: ${{ github.event.pull_request.head.sha }}
         - Review green: true|false
         - Must-fix count: {count}
         - Should-fix count: {count}
@@ -171,6 +172,7 @@ jobs:
         <details><summary>Review metadata</summary>
 
         - Verdict: APPROVED
+        - Reviewed head SHA: ${{ github.event.pull_request.head.sha }}
         - Review green: true
         - Must-fix count: 0
         - Should-fix count: 0
@@ -299,18 +301,22 @@ jobs:
         run: |
           comments_json="$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --paginate)"
           # The verdict source of truth must be the review comment posted by the
-          # Claude GitHub App (claude[bot]), not any comment that happens to
-          # carry the verdict marker. Without the author constraint, a PR author
-          # could post "## Claude Code Review: APPROVED" and forge the verdict.
-          # GitHub owns the claude[bot] identity; a PR author cannot post as it.
-          # The Bot type check is defence in depth.
+          # Claude GitHub App (claude[bot]) for this exact PR head, not any
+          # comment that happens to carry the verdict marker. Without the author
+          # constraint, a PR author could forge the verdict. Without the head
+          # constraint, a late comment from a cancelled review of an older head
+          # could certify the current head. GitHub owns the claude[bot] identity;
+          # a PR author cannot post as it. The Bot type check is defence in depth.
           review_json="$(
-            jq -c --arg started "$REVIEW_RUN_STARTED_AT" '
+            jq -c \
+              --arg started "$REVIEW_RUN_STARTED_AT" \
+              --arg expected_head "$HEAD_SHA" '
               [ .[]
                 | select(.user.login == "claude[bot]")
                 | select(.user.type == "Bot")
                 | select(.created_at >= $started)
                 | select(.body | contains("## Claude Code Review:"))
+                | select((.body | split("\n") | index("- Reviewed head SHA: \($expected_head)")) != null)
               ]
               | sort_by(.created_at)
               | last // empty
