@@ -87,9 +87,12 @@ export interface ScanLearningTextResult {
   /** Number of distinct protected lexemes found. Observability-safe (a count). */
   readonly protectedLexemeCount: number;
   /**
-   * Corpus confidence for the language whose grammar was applied. 'model-generated'
-   * means the corpus has NOT been native-speaker reviewed — surfaced so callers
-   * and auditors can see the strength of the control they are relying on.
+   * Confidence of the corpora actually consulted for THIS result — the declared
+   * language's corpus AND every corpus that contributed a matched lexeme.
+   * 'model-generated' means at least one of them has NOT been native-speaker
+   * reviewed, so callers and auditors can see the strength of the control they
+   * are relying on. Never reports 'reviewed' on the strength of the declared
+   * language alone.
    */
   readonly corpusConfidence: LanguageCorpus['confidence'];
 }
@@ -165,7 +168,6 @@ interface CompiledGrammar {
   /** Patterns yielding a `person` group that must look like a name. */
   readonly namedPatterns: readonly RegExp[];
   readonly inferenceRe: RegExp | null;
-  readonly confidence: LanguageCorpus['confidence'];
 }
 
 function compileGrammar(declared: ConversationLanguage): CompiledGrammar {
@@ -245,7 +247,6 @@ function compileGrammar(declared: ConversationLanguage): CompiledGrammar {
     inferenceRe: markers.length
       ? new RegExp(`(?:${alternation(markers)})`, 'iu')
       : null,
-    confidence: LANGUAGE_CORPORA[declared].confidence,
   };
 }
 
@@ -274,14 +275,43 @@ function normalizeForMatching(text: string): string {
   ).replace(/\s+/gu, ' ');
 }
 
-function countProtectedLexemes(normalized: string): number {
+function findProtectedLexemes(normalized: string): ReadonlySet<string> {
   const found = new Set<string>();
   for (const re of [LATIN_LEXEME_RE, CJK_LEXEME_RE]) {
     re.lastIndex = 0;
     for (const match of normalized.matchAll(re))
       found.add(match[0].toLowerCase());
   }
-  return found.size;
+  return found;
+}
+
+/** Lexemes contributed by a corpus whose `confidence` is 'reviewed'. */
+const REVIEWED_LEXEMES = new Set(
+  CORPUS_LANGUAGES.filter(
+    (language) => LANGUAGE_CORPORA[language].confidence === 'reviewed',
+  ).flatMap((language) =>
+    LANGUAGE_CORPORA[language].lexemes.map((lexeme) => lexeme.toLowerCase()),
+  ),
+);
+
+/**
+ * Confidence of the corpora ACTUALLY CONSULTED for this result, not of the
+ * declared language alone. Lexeme detection spans all ten corpora, so
+ * "Žák má dyslexii" scanned with `conversationLanguage: 'en'` blocks on a
+ * `model-generated` Czech lexeme — reporting the declared language's
+ * 'reviewed' there would over-claim the strength of the control, which is the
+ * exact failure this field exists to prevent.
+ */
+function resolveCorpusConfidence(
+  declared: ConversationLanguage,
+  matchedLexemes: ReadonlySet<string>,
+): LanguageCorpus['confidence'] {
+  if (LANGUAGE_CORPORA[declared].confidence !== 'reviewed') {
+    return 'model-generated';
+  }
+  return [...matchedLexemes].every((lexeme) => REVIEWED_LEXEMES.has(lexeme))
+    ? 'reviewed'
+    : 'model-generated';
 }
 
 /** A `person` capture that is a plausible name, not a bare clinical term. */
@@ -320,12 +350,16 @@ export function scanLearningText(
 ): ScanLearningTextResult {
   const grammar = grammarFor(input.conversationLanguage);
   const normalized = normalizeForMatching(input.text);
-  const protectedLexemeCount = countProtectedLexemes(normalized);
+  const matchedLexemes = findProtectedLexemes(normalized);
+  const protectedLexemeCount = matchedLexemes.size;
 
   const base = {
     fieldKind: input.fieldKind,
     protectedLexemeCount,
-    corpusConfidence: grammar.confidence,
+    corpusConfidence: resolveCorpusConfidence(
+      input.conversationLanguage,
+      matchedLexemes,
+    ),
   } as const;
 
   // No protected lexeme anywhere in any of the ten corpora → clear.

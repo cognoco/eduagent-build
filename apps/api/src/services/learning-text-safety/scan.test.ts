@@ -332,6 +332,21 @@ describe('[WI-2628] corpus confidence is surfaced, not asserted away', () => {
       );
     }
   });
+
+  it('reports reviewed when the match came from the reviewed English corpus', () => {
+    const result = scanAsLlm('The learner has ADHD.', 'en');
+    expect(result.classification).toBe('block');
+    expect(result.corpusConfidence).toBe('reviewed');
+  });
+
+  it('does NOT report reviewed when a model-generated lexeme drove the match', () => {
+    // Declared language is English (reviewed corpus), but the blocking lexeme
+    // "dyslexii" comes only from the model-generated Czech corpus. Reporting
+    // 'reviewed' here would over-claim the strength of the control.
+    const result = scanAsLlm('Žák má dyslexii a potřebuje pomoc.', 'en');
+    expect(result.protectedLexemeCount).toBeGreaterThan(0);
+    expect(result.corpusConfidence).toBe('model-generated');
+  });
 });
 
 describe('[WI-2628] regression: the shipped English-only guard is the bug', () => {
