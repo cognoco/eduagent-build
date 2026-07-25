@@ -16,35 +16,35 @@ const allControllerGatesClosed = {
   launchDayLegalRefresh: true,
 } as const;
 
+const validRecord = {
+  countryCode: 'NO',
+  countryName: 'Norway',
+  regimeKey: 'EU_GDPR_13',
+  article8Threshold: 13,
+  authorizationForm: 'guardian',
+  launchStatus: 'enabled',
+  launchBlockReason: null,
+  legalVerificationStatus: 'verified',
+  legalReviewedAt: new Date('2026-07-24T00:00:00Z'),
+  legalReviewValidUntil: new Date('2026-07-31T00:00:00Z'),
+  launchDayReviewRequired: true,
+  processingLocationClass: 'eea_only',
+  policyVersion: '2026-07-24.1',
+  effectiveAt: new Date('2026-07-24T00:00:00Z'),
+  expiresAt: null,
+  sourceProvenance: [
+    {
+      title: 'Personal Data Act §5',
+      url: 'https://lovdata.no/dokument/NLE/lov/2018-06-15-38/%C2%A75',
+      checkedAt: new Date('2026-07-24T00:00:00Z'),
+    },
+  ],
+  controllerGates: allControllerGatesClosed,
+} as const;
+
 describe('country policy contracts', () => {
   it('accepts a complete effective-dated country policy record', () => {
-    expect(
-      countryPolicyRecordSchema.parse({
-        countryCode: 'NO',
-        countryName: 'Norway',
-        regimeKey: 'EU_GDPR_13',
-        article8Threshold: 13,
-        authorizationForm: 'guardian',
-        launchStatus: 'enabled',
-        launchBlockReason: null,
-        legalVerificationStatus: 'verified',
-        legalReviewedAt: new Date('2026-07-24T00:00:00Z'),
-        legalReviewValidUntil: new Date('2026-07-31T00:00:00Z'),
-        launchDayReviewRequired: true,
-        processingLocationClass: 'eea_only',
-        policyVersion: '2026-07-24.1',
-        effectiveAt: new Date('2026-07-24T00:00:00Z'),
-        expiresAt: null,
-        sourceProvenance: [
-          {
-            title: 'Personal Data Act §5',
-            url: 'https://lovdata.no/dokument/NLE/lov/2018-06-15-38/%C2%A75',
-            checkedAt: new Date('2026-07-24T00:00:00Z'),
-          },
-        ],
-        controllerGates: allControllerGatesClosed,
-      }),
-    ).toMatchObject({
+    expect(countryPolicyRecordSchema.parse(validRecord)).toMatchObject({
       countryCode: 'NO',
       article8Threshold: 13,
       launchStatus: 'enabled',
@@ -72,34 +72,46 @@ describe('country policy contracts', () => {
       },
     ],
   ])('rejects %s', (_label, patch) => {
-    const candidate = {
-      countryCode: 'NO',
-      countryName: 'Norway',
-      regimeKey: 'EU_GDPR_13',
-      article8Threshold: 13,
-      authorizationForm: 'guardian',
-      launchStatus: 'enabled',
-      launchBlockReason: null,
-      legalVerificationStatus: 'verified',
-      legalReviewedAt: new Date('2026-07-24T00:00:00Z'),
-      legalReviewValidUntil: new Date('2026-07-31T00:00:00Z'),
-      launchDayReviewRequired: true,
-      processingLocationClass: 'eea_only',
-      policyVersion: '2026-07-24.1',
-      effectiveAt: new Date('2026-07-24T00:00:00Z'),
-      expiresAt: null,
-      sourceProvenance: [
-        {
-          title: 'Personal Data Act §5',
-          url: 'https://lovdata.no/dokument/NLE/lov/2018-06-15-38/%C2%A75',
-          checkedAt: new Date('2026-07-24T00:00:00Z'),
-        },
-      ],
-      controllerGates: allControllerGatesClosed,
-      ...patch,
-    };
+    expect(
+      countryPolicyRecordSchema.safeParse({ ...validRecord, ...patch }).success,
+    ).toBe(false);
+  });
 
-    expect(countryPolicyRecordSchema.safeParse(candidate).success).toBe(false);
+  it('rejects a record with no legal provenance at all', () => {
+    expect(
+      countryPolicyRecordSchema.safeParse({
+        ...validRecord,
+        sourceProvenance: [],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('accepts provenance that cites an instrument without a link', () => {
+    // A controller ruling can record a position with no online instrument to
+    // link; the row must still be attributable, and inventing a URL would be
+    // worse than admitting there is none.
+    expect(
+      countryPolicyRecordSchema.safeParse({
+        ...validRecord,
+        sourceProvenance: [
+          {
+            title: 'Launch-country ruling 2026-07-23 (internal)',
+            url: null,
+            checkedAt: new Date('2026-07-24T00:00:00Z'),
+          },
+        ],
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects a blocked country with no stated block reason', () => {
+    expect(
+      countryPolicyRecordSchema.safeParse({
+        ...validRecord,
+        launchStatus: 'blocked',
+        launchBlockReason: null,
+      }).success,
+    ).toBe(false);
   });
 
   it('accepts only authoritative residence evidence as the primary assertion', () => {
