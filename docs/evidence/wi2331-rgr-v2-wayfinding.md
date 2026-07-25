@@ -159,7 +159,7 @@ and `'never lets returnTo override a definitive subjects/journal pathname owner'
 `my-notes/index.test.tsx` → `'labels and routes Back to Journal when returnTo is journal'`
 + the Mentor-origin counterpart.
 
-```
+```text
 ### GREEN baseline (fix present)
 _layout.test.tsx + my-notes/index.test.tsx: 133 passed, 133 total
 ### REVERT A (resolveV2TabIsActive -> pathname-only; my-notes backLabel -> hard-coded mentor)

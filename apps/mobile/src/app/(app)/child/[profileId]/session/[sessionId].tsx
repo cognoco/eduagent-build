@@ -75,14 +75,13 @@ export default function SessionDetailScreen() {
         : ((v2Enabled ? '/(app)/mentor' : '/(app)/home') as Href);
   const handleBack = () => goBackOrReplace(router, backFallbackHref);
 
-  // WI-2331 rework, F1b: every Back control below routes through
-  // handleBack/backFallbackHref, so they all name the same actual
-  // destination — the owning V2 tab named by returnTo, the child's profile
-  // (this screen's real, unchanged parent when there's no returnTo), or the
-  // Mentor default — instead of the generic `common.goBack` most of them
-  // showed before. V0/V1 keep their prior copy unchanged (`common.goBack`
-  // for the generic sites; the dedicated `backToChildProfile` string for the
-  // one button that already named it).
+  // WI-2331 rework, F1b: the header/error/narrative-unavailable Back
+  // controls route through handleBack/backFallbackHref, so they name the
+  // same actual destination — the owning V2 tab named by returnTo, the
+  // child's profile (this screen's real, unchanged parent when there's no
+  // returnTo), or the Mentor default — instead of the generic
+  // `common.goBack` most of them showed before. V0/V1 keep their prior copy
+  // unchanged (`common.goBack`).
   const v2ExitLabel =
     returnTo != null
       ? t('common.backTo', {
@@ -92,9 +91,20 @@ export default function SessionDetailScreen() {
         ? t('parentView.session.backToChildProfile')
         : t('common.backTo', { destination: t(V2_TAB_TITLE_KEYS.mentor) });
   const backLabel = v2Enabled ? v2ExitLabel : t('common.goBack');
-  const childProfileBackLabel = v2Enabled
-    ? v2ExitLabel
-    : t('parentView.session.backToChildProfile');
+  // The footer "back to child" CTA is a distinct control from the header
+  // Back: it always names and routes to the child's profile specifically,
+  // regardless of `returnTo` — so a parent who followed a `returnTo` deep
+  // link (e.g. from Recaps) still has a direct way back to the child.
+  // Keeping this separate from `backLabel`/`handleBack` avoids the two
+  // controls becoming indistinguishable when `returnTo` is set.
+  const childProfileBackLabel = t('parentView.session.backToChildProfile');
+  const handleBackToChildProfile = () => {
+    if (profileId) {
+      router.push(childProfileHref(profileId));
+      return;
+    }
+    handleBack();
+  };
 
   useEffect(() => {
     if (copyState === 'idle') return undefined;
@@ -419,7 +429,7 @@ export default function SessionDetailScreen() {
           </Pressable>
         ) : null}
         <Pressable
-          onPress={handleBack}
+          onPress={handleBackToChildProfile}
           className="rounded-lg px-4 py-3 items-center min-h-[48px] justify-center"
           accessibilityRole="button"
           accessibilityLabel={childProfileBackLabel}

@@ -8,6 +8,7 @@ import {
   renderScreen,
   NAMED_PROFILES,
 } from '../../../../../test-utils/screen-render';
+import { FEATURE_FLAGS } from '../../../../../lib/feature-flags';
 
 // i18n boundary. This screen's assertions reference the rendered English
 // strings AND raw keys via the key-passthrough `t`. We keep a key-passthrough
@@ -31,6 +32,7 @@ jest.mock(
 );
 
 const mockPush = jest.fn();
+let mockReturnTo: string | undefined;
 jest.mock('expo-router' /* gc1-allow: native-boundary */, () => ({
   useRouter: () => ({
     back: jest.fn(),
@@ -40,6 +42,7 @@ jest.mock('expo-router' /* gc1-allow: native-boundary */, () => ({
   useLocalSearchParams: () => ({
     profileId: 'child-profile-001',
     sessionId: 'session-001',
+    returnTo: mockReturnTo,
   }),
 }));
 
@@ -183,6 +186,7 @@ describe('SessionDetailScreen (summary-only)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFetch.mockClear();
+    mockReturnTo = undefined;
   });
 
   it('shows session metadata when displaySummary is present', async () => {
@@ -395,5 +399,64 @@ describe('SessionDetailScreen (summary-only)', () => {
     );
 
     cleanup();
+  });
+
+  // [WI-2331 rework, CodeRabbit MAJOR fix] the footer "back to child" CTA
+  // must stay a distinct control from the header Back: it always names and
+  // routes to the child's profile specifically, even when `returnTo` points
+  // the header elsewhere (e.g. Recaps). Before this fix, setting `returnTo`
+  // under V2 made both controls share the same label AND the same
+  // returnTo-aware destination — two indistinguishable Back buttons.
+  describe('footer back-to-child CTA stays distinct from header Back under V2 + returnTo', () => {
+    let originalV2: boolean;
+
+    beforeEach(() => {
+      originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        true;
+      mockReturnTo = 'journal';
+    });
+
+    afterEach(() => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        originalV2;
+    });
+
+    it('gives the header and footer Back controls different accessibility labels', async () => {
+      setRoutes(makeSession({ narrative: 'They reviewed fractions.' }));
+
+      const { cleanup } = renderSessionDetail();
+
+      const footer = await waitFor(() =>
+        screen.getByTestId('session-detail-back-to-child'),
+      );
+      const header = screen.getByLabelText(
+        'common.backTo:{"destination":"tabs.journal"}',
+      );
+
+      expect(footer.props.accessibilityLabel).not.toBe(
+        header.props.accessibilityLabel,
+      );
+      expect(footer.props.accessibilityLabel).toBe(
+        'parentView.session.backToChildProfile',
+      );
+
+      cleanup();
+    });
+
+    it('always routes the footer CTA to the child profile, not the returnTo destination', async () => {
+      setRoutes(makeSession({ narrative: 'They reviewed fractions.' }));
+
+      const { cleanup } = renderSessionDetail();
+
+      const footer = await waitFor(() =>
+        screen.getByTestId('session-detail-back-to-child'),
+      );
+      fireEvent.press(footer);
+
+      expect(mockPush).toHaveBeenCalledWith('/(app)/child/child-profile-001');
+
+      cleanup();
+    });
   });
 });

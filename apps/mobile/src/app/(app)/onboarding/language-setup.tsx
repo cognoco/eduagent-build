@@ -207,11 +207,6 @@ export default function LanguageSetup() {
     }
   };
 
-  const guardActionLabel =
-    returnTo === SETTINGS_RETURN_TO || returnTo === SUBJECTS_RETURN_TO
-      ? t('common.goBack')
-      : t('common.goHome');
-
   // WI-2331 rework, F1b: handleBack always exits this screen — to Mentor
   // (the settings-return case, since `/(app)/more` is dead in V2) or the
   // owning V2 tab named by returnTo otherwise — so the header Back control
@@ -228,6 +223,17 @@ export default function LanguageSetup() {
         ),
       })
     : t('common.goBack');
+
+  // The "no subject selected" guard button also calls handleBack, so under
+  // V2 it must name the same destination backLabel does instead of the
+  // generic goBack/goHome split (a V0/V1-only distinction — settings/subjects
+  // return "back", everything else "home" — that doesn't hold once V2 routes
+  // every case through a named tab/Mentor destination).
+  const guardActionLabel = FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+    ? backLabel
+    : returnTo === SETTINGS_RETURN_TO || returnTo === SUBJECTS_RETURN_TO
+      ? t('common.goBack')
+      : t('common.goHome');
 
   if (!subjectId) {
     return (

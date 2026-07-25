@@ -49,7 +49,13 @@ import {
   normalizeHomeworkEntrySource,
 } from './_view-models/homework-session-params';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
-import { accountReturnToken, V2_TAB_TITLE_KEYS } from '../../../lib/navigation';
+import {
+  accountReturnToken,
+  JOURNAL_HREF,
+  MENTOR_HREF,
+  SUBJECTS_HREF,
+  V2_TAB_TITLE_KEYS,
+} from '../../../lib/navigation';
 
 type FlashMode = 'off' | 'on' | 'auto';
 
@@ -768,11 +774,29 @@ export default function CameraScreen(): React.ReactNode {
   // "X" close affordances elsewhere on this screen follow camera-modal
   // convention (dismiss), not this screen-exit "Back" pattern, and are left
   // untouched.
-  const permissionCloseLabel = FEATURE_FLAGS.MODE_NAV_V2_ENABLED
-    ? t('common.backTo', {
-        destination: t(V2_TAB_TITLE_KEYS[accountReturnToken(returnTo)]),
-      })
-    : t('common.goBack');
+  //
+  // `accountReturnToken()` only ever names Mentor/Subjects/Journal, but
+  // `homeworkReturnHrefForReturnTo()` (the same resolver `handleClose` uses)
+  // honors many more `returnTo` tokens (practice, own-learning, recaps,
+  // home, progress, …) that land outside those three tabs. Only name the
+  // destination when it actually resolves to one of the three V2 tabs;
+  // otherwise fall back to the generic label so the CTA never claims a tab
+  // it isn't actually going to.
+  const homeworkCloseHref = homeworkReturnHrefForReturnTo(
+    returnTo,
+    undefined,
+    FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+  );
+  const closesToNamedV2Tab =
+    homeworkCloseHref === MENTOR_HREF ||
+    homeworkCloseHref === SUBJECTS_HREF ||
+    homeworkCloseHref === JOURNAL_HREF;
+  const permissionCloseLabel =
+    FEATURE_FLAGS.MODE_NAV_V2_ENABLED && closesToNamedV2Tab
+      ? t('common.backTo', {
+          destination: t(V2_TAB_TITLE_KEYS[accountReturnToken(returnTo)]),
+        })
+      : t('common.goBack');
 
   // Intercept Android hardware back so it routes through handleClose too;
   // without this, the OS goBack() returns to whichever tab was active when
