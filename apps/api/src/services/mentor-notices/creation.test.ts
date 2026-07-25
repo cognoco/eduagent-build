@@ -3,6 +3,7 @@ import type { NoticedGapSignal, SessionType } from '@eduagent/schemas';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { inngest } from '../../inngest/client';
 import { createMentorNoticeFromExchange } from './creation';
 
 const PROFILE_ID = '00000000-0000-4000-8000-000000000001';
@@ -58,6 +59,18 @@ function session(sessionType: SessionType) {
 }
 
 describe('createMentorNoticeFromExchange', () => {
+  let sendSpy: jest.SpiedFunction<typeof inngest.send>;
+
+  beforeEach(() => {
+    sendSpy = jest
+      .spyOn(inngest, 'send')
+      .mockResolvedValue({ ids: [] } as never);
+  });
+
+  afterEach(() => {
+    sendSpy.mockRestore();
+  });
+
   it('is the shared creation boundary for streaming and non-streaming exchanges', () => {
     const source = readFileSync(
       join(__dirname, '..', 'session', 'session-exchange.ts'),
@@ -89,6 +102,14 @@ describe('createMentorNoticeFromExchange', () => {
           answerEventId: EVENT_ID,
         }),
       );
+      expect(sendSpy).toHaveBeenCalledTimes(1);
+      expect(sendSpy).toHaveBeenCalledWith({
+        name: 'app/notice.created',
+        data: { noticeId: NOTICE_ID, profileId: PROFILE_ID },
+      });
+      await expect(sendSpy.mock.results[0]?.value).resolves.toEqual({
+        ids: [],
+      });
     },
   );
 
@@ -108,6 +129,7 @@ describe('createMentorNoticeFromExchange', () => {
       }),
     ).resolves.toBeNull();
     expect(insert).not.toHaveBeenCalled();
+    expect(sendSpy).not.toHaveBeenCalled();
   });
 
   it('rejects a new notice while the session is already re-checking one', async () => {
@@ -122,6 +144,7 @@ describe('createMentorNoticeFromExchange', () => {
       }),
     ).resolves.toBeNull();
     expect(insert).not.toHaveBeenCalled();
+    expect(sendSpy).not.toHaveBeenCalled();
   });
 
   it('rejects unsupported evidence before persistence', async () => {
@@ -135,5 +158,6 @@ describe('createMentorNoticeFromExchange', () => {
       }),
     ).resolves.toBeNull();
     expect(insert).not.toHaveBeenCalled();
+    expect(sendSpy).not.toHaveBeenCalled();
   });
 });
