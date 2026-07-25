@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, Text } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { ScopeDescriptor } from '@eduagent/schemas';
 
@@ -35,8 +35,13 @@ function sameScope(left: ScopeDescriptor, right: ScopeDescriptor): boolean {
 
 export function ScopeChip(): React.ReactElement | null {
   const { t } = useTranslation();
-  const { scopeList, availableScopes, activeScope, setActiveScope } =
-    useScopeContext();
+  const {
+    scopeList,
+    availableScopes,
+    activeScope,
+    isActiveScopePersisted,
+    setActiveScope,
+  } = useScopeContext();
   const labels = {
     supportHub: t('scopeChip.supportHub'),
     me: t('scopeChip.me'),
@@ -47,40 +52,59 @@ export function ScopeChip(): React.ReactElement | null {
   }
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      testID="scope-chip"
-      accessibilityRole="tablist"
-      className="max-w-[260px] rounded-full border border-border bg-surface shadow-sm"
-      contentContainerClassName="items-center gap-1 p-1"
-    >
-      {availableScopes.map((scope) => {
-        const selected = sameScope(scope, activeScope);
-        const label = scopeLabel(scope, labels);
-        return (
-          <Pressable
-            key={scopeOptionKey(scope)}
-            testID={`scope-chip-option-${scopeOptionKey(scope)}`}
-            accessibilityRole="button"
-            accessibilityLabel={label}
-            accessibilityState={{ selected }}
-            onPress={() => setActiveScope(scope)}
-            className={`min-h-11 min-w-11 max-w-[150px] items-center justify-center rounded-full px-3 ${
-              selected ? 'bg-primary' : 'bg-transparent'
-            }`}
-          >
-            <Text
-              numberOfLines={1}
-              className={`text-body-sm font-semibold ${
-                selected ? 'text-on-primary' : 'text-text-secondary'
+    <View testID="scope-chip-persistence-anchor" className="max-w-[260px]">
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        testID="scope-chip"
+        accessibilityRole="tablist"
+        className="max-w-[260px] rounded-full border border-border bg-surface shadow-sm"
+        contentContainerClassName="items-center gap-1"
+        contentContainerStyle={{ padding: 4 }}
+      >
+        {availableScopes.map((scope) => {
+          const selected = sameScope(scope, activeScope);
+          const label = scopeLabel(scope, labels);
+          return (
+            <Pressable
+              key={scopeOptionKey(scope)}
+              testID={`scope-chip-option-${scopeOptionKey(scope)}`}
+              accessibilityRole="button"
+              accessibilityLabel={label}
+              accessibilityState={{ selected }}
+              onPress={() => setActiveScope(scope)}
+              style={{ minHeight: 44, minWidth: 44 }}
+              className={`max-w-[150px] items-center justify-center rounded-full px-3 ${
+                selected ? 'bg-primary' : 'bg-transparent'
               }`}
             >
-              {label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </ScrollView>
+              <Text
+                numberOfLines={1}
+                className={`text-body-sm font-semibold ${
+                  selected ? 'text-on-primary' : 'text-text-secondary'
+                }`}
+              >
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+      {process.env.EXPO_PUBLIC_E2E === 'true' && isActiveScopePersisted && (
+        <View
+          accessible
+          collapsable={false}
+          pointerEvents="none"
+          testID={`scope-chip-persisted-${scopeOptionKey(activeScope)}`}
+          style={{
+            position: 'absolute',
+            right: 4,
+            bottom: 4,
+            width: 2,
+            height: 2,
+          }}
+        />
+      )}
+    </View>
   );
 }
