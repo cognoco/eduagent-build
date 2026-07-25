@@ -6820,6 +6820,70 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(noMatchInput).toBeGreaterThan(-1);
   });
 
+  it('[WI-2741] dismisses the Mentor keyboard before selecting the hard Homework starter case', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-mentor-single-composer.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as unknown[];
+    const expectedSequence: unknown[] = [
+      { tapOn: { id: 'cold-start-chip-learn' } },
+      { inputText: ' please' },
+      {
+        assertVisible: {
+          id: 'mentor-bar-input',
+          text: 'Teach me something new please',
+        },
+      },
+      { assertVisible: { id: 'mentor-bar-send', enabled: true } },
+      'hideKeyboard',
+      { assertVisible: { id: 'cold-start-chip-homework' } },
+      { tapOn: { id: 'cold-start-chip-homework' } },
+      { assertVisible: { id: 'cold-start-homework-reply' } },
+      { assertVisible: { id: 'mentor-bar-camera' } },
+      { assertNotVisible: { text: '^Camera$', index: 1 } },
+      {
+        assertVisible: {
+          id: 'mentor-bar-input',
+          text: 'Teach me something new please',
+        },
+      },
+    ];
+    const hasExactSequence = (candidate: unknown[]): boolean =>
+      candidate.some((_, index) =>
+        isDeepStrictEqual(
+          candidate.slice(index, index + expectedSequence.length),
+          expectedSequence,
+        ),
+      );
+
+    expect(hasExactSequence(commands)).toBe(true);
+
+    for (const mutate of [
+      (candidate: unknown[]) =>
+        candidate.filter((command) => command !== 'hideKeyboard'),
+      (candidate: unknown[]) => {
+        const keyboardIndex = candidate.indexOf('hideKeyboard');
+        const [keyboardDismiss] = candidate.splice(keyboardIndex, 1);
+        candidate.splice(keyboardIndex + 2, 0, keyboardDismiss);
+        return candidate;
+      },
+      (candidate: unknown[]) =>
+        candidate.map((command) =>
+          isDeepStrictEqual(command, {
+            assertVisible: { id: 'cold-start-chip-homework' },
+          })
+            ? {
+                assertVisible: { id: 'cold-start-chip-homework' },
+                optional: true,
+              }
+            : command,
+        ),
+    ]) {
+      expect(hasExactSequence(mutate(structuredClone(commands)))).toBe(false);
+    }
+  });
+
   it('[WI-1406] keeps native MFA placeholders explicitly non-executable until OPQ-26 fixtures exist', () => {
     const nightlyFlows = new Set(loadPlan('nightly').map(({ flow }) => flow));
     const placeholders = [

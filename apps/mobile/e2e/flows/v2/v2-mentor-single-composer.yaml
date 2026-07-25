@@ -49,6 +49,9 @@ tags:
 - assertVisible:
     id: 'mentor-bar-send'
     enabled: true
+- hideKeyboard
+- assertVisible:
+    id: 'cold-start-chip-homework'
 
 # The homework starter preserves the learner's existing draft while the
 # composer's canonical Camera action remains available and no second Camera
