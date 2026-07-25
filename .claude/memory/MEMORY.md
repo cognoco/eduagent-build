@@ -7,6 +7,7 @@
 ## Shepherding & Cosmo Workflow
 
 - **Quartet mechanics** → `_quartet/_quartet-wip/quartet-findings.md` (2026-07-01). **Cosmo WI finalization** → `_wip/umbrella-program/cosmo-finalization-guide.md` (2026-06-20).
+- [feedback_quartet_pr_authority.md](feedback_quartet_pr_authority.md) — Combined Orchestrator + Shepherd mandate covers ordinary PR open/CI/review/merge; never file OQ approval for routine engineering mechanics. Operator-reaffirmed 2026-07-25.
 - [project_batch1_shepherd_lessons.md](project_batch1_shepherd_lessons.md) — Batch-1 lessons: Doppler→Worker sync is deploy-time only; cd-chain worktree cosmo cmds; no-code WI evidence verbatim on the WI page; stale test-merge needs update-branch not rerun; ops-WI ACs are literal (flip must happen).
 - [feedback_agent_spawn_inherits_shell_cwd.md](feedback_agent_spawn_inherits_shell_cwd.md) — Subagents inherit the spawning session's Bash cwd; spawning from inside a worktree misorients executors onto the wrong WI. cd to repo root before any Agent-tool wave.
 - [project_cosmo_wi_project_relation_misfiling.md](project_cosmo_wi_project_relation_misfiling.md) — Nexus-context captures inherit the Nexus Project; VERIFY genuine misfiling before repointing — estate-machinery items are often correctly Nexus; never repoint to defeat the guard.
