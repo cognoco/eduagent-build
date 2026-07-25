@@ -147,9 +147,7 @@ function getEnvBinding<K extends keyof EnvBindings>(
 }
 
 export function getStepEnvironment(): string {
-  return (
-    getEnvBinding('environment') ?? process.env['ENVIRONMENT'] ?? 'unknown'
-  );
+  return getEnvBinding('environment') ?? 'unknown';
 }
 
 /**

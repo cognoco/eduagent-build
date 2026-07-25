@@ -893,6 +893,7 @@ describe('LLM Router', () => {
         for await (const chunk of result.stream) chunks.push(chunk);
 
         expect(result.provider).toBe('openai');
+        expect(result.fallbackUsed).toBe(true);
         expect(chunks.join('')).toContain('Mock streamed');
         expect(mockCaptureException).toHaveBeenCalledTimes(1);
         expect(mockCaptureException).toHaveBeenCalledWith(

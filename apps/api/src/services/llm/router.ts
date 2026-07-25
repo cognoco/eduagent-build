@@ -2485,6 +2485,8 @@ async function attemptStreamProvider(
   const providerResult = normalizeStreamResult(
     provider.chatStream(messages, config),
   );
+  // This helper is reached only from the direct-fallback branch above, so the
+  // stream and returned result are intentionally marked as fallback usage.
   const stream = wrapStreamWithCircuitBreaker(
     providerResult.stream,
     config.provider,
@@ -2528,5 +2530,6 @@ async function attemptStreamProvider(
     provider: config.provider,
     model: config.model,
     stopReasonPromise,
+    fallbackUsed: true,
   };
 }
