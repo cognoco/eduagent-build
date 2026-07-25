@@ -3,6 +3,8 @@ import type { LogEntry } from './logger';
 
 const LLM_VOLUME_ALERT_EVENT = 'llm.volume.daily_threshold_exceeded';
 const LLM_VOLUME_ALERT_SURFACE = 'llm_volume_alert';
+const LLM_FALLBACK_RATE_ALERT_EVENT = 'llm.fallback_rate_threshold_exceeded';
+const LLM_FALLBACK_RATE_ALERT_SURFACE = 'llm_fallback_rate';
 const UTC_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const logger = createLogger();
 
@@ -19,6 +21,35 @@ export interface LlmVolumeAlertAttributes extends Record<string, unknown> {
 export type LlmVolumeAlertSink = (
   message: typeof LLM_VOLUME_ALERT_EVENT,
   attributes: LlmVolumeAlertAttributes,
+) => void;
+
+export interface LlmFallbackRateAlertAttributes extends Record<
+  string,
+  unknown
+> {
+  event: typeof LLM_FALLBACK_RATE_ALERT_EVENT;
+  surface: typeof LLM_FALLBACK_RATE_ALERT_SURFACE;
+  signal: 'fallback-rate-threshold';
+  tier: 'warn' | 'page';
+  environment: string;
+  numerator: number;
+  denominator: number;
+  rate_pct: number;
+  window_seconds: 900;
+  minimum_calls: 20;
+  warn_threshold_pct: 2;
+  page_threshold_pct: 10;
+  provider: string;
+  capability: string;
+}
+
+export type LaunchHealthAlertAttributes =
+  | LlmVolumeAlertAttributes
+  | LlmFallbackRateAlertAttributes;
+
+export type LaunchHealthAlertSink = (
+  message: typeof LLM_VOLUME_ALERT_EVENT | typeof LLM_FALLBACK_RATE_ALERT_EVENT,
+  attributes: LaunchHealthAlertAttributes,
 ) => void;
 
 export function emitLlmVolumeAlertProbe(environment?: string): {
@@ -81,6 +112,54 @@ function selectLlmVolumeAlertAttributes(
   };
 }
 
+function selectLlmFallbackRateAlertAttributes(
+  level: string,
+  message: unknown,
+  context: Record<string, unknown> | undefined,
+): LlmFallbackRateAlertAttributes | null {
+  if (level !== 'warn' || message !== LLM_FALLBACK_RATE_ALERT_EVENT) {
+    return null;
+  }
+  if (
+    context?.event !== LLM_FALLBACK_RATE_ALERT_EVENT ||
+    context.surface !== LLM_FALLBACK_RATE_ALERT_SURFACE ||
+    context.signal !== 'fallback-rate-threshold' ||
+    (context.tier !== 'warn' && context.tier !== 'page') ||
+    typeof context.environment !== 'string' ||
+    typeof context.numerator !== 'number' ||
+    !Number.isFinite(context.numerator) ||
+    typeof context.denominator !== 'number' ||
+    !Number.isFinite(context.denominator) ||
+    typeof context.rate_pct !== 'number' ||
+    !Number.isFinite(context.rate_pct) ||
+    context.window_seconds !== 900 ||
+    context.minimum_calls !== 20 ||
+    context.warn_threshold_pct !== 2 ||
+    context.page_threshold_pct !== 10 ||
+    typeof context.provider !== 'string' ||
+    typeof context.capability !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    event: LLM_FALLBACK_RATE_ALERT_EVENT,
+    surface: LLM_FALLBACK_RATE_ALERT_SURFACE,
+    signal: 'fallback-rate-threshold',
+    tier: context.tier,
+    environment: context.environment,
+    numerator: context.numerator,
+    denominator: context.denominator,
+    rate_pct: context.rate_pct,
+    window_seconds: 900,
+    minimum_calls: 20,
+    warn_threshold_pct: 2,
+    page_threshold_pct: 10,
+    provider: context.provider,
+    capability: context.capability,
+  };
+}
+
 /**
  * Routes only the canonical daily LLM-volume warning to an alertable sink.
  *
@@ -102,6 +181,30 @@ export function forwardLlmVolumeAlertToSink(
   }
 
   send(LLM_VOLUME_ALERT_EVENT, attributes);
+}
+
+export function forwardLaunchHealthAlertToSink(
+  entry: Readonly<LogEntry>,
+  send: LaunchHealthAlertSink,
+): void {
+  const volumeAttributes = selectLlmVolumeAlertAttributes(
+    entry.level,
+    entry.message,
+    entry.context,
+  );
+  if (volumeAttributes) {
+    send(LLM_VOLUME_ALERT_EVENT, volumeAttributes);
+    return;
+  }
+
+  const fallbackAttributes = selectLlmFallbackRateAlertAttributes(
+    entry.level,
+    entry.message,
+    entry.context,
+  );
+  if (fallbackAttributes) {
+    send(LLM_FALLBACK_RATE_ALERT_EVENT, fallbackAttributes);
+  }
 }
 
 /**
@@ -126,5 +229,23 @@ export function scrubLlmVolumeAlertSentryLog<
     return null;
   }
 
+  return { ...log, attributes };
+}
+
+export function scrubLaunchHealthSentryLog<
+  T extends {
+    level: string;
+    message: unknown;
+    attributes?: Record<string, unknown>;
+  },
+>(log: T): T | null {
+  const attributes =
+    selectLlmVolumeAlertAttributes(log.level, log.message, log.attributes) ??
+    selectLlmFallbackRateAlertAttributes(
+      log.level,
+      log.message,
+      log.attributes,
+    );
+  if (!attributes) return null;
   return { ...log, attributes };
 }

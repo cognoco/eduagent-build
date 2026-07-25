@@ -19,6 +19,7 @@ remain unavailable.
 | [`art9-special-category-position.md`](art9-special-category-position.md) | Current proposed treatment of incidental special-category data. |
 | [`breach-response-plan.md`](breach-response-plan.md) | Personal-data breach procedure. |
 | [`DPO exchanges/`](DPO%20exchanges/) | Stephan’s findings, ZWIZZLY AS’s response, decision annex, and separate AI Act request. |
+| [`assessments/providers/2026-07-25-processor-transfer-evidence-ledger.md`](assessments/providers/2026-07-25-processor-transfer-evidence-ledger.md) | Current-main processor and international-transfer evidence ledger for counsel/DPO handoff. |
 
 ## Supporting records
 
@@ -31,12 +32,15 @@ remain unavailable.
 | [`privacy-policy.html`](privacy-policy.html) | Adult-facing privacy notice draft. |
 | [`child-readable-privacy-summary-draft.md`](child-readable-privacy-summary-draft.md) | Child-readable transparency draft. |
 | [`2026-07-04-launch-compliance-closure-check-early-pass.md`](2026-07-04-launch-compliance-closure-check-early-pass.md) | Historical engineering evidence still cited by the DPIA; re-verify at the final launch gate. |
+| [`2026-07-06-school-institutional-ai-act-tripwire.md`](2026-07-06-school-institutional-ai-act-tripwire.md) | Product/legal gate for school, LMS/SIS, formal-assessment, proctoring, and institutional use, plus the blocked-copy list. Decides no classification. |
+| [`2026-07-06-eu-ai-act-technical-file-qms-skeleton.md`](2026-07-06-eu-ai-act-technical-file-qms-skeleton.md) | High-risk-readiness technical-file and QMS index. A gap map, not evidence of compliance. |
 
 ## Directory structure
 
 | Directory | Contents | Authority |
 |---|---|---|
 | [`DPO exchanges/`](DPO%20exchanges/) | Dated correspondence and review requests. | External-review working material, not controller approval. |
+| [`assessments/providers/`](assessments/providers/) | Controller processor due-diligence and international-transfer assessments. | Management evidence; final legal/DPO conclusions remain independently reviewed. |
 | [`evidence/providers/`](evidence/providers/) | Provider DPAs and configuration evidence with SHA-256 integrity hashes. | Evidence only; legal adequacy remains for review. |
 | [`research/providers/`](research/providers/) | Vendor-owned source research supporting procurement and transfer review. | Research, not legal advice or executed approval. |
 | [`templates/`](templates/) | Blank source templates. | No product or legal authority. |
