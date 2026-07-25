@@ -100,10 +100,10 @@ import { applyAppHelpSignalGuard, isAppHelpQuery } from '../app-help-map';
 import {
   applyMentorNoticeOutcome,
   createMentorNoticeFromExchange,
+  evaluateMentorNoticeRecheck,
   getLearningDayStart,
   getProfileTimeZone,
   resolveMentorNoticeRecheckContext,
-  validateNoticeEvidence,
 } from '../mentor-notices';
 import { generateEmbedding } from '../embeddings';
 import { retrieveRelevantMemory } from '../memory';
@@ -4345,20 +4345,29 @@ export async function processMessage(
   if (
     options?.mentorNoticeEnabled === true &&
     context.mentorNoticeRecheck &&
-    persisted.persistedUserMessage
+    persisted.persistedUserMessage &&
+    persisted.userMessageEventId
   ) {
-    const proposed = result.noticeRecheck;
-    const valid =
-      proposed?.noticeId === context.mentorNoticeRecheck.id
-        ? await validateNoticeEvidence(db, profileId, sessionId, proposed)
-        : null;
-    if (valid) {
+    // [WI-2625] Independent server-side judge decides the re-check outcome —
+    // the tutor is never asked for a verdict. `persisted.persistedUserMessage`
+    // is also the retry/replay idempotency gate: a duplicate client send
+    // that hits the exchange's clientId dedup path never re-enters this
+    // block, so the judge is called at most once per genuinely new turn.
+    const outcome = await evaluateMentorNoticeRecheck(db, {
+      profileId,
+      sessionId,
+      notice: context.mentorNoticeRecheck,
+      answerEventId: persisted.userMessageEventId,
+      conversationLanguage: context.conversationLanguage,
+      tutorVendor: result.provider,
+    });
+    if (outcome) {
       const now = new Date();
       const timezone = await getProfileTimeZone(db, profileId);
       await applyMentorNoticeOutcome(db, {
         profileId,
         noticeId: context.mentorNoticeRecheck.id,
-        outcome: valid.verdict,
+        outcome,
         occurredAt: now,
         learningDayStart: getLearningDayStart(now, timezone),
       });
@@ -4966,20 +4975,26 @@ export async function streamMessage(
       if (
         options?.mentorNoticeEnabled === true &&
         context.mentorNoticeRecheck &&
-        persisted.persistedUserMessage
+        persisted.persistedUserMessage &&
+        persisted.userMessageEventId
       ) {
-        const proposed = parsed.noticeRecheck;
-        const valid =
-          proposed?.noticeId === context.mentorNoticeRecheck.id
-            ? await validateNoticeEvidence(db, profileId, sessionId, proposed)
-            : null;
-        if (valid) {
+        // [WI-2625] Independent server-side judge decides the re-check
+        // outcome — mirrors the processMessage call site above.
+        const outcome = await evaluateMentorNoticeRecheck(db, {
+          profileId,
+          sessionId,
+          notice: context.mentorNoticeRecheck,
+          answerEventId: persisted.userMessageEventId,
+          conversationLanguage: context.conversationLanguage,
+          tutorVendor: result.provider,
+        });
+        if (outcome) {
           const now = new Date();
           const timezone = await getProfileTimeZone(db, profileId);
           await applyMentorNoticeOutcome(db, {
             profileId,
             noticeId: context.mentorNoticeRecheck.id,
-            outcome: valid.verdict,
+            outcome,
             occurredAt: now,
             learningDayStart: getLearningDayStart(now, timezone),
           });
