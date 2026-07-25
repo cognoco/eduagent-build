@@ -22,7 +22,7 @@ import { JournalSegmentedControl } from './JournalSegmentedControl';
 import { JournalNotesArchive } from './JournalNotesArchive';
 import { JournalPracticeSection } from './JournalPracticeSection';
 import { RecapRow } from './RecapRow';
-import { JOURNAL_RETURN_TO } from '../../lib/navigation';
+import { JOURNAL_REPORTS_HREF, JOURNAL_RETURN_TO } from '../../lib/navigation';
 import {
   JOURNAL_SECTION_IDS,
   PracticeReportsEmptyMotif,
@@ -57,10 +57,14 @@ type JournalReportTarget =
   | { kind: 'weekly'; reportId: string };
 
 function pushJournalReport(
-  router: Pick<Router, 'push'>,
+  router: Pick<Router, 'push' | 'replace'>,
   target: JournalReportTarget,
 ): void {
-  if (Platform.OS !== 'web') {
+  if (Platform.OS === 'web') {
+    // Make browser Back restore the section that owns the report rather than
+    // remounting Journal on its default Sessions section.
+    router.replace(JOURNAL_REPORTS_HREF);
+  } else {
     router.push('/(app)/progress' as Href);
     router.push('/(app)/progress/reports' as Href);
   }
@@ -318,10 +322,18 @@ function ActiveSection({
 
 export function JournalTabView(): React.ReactElement {
   const { t } = useTranslation();
+  const router = useRouter();
   const { section } = useLocalSearchParams<{ section?: string | string[] }>();
   const [organicSection, setOrganicSection] =
     useState<JournalSectionId>('sessions');
-  const activeSection = journalSectionOverride(section) ?? organicSection;
+  const routeSection = journalSectionOverride(section);
+  const activeSection = routeSection ?? organicSection;
+  const selectSection = (nextSection: JournalSectionId): void => {
+    setOrganicSection(nextSection);
+    if (routeSection) {
+      router.setParams({ section: undefined });
+    }
+  };
 
   return (
     <ScrollView
@@ -340,10 +352,7 @@ export function JournalTabView(): React.ReactElement {
 
       <JournalMomentsStrip />
 
-      <JournalSegmentedControl
-        value={activeSection}
-        onChange={setOrganicSection}
-      />
+      <JournalSegmentedControl value={activeSection} onChange={selectSection} />
       <Text className="text-body-sm text-text-secondary">
         {sectionSubtitle(activeSection, t)}
       </Text>
