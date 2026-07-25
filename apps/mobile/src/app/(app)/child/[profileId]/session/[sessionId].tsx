@@ -9,9 +9,11 @@ import {
   useChildSessionDetail,
 } from '../../../../../hooks/use-dashboard';
 import {
+  accountReturnToken,
   childProfileHref,
   goBackOrReplace,
   homeHrefForReturnTo,
+  V2_TAB_TITLE_KEYS,
 } from '../../../../../lib/navigation';
 import { FEATURE_FLAGS } from '../../../../../lib/feature-flags';
 import { firstParam } from '../../../../../lib/route-params';
@@ -73,6 +75,27 @@ export default function SessionDetailScreen() {
         : ((v2Enabled ? '/(app)/mentor' : '/(app)/home') as Href);
   const handleBack = () => goBackOrReplace(router, backFallbackHref);
 
+  // WI-2331 rework, F1b: every Back control below routes through
+  // handleBack/backFallbackHref, so they all name the same actual
+  // destination — the owning V2 tab named by returnTo, the child's profile
+  // (this screen's real, unchanged parent when there's no returnTo), or the
+  // Mentor default — instead of the generic `common.goBack` most of them
+  // showed before. V0/V1 keep their prior copy unchanged (`common.goBack`
+  // for the generic sites; the dedicated `backToChildProfile` string for the
+  // one button that already named it).
+  const v2ExitLabel =
+    returnTo != null
+      ? t('common.backTo', {
+          destination: t(V2_TAB_TITLE_KEYS[accountReturnToken(returnTo)]),
+        })
+      : profileId
+        ? t('parentView.session.backToChildProfile')
+        : t('common.backTo', { destination: t(V2_TAB_TITLE_KEYS.mentor) });
+  const backLabel = v2Enabled ? v2ExitLabel : t('common.goBack');
+  const childProfileBackLabel = v2Enabled
+    ? v2ExitLabel
+    : t('parentView.session.backToChildProfile');
+
   useEffect(() => {
     if (copyState === 'idle') return undefined;
 
@@ -98,7 +121,11 @@ export default function SessionDetailScreen() {
         isLoading={isLoading}
         error={isError && !session ? true : undefined}
         retry={{ onPress: () => refetch(), testID: 'retry-session' }}
-        back={{ onPress: handleBack, testID: 'error-go-back' }}
+        back={{
+          onPress: handleBack,
+          label: backLabel,
+          testID: 'error-go-back',
+        }}
         errorTitle={t('parentView.session.somethingWentWrong')}
         testID="loading"
       >
@@ -121,9 +148,7 @@ export default function SessionDetailScreen() {
           onPress={handleBack}
           className="mt-4 rounded-lg bg-primary px-6 py-3"
         >
-          <Text className="text-text-inverse font-medium">
-            {t('common.goBack')}
-          </Text>
+          <Text className="text-text-inverse font-medium">{backLabel}</Text>
         </Pressable>
       </View>
     );
@@ -167,7 +192,7 @@ export default function SessionDetailScreen() {
           onPress={handleBack}
           className="mb-4 flex-row items-center"
           accessibilityRole="button"
-          accessibilityLabel={t('common.goBack')}
+          accessibilityLabel={backLabel}
         >
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </Pressable>
@@ -311,12 +336,10 @@ export default function SessionDetailScreen() {
             onPress={handleBack}
             className="mt-4 self-start rounded-lg bg-primary px-4 py-3"
             accessibilityRole="button"
-            accessibilityLabel={t('common.goBack')}
+            accessibilityLabel={backLabel}
             testID="narrative-unavailable-back"
           >
-            <Text className="text-text-inverse font-medium">
-              {t('common.goBack')}
-            </Text>
+            <Text className="text-text-inverse font-medium">{backLabel}</Text>
           </Pressable>
         </View>
       )}
@@ -399,11 +422,11 @@ export default function SessionDetailScreen() {
           onPress={handleBack}
           className="rounded-lg px-4 py-3 items-center min-h-[48px] justify-center"
           accessibilityRole="button"
-          accessibilityLabel={t('parentView.session.backToChildProfile')}
+          accessibilityLabel={childProfileBackLabel}
           testID="session-detail-back-to-child"
         >
           <Text className="text-primary font-medium">
-            {t('parentView.session.backToChildProfile')}
+            {childProfileBackLabel}
           </Text>
         </Pressable>
       </View>

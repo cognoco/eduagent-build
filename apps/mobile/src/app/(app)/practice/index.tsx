@@ -26,11 +26,13 @@ import type { QuizActivityType, QuizStats } from '@eduagent/schemas';
 import { useQuizStats } from '../../../hooks/use-quiz';
 import { useSubjects } from '../../../hooks/use-subjects';
 import {
+  accountReturnToken,
   goBackOrReplace,
   homeHrefForReturnTo,
   JOURNAL_HREF,
   JOURNAL_RETURN_TO,
   PRACTICE_RETURN_TO,
+  V2_TAB_TITLE_KEYS,
 } from '../../../lib/navigation';
 import { useReviewSummary } from '../../../hooks/use-progress';
 import { useEntryGate } from '../../../hooks/use-entry-gate';
@@ -420,6 +422,16 @@ export default function PracticeScreen(): React.ReactElement {
     );
   };
 
+  // WI-2331 rework, F1b: handleBack always exits this screen (Journal
+  // directly, or the owning V2 tab named by returnTo/the Mentor default via
+  // homeHrefForReturnTo), so the header Back control names that destination
+  // instead of the generic `common.goBack` it showed before.
+  const backLabel = FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+    ? t('common.backTo', {
+        destination: t(V2_TAB_TITLE_KEYS[accountReturnToken(returnTo)]),
+      })
+    : t('common.goBack');
+
   const openQuiz = () =>
     router.push({
       pathname: '/(app)/quiz',
@@ -480,7 +492,7 @@ export default function PracticeScreen(): React.ReactElement {
               pointerStyle(),
             ]}
             accessibilityRole="button"
-            accessibilityLabel={t('common.goBack')}
+            accessibilityLabel={backLabel}
             testID="practice-back"
           >
             <Ionicons name="arrow-back" size={24} color={colors.ink} />

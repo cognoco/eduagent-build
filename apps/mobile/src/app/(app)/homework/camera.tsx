@@ -49,6 +49,7 @@ import {
   normalizeHomeworkEntrySource,
 } from './_view-models/homework-session-params';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
+import { accountReturnToken, V2_TAB_TITLE_KEYS } from '../../../lib/navigation';
 
 type FlashMode = 'off' | 'on' | 'auto';
 
@@ -759,6 +760,20 @@ export default function CameraScreen(): React.ReactNode {
     );
   }, [returnTo, router]);
 
+  // WI-2331 rework, F1b: the permission-denied phase's "close" control is a
+  // full-screen exit action (structurally the same as an ErrorFallback
+  // secondary action elsewhere in this WI), and always routes through
+  // handleClose to the same destination — so it names that destination
+  // instead of the generic `common.goBack` it showed before. The icon-only
+  // "X" close affordances elsewhere on this screen follow camera-modal
+  // convention (dismiss), not this screen-exit "Back" pattern, and are left
+  // untouched.
+  const permissionCloseLabel = FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+    ? t('common.backTo', {
+        destination: t(V2_TAB_TITLE_KEYS[accountReturnToken(returnTo)]),
+      })
+    : t('common.goBack');
+
   // Intercept Android hardware back so it routes through handleClose too;
   // without this, the OS goBack() returns to whichever tab was active when
   // camera was pushed, which for cross-tab pushes is the tabs first-route.
@@ -918,11 +933,11 @@ export default function CameraScreen(): React.ReactNode {
           testID="close-button"
           onPress={handleClose}
           className="mt-4 py-3 px-6 min-h-[48px] items-center justify-center"
-          accessibilityLabel={t('common.goBack')}
+          accessibilityLabel={permissionCloseLabel}
           accessibilityRole="button"
         >
           <Text className="text-body text-text-secondary">
-            {t('common.goBack')}
+            {permissionCloseLabel}
           </Text>
         </Pressable>
       </View>

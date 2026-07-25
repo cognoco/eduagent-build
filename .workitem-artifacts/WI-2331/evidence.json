@@ -2,48 +2,58 @@
   "claims": [
     {
       "acRef": "AC-1",
-      "description": "Owning-tab highlight restored on pushed screens. New pure resolveV2TabIsActive(pathname, tabName, v2Enabled, reactNavigationFocused) resolves the visually-active V2 tab from the pathname's owning tab (accountReturnTokenForPathname) instead of React Navigation focus, which reports false for all three real tab buttons while a hidden-sibling pushed screen is active. Wired into the Mentor/Subjects/Journal tabBarIcon/tabBarLabel; V2-gated (V0/V1 pass reactNavigationFocused straight through). File-level pointer: (app) route path breaks path:line resolution; resolveV2TabIsActive is defined near line 285.",
+      "description": "Owning-tab highlight on pushed screens: resolveV2TabIsActive resolves the visually-active V2 tab from the pathname's owning tab instead of React Navigation focus (which reports false for all three tabs while a hidden-sibling pushed screen is active). Wired into the three tab icons/labels, V2-gated. REWORK: also made returnTo-aware — a definitive subjects/journal pathname owner still wins, but the Mentor catch-all now defers to accountReturnToken(returnTo), fixing multi-origin routes (e.g. /my-notes reached from Journal). The active leaf returnTo is read via useGlobalSearchParams and threaded into all six call sites. File-level pointer: (app) route path.",
       "pointer": "apps/mobile/src/app/(app)/_layout.tsx"
     },
     {
       "acRef": "AC-1",
-      "description": "Guard test proving the AC-1 fix red-green-revert: describe('resolveV2TabIsActive [WI-2331 AC-1]'). Reverting to unconditional reactNavigationFocused fails the owning-tab-for-pushed-route cases; restore passes. Cited in docs/evidence/wi2331-rgr-v2-wayfinding.md Defect 1.",
+      "description": "Guard tests for the AC-1 owning-tab resolver, including the rework: describe('resolveV2TabIsActive [WI-2331 AC-1]') plus the rework cases 'disambiguates the multi-origin /my-notes/* catch-all via returnTo' and 'never lets returnTo override a definitive subjects/journal pathname owner'. Red-green-revert for the multi-origin fix recorded in docs/evidence/wi2331-rgr-v2-wayfinding.md Rework Defect A.",
       "pointer": "apps/mobile/src/app/(app)/_layout.test.tsx"
     },
     {
       "acRef": "AC-2",
-      "description": "AC-2 narrowed by PM AC-scope ruling (clacks mentomate-pgm seq 39322, 2026-07-23) to the root-level dead-V0-fallback screens; exhaustive ~76-file semantic-Back sweep split to WI-2677. Root-cause fix: homeHrefForReturnTo gained a v2Enabled param (defined at line 141); its catch-all now routes through the owning-tab contract when V2 is on instead of the retired /(app)/home. Named tokens above the catch-all and the v2Enabled=false default are untouched, so V0/V1 does not regress.",
+      "description": "AC-2 (narrowed by PM AC-scope ruling seq 39322, 2026-07-23, to the root-level dead-V0-fallback screens; exhaustive sweep split to WI-2677). homeHrefForReturnTo gained a v2Enabled param (line 141); its catch-all routes through the owning-tab contract under V2 instead of the retired /(app)/home. Named tokens above the catch-all and the v2Enabled=false default are untouched, so V0/V1 does not regress.",
       "pointer": "apps/mobile/src/lib/navigation.ts:141"
     },
     {
       "acRef": "AC-2",
-      "description": "mentor-memory Back control (header chevron + load-timeout + error-state secondary actions, one handleBack near line 234) derives backFallback/backLabel from the V2 nav flag: V2 on routes and names the owning Mentor tab; V2 off keeps the original /(app)/more + generic label byte-for-byte. After the origin/main reconcile, handleBack also preserves main's JOURNAL_RETURN_TO branch (WI-2239). File-level pointer: (app) route path.",
-      "pointer": "apps/mobile/src/app/(app)/mentor-memory.tsx"
+      "description": "REWORK sweep: the reviewer-named progress/[subjectId] Back controls (all five sites — header, loading, error, and two previously hard-coded edge states) unified into one returnTo-derived backLabel that names its destination instead of the generic common.goBack. Same sweep applied to quiz/launch error-state exits, quiz/index, my-notes hub, topic/relearn empty-state exit, homework/camera permission-denied exit, practice/index, onboarding/language-setup, and child/[profileId]/session/[sessionId]. V2-gated; V0/V1 copy unchanged. File-level pointer: (app) route path.",
+      "pointer": "apps/mobile/src/app/(app)/progress/[subjectId]/index.tsx"
     },
     {
       "acRef": "AC-2",
-      "description": "V0/V1 must-not-regress and homeHrefForReturnTo behavior asserted by navigation.test.ts (catch-all still returns /(app)/home with V2 off; every pre-existing 2-arg token assertion unchanged). Red-green-revert for the catch-all in docs/evidence/wi2331-rgr-v2-wayfinding.md Defect 2.",
+      "description": "mentor-memory Back control derives backFallback/backLabel from the V2 flag (V2 on routes+names the owning Mentor tab; V2 off keeps the legacy /(app)/more + generic label byte-for-byte); preserves main's JOURNAL_RETURN_TO branch. V0/V1 must-not-regress and homeHrefForReturnTo behavior asserted by navigation.test.ts. RGR in docs/evidence/wi2331-rgr-v2-wayfinding.md Defects 2 & 3.",
       "pointer": "apps/mobile/src/lib/navigation.test.ts"
     },
     {
       "acRef": "AC-3",
-      "description": "Focused journeys (active session / onboarding) keep an explicit exit and restore prior context. session screen handleChatBackPress last-resort branch (near line 532) routes to the owning Mentor tab under V2 instead of the dead /(app)/home; the MENTOR_RETURN_TO path (main's WI-2234 mentor-return epoch hydration) is preserved in the merge. File-level pointer: (app) route path.",
+      "description": "Focused journeys (active session / onboarding) keep an explicit exit and restore prior context. session screen handleChatBackPress last-resort branch routes to the owning Mentor tab under V2 instead of the dead /(app)/home; the MENTOR_RETURN_TO mentor-return path (WI-2234) is preserved in the merge. File-level pointer: (app) route path.",
       "pointer": "apps/mobile/src/app/(app)/session/index.tsx"
     },
     {
       "acRef": "AC-4",
-      "description": "AC-4 REMOVED per PM AC-scope ruling (clacks mentomate-pgm seq 39322, relayed to this lane at seq 39333, 2026-07-23) as a type correction: net-new persistent own/supporting identity UI (avatar + Your learning / Supporting {name}) is a Feature, not a Bug deviation-from-intended-behavior, so nothing equivalent exists to deviate from. The ruling was executed in place on the Cosmo AC field ([REMOVED] marker, original text preserved). Split to WI-2678 (Feature), minted and linked before completion (mint-before-complete) and orchestrator-verified (clacks seq 40193; WI-2331 Related Items include WI-2678). No code deliverable on this Bug. Provenance and the full AC-reconciliation table are recorded in the pointer's Scope reconciliation and provenance section.",
+      "description": "AC-4 REMOVED per PM AC-scope ruling (clacks mentomate-pgm seq 39322, relayed seq 39333, 2026-07-23) as a type correction: net-new own/supporting identity UI is a Feature, not a Bug deviation. Executed in place on the Cosmo AC field ([REMOVED] marker, original text preserved). Split to WI-2678 (Feature), minted and linked before completion, orchestrator-verified (seq 40193). No code deliverable on this Bug. Provenance and the full AC-reconciliation table are recorded in the pointer's Scope reconciliation and provenance section.",
       "pointer": "docs/evidence/wi2331-rgr-v2-wayfinding.md"
     },
     {
       "acRef": "AC-5",
-      "description": "One central route-to-owning-tab, return-label, and active-context contract (accountReturnTokenForPathname, homeHrefForReturnTo, V2_TAB_TITLE_KEYS) backs both the tab highlight (AC-1) and every Back target (AC-2/AC-3), so they cannot disagree; every fix is v2Enabled-gated and the shipped V0/V1 flag states are preserved.",
+      "description": "One central route-to-owning-tab, return-label, and active-context contract (accountReturnTokenForPathname, accountReturnToken, homeHrefForReturnTo, V2_TAB_TITLE_KEYS) backs both the tab highlight (AC-1) and every Back target (AC-2/AC-3), so they cannot disagree — highlight and Back are now both returnTo-aware for catch-all routes. Every fix is v2Enabled-gated and the shipped V0/V1 flag states are preserved.",
       "pointer": "apps/mobile/src/lib/navigation.ts"
     },
     {
       "acRef": "AC-5",
-      "description": "AC-5 audit of all V2 back-routes: the full ~78-file back-navigation audit enumeration (the audit that feeds the split-out sweep WI-2677) is committed as in-repo evidence. Representative regression coverage across all three tabs, own/supporting contexts, deep links, and V0/V1-preserved paths is proven by the AC-1/AC-2 guard suites and the red-green-revert cycles in docs/evidence/wi2331-rgr-v2-wayfinding.md.",
+      "description": "AC-5 audit of all V2 back-routes: the full ~78-file back-navigation audit enumeration (feeding the split-out sweep WI-2677) committed as in-repo evidence.",
       "pointer": "docs/evidence/wi2331-backnav-audit.md"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "AC-5 representative regression coverage identified PER AXIS (closing the reviewer's finding-2 over-claim): all three tabs (resolveV2TabIsActive Mentor/Subjects/Journal cases); own vs supporting context ('resolves identically for own-scope and supporter-scope returnTo tokens'); deep links ('resolves a cold deep-link landing to its owning tab'); dark/light themes ('TabIcon / TabLabel theme-token wiring' — focused colors.accent / unfocused colors.textSecondary, the semantic-token mechanism); small-phone layout ('keeps the V2 tab bar visible with correct tab highlight at a small-phone viewport'). The per-axis table is in docs/evidence/wi2331-rgr-v2-wayfinding.md Rework Finding 2.",
+      "pointer": "apps/mobile/src/app/(app)/_layout.test.tsx"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "AC-5 small-phone axis, Back-usability half: 'keeps the named Back control usable at a small-phone viewport' — at a small inset the my-notes hub still renders the destination-naming Back label ('Back to Journal') and Back still routes to /(app)/journal. Proves the named Back action does not regress through layout at a small viewport.",
+      "pointer": "apps/mobile/src/app/(app)/my-notes/index.test.tsx"
     }
   ],
   "noiseBaselineVersion": "2026-07-13",

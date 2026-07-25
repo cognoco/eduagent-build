@@ -27,7 +27,12 @@ import {
 } from '../../../hooks/use-progress';
 import { useLinkedChildren, useProfile } from '../../../lib/profile';
 import { computeAgeBracket, type RetentionStatus } from '@eduagent/schemas';
-import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
+import {
+  accountReturnToken,
+  goBackOrReplace,
+  homeHrefForReturnTo,
+  V2_TAB_TITLE_KEYS,
+} from '../../../lib/navigation';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { formatApiError } from '../../../lib/format-api-error';
 import { useEntryGate } from '../../../hooks/use-entry-gate';
@@ -179,6 +184,22 @@ export default function RelearnScreen() {
   const routeSubjectName = firstParam(params.subjectName);
   const returnTo = firstParam(params.returnTo);
   const returnId = firstParam(params.returnId);
+  const v2Enabled = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+  // WI-2331 rework, F1b: the empty-state exit control always calls
+  // handleLeave() (never a phase step-back like the header chevron does), so
+  // it names the ACTUAL destination handleLeave resolves to — the returnTo
+  // token when present, else Subjects (this screen's owning tab, per the
+  // AC-2 comment on handleLeave below) — instead of the generic
+  // `common.goBackAction` it showed before.
+  const leaveLabel = v2Enabled
+    ? t('common.backTo', {
+        destination: t(
+          V2_TAB_TITLE_KEYS[
+            returnTo ? accountReturnToken(returnTo) : 'subjects'
+          ],
+        ),
+      })
+    : t('common.goBackAction');
   const source = firstParam(params.source);
   const sourceChildProfileId = firstParam(params.childProfileId);
   const isParentBridgeSource = source === 'parent_bridge';
@@ -271,7 +292,6 @@ export default function RelearnScreen() {
   ]);
 
   const handleLeave = useCallback(() => {
-    const v2Enabled = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
     if (returnTo) {
       router.replace(
         homeHrefForReturnTo(returnTo, returnId, v2Enabled) as Href,
@@ -287,7 +307,7 @@ export default function RelearnScreen() {
       router,
       (v2Enabled ? '/(app)/subjects' : '/(app)/library') as Href,
     );
-  }, [returnId, returnTo, router]);
+  }, [returnId, returnTo, router, v2Enabled]);
 
   const handleBack = useCallback(() => {
     setError(null);
@@ -610,10 +630,10 @@ export default function RelearnScreen() {
             className="mt-4 min-h-[44px] rounded-button bg-primary px-6 py-3 items-center justify-center"
             testID="relearn-empty-back"
             accessibilityRole="button"
-            accessibilityLabel={t('common.goBackAction')}
+            accessibilityLabel={leaveLabel}
           >
             <Text className="text-body font-semibold text-text-inverse">
-              {t('common.goBackAction')}
+              {leaveLabel}
             </Text>
           </Pressable>
         </View>

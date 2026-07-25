@@ -18,11 +18,13 @@ import { useStartFirstCurriculumSession } from '../../../hooks/use-sessions';
 import { formatApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
 import {
+  accountReturnToken,
   goBackOrReplace,
   homeHrefForReturnTo,
   isSessionForwardableReturnTo,
   SETTINGS_RETURN_TO,
   SUBJECTS_RETURN_TO,
+  V2_TAB_TITLE_KEYS,
 } from '../../../lib/navigation';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
@@ -210,6 +212,23 @@ export default function LanguageSetup() {
       ? t('common.goBack')
       : t('common.goHome');
 
+  // WI-2331 rework, F1b: handleBack always exits this screen — to Mentor
+  // (the settings-return case, since `/(app)/more` is dead in V2) or the
+  // owning V2 tab named by returnTo otherwise — so the header Back control
+  // names that destination instead of the generic `common.goBack` it showed
+  // before.
+  const backLabel = FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+    ? t('common.backTo', {
+        destination: t(
+          V2_TAB_TITLE_KEYS[
+            returnTo === SETTINGS_RETURN_TO
+              ? 'mentor'
+              : accountReturnToken(returnTo)
+          ],
+        ),
+      })
+    : t('common.goBack');
+
   if (!subjectId) {
     return (
       <View className="flex-1 bg-background items-center justify-center px-5">
@@ -241,7 +260,7 @@ export default function LanguageSetup() {
         <Pressable
           onPress={handleBack}
           className="mb-3 min-w-[44px] min-h-[44px] justify-center self-start"
-          accessibilityLabel={t('common.goBack')}
+          accessibilityLabel={backLabel}
           accessibilityRole="button"
           testID="language-setup-back"
         >

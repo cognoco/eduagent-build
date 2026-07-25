@@ -5,6 +5,8 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
+import { Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import i18n from 'i18next';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -76,6 +78,7 @@ jest.mock('expo-router', () => ({
   },
   Tabs: mockTabs,
   usePathname: () => mockUsePathname(),
+  useGlobalSearchParams: () => ({}),
   useRouter: () => ({
     push: jest.fn(),
     replace: mockReplace,
@@ -213,6 +216,8 @@ const {
   assertV2SafeAreaOwnershipInvariant,
   resolveV2PushedScenePaddingTop,
   resolveV2TabIsActive,
+  TabIcon,
+  TabLabel,
 } = require('./_layout');
 const {
   computeModeVisibleTabs,
@@ -1037,6 +1042,94 @@ describe('AppLayout', () => {
           paddingBottom: 48,
         }),
       );
+    } finally {
+      (
+        flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+      ).MODE_NAV_V2_ENABLED = original;
+    }
+  });
+
+  // [WI-2331 AC-5] the central resolveV2TabIsActive() resolver is
+  // size-independent, but AC-1/AC-2 are integrated UI outcomes that can
+  // regress through LAYOUT at a small viewport. Distinct from the
+  // all-zero-inset web surface above: this uses a small-phone inset (modest
+  // status bar, no home-indicator gesture area — e.g. iPhone SE-class) to
+  // prove the V2 tab bar stays visible and the owning tab's highlight is
+  // correct at that viewport, not just that the resolver returns the right
+  // boolean in isolation.
+  it('keeps the V2 tab bar visible with correct tab highlight at a small-phone viewport', async () => {
+    const flags = require('../../lib/feature-flags') as {
+      FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+    };
+    const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    try {
+      (
+        flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+      ).MODE_NAV_V2_ENABLED = true;
+      mockSafeAreaInsets = { top: 20, bottom: 0, left: 0, right: 0 };
+      mockUsePathname.mockReturnValue('/mentor');
+
+      renderLayout();
+
+      // Top chrome clears the small status-bar inset and the pushed scene
+      // sits below it — this would fail if a future change collapsed the
+      // floating chrome (and thus the content clearance) at a small top
+      // inset.
+      expect(await screen.findByTestId('account-avatar-shell')).toHaveStyle({
+        top: 32,
+      });
+      expect(await screen.findByTestId('active-root-scene')).toHaveStyle({
+        paddingTop: 76,
+      });
+
+      // The tab bar itself must remain visible (not collapsed to
+      // display:'none'/zero-height) at this viewport.
+      const tabs = await screen.findByTestId('tabs');
+      const screenOptions = tabs.props.screenOptions as ({
+        route,
+      }: {
+        route: { name: string };
+      }) => {
+        tabBarStyle: {
+          display?: string;
+          height?: number;
+          paddingBottom?: number;
+        };
+      };
+      const mentorTabBarStyle = screenOptions({
+        route: { name: 'mentor' },
+      }).tabBarStyle;
+      expect(mentorTabBarStyle.display).not.toBe('none');
+      expect(mentorTabBarStyle).toEqual(
+        expect.objectContaining({ height: 104, paddingBottom: 48 }),
+      );
+
+      // The owning tab (Mentor, for pathname /mentor) highlights; a
+      // non-owning tab (Subjects) does not — proving the highlight itself
+      // (not just the bar's presence) survives at this viewport. TabIcon
+      // and TabLabel are rendered directly (real components, not mocked)
+      // off the same resolveV2TabIsActive() result the Tabs.Screen entries
+      // use.
+      const mentorFocused = resolveV2TabIsActive(
+        '/mentor',
+        'mentor',
+        true,
+        true,
+      );
+      const subjectsFocused = resolveV2TabIsActive(
+        '/mentor',
+        'subjects',
+        true,
+        false,
+      );
+      expect(mentorFocused).toBe(true);
+      expect(subjectsFocused).toBe(false);
+
+      render(<TabLabel title="Mentor" focused={mentorFocused} />);
+      expect(screen.getByText('Mentor')).toHaveStyle({ color: '#0ea5e9' });
+
+      render(<TabLabel title="Subjects" focused={subjectsFocused} />);
+      expect(screen.getByText('Subjects')).toHaveStyle({ color: '#52525b' });
     } finally {
       (
         flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
@@ -2254,6 +2347,163 @@ describe('resolveV2TabIsActive [WI-2331 AC-1]', () => {
       true,
     );
     expect(resolveV2TabIsActive('/journal', 'journal', true, true)).toBe(true);
+  });
+
+  // [WI-2331 rework, F1a] `/my-notes/*` is multi-origin: Mentor's home
+  // screen pushes it plain, Journal's notes archive pushes it with
+  // `returnTo: 'journal'`. Pathname-only resolution always fell through to
+  // the Mentor catch-all, wrongly highlighting Mentor for a Journal-origin
+  // visit. `returnTo` disambiguates the catch-all; `subjects`/`journal`
+  // pathname owners stay definitive regardless of `returnTo`.
+  it('disambiguates the multi-origin /my-notes/* catch-all via returnTo', () => {
+    expect(
+      resolveV2TabIsActive(
+        '/my-notes/notes',
+        'journal',
+        true,
+        false,
+        'journal',
+      ),
+    ).toBe(true);
+    expect(
+      resolveV2TabIsActive('/my-notes/notes', 'mentor', true, false, 'journal'),
+    ).toBe(false);
+    // Mentor-origin (no returnTo, or a non subjects/journal token) still
+    // defaults to Mentor — unchanged behavior.
+    expect(resolveV2TabIsActive('/my-notes/notes', 'mentor', true, false)).toBe(
+      true,
+    );
+    expect(
+      resolveV2TabIsActive('/my-notes', 'mentor', true, false, undefined),
+    ).toBe(true);
+  });
+
+  it('never lets returnTo override a definitive subjects/journal pathname owner', () => {
+    // A /subjects/* or /journal/* pathname can only have been pushed by its
+    // own tab — returnTo must not be able to relabel it as Mentor.
+    expect(
+      resolveV2TabIsActive(
+        '/subjects/subject-1',
+        'mentor',
+        true,
+        false,
+        'journal',
+      ),
+    ).toBe(false);
+    expect(
+      resolveV2TabIsActive(
+        '/subjects/subject-1',
+        'subjects',
+        true,
+        false,
+        'journal',
+      ),
+    ).toBe(true);
+  });
+
+  // [WI-2331 rework, F2 / AC-5] "own vs supporting context" coverage: the
+  // resolver takes no scope/profile input at all (pathname, tabName,
+  // v2Enabled, reactNavigationFocused, returnTo) — it cannot branch on
+  // whether the active profile is a learner's own scope or a supporter's
+  // linked-child scope. This test makes that structural axis explicit rather
+  // than leaving it merely implicit in the generic returnTo cases above:
+  // supporter-only returnTo tokens (family-recaps/family-progress, used by
+  // ParentHomeScreen/dashboard flows) resolve through the SAME Mentor
+  // catch-all as an owner's own-learning tokens, because none of them are
+  // 'subjects' or 'journal'.
+  it('resolves identically for own-scope and supporter-scope returnTo tokens (both fall to the Mentor catch-all)', () => {
+    expect(
+      resolveV2TabIsActive('/my-notes', 'mentor', true, false, 'own-learning'),
+    ).toBe(true);
+    expect(
+      resolveV2TabIsActive('/my-notes', 'mentor', true, false, 'family-recaps'),
+    ).toBe(true);
+    expect(
+      resolveV2TabIsActive(
+        '/my-notes',
+        'mentor',
+        true,
+        false,
+        'family-progress',
+      ),
+    ).toBe(true);
+    // None of the above ever highlight Subjects or Journal.
+    expect(
+      resolveV2TabIsActive(
+        '/my-notes',
+        'subjects',
+        true,
+        false,
+        'family-recaps',
+      ),
+    ).toBe(false);
+  });
+
+  // [WI-2331 rework, F2 / AC-5] "deep link" coverage: a cold app-launch
+  // straight into a pushed route (no upstream returnTo param, no prior
+  // React Navigation focus history — the exact shape of a universal-link
+  // landing) must still resolve to a sane owning tab rather than leaving
+  // every tab unhighlighted.
+  it('resolves a cold deep-link landing (no returnTo, reactNavigationFocused=false) to its owning tab', () => {
+    // A Journal-owned deep link (e.g. a shared journal report URL).
+    expect(
+      resolveV2TabIsActive('/journal/report-1', 'journal', true, false),
+    ).toBe(true);
+    expect(
+      resolveV2TabIsActive('/journal/report-1', 'mentor', true, false),
+    ).toBe(false);
+    // A Subjects-owned deep link (e.g. a shared subject-hub URL).
+    expect(
+      resolveV2TabIsActive('/subject-hub/subject-1', 'subjects', true, false),
+    ).toBe(true);
+    // A multi-origin deep link with no returnTo at all (the raw-URL case
+    // Finding 1a's fix targets) still falls to the Mentor default, not an
+    // unhighlighted dead state.
+    expect(resolveV2TabIsActive('/my-notes/notes', 'mentor', true, false)).toBe(
+      true,
+    );
+  });
+});
+
+// [WI-2331 rework, F2 / AC-5] "dark/light theme" coverage: TabIcon and
+// TabLabel (the two components every V2 tab button renders — see the
+// Tabs.Screen `tabBarIcon`/`tabBarLabel` wiring above, all fed by
+// resolveV2TabIsActive's boolean result) never hardcode a hex color. They
+// read `colors.accent` / `colors.textSecondary` from useThemeColors() —
+// semantic tokens that resolve differently per theme — and switch between
+// them purely on the `focused` boolean. This test proves that MECHANISM: an
+// active tab (focused=true, i.e. resolveV2TabIsActive returned true) renders
+// with colors.accent, an inactive one (focused=false) with
+// colors.textSecondary, for both the icon and the label. Because the color
+// is a token lookup rather than a literal, the same assertion holds
+// regardless of which values light/dark theme resolves those tokens to —
+// this is the adaptation mechanism, not a snapshot of one theme's hex codes.
+describe('TabIcon / TabLabel theme-token wiring [WI-2331 rework, AC-5 dark/light axis]', () => {
+  // Mirrors the useThemeColors() mock's accent/textSecondary values declared
+  // near the top of this file.
+  const ACCENT = '#0ea5e9';
+  const TEXT_SECONDARY = '#52525b';
+
+  it('TabIcon colors the icon with colors.accent when focused, colors.textSecondary when not', () => {
+    const focused = resolveV2TabIsActive('/mentor', 'mentor', true, true);
+    render(<TabIcon name="Home" focused={focused} />);
+    expect(screen.UNSAFE_getByType(Ionicons).props.color).toBe(ACCENT);
+
+    const notFocused = resolveV2TabIsActive('/subjects', 'mentor', true, true);
+    render(<TabIcon name="Home" focused={notFocused} />);
+    expect(screen.UNSAFE_getByType(Ionicons).props.color).toBe(TEXT_SECONDARY);
+  });
+
+  it('TabLabel colors the label text with colors.accent when focused, colors.textSecondary when not', () => {
+    const focused = resolveV2TabIsActive('/journal', 'journal', true, true);
+    render(<TabLabel title="Journal" focused={focused} />);
+    expect(screen.UNSAFE_getByType(Text).props.style.color).toBe(ACCENT);
+
+    const notFocused = resolveV2TabIsActive('/mentor', 'journal', true, true);
+    render(<TabLabel title="Journal" focused={notFocused} />);
+    expect(screen.UNSAFE_getByType(Text).props.style.color).toBe(
+      TEXT_SECONDARY,
+    );
   });
 });
 

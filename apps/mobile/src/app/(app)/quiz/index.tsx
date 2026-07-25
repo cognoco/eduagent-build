@@ -21,9 +21,11 @@ import { useQuizStats } from '../../../hooks/use-quiz';
 import { useSubjects } from '../../../hooks/use-subjects';
 import { useVocabulary } from '../../../hooks/use-vocabulary';
 import {
+  accountReturnToken,
   homeHrefForReturnTo,
   PRACTICE_HREF,
   PRACTICE_RETURN_TO,
+  V2_TAB_TITLE_KEYS,
 } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
@@ -232,6 +234,20 @@ export default function QuizIndexScreen(): React.ReactElement {
     router.replace(PRACTICE_HREF as Href);
   }, [isPracticeReturn, practiceReturnToken, returnToken, router]);
 
+  // WI-2331 rework, F1b: handleBack always exits this screen (no
+  // phase-stepping) to one of two destinations — Practice (practice-return,
+  // or the no-returnToken default) or the owning V2 tab named by
+  // returnToken — so the Back label names whichever one it actually is,
+  // instead of the generic "Go back" `quiz.index.backLabel` copy it showed
+  // before.
+  const quizBackLabel = FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+    ? isPracticeReturn || !returnToken
+      ? t('common.backTo', { destination: t('practiceHub.title') })
+      : t('common.backTo', {
+          destination: t(V2_TAB_TITLE_KEYS[accountReturnToken(returnToken)]),
+        })
+    : t('quiz.index.backLabel');
+
   // Quiz index is another cross-tab root. Consume native Back only for the
   // Practice entry path; nested Quiz children retain their own stack Back.
   useFocusEffect(
@@ -264,7 +280,7 @@ export default function QuizIndexScreen(): React.ReactElement {
           onPress={handleBack}
           className="mr-3 min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
-          accessibilityLabel={t('quiz.index.backLabel')}
+          accessibilityLabel={quizBackLabel}
           testID="quiz-back"
         >
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
@@ -297,7 +313,7 @@ export default function QuizIndexScreen(): React.ReactElement {
             onPress={handleBack}
             className="min-h-[44px] items-center justify-center rounded-button bg-surface-elevated px-4 py-3"
             accessibilityRole="button"
-            accessibilityLabel={t('quiz.index.backLabel')}
+            accessibilityLabel={quizBackLabel}
             testID="quiz-error-back"
           >
             <Text className="text-body-sm font-semibold text-text-primary">
