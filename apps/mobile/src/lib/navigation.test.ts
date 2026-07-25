@@ -202,7 +202,7 @@ describe('returnJournalReportToCaller [WI-2239]', () => {
       dismissTo: jest.fn(),
       navigate: jest.fn(),
       replace: jest.fn(),
-    };
+    } satisfies Pick<Router, 'dismissTo' | 'navigate' | 'replace'>;
   }
 
   it('replaces the web report with its exact Journal caller', () => {

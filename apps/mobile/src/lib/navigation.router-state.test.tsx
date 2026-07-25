@@ -13,6 +13,7 @@ import {
 // Jest 30 no longer ships despite retaining it in the package export map.
 // Supply only the equality matcher the helper needs so this state test can
 // exercise the real Expo Router navigator instead of mocking router calls.
+// Remove this shim when Expo Router's test helper supports Jest 30 directly.
 jest.mock(
   'expect/build/matchers',
   () => {
