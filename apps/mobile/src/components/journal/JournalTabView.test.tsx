@@ -10,7 +10,6 @@ import type { NowResponse, RecapListItem } from '@eduagent/schemas';
 import { JournalTabView } from './JournalTabView';
 
 const mockPush = jest.fn();
-const mockReplace = jest.fn();
 const mockSetParams = jest.fn(
   (params: { section?: string | undefined }): void => {
     mockJournalSection = params.section;
@@ -44,7 +43,6 @@ function setPlatformOs(os: 'android' | 'ios' | 'web'): void {
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     push: mockPush,
-    replace: mockReplace,
     setParams: mockSetParams,
   }),
   useLocalSearchParams: () => ({ section: mockJournalSection }),
@@ -520,7 +518,7 @@ describe('JournalTabView', () => {
       },
     ],
   ])(
-    'routes a web %s report directly to its exact leaf without synthetic Progress ancestry',
+    'commits the web Reports owner before routing a %s report to its exact leaf',
     (_kind, reportTestId, expectedHref) => {
       setPlatformOs('web');
       render(<JournalTabView />);
@@ -528,12 +526,9 @@ describe('JournalTabView', () => {
       fireEvent.press(screen.getByTestId('journal-tab-reports'));
       fireEvent.press(screen.getByTestId(reportTestId));
 
-      expect(mockReplace).toHaveBeenCalledTimes(1);
-      expect(mockReplace).toHaveBeenCalledWith({
-        pathname: '/(app)/journal',
-        params: { section: 'reports' },
-      });
-      expect(firstCallOrder(mockReplace)).toBeLessThan(
+      expect(mockSetParams).toHaveBeenCalledTimes(1);
+      expect(mockSetParams).toHaveBeenCalledWith({ section: 'reports' });
+      expect(firstCallOrder(mockSetParams)).toBeLessThan(
         firstCallOrder(mockPush),
       );
       expect(mockPush).toHaveBeenCalledTimes(1);

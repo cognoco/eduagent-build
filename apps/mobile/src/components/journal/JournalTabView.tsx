@@ -22,7 +22,7 @@ import { JournalSegmentedControl } from './JournalSegmentedControl';
 import { JournalNotesArchive } from './JournalNotesArchive';
 import { JournalPracticeSection } from './JournalPracticeSection';
 import { RecapRow } from './RecapRow';
-import { JOURNAL_REPORTS_HREF, JOURNAL_RETURN_TO } from '../../lib/navigation';
+import { JOURNAL_RETURN_TO } from '../../lib/navigation';
 import {
   JOURNAL_SECTION_IDS,
   PracticeReportsEmptyMotif,
@@ -57,14 +57,10 @@ type JournalReportTarget =
   | { kind: 'weekly'; reportId: string };
 
 function pushJournalReport(
-  router: Pick<Router, 'push' | 'replace'>,
+  router: Pick<Router, 'push'>,
   target: JournalReportTarget,
 ): void {
-  if (Platform.OS === 'web') {
-    // Make browser Back restore the section that owns the report rather than
-    // remounting Journal on its default Sessions section.
-    router.replace(JOURNAL_REPORTS_HREF);
-  } else {
+  if (Platform.OS !== 'web') {
     router.push('/(app)/progress' as Href);
     router.push('/(app)/progress/reports' as Href);
   }
@@ -330,6 +326,13 @@ export function JournalTabView(): React.ReactElement {
   const activeSection = routeSection ?? organicSection;
   const selectSection = (nextSection: JournalSectionId): void => {
     setOrganicSection(nextSection);
+    // Web history must own Reports before a later report click pushes its leaf.
+    // Keeping these as separate user events prevents the router from coalescing
+    // both states into the final report entry.
+    if (Platform.OS === 'web' && nextSection === 'reports') {
+      router.setParams({ section: 'reports' });
+      return;
+    }
     if (routeSection) {
       router.setParams({ section: undefined });
     }
