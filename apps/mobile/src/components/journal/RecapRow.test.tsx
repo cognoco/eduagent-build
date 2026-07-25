@@ -30,7 +30,7 @@ const recap = {
   engagementSignal: null,
   nextTopicTitle: null,
   nextTopicReason: null,
-  verifiedProof: null,
+  verifiedProof: { status: 'absent' },
 } satisfies RecapListItem;
 
 describe('RecapRow', () => {
