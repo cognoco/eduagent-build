@@ -1623,6 +1623,9 @@ async function applyChallengeRoundRuntimeSignals(
       askedQuestion: payload.askedQuestion ?? '',
       learnerAnswer: payload.currentUserMessage.content,
       answerEventId: payload.currentUserMessage.id,
+      priorQuestionIdentities: current.evaluations.flatMap((evaluation) =>
+        evaluation.questionIdentity ? [evaluation.questionIdentity] : [],
+      ),
       conversationLanguage: context.conversationLanguage,
       ageBracket,
       sessionId: context.sessionId,
