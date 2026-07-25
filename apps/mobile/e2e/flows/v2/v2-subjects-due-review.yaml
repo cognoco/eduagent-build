@@ -65,9 +65,8 @@ tags:
     id: 'topic-detail-scroll'
     containsDescendants:
       - text: '^Biology Topic 1$'
-      - text: '^Biology$'
-      - id: 'topic-retention-card'
-      - id: 'study-cta'
+      - id: 'retention-pill-elapsed'
+        text: '^Ready for a refresh after 8 days$'
 
 # Android Back must restore the immediate Biology Hub ancestor first, then the
 # V2 Subjects list with the exact seeded row.

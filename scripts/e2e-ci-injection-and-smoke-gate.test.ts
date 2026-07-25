@@ -7343,6 +7343,26 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         },
       },
     ];
+    const exactDueReviewTopicDetail: Selector[] = [
+      {
+        extendedWaitUntil: {
+          visible: { id: 'topic-detail-scroll' },
+          timeout: 30000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'topic-detail-scroll',
+          containsDescendants: [
+            { text: '^Biology Topic 1$' },
+            {
+              id: 'retention-pill-elapsed',
+              text: '^Ready for a refresh after 8 days$',
+            },
+          ],
+        },
+      },
+    ];
     const exactTopicSheetOwnership: Selector[] = [
       {
         extendedWaitUntil: {
@@ -7487,6 +7507,9 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       true,
     );
     expect(hasExactCommandSequence(dueReview, exactDueReviewNextUp)).toBe(true);
+    expect(hasExactCommandSequence(dueReview, exactDueReviewTopicDetail)).toBe(
+      true,
+    );
     expect(hasExactCommandSequence(resume, exactTopicResumeToOwningHub)).toBe(
       true,
     );
@@ -8262,6 +8285,87 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(
       hasExactCommandSequence(adjacentSeedCase, exactDueReviewNextUp),
     ).toBe(false);
+
+    const topicDetailAssertion = exactDueReviewTopicDetail[1]!;
+    const topicDetailMutations: Selector[][] = [
+      // The exact seeded topic name is required on the Topic Detail owner.
+      exactDueReviewTopicDetail.with(1, {
+        assertVisible: {
+          id: 'topic-detail-scroll',
+          containsDescendants: [
+            {
+              id: 'retention-pill-elapsed',
+              text: '^Ready for a refresh after 8 days$',
+            },
+          ],
+        },
+      }),
+      // An adjacent topic cannot prove the Biology Topic 1 case.
+      exactDueReviewTopicDetail.with(1, {
+        assertVisible: {
+          id: 'topic-detail-scroll',
+          containsDescendants: [
+            { text: '^Biology Topic 2$' },
+            {
+              id: 'retention-pill-elapsed',
+              text: '^Ready for a refresh after 8 days$',
+            },
+          ],
+        },
+      }),
+      // The retention receipt must be owned by the exact learner-route pill.
+      exactDueReviewTopicDetail.with(1, {
+        assertVisible: {
+          id: 'topic-detail-scroll',
+          containsDescendants: [
+            { text: '^Biology Topic 1$' },
+            {
+              id: 'topic-retention-card',
+              text: '^Ready for a refresh after 8 days$',
+            },
+          ],
+        },
+      }),
+      // A neighboring retention age does not establish the seeded due state.
+      exactDueReviewTopicDetail.with(1, {
+        assertVisible: {
+          id: 'topic-detail-scroll',
+          containsDescendants: [
+            { text: '^Biology Topic 1$' },
+            {
+              id: 'retention-pill-elapsed',
+              text: '^Ready for a refresh after 7 days$',
+            },
+          ],
+        },
+      }),
+      // Optional retention evidence cannot establish the guaranteed property.
+      exactDueReviewTopicDetail.with(1, {
+        assertVisible: {
+          id: 'topic-detail-scroll',
+          containsDescendants: [
+            { text: '^Biology Topic 1$' },
+            {
+              id: 'retention-pill-elapsed',
+              text: '^Ready for a refresh after 8 days$',
+              optional: true,
+            },
+          ],
+        },
+      }),
+      // Every Topic Detail property is hard evidence.
+      exactDueReviewTopicDetail.with(1, {
+        assertVisible: {
+          ...(topicDetailAssertion.assertVisible as Selector),
+          optional: true,
+        },
+      }),
+    ];
+    for (const mutation of topicDetailMutations) {
+      expect(hasExactCommandSequence(mutation, exactDueReviewTopicDetail)).toBe(
+        false,
+      );
+    }
 
     expect(
       hasRunFlowWithEnv(
