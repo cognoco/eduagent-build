@@ -103,8 +103,7 @@ const TEST_ENV = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-type TestWebhookPayload = {
-  api_version: string;
+type TestWebhookPayload = Omit<RevenuecatWebhook, 'event'> & {
   event: RevenuecatWebhook['event'] & Record<string, unknown>;
 };
 

@@ -293,6 +293,22 @@ describe('authorizeRevenuecatSandboxVerification', () => {
     });
   });
 
+  it('denies an unsupported event shape with environment omitted', () => {
+    const { environment: _omitted, ...eventWithoutEnvironment } = baseEvent();
+
+    expect(eventWithoutEnvironment).not.toHaveProperty('environment');
+    expect(
+      authorizeRevenuecatSandboxVerification(
+        baseAuthorization(),
+        eventWithoutEnvironment,
+        NOW_MS,
+      ),
+    ).toEqual({
+      authorized: false,
+      reason: 'unsupported_event',
+    });
+  });
+
   it.each([
     ['unqualified Android product', 'com.eduagent.plus.monthly.android'],
     [
