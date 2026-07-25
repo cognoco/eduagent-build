@@ -68,6 +68,11 @@ const EN: LanguageCorpus = {
     'dyscalculic',
     'learning disability',
     'learning disabilities',
+    // Hyphenated compounds, matching how 'mental-health condition' is already
+    // carried. Without these, "a learning-disability diagnosis" scanned clear
+    // while the space-separated form blocked.
+    'learning-disability',
+    'learning-disabilities',
     'mental health condition',
     'mental-health condition',
     'physical health condition',

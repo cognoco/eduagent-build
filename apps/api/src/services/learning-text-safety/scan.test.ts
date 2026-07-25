@@ -221,6 +221,81 @@ describe('[WI-2628] NFKC normalization and Japanese script variation', () => {
   });
 });
 
+describe('[WI-2628] invisible-codepoint evasion', () => {
+  // NFKC does not remove default-ignorable format characters, so before the
+  // strip a single zero-width space made any Latin-script lexeme invisible to
+  // the gate. These fail without the strip in normalizeForMatching.
+  const ZWSP = '​';
+  const ZWNJ = '‌';
+  const ZWJ = '‍';
+  const BOM = '﻿';
+  const SOFT_HYPHEN = '­';
+
+  it('confirms NFKC alone does NOT strip these codepoints', () => {
+    // The premise of the fix. If this ever becomes true, the strip is redundant
+    // — but it is false today, which is exactly why the bypass existed.
+    expect(`AD${ZWSP}HD`.normalize('NFKC')).not.toBe('ADHD');
+  });
+
+  it('pins Default_Ignorable_Code_Point coverage for every codepoint relied on', () => {
+    // The implementation uses the Unicode property rather than an explicit
+    // list. A runtime whose property data omits any of these would silently
+    // reopen the bypass, so assert the coverage instead of trusting it.
+    for (const cp of [ZWSP, ZWNJ, ZWJ, BOM, SOFT_HYPHEN]) {
+      expect(/\p{Default_Ignorable_Code_Point}/u.test(cp)).toBe(true);
+    }
+  });
+
+  it.each([
+    ['zero-width space', ZWSP],
+    ['zero-width non-joiner', ZWNJ],
+    ['zero-width joiner', ZWJ],
+    ['byte-order mark', BOM],
+    ['soft hyphen', SOFT_HYPHEN],
+  ])(
+    'blocks person attribution with a %s inside the clinical lexeme',
+    (_name, invisible) => {
+      const result = scanAsLlm(`The learner has AD${invisible}HD.`, 'en');
+      expect(result.classification).toBe('block');
+      expect(result.disposition).toBe('block');
+      expect(result.reason).toBe('person_attribution');
+    },
+  );
+
+  it('blocks the cross-language case with an invisible codepoint inside the lexeme', () => {
+    // English acronym in Japanese prose, split by a zero-width space.
+    const result = scanAsLlm(`生徒はAD${ZWSP}HDと診断されました。`, 'ja');
+    expect(result.classification).toBe('block');
+    expect(result.disposition).toBe('block');
+  });
+
+  it('still reports clear for genuinely clean text containing an invisible codepoint', () => {
+    const result = scanAsLlm(`Photosynthesis${ZWSP} converts light.`, 'en');
+    expect(result.classification).toBe('clear');
+    expect(result.protectedLexemeCount).toBe(0);
+  });
+});
+
+describe('[WI-2628] hyphenated compound lexemes', () => {
+  it('blocks the hyphenated "learning-disability" form', () => {
+    const result = scanAsLlm(
+      'The learner has a learning-disability diagnosis.',
+      'en',
+    );
+    expect(result.classification).toBe('block');
+    expect(result.reason).toBe('person_attribution');
+  });
+
+  it('treats the hyphenated and space-separated forms identically', () => {
+    for (const text of [
+      'The learner has a learning disability diagnosis.',
+      'The learner has a learning-disability diagnosis.',
+    ]) {
+      expect(scanAsLlm(text, 'en').classification).toBe('block');
+    }
+  });
+});
+
 describe('[WI-2628] deterministic fail-closed provenance matrix (ADR-0036 §4.6)', () => {
   const AMBIGUOUS_TEXT = 'This chapter explains what dyslexia is.';
 

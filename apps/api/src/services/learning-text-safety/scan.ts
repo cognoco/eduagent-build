@@ -262,6 +262,23 @@ function grammarFor(language: ConversationLanguage): CompiledGrammar {
 // --- scanning --------------------------------------------------------------
 
 /**
+ * Invisible formatting codepoints, stripped BEFORE NFKC.
+ *
+ * NFKC does NOT remove these — verified, not assumed: an 'ADHD' with a
+ * U+200B between the D and the H does not normalize to 'ADHD'. So a single zero-width space defeated the entire gate for any
+ * Latin-script lexeme, which for an Article-9 control over minor learners is a
+ * deterministic bypass, not a probabilistic gap.
+ *
+ * Chosen the `Default_Ignorable_Code_Point` property over an explicit codepoint
+ * list: it is the Unicode-maintained definition (so new format characters are
+ * covered as the standard evolves) and it already includes every codepoint of
+ * concern — U+200B/C/D, U+FEFF, U+00AD, and the variation selectors. The test
+ * suite pins that coverage for the five named codepoints, so a runtime whose
+ * property data disagrees fails loudly instead of silently reopening the bypass.
+ */
+const DEFAULT_IGNORABLE_RE = /\p{Default_Ignorable_Code_Point}/gu;
+
+/**
  * Normalize for MATCHING ONLY. The normalized string is never returned and
  * never persisted — NFKC folds characters and shifts offsets, so it must not
  * escape this module (mirrors the shipped guard's `valueForMatching` split).
@@ -269,7 +286,7 @@ function grammarFor(language: ConversationLanguage): CompiledGrammar {
 function normalizeForMatching(text: string): string {
   return CONTRACTIONS.reduce(
     (value, [pattern, replacement]) => value.replace(pattern, replacement),
-    text.normalize('NFKC'),
+    text.replace(DEFAULT_IGNORABLE_RE, '').normalize('NFKC'),
     // Collapse whitespace runs to a single space. Unicode-mode `\s` covers the
     // ideographic space (U+3000) too, so full-width-spaced prose matches.
   ).replace(/\s+/gu, ' ');
