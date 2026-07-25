@@ -6,7 +6,11 @@
 // This module holds only pure, store-agnostic types and mapping — no DB
 // access — reused by billing-v2/revenuecat-v2.ts.
 
-import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
+import type {
+  RevenuecatWebhookEvent,
+  SubscriptionTier,
+  SubscriptionStatus,
+} from '@eduagent/schemas';
 
 export interface RevenuecatWebhookUpdate {
   tier?: SubscriptionTier;
@@ -23,37 +27,14 @@ export interface RevenuecatQuotaUpdate {
 }
 
 // ---------------------------------------------------------------------------
-// Inbound event shape (kept in sync with revenuecatWebhookSchema in the route)
+// Inbound event shape
 // ---------------------------------------------------------------------------
 //
 // We intentionally do NOT import the Zod schema here — the route owns parsing
 // (route-level validation is required so a malformed payload returns 400 at
-// the HTTP boundary). Handlers receive the already-validated `event` and use
-// this inferred type to stay type-safe without depending on the route.
-export interface RevenueCatEvent {
-  id: string;
-  type: string;
-  app_id?: string;
-  app_user_id: string;
-  original_app_user_id?: string;
-  product_id?: string;
-  entitlement_ids?: string[];
-  period_type?: string;
-  purchased_at_ms?: number;
-  expiration_at_ms?: number;
-  store?: string;
-  environment?: string;
-  is_family_share?: boolean;
-  transferred_from?: string[];
-  transferred_to?: string[];
-  new_product_id?: string;
-  cancel_reason?: string;
-  grace_period_expiration_at_ms?: number;
-  transaction_id?: string;
-  store_transaction_id?: string;
-  /** BD-01: Event timestamp for ordering-based idempotency. */
-  event_timestamp_ms?: number;
-}
+// the HTTP boundary). Handlers receive that already-validated shared contract
+// through this compatibility name.
+export type RevenueCatEvent = RevenuecatWebhookEvent;
 
 // ---------------------------------------------------------------------------
 // Product ID mapping

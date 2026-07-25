@@ -320,7 +320,7 @@ export const revenuecatWebhookRoute = new Hono<{
 
   // Non-production SANDBOX events continue through the normal webhook flow so
   // staging/dev can exercise RevenueCat QA paths.
-  if (event.environment === 'SANDBOX') {
+  if (event.environment === 'SANDBOX' && !sandboxVerification?.authorized) {
     logger.warn(
       '[revenuecat] Received SANDBOX webhook event — verify this is intentional',
       {

@@ -91,6 +91,12 @@ the App User ID. Store it only in the approved production secret manager.
    mapped in `apps/api/src/services/billing/revenuecat-shared.ts`, the store is
    `PLAY_STORE`, and the expected base-plan suffix matches the Play Console
    configuration.
+6. Before starting either authorization window, record the most recent
+   measured production secret-sync/deploy propagation time. Start only if the
+   operator can complete propagation, active-binding confirmation, two event
+   resends, and restricted evidence capture within 15 minutes while retaining
+   at least five minutes after the binding becomes active. Otherwise stop and
+   reschedule; do not lengthen the window.
 
 ## Phase 1 — Initial Purchase Proof
 
@@ -109,11 +115,14 @@ the App User ID. Store it only in the approved production secret manager.
    fields in the authorization shape to be present. Stop on a missing
    `app_id`, `transaction_id`, qualified product/base plan, or unexpected
    period/store/event/environment.
-4. Create the exact authorization with a fresh ID and a window no longer than
-   15 minutes. Add it to the production Doppler config through the approved
-   secret-sync/deploy procedure.
+4. After the Phase-0 propagation preflight passes, create the exact
+   authorization with a fresh ID and a window no longer than 15 minutes. Add
+   it to the production Doppler config through the approved secret-sync/deploy
+   procedure.
 5. Re-read the active worker configuration without printing the value. Confirm
-   only that the binding is present.
+   only that the binding is present and at least five minutes remain before
+   expiry. If less remains, remove the binding and restart step 4 later with a
+   fresh authorization ID and window; never extend or reuse it.
 6. Resend the exact RevenueCat event.
 7. Capture restricted evidence that:
    - the structured accepted log names the authorization ID, event ID, app ID,
@@ -146,7 +155,10 @@ the App User ID. Store it only in the approved production secret manager.
    - exact expiration event ID;
    - the same app/user/product/`NORMAL` period/store/transaction boundary;
    - a fresh window no longer than 15 minutes.
-5. Add/sync the binding, resend that exact expiration once, and verify:
+5. Re-run the Phase-0 propagation preflight, add/sync the binding, and confirm
+   at least five minutes remain after it becomes active. If less remains,
+   remove it and restart step 4 later with a fresh authorization; never extend
+   or reuse it. Then resend that exact expiration once and verify:
    - `subscription.plan_tier = 'free'`;
    - `subscription.status = 'expired'`;
    - quota limits match the free tier;

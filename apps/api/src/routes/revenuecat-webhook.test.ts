@@ -783,7 +783,7 @@ describe('sandbox events [BUG-624 / A-8]', () => {
     );
   });
 
-  it('[WI-2705] audits an accepted verification without logging user or transaction identifiers', async () => {
+  it('[WI-2705] audits an accepted verification without logging user, transaction, or internal account identifiers', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation();
     try {
       const payload = makeAuthorizedSandboxPayload();
@@ -813,6 +813,9 @@ describe('sandbox events [BUG-624 / A-8]', () => {
       });
       expect(auditEntry.context).not.toHaveProperty('appUserId');
       expect(auditEntry.context).not.toHaveProperty('transactionId');
+      expect(
+        warn.mock.calls.map(([entry]) => String(entry)).join('\n'),
+      ).not.toContain('"accountId":"acc-1"');
     } finally {
       warn.mockRestore();
     }
@@ -1037,15 +1040,25 @@ describe('sandbox events [BUG-624 / A-8]', () => {
   });
 
   it('accepts SANDBOX events in non-production (staging/dev) so QA can drive flows', async () => {
-    const payload = makeWebhookPayload('INITIAL_PURCHASE', {
-      environment: 'SANDBOX',
-    });
-    const res = await makeRequest(payload, {
-      ...TEST_ENV,
-      ENVIRONMENT: 'staging',
-    });
-    expect(res.status).toBe(200);
-    expect(handlers.handleInitialPurchase).toHaveBeenCalled();
+    const warn = jest.spyOn(console, 'warn').mockImplementation();
+    try {
+      const payload = makeWebhookPayload('INITIAL_PURCHASE', {
+        environment: 'SANDBOX',
+      });
+      const res = await makeRequest(payload, {
+        ...TEST_ENV,
+        ENVIRONMENT: 'staging',
+      });
+      expect(res.status).toBe(200);
+      expect(handlers.handleInitialPurchase).toHaveBeenCalled();
+      expect(
+        warn.mock.calls.map(([entry]) => String(entry)).join('\n'),
+      ).toContain(
+        'Received SANDBOX webhook event — verify this is intentional',
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('accepts PRODUCTION events in production (no regression)', async () => {
