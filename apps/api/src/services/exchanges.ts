@@ -536,10 +536,6 @@ export interface ExchangeResult {
   noticedGap?: NonNullable<
     NonNullable<LlmResponseEnvelope['signals']>['noticed_gap']
   >;
-  /** Untrusted bounded re-check verdict; caller validates durable evidence. */
-  noticeRecheck?: NonNullable<
-    NonNullable<LlmResponseEnvelope['signals']>['notice_recheck']
-  >;
   /** Challenge Round: note draft UI hint, validated later before surfacing. */
   noteDraft?: ChallengeRoundNoteDraftHint | null;
   /** Fluency drill annotation (language sessions only) */
@@ -2137,7 +2133,6 @@ export async function processExchange(
     challengeRoundOffer: finalParsed.challengeRoundOffer || undefined,
     challengeRoundEvaluation: finalParsed.challengeRoundEvaluation,
     noticedGap: finalParsed.noticedGap,
-    noticeRecheck: finalParsed.noticeRecheck,
     noteDraft: finalParsed.noteDraft,
     fluencyDrill: finalParsed.fluencyDrill ?? undefined,
     confidence: finalParsed.confidence,
@@ -2327,9 +2322,6 @@ export interface ParsedExchangeEnvelope {
   noticedGap?: NonNullable<
     NonNullable<LlmResponseEnvelope['signals']>['noticed_gap']
   >;
-  noticeRecheck?: NonNullable<
-    NonNullable<LlmResponseEnvelope['signals']>['notice_recheck']
-  >;
   /** Challenge Round: learner-reviewed note draft hint from the envelope. */
   noteDraft: ChallengeRoundNoteDraftHint | null;
   fluencyDrill: FluencyDrillAnnotation | null;
@@ -2390,7 +2382,6 @@ const EMPTY_PARSED_ENVELOPE: ParsedExchangeEnvelope = {
   challengeRoundOffer: false,
   challengeRoundEvaluation: [],
   noticedGap: undefined,
-  noticeRecheck: undefined,
   noteDraft: null,
   fluencyDrill: null,
   confidence: undefined,
@@ -2596,7 +2587,6 @@ function envelopeToParsedExchange(
     challengeRoundOffer: signals.challenge_round_offer === true,
     challengeRoundEvaluation: signals.challenge_round_evaluation ?? [],
     noticedGap: signals.noticed_gap ?? undefined,
-    noticeRecheck: signals.notice_recheck ?? undefined,
     noteDraft: uiHints.note_draft ?? null,
     fluencyDrill,
     confidence: envelope.confidence,

@@ -390,14 +390,6 @@ function normalizeNoticedGapDecision(value: unknown): unknown {
   return evidence;
 }
 
-export const noticeRecheckSignalSchema = z.object({
-  noticeId: z.string().uuid(),
-  verdict: z.enum(['locked_in', 'not_yet', 'dismissed', 'deferred']),
-  answerEventId: z.string().uuid(),
-  learnerQuote: z.string().min(1).max(500),
-});
-export type NoticeRecheckSignal = z.infer<typeof noticeRecheckSignalSchema>;
-
 export const answerEvaluationSchema = z.object({
   correctness: z.enum(['correct', 'partial', 'incorrect', 'na']),
   concept: z.string().min(1).max(200).optional(),
@@ -471,8 +463,6 @@ const signalsSchema = z.preprocess(
         normalizeNoticedGapDecision,
         noticedGapSignalSchema.nullable().optional(),
       ),
-      /** Mentor notice re-check verdict, accepted only after DB-backed evidence checks. */
-      notice_recheck: noticeRecheckSignalSchema.optional(),
     })
     .optional(),
 );
@@ -637,8 +627,6 @@ export interface NormalisedEnvelopeSignals {
   topic_opened_pending_content: boolean;
   /** Personal-mentor felt moment proposal. Null when absent. */
   noticed_gap: NoticedGapSignal | null;
-  /** Mentor notice re-check verdict. Null when absent. */
-  notice_recheck: NoticeRecheckSignal | null;
 }
 
 export function normaliseSignals(
@@ -660,7 +648,6 @@ export function normaliseSignals(
     topic_opened_pending_content:
       signals?.topic_opened_pending_content ?? false,
     noticed_gap: signals?.noticed_gap ?? null,
-    notice_recheck: signals?.notice_recheck ?? null,
   };
 }
 

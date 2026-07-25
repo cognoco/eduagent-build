@@ -10,14 +10,22 @@
  *   - Mastery-verified side-effect: `finalizeChallengeRoundIfReady` writes an
  *     `assessments` row when all evaluations are solid.
  *
+ * Also covers the [WI-2625] mentor-notice re-check judge: the producing
+ * tutor model no longer self-reports a re-check verdict — an independent
+ * server-side judge (evaluateMentorNoticeRecheck, recheck-judge.ts) decides
+ * it after the learner turn is persisted. The same branching fixture below
+ * recognises that judge's distinctive system prompt the same way it
+ * recognises the grader's.
+ *
  * Integration-mock-guard compliant (apps/api `*.integration.test.ts`):
  *   - The LLM is stubbed at the PROVIDER-REGISTRY boundary — `routeAndCall`
  *     runs REAL and delegates to a branching fixture provider. The provider is
- *     registered under every id the router fallback may select so BOTH the
- *     tutor turn and the (vendor-independent) judge grader call land on it; the
- *     grader call is recognised by its distinctive rubric system prompt. This
- *     replaces the old internal-module mock of the `../llm` barrel, which the
- *     integration internal-mock guard correctly rejects
+ *     registered under every id the router fallback may select so the tutor
+ *     turn AND every (vendor-independent) judge call — Challenge Round grader,
+ *     mentor-notice re-check judge — land on it; each judge call is
+ *     recognised by its distinctive system prompt. This replaces the old
+ *     internal-module mock of the `../llm` barrel, which the integration
+ *     internal-mock guard correctly rejects
  *     (see test-utils/integration-mock-guard.test.ts).
  *   - The Inngest client is the one allowlisted internal boundary stub.
  *
@@ -167,10 +175,10 @@ const NOTICE_DO_NOT_FAKE = [
   'clearTimeout',
 ] as const;
 
-function tutorEnvelopeDeferringNotice(
-  noticeId: string,
-  answerEventId: string,
-): string {
+// [WI-2625] The tutor no longer emits any re-check verdict — its envelope is
+// neutral. The recheck outcome comes from the notice-recheck judge fixture
+// instead (see `llm.setNoticeRecheckJudgeResponse` at each call site below).
+function tutorEnvelopeDuringNoticeRecheck(): string {
   return JSON.stringify({
     reply: 'Let us come back to that one another time.',
     signals: {
@@ -178,12 +186,6 @@ function tutorEnvelopeDeferringNotice(
       needs_deepening: false,
       understanding_check: false,
       ready_to_finish: false,
-      notice_recheck: {
-        noticeId,
-        verdict: 'deferred',
-        answerEventId,
-        learnerQuote: NOTICE_LEARNER_ANSWER,
-      },
     },
     ui_hints: {
       note_prompt: { show: false, post_session: false },
@@ -259,6 +261,14 @@ const GRADER_VERDICT_SOLID_INPUTS = JSON.stringify({
 /** Degraded grader verdict — an empty `items` array → fail-open ([]) in the service. */
 const GRADER_VERDICT_EMPTY = JSON.stringify({ items: [] });
 
+// [WI-2625] Default notice-recheck judge verdict: "continue" makes no
+// transition, so a test that doesn't care about the recheck outcome is
+// unaffected unless it opts in via `llm.setNoticeRecheckJudgeResponse`.
+const NOTICE_RECHECK_JUDGE_VERDICT_CONTINUE = JSON.stringify({
+  verdict: 'continue',
+  reason: 'unclear',
+});
+
 // ---------------------------------------------------------------------------
 // Branching provider fixture — keeps `routeAndCall` real (provider-registry
 // boundary, not a jest.mock of the internal llm module).
@@ -271,6 +281,12 @@ const GRADER_VERDICT_EMPTY = JSON.stringify({ items: [] });
 // ---------------------------------------------------------------------------
 
 const GRADER_SYSTEM_MARKER = 'You are a precise grading assistant';
+// [WI-2625] The mentor-notice re-check judge's system prompt opens with this
+// unique marker (recheck-judge.ts) — detected the same way as the Challenge
+// Round grader above, so its (vendor-independent) judge call lands on this
+// fixture regardless of routing.
+const NOTICE_RECHECK_JUDGE_SYSTEM_MARKER =
+  'You are an independent re-check judge for an educational mentor app';
 const FALLBACK_PROVIDER_IDS = ['gemini', 'anthropic', 'cerebras', 'openai'];
 type TutorStreamFailurePhase = 'setup' | 'pre-first-byte' | 'mid-stream';
 
@@ -281,9 +297,18 @@ function isGraderMessages(messages: ChatMessage[]): boolean {
   );
 }
 
+function isNoticeRecheckJudgeMessages(messages: ChatMessage[]): boolean {
+  return messages.some(
+    (m) =>
+      typeof m.content === 'string' &&
+      m.content.includes(NOTICE_RECHECK_JUDGE_SYSTEM_MARKER),
+  );
+}
+
 function createBranchingLlm() {
   let tutorResponse = TUTOR_ENVELOPE_NO_EVAL;
   let graderResponse = GRADER_VERDICT_SOLID;
+  let noticeRecheckJudgeResponse = NOTICE_RECHECK_JUDGE_VERDICT_CONTINUE;
   let streamFailurePhase: TutorStreamFailurePhase | undefined;
   let tutorChatCalls = 0;
   let tutorChatStreamCalls = 0;
@@ -291,7 +316,11 @@ function createBranchingLlm() {
 
   function respond(messages: ChatMessage[]): string {
     calls.push(messages);
-    return isGraderMessages(messages) ? graderResponse : tutorResponse;
+    if (isGraderMessages(messages)) return graderResponse;
+    if (isNoticeRecheckJudgeMessages(messages)) {
+      return noticeRecheckJudgeResponse;
+    }
+    return tutorResponse;
   }
 
   const providers: LLMProvider[] = FALLBACK_PROVIDER_IDS.map((id) => ({
@@ -300,14 +329,20 @@ function createBranchingLlm() {
       messages: ChatMessage[],
       _config: ModelConfig,
     ): Promise<ChatResult> {
-      if (!isGraderMessages(messages)) tutorChatCalls++;
+      if (
+        !isGraderMessages(messages) &&
+        !isNoticeRecheckJudgeMessages(messages)
+      ) {
+        tutorChatCalls++;
+      }
       return { content: respond(messages), stopReason: 'stop' };
     },
     chatStream(messages: ChatMessage[], _config: ModelConfig) {
-      const graderCall = isGraderMessages(messages);
-      if (!graderCall) tutorChatStreamCalls++;
+      const nonTutorCall =
+        isGraderMessages(messages) || isNoticeRecheckJudgeMessages(messages);
+      if (!nonTutorCall) tutorChatStreamCalls++;
       const content = respond(messages);
-      const tutorStreamFailure = graderCall ? undefined : streamFailurePhase;
+      const tutorStreamFailure = nonTutorCall ? undefined : streamFailurePhase;
       if (tutorStreamFailure === 'setup') {
         throw new Error('injected provider setup failure');
       }
@@ -348,6 +383,9 @@ function createBranchingLlm() {
     setGraderResponse(content: string): void {
       graderResponse = content;
     },
+    setNoticeRecheckJudgeResponse(content: string): void {
+      noticeRecheckJudgeResponse = content;
+    },
     setStreamFailurePhase(phase: TutorStreamFailurePhase | undefined): void {
       streamFailurePhase = phase;
     },
@@ -363,9 +401,13 @@ function createBranchingLlm() {
     graderMessages(): ChatMessage[][] {
       return calls.filter(isGraderMessages);
     },
+    noticeRecheckJudgeCallCount(): number {
+      return calls.filter(isNoticeRecheckJudgeMessages).length;
+    },
     reset(): void {
       tutorResponse = TUTOR_ENVELOPE_NO_EVAL;
       graderResponse = GRADER_VERDICT_SOLID;
+      noticeRecheckJudgeResponse = NOTICE_RECHECK_JUDGE_VERDICT_CONTINUE;
       streamFailurePhase = undefined;
       tutorChatCalls = 0;
       tutorChatStreamCalls = 0;
@@ -1403,21 +1445,6 @@ describeIfDb('session exchange production-path integration', () => {
         .where(eq(organization.id, link.organizationId));
       expect(await getProfileTimeZone(db, profileId)).toBe('America/Santiago');
 
-      // The learner turn the notice_recheck signal must cite as evidence.
-      const [answerEvent] = await db
-        .insert(sessionEvents)
-        .values({
-          profileId,
-          subjectId,
-          sessionId: session.id,
-          topicId,
-          eventType: 'user_message',
-          content: NOTICE_LEARNER_ANSWER,
-          metadata: {},
-        })
-        .returning({ id: sessionEvents.id });
-      if (!answerEvent) throw new Error('answer event insert failed');
-
       const [notice] = await db
         .insert(mentorNotices)
         .values({
@@ -1440,8 +1467,9 @@ describeIfDb('session exchange production-path integration', () => {
         .set({ metadata: { recheckNoticeId: notice.id } })
         .where(eq(learningSessions.id, session.id));
 
-      llm.setTutorResponse(
-        tutorEnvelopeDeferringNotice(notice.id, answerEvent.id),
+      llm.setTutorResponse(tutorEnvelopeDuringNoticeRecheck());
+      llm.setNoticeRecheckJudgeResponse(
+        JSON.stringify({ verdict: 'deferred', reason: 'explicit_not_now' }),
       );
       return { profileId, session, noticeId: notice.id };
     }
@@ -1506,35 +1534,6 @@ describeIfDb('session exchange production-path integration', () => {
   // `applyMentorNoticeOutcome` directly and would pass even if one of these
   // two call sites regressed to leaving the notice 'open'.
   describe('mentor-notice not_yet terminalization through the exchange call sites', () => {
-    function tutorEnvelopeNotYetNotice(
-      noticeId: string,
-      answerEventId: string,
-    ): string {
-      return JSON.stringify({
-        reply: "Let's keep practicing that one.",
-        signals: {
-          partial_progress: false,
-          needs_deepening: false,
-          understanding_check: false,
-          ready_to_finish: false,
-          notice_recheck: {
-            noticeId,
-            verdict: 'not_yet',
-            answerEventId,
-            learnerQuote: NOTICE_LEARNER_ANSWER,
-          },
-        },
-        ui_hints: {
-          note_prompt: { show: false, post_session: false },
-        },
-        private_sources: {
-          relied_on: ['conversation_history'],
-          insufficient: false,
-          reason: 'test envelope',
-        },
-      });
-    }
-
     async function seedMentorNoticeNotYetTurn() {
       const { profileId, subjectId } = await seedProfileAndSubject(db);
       const topicId = await seedCurriculumTopic(db, subjectId);
@@ -1544,21 +1543,6 @@ describeIfDb('session exchange production-path integration', () => {
         subjectId,
         topicId,
       );
-
-      // The learner turn the notice_recheck signal must cite as evidence.
-      const [answerEvent] = await db
-        .insert(sessionEvents)
-        .values({
-          profileId,
-          subjectId,
-          sessionId: session.id,
-          topicId,
-          eventType: 'user_message',
-          content: NOTICE_LEARNER_ANSWER,
-          metadata: {},
-        })
-        .returning({ id: sessionEvents.id });
-      if (!answerEvent) throw new Error('answer event insert failed');
 
       const [notice] = await db
         .insert(mentorNotices)
@@ -1580,8 +1564,9 @@ describeIfDb('session exchange production-path integration', () => {
         .set({ metadata: { recheckNoticeId: notice.id } })
         .where(eq(learningSessions.id, session.id));
 
-      llm.setTutorResponse(
-        tutorEnvelopeNotYetNotice(notice.id, answerEvent.id),
+      llm.setTutorResponse(tutorEnvelopeDuringNoticeRecheck());
+      llm.setNoticeRecheckJudgeResponse(
+        JSON.stringify({ verdict: 'not_yet', reason: 'insufficient' }),
       );
       return { profileId, session, noticeId: notice.id };
     }
@@ -1635,6 +1620,201 @@ describeIfDb('session exchange production-path integration', () => {
       expect(row?.status).toBe('not_yet');
       expect(row?.status).not.toBe('open');
       expect(row?.lastRecheckOutcome).toBe('not_yet');
+    });
+  });
+
+  // [WI-2625] The independent judge is the ONLY source of a re-check verdict
+  // now — these cover the remaining outcomes (locked_in, dismissed), the
+  // fail-open "no transition" cases (continue, malformed judge output), the
+  // deterministic turn-3 not_yet force over those fail-open cases, and the
+  // retry/replay idempotency boundary (a duplicate clientId send must not
+  // re-invoke the judge or double-apply an outcome).
+  describe('mentor-notice recheck judge outcomes and idempotency (WI-2625)', () => {
+    async function seedOpenMentorNoticeRecheckTurn() {
+      const { profileId, subjectId } = await seedProfileAndSubject(db);
+      const topicId = await seedCurriculumTopic(db, subjectId);
+      const session = await seedOrdinarySession(
+        db,
+        profileId,
+        subjectId,
+        topicId,
+      );
+
+      const [notice] = await db
+        .insert(mentorNotices)
+        .values({
+          profileId,
+          subjectId,
+          sourceSessionId: session.id,
+          concept: 'Changing signs across the equals sign',
+          correctionHint: 'Apply the inverse operation to both sides.',
+          status: 'open',
+          lastOfferedSessionId: session.id,
+          lastOfferedAt: NOTICE_OFFERED_AT,
+        })
+        .returning({ id: mentorNotices.id });
+      if (!notice) throw new Error('mentor notice insert failed');
+
+      await db
+        .update(learningSessions)
+        .set({ metadata: { recheckNoticeId: notice.id } })
+        .where(eq(learningSessions.id, session.id));
+
+      llm.setTutorResponse(tutorEnvelopeDuringNoticeRecheck());
+      return { profileId, session, noticeId: notice.id };
+    }
+
+    async function readNotice(noticeId: string) {
+      const [row] = await db
+        .select({
+          status: mentorNotices.status,
+          lastRecheckOutcome: mentorNotices.lastRecheckOutcome,
+          recheckAttemptCount: mentorNotices.recheckAttemptCount,
+        })
+        .from(mentorNotices)
+        .where(eq(mentorNotices.id, noticeId));
+      return row ?? null;
+    }
+
+    it.each([
+      ['locked_in', 'demonstrated'],
+      ['dismissed', 'explicit_stop'],
+    ] as const)(
+      'processMessage terminalizes a %s judge verdict',
+      async (verdict, reason) => {
+        const { profileId, session, noticeId } =
+          await seedOpenMentorNoticeRecheckTurn();
+        llm.setNoticeRecheckJudgeResponse(JSON.stringify({ verdict, reason }));
+
+        await processMessage(
+          db,
+          profileId,
+          session.id,
+          { message: NOTICE_LEARNER_ANSWER },
+          { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+        );
+
+        const row = await readNotice(noticeId);
+        expect(row?.status).toBe(verdict);
+        expect(row?.lastRecheckOutcome).toBe(verdict);
+      },
+    );
+
+    it('a "continue" judge verdict makes no transition before turn 3', async () => {
+      const { profileId, session, noticeId } =
+        await seedOpenMentorNoticeRecheckTurn();
+      llm.setNoticeRecheckJudgeResponse(
+        JSON.stringify({ verdict: 'continue', reason: 'unclear' }),
+      );
+
+      await processMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+      );
+
+      const row = await readNotice(noticeId);
+      expect(row?.status).toBe('open');
+      expect(row?.lastRecheckOutcome).toBeNull();
+    });
+
+    it('malformed judge output makes no transition before turn 3 (fail-open)', async () => {
+      const { profileId, session, noticeId } =
+        await seedOpenMentorNoticeRecheckTurn();
+      llm.setNoticeRecheckJudgeResponse('not valid json at all');
+
+      await processMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+      );
+
+      const row = await readNotice(noticeId);
+      expect(row?.status).toBe('open');
+      expect(row?.lastRecheckOutcome).toBeNull();
+    });
+
+    it('deterministically terminalizes not_yet on turn 3 when the judge never resolves', async () => {
+      const { profileId, session, noticeId } =
+        await seedOpenMentorNoticeRecheckTurn();
+      // Every turn the judge fails open (malformed) — exercises the turn-3
+      // hard cap rather than the judge ever producing not_yet itself.
+      // `seedOrdinarySession` seeds `exchangeCount: 1`, so the FIRST call
+      // here already lands on re-check exchange 2 (still under the cap);
+      // the SECOND call lands on exchange 3, where the cap forces not_yet.
+      llm.setNoticeRecheckJudgeResponse('still not valid json');
+
+      await processMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+      );
+      const midRow = await readNotice(noticeId);
+      expect(midRow?.status).toBe('open');
+
+      await processMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+      );
+
+      const finalRow = await readNotice(noticeId);
+      expect(finalRow?.status).toBe('not_yet');
+      expect(finalRow?.lastRecheckOutcome).toBe('not_yet');
+    });
+
+    it('a retried (duplicate clientId) send does not re-invoke the judge or double-apply the outcome', async () => {
+      const { profileId, session, noticeId } =
+        await seedOpenMentorNoticeRecheckTurn();
+      llm.setNoticeRecheckJudgeResponse(
+        JSON.stringify({ verdict: 'locked_in', reason: 'demonstrated' }),
+      );
+      const clientId = 'wi-2625-retry-client-id';
+
+      await processMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        {
+          semanticMemoryRetrievalEnabled: false,
+          mentorNoticeEnabled: true,
+          clientId,
+        },
+      );
+      expect(llm.noticeRecheckJudgeCallCount()).toBe(1);
+      const firstRow = await readNotice(noticeId);
+      expect(firstRow?.status).toBe('locked_in');
+      expect(firstRow?.recheckAttemptCount).toBe(1);
+
+      // Retry: same clientId, same message — the exchange's onConflictDoNothing
+      // dedup means `persisted.persistedUserMessage` is false, so the mentor-
+      // notice recheck block (gated on that flag) never re-enters, and the
+      // judge is never called a second time.
+      await processMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        {
+          semanticMemoryRetrievalEnabled: false,
+          mentorNoticeEnabled: true,
+          clientId,
+        },
+      );
+
+      expect(llm.noticeRecheckJudgeCallCount()).toBe(1);
+      const secondRow = await readNotice(noticeId);
+      expect(secondRow?.status).toBe('locked_in');
+      expect(secondRow?.recheckAttemptCount).toBe(1);
     });
   });
 
