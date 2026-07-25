@@ -44,7 +44,7 @@ export interface LanguageCorpus {
   /**
    * Whether the script has letter case. When false the "capitalized token =
    * person name" heuristic used for Latin scripts is meaningless and MUST NOT
-   * be applied — see `particleAttributionPatterns`.
+   * be applied — see `rawAttributionPatterns`.
    */
   readonly scriptHasCase: boolean;
   /**
