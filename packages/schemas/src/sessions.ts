@@ -7,7 +7,10 @@ import {
   pendingCelebrationSchema,
 } from './progress.ts';
 import { languageSessionSummarySchema } from './language.ts';
-import { mentorNoticeAcceptedSchema } from './mentor-notices.ts';
+import {
+  mentorNoticeAcceptedSchema,
+  mentorNoticePolicyObservationField,
+} from './mentor-notices.ts';
 
 export const orphanReasonSchema = z.enum([
   'llm_stream_error',
@@ -803,6 +806,15 @@ export type HomeworkStateSyncResponse = z.infer<
 // SessionSummaryGetResponse — GET /sessions/:sessionId/summary → 200
 export const sessionSummaryGetResponseSchema = z.object({
   summary: sessionSummarySchema.nullable(),
+  /**
+   * [WI-2627] The summary carries the mentor-notice RECEIPT, so it is a
+   * notice-bearing surface and must observe the same policy the Now feed does.
+   * WI-2504 deliberately left the epoch OFF this response because the summary
+   * is not persisted and so had nothing to invalidate; ordering is a different
+   * requirement from invalidation — a client holding a warm summary needs to
+   * know whether the receipt it is painting predates a rollback.
+   */
+  mentorNoticePolicy: mentorNoticePolicyObservationField,
 });
 export type SessionSummaryGetResponse = z.infer<
   typeof sessionSummaryGetResponseSchema

@@ -13,6 +13,7 @@ import {
   isTopicIntentMatcherEnabled,
   isMentorNoticeEnabled,
   isMentorNoticePushPostMvpEnabled,
+  resolveMentorNoticePolicyRevision,
   validateEnv,
   validateProductionBindings,
   validateProductionKeys,
@@ -731,6 +732,43 @@ describe('validateEnv', () => {
     expect(isMentorNoticeEnabled(env.MENTOR_NOTICE_ENABLED)).toBe(false);
     expect(isMentorNoticeEnabled('true')).toBe(true);
     expect(isMentorNoticeEnabled('yes')).toBe(false);
+  });
+
+  // [WI-2627] The revision is what makes rollout observations ORDERABLE. The
+  // guaranteed property under test is not "it parses integers" but "no
+  // admissible input can RAISE the ordering above a real deployment value":
+  // every rejected form resolves to 0, the lowest revision, and a client only
+  // re-enables on a strictly HIGHER revision. So a typo'd or absent binding is
+  // structurally incapable of re-enabling a client that has observed a rollback.
+  it('[WI-2627] resolves the policy revision, clamping every malformed form to the lowest admissible value', () => {
+    expect(resolveMentorNoticePolicyRevision('7')).toBe(7);
+    expect(resolveMentorNoticePolicyRevision(' 12 ')).toBe(12);
+    expect(resolveMentorNoticePolicyRevision('0')).toBe(0);
+
+    for (const malformed of [
+      undefined,
+      '',
+      '   ',
+      'latest',
+      '2.5',
+      '-3',
+      'NaN',
+      'Infinity',
+      '1e999',
+    ]) {
+      expect(resolveMentorNoticePolicyRevision(malformed)).toBe(0);
+    }
+  });
+
+  it('[WI-2627] MENTOR_NOTICE_POLICY_REVISION is optional in the env schema, so no deployment needs the binding to boot', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(env.MENTOR_NOTICE_POLICY_REVISION).toBeUndefined();
+    expect(
+      resolveMentorNoticePolicyRevision(env.MENTOR_NOTICE_POLICY_REVISION),
+    ).toBe(0);
   });
 
   it('[WI-2573] MENTOR_NOTICE_PUSH_POST_MVP_ENABLED defaults off and is independent of the in-app flag', () => {
