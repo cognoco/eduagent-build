@@ -276,6 +276,85 @@ describe('[WI-2628] invisible-codepoint evasion', () => {
   });
 });
 
+describe('[WI-2628] hedge word order', () => {
+  // A post-verb hedge previously downgraded person-attributed clinical text
+  // from `block` to `refer`, because the corpora disagreed on which order they
+  // enumerated: en/cs listed only pre-verb hedges, es/pt/pl only hedge-first,
+  // while fr/it/de/nb hand-enumerated verb+hedge phrases and so escaped it.
+  //
+  // In English this was a REGRESSION against the shipped guard, whose
+  // ATTRIBUTION_MODIFIER already blocks post-verb hedges deterministically —
+  // asserted directly below, so the two controls can never silently diverge.
+  const POST_VERB_HEDGE: ReadonlyArray<
+    [name: string, text: string, language: ConversationLanguage]
+  > = [
+    ['en post-verb "suspected"', 'The learner has suspected ADHD', 'en'],
+    ['en post-verb "possibly"', 'the student is possibly autistic', 'en'],
+    ['en post-verb "probably"', 'user has probably ADHD', 'en'],
+    ['cs post-verb hedge', 'Žák má pravděpodobně dyslexii', 'cs'],
+    ['es post-verb hedge', 'El alumno tiene probablemente dislexia', 'es'],
+    ['pt post-verb hedge', 'O aluno tem provavelmente dislexia', 'pt'],
+    ['pl post-verb hedge', 'Uczeń ma prawdopodobnie dysleksję', 'pl'],
+  ];
+
+  it.each(POST_VERB_HEDGE)('blocks %s', (_name, text, language) => {
+    const result = scanAsLlm(text, language);
+    expect(result.classification).toBe('block');
+    expect(result.disposition).toBe('block');
+    // The hedge falls inside the matched span, so this is an inference, not a
+    // bare assertion. Expected reason is diagnostic_inference.
+    expect(result.reason).toBe('diagnostic_inference');
+  });
+
+  it.each([
+    ['The learner has suspected ADHD'],
+    ['the student is possibly autistic'],
+    ['user has probably ADHD'],
+  ])(
+    'never refers what the shipped English guard already blocks: %s',
+    (text) => {
+      // Guards against re-introducing the regression: the shipped guard drops
+      // these deterministically, so the replacement must block them too — a
+      // judge referral here would weaken a working Article-9 control.
+      expect(scrubClinicalInferenceFromLearningRecord(text)).toBeNull();
+      expect(scanAsLlm(text, 'en').disposition).toBe('block');
+    },
+  );
+
+  it('blocks a hedge on either side of the determiner', () => {
+    // Chose to permit the hedge in both post-verb positions rather than only
+    // immediately after the verb. Both slots are optional, so this only adds
+    // matches. The shipped guard misses the determiner-first order, so this is
+    // strictly better coverage, not a regression fix.
+    for (const text of [
+      'The learner has probably a dyslexia',
+      'The learner has a suspected dyslexia',
+    ]) {
+      expect(scanAsLlm(text, 'en').classification).toBe('block');
+    }
+  });
+
+  it('blocks a hedged possessive attribution', () => {
+    const result = scanAsLlm("The learner's suspected ADHD", 'en');
+    expect(result.classification).toBe('block');
+    expect(result.reason).toBe('diagnostic_inference');
+  });
+
+  it.each([
+    ['fr', 'Petr a probablement une dyslexie'],
+    ['de', 'Petr hat wahrscheinlich Legasthenie'],
+    ['it', 'Petr ha probabilmente dislessia'],
+    ['nb', 'Petr har sannsynligvis dysleksi'],
+  ])(
+    'keeps blocking %s, which already worked via hand-enumerated verb+hedge phrases',
+    (language, text) => {
+      expect(
+        scanAsLlm(text, language as ConversationLanguage).classification,
+      ).toBe('block');
+    },
+  );
+});
+
 describe('[WI-2628] hyphenated compound lexemes', () => {
   it('blocks the hyphenated "learning-disability" form', () => {
     const result = scanAsLlm(

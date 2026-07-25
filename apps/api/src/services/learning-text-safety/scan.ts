@@ -191,6 +191,15 @@ function compileGrammar(declared: ConversationLanguage): CompiledGrammar {
     const hedge = corpus.inferenceMarkers.length
       ? `(?:(?:${alternation(corpus.inferenceMarkers)})\\s+)?`
       : '';
+    // A hedge can sit EITHER side of the verb, and either side of the
+    // determiner: "may have ADHD" (pre-verb) and "has suspected ADHD" /
+    // "has a suspected dyslexia" (post-verb) are all natural. The corpora
+    // disagreed on which order they enumerated — `en`/`cs` listed only
+    // pre-verb, `es`/`pt`/`pl` only hedge-first, `fr`/`it`/`de`/`nb`
+    // hand-enumerated verb+hedge phrases — so post-verb hedges fell through to
+    // `refer` in the first four. Every slot is optional, so allowing the hedge
+    // in each position only ever ADDS matches; it can never suppress one.
+    const postVerb = `${hedge}${determiner}${hedge}`;
 
     if (corpus.attributionPhrases.length) {
       const phrase = `(?:${alternation(corpus.attributionPhrases)})`;
@@ -198,7 +207,7 @@ function compileGrammar(declared: ConversationLanguage): CompiledGrammar {
       if (corpus.personReferences.length) {
         patterns.push(
           new RegExp(
-            `${LATIN_LEFT_BOUNDARY}(?:${alternation(corpus.personReferences)})${LATIN_RIGHT_BOUNDARY}\\s+${hedge}${phrase}\\s+${determiner}${lexeme}${LATIN_RIGHT_BOUNDARY}`,
+            `${LATIN_LEFT_BOUNDARY}(?:${alternation(corpus.personReferences)})${LATIN_RIGHT_BOUNDARY}\\s+${hedge}${phrase}\\s+${postVerb}${lexeme}${LATIN_RIGHT_BOUNDARY}`,
             'giu',
           ),
         );
@@ -206,7 +215,7 @@ function compileGrammar(declared: ConversationLanguage): CompiledGrammar {
       if (corpus.scriptHasCase) {
         namedPatterns.push(
           new RegExp(
-            `${LATIN_LEFT_BOUNDARY}(?<person>[\\p{Lu}][\\p{L}\\p{M}'’-]{1,39})${LATIN_RIGHT_BOUNDARY}\\s+${hedge}${phrase}\\s+${determiner}${lexeme}${LATIN_RIGHT_BOUNDARY}`,
+            `${LATIN_LEFT_BOUNDARY}(?<person>[\\p{Lu}][\\p{L}\\p{M}'’-]{1,39})${LATIN_RIGHT_BOUNDARY}\\s+${hedge}${phrase}\\s+${postVerb}${lexeme}${LATIN_RIGHT_BOUNDARY}`,
             'giu',
           ),
         );
@@ -216,7 +225,7 @@ function compileGrammar(declared: ConversationLanguage): CompiledGrammar {
     if (corpus.possessiveDeterminers.length) {
       patterns.push(
         new RegExp(
-          `${LATIN_LEFT_BOUNDARY}(?:${alternation(corpus.possessiveDeterminers)})(?:['’]s)?\\s+${lexeme}${LATIN_RIGHT_BOUNDARY}`,
+          `${LATIN_LEFT_BOUNDARY}(?:${alternation(corpus.possessiveDeterminers)})(?:['’]s)?\\s+${postVerb}${lexeme}${LATIN_RIGHT_BOUNDARY}`,
           'giu',
         ),
       );
@@ -224,7 +233,7 @@ function compileGrammar(declared: ConversationLanguage): CompiledGrammar {
     if (corpus.scriptHasCase) {
       namedPatterns.push(
         new RegExp(
-          `${LATIN_LEFT_BOUNDARY}(?<person>[\\p{Lu}][\\p{L}\\p{M}'’-]{1,39})['’]s\\s+${lexeme}${LATIN_RIGHT_BOUNDARY}`,
+          `${LATIN_LEFT_BOUNDARY}(?<person>[\\p{Lu}][\\p{L}\\p{M}'’-]{1,39})['’]s\\s+${postVerb}${lexeme}${LATIN_RIGHT_BOUNDARY}`,
           'giu',
         ),
       );
