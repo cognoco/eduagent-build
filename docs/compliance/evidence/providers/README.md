@@ -2,6 +2,17 @@
 
 Evidence collected on 2026-07-24 for ZWIZZLY AS / MentoMate.
 
+## Cerebras
+
+- Authenticated Trust Center access was approved for Zuzana Kopecna on
+  2026-07-24. The June 2025 Cerebras DPA and the current Inference Cloud
+  security evidence were reviewed under NDA.
+- The available DPA is not yet binding on ZWIZZLY AS. Cerebras has been asked
+  to provide an executable agreement covering the Inference API and EEA-US
+  transfers.
+- The controller assessment and exact conditions for approval are recorded in
+  [`../../assessments/providers/2026-07-24-cerebras-processor-transfer-assessment.md`](../../assessments/providers/2026-07-24-cerebras-processor-transfer-assessment.md).
+
 ## OpenAI
 
 - [`OpenAI/2026-07-24-ZWIZZLY-AS-signed-openai-dpa.pdf`](OpenAI/2026-07-24-ZWIZZLY-AS-signed-openai-dpa.pdf) — organization-specific DPA naming ZWIZZLY AS as the customer.
