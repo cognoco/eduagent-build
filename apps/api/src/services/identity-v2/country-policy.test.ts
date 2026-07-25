@@ -322,6 +322,86 @@ describe('resolveCountryPolicy', () => {
     expect(decision.reasonCodes).toContain('LEGAL_REVIEW_STALE');
   });
 
+  it('enables a fast-follow country through an effective-dated update, with no code change', () => {
+    // AC4: a country above the 13 threshold is blocked at launch and becomes
+    // enabled later purely by inserting a newer effective-dated row once the
+    // guardian flow and the remaining gates are approved.
+    const enabledLater = [
+      policy('DE', 16),
+      policy('DE', 16, {
+        launchStatus: 'enabled',
+        launchBlockReason: null,
+        controllerGates: allControllerGatesClosed,
+        policyVersion: '2026-08-01.1',
+        effectiveAt: new Date('2026-08-01T00:00:00Z'),
+        legalReviewValidUntil: new Date('2026-12-31T00:00:00Z'),
+      }),
+    ];
+    const asOf = new Date('2026-08-02T12:00:00Z');
+
+    const atThreshold = resolveCountryPolicy({
+      policies: enabledLater,
+      habitualResidence: 'DE',
+      birthDate: '2010-07-23',
+      residenceAssurance,
+      asOf,
+    });
+    expect(atThreshold.launchDecision).toBe('allowed');
+    expect(atThreshold.reasonCodes).toEqual([]);
+    expect(atThreshold.authorizationForm).toBe('self');
+    expect(atThreshold.policyVersion).toBe('2026-08-01.1');
+
+    // Launch eligibility and consent capacity are separate questions: the
+    // country is open, and a learner below its threshold still needs a
+    // guardian rather than being refused the country outright.
+    const belowThreshold = resolveCountryPolicy({
+      policies: enabledLater,
+      habitualResidence: 'DE',
+      birthDate: '2012-07-23',
+      residenceAssurance,
+      asOf,
+    });
+    expect(belowThreshold.launchDecision).toBe('allowed');
+    expect(belowThreshold.authorizationForm).toBe('guardian');
+    expect(belowThreshold.consentDecision?.ageBand).toBe(
+      'guardian_required_minor',
+    );
+    expect(belowThreshold.consentDecision?.consentStatus).toBe(
+      'REQUIRED_PENDING',
+    );
+  });
+
+  it('treats the national threshold birthday as the boundary, to the day', () => {
+    const enabledDe = [
+      policy('DE', 16, {
+        launchStatus: 'enabled',
+        launchBlockReason: null,
+        controllerGates: allControllerGatesClosed,
+      }),
+    ];
+    const asOf = new Date('2026-07-24T12:00:00Z');
+
+    const dayBefore = resolveCountryPolicy({
+      policies: enabledDe,
+      habitualResidence: 'DE',
+      birthDate: '2010-07-25',
+      residenceAssurance,
+      asOf,
+    });
+    const onBirthday = resolveCountryPolicy({
+      policies: enabledDe,
+      habitualResidence: 'DE',
+      birthDate: '2010-07-24',
+      residenceAssurance,
+      asOf,
+    });
+
+    expect(dayBefore.authorizationForm).toBe('guardian');
+    expect(dayBefore.consentDecision?.ageBand).toBe('guardian_required_minor');
+    expect(onBirthday.authorizationForm).toBe('self');
+    expect(onBirthday.consentDecision?.ageBand).toBe('consent_capable_minor');
+  });
+
   it('selects the newest active effective-dated policy row', () => {
     const decision = resolveCountryPolicy({
       policies: [
