@@ -54,7 +54,7 @@
 - [feedback_verify_claims_against_source_before_canon.md](feedback_verify_claims_against_source_before_canon.md) — Read SOURCE before writing implementation claims into canon; surface corrections, never quietly patch.
 - [project_zdx_bundle_guard_family.md](project_zdx_bundle_guard_family.md) — /cosmo:bundle defect family (absorb destroys unchecked fields; 4th: formation leaves Description/AC properties empty). Enumerate what a child carries before deciding what a bundle copies.
 - Commit early + push after every commit. Never batch large changes.
-- [feedback_never_switch_branch.md](feedback_never_switch_branch.md) — NEVER switch branches unless user explicitly asks.
+- [feedback_never_switch_branch.md](feedback_never_switch_branch.md) — Never switch branches without authority; docs-only publication uses a normal branch in the main checkout, not a worktree.
 - [feedback_fast_iteration.md](feedback_fast_iteration.md) — 60-min feedback loops unacceptable. CI gates, but optimize speed.
 - [feedback_just_do_it.md](feedback_just_do_it.md) — Clear action commands = execute immediately, don't gate on confirmations.
 - [feedback_autonomous_speccing.md](feedback_autonomous_speccing.md) — Decide small stuff yourself; ask only on genuinely big trade-offs.

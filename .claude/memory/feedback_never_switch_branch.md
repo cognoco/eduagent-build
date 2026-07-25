@@ -1,8 +1,8 @@
 ---
 name: Never switch branches without explicit permission
-description: NEVER run git checkout/switch to change branches unless the user explicitly asks — this has caused repeated frustration
+description: Never change branches without authority; documentation-only publication uses a normal branch in the main checkout, not a worktree
 type: feedback
-last_confirmed: 2026-06-21 (shared-checkout PR work correction)
+last_confirmed: 2026-07-25 (documentation-only branch carve-out)
 ---
 
 NEVER switch git branches (git checkout, git switch, or any equivalent) unless the user explicitly asks to change branches.
@@ -19,3 +19,11 @@ NEVER switch git branches (git checkout, git switch, or any equivalent) unless t
 - The only exception is if the user literally says "switch to X branch" or "checkout X".
 
 **Carve-out — worktree creation is not a branch switch.** Creating an isolated worktree via the repo's worktree skill (`git worktree add .worktrees/<name> -b <name>`) creates a new branch in a separate directory; the current CWD's branch is untouched. This is allowed and is the standard pattern for parallel/isolated work. The rule above applies only to `git checkout`/`git switch` operations on the current working tree.
+
+**Carve-out — documentation-only publication uses a normal branch.** When the
+user asks to publish changes that touch documentation only, do not create a
+worktree solely for that work. Verify the intended document set and the current
+checkout's unrelated dirty state, then create/use a normal branch in the main
+checkout and bring it back to `main` through the requested publish flow. This
+does not authorize including another session's files or switching branches for
+code changes.

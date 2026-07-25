@@ -19,6 +19,7 @@ remain unavailable.
 | [`art9-special-category-position.md`](art9-special-category-position.md) | Current proposed treatment of incidental special-category data. |
 | [`breach-response-plan.md`](breach-response-plan.md) | Personal-data breach procedure. |
 | [`DPO exchanges/`](DPO%20exchanges/) | Stephan’s findings, ZWIZZLY AS’s response, decision annex, and separate AI Act request. |
+| [`assessments/providers/2026-07-25-processor-transfer-evidence-ledger.md`](assessments/providers/2026-07-25-processor-transfer-evidence-ledger.md) | Current-main processor and international-transfer evidence ledger for counsel/DPO handoff. |
 
 ## Supporting records
 
@@ -37,6 +38,7 @@ remain unavailable.
 | Directory | Contents | Authority |
 |---|---|---|
 | [`DPO exchanges/`](DPO%20exchanges/) | Dated correspondence and review requests. | External-review working material, not controller approval. |
+| [`assessments/providers/`](assessments/providers/) | Controller processor due-diligence and international-transfer assessments. | Management evidence; final legal/DPO conclusions remain independently reviewed. |
 | [`evidence/providers/`](evidence/providers/) | Provider DPAs and configuration evidence with SHA-256 integrity hashes. | Evidence only; legal adequacy remains for review. |
 | [`research/providers/`](research/providers/) | Vendor-owned source research supporting procurement and transfer review. | Research, not legal advice or executed approval. |
 | [`templates/`](templates/) | Blank source templates. | No product or legal authority. |
