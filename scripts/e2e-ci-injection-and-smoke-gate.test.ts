@@ -7442,6 +7442,9 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         },
       },
       exactWorldHistoryHubTitle,
+      { assertNotVisible: { id: 'topic-detail-scroll' } },
+      { assertNotVisible: { id: 'session-screen' } },
+      { assertNotVisible: { id: 'subject-hub-topic-sheet' } },
     ];
 
     expect(hasExactCommandSequence(resume, exactWorldHistoryRestore)).toBe(
@@ -7626,6 +7629,21 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         assertVisible: {
           id: 'subject-hub-title-adjacent-subject',
           text: '^World History$',
+        },
+      }),
+      exactTopicResumeToOwningHub.filter((_, index) => index !== 17),
+      exactTopicResumeToOwningHub.with(17, {
+        assertNotVisible: { id: 'topic-detail-scroll', optional: true },
+      }),
+      exactTopicResumeToOwningHub.filter((_, index) => index !== 18),
+      exactTopicResumeToOwningHub.with(18, {
+        assertNotVisible: { id: 'session-screen', optional: true },
+      }),
+      exactTopicResumeToOwningHub.filter((_, index) => index !== 19),
+      exactTopicResumeToOwningHub.with(19, {
+        assertNotVisible: {
+          id: 'subject-hub-topic-sheet',
+          optional: true,
         },
       }),
     ]) {

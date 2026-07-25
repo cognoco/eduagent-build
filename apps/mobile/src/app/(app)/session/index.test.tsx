@@ -1,6 +1,6 @@
 import type { InputMode } from '@eduagent/schemas';
 import React from 'react';
-import { Alert, Platform } from 'react-native';
+import { Alert, BackHandler, Platform } from 'react-native';
 import { fireEvent, waitFor, act, within } from '@testing-library/react-native';
 import { usePreventRemove } from '@react-navigation/native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
@@ -925,9 +925,173 @@ describe('SessionScreen homework flow', () => {
     expect(mockBack).not.toHaveBeenCalled();
   });
 
+  it('claims real Android hardware Back only for consumed exact Hub-to-Session provenance', async () => {
+    const platformReplacement = jest.replaceProperty(Platform, 'OS', 'android');
+    const removeHardwareBackHandler = jest.fn();
+    const addHardwareBackHandler = jest
+      .spyOn(BackHandler, 'addEventListener')
+      .mockReturnValue({ remove: removeHardwareBackHandler });
+    try {
+      markHubToSessionTransition(SUBJECT_ID);
+      (useLocalSearchParams as jest.Mock).mockReturnValue({
+        mode: 'learning',
+        subjectId: SUBJECT_ID,
+        subjectName: 'Math',
+        topicId: TOPIC_ID,
+        topicName: 'Linear equations',
+        returnTo: 'subject-hub',
+        returnId: SUBJECT_ID,
+      });
+
+      const testScreen = renderSessionScreen();
+      await flushAsyncWork();
+      expect(consumeHubToSessionTransition(SUBJECT_ID)).toBe(false);
+
+      const hardwareBackHandler = addHardwareBackHandler.mock.calls
+        .filter(([event]) => event === 'hardwareBackPress')
+        .at(-1)?.[1];
+      expect(hardwareBackHandler).toBeDefined();
+      mockReplace.mockClear();
+
+      let hardwareBackHandled: boolean | null | undefined;
+      act(() => {
+        hardwareBackHandled = hardwareBackHandler?.();
+      });
+      expect(hardwareBackHandled).toBe(true);
+      await waitFor(() =>
+        expect(mockReplace).toHaveBeenCalledWith({
+          pathname: '/(app)/subject-hub/[subjectId]',
+          params: { subjectId: SUBJECT_ID },
+        }),
+      );
+
+      testScreen.unmount();
+      expect(removeHardwareBackHandler).toHaveBeenCalled();
+    } finally {
+      addHardwareBackHandler.mockRestore();
+      platformReplacement.restore();
+    }
+  });
+
+  it('does not claim Android hardware Back when return proof belongs to a different Session subject', async () => {
+    const platformReplacement = jest.replaceProperty(Platform, 'OS', 'android');
+    const addHardwareBackHandler = jest
+      .spyOn(BackHandler, 'addEventListener')
+      .mockReturnValue({ remove: jest.fn() });
+    try {
+      markHubToSessionTransition(SECOND_SUBJECT_ID);
+      (useLocalSearchParams as jest.Mock).mockReturnValue({
+        mode: 'learning',
+        subjectId: SUBJECT_ID,
+        subjectName: 'Math',
+        topicId: TOPIC_ID,
+        topicName: 'Linear equations',
+        returnTo: 'subject-hub',
+        returnId: SECOND_SUBJECT_ID,
+      });
+
+      renderSessionScreen();
+      await flushAsyncWork();
+
+      expect(
+        addHardwareBackHandler.mock.calls.some(
+          ([event]) => event === 'hardwareBackPress',
+        ),
+      ).toBe(false);
+      expect(consumeHubToSessionTransition(SECOND_SUBJECT_ID)).toBe(false);
+    } finally {
+      addHardwareBackHandler.mockRestore();
+      platformReplacement.restore();
+    }
+  });
+
   it.each([
-    ['Android hardware back', { type: 'GO_BACK' }],
-    ['native stack gesture', { type: 'POP' }],
+    ['crafted Hub return with no transition proof', undefined],
+    ['Hub return with mismatched transition proof', SECOND_SUBJECT_ID],
+  ])(
+    'does not claim Android hardware Back for a %s',
+    async (_case, proofId) => {
+      const platformReplacement = jest.replaceProperty(
+        Platform,
+        'OS',
+        'android',
+      );
+      const addHardwareBackHandler = jest.spyOn(
+        BackHandler,
+        'addEventListener',
+      );
+      try {
+        if (proofId) {
+          markHubToSessionTransition(proofId);
+        }
+        (useLocalSearchParams as jest.Mock).mockReturnValue({
+          mode: 'learning',
+          subjectId: SUBJECT_ID,
+          subjectName: 'Math',
+          topicId: TOPIC_ID,
+          topicName: 'Linear equations',
+          returnTo: 'subject-hub',
+          returnId: SUBJECT_ID,
+        });
+
+        renderSessionScreen();
+        await flushAsyncWork();
+
+        expect(
+          addHardwareBackHandler.mock.calls.some(
+            ([event]) => event === 'hardwareBackPress',
+          ),
+        ).toBe(false);
+      } finally {
+        addHardwareBackHandler.mockRestore();
+        platformReplacement.restore();
+      }
+    },
+  );
+
+  it.each(['ios', 'web'] as const)(
+    'does not install Android hardware Back ownership on %s after exact Hub-to-Session provenance',
+    async (platform) => {
+      const platformReplacement = jest.replaceProperty(
+        Platform,
+        'OS',
+        platform,
+      );
+      const addHardwareBackHandler = jest.spyOn(
+        BackHandler,
+        'addEventListener',
+      );
+      try {
+        markHubToSessionTransition(SUBJECT_ID);
+        (useLocalSearchParams as jest.Mock).mockReturnValue({
+          mode: 'learning',
+          subjectId: SUBJECT_ID,
+          subjectName: 'Math',
+          topicId: TOPIC_ID,
+          topicName: 'Linear equations',
+          returnTo: 'subject-hub',
+          returnId: SUBJECT_ID,
+        });
+
+        renderSessionScreen();
+        await flushAsyncWork();
+        expect(consumeHubToSessionTransition(SUBJECT_ID)).toBe(false);
+
+        expect(
+          addHardwareBackHandler.mock.calls.some(
+            ([event]) => event === 'hardwareBackPress',
+          ),
+        ).toBe(false);
+      } finally {
+        addHardwareBackHandler.mockRestore();
+        platformReplacement.restore();
+      }
+    },
+  );
+
+  it.each([
+    ['native GO_BACK removal action', { type: 'GO_BACK' }],
+    ['native stack POP gesture', { type: 'POP' }],
   ])(
     'routes %s to the exact owning Subject Hub after consuming the real Topic handoff',
     async (_exitKind, action) => {

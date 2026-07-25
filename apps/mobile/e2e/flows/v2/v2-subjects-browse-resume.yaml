@@ -162,6 +162,12 @@ tags:
 - assertVisible:
     id: 'subject-hub-title-${SUBJECT_ID}'
     text: '^World History$'
+- assertNotVisible:
+    id: 'topic-detail-scroll'
+- assertNotVisible:
+    id: 'session-screen'
+- assertNotVisible:
+    id: 'subject-hub-topic-sheet'
 
 # Next Up must resume the seed's active SESSION_ID. These transcript lines are
 # stored only on that seeded session, so their presence proves the association
