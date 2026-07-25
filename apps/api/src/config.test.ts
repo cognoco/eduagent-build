@@ -283,6 +283,32 @@ describe('validateEnv', () => {
     expect(env.DATABASE_URL).toBe('postgresql://localhost/test');
   });
 
+  it('[WI-2705] preserves a non-empty sandbox verification authorization binding', () => {
+    const authorization = JSON.stringify({
+      version: 1,
+      authorizationId: 'wi-2705-config-proof',
+    });
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+      REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION: authorization,
+    });
+
+    expect(env.REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION).toBe(
+      authorization,
+    );
+  });
+
+  it('[WI-2705] rejects an empty sandbox verification authorization binding', () => {
+    expect(() =>
+      validateEnv({
+        ENVIRONMENT: 'development',
+        DATABASE_URL: 'postgresql://localhost/test',
+        REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION: '',
+      }),
+    ).toThrow('Invalid environment');
+  });
+
   it('throws on missing DATABASE_URL', () => {
     expect(() =>
       validateEnv({
