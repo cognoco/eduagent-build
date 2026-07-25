@@ -6,6 +6,7 @@ type SessionDetailHrefOptions = {
   subjectId?: string | null;
   topicId?: string | null;
   bookId?: string | null;
+  returnTo?: string | null;
 };
 
 export function buildSessionDetailHref({
@@ -14,6 +15,7 @@ export function buildSessionDetailHref({
   subjectId,
   topicId,
   bookId,
+  returnTo,
 }: SessionDetailHrefOptions): Href {
   if (childProfileId) {
     return {
@@ -32,6 +34,7 @@ export function buildSessionDetailHref({
       ...(subjectId ? { subjectId } : {}),
       ...(topicId ? { topicId } : {}),
       ...(bookId ? { bookId } : {}),
+      ...(returnTo ? { returnTo } : {}),
     },
   } as Href;
 }

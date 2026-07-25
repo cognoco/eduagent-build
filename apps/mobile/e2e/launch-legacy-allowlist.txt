@@ -42,5 +42,10 @@ flows/v2/v2-supporter-scope-journey.yaml
 # mechanism, not setup.
 flows/v2/v2-supporter-self-learning-doorway.yaml
 
+# [WI-2176] Cold-relaunches after an explicit SecureStore-complete receipt to
+# prove both Me and person scope persistence on Orion. The relaunch is the
+# behavior under test, not test setup.
+flows/v2/v2-supporter-scope-geometry.yaml
+
 # DEFERRED:M1-COMPREHENSIVE — full rewrite needed (theme picker removed, stale More-screen refs)
 flows/post-auth-comprehensive-devclient.yaml

@@ -37,7 +37,8 @@ export function AccountAvatar(): React.ReactElement | null {
           params: { returnTo: accountReturnTokenForPathname(pathname) },
         })
       }
-      className="h-11 w-11 items-center justify-center rounded-full border border-border bg-surface shadow-sm"
+      style={{ height: 44, width: 44 }}
+      className="items-center justify-center rounded-full border border-border bg-surface shadow-sm"
       testID="account-avatar-button"
     >
       {activeProfile.avatarUrl ? (

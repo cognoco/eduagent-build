@@ -128,7 +128,7 @@ const RECAP_DATA = {
   startedAt: '2026-05-20T10:00:00Z',
   exchangeCount: 5,
   topicId: 'topic-001',
-  verifiedProof: null,
+  verifiedProof: { status: 'absent' },
 };
 
 const VERIFIED_PROOF = {
@@ -139,6 +139,7 @@ const VERIFIED_PROOF = {
   verificationState: 'fresh',
   retentionStatus: 'strong',
   nextReviewDate: '2026-07-17T10:00:00.000Z',
+  evidenceAvailability: 'available',
   quote: 'Equivalent fractions name the same amount.',
 } as const;
 
@@ -227,7 +228,10 @@ describe('RecapDetailScreen', () => {
 
     it('renders the verified-proof block with quote and retention state', () => {
       mockUseRecap.mockReturnValue({
-        data: { ...RECAP_DATA, verifiedProof: VERIFIED_PROOF },
+        data: {
+          ...RECAP_DATA,
+          verifiedProof: { status: 'present', proof: VERIFIED_PROOF },
+        },
         isLoading: false,
         isError: false,
         refetch: jest.fn(),
@@ -245,17 +249,43 @@ describe('RecapDetailScreen', () => {
       ).toBeTruthy();
     });
 
-    it('renders no verified-proof block when the response field is null', () => {
+    it('renders no verified-proof block when the lookup completed without proof', () => {
       render(<RecapDetailScreen />);
 
       expect(screen.queryByTestId('recap-detail-verified-proof')).toBeNull();
     });
 
-    it('renders the abstracted line when an aged proof has no quote', () => {
+    it('renders proof lookup unavailable distinctly from no proof', () => {
       mockUseRecap.mockReturnValue({
         data: {
           ...RECAP_DATA,
-          verifiedProof: { ...VERIFIED_PROOF, quote: null },
+          verifiedProof: { status: 'unavailable' },
+        },
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+
+      render(<RecapDetailScreen />);
+
+      expect(
+        screen.getByTestId('recap-detail-verified-proof-unavailable'),
+      ).toBeTruthy();
+      expect(screen.queryByTestId('recap-detail-verified-proof')).toBeNull();
+    });
+
+    it('renders the abstracted line when proof evidence was purged', () => {
+      mockUseRecap.mockReturnValue({
+        data: {
+          ...RECAP_DATA,
+          verifiedProof: {
+            status: 'present',
+            proof: {
+              ...VERIFIED_PROOF,
+              evidenceAvailability: 'source_unavailable',
+              quote: null,
+            },
+          },
         },
         isLoading: false,
         isError: false,

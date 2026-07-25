@@ -278,6 +278,7 @@ export async function handleReviewCalibrationGrade({
       const grade = await evaluateRecallQuality(
         learnerMessageRow.content,
         topic.topicTitle,
+        profileId,
         topic.topicDescription ?? undefined,
         focusConcepts,
       );

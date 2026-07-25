@@ -22,7 +22,12 @@ import {
   getFocusAreaProgress,
 } from '../../components/mentor-memory-sections';
 import { TellMentorInput } from '../../components/tell-mentor-input';
-import { goBackOrReplace, V2_TAB_TITLE_KEYS } from '../../lib/navigation';
+import {
+  goBackOrReplace,
+  JOURNAL_HREF,
+  JOURNAL_RETURN_TO,
+  V2_TAB_TITLE_KEYS,
+} from '../../lib/navigation';
 import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { ErrorFallback, TimeoutLoader } from '../../components/common';
 import { formatRelativeDate } from '../../lib/format-relative-date';
@@ -227,6 +232,11 @@ export default function MentorMemoryScreen() {
     ? t('common.backTo', { destination: t(V2_TAB_TITLE_KEYS.mentor) })
     : t('common.goBack');
   const handleBack = useCallback(() => {
+    if (resolvedReturnTo === JOURNAL_RETURN_TO) {
+      router.replace(JOURNAL_HREF);
+      return;
+    }
+
     if (resolvedReturnTo === 'more' && !v2Enabled) {
       router.replace('/(app)/more');
       return;
@@ -305,10 +315,10 @@ export default function MentorMemoryScreen() {
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
           onPress={handleBack}
+          testID="mentor-memory-back"
           className="me-3 py-2 pe-2"
           accessibilityRole="button"
           accessibilityLabel={backLabel}
-          testID="mentor-memory-back"
         >
           <Text className="text-primary text-body font-semibold">
             {'\u2190'}

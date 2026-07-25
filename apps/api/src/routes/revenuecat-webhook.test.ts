@@ -1,14 +1,14 @@
 // ---------------------------------------------------------------------------
 // RevenueCat Webhook Route — Tests
 //
-// [WI-1239 / 779-strip] This file now covers ONLY what the route itself owns
+// [WI-1239 / 779-strip / WI-2619] This file covers ONLY what the route itself owns
 // (see revenuecat-webhook.ts header): Bearer-token validation, Zod payload
 // parsing, account resolution, idempotency gate + ordering exemptions,
 // SANDBOX/non-production guards, late-event observability logging,
 // ensureFreeSubscription, event-type dispatch, and the sustained-auth-failure
-// escalator. It no longer forces dispatch to the legacy handler bundle —
-// `billing-v2/dispatch` is mocked to return plain jest.fn() handlers so
-// route-level behavior is verifiable without simulating v2 billing business
+// escalator. It exercises the real billing-v2 selector while replacing
+// downstream handler behavior so route-level behavior is verifiable without
+// simulating v2 billing business
 // logic. Handler business logic (INITIAL_PURCHASE/RENEWAL/CANCELLATION/
 // EXPIRATION/BILLING_ISSUE/SUBSCRIBER_ALIAS/PRODUCT_CHANGE/UNCANCELLATION/
 // NON_RENEWING_PURCHASE rules, product-ID mapping, family-share guard) now
@@ -16,16 +16,43 @@
 // and services/billing/revenuecat-shared.test.ts.
 // ---------------------------------------------------------------------------
 
-const mockGetRevenuecatWebhookHandlers = jest.fn();
+const mockRevenuecatHandlers = {
+  resolveAccountId: jest.fn().mockResolvedValue('acc-1'),
+  isRevenuecatEventProcessed: jest.fn().mockResolvedValue(false),
+  ensureFreeSubscription: jest.fn().mockResolvedValue(undefined),
+  handleInitialPurchase: jest.fn().mockResolvedValue(undefined),
+  handleRenewal: jest.fn().mockResolvedValue(undefined),
+  handleCancellation: jest.fn().mockResolvedValue(undefined),
+  handleExpiration: jest.fn().mockResolvedValue(undefined),
+  handleBillingIssue: jest.fn().mockResolvedValue(undefined),
+  handleSubscriberAlias: jest.fn().mockResolvedValue(undefined),
+  handleProductChange: jest.fn().mockResolvedValue(undefined),
+  handleNonRenewingPurchase: jest.fn().mockResolvedValue(null),
+  handleUncancellation: jest.fn().mockResolvedValue(undefined),
+};
 
-jest.mock(
-  // gc1-allow: intentional full replacement, not a passthrough gap — the whole point of this mock is to isolate route-level dispatch behavior (which handler gets called for which event type) from v2 handler business logic, which is covered separately in revenuecat-webhook-handler-v2.test.ts
-  '../services/billing/billing-v2/dispatch',
-  () => ({
-    getRevenuecatWebhookHandlers: (...args: unknown[]) =>
-      mockGetRevenuecatWebhookHandlers(...args),
-  }),
-);
+jest.mock('../services/billing/billing-v2', () => {
+  const actual = jest.requireActual(
+    '../services/billing/billing-v2',
+  ) as typeof import('../services/billing/billing-v2');
+  return {
+    ...actual,
+    resolveAccountIdV2: mockRevenuecatHandlers.resolveAccountId,
+    isRevenuecatEventProcessedV2:
+      mockRevenuecatHandlers.isRevenuecatEventProcessed,
+    ensureFreeSubscriptionV2: mockRevenuecatHandlers.ensureFreeSubscription,
+    handleInitialPurchaseV2: mockRevenuecatHandlers.handleInitialPurchase,
+    handleRenewalV2: mockRevenuecatHandlers.handleRenewal,
+    handleCancellationV2: mockRevenuecatHandlers.handleCancellation,
+    handleExpirationV2: mockRevenuecatHandlers.handleExpiration,
+    handleBillingIssueV2: mockRevenuecatHandlers.handleBillingIssue,
+    handleSubscriberAliasV2: mockRevenuecatHandlers.handleSubscriberAlias,
+    handleProductChangeV2: mockRevenuecatHandlers.handleProductChange,
+    handleNonRenewingPurchaseV2:
+      mockRevenuecatHandlers.handleNonRenewingPurchase,
+    handleUncancellationV2: mockRevenuecatHandlers.handleUncancellation,
+  };
+});
 
 const mockCaptureException = jest.fn();
 const mockCaptureMessage = jest.fn();
@@ -119,29 +146,22 @@ function makeRequest(
   );
 }
 
-function makeHandlers() {
-  return {
-    resolveAccountId: jest.fn().mockResolvedValue('acc-1'),
-    isRevenuecatEventProcessed: jest.fn().mockResolvedValue(false),
-    ensureFreeSubscription: jest.fn().mockResolvedValue(undefined),
-    handleInitialPurchase: jest.fn().mockResolvedValue(undefined),
-    handleRenewal: jest.fn().mockResolvedValue(undefined),
-    handleCancellation: jest.fn().mockResolvedValue(undefined),
-    handleExpiration: jest.fn().mockResolvedValue(undefined),
-    handleBillingIssue: jest.fn().mockResolvedValue(undefined),
-    handleSubscriberAlias: jest.fn().mockResolvedValue(undefined),
-    handleProductChange: jest.fn().mockResolvedValue(undefined),
-    handleNonRenewingPurchase: jest.fn().mockResolvedValue(null),
-    handleUncancellation: jest.fn().mockResolvedValue(undefined),
-  };
-}
-
-let handlers: ReturnType<typeof makeHandlers>;
+const handlers = mockRevenuecatHandlers;
 
 beforeEach(() => {
   jest.clearAllMocks();
-  handlers = makeHandlers();
-  mockGetRevenuecatWebhookHandlers.mockReturnValue(handlers);
+  handlers.resolveAccountId.mockResolvedValue('acc-1');
+  handlers.isRevenuecatEventProcessed.mockResolvedValue(false);
+  handlers.ensureFreeSubscription.mockResolvedValue(undefined);
+  handlers.handleInitialPurchase.mockResolvedValue(undefined);
+  handlers.handleRenewal.mockResolvedValue(undefined);
+  handlers.handleCancellation.mockResolvedValue(undefined);
+  handlers.handleExpiration.mockResolvedValue(undefined);
+  handlers.handleBillingIssue.mockResolvedValue(undefined);
+  handlers.handleSubscriberAlias.mockResolvedValue(undefined);
+  handlers.handleProductChange.mockResolvedValue(undefined);
+  handlers.handleNonRenewingPurchase.mockResolvedValue(null);
+  handlers.handleUncancellation.mockResolvedValue(undefined);
 });
 
 // ---------------------------------------------------------------------------

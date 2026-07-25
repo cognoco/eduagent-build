@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -21,7 +27,7 @@ interface AttemptFeedback {
   isComplete: boolean;
 }
 
-// WI-1777: renders the repeat-after-me/shadowing artifact via the existing
+// WI-1777: renders the repeat-after-me artifact via the existing
 // SpeakingPracticeCard, wiring the existing TTS/STT hooks (same pattern as
 // GradedInputCard/MeaningOutputCard) and posting a completed recording as an
 // attempt. The server's response is the single source of feedback rendered
@@ -48,7 +54,30 @@ export function SpeakingPracticeActivity({
   const [feedback, setFeedback] = useState<AttemptFeedback | null>(null);
   const [attemptFailed, setAttemptFailed] = useState(false);
   const wasListeningRef = useRef(false);
+  const discardListeningCycleRef = useRef(false);
+  const attemptGenerationRef = useRef(0);
   const { t } = useTranslation();
+
+  // Only the request belonging to the current recording/session generation
+  // may update feedback. Layout cleanup is intentionally commit-synchronous:
+  // changing session context or unmounting must invalidate in-flight requests
+  // before a promise continuation can settle into stale UI.
+  useLayoutEffect(() => {
+    attemptGenerationRef.current += 1;
+    discardListeningCycleRef.current = true;
+    wasListeningRef.current = false;
+    setFeedback(null);
+    setAttemptFailed(false);
+
+    return () => {
+      attemptGenerationRef.current += 1;
+    };
+  }, [
+    sessionId,
+    subjectId,
+    speakingPractice?.targetText,
+    speakingPractice?.locale,
+  ]);
 
   // Submits exactly once per stop-listening transition, when a non-empty
   // transcript exists. Guarded by `wasListeningRef` so a late STT `result`
@@ -56,26 +85,35 @@ export function SpeakingPracticeActivity({
   // re-triggers this effect via the `transcript` dependency) does not
   // double-submit — the ref only enables the false-transition branch once.
   useEffect(() => {
+    if (discardListeningCycleRef.current) {
+      if (!isListening) discardListeningCycleRef.current = false;
+      wasListeningRef.current = false;
+      return;
+    }
+
     if (wasListeningRef.current && !isListening) {
       const trimmed = transcript.trim();
       if (trimmed && speakingPractice) {
+        const attemptGeneration = ++attemptGenerationRef.current;
         setAttemptFailed(false);
         void (async () => {
           try {
             const result = await recordAttempt.mutateAsync({
               sessionId,
               subjectId,
-              mode: speakingPractice.type,
+              mode: 'repeat_after_me',
               targetText: speakingPractice.targetText,
               transcript: trimmed,
               locale: speakingPractice.locale,
             });
+            if (attemptGeneration !== attemptGenerationRef.current) return;
             setFeedback({
               missingWords: result.missingWords,
               extraWords: result.extraWords,
               isComplete: result.isComplete,
             });
           } catch {
+            if (attemptGeneration !== attemptGenerationRef.current) return;
             setAttemptFailed(true);
           }
         })();
@@ -105,6 +143,8 @@ export function SpeakingPracticeActivity({
       void stopListening();
       return;
     }
+    attemptGenerationRef.current += 1;
+    discardListeningCycleRef.current = false;
     setFeedback(null);
     setAttemptFailed(false);
     void startListening();
@@ -113,6 +153,7 @@ export function SpeakingPracticeActivity({
   const handleRetry = useCallback(() => {
     // Target text is a prop derived from `activity`, never local state — no
     // code path here can lose it. Only the transcript/feedback reset.
+    attemptGenerationRef.current += 1;
     clearTranscript();
     setFeedback(null);
     setAttemptFailed(false);
@@ -126,7 +167,6 @@ export function SpeakingPracticeActivity({
     <>
       <SpeakingPracticeCard
         targetText={speakingPractice.targetText}
-        mode={speakingPractice.type}
         transcript={transcript}
         isListening={isListening}
         isSpeaking={isSpeaking}

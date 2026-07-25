@@ -41,6 +41,25 @@ import { parse as parseYaml, parseAllDocuments } from 'yaml';
 
 const repoRoot = join(__dirname, '..');
 
+function assertCommandsInOrder(
+  commands: unknown[],
+  expectedCommands: unknown[],
+): void {
+  let cursor = -1;
+  for (const expected of expectedCommands) {
+    const serializedExpected = JSON.stringify(expected);
+    cursor = commands.findIndex(
+      (command, index) =>
+        index > cursor && isDeepStrictEqual(command, expected),
+    );
+    if (cursor < 0) {
+      throw new Error(
+        `Missing ordered Maestro property: ${serializedExpected}`,
+      );
+    }
+  }
+}
+
 function loadWorkflowRaw(name: string): string {
   return readFileSync(join(repoRoot, '.github', 'workflows', name), 'utf8');
 }
@@ -53,6 +72,8 @@ type ElementSelector = {
   id?: string;
   text?: string;
   enabled?: boolean;
+  below?: ElementSelector;
+  childOf?: ElementSelector;
   containsDescendants?: ElementSelector[];
 };
 
@@ -6890,6 +6911,27 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scenario: 'trial-active',
         shard: 1,
       },
+      // [WI-2239] Sole native Journal journey: exact Practice round trip.
+      {
+        flow: 'flows/v2/v2-journal-paper-trail.yaml',
+        scenario: 'v2-journal-paper-trail',
+        shard: 1,
+      },
+      // [WI-2129] Mentor cold start exposes one composer before and after
+      // selecting a starter prompt.
+      {
+        flow: 'flows/v2/v2-mentor-single-composer.yaml',
+        scenario: 'onboarding-no-subject',
+        shard: 1,
+      },
+      // [WI-2234] Returning learner release case — exact unfinished session
+      // resume, new assistant exchange, supported Mentor return, and refreshed
+      // Me-scope feed with the unfinished session and due review still present.
+      {
+        flow: 'flows/v2/v2-returning-learner-resume.yaml',
+        scenario: 'v2-returning-learner',
+        shard: 1,
+      },
       {
         flow: 'flows/v2/v2-shell-navigation.yaml',
         scenario: 'learning-active',
@@ -6917,6 +6959,14 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       {
         flow: 'flows/v2/v2-supporter-link-ceremony.yaml',
         scenario: 'v2-supporter-pending-link',
+        shard: 1,
+      },
+      // [WI-2176] Orion-small-phone Support-hub geometry — exact Support
+      // hub + one supportee + Me shape, Account action, separate cold-launch
+      // persistence checks for Me/person, and deterministic hierarchy endpoint.
+      {
+        flow: 'flows/v2/v2-supporter-scope-geometry.yaml',
+        scenario: 'v2-supporter-self-learning-active',
         shard: 1,
       },
       // [WI-2241] Supporter scope journey — Support hub -> person scope ->
@@ -7865,6 +7915,210 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(containsOptionalTrue(commands)).toBe(false);
   });
 
+  it('[WI-2234] binds the returning-learner Continue action to the unfinished-session card', () => {
+    type Command = Record<string, unknown>;
+    const returningLearner = parseAllDocuments(
+      readFileSync(
+        join(
+          repoRoot,
+          'apps/mobile/e2e/flows/v2/v2-returning-learner-resume.yaml',
+        ),
+        'utf8',
+      ),
+    )[1]?.toJS() as unknown;
+
+    expect(Array.isArray(returningLearner)).toBe(true);
+    if (!Array.isArray(returningLearner)) {
+      throw new Error(
+        'V2 returning-learner Maestro commands must be a YAML list',
+      );
+    }
+
+    const continueActions = returningLearner
+      .map((command) => (command as Command).tapOn)
+      .filter(
+        (tap): tap is Command =>
+          tap !== null &&
+          typeof tap === 'object' &&
+          (tap as Command).id === 'now-card-continue',
+      );
+
+    expect(continueActions).toEqual([
+      {
+        id: 'now-card-continue',
+        childOf: { id: 'now-card-unfinished_session' },
+      },
+    ]);
+    expect(continueActions[0]).not.toHaveProperty('index');
+  });
+
+  it('[WI-2234] binds exact turn 3 completion below exact submitted learner turn 2', () => {
+    const commands = parseMaestroCommands(
+      readFileSync(
+        join(
+          repoRoot,
+          'apps/mobile/e2e/flows/v2/v2-returning-learner-resume.yaml',
+        ),
+        'utf8',
+      ),
+    );
+
+    const exactLearnerTurn = {
+      id: 'message-bubble-user-2',
+      containsDescendants: [
+        {
+          text: '^How did Roman roads help people exchange ideas\\?$',
+        },
+      ],
+    };
+    const exactLearnerTurnIndex = commands.findIndex(
+      (command) =>
+        command.optional !== true &&
+        isDeepStrictEqual(command.assertVisible, exactLearnerTurn),
+    );
+    const completedReplyWaits = commands.filter((command) =>
+      isDeepStrictEqual(command, {
+        extendedWaitUntil: {
+          visible: {
+            id: 'assistant-response-complete-3',
+            below: {
+              id: 'message-bubble-user-2',
+            },
+          },
+          timeout: 60_000,
+        },
+      }),
+    );
+
+    expect(exactLearnerTurnIndex).toBeGreaterThanOrEqual(0);
+    expect(completedReplyWaits).toHaveLength(1);
+    expect(commands.indexOf(completedReplyWaits[0]!)).toBeGreaterThan(
+      exactLearnerTurnIndex,
+    );
+    expect(
+      completedReplyWaits[0]?.extendedWaitUntil?.visible,
+    ).not.toHaveProperty('index');
+    expect(commands.some((command) => command.optional === true)).toBe(false);
+  });
+
+  it('[WI-2234] proves the seeded transcript before submitting the new learner message', () => {
+    const commands = parseMaestroCommands(
+      readFileSync(
+        join(
+          repoRoot,
+          'apps/mobile/e2e/flows/v2/v2-returning-learner-resume.yaml',
+        ),
+        'utf8',
+      ),
+    );
+    const seededTranscriptOwner = {
+      id: 'message-bubble-assistant-1',
+      containsDescendants: [
+        {
+          text: '^They connected cities, trade, armies, and new ideas\\.$',
+        },
+      ],
+    };
+    const inputText = 'How did Roman roads help people exchange ideas?';
+    const inputIndex = (items: MaestroCommand[]): number =>
+      items.findIndex((command) => command.inputText === inputText);
+    const hardAssertionIndex = (
+      items: MaestroCommand[],
+      selector: ElementSelector,
+    ): number => {
+      const newInputIndex = inputIndex(items);
+      return items.findIndex(
+        (command, index) =>
+          index < newInputIndex &&
+          command.optional !== true &&
+          isDeepStrictEqual(command.assertVisible, selector),
+      );
+    };
+    const hasSeededTranscriptProperty = (items: MaestroCommand[]): boolean =>
+      inputIndex(items) >= 0 &&
+      hardAssertionIndex(items, seededTranscriptOwner) >= 0;
+
+    expect(hasSeededTranscriptProperty(commands)).toBe(true);
+
+    const transcriptOwnerIndex = hardAssertionIndex(
+      commands,
+      seededTranscriptOwner,
+    );
+    const replaceAssertion = (
+      assertVisible: ElementSelector,
+      optional = false,
+    ): MaestroCommand[] =>
+      commands.map((command, commandIndex) =>
+        commandIndex === transcriptOwnerIndex
+          ? { assertVisible, ...(optional ? { optional: true } : {}) }
+          : command,
+      );
+    const replaceWithIndependentAssertions = (id: string): MaestroCommand[] => [
+      ...commands.slice(0, transcriptOwnerIndex),
+      {
+        assertVisible: {
+          text: '^They connected cities, trade, armies, and new ideas\\.$',
+        },
+      },
+      { assertVisible: { id } },
+      ...commands.slice(transcriptOwnerIndex + 1),
+    ];
+    const moveOwnedIdentityAndTextAfterInput = (): MaestroCommand[] => {
+      const ownedIdentityAndText = commands[transcriptOwnerIndex];
+      const withoutEvidence = commands.filter(
+        (_, commandIndex) => commandIndex !== transcriptOwnerIndex,
+      );
+      const newInputIndex = inputIndex(withoutEvidence);
+      return [
+        ...withoutEvidence.slice(0, newInputIndex + 1),
+        ownedIdentityAndText!,
+        ...withoutEvidence.slice(newInputIndex + 1),
+      ];
+    };
+    const mutations = [
+      {
+        name: 'optional owned seeded identity and text',
+        commands: replaceAssertion(seededTranscriptOwner, true),
+      },
+      {
+        name: 'wrong seeded assistant identity',
+        commands: replaceAssertion({
+          ...seededTranscriptOwner,
+          id: 'message-bubble-assistant-0',
+        }),
+      },
+      {
+        name: 'wrong seeded transcript text',
+        commands: replaceAssertion({
+          ...seededTranscriptOwner,
+          containsDescendants: [{ text: '^They connected roads only\\.$' }],
+        }),
+      },
+      {
+        name: 'owned seeded identity and text both after new input',
+        commands: moveOwnedIdentityAndTextAfterInput(),
+      },
+      {
+        name: 'adjacent independent seeded text and identity assertions',
+        commands: replaceWithIndependentAssertions(
+          'message-bubble-assistant-1',
+        ),
+      },
+      {
+        name: 'mismatched adjacent seeded text and identity assertions',
+        commands: replaceWithIndependentAssertions(
+          'message-bubble-assistant-0',
+        ),
+      },
+    ];
+
+    for (const mutation of mutations) {
+      expect({
+        [mutation.name]: hasSeededTranscriptProperty(mutation.commands),
+      }).toEqual({ [mutation.name]: false });
+    }
+  });
+
   it('[WI-2584 profile-load-error] hard-fails authenticated bootstrap errors before Back recovery', () => {
     const commands = parseAllDocuments(
       readFileSync(
@@ -8293,6 +8547,130 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         ),
       ).toBe(false);
     }
+  });
+
+  it('[WI-2239] registers one Practice-only native Journal round trip with exact identity and Me-scope evidence', () => {
+    const manifest = JSON.parse(
+      readFileSync(
+        join(repoRoot, 'apps/mobile/e2e/ci-maestro-manifest.json'),
+        'utf8',
+      ),
+    ) as {
+      v2: Array<{ flow: string; scenario: string | null }>;
+    };
+    expect(
+      manifest.v2.filter(({ flow }) => flow.includes('/v2-journal-')),
+    ).toEqual([
+      {
+        flow: 'flows/v2/v2-journal-paper-trail.yaml',
+        scenario: 'v2-journal-paper-trail',
+      },
+    ]);
+    expect(
+      existsSync(
+        join(
+          repoRoot,
+          'apps/mobile/e2e/flows/v2/v2-journal-empty-recovery.yaml',
+        ),
+      ),
+    ).toBe(false);
+
+    const journalFlow = parseAllDocuments(
+      readFileSync(
+        join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-journal-paper-trail.yaml'),
+        'utf8',
+      ),
+    )[1]?.toJS() as unknown;
+    expect(Array.isArray(journalFlow)).toBe(true);
+    if (!Array.isArray(journalFlow)) {
+      throw new Error(
+        'Journal paper-trail Maestro commands must be a YAML list',
+      );
+    }
+
+    const exactPracticeEvidence = [
+      {
+        assertVisible: {
+          id: 'journal-activity-${PRACTICE_ACTIVITY_EVENT_ID}',
+        },
+      },
+      {
+        assertVisible: {
+          id: 'journal-activity-headline-${PRACTICE_ACTIVITY_EVENT_ID}',
+          text: '^Biology Topic 1$',
+        },
+      },
+      {
+        assertVisible: {
+          id: 'journal-activity-meta-${PRACTICE_ACTIVITY_EVENT_ID}',
+          text: '^Review · Biology · .+$',
+        },
+      },
+    ];
+    expect(() =>
+      assertCommandsInOrder(journalFlow, [
+        { tapOn: { id: 'tab-journal', retryTapIfNoChange: true } },
+        {
+          extendedWaitUntil: {
+            visible: { id: 'journal-screen' },
+            timeout: 15000,
+          },
+        },
+        { assertNotVisible: { id: 'scope-chip' } },
+        { tapOn: { id: 'journal-tab-practice' } },
+        {
+          scrollUntilVisible: {
+            element: {
+              id: 'journal-activity-${PRACTICE_ACTIVITY_EVENT_ID}',
+            },
+            direction: 'DOWN',
+            timeout: 10000,
+          },
+        },
+        ...exactPracticeEvidence,
+        { tapOn: { id: 'journal-practice-open-hub' } },
+        {
+          extendedWaitUntil: {
+            visible: { id: 'practice-screen' },
+            timeout: 15000,
+          },
+        },
+        { tapOn: { id: 'practice-back' } },
+        {
+          extendedWaitUntil: {
+            visible: { id: 'journal-screen' },
+            timeout: 15000,
+          },
+        },
+        { assertNotVisible: { id: 'scope-chip' } },
+        {
+          scrollUntilVisible: {
+            element: {
+              id: 'journal-activity-${PRACTICE_ACTIVITY_EVENT_ID}',
+            },
+            direction: 'DOWN',
+            timeout: 10000,
+          },
+        },
+        ...exactPracticeEvidence,
+      ]),
+    ).not.toThrow();
+
+    const tapIds = journalFlow.flatMap((command) => {
+      if (!command || typeof command !== 'object') return [];
+      const tapOn = (command as { tapOn?: unknown }).tapOn;
+      if (!tapOn || typeof tapOn !== 'object') return [];
+      const id = (tapOn as { id?: unknown }).id;
+      return typeof id === 'string' ? [id] : [];
+    });
+    expect(tapIds).toEqual([
+      'tab-journal',
+      'journal-tab-practice',
+      'journal-practice-open-hub',
+      'practice-back',
+    ]);
+    expect(JSON.stringify(journalFlow)).not.toContain('"optional":true');
+    expect(JSON.stringify(journalFlow)).not.toContain('"containsDescendants"');
   });
 
   it('[WI-2506 / WI-2608] binds resolver actions and requires the exact stable Photosynthesis round trip', () => {
@@ -8960,6 +9338,65 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           id: 'visibility-shared-record',
         },
       },
+    ]);
+  });
+
+  it('[WI-2176] waits for persisted scope hydration after cold release relaunches', () => {
+    const geometryFlow = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/v2/v2-supporter-scope-geometry.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(geometryFlow)[1]?.toJS() as unknown;
+
+    expect(Array.isArray(commands)).toBe(true);
+    if (!Array.isArray(commands)) {
+      throw new Error('supporter scope geometry commands must be a YAML list');
+    }
+
+    const coldRelaunches = commands.flatMap((command, index) =>
+      command === 'stopApp' ? [commands.slice(index, index + 5)] : [],
+    );
+
+    expect(coldRelaunches).toEqual([
+      [
+        'stopApp',
+        { launchApp: { clearState: false } },
+        {
+          extendedWaitUntil: {
+            visible: { id: 'scope-chip-persisted-me' },
+            timeout: 120000,
+          },
+        },
+        { assertVisible: { id: 'mentor-screen' } },
+        {
+          assertVisible: {
+            id: 'scope-chip-option-me',
+            selected: true,
+          },
+        },
+      ],
+      [
+        'stopApp',
+        { launchApp: { clearState: false } },
+        {
+          extendedWaitUntil: {
+            visible: {
+              id: 'scope-chip-persisted-person-${SUPPORTEE_PERSON_ID}',
+            },
+            timeout: 120000,
+          },
+        },
+        { assertVisible: { id: 'person-scope-mentor-tab' } },
+        {
+          assertVisible: {
+            id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}',
+            selected: true,
+          },
+        },
+      ],
     ]);
   });
 

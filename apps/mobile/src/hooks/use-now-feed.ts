@@ -30,6 +30,7 @@ import {
 import { useNavigationDataScopeContract } from './use-navigation-contract';
 import { parseJson } from '../lib/parse-json';
 import { useApiQuery } from './use-api-query';
+import { queryKeys } from '../lib/query-keys';
 
 const NOW_FEED_STALE_TIME_MS = 30_000;
 const NOW_FEED_SLOW_FALLBACK_MS = 2_000;
@@ -182,7 +183,7 @@ export function useNowFeed(): NowFeedQueryResult {
     // shared across actors selecting the same profile.
     // [WI-2504] ...and by the observed epoch, so the warm in-memory projection
     // is dropped at the same moment the persisted one becomes unreachable.
-    queryKey: ['now-feed', userId, profileId, observedEpoch],
+    queryKey: queryKeys.now.feed(userId, profileId, observedEpoch),
     queryFn: async ({ signal: querySignal }): Promise<NowResponse> => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -359,7 +360,7 @@ export function useNowOverflow(
 
   return useApiQuery({
     // [WI-2498] Actor-bound, matching the now-feed key above.
-    queryKey: ['now-overflow', userId, profileId, observedEpoch],
+    queryKey: queryKeys.now.overflow(userId, profileId, observedEpoch),
     enabled: enabled && epochHydrated,
     schema: nowOverflowResponseSchema,
     fetch: (signal) =>

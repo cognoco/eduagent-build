@@ -30,6 +30,8 @@ function createBookmarkFixture(overrides: Partial<Bookmark> = {}): Bookmark {
     subjectName: 'Biology',
     topicTitle: null,
     content: 'Photosynthesis converts light into chemical energy.',
+    artifactSource: 'freeform_keep',
+    verificationState: 'unverified',
     createdAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
   };

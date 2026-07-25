@@ -89,6 +89,20 @@ describe('AccountAvatar', () => {
     ).toBe('Open account settings for Test Parent');
   });
 
+  it('[WI-2176] exposes an explicit native 44dp account target', () => {
+    active = renderScreen(<AccountAvatar />, {
+      profile: createTestProfile({
+        displayName: 'Test Parent',
+        avatarUrl: null,
+      }),
+    });
+
+    expect(active.result.getByTestId('account-avatar-button')).toHaveStyle({
+      height: 44,
+      width: 44,
+    });
+  });
+
   it('renders a "?" placeholder when the display name is empty', () => {
     active = renderScreen(<AccountAvatar />, {
       profile: createTestProfile({

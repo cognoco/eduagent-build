@@ -7,6 +7,8 @@ import {
   sessionEvents,
   sessionSummaries,
   bookmarks,
+  evidenceLinks,
+  topicNotes,
   needsDeepeningTopics,
   onboardingDrafts,
   parkingLotItems,
@@ -37,6 +39,27 @@ export function createSessionRepository(
         return db.query.learningSessions.findFirst({
           where: scopedWhere(learningSessions, extraWhere),
         });
+      },
+      async findId(extraWhere?: SQL): Promise<{ id: string } | undefined> {
+        const [row] = await db
+          .select({ id: learningSessions.id })
+          .from(learningSessions)
+          .where(scopedWhere(learningSessions, extraWhere))
+          .limit(1);
+        return row;
+      },
+      async findIdAndMetadata(
+        extraWhere?: SQL,
+      ): Promise<{ id: string; metadata: unknown } | undefined> {
+        const [row] = await db
+          .select({
+            id: learningSessions.id,
+            metadata: learningSessions.metadata,
+          })
+          .from(learningSessions)
+          .where(scopedWhere(learningSessions, extraWhere))
+          .limit(1);
+        return row;
       },
       /**
        * Return topicIds this profile has *meaningfully completed* in a
@@ -96,6 +119,14 @@ export function createSessionRepository(
           ...(orderBy ? { orderBy } : {}),
         });
       },
+      async findId(extraWhere?: SQL): Promise<{ id: string } | undefined> {
+        const [row] = await db
+          .select({ id: sessionEvents.id })
+          .from(sessionEvents)
+          .where(scopedWhere(sessionEvents, extraWhere))
+          .limit(1);
+        return row;
+      },
     },
 
     retrievalEvents: {
@@ -128,6 +159,33 @@ export function createSessionRepository(
       async findFirst(extraWhere?: SQL) {
         return db.query.bookmarks.findFirst({
           where: scopedWhere(bookmarks, extraWhere),
+        });
+      },
+      async findId(extraWhere?: SQL): Promise<{ id: string } | undefined> {
+        const [row] = await db
+          .select({ id: bookmarks.id })
+          .from(bookmarks)
+          .where(scopedWhere(bookmarks, extraWhere))
+          .limit(1);
+        return row;
+      },
+    },
+
+    topicNotes: {
+      async findId(extraWhere?: SQL): Promise<{ id: string } | undefined> {
+        const [row] = await db
+          .select({ id: topicNotes.id })
+          .from(topicNotes)
+          .where(scopedWhere(topicNotes, extraWhere))
+          .limit(1);
+        return row;
+      },
+    },
+
+    evidenceLinks: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.evidenceLinks.findMany({
+          where: scopedWhere(evidenceLinks, extraWhere),
         });
       },
     },

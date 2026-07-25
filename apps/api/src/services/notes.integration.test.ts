@@ -368,7 +368,7 @@ describeIfDb(
       expect(row?.artifactSource).toBe('challenge_drafted_note');
     });
 
-    it('defaults artifactSource to null when omitted', async () => {
+    it('writes learner-authored metadata when omitted', async () => {
       const { profileId } = await seedProfile();
       const { subjectId, topicId } = await seedTopic(
         profileId,
@@ -389,17 +389,16 @@ describeIfDb(
         .from(topicNotes)
         .where(eq(topicNotes.profileId, profileId));
 
-      expect(row?.artifactSource).toBeNull();
+      expect(row?.artifactSource).toBe('learner_authored_note');
     });
 
     it('regression: a marker on an otherwise-identical-content call is not swallowed by dedup', async () => {
       // insertNoteWithCap's dedupeExactSessionContent match keys on
-      // (profileId, sessionId, topicId, content) and does not consider
-      // artifactSource. Seed a null-marker note first (e.g. the ordinary
-      // session-summary path), then call createNoteForSession again with the
+      // (profileId, sessionId, topicId, content, artifactSource). Seed an
+      // ordinary learner-authored note first, then call createNoteForSession with the
       // SAME tuple but a marker set (e.g. a same-turn Challenge-Round
       // finalize) — the marked write must not be silently dropped by the dedup
-      // hit on the earlier null-marker row.
+      // hit on the earlier ordinary row.
       const { profileId } = await seedProfile();
       const { subjectId, topicId } = await seedTopic(
         profileId,

@@ -40,8 +40,20 @@
   ],
   "v2": [
     {
+      "flow": "flows/v2/v2-mentor-single-composer.yaml",
+      "scenario": "onboarding-no-subject"
+    },
+    {
+      "flow": "flows/v2/v2-returning-learner-resume.yaml",
+      "scenario": "v2-returning-learner"
+    },
+    {
       "flow": "flows/v2/v2-homework-manual-entry.yaml",
       "scenario": "trial-active"
+    },
+    {
+      "flow": "flows/v2/v2-journal-paper-trail.yaml",
+      "scenario": "v2-journal-paper-trail"
     },
     {
       "flow": "flows/v2/v2-shell-navigation.yaml",
@@ -73,6 +85,10 @@
     },
     {
       "flow": "flows/v2/v2-supporter-self-learning-doorway.yaml",
+      "scenario": "v2-supporter-self-learning-active"
+    },
+    {
+      "flow": "flows/v2/v2-supporter-scope-geometry.yaml",
       "scenario": "v2-supporter-self-learning-active"
     }
   ],

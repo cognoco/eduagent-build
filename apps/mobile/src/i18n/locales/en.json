@@ -854,7 +854,6 @@
     "speakingPractice": {
       "title": "Say it back",
       "subtitle": "Repeat the line",
-      "subtitleShadowing": "Speak along with the audio, a beat behind",
       "playAudioLabel": "Play target sentence",
       "stopAudioLabel": "Stop target audio",
       "startRecordingLabel": "Start speaking attempt",
@@ -3458,6 +3457,7 @@
     "openChildSession": "Open child session",
     "verifiedProof": {
       "holdsStrong": "holds strong",
+      "lookupUnavailable": "Verified proof is temporarily unavailable",
       "recheckDue": "due for a re-check on {{date}}"
     },
     "emptyCtaStartSession": "Start a session"
@@ -4089,6 +4089,8 @@
     "bridge": {
       "headline": "Turn \"I don't get it\" into \"I've got this.\"",
       "supporting": "Create a free account so your mentor can remember your subjects, notes, and progress.",
+      "parentHeadline": "Continue with your account to support your learner.",
+      "parentSupporting": "Sign in or sign up to accept the invitation and set up support. Your account does not grant access to learning activity unless the learner authorizes it.",
       "primaryCta": "Create free account",
       "secondaryCta": "I already have an account"
     },

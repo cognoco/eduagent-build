@@ -20,6 +20,7 @@ import {
   challengeRoundGraderVerdictSchema,
   type AgeBracket,
   type ChallengeRoundEvaluationItem,
+  type ChallengeRoundQuestionIdentity,
   type ConversationLanguage,
 } from '@eduagent/schemas';
 import { inngest } from '../../inngest/client';
@@ -49,6 +50,8 @@ export interface RunChallengeRoundGraderInput {
   askedQuestion: string;
   /** The learner's verbatim answer. */
   learnerAnswer: string;
+  /** Earlier Challenge identities, in round order, for novelty classification. */
+  priorQuestionIdentities?: ChallengeRoundQuestionIdentity[];
   /** Server-owned event id — injected into every returned item; never sent to the model. */
   answerEventId: string;
   /** Language for learner-facing fields in the verdict. */
@@ -108,6 +111,7 @@ export async function runChallengeRoundGrader(
   const messages = buildChallengeRoundGraderPrompt({
     askedQuestion: input.askedQuestion,
     learnerAnswer: input.learnerAnswer,
+    priorQuestionIdentities: input.priorQuestionIdentities,
     conversationLanguage: input.conversationLanguage,
     ageBracket: input.ageBracket,
   });
@@ -203,10 +207,19 @@ export async function runChallengeRoundGrader(
     return [];
   }
 
-  // 5. Inject the server-owned answerEventId into every item. The model never
-  //    sees or supplies this field — server ownership is the invariant.
+  // 5. Inject the server-owned answerEventId and bind the exact asked-question
+  //    text into the semantic identity. The model supplies the structured
+  //    claim/operation/context, but cannot rewrite which question was asked.
   return verdict.data.items.map((item) => ({
     ...item,
     answerEventId: input.answerEventId,
+    ...(item.questionIdentity
+      ? {
+          questionIdentity: {
+            ...item.questionIdentity,
+            questionText: input.askedQuestion,
+          },
+        }
+      : {}),
   }));
 }

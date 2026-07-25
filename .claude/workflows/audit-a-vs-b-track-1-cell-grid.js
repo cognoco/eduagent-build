@@ -216,7 +216,7 @@ finding across both. Same schema.`,
   },
   {
     key: 'audience-matrix',
-    prompt: `Read the audience matrix in docs/audience-matrix.md. Produce 8 cells — the full
+    prompt: `Read the audience matrix in docs/compliance/audience-matrix.md. Produce 8 cells — the full
 mode × isOwner × hasLinkedChildren × canGiveOwnConsent grid. For each cell: "is this cell reachable
 at launch under A? Under B? What does the code do?" Anchor the "actual" side to apps/mobile/src/app/
 (app)/_layout.tsx:122-185 and apps/mobile/src/app-context.tsx:53-61, 70.`,

@@ -174,6 +174,8 @@ export const PROFILE_SCOPED_KEYS = [
   'book-suggestions',
   'all-books',
   'nudges',
+  'now-feed',
+  'now-overflow',
 ] as const;
 
 export const ProfileContext = createContext<ProfileContextValue>({

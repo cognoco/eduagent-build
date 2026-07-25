@@ -1,9 +1,9 @@
 # Record of Processing Activities (ROPA)
 
 **Checklist item:** A3 · **Law:** GDPR Article 30 · **Status:** DRAFT for DPO sign-off.
-**Controller:** **ZWIZZLY AS**, org.nr **811696072**, Fiskekroken 3B, 0139 Oslo, Norway. **Lead supervisory authority:** Norwegian Datatilsynet. **DPO:** `[dpo@… — TODO]`.
+**Controller:** **ZWIZZLY AS**, org.nr **811696072**, Fiskekroken 3B, 0139 Oslo, Norway. **Proposed lead supervisory authority:** Norwegian Datatilsynet, subject to DPO/counsel confirmation of the factual main establishment. **DPO:** `[dpo@… — TODO]`.
 
-> **Launch substrate = the identity-foundation architecture — BUILT AND LIVE (status updated 2026-07-10).** This register describes processing on the identity-foundation schema, which is **no longer a ratified design — it is the production system**: `resolveIdentityV2` runs unconditionally for every authenticated request (`apps/api/src/middleware/account.ts:146-147`); the legacy `accounts`/`profiles`/`family_links` tables are **dropped** on the staging and production databases (live-query verified 2026-06-28). Design rationale: [`_wip/identity-foundation/data-model.md`](../../_wip/identity-foundation/data-model.md) (`MMT-ADR-0011`/`0012`; amendments `0013`–`0015`). Built-state verification: [`2026-07-04-launch-compliance-closure-check-early-pass.md`](2026-07-04-launch-compliance-closure-check-early-pass.md).
+> **Launch substrate = the identity-foundation architecture — BUILT AND LIVE (status updated 2026-07-10).** This register describes processing on the identity-foundation schema, which is **no longer a ratified design — it is the production system**: `resolveIdentityV2` runs unconditionally for every authenticated request (`apps/api/src/middleware/account.ts:146-147`); the legacy `accounts`/`profiles`/`family_links` tables are **dropped** on the staging and production databases (live-query verified 2026-06-28). Design rationale: [`docs/canon/identity/data-model.md`](../canon/identity/data-model.md) (`MMT-ADR-0011`/`0012`; amendments `0013`–`0015`). Built-state verification: [`2026-07-04-launch-compliance-closure-check-early-pass.md`](2026-07-04-launch-compliance-closure-check-early-pass.md).
 
 > A ROPA is the internal register of *what personal data we hold, why, who else touches it, and how long we keep it.* It is not published; you show it to Datatilsynet on request. Keep it current.
 
@@ -19,11 +19,20 @@ The legacy "account owner" concept dissolves into a **`person`** (the human, the
 | **Mentor** (data access only) | `mentorship` edge | Opt-in; data-access only, never auto-conferred. |
 | **Payer** (billing only) | `subscription.payer_person_id` + `subscription_payers` | Primary + ≤1 secondary; access-inert. |
 
-Age posture (per `data-model.md` §2A.5 + ROADMAP age-floor thread): **13+ consent-capacity floor at launch; sub-13 built but front-end-gated; US sub-13 excluded** (keeps COPPA dormant). One human may wear all hats (the "full parent").
+Age and geography posture (per `data-model.md` §2A.5 + the [`13+ EEA launch-country ruling`](2026-07-23-13-plus-eea-launch-country-ruling.md)): **0–12 unavailable; 13–17 minor; 18+ adult; all 30 EEA countries within the intended policy perimeter, with guardian authorization below the habitual-residence threshold; France requires joint child + parental consent at ages 13–14; UK and all non-EEA markets disabled.** One human may wear all hats (the "full parent").
 
 ## Special categories
 
-**None.** No Art 9 health/disability data is processed — see [`art9-special-category-decision.md`](art9-special-category-decision.md). `person.birth_date` and the `knowledge_assertions` age/residence history are ordinary personal data (processed for lawful age/regime gating).
+MentoMate does not solicit or intend to use special-category data. In an
+open-text AI service, however, learners may disclose and models may infer
+health, disability, belief, ethnicity, sexual-orientation, or other sensitive
+information. Incidental transmission and temporary storage are therefore
+foreseeable. The proposed minimisation and suppression treatment, and the
+applicable Article 9 condition if one is required, are recorded in
+[`art9-special-category-position.md`](art9-special-category-position.md) for
+DPO/privacy advice. `person.birth_date` and the `knowledge_assertions`
+age/residence history are ordinary personal data used for lawful age and
+jurisdiction gating.
 
 ## Legal bases
 

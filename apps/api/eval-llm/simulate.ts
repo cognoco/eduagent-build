@@ -80,6 +80,7 @@ import {
 import {
   aggregate,
   compareSimulationBaseline,
+  formatSimulatorDiagnosticMetrics,
   toBaseline,
   validateBaselineStructure,
   writeCorpus,
@@ -482,6 +483,9 @@ async function main(): Promise<void> {
   console.log(
     `  per-grader signal:   ${JSON.stringify(metrics.signalEmissionRateByGrader)}`,
   );
+  for (const line of formatSimulatorDiagnosticMetrics(metrics)) {
+    console.log(`  ${line}`);
+  }
   if (!metrics.sufficientForCalibration) {
     console.warn(
       `\n  ⚠ INSUFFICIENT N: ${metrics.totalRounds} round(s) is a smoke run, NOT a calibration ` +

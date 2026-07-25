@@ -29,6 +29,7 @@ const ALL_OUTCOMES: MasteryOutcome[] = [
   'verified',
   'partial',
   'reteach',
+  'insufficient_breadth',
   'invalid',
 ];
 type ConceptResult = 'solid' | 'partial' | 'missing' | 'misconception';
@@ -77,12 +78,22 @@ export interface SimMetrics {
   /** The exact scenario ids that over-credited (gate `verified`, ground truth
    *  not). Feeds the hard ceiling: a non-empty list means a breach to name. */
   overCreditScenarioIds: string[];
-  /** Gate said `partial`/`reteach`/`invalid` but ground truth was `verified`. */
+  /** Gate did not verify mastery but ground truth was `verified`. */
   underCreditRate: number;
   /** Share of rounds whose GRADER emitted a usable evaluation signal, overall… */
   signalEmissionRate: number;
   /** …and per GRADER model (the gpt-oss-drop indicator). */
   signalEmissionRateByGrader: Record<string, number>;
+  /** Share of generated tutor turns that failed envelope parsing. */
+  tutorParseFailureRate: number;
+  /** Exact-repeat rate among model-authored tutor questions only. */
+  modelAuthoredQuestionRepeatRate: number;
+  /** Exact-repeat rate across seed and model-authored questions; degraded turns excluded. */
+  questionRepeatRate: number;
+  /** Exact-repeat rate among degraded fallback turns, reported separately. */
+  degradedQuestionRepeatRate: number;
+  /** Distinct scenario-owned semantic concept keys, never raw evaluator labels. */
+  distinctAssessedConceptCount: number;
   /** Wilson 95% CIs + denominators for the four headline rates. */
   ci: {
     masteryVerified: RateCI;
@@ -92,6 +103,27 @@ export interface SimMetrics {
   };
 }
 
+/** Simulator-only diagnostic lines for the deterministic and live CLI reports. */
+export function formatSimulatorDiagnosticMetrics(
+  metrics: Pick<
+    SimMetrics,
+    | 'tutorParseFailureRate'
+    | 'modelAuthoredQuestionRepeatRate'
+    | 'questionRepeatRate'
+    | 'degradedQuestionRepeatRate'
+    | 'distinctAssessedConceptCount'
+  >,
+): string[] {
+  const pct = (value: number): string => `${(value * 100).toFixed(1)}%`;
+  return [
+    `tutor parse failures: ${pct(metrics.tutorParseFailureRate)}`,
+    `model question repeats: ${pct(metrics.modelAuthoredQuestionRepeatRate)}`,
+    `measured question repeats: ${pct(metrics.questionRepeatRate)}`,
+    `degraded question repeats: ${pct(metrics.degradedQuestionRepeatRate)}`,
+    `distinct assessed concepts: ${metrics.distinctAssessedConceptCount}`,
+  ];
+}
+
 export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
   const total = results.length;
 
@@ -99,6 +131,7 @@ export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
     verified: 0,
     partial: 0,
     reteach: 0,
+    insufficient_breadth: 0,
     invalid: 0,
   };
   const conceptResultCounts: Record<ConceptResult, number> = {
@@ -113,6 +146,15 @@ export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
   const overCreditScenarioIds: string[] = [];
   let underCredit = 0;
   let signalEmittedTotal = 0;
+  let tutorTurnTotal = 0;
+  let tutorParseFailures = 0;
+  let modelAuthoredQuestionTotal = 0;
+  let modelAuthoredQuestionRepeats = 0;
+  let measuredQuestionTotal = 0;
+  let measuredQuestionRepeats = 0;
+  let degradedQuestionTotal = 0;
+  let degradedQuestionRepeats = 0;
+  const assessedConcepts = new Set<string>();
   const graderTotals: Record<string, { emitted: number; total: number }> = {};
 
   for (const r of results) {
@@ -121,6 +163,31 @@ export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
 
     for (const e of r.evaluations) {
       conceptResultCounts[e.result as ConceptResult] += 1;
+      assessedConcepts.add(
+        r.conceptEquivalenceKeys[normalizeConcept(e.concept)] ??
+          normalizeConcept(e.concept),
+      );
+    }
+
+    for (const turn of r.tutorTurns) {
+      tutorTurnTotal += 1;
+      if (turn.source === 'degraded') {
+        degradedQuestionTotal += 1;
+        tutorParseFailures += 1;
+      } else {
+        modelAuthoredQuestionTotal += 1;
+      }
+    }
+    for (const diagnostic of r.questionDiagnostics) {
+      if (diagnostic.source !== 'degraded') {
+        measuredQuestionTotal += 1;
+        if (diagnostic.repeatsPriorQuestion) measuredQuestionRepeats += 1;
+      }
+      if (diagnostic.source === 'model') {
+        if (diagnostic.repeatsPriorQuestion) modelAuthoredQuestionRepeats += 1;
+      } else if (diagnostic.source === 'degraded') {
+        if (diagnostic.repeatsPriorQuestion) degradedQuestionRepeats += 1;
+      }
     }
 
     // Over-credit (the dangerous direction): gate said `verified` but ground
@@ -139,6 +206,7 @@ export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
       r.expectedOutcome === 'verified' &&
       (r.decision.outcome === 'partial' ||
         r.decision.outcome === 'reteach' ||
+        r.decision.outcome === 'insufficient_breadth' ||
         r.decision.outcome === 'invalid')
     ) {
       underCredit += 1;
@@ -172,6 +240,21 @@ export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
     underCreditRate: rate(underCredit),
     signalEmissionRate: rate(signalEmittedTotal),
     signalEmissionRateByGrader,
+    tutorParseFailureRate:
+      tutorTurnTotal === 0 ? 0 : tutorParseFailures / tutorTurnTotal,
+    modelAuthoredQuestionRepeatRate:
+      modelAuthoredQuestionTotal === 0
+        ? 0
+        : modelAuthoredQuestionRepeats / modelAuthoredQuestionTotal,
+    questionRepeatRate:
+      measuredQuestionTotal === 0
+        ? 0
+        : measuredQuestionRepeats / measuredQuestionTotal,
+    degradedQuestionRepeatRate:
+      degradedQuestionTotal === 0
+        ? 0
+        : degradedQuestionRepeats / degradedQuestionTotal,
+    distinctAssessedConceptCount: assessedConcepts.size,
     ci: {
       masteryVerified: wilsonCI(masteryVerified, total),
       overCredit: wilsonCI(overCredit, total),
@@ -179,6 +262,10 @@ export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
       signalEmission: wilsonCI(signalEmittedTotal, total),
     },
   };
+}
+
+function normalizeConcept(concept: string): string {
+  return concept.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
 export interface WriteCorpusMeta {

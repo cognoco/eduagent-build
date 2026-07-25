@@ -1,0 +1,1692 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <meta name="description" content="MentoMate Google Play screenshot and store-readiness dependency map, snapshot 2026-07-23.">
+  <title>MentoMate · Play screenshot dependency map</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --font-sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+      --bg: #071018;
+      --bg-elevated: #0c1722;
+      --panel: #101d29;
+      --panel-2: #142331;
+      --panel-3: #182a39;
+      --text: #edf6fb;
+      --muted: #91a4b5;
+      --faint: #657a8d;
+      --line: #27394a;
+      --line-strong: #3a5063;
+      --cyan: #4dd8f0;
+      --cyan-soft: rgba(77, 216, 240, .13);
+      --amber: #f6b94f;
+      --amber-soft: rgba(246, 185, 79, .13);
+      --purple: #b99cff;
+      --purple-soft: rgba(185, 156, 255, .12);
+      --green: #67dfa3;
+      --green-soft: rgba(103, 223, 163, .12);
+      --blue: #79aefc;
+      --blue-soft: rgba(121, 174, 252, .12);
+      --rose: #ff8f9f;
+      --rose-soft: rgba(255, 143, 159, .12);
+      --shadow: 0 18px 48px rgba(0, 0, 0, .23);
+      --radius: 14px;
+      --card-width: 230px;
+      --gap-x: 52px;
+      --gap-y: 24px;
+    }
+
+    html[data-theme="light"] {
+      --bg: #f4f7f9;
+      --bg-elevated: #ffffff;
+      --panel: #ffffff;
+      --panel-2: #f7fafc;
+      --panel-3: #edf3f7;
+      --text: #102333;
+      --muted: #526879;
+      --faint: #748797;
+      --line: #d8e2e9;
+      --line-strong: #b8c8d4;
+      --cyan: #007f9a;
+      --cyan-soft: rgba(0, 127, 154, .09);
+      --amber: #9a5f00;
+      --amber-soft: rgba(154, 95, 0, .08);
+      --purple: #6540b6;
+      --purple-soft: rgba(101, 64, 182, .08);
+      --green: #087b4b;
+      --green-soft: rgba(8, 123, 75, .08);
+      --blue: #245eae;
+      --blue-soft: rgba(36, 94, 174, .08);
+      --rose: #af3548;
+      --rose-soft: rgba(175, 53, 72, .08);
+      --shadow: 0 16px 40px rgba(35, 55, 70, .09);
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      background: var(--bg);
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background:
+        radial-gradient(circle at 80% -10%, var(--cyan-soft), transparent 30rem),
+        radial-gradient(circle at 0% 16%, var(--purple-soft), transparent 34rem),
+        var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      line-height: 1.45;
+      transition: background-color .2s ease, color .2s ease;
+    }
+
+    button, input { font: inherit; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    :focus-visible {
+      outline: 3px solid var(--cyan);
+      outline-offset: 3px;
+    }
+
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      border-bottom: 1px solid var(--line);
+      background: color-mix(in srgb, var(--bg-elevated) 88%, transparent);
+      backdrop-filter: blur(18px);
+    }
+
+    .header-row,
+    .toolbar,
+    main,
+    footer {
+      width: min(1500px, calc(100% - 32px));
+      margin-inline: auto;
+    }
+
+    .header-row {
+      min-height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border: 1px solid color-mix(in srgb, var(--cyan) 54%, var(--line));
+      border-radius: 10px;
+      background: var(--cyan-soft);
+      color: var(--cyan);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      box-shadow: inset 0 0 20px var(--cyan-soft);
+    }
+
+    .brand-copy { min-width: 0; }
+
+    .brand-copy strong {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 14px;
+      letter-spacing: -.01em;
+    }
+
+    .brand-copy span {
+      display: block;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 0 0 auto;
+    }
+
+    .icon-button,
+    .control-button,
+    .branch-toggle {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      color: var(--text);
+      cursor: pointer;
+      transition: border-color .15s ease, background .15s ease, transform .15s ease;
+    }
+
+    .icon-button:hover,
+    .control-button:hover,
+    .branch-toggle:hover {
+      border-color: var(--line-strong);
+      background: var(--panel-2);
+    }
+
+    .icon-button:active,
+    .control-button:active,
+    .branch-toggle:active { transform: translateY(1px); }
+
+    .icon-button {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      font-size: 17px;
+    }
+
+    .toolbar-wrap {
+      border-top: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+    }
+
+    .toolbar {
+      padding-block: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+
+    .search-wrap {
+      position: relative;
+      flex: 1 1 270px;
+      min-width: 210px;
+      max-width: 430px;
+    }
+
+    .search-wrap span {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      color: var(--muted);
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+
+    #search {
+      width: 100%;
+      height: 38px;
+      padding: 0 38px 0 36px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      color: var(--text);
+      outline: none;
+    }
+
+    #search:focus { border-color: var(--cyan); }
+
+    #search-count {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      color: var(--faint);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      transform: translateY(-50%);
+    }
+
+    .control-button {
+      min-height: 38px;
+      padding: 0 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex: 0 0 auto;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .control-button[aria-pressed="true"] {
+      border-color: color-mix(in srgb, var(--cyan) 65%, var(--line));
+      background: var(--cyan-soft);
+      color: var(--cyan);
+    }
+
+    .control-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    main { padding: 36px 0 72px; }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(300px, .7fr);
+      gap: 24px;
+      align-items: stretch;
+    }
+
+    .hero-copy,
+    .finding-card,
+    .legend,
+    .branch {
+      border: 1px solid var(--line);
+      background: color-mix(in srgb, var(--panel) 95%, transparent);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-copy {
+      min-height: 286px;
+      padding: clamp(26px, 4vw, 52px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      border-radius: 20px;
+      background:
+        linear-gradient(135deg, var(--cyan-soft), transparent 44%),
+        color-mix(in srgb, var(--panel) 96%, transparent);
+    }
+
+    .eyebrow {
+      margin: 0 0 14px;
+      color: var(--cyan);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 860px;
+      margin: 0;
+      font-size: clamp(34px, 5vw, 68px);
+      line-height: .98;
+      letter-spacing: -.055em;
+    }
+
+    .hero-copy > p:not(.eyebrow) {
+      max-width: 780px;
+      margin: 22px 0 0;
+      color: var(--muted);
+      font-size: clamp(15px, 1.4vw, 18px);
+    }
+
+    .snapshot-line {
+      margin-top: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .snapshot-chip {
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--panel-2);
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 10px;
+    }
+
+    .snapshot-chip strong { color: var(--text); }
+
+    .finding-stack {
+      display: grid;
+      grid-template-rows: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .finding-card {
+      padding: 18px;
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      border-radius: 16px;
+    }
+
+    .finding-number {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 9px;
+      background: var(--panel-3);
+      color: var(--cyan);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .finding-card h2 {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    .finding-card p {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .legend {
+      margin-top: 18px;
+      padding: 18px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 24px;
+      align-items: center;
+      border-radius: 16px;
+    }
+
+    .legend-title {
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .legend-swatch {
+      width: 20px;
+      height: 11px;
+      border: 1px solid var(--line-strong);
+      border-radius: 3px;
+      background: var(--panel-2);
+    }
+
+    .legend-swatch.original { border: 2px solid var(--cyan); }
+    .legend-swatch.opq { border-color: var(--amber); background: var(--amber-soft); }
+    .legend-swatch.action { border: 1px dashed var(--purple); background: var(--purple-soft); }
+    .legend-swatch.outcome { border-radius: 999px; border-color: var(--green); background: var(--green-soft); }
+
+    .legend-line {
+      width: 28px;
+      height: 0;
+      border-top: 2px solid var(--blue);
+    }
+
+    .legend-line.coordination { border-top-style: dashed; border-top-color: var(--amber); }
+    .legend-line.lifecycle { border-top-style: dotted; border-top-color: var(--purple); }
+    .legend-line.cleared { border-top-style: dashed; border-top-color: var(--green); }
+
+    .section-heading {
+      margin: 54px 0 18px;
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .section-heading h2 {
+      margin: 0;
+      font-size: clamp(24px, 3vw, 38px);
+      letter-spacing: -.04em;
+    }
+
+    .section-heading p {
+      max-width: 620px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: right;
+    }
+
+    .original-table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 880px;
+    }
+
+    th, td {
+      padding: 13px 15px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--faint);
+      background: var(--panel-2);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    td {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    tbody tr:last-child td { border-bottom: 0; }
+
+    td:first-child {
+      color: var(--cyan);
+      font-family: var(--font-mono);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    td strong { color: var(--text); }
+
+    .branches { display: grid; gap: 18px; }
+
+    .branch {
+      overflow: hidden;
+      border-radius: 18px;
+    }
+
+    .branch[data-search-empty="true"] { opacity: .35; }
+
+    .branch-header {
+      min-height: 78px;
+      padding: 17px 18px 17px 20px;
+      display: grid;
+      grid-template-columns: 38px minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-2);
+    }
+
+    .branch-index {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      color: var(--cyan);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .branch-heading h3 {
+      margin: 0;
+      font-size: 15px;
+      letter-spacing: -.01em;
+    }
+
+    .branch-heading p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .branch-toggle {
+      width: 36px;
+      height: 36px;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .branch[data-collapsed="true"] .branch-header { border-bottom: 0; }
+    .branch[data-collapsed="true"] .canvas-shell { display: none; }
+    .branch[data-collapsed="true"] .branch-toggle { transform: rotate(-90deg); }
+
+    .canvas-shell {
+      position: relative;
+      overflow-x: auto;
+      overflow-y: hidden;
+      overscroll-behavior-x: contain;
+      scrollbar-color: var(--line-strong) var(--panel);
+    }
+
+    .branch-canvas {
+      position: relative;
+      min-width: calc(var(--cols) * var(--card-width) + (var(--cols) - 1) * var(--gap-x) + 48px);
+      padding: 32px 24px 38px;
+      background:
+        linear-gradient(var(--line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--line) 1px, transparent 1px),
+        var(--panel);
+      background-size: 28px 28px;
+      background-position: -1px -1px;
+    }
+
+    .branch-grid {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: repeat(var(--cols), var(--card-width));
+      grid-auto-rows: minmax(138px, auto);
+      column-gap: var(--gap-x);
+      row-gap: var(--gap-y);
+      align-items: start;
+    }
+
+    .edge-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      pointer-events: none;
+    }
+
+    .edge-path {
+      fill: none;
+      stroke-width: 2;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .edge-path.formal { stroke: var(--blue); }
+    .edge-path.coordination { stroke: var(--amber); stroke-dasharray: 7 6; }
+    .edge-path.lifecycle { stroke: var(--purple); stroke-dasharray: 2 5; }
+    .edge-path.cleared { stroke: var(--green); stroke-dasharray: 7 6; opacity: .75; }
+
+    .edge-label {
+      fill: var(--muted);
+      paint-order: stroke;
+      stroke: var(--panel);
+      stroke-width: 5px;
+      stroke-linejoin: round;
+      font-family: var(--font-mono);
+      font-size: 9px;
+    }
+
+    .graph-node {
+      position: relative;
+      min-height: 128px;
+      padding: 15px 15px 13px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: color-mix(in srgb, var(--panel-2) 96%, transparent);
+      box-shadow: 0 12px 26px rgba(0, 0, 0, .15);
+      transition: opacity .15s ease, border-color .15s ease, transform .15s ease, box-shadow .15s ease;
+    }
+
+    .graph-node:hover {
+      z-index: 4;
+      border-color: color-mix(in srgb, var(--cyan) 55%, var(--line-strong));
+      transform: translateY(-2px);
+      box-shadow: 0 18px 36px rgba(0, 0, 0, .22);
+    }
+
+    .graph-node.original {
+      border: 2px solid var(--cyan);
+      background:
+        linear-gradient(145deg, var(--cyan-soft), transparent 58%),
+        var(--panel-2);
+    }
+
+    html[data-originals="off"] .graph-node.original {
+      border: 1px solid var(--line-strong);
+      background: var(--panel-2);
+    }
+
+    .original-ribbon {
+      position: absolute;
+      top: -9px;
+      right: 10px;
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: var(--cyan);
+      color: #031217;
+      font-family: var(--font-mono);
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    html[data-originals="off"] .original-ribbon { display: none; }
+
+    .graph-node.opq {
+      border-color: color-mix(in srgb, var(--amber) 68%, var(--line));
+      background:
+        linear-gradient(145deg, var(--amber-soft), transparent 62%),
+        var(--panel-2);
+    }
+
+    .graph-node.action {
+      border: 1px dashed var(--purple);
+      background:
+        linear-gradient(145deg, var(--purple-soft), transparent 62%),
+        var(--panel-2);
+    }
+
+    .graph-node.outcome {
+      border-color: color-mix(in srgb, var(--green) 60%, var(--line));
+      border-radius: 24px;
+      background:
+        linear-gradient(145deg, var(--green-soft), transparent 62%),
+        var(--panel-2);
+    }
+
+    .graph-node.reference {
+      border-style: dashed;
+      color: var(--muted);
+    }
+
+    .graph-node.search-dim { opacity: .16; }
+
+    .node-topline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .node-id {
+      color: var(--cyan);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .03em;
+    }
+
+    .opq .node-id { color: var(--amber); }
+    .action .node-id { color: var(--purple); }
+    .outcome .node-id { color: var(--green); }
+
+    .node-open {
+      width: 24px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border: 1px solid transparent;
+      border-radius: 7px;
+      color: var(--faint);
+      font-size: 12px;
+    }
+
+    .node-open:hover {
+      border-color: var(--line);
+      background: var(--panel);
+      color: var(--cyan);
+    }
+
+    .node-title {
+      min-height: 34px;
+      margin: 9px 0 11px;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.35;
+      letter-spacing: -.01em;
+      overflow: hidden;
+    }
+
+    .node-title:focus,
+    .node-note:focus {
+      overflow: visible;
+      height: auto !important;
+    }
+
+    .node-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .meta-pill {
+      padding: 3px 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--panel);
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 8px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .meta-pill.stage-captured { color: var(--faint); }
+    .meta-pill.stage-refining { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 36%, var(--line)); }
+    .meta-pill.stage-ready { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 36%, var(--line)); }
+    .meta-pill.stage-executing { color: var(--cyan); border-color: color-mix(in srgb, var(--cyan) 36%, var(--line)); }
+    .meta-pill.stage-reviewing { color: var(--purple); border-color: color-mix(in srgb, var(--purple) 36%, var(--line)); }
+    .meta-pill.stage-closed { color: var(--green); border-color: color-mix(in srgb, var(--green) 36%, var(--line)); }
+    .meta-pill.state-blocked,
+    .meta-pill.state-parked { color: var(--rose); border-color: color-mix(in srgb, var(--rose) 36%, var(--line)); }
+
+    .node-note {
+      min-height: 28px;
+      margin: 9px 0 0;
+      color: var(--muted);
+      font-size: 9.5px;
+      line-height: 1.4;
+      overflow: hidden;
+    }
+
+    .branch-footnote {
+      padding: 11px 20px 12px;
+      border-top: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--faint);
+      font-size: 10px;
+    }
+
+    .branch-footnote strong { color: var(--muted); }
+
+    .method-note {
+      margin-top: 18px;
+      padding: 18px 20px;
+      border-left: 3px solid var(--cyan);
+      border-radius: 0 12px 12px 0;
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .method-note strong { color: var(--text); }
+
+    footer {
+      padding: 24px 0 40px;
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      border-top: 1px solid var(--line);
+      color: var(--faint);
+      font-size: 10px;
+    }
+
+    footer code {
+      color: var(--muted);
+      font-family: var(--font-mono);
+    }
+
+    .print-only { display: none; }
+
+    @media (max-width: 1024px) {
+      .hero { grid-template-columns: 1fr; }
+      .finding-stack { grid-template-columns: repeat(3, 1fr); grid-template-rows: none; }
+      .section-heading { align-items: start; flex-direction: column; }
+      .section-heading p { text-align: left; }
+    }
+
+    @media (max-width: 768px) {
+      .header-row, .toolbar, main, footer { width: min(100% - 20px, 1500px); }
+      .brand-copy span { display: none; }
+      .toolbar { align-items: stretch; }
+      .search-wrap { min-width: min(72vw, 320px); }
+      main { padding-top: 20px; }
+      .hero-copy { min-height: 240px; padding: 28px 22px; }
+      .finding-stack { grid-template-columns: 1fr; }
+      .legend { gap: 10px 16px; }
+      .branch-header { grid-template-columns: 34px minmax(0, 1fr) 36px; padding-inline: 14px; }
+      .branch-index { width: 34px; height: 34px; }
+      .branch-canvas { padding-inline: 18px; }
+      footer { flex-direction: column; }
+    }
+
+    @media (max-width: 480px) {
+      .header-row { min-height: 60px; }
+      .header-actions .icon-button:not(#theme-toggle) { display: none; }
+      h1 { font-size: 38px; }
+      .snapshot-chip { font-size: 9px; }
+      .section-heading { margin-top: 40px; }
+      .branch-heading p { display: none; }
+      .branch-grid { grid-auto-rows: minmax(132px, auto); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+        animation-duration: .01ms !important;
+      }
+    }
+
+    @media print {
+      :root {
+        --bg: #fff;
+        --bg-elevated: #fff;
+        --panel: #fff;
+        --panel-2: #f6f8fa;
+        --panel-3: #eef2f5;
+        --text: #102333;
+        --muted: #4d6475;
+        --faint: #667b8b;
+        --line: #ccd7df;
+        --line-strong: #a9bac7;
+      }
+
+      body { background: #fff; }
+      .app-header, .toolbar-wrap, .branch-toggle, .node-open { display: none !important; }
+      main { width: 100%; padding: 0; }
+      .hero { display: block; }
+      .hero-copy { min-height: 0; box-shadow: none; }
+      .finding-stack { margin-top: 12px; grid-template-columns: repeat(3, 1fr); }
+      .finding-card, .legend, .branch, .original-table-wrap { box-shadow: none; break-inside: avoid; }
+      .branch { margin-top: 12px; }
+      .canvas-shell { overflow: visible; }
+      .branch-canvas { transform-origin: top left; zoom: .72; }
+      .graph-node { box-shadow: none; }
+      .print-only { display: block; }
+      footer { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-row">
+      <a class="brand" href="#top" aria-label="Back to top">
+        <span class="brand-mark">MM</span>
+        <span class="brand-copy">
+          <strong>Play screenshot dependency map</strong>
+          <span>Portfolio snapshot · topology-mentomate-003</span>
+        </span>
+      </a>
+      <div class="header-actions">
+        <button class="icon-button" id="print-button" type="button" aria-label="Print or save as PDF" title="Print or save as PDF">⇩</button>
+        <button class="icon-button" id="theme-toggle" type="button" aria-label="Switch to light theme" title="Toggle theme">☼</button>
+      </div>
+    </div>
+    <div class="toolbar-wrap">
+      <nav class="toolbar" aria-label="Diagram controls">
+        <label class="search-wrap" for="search">
+          <span aria-hidden="true">⌕</span>
+          <input id="search" type="search" placeholder="Find WI, OPQ, batch, stage, or scene…" autocomplete="off">
+          <output id="search-count" for="search">all</output>
+        </label>
+        <button class="control-button" id="formal-toggle" type="button" aria-pressed="false">
+          <span class="control-dot"></span> Formal edges only
+        </button>
+        <button class="control-button" id="original-toggle" type="button" aria-pressed="true">
+          <span class="control-dot"></span> Original list
+        </button>
+        <button class="control-button" id="collapse-all" type="button">Collapse all</button>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero" aria-labelledby="page-title">
+      <div class="hero-copy">
+        <p class="eyebrow">MentoMate · Google Play registration</p>
+        <h1 id="page-title">Parallel work, one screenshot package.</h1>
+        <p>
+          The apparent circle is not a formal dependency cycle. Store bootstrap can proceed independently;
+          final screenshots converge later, after the chosen scenes are visually stable and the genuine
+          legal, identity, and consent gates have cleared.
+        </p>
+        <div class="snapshot-line" aria-label="Snapshot metadata">
+          <span class="snapshot-chip"><strong>Snapshot</strong> 2026-07-23 · 18:43Z</span>
+          <span class="snapshot-chip"><strong>Formal cycles</strong> <span id="cycle-count">checking…</span></span>
+          <span class="snapshot-chip"><strong>Original list</strong> 8 work items</span>
+          <span class="snapshot-chip"><strong>Source</strong> live Cosmo + OPQ + Clacks ruling</span>
+        </div>
+      </div>
+      <div class="finding-stack" aria-label="Key findings">
+        <article class="finding-card">
+          <span class="finding-number">01</span>
+          <div>
+            <h2>No circular reference</h2>
+            <p>The Play app record already exists. Final listing completion does not gate the AAB or credential path.</p>
+          </div>
+        </article>
+        <article class="finding-card">
+          <span class="finding-number">02</span>
+          <div>
+            <h2>Two real upstream chains</h2>
+            <p>Mentor card waits on WI-1767; the shared Journal mirror waits on WI-2127 → WI-2128.</p>
+          </div>
+        </article>
+        <article class="finding-card">
+          <span class="finding-number">03</span>
+          <div>
+            <h2>Photography is a later choice</h2>
+            <p>Speaking and manual homework chooser remain optional scenes, not global release blockers.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <aside class="legend" aria-label="Diagram legend">
+      <span class="legend-title">Nodes</span>
+      <span class="legend-item"><span class="legend-swatch original"></span> Original request</span>
+      <span class="legend-item"><span class="legend-swatch opq"></span> OPQ / human input</span>
+      <span class="legend-item"><span class="legend-swatch action"></span> Untracked action</span>
+      <span class="legend-item"><span class="legend-swatch outcome"></span> Milestone / outcome</span>
+      <span class="legend-title">Edges</span>
+      <span class="legend-item"><span class="legend-line"></span> Formal <code>Blocked by</code></span>
+      <span class="legend-item"><span class="legend-line coordination"></span> Visual convergence</span>
+      <span class="legend-item"><span class="legend-line lifecycle"></span> Decision / lifecycle</span>
+      <span class="legend-item"><span class="legend-line cleared"></span> Closed or removed gate</span>
+    </aside>
+
+    <section aria-labelledby="original-heading">
+      <div class="section-heading">
+        <h2 id="original-heading">The eight items you started with</h2>
+        <p>Every one is outlined in cyan in the graph. Stage and batch are the static Cosmo values at the snapshot time.</p>
+      </div>
+      <div class="original-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Work item</th>
+              <th>Current position</th>
+              <th>Batch</th>
+              <th>What it means for screenshots</th>
+            </tr>
+          </thead>
+          <tbody id="original-table-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section aria-labelledby="graph-heading">
+      <div class="section-heading">
+        <h2 id="graph-heading">Dependency branches</h2>
+        <p>Read each branch from left to right. Solid blue arrows are the only edges that assert a formal Cosmo dependency.</p>
+      </div>
+      <div class="branches" id="branches"></div>
+      <p class="method-note">
+        <strong>Reading rule:</strong> Cosmo’s <code>Blocking</code> and <code>Blocked by</code> fields are inverse
+        views of the same formal edge. Dashed and dotted arrows are deliberately different: they describe screenshot
+        sequencing, a human ruling, or a lifecycle action—not a claim that delivery is formally blocked.
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    <span>Prepared for the MentoMate program roadmapping discussion. Static snapshot; re-check Cosmo before making a new ruling.</span>
+    <span><code>topology-mentomate-003 · pm:codex:mentomate</code></span>
+  </footer>
+
+  <script id="pretext-vendor">var x0=["BN","BN","BN","BN","BN","BN","BN","BN","BN","S","B","S","WS","B","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","B","B","B","S","WS","ON","ON","ET","ET","ET","ON","ON","ON","ON","ON","ON","CS","ON","CS","ON","EN","EN","EN","EN","EN","EN","EN","EN","EN","EN","ON","ON","ON","ON","ON","ON","ON","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","ON","ON","ON","ON","ON","ON","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","ON","ON","ON","ON","BN","BN","BN","BN","BN","BN","B","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","CS","ON","ET","ET","ET","ET","ON","ON","ON","ON","L","ON","ON","ON","ON","ON","ET","ET","EN","EN","ON","L","ON","ON","ON","EN","L","ON","ON","ON","ON","ON","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","ON","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","ON","L","L","L","L","L","L","L","L"],g0=["AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","CS","AL","ON","ON","NSM","NSM","NSM","NSM","NSM","NSM","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","AL","AL","AL","AL","AL","AL","AL","AN","AN","AN","AN","AN","AN","AN","AN","AN","AN","ET","AN","AN","AL","AL","AL","NSM","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","ON","NSM","NSM","NSM","NSM","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL"];function m0(O){if(O<=255)return x0[O];if(1424<=O&&O<=1524)return"R";if(1536<=O&&O<=1791)return g0[O&255];if(1792<=O&&O<=2220)return"AL";return"L"}function r0(O){let _=O.length;if(_===0)return null;let J=Array(_),Y=0;for(let V=0;V<_;V++){let $=m0(O.charCodeAt(V));if($==="R"||$==="AL"||$==="AN")Y++;J[V]=$}if(Y===0)return null;let X=_/Y<0.3?0:1,R=new Int8Array(_);for(let V=0;V<_;V++)R[V]=X;let Z=X&1?"R":"L",Q=Z,f=Q;for(let V=0;V<_;V++)if(J[V]==="NSM")J[V]=f;else f=J[V];f=Q;for(let V=0;V<_;V++){let $=J[V];if($==="EN")J[V]=f==="AL"?"AN":"EN";else if($==="R"||$==="L"||$==="AL")f=$}for(let V=0;V<_;V++)if(J[V]==="AL")J[V]="R";for(let V=1;V<_-1;V++){if(J[V]==="ES"&&J[V-1]==="EN"&&J[V+1]==="EN")J[V]="EN";if(J[V]==="CS"&&(J[V-1]==="EN"||J[V-1]==="AN")&&J[V+1]===J[V-1])J[V]=J[V-1]}for(let V=0;V<_;V++){if(J[V]!=="EN")continue;let $;for($=V-1;$>=0&&J[$]==="ET";$--)J[$]="EN";for($=V+1;$<_&&J[$]==="ET";$++)J[$]="EN"}for(let V=0;V<_;V++){let $=J[V];if($==="WS"||$==="ES"||$==="ET"||$==="CS")J[V]="ON"}f=Q;for(let V=0;V<_;V++){let $=J[V];if($==="EN")J[V]=f==="L"?"L":"EN";else if($==="R"||$==="L")f=$}for(let V=0;V<_;V++){if(J[V]!=="ON")continue;let $=V+1;while($<_&&J[$]==="ON")$++;let u=V>0?J[V-1]:Q,q=$<_?J[$]:Q,D=u!=="L"?"R":"L";if(D===(q!=="L"?"R":"L"))for(let K=V;K<$;K++)J[K]=D;V=$-1}for(let V=0;V<_;V++)if(J[V]==="ON")J[V]=Z;for(let V=0;V<_;V++){let $=J[V];if((R[V]&1)===0){if($==="R")R[V]++;else if($==="AN"||$==="EN")R[V]+=2}else if($==="L"||$==="AN"||$==="EN")R[V]++}return R}function u0(O,_){let J=r0(O);if(J===null)return null;let Y=new Int8Array(_.length);for(let X=0;X<_.length;X++)Y[X]=J[_[X]];return Y}var a0=/[ \t\n\r\f]+/g,s0=/[\t\n\r\f]| {2,}|^ | $/;function d0(O){let _=O??"normal";return _==="pre-wrap"?{mode:_,preserveOrdinarySpaces:!0,preserveHardBreaks:!0}:{mode:_,preserveOrdinarySpaces:!1,preserveHardBreaks:!1}}function i0(O){if(!s0.test(O))return O;let _=O.replace(a0," ");if(_.charCodeAt(0)===32)_=_.slice(1);if(_.length>0&&_.charCodeAt(_.length-1)===32)_=_.slice(0,-1);return _}function t0(O){if(!/[\r\f]/.test(O))return O.replace(/\r\n/g,`
+`);return O.replace(/\r\n/g,`
+`).replace(/[\r\f]/g,`
+`)}var d=null,V0;function n0(){if(d===null)d=new Intl.Segmenter(V0,{granularity:"word"});return d}function z0(){d=null}function j0(O){let _=O&&O.length>0?O:void 0;if(V0===_)return;V0=_,d=null}var e0=/\p{Script=Arabic}/u,O0=/\p{M}/u,b0=/\p{Nd}/u;function X0(O){return e0.test(O)}function p(O){for(let _ of O){let J=_.codePointAt(0);if(J>=19968&&J<=40959||J>=13312&&J<=19903||J>=131072&&J<=173791||J>=173824&&J<=177983||J>=177984&&J<=178207||J>=178208&&J<=183983||J>=183984&&J<=191471||J>=196608&&J<=201551||J>=63744&&J<=64255||J>=194560&&J<=195103||J>=12288&&J<=12351||J>=12352&&J<=12447||J>=12448&&J<=12543||J>=44032&&J<=55215||J>=65280&&J<=65519)return!0}return!1}var $0=new Set(["，","．","！","：","；","？","、","。","・","）","〕","〉","》","」","』","】","〗","〙","〛","ー","々","〻","ゝ","ゞ","ヽ","ヾ"]),i=new Set(['"',"(","[","{","“","‘","«","‹","（","〔","〈","《","「","『","【","〖","〘","〚"]),Q0=new Set(["'","’"]),r=new Set([".",",","!","?",":",";","،","؛","؟","।","॥","၊","။","၌","၍","၏",")","]","}","%",'"',"”","’","»","›","…"]),OO=new Set([":",".","،","؛"]),_O=new Set(["၏"]),JO=new Set(["”","’","»","›","」","』","】","》","〉","〕","）"]);function RO(O){if(q0(O))return!0;let _=!1;for(let J of O){if(r.has(J)){_=!0;continue}if(_&&O0.test(J))continue;return!1}return _}function VO(O){for(let _ of O)if(!$0.has(_)&&!r.has(_))return!1;return O.length>0}function XO(O){if(q0(O))return!0;for(let _ of O)if(!i.has(_)&&!Q0.has(_)&&!O0.test(_))return!1;return O.length>0}function q0(O){let _=!1;for(let J of O){if(J==="\\"||O0.test(J))continue;if(i.has(J)||r.has(J)||Q0.has(J)){_=!0;continue}return!1}return _}function YO(O){let _=Array.from(O),J=_.length;while(J>0){let Y=_[J-1];if(O0.test(Y)){J--;continue}if(i.has(Y)||Q0.has(Y)){J--;continue}break}if(J<=0||J===_.length)return null;return{head:_.slice(0,J).join(""),tail:_.slice(J).join("")}}function ZO(O,_){if(O.length===0)return!1;for(let J of O)if(J!==_)return!1;return!0}function $O(O){if(!X0(O)||O.length===0)return!1;return OO.has(O[O.length-1])}function QO(O){if(O.length===0)return!1;return _O.has(O[O.length-1])}function qO(O){if(O.length<2||O[0]!==" ")return null;let _=O.slice(1);if(/^\p{M}+$/u.test(_))return{space:" ",marks:_};return null}function D0(O){for(let _=O.length-1;_>=0;_--){let J=O[_];if(JO.has(J))return!0;if(!r.has(J))return!1}return!1}function DO(O,_){if(_.preserveOrdinarySpaces||_.preserveHardBreaks){if(O===" ")return"preserved-space";if(O==="\t")return"tab";if(_.preserveHardBreaks&&O===`
+`)return"hard-break"}if(O===" ")return"space";if(O===" "||O===" "||O==="⁠"||O==="\uFEFF")return"glue";if(O==="​")return"zero-width-break";if(O==="­")return"soft-hyphen";return"text"}function NO(O,_,J,Y){let X=[],R=null,Z="",Q=J,f=!1,V=0;for(let $ of O){let u=DO($,Y),q=u==="text"&&_;if(R!==null&&u===R&&q===f){Z+=$,V+=$.length;continue}if(R!==null)X.push({text:Z,isWordLike:f,kind:R,start:Q});R=u,Z=$,Q=J+V,f=q,V+=$.length}if(R!==null)X.push({text:Z,isWordLike:f,kind:R,start:Q});return X}function Y0(O){return O==="space"||O==="preserved-space"||O==="zero-width-break"||O==="hard-break"}var fO=/^[A-Za-z][A-Za-z0-9+.-]*:$/;function HO(O,_){let J=O.texts[_];if(J.startsWith("www."))return!0;return fO.test(J)&&_+1<O.len&&O.kinds[_+1]==="text"&&O.texts[_+1]==="//"}function UO(O){return O.includes("?")&&(O.includes("://")||O.startsWith("www."))}function MO(O){let _=O.texts.slice(),J=O.isWordLike.slice(),Y=O.kinds.slice(),X=O.starts.slice();for(let Z=0;Z<O.len;Z++){if(Y[Z]!=="text"||!HO(O,Z))continue;let Q=Z+1;while(Q<O.len&&!Y0(Y[Q])){_[Z]+=_[Q],J[Z]=!0;let f=_[Q].includes("?");if(Y[Q]="text",_[Q]="",Q++,f)break}}let R=0;for(let Z=0;Z<_.length;Z++){let Q=_[Z];if(Q.length===0)continue;if(R!==Z)_[R]=Q,J[R]=J[Z],Y[R]=Y[Z],X[R]=X[Z];R++}return _.length=R,J.length=R,Y.length=R,X.length=R,{len:R,texts:_,isWordLike:J,kinds:Y,starts:X}}function CO(O){let _=[],J=[],Y=[],X=[];for(let R=0;R<O.len;R++){let Z=O.texts[R];if(_.push(Z),J.push(O.isWordLike[R]),Y.push(O.kinds[R]),X.push(O.starts[R]),!UO(Z))continue;let Q=R+1;if(Q>=O.len||Y0(O.kinds[Q]))continue;let f="",V=O.starts[Q],$=Q;while($<O.len&&!Y0(O.kinds[$]))f+=O.texts[$],$++;if(f.length>0)_.push(f),J.push(!0),Y.push("text"),X.push(V),R=$-1}return{len:_.length,texts:_,isWordLike:J,kinds:Y,starts:X}}var FO=new Set([":","-","/","×",",",".","+","–","—"]),K0=/^[A-Za-z0-9_]+[,:;]*$/,vO=/[,:;]+$/;function E0(O){for(let _ of O)if(b0.test(_))return!0;return!1}function Z0(O){if(O.length===0)return!1;for(let _ of O){if(b0.test(_)||FO.has(_))continue;return!1}return!0}function uO(O){let _=[],J=[],Y=[],X=[];for(let R=0;R<O.len;R++){let Z=O.texts[R],Q=O.kinds[R];if(Q==="text"&&Z0(Z)&&E0(Z)){let f=Z,V=R+1;while(V<O.len&&O.kinds[V]==="text"&&Z0(O.texts[V]))f+=O.texts[V],V++;_.push(f),J.push(!0),Y.push("text"),X.push(O.starts[R]),R=V-1;continue}_.push(Z),J.push(O.isWordLike[R]),Y.push(Q),X.push(O.starts[R])}return{len:_.length,texts:_,isWordLike:J,kinds:Y,starts:X}}function KO(O){let _=[],J=[],Y=[],X=[];for(let R=0;R<O.len;R++){let Z=O.texts[R],Q=O.kinds[R],f=O.isWordLike[R];if(Q==="text"&&f&&K0.test(Z)){let V=Z,$=R+1;while(vO.test(V)&&$<O.len&&O.kinds[$]==="text"&&O.isWordLike[$]&&K0.test(O.texts[$]))V+=O.texts[$],$++;_.push(V),J.push(!0),Y.push("text"),X.push(O.starts[R]),R=$-1;continue}_.push(Z),J.push(f),Y.push(Q),X.push(O.starts[R])}return{len:_.length,texts:_,isWordLike:J,kinds:Y,starts:X}}function zO(O){let _=[],J=[],Y=[],X=[];for(let R=0;R<O.len;R++){let Z=O.texts[R];if(O.kinds[R]==="text"&&Z.includes("-")){let Q=Z.split("-"),f=Q.length>1;for(let V=0;V<Q.length;V++){let $=Q[V];if(!f)break;if($.length===0||!E0($)||!Z0($))f=!1}if(f){let V=0;for(let $=0;$<Q.length;$++){let u=Q[$],q=$<Q.length-1?`${u}-`:u;_.push(q),J.push(!0),Y.push("text"),X.push(O.starts[R]+V),V+=q.length}continue}}_.push(Z),J.push(O.isWordLike[R]),Y.push(O.kinds[R]),X.push(O.starts[R])}return{len:_.length,texts:_,isWordLike:J,kinds:Y,starts:X}}function jO(O){let _=[],J=[],Y=[],X=[],R=0;while(R<O.len){let Z=O.texts[R],Q=O.isWordLike[R],f=O.kinds[R],V=O.starts[R];if(f==="glue"){let $=Z,u=V;R++;while(R<O.len&&O.kinds[R]==="glue")$+=O.texts[R],R++;if(R<O.len&&O.kinds[R]==="text")Z=$+O.texts[R],Q=O.isWordLike[R],f="text",V=u,R++;else{_.push($),J.push(!1),Y.push("glue"),X.push(u);continue}}else R++;if(f==="text")while(R<O.len&&O.kinds[R]==="glue"){let $="";while(R<O.len&&O.kinds[R]==="glue")$+=O.texts[R],R++;if(R<O.len&&O.kinds[R]==="text"){Z+=$+O.texts[R],Q=Q||O.isWordLike[R],R++;continue}Z+=$}_.push(Z),J.push(Q),Y.push(f),X.push(V)}return{len:_.length,texts:_,isWordLike:J,kinds:Y,starts:X}}function bO(O){let _=O.texts.slice(),J=O.isWordLike.slice(),Y=O.kinds.slice(),X=O.starts.slice();for(let R=0;R<_.length-1;R++){if(Y[R]!=="text"||Y[R+1]!=="text")continue;if(!p(_[R])||!p(_[R+1]))continue;let Z=YO(_[R]);if(Z===null)continue;_[R]=Z.head,_[R+1]=Z.tail+_[R+1],X[R+1]=X[R]+Z.head.length}return{len:_.length,texts:_,isWordLike:J,kinds:Y,starts:X}}function EO(O,_,J){let Y=n0(),X=0,R=[],Z=[],Q=[],f=[];for(let q of Y.segment(O))for(let D of NO(q.segment,q.isWordLike??!1,q.index,J)){let b=D.kind==="text";if(_.carryCJKAfterClosingQuote&&b&&X>0&&Q[X-1]==="text"&&p(D.text)&&p(R[X-1])&&D0(R[X-1]))R[X-1]+=D.text,Z[X-1]=Z[X-1]||D.isWordLike;else if(b&&X>0&&Q[X-1]==="text"&&VO(D.text)&&p(R[X-1]))R[X-1]+=D.text,Z[X-1]=Z[X-1]||D.isWordLike;else if(b&&X>0&&Q[X-1]==="text"&&QO(R[X-1]))R[X-1]+=D.text,Z[X-1]=Z[X-1]||D.isWordLike;else if(b&&X>0&&Q[X-1]==="text"&&D.isWordLike&&X0(D.text)&&$O(R[X-1]))R[X-1]+=D.text,Z[X-1]=!0;else if(b&&!D.isWordLike&&X>0&&Q[X-1]==="text"&&D.text.length===1&&D.text!=="-"&&D.text!=="—"&&ZO(R[X-1],D.text))R[X-1]+=D.text;else if(b&&!D.isWordLike&&X>0&&Q[X-1]==="text"&&(RO(D.text)||D.text==="-"&&Z[X-1]))R[X-1]+=D.text;else R[X]=D.text,Z[X]=D.isWordLike,Q[X]=D.kind,f[X]=D.start,X++}for(let q=1;q<X;q++)if(Q[q]==="text"&&!Z[q]&&q0(R[q])&&Q[q-1]==="text")R[q-1]+=R[q],Z[q-1]=Z[q-1]||Z[q],R[q]="";for(let q=X-2;q>=0;q--)if(Q[q]==="text"&&!Z[q]&&XO(R[q])){let D=q+1;while(D<X&&R[D]==="")D++;if(D<X&&Q[D]==="text")R[D]=R[q]+R[D],f[D]=f[q],R[q]=""}let V=0;for(let q=0;q<X;q++){let D=R[q];if(D.length===0)continue;if(V!==q)R[V]=D,Z[V]=Z[q],Q[V]=Q[q],f[V]=f[q];V++}R.length=V,Z.length=V,Q.length=V,f.length=V;let $=jO({len:V,texts:R,isWordLike:Z,kinds:Q,starts:f}),u=bO(KO(zO(uO(CO(MO($))))));for(let q=0;q<u.len-1;q++){let D=qO(u.texts[q]);if(D===null)continue;if(u.kinds[q]!=="space"&&u.kinds[q]!=="preserved-space"||u.kinds[q+1]!=="text"||!X0(u.texts[q+1]))continue;u.texts[q]=D.space,u.isWordLike[q]=!1,u.kinds[q]=u.kinds[q]==="preserved-space"?"preserved-space":"space",u.texts[q+1]=D.marks+u.texts[q+1],u.starts[q+1]=u.starts[q]+D.space.length}return u}function GO(O,_){if(O.len===0)return[];if(!_.preserveHardBreaks)return[{startSegmentIndex:0,endSegmentIndex:O.len,consumedEndSegmentIndex:O.len}];let J=[],Y=0;for(let X=0;X<O.len;X++){if(O.kinds[X]!=="hard-break")continue;J.push({startSegmentIndex:Y,endSegmentIndex:X,consumedEndSegmentIndex:X+1}),Y=X+1}if(Y<O.len)J.push({startSegmentIndex:Y,endSegmentIndex:O.len,consumedEndSegmentIndex:O.len});return J}function N0(O,_,J="normal"){let Y=d0(J),X=Y.mode==="pre-wrap"?t0(O):i0(O);if(X.length===0)return{normalized:X,chunks:[],len:0,texts:[],isWordLike:[],kinds:[],starts:[]};let R=EO(X,_,Y);return{normalized:X,chunks:GO(R,Y),...R}}var a=null,f0=new Map,s=null,PO=/\p{Emoji_Presentation}/u,AO=/[\p{Emoji_Presentation}\p{Extended_Pictographic}\p{Regional_Indicator}\uFE0F\u20E3]/u,_0=null,H0=new Map;function U0(){if(a!==null)return a;if(typeof OffscreenCanvas<"u")return a=new OffscreenCanvas(1,1).getContext("2d"),a;if(typeof document<"u")return a=document.createElement("canvas").getContext("2d"),a;throw Error("Text measurement requires OffscreenCanvas or a DOM canvas context.")}function BO(O){let _=f0.get(O);if(!_)_=new Map,f0.set(O,_);return _}function x(O,_){let J=_.get(O);if(J===void 0)J={width:U0().measureText(O).width,containsCJK:p(O)},_.set(O,J);return J}function h(){if(s!==null)return s;if(typeof navigator>"u")return s={lineFitEpsilon:0.005,carryCJKAfterClosingQuote:!1,preferPrefixWidthsForBreakableRuns:!1,preferEarlySoftHyphenBreak:!1},s;let O=navigator.userAgent,J=navigator.vendor==="Apple Computer, Inc."&&O.includes("Safari/")&&!O.includes("Chrome/")&&!O.includes("Chromium/")&&!O.includes("CriOS/")&&!O.includes("FxiOS/")&&!O.includes("EdgiOS/"),Y=O.includes("Chrome/")||O.includes("Chromium/")||O.includes("CriOS/")||O.includes("Edg/");return s={lineFitEpsilon:J?0.015625:0.005,carryCJKAfterClosingQuote:Y,preferPrefixWidthsForBreakableRuns:J,preferEarlySoftHyphenBreak:J},s}function TO(O){let _=O.match(/(\d+(?:\.\d+)?)\s*px/);return _?parseFloat(_[1]):16}function M0(){if(_0===null)_0=new Intl.Segmenter(void 0,{granularity:"grapheme"});return _0}function wO(O){return PO.test(O)||O.includes("️")}function G0(O){return AO.test(O)}function yO(O,_){let J=H0.get(O);if(J!==void 0)return J;let Y=U0();Y.font=O;let X=Y.measureText("\uD83D\uDE00").width;if(J=0,X>_+0.5&&typeof document<"u"&&document.body!==null){let R=document.createElement("span");R.style.font=O,R.style.display="inline-block",R.style.visibility="hidden",R.style.position="absolute",R.textContent="\uD83D\uDE00",document.body.appendChild(R);let Z=R.getBoundingClientRect().width;if(document.body.removeChild(R),X-Z>0.5)J=X-Z}return H0.set(O,J),J}function LO(O){let _=0,J=M0();for(let Y of J.segment(O))if(wO(Y.segment))_++;return _}function WO(O,_){if(_.emojiCount===void 0)_.emojiCount=LO(O);return _.emojiCount}function g(O,_,J){if(J===0)return _.width;return _.width-WO(O,_)*J}function P0(O,_,J,Y){if(_.graphemeWidths!==void 0)return _.graphemeWidths;let X=[],R=M0();for(let Z of R.segment(O)){let Q=x(Z.segment,J);X.push(g(Z.segment,Q,Y))}return _.graphemeWidths=X.length>1?X:null,_.graphemeWidths}function A0(O,_,J,Y){if(_.graphemePrefixWidths!==void 0)return _.graphemePrefixWidths;let X=[],R=M0(),Z="";for(let Q of R.segment(O)){Z+=Q.segment;let f=x(Z,J);X.push(g(Z,f,Y))}return _.graphemePrefixWidths=X.length>1?X:null,_.graphemePrefixWidths}function B0(O,_){let J=U0();J.font=O;let Y=BO(O),X=TO(O),R=_?yO(O,X):0;return{cache:Y,fontSize:X,emojiCorrection:R}}function T0(){f0.clear(),H0.clear(),_0=null}function m(O){return O==="space"||O==="preserved-space"||O==="tab"||O==="zero-width-break"||O==="soft-hyphen"}function SO(O){return O==="space"}function w0(O,_){if(_<=0)return 0;let J=O%_;if(Math.abs(J)<=0.000001)return _;return _-J}function t(O,_,J,Y){if(!Y||_===null)return O[J];return _[J]-(J>0?_[J-1]:0)}function y0(O,_,J,Y,X,R){let Z=0,Q=_;while(Z<O.length){let f=R?_+O[Z]:Q+O[Z];if((Z+1<O.length?f+X:f)>J+Y)break;Q=f,Z++}return{fitCount:Z,fittedWidth:Q}}function L0(O,_){for(let J=0;J<O.chunks.length;J++){let Y=O.chunks[J];if(_<Y.consumedEndSegmentIndex)return J}return-1}function kO(O,_){let{segmentIndex:J,graphemeIndex:Y}=_;if(J>=O.widths.length)return null;if(Y>0)return _;let X=L0(O,J);if(X<0)return null;let R=O.chunks[X];if(R.startSegmentIndex===R.endSegmentIndex&&J===R.startSegmentIndex)return{segmentIndex:J,graphemeIndex:0};if(J<R.startSegmentIndex)J=R.startSegmentIndex;while(J<R.endSegmentIndex){let Z=O.kinds[J];if(Z!=="space"&&Z!=="zero-width-break"&&Z!=="soft-hyphen")return{segmentIndex:J,graphemeIndex:0};J++}if(R.consumedEndSegmentIndex>=O.widths.length)return null;return{segmentIndex:R.consumedEndSegmentIndex,graphemeIndex:0}}function W0(O,_){if(O.simpleLineWalkFastPath)return IO(O,_);return J0(O,_)}function IO(O,_){let{widths:J,kinds:Y,breakableWidths:X,breakablePrefixWidths:R}=O;if(J.length===0)return 0;let Z=h(),Q=Z.lineFitEpsilon,f=0,V=0,$=!1;function u(q){let D=J[q];if(D>_&&X[q]!==null){let b=X[q],K=R[q]??null;V=0;for(let j=0;j<b.length;j++){let B=t(b,K,j,Z.preferPrefixWidthsForBreakableRuns);if(V>0&&V+B>_+Q)f++,V=B;else{if(V===0)f++;V+=B}}}else V=D,f++;$=!0}for(let q=0;q<J.length;q++){let D=J[q],b=Y[q];if(!$){u(q);continue}let K=V+D;if(K>_+Q){if(SO(b))continue;V=0,$=!1,u(q);continue}V=K}if(!$)return f+1;return f}function cO(O,_,J){let{widths:Y,kinds:X,breakableWidths:R,breakablePrefixWidths:Z}=O;if(Y.length===0)return 0;let Q=h(),f=Q.lineFitEpsilon,V=0,$=0,u=!1,q=0,D=0,b=0,K=0,j=-1,B=0;function k(){j=-1,B=0}function y(H=b,z=K,W=$){V++,J?.({startSegmentIndex:q,startGraphemeIndex:D,endSegmentIndex:H,endGraphemeIndex:z,width:W}),$=0,u=!1,k()}function A(H,z){u=!0,q=H,D=0,b=H+1,K=0,$=z}function T(H,z,W){u=!0,q=H,D=z,b=H,K=z+1,$=W}function L(H,z){if(!u){A(H,z);return}$+=z,b=H+1,K=0}function C(H,z){if(!m(X[H]))return;j=H+1,B=$-z}function F(H){P(H,0)}function P(H,z){let W=R[H],c=Z[H]??null;for(let I=z;I<W.length;I++){let o=t(W,c,I,Q.preferPrefixWidthsForBreakableRuns);if(!u){T(H,I,o);continue}if($+o>_+f)y(),T(H,I,o);else $+=o,b=H,K=I+1}if(u&&b===H&&K===W.length)b=H+1,K=0}let E=0;while(E<Y.length){let H=Y[E],z=X[E];if(!u){if(H>_&&R[E]!==null)F(E);else A(E,H);C(E,H),E++;continue}if($+H>_+f){if(m(z)){L(E,H),y(E+1,0,$-H),E++;continue}if(j>=0){y(j,0,B);continue}if(H>_&&R[E]!==null){y(),F(E),E++;continue}y();continue}L(E,H),C(E,H),E++}if(u)y();return V}function J0(O,_,J){if(O.simpleLineWalkFastPath)return cO(O,_,J);let{widths:Y,lineEndFitAdvances:X,lineEndPaintAdvances:R,kinds:Z,breakableWidths:Q,breakablePrefixWidths:f,discretionaryHyphenWidth:V,tabStopAdvance:$,chunks:u}=O;if(Y.length===0||u.length===0)return 0;let q=h(),D=q.lineFitEpsilon,b=0,K=0,j=!1,B=0,k=0,y=0,A=0,T=-1,L=0,C=0,F=null;function P(){T=-1,L=0,C=0,F=null}function E(N=y,M=A,v=K){b++,J?.({startSegmentIndex:B,startGraphemeIndex:k,endSegmentIndex:N,endGraphemeIndex:M,width:v}),K=0,j=!1,P()}function H(N,M){j=!0,B=N,k=0,y=N+1,A=0,K=M}function z(N,M,v){j=!0,B=N,k=M,y=N,A=M+1,K=v}function W(N,M){if(!j){H(N,M);return}K+=M,y=N+1,A=0}function c(N,M){if(!m(Z[N]))return;let v=Z[N]==="tab"?0:X[N],w=Z[N]==="tab"?M:R[N];T=N+1,L=K-M+v,C=K-M+w,F=Z[N]}function I(N){o(N,0)}function o(N,M){let v=Q[N],w=f[N]??null;for(let G=M;G<v.length;G++){let l=t(v,w,G,q.preferPrefixWidthsForBreakableRuns);if(!j){z(N,G,l);continue}if(K+l>_+D)E(),z(N,G,l);else K+=l,y=N,A=G+1}if(j&&y===N&&A===v.length)y=N+1,A=0}function S(N){if(F!=="soft-hyphen")return!1;let M=Q[N];if(M===null)return!1;let v=q.preferPrefixWidthsForBreakableRuns?f[N]??M:M,w=v!==M,{fitCount:G,fittedWidth:l}=y0(v,K,_,D,V,w);if(G===0)return!1;if(K=l,y=N,A=G,P(),G===M.length)return y=N+1,A=0,!0;return E(N,G,l+V),o(N,G),!0}function U(N){b++,J?.({startSegmentIndex:N.startSegmentIndex,startGraphemeIndex:0,endSegmentIndex:N.consumedEndSegmentIndex,endGraphemeIndex:0,width:0}),P()}for(let N=0;N<u.length;N++){let M=u[N];if(M.startSegmentIndex===M.endSegmentIndex){U(M);continue}j=!1,K=0,B=M.startSegmentIndex,k=0,y=M.startSegmentIndex,A=0,P();let v=M.startSegmentIndex;while(v<M.endSegmentIndex){let w=Z[v],G=w==="tab"?w0(K,$):Y[v];if(w==="soft-hyphen"){if(j)y=v+1,A=0,T=v+1,L=K+V,C=K+V,F=w;v++;continue}if(!j){if(G>_&&Q[v]!==null)I(v);else H(v,G);c(v,G),v++;continue}if(K+G>_+D){let n=K+(w==="tab"?0:X[v]),e=K+(w==="tab"?G:R[v]);if(F==="soft-hyphen"&&q.preferEarlySoftHyphenBreak&&L<=_+D){E(T,0,C);continue}if(F==="soft-hyphen"&&S(v)){v++;continue}if(m(w)&&n<=_+D){W(v,G),E(v+1,0,e),v++;continue}if(T>=0&&L<=_+D){E(T,0,C);continue}if(G>_&&Q[v]!==null){E(),I(v),v++;continue}E();continue}W(v,G),c(v,G),v++}if(j){let w=T===M.consumedEndSegmentIndex?C:K;E(M.consumedEndSegmentIndex,0,w)}}return b}function S0(O,_,J){let Y=kO(O,_);if(Y===null)return null;if(O.simpleLineWalkFastPath)return oO(O,Y,J);let X=L0(O,Y.segmentIndex);if(X<0)return null;let R=O.chunks[X];if(R.startSegmentIndex===R.endSegmentIndex)return{startSegmentIndex:R.startSegmentIndex,startGraphemeIndex:0,endSegmentIndex:R.consumedEndSegmentIndex,endGraphemeIndex:0,width:0};let{widths:Z,lineEndFitAdvances:Q,lineEndPaintAdvances:f,kinds:V,breakableWidths:$,breakablePrefixWidths:u,discretionaryHyphenWidth:q,tabStopAdvance:D}=O,b=h(),K=b.lineFitEpsilon,j=0,B=!1,k=Y.segmentIndex,y=Y.graphemeIndex,A=k,T=y,L=-1,C=0,F=0,P=null;function E(){L=-1,C=0,F=0,P=null}function H(U=A,N=T,M=j){if(!B)return null;return{startSegmentIndex:k,startGraphemeIndex:y,endSegmentIndex:U,endGraphemeIndex:N,width:M}}function z(U,N){B=!0,A=U+1,T=0,j=N}function W(U,N,M){B=!0,A=U,T=N+1,j=M}function c(U,N){if(!B){z(U,N);return}j+=N,A=U+1,T=0}function I(U,N){if(!m(V[U]))return;let M=V[U]==="tab"?0:Q[U],v=V[U]==="tab"?N:f[U];L=U+1,C=j-N+M,F=j-N+v,P=V[U]}function o(U,N){let M=$[U],v=u[U]??null;for(let w=N;w<M.length;w++){let G=t(M,v,w,b.preferPrefixWidthsForBreakableRuns);if(!B){W(U,w,G);continue}if(j+G>J+K)return H();j+=G,A=U,T=w+1}if(B&&A===U&&T===M.length)A=U+1,T=0;return null}function S(U){if(P!=="soft-hyphen"||L<0)return null;let N=$[U]??null;if(N!==null){let M=b.preferPrefixWidthsForBreakableRuns?u[U]??N:N,v=M!==N,{fitCount:w,fittedWidth:G}=y0(M,j,J,K,q,v);if(w===N.length)return j=G,A=U+1,T=0,E(),null;if(w>0)return H(U,w,G+q)}if(C<=J+K)return H(L,0,F);return null}for(let U=Y.segmentIndex;U<R.endSegmentIndex;U++){let N=V[U],M=U===Y.segmentIndex?Y.graphemeIndex:0,v=N==="tab"?w0(j,D):Z[U];if(N==="soft-hyphen"&&M===0){if(B)A=U+1,T=0,L=U+1,C=j+q,F=j+q,P=N;continue}if(!B){if(M>0){let G=o(U,M);if(G!==null)return G}else if(v>J&&$[U]!==null){let G=o(U,0);if(G!==null)return G}else z(U,v);I(U,v);continue}if(j+v>J+K){let G=j+(N==="tab"?0:Q[U]),l=j+(N==="tab"?v:f[U]);if(P==="soft-hyphen"&&b.preferEarlySoftHyphenBreak&&C<=J+K)return H(L,0,F);let n=S(U);if(n!==null)return n;if(m(N)&&G<=J+K)return c(U,v),H(U+1,0,l);if(L>=0&&C<=J+K)return H(L,0,F);if(v>J&&$[U]!==null){let e=H();if(e!==null)return e;let v0=o(U,0);if(v0!==null)return v0}return H()}c(U,v),I(U,v)}if(L===R.consumedEndSegmentIndex&&T===0)return H(R.consumedEndSegmentIndex,0,F);return H(R.consumedEndSegmentIndex,0,j)}function oO(O,_,J){let{widths:Y,kinds:X,breakableWidths:R,breakablePrefixWidths:Z}=O,Q=h(),f=Q.lineFitEpsilon,V=0,$=!1,u=_.segmentIndex,q=_.graphemeIndex,D=u,b=q,K=-1,j=0;function B(C=D,F=b,P=V){if(!$)return null;return{startSegmentIndex:u,startGraphemeIndex:q,endSegmentIndex:C,endGraphemeIndex:F,width:P}}function k(C,F){$=!0,D=C+1,b=0,V=F}function y(C,F,P){$=!0,D=C,b=F+1,V=P}function A(C,F){if(!$){k(C,F);return}V+=F,D=C+1,b=0}function T(C,F){if(!m(X[C]))return;K=C+1,j=V-F}function L(C,F){let P=R[C],E=Z[C]??null;for(let H=F;H<P.length;H++){let z=t(P,E,H,Q.preferPrefixWidthsForBreakableRuns);if(!$){y(C,H,z);continue}if(V+z>J+f)return B();V+=z,D=C,b=H+1}if($&&D===C&&b===P.length)D=C+1,b=0;return null}for(let C=_.segmentIndex;C<Y.length;C++){let F=Y[C],P=X[C],E=C===_.segmentIndex?_.graphemeIndex:0;if(!$){if(E>0){let z=L(C,E);if(z!==null)return z}else if(F>J&&R[C]!==null){let z=L(C,0);if(z!==null)return z}else k(C,F);T(C,F);continue}if(V+F>J+f){if(m(P))return A(C,F),B(C+1,0,V-F);if(K>=0)return B(K,0,j);if(F>J&&R[C]!==null){let z=B();if(z!==null)return z;let W=L(C,0);if(W!==null)return W}return B()}A(C,F),T(C,F)}return B()}var R0=null,C0=new WeakMap;function I0(){if(R0===null)R0=new Intl.Segmenter(void 0,{granularity:"grapheme"});return R0}function lO(O){if(O)return{widths:[],lineEndFitAdvances:[],lineEndPaintAdvances:[],kinds:[],simpleLineWalkFastPath:!0,segLevels:null,breakableWidths:[],breakablePrefixWidths:[],discretionaryHyphenWidth:0,tabStopAdvance:0,chunks:[],segments:[]};return{widths:[],lineEndFitAdvances:[],lineEndPaintAdvances:[],kinds:[],simpleLineWalkFastPath:!0,segLevels:null,breakableWidths:[],breakablePrefixWidths:[],discretionaryHyphenWidth:0,tabStopAdvance:0,chunks:[]}}function c0(O,_,J){let Y=I0(),X=h(),{cache:R,emojiCorrection:Z}=B0(_,G0(O.normalized)),Q=g("-",x("-",R),Z),V=g(" ",x(" ",R),Z)*8;if(O.len===0)return lO(J);let $=[],u=[],q=[],D=[],b=O.chunks.length<=1,K=J?[]:null,j=[],B=[],k=J?[]:null,y=Array.from({length:O.len}),A=Array.from({length:O.len});function T(F,P,E,H,z,W,c,I){if(z!=="text"&&z!=="space"&&z!=="zero-width-break")b=!1;if($.push(P),u.push(E),q.push(H),D.push(z),K?.push(W),j.push(c),B.push(I),k!==null)k.push(F)}for(let F=0;F<O.len;F++){y[F]=$.length;let P=O.texts[F],E=O.isWordLike[F],H=O.kinds[F],z=O.starts[F];if(H==="soft-hyphen"){T(P,0,Q,Q,H,z,null,null),A[F]=$.length;continue}if(H==="hard-break"){T(P,0,0,0,H,z,null,null),A[F]=$.length;continue}if(H==="tab"){T(P,0,0,0,H,z,null,null),A[F]=$.length;continue}let W=x(P,R);if(H==="text"&&W.containsCJK){let S="",U=0;for(let N of Y.segment(P)){let M=N.segment;if(S.length===0){S=M,U=N.index;continue}if(i.has(S)||$0.has(M)||r.has(M)||X.carryCJKAfterClosingQuote&&p(M)&&D0(S)){S+=M;continue}let v=x(S,R),w=g(S,v,Z);T(S,w,w,w,"text",z+U,null,null),S=M,U=N.index}if(S.length>0){let N=x(S,R),M=g(S,N,Z);T(S,M,M,M,"text",z+U,null,null)}A[F]=$.length;continue}let c=g(P,W,Z),I=H==="space"||H==="preserved-space"||H==="zero-width-break"?0:c,o=H==="space"||H==="zero-width-break"?0:c;if(E&&P.length>1){let S=P0(P,W,R,Z),U=X.preferPrefixWidthsForBreakableRuns?A0(P,W,R,Z):null;T(P,c,I,o,H,z,S,U)}else T(P,c,I,o,H,z,null,null);A[F]=$.length}let L=hO(O.chunks,y,A),C=K===null?null:u0(O.normalized,K);if(k!==null)return{widths:$,lineEndFitAdvances:u,lineEndPaintAdvances:q,kinds:D,simpleLineWalkFastPath:b,segLevels:C,breakableWidths:j,breakablePrefixWidths:B,discretionaryHyphenWidth:Q,tabStopAdvance:V,chunks:L,segments:k};return{widths:$,lineEndFitAdvances:u,lineEndPaintAdvances:q,kinds:D,simpleLineWalkFastPath:b,segLevels:C,breakableWidths:j,breakablePrefixWidths:B,discretionaryHyphenWidth:Q,tabStopAdvance:V,chunks:L}}function hO(O,_,J){let Y=[];for(let X=0;X<O.length;X++){let R=O[X],Z=R.startSegmentIndex<_.length?_[R.startSegmentIndex]:J[J.length-1]??0,Q=R.endSegmentIndex<_.length?_[R.endSegmentIndex]:J[J.length-1]??0,f=R.consumedEndSegmentIndex<_.length?_[R.consumedEndSegmentIndex]:J[J.length-1]??0;Y.push({startSegmentIndex:Z,endSegmentIndex:Q,consumedEndSegmentIndex:f})}return Y}function o0(O,_,J,Y){let X=N0(O,h(),Y?.whiteSpace);return c0(X,_,J)}function V1(O,_,J){let Y=performance.now(),X=N0(O,h(),J?.whiteSpace),R=performance.now(),Z=c0(X,_,!1),Q=performance.now(),f=0;for(let V of Z.breakableWidths)if(V!==null)f++;return{analysisMs:R-Y,measureMs:Q-R,totalMs:Q-Y,analysisSegments:X.len,preparedSegments:Z.widths.length,breakableSegments:f}}function X1(O,_,J){return o0(O,_,!1,J)}function Y1(O,_,J){return o0(O,_,!0,J)}function F0(O){return O}function Z1(O,_,J){let Y=W0(F0(O),_);return{lineCount:Y,height:Y*J}}function k0(O,_,J){let Y=J.get(O);if(Y!==void 0)return Y;Y=[];let X=I0();for(let R of X.segment(_[O]))Y.push(R.segment);return J.set(O,Y),Y}function l0(O){let _=C0.get(O);if(_!==void 0)return _;return _=new Map,C0.set(O,_),_}function pO(O,_,J,Y){return Y>0&&O[Y-1]==="soft-hyphen"&&!(_===Y&&J>0)}function xO(O,_,J,Y,X,R,Z){let Q="",f=pO(_,Y,X,R);for(let V=Y;V<R;V++){if(_[V]==="soft-hyphen"||_[V]==="hard-break")continue;if(V===Y&&X>0)Q+=k0(V,O,J).slice(X).join("");else Q+=O[V]}if(Z>0){if(f)Q+="-";Q+=k0(R,O,J).slice(Y===R?X:0,Z).join("")}else if(f)Q+="-";return Q}function h0(O,_,J,Y,X,R,Z){return{text:xO(O.segments,O.kinds,_,Y,X,R,Z),width:J,start:{segmentIndex:Y,graphemeIndex:X},end:{segmentIndex:R,graphemeIndex:Z}}}function gO(O,_,J){return h0(O,_,J.width,J.startSegmentIndex,J.startGraphemeIndex,J.endSegmentIndex,J.endGraphemeIndex)}function p0(O){return{width:O.width,start:{segmentIndex:O.startSegmentIndex,graphemeIndex:O.startGraphemeIndex},end:{segmentIndex:O.endSegmentIndex,graphemeIndex:O.endGraphemeIndex}}}function mO(O,_,J){let Y=S0(O,_,J);if(Y===null)return null;return p0(Y)}function rO(O,_){return h0(O,l0(O),_.width,_.start.segmentIndex,_.start.graphemeIndex,_.end.segmentIndex,_.end.graphemeIndex)}function $1(O,_,J){if(O.widths.length===0)return 0;return J0(F0(O),_,(Y)=>{J(p0(Y))})}function Q1(O,_,J){let Y=mO(O,_,J);if(Y===null)return null;return rO(O,Y)}function q1(O,_,J){let Y=[];if(O.widths.length===0)return{lineCount:0,height:0,lines:Y};let X=l0(O),R=J0(F0(O),_,(Z)=>{Y.push(gO(O,X,Z))});return{lineCount:R,height:R*J,lines:Y}}function aO(){z0(),R0=null,C0=new WeakMap,T0()}function D1(O){j0(O),aO()}globalThis.Pretext={walkLineRanges:$1,setLocale:D1,profilePrepare:V1,prepareWithSegments:Y1,prepare:X1,layoutWithLines:q1,layoutNextLine:Q1,layout:Z1,clearCache:aO};
+</script>
+  <script type="module">
+    const pretext = globalThis.Pretext ?? null;
+
+    const WI = (id, title, stage, state, priority, bid, url, note, original = false) => ({
+      id, title, stage, state, priority, bid, url, note, original, type: 'wi'
+    });
+    const OPQ = (id, title, status, priority, deadline, url, note) => ({
+      id, title, status, priority, deadline, url, note, type: 'opq'
+    });
+    const ACT = (id, title, note) => ({ id, title, note, type: 'action' });
+    const OUT = (id, title, note, reference = false) => ({ id, title, note, type: reference ? 'reference' : 'outcome' });
+
+    const nodes = new Map([
+      ['OPQ-60', OPQ('OPQ-60', 'Create Play record, listing, and Data Safety form', 'Open · record milestone satisfied', 'P1', null, 'https://app.notion.com/p/WI-1335-Play-Console-app-record-store-listing-Data-Safety-form-long-lead-39a8bce91f7c81c6aed1ef4314a944b1', 'The com.mentomate.app Play record exists; the row stays open for listing work.')],
+      ['MILESTONE-PLAY-RECORD', OUT('MILESTONE', 'Play app record exists', 'Satisfied. This breaks the apparent circle: bootstrap work no longer waits for final screenshots.')],
+      ['OPQ-37', OPQ('OPQ-37', 'Provide store credentials, EAS access, and Config-T go-ahead', 'Open', 'P1', null, 'https://app.notion.com/p/WI-1341-store-credentials-EAS-access-Config-T-go-ahead-39a8bce91f7c8197a2d9c5bbda91be59', 'Human access/input for the submission pipeline.')],
+      ['WI-1341', WI('WI-1341', 'Store submission pipeline: eas submit, Config-T, production build', 'Executing', 'Active', 'P2', null, 'https://app.notion.com/p/Store-submission-pipeline-eas-submit-Config-T-production-build-3928bce91f7c81859fd5e6e8f8ca799b', 'Claimed; PR open. Stale Awaiting Info was cleared.')],
+      ['OUT-INTERNAL-TRACK', OUT('OUTCOME', 'Internal-track AAB path', 'Can progress independently of final marketing-image selection.')],
+      ['WI-1328', WI('WI-1328', 'RevenueCat production monetization setup', 'Executing', 'Active', 'P1', 'BID-42 · Formed', 'https://app.notion.com/p/RevenueCat-production-monetization-setup-MVP-3928bce91f7c81c1aadbdf0ec5315671', 'Claimed; PR open. Parallel technical readiness branch.')],
+      ['OUT-MONETIZATION', OUT('OUTCOME', 'Production monetization ready', 'Parallel store-readiness outcome; not a screenshot prerequisite.')],
+
+      ['OPQ-102', OPQ('OPQ-102', 'Engage outsourced DPO retainer', 'Open', 'P1', '2026-07-24', 'https://app.notion.com/p/WI-1105-engage-outsourced-DPO-retainer-39e8bce91f7c8134ba37cebb369291ba', 'Human appointment with a near-term deadline.')],
+      ['WI-1105', WI('WI-1105', 'Appoint outsourced Data Protection Officer', 'Ready', 'Active', 'P1', null, 'https://app.notion.com/p/Appoint-outsourced-Data-Protection-Officer-DPO-38d8bce91f7c81c698f7c26f5df191f3', 'Human-led legal appointment.')],
+      ['WI-1106', WI('WI-1106', 'Produce pre-launch DPIA', 'Ready', 'Active', 'P1', null, 'https://app.notion.com/p/Produce-pre-launch-DPIA-data-protection-impact-assessment-38d8bce91f7c81e390ccf60fdd6502bb', 'Formally blocked by the DPO appointment and related legal inputs.')],
+      ['WI-1107', WI('WI-1107', 'Create Record of Processing Activities', 'Ready', 'Active', 'P1', null, 'https://app.notion.com/p/Create-Record-of-Processing-Activities-ROPA-38d8bce91f7c81ecab94d7de93acf5a0', 'Required compliance evidence for launch closure.')],
+      ['WI-1109', WI('WI-1109', 'Finalize and publish privacy policy', 'Ready', 'Active', 'P1', null, 'https://app.notion.com/p/Finalize-and-publish-privacy-policy-child-readable-summary-38d8bce91f7c81e692fed905db21c8e1', 'Feeds the store age/privacy declaration.')],
+      ['OPQ-109', OPQ('OPQ-109', 'Complete store age rating and kids-privacy declarations', 'Open', 'P1', null, 'https://app.notion.com/p/WI-1114-store-age-rating-kids-privacy-declarations-both-consoles-39e8bce91f7c8190b81cf48e3a10e2e1', 'Human console declarations.')],
+      ['WI-1114', WI('WI-1114', 'Complete store age rating and kids-privacy declarations', 'Ready', 'Active', 'P1', null, 'https://app.notion.com/p/Complete-store-age-rating-and-kids-privacy-declarations-both-stores-38d8bce91f7c81d288dbc7ce3f0ceacf', 'Formally blocked by the published privacy policy.')],
+      ['OPQ-108', OPQ('OPQ-108', 'Choose store-country availability and hard blocks', 'Open', 'P2', null, 'https://app.notion.com/p/WI-1115-store-country-availability-hard-blocks-console-config-39e8bce91f7c81f4a7c1c350e8aa2b73', 'Human product/legal availability choice.')],
+      ['WI-1115', WI('WI-1115', 'Configure store country availability and hard blocks', 'Ready', 'Active', 'P2', null, 'https://app.notion.com/p/Configure-store-country-availability-and-hard-blocks-38d8bce91f7c81cfb97fe4109ffd351c', 'Formal prerequisite of store publishing.')],
+      ['OPQ-110', OPQ('OPQ-110', 'Sign Art. 28 DPAs and per-vendor TIAs', 'Open', 'P1', '2026-07-24', 'https://app.notion.com/p/WI-1192-sign-Art-28-DPAs-business-no-training-tier-per-vendor-TIAs-39e8bce91f7c81f78567c31c2cf1444e', 'Human signatures and vendor terms.')],
+      ['WI-1192', WI('WI-1192', 'Sign processor DPAs and complete transfer TIAs', 'Ready', 'Active', 'P1', 'BID-38 · Running', 'https://app.notion.com/p/Sign-Art-28-processor-DPAs-business-tier-no-training-and-complete-per-vendor-transfer-TIAs-38f8bce91f7c81e4972ac27890f1c4b4', 'Human/legal gate in the consent-security batch.')],
+      ['OPQ-24', OPQ('OPQ-24', 'Obtain counsel-approved retention periods', 'Open', 'P1', '2026-07-25', 'https://app.notion.com/p/WI-1194-obtain-counsel-approved-retention-periods-39a8bce91f7c81bcb751e1ff098f4a7a', 'Human legal values are still required.')],
+      ['WI-1194', WI('WI-1194', 'Close retention gaps and set retention periods', 'Executing', 'Active', 'P1', null, 'https://app.notion.com/p/Close-retention-gaps-verify-transcript-purge-age-out-verbatim-quotes-set-retention-periods-add-d-38f8bce91f7c819a8b96f44f9a617277', 'Claimed; PR open. Legal values remain the human input.')],
+      ['OPQ-132', OPQ('OPQ-132', 'Rule the image-retention Data Safety assertion', 'Open · blocking', 'P1', null, 'https://app.notion.com/p/WI-1561-AC-3-store-data-safety-worksheet-cannot-honestly-assert-image-non-retention-or-on-device-on-3a48bce91f7c815d8dd9e5503fead92e', 'A truthful Data Safety answer requires an explicit ruling.')],
+      ['WI-1561', WI('WI-1561', 'Reconcile store Data Safety worksheet with current code', 'Executing', 'Blocked', 'P1', 'BID-11 · Running', 'https://app.notion.com/p/Store-data-safety-worksheet-stale-vs-current-code-age-11-vs-13-legacy-tables-3938bce91f7c8169a061e444da9c09e3', 'Changes requested; genuinely blocked on the Data Safety ruling.')],
+      ['WI-1577', WI('WI-1577', 'Launch compliance closure — final pre-store gate', 'Executing', 'Active', 'P1', 'BID-38 · Running', 'https://app.notion.com/p/Launch-compliance-closure-FINAL-GATE-pre-store-submission-re-run-3938bce91f7c81b3b8efe44edd96b841', 'Convergence gate for the legal and operational evidence.')],
+      ['GATE-COMPLIANCE', OUT('GATE', 'Compliance gate ready', 'Visual join for the prerequisites that must clear before store publishing.')],
+
+      ['WI-2331', WI('WI-2331', 'Restore V2 wayfinding and active-profile orientation', 'Executing', 'Active', 'P2', 'BID-28 · Running', 'https://app.notion.com/p/Restore-V2-wayfinding-and-active-profile-orientation-on-pushed-screens-3a08bce91f7c81eabf86f04df85d80c4', 'Bounded dead-fallback fix in an active batch; PR open.', true)],
+      ['WI-2677', WI('WI-2677', 'Exhaustive V2 back-navigation sweep beyond WI-2331', 'Captured', 'Active', 'P3', null, 'https://app.notion.com/p/Exhaustive-V2-back-navigation-sweep-beyond-WI-2331-s-dead-fallback-fix-3a68bce91f7c81b7a6a6d10a745adca9', 'Split follow-up; not a blocker for the bounded WI-2331 completion.')],
+      ['WI-2678', WI('WI-2678', 'Net-new active-profile/account identity UI on pushed screens', 'Captured', 'Active', 'P3', null, 'https://app.notion.com/p/Net-new-active-profile-account-identity-UI-on-pushed-V2-screens-3a68bce91f7c8137a9dce635ef897a66', 'Split follow-up; not smuggled into WI-2331 scope.')],
+      ['WI-2176', WI('WI-2176', 'Keep Support-hub selector clear of avatar and heading', 'Executing', 'Active', 'P2', 'BID-33 · Running', 'https://app.notion.com/p/Keep-the-Support-hub-scope-selector-clear-of-the-avatar-and-page-heading-on-small-phones-39f8bce91f7c816380a9ee3abb08ff44', 'Directly changes the small-phone screenshot composition.', true)],
+      ['WI-2189', WI('WI-2189', 'Route V2 Family settings to a family-scoped destination', 'Reviewing', 'Active', 'P2', 'BID-18 · Running', 'https://app.notion.com/p/Route-V2-Family-settings-to-a-family-scoped-destination-39f8bce91f7c819985c1f970ed9b08c9', 'Landed into review; family/settings image should use the reviewed behavior.', true)],
+      ['ACT-CAPTURE-V2', ACT('ACTION', 'Capture stable V2 pushed-screen scene', 'Untracked production action after the bounded fix is landed and visually verified.')],
+      ['ACT-CAPTURE-SUPPORT', ACT('ACTION', 'Capture Supporter home/header', 'Untracked production action after WI-2176 layout stabilizes.')],
+      ['ACT-CAPTURE-FAMILY', ACT('ACTION', 'Capture family/settings scene', 'Untracked production action after WI-2189 review/QA clears.')],
+      ['OUT-CORE-SCENES', OUT('CANDIDATES', 'Core V2 / Support / Family scenes', 'High-priority candidate set for the final screenshot selection.')],
+
+      ['OPQ-40', OPQ('OPQ-40', 'Trust-package design pass', 'Open', 'P1', null, 'https://app.notion.com/p/WI-1767-trust-package-design-pass-39a8bce91f7c81cc9a11ef4933ba4631', 'Human design pass for the trust package.')],
+      ['WI-1767', WI('WI-1767', 'Trust-package batch design pass — all five slices', 'Refining', 'Active', 'P1', null, 'https://app.notion.com/p/Trust-package-batch-design-pass-Zuzka-all-five-slices-3998bce91f7c8171a0efe67286b355c8', 'The real formal upstream gate for WI-1502.')],
+      ['WI-1502', WI('WI-1502', 'Add visible review-promise Mentor card', 'Refining', 'Active', 'P1', null, 'https://app.notion.com/p/Add-visible-review-promise-Mentor-card-3928bce91f7c81e8a2a6f3f6d2566596', 'Draft can be taken now; final Mentor-home image waits for this branch.', true)],
+      ['OPQ-128', OPQ('OPQ-128', 'Mentor UI focal decisions', 'Open row · rulings consumed', 'P1', null, 'https://app.notion.com/p/Mentor-UI-focal-decisions-two-one-line-product-calls-2106-2129-fast-track-3a28bce91f7c8143b8dfc2db17ed1edf', 'The decisions have already been consumed by WI-2106 and WI-2129.')],
+      ['WI-2129', WI('WI-2129', 'Consolidate duplicate Mentor-home prompt cards', 'Ready', 'Active', 'P2', 'BID-45 · Formed', 'https://app.notion.com/p/Consolidate-duplicate-Mentor-home-prompt-cards-39f8bce91f7c81a598b3e4d693774064', 'Ready in the UI-polish batch; affects Mentor-home composition.')],
+      ['ACT-CAPTURE-MENTOR', ACT('ACTION', 'Finalize Mentor-home screenshot', 'Take drafts earlier if useful; finalize only after the chosen Mentor composition settles.')],
+      ['OUT-MENTOR-SCENE', OUT('CANDIDATE', 'Mentor-home scene', 'Late candidate because the visible promise and prompt-card composition are still moving.')],
+
+      ['WI-2237', WI('WI-2237', 'Gate supporter scopes on accepted visibility', 'Closed', 'Done', 'P1', 'BID-16 · Closed', 'https://app.notion.com/p/Gate-supporter-scopes-and-structural-reads-on-accepted-visibility-39f8bce91f7c81ea8274e0ec33509e3f', 'Historical gate is closed; stale blocker edges to WI-2232/WI-2233 were removed.')],
+      ['ACT-ROUTE-2232', ACT('ACTION', 'Refine WI-2232 and choose an execution home', 'No upstream delivery blocker remains; this is routing/lifecycle work, not a product dependency.')],
+      ['WI-2232', WI('WI-2232', 'Rehome durable reports and recaps into person Journal', 'Refining', 'Active', 'P1', null, 'https://app.notion.com/p/Rehome-existing-durable-reports-and-recaps-into-person-Journal-39f8bce91f7c8115a29aeca8d5651913', 'The stale WI-2237 blocker was removed; can advance after refinement.', true)],
+      ['WI-2128', WI('WI-2128', 'Bind joined learner credentials to their own person', 'Refining', 'Active', 'P0', null, 'https://app.notion.com/p/Bind-joined-learner-credentials-to-their-own-person-instead-of-the-family-owner-39f8bce91f7c8169bb17eabccc7f0260', 'Identity prerequisite at the head of the shared-record chain.')],
+      ['WI-2127', WI('WI-2127', 'Complete visibility consent after family join', 'Refining', 'Active', 'P1', null, 'https://app.notion.com/p/Complete-visibility-consent-after-family-join-supportership-opt-in-39f8bce91f7c8102a773dfa1644690ee', 'Formally blocked by WI-2128; formally blocks WI-2233.')],
+      ['WI-2233', WI('WI-2233', 'Expose supportee shared-record mirror in Me Journal', 'Refining', 'Active', 'P1', null, 'https://app.notion.com/p/Expose-the-supportee-side-shared-record-mirror-in-Me-Journal-39f8bce91f7c81debd94c3615644c79c', 'Genuinely gated by WI-2127 → WI-2128.', true)],
+      ['WI-2106', WI('WI-2106', 'Use one coherent focal animation in Journal empty states', 'Executing', 'Active', 'P2', 'BID-45 · Formed', 'https://app.notion.com/p/Use-one-coherent-focal-animation-in-Journal-empty-states-39e8bce91f7c81dab364e622907ee1a6', 'Decision consumed; active visual-polish work that affects the Journal image.')],
+      ['ACT-CAPTURE-JOURNAL', ACT('ACTION', 'Finalize Journal screenshot', 'Wait for the selected Journal content and empty-state composition to be stable.')],
+      ['OUT-JOURNAL-SCENE', OUT('CANDIDATE', 'Journal scene', 'Late/optional candidate because the shared-record branch has real identity/consent gates.')],
+
+      ['WI-1447', WI('WI-1447', 'Fix voice locale fallback mappings', 'Closed', 'Done', 'P2', null, 'https://app.notion.com/p/Fix-voice-STT-TTS-locale-fallback-for-non-language-subjects-add-cs-ja-pl-en-locale-mappings-3928bce91f7c81149db0fa4d40901f06', 'The formal prerequisite shown on WI-1777 is already closed.')],
+      ['OPQ-93', OPQ('OPQ-93', 'Rule real speak-along audio vs narrowed AC', 'Closed', 'P1', null, 'https://app.notion.com/p/WI-1777-shadowing-BLOCKING-implement-real-speak-along-audio-or-descope-narrow-the-AC-39b8bce91f7c81fdb8dbd50138e4cee3', 'Human scope ruling is complete.')],
+      ['ACT-RECONCILE-1777', ACT('ACTION', 'Reconcile WI-1777 claim/rework ownership', 'Lifecycle hygiene: the delivery scope is executable, but ownership/rework state must stay honest.')],
+      ['WI-1777', WI('WI-1777', 'Four Strands repeat-after-me attempt persistence', 'Executing', 'Active', 'P2', null, 'https://app.notion.com/p/Four-Strands-repeat-after-me-slice-attempt-persistence-3998bce91f7c81a89de4cf4a9f9e1f7b', 'Changes requested. Only matters to screenshots if speaking practice is selected.', true)],
+      ['OPQ-51', OPQ('OPQ-51', 'Device voice QA for cs/ja/pl/en', 'Open', 'P2', null, 'https://app.notion.com/p/Batch-2-device-voice-QA-TTS-STT-for-cs-ja-pl-en-locales-39a8bce91f7c81049a77db888408c486', 'Post-delivery device QA; it does not block starting WI-1777.')],
+      ['OUT-SPEAKING-SCENE', OUT('OPTIONAL', 'Speaking-practice scene', 'Include only if the scene is selected and device behavior is credible.')],
+      ['ACT-AVOID-CHOOSER', ACT('ACTION', 'Use camera/post-capture homework scene', 'Safe path: avoid the manual subject chooser and do not make WI-2196 a screenshot blocker.')],
+      ['ACT-UNPARK-2196', ACT('ACTION', 'Unpark only if manual chooser is selected', 'Explicit product/portfolio choice; otherwise leave the parked item alone.')],
+      ['WI-2196', WI('WI-2196', 'Create the correct homework subject when others exist', 'Ready', 'Parked', 'P1', 'BID-33 · Running', 'https://app.notion.com/p/Allow-creating-the-correct-homework-subject-when-other-subjects-exist-39f8bce91f7c81d98df4e0056a8a2ed7', 'Parked inside the heavy batch; avoid the chooser and it is non-blocking.', true)],
+      ['OUT-HOMEWORK-SAFE', OUT('CANDIDATE', 'Homework camera/post-capture scene', 'Available without waiting for WI-2196.')],
+      ['OUT-HOMEWORK-CHOOSER', OUT('OPTIONAL', 'Manual subject-chooser scene', 'Only available after an explicit unpark/priority decision and delivery of WI-2196.')],
+
+      ['REF-STORE-TECH', OUT('FROM BRANCH 1', 'Store bootstrap ready', 'Internal-track AAB path and monetization can advance independently.', true)],
+      ['REF-COMPLIANCE', OUT('FROM BRANCH 2', 'Compliance gate ready', 'Formal store-publishing blockers: WI-1114, WI-1115, and WI-1577.', true)],
+      ['REF-CORE', OUT('FROM BRANCH 3', 'Core scene candidates', 'V2 pushed screens, Supporter header, and Family/settings.', true)],
+      ['REF-MENTOR', OUT('FROM BRANCH 4', 'Mentor candidate', 'Draft early; finalize after visual composition settles.', true)],
+      ['REF-JOURNAL', OUT('FROM BRANCH 5', 'Journal candidate', 'Late/optional while identity and consent work remains.', true)],
+      ['REF-OPTIONAL', OUT('FROM BRANCH 6', 'Optional speaking/homework scenes', 'Do not make these global blockers unless explicitly selected.', true)],
+      ['ACT-CHOOSE-SCENES', ACT('ACTION', 'Choose the final Google Play scenes', 'Human product/marketing selection. This converts candidates into an actual capture plan.')],
+      ['OUT-FINAL-PACKAGE', OUT('OUTCOME', 'Final screenshot package', 'Stable, captured, and ready to place in the store listing.')],
+      ['WI-1335', WI('WI-1335', 'Publish Play/App Store records, listings, and privacy labels', 'Ready', 'Active', 'P1', null, 'https://app.notion.com/p/Store-publishing-App-Store-Play-Console-records-listings-privacy-labels-ratings-3928bce91f7c81a0bf57da8f2327632b', 'Formally blocked by WI-1114, WI-1115, and WI-1577. Final screenshots are a listing deliverable, not a bootstrap prerequisite.')],
+      ['OUT-PLAY-LISTING', OUT('ENDPOINT', 'Google Play listing ready for submission', 'The convergence point—not the starting point of the technical store branch.')]
+    ]);
+
+    const branches = [
+      {
+        id: 'store-technical',
+        index: '01',
+        title: 'Store technical bootstrap',
+        summary: 'The Play record exists; credentials, AAB submission, and monetization can move without final screenshots.',
+        columns: 5,
+        rows: 3,
+        layout: [
+          ['OPQ-60', 1, 1], ['MILESTONE-PLAY-RECORD', 2, 1],
+          ['OPQ-37', 2, 2], ['WI-1341', 3, 2], ['OUT-INTERNAL-TRACK', 5, 2],
+          ['WI-1328', 3, 3], ['OUT-MONETIZATION', 5, 3]
+        ],
+        edges: [
+          ['OPQ-60', 'MILESTONE-PLAY-RECORD', 'lifecycle', 'milestone met'],
+          ['MILESTONE-PLAY-RECORD', 'WI-1341', 'coordination', 'record available'],
+          ['OPQ-37', 'WI-1341', 'lifecycle', 'access / go-ahead'],
+          ['WI-1341', 'OUT-INTERNAL-TRACK', 'coordination', 'bootstrap path'],
+          ['MILESTONE-PLAY-RECORD', 'WI-1328', 'coordination', 'record available'],
+          ['WI-1328', 'OUT-MONETIZATION', 'coordination', 'production setup']
+        ],
+        footnote: '<strong>Why this is not circular:</strong> OPQ-60 records that the app-record milestone is already satisfied. WI-1335 can remain open for the final listing without blocking WI-1341 or WI-1328.'
+      },
+      {
+        id: 'store-compliance',
+        index: '02',
+        title: 'Store compliance and legal closure',
+        summary: 'Human legal inputs and truthful console declarations form the real long-lead path into publishing.',
+        columns: 5,
+        rows: 7,
+        layout: [
+          ['OPQ-102', 1, 1], ['WI-1105', 2, 1], ['WI-1106', 3, 1],
+          ['OPQ-24', 1, 2], ['WI-1194', 2, 2],
+          ['OPQ-110', 1, 3], ['WI-1192', 2, 3],
+          ['OPQ-132', 1, 4], ['WI-1561', 2, 4], ['WI-1577', 4, 4], ['GATE-COMPLIANCE', 5, 4],
+          ['OPQ-109', 1, 5], ['WI-1109', 2, 5], ['WI-1114', 3, 5],
+          ['OPQ-108', 1, 6], ['WI-1115', 3, 6],
+          ['WI-1107', 2, 7]
+        ],
+        edges: [
+          ['OPQ-102', 'WI-1105', 'lifecycle', 'appointment'],
+          ['WI-1105', 'WI-1106', 'formal', 'Blocked by'],
+          ['OPQ-24', 'WI-1194', 'lifecycle', 'retention values'],
+          ['OPQ-110', 'WI-1192', 'lifecycle', 'signatures'],
+          ['OPQ-132', 'WI-1561', 'lifecycle', 'Data Safety ruling'],
+          ['OPQ-109', 'WI-1114', 'lifecycle', 'console action'],
+          ['WI-1109', 'WI-1114', 'formal', 'Blocked by'],
+          ['OPQ-108', 'WI-1115', 'lifecycle', 'availability choice'],
+          ['WI-1106', 'WI-1577', 'coordination', 'evidence'],
+          ['WI-1107', 'WI-1577', 'coordination', 'evidence'],
+          ['WI-1194', 'WI-1577', 'coordination', 'evidence'],
+          ['WI-1192', 'WI-1577', 'coordination', 'evidence'],
+          ['WI-1561', 'WI-1577', 'coordination', 'truthful worksheet'],
+          ['WI-1577', 'GATE-COMPLIANCE', 'coordination', 'launch gate'],
+          ['WI-1114', 'GATE-COMPLIANCE', 'coordination', 'store declaration'],
+          ['WI-1115', 'GATE-COMPLIANCE', 'coordination', 'country config']
+        ],
+        footnote: '<strong>Long-lead attention:</strong> OPQ-102 and OPQ-110 are due 24 July; OPQ-24 is due 25 July. OPQ-132 is the explicit blocking ruling for WI-1561.'
+      },
+      {
+        id: 'core-scenes',
+        index: '03',
+        title: 'V2, Supporter, and Family screenshot branch',
+        summary: 'The highest-value final-image candidates already sit in active or reviewing batches.',
+        columns: 5,
+        rows: 4,
+        layout: [
+          ['WI-2331', 1, 1], ['ACT-CAPTURE-V2', 3, 1], ['OUT-CORE-SCENES', 5, 2],
+          ['WI-2677', 2, 2], ['WI-2678', 2, 3],
+          ['WI-2176', 1, 3], ['ACT-CAPTURE-SUPPORT', 3, 3],
+          ['WI-2189', 1, 4], ['ACT-CAPTURE-FAMILY', 3, 4]
+        ],
+        edges: [
+          ['WI-2331', 'ACT-CAPTURE-V2', 'lifecycle', 'land + verify'],
+          ['WI-2331', 'WI-2677', 'lifecycle', 'scope split'],
+          ['WI-2331', 'WI-2678', 'lifecycle', 'scope split'],
+          ['WI-2176', 'ACT-CAPTURE-SUPPORT', 'lifecycle', 'layout stable'],
+          ['WI-2189', 'ACT-CAPTURE-FAMILY', 'lifecycle', 'review clears'],
+          ['ACT-CAPTURE-V2', 'OUT-CORE-SCENES', 'coordination', 'candidate'],
+          ['ACT-CAPTURE-SUPPORT', 'OUT-CORE-SCENES', 'coordination', 'candidate'],
+          ['ACT-CAPTURE-FAMILY', 'OUT-CORE-SCENES', 'coordination', 'candidate']
+        ],
+        footnote: '<strong>Scope protection:</strong> WI-2677 and WI-2678 are captured follow-ups, not extra acceptance criteria silently added to WI-2331.'
+      },
+      {
+        id: 'mentor-scene',
+        index: '04',
+        title: 'Mentor-home screenshot branch',
+        summary: 'One formal design dependency and one parallel polish item converge on the final composition.',
+        columns: 5,
+        rows: 3,
+        layout: [
+          ['OPQ-40', 1, 1], ['WI-1767', 2, 1], ['WI-1502', 3, 1],
+          ['OPQ-128', 1, 3], ['WI-2129', 3, 3],
+          ['ACT-CAPTURE-MENTOR', 4, 2], ['OUT-MENTOR-SCENE', 5, 2]
+        ],
+        edges: [
+          ['OPQ-40', 'WI-1767', 'lifecycle', 'human design pass'],
+          ['WI-1767', 'WI-1502', 'formal', 'Blocked by'],
+          ['OPQ-128', 'WI-2129', 'cleared', 'ruling consumed'],
+          ['WI-1502', 'ACT-CAPTURE-MENTOR', 'coordination', 'promise card'],
+          ['WI-2129', 'ACT-CAPTURE-MENTOR', 'coordination', 'prompt layout'],
+          ['ACT-CAPTURE-MENTOR', 'OUT-MENTOR-SCENE', 'coordination', 'final image']
+        ],
+        footnote: '<strong>Practical rule:</strong> a draft Mentor image is safe now; do not call it final until WI-1502 and the selected WI-2129 composition are settled.'
+      },
+      {
+        id: 'journal-scene',
+        index: '05',
+        title: 'Journal and linking screenshot branch',
+        summary: 'WI-2232 can advance; WI-2233 has a genuine identity → consent dependency chain.',
+        columns: 6,
+        rows: 5,
+        layout: [
+          ['WI-2237', 1, 1], ['ACT-ROUTE-2232', 2, 1], ['WI-2232', 3, 1],
+          ['WI-2128', 1, 3], ['WI-2127', 2, 3], ['WI-2233', 3, 3],
+          ['OPQ-128', 1, 5], ['WI-2106', 3, 5],
+          ['ACT-CAPTURE-JOURNAL', 5, 3], ['OUT-JOURNAL-SCENE', 6, 3]
+        ],
+        edges: [
+          ['WI-2237', 'WI-2232', 'cleared', 'stale edge removed'],
+          ['ACT-ROUTE-2232', 'WI-2232', 'lifecycle', 'refine + home'],
+          ['WI-2128', 'WI-2127', 'formal', 'Blocked by'],
+          ['WI-2127', 'WI-2233', 'formal', 'Blocked by'],
+          ['OPQ-128', 'WI-2106', 'cleared', 'ruling consumed'],
+          ['WI-2232', 'ACT-CAPTURE-JOURNAL', 'coordination', 'durable content'],
+          ['WI-2233', 'ACT-CAPTURE-JOURNAL', 'coordination', 'shared mirror'],
+          ['WI-2106', 'ACT-CAPTURE-JOURNAL', 'coordination', 'visual polish'],
+          ['ACT-CAPTURE-JOURNAL', 'OUT-JOURNAL-SCENE', 'coordination', 'final image']
+        ],
+        footnote: '<strong>Important correction:</strong> the stale WI-2237 blocker was removed from WI-2232 and WI-2233. WI-2127 remains a real blocker for WI-2233, and WI-2127 is itself blocked by WI-2128.'
+      },
+      {
+        id: 'optional-scenes',
+        index: '06',
+        title: 'Speaking practice and homework fallback',
+        summary: 'Both branches are optional scene choices; neither should slow the core screenshot package by default.',
+        columns: 6,
+        rows: 5,
+        layout: [
+          ['WI-1447', 1, 1], ['OPQ-93', 1, 2], ['ACT-RECONCILE-1777', 2, 2],
+          ['WI-1777', 3, 2], ['OPQ-51', 4, 2], ['OUT-SPEAKING-SCENE', 6, 2],
+          ['ACT-AVOID-CHOOSER', 1, 4], ['OUT-HOMEWORK-SAFE', 6, 4],
+          ['ACT-UNPARK-2196', 1, 5], ['WI-2196', 3, 5], ['OUT-HOMEWORK-CHOOSER', 6, 5]
+        ],
+        edges: [
+          ['WI-1447', 'WI-1777', 'cleared', 'formal gate closed'],
+          ['OPQ-93', 'WI-1777', 'cleared', 'ruling closed'],
+          ['ACT-RECONCILE-1777', 'WI-1777', 'lifecycle', 'honest ownership'],
+          ['WI-1777', 'OPQ-51', 'lifecycle', 'then device QA'],
+          ['OPQ-51', 'OUT-SPEAKING-SCENE', 'coordination', 'if selected'],
+          ['ACT-AVOID-CHOOSER', 'OUT-HOMEWORK-SAFE', 'coordination', 'safe scene'],
+          ['ACT-UNPARK-2196', 'WI-2196', 'lifecycle', 'only if selected'],
+          ['WI-2196', 'OUT-HOMEWORK-CHOOSER', 'coordination', 'chooser fixed']
+        ],
+        footnote: '<strong>Default roadmap:</strong> omit speaking practice if it is not a chosen scene; use camera/post-capture homework screens and leave WI-2196 parked.'
+      },
+      {
+        id: 'final-convergence',
+        index: '07',
+        title: 'Final scene selection and store listing',
+        summary: 'Parallel branches converge here; this is the only place screenshot finalization meets store publishing.',
+        columns: 6,
+        rows: 6,
+        layout: [
+          ['REF-STORE-TECH', 1, 1], ['REF-COMPLIANCE', 1, 2],
+          ['REF-CORE', 1, 3], ['REF-MENTOR', 1, 4], ['REF-JOURNAL', 1, 5], ['REF-OPTIONAL', 1, 6],
+          ['ACT-CHOOSE-SCENES', 3, 4], ['OUT-FINAL-PACKAGE', 4, 4],
+          ['WI-1335', 5, 3], ['OUT-PLAY-LISTING', 6, 3]
+        ],
+        edges: [
+          ['REF-CORE', 'ACT-CHOOSE-SCENES', 'coordination', 'high priority'],
+          ['REF-MENTOR', 'ACT-CHOOSE-SCENES', 'coordination', 'candidate'],
+          ['REF-JOURNAL', 'ACT-CHOOSE-SCENES', 'coordination', 'late / optional'],
+          ['REF-OPTIONAL', 'ACT-CHOOSE-SCENES', 'coordination', 'optional'],
+          ['ACT-CHOOSE-SCENES', 'OUT-FINAL-PACKAGE', 'lifecycle', 'capture plan'],
+          ['OUT-FINAL-PACKAGE', 'WI-1335', 'lifecycle', 'listing asset'],
+          ['REF-STORE-TECH', 'WI-1335', 'coordination', 'technical readiness'],
+          ['REF-COMPLIANCE', 'WI-1335', 'formal', 'WI-1114 / 1115 / 1577'],
+          ['WI-1335', 'OUT-PLAY-LISTING', 'coordination', 'publish listing']
+        ],
+        footnote: '<strong>Result:</strong> final screenshots and compliance gate WI-1335. WI-1335 does not point backward and block the already-created Play record or the technical bootstrap branch.'
+      }
+    ];
+
+    const originalIds = ['WI-2331', 'WI-2176', 'WI-1502', 'WI-2232', 'WI-2233', 'WI-2189', 'WI-1777', 'WI-2196'];
+    const originalSummary = {
+      'WI-2331': 'Finish the bounded fix; do not wait for its captured follow-ups.',
+      'WI-2176': 'Wait before the final Supporter header capture.',
+      'WI-1502': 'Draft now; final image waits on WI-1767 / OPQ-40.',
+      'WI-2232': 'Can advance after refinement and execution routing.',
+      'WI-2233': 'Waits on the real WI-2127 → WI-2128 chain.',
+      'WI-2189': 'In review; capture only after review/QA clears.',
+      'WI-1777': 'Only a screenshot concern if speaking practice is selected.',
+      'WI-2196': 'Avoid the chooser; leave parked unless that scene is selected.'
+    };
+
+    const state = {
+      formalOnly: false,
+      originals: true,
+      allCollapsed: false,
+      search: ''
+    };
+
+    const escapeHtml = (value = '') => String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+
+    function stageClass(stage = '') {
+      return `stage-${stage.toLowerCase().replaceAll(/\s+/g, '-')}`;
+    }
+
+    function nodeSearchText(node) {
+      return [
+        node.id, node.title, node.stage, node.state, node.priority, node.bid,
+        node.status, node.deadline, node.note, node.type
+      ].filter(Boolean).join(' ').toLowerCase();
+    }
+
+    function renderMeta(node) {
+      if (node.type === 'wi') {
+        return [
+          `<span class="meta-pill ${stageClass(node.stage)}">${escapeHtml(node.stage)}</span>`,
+          `<span class="meta-pill state-${escapeHtml(node.state.toLowerCase())}">${escapeHtml(node.state)}</span>`,
+          `<span class="meta-pill">${escapeHtml(node.priority)}</span>`,
+          `<span class="meta-pill">${escapeHtml(node.bid || 'No BID')}</span>`
+        ].join('');
+      }
+      if (node.type === 'opq') {
+        return [
+          `<span class="meta-pill">${escapeHtml(node.status)}</span>`,
+          `<span class="meta-pill">${escapeHtml(node.priority)}</span>`,
+          node.deadline ? `<span class="meta-pill">Due ${escapeHtml(node.deadline)}</span>` : ''
+        ].join('');
+      }
+      return `<span class="meta-pill">${node.type === 'action' ? 'Not tracked' : node.type === 'reference' ? 'Branch handoff' : 'Milestone'}</span>`;
+    }
+
+    function renderNode(id, col, row) {
+      const node = nodes.get(id);
+      const classes = ['graph-node', node.type];
+      if (node.original) classes.push('original');
+      const open = node.url
+        ? `<a class="node-open" href="${escapeHtml(node.url)}" target="_blank" rel="noreferrer" aria-label="Open ${escapeHtml(node.id)} in Notion" title="Open in Notion">↗</a>`
+        : '<span aria-hidden="true"></span>';
+      return `
+        <article
+          class="${classes.join(' ')}"
+          id="node-${escapeHtml(id)}"
+          data-node-id="${escapeHtml(id)}"
+          data-search="${escapeHtml(nodeSearchText(node))}"
+          style="grid-column:${col};grid-row:${row}"
+          tabindex="0"
+          aria-label="${escapeHtml(node.id)}: ${escapeHtml(node.title)}"
+        >
+          ${node.original ? '<span class="original-ribbon">Original list</span>' : ''}
+          <div class="node-topline">
+            <span class="node-id">${escapeHtml(node.id)}</span>
+            ${open}
+          </div>
+          <div class="node-title" data-pretext contenteditable="true" spellcheck="false">${escapeHtml(node.title)}</div>
+          <div class="node-meta">${renderMeta(node)}</div>
+          <div class="node-note" data-pretext contenteditable="true" spellcheck="false">${escapeHtml(node.note || '')}</div>
+        </article>`;
+    }
+
+    function renderBranches() {
+      const host = document.getElementById('branches');
+      host.innerHTML = branches.map(branch => `
+        <article class="branch" id="branch-${branch.id}" data-branch-id="${branch.id}" data-collapsed="false">
+          <header class="branch-header">
+            <span class="branch-index">${branch.index}</span>
+            <div class="branch-heading">
+              <h3>${escapeHtml(branch.title)}</h3>
+              <p>${escapeHtml(branch.summary)}</p>
+            </div>
+            <button class="branch-toggle" type="button" aria-expanded="true" aria-label="Collapse ${escapeHtml(branch.title)}">⌄</button>
+          </header>
+          <div class="canvas-shell">
+            <div class="branch-canvas" style="--cols:${branch.columns}">
+              <svg class="edge-layer" aria-hidden="true"></svg>
+              <div class="branch-grid">
+                ${branch.layout.map(([id, col, row]) => renderNode(id, col, row)).join('')}
+              </div>
+            </div>
+          </div>
+          <div class="branch-footnote">${branch.footnote}</div>
+        </article>
+      `).join('');
+
+      document.querySelectorAll('.branch-toggle').forEach(button => {
+        button.addEventListener('click', () => {
+          const branch = button.closest('.branch');
+          const collapsed = branch.dataset.collapsed === 'true';
+          branch.dataset.collapsed = String(!collapsed);
+          button.setAttribute('aria-expanded', String(collapsed));
+          button.setAttribute('aria-label', `${collapsed ? 'Collapse' : 'Expand'} ${branch.querySelector('h3').textContent}`);
+          requestAnimationFrame(drawAllEdges);
+        });
+      });
+    }
+
+    function renderOriginalTable() {
+      document.getElementById('original-table-body').innerHTML = originalIds.map(id => {
+        const node = nodes.get(id);
+        return `
+          <tr>
+            <td><a href="${escapeHtml(node.url)}" target="_blank" rel="noreferrer">${escapeHtml(id)} ↗</a></td>
+            <td><strong>${escapeHtml(node.stage)}</strong> · ${escapeHtml(node.state)} · ${escapeHtml(node.priority)}</td>
+            <td>${escapeHtml(node.bid || 'No BID assigned')}</td>
+            <td>${escapeHtml(originalSummary[id])}</td>
+          </tr>`;
+      }).join('');
+    }
+
+    function addMarkerDefs(svg, branchId) {
+      svg.innerHTML = `
+        <defs>
+          ${['formal', 'coordination', 'lifecycle', 'cleared'].map(type => `
+            <marker id="arrow-${branchId}-${type}" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L7,3.5 L0,7 z" fill="var(--${type === 'formal' ? 'blue' : type === 'coordination' ? 'amber' : type === 'lifecycle' ? 'purple' : 'green'})"></path>
+            </marker>`).join('')}
+        </defs>`;
+    }
+
+    function edgeGeometry(fromEl, toEl, canvas) {
+      const c = canvas.getBoundingClientRect();
+      const a = fromEl.getBoundingClientRect();
+      const b = toEl.getBoundingClientRect();
+      const ax = a.left - c.left + a.width / 2;
+      const ay = a.top - c.top + a.height / 2;
+      const bx = b.left - c.left + b.width / 2;
+      const by = b.top - c.top + b.height / 2;
+      const dx = bx - ax;
+      const dy = by - ay;
+      let start, end, d;
+
+      if (Math.abs(dx) >= Math.abs(dy) * .55) {
+        const direction = dx >= 0 ? 1 : -1;
+        start = { x: ax + direction * a.width / 2, y: ay };
+        end = { x: bx - direction * b.width / 2, y: by };
+        const bend = Math.max(34, Math.abs(end.x - start.x) * .48);
+        d = `M ${start.x} ${start.y} C ${start.x + direction * bend} ${start.y}, ${end.x - direction * bend} ${end.y}, ${end.x} ${end.y}`;
+      } else {
+        const direction = dy >= 0 ? 1 : -1;
+        start = { x: ax, y: ay + direction * a.height / 2 };
+        end = { x: bx, y: by - direction * b.height / 2 };
+        const bend = Math.max(30, Math.abs(end.y - start.y) * .48);
+        d = `M ${start.x} ${start.y} C ${start.x} ${start.y + direction * bend}, ${end.x} ${end.y - direction * bend}, ${end.x} ${end.y}`;
+      }
+      return { d, labelX: (start.x + end.x) / 2, labelY: (start.y + end.y) / 2 - 5 };
+    }
+
+    function drawBranchEdges(branch) {
+      const branchEl = document.getElementById(`branch-${branch.id}`);
+      if (!branchEl || branchEl.dataset.collapsed === 'true') return;
+      const canvas = branchEl.querySelector('.branch-canvas');
+      const svg = branchEl.querySelector('.edge-layer');
+      const width = canvas.scrollWidth;
+      const height = canvas.scrollHeight;
+      svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+      svg.setAttribute('width', width);
+      svg.setAttribute('height', height);
+      addMarkerDefs(svg, branch.id);
+
+      branch.edges.forEach(([from, to, type, label]) => {
+        if (state.formalOnly && type !== 'formal') return;
+        const fromEl = branchEl.querySelector(`[data-node-id="${CSS.escape(from)}"]`);
+        const toEl = branchEl.querySelector(`[data-node-id="${CSS.escape(to)}"]`);
+        if (!fromEl || !toEl) return;
+        const geometry = edgeGeometry(fromEl, toEl, canvas);
+        const dimmed = fromEl.classList.contains('search-dim') || toEl.classList.contains('search-dim');
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', geometry.d);
+        path.setAttribute('class', `edge-path ${type}`);
+        path.setAttribute('marker-end', `url(#arrow-${branch.id}-${type})`);
+        if (dimmed) path.setAttribute('opacity', '.08');
+        svg.appendChild(path);
+
+        if (label && !dimmed) {
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('x', geometry.labelX);
+          text.setAttribute('y', geometry.labelY);
+          text.setAttribute('text-anchor', 'middle');
+          text.setAttribute('class', 'edge-label');
+          text.textContent = label;
+          svg.appendChild(text);
+        }
+      });
+    }
+
+    function drawAllEdges() {
+      branches.forEach(drawBranchEdges);
+    }
+
+    let prepared = new Map();
+    async function prepareText() {
+      if (!pretext?.prepare || !pretext?.layout) return;
+      await document.fonts.ready;
+      document.querySelectorAll('[data-pretext]').forEach(el => {
+        const style = getComputedStyle(el);
+        try {
+          prepared.set(el, pretext.prepare(el.textContent, style.font));
+        } catch (error) {
+          console.warn('Pretext prepare failed for one element.', error);
+        }
+      });
+      relayoutText();
+    }
+
+    function relayoutText() {
+      if (!pretext?.layout) {
+        requestAnimationFrame(drawAllEdges);
+        return;
+      }
+      for (const [el, handle] of prepared) {
+        const style = getComputedStyle(el);
+        const lineHeight = parseFloat(style.lineHeight);
+        if (!el.clientWidth || !Number.isFinite(lineHeight)) continue;
+        try {
+          const result = pretext.layout(handle, el.clientWidth, lineHeight);
+          const cap = el.classList.contains('node-title') ? lineHeight * 3 : lineHeight * 4;
+          el.style.height = `${Math.min(result.height || lineHeight, cap)}px`;
+        } catch (error) {
+          el.style.height = '';
+        }
+      }
+      requestAnimationFrame(drawAllEdges);
+    }
+
+    function observeEditableText() {
+      document.querySelectorAll('[data-pretext][contenteditable="true"]').forEach(el => {
+        new MutationObserver(() => {
+          if (!pretext?.prepare) return;
+          try {
+            prepared.set(el, pretext.prepare(el.textContent, getComputedStyle(el).font));
+            relayoutText();
+          } catch (error) {
+            console.warn('Pretext re-prepare failed.', error);
+          }
+        }).observe(el, { characterData: true, subtree: true, childList: true });
+      });
+    }
+
+    function applySearch() {
+      const query = state.search.trim().toLowerCase();
+      let matches = 0;
+      document.querySelectorAll('.graph-node').forEach(el => {
+        const match = !query || el.dataset.search.includes(query);
+        el.classList.toggle('search-dim', !match);
+        if (match && query) matches += 1;
+      });
+      document.querySelectorAll('.branch').forEach(branch => {
+        const hasMatch = !query || [...branch.querySelectorAll('.graph-node')].some(el => !el.classList.contains('search-dim'));
+        branch.dataset.searchEmpty = String(!hasMatch);
+      });
+      document.getElementById('search-count').textContent = query ? String(matches) : 'all';
+      requestAnimationFrame(drawAllEdges);
+    }
+
+    function detectFormalCycles() {
+      const formalEdges = branches.flatMap(branch => branch.edges)
+        .filter(edge => edge[2] === 'formal')
+        .map(([from, to]) => [from, to]);
+      const adjacency = new Map();
+      formalEdges.forEach(([from, to]) => {
+        if (!adjacency.has(from)) adjacency.set(from, []);
+        adjacency.get(from).push(to);
+      });
+      const visiting = new Set();
+      const visited = new Set();
+      let cycles = 0;
+      function visit(id) {
+        if (visiting.has(id)) { cycles += 1; return; }
+        if (visited.has(id)) return;
+        visiting.add(id);
+        (adjacency.get(id) || []).forEach(visit);
+        visiting.delete(id);
+        visited.add(id);
+      }
+      [...adjacency.keys()].forEach(visit);
+      document.getElementById('cycle-count').textContent = cycles === 0 ? '0 found' : String(cycles);
+    }
+
+    function setTheme(theme) {
+      document.documentElement.dataset.theme = theme;
+      localStorage.setItem('mentomate-dependency-theme', theme);
+      const button = document.getElementById('theme-toggle');
+      button.textContent = theme === 'dark' ? '☼' : '☾';
+      button.setAttribute('aria-label', `Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`);
+      requestAnimationFrame(drawAllEdges);
+    }
+
+    function wireControls() {
+      const savedTheme = localStorage.getItem('mentomate-dependency-theme');
+      setTheme(savedTheme === 'light' ? 'light' : 'dark');
+
+      document.getElementById('theme-toggle').addEventListener('click', () => {
+        setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+      });
+      document.getElementById('print-button').addEventListener('click', () => window.print());
+
+      const search = document.getElementById('search');
+      search.addEventListener('input', () => {
+        state.search = search.value;
+        applySearch();
+      });
+
+      document.getElementById('formal-toggle').addEventListener('click', event => {
+        state.formalOnly = !state.formalOnly;
+        event.currentTarget.setAttribute('aria-pressed', String(state.formalOnly));
+        drawAllEdges();
+      });
+
+      document.getElementById('original-toggle').addEventListener('click', event => {
+        state.originals = !state.originals;
+        document.documentElement.dataset.originals = state.originals ? 'on' : 'off';
+        event.currentTarget.setAttribute('aria-pressed', String(state.originals));
+      });
+
+      document.getElementById('collapse-all').addEventListener('click', event => {
+        state.allCollapsed = !state.allCollapsed;
+        document.querySelectorAll('.branch').forEach(branch => {
+          branch.dataset.collapsed = String(state.allCollapsed);
+          const button = branch.querySelector('.branch-toggle');
+          button.setAttribute('aria-expanded', String(!state.allCollapsed));
+        });
+        event.currentTarget.textContent = state.allCollapsed ? 'Expand all' : 'Collapse all';
+        requestAnimationFrame(drawAllEdges);
+      });
+    }
+
+    renderOriginalTable();
+    renderBranches();
+    detectFormalCycles();
+    wireControls();
+    await prepareText();
+    observeEditableText();
+    applySearch();
+
+    let resizeFrame = null;
+    new ResizeObserver(() => {
+      cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(() => {
+        relayoutText();
+        drawAllEdges();
+      });
+    }).observe(document.body);
+
+    window.addEventListener('load', () => requestAnimationFrame(drawAllEdges), { once: true });
+  </script>
+</body>
+</html>

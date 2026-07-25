@@ -14,6 +14,14 @@ const mockReplace = jest.fn();
 const mockCanGoBack = jest.fn();
 const mockDismiss = jest.fn();
 const mockCanDismiss = jest.fn();
+const mockRefetchQueries = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('@tanstack/react-query', () => ({
+  ...jest.requireActual('@tanstack/react-query'),
+  useQueryClient: () => ({
+    refetchQueries: mockRefetchQueries,
+  }),
+}));
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -184,6 +192,30 @@ describe('ProfilesScreen', () => {
       screen.getByText('Create your first profile to get started'),
     ).toBeTruthy();
     screen.getByTestId('profiles-create-first');
+  });
+
+  it('shows retry and back instead of profile creation when loading profiles fails [WI-1884]', () => {
+    useProfile.mockReturnValue({
+      profiles: [],
+      activeProfile: null,
+      switchProfile: mockSwitchProfile,
+      isLoading: false,
+      profileLoadError: new Error('Profile service unavailable'),
+    });
+
+    render(<ProfilesScreen />);
+
+    screen.getByTestId('profiles-load-error');
+    screen.getByText('Profile service unavailable');
+    expect(screen.queryByTestId('profiles-create-first')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('profiles-load-error-retry'));
+    expect(mockRefetchQueries).toHaveBeenCalledWith({
+      queryKey: ['profiles'],
+    });
+
+    fireEvent.press(screen.getByTestId('profiles-load-error-back'));
+    expect(mockBack).toHaveBeenCalledTimes(1);
   });
 
   it('renders profile list with active checkmark', () => {

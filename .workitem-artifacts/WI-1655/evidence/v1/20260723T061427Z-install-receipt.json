@@ -1,0 +1,24 @@
+{
+  "schema": "wi1655.orion-apk-install.v1",
+  "variant": "v1",
+  "commit": "9f5c556317a2300ed891920509d99bb5f60941cb",
+  "apkPath": "C:\\Temp\\WI-1655-apks\\wi1655-v1-9f5c556-app-release.apk",
+  "apkBytes": 183513323,
+  "apkSha256": "93750a8a91c86498b9ebdae37e8e7bfb2533f4082ac8a00c7297c6886ee97b94",
+  "buildFlags": {
+    "EXPO_PUBLIC_E2E": true,
+    "EXPO_PUBLIC_ENABLE_MODE_NAV": true,
+    "EXPO_PUBLIC_ENABLE_MODE_NAV_V1": true,
+    "EXPO_PUBLIC_ENABLE_MODE_NAV_V2": false
+  },
+  "signatureVerified": true,
+  "device": "emulator-5554",
+  "deviceApkPath": "/data/app/~~VGWgpgaUVjR9lYN4AmuQ5Q==/com.mentomate.app-f7eBC36kUOZDgNN5BFwp7g==/base.apk",
+  "deviceApkSha256": "93750a8a91c86498b9ebdae37e8e7bfb2533f4082ac8a00c7297c6886ee97b94",
+  "deviceApkMatchesLocal": true,
+  "package": "com.mentomate.app",
+  "versionName": "1.0.1",
+  "lastUpdateTime": "2026-07-23 08:09:20",
+  "debuggable": false,
+  "installedAt": "2026-07-23T06:14:27.9527891Z"
+}

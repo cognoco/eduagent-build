@@ -181,6 +181,17 @@ interface ChatMessageRowProps {
   renderMessageActions?: (message: ChatMessage) => React.ReactNode;
 }
 
+function isCompletedAssistantResponse(message: ChatMessage): boolean {
+  return (
+    message.role === 'assistant' &&
+    message.isResponseComplete === true &&
+    message.content.trim().length > 0 &&
+    message.streaming !== true &&
+    message.kind == null &&
+    message.isSystemPrompt !== true
+  );
+}
+
 const ChatMessageRow = memo(function ChatMessageRow({
   msg,
   index,
@@ -191,7 +202,13 @@ const ChatMessageRow = memo(function ChatMessageRow({
   const [imageFailed, setImageFailed] = useState(false);
 
   return (
-    <View>
+    <View
+      testID={
+        isCompletedAssistantResponse(msg)
+          ? `assistant-response-complete-${index}`
+          : undefined
+      }
+    >
       {msg.imageUri && !imageFailed && (
         <View className="self-end max-w-[85%] mb-1">
           {/* [BUG-NOTION-257] Hint the platform image cache so homework

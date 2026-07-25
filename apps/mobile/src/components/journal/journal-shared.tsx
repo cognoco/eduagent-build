@@ -2,8 +2,6 @@ import React from 'react';
 import { Text, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 
-import { BookPageFlipAnimation } from '../common/BookPageFlipAnimation';
-import { DeskLampAnimation } from '../common/DeskLampAnimation';
 import { MagicPenAnimation } from '../common/MagicPenAnimation';
 import { classifyApiError, recoveryActions } from '../../lib/format-api-error';
 
@@ -80,14 +78,8 @@ export function PracticeReportsEmptyMotif({
       className="h-[92px] w-[176px] items-center justify-center"
       pointerEvents="none"
     >
-      <View className="absolute left-0 top-3">
-        <DeskLampAnimation size={62} testID={`${testID}-lamp`} />
-      </View>
-      <View className="absolute left-[58px] top-4">
+      <View className="absolute left-[59px] top-4">
         <MagicPenAnimation size={58} testID={`${testID}-pen`} />
-      </View>
-      <View className="absolute right-0 top-1">
-        <BookPageFlipAnimation size={66} testID={`${testID}-book`} />
       </View>
     </View>
   );

@@ -109,7 +109,7 @@ describe('pushNowDeepLink', () => {
     expect(router.push).toHaveBeenNthCalledWith(2, '/(app)/topic/topic-1');
   });
 
-  it('pushes a session resume route once when the chain is empty', () => {
+  it('omits a return destination from session.resume when none is supplied', () => {
     const router = { push: jest.fn() };
 
     pushNowDeepLink(router, {
@@ -121,6 +121,25 @@ describe('pushNowDeepLink', () => {
     expect(router.push).toHaveBeenCalledTimes(1);
     expect(router.push).toHaveBeenCalledWith(
       '/(app)/session?sessionId=session-1',
+    );
+  });
+
+  it('[WI-2234] preserves Mentor as the explicit return destination for its resume case', () => {
+    const router = { push: jest.fn() };
+
+    pushNowDeepLink(
+      router,
+      {
+        route: 'session.resume',
+        params: { sessionId: 'session-1' },
+        chain: [],
+      },
+      { returnTo: 'mentor' },
+    );
+
+    expect(router.push).toHaveBeenCalledTimes(1);
+    expect(router.push).toHaveBeenCalledWith(
+      '/(app)/session?sessionId=session-1&returnTo=mentor',
     );
   });
 

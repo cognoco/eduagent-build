@@ -52,6 +52,11 @@ export function useSessionTranscriptHydration({
         content: entry.content,
         eventId: entry.eventId,
         isSystemPrompt: entry.isSystemPrompt,
+        // Historical transcripts omit reconnect/fallback rows; isSystemPrompt excludes non-replies.
+        isResponseComplete:
+          entry.role === 'assistant' &&
+          entry.isSystemPrompt !== true &&
+          entry.content.trim().length > 0,
         escalationRung: entry.escalationRung,
       }));
 

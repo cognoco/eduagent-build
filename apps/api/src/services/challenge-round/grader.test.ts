@@ -69,6 +69,13 @@ const SOLID_VERDICT_JSON = JSON.stringify({
       result: 'solid',
       evidence: 'links speed to collision frequency and energy',
       learnerQuote: 'particles move faster and collide more often',
+      questionIdentity: {
+        questionText: 'model-supplied text is overwritten',
+        minimalLearningClaim:
+          'higher temperature raises productive collision frequency',
+        cognitiveOperation: 'causal_explanation',
+        materialContext: 'most chemical reactions',
+      },
     },
   ],
 });
@@ -118,6 +125,9 @@ describe('runChallengeRoundGrader', () => {
       expect(items[0]!.result).toBe('solid');
       // answerEventId is server-injected; the model never saw or supplied it.
       expect(items[0]!.answerEventId).toBe(BASE_INPUT.answerEventId);
+      expect(items[0]!.questionIdentity?.questionText).toBe(
+        BASE_INPUT.askedQuestion,
+      );
     });
 
     it('maps the concept and evidence fields from the verdict', async () => {
@@ -131,6 +141,28 @@ describe('runChallengeRoundGrader', () => {
       );
       expect(items[0]!.learnerQuote).toBe(
         'particles move faster and collide more often',
+      );
+    });
+
+    it('passes prior question identities to the grader for novelty classification', async () => {
+      mockRouteAndCall.mockResolvedValue(routeResult(SOLID_VERDICT_JSON));
+
+      await runChallengeRoundGrader({
+        ...BASE_INPUT,
+        priorQuestionIdentities: [
+          {
+            questionText: 'Why do particles collide more often when heated?',
+            minimalLearningClaim:
+              'temperature increases particle collision frequency',
+            cognitiveOperation: 'causal_explanation',
+            materialContext: 'most chemical reactions',
+          },
+        ],
+      });
+
+      const [messages] = mockRouteAndCall.mock.calls[0]!;
+      expect(messages.map((message) => message.content).join('\n')).toContain(
+        'temperature increases particle collision frequency',
       );
     });
   });

@@ -6,6 +6,8 @@ const mockDatabaseModule = createDatabaseModuleMock({
     createScopedRepository: jest.fn(),
   },
 });
+const mockCaptureException = jest.fn();
+const mockInngestSend = jest.fn().mockResolvedValue(undefined);
 
 jest.mock(
   '@eduagent/database' /* gc1-allow: service unit test — db boundary mocked; real DB covered by sibling .integration.test.ts where present */,
@@ -42,6 +44,22 @@ jest.mock(
         .mockReturnValue({ atCapacity: false, shouldPromote: false }),
     };
   },
+);
+
+jest.mock(
+  './sentry' /* gc1-allow: Sentry is an external observability boundary */,
+  () => ({
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  }),
+);
+
+jest.mock(
+  '../inngest/client' /* gc1-allow: Inngest is an external event-dispatch boundary */,
+  () => ({
+    inngest: {
+      send: (...args: unknown[]) => mockInngestSend(...args),
+    },
+  }),
 );
 
 import { z } from 'zod';
@@ -2842,9 +2860,36 @@ describe('buildRecallGradeMessages [WI-2114]', () => {
 // ---------------------------------------------------------------------------
 
 describe('evaluateRecallQuality', () => {
+  let consoleWarnSpy: jest.SpiedFunction<typeof console.warn>;
+
+  beforeEach(() => {
+    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    mockCaptureException.mockClear();
+    mockInngestSend.mockClear();
+  });
+
   afterEach(() => {
+    consoleWarnSpy.mockRestore();
     registerProvider(createMockProvider('gemini'));
   });
+
+  function recallQualityWarnings(): unknown[] {
+    return consoleWarnSpy.mock.calls
+      .map(([line]) => {
+        if (typeof line !== 'string') return null;
+        try {
+          return JSON.parse(line) as {
+            message?: string;
+            context?: Record<string, unknown>;
+          };
+        } catch {
+          return null;
+        }
+      })
+      .filter((entry) =>
+        entry?.message?.startsWith('[retention.recall-quality]'),
+      );
+  }
 
   // Helper: register a grader provider that returns a fixed string body.
   function registerGrader(body: string): void {
@@ -2876,6 +2921,7 @@ describe('evaluateRecallQuality', () => {
     const result = await evaluateRecallQuality(
       'A thorough explanation of photosynthesis involving chlorophyll and light reactions',
       'Photosynthesis',
+      profileId,
     );
     expect(result).toEqual({
       graded: true,
@@ -2888,6 +2934,9 @@ describe('evaluateRecallQuality', () => {
       // [WI-2114] Grader response above omits feedback → null passthrough.
       feedback: null,
     });
+    expect(recallQualityWarnings()).toHaveLength(0);
+    expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(mockInngestSend).not.toHaveBeenCalled();
   });
 
   it('handles quality 0 / verdict "missing" (blackout)', async () => {
@@ -2895,7 +2944,7 @@ describe('evaluateRecallQuality', () => {
       '{"quality": 0, "verdict": "missing", "rationale": "No meaningful content.", "misconception": null}',
     );
 
-    const result = await evaluateRecallQuality('', 'Photosynthesis');
+    const result = await evaluateRecallQuality('', 'Photosynthesis', profileId);
     expect(result).toMatchObject({
       graded: true,
       quality: 0,
@@ -2911,6 +2960,7 @@ describe('evaluateRecallQuality', () => {
     const result = await evaluateRecallQuality(
       'Complete and perfect explanation of the topic',
       'Topic',
+      profileId,
     );
     expect(result).toMatchObject({
       graded: true,
@@ -2927,6 +2977,7 @@ describe('evaluateRecallQuality', () => {
     const result = await evaluateRecallQuality(
       'Mitosis makes four cells with half the chromosomes',
       'Mitosis',
+      profileId,
     );
     expect(result).toMatchObject({
       graded: true,
@@ -2943,6 +2994,7 @@ describe('evaluateRecallQuality', () => {
     const result = await evaluateRecallQuality(
       'Some answer about the topic',
       'Topic',
+      profileId,
     );
     expect(result).toMatchObject({
       graded: true,
@@ -2954,15 +3006,65 @@ describe('evaluateRecallQuality', () => {
   it('returns an honest fallback (no fabricated score) on an unparseable response', async () => {
     registerGrader('I think the answer is pretty good, maybe a 4?');
 
-    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    const result = await evaluateRecallQuality(
+      'A'.repeat(60),
+      'Topic',
+      profileId,
+    );
     expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
+    expect(recallQualityWarnings()).toContainEqual(
+      expect.objectContaining({
+        context: expect.objectContaining({ reason: 'no_json' }),
+      }),
+    );
+    expect(mockInngestSend).toHaveBeenCalledWith({
+      name: 'app/retention.recall_quality_degraded',
+      data: expect.objectContaining({ profileId, reason: 'no_json' }),
+    });
+  });
+
+  it('observes malformed JSON separately from a response with no JSON', async () => {
+    registerGrader('{"quality": 4,}');
+
+    const result = await evaluateRecallQuality(
+      'A'.repeat(60),
+      'Topic',
+      profileId,
+    );
+    expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
+    expect(recallQualityWarnings()).toContainEqual(
+      expect.objectContaining({
+        context: expect.objectContaining({ reason: 'parse_error' }),
+      }),
+    );
+    expect(mockInngestSend).toHaveBeenCalledWith({
+      name: 'app/retention.recall_quality_degraded',
+      data: expect.objectContaining({ profileId, reason: 'parse_error' }),
+    });
+  });
+
+  it('keeps the honest fallback when degraded-event dispatch fails', async () => {
+    mockInngestSend.mockRejectedValueOnce(new Error('Inngest unavailable'));
+    registerGrader('not json');
+
+    const result = await evaluateRecallQuality(
+      'A'.repeat(60),
+      'Topic',
+      profileId,
+    );
+
+    expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
+    expect(mockInngestSend).toHaveBeenCalledWith({
+      name: 'app/retention.recall_quality_degraded',
+      data: expect.objectContaining({ profileId, reason: 'no_json' }),
+    });
   });
 
   it('returns an honest fallback on an LLM error', async () => {
     const provider: LLMProvider = {
       id: 'gemini',
       async chat(): Promise<ChatResult> {
-        throw new Error('LLM unavailable');
+        throw new Error('LLM unavailable: learner answer must stay private');
       },
       chatStream(): ChatStreamResult {
         return makeChatStreamResult(
@@ -2975,8 +3077,32 @@ describe('evaluateRecallQuality', () => {
     };
     registerProvider(provider);
 
-    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    const result = await evaluateRecallQuality(
+      'A'.repeat(60),
+      'Topic',
+      profileId,
+    );
     expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
+    expect(recallQualityWarnings()).toContainEqual(
+      expect.objectContaining({
+        context: expect.objectContaining({ reason: 'route_error' }),
+      }),
+    );
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Recall quality grading route failed',
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({ reason: 'route_error' }),
+      }),
+    );
+    expect(
+      (mockCaptureException.mock.calls[0]?.[0] as Error).message,
+    ).not.toContain('learner answer');
+    expect(mockInngestSend).toHaveBeenCalledWith({
+      name: 'app/retention.recall_quality_degraded',
+      data: expect.objectContaining({ profileId, reason: 'route_error' }),
+    });
   });
 
   it('returns an honest fallback when quality is above range', async () => {
@@ -2984,8 +3110,21 @@ describe('evaluateRecallQuality', () => {
       '{"quality": 7, "verdict": "solid", "rationale": "x", "misconception": null}',
     );
 
-    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    const result = await evaluateRecallQuality(
+      'A'.repeat(60),
+      'Topic',
+      profileId,
+    );
     expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
+    expect(recallQualityWarnings()).toContainEqual(
+      expect.objectContaining({
+        context: expect.objectContaining({ reason: 'schema_invalid' }),
+      }),
+    );
+    expect(mockInngestSend).toHaveBeenCalledWith({
+      name: 'app/retention.recall_quality_degraded',
+      data: expect.objectContaining({ profileId, reason: 'schema_invalid' }),
+    });
   });
 
   it('returns an honest fallback when quality is below range (negative)', async () => {
@@ -2993,7 +3132,11 @@ describe('evaluateRecallQuality', () => {
       '{"quality": -1, "verdict": "missing", "rationale": "x", "misconception": null}',
     );
 
-    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    const result = await evaluateRecallQuality(
+      'A'.repeat(60),
+      'Topic',
+      profileId,
+    );
     expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
   });
 
@@ -3006,7 +3149,11 @@ describe('evaluateRecallQuality', () => {
       '{"quality": 5, "verdict": "misconception", "rationale": "x", "misconception": "thinks mass and weight are identical"}',
     );
 
-    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    const result = await evaluateRecallQuality(
+      'A'.repeat(60),
+      'Topic',
+      profileId,
+    );
     expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
   });
 
@@ -3019,7 +3166,11 @@ describe('evaluateRecallQuality', () => {
       '{"quality": 0, "verdict": "solid", "rationale": "x", "misconception": null}',
     );
 
-    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    const result = await evaluateRecallQuality(
+      'A'.repeat(60),
+      'Topic',
+      profileId,
+    );
     expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
   });
 });

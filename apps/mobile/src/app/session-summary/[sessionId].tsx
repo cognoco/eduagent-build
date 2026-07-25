@@ -42,7 +42,12 @@ import { useTotalSessionCount } from '../../hooks/use-session-context';
 import { useLearnerProfile } from '../../hooks/use-learner-profile';
 import { useTopicSuggestions } from '../../hooks/use-topic-suggestions';
 import { usePostSessionNotificationAsk } from '../../hooks/use-post-session-notification-ask';
-import { goBackOrReplace, homeHrefForReturnTo } from '../../lib/navigation';
+import {
+  goBackOrReplace,
+  homeHrefForReturnTo,
+  JOURNAL_HREF,
+  JOURNAL_RETURN_TO,
+} from '../../lib/navigation';
 import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { platformAlert } from '../../lib/platform-alert';
 import { formatApiError, classifyApiError } from '../../lib/format-api-error';
@@ -102,12 +107,13 @@ export default function SessionSummaryScreen() {
     sessionType?: string;
     filedSubjectId?: string;
     filedBookId?: string;
-    returnTo?: string;
+    returnTo?: string | string[];
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const resolvedReturnTo = Array.isArray(returnTo) ? returnTo[0] : returnTo;
   const summaryHomeHref = homeHrefForReturnTo(
-    returnTo,
+    resolvedReturnTo,
     undefined,
     FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
   );
@@ -448,7 +454,29 @@ export default function SessionSummaryScreen() {
     }
   };
 
+  const navigateToSummaryHome = (preferBack: boolean): void => {
+    if (resolvedReturnTo === JOURNAL_RETURN_TO) {
+      // Pop to the already-mounted Journal tab route. Replacing this root
+      // summary route leaves the retained tab underneath and mounts a second
+      // Journal screen; dismissTo also replaces safely for a direct deep link.
+      router.dismissTo(JOURNAL_HREF);
+      return;
+    }
+
+    if (preferBack) {
+      goBackOrReplace(router, summaryHomeHref);
+      return;
+    }
+
+    router.replace(summaryHomeHref as Href);
+  };
+
   const finishSummaryNavigation = (): void => {
+    if (resolvedReturnTo === JOURNAL_RETURN_TO) {
+      navigateToSummaryHome(false);
+      return;
+    }
+
     if (filedSubjectId && filedBookId) {
       router.replace('/(app)/library' as Href);
       InteractionManager.runAfterInteractions(() => {
@@ -478,11 +506,11 @@ export default function SessionSummaryScreen() {
     }
 
     if (isRevisitedPersistedSummary) {
-      goBackOrReplace(router, summaryHomeHref);
+      navigateToSummaryHome(true);
       return;
     }
 
-    router.replace(summaryHomeHref as Href);
+    navigateToSummaryHome(false);
   };
 
   // [BUG-134] Auth gate (see comment at top of component).
@@ -514,7 +542,7 @@ export default function SessionSummaryScreen() {
         message={t('sessionSummary.notFoundHeadHomeMessage')}
         primaryAction={{
           label: t('common.goHome'),
-          onPress: () => goBackOrReplace(router, summaryHomeHref),
+          onPress: () => navigateToSummaryHome(true),
           testID: 'session-summary-missing-param',
         }}
       />
@@ -545,7 +573,7 @@ export default function SessionSummaryScreen() {
         <Button
           variant="primary"
           label={t('common.goHome')}
-          onPress={() => goBackOrReplace(router, summaryHomeHref)}
+          onPress={() => navigateToSummaryHome(true)}
           testID="expired-session-go-home"
         />
       </View>
@@ -566,7 +594,7 @@ export default function SessionSummaryScreen() {
         <Button
           variant="primary"
           label={t('common.goHome')}
-          onPress={() => goBackOrReplace(router, summaryHomeHref)}
+          onPress={() => navigateToSummaryHome(true)}
           testID="session-not-found-go-home"
         />
       </View>
@@ -595,7 +623,7 @@ export default function SessionSummaryScreen() {
           }}
           secondaryAction={{
             label: t('common.goHome'),
-            onPress: () => goBackOrReplace(router, summaryHomeHref),
+            onPress: () => navigateToSummaryHome(true),
           }}
         />
       );
@@ -630,7 +658,7 @@ export default function SessionSummaryScreen() {
         <Button
           variant="primary"
           label={t('common.goHome')}
-          onPress={() => router.replace(summaryHomeHref as Href)}
+          onPress={() => navigateToSummaryHome(false)}
           testID="session-not-found-go-home"
         />
       </View>
@@ -1156,7 +1184,10 @@ export default function SessionSummaryScreen() {
                   <Text className="text-body text-text-secondary me-2">
                     {'\u2022'}
                   </Text>
-                  <Text className="text-body text-text-primary flex-1">
+                  <Text
+                    className="text-body text-text-primary flex-1"
+                    testID={`session-recap-learning-point-${index}`}
+                  >
                     {bullet.replace(/^- /, '')}
                   </Text>
                 </View>

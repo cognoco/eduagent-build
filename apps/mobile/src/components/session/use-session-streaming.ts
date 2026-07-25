@@ -946,6 +946,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
                 return {
                   ...m,
                   streaming: false,
+                  isResponseComplete: true,
                   eventId: result.aiEventId,
                   escalationRung: result.escalationRung,
                   mentorNotice: result.mentorNotice,

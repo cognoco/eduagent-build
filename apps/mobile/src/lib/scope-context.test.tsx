@@ -129,6 +129,47 @@ describe('ScopeContextProvider', () => {
     });
   });
 
+  it('warns when the active scope cannot be persisted', async () => {
+    const profileId = '00000000-0000-4000-8000-000000000903';
+    const persistenceError = new Error(
+      `An error occurred when writing to key: 'scope.last-active-${profileId}'`,
+    );
+    const setItemSpy = jest
+      .spyOn(SecureStore, 'setItemAsync')
+      .mockRejectedValueOnce(persistenceError);
+    const warnSpy = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+
+    try {
+      const { result } = renderHook(() => useScopeContext(), {
+        wrapper: wrapperFor(
+          {
+            shape: 'supporter',
+            scopes: [{ kind: 'supporter-hub' }, personScope, { kind: 'me' }],
+            defaultScopeIndex: 0,
+          },
+          profileId,
+        ),
+      });
+
+      act(() => result.current.setActiveScope(personScope));
+
+      await waitFor(() => {
+        expect(warnSpy.mock.calls).toEqual([
+          ['[scope-context] failed to persist active scope'],
+        ]);
+      });
+      expect(JSON.stringify(warnSpy.mock.calls)).not.toContain(profileId);
+      expect(JSON.stringify(warnSpy.mock.calls)).not.toContain(
+        'scope.last-active-',
+      );
+    } finally {
+      setItemSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+  });
+
   // [WI-2243] AC-3 — THE tricky correctness clause. A test that only checks
   // the settled state (Me selected, scopeList already lists Me) would pass
   // green while leaving the actual guarantee — no flash/fall-back to

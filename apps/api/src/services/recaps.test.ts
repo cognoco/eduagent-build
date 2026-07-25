@@ -21,6 +21,14 @@ const mockGetChildrenForParent = jest.fn();
 const mockGetChildSessions = jest.fn();
 const mockGetChildSessionDetail = jest.fn();
 const mockListProfileSessions = jest.fn();
+const mockCaptureException = jest.fn();
+
+jest.mock(
+  './sentry' /* gc1-allow: Sentry is the external observation boundary for safe proof-lookup degradation */,
+  () => ({
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  }),
+);
 
 jest.mock('./dashboard', () => {
   const actual = jest.requireActual(
@@ -52,8 +60,10 @@ jest.mock(
 
 import {
   assessments,
+  evidenceLinks,
   needsDeepeningTopics,
   retentionCards,
+  sessionEvents,
   sessionSummaries,
   topicNotes,
   type Database,
@@ -72,6 +82,8 @@ const ORGANIZATION_ID = 'c0000000-0000-4000-8000-000000000001';
 const VISIBLE_CHILD = 'a0000000-0000-4000-8000-000000000010';
 const HIDDEN_CHILD = 'a0000000-0000-4000-8000-000000000020';
 const RECAP_ID = 'b0000000-0000-4000-8000-000000000100';
+const ARTIFACT_ID = 'e0000000-0000-4000-8000-000000000001';
+const EVENT_ID = 'f0000000-0000-4000-8000-000000000001';
 
 const db = {} as Database;
 
@@ -118,9 +130,39 @@ beforeEach(() => {
   mockGetChildSessions.mockReset();
   mockGetChildSessionDetail.mockReset();
   mockListProfileSessions.mockReset();
+  mockCaptureException.mockReset();
 });
 
 describe('listRecapsForParent — per-child ForbiddenError isolation', () => {
+  it('preserves unavailable when guardian-list proof enrichment fails', async () => {
+    mockGetChildrenForParent.mockResolvedValue([
+      childRow(VISIBLE_CHILD, 'Visible'),
+    ]);
+    mockGetChildSessions.mockResolvedValue([topicSessionRow(RECAP_ID)]);
+    const readFailure = new Error('database query detail');
+    const failingDb = {
+      select: jest.fn(() => {
+        throw readFailure;
+      }),
+    } as unknown as Database;
+
+    const recaps = await listRecapsForParent(
+      failingDb,
+      PARENT_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
+
+    expect(recaps[0]?.verifiedProof).toEqual({ status: 'unavailable' });
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Verified proof lookup failed' }),
+      { tags: { surface: 'recaps.verified-proof' } },
+    );
+    expect(JSON.stringify(mockCaptureException.mock.calls)).not.toContain(
+      readFailure.message,
+    );
+  });
+
   it('returns recaps from visible children when a sibling has hidden consent', async () => {
     mockGetChildrenForParent.mockResolvedValue([
       childRow(VISIBLE_CHILD, 'Visible'),
@@ -146,6 +188,7 @@ describe('listRecapsForParent — per-child ForbiddenError isolation', () => {
     expect(recaps[0]).toMatchObject({
       recapId: RECAP_ID,
       childProfileId: VISIBLE_CHILD,
+      verifiedProof: { status: 'absent' },
     });
   });
 
@@ -198,7 +241,8 @@ function fakeProofDb(rowsByTable: Map<unknown, unknown[]>): Database {
       return chain;
     }),
     // Scoped-repository path used by getVerifiedProofForSessionTopic for the
-    // weak-spot and retention-card reads; serve from the same seeded map.
+    // weak-spot and retention-card reads, and by getArtifactEvidenceAvailability
+    // for the evidence-links read; serve from the same seeded map.
     query: {
       needsDeepeningTopics: {
         findMany: jest.fn(
@@ -209,6 +253,9 @@ function fakeProofDb(rowsByTable: Map<unknown, unknown[]>): Database {
         findFirst: jest.fn(
           async () => (rowsByTable.get(retentionCards) ?? [])[0],
         ),
+      },
+      evidenceLinks: {
+        findMany: jest.fn(async () => rowsByTable.get(evidenceLinks) ?? []),
       },
     },
   } as unknown as Database;
@@ -439,7 +486,11 @@ describe('getRecapForParent — verified-proof enrichment', () => {
     mockGetChildSessionDetail.mockResolvedValue(topicSessionRow(RECAP_ID));
   });
 
-  function proofDb(noteCreatedAt = new Date()): Database {
+  function proofDb(
+    noteCreatedAt = new Date(),
+    targetAvailable = true,
+    artifactAvailable = true,
+  ): Database {
     return fakeProofDb(
       new Map<unknown, unknown[]>([
         [sessionSummaries, []],
@@ -457,13 +508,31 @@ describe('getRecapForParent — verified-proof enrichment', () => {
         ],
         [
           topicNotes,
+          artifactAvailable
+            ? [
+                {
+                  id: ARTIFACT_ID,
+                  content: 'Equivalent fractions name the same amount.',
+                  createdAt: noteCreatedAt,
+                },
+              ]
+            : [],
+        ],
+        [
+          evidenceLinks,
           [
             {
-              content: 'Equivalent fractions name the same amount.',
-              createdAt: noteCreatedAt,
+              id: '10000000-0000-4000-8000-000000000001',
+              profileId: VISIBLE_CHILD,
+              fromKind: 'artifact',
+              fromId: ARTIFACT_ID,
+              toKind: 'transcript_excerpt',
+              toId: EVENT_ID,
+              createdAt: new Date(),
             },
           ],
         ],
+        [sessionEvents, targetAvailable ? [{ id: EVENT_ID }] : []],
         [needsDeepeningTopics, []],
         [
           retentionCards,
@@ -495,18 +564,22 @@ describe('getRecapForParent — verified-proof enrichment', () => {
     );
 
     expect(recap?.verifiedProof).toEqual({
-      topicId: topicSessionRow(RECAP_ID).topicId,
-      topicTitle: 'Fractions',
-      subjectId: topicSessionRow(RECAP_ID).subjectId,
-      verifiedAt: verifiedAt.toISOString(),
-      verificationState: 'fresh',
-      retentionStatus: 'strong',
-      nextReviewDate: nextReviewAt.toISOString(),
-      quote: 'Equivalent fractions name the same amount.',
+      status: 'present',
+      proof: {
+        topicId: topicSessionRow(RECAP_ID).topicId,
+        topicTitle: 'Fractions',
+        subjectId: topicSessionRow(RECAP_ID).subjectId,
+        verifiedAt: verifiedAt.toISOString(),
+        verificationState: 'fresh',
+        retentionStatus: 'strong',
+        nextReviewDate: nextReviewAt.toISOString(),
+        evidenceAvailability: 'available',
+        quote: 'Equivalent fractions name the same amount.',
+      },
     });
   });
 
-  it('leaves verified proof null and preserves the recap when no verified assessment exists', async () => {
+  it('returns absent and preserves the recap when no verified assessment exists', async () => {
     const noProofDb = fakeProofDb(
       new Map<unknown, unknown[]>([
         [sessionSummaries, []],
@@ -527,8 +600,58 @@ describe('getRecapForParent — verified-proof enrichment', () => {
       childProfileId: VISIBLE_CHILD,
       topicTitle: 'Fractions',
       narrative: null,
-      verifiedProof: null,
+      verifiedProof: { status: 'absent' },
     });
+  });
+
+  it('returns absent when no qualifying verified artifact exists', async () => {
+    const recap = await getRecapForParent(
+      proofDb(new Date(), true, false),
+      PARENT_ID,
+      RECAP_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
+
+    expect(recap?.verifiedProof).toEqual({ status: 'absent' });
+  });
+
+  it('returns only a typed unavailable result and observes a proof read failure', async () => {
+    const readFailure = new Error(
+      'column verified_artifact_secret does not exist in database query',
+    );
+    const failingDb = {
+      select: jest.fn(() => {
+        throw readFailure;
+      }),
+    } as unknown as Database;
+
+    const recap = await getRecapForParent(
+      failingDb,
+      PARENT_ID,
+      RECAP_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
+
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    const [observedError, observedContext] =
+      mockCaptureException.mock.calls[0] ?? [];
+    expect(observedError).toEqual(
+      new Error('Verified proof lookup failed', {
+        cause: { errorKind: 'error' },
+      }),
+    );
+    expect(observedContext).toEqual({
+      tags: { surface: 'recaps.verified-proof' },
+    });
+    expect(JSON.stringify(mockCaptureException.mock.calls)).not.toMatch(
+      /column|database|query|secret/i,
+    );
+    expect(recap?.verifiedProof).toEqual({ status: 'unavailable' });
+    expect(JSON.stringify(recap?.verifiedProof)).not.toMatch(
+      /column|database|query|secret/i,
+    );
   });
 
   it('keeps proof metadata but nulls an aged marked-note quote', async () => {
@@ -544,16 +667,68 @@ describe('getRecapForParent — verified-proof enrichment', () => {
     );
 
     expect(recap?.verifiedProof).toMatchObject({
-      topicId: topicSessionRow(RECAP_ID).topicId,
-      verifiedAt: verifiedAt.toISOString(),
-      verificationState: 'fresh',
-      nextReviewDate: nextReviewAt.toISOString(),
-      quote: null,
+      status: 'present',
+      proof: {
+        topicId: topicSessionRow(RECAP_ID).topicId,
+        verifiedAt: verifiedAt.toISOString(),
+        verificationState: 'fresh',
+        nextReviewDate: nextReviewAt.toISOString(),
+        quote: null,
+      },
+    });
+  });
+
+  it('keeps recap proof metadata but nulls the quote when evidence was purged', async () => {
+    const recap = await getRecapForParent(
+      proofDb(new Date(), false),
+      PARENT_ID,
+      RECAP_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
+
+    expect(recap?.verifiedProof).toMatchObject({
+      status: 'present',
+      proof: {
+        topicId: topicSessionRow(RECAP_ID).topicId,
+        verifiedAt: verifiedAt.toISOString(),
+        evidenceAvailability: 'source_unavailable',
+        quote: null,
+      },
     });
   });
 });
 
 describe('listRecapsForProfile — self-scope session mapping', () => {
+  it('preserves unavailable when self-recap proof enrichment fails', async () => {
+    mockListProfileSessions.mockResolvedValue({
+      sessions: [topicSessionRow(RECAP_ID)],
+      nextCursor: null,
+    });
+    const readFailure = new Error('database schema detail');
+    const profileDb = {
+      select: jest.fn(() => {
+        throw readFailure;
+      }),
+      query: {
+        person: {
+          findFirst: jest.fn(async () => ({ displayName: 'Self Learner' })),
+        },
+      },
+    } as unknown as Database;
+
+    const recaps = await listRecapsForProfile(profileDb, VISIBLE_CHILD);
+
+    expect(recaps[0]?.verifiedProof).toEqual({ status: 'unavailable' });
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Verified proof lookup failed' }),
+      { tags: { surface: 'recaps.verified-proof' } },
+    );
+    expect(JSON.stringify(mockCaptureException.mock.calls)).not.toContain(
+      readFailure.message,
+    );
+  });
+
   it('maps scoped profile sessions to recap items without parent or child-edge reads', async () => {
     mockListProfileSessions.mockResolvedValue({
       sessions: [sessionRow(RECAP_ID)],

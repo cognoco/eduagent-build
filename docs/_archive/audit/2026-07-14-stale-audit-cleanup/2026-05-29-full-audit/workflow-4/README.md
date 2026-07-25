@@ -1,7 +1,7 @@
 # Audience-Matrix Re-Verification
 
 **Date:** 2026-05-30
-**Target:** `docs/audience-matrix.md` — its 32-row gating inventory and findings F1–F14.
+**Target:** `docs/compliance/audience-matrix.md` — its 32-row gating inventory and findings F1–F14.
 **Claim under test:** the matrix says "Verified 2026-05-23 against HEAD." This re-checks that one week later.
 **Method:** multi-agent workflow — 32 citation-verifiers (each *re-locates the gate by description*, since line numbers were expected to have rotted) then 14 finding-assessors that received the citation results as ground truth. 46 agents, ~3.6M tokens, ~4.5 min. Read-only.
 **Run:** `wf_84c3040e-660` (workflow `audience-matrix-reverify`).

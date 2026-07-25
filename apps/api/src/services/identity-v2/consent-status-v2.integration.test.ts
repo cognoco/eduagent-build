@@ -689,7 +689,7 @@ const COPPA = 'coppa_parental_consent';
     // accepted timestamp + accepted purposes (GDPR Art 5(2)/7(1)).
     // -------------------------------------------------------------------------
     describe('getConsentAccountabilityV2', () => {
-      it('returns lawful basis + terms-accepted timestamp for EACH purpose in one query', async () => {
+      it('keeps legacy grants without a captured terms-acceptance fact distinct', async () => {
         const { personId, orgId } = await seedPersonOrg();
         const grantedAt = new Date();
         await db.insert(consentGrant).values([
@@ -716,11 +716,37 @@ const COPPA = 'coppa_parental_consent';
         expect(report).toHaveLength(2);
         const byPurpose = new Map(report.map((r) => [r.purpose, r]));
         expect(byPurpose.get(PURPOSE)?.lawfulBasis).toBe('art6_1_a');
-        expect(byPurpose.get(PURPOSE)?.termsAcceptedAt).toEqual(grantedAt);
+        expect(byPurpose.get(PURPOSE)?.termsAcceptedAt).toBeNull();
+        expect(byPurpose.get(PURPOSE)?.termsVersion).toBeNull();
         expect(byPurpose.get(PURPOSE)?.withdrawnAt).toBeNull();
         expect(byPurpose.get(CONSENT_PURPOSES[1])?.lawfulBasis).toBe(
           'art6_1_a',
         );
+      });
+
+      it('returns a genuine captured versioned terms-acceptance fact', async () => {
+        const { personId, orgId } = await seedPersonOrg();
+        const termsAcceptedAt = new Date(Date.now() - 60_000);
+        const grantedAt = new Date();
+        await db.insert(consentGrant).values({
+          chargePersonId: personId,
+          organizationId: orgId,
+          purpose: PURPOSE,
+          lawfulBasis: GDPR,
+          granted: true,
+          grantedAt,
+          auditFact: {
+            termsAcceptedAt: termsAcceptedAt.toISOString(),
+            termsVersion: '2026-07-24',
+          },
+        });
+
+        const report = await getConsentAccountabilityV2(db, personId, orgId);
+
+        expect(report).toHaveLength(1);
+        expect(report[0]?.termsAcceptedAt).toEqual(termsAcceptedAt);
+        expect(report[0]?.termsAcceptedAt).not.toEqual(grantedAt);
+        expect(report[0]?.termsVersion).toBe('2026-07-24');
       });
 
       it('reports only the CURRENT grant per (purpose, basis) — an older superseded row is not double-counted', async () => {
@@ -748,7 +774,7 @@ const COPPA = 'coppa_parental_consent';
         const report = await getConsentAccountabilityV2(db, personId, orgId);
 
         expect(report).toHaveLength(1);
-        expect(report[0]?.termsAcceptedAt).toEqual(newer);
+        expect(report[0]?.termsAcceptedAt).toBeNull();
         expect(report[0]?.withdrawnAt).toEqual(newer);
       });
 

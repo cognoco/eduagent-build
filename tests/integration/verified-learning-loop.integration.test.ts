@@ -328,6 +328,7 @@ async function driveVerifiedChallengeRound(
   topicId: string,
 ): Promise<{ sessionId: string; result: ChallengeRoundRuntimeOutcome }> {
   const answerEventId = nextAnswerEventId();
+  const applicationAnswerEventId = nextAnswerEventId();
   const session = await seedDraftingSession(db, profileId, subjectId, topicId, [
     {
       concept: 'photosynthesis inputs',
@@ -335,6 +336,29 @@ async function driveVerifiedChallengeRound(
       evidence: 'Learner correctly named all three inputs.',
       answerEventId,
       learnerQuote: LEARNER_ANSWER,
+      questionIdentity: {
+        questionText: 'What inputs does a plant use for photosynthesis?',
+        minimalLearningClaim:
+          'photosynthesis uses sunlight water and carbon dioxide to make food',
+        cognitiveOperation: 'explanation',
+        materialContext: '',
+      },
+    },
+    {
+      concept: 'photosynthesis inputs in a greenhouse',
+      result: 'solid',
+      evidence:
+        'Learner correctly applied the same inputs to a carbon-dioxide-limited greenhouse.',
+      answerEventId: applicationAnswerEventId,
+      learnerQuote: LEARNER_ANSWER,
+      questionIdentity: {
+        questionText:
+          'How would limited carbon dioxide affect a greenhouse plant making food?',
+        minimalLearningClaim:
+          'photosynthesis uses sunlight water and carbon dioxide to make food',
+        cognitiveOperation: 'application',
+        materialContext: 'a greenhouse plant with limited carbon dioxide',
+      },
     },
   ]);
   const meta = await readSessionChallengeRound(db, profileId, session.id);
@@ -395,7 +419,8 @@ describeIfDb('Verified-learning loop (WI-1666, S8)', () => {
     );
 
     expect(result.challengeRoundVerdict).toEqual({
-      solidCount: 1,
+      outcome: 'verified',
+      solidCount: 2,
       partialCount: 0,
       missingCount: 0,
       misconceptionCount: 0,
@@ -470,6 +495,7 @@ describeIfDb('Verified-learning loop (WI-1666, S8)', () => {
     expect(result).not.toBeNull();
 
     expect(result!.challengeRoundVerdict).toEqual({
+      outcome: 'partial',
       solidCount: 0,
       partialCount: 1,
       missingCount: 0,
@@ -539,6 +565,7 @@ describeIfDb('Verified-learning loop (WI-1666, S8)', () => {
     expect(result).not.toBeNull();
 
     expect(result!.challengeRoundVerdict).toEqual({
+      outcome: 'partial',
       solidCount: 0,
       partialCount: 0,
       missingCount: 0,

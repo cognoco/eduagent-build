@@ -8,7 +8,11 @@ import {
   topicNotes,
   type Database,
 } from '@eduagent/database';
-import type { VerifiedProofReceipt } from '@eduagent/schemas';
+import type {
+  EvidenceAvailability,
+  VerifiedEvidenceQuote,
+  VerifiedProofReceipt,
+} from '@eduagent/schemas';
 import {
   assertChargeNotCredentialed,
   assertParentAccess,
@@ -16,6 +20,7 @@ import {
 import { assertChildDashboardDataVisible } from './dashboard';
 import { resolveMasteryVerificationState } from './challenge-round/verification';
 import { getRetentionStatus } from './retention';
+import { getArtifactEvidenceAvailability } from './evidence-links';
 
 // [WI-1658 rework] Read-side quote age-out (AC4). WI-1194 cites this same
 // 30-day window as the clock verbatim quotes should align to (its
@@ -26,6 +31,15 @@ import { getRetentionStatus } from './retention';
 // only — past the window the quote reads back as null and the existing
 // degradation branch below renders the abstracted line instead.
 const QUOTE_AGE_OUT_DAYS = 30;
+
+function verifiedEvidenceQuote(
+  evidenceAvailability: EvidenceAvailability,
+  quote: string | null,
+): VerifiedEvidenceQuote {
+  return evidenceAvailability === 'available'
+    ? { evidenceAvailability, quote }
+    : { evidenceAvailability, quote: null };
+}
 
 /**
  * The verified artifact for one exact Recap session/topic. Unlike the home
@@ -73,7 +87,11 @@ export async function getVerifiedProofForSessionTopic(
   const repo = createScopedRepository(db, childProfileId);
   const [noteRows, weakSpotRows, retentionCard] = await Promise.all([
     db
-      .select({ content: topicNotes.content, createdAt: topicNotes.createdAt })
+      .select({
+        id: topicNotes.id,
+        content: topicNotes.content,
+        createdAt: topicNotes.createdAt,
+      })
       .from(topicNotes)
       .where(
         and(
@@ -81,6 +99,7 @@ export async function getVerifiedProofForSessionTopic(
           eq(topicNotes.topicId, topicId),
           eq(topicNotes.sessionId, sessionId),
           eq(topicNotes.artifactSource, 'challenge_drafted_note'),
+          eq(topicNotes.verificationState, 'verified'),
         ),
       )
       .orderBy(desc(topicNotes.createdAt))
@@ -101,6 +120,10 @@ export async function getVerifiedProofForSessionTopic(
     quoteAgeOutCutoff.getUTCDate() - QUOTE_AGE_OUT_DAYS,
   );
 
+  const evidenceAvailability =
+    note.createdAt.getTime() >= quoteAgeOutCutoff.getTime()
+      ? await getArtifactEvidenceAvailability(db, childProfileId, note.id)
+      : 'source_unavailable';
   return {
     hasProof: true,
     topicId: verified.topicId,
@@ -108,10 +131,6 @@ export async function getVerifiedProofForSessionTopic(
     subjectId: verified.subjectId,
     sessionId: verified.sessionId,
     verifiedAt: verified.verifiedAt.toISOString(),
-    quote:
-      note.createdAt.getTime() >= quoteAgeOutCutoff.getTime()
-        ? note.content
-        : null,
     masteryVerificationState: resolveMasteryVerificationState({
       verifiedAt: verified.verifiedAt,
       newWeakSpotRows: weakSpotRows,
@@ -124,6 +143,12 @@ export async function getVerifiedProofForSessionTopic(
         })
       : undefined,
     nextReviewDate: retentionCard?.nextReviewAt?.toISOString(),
+    ...verifiedEvidenceQuote(
+      evidenceAvailability,
+      note.createdAt.getTime() >= quoteAgeOutCutoff.getTime()
+        ? note.content
+        : null,
+    ),
   };
 }
 
@@ -184,7 +209,7 @@ export async function getLatestVerifiedProofForChild(
 
   const [noteRow, weakSpotRows, retentionCard] = await Promise.all([
     db
-      .select({ content: topicNotes.content })
+      .select({ id: topicNotes.id, content: topicNotes.content })
       .from(topicNotes)
       .where(
         and(
@@ -192,6 +217,7 @@ export async function getLatestVerifiedProofForChild(
           eq(topicNotes.topicId, latest.topicId),
           eq(topicNotes.sessionId, latest.sessionId),
           eq(topicNotes.artifactSource, 'challenge_drafted_note'),
+          eq(topicNotes.verificationState, 'verified'),
           gte(topicNotes.createdAt, quoteAgeOutCutoff),
         ),
       )
@@ -221,6 +247,9 @@ export async function getLatestVerifiedProofForChild(
       .limit(1),
   ]);
 
+  const evidenceAvailability = noteRow[0]
+    ? await getArtifactEvidenceAvailability(db, childProfileId, noteRow[0].id)
+    : 'source_unavailable';
   return {
     hasProof: true,
     topicId: latest.topicId,
@@ -232,7 +261,6 @@ export async function getLatestVerifiedProofForChild(
     // persisted for this round (e.g. finalize only produced a fallback
     // prompt) — the card still shows the verified fact, never a fabricated
     // quote or a fallback to raw transcript.
-    quote: noteRow[0]?.content ?? null,
     masteryVerificationState: resolveMasteryVerificationState({
       verifiedAt: latest.verifiedAt,
       newWeakSpotRows: weakSpotRows,
@@ -245,5 +273,6 @@ export async function getLatestVerifiedProofForChild(
           nextReviewAt: retentionCard[0].nextReviewAt?.toISOString() ?? null,
         })
       : undefined,
+    ...verifiedEvidenceQuote(evidenceAvailability, noteRow[0]?.content ?? null),
   };
 }

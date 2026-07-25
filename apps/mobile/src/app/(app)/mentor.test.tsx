@@ -1,5 +1,16 @@
-import { AccessibilityInfo, Dimensions, Platform } from 'react-native';
-import { act, fireEvent, screen, within } from '@testing-library/react-native';
+import {
+  AccessibilityInfo,
+  Dimensions,
+  Platform,
+  TextInput,
+} from 'react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native';
 import type {
   NowCard,
   NowResponse,
@@ -11,6 +22,7 @@ import { MENTOR_CAPABILITY_CASES } from '@eduagent/test-utils';
 import {
   ERROR_RESPONSES,
   NAMED_PROFILES,
+  createScreenWrapper,
   renderScreen,
   type RenderScreenOptions,
 } from '../../test-utils/screen-render';
@@ -279,6 +291,20 @@ describe('MentorScreen', () => {
       ],
       setActiveScope: jest.fn(),
     };
+  });
+
+  it('[WI-2234 review] does not mount the learner Mentor screen without an active Profile', () => {
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile: null,
+      profiles: [],
+    });
+    const rendered = render(<MentorScreen />, { wrapper });
+    cleanupRender = () => {
+      rendered.unmount();
+      queryClient.clear();
+    };
+
+    expect(screen.queryByTestId('mentor-screen')).toBeNull();
   });
 
   it('[WI-2113 AC-1] does not inject a Challenge during idle time and accepts it on the next focus boundary', async () => {
@@ -568,6 +594,96 @@ describe('MentorScreen', () => {
     expect(screen.queryByTestId('now-card-stack')).toBeNull();
   });
 
+  it.each([
+    { state: 'loading', isLoading: true, isError: false },
+    { state: 'error', isLoading: false, isError: true },
+  ])(
+    'does not surface cold-start suggestions before the initial feed $state state resolves',
+    ({ isLoading, isError }) => {
+      mockSubjects = [];
+      mockNowFeed = {
+        ...mockNowFeed,
+        data: undefined,
+        isLoading,
+        isError,
+      };
+
+      renderMentorScreen();
+
+      screen.getByTestId('mentor-input-bar');
+      expect(screen.queryByTestId('mentor-cold-start-card')).toBeNull();
+    },
+  );
+
+  it.each(
+    [320, 1024].flatMap((width) => [
+      {
+        state: 'empty',
+        width,
+        hasSubject: false,
+        cards: [] as NowCard[],
+      },
+      {
+        state: 'returning empty feed',
+        width,
+        hasSubject: true,
+        cards: [] as NowCard[],
+      },
+      {
+        state: 'non-empty feed',
+        width,
+        hasSubject: true,
+        cards: [
+          card({
+            kind: 'retention_due',
+            templateKey: 'now.retention_due.default',
+            deepLink: {
+              route: 'retention.review',
+              params: { subjectId: 'subject-0', topicId: 'topic-0' },
+              chain: [],
+            },
+          }),
+        ],
+      },
+      {
+        state: 'active session',
+        width,
+        hasSubject: true,
+        cards: [card()],
+      },
+    ]),
+  )(
+    'renders one enabled free-form composer in the $state state at $width px',
+    ({ width, hasSubject, cards }) => {
+      const dimensions = jest.spyOn(Dimensions, 'get').mockReturnValue({
+        width,
+        height: width <= 360 ? 640 : 768,
+        scale: 2,
+        fontScale: 1,
+      });
+      if (!hasSubject) {
+        mockSubjects = [];
+      }
+      mockNowFeed = {
+        ...mockNowFeed,
+        data: feed(cards),
+      };
+
+      try {
+        renderMentorScreen();
+
+        const enabledTextInputs = within(screen.getByTestId('mentor-screen'))
+          .UNSAFE_getAllByType(TextInput)
+          .filter((input) => input.props.editable !== false);
+
+        expect(enabledTextInputs).toHaveLength(1);
+        expect(enabledTextInputs[0]?.props.testID).toBe('mentor-bar-input');
+      } finally {
+        dimensions.mockRestore();
+      }
+    },
+  );
+
   it('cold-start pedagogical literal ID routes exact input through the shared freeform boundary', () => {
     mockSubjects = [];
     mockNowFeed = {
@@ -577,10 +693,10 @@ describe('MentorScreen', () => {
     renderMentorScreen();
 
     fireEvent.changeText(
-      screen.getByTestId('cold-start-input'),
+      screen.getByTestId('mentor-bar-input'),
       'show me how subject subject-123 works',
     );
-    fireEvent.press(screen.getByTestId('cold-start-send'));
+    fireEvent.press(screen.getByTestId('mentor-bar-send'));
 
     expectFreeformRoute('show me how subject subject-123 works');
   });
@@ -1023,7 +1139,9 @@ describe('MentorScreen', () => {
     fireEvent.press(fallback);
 
     // The cached unfinished_session deep-links straight back into that session.
-    expect(mockPush).toHaveBeenCalledWith('/(app)/session?sessionId=session-1');
+    expect(mockPush).toHaveBeenCalledWith(
+      '/(app)/session?sessionId=session-1&returnTo=mentor',
+    );
   });
 
   it('falls back to the session spine when the cache has no resumable session [T11]', () => {

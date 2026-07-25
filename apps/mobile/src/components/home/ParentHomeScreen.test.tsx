@@ -377,6 +377,7 @@ describe('ParentHomeScreen', () => {
         sessionId: '10000000-0000-4000-8000-0000000000e1',
         verifiedAt: '2026-07-01T12:00:00.000Z',
         quote: 'Plants convert light into chemical energy.',
+        evidenceAvailability: 'available',
         masteryVerificationState: 'fresh',
         retentionStatus: 'strong',
       },

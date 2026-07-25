@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { ScrollView, Switch, Text, View } from 'react-native';
-import { type Href, useRouter } from 'expo-router';
+import { Redirect, type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import {
   useFamilyPoolBreakdownSharing,
   useUpdateFamilyPoolBreakdownSharing,
@@ -15,7 +16,15 @@ import {
   SettingsRow,
 } from '../../../components/more/settings-rows';
 
-export default function FamilySettingsScreen(): React.ReactElement | null {
+export default function FamilySettingsScreen(): React.ReactElement {
+  if (!FEATURE_FLAGS.MODE_NAV_V2_ENABLED) {
+    return <Redirect href="/(app)/home" />;
+  }
+
+  return <FamilySettingsGate />;
+}
+
+function FamilySettingsGate(): React.ReactElement | null {
   const router = useRouter();
   const navigationContract = useNavigationContract();
   const isUnauthorized =
