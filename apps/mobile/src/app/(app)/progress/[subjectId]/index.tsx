@@ -8,10 +8,10 @@ import {
   type Href,
 } from 'expo-router';
 import {
-  accountReturnToken,
   goBackOrReplace,
   homeHrefForReturnTo,
   pushLearningResumeTarget,
+  resolvedV2TabForReturnTo,
   V2_TAB_TITLE_KEYS,
 } from '../../../../lib/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -145,14 +145,23 @@ export default function ProgressSubjectScreen(): React.ReactElement {
     : ('/(app)/progress' as const);
   // WI-2331 rework, F1b: every Back control below (loading, error, header)
   // routes to this SAME backFallback, so all of them name the actual
-  // destination — the owning V2 tab named by returnTo, or Progress itself
-  // (this screen's real, unchanged parent when returnTo is absent) — instead
-  // of the generic `common.goBack` they showed before.
+  // destination — the owning V2 tab named by returnTo (via
+  // resolvedV2TabForReturnTo, which only claims a tab when backFallback
+  // genuinely resolves to one), or Progress itself (this screen's real,
+  // unchanged parent when returnTo is absent) — instead of the generic
+  // `common.goBack` they showed before. When returnTo names a non-tab
+  // destination the label falls back to the generic action rather than
+  // mislabeling as a tab it isn't going to.
+  const returnToBackTab = returnTo
+    ? resolvedV2TabForReturnTo(returnTo, undefined, v2Enabled)
+    : null;
   const backLabel = v2Enabled
     ? returnTo
-      ? t('common.backTo', {
-          destination: t(V2_TAB_TITLE_KEYS[accountReturnToken(returnTo)]),
-        })
+      ? returnToBackTab
+        ? t('common.backTo', {
+            destination: t(V2_TAB_TITLE_KEYS[returnToBackTab]),
+          })
+        : t('common.goBack')
       : t('progress.subject.backToProgress')
     : t('common.goBack');
   const inventoryQuery = useProgressInventory();

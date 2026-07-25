@@ -21,10 +21,10 @@ import { useQuizStats } from '../../../hooks/use-quiz';
 import { useSubjects } from '../../../hooks/use-subjects';
 import { useVocabulary } from '../../../hooks/use-vocabulary';
 import {
-  accountReturnToken,
   homeHrefForReturnTo,
   PRACTICE_HREF,
   PRACTICE_RETURN_TO,
+  resolvedV2TabForReturnTo,
   V2_TAB_TITLE_KEYS,
 } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
@@ -239,13 +239,25 @@ export default function QuizIndexScreen(): React.ReactElement {
   // or the no-returnToken default) or the owning V2 tab named by
   // returnToken — so the Back label names whichever one it actually is,
   // instead of the generic "Go back" `quiz.index.backLabel` copy it showed
-  // before.
+  // before. When returnToken names a non-tab destination (e.g. family-recaps
+  // forwarded from elsewhere), resolvedV2TabForReturnTo returns null and the
+  // label falls back to the generic quiz.index.backLabel copy instead of
+  // mislabeling as a tab handleBack isn't actually routing to.
+  const returnTokenBackTab = returnToken
+    ? resolvedV2TabForReturnTo(
+        returnToken,
+        undefined,
+        FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+      )
+    : null;
   const quizBackLabel = FEATURE_FLAGS.MODE_NAV_V2_ENABLED
     ? isPracticeReturn || !returnToken
       ? t('common.backTo', { destination: t('practiceHub.title') })
-      : t('common.backTo', {
-          destination: t(V2_TAB_TITLE_KEYS[accountReturnToken(returnToken)]),
-        })
+      : returnTokenBackTab
+        ? t('common.backTo', {
+            destination: t(V2_TAB_TITLE_KEYS[returnTokenBackTab]),
+          })
+        : t('quiz.index.backLabel')
     : t('quiz.index.backLabel');
 
   // Quiz index is another cross-tab root. Consume native Back only for the

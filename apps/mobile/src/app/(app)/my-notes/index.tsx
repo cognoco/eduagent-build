@@ -6,8 +6,8 @@ import type { TFunction } from 'i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   OWN_LEARNING_RETURN_TO,
-  accountReturnToken,
   homeHrefForReturnTo,
+  resolvedV2TabForReturnTo,
   V2_TAB_TITLE_KEYS,
 } from '../../../lib/navigation';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
@@ -93,14 +93,19 @@ export default function MyNotesHubScreen(): React.ReactElement {
   // notes archive (JournalNotesArchive.tsx) pushes it with
   // `returnTo: 'journal'` — so the Back label must name the ACTUAL
   // destination, not hard-code Mentor. `homeHref` above already resolves the
-  // real destination via `accountReturnToken`; derive the label from the
-  // same token so the two never disagree (mirrors resolveV2TabIsActive's
-  // returnTo-aware Mentor catch-all in _layout.tsx).
-  const backLabel = v2Enabled
-    ? t('common.backTo', {
-        destination: t(V2_TAB_TITLE_KEYS[accountReturnToken(returnTo)]),
-      })
-    : t('common.back');
+  // real destination; derive the label from `resolvedV2TabForReturnTo`, which
+  // resolves the same way and only claims a tab when `homeHref` genuinely is
+  // one, so the two never disagree. The `myNotesReturnTo` default
+  // (own-learning) isn't a tab, so that case — and any other non-tab
+  // returnTo — falls back to the generic label instead of mislabeling as a
+  // tab it isn't going to.
+  const backTab = resolvedV2TabForReturnTo(returnTo, undefined, v2Enabled);
+  const backLabel =
+    v2Enabled && backTab
+      ? t('common.backTo', {
+          destination: t(V2_TAB_TITLE_KEYS[backTab]),
+        })
+      : t('common.back');
   const { activeProfile } = useProfile();
   const sessionsQuery = useProfileSessions(activeProfile?.id);
 

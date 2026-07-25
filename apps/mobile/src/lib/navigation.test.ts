@@ -28,6 +28,7 @@ import {
   FAMILY_HOME_RETURN_TO,
   accountReturnHref,
   accountReturnTokenForPathname,
+  resolvedV2TabForReturnTo,
 } from './navigation';
 import type { LearningResumeTarget } from '@eduagent/schemas';
 import type { Router } from 'expo-router';
@@ -149,6 +150,43 @@ describe('homeHrefForReturnTo', () => {
     expect(homeHrefForReturnTo('something-else', undefined, false)).toBe(
       '/(app)/home',
     );
+  });
+});
+
+// [WI-2331 rework] resolvedV2TabForReturnTo must only claim a tab when
+// homeHrefForReturnTo's resolved destination genuinely is that tab root —
+// otherwise a "Back to {tab}" label lies about where Back actually goes.
+describe('resolvedV2TabForReturnTo', () => {
+  it('returns the owning tab token for each V2 tab root', () => {
+    expect(resolvedV2TabForReturnTo('mentor', undefined, true)).toBe('mentor');
+    expect(resolvedV2TabForReturnTo(SUBJECTS_RETURN_TO, undefined, true)).toBe(
+      'subjects',
+    );
+    expect(resolvedV2TabForReturnTo(JOURNAL_RETURN_TO, undefined, true)).toBe(
+      'journal',
+    );
+  });
+
+  it('returns null for non-tab destinations', () => {
+    expect(
+      resolvedV2TabForReturnTo(PRACTICE_RETURN_TO, undefined, true),
+    ).toBeNull();
+    expect(
+      resolvedV2TabForReturnTo(FAMILY_RECAPS_RETURN_TO, 'recap-1', true),
+    ).toBeNull();
+    expect(
+      resolvedV2TabForReturnTo(OWN_LEARNING_RETURN_TO, undefined, true),
+    ).toBeNull();
+    expect(
+      resolvedV2TabForReturnTo(FAMILY_HOME_RETURN_TO, undefined, true),
+    ).toBeNull();
+  });
+
+  it('returns null when V2 is disabled, regardless of token', () => {
+    expect(resolvedV2TabForReturnTo(SUBJECTS_RETURN_TO, undefined, false)).toBe(
+      null,
+    );
+    expect(resolvedV2TabForReturnTo(undefined, undefined, false)).toBeNull();
   });
 });
 

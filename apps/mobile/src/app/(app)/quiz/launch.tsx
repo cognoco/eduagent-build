@@ -13,10 +13,10 @@ import { DeskLampAnimation } from '../../../components/common';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { useFetchRound, useGenerateRound } from '../../../hooks/use-quiz';
 import {
-  accountReturnToken,
   homeHrefForReturnTo,
   PRACTICE_HREF,
   PRACTICE_RETURN_TO,
+  resolvedV2TabForReturnTo,
   V2_TAB_TITLE_KEYS,
 } from '../../../lib/navigation';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
@@ -159,14 +159,25 @@ export default function QuizLaunchScreen(): React.ReactElement {
   // effectiveReturnTo, or this quiz flow's own root when neither is set)
   // instead of the generic `common.goBack` it showed before. The loading
   // state's own "Cancel" secondary action is left untouched: it cancels the
-  // in-flight round generation rather than exiting the screen.
+  // in-flight round generation rather than exiting the screen. When
+  // effectiveReturnTo names a non-tab destination, resolvedV2TabForReturnTo
+  // returns null and the label falls back to this quiz flow's own root
+  // instead of mislabeling as a tab handleExit isn't actually routing to.
+  const effectiveReturnToBackTab =
+    effectiveReturnTo && effectiveReturnTo !== PRACTICE_RETURN_TO
+      ? resolvedV2TabForReturnTo(
+          effectiveReturnTo,
+          undefined,
+          FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+        )
+      : null;
   const exitLabel = FEATURE_FLAGS.MODE_NAV_V2_ENABLED
     ? t('common.backTo', {
         destination:
           effectiveReturnTo === PRACTICE_RETURN_TO
             ? t('practiceHub.title')
-            : effectiveReturnTo
-              ? t(V2_TAB_TITLE_KEYS[accountReturnToken(effectiveReturnTo)])
+            : effectiveReturnToBackTab
+              ? t(V2_TAB_TITLE_KEYS[effectiveReturnToBackTab])
               : t('quiz.index.title'),
       })
     : t('common.goBack');

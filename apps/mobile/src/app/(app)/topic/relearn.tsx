@@ -28,9 +28,9 @@ import {
 import { useLinkedChildren, useProfile } from '../../../lib/profile';
 import { computeAgeBracket, type RetentionStatus } from '@eduagent/schemas';
 import {
-  accountReturnToken,
   goBackOrReplace,
   homeHrefForReturnTo,
+  resolvedV2TabForReturnTo,
   V2_TAB_TITLE_KEYS,
 } from '../../../lib/navigation';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
@@ -188,18 +188,22 @@ export default function RelearnScreen() {
   // WI-2331 rework, F1b: the empty-state exit control always calls
   // handleLeave() (never a phase step-back like the header chevron does), so
   // it names the ACTUAL destination handleLeave resolves to — the returnTo
-  // token when present, else Subjects (this screen's owning tab, per the
-  // AC-2 comment on handleLeave below) — instead of the generic
-  // `common.goBackAction` it showed before.
-  const leaveLabel = v2Enabled
-    ? t('common.backTo', {
-        destination: t(
-          V2_TAB_TITLE_KEYS[
-            returnTo ? accountReturnToken(returnTo) : 'subjects'
-          ],
-        ),
-      })
-    : t('common.goBackAction');
+  // token when present (via resolvedV2TabForReturnTo, which only claims a tab
+  // when the resolved destination genuinely is one), else Subjects (this
+  // screen's owning tab, per the AC-2 comment on handleLeave below) —
+  // instead of the generic `common.goBackAction` it showed before. When
+  // returnTo names a non-tab destination (practice, family-recaps,
+  // own-learning, …) the label falls back to the generic action rather than
+  // mislabeling as a tab it isn't going to.
+  const leaveBackTab = returnTo
+    ? resolvedV2TabForReturnTo(returnTo, returnId, v2Enabled)
+    : 'subjects';
+  const leaveLabel =
+    v2Enabled && leaveBackTab
+      ? t('common.backTo', {
+          destination: t(V2_TAB_TITLE_KEYS[leaveBackTab]),
+        })
+      : t('common.goBackAction');
   const source = firstParam(params.source);
   const sourceChildProfileId = firstParam(params.childProfileId);
   const isParentBridgeSource = source === 'parent_bridge';

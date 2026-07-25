@@ -32,17 +32,22 @@ jest.mock(
 );
 
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
+let mockCanGoBack = true;
 let mockReturnTo: string | undefined;
+let mockReturnId: string | undefined;
 jest.mock('expo-router' /* gc1-allow: native-boundary */, () => ({
   useRouter: () => ({
     back: jest.fn(),
-    canGoBack: jest.fn(() => true),
+    canGoBack: jest.fn(() => mockCanGoBack),
     push: mockPush,
+    replace: mockReplace,
   }),
   useLocalSearchParams: () => ({
     profileId: 'child-profile-001',
     sessionId: 'session-001',
     returnTo: mockReturnTo,
+    returnId: mockReturnId,
   }),
 }));
 
@@ -187,6 +192,8 @@ describe('SessionDetailScreen (summary-only)', () => {
     jest.clearAllMocks();
     mockFetch.mockClear();
     mockReturnTo = undefined;
+    mockReturnId = undefined;
+    mockCanGoBack = true;
   });
 
   it('shows session metadata when displaySummary is present', async () => {
@@ -455,6 +462,60 @@ describe('SessionDetailScreen (summary-only)', () => {
       fireEvent.press(footer);
 
       expect(mockPush).toHaveBeenCalledWith('/(app)/child/child-profile-001');
+
+      cleanup();
+    });
+  });
+
+  // [WI-2331 rework] the header Back label must never claim a tab
+  // handleBack isn't actually routing to: a non-tab returnTo (family-recaps,
+  // with a returnId) resolves to the real recap destination, so the label
+  // falls back to the generic Back action instead of mislabeling as
+  // "Back to Mentor".
+  describe('header Back label under V2 with a non-tab returnTo', () => {
+    let originalV2: boolean;
+
+    beforeEach(() => {
+      originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        true;
+      mockReturnTo = 'family-recaps';
+      mockReturnId = 'recap-1';
+    });
+
+    afterEach(() => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        originalV2;
+    });
+
+    it('uses the generic fallback label instead of "Back to Mentor"', async () => {
+      setRoutes(makeSession({ narrative: 'They reviewed fractions.' }));
+
+      const { cleanup } = renderSessionDetail();
+
+      const header = await waitFor(() =>
+        screen.getByLabelText('common.goBack'),
+      );
+      expect(header).toBeTruthy();
+
+      cleanup();
+    });
+
+    it('still routes Back to the real family-recaps destination', async () => {
+      mockCanGoBack = false;
+      setRoutes(makeSession({ narrative: 'They reviewed fractions.' }));
+
+      const { cleanup } = renderSessionDetail();
+
+      const header = await waitFor(() =>
+        screen.getByLabelText('common.goBack'),
+      );
+      fireEvent.press(header);
+
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(app)/recaps/[recapId]',
+        params: { recapId: 'recap-1' },
+      });
 
       cleanup();
     });

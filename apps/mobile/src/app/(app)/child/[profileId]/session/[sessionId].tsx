@@ -9,10 +9,10 @@ import {
   useChildSessionDetail,
 } from '../../../../../hooks/use-dashboard';
 import {
-  accountReturnToken,
   childProfileHref,
   goBackOrReplace,
   homeHrefForReturnTo,
+  resolvedV2TabForReturnTo,
   V2_TAB_TITLE_KEYS,
 } from '../../../../../lib/navigation';
 import { FEATURE_FLAGS } from '../../../../../lib/feature-flags';
@@ -77,16 +77,25 @@ export default function SessionDetailScreen() {
 
   // WI-2331 rework, F1b: the header/error/narrative-unavailable Back
   // controls route through handleBack/backFallbackHref, so they name the
-  // same actual destination — the owning V2 tab named by returnTo, the
-  // child's profile (this screen's real, unchanged parent when there's no
-  // returnTo), or the Mentor default — instead of the generic
-  // `common.goBack` most of them showed before. V0/V1 keep their prior copy
-  // unchanged (`common.goBack`).
+  // same actual destination — the owning V2 tab named by returnTo
+  // (via resolvedV2TabForReturnTo, which only claims a tab when
+  // backFallbackHref genuinely resolves to one), the child's profile (this
+  // screen's real, unchanged parent when there's no returnTo), or the Mentor
+  // default — instead of the generic `common.goBack` most of them showed
+  // before. V0/V1 keep their prior copy unchanged (`common.goBack`). When
+  // returnTo names a non-tab destination (practice, family-recaps, …) the
+  // label falls back to the generic Back action rather than mislabeling.
+  const returnToBackTab =
+    returnTo != null
+      ? resolvedV2TabForReturnTo(returnTo, returnId, v2Enabled)
+      : null;
   const v2ExitLabel =
     returnTo != null
-      ? t('common.backTo', {
-          destination: t(V2_TAB_TITLE_KEYS[accountReturnToken(returnTo)]),
-        })
+      ? returnToBackTab
+        ? t('common.backTo', {
+            destination: t(V2_TAB_TITLE_KEYS[returnToBackTab]),
+          })
+        : t('common.goBack')
       : profileId
         ? t('parentView.session.backToChildProfile')
         : t('common.backTo', { destination: t(V2_TAB_TITLE_KEYS.mentor) });
