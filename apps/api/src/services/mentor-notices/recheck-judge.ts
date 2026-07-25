@@ -61,7 +61,8 @@ const recheckReasonValues = [
   'unclear',
 ] as const;
 
-const recheckJudgeRawSchema = z.object({
+/** Exported for the live-eval harness — validates the judge's raw {verdict, reason} shape. */
+export const recheckJudgeRawSchema = z.object({
   verdict: z.enum(recheckVerdictValues),
   reason: z.enum(recheckReasonValues),
 });
@@ -105,7 +106,8 @@ function resolveOutcome(
   return outcome.success ? outcome.data : null;
 }
 
-function buildJudgePrompt(input: {
+/** Exported for the live-eval harness (apps/api/eval-llm/flows/recheck-judge.ts) — the eval invokes this SAME builder so the prompt under evaluation matches production exactly. */
+export function buildJudgePrompt(input: {
   concept: string;
   correctionHint: string | null;
   exchangeNumber: number;
