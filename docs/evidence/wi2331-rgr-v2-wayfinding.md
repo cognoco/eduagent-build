@@ -60,7 +60,7 @@ Tests:       44 passed, 44 total
 
 ## Defect 3 — AC-2: mentor-memory.tsx Back control falls back to dead `/(app)/more`
 
-**Fix:** `apps/mobile/src/app/(app)/mentor-memory.tsx:213-231` — `handleBack`
+**Fix:** `apps/mobile/src/app/(app)/mentor-memory.tsx:229-246` — `handleBack`
 (wired to the header back chevron, the load-timeout secondary action, and the
 error-state secondary action — one function, three UI sites) now derives
 `backFallback`/`backLabel` from `FEATURE_FLAGS.MODE_NAV_V2_ENABLED`: V2 on ->
@@ -92,3 +92,39 @@ The `v2Enabled=false` default is the legacy path. `navigation.test.ts` asserts
 the catch-all still returns `/(app)/home` with V2 off, and every pre-existing
 `homeHrefForReturnTo` token assertion (2-arg form) is unchanged — the diff adds
 behaviour behind the flag and removes none.
+
+## Scope reconciliation & provenance (PM AC-scope ruling, 2026-07-23)
+
+WI-2331 is `Type=Bug` but carried feature-scale Acceptance Criteria. A PM AC-scope
+ruling (MentoMate PM chair, clacks `mentomate-pgm` seq **39322**, relayed to this lane
+at seq **39333**, 2026-07-23) split the item on the **bug/feature line** — Option (b) —
+and was **executed in place on the Cosmo AC field** with `[AMENDED]` / `[REMOVED]`
+markers (original AC-4 text preserved in its removal note; same pattern as WI-2624).
+This section reconciles the delivered code against that amended field so a reviewer can
+resolve every AC unit in-repo. The shepherd did **not** edit the Cosmo AC field — the PM
+chair did.
+
+| AC | Ruling | Delivered here |
+|----|--------|----------------|
+| AC-1 | Stays | Owning-tab highlight — `resolveV2TabIsActive` (Defect 1). |
+| AC-2 | **Narrowed** to the root-level dead-V0-fallback screens; the exhaustive ~76-file semantic-Back sweep is split out. | Root-cause dead-fallback fix (Defects 2 & 3: `homeHrefForReturnTo` catch-all + `mentor-memory` Back). Sweep → **WI-2677**. |
+| AC-3 | Stays | Focused-journey exit preserved; `session/index.tsx` `handleChatBackPress` last-resort routes to the owning tab under V2 instead of dead `/(app)/home`. |
+| AC-4 | **Removed** — type correction: net-new own/supporting identity UI is a Feature, not a Bug deviation. | Not delivered here; split → **WI-2678**. |
+| AC-5 | Stays | One central contract (`accountReturnTokenForPathname` / `homeHrefForReturnTo` / `V2_TAB_TITLE_KEYS`) backs both the tab highlight and every Back target; the full ~78-file back-route audit is enumerated in `docs/evidence/wi2331-backnav-audit.md`; representative regression coverage across all three tabs; V0/V1 flag states preserved. The exhaustive fix-sweep of the audited set → WI-2677. |
+
+Both mandated follow-ups were minted and linked **before** completion (mint-before-complete
+rule) and independently verified by the orchestrator (clacks seq **40193**): WI-2331
+`Related Items = [WI-2185, WI-2178, WI-2240, WI-2677, WI-2678]`; WI-2677 (Enhancement,
+AC-2 sweep) and WI-2678 (Feature, removed AC-4) both back-link to WI-2331 with Workstream
+and Project set.
+
+## Post-merge re-verification (origin/main reconcile)
+
+The RGR cycles above were captured at base `b95639a4b`. `origin/main` later advanced and
+was forward-merged into this branch (merge commit reconciling WI-2331 against the landed
+WI-2234 returning-learner and WI-2239 Journal-paper-trail changes, which touched the same
+`handleBack` / `handleChatBackPress` / `summaryHomeHref` sites). Both sides were preserved
+in the resolution. Re-verified on the merged head (Node 22): `jest --findRelatedTests` over
+the three reconciled files plus `navigation.ts` and `_layout.tsx` → **96 suites / 2239
+tests pass**, covering both the WI-2331 AC guards above and the WI-2234/WI-2239 additions;
+mobile `tsc --noEmit` clean.
