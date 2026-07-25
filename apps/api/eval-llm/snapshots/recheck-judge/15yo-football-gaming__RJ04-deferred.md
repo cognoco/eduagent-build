@@ -34,6 +34,7 @@
   "exchangeNumber": 1,
   "learnerAnswer": "Can we not do this right now? Maybe later.",
   "expectedVerdict": "deferred",
+  "expectedReason": "explicit_not_now",
   "conversationLanguage": "en"
 }
 ```
@@ -78,5 +79,5 @@ Learner's latest message:
 ## Builder notes
 
 - Scenario: RJ04-deferred — Learner asks to defer — ordinary reluctance, not a hard stop.
-- Expected verdict: deferred
+- Expected verdict/reason pair: deferred/explicit_not_now
 - Run live: doppler run -- pnpm eval:llm -- --flow recheck-judge --live

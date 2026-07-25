@@ -34,6 +34,7 @@
   "exchangeNumber": 1,
   "learnerAnswer": "x minus 3 equals 7, so x equals 7 minus 3, x equals 4.",
   "expectedVerdict": "not_yet",
+  "expectedReason": "insufficient",
   "conversationLanguage": "en"
 }
 ```
@@ -78,5 +79,5 @@ Learner's latest message:
 ## Builder notes
 
 - Scenario: RJ02-not-yet — Learner attempts the concept but still gets the sign wrong.
-- Expected verdict: not_yet
+- Expected verdict/reason pair: not_yet/insufficient
 - Run live: doppler run -- pnpm eval:llm -- --flow recheck-judge --live

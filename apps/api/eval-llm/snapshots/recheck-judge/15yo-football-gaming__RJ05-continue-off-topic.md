@@ -34,6 +34,7 @@
   "exchangeNumber": 1,
   "learnerAnswer": "Hmm, so if x is negative here... wait actually what's the football practice schedule for tomorrow?",
   "expectedVerdict": "continue",
+  "expectedReason": "unclear",
   "conversationLanguage": "en"
 }
 ```
@@ -78,5 +79,5 @@ Learner's latest message:
 ## Builder notes
 
 - Scenario: RJ05-continue-off-topic — Learner message does not engage with the re-check at all — no transition yet, and no request to postpone (distinct from RJ04's explicit "not now").
-- Expected verdict: continue
+- Expected verdict/reason pair: continue/unclear
 - Run live: doppler run -- pnpm eval:llm -- --flow recheck-judge --live

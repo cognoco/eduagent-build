@@ -34,6 +34,7 @@
   "exchangeNumber": 2,
   "learnerAnswer": "Please stop bringing this up, I don't want to go over the sign-flipping thing again, ever.",
   "expectedVerdict": "dismissed",
+  "expectedReason": "explicit_stop",
   "conversationLanguage": "en"
 }
 ```
@@ -78,5 +79,5 @@ Learner's latest message:
 ## Builder notes
 
 - Scenario: RJ03-dismissed — Learner explicitly asks never to raise this again.
-- Expected verdict: dismissed
+- Expected verdict/reason pair: dismissed/explicit_stop
 - Run live: doppler run -- pnpm eval:llm -- --flow recheck-judge --live

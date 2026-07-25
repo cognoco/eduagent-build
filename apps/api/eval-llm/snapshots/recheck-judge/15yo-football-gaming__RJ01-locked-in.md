@@ -34,6 +34,7 @@
   "exchangeNumber": 1,
   "learnerAnswer": "Oh I see — when I move the 3 across I have to flip its sign, so x minus 3 equals 7 becomes x equals 7 plus 3, x equals 10.",
   "expectedVerdict": "locked_in",
+  "expectedReason": "demonstrated",
   "conversationLanguage": "en"
 }
 ```
@@ -78,5 +79,5 @@ Learner's latest message:
 ## Builder notes
 
 - Scenario: RJ01-locked-in — Learner correctly demonstrates the concept unprompted.
-- Expected verdict: locked_in
+- Expected verdict/reason pair: locked_in/demonstrated
 - Run live: doppler run -- pnpm eval:llm -- --flow recheck-judge --live
