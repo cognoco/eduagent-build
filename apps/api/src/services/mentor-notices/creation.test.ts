@@ -58,6 +58,14 @@ function session(sessionType: SessionType) {
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 describe('createMentorNoticeFromExchange', () => {
   let sendSpy: jest.SpiedFunction<typeof inngest.send>;
 
@@ -85,31 +93,44 @@ describe('createMentorNoticeFromExchange', () => {
     'inherits the authoritative session target for a %s session',
     async (sessionType) => {
       const { db, insertedValues } = makeDb();
-
-      await expect(
-        createMentorNoticeFromExchange(db, {
-          profileId: PROFILE_ID,
-          session: session(sessionType),
-          signal,
-        }),
-      ).resolves.toMatchObject({ id: NOTICE_ID });
-
-      expect(insertedValues).toContainEqual(
-        expect.objectContaining({
-          subjectId: SUBJECT_ID,
-          topicId: TOPIC_ID,
-          sourceSessionId: SESSION_ID,
-          answerEventId: EVENT_ID,
-        }),
-      );
-      expect(sendSpy).toHaveBeenCalledTimes(1);
-      expect(sendSpy).toHaveBeenCalledWith({
-        name: 'app/notice.created',
-        data: { noticeId: NOTICE_ID, profileId: PROFILE_ID },
+      const sendStarted = deferred<void>();
+      const sendResult = deferred<{ ids: never[] }>();
+      sendSpy.mockImplementationOnce(() => {
+        sendStarted.resolve();
+        return sendResult.promise as never;
       });
-      await expect(sendSpy.mock.results[0]?.value).resolves.toEqual({
-        ids: [],
+
+      const creation = createMentorNoticeFromExchange(db, {
+        profileId: PROFILE_ID,
+        session: session(sessionType),
+        signal,
       });
+      await sendStarted.promise;
+
+      try {
+        const creationSettled = jest.fn();
+        void creation.then(creationSettled, creationSettled);
+        await Promise.resolve();
+        expect(creationSettled).not.toHaveBeenCalled();
+
+        expect(insertedValues).toContainEqual(
+          expect.objectContaining({
+            subjectId: SUBJECT_ID,
+            topicId: TOPIC_ID,
+            sourceSessionId: SESSION_ID,
+            answerEventId: EVENT_ID,
+          }),
+        );
+        expect(sendSpy).toHaveBeenCalledTimes(1);
+        expect(sendSpy).toHaveBeenCalledWith({
+          name: 'app/notice.created',
+          data: { noticeId: NOTICE_ID, profileId: PROFILE_ID },
+        });
+      } finally {
+        sendResult.resolve({ ids: [] });
+      }
+
+      await expect(creation).resolves.toMatchObject({ id: NOTICE_ID });
     },
   );
 

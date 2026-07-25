@@ -27,6 +27,14 @@ function makeInsertDb(rows: unknown[]) {
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 describe('mentor notice creation state', () => {
   let sendSpy: jest.SpiedFunction<typeof inngest.send>;
 
@@ -89,14 +97,32 @@ describe('mentor notice creation state', () => {
       correctionHint: input.correctionHint,
     };
     const { db } = makeInsertDb([accepted]);
-
-    await expect(acceptMentorNotice(db, input)).resolves.toEqual(accepted);
-    expect(sendSpy).toHaveBeenCalledTimes(1);
-    expect(sendSpy).toHaveBeenCalledWith({
-      name: 'app/notice.created',
-      data: { noticeId: accepted.id, profileId: input.profileId },
+    const sendStarted = deferred<void>();
+    const sendResult = deferred<{ ids: never[] }>();
+    sendSpy.mockImplementationOnce(() => {
+      sendStarted.resolve();
+      return sendResult.promise as never;
     });
-    await expect(sendSpy.mock.results[0]?.value).resolves.toEqual({ ids: [] });
+
+    const acceptance = acceptMentorNotice(db, input);
+    await sendStarted.promise;
+
+    try {
+      const acceptanceSettled = jest.fn();
+      void acceptance.then(acceptanceSettled, acceptanceSettled);
+      await Promise.resolve();
+      expect(acceptanceSettled).not.toHaveBeenCalled();
+
+      expect(sendSpy).toHaveBeenCalledTimes(1);
+      expect(sendSpy).toHaveBeenCalledWith({
+        name: 'app/notice.created',
+        data: { noticeId: accepted.id, profileId: input.profileId },
+      });
+    } finally {
+      sendResult.resolve({ ids: [] });
+    }
+
+    await expect(acceptance).resolves.toEqual(accepted);
   });
 
   it('preserves an accepted notice when the created-event send rejects', async () => {
