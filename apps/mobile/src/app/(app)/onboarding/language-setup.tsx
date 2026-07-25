@@ -18,10 +18,10 @@ import { useStartFirstCurriculumSession } from '../../../hooks/use-sessions';
 import { formatApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
 import {
-  accountReturnToken,
   goBackOrReplace,
   homeHrefForReturnTo,
   isSessionForwardableReturnTo,
+  resolvedV2TabForReturnTo,
   SETTINGS_RETURN_TO,
   SUBJECTS_RETURN_TO,
   V2_TAB_TITLE_KEYS,
@@ -211,18 +211,23 @@ export default function LanguageSetup() {
   // (the settings-return case, since `/(app)/more` is dead in V2) or the
   // owning V2 tab named by returnTo otherwise — so the header Back control
   // names that destination instead of the generic `common.goBack` it showed
-  // before.
-  const backLabel = FEATURE_FLAGS.MODE_NAV_V2_ENABLED
-    ? t('common.backTo', {
-        destination: t(
-          V2_TAB_TITLE_KEYS[
-            returnTo === SETTINGS_RETURN_TO
-              ? 'mentor'
-              : accountReturnToken(returnTo)
-          ],
-        ),
-      })
-    : t('common.goBack');
+  // before. `accountReturnToken` used to build this label, but it collapses
+  // every non-tab returnTo (practice, family-recaps, …) to 'mentor' even
+  // though handleBack routes those elsewhere — resolvedV2TabForReturnTo
+  // resolves the label the same way handleBack resolves the destination, and
+  // only names a tab when that destination genuinely is one, else falls back
+  // to the generic label. `homeHrefForReturnTo(SETTINGS_RETURN_TO, …, true)`
+  // already resolves to Mentor (its unrecognized-token default), so no
+  // explicit SETTINGS_RETURN_TO branch is needed here.
+  const backTab = resolvedV2TabForReturnTo(
+    returnTo,
+    undefined,
+    FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+  );
+  const backLabel =
+    FEATURE_FLAGS.MODE_NAV_V2_ENABLED && backTab
+      ? t('common.backTo', { destination: t(V2_TAB_TITLE_KEYS[backTab]) })
+      : t('common.goBack');
 
   // The "no subject selected" guard button also calls handleBack, so under
   // V2 it must name the same destination backLabel does instead of the

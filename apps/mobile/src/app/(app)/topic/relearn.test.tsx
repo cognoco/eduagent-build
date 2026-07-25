@@ -104,31 +104,10 @@ jest.mock(
 // list is computed by the real hook from `profiles[]` instead of stubbed.
 
 jest.mock(
-  '../../../lib/navigation' /* gc1-allow: imports expo-router Router type; goBackOrReplace calls router.back which requires native navigation context */,
+  '../../../lib/navigation' /* gc1-allow: goBackOrReplace calls router.back which requires native navigation context */,
   () => ({
+    ...jest.requireActual('../../../lib/navigation'),
     goBackOrReplace: (...args: unknown[]) => mockBack(...args),
-    homeHrefForReturnTo: (returnTo: string | undefined) =>
-      returnTo === 'practice' ? '/(app)/practice' : '/(app)/home',
-    // [WI-2331 rework] mirrors the real resolvedV2TabForReturnTo's contract:
-    // only the three V2 tab tokens resolve to a tab; everything else
-    // (including 'practice', 'family-recaps', 'learner-home', undefined)
-    // is a non-tab destination and returns null.
-    resolvedV2TabForReturnTo: (
-      returnTo: string | string[] | undefined,
-      _returnId: string | string[] | undefined,
-      v2Enabled: boolean,
-    ) => {
-      if (!v2Enabled) return null;
-      const token = Array.isArray(returnTo) ? returnTo[0] : returnTo;
-      return token === 'mentor' || token === 'subjects' || token === 'journal'
-        ? token
-        : null;
-    },
-    V2_TAB_TITLE_KEYS: {
-      mentor: 'tabs.mentor',
-      subjects: 'tabs.subjects',
-      journal: 'tabs.journal',
-    },
   }),
 );
 
