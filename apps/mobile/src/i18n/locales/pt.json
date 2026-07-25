@@ -3406,6 +3406,7 @@
     "emptyCtaStartSession": "Iniciar uma sessão",
     "verifiedProof": {
       "holdsStrong": "continua válido",
+      "lookupUnavailable": "A prova verificada está temporariamente indisponível",
       "recheckDue": "revisão agendada para {{date}}"
     }
   },

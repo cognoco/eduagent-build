@@ -3406,6 +3406,7 @@
     "emptyCtaStartSession": "Start en økt",
     "verifiedProof": {
       "holdsStrong": "holder fortsatt",
+      "lookupUnavailable": "Verifisert dokumentasjon er midlertidig utilgjengelig",
       "recheckDue": "skal sjekkes på nytt {{date}}"
     }
   },

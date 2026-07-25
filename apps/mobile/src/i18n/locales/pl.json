@@ -3554,6 +3554,7 @@
     "emptyCtaStartSession": "Rozpocznij sesję",
     "verifiedProof": {
       "holdsStrong": "nadal ważne",
+      "lookupUnavailable": "Zweryfikowany dowód jest tymczasowo niedostępny",
       "recheckDue": "do ponownej weryfikacji {{date}}"
     }
   },

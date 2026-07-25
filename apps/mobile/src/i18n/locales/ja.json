@@ -3406,6 +3406,7 @@
     "emptyCtaStartSession": "セッションを開始する",
     "verifiedProof": {
       "holdsStrong": "有効",
+      "lookupUnavailable": "確認済みの証明は一時的に利用できません",
       "recheckDue": "{{date}}に再確認予定"
     }
   },
