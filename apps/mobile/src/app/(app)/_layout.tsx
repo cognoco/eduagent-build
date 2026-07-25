@@ -28,7 +28,11 @@ import { ErrorFallback } from '../../components/common';
 import { ModeSwitcher } from '../../components/chrome/ModeSwitcher';
 import { ScopeChip } from '../../components/chrome/ScopeChip';
 import { AccountAvatar } from '../../components/chrome/AccountAvatar';
-import { goBackOrReplace } from '../../lib/navigation';
+import {
+  accountReturnTokenForPathname,
+  goBackOrReplace,
+  type V2AccountReturnToken,
+} from '../../lib/navigation';
 import { ScopeContextProvider } from '../../lib/scope-context';
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { useMentorLanguageSync } from '../../hooks/use-mentor-language-sync';
@@ -259,6 +263,35 @@ export function resolveV2PushedScenePaddingTop({
     : pushedSceneTopInset - safeAreaTop;
 }
 
+/**
+ * WI-2331 AC-1: resolve whether a real V2 tab button (Mentor, Subjects,
+ * Journal) should render as the visually active tab.
+ *
+ * V2's tab bar only ever shows these three buttons, but every other route
+ * (progress, subject-hub, child/[id], account, …) is still a SIBLING
+ * `Tabs.Screen` hidden from the bar (`href: null`). React Navigation tracks
+ * one of those hidden siblings as the actually-focused route whenever the
+ * user is on a pushed screen, so none of the three visible tab buttons is
+ * ever reported `focused` by the library — the owning tab silently loses its
+ * highlight (the bug this WI fixes). `accountReturnTokenForPathname` already
+ * maps any pathname to its owning V2 tab (built for the Account screen's
+ * "Back to {tab}" contract); reusing it here means a pushed screen and its
+ * Back button always agree on which tab owns it.
+ *
+ * V0/V1 never register mentor/subjects/journal as visible tabs, so
+ * `reactNavigationFocused` passes straight through when V2 is off — this
+ * function only overrides the highlight while V2 is active.
+ */
+export function resolveV2TabIsActive(
+  pathname: string,
+  tabName: V2AccountReturnToken,
+  v2Enabled: boolean,
+  reactNavigationFocused: boolean,
+): boolean {
+  if (!v2Enabled) return reactNavigationFocused;
+  return accountReturnTokenForPathname(pathname) === tabName;
+}
+
 const ACCOUNT_AVATAR_HIDDEN_PATHS = [
   '/account',
   '/onboarding',
@@ -306,6 +339,27 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
       size={22}
       color={focused ? colors.accent : colors.textSecondary}
     />
+  );
+}
+
+// WI-2331 AC-1: paired with TabIcon so the V2 Mentor/Subjects/Journal tab
+// buttons color icon AND label off the same resolveV2TabIsActive() result,
+// instead of React Navigation's own (unreliable on pushed V2 screens) focus
+// state. Only ever wired to those three tabs — see the Tabs.Screen entries
+// below — so it never renders alongside the default title-based label used
+// by every other (hidden-when-V2) tab.
+function TabLabel({ title, focused }: { title: string; focused: boolean }) {
+  const colors = useThemeColors();
+  return (
+    <Text
+      numberOfLines={1}
+      style={{
+        fontSize: 12,
+        color: focused ? colors.accent : colors.textSecondary,
+      }}
+    >
+      {title}
+    </Text>
   );
 }
 
@@ -946,7 +1000,26 @@ export default function AppLayout() {
                 tabBarButtonTestID: 'tab-mentor',
                 tabBarAccessibilityLabel: t('tabs.mentorLabel'),
                 tabBarIcon: ({ focused }) => (
-                  <TabIcon name="Home" focused={focused} />
+                  <TabIcon
+                    name="Home"
+                    focused={resolveV2TabIsActive(
+                      pathname,
+                      'mentor',
+                      FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+                      focused,
+                    )}
+                  />
+                ),
+                tabBarLabel: ({ focused }) => (
+                  <TabLabel
+                    title={t('tabs.mentor')}
+                    focused={resolveV2TabIsActive(
+                      pathname,
+                      'mentor',
+                      FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+                      focused,
+                    )}
+                  />
                 ),
               }}
             />
@@ -957,7 +1030,26 @@ export default function AppLayout() {
                 tabBarButtonTestID: 'tab-subjects',
                 tabBarAccessibilityLabel: t('tabs.subjectsLabel'),
                 tabBarIcon: ({ focused }) => (
-                  <TabIcon name="Book" focused={focused} />
+                  <TabIcon
+                    name="Book"
+                    focused={resolveV2TabIsActive(
+                      pathname,
+                      'subjects',
+                      FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+                      focused,
+                    )}
+                  />
+                ),
+                tabBarLabel: ({ focused }) => (
+                  <TabLabel
+                    title={t('tabs.subjects')}
+                    focused={resolveV2TabIsActive(
+                      pathname,
+                      'subjects',
+                      FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+                      focused,
+                    )}
+                  />
                 ),
               }}
             />
@@ -968,7 +1060,26 @@ export default function AppLayout() {
                 tabBarButtonTestID: 'tab-journal',
                 tabBarAccessibilityLabel: t('tabs.journalLabel'),
                 tabBarIcon: ({ focused }) => (
-                  <TabIcon name="Recaps" focused={focused} />
+                  <TabIcon
+                    name="Recaps"
+                    focused={resolveV2TabIsActive(
+                      pathname,
+                      'journal',
+                      FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+                      focused,
+                    )}
+                  />
+                ),
+                tabBarLabel: ({ focused }) => (
+                  <TabLabel
+                    title={t('tabs.journal')}
+                    focused={resolveV2TabIsActive(
+                      pathname,
+                      'journal',
+                      FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+                      focused,
+                    )}
+                  />
                 ),
               }}
             />

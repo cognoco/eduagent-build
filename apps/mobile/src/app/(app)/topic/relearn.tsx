@@ -28,6 +28,7 @@ import {
 import { useLinkedChildren, useProfile } from '../../../lib/profile';
 import { computeAgeBracket, type RetentionStatus } from '@eduagent/schemas';
 import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { formatApiError } from '../../../lib/format-api-error';
 import { useEntryGate } from '../../../hooks/use-entry-gate';
 import { firstParam } from '../../../lib/route-params';
@@ -270,12 +271,22 @@ export default function RelearnScreen() {
   ]);
 
   const handleLeave = useCallback(() => {
+    const v2Enabled = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
     if (returnTo) {
-      router.replace(homeHrefForReturnTo(returnTo, returnId) as Href);
+      router.replace(
+        homeHrefForReturnTo(returnTo, returnId, v2Enabled) as Href,
+      );
       return;
     }
 
-    goBackOrReplace(router, '/(app)/library' as const);
+    // WI-2331 AC-2 (core): `/(app)/library` is dead in V2 (not one of the
+    // three tabs) — topic/relearn is a Subjects-owned nested leaf, so the
+    // no-returnTo fallback resolves through the same owning-tab contract
+    // AC-1's tab highlight uses instead of the retired Library tab.
+    goBackOrReplace(
+      router,
+      (v2Enabled ? '/(app)/subjects' : '/(app)/library') as Href,
+    );
   }, [returnId, returnTo, router]);
 
   const handleBack = useCallback(() => {

@@ -92,7 +92,8 @@
     "tryAgainAction": "Prøv igjen",
     "dismiss": "Avvis",
     "pleaseTryAgain": "Prøv igjen.",
-    "mentorImageAlt": "Mentoren din"
+    "mentorImageAlt": "Mentoren din",
+    "backTo": "Tilbake til {{destination}}"
   },
   "quota": {
     "parent": {

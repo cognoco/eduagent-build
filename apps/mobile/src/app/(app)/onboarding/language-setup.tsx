@@ -24,6 +24,7 @@ import {
   SETTINGS_RETURN_TO,
   SUBJECTS_RETURN_TO,
 } from '../../../lib/navigation';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 
 const NATIVE_LANGUAGE_OPTIONS = [
@@ -139,11 +140,21 @@ export default function LanguageSetup() {
     // BUG-692-FOLLOWUP: Mark the mutation as cancelled so the post-await
     // router.replace in handleContinue does not fire after back-navigation.
     cancelledRef.current = true;
+    const v2Enabled = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
     if (returnTo === SETTINGS_RETURN_TO) {
-      goBackOrReplace(router, '/(app)/more' as Href);
+      // WI-2331 AC-3: `/(app)/more` is dead in V2 (not one of the three
+      // tabs) — route through the same owning-tab contract AC-1's tab
+      // highlight uses instead of the retired More tab.
+      goBackOrReplace(
+        router,
+        (v2Enabled ? '/(app)/mentor' : '/(app)/more') as Href,
+      );
       return;
     }
-    goBackOrReplace(router, homeHrefForReturnTo(returnTo));
+    goBackOrReplace(
+      router,
+      homeHrefForReturnTo(returnTo, undefined, v2Enabled),
+    );
   }, [returnTo, router]);
 
   const handleContinue = async () => {

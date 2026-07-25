@@ -92,7 +92,8 @@
     "tryAgainAction": "Erneut versuchen",
     "dismiss": "Schließen",
     "pleaseTryAgain": "Bitte versuche es erneut.",
-    "mentorImageAlt": "Dein Mentor"
+    "mentorImageAlt": "Dein Mentor",
+    "backTo": "Zurück zu {{destination}}"
   },
   "quota": {
     "parent": {

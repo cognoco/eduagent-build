@@ -410,7 +410,14 @@ export default function PracticeScreen(): React.ReactElement {
       return;
     }
 
-    goBackOrReplace(router, homeHrefForReturnTo(returnTo));
+    goBackOrReplace(
+      router,
+      homeHrefForReturnTo(
+        returnTo,
+        undefined,
+        FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+      ),
+    );
   };
 
   const openQuiz = () =>
