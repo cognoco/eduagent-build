@@ -7303,11 +7303,43 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       },
       {
         assertVisible: {
-          id: 'subject-hub-next-up',
-          containsDescendants: [
-            { text: '^World History Topic 1$' },
-            { id: 'subject-hub-next-up-action', text: '^Resume$' },
-          ],
+          id: 'subject-hub-next-up-topic',
+          text: '^World History Topic 1$',
+        },
+      },
+      {
+        assertVisible: {
+          id: 'subject-hub-next-up-action',
+        },
+      },
+      {
+        assertVisible: {
+          id: 'subject-hub-next-up-primary',
+          text: '^Resume$',
+        },
+      },
+    ];
+    const exactDueReviewNextUp: Selector[] = [
+      {
+        assertVisible: {
+          id: 'subject-hub-next-up-topic',
+          text: '^Biology Topic 1$',
+        },
+      },
+      {
+        assertVisible: {
+          id: 'subject-hub-next-up-action',
+        },
+      },
+      {
+        assertVisible: {
+          id: 'subject-hub-next-up-primary',
+          text: '^Review$',
+        },
+      },
+      {
+        tapOn: {
+          id: 'subject-hub-next-up-action',
         },
       },
     ];
@@ -7350,8 +7382,6 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     const exactNextUpResumeTap: Selector = {
       tapOn: {
         id: 'subject-hub-next-up-action',
-        text: '^Resume$',
-        childOf: { id: 'subject-hub-next-up' },
       },
     };
     const exactSeededSessionArrival: Selector[] = [
@@ -7456,6 +7486,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(hasExactCommandSequence(resume, exactNextUpVisibilitySync)).toBe(
       true,
     );
+    expect(hasExactCommandSequence(dueReview, exactDueReviewNextUp)).toBe(true);
     expect(hasExactCommandSequence(resume, exactTopicResumeToOwningHub)).toBe(
       true,
     );
@@ -7710,15 +7741,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         },
       },
       exactBiologyHubTitle,
-      {
-        assertVisible: {
-          id: 'subject-hub-next-up',
-          containsDescendants: [
-            { text: '^Biology Topic 1$' },
-            { id: 'subject-hub-next-up-action', text: '^Review$' },
-          ],
-        },
-      },
+      ...exactDueReviewNextUp,
     ];
     const exactDueReviewPostTopicBack: Selector[] = [
       { pressKey: 'back' },
@@ -8155,23 +8178,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         'subject-hub-topic-${TOPIC_ID}',
         [{ text: '^World History Topic 1$' }],
       ],
-      [
-        resume,
-        'subject-hub-next-up',
-        [
-          { text: '^World History Topic 1$' },
-          { id: 'subject-hub-next-up-action', text: '^Resume$' },
-        ],
-      ],
       [dueReview, 'subjects-browse-row-${SUBJECT_ID}', [{ text: '^Biology$' }]],
-      [
-        dueReview,
-        'subject-hub-next-up',
-        [
-          { text: '^Biology Topic 1$' },
-          { id: 'subject-hub-next-up-action', text: '^Review$' },
-        ],
-      ],
       [profileIdentity, 'account-admin-sheet', [{ text: '^${PROFILE_NAME}$' }]],
       [
         profileIdentity,
@@ -8246,22 +8253,14 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       ),
     ).toBe(false);
 
-    const adjacentSeedCase = [
-      {
-        assertVisible: {
-          id: 'subject-hub-next-up',
-          containsDescendants: [
-            { text: '^Biology Topic 2$' },
-            { id: 'subject-hub-next-up-action', text: '^Review$' },
-          ],
-        },
+    const adjacentSeedCase = exactDueReviewNextUp.with(0, {
+      assertVisible: {
+        id: 'subject-hub-next-up-topic',
+        text: '^Biology Topic 2$',
       },
-    ];
+    });
     expect(
-      hasHardOwnedAssertion(adjacentSeedCase, 'subject-hub-next-up', [
-        { text: '^Biology Topic 1$' },
-        { id: 'subject-hub-next-up-action', text: '^Review$' },
-      ]),
+      hasExactCommandSequence(adjacentSeedCase, exactDueReviewNextUp),
     ).toBe(false);
 
     expect(
@@ -8320,36 +8319,48 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       expected: [
         {
           assertVisible: {
-            id: 'subject-hub-next-up',
-            containsDescendants: [
-              { text: '^Biology Topic 1$' },
-              { id: 'subject-hub-next-up-action', text: '^Review$' },
-            ],
+            id: 'subject-hub-next-up-topic',
+            text: '^Biology Topic 1$',
+          },
+        },
+        {
+          assertVisible: {
+            id: 'subject-hub-next-up-action',
+          },
+        },
+        {
+          assertVisible: {
+            id: 'subject-hub-next-up-primary',
+            text: '^Review$',
           },
         },
         {
           tapOn: {
             id: 'subject-hub-next-up-action',
-            text: '^Review$',
-            childOf: { id: 'subject-hub-next-up' },
           },
         },
       ],
       mutation: [
         {
           assertVisible: {
-            id: 'subject-hub-next-up',
-            containsDescendants: [
-              { text: '^Biology Topic 2$' },
-              { id: 'subject-hub-next-up-action', text: '^Review$' },
-            ],
+            id: 'subject-hub-next-up-topic',
+            text: '^Biology Topic 2$',
+          },
+        },
+        {
+          assertVisible: {
+            id: 'subject-hub-next-up-action',
+          },
+        },
+        {
+          assertVisible: {
+            id: 'subject-hub-next-up-primary',
+            text: '^Review$',
           },
         },
         {
           tapOn: {
             id: 'subject-hub-next-up-action',
-            text: '^Review$',
-            childOf: { id: 'subject-hub-next-up' },
           },
         },
       ],

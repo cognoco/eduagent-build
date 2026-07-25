@@ -178,16 +178,15 @@ tags:
     direction: DOWN
     timeout: 15000
 - assertVisible:
-    id: 'subject-hub-next-up'
-    containsDescendants:
-      - text: '^World History Topic 1$'
-      - id: 'subject-hub-next-up-action'
-        text: '^Resume$'
+    id: 'subject-hub-next-up-topic'
+    text: '^World History Topic 1$'
+- assertVisible:
+    id: 'subject-hub-next-up-action'
+- assertVisible:
+    id: 'subject-hub-next-up-primary'
+    text: '^Resume$'
 - tapOn:
     id: 'subject-hub-next-up-action'
-    text: '^Resume$'
-    childOf:
-      id: 'subject-hub-next-up'
 - extendedWaitUntil:
     visible:
       id: 'session-screen'
@@ -224,16 +223,15 @@ tags:
       id: 'subject-hub-screen'
     timeout: 15000
 - assertVisible:
-    id: 'subject-hub-next-up'
-    containsDescendants:
-      - text: '^World History Topic 1$'
-      - id: 'subject-hub-next-up-action'
-        text: '^Resume$'
+    id: 'subject-hub-next-up-topic'
+    text: '^World History Topic 1$'
+- assertVisible:
+    id: 'subject-hub-next-up-action'
+- assertVisible:
+    id: 'subject-hub-next-up-primary'
+    text: '^Resume$'
 - tapOn:
     id: 'subject-hub-next-up-action'
-    text: '^Resume$'
-    childOf:
-      id: 'subject-hub-next-up'
 - extendedWaitUntil:
     visible:
       id: 'session-screen'
