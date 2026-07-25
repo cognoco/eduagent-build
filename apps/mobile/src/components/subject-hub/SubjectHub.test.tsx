@@ -204,6 +204,46 @@ describe('SubjectHub', () => {
     screen.getByText('Cell division description');
   });
 
+  it('closes the focused topic sheet before handing Study the exact topic', () => {
+    const onStudyTopic = jest.fn();
+    render(
+      <SubjectHub
+        data={baseData}
+        onNextUpPress={jest.fn()}
+        onStudyTopic={onStudyTopic}
+        onReviewTopic={jest.fn()}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('subject-hub-topic-topic-1'));
+    screen.getByTestId('subject-hub-topic-sheet');
+
+    fireEvent.press(screen.getByText('subjectHub.sheet.study'));
+
+    expect(screen.queryByTestId('subject-hub-topic-sheet')).toBeNull();
+    expect(onStudyTopic).toHaveBeenCalledWith('topic-1');
+  });
+
+  it('closes the focused topic sheet before handing Review the exact topic', () => {
+    const onReviewTopic = jest.fn();
+    render(
+      <SubjectHub
+        data={baseData}
+        onNextUpPress={jest.fn()}
+        onStudyTopic={jest.fn()}
+        onReviewTopic={onReviewTopic}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('subject-hub-topic-topic-1'));
+    screen.getByTestId('subject-hub-topic-sheet');
+
+    fireEvent.press(screen.getByText('subjectHub.sheet.review'));
+
+    expect(screen.queryByTestId('subject-hub-topic-sheet')).toBeNull();
+    expect(onReviewTopic).toHaveBeenCalledWith('topic-1');
+  });
+
   it('threads onAddNote to the focused topic sheet and binds the note to that topic (WI-1118)', () => {
     const onAddNote = jest.fn();
     render(

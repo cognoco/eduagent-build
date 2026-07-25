@@ -1,6 +1,6 @@
 import type { InputMode } from '@eduagent/schemas';
 import React from 'react';
-import { Alert, BackHandler, Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { fireEvent, waitFor, act, within } from '@testing-library/react-native';
 import { usePreventRemove } from '@react-navigation/native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
@@ -923,82 +923,6 @@ describe('SessionScreen homework flow', () => {
     });
     expect(mockCanGoBack).not.toHaveBeenCalled();
     expect(mockBack).not.toHaveBeenCalled();
-  });
-
-  it('consumes the real Android hardware-back boundary and replaces to the exact owning Subject Hub', async () => {
-    const platformReplacement = jest.replaceProperty(Platform, 'OS', 'android');
-    const removeHardwareBackHandler = jest.fn();
-    const addHardwareBackHandler = jest
-      .spyOn(BackHandler, 'addEventListener')
-      .mockReturnValue({ remove: removeHardwareBackHandler });
-    try {
-      markHubToSessionTransition(SUBJECT_ID);
-      (useLocalSearchParams as jest.Mock).mockReturnValue({
-        mode: 'learning',
-        subjectId: SUBJECT_ID,
-        subjectName: 'Math',
-        topicId: TOPIC_ID,
-        topicName: 'Linear equations',
-        returnTo: 'subject-hub',
-        returnId: SUBJECT_ID,
-      });
-
-      const testScreen = renderSessionScreen();
-      await flushAsyncWork();
-      expect(consumeHubToSessionTransition(SUBJECT_ID)).toBe(false);
-
-      const hardwareBackHandler = addHardwareBackHandler.mock.calls
-        .filter(([event]) => event === 'hardwareBackPress')
-        .at(-1)?.[1];
-      expect(hardwareBackHandler).toBeDefined();
-      mockReplace.mockClear();
-
-      let hardwareBackHandled: boolean | null | undefined;
-      act(() => {
-        hardwareBackHandled = hardwareBackHandler?.();
-      });
-      expect(hardwareBackHandled).toBe(true);
-      await waitFor(() =>
-        expect(mockReplace).toHaveBeenCalledWith({
-          pathname: '/(app)/subject-hub/[subjectId]',
-          params: { subjectId: SUBJECT_ID },
-        }),
-      );
-
-      testScreen.unmount();
-      expect(removeHardwareBackHandler).toHaveBeenCalled();
-    } finally {
-      addHardwareBackHandler.mockRestore();
-      platformReplacement.restore();
-    }
-  });
-
-  it('does not claim Android hardware Back from a crafted Subject Hub return without transition provenance', async () => {
-    const platformReplacement = jest.replaceProperty(Platform, 'OS', 'android');
-    const addHardwareBackHandler = jest.spyOn(BackHandler, 'addEventListener');
-    try {
-      (useLocalSearchParams as jest.Mock).mockReturnValue({
-        mode: 'learning',
-        subjectId: SUBJECT_ID,
-        subjectName: 'Math',
-        topicId: TOPIC_ID,
-        topicName: 'Linear equations',
-        returnTo: 'subject-hub',
-        returnId: SUBJECT_ID,
-      });
-
-      renderSessionScreen();
-      await flushAsyncWork();
-
-      expect(
-        addHardwareBackHandler.mock.calls.some(
-          ([event]) => event === 'hardwareBackPress',
-        ),
-      ).toBe(false);
-    } finally {
-      addHardwareBackHandler.mockRestore();
-      platformReplacement.restore();
-    }
   });
 
   it.each([

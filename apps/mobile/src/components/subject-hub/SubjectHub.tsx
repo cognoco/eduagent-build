@@ -98,6 +98,14 @@ export function SubjectHub({
   // there are notes to show (a masked supporter with canStudy=false still sees
   // existing notes read-only). canStudy=false + no notes → nothing to render.
   const showNotes = data.canStudy || data.notes.length > 0;
+  const handleStudyTopic = (topicId: string) => {
+    setOpenTopicId(null);
+    onStudyTopic?.(topicId);
+  };
+  const handleReviewTopic = (topicId: string) => {
+    setOpenTopicId(null);
+    onReviewTopic?.(topicId);
+  };
 
   return (
     <>
@@ -238,8 +246,8 @@ export function SubjectHub({
         notes={selectedTopicNotes}
         canStudy={data.canStudy}
         onClose={() => setOpenTopicId(null)}
-        onStudyTopic={onStudyTopic}
-        onReviewTopic={onReviewTopic}
+        onStudyTopic={handleStudyTopic}
+        onReviewTopic={handleReviewTopic}
         onAddNote={onAddNote}
         isAddingNote={isAddingNote}
       />
