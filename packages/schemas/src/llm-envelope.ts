@@ -285,6 +285,18 @@ export const challengeRoundQuestionIdentitySchema = z.object({
     'other',
   ]),
   materialContext: z.string().max(300),
+  /**
+   * Structured evidence that this probe is genuinely distinct from every
+   * earlier probe in the current Challenge Round. Omit for the first probe,
+   * repeats, paraphrases, and cosmetic context changes.
+   */
+  noveltyBasis: z
+    .enum([
+      'new_minimal_learning_claim',
+      'new_material_evidence_or_context',
+      'new_reasoning',
+    ])
+    .optional(),
 });
 export type ChallengeRoundQuestionIdentity = z.infer<
   typeof challengeRoundQuestionIdentitySchema

@@ -143,6 +143,28 @@ describe('runChallengeRoundGrader', () => {
         'particles move faster and collide more often',
       );
     });
+
+    it('passes prior question identities to the grader for novelty classification', async () => {
+      mockRouteAndCall.mockResolvedValue(routeResult(SOLID_VERDICT_JSON));
+
+      await runChallengeRoundGrader({
+        ...BASE_INPUT,
+        priorQuestionIdentities: [
+          {
+            questionText: 'Why do particles collide more often when heated?',
+            minimalLearningClaim:
+              'temperature increases particle collision frequency',
+            cognitiveOperation: 'causal_explanation',
+            materialContext: 'most chemical reactions',
+          },
+        ],
+      });
+
+      const [messages] = mockRouteAndCall.mock.calls[0]!;
+      expect(messages.map((message) => message.content).join('\n')).toContain(
+        'temperature increases particle collision frequency',
+      );
+    });
   });
 
   // (b) Other result types map through correctly.

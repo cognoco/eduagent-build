@@ -1,4 +1,9 @@
-import { createLogger, type LogEntry, type LogLevel } from './logger';
+import {
+  createLogger,
+  setStructuredLogSink,
+  type LogEntry,
+  type LogLevel,
+} from './logger';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -50,6 +55,7 @@ describe('createLogger', () => {
   });
 
   afterEach(() => {
+    setStructuredLogSink(null);
     captured.restore();
   });
 
@@ -141,6 +147,71 @@ describe('createLogger', () => {
       logger.debug('trace');
 
       expect(captured.logs).toHaveLength(1);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Structured sink
+  // -------------------------------------------------------------------------
+
+  describe('structured sink', () => {
+    it('offers the emitted entry to the configured sink without replacing console output', () => {
+      const sink = jest.fn();
+      setStructuredLogSink(sink);
+      const logger = createLogger({ level: 'debug' });
+
+      logger.warn('llm.volume.daily_threshold_exceeded', {
+        provider: 'openai',
+      });
+
+      expect(captured.warns).toHaveLength(1);
+      expect(sink).toHaveBeenCalledTimes(1);
+      expect(sink).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: 'warn',
+          message: 'llm.volume.daily_threshold_exceeded',
+          context: { provider: 'openai' },
+        }),
+      );
+    });
+
+    it('contains sink failures and preserves the original console record', () => {
+      setStructuredLogSink(() => {
+        throw new Error('sink unavailable');
+      });
+      const logger = createLogger({ level: 'debug' });
+
+      expect(() => logger.warn('canonical warning')).not.toThrow();
+
+      expect(captured.warns).toHaveLength(1);
+      expect(parseEntry(captured.warns[0]!).message).toBe('canonical warning');
+      expect(captured.errors).toHaveLength(1);
+      expect(parseEntry(captured.errors[0]!).message).toBe(
+        'structured_log_sink.failed',
+      );
+    });
+
+    it('contains rejected sink promises and preserves the original console record', async () => {
+      const rejectedSinkResult = Promise.reject(
+        new Error('async sink unavailable'),
+      );
+      // Keep the intentional RED phase from leaking an unhandled rejection;
+      // the logger must still attach its own handler and emit the diagnostic.
+      void rejectedSinkResult.catch(() => undefined);
+      setStructuredLogSink(() => rejectedSinkResult);
+      const logger = createLogger({ level: 'debug' });
+
+      expect(() => logger.warn('canonical async warning')).not.toThrow();
+      await rejectedSinkResult.catch(() => undefined);
+
+      expect(captured.warns).toHaveLength(1);
+      expect(parseEntry(captured.warns[0]!).message).toBe(
+        'canonical async warning',
+      );
+      expect(captured.errors).toHaveLength(1);
+      expect(parseEntry(captured.errors[0]!).message).toBe(
+        'structured_log_sink.failed',
+      );
     });
   });
 

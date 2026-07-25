@@ -1019,6 +1019,7 @@ describe('challenge round envelope fields', () => {
                 'photosynthesis stores energy while respiration releases it',
               cognitiveOperation: 'causal_explanation',
               materialContext: '',
+              noveltyBasis: 'new_reasoning',
             },
           },
           {
@@ -1045,9 +1046,54 @@ describe('challenge round envelope fields', () => {
       parsed.signals?.challenge_round_evaluation?.[0]?.questionIdentity
         ?.cognitiveOperation,
     ).toBe('causal_explanation');
+    expect(
+      parsed.signals?.challenge_round_evaluation?.[0]?.questionIdentity
+        ?.noveltyBasis,
+    ).toBe('new_reasoning');
     expect(parsed.signals?.challenge_round_evaluation?.[2]?.correction).toBe(
       'occurs in chloroplasts',
     );
+  });
+
+  it('accepts a legacy question identity without noveltyBasis', () => {
+    const result = challengeRoundEvaluationItemSchema.safeParse({
+      concept: 'photosynthesis',
+      result: 'solid',
+      evidence: 'learner explains stored chemical energy',
+      answerEventId: '00000000-0000-4000-8000-000000000001',
+      learnerQuote: 'sunlight becomes energy stored in glucose',
+      questionIdentity: {
+        questionText: 'How does photosynthesis store energy?',
+        minimalLearningClaim:
+          'photosynthesis stores light energy as chemical energy',
+        cognitiveOperation: 'causal_explanation',
+        materialContext: '',
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.questionIdentity?.noveltyBasis).toBeUndefined();
+  });
+
+  it('rejects an unsupported question identity noveltyBasis', () => {
+    const result = challengeRoundEvaluationItemSchema.safeParse({
+      concept: 'photosynthesis',
+      result: 'solid',
+      evidence: 'learner explains stored chemical energy',
+      answerEventId: '00000000-0000-4000-8000-000000000001',
+      learnerQuote: 'sunlight becomes energy stored in glucose',
+      questionIdentity: {
+        questionText: 'How does photosynthesis store energy?',
+        minimalLearningClaim:
+          'photosynthesis stores light energy as chemical energy',
+        cognitiveOperation: 'causal_explanation',
+        materialContext: '',
+        noveltyBasis: 'cosmetic_paraphrase',
+      },
+    });
+
+    expect(result.success).toBe(false);
   });
 
   it('rejects an item missing answerEventId (HIGH-6 grounding requirement)', () => {

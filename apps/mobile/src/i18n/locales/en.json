@@ -3456,6 +3456,7 @@
     "openChildSession": "Open child session",
     "verifiedProof": {
       "holdsStrong": "holds strong",
+      "lookupUnavailable": "Verified proof is temporarily unavailable",
       "recheckDue": "due for a re-check on {{date}}"
     },
     "emptyCtaStartSession": "Start a session"
