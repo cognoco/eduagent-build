@@ -97,10 +97,15 @@ export type ProcessingLocationClass = z.infer<
   typeof processingLocationClassSchema
 >;
 
-/** A citable legal source for one registry row. */
+/**
+ * A citable legal source for one registry row. `url` is nullable because some
+ * provenance is genuinely un-linkable — a controller ruling that records a
+ * position without citing an online instrument still has to be attributable,
+ * and a fabricated URL would be worse than none. `title` is always required.
+ */
 export const policySourceSchema = z.object({
   title: z.string().min(1),
-  url: z.string().url(),
+  url: z.string().url().nullable(),
   checkedAt: z.date(),
 });
 export type PolicySource = z.infer<typeof policySourceSchema>;
