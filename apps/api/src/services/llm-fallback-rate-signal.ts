@@ -1,12 +1,15 @@
 import { createLogger } from './logger';
 
-export const LLM_FALLBACK_RATE_WINDOW_MS = 15 * 60 * 1000;
+export const LLM_FALLBACK_RATE_WINDOW_SECONDS = 900;
+export const LLM_FALLBACK_RATE_WINDOW_MS =
+  LLM_FALLBACK_RATE_WINDOW_SECONDS * 1000;
 export const LLM_FALLBACK_RATE_MINIMUM_CALLS = 20;
 export const LLM_FALLBACK_RATE_WARN_PERCENT = 2;
 export const LLM_FALLBACK_RATE_PAGE_PERCENT = 10;
 const BREACH_HEARTBEAT_MS = 5 * 60 * 1000;
 
 type AlertTier = 'healthy' | 'warn' | 'page';
+type EvaluatedAlertTier = AlertTier | null;
 
 interface Sample {
   at: number;
@@ -28,10 +31,10 @@ export interface LlmFallbackRateSignal extends Record<string, unknown> {
   numerator: number;
   denominator: number;
   rate_pct: number;
-  window_seconds: 900;
-  minimum_calls: 20;
-  warn_threshold_pct: 2;
-  page_threshold_pct: 10;
+  window_seconds: typeof LLM_FALLBACK_RATE_WINDOW_SECONDS;
+  minimum_calls: typeof LLM_FALLBACK_RATE_MINIMUM_CALLS;
+  warn_threshold_pct: typeof LLM_FALLBACK_RATE_WARN_PERCENT;
+  page_threshold_pct: typeof LLM_FALLBACK_RATE_PAGE_PERCENT;
   provider: string;
   capability: string;
 }
@@ -48,8 +51,8 @@ interface TrackerOptions {
   emit: (signal: LlmFallbackRateSignal) => void;
 }
 
-function tierFor(denominator: number, ratePercent: number): AlertTier {
-  if (denominator < LLM_FALLBACK_RATE_MINIMUM_CALLS) return 'healthy';
+function tierFor(denominator: number, ratePercent: number): EvaluatedAlertTier {
+  if (denominator < LLM_FALLBACK_RATE_MINIMUM_CALLS) return null;
   if (ratePercent > LLM_FALLBACK_RATE_PAGE_PERCENT) return 'page';
   if (ratePercent > LLM_FALLBACK_RATE_WARN_PERCENT) return 'warn';
   return 'healthy';
@@ -83,6 +86,10 @@ export function createLlmFallbackRateTracker(options: TrackerOptions): {
       const ratePercent =
         denominator === 0 ? 0 : (numerator / denominator) * 100;
       const tier = tierFor(denominator, ratePercent);
+      if (tier === null) {
+        windows.set(input.environment, window);
+        return;
+      }
       const changed = tier !== window.tier;
       const heartbeatDue =
         tier !== 'healthy' &&
@@ -92,26 +99,34 @@ export function createLlmFallbackRateTracker(options: TrackerOptions): {
       if (changed || heartbeatDue) {
         if (tier !== 'healthy' || window.tier !== 'healthy') {
           const signalTier = tier === 'healthy' ? 'recovered' : tier;
-          options.emit({
-            event:
-              tier === 'healthy'
-                ? 'llm.fallback_rate_recovered'
-                : 'llm.fallback_rate_threshold_exceeded',
-            surface: 'llm_fallback_rate',
-            signal: 'fallback-rate-threshold',
-            tier: signalTier,
-            environment: input.environment,
-            numerator,
-            denominator,
-            rate_pct: Number(ratePercent.toFixed(2)),
-            window_seconds: 900,
-            minimum_calls: 20,
-            warn_threshold_pct: 2,
-            page_threshold_pct: 10,
-            provider: input.provider,
-            capability: input.capability,
-          });
-          window.lastEmittedAt = timestamp;
+          try {
+            options.emit({
+              event:
+                tier === 'healthy'
+                  ? 'llm.fallback_rate_recovered'
+                  : 'llm.fallback_rate_threshold_exceeded',
+              surface: 'llm_fallback_rate',
+              signal: 'fallback-rate-threshold',
+              tier: signalTier,
+              environment: input.environment,
+              numerator,
+              denominator,
+              rate_pct: Number(ratePercent.toFixed(2)),
+              window_seconds: LLM_FALLBACK_RATE_WINDOW_SECONDS,
+              minimum_calls: LLM_FALLBACK_RATE_MINIMUM_CALLS,
+              warn_threshold_pct: LLM_FALLBACK_RATE_WARN_PERCENT,
+              page_threshold_pct: LLM_FALLBACK_RATE_PAGE_PERCENT,
+              provider: input.provider,
+              capability: input.capability,
+            });
+            window.lastEmittedAt = timestamp;
+          } catch {
+            // Observability must never reclassify a successful provider result
+            // as a provider failure. Preserve the prior tier so the next sample
+            // retries this transition instead of losing it.
+            windows.set(input.environment, window);
+            return;
+          }
         }
         window.tier = tier;
       }
@@ -132,7 +147,11 @@ const tracker = createLlmFallbackRateTracker({
 });
 
 export function recordLlmFallbackRateSample(input: RecordInput): void {
-  tracker.record(input);
+  try {
+    tracker.record(input);
+  } catch {
+    // Launch-health instrumentation must never alter a provider outcome.
+  }
 }
 
 /** Exported for deterministic tests that exercise the router. */

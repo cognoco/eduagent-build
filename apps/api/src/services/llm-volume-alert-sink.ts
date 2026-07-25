@@ -1,5 +1,11 @@
 import { createLogger } from './logger';
 import type { LogEntry } from './logger';
+import {
+  LLM_FALLBACK_RATE_MINIMUM_CALLS,
+  LLM_FALLBACK_RATE_PAGE_PERCENT,
+  LLM_FALLBACK_RATE_WARN_PERCENT,
+  LLM_FALLBACK_RATE_WINDOW_SECONDS,
+} from './llm-fallback-rate-signal';
 
 const LLM_VOLUME_ALERT_EVENT = 'llm.volume.daily_threshold_exceeded';
 const LLM_VOLUME_ALERT_SURFACE = 'llm_volume_alert';
@@ -35,10 +41,10 @@ export interface LlmFallbackRateAlertAttributes extends Record<
   numerator: number;
   denominator: number;
   rate_pct: number;
-  window_seconds: 900;
-  minimum_calls: 20;
-  warn_threshold_pct: 2;
-  page_threshold_pct: 10;
+  window_seconds: typeof LLM_FALLBACK_RATE_WINDOW_SECONDS;
+  minimum_calls: typeof LLM_FALLBACK_RATE_MINIMUM_CALLS;
+  warn_threshold_pct: typeof LLM_FALLBACK_RATE_WARN_PERCENT;
+  page_threshold_pct: typeof LLM_FALLBACK_RATE_PAGE_PERCENT;
   provider: string;
   capability: string;
 }
@@ -126,18 +132,21 @@ function selectLlmFallbackRateAlertAttributes(
     context.signal !== 'fallback-rate-threshold' ||
     (context.tier !== 'warn' && context.tier !== 'page') ||
     typeof context.environment !== 'string' ||
+    context.environment.length === 0 ||
     typeof context.numerator !== 'number' ||
     !Number.isFinite(context.numerator) ||
     typeof context.denominator !== 'number' ||
     !Number.isFinite(context.denominator) ||
     typeof context.rate_pct !== 'number' ||
     !Number.isFinite(context.rate_pct) ||
-    context.window_seconds !== 900 ||
-    context.minimum_calls !== 20 ||
-    context.warn_threshold_pct !== 2 ||
-    context.page_threshold_pct !== 10 ||
+    context.window_seconds !== LLM_FALLBACK_RATE_WINDOW_SECONDS ||
+    context.minimum_calls !== LLM_FALLBACK_RATE_MINIMUM_CALLS ||
+    context.warn_threshold_pct !== LLM_FALLBACK_RATE_WARN_PERCENT ||
+    context.page_threshold_pct !== LLM_FALLBACK_RATE_PAGE_PERCENT ||
     typeof context.provider !== 'string' ||
-    typeof context.capability !== 'string'
+    context.provider.length === 0 ||
+    typeof context.capability !== 'string' ||
+    context.capability.length === 0
   ) {
     return null;
   }
@@ -151,10 +160,10 @@ function selectLlmFallbackRateAlertAttributes(
     numerator: context.numerator,
     denominator: context.denominator,
     rate_pct: context.rate_pct,
-    window_seconds: 900,
-    minimum_calls: 20,
-    warn_threshold_pct: 2,
-    page_threshold_pct: 10,
+    window_seconds: LLM_FALLBACK_RATE_WINDOW_SECONDS,
+    minimum_calls: LLM_FALLBACK_RATE_MINIMUM_CALLS,
+    warn_threshold_pct: LLM_FALLBACK_RATE_WARN_PERCENT,
+    page_threshold_pct: LLM_FALLBACK_RATE_PAGE_PERCENT,
     provider: context.provider,
     capability: context.capability,
   };

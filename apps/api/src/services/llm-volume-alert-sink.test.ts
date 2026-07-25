@@ -188,6 +188,28 @@ describe('LLM fallback-rate alert transport', () => {
     );
   });
 
+  it.each(['environment', 'provider', 'capability'] as const)(
+    'rejects an empty %s dimension',
+    (field) => {
+      const send = jest.fn();
+
+      forwardLaunchHealthAlertToSink(
+        {
+          timestamp: '2026-07-25T10:00:00.000Z',
+          level: 'warn',
+          message: 'llm.fallback_rate_threshold_exceeded',
+          context: {
+            ...fallbackContext,
+            [field]: '',
+          },
+        },
+        send,
+      );
+
+      expect(send).not.toHaveBeenCalled();
+    },
+  );
+
   it('rebuilds the fallback-rate allowlist after SDK enrichment', () => {
     expect(
       scrubLaunchHealthSentryLog({

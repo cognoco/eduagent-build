@@ -7,6 +7,7 @@ const baseSubscriptionRow: typeof subscription.$inferSelect = {
   organizationId: 'org_123',
   planTier: 'plus',
   status: 'active',
+  pastDueAt: null,
   payerPersonId: 'person_123',
   storeProductId: null,
   storePlatform: null,
