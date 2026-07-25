@@ -27,6 +27,7 @@ import {
   getLlmRequestRoutingV2Enabled,
   readLlmRequestKillSwitch,
 } from './request-context';
+import { recordLlmFallbackRateSample } from '../llm-fallback-rate-signal';
 const logger = createLogger();
 
 export type PreferredLlmProvider = 'gemini' | 'openai' | 'anthropic';
@@ -1826,6 +1827,12 @@ export async function routeAndCall(
         responseChars: result.content.length,
         usage: result.usage,
       });
+      recordLlmFallbackRateSample({
+        environment: getLlmRequestEnvironment(llmEnvironment),
+        fallbackUsed: false,
+        provider: config.provider,
+        capability,
+      });
       return {
         response: result.content,
         provider: config.provider,
@@ -1987,6 +1994,12 @@ async function attemptProvider(
       responseChars: result.content.length,
       usage: result.usage,
     });
+    recordLlmFallbackRateSample({
+      environment: getLlmRequestEnvironment(llmEnvironment),
+      fallbackUsed: true,
+      provider: config.provider,
+      capability: metricContext.capability,
+    });
     return {
       response: result.content,
       provider: config.provider,
@@ -2063,6 +2076,7 @@ async function* wrapStreamWithCircuitBreaker(
   // the provider that actually produced the bytes.
   onUsage: (u: LlmUsage | undefined) => void,
   onFallback?: () => void,
+  fallbackUsed = false,
 ): AsyncIterable<string> {
   let chunksYielded = 0;
   let forwardedStopReason = false;
@@ -2120,6 +2134,8 @@ async function* wrapStreamWithCircuitBreaker(
           metricContext,
           onStopReason,
           onUsage,
+          undefined,
+          true,
         );
         let signalled = false;
         for await (const chunk of fallbackStream) {
@@ -2136,6 +2152,12 @@ async function* wrapStreamWithCircuitBreaker(
 
     recordSuccess(circuitKey);
     recordVolumeMetric(providerId);
+    recordLlmFallbackRateSample({
+      environment: getLlmRequestEnvironment(llmEnvironment),
+      fallbackUsed,
+      provider: providerId,
+      capability,
+    });
     // Forward usage before the stop reason: the router logs on the stop-reason
     // promise, so usage must already be settled when that fires (WI-1827).
     onUsage(await innerUsagePromise);
@@ -2205,6 +2227,8 @@ async function* wrapStreamWithCircuitBreaker(
           metricContext,
           onStopReason,
           onUsage,
+          undefined,
+          true,
         );
         let signalled = false;
         for await (const chunk of fallbackStream) {
@@ -2477,6 +2501,8 @@ async function attemptStreamProvider(
     },
     resolveStop,
     resolveUsage,
+    undefined,
+    true,
   );
   // [LLM-TRUNCATE-01] Metric emission on drain.
   stopReasonPromise

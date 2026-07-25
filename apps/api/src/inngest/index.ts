@@ -130,6 +130,7 @@ import {
   blockedSafetyDigestDelivery,
   blockedSafetyDigestIngest,
 } from './functions/blocked-safety-digest';
+import { pastDueLaunchHealth } from './functions/past-due-launch-health';
 
 export {
   inngest,
@@ -230,6 +231,7 @@ export {
   graduationNarration,
   blockedSafetyDigestIngest,
   blockedSafetyDigestDelivery,
+  pastDueLaunchHealth,
 };
 
 // All Inngest functions to register with the serve handler
@@ -332,4 +334,5 @@ export const functions = [
   graduationNarration,
   blockedSafetyDigestIngest,
   blockedSafetyDigestDelivery,
+  pastDueLaunchHealth,
 ];
