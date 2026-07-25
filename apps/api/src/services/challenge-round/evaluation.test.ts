@@ -179,6 +179,79 @@ describe('decideMasteryAndReview — distinct probe breadth [WI-2464]', () => {
     expect(decision.markMasteryVerified).toBe(false);
   });
 
+  it('rejects a cosmetic paraphrase with a contradictory new-context basis', () => {
+    const repeatedProbe = [
+      withQuestionIdentity(allSolid[0]!, {
+        questionText:
+          'Why does photosynthesis turn sunlight into stored chemical energy?',
+        minimalLearningClaim: sameClaim,
+        cognitiveOperation: 'causal_explanation',
+        materialContext: sameContext,
+      }),
+      withQuestionIdentity(allSolid[1]!, {
+        questionText:
+          'How does photosynthesis convert sunlight into chemical energy for storage?',
+        minimalLearningClaim: sameClaim,
+        cognitiveOperation: 'causal_explanation',
+        materialContext: sameContext,
+        noveltyBasis: 'new_material_evidence_or_context',
+      }),
+    ];
+
+    const decision = decideMasteryAndReview(repeatedProbe);
+
+    expect(decision.outcome).toBe('insufficient_breadth');
+    expect(decision.markMasteryVerified).toBe(false);
+  });
+
+  it('rejects a cosmetic paraphrase with a contradictory new-claim basis', () => {
+    const repeatedProbe = [
+      withQuestionIdentity(allSolid[0]!, {
+        questionText:
+          'Why does photosynthesis turn sunlight into stored chemical energy?',
+        minimalLearningClaim: sameClaim,
+        cognitiveOperation: 'causal_explanation',
+        materialContext: sameContext,
+      }),
+      withQuestionIdentity(allSolid[1]!, {
+        questionText:
+          'How does photosynthesis convert sunlight into chemical energy for storage?',
+        minimalLearningClaim: sameClaim,
+        cognitiveOperation: 'causal_explanation',
+        materialContext: sameContext,
+        noveltyBasis: 'new_minimal_learning_claim',
+      }),
+    ];
+
+    expect(decideMasteryAndReview(repeatedProbe).outcome).toBe(
+      'insufficient_breadth',
+    );
+  });
+
+  it('rejects a cosmetic paraphrase with a contradictory new-reasoning basis', () => {
+    const repeatedProbe = [
+      withQuestionIdentity(allSolid[0]!, {
+        questionText:
+          'Why does photosynthesis turn sunlight into stored chemical energy?',
+        minimalLearningClaim: sameClaim,
+        cognitiveOperation: 'causal_explanation',
+        materialContext: sameContext,
+      }),
+      withQuestionIdentity(allSolid[1]!, {
+        questionText:
+          'How does photosynthesis convert sunlight into chemical energy for storage?',
+        minimalLearningClaim: sameClaim,
+        cognitiveOperation: 'causal_explanation',
+        materialContext: sameContext,
+        noveltyBasis: 'new_reasoning',
+      }),
+    ];
+
+    expect(decideMasteryAndReview(repeatedProbe).outcome).toBe(
+      'insufficient_breadth',
+    );
+  });
+
   it('allows a narrow topic to verify through genuinely different reasoning', () => {
     const distinctNarrowTopicProbes = [
       withQuestionIdentity(allSolid[0]!, {
@@ -201,6 +274,28 @@ describe('decideMasteryAndReview — distinct probe breadth [WI-2464]', () => {
 
     expect(decision.outcome).toBe('verified');
     expect(decision.markMasteryVerified).toBe(true);
+  });
+
+  it('allows a materially different claim declared by its matching basis', () => {
+    const distinctClaims = [
+      withQuestionIdentity(allSolid[0]!, {
+        questionText: 'Why do plants convert sunlight into chemical energy?',
+        minimalLearningClaim: sameClaim,
+        cognitiveOperation: 'explanation',
+        materialContext: sameContext,
+      }),
+      withQuestionIdentity(allSolid[1]!, {
+        questionText:
+          'Why does chlorophyll absorb some wavelengths better than others?',
+        minimalLearningClaim:
+          'chlorophyll absorption varies across light wavelengths',
+        cognitiveOperation: 'explanation',
+        materialContext: sameContext,
+        noveltyBasis: 'new_minimal_learning_claim',
+      }),
+    ];
+
+    expect(decideMasteryAndReview(distinctClaims).outcome).toBe('verified');
   });
 
   it('treats an exact normalized duplicate as a repeat despite conflicting metadata', () => {
