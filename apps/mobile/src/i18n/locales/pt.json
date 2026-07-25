@@ -319,8 +319,8 @@
       "emptySubjectsMessage": "Comece uma agora, ou use ajuda com lição de casa quando precisar.",
       "addSubject": "Adicionar matéria",
       "momentum": {
-        "topicLearned": "{{n}} topic learned",
-        "topicsLearned": "{{n}} topics learned"
+        "topicLearned": "{{n}} tópico aprendido",
+        "topicsLearned": "{{n}} tópicos aprendidos"
       },
       "intentActions": {
         "homework": {
@@ -358,9 +358,9 @@
       "coachBandRevisitTopic": "Revisite {{topic}} — pronto para uma revisão rápida."
     },
     "notices": {
-      "consentArchivedTitle": "{{name}}'s account was archived",
+      "consentArchivedTitle": "A conta de {{name}} foi arquivada",
       "consentArchivedBody": "Os dados são retidos por 30 dias e depois excluídos.",
-      "consentDeletedTitle": "{{name}}'s account was deleted",
+      "consentDeletedTitle": "A conta de {{name}} foi eliminada",
       "consentDeletedBody": "O período de carência para retirada terminou."
     },
     "parent": {
@@ -394,7 +394,7 @@
       "childCard": {
         "statusPending": "Verificando",
         "reportsAction": "Relatórios",
-        "nudgeAction": "Nudge",
+        "nudgeAction": "Incentivar",
         "learnTogetherAction": "Aprender juntos"
       },
       "card": {
@@ -530,15 +530,15 @@
   "family": {
     "orientationCueDismiss": "Entendido",
     "withdrawal": {
-      "bannerTitleSingle": "{{name}}'s account closes in {{days}} {{daysWord}}",
-      "bannerTitleMulti": "{{count}} accounts closing soon",
+      "bannerTitleSingle": "A conta de {{name}} fecha em {{days}} {{daysWord}}",
+      "bannerTitleMulti": "{{count}} contas a fechar em breve",
       "bannerCta": "Reverter",
-      "bannerCtaShort": "Undo",
-      "daysOne": "day",
-      "daysOther": "days",
+      "bannerCtaShort": "Desfazer",
+      "daysOne": "dia",
+      "daysOther": "dias",
       "restoreErrorTitle": "Não foi possível reverter o cancelamento",
       "restoreErrorBody": "Tente novamente em um momento.",
-      "restoreSuccessToast": "Withdrawal reversed for {{name}}"
+      "restoreSuccessToast": "A retirada do consentimento de {{name}} foi anulada"
     }
   },
   "more": {
@@ -669,7 +669,7 @@
       "notNow": "Agora não",
       "dontAskAgain": "Não perguntar mais",
       "banner": {
-        "question": "Question {{index}} of {{total}}"
+        "question": "Pergunta {{index}} de {{total}}"
       },
       "draft": {
         "title": "Isso é o que você sabe agora",
@@ -856,7 +856,7 @@
       "retryWithMissingWords": "Tente novamente: {{words}}",
       "retry": "Tentar novamente",
       "retryLabel": "Tentar a fala novamente",
-      "extraWords": "Extra: {{words}}",
+      "extraWords": "Extras: {{words}}",
       "attemptError": "Não foi possível salvar a tentativa. Tente gravar novamente."
     },
     "chatShell": {
@@ -2179,7 +2179,7 @@
     "register": {
       "child": {
         "growthSubtitle": "Suas vitórias semanais",
-        "masteredTopicsHero": "You learned {{count}} topics. Steady wins.",
+        "masteredTopicsHero": "Tópicos aprendidos: {{count}}. A persistência compensa.",
         "retentionStrong": "O que você lembrou esta semana.",
         "retentionFading": "Vale uma revisão rápida.",
         "retentionWeak": "Vale a pena rever."
@@ -2393,14 +2393,14 @@
         "label": "Precisa de uma nova passagem"
       },
       "elapsed": {
-        "remembered_one": "Remembered after {{count}} day",
-        "remembered_other": "Remembered after {{count}} days",
-        "fading_one": "Getting fuzzy after {{count}} day",
-        "fading_other": "Getting fuzzy after {{count}} days",
-        "weak_one": "Ready for a refresh after {{count}} day",
-        "weak_other": "Ready for a refresh after {{count}} days",
-        "forgotten_one": "Last seen {{count}} day ago",
-        "forgotten_other": "Last seen {{count}} days ago"
+        "remembered_one": "Lembrado após {{count}} dia",
+        "remembered_other": "Lembrado após {{count}} dias",
+        "fading_one": "A ficar vago após {{count}} dia",
+        "fading_other": "A ficar vago após {{count}} dias",
+        "weak_one": "Pronto para uma revisão após {{count}} dia",
+        "weak_other": "Pronto para uma revisão após {{count}} dias",
+        "forgotten_one": "Visto pela última vez há {{count}} dia",
+        "forgotten_other": "Visto pela última vez há {{count}} dias"
       }
     },
     "previousReports": {
@@ -2411,24 +2411,24 @@
     "latestReport": {
       "title": "Último relatório",
       "open": "Abrir relatório",
-      "openWithDate": "Open report for {{date}}",
+      "openWithDate": "Abrir relatório de {{date}}",
       "empty": "Seu próximo relatório semanal ou mensal aparecerá aqui quando houver aprendizado suficiente para resumir.",
       "error": "Não foi possível carregar o relatório mais recente agora.",
       "sessions": "Sessões",
-      "time": "Time",
+      "time": "Tempo",
       "topics": "Tópicos",
-      "words": "Words",
-      "practiceLessons_one": "{{count}} practice lesson",
-      "practiceLessons_other": "{{count}} practice lessons",
-      "practicePoints_one": "{{count}} practice point",
-      "practicePoints_other": "{{count}} practice points"
+      "words": "Palavras",
+      "practiceLessons_one": "{{count}} lição de prática",
+      "practiceLessons_other": "{{count}} lições de prática",
+      "practicePoints_one": "{{count}} ponto de prática",
+      "practicePoints_other": "{{count}} pontos de prática"
     },
     "recentFocus": {
       "title": "Sessões recentes",
       "showAll": "Mostrar todas as sessões",
       "empty": "Sessões recentes aparecerão aqui quando o aprendizado começar.",
       "error": "Não foi possível carregar as sessões recentes agora.",
-      "sessionFallback": "Studied {{date}}"
+      "sessionFallback": "Estudou em {{date}}"
     },
     "guardian": {
       "summaryFallback": "Nenhum resumo disponível ainda. Um aparecerá após a próxima sessão.",
@@ -2444,8 +2444,8 @@
     "remediation": {
       "heading": "Tente uma abordagem diferente",
       "body": "É completamente normal precisar de outra passagem nisso.",
-      "cooldownMinutes": "You can retry in {{minutes}} min — take a short break and come back.",
-      "cooldownHours": "You can retry in about {{hours}} h — step away and let it settle.",
+      "cooldownMinutes": "Você pode tentar novamente em {{minutes}} min — faça uma pequena pausa e volte.",
+      "cooldownHours": "Você pode tentar novamente em cerca de {{hours}} h — afaste-se e deixe a ideia assentar.",
       "cooldownTomorrow": "Faça uma pausa mais longa e tente novamente amanhã.",
       "primaryCta": "Tente de outra forma",
       "primaryCtaA11y": "Tente uma forma diferente de aprender este tópico",
@@ -2547,10 +2547,10 @@
     },
     "ready": {
       "title": "Está tudo pronto.",
-      "introWithLearner": "For {{learner}}:",
+      "introWithLearner": "Para {{learner}}:",
       "intro": "Isto é o que está configurado:",
       "rowTone": "O seu mentor falará consigo da forma certa",
-      "rowSubject": "Starting with {{subject}}",
+      "rowSubject": "A começar com {{subject}}",
       "rowSubjectNoSubject": "Seu primeiro tópico está pronto",
       "rowPace": "O ritmo mantém-se à sua velocidade — nunca apressado",
       "reassurance": "A maioria dos alunos sente a diferença na primeira sessão.",
@@ -2610,7 +2610,7 @@
       "progressNudgeStartSubtitle": "Abre {{subject}} para ver o que está pronto e experimenta uma lição curta para poderes ajudar.",
       "openProgressNudgeAction": "Abrir {{subject}}",
       "subjects": "Matérias",
-      "subjectsDescription": "{{name}}'s active subjects, with the most recent activity first.",
+      "subjectsDescription": "Disciplinas ativas de {{name}}, com a atividade mais recente primeiro.",
       "subjectRawInputAudit": "Seu filho pesquisou por \"{{rawInput}}\"",
       "openSubjectProgress": "Abrir progresso em {{subject}}",
       "recentSessions": "Sessões recentes",
@@ -2634,7 +2634,7 @@
       "cancelDeletion": "Cancelar exclusão",
       "withdrawConsent": "Retirar consentimento",
       "withdrawConsentConfirmTitle": "Retirar consentimento?",
-      "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
+      "withdrawConsentBody": "A conta e os dados de aprendizagem de {{childName}} serão eliminados após um período de tolerância de 7 dias. (Para contas de menores de 13 anos, a eliminação é imediata no final do período de tolerância para cumprir a lei de privacidade.)",
       "confirmWithdrawConsent": "Confirmar — retirar consentimento",
       "curriculumTitle": "Currículo",
       "curriculumSubtitle": "Explore as disciplinas e os tópicos de {{name}}",
@@ -2779,9 +2779,9 @@
       "topicsNewLearnerBody": "Isso pode acontecer após as primeiras sessões ou navegação livre. As sessões recentes abaixo ainda mostram o que aconteceu.",
       "noTopicsYetTitle": "Nenhum tópico de lição ainda",
       "noTopicsYetBody": "As sessões ainda podem existir aqui antes que o mentor tenha progresso suficiente no nível da lição para mostrar.",
-      "description": "This is your child's progress in {{subject}}. Topics appear once sessions connect to a lesson step.",
-      "recentSubjectSessions": "Recent {{subject}} sessions",
-      "viewSessionFrom": "View session from {{date}}"
+      "description": "Este é o progresso do seu filho em {{subject}}. Os tópicos aparecem assim que as sessões se ligam a uma etapa da lição.",
+      "recentSubjectSessions": "Sessões recentes de {{subject}}",
+      "viewSessionFrom": "Ver sessão de {{date}}"
     },
     "topic": {
       "topic": "Tópico",
@@ -3057,15 +3057,15 @@
     "childPaywall": {
       "headline": "Bom trabalho até agora!",
       "greatStart": "Você tem explorado e aprendido — ótimo começo!",
-      "xpStats_one": "You learned {{count}} topic and earned {{xp}} XP — great work!",
-      "xpStats_other": "You learned {{count}} topics and earned {{xp}} XP — great work!",
+      "xpStats_one": "Você aprendeu {{count}} tópico e ganhou {{xp}} XP — ótimo trabalho!",
+      "xpStats_other": "Você aprendeu {{count}} tópicos e ganhou {{xp}} XP — ótimo trabalho!",
       "usedAllQuestions": "Você usou todas as suas perguntas gratuitas. Peça aos seus pais para fazerem um upgrade para você continuar aprendendo.",
       "quotaUsedAllQuestions": "Você usou suas perguntas por enquanto. Pode tentar novamente depois de {{resetAt}} ou avisar um responsável se precisar de mais espaço.",
       "notifyButton": "Notificar Meus Pais",
       "notifyButtonNotified": "Pais notificados",
       "notifyButtonAccessibilityNotified": "Pais já notificados",
       "notifyButtonAccessibilityNotify": "Notificar meus pais",
-      "cooldownReminder": "You can remind them again in {{label}}.",
+      "cooldownReminder": "Você pode lembrá-los novamente em {{label}}.",
       "notifiedExploreText": "Seus pais foram notificados! Enquanto espera, você ainda pode explorar:",
       "waitText": "Enquanto espera, você ainda pode navegar pela sua Biblioteca e ver seu progresso.",
       "browseLibrary": "Navegar na Biblioteca",
@@ -3074,10 +3074,10 @@
       "seeProgressAccessibilityLabel": "Ver seu progresso",
       "goHome": "Ir para Início",
       "goHomeAccessibilityLabel": "Ir para Início",
-      "back": "Back",
+      "back": "Voltar",
       "backAccessibilityLabel": "Voltar",
       "alerts": {
-        "sentTitle": "Sent!",
+        "sentTitle": "Enviado!",
         "sentBody": "Avisamos seus pais!",
         "askParentTitle": "Pergunte aos seus pais",
         "askParentBody": "Peça aos seus pais para abrirem o aplicativo e assinarem.",
@@ -3110,7 +3110,7 @@
       "alerts": {
         "successTitle": "Lista de Espera",
         "successBody": "Você foi adicionado à lista de espera BYOK.",
-        "errorTitle": "Error",
+        "errorTitle": "Erro",
         "errorBody": "Não foi possível entrar na lista. Tente novamente."
       }
     },
@@ -3398,7 +3398,7 @@
     "detailLoadErrorMessage": "Tente novamente ou volte para a lista de resumos.",
     "notFoundTitle": "Resumo não encontrado",
     "notFoundMessage": "Este resumo não está mais disponível.",
-    "exchangesCount": "{{count}} exchanges",
+    "exchangesCount": "Trocas: {{count}}",
     "whatHappened": "O que aconteceu",
     "detailPending": "Este resumo ainda está sendo preparado.",
     "tryAsking": "Tente perguntar",
@@ -3665,7 +3665,7 @@
         },
         "card2": {
           "subjects": {
-            "math": "Math",
+            "math": "Matemática",
             "history": "História",
             "spanish": "Espanhol"
           },
@@ -3722,12 +3722,12 @@
       "primaryCta": "Criar conta gratuita",
       "secondaryCta": "Já tenho uma conta"
     },
-    "next": "Next",
+    "next": "Seguinte",
     "letsStart": "Vamos começar",
     "a11y": {
       "previous": "Cartão anterior",
       "next": "Próximo cartão",
-      "dots": "Page {{current}} of {{total}}",
+      "dots": "Página {{current}} de {{total}}",
       "bridgePrimary": "Criar uma conta gratuita",
       "bridgeSecondary": "Entrar em uma conta existente"
     }

@@ -394,7 +394,7 @@
       "childCard": {
         "statusPending": "Sjekker inn",
         "reportsAction": "Rapporter",
-        "nudgeAction": "Nudge",
+        "nudgeAction": "Dytt",
         "learnTogetherAction": "Lær sammen"
       },
       "card": {
@@ -411,7 +411,7 @@
         "momentumStreak": "{{count}}-dagers streak",
         "momentumTopics": "+{{count}} emner",
         "momentumWords": "+{{count}} ord",
-        "solid": "Solid: {{subjects}}",
+        "solid": "Stødig: {{subjects}}",
         "comingUp": "Neste: {{topic}}",
         "tryTonight": "Prøv i kveld",
         "quietStarterWithFocus": "Spør {{name}} hva som ville gjort det enkelt å starte på nytt med {{focus}}."
@@ -511,7 +511,7 @@
       "daysOther": "dager",
       "restoreErrorTitle": "Kunne ikke angre tilbaketrekkingen",
       "restoreErrorBody": "Prøv igjen om et øyeblikk.",
-      "restoreSuccessToast": "Tilbaketrekkingen er angret for {{name}}"
+      "restoreSuccessToast": "Tilbaketrekkingen av samtykke for {{name}} er angret"
     }
   },
   "more": {
@@ -642,7 +642,7 @@
       "notNow": "Ikke nå",
       "dontAskAgain": "Ikke spør igjen",
       "banner": {
-        "question": "Question {{index}} of {{total}}"
+        "question": "Spørsmål {{index}} av {{total}}"
       },
       "draft": {
         "title": "Dette vet du nå",
@@ -1036,7 +1036,7 @@
       "a11yComplete": "Boken din er klar – trykk for å fortsette"
     },
     "quickChips": {
-      "hintLabel": "Hint",
+      "hintLabel": "Tips",
       "hintPrompt": "Gi meg et hint.",
       "hintConfirm": "Legger til et hint.",
       "exampleLabel": "Eksempel",
@@ -2152,7 +2152,7 @@
     "register": {
       "child": {
         "growthSubtitle": "Ukens gevinster",
-        "masteredTopicsHero": "Du lærte {{count}} temaer. Stødig fremgang.",
+        "masteredTopicsHero": "Lærte temaer: {{count}}. Stødig fremgang.",
         "retentionStrong": "Det du husket denne uken.",
         "retentionFading": "Verdt en liten oppfriskning.",
         "retentionWeak": "Verdt å komme tilbake til."
@@ -2384,24 +2384,24 @@
     "latestReport": {
       "title": "Siste rapport",
       "open": "Åpne rapport",
-      "openWithDate": "Open report for {{date}}",
+      "openWithDate": "Åpne rapport for {{date}}",
       "empty": "Din neste ukentlige eller månedlige rapport vises her når det er nok læring å oppsummere.",
       "error": "Vi kunne ikke laste inn den siste rapporten nå.",
       "sessions": "Økter",
-      "time": "Time",
+      "time": "Tid",
       "topics": "Emner",
-      "words": "Words",
-      "practiceLessons_one": "{{count}} practice lesson",
-      "practiceLessons_other": "{{count}} practice lessons",
-      "practicePoints_one": "{{count}} practice point",
-      "practicePoints_other": "{{count}} practice points"
+      "words": "Ord",
+      "practiceLessons_one": "{{count}} øving",
+      "practiceLessons_other": "{{count}} øvinger",
+      "practicePoints_one": "{{count}} øvingspoeng",
+      "practicePoints_other": "{{count}} øvingspoeng"
     },
     "recentFocus": {
       "title": "Nylige økter",
       "showAll": "Vis alle økter",
       "empty": "Nylige økter vises her når læringen kommer i gang.",
       "error": "Vi kunne ikke laste inn nylige økter nå.",
-      "sessionFallback": "Studied {{date}}"
+      "sessionFallback": "Øvde {{date}}"
     },
     "guardian": {
       "summaryFallback": "Ingen oppsummering tilgjengelig ennå. En vil vises etter neste økt.",
@@ -2523,7 +2523,7 @@
       "introWithLearner": "For {{learner}}:",
       "intro": "Dette er satt opp:",
       "rowTone": "Mentoren din vil snakke med deg på riktig måte",
-      "rowSubject": "Starting with {{subject}}",
+      "rowSubject": "Starter med {{subject}}",
       "rowSubjectNoSubject": "Det første emnet ditt er klart",
       "rowPace": "Tempoet holder seg til din hastighet – aldri stresset",
       "reassurance": "De fleste elever merker forskjellen i den første økten.",
@@ -2583,7 +2583,7 @@
       "progressNudgeStartSubtitle": "Åpne {{subject}} for å se hva som er klart, og prøv en kort leksjon selv så du kan hjelpe.",
       "openProgressNudgeAction": "Åpne {{subject}}",
       "subjects": "Emner",
-      "subjectsDescription": "{{name}}'s active subjects, with the most recent activity first.",
+      "subjectsDescription": "{{name}}s aktive fag, med den nyeste aktiviteten først.",
       "subjectRawInputAudit": "Barnet ditt søkte etter «{{rawInput}}»",
       "openSubjectProgress": "Åpne fremgang for {{subject}}",
       "recentSessions": "Nylige økter",
@@ -2607,7 +2607,7 @@
       "cancelDeletion": "Avbryt sletting",
       "withdrawConsent": "Trekk tilbake samtykke",
       "withdrawConsentConfirmTitle": "Trekke tilbake samtykke?",
-      "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
+      "withdrawConsentBody": "{{childName}}s konto og læringsdata blir slettet etter en 7-dagers frist. (For kontoer under 13 år skjer slettingen umiddelbart etter fristens utløp for å overholde personvernlovgivningen.)",
       "confirmWithdrawConsent": "Bekreft – trekk tilbake samtykke",
       "curriculumTitle": "Læreplan",
       "curriculumSubtitle": "Utforsk {{name}}s fag og emner",
@@ -2752,9 +2752,9 @@
       "topicsNewLearnerBody": "Dette kan skje etter tidlige økter eller fri utforskning. Nylige økter nedenfor viser fortsatt hva som skjedde.",
       "noTopicsYetTitle": "Ingen leksjonsemner ennå",
       "noTopicsYetBody": "Økter kan fortsatt eksistere her før mentoren har nok fremgang på leksjonsnivå å vise.",
-      "description": "This is your child's progress in {{subject}}. Topics appear once sessions connect to a lesson step.",
-      "recentSubjectSessions": "Recent {{subject}} sessions",
-      "viewSessionFrom": "View session from {{date}}"
+      "description": "Dette er barnets fremgang i {{subject}}. Temaer vises når økter kobles til et leksjonstrinn.",
+      "recentSubjectSessions": "Nylige {{subject}}-økter",
+      "viewSessionFrom": "Se økt fra {{date}}"
     },
     "topic": {
       "topic": "Tema",
@@ -3030,15 +3030,15 @@
     "childPaywall": {
       "headline": "Bra jobbet så langt!",
       "greatStart": "Du har utforsket og lært – en flott start!",
-      "xpStats_one": "You learned {{count}} topic and earned {{xp}} XP — great work!",
-      "xpStats_other": "You learned {{count}} topics and earned {{xp}} XP — great work!",
+      "xpStats_one": "Du lærte {{count}} tema og tjente {{xp}} XP – bra jobba!",
+      "xpStats_other": "Du lærte {{count}} temaer og tjente {{xp}} XP – bra jobba!",
       "usedAllQuestions": "Du har brukt alle dine gratis spørsmål. Be forelderen din om å oppgradere slik at du kan fortsette å lære.",
       "quotaUsedAllQuestions": "Du har brukt spørsmålene dine for nå. Du kan prøve igjen etter {{resetAt}}, eller varsle en foresatt hvis du trenger mer rom.",
       "notifyButton": "Varsle forelderen min",
       "notifyButtonNotified": "Forelder varslet",
       "notifyButtonAccessibilityNotified": "Forelder allerede varslet",
       "notifyButtonAccessibilityNotify": "Varsle forelderen min",
-      "cooldownReminder": "You can remind them again in {{label}}.",
+      "cooldownReminder": "Du kan minne dem på det igjen om {{label}}.",
       "notifiedExploreText": "Forelderen din er varslet! Mens du venter, kan du fortsatt utforske:",
       "waitText": "Mens du venter, kan du fortsatt bla gjennom biblioteket ditt og se fremgangen din.",
       "browseLibrary": "Bla gjennom biblioteket",
@@ -3047,10 +3047,10 @@
       "seeProgressAccessibilityLabel": "Se fremgangen din",
       "goHome": "Gå hjem",
       "goHomeAccessibilityLabel": "Gå hjem",
-      "back": "Back",
+      "back": "Tilbake",
       "backAccessibilityLabel": "Gå tilbake",
       "alerts": {
-        "sentTitle": "Sent!",
+        "sentTitle": "Sendt!",
         "sentBody": "Vi ga beskjed til forelderen din!",
         "askParentTitle": "Spør forelderen din",
         "askParentBody": "Be forelderen din om å åpne appen og abonnere.",
@@ -3083,7 +3083,7 @@
       "alerts": {
         "successTitle": "Venteliste",
         "successBody": "Du er lagt til BYOK-ventelisten.",
-        "errorTitle": "Error",
+        "errorTitle": "Feil",
         "errorBody": "Kunne ikke melde deg på ventelisten. Prøv igjen."
       }
     },
@@ -3398,7 +3398,7 @@
     "detailLoadErrorMessage": "Prøv igjen, eller gå tilbake til listen.",
     "notFoundTitle": "Sammendrag ikke funnet",
     "notFoundMessage": "Dette sammendraget er ikke lenger tilgjengelig.",
-    "exchangesCount": "{{count}} utvekslinger",
+    "exchangesCount": "Utvekslinger: {{count}}",
     "whatHappened": "Hva skjedde",
     "detailPending": "Dette sammendraget forberedes fortsatt.",
     "tryAsking": "Prøv å spørre",

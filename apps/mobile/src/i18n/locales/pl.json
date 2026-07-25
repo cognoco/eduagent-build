@@ -185,7 +185,7 @@
       "totpHint": "Otwórz aplikację uwierzytelniającą i wpisz 6-cyfrowy kod.",
       "backupCodeHint": "Wpisz jeden z kodów zapasowych zapisanych podczas konfigurowania uwierzytelniania dwuskładnikowego.",
       "verificationCodeLabel": "Kod weryfikacyjny",
-      "emailLabel": "Email",
+      "emailLabel": "E-mail",
       "passwordLabel": "Hasło",
       "enterEmailHint": "Wpisz swój email, aby kontynuować",
       "enterPasswordHint": "Wpisz swoje hasło, aby kontynuować",
@@ -240,7 +240,7 @@
       "subtitle": "Rozpocznij swoją podróż z nauką",
       "accountNotFound": "Nie znaleźliśmy konta z tym adresem email. Utwórz je poniżej, aby zacząć.",
       "orContinueWithEmail": "lub kontynuuj przez email",
-      "emailLabel": "Email",
+      "emailLabel": "E-mail",
       "passwordLabel": "Hasło",
       "alreadyHaveAccount": "Masz już konto?",
       "verifyEmailTitle": "Zweryfikuj swój email",
@@ -272,7 +272,7 @@
     "forgotPassword": {
       "title": "Nie pamiętasz hasła?",
       "subtitle": "Wyślemy kod resetujący na Twój email",
-      "emailLabel": "Email",
+      "emailLabel": "E-mail",
       "resetPasswordTitle": "Zresetuj hasło",
       "resetCodeLabel": "Kod resetujący",
       "newPasswordLabel": "Nowe hasło",
@@ -319,8 +319,8 @@
       "emptySubjectsMessage": "Zacznij jeden teraz albo użyj pomocy w zadaniach, gdy jej potrzebujesz.",
       "addSubject": "Dodaj przedmiot",
       "momentum": {
-        "topicLearned": "{{n}} topic learned",
-        "topicsLearned": "{{n}} topics learned"
+        "topicLearned": "Ukończono {{n}} temat",
+        "topicsLearned": "Poznane tematy: {{n}}"
       },
       "intentActions": {
         "homework": {
@@ -358,9 +358,9 @@
       "coachBandRevisitTopic": "Powtórz {{topic}} — czas na szybką powtórkę."
     },
     "notices": {
-      "consentArchivedTitle": "{{name}}'s account was archived",
+      "consentArchivedTitle": "Konto {{name}} zostało zarchiwizowane",
       "consentArchivedBody": "Dane są przechowywane przez 30 dni, a następnie usuwane.",
-      "consentDeletedTitle": "{{name}}'s account was deleted",
+      "consentDeletedTitle": "Konto {{name}} zostało usunięte",
       "consentDeletedBody": "Okres karencji na wycofanie zgody zakończył się."
     },
     "parent": {
@@ -400,7 +400,7 @@
       "childCard": {
         "statusPending": "Sprawdzanie",
         "reportsAction": "Raporty",
-        "nudgeAction": "Nudge",
+        "nudgeAction": "Szturchnij",
         "learnTogetherAction": "Uczcie się razem"
       },
       "card": {
@@ -536,15 +536,15 @@
   "family": {
     "orientationCueDismiss": "Rozumiem",
     "withdrawal": {
-      "bannerTitleSingle": "{{name}}'s account closes in {{days}} {{daysWord}}",
-      "bannerTitleMulti": "{{count}} accounts closing soon",
+      "bannerTitleSingle": "Konto {{name}} zostanie zamknięte za {{days}} {{daysWord}}",
+      "bannerTitleMulti": "Konta do zamknięcia: {{count}}",
       "bannerCta": "Cofnij",
-      "bannerCtaShort": "Undo",
-      "daysOne": "day",
-      "daysOther": "days",
+      "bannerCtaShort": "Cofnij",
+      "daysOne": "dzień",
+      "daysOther": "dni",
       "restoreErrorTitle": "Nie udało się cofnąć wycofania",
       "restoreErrorBody": "Spróbuj ponownie za chwilę.",
-      "restoreSuccessToast": "Withdrawal reversed for {{name}}"
+      "restoreSuccessToast": "Cofnięto wycofanie zgody dla {{name}}"
     }
   },
   "more": {
@@ -675,7 +675,7 @@
       "notNow": "Nie teraz",
       "dontAskAgain": "Nie pytaj więcej",
       "banner": {
-        "question": "Question {{index}} of {{total}}"
+        "question": "Pytanie {{index}} z {{total}}"
       },
       "draft": {
         "title": "To wiesz teraz",
@@ -2123,12 +2123,12 @@
     "addSkippedFragmentsLabel": "Dodaj pominięte fragmenty z powrotem",
     "skippedFragments_one": "Pominęliśmy {{count}} niejasny fragment. Stuknij, aby go dodać z powrotem.",
     "skippedFragments_other": "Pominęliśmy {{count}} niejasnych fragmentów. Stuknij, aby je dodać z powrotem.",
-    "problemNumber": "Problem {{number}}",
-    "removeProblemLabel": "Usuń problem {{number}}",
+    "problemNumber": "Zadanie {{number}}",
+    "removeProblemLabel": "Usuń zadanie {{number}}",
     "remove": "Usuń",
-    "problemInputLabel": "Problem {{number}}, edytowalny",
-    "addProblem": "Dodaj kolejny problem",
-    "addProblemLabel": "Dodaj kolejną kartę problemu",
+    "problemInputLabel": "Zadanie {{number}}, edytowalne",
+    "addProblem": "Dodaj kolejne zadanie",
+    "addProblemLabel": "Dodaj kolejną kartę zadania",
     "confirmTaskCta": "To jest zadanie, z którym chcę pomocy",
     "confirmedTaskCta": "Zadanie potwierdzone",
     "confirmTaskHint": "Przed startem popraw powyżej wszystko, czego brakuje.",
@@ -2238,7 +2238,7 @@
     "register": {
       "child": {
         "growthSubtitle": "Twoje tygodniowe sukcesy",
-        "masteredTopicsHero": "You learned {{count}} topics. Steady wins.",
+        "masteredTopicsHero": "Opanowane tematy: {{count}}. Tak trzymać!",
         "retentionStrong": "Co przypomniało Ci się w tym tygodniu.",
         "retentionFading": "Warto szybko odświeżyć.",
         "retentionWeak": "Warto do tego wrócić."
@@ -2493,22 +2493,22 @@
         "label": "Wymaga nowego podejścia"
       },
       "elapsed": {
-        "remembered_one": "Remembered after {{count}} day",
-        "remembered_other": "Remembered after {{count}} days",
-        "fading_one": "Getting fuzzy after {{count}} day",
-        "fading_other": "Getting fuzzy after {{count}} days",
-        "weak_one": "Ready for a refresh after {{count}} day",
-        "weak_other": "Ready for a refresh after {{count}} days",
-        "forgotten_one": "Last seen {{count}} day ago",
-        "forgotten_other": "Last seen {{count}} days ago",
-        "fading_few": "Getting fuzzy after {{count}} days",
-        "fading_many": "Getting fuzzy after {{count}} days",
-        "forgotten_few": "Last seen {{count}} days ago",
-        "forgotten_many": "Last seen {{count}} days ago",
-        "remembered_few": "Remembered after {{count}} days",
-        "remembered_many": "Remembered after {{count}} days",
-        "weak_few": "Ready for a refresh after {{count}} days",
-        "weak_many": "Ready for a refresh after {{count}} days"
+        "remembered_one": "Zapamiętane po {{count}} dniu",
+        "remembered_other": "Zapamiętane po {{count}} dniach",
+        "fading_one": "Zaczyna się zacierać po {{count}} dniu",
+        "fading_other": "Zaczyna się zacierać po {{count}} dniach",
+        "weak_one": "Wymaga odświeżenia po {{count}} dniu",
+        "weak_other": "Wymaga odświeżenia po {{count}} dniach",
+        "forgotten_one": "Ostatnio widziane {{count}} dzień temu",
+        "forgotten_other": "Ostatnio widziane {{count}} dni temu",
+        "fading_few": "Zaczyna się zacierać po {{count}} dniach",
+        "fading_many": "Zaczyna się zacierać po {{count}} dniach",
+        "forgotten_few": "Ostatnio widziane {{count}} dni temu",
+        "forgotten_many": "Ostatnio widziane {{count}} dni temu",
+        "remembered_few": "Zapamiętane po {{count}} dniach",
+        "remembered_many": "Zapamiętane po {{count}} dniach",
+        "weak_few": "Wymaga odświeżenia po {{count}} dniach",
+        "weak_many": "Wymaga odświeżenia po {{count}} dniach"
       }
     },
     "previousReports": {
@@ -2519,28 +2519,28 @@
     "latestReport": {
       "title": "Najnowszy raport",
       "open": "Otwórz raport",
-      "openWithDate": "Open report for {{date}}",
+      "openWithDate": "Otwórz raport z {{date}}",
       "empty": "Twój następny raport tygodniowy lub miesięczny pojawi się tutaj, gdy zbierze się wystarczająco dużo danych do podsumowania.",
       "error": "Nie udało się załadować najnowszego raportu.",
       "sessions": "Sesje",
-      "time": "Time",
+      "time": "Czas",
       "topics": "Tematy",
-      "words": "Words",
-      "practiceLessons_one": "{{count}} practice lesson",
-      "practiceLessons_other": "{{count}} practice lessons",
-      "practicePoints_one": "{{count}} practice point",
-      "practicePoints_other": "{{count}} practice points",
-      "practiceLessons_few": "{{count}} practice lessons",
-      "practiceLessons_many": "{{count}} practice lessons",
-      "practicePoints_few": "{{count}} practice points",
-      "practicePoints_many": "{{count}} practice points"
+      "words": "Słowa",
+      "practiceLessons_one": "{{count}} lekcja ćwiczeniowa",
+      "practiceLessons_other": "{{count}} lekcji ćwiczeniowych",
+      "practicePoints_one": "{{count}} punkt ćwiczeniowy",
+      "practicePoints_other": "{{count}} punktów ćwiczeniowych",
+      "practiceLessons_few": "{{count}} lekcje ćwiczeniowe",
+      "practiceLessons_many": "{{count}} lekcji ćwiczeniowych",
+      "practicePoints_few": "{{count}} punkty ćwiczeniowe",
+      "practicePoints_many": "{{count}} punktów ćwiczeniowych"
     },
     "recentFocus": {
       "title": "Ostatnie sesje",
       "showAll": "Pokaż wszystkie sesje",
       "empty": "Ostatnie sesje pojawią się tutaj, gdy nauka ruszy.",
       "error": "Nie udało się załadować ostatnich sesji.",
-      "sessionFallback": "Studied {{date}}"
+      "sessionFallback": "Sesja z {{date}}"
     },
     "guardian": {
       "summaryFallback": "Brak podsumowania. Pojawi się po następnej sesji.",
@@ -2659,10 +2659,10 @@
     },
     "ready": {
       "title": "Wszystko gotowe.",
-      "introWithLearner": "For {{learner}}:",
+      "introWithLearner": "Dla {{learner}}:",
       "intro": "Oto co zostało ustawione:",
       "rowTone": "Twój mentor będzie rozmawiać z Tobą we właściwy sposób",
-      "rowSubject": "Starting with {{subject}}",
+      "rowSubject": "Zaczynamy od {{subject}}",
       "rowSubjectNoSubject": "Twój pierwszy temat jest gotowy",
       "rowPace": "Tempo dostosowuje się do Twojej prędkości — bez pośpiechu",
       "reassurance": "Większość uczących się odczuwa różnicę już podczas pierwszej sesji.",
@@ -2722,7 +2722,7 @@
       "progressNudgeStartSubtitle": "Otwórz {{subject}}, zobacz co jest gotowe, a potem spróbuj krótkiej lekcji samodzielnie.",
       "openProgressNudgeAction": "Otwórz {{subject}}",
       "subjects": "Przedmioty",
-      "subjectsDescription": "{{name}}'s active subjects, with the most recent activity first.",
+      "subjectsDescription": "Aktywne przedmioty użytkownika {{name}}, uporządkowane od najnowszej aktywności.",
       "subjectRawInputAudit": "Twoje dziecko szukało „{{rawInput}}”",
       "openSubjectProgress": "Otwórz postępy w {{subject}}",
       "recentSessions": "Ostatnie sesje",
@@ -2746,7 +2746,7 @@
       "cancelDeletion": "Anuluj usunięcie",
       "withdrawConsent": "Wycofaj zgodę",
       "withdrawConsentConfirmTitle": "Wycofać zgodę?",
-      "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
+      "withdrawConsentBody": "Konto {{childName}} i dane dotyczące nauki zostaną usunięte po 7-dniowym okresie karencji. (W przypadku kont dzieci poniżej 13 lat usunięcie następuje natychmiast po upływie okresu karencji, zgodnie z prawem o ochronie prywatności).",
       "confirmWithdrawConsent": "Potwierdź — wycofaj zgodę",
       "curriculumTitle": "Program nauczania",
       "curriculumSubtitle": "Przeglądaj przedmioty i tematy użytkownika {{name}}",
@@ -2907,9 +2907,9 @@
       "topicsNewLearnerBody": "Może się tak zdarzyć po wczesnych sesjach lub swobodnym przeglądaniu. Ostatnie sesje poniżej nadal pokazują, co się wydarzyło.",
       "noTopicsYetTitle": "Brak tematów lekcji",
       "noTopicsYetBody": "Sesje mogą tu nadal istnieć, zanim mentor będzie miał wystarczające postępy na poziomie lekcji do pokazania.",
-      "description": "This is your child's progress in {{subject}}. Topics appear once sessions connect to a lesson step.",
-      "recentSubjectSessions": "Recent {{subject}} sessions",
-      "viewSessionFrom": "View session from {{date}}"
+      "description": "To są postępy Twojego dziecka w {{subject}}. Tematy pojawiają się, gdy sesje połączą się z krokiem lekcji.",
+      "recentSubjectSessions": "Ostatnie sesje z {{subject}}",
+      "viewSessionFrom": "Zobacz sesję z {{date}}"
     },
     "topic": {
       "topic": "Temat",
@@ -3185,15 +3185,15 @@
     "childPaywall": {
       "headline": "Świetna robota!",
       "greatStart": "Odkrywasz i uczysz się — świetny początek!",
-      "xpStats_one": "You learned {{count}} topic and earned {{xp}} XP — great work!",
-      "xpStats_other": "You learned {{count}} topics and earned {{xp}} XP — great work!",
+      "xpStats_one": "Ukończono {{count}} temat i zdobyto {{xp}} XP — świetna robota!",
+      "xpStats_other": "Ukończono {{count}} tematów i zdobyto {{xp}} XP — świetna robota!",
       "usedAllQuestions": "Wykorzystałeś wszystkie darmowe pytania. Poproś rodzica o ulepszenie, aby móc kontynuować naukę.",
       "quotaUsedAllQuestions": "Na razie wykorzystano dostępne pytania. Możesz spróbować ponownie po {{resetAt}} albo powiadomić rodzica, jeśli potrzebujesz więcej miejsca.",
       "notifyButton": "Powiadom Rodzica",
       "notifyButtonNotified": "Rodzic powiadomiony",
       "notifyButtonAccessibilityNotified": "Rodzic już powiadomiony",
       "notifyButtonAccessibilityNotify": "Powiadom mojego rodzica",
-      "cooldownReminder": "You can remind them again in {{label}}.",
+      "cooldownReminder": "Możesz przypomnieć ponownie za {{label}}.",
       "notifiedExploreText": "Twój rodzic został powiadomiony! Czekając, możesz nadal odkrywać:",
       "waitText": "Czekając, możesz nadal przeglądać swoją Bibliotekę i sprawdzać postępy.",
       "browseLibrary": "Przeglądaj Bibliotekę",
@@ -3202,10 +3202,10 @@
       "seeProgressAccessibilityLabel": "Zobacz swoje postępy",
       "goHome": "Idź do domu",
       "goHomeAccessibilityLabel": "Idź do domu",
-      "back": "Back",
+      "back": "Wstecz",
       "backAccessibilityLabel": "Wróć",
       "alerts": {
-        "sentTitle": "Sent!",
+        "sentTitle": "Wysłano!",
         "sentBody": "Powiadomiliśmy Twojego rodzica!",
         "askParentTitle": "Zapytaj rodzica",
         "askParentBody": "Poproś rodzica o otwarcie aplikacji i subskrybowanie.",
@@ -3214,8 +3214,8 @@
         "quotaSentBody": "Powiadomiliśmy rodzica, że limit pytań został wykorzystany.",
         "quotaAskParentBody": "Poproś rodzica, aby otworzył aplikację i sprawdził szczegóły."
       },
-      "xpStats_few": "You learned {{count}} topics and earned {{xp}} XP — great work!",
-      "xpStats_many": "You learned {{count}} topics and earned {{xp}} XP — great work!"
+      "xpStats_few": "Ukończono {{count}} tematy i zdobyto {{xp}} XP — świetna robota!",
+      "xpStats_many": "Ukończono {{count}} tematów i zdobyto {{xp}} XP — świetna robota!"
     },
     "restore": {
       "button": "Przywróć zakupy",
@@ -3240,7 +3240,7 @@
       "alerts": {
         "successTitle": "Lista oczekujących",
         "successBody": "Zostałeś dodany do listy oczekujących BYOK.",
-        "errorTitle": "Error",
+        "errorTitle": "Błąd",
         "errorBody": "Nie udało się dołączyć do listy. Spróbuj ponownie."
       }
     },
@@ -3546,7 +3546,7 @@
     "detailLoadErrorMessage": "Spróbuj ponownie lub wróć do listy podsumowań.",
     "notFoundTitle": "Podsumowania nie znaleziono",
     "notFoundMessage": "To podsumowanie nie jest już dostępne.",
-    "exchangesCount": "{{count}} exchanges",
+    "exchangesCount": "Wymiany: {{count}}",
     "whatHappened": "Co się wydarzyło",
     "detailPending": "To podsumowanie jest wciąż przygotowywane.",
     "tryAsking": "Spróbuj zapytać",
@@ -3819,7 +3819,7 @@
         },
         "card2": {
           "subjects": {
-            "math": "Math",
+            "math": "Matematyka",
             "history": "Historia",
             "spanish": "Hiszpański"
           },
@@ -3876,12 +3876,12 @@
       "primaryCta": "Utwórz darmowe konto",
       "secondaryCta": "Mam już konto"
     },
-    "next": "Next",
+    "next": "Dalej",
     "letsStart": "Zacznijmy",
     "a11y": {
       "previous": "Poprzednia karta",
       "next": "Następna karta",
-      "dots": "Page {{current}} of {{total}}",
+      "dots": "Strona {{current}} z {{total}}",
       "bridgePrimary": "Utwórz darmowe konto",
       "bridgeSecondary": "Zaloguj się do istniejącego konta"
     }
