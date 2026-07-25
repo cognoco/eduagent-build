@@ -1700,6 +1700,61 @@ describeIfDb('session exchange production-path integration', () => {
       },
     );
 
+    // [WI-2625] `deferred` is NOT terminal like locked_in/dismissed/not_yet —
+    // applyMentorNoticeOutcome's deferred branch (state.ts) intentionally
+    // leaves `status` at 'open' (the notice stays re-offerable later) and
+    // only stamps lastRecheckOutcome/lastDeferredAt. This is the judge
+    // reaching the SAME direct-not-now outcome the deterministic
+    // deferMentorNotice() API path also produces (recheck.ts) — proving the
+    // judge integration routes into the pre-existing defer machinery
+    // correctly, not a new terminal state.
+    it('processMessage applies a deferred judge verdict without closing the notice', async () => {
+      const { profileId, session, noticeId } =
+        await seedOpenMentorNoticeRecheckTurn();
+      llm.setNoticeRecheckJudgeResponse(
+        JSON.stringify({ verdict: 'deferred', reason: 'explicit_not_now' }),
+      );
+
+      await processMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+      );
+
+      const row = await readNotice(noticeId);
+      expect(row?.status).toBe('open');
+      expect(row?.lastRecheckOutcome).toBe('deferred');
+    });
+
+    // [WI-2625] streamMessage variant of the terminal-verdict case above —
+    // proves the judge integration is identical across both call sites, not
+    // just processMessage. locked_in is representative; not_yet's streaming
+    // parity is already covered by the "not_yet terminalization" describe
+    // block above.
+    it('streamMessage terminalizes a locked_in judge verdict', async () => {
+      const { profileId, session, noticeId } =
+        await seedOpenMentorNoticeRecheckTurn();
+      llm.setNoticeRecheckJudgeResponse(
+        JSON.stringify({ verdict: 'locked_in', reason: 'demonstrated' }),
+      );
+
+      const result = await streamMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+      );
+      for await (const chunk of result.stream) void chunk;
+      await result.onComplete();
+
+      const row = await readNotice(noticeId);
+      expect(row?.status).toBe('locked_in');
+      expect(row?.lastRecheckOutcome).toBe('locked_in');
+    });
+
     it('a "continue" judge verdict makes no transition before turn 3', async () => {
       const { profileId, session, noticeId } =
         await seedOpenMentorNoticeRecheckTurn();
@@ -1810,6 +1865,55 @@ describeIfDb('session exchange production-path integration', () => {
           clientId,
         },
       );
+
+      expect(llm.noticeRecheckJudgeCallCount()).toBe(1);
+      const secondRow = await readNotice(noticeId);
+      expect(secondRow?.status).toBe('locked_in');
+      expect(secondRow?.recheckAttemptCount).toBe(1);
+    });
+
+    // [WI-2625] streamMessage variant of the retry-idempotency case above —
+    // the dedup gate (persisted.persistedUserMessage) is the same shared
+    // exchange-persistence code both call sites go through.
+    it('streamMessage: a retried (duplicate clientId) send does not re-invoke the judge or double-apply the outcome', async () => {
+      const { profileId, session, noticeId } =
+        await seedOpenMentorNoticeRecheckTurn();
+      llm.setNoticeRecheckJudgeResponse(
+        JSON.stringify({ verdict: 'locked_in', reason: 'demonstrated' }),
+      );
+      const clientId = 'wi-2625-stream-retry-client-id';
+
+      const first = await streamMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        {
+          semanticMemoryRetrievalEnabled: false,
+          mentorNoticeEnabled: true,
+          clientId,
+        },
+      );
+      for await (const chunk of first.stream) void chunk;
+      await first.onComplete();
+      expect(llm.noticeRecheckJudgeCallCount()).toBe(1);
+      const firstRow = await readNotice(noticeId);
+      expect(firstRow?.status).toBe('locked_in');
+      expect(firstRow?.recheckAttemptCount).toBe(1);
+
+      const second = await streamMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        {
+          semanticMemoryRetrievalEnabled: false,
+          mentorNoticeEnabled: true,
+          clientId,
+        },
+      );
+      for await (const chunk of second.stream) void chunk;
+      await second.onComplete();
 
       expect(llm.noticeRecheckJudgeCallCount()).toBe(1);
       const secondRow = await readNotice(noticeId);
