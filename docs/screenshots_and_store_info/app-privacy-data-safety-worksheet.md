@@ -15,6 +15,7 @@ Status: repo-evidence draft for Apple App Privacy and Google Play Data Safety. D
 - [ ] Final third-party processor list is not confirmed against production configuration.
 - [ ] Final tracking/advertising answers require legal/admin review.
 - [ ] Final retention/deletion language must match the live privacy policy.
+- [ ] Store copy must stay consumer/family only. No school, classroom, LMS/SIS, formal-assessment, proctoring, or EU AI Act high-risk-compliance claims without DPO/counsel approval under [`../compliance/2026-07-06-school-institutional-ai-act-tripwire.md`](../compliance/2026-07-06-school-institutional-ai-act-tripwire.md).
 
 ## App Facts From Repo
 
