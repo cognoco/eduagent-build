@@ -89,6 +89,17 @@ const ACCEPTED_PAIRS: Record<
 function resolveOutcome(
   raw: z.infer<typeof recheckJudgeRawSchema>,
 ): MentorNoticeRecheckOutcome | null {
+  if (ACCEPTED_PAIRS[raw.verdict] !== raw.reason) {
+    logger.warn(
+      '[mentor-notice-recheck-judge] degraded — mismatched verdict/reason pair',
+      {
+        reason: 'mismatched_pair',
+        flow: JUDGE_MENTOR_NOTICE_RECHECK_FLOW,
+        verdict: raw.verdict,
+      },
+    );
+    return null;
+  }
   if (raw.verdict === 'continue') return null;
   const outcome = mentorNoticeRecheckOutcomeSchema.safeParse(raw.verdict);
   return outcome.success ? outcome.data : null;
