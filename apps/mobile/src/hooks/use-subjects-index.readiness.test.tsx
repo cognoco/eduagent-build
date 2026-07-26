@@ -9,16 +9,20 @@ import {
 import { setActiveProfileId } from '../lib/api-client';
 import { useSubjectsIndex } from './use-subjects-index';
 
-jest.mock(
-  '../lib/app-context' /* gc1-allow: readiness tests need deterministic mode state without AppContextProvider */,
-  () => ({
+jest.mock('../lib/app-context', () => {
+  const actual =
+    jest.requireActual<typeof import('../lib/app-context')>(
+      '../lib/app-context',
+    );
+  return {
+    ...actual,
     useAppContext: () => ({
       mode: null,
       setMode: jest.fn(),
       familyCapable: false,
     }),
-  }),
-);
+  };
+});
 
 jest.mock('@sentry/react-native', () => ({
   captureMessage: jest.fn(),
