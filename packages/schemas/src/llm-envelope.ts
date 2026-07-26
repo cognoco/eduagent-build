@@ -363,7 +363,18 @@ export const challengeRoundGraderDegradedEventSchema = z.object({
   sessionId: z.string().optional(),
   answerEventId: z.string().optional(),
   timestamp: z.string(),
-  reason: z.enum(['route_error', 'no_json', 'parse_error', 'schema_invalid']),
+  // [WI-2670] 'producer_vendor_unresolved': the caller could not provably
+  // identify the vendor that produced the graded question (e.g. a legacy
+  // ai_response row predating per-turn vendor tracking) — the grader never
+  // fabricates a producerVendor, so this is a distinct, structurally loud
+  // degradation reason rather than being silently folded into another one.
+  reason: z.enum([
+    'route_error',
+    'no_json',
+    'parse_error',
+    'schema_invalid',
+    'producer_vendor_unresolved',
+  ]),
 });
 export type ChallengeRoundGraderDegradedEvent = z.infer<
   typeof challengeRoundGraderDegradedEventSchema
@@ -389,14 +400,6 @@ function normalizeNoticedGapDecision(value: unknown): unknown {
   const { observed: _observed, ...evidence } = input;
   return evidence;
 }
-
-export const noticeRecheckSignalSchema = z.object({
-  noticeId: z.string().uuid(),
-  verdict: z.enum(['locked_in', 'not_yet', 'dismissed', 'deferred']),
-  answerEventId: z.string().uuid(),
-  learnerQuote: z.string().min(1).max(500),
-});
-export type NoticeRecheckSignal = z.infer<typeof noticeRecheckSignalSchema>;
 
 export const answerEvaluationSchema = z.object({
   correctness: z.enum(['correct', 'partial', 'incorrect', 'na']),
@@ -471,8 +474,6 @@ const signalsSchema = z.preprocess(
         normalizeNoticedGapDecision,
         noticedGapSignalSchema.nullable().optional(),
       ),
-      /** Mentor notice re-check verdict, accepted only after DB-backed evidence checks. */
-      notice_recheck: noticeRecheckSignalSchema.optional(),
     })
     .optional(),
 );
@@ -637,8 +638,6 @@ export interface NormalisedEnvelopeSignals {
   topic_opened_pending_content: boolean;
   /** Personal-mentor felt moment proposal. Null when absent. */
   noticed_gap: NoticedGapSignal | null;
-  /** Mentor notice re-check verdict. Null when absent. */
-  notice_recheck: NoticeRecheckSignal | null;
 }
 
 export function normaliseSignals(
@@ -660,7 +659,6 @@ export function normaliseSignals(
     topic_opened_pending_content:
       signals?.topic_opened_pending_content ?? false,
     noticed_gap: signals?.noticed_gap ?? null,
-    notice_recheck: signals?.notice_recheck ?? null,
   };
 }
 

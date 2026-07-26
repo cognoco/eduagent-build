@@ -27,6 +27,7 @@ import {
   getLlmRequestRoutingV2Enabled,
   readLlmRequestKillSwitch,
 } from './request-context';
+import { recordLlmFallbackRateSample } from '../llm-fallback-rate-signal';
 const logger = createLogger();
 
 export type PreferredLlmProvider = 'gemini' | 'openai' | 'anthropic';
@@ -1826,6 +1827,12 @@ export async function routeAndCall(
         responseChars: result.content.length,
         usage: result.usage,
       });
+      recordLlmFallbackRateSample({
+        environment: getLlmRequestEnvironment(llmEnvironment),
+        fallbackUsed: false,
+        provider: config.provider,
+        capability,
+      });
       return {
         response: result.content,
         provider: config.provider,
@@ -1987,6 +1994,12 @@ async function attemptProvider(
       responseChars: result.content.length,
       usage: result.usage,
     });
+    recordLlmFallbackRateSample({
+      environment: getLlmRequestEnvironment(llmEnvironment),
+      fallbackUsed: true,
+      provider: config.provider,
+      capability: metricContext.capability,
+    });
     return {
       response: result.content,
       provider: config.provider,
@@ -2063,6 +2076,7 @@ async function* wrapStreamWithCircuitBreaker(
   // the provider that actually produced the bytes.
   onUsage: (u: LlmUsage | undefined) => void,
   onFallback?: () => void,
+  fallbackUsed = false,
 ): AsyncIterable<string> {
   let chunksYielded = 0;
   let forwardedStopReason = false;
@@ -2120,6 +2134,8 @@ async function* wrapStreamWithCircuitBreaker(
           metricContext,
           onStopReason,
           onUsage,
+          undefined,
+          true,
         );
         let signalled = false;
         for await (const chunk of fallbackStream) {
@@ -2136,6 +2152,12 @@ async function* wrapStreamWithCircuitBreaker(
 
     recordSuccess(circuitKey);
     recordVolumeMetric(providerId);
+    recordLlmFallbackRateSample({
+      environment: getLlmRequestEnvironment(llmEnvironment),
+      fallbackUsed,
+      provider: providerId,
+      capability,
+    });
     // Forward usage before the stop reason: the router logs on the stop-reason
     // promise, so usage must already be settled when that fires (WI-1827).
     onUsage(await innerUsagePromise);
@@ -2205,6 +2227,8 @@ async function* wrapStreamWithCircuitBreaker(
           metricContext,
           onStopReason,
           onUsage,
+          undefined,
+          true,
         );
         let signalled = false;
         for await (const chunk of fallbackStream) {
@@ -2236,11 +2260,15 @@ async function* wrapStreamWithCircuitBreaker(
 /**
  * Streaming variant of routeAndCall.
  *
- * NOTE: The `provider` and `model` fields in the returned StreamResult
- * reflect the initially selected provider. If wrapStreamWithCircuitBreaker
- * transparently falls back (pre-first-byte failure), these fields still
- * report the original provider. Callers using these fields for cost
- * attribution or observability should be aware of this limitation.
+ * [WI-2670] The `provider` and `model` fields on the returned StreamResult
+ * are lazy getters (mirroring `fallbackUsed` on the same object): they
+ * report the EFFECTIVE provider — the fallback's, if
+ * `wrapStreamWithCircuitBreaker` transparently fell back before the first
+ * byte — not the originally-selected one. Read them only after the stream
+ * has drained (or after `fallbackUsed`/`stopReasonPromise` has settled);
+ * reading them earlier (e.g. destructuring `{ provider }` or spreading the
+ * result immediately after this function resolves) captures the
+ * pre-fallback value, because the fallback only happens during iteration.
  */
 export async function routeAndStream(
   messages: ChatMessage[],
@@ -2378,8 +2406,20 @@ export async function routeAndStream(
       });
     return {
       stream,
-      provider: config.provider,
-      model: config.model,
+      // [WI-2670] Lazy getters — same closure as `fallbackUsed` below.
+      // Read the fallback's config once a pre-first-byte transparent
+      // fallback has fired; otherwise the primary's. See the JSDoc above
+      // this function for why these must not be read before stream drain.
+      get provider() {
+        return fallbackFired && fallbackConfig
+          ? fallbackConfig.provider
+          : config.provider;
+      },
+      get model() {
+        return fallbackFired && fallbackConfig
+          ? fallbackConfig.model
+          : config.model;
+      },
       stopReasonPromise,
       get fallbackUsed() {
         return fallbackFired;
@@ -2461,6 +2501,8 @@ async function attemptStreamProvider(
   const providerResult = normalizeStreamResult(
     provider.chatStream(messages, config),
   );
+  // This helper is reached only from the direct-fallback branch above, so the
+  // stream and returned result are intentionally marked as fallback usage.
   const stream = wrapStreamWithCircuitBreaker(
     providerResult.stream,
     config.provider,
@@ -2477,6 +2519,8 @@ async function attemptStreamProvider(
     },
     resolveStop,
     resolveUsage,
+    undefined,
+    true,
   );
   // [LLM-TRUNCATE-01] Metric emission on drain.
   stopReasonPromise
@@ -2502,5 +2546,6 @@ async function attemptStreamProvider(
     provider: config.provider,
     model: config.model,
     stopReasonPromise,
+    fallbackUsed: true,
   };
 }

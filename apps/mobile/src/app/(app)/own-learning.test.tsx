@@ -1,4 +1,9 @@
 import { render, screen } from '@testing-library/react-native';
+import {
+  OWN_LEARNING_RETURN_TO,
+  OWN_LEARNING_HREF,
+  homeHrefForReturnTo,
+} from '../../lib/navigation';
 
 type MockActiveProfile = {
   id: string;
@@ -220,6 +225,53 @@ describe('OwnLearningScreen', () => {
       render(<OwnLearningScreen />);
       screen.getByTestId('learner-screen');
       expect(screen.queryByTestId('mock-redirect-/(app)/home')).toBeNull();
+    });
+
+    // [WI-2331 rework #2, F2 / AC-5 own-scope producer] the reachability
+    // above (no /home redirect for a guardian fixture) is necessary but not
+    // sufficient — this asserts what the screen ACTUALLY emits once reached.
+    // own-learning.tsx wires `returnToTab={OWN_LEARNING_RETURN_TO}` straight
+    // into LearnerScreen (own-learning.tsx:42); capturedProps.returnToTab is
+    // that REAL prop, not a hand-injected token. Feeding it into the same
+    // homeHrefForReturnTo() the Back-destination consumers use (child
+    // session detail, topic/relearn) proves the own-scope path lands on
+    // OWN_LEARNING_HREF end-to-end.
+    it('emits OWN_LEARNING_RETURN_TO as returnToTab for a guardian (own-scope study mode), resolving to OWN_LEARNING_HREF', () => {
+      mockActiveProfile = {
+        id: 'parent-1',
+        accountId: 'acc-1',
+        displayName: 'Parent',
+        isOwner: true,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        pronouns: null,
+        consentStatus: null,
+      };
+      mockProfiles = [
+        mockActiveProfile,
+        {
+          ...mockActiveProfile,
+          id: 'child-1',
+          displayName: 'Child',
+          isOwner: false,
+        },
+      ];
+      mockIsGuardianProfile = true;
+
+      render(<OwnLearningScreen />);
+
+      // Reachability (defect #1): the guardian fixture must not redirect.
+      expect(screen.queryByTestId('mock-redirect-/(app)/home')).toBeNull();
+      screen.getByTestId('learner-screen');
+
+      // Real emission (defect #2): the token comes from the screen's own
+      // prop wiring, not injected into a consumer.
+      const emittedReturnTo = capturedProps.returnToTab;
+      expect(emittedReturnTo).toBe(OWN_LEARNING_RETURN_TO);
+
+      expect(
+        homeHrefForReturnTo(emittedReturnTo as string, undefined, true),
+      ).toBe(OWN_LEARNING_HREF);
     });
   });
 });

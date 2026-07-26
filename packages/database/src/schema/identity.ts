@@ -298,6 +298,7 @@ export const subscription = pgTable(
       .references(() => organization.id, { onDelete: 'restrict' }),
     planTier: text('plan_tier').notNull(),
     status: text('status').notNull(),
+    pastDueAt: timestamp('past_due_at', { withTimezone: true }),
     /**
      * Primary Payer (NOT NULL per data-model.md §2A.4).
      * RESTRICT: a person who is the primary payer cannot be deleted without

@@ -293,6 +293,10 @@ export async function updateSubscriptionFromWebhookV2(
         throw transitionErr;
       }
       setValues.status = updates.status;
+      setValues.pastDueAt =
+        updates.status === 'past_due'
+          ? new Date(updates.lastStripeEventTimestamp)
+          : null;
     }
     if (updates.currentPeriodStart !== undefined) {
       setValues.periodStartAt = new Date(updates.currentPeriodStart);
@@ -900,6 +904,7 @@ export async function activateSubscriptionFromCheckoutV2(
               stripeSubscriptionId,
               planTier: tier,
               status: 'active',
+              pastDueAt: null,
               lastStripeEventTimestamp: new Date(eventTimestamp),
               updatedAt: new Date(),
             })
@@ -991,6 +996,7 @@ export async function activateSubscriptionFromCheckoutV2(
         stripeSubscriptionId,
         planTier: tier,
         status: 'active',
+        pastDueAt: null,
         lastStripeEventTimestamp: new Date(eventTimestamp),
         updatedAt: new Date(),
       })

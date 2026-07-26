@@ -299,6 +299,10 @@ async function applySubscriptionUpdateFromRevenuecatV2(
       throw transitionErr;
     }
     setValues.status = updates.status;
+    setValues.pastDueAt =
+      updates.status === 'past_due'
+        ? new Date(updates.eventTimestampMs ?? Date.now())
+        : null;
   }
   if (updates.currentPeriodStart !== undefined) {
     setValues.periodStartAt = new Date(updates.currentPeriodStart);
@@ -520,6 +524,7 @@ export async function activateSubscriptionFromRevenuecatV2(
   const setValues: Record<string, unknown> = {
     planTier: tier,
     status,
+    pastDueAt: null,
     lastRevenuecatEventId: eventId,
     updatedAt: new Date(),
   };

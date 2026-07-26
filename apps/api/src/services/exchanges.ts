@@ -536,10 +536,6 @@ export interface ExchangeResult {
   noticedGap?: NonNullable<
     NonNullable<LlmResponseEnvelope['signals']>['noticed_gap']
   >;
-  /** Untrusted bounded re-check verdict; caller validates durable evidence. */
-  noticeRecheck?: NonNullable<
-    NonNullable<LlmResponseEnvelope['signals']>['notice_recheck']
-  >;
   /** Challenge Round: note draft UI hint, validated later before surfacing. */
   noteDraft?: ChallengeRoundNoteDraftHint | null;
   /** Fluency drill annotation (language sessions only) */
@@ -2137,7 +2133,6 @@ export async function processExchange(
     challengeRoundOffer: finalParsed.challengeRoundOffer || undefined,
     challengeRoundEvaluation: finalParsed.challengeRoundEvaluation,
     noticedGap: finalParsed.noticedGap,
-    noticeRecheck: finalParsed.noticeRecheck,
     noteDraft: finalParsed.noteDraft,
     fluencyDrill: finalParsed.fluencyDrill ?? undefined,
     confidence: finalParsed.confidence,
@@ -2292,8 +2287,18 @@ export async function streamExchange(
     stream: cleanReplyStream,
     rawResponsePromise,
     newEscalationRung: context.escalationRung,
-    provider: result.provider,
-    model: result.model,
+    // [WI-2670] Lazy getters, not a value captured at this synchronous
+    // return — `result.provider`/`result.model` are themselves lazy getters
+    // on the router's StreamResult (see routeAndStream's JSDoc). Capturing
+    // them here as plain properties would freeze the pre-fallback value
+    // before the stream (and any transparent fallback) has even started,
+    // defeating the router-level fix for every caller of streamExchange.
+    get provider() {
+      return result.provider;
+    },
+    get model() {
+      return result.model;
+    },
     sourceEvidence,
     get fallbackUsed() {
       return result.fallbackUsed;
@@ -2326,9 +2331,6 @@ export interface ParsedExchangeEnvelope {
   /** Untrusted homework-notice proposal; validated after event persistence. */
   noticedGap?: NonNullable<
     NonNullable<LlmResponseEnvelope['signals']>['noticed_gap']
-  >;
-  noticeRecheck?: NonNullable<
-    NonNullable<LlmResponseEnvelope['signals']>['notice_recheck']
   >;
   /** Challenge Round: learner-reviewed note draft hint from the envelope. */
   noteDraft: ChallengeRoundNoteDraftHint | null;
@@ -2390,7 +2392,6 @@ const EMPTY_PARSED_ENVELOPE: ParsedExchangeEnvelope = {
   challengeRoundOffer: false,
   challengeRoundEvaluation: [],
   noticedGap: undefined,
-  noticeRecheck: undefined,
   noteDraft: null,
   fluencyDrill: null,
   confidence: undefined,
@@ -2596,7 +2597,6 @@ function envelopeToParsedExchange(
     challengeRoundOffer: signals.challenge_round_offer === true,
     challengeRoundEvaluation: signals.challenge_round_evaluation ?? [],
     noticedGap: signals.noticed_gap ?? undefined,
-    noticeRecheck: signals.notice_recheck ?? undefined,
     noteDraft: uiHints.note_draft ?? null,
     fluencyDrill,
     confidence: envelope.confidence,

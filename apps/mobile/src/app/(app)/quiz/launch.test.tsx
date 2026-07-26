@@ -5,6 +5,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 // i18n mock — returns English values for the quiz.launch namespace so tests
 // can assert on the same English strings as before the migration.
@@ -32,6 +33,12 @@ jest.mock('react-i18next', () => {
     'quiz.launch.cancelLabel': 'Cancel',
     'common.retry': 'Retry',
     'common.goBack': 'Go Back',
+    'common.backTo': 'Back to {{destination}}',
+    'practiceHub.title': 'Test yourself',
+    'quiz.index.title': 'Quiz',
+    'tabs.mentor': 'Mentor',
+    'tabs.subjects': 'Subjects',
+    'tabs.journal': 'Journal',
   };
   const t = (key: string, opts?: Record<string, unknown>) => {
     const template = TRANSLATIONS[key] ?? key;
@@ -71,7 +78,6 @@ jest.mock(
 
 const mockReplace = jest.fn();
 const mockNavigate = jest.fn();
-const mockGoBackOrReplace = jest.fn();
 const mockSetRound = jest.fn();
 const mockSetActivityType = jest.fn();
 const mockSetSubjectId = jest.fn();
@@ -159,21 +165,6 @@ jest.mock(
       textInverse: '#ffffff',
       danger: '#ef4444',
     }),
-  }),
-);
-
-jest.mock(
-  '../../../lib/navigation' /* gc1-allow: navigation helper mock keeps screen unit-scoped */,
-  () => ({
-    goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-    PRACTICE_HREF: '/(app)/practice',
-    PRACTICE_RETURN_TO: 'practice',
-    homeHrefForReturnTo: (returnTo: string) =>
-      returnTo === 'practice'
-        ? '/(app)/practice'
-        : returnTo === 'own-learning'
-          ? '/(app)/own-learning'
-          : '/(app)/home',
   }),
 );
 
@@ -434,6 +425,60 @@ describe('QuizLaunchScreen', () => {
       params: { returnTo: 'journal' },
     });
     expect(mockReplace).not.toHaveBeenCalledWith('/(app)/practice');
+  });
+
+  // [WI-2331 rework] exitLabel (the error-state secondary action, shared by
+  // both error panels) must never claim a tab handleExit isn't actually
+  // routing to. Covers the three destination classes it can resolve under
+  // V2: the Practice hub special case, a real V2 tab returnTo, and a
+  // non-tab returnTo that falls back to this quiz flow's own root.
+  describe('[WI-2331 rework] exitLabel under V2', () => {
+    let originalV2: boolean;
+
+    beforeEach(() => {
+      originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        true;
+      mockGenerateRound = {
+        mutate: mockMutate,
+        isPending: false,
+        isError: true,
+        error: new Error('network unavailable'),
+      };
+      mockMutate.mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        originalV2;
+    });
+
+    it('names Practice when returnTo is the practice hub', () => {
+      mockSearchParams = { activityType: 'capitals', returnTo: 'practice' };
+
+      render(<QuizLaunchScreen />);
+
+      screen.getByText('Back to Test yourself');
+    });
+
+    it('names the owning V2 tab for a real tab returnTo', () => {
+      mockSearchParams = { activityType: 'capitals', returnTo: 'subjects' };
+
+      render(<QuizLaunchScreen />);
+
+      screen.getByText('Back to Subjects');
+    });
+
+    it("falls back to this quiz flow's own root for a non-tab returnTo", () => {
+      mockSearchParams = {
+        activityType: 'capitals',
+        returnTo: 'family-recaps',
+      };
+
+      render(<QuizLaunchScreen />);
+
+      screen.getByText('Back to Quiz');
+    });
   });
 
   // [BUG-UX-QUIZ-TIMEOUT] 30s hard UI-level timeout on round generation.

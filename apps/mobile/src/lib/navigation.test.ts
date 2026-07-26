@@ -28,6 +28,7 @@ import {
   FAMILY_HOME_RETURN_TO,
   accountReturnHref,
   accountReturnTokenForPathname,
+  resolvedV2TabForReturnTo,
 } from './navigation';
 import type { LearningResumeTarget } from '@eduagent/schemas';
 import type { Router } from 'expo-router';
@@ -124,6 +125,68 @@ describe('homeHrefForReturnTo', () => {
   // [WI-1658]
   it('resolves FAMILY_HOME_RETURN_TO to FAMILY_HOME_PATH', () => {
     expect(homeHrefForReturnTo(FAMILY_HOME_RETURN_TO)).toBe(FAMILY_HOME_PATH);
+  });
+
+  // [WI-2331 AC-2/AC-5] The trailing catch-all used to be an unconditional
+  // dead `/(app)/home` (not a V2 tab) reachable from every root pushed screen
+  // whose returnTo is absent or unrecognized. With V2 on it now routes through
+  // the owning-tab contract (unknown -> Mentor); with V2 off it must not
+  // regress the legacy home fallback.
+  it('routes the unrecognized/absent catch-all to the Mentor tab when V2 is on', () => {
+    expect(homeHrefForReturnTo('something-else', undefined, true)).toBe(
+      '/(app)/mentor',
+    );
+    expect(homeHrefForReturnTo(undefined, undefined, true)).toBe(
+      '/(app)/mentor',
+    );
+  });
+
+  it('leaves recognized tokens and the V0/V1 catch-all unchanged under V2', () => {
+    // A recognized token resolves identically regardless of the V2 flag …
+    expect(homeHrefForReturnTo(SUBJECTS_RETURN_TO, undefined, true)).toBe(
+      SUBJECTS_HREF,
+    );
+    // … and with V2 off the catch-all still lands on the legacy home.
+    expect(homeHrefForReturnTo('something-else', undefined, false)).toBe(
+      '/(app)/home',
+    );
+  });
+});
+
+// [WI-2331 rework] resolvedV2TabForReturnTo must only claim a tab when
+// homeHrefForReturnTo's resolved destination genuinely is that tab root —
+// otherwise a "Back to {tab}" label lies about where Back actually goes.
+describe('resolvedV2TabForReturnTo', () => {
+  it('returns the owning tab token for each V2 tab root', () => {
+    expect(resolvedV2TabForReturnTo('mentor', undefined, true)).toBe('mentor');
+    expect(resolvedV2TabForReturnTo(SUBJECTS_RETURN_TO, undefined, true)).toBe(
+      'subjects',
+    );
+    expect(resolvedV2TabForReturnTo(JOURNAL_RETURN_TO, undefined, true)).toBe(
+      'journal',
+    );
+  });
+
+  it('returns null for non-tab destinations', () => {
+    expect(
+      resolvedV2TabForReturnTo(PRACTICE_RETURN_TO, undefined, true),
+    ).toBeNull();
+    expect(
+      resolvedV2TabForReturnTo(FAMILY_RECAPS_RETURN_TO, 'recap-1', true),
+    ).toBeNull();
+    expect(
+      resolvedV2TabForReturnTo(OWN_LEARNING_RETURN_TO, undefined, true),
+    ).toBeNull();
+    expect(
+      resolvedV2TabForReturnTo(FAMILY_HOME_RETURN_TO, undefined, true),
+    ).toBeNull();
+  });
+
+  it('returns null when V2 is disabled, regardless of token', () => {
+    expect(resolvedV2TabForReturnTo(SUBJECTS_RETURN_TO, undefined, false)).toBe(
+      null,
+    );
+    expect(resolvedV2TabForReturnTo(undefined, undefined, false)).toBeNull();
   });
 });
 

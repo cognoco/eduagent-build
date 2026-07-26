@@ -39,6 +39,7 @@ export async function closeStepDatabases(
 
 /** Env values injected per invocation at the Inngest HTTP request boundary. */
 export interface EnvBindings {
+  environment?: string;
   databaseUrl?: string;
   voyageApiKey?: string;
   resendApiKey?: string;
@@ -73,6 +74,7 @@ function isBindingRecord(value: unknown): value is Record<string, unknown> {
 export function readInngestEnvBindings(env: unknown): EnvBindings {
   const bindings = isBindingRecord(env) ? env : undefined;
   return {
+    environment: readStringBinding(bindings, 'ENVIRONMENT'),
     databaseUrl: readStringBinding(bindings, 'DATABASE_URL'),
     voyageApiKey: readStringBinding(bindings, 'VOYAGE_API_KEY'),
     resendApiKey: readStringBinding(bindings, 'RESEND_API_KEY'),
@@ -142,6 +144,10 @@ function getEnvBinding<K extends keyof EnvBindings>(
   key: K,
 ): EnvBindings[K] | undefined {
   return envBindings.getStore()?.[key];
+}
+
+export function getStepEnvironment(): string {
+  return getEnvBinding('environment') ?? 'unknown';
 }
 
 /**
