@@ -189,6 +189,10 @@ function main() {
   }
 
   if (mode === '--nx') {
+    if (forwardedArgs.length) {
+      refuse('--nx does not accept arguments; use --jest for targeted runs.');
+    }
+    // Defense in depth: --jest repeats both checks after Nx re-invokes this script.
     assertDatabaseContract();
     assertPinnedPnpm();
     return run('corepack', [

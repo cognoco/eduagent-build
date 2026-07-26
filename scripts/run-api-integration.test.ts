@@ -184,6 +184,17 @@ describe('run-api-integration.mjs', () => {
     );
   });
 
+  test('refuses arguments passed to the Nx launcher instead of dropping them', () => {
+    const result = run(
+      ['--nx', 'apps/api/src/services/auth-scoping.integration.test.ts'],
+      localDatabase,
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/--nx does not accept arguments.*--jest/i);
+    expect(readMarker(corepackMarker)).toBe('');
+  });
+
   test('preserves the package-manager version gate before Jest', () => {
     const result = run(['--jest'], {
       ...localDatabase,
