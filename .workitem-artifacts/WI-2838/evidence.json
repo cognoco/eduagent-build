@@ -1,0 +1,38 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The held request receives a unique correlation before release and response matching uses GET plus the exact correlated URL rather than wrapper identity.",
+      "pointer": "apps/mobile/e2e-web/helpers/held-now-request.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "The named journey preserves the held Session boundary, successful fresh response, Mentor destination, and both exact returning-learner cards.",
+      "pointer": "apps/mobile/e2e-web/flows/v2/returning-learner-resume.spec.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Executed red-green evidence reproduces the legacy wrapper-identity failure and proves the stable matcher across distinct wrappers.",
+      "pointer": ".workitem-artifacts/WI-2838/red-green.md"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "The named journey passed repeatedly with retries disabled; hosted exact-head E2E Web run 30222631190 then passed the complete V2 release project 16/16 and the required legacy lane 24/24 without containing WI-2822's commit.",
+      "pointer": ".workitem-artifacts/WI-2838/verification.md"
+    }
+  ],
+  "headProvenance": {
+    "executorAuthoredMerge": false,
+    "baseSyncHead": "d3caddaa3ece0a187cc3b34ec3625f3c6aebbb3c",
+    "strictGreenEvidenceHead": "aaff1546c8d1e241bf56016bdd3c23988dac0a6e",
+    "strictGreenE2ERun": 30222631190,
+    "parents": [
+      "732b684eb69d1ffaa8613c59318e804f18566fbe",
+      "f8aa11b086e8787f672c6d326018ee4bcfc32c6f"
+    ],
+    "tree": "7df708ac08df6a4531d9fa41d0eddfff9e396b72",
+    "wiPatchSha256": "e2db8f4c352bf32013b5a747ed8f8b0cc167a99dd673079ecab51478772776c5"
+  },
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": "apps/mobile/e2e-web/helpers/held-now-request.test.ts"
+}
