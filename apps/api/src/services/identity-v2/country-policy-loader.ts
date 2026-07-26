@@ -44,10 +44,10 @@ function reviveSourceProvenance(raw: unknown): unknown {
 }
 
 /**
- * Every registry row for one country, newest first. Rows are returned
- * unfiltered by effective date: selecting the row in force is the resolver's
- * job, and it needs the out-of-window rows to tell "not yet effective" apart
- * from "expired" (AC6).
+ * Every registry row for one country, in no guaranteed order. Rows are
+ * returned unfiltered by effective date: selecting the row in force is the
+ * resolver's job (it sorts by effectiveAt itself), and it needs the
+ * out-of-window rows to tell "not yet effective" apart from "expired" (AC6).
  */
 export async function loadCountryPolicies(
   db: Database,

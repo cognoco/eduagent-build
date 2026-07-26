@@ -196,6 +196,10 @@ export function resolveCountryPolicy(
             assurance.success && assurance.data.method === 'verified_credential'
               ? 'VERIFIED'
               : 'SELF_DECLARED',
+          // 'self_report' is a deliberate sentinel when no assurance parses:
+          // the weakest method the schema names, matching the SELF_DECLARED
+          // assurance level above. The decision is already blocked by
+          // RESIDENCE_ASSURANCE_INSUFFICIENT, so this never grants anything.
           consentMethod: assurance.success
             ? assurance.data.method
             : 'self_report',

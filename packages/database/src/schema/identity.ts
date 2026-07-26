@@ -28,7 +28,9 @@
  *
  * F-032: scoped single-table reads on these tables must use
  * createScopedRepository(profileId). This file declares the tables;
- * the enforcement pattern is in repository.ts.
+ * the enforcement pattern is in repository.ts. Global reference tables
+ * (regimes, country_policy_registry) are exempt — they carry no profile_id,
+ * so there is no per-profile scope to enforce.
  */
 
 import {
