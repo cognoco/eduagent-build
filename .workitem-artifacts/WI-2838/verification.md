@@ -54,11 +54,33 @@ The exact head does not contain WI-2822 commit `c0002155`; the hosted result is
 therefore independent WI-2838 strict-green evidence, not a combined or skipped
 suite.
 
+## Hosted bounce and corrected lifecycle
+
+GitHub Actions E2E Web run `30223075316` on later exact head `fe52d114` exposed
+the remaining lifecycle mismatch. The WI-2234 journey timed out at
+`page.waitForResponse` on both the initial attempt and workflow retry; the gate
+reported `FAILURE_CLASS=product` and `GATE_DECISION=fail`. One unrelated
+homework case was flaky and passed its retry; 14 other V2 cases passed.
+
+The deterministic focused seam reproduced that a later response Request wrapper
+can retain the original URL after `route.continue({ url })`. It exited 1 with
+the expected `true` versus received `false`. The corrected route-owned
+fetch/fulfill seam then exited 0 with 4/4 cases passing. Fresh Prettier, ESLint,
+and mobile typecheck gates passed. The corrected named staging journey passed
+3/3 with one worker, retries disabled, and no dependency projects.
+
+The corrected complete V2 release project was then rerun with retries disabled
+and normal four-worker parallelism. The WI-2234 journey passed; the result was
+15/16 with only the same independently owned WI-2822 nav-shell stale-doorway
+assertion failing. No WI-2838 failure remained in the local aggregate run.
+
 ## Scope audit
 
 - No timeout value changed.
 - No retries were added or widened.
 - No product assertion was removed.
+- The route-owned response wait retains the prior 15-second bound, clears its
+  timer on success or failure, and emits a specific timeout diagnostic.
 - The Session-held boundary, response success/freshness, Mentor arrival, and
   both exact returning-learner card assertions remain in the named journey.
 
@@ -87,3 +109,15 @@ then recorded that event and became the hosted strict-green evidence head.
   Jest (3/3), Prettier, ESLint, evidence JSON parse, mobile typecheck, and the
   branch-scoped fast TypeScript build gate. `complete --validate` also passed
   without lifecycle writes after the provenance evidence was added.
+
+## Subsequent head provenance
+
+Evidence-only commit `8256149708720c35054ae9f8afb8f680a5163e87` followed
+`aaff1546`, then merge commit `fe52d114192d15373ef5ba215c19b19e3e24ebda`
+added current `origin/main` as second parent
+`69b1818a6bf0674af1cb3d01c01fbf394952f3dc`. GitHub PushEvent actor was
+`jojorgen`; both commits use the shared Lord Vetinari Git identity, so repository
+evidence cannot distinguish the initiating local session. The merge added only
+six `zdx-config.yaml` lines from main. The three WI E2E code-file diff hashes
+before and after that merge were identical:
+`df8b8db132d35dbbf8390bb5669df1538cd6d23482cba8ba2cc9d20a362b082e`.
