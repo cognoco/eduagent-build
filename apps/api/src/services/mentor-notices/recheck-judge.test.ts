@@ -23,6 +23,7 @@ import { routeAndCall } from '../llm';
 import {
   evaluateMentorNoticeRecheck,
   JUDGE_MENTOR_NOTICE_RECHECK_FLOW,
+  type MentorNoticeRecheckEvaluation,
 } from './recheck-judge';
 
 const mockRouteAndCall = routeAndCall as jest.MockedFunction<
@@ -85,53 +86,133 @@ describe('evaluateMentorNoticeRecheck', () => {
       mockRouteAndCall.mockResolvedValue(
         routeResult(JSON.stringify({ verdict, reason })),
       );
-      const outcome = await evaluateMentorNoticeRecheck(db(), baseInput);
-      expect(outcome).toBe(verdict);
+      const evaluation = await evaluateMentorNoticeRecheck(db(), baseInput);
+      expect(evaluation).toEqual({ kind: 'outcome', outcome: verdict });
     },
   );
 
-  it('resolves "continue"/"unclear" to null (no transition)', async () => {
+  it('resolves "continue"/"unclear" to the VALID continue variant, not a failure', async () => {
     mockRouteAndCall.mockResolvedValue(
       routeResult(JSON.stringify({ verdict: 'continue', reason: 'unclear' })),
     );
-    const outcome = await evaluateMentorNoticeRecheck(db(), baseInput);
-    expect(outcome).toBeNull();
+    const evaluation = await evaluateMentorNoticeRecheck(db(), baseInput);
+    expect(evaluation).toEqual({ kind: 'continue' });
   });
 
-  it('rejects a mismatched verdict/reason pair as malformed (fail-open null)', async () => {
+  it('rejects a mismatched verdict/reason pair as malformed (fail-open unresolved)', async () => {
     mockRouteAndCall.mockResolvedValue(
       routeResult(
         JSON.stringify({ verdict: 'locked_in', reason: 'insufficient' }),
       ),
     );
-    const outcome = await evaluateMentorNoticeRecheck(db(), baseInput);
-    expect(outcome).toBeNull();
+    const evaluation = await evaluateMentorNoticeRecheck(db(), baseInput);
+    expect(evaluation).toEqual({ kind: 'unresolved' });
   });
 
-  it('fails open (null) when the judge route call throws', async () => {
+  it('fails open (unresolved) when the judge route call throws', async () => {
     mockRouteAndCall.mockRejectedValue(new Error('circuit open'));
-    const outcome = await evaluateMentorNoticeRecheck(db(), baseInput);
-    expect(outcome).toBeNull();
+    const evaluation = await evaluateMentorNoticeRecheck(db(), baseInput);
+    expect(evaluation).toEqual({ kind: 'unresolved' });
   });
 
-  it('fails open (null) when the response has no JSON object', async () => {
+  it('fails open (unresolved) when the response has no JSON object', async () => {
     mockRouteAndCall.mockResolvedValue(routeResult('I cannot decide.'));
-    const outcome = await evaluateMentorNoticeRecheck(db(), baseInput);
-    expect(outcome).toBeNull();
+    const evaluation = await evaluateMentorNoticeRecheck(db(), baseInput);
+    expect(evaluation).toEqual({ kind: 'unresolved' });
   });
 
-  it('fails open (null) when the JSON fails schema validation', async () => {
+  it('fails open (unresolved) when the JSON fails schema validation', async () => {
     mockRouteAndCall.mockResolvedValue(
       routeResult(JSON.stringify({ verdict: 'maybe', reason: 'unsure' })),
     );
-    const outcome = await evaluateMentorNoticeRecheck(db(), baseInput);
-    expect(outcome).toBeNull();
+    const evaluation = await evaluateMentorNoticeRecheck(db(), baseInput);
+    expect(evaluation).toEqual({ kind: 'unresolved' });
   });
 
-  it('fails open (null) without calling the judge when the answer event is not found', async () => {
-    const outcome = await evaluateMentorNoticeRecheck(makeDb(null), baseInput);
-    expect(outcome).toBeNull();
+  it('fails open (unresolved) without calling the judge when the answer event is not found', async () => {
+    const evaluation = await evaluateMentorNoticeRecheck(
+      makeDb(null),
+      baseInput,
+    );
+    expect(evaluation).toEqual({ kind: 'unresolved' });
     expect(mockRouteAndCall).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-2625 rework] The coupling guard. The Gate-2 bounce was caused by a
+  // valid `continue` verdict and an evaluator FAILURE sharing one return
+  // value, which made the caller's turn-3 `not_yet` force terminalize a
+  // deliberate no-transition. This case asserts the two are distinguishable
+  // and enumerates EVERY failure mode against the valid-continue result, so
+  // the two can never silently re-merge: any change that collapses them fails
+  // here, whichever direction it collapses in.
+  // -------------------------------------------------------------------------
+  it('keeps a valid "continue" distinguishable from every evaluator-failure mode', async () => {
+    mockRouteAndCall.mockResolvedValue(
+      routeResult(JSON.stringify({ verdict: 'continue', reason: 'unclear' })),
+    );
+    const validContinue = await evaluateMentorNoticeRecheck(db(), baseInput);
+    expect(validContinue).toEqual({ kind: 'continue' });
+
+    const failureModes: {
+      name: string;
+      run: () => Promise<MentorNoticeRecheckEvaluation>;
+    }[] = [
+      {
+        name: 'mismatched verdict/reason pair',
+        run: async () => {
+          mockRouteAndCall.mockResolvedValue(
+            routeResult(
+              JSON.stringify({ verdict: 'locked_in', reason: 'insufficient' }),
+            ),
+          );
+          return evaluateMentorNoticeRecheck(db(), baseInput);
+        },
+      },
+      {
+        name: 'judge unavailable (route throws)',
+        run: async () => {
+          mockRouteAndCall.mockRejectedValue(new Error('circuit open'));
+          return evaluateMentorNoticeRecheck(db(), baseInput);
+        },
+      },
+      {
+        name: 'no JSON object in the response',
+        run: async () => {
+          mockRouteAndCall.mockResolvedValue(routeResult('I cannot decide.'));
+          return evaluateMentorNoticeRecheck(db(), baseInput);
+        },
+      },
+      {
+        name: 'JSON parse failure',
+        run: async () => {
+          mockRouteAndCall.mockResolvedValue(routeResult('{ "verdict": '));
+          return evaluateMentorNoticeRecheck(db(), baseInput);
+        },
+      },
+      {
+        name: 'verdict outside the schema',
+        run: async () => {
+          mockRouteAndCall.mockResolvedValue(
+            routeResult(JSON.stringify({ verdict: 'maybe', reason: 'unsure' })),
+          );
+          return evaluateMentorNoticeRecheck(db(), baseInput);
+        },
+      },
+      {
+        name: 'answer event missing',
+        run: async () => evaluateMentorNoticeRecheck(makeDb(null), baseInput),
+      },
+    ];
+
+    for (const mode of failureModes) {
+      const failure = await mode.run();
+      // Every failure mode lands on the ONE variant the turn-3 not_yet force
+      // acts on — and none of them equals the valid-continue result.
+      expect(failure).toEqual({ kind: 'unresolved' });
+      expect(failure).not.toEqual(validContinue);
+      expect(failure.kind).not.toBe(validContinue.kind);
+    }
   });
 
   it('routes with the judge flow, JSON format, and a model-output judgeIndependence naming the real tutor producer', async () => {
@@ -182,8 +263,9 @@ describe('evaluateMentorNoticeRecheck', () => {
         }),
       ),
     );
-    const outcome = await evaluateMentorNoticeRecheck(db(), baseInput);
-    expect(outcome).toBe('locked_in');
-    expect(typeof outcome).toBe('string');
+    const evaluation = await evaluateMentorNoticeRecheck(db(), baseInput);
+    // The result carries ONLY the discriminant plus the enum outcome — no
+    // confidence, no rationale, no raw judge JSON.
+    expect(evaluation).toEqual({ kind: 'outcome', outcome: 'locked_in' });
   });
 });

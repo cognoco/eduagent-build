@@ -8,9 +8,18 @@
 //
 // Fail-open (mirrors judge-suitability.ts): any error, missing/malformed
 // judge output, or a `verdict`/`reason` pair outside the five accepted
-// combinations returns null. Null means "no transition this turn" — the
-// caller (session-exchange.ts) is responsible for the deterministic turn-3
-// `not_yet` force, exactly as before.
+// combinations resolves to `{ kind: 'unresolved' }` — the caller
+// (session-exchange.ts) applies the deterministic turn-3 `not_yet` force over
+// exactly that variant.
+//
+// The result is a THREE-variant discriminated union, not a nullable outcome,
+// because "the judge validly said continue" and "the judge failed" are
+// different facts with different turn-3 consequences: a valid `continue`
+// (`{ kind: 'continue' }`) makes no transition at ANY exchange number, while
+// only `unresolved` terminalizes `not_yet` at turn 3. Collapsing both into one
+// return value is what made a valid turn-3 `continue` terminalize (the defect
+// this rework fixes); the union makes re-merging them a type error at both
+// call sites, which exhaustively switch on `kind`.
 //
 // Data minimization: the judge sees the notice's concept/correctionHint
 // (already tutor-visible), the exchange number, and the learner's CURRENT
@@ -68,13 +77,31 @@ export const recheckJudgeRawSchema = z.object({
 });
 
 /**
+ * The re-check evaluation result. Three variants, deliberately distinct:
+ *
+ * - `outcome` — a valid terminal/defer verdict to apply now.
+ * - `continue` — a VALID `continue`/`unclear` verdict: deliberately no
+ *   transition, at every exchange number including 3 and beyond.
+ * - `unresolved` — the evaluator could not get a valid verdict (malformed
+ *   output, judge unavailable, routing failure, thrown error, missing answer
+ *   event). Fail-open: no transition before turn 3, and the caller's
+ *   deterministic turn-3 `not_yet` force applies to THIS variant only.
+ */
+export type MentorNoticeRecheckEvaluation =
+  | { kind: 'outcome'; outcome: MentorNoticeRecheckOutcome }
+  | { kind: 'continue' }
+  | { kind: 'unresolved' };
+
+const UNRESOLVED: MentorNoticeRecheckEvaluation = { kind: 'unresolved' };
+
+/**
  * [AC-3] The ONLY accepted verdict/reason pairs. A verdict paired with any
  * reason other than its listed match — e.g. `locked_in` + `insufficient` — is
  * a malformed, self-contradicting response and is rejected, not coerced.
- * `continue` resolves to `null` (no transition) rather than a persisted
+ * `continue` resolves to the `continue` variant rather than a persisted
  * status: it is a valid, recognized judge answer meaning "not resolved yet,
- * but not decided either" — distinct from a genuinely malformed/unavailable
- * response, though both are "no transition" to the caller.
+ * but not decided either" — and, unlike `unresolved`, it is never subject to
+ * the caller's turn-3 `not_yet` force.
  */
 const ACCEPTED_PAIRS: Record<
   (typeof recheckVerdictValues)[number],
@@ -89,7 +116,7 @@ const ACCEPTED_PAIRS: Record<
 
 function resolveOutcome(
   raw: z.infer<typeof recheckJudgeRawSchema>,
-): MentorNoticeRecheckOutcome | null {
+): MentorNoticeRecheckEvaluation {
   if (ACCEPTED_PAIRS[raw.verdict] !== raw.reason) {
     logger.warn(
       '[mentor-notice-recheck-judge] degraded — mismatched verdict/reason pair',
@@ -99,11 +126,13 @@ function resolveOutcome(
         verdict: raw.verdict,
       },
     );
-    return null;
+    return UNRESOLVED;
   }
-  if (raw.verdict === 'continue') return null;
+  if (raw.verdict === 'continue') return { kind: 'continue' };
   const outcome = mentorNoticeRecheckOutcomeSchema.safeParse(raw.verdict);
-  return outcome.success ? outcome.data : null;
+  return outcome.success
+    ? { kind: 'outcome', outcome: outcome.data }
+    : UNRESOLVED;
 }
 
 /** Exported for the live-eval harness (apps/api/eval-llm/flows/recheck-judge.ts) — the eval invokes this SAME builder so the prompt under evaluation matches production exactly. */
@@ -176,15 +205,15 @@ export interface EvaluateMentorNoticeRecheckInput {
  * also the retry/replay idempotency boundary: a duplicate client send that
  * hits the `onConflictDoNothing` dedup path never re-invokes this function).
  *
- * Returns the resolved outcome to apply, or null when there is no transition
- * this turn (judge said "continue", or the judge/route call failed/returned
- * malformed output — fail-open). The caller applies the deterministic
- * turn-3 `not_yet` force when this returns null and exchangeNumber >= 3.
+ * Returns a `MentorNoticeRecheckEvaluation`: `outcome` (apply it now),
+ * `continue` (a VALID no-transition verdict — never terminalized, at any
+ * exchange number), or `unresolved` (fail-open; the caller applies the
+ * deterministic turn-3 `not_yet` force over this variant only).
  */
 export async function evaluateMentorNoticeRecheck(
   db: Database,
   input: EvaluateMentorNoticeRecheckInput,
-): Promise<MentorNoticeRecheckOutcome | null> {
+): Promise<MentorNoticeRecheckEvaluation> {
   const repo = createScopedRepository(db, input.profileId);
   const answerEvent = await repo.sessionEvents.findFirst(
     and(
@@ -201,7 +230,7 @@ export async function evaluateMentorNoticeRecheck(
         flow: JUDGE_MENTOR_NOTICE_RECHECK_FLOW,
       },
     );
-    return null;
+    return UNRESOLVED;
   }
 
   const messages = buildJudgePrompt({
@@ -231,7 +260,7 @@ export async function evaluateMentorNoticeRecheck(
       flow: JUDGE_MENTOR_NOTICE_RECHECK_FLOW,
       message: error instanceof Error ? error.message : String(error),
     });
-    return null;
+    return UNRESOLVED;
   }
 
   const jsonText = extractFirstJsonObject(response);
@@ -243,7 +272,7 @@ export async function evaluateMentorNoticeRecheck(
         flow: JUDGE_MENTOR_NOTICE_RECHECK_FLOW,
       },
     );
-    return null;
+    return UNRESOLVED;
   }
 
   let raw: unknown;
@@ -254,7 +283,7 @@ export async function evaluateMentorNoticeRecheck(
       reason: 'json_parse_error',
       flow: JUDGE_MENTOR_NOTICE_RECHECK_FLOW,
     });
-    return null;
+    return UNRESOLVED;
   }
 
   const parsed = recheckJudgeRawSchema.safeParse(raw);
@@ -267,7 +296,7 @@ export async function evaluateMentorNoticeRecheck(
         issues: parsed.error.issues.map((issue) => issue.path.join('.')),
       },
     );
-    return null;
+    return UNRESOLVED;
   }
 
   return resolveOutcome(parsed.data);

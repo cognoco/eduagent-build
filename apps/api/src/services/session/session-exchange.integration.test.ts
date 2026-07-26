@@ -404,6 +404,13 @@ function createBranchingLlm() {
     noticeRecheckJudgeCallCount(): number {
       return calls.filter(isNoticeRecheckJudgeMessages).length;
     },
+    // [WI-2625 rework] Recorded judge prompts — lets a test PROVE which
+    // re-check exchange number a turn actually reached (buildJudgePrompt
+    // embeds "Re-check exchange N of at most 3"), rather than inferring it
+    // from the number of processMessage calls made.
+    noticeRecheckJudgeMessages(): ChatMessage[][] {
+      return calls.filter(isNoticeRecheckJudgeMessages);
+    },
     reset(): void {
       tutorResponse = TUTOR_ENVELOPE_NO_EVAL;
       graderResponse = GRADER_VERDICT_SOLID;
@@ -1824,6 +1831,109 @@ describeIfDb('session exchange production-path integration', () => {
       const finalRow = await readNotice(noticeId);
       expect(finalRow?.status).toBe('not_yet');
       expect(finalRow?.lastRecheckOutcome).toBe('not_yet');
+    });
+
+    // -----------------------------------------------------------------------
+    // [WI-2625 rework] Turn 3 — the two outcomes side by side, on BOTH
+    // transports. This is the case the original build shipped broken: a valid
+    // `continue` verdict and an evaluator FAILURE shared one return value, so
+    // the deterministic turn-3 `not_yet` force terminalized a deliberate
+    // no-transition. The suite only covered `continue` BEFORE turn 3, so the
+    // conflation was invisible.
+    //
+    // Pairing matters: "valid continue at 3 → no transition" alone would also
+    // pass if turn-3 force were removed entirely, and "malformed at 3 →
+    // not_yet" alone is the pre-existing coverage. Only both together pin the
+    // distinction. Both transports are exercised because processMessage and
+    // streamMessage each derive their own context — one does not prove the
+    // other.
+    //
+    // Each case asserts it ACTUALLY reached exchange 3 by reading the judge
+    // prompt the evaluator sent (buildJudgePrompt embeds "Re-check exchange N
+    // of at most 3"), so a regression that silently stops advancing the
+    // re-check exchange number cannot make these pass vacuously.
+    // -----------------------------------------------------------------------
+    describe('turn 3 — valid continue vs evaluator failure (both transports)', () => {
+      /** exchangeNumber = session.exchangeCount - recheckOfferExchangeCount + 1 (offer.ts). seedOrdinarySession seeds exchangeCount: 1 and the seed sets no offer count, so turn 1 of this helper is re-check exchange 2 and turn 2 is exchange 3. */
+      async function runTwoRecheckTurns(
+        transport: 'processMessage' | 'streamMessage',
+        profileId: string,
+        sessionId: string,
+      ): Promise<void> {
+        for (let turn = 0; turn < 2; turn++) {
+          if (transport === 'processMessage') {
+            await processMessage(
+              db,
+              profileId,
+              sessionId,
+              { message: NOTICE_LEARNER_ANSWER },
+              {
+                semanticMemoryRetrievalEnabled: false,
+                mentorNoticeEnabled: true,
+              },
+            );
+          } else {
+            const result = await streamMessage(
+              db,
+              profileId,
+              sessionId,
+              { message: NOTICE_LEARNER_ANSWER },
+              {
+                semanticMemoryRetrievalEnabled: false,
+                mentorNoticeEnabled: true,
+              },
+            );
+            for await (const chunk of result.stream) void chunk;
+            await result.onComplete();
+          }
+        }
+      }
+
+      /** Proves the LAST judge call this test made was for re-check exchange 3. */
+      function expectLastJudgeCallWasExchange3(): void {
+        const judgeCalls = llm.noticeRecheckJudgeMessages();
+        expect(judgeCalls.length).toBe(2);
+        const lastUserMessage = judgeCalls[judgeCalls.length - 1]?.find(
+          (m) => m.role === 'user',
+        );
+        expect(String(lastUserMessage?.content)).toContain(
+          'Re-check exchange 3 of at most 3',
+        );
+      }
+
+      it.each(['processMessage', 'streamMessage'] as const)(
+        '%s: a VALID continue verdict on turn 3 makes no transition',
+        async (transport) => {
+          const { profileId, session, noticeId } =
+            await seedOpenMentorNoticeRecheckTurn();
+          llm.setNoticeRecheckJudgeResponse(
+            JSON.stringify({ verdict: 'continue', reason: 'unclear' }),
+          );
+
+          await runTwoRecheckTurns(transport, profileId, session.id);
+
+          expectLastJudgeCallWasExchange3();
+          const row = await readNotice(noticeId);
+          expect(row?.status).toBe('open');
+          expect(row?.lastRecheckOutcome).toBeNull();
+        },
+      );
+
+      it.each(['processMessage', 'streamMessage'] as const)(
+        '%s: malformed judge output on turn 3 deterministically terminalizes not_yet',
+        async (transport) => {
+          const { profileId, session, noticeId } =
+            await seedOpenMentorNoticeRecheckTurn();
+          llm.setNoticeRecheckJudgeResponse('not valid json at all');
+
+          await runTwoRecheckTurns(transport, profileId, session.id);
+
+          expectLastJudgeCallWasExchange3();
+          const row = await readNotice(noticeId);
+          expect(row?.status).toBe('not_yet');
+          expect(row?.lastRecheckOutcome).toBe('not_yet');
+        },
+      );
     });
 
     it('a retried (duplicate clientId) send does not re-invoke the judge or double-apply the outcome', async () => {

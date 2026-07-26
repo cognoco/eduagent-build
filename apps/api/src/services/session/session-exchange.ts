@@ -4353,7 +4353,7 @@ export async function processMessage(
     // is also the retry/replay idempotency gate: a duplicate client send
     // that hits the exchange's clientId dedup path never re-enters this
     // block, so the judge is called at most once per genuinely new turn.
-    const outcome = await evaluateMentorNoticeRecheck(db, {
+    const evaluation = await evaluateMentorNoticeRecheck(db, {
       profileId,
       sessionId,
       notice: context.mentorNoticeRecheck,
@@ -4361,22 +4361,39 @@ export async function processMessage(
       conversationLanguage: context.conversationLanguage,
       tutorVendor: result.provider,
     });
-    if (outcome) {
-      const now = new Date();
-      const timezone = await getProfileTimeZone(db, profileId);
-      await applyMentorNoticeOutcome(db, {
-        profileId,
-        noticeId: context.mentorNoticeRecheck.id,
-        outcome,
-        occurredAt: now,
-        learningDayStart: getLearningDayStart(now, timezone),
-      });
-    } else if (context.mentorNoticeRecheck.exchangeNumber >= 3) {
-      await applyMentorNoticeOutcome(db, {
-        profileId,
-        noticeId: context.mentorNoticeRecheck.id,
-        outcome: 'not_yet',
-      });
+    // [WI-2625 rework] Exhaustive switch on the evaluation variant. A valid
+    // `continue` verdict makes NO transition at any exchange number; only
+    // `unresolved` (malformed / unavailable judge) is subject to the
+    // deterministic turn-3 `not_yet` force. The `never` default makes any
+    // future re-merging of those two facts a compile error.
+    switch (evaluation.kind) {
+      case 'outcome': {
+        const now = new Date();
+        const timezone = await getProfileTimeZone(db, profileId);
+        await applyMentorNoticeOutcome(db, {
+          profileId,
+          noticeId: context.mentorNoticeRecheck.id,
+          outcome: evaluation.outcome,
+          occurredAt: now,
+          learningDayStart: getLearningDayStart(now, timezone),
+        });
+        break;
+      }
+      case 'continue':
+        break;
+      case 'unresolved':
+        if (context.mentorNoticeRecheck.exchangeNumber >= 3) {
+          await applyMentorNoticeOutcome(db, {
+            profileId,
+            noticeId: context.mentorNoticeRecheck.id,
+            outcome: 'not_yet',
+          });
+        }
+        break;
+      default: {
+        const exhaustive: never = evaluation;
+        void exhaustive;
+      }
     }
   }
 
@@ -4980,7 +4997,7 @@ export async function streamMessage(
       ) {
         // [WI-2625] Independent server-side judge decides the re-check
         // outcome — mirrors the processMessage call site above.
-        const outcome = await evaluateMentorNoticeRecheck(db, {
+        const evaluation = await evaluateMentorNoticeRecheck(db, {
           profileId,
           sessionId,
           notice: context.mentorNoticeRecheck,
@@ -4988,22 +5005,37 @@ export async function streamMessage(
           conversationLanguage: context.conversationLanguage,
           tutorVendor: result.provider,
         });
-        if (outcome) {
-          const now = new Date();
-          const timezone = await getProfileTimeZone(db, profileId);
-          await applyMentorNoticeOutcome(db, {
-            profileId,
-            noticeId: context.mentorNoticeRecheck.id,
-            outcome,
-            occurredAt: now,
-            learningDayStart: getLearningDayStart(now, timezone),
-          });
-        } else if (context.mentorNoticeRecheck.exchangeNumber >= 3) {
-          await applyMentorNoticeOutcome(db, {
-            profileId,
-            noticeId: context.mentorNoticeRecheck.id,
-            outcome: 'not_yet',
-          });
+        // [WI-2625 rework] Same exhaustive variant switch as the
+        // processMessage call site above — a valid `continue` never
+        // terminalizes, only `unresolved` hits the turn-3 `not_yet` force.
+        switch (evaluation.kind) {
+          case 'outcome': {
+            const now = new Date();
+            const timezone = await getProfileTimeZone(db, profileId);
+            await applyMentorNoticeOutcome(db, {
+              profileId,
+              noticeId: context.mentorNoticeRecheck.id,
+              outcome: evaluation.outcome,
+              occurredAt: now,
+              learningDayStart: getLearningDayStart(now, timezone),
+            });
+            break;
+          }
+          case 'continue':
+            break;
+          case 'unresolved':
+            if (context.mentorNoticeRecheck.exchangeNumber >= 3) {
+              await applyMentorNoticeOutcome(db, {
+                profileId,
+                noticeId: context.mentorNoticeRecheck.id,
+                outcome: 'not_yet',
+              });
+            }
+            break;
+          default: {
+            const exhaustive: never = evaluation;
+            void exhaustive;
+          }
         }
       }
 
