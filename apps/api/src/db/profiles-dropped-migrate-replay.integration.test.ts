@@ -46,6 +46,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
+import { closePoolAndDropScratchDatabase } from './scratch-database-teardown';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -195,13 +196,20 @@ describe('migration-tail replay on a profiles-dropped database [WI-1167]', () =>
   });
 
   afterAll(async () => {
-    await scratchPool?.end();
-    await adminPool.query(
-      `DROP DATABASE IF EXISTS "${databaseName}" WITH (FORCE)`,
-    );
-    await adminPool.end();
-    for (const dir of tempDirs) {
-      rmSync(dir, { recursive: true, force: true });
+    try {
+      await closePoolAndDropScratchDatabase({
+        adminPool,
+        scratchPool,
+        databaseName,
+      });
+    } finally {
+      try {
+        await adminPool?.end();
+      } finally {
+        for (const dir of tempDirs) {
+          rmSync(dir, { recursive: true, force: true });
+        }
+      }
     }
   });
 
