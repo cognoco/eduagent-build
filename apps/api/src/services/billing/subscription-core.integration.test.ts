@@ -344,7 +344,7 @@ describe('updateSubscriptionFromWebhookV2', () => {
       const { organizationId, ownerId } = await seedV2OrgWithOwner(
         `webhook-update-${seedResidue ? 'dirty' : 'clean'}`,
       );
-      const stripeId = stripeSubscriptionId('webhook-update');
+      const stripeId = STATIC_WEBHOOK_RESIDUE_ID;
       const sub = await seedV2SubscriptionDirect({
         organizationId,
         ownerId,
