@@ -217,15 +217,37 @@ export function reduceMentorNoticePolicy(
  *     cannot READ, and a blind write to a single slot can overwrite a higher
  *     revision it never saw. Adding a member cannot.
  *
- * A prefix-matching key whose revision suffix does not parse is 'malformed' —
- * disable at the HELD revision. Fail-closed, and still cleared by a strictly
- * higher server revision, so garbage under our prefix cannot strand the device.
+ * UNPARSEABLE MARKERS, and this is where the first pass was outright wrong. It
+ * folded 'malformed' — disable at the HELD revision — which is unconditional and
+ * re-applied on EVERY hydration, so a genuine re-enable was adopted in-session,
+ * written durably, and then re-disabled at that same revision on the next launch.
+ * Forever: raising the deploy revision did not help, because the marker re-fired
+ * at whatever revision was then held. A corrupt STATE RECORD self-heals (the next
+ * write overwrites it); a corrupt MARKER cannot, because markers are deliberately
+ * never pruned. "Never remove" bought non-lowerability and sold self-healing, and
+ * that turned a transient fault into a permanent one — the exact
+ * "permanently disabled with no recovery path" this module claims to avoid.
+ *
+ * So an unparseable marker contributes a suppress-only floor at revision
+ * `floor ?? 0` — never 'malformed'. That is the honest reading: its true revision
+ * is UNKNOWABLE, and asserting one would fabricate a revision the server never
+ * issued, pointed at blocking re-enables, which is precisely the prohibited move
+ * that caused this. At revision 0 it is `older` than any real state, so a genuine
+ * revision clears it and recovery survives a restart; it still withholds the
+ * never-told benefit, because an object signal counts as an observation just as
+ * 'malformed' did, so a cached projection cannot paint on a fresh install.
+ *
+ * RESIDUAL, stated: if a corrupt marker's true revision was high, that disable is
+ * lost. Unavoidable — we cannot read it — and the alternative is bricking. Nothing
+ * in this codebase writes a corrupt marker; it takes storage corruption or a
+ * foreign writer under the prefix.
+ *
  * No prefix match at all is 'absent' and contributes nothing (the common case).
  */
-function disableFloorSignals(
+function disableFloorSignal(
   allKeys: readonly string[],
   prefix: string,
-): MentorNoticePolicySignal[] {
+): MentorNoticePolicySignal {
   let floor: number | null = null;
   let sawUnparseable = false;
   for (const key of allKeys) {
@@ -244,16 +266,15 @@ function disableFloorSignals(
     }
     if (floor === null || revision > floor) floor = revision;
   }
-  // ACCUMULATE FIRST, then fail closed on top — never instead. Returning
-  // 'malformed' on the first bad suffix would discard every good marker already
-  // found, and 'malformed' disables at the HELD revision: with no state record
-  // that is the bootstrap 0, so one corrupt key would drop a rev-8 floor to 0 and
-  // let a stale rev-5 enable through as 'newer'. Folding the floor and THEN
-  // 'malformed' disables at the floor instead, which is the fail-closed reading.
-  const signals: MentorNoticePolicySignal[] = [];
-  if (floor !== null) signals.push({ revision: floor, enabled: false });
-  if (sawUnparseable) signals.push('malformed');
-  return signals;
+  // Both halves at once, and either alone re-opens the other defect:
+  //   - the good markers' floor is `max` over the PARSEABLE ones, so a corrupt
+  //     sibling cannot lower it (that was its own fail-open: bailing on the first
+  //     bad suffix discarded markers already found, dropping a rev-8 floor to 0
+  //     and letting a stale rev-5 enable through as 'newer');
+  //   - an unparseable marker with no good marker behind it contributes revision
+  //     0 — inert against any real revision, so it cannot brick the device.
+  const revision = floor ?? (sawUnparseable ? 0 : null);
+  return revision === null ? 'absent' : { revision, enabled: false };
 }
 
 /**
@@ -693,12 +714,19 @@ async function flush(key: string, entry: Entry): Promise<void> {
       //     a blind write only ever ADDS a member, and a maximum over a growing
       //     set cannot decrease. No read is required for that to hold, which is
       //     the point — reads are unavailable by hypothesis here.
-      //   - every marker's revision was issued by the SERVER with
+      //   - every marker WRITTEN here carries a revision the SERVER issued with
       //     `rolloutEnabled: false` (`entry.observedDisableRevision`) — no
-      //     sentinel, no synthesized maximum. A fabricated revision pointed at
-      //     BLOCKING re-enables could strand a device permanently disabled with
-      //     no recovery path; this cannot, because a genuine deploy above the
-      //     highest marker still clears it.
+      //     sentinel, no synthesized maximum. A genuine deploy above the highest
+      //     marker clears it.
+      //
+      // A fabricated revision pointed at BLOCKING re-enables strands a device
+      // permanently disabled with no recovery path. This write path cannot do
+      // that. But the READ path once did, and the correction is load-bearing: an
+      // unparseable marker used to fold 'malformed' (disable at the HELD
+      // revision, re-applied every hydration) and no revision could clear it,
+      // because markers are never pruned. `disableFloorSignal` now treats an
+      // unknowable revision as 0 rather than asserting one. Do not "harden" that
+      // back — asserting a revision you cannot read is the bricking move.
       //
       // NOT pruned, deliberately. A marker below the state record's revision is
       // redundant, but pruning is a write, and a prune that misfires is where
@@ -789,16 +817,25 @@ function schedulePersist(key: string, entry: Entry): void {
  * what makes the re-read safe (see `useMentorNoticePolicy`).
  *
  * A storage THROW is 'malformed', not 'absent': "storage failure remains
- * fail-closed" per the acceptance criteria. It disables at the held revision,
- * so it can never re-enable and never resurrects a lower revision.
+ * fail-closed" per the acceptance criteria. It disables at the held revision and
+ * never resurrects a lower revision.
+ *
+ * PRECISELY, because the stronger reading is false: at HYDRATION the held revision
+ * is the bootstrap 0, so a subsequent observation above 0 does re-enable
+ * IN-SESSION. Pre-existing and unchanged here — it occurs identically with the
+ * rollback carried in the state record on `main`. It is not the durable class this
+ * Work Item closes: the durable write is correctly withheld while blind, and a
+ * restart re-reads the floor. Tracked as a follow-up rather than fixed in scope.
  */
 async function readAndFold(key: string, entry: Entry): Promise<void> {
   let signal: MentorNoticePolicySignal;
   // [WI-2627 rework 4] The suppress-only disable floor, folded ADDITIVELY on top
-  // of the state record below. Empty — no markers, the common case — contributes
-  // nothing. Up to two signals: the floor itself, then 'malformed' if any marker
-  // under our prefix was unparseable (see `disableFloorSignals`).
-  let floorSignals: MentorNoticePolicySignal[] = [];
+  // of the state record below. 'absent' — no markers, the common case —
+  // contributes nothing. Always `enabled: false` (see `disableFloorSignal`), so
+  // fold ORDER against the state record is immaterial: at a higher revision it
+  // adopts, at the same revision disabled wins either way, at a lower revision it
+  // is ignored either way.
+  let floor: MentorNoticePolicySignal = 'absent';
   try {
     // Sequential, state record FIRST, both inside this one `try`. Not
     // `multiGet`/`Promise.all`: a failing read must short-circuit so ONE
@@ -812,7 +849,7 @@ async function readAndFold(key: string, entry: Entry): Promise<void> {
     // extra index read against a store this app already scans wholesale on
     // sign-out (`sign-out-cleanup.ts`), bought in exchange for a floor no blind
     // write can lower.
-    floorSignals = disableFloorSignals(
+    floor = disableFloorSignal(
       await AsyncStorage.getAllKeys(),
       disableFloorPrefix(key),
     );
@@ -830,7 +867,7 @@ async function readAndFold(key: string, entry: Entry): Promise<void> {
       tags: { feature: 'mentor_notice_policy', op: 'read' },
     });
     signal = 'malformed';
-    floorSignals = [];
+    floor = 'absent';
     // [WI-2627 rework 2] We could not LOOK. Do NOT null `durable`: a record
     // established by an earlier successful read or write is still the best guard
     // we have, and discarding it would hand the write path a blank cheque. And
@@ -841,19 +878,12 @@ async function readAndFold(key: string, entry: Entry): Promise<void> {
   // ONE commit for both records. Committing the state record first would leave a
   // window in which a `suppressed()` call reads an enabled state that the floor
   // is about to disable — the exact fail-open shape this module is about.
-  // Explicit arrow rather than passing the reducer to `reduce` directly: `reduce`
-  // would also hand it the index and the array, and a two-parameter safety fold
-  // silently absorbing extra arguments is not something to leave to inspection.
-  // The explicit generic is required, not decoration: without it `reduce` infers
-  // the accumulator from the ELEMENT type (`MentorNoticePolicySignal`) rather than
-  // from the seed, and the fold stops type-checking.
-  const folded = floorSignals.reduce<MentorNoticePolicyState>(
-    (state, next) => reduceMentorNoticePolicy(state, next),
-    reduceMentorNoticePolicy(entry.snapshot.state, signal),
-  );
   commit(
     entry,
-    folded,
+    reduceMentorNoticePolicy(
+      reduceMentorNoticePolicy(entry.snapshot.state, signal),
+      floor,
+    ),
     // A stored record that EXISTS (even unparseably) means this device was told
     // something and persisted it; only its genuine absence leaves the device
     // never-told. A disable-floor marker counts for the same reason, and MUST:
@@ -862,7 +892,7 @@ async function readAndFold(key: string, entry: Entry): Promise<void> {
     // projection paint.
     entry.snapshot.observed ||
       signalIsObservation(signal) ||
-      floorSignals.some(signalIsObservation),
+      signalIsObservation(floor),
     true,
   );
 }

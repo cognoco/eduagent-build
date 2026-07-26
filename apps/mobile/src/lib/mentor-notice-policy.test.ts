@@ -1336,22 +1336,105 @@ describe('useMentorNoticePolicy', () => {
     expect(again.result.current.suppressed(observation(9, true))).toBe(false);
   });
 
-  it('treats an UNPARSEABLE disable-floor marker as fail-closed, not as absent', async () => {
-    await seedStored(ACTOR, PROFILE, '{"revision":7,"enabled":true}');
-    // A key under our prefix whose revision suffix does not parse. There is no
-    // honest revision to read out of it, so it must fail closed rather than be
-    // silently skipped.
+  // ── [WI-2627 rework 6] A CORRUPT MARKER MUST NOT BRICK THE DEVICE ─────────
+  //
+  // REPLACES a test that asserted the bricking behaviour. It seeded a corrupt
+  // marker over an enabled state record and asserted `{7,false}` — "disabled at
+  // the held revision" — and it was green while the defect shipped underneath it,
+  // because it only ever asserted ONE hydration. Never a restart.
+  //
+  // What was wrong: an unparseable marker folded 'malformed', which disables at
+  // the HELD revision unconditionally and is re-applied on EVERY hydration. A
+  // genuine re-enable was adopted in-session, written durably, and then
+  // re-disabled at that same revision on the next launch — forever, at any deploy
+  // revision. And unlike a corrupt STATE RECORD, which the next write overwrites,
+  // a corrupt marker is never pruned, so nothing could ever clear it. The
+  // no-prune decision bought non-lowerability and sold self-healing.
+  it('withholds the never-told benefit for a corrupt marker, but does not suppress at a revision it cannot prove', async () => {
+    // Fresh install, the corrupt marker the ONLY thing on disk.
     await AsyncStorage.setItem(`${floorPrefix(ACTOR, PROFILE)}abc`, '1');
 
     const { result } = mountPolicy();
     await waitFor(() => expect(result.current.hydrated).toBe(true));
 
-    // Disabled AT THE HELD REVISION — so it cannot re-enable at 7, and a genuine
-    // deploy above 7 still can.
-    expect(result.current.state).toEqual({ revision: 7, enabled: false });
-    expect(result.current.suppressed(observation(7, true))).toBe(true);
-    act(() => result.current.observe(observation(8, true)));
-    expect(result.current.state).toEqual({ revision: 8, enabled: true });
+    // The fail-closed half that must NOT be lost: a marker exists, so this device
+    // counts as told-something and a cached projection carrying no observation of
+    // its own stays blank.
+    expect(result.current.state).toEqual({ revision: 0, enabled: false });
+    expect(result.current.suppressed(undefined)).toBe(true);
+
+    // ...and the honest limit: its true revision is UNKNOWABLE, so it asserts
+    // revision 0 and nothing more. Claiming a revision we cannot read would be the
+    // fabrication this module forbids — pointed at blocking re-enables, which is
+    // exactly what stranded the device.
+  });
+
+  it('lets a genuine re-enable SURVIVE A RESTART with a corrupt marker still on disk', async () => {
+    await AsyncStorage.setItem(`${floorPrefix(ACTOR, PROFILE)}abc`, '1');
+
+    const { result } = mountPolicy();
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    act(() => result.current.observe(observation(9, true)));
+    expect(result.current.state).toEqual({ revision: 9, enabled: true });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 1200));
+    });
+    expect(await AsyncStorage.getItem(stateKey(ACTOR, PROFILE))).toBe(
+      '{"revision":9,"enabled":true}',
+    );
+
+    // THE CRITERION'S OWN LAYER. In-session recovery is NOT the criterion — that
+    // is precisely what the replaced test asserted, and why the brick shipped
+    // under it. The marker is still on disk here.
+    resetMentorNoticePolicyStoreForTests();
+    const r1 = mountPolicy();
+    await waitFor(() => expect(r1.result.current.hydrated).toBe(true));
+    expect(r1.result.current.state).toEqual({ revision: 9, enabled: true });
+    expect(r1.result.current.suppressed(observation(9, true))).toBe(false);
+
+    // ...and a LATER deploy is not re-disabled either. On the defect this landed
+    // as {20,false}: raising the revision never helped, because the marker
+    // re-fired at whatever revision was then held.
+    act(() => r1.result.current.observe(observation(20, true)));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 1200));
+    });
+    resetMentorNoticePolicyStoreForTests();
+    const r2 = mountPolicy();
+    await waitFor(() => expect(r2.result.current.hydrated).toBe(true));
+    expect(r2.result.current.state).toEqual({ revision: 20, enabled: true });
+    expect(r2.result.current.suppressed(observation(20, true))).toBe(false);
+
+    // The marker was never pruned — recovery is NOT achieved by removing it.
+    expect(
+      await AsyncStorage.getItem(`${floorPrefix(ACTOR, PROFILE)}abc`),
+    ).not.toBeNull();
+  });
+
+  // CONTROL, kept separate so the marker path and the state-record path cannot
+  // silently converge again. A corrupt STATE RECORD self-heals because the next
+  // write OVERWRITES it; that asymmetry is what made the marker case permanent,
+  // and it is what this control pins.
+  it('a corrupt STATE RECORD still self-heals across a restart', async () => {
+    await seedStored(ACTOR, PROFILE, 'not json');
+
+    const { result } = mountPolicy();
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    act(() => result.current.observe(observation(9, true)));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 1200));
+    });
+
+    resetMentorNoticePolicyStoreForTests();
+    const relaunched = mountPolicy();
+    await waitFor(() => expect(relaunched.result.current.hydrated).toBe(true));
+    expect(relaunched.result.current.state).toEqual({
+      revision: 9,
+      enabled: true,
+    });
+    expect(relaunched.result.current.suppressed(observation(9, true))).toBe(
+      false,
+    );
   });
 
   // ONE corrupt key must not destroy the floor the GOOD markers establish. This
