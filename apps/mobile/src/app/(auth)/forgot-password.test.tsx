@@ -10,6 +10,10 @@ import { useSignIn } from '@clerk/expo';
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockPush = jest.fn();
+// [WI-2771] Mutable so individual tests can simulate arriving from sign-in
+// with an `email` param seeded, mirroring the existing sign-up emailParam
+// pattern's test setup.
+let mockSearchParams: { email?: string } = {};
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -18,6 +22,7 @@ jest.mock('expo-router', () => ({
     push: mockPush,
     canGoBack: jest.fn(() => true),
   }),
+  useLocalSearchParams: () => mockSearchParams,
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -33,6 +38,7 @@ describe('ForgotPasswordScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSearchParams = {};
     (useSignIn as jest.Mock).mockReturnValue({
       isLoaded: true,
       signIn: {
@@ -49,6 +55,25 @@ describe('ForgotPasswordScreen', () => {
     screen.getByTestId('forgot-password-email');
     screen.getByTestId('send-reset-code-button');
     screen.getByText('Forgot password?');
+  });
+
+  // [WI-2771] Starting password reset from sign-in with a filled email field
+  // should prefill that email here — mirrors the existing sign-up emailParam
+  // pattern. Still editable, and works even with the param absent (empty).
+  it('prefills the email input from the sign-in email param', () => {
+    mockSearchParams = { email: 'quiz-champ@example.com' };
+
+    render(<ForgotPasswordScreen />);
+
+    const input = screen.getByTestId('forgot-password-email');
+    expect(input.props.value).toBe('quiz-champ@example.com');
+  });
+
+  it('leaves the email input empty when no email param is present', () => {
+    render(<ForgotPasswordScreen />);
+
+    const input = screen.getByTestId('forgot-password-email');
+    expect(input.props.value).toBe('');
   });
 
   it('renders back to sign in link', () => {
@@ -158,9 +183,17 @@ describe('ForgotPasswordScreen', () => {
     expect(mockReplace).not.toHaveBeenCalled();
   });
 
-  it('displays error on send code failure', async () => {
+  // [WI-2768] Clerk's `code` (locale-independent) drives the message, not the
+  // raw English `longMessage` — extractClerkError maps known codes to
+  // localized copy in auth.errors.* instead of surfacing Clerk's raw text.
+  it('displays the localized error for the Clerk error code on send code failure', async () => {
     mockCreate.mockRejectedValue({
-      errors: [{ longMessage: 'User not found' }],
+      errors: [
+        {
+          code: 'form_identifier_not_found',
+          longMessage: 'No account found with that email',
+        },
+      ],
     });
 
     render(<ForgotPasswordScreen />);
@@ -172,7 +205,7 @@ describe('ForgotPasswordScreen', () => {
     fireEvent.press(screen.getByTestId('send-reset-code-button'));
 
     await waitFor(() => {
-      screen.getByText('User not found');
+      screen.getByText("We couldn't find an account with that email.");
     });
   });
 
@@ -337,10 +370,11 @@ describe('ForgotPasswordScreen', () => {
     }
   });
 
-  it('displays error on reset failure', async () => {
+  // [WI-2768] Same code-based mapping on the reset-code path.
+  it('displays the localized error for the Clerk error code on reset failure', async () => {
     mockCreate.mockResolvedValue({});
     mockAttemptFirstFactor.mockRejectedValue({
-      errors: [{ longMessage: 'Invalid code' }],
+      errors: [{ code: 'form_code_incorrect', longMessage: 'Incorrect code' }],
     });
 
     render(<ForgotPasswordScreen />);
@@ -363,7 +397,7 @@ describe('ForgotPasswordScreen', () => {
     fireEvent.press(screen.getByTestId('reset-password-button'));
 
     await waitFor(() => {
-      screen.getByText('Invalid code');
+      screen.getByText("That code doesn't match. Please try again.");
     });
   });
 });
