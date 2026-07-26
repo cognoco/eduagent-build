@@ -222,22 +222,38 @@ export function reduceMentorNoticePolicy(
  * higher server revision, so garbage under our prefix cannot strand the device.
  * No prefix match at all is 'absent' and contributes nothing (the common case).
  */
-function disableFloorSignal(
+function disableFloorSignals(
   allKeys: readonly string[],
   prefix: string,
-): MentorNoticePolicySignal {
+): MentorNoticePolicySignal[] {
   let floor: number | null = null;
+  let sawUnparseable = false;
   for (const key of allKeys) {
     if (!key.startsWith(prefix)) continue;
     const suffix = key.slice(prefix.length);
     // Strict: `Number` would accept '', ' 3', '3.5', '0x8', 'Infinity'. A
     // fabricated or unbounded revision is exactly what must never reach the fold.
-    if (!/^\d+$/.test(suffix)) return 'malformed';
+    if (!/^\d+$/.test(suffix)) {
+      sawUnparseable = true;
+      continue;
+    }
     const revision = Number(suffix);
-    if (!Number.isSafeInteger(revision)) return 'malformed';
+    if (!Number.isSafeInteger(revision)) {
+      sawUnparseable = true;
+      continue;
+    }
     if (floor === null || revision > floor) floor = revision;
   }
-  return floor === null ? 'absent' : { revision: floor, enabled: false };
+  // ACCUMULATE FIRST, then fail closed on top — never instead. Returning
+  // 'malformed' on the first bad suffix would discard every good marker already
+  // found, and 'malformed' disables at the HELD revision: with no state record
+  // that is the bootstrap 0, so one corrupt key would drop a rev-8 floor to 0 and
+  // let a stale rev-5 enable through as 'newer'. Folding the floor and THEN
+  // 'malformed' disables at the floor instead, which is the fail-closed reading.
+  const signals: MentorNoticePolicySignal[] = [];
+  if (floor !== null) signals.push({ revision: floor, enabled: false });
+  if (sawUnparseable) signals.push('malformed');
+  return signals;
 }
 
 /**
@@ -779,9 +795,10 @@ function schedulePersist(key: string, entry: Entry): void {
 async function readAndFold(key: string, entry: Entry): Promise<void> {
   let signal: MentorNoticePolicySignal;
   // [WI-2627 rework 4] The suppress-only disable floor, folded ADDITIVELY on top
-  // of the state record below. 'absent' — no markers, the common case —
-  // contributes nothing.
-  let floor: MentorNoticePolicySignal = 'absent';
+  // of the state record below. Empty — no markers, the common case — contributes
+  // nothing. Up to two signals: the floor itself, then 'malformed' if any marker
+  // under our prefix was unparseable (see `disableFloorSignals`).
+  let floorSignals: MentorNoticePolicySignal[] = [];
   try {
     // Sequential, state record FIRST, both inside this one `try`. Not
     // `multiGet`/`Promise.all`: a failing read must short-circuit so ONE
@@ -795,7 +812,7 @@ async function readAndFold(key: string, entry: Entry): Promise<void> {
     // extra index read against a store this app already scans wholesale on
     // sign-out (`sign-out-cleanup.ts`), bought in exchange for a floor no blind
     // write can lower.
-    floor = disableFloorSignal(
+    floorSignals = disableFloorSignals(
       await AsyncStorage.getAllKeys(),
       disableFloorPrefix(key),
     );
@@ -813,7 +830,7 @@ async function readAndFold(key: string, entry: Entry): Promise<void> {
       tags: { feature: 'mentor_notice_policy', op: 'read' },
     });
     signal = 'malformed';
-    floor = 'absent';
+    floorSignals = [];
     // [WI-2627 rework 2] We could not LOOK. Do NOT null `durable`: a record
     // established by an earlier successful read or write is still the best guard
     // we have, and discarding it would hand the write path a blank cheque. And
@@ -824,12 +841,16 @@ async function readAndFold(key: string, entry: Entry): Promise<void> {
   // ONE commit for both records. Committing the state record first would leave a
   // window in which a `suppressed()` call reads an enabled state that the floor
   // is about to disable — the exact fail-open shape this module is about.
+  // Explicit arrow rather than passing the reducer to `reduce` directly: `reduce`
+  // would also hand it the index and the array, and a two-parameter safety fold
+  // silently absorbing extra arguments is not something to leave to inspection.
+  const folded = floorSignals.reduce(
+    (state, next) => reduceMentorNoticePolicy(state, next),
+    reduceMentorNoticePolicy(entry.snapshot.state, signal),
+  );
   commit(
     entry,
-    reduceMentorNoticePolicy(
-      reduceMentorNoticePolicy(entry.snapshot.state, signal),
-      floor,
-    ),
+    folded,
     // A stored record that EXISTS (even unparseably) means this device was told
     // something and persisted it; only its genuine absence leaves the device
     // never-told. A disable-floor marker counts for the same reason, and MUST:
@@ -838,7 +859,7 @@ async function readAndFold(key: string, entry: Entry): Promise<void> {
     // projection paint.
     entry.snapshot.observed ||
       signalIsObservation(signal) ||
-      signalIsObservation(floor),
+      floorSignals.some(signalIsObservation),
     true,
   );
 }

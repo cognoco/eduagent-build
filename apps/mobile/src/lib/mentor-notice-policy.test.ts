@@ -1354,6 +1354,33 @@ describe('useMentorNoticePolicy', () => {
     expect(result.current.state).toEqual({ revision: 8, enabled: true });
   });
 
+  // ONE corrupt key must not destroy the floor the GOOD markers establish. This
+  // is the fail-open the first pass at the malformed branch had: bailing on the
+  // first unparseable suffix discarded every marker already accumulated, so
+  // `{…::8, …::abc}` disabled at the HELD revision — the bootstrap 0 when there
+  // is no state record — and a stale rev-5 enable was then `newer` than 0 and
+  // re-enabled. Same E3, triggered by a single corrupt key.
+  it('keeps the floor from GOOD markers when a sibling marker is unparseable', async () => {
+    await AsyncStorage.setItem(`${floorPrefix(ACTOR, PROFILE)}8`, '1');
+    await AsyncStorage.setItem(`${floorPrefix(ACTOR, PROFILE)}abc`, '1');
+
+    const { result } = mountPolicy();
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    // The rev-8 floor SURVIVES the corrupt sibling — not lowered to 0.
+    expect(result.current.state).toEqual({ revision: 8, enabled: false });
+    // ...so the stale intermediate reply is still refused.
+    act(() => result.current.observe(observation(5, true)));
+    expect(result.current.state).toEqual({ revision: 8, enabled: false });
+    expect(result.current.suppressed(undefined)).toBe(true);
+
+    // ...and a genuine deploy above the floor still recovers, so a corrupt key
+    // cannot strand the device either.
+    act(() => result.current.observe(observation(9, true)));
+    expect(result.current.state).toEqual({ revision: 9, enabled: true });
+    expect(result.current.suppressed(observation(9, true))).toBe(false);
+  });
+
   // NON-TRIVIALITY CONTROL for the test above. "Always write disabled" and
   // "always hydrate disabled" would both satisfy every assertion there; neither
   // survives this. A clean enabled observation must reach disk as enabled and
