@@ -117,8 +117,8 @@ Tests cover cold/warm start, lower/same/higher revisions, storage failure, malfo
 - Introduce one async batch evaluator receiving named fields, Conversation Language, provenance (`user`, `llm`, or `migration`), and producer vendor for LLM output.
 - Apply NFKC/Unicode deterministic detection across English, Czech, Spanish, French, German, Italian, Portuguese, Polish, Japanese, and Norwegian Bokmål, including cross-language phrases.
 - Classify known-person attribution as block, absence of protected lexemes as clear, and uncertain educational/reference uses as ambiguous.
-- Send ambiguous text with known producer identity to the independent judge, whether that producer is a model or a user. Strict allowance is `allow/educational_reference`; block reasons are `person_attribution`, `diagnostic_inference`, or `unclear`.
-- Refer ambiguous text to the independent judge regardless of provenance, including user-authored educational text. Block ambiguity from migrations/backfills, missing producers, unavailable judging, and malformed output without external disclosure.
+- Refer ambiguous text with known producer identity to the independent judge regardless of provenance — `user` provenance refers exactly as `llm` provenance does, so user-authored ambiguous educational text is judged rather than blocked outright. Strict allowance is `allow/educational_reference`; block reasons are `person_attribution`, `diagnostic_inference`, or `unclear`.
+- Block ambiguity from migrations/backfills, missing producers, unavailable judging, and malformed output without external disclosure.
 - Gate notices, notes, session-analysis Learning Profile fields, memory facts/backfill/dedup, and Needs-Deepening persistence.
 - Derived writes drop unsafe fields/records; user mutations retain `BadRequestError`. Observability records only field kind, reason, and count.
 
