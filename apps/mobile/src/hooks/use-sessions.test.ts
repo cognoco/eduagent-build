@@ -2168,6 +2168,67 @@ describe('[WI-2627] mentor-notice policy observation reaches its consumers', () 
       expect(result.current.data?.mentorNotice).toBeUndefined();
     });
 
+    // [WI-2627 rework, finding 1] The malformed-response route on this surface,
+    // which the first pass left fail-OPEN.
+    //
+    // A bad `mentorNoticePolicy` fails the WHOLE `sessionSummaryGetResponseSchema`,
+    // so `parseJson` threw before the fold and TanStack Query went on RETAINING
+    // the prior receipt-bearing summary with policy still enabled. The assertion
+    // is therefore about what the hook exposes while the query is in an error
+    // state holding that retained summary — not that `observeMalformed` ran, and
+    // not that the schema rejects the field. Both of those pass on code that
+    // keeps rendering the retained receipt.
+    it('goes fail-closed when the summary response fails to parse, and suppresses the RETAINED receipt', async () => {
+      mockFetch.mockResolvedValueOnce(summaryResponse(policy(7, true), true));
+
+      const { result } = renderHook(() => useSessionSummary('session-1'), {
+        wrapper: createWrapper(),
+      });
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      // NON-TRIVIALITY CONTROL: with rollout ON at an acceptable revision the
+      // receipt really renders, so the suppression assertion below cannot be
+      // satisfied by an always-suppressing implementation.
+      expect(result.current.data?.mentorNotice?.concept).toBe('sign flip');
+      await waitFor(async () =>
+        expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
+          '{"revision":7,"enabled":true}',
+        ),
+      );
+
+      // A malformed observation — negative revision — so the response fails
+      // schema validation and no observation value reaches `observe`.
+      mockFetch.mockResolvedValue(
+        summaryResponse(
+          {
+            rolloutRevision: -1,
+            rolloutEnabled: true,
+            projectionEpoch: 'notice-policy-v1:bad',
+          } as unknown as ReturnType<typeof policy>,
+          true,
+        ),
+      );
+
+      await act(async () => {
+        await result.current.refetch();
+      });
+
+      // The query IS in an error state and IS still holding the prior successful
+      // summary — establish the retention, since it is the exposure.
+      await waitFor(() => expect(result.current.isError).toBe(true));
+      // THE CRITERION'S LAYER: the receipt off that retained summary is not
+      // exposed, while the retained body still is — so the summary was not
+      // merely dropped, the receipt was suppressed.
+      await waitFor(() =>
+        expect(result.current.data?.mentorNotice).toBeUndefined(),
+      );
+      expect(result.current.data?.content).toBe('I learned about gravity');
+      // And the mechanism behind it: fail-closed at the held revision, never
+      // dropped to 0.
+      expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
+        '{"revision":7,"enabled":false}',
+      );
+    });
+
     it('keeps the receipt when the summary carries NO observation', async () => {
       // A pre-field worker. Absence is not a rollback signal in either
       // direction, and the server has already stripped notice data if the flag

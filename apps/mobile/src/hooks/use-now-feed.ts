@@ -32,7 +32,6 @@ import {
 import { useMentorNoticePolicy } from '../lib/mentor-notice-policy';
 import { useNavigationDataScopeContract } from './use-navigation-contract';
 import { parseJson } from '../lib/parse-json';
-import { useApiQuery } from './use-api-query';
 import { queryKeys } from '../lib/query-keys';
 
 const NOW_FEED_STALE_TIME_MS = 30_000;
@@ -430,37 +429,68 @@ export function useNowOverflow(
     useObservedPolicyEpoch(userId, profileId);
   const policy = useMentorNoticePolicy(userId, profileId);
 
-  const query = useApiQuery({
+  const query = useQuery({
     // [WI-2498] Actor-bound, matching the now-feed key above.
     queryKey: queryKeys.now.overflow(userId, profileId, observedEpoch),
-    enabled: enabled && epochHydrated,
-    schema: nowOverflowResponseSchema,
-    fetch: (signal) =>
-      client.now.overflow.$get(
-        { query: { scope: 'self' } },
-        { init: { signal } },
-      ),
-    // [WI-2627] The fold happens HERE, not in an effect. `useApiQuery` runs
-    // `select` inside the query fn, i.e. BEFORE the query publishes — which is
-    // the only place a fold can sit without the surface painting a frame first.
+    // [WI-2627 rework] Inlined off `useApiQuery`, which parses BEFORE its
+    // `select` callback — so a malformed `mentorNoticePolicy` threw at the
+    // wrapper's `parseJson` and the fold below was never reached, leaving
+    // TanStack Query retaining and rendering the prior notice-bearing data with
+    // policy still enabled. The catch has to sit around the parse itself, and
+    // the wrapper is shared by every scoped GET in the app, so the fix belongs
+    // here rather than in its signature. `useNowFeed` above is inlined for the
+    // same reason; the three notice-bearing surfaces are now symmetric.
     //
-    // In an effect it was too late: the preceding committed render evaluated
-    // `policy.suppressed(observation)` against the still-enabled store, judged
-    // the newer payload non-stale, and handed its notice items and their
-    // notice.recheck deep links to NowCardStack; they disappeared only once the
-    // effect forced another render. A rollback-bearing response therefore
-    // painted for one frame, which is precisely the exposure the emergency
-    // rollback boundary exists to prevent. `useNowFeed` folds in its query fn
-    // for the same reason.
-    //
-    // The STRIP stays outside `select` — baked into the cache entry it would
-    // never re-evaluate when a sibling surface observes a disable.
-    select: (json) => {
-      policy.observe(json.mentorNoticePolicy);
-      return json;
+    // `!!activeProfile` carries over `useApiQuery`'s own profile guard, which
+    // was part of its `enabled` and is not otherwise expressed here.
+    queryFn: async ({ signal: querySignal }): Promise<NowOverflowResponse> => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.now.overflow.$get(
+          { query: { scope: 'self' } },
+          { init: { signal } },
+        );
+        const okRes = await assertOk(res);
+        let data: NowOverflowResponse;
+        try {
+          data = await parseJson(
+            okRes,
+            nowOverflowResponseSchema,
+            'GET /now/overflow',
+          );
+        } catch (err) {
+          // Deliberately over-broad, exactly as in `useNowFeed`: a body we
+          // cannot parse is one whose policy we cannot confirm, and notices are
+          // the private feature. Going fail-closed here is also what blanks the
+          // RETAINED payload — the store moves to disabled, and the suppression
+          // memo below re-evaluates and strips the data the query kept.
+          policy.observeMalformed();
+          throw err;
+        }
+        policy.observe(data.mentorNoticePolicy);
+        return data;
+      } finally {
+        cleanup();
+      }
     },
+    enabled: enabled && epochHydrated && !!activeProfile,
   });
 
+  // [WI-2627] The fold happens in the QUERY FN, not in an effect — i.e. BEFORE
+  // the query publishes, which is the only place a fold can sit without the
+  // surface painting a frame first.
+  //
+  // In an effect it was too late: the preceding committed render evaluated
+  // `policy.suppressed(observation)` against the still-enabled store, judged
+  // the newer payload non-stale, and handed its notice items and their
+  // notice.recheck deep links to NowCardStack; they disappeared only once the
+  // effect forced another render. A rollback-bearing response therefore
+  // painted for one frame, which is precisely the exposure the emergency
+  // rollback boundary exists to prevent.
+  //
+  // The STRIP stays outside the query fn — baked into the cache entry it would
+  // never re-evaluate when a sibling surface observes a disable, and it is what
+  // blanks data the query RETAINED across a failed refetch.
   const observation = query.data?.mentorNoticePolicy;
 
   const noticeSafeData = useMemo(() => {

@@ -287,6 +287,24 @@ type Entry = {
   snapshot: MentorNoticePolicySnapshot;
   listeners: Set<() => void>;
   hydrating: boolean;
+  /**
+   * [WI-2627 rework] The ONE storage-operation chain for this pair. Every read
+   * and every write goes through it, so no two storage operations for the same
+   * key are ever in flight together. See `enqueue`.
+   */
+  chain: Promise<void>;
+  /**
+   * Whether a flush is already queued behind the chain. A queued flush reads
+   * the CURRENT state when it runs, so further requests coalesce into it rather
+   * than each carrying their own snapshot.
+   */
+  flushQueued: boolean;
+  /**
+   * The record this device believes is durably on disk, or `null` when unknown
+   * or untrusted (nothing stored, or a stored record that would not parse).
+   * Guards the write so a flush can never LOWER the durable revision.
+   */
+  durable: MentorNoticePolicyState | null;
 };
 
 const UNBOUND_SNAPSHOT: MentorNoticePolicySnapshot = {
@@ -316,6 +334,9 @@ function getEntry(key: string): Entry {
       },
       listeners: new Set(),
       hydrating: false,
+      chain: Promise.resolve(),
+      flushQueued: false,
+      durable: null,
     };
     entries.set(key, entry);
   }
@@ -353,10 +374,54 @@ function delay(ms: number): Promise<void> {
 }
 
 /**
+ * [WI-2627 rework] Serialize one storage operation per pair, in order.
+ *
+ * The whole durable-monotonicity argument rests on this: reads and writes for a
+ * given key are totally ordered, so hydration always precedes any write on that
+ * entry (which is what lets `durableCandidate` compare against a known record),
+ * and no two writes for the same key can ever be resolving concurrently.
+ *
+ * `work` is expected to absorb its own failures; the `catch` is a floor so one
+ * rejection cannot poison the chain for every later operation.
+ */
+function enqueue(entry: Entry, work: () => Promise<void>): void {
+  entry.chain = entry.chain.then(work).catch(() => undefined);
+}
+
+/**
+ * [WI-2627 rework] What a flush should write RIGHT NOW.
+ *
+ * Two properties, and the defect this replaced had neither:
+ *
+ *   read-latest — the candidate is the CURRENT in-memory state, read at the
+ *     moment of the attempt, never a snapshot captured when the observation
+ *     arrived. Every retry therefore re-reads too, so a retry that lands late
+ *     writes today's state rather than resurrecting the state that failed.
+ *
+ *   revision-guarded — folded against what is believed to be on disk through
+ *     the same monotonic reducer the in-memory state uses, so a write can never
+ *     lower the durable revision nor re-enable at the revision it holds. This is
+ *     what covers retry-AFTER-EXHAUSTION: a flush whose retries all failed
+ *     leaves `durable` stale, and the next flush still cannot regress it.
+ *
+ * `durable === null` means nothing trustworthy is on disk (fresh install, or a
+ * record that would not parse — in which case its revision is unknowable and
+ * the in-memory state, already fail-closed by the malformed fold, is the better
+ * record). Writing the current state unguarded is correct in both cases, and
+ * because hydration is serialized ahead of every write, `null` here never means
+ * "we have not looked yet".
+ */
+function durableCandidate(entry: Entry): MentorNoticePolicyState {
+  const current = entry.snapshot.state;
+  if (entry.durable === null) return current;
+  return reduceMentorNoticePolicy(entry.durable, current);
+}
+
+/**
  * [WI-2627] Retry a disable-write across transient `setItem` failures.
  *
- * `persist` is fire-and-forget (`void persist(...)`) and its only caller
- * already committed the correct state to memory before calling it — so a
+ * `flush` is fire-and-forget (via `schedulePersist`) and its only caller
+ * already committed the correct state to memory before scheduling it — so a
  * failed write never corrupts THIS session. What it can corrupt is the NEXT
  * one: a relaunch reads whatever `setItem` last durably wrote, and a single
  * rejected write silently leaves that durable record at its previous,
@@ -374,21 +439,20 @@ function delay(ms: number): Promise<void> {
  *
  * Retrying with backoff is the defensible shape: it recovers the common
  * transient failure (the case this device most likely to hit) without
- * inventing a second fallible write path. RESIDUAL, recorded rather than
- * papered over: under sustained/unbounded failure (e.g. disk genuinely
- * full for the retry window), the write can still never land, and a
- * relaunch during that window can still read a stale record. In-session
- * behaviour stays fail-closed throughout — only the durable record can lag.
+ * inventing a second fallible write path. Under sustained failure (disk
+ * genuinely full for the retry window) the write still never lands and the
+ * durable record lags — but it lags at an OLDER revision that no later flush
+ * can be tricked into re-adopting, and in-session behaviour is fail-closed
+ * throughout.
  */
-async function persist(
-  key: string,
-  state: MentorNoticePolicyState,
-): Promise<void> {
-  const payload = JSON.stringify(state);
+async function flush(key: string, entry: Entry): Promise<void> {
+  entry.flushQueued = false;
   let lastError: unknown;
   for (let attempt = 0; attempt <= PERSIST_RETRY_DELAYS_MS.length; attempt++) {
+    const candidate = durableCandidate(entry);
     try {
-      await AsyncStorage.setItem(key, payload);
+      await AsyncStorage.setItem(key, JSON.stringify(candidate));
+      entry.durable = candidate;
       return;
     } catch (err) {
       lastError = err;
@@ -399,6 +463,24 @@ async function persist(
   Sentry.captureException(lastError, {
     tags: { feature: 'mentor_notice_policy', op: 'write' },
   });
+}
+
+/**
+ * [WI-2627 rework] Queue a durable write of the current state.
+ *
+ * Hydration is requested FIRST so it is ordered ahead of the write on the same
+ * chain — a fold can reach this before any hook has mounted, and an unhydrated
+ * entry has no `durable` record to guard against.
+ *
+ * Coalescing is safe precisely because the queued flush reads the latest state:
+ * a second observation arriving while a flush is pending needs no write of its
+ * own, since the pending one will carry it.
+ */
+function schedulePersist(key: string, entry: Entry): void {
+  hydrateOnce(key, entry);
+  if (entry.flushQueued) return;
+  entry.flushQueued = true;
+  enqueue(entry, () => flush(key, entry));
 }
 
 /**
@@ -414,11 +496,17 @@ async function readAndFold(key: string, entry: Entry): Promise<void> {
   let signal: MentorNoticePolicySignal;
   try {
     signal = storedSignal(await AsyncStorage.getItem(key));
+    // [WI-2627 rework] Seed the write guard from what is actually on disk. Only
+    // a PARSEABLE record tells us a durable revision; 'absent' means there is
+    // nothing to regress, and 'malformed' means its revision is unknowable — in
+    // both of those the guard stays off (`null`) rather than guessing.
+    entry.durable = typeof signal === 'object' ? signal : null;
   } catch (err) {
     Sentry.captureException(err, {
       tags: { feature: 'mentor_notice_policy', op: 'read' },
     });
     signal = 'malformed';
+    entry.durable = null;
   }
   commit(
     entry,
@@ -434,7 +522,7 @@ async function readAndFold(key: string, entry: Entry): Promise<void> {
 function hydrateOnce(key: string, entry: Entry): void {
   if (entry.hydrating || entry.snapshot.hydrated) return;
   entry.hydrating = true;
-  void readAndFold(key, entry);
+  enqueue(entry, () => readAndFold(key, entry));
 }
 
 /** Test seam: drop all in-memory policy state. */
@@ -468,7 +556,11 @@ export function foldMentorNoticePolicyFor(
   const entry = getEntry(key);
   const next = reduceMentorNoticePolicy(entry.snapshot.state, signal);
   commit(entry, next, true, entry.snapshot.hydrated);
-  void persist(key, next);
+  // [WI-2627 rework] Not `persist(key, next)`. The write must carry whatever the
+  // store holds when it actually reaches the disk, not this observation's
+  // snapshot — otherwise a retried older ENABLED write can land after a newer
+  // DISABLED one and hand the next launch a resurrected notice.
+  schedulePersist(key, entry);
 }
 
 /**
@@ -564,7 +656,10 @@ export function useMentorNoticePolicy(
     if (!key) return undefined;
     const sub = AppState.addEventListener('change', (next) => {
       if (next !== 'active') return;
-      void readAndFold(key, getEntry(key));
+      const entry = getEntry(key);
+      // On the shared chain, so a foreground re-read can never interleave with
+      // an in-flight write of the same key.
+      enqueue(entry, () => readAndFold(key, entry));
     });
     return () => sub.remove();
   }, [key]);

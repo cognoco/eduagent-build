@@ -672,4 +672,133 @@ describe('useMentorNoticePolicy', () => {
     });
     expect(relaunched.result.current.suppressed(undefined)).toBe(true);
   });
+
+  // ── [WI-2627 rework, finding 2] Durable state under interleaved writes ────
+  //
+  // The in-memory reducer was already monotonic; the DURABLE record was not.
+  // Each observation started its own fire-and-forget write carrying its OWN
+  // captured snapshot, so an older ENABLED write that failed and retried could
+  // land AFTER a newer DISABLED write that succeeded — leaving AsyncStorage
+  // holding the enabled record. Nothing in-session noticed, because in-session
+  // state was correct the whole time. The next launch hydrated the stale enabled
+  // record and resurrected the notices the rollback had voided.
+  //
+  // Asserting the in-memory reducer proves nothing here, so this test asserts
+  // the FINAL DURABLE RECORD and then hydrates a fresh store from it.
+  it('never lets an older enabled write land last, so a restart after interleaved writes does not resurrect notices', async () => {
+    await seedStored(ACTOR, PROFILE, '{"revision":6,"enabled":true}');
+    const { result } = mountPolicy();
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    expect(result.current.state).toEqual({ revision: 6, enabled: true });
+
+    // Hand-controlled `setItem`: the FIRST attempt is held open and then
+    // rejected, every later one goes through. Holding it open is what makes the
+    // interleaving deterministic instead of racing the retry backoff.
+    const originalSetItem = AsyncStorage.setItem;
+    const writes: string[] = [];
+    const failFirstAttempt: ((err: unknown) => void)[] = [];
+    let calls = 0;
+    AsyncStorage.setItem = jest.fn((k: string, v: string) => {
+      writes.push(v);
+      calls += 1;
+      if (calls === 1) {
+        return new Promise<void>((_resolve, reject) => {
+          failFirstAttempt.push(reject);
+        });
+      }
+      return originalSetItem(k, v);
+    }) as unknown as typeof AsyncStorage.setItem;
+
+    try {
+      // (1) The ENABLED write at revision 7. Its first attempt is now in flight
+      // and will fail.
+      act(() => result.current.observe(observation(7, true)));
+      await waitFor(() => expect(writes.length).toBe(1));
+      expect(writes[0]).toBe('{"revision":7,"enabled":true}');
+
+      // (2) The DISABLED write at revision 8, issued while (1) is still
+      // outstanding. In-session state goes fail-closed immediately.
+      act(() => result.current.observe(observation(8, false)));
+      expect(result.current.state).toEqual({ revision: 8, enabled: false });
+      expect(result.current.suppressed(undefined)).toBe(true);
+
+      // (3) Only NOW does (1) fail, so its retry is genuinely late — the
+      // pre-rework ordering in which the older enabled payload lands last.
+      failFirstAttempt[0]?.(new Error('transient disk write failure'));
+
+      // Wait for the LATE RETRY to have actually issued, and for the last write
+      // to have reached disk. Asserting the durable record before this point is
+      // what makes the test vacuous: there is a window in which the disable has
+      // landed and the older enabled retry has not yet overwritten it, and a
+      // bare `waitFor` on the expected value passes inside that window on
+      // completely unfixed code. Both the fixed and pre-fix orderings issue
+      // exactly three `setItem` calls here (held+rejected attempt, its retry,
+      // and the second observation's write), so this waits for all of them.
+      await waitFor(() => expect(writes.length).toBeGreaterThanOrEqual(3));
+      await waitFor(async () => {
+        expect(await AsyncStorage.getItem(stateKey(ACTOR, PROFILE))).toBe(
+          writes[writes.length - 1],
+        );
+      });
+
+      // THE FINAL DURABLE RECORD, once every write including the late retry has
+      // landed. This is the assertion the defect fails.
+      expect(await AsyncStorage.getItem(stateKey(ACTOR, PROFILE))).toBe(
+        '{"revision":8,"enabled":false}',
+      );
+    } finally {
+      AsyncStorage.setItem = originalSetItem;
+    }
+
+    // THE CRITERION'S OWN LAYER: restart. Fresh in-memory store, storage as the
+    // interleaving left it. The defect lived here — hydration adopting the stale
+    // enabled record — so this is where it has to be denied.
+    resetMentorNoticePolicyStoreForTests();
+    const relaunched = mountPolicy();
+    await waitFor(() => expect(relaunched.result.current.hydrated).toBe(true));
+    expect(relaunched.result.current.state).toEqual({
+      revision: 8,
+      enabled: false,
+    });
+    // ...and a cached projection carrying no observation of its own stays blank.
+    expect(relaunched.result.current.suppressed(undefined)).toBe(true);
+    expect(relaunched.result.current.suppressed(observation(8, true))).toBe(
+      true,
+    );
+
+    // Corroboration on the mechanism: every write that reached disk after the
+    // failed first attempt carried the CURRENT state, so no ordering of retries
+    // could have put the older enabled payload last.
+    expect(
+      writes.slice(1).filter((w) => w !== '{"revision":8,"enabled":false}'),
+    ).toEqual([]);
+  });
+
+  // NON-TRIVIALITY CONTROL for the test above. "Always write disabled" and
+  // "always hydrate disabled" would both satisfy every assertion there; neither
+  // survives this. A clean enabled observation must reach disk as enabled and
+  // hydrate as enabled.
+  it('durably records an ENABLED observation, so the interleaving test above is not satisfied by always writing disabled', async () => {
+    const { result } = mountPolicy();
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    act(() => result.current.observe(observation(9, true)));
+
+    await waitFor(async () => {
+      expect(await AsyncStorage.getItem(stateKey(ACTOR, PROFILE))).toBe(
+        '{"revision":9,"enabled":true}',
+      );
+    });
+
+    resetMentorNoticePolicyStoreForTests();
+    const relaunched = mountPolicy();
+    await waitFor(() => expect(relaunched.result.current.hydrated).toBe(true));
+    expect(relaunched.result.current.state).toEqual({
+      revision: 9,
+      enabled: true,
+    });
+    expect(relaunched.result.current.suppressed(observation(9, true))).toBe(
+      false,
+    );
+  });
 });
