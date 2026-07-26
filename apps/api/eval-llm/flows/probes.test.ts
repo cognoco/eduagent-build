@@ -405,6 +405,14 @@ describe('probes quality heuristics — HW02 (too-little-text, solved-from-memor
     expect(issues.some((i) => i.code === 'HW02.solved-from-memory')).toBe(true);
   });
 
+  it('still flags an unquantified living-organisms answer', async () => {
+    const issues = await evaluate('12yo-dinosaurs', 'HW02', {
+      reply: 'Cells are the building blocks of living organisms.',
+      private_sources: { relied_on: [], insufficient: true },
+    });
+    expect(issues.some((i) => i.code === 'HW02.solved-from-memory')).toBe(true);
+  });
+
   it('still requires an insufficient-source signal when the model answers', async () => {
     const issues = await evaluate('12yo-dinosaurs', 'HW02', {
       reply: 'Cells are the building blocks of every living organism.',
