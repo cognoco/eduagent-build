@@ -27,7 +27,10 @@ import {
   LANGUAGE_CORPORA,
   type LanguageCorpus,
 } from './corpus';
-import { REFERRAL_PAYLOAD, type LearningTextReferralPayload } from './referral';
+import {
+  referralPayloadKey,
+  type LearningTextReferralPayload,
+} from './referral';
 
 /** Who authored the text reaching the persistence boundary. */
 export type LearningTextProvenance = 'user' | 'llm' | 'migration';
@@ -107,7 +110,7 @@ export interface ScanLearningTextResult {
    * so a hand-built `refer` object still compiles — the judge treats a missing
    * payload as fail-closed rather than trusting the shape.
    */
-  readonly [REFERRAL_PAYLOAD]?: LearningTextReferralPayload;
+  readonly [referralPayloadKey]?: LearningTextReferralPayload;
 }
 
 // --- regex construction ----------------------------------------------------
@@ -450,6 +453,6 @@ export function scanLearningText(
     // Binds this referral to the exact text and vendor scanned. Symbol-keyed,
     // so it never appears in a serialized/logged result — see referral.ts for
     // the two P1 misuse shapes this makes unrepresentable.
-    [REFERRAL_PAYLOAD]: { text: input.text, producerVendor },
+    [referralPayloadKey]: { text: input.text, producerVendor },
   };
 }

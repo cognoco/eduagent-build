@@ -43,7 +43,7 @@ import { z } from 'zod';
 import type { ConversationLanguage } from '@eduagent/schemas';
 import { escapeXml, extractFirstJsonObject, routeAndCall } from '../llm';
 import { createLogger } from '../logger';
-import { REFERRAL_PAYLOAD } from './referral';
+import { referralPayloadKey } from './referral';
 import type {
   LearningTextBlockReason,
   LearningTextFieldKind,
@@ -245,7 +245,7 @@ export async function judgeReferredLearningText(
   // its absence on a `refer` scan means the object did not come from a real
   // scan (hand-built, deserialized, or mutated) — there is no text this judge
   // is entitled to send anywhere, and no vendor it can safely exclude.
-  const referral = input.scan[REFERRAL_PAYLOAD];
+  const referral = input.scan[referralPayloadKey];
   if (referral === undefined) {
     logDegraded('missing_referral_payload', fieldKind);
     return BLOCKED_UNCLEAR;

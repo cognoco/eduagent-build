@@ -28,7 +28,7 @@ import {
   buildJudgePrompt,
   judgeReferredLearningText,
 } from './judge';
-import { REFERRAL_PAYLOAD } from './referral';
+import { referralPayloadKey } from './referral';
 import {
   scanLearningText,
   type LearningTextProvenance,
@@ -263,7 +263,7 @@ describe('judgeReferredLearningText — fails CLOSED on every degraded path', ()
     // its own output, silently — so it must not be buyable.
     const forged: ScanLearningTextResult = {
       ...referredScan(),
-      [REFERRAL_PAYLOAD]: { text: AMBIGUOUS_TEXT, producerVendor: '   ' },
+      [referralPayloadKey]: { text: AMBIGUOUS_TEXT, producerVendor: '   ' },
     };
 
     await expect(judgeReferredLearningText({ scan: forged })).resolves.toEqual({
@@ -660,9 +660,9 @@ describe('scanLearningText referral payload', () => {
       fieldKind: 'note_text',
     });
 
-    expect(cleared[REFERRAL_PAYLOAD]).toBeUndefined();
-    expect(blocked[REFERRAL_PAYLOAD]).toBeUndefined();
-    expect(referredScan()[REFERRAL_PAYLOAD]).toEqual({
+    expect(cleared[referralPayloadKey]).toBeUndefined();
+    expect(blocked[referralPayloadKey]).toBeUndefined();
+    expect(referredScan()[referralPayloadKey]).toEqual({
       text: AMBIGUOUS_TEXT,
       producerVendor: PRODUCER_VENDOR,
     });

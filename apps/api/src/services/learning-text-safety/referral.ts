@@ -28,8 +28,20 @@
 // deliberately NOT re-exported from any barrel: only this folder can unseal it.
 // ---------------------------------------------------------------------------
 
-/** Private key for the referral payload on a `refer` scan result. */
-export const REFERRAL_PAYLOAD = Symbol('learningTextSafety.referralPayload');
+/**
+ * Private key for the referral payload on a `refer` scan result.
+ *
+ * Deliberately NOT SCREAMING_CASE, despite being a module constant. The
+ * computed-property form `[SCREAMING_CASE]` is indistinguishable from a
+ * free-text `[MARKER]` token to `scripts/check-prompt-markers.sh`, the guard
+ * that stops LLM markers being used instead of the structured envelope. This
+ * file sits in `services/` and is prompt-adjacent, so the guard scans it and
+ * fails the required `main` check on the false positive. Renaming here is the
+ * correct fix — widening the guard's ALLOWLIST_RE to accommodate this code
+ * would also let a genuine `[REFERRAL_PAYLOAD]` inside a real prompt string
+ * through unnoticed. Do not rename it back.
+ */
+export const referralPayloadKey = Symbol('learningTextSafety.referralPayload');
 
 export interface LearningTextReferralPayload {
   /**
