@@ -141,6 +141,18 @@ describe('applySuitabilityGate', () => {
     expect(result.unavailable).toBe(false);
   });
 
+  it('[WI-1898] soft-block copy resets without questioning the learner intent', () => {
+    const response = suitabilityRefusalResponse();
+
+    expect(response).toMatch(/answer may have gone|let's reset/i);
+    expect(response).toMatch(/schoolwork/i);
+    expect(response).toMatch(/idea/i);
+    expect(response).toMatch(/related question/i);
+    expect(response).not.toMatch(
+      /you actually want|i don'?t want|that path|your intent|your answer|you (went|took)/i,
+    );
+  });
+
   it('does NOT block a minor reply on a concern verdict (reply passes)', () => {
     const result = applySuitabilityGate('fine reply', CONCERN, {
       isMinor: true,
@@ -212,10 +224,13 @@ describe('runSuitabilityEnforcement', () => {
   });
 
   it('fails OPEN with alarm signal when the judge route throws (unavailable)', async () => {
-    mockRouteAndCall.mockRejectedValue(new Error('circuit open'));
+    mockRouteAndCall.mockRejectedValue(
+      new Error('raw provider classifier error: circuit open'),
+    );
     const result = await runSuitabilityEnforcement(enforcementInput);
     expect(result.blocked).toBe(false);
     expect(result.response).toBe(enforcementInput.reply);
+    expect(result.response).not.toContain('raw provider classifier error');
     expect(result.unavailable).toBe(true);
   });
 

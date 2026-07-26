@@ -13,6 +13,7 @@ import {
   emitDangerousProcedureBlockedEvent,
   emitMinorPiiEchoRedactedEvent,
   emitSuitabilityBlockedEvent,
+  emitSuitabilityJudgeUnavailableEvent,
   parseExchangeEnvelope,
   processExchange,
   streamExchange,
@@ -316,6 +317,42 @@ describe('[WI-1691] blocked-safety digest event identity', () => {
       );
       expect(warnSpy.mock.calls[index]?.[0]).toContain(event.data['eventId']);
     }
+  });
+});
+
+describe('[WI-1898] suitability-judge unavailable alarm', () => {
+  it('fails open through a metadata-only structured operator event', async () => {
+    await emitSuitabilityJudgeUnavailableEvent({
+      sessionId: 'sess-suitability-unavailable',
+      profileId: 'prof-suitability-unavailable',
+      flow: 'session-exchange.stream',
+      provider: 'anthropic',
+      model: 'tutor-model',
+    });
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('safety.suitability_judge_unavailable'),
+    );
+    expect(mockInngestSend).toHaveBeenCalledTimes(1);
+    const sent = mockInngestSend.mock.calls[0][0] as {
+      name: string;
+      data: Record<string, unknown>;
+    };
+    expect(sent.name).toBe('app/safety.suitability_judge_unavailable');
+    expect(Object.keys(sent.data).sort()).toEqual(
+      [
+        'flow',
+        'model',
+        'profileId',
+        'provider',
+        'sessionId',
+        'timestamp',
+        'tutorModel',
+      ].sort(),
+    );
+    expect(JSON.stringify(sent.data)).not.toMatch(
+      /classifier error|provider error|learner message|tutor reply/i,
+    );
   });
 });
 

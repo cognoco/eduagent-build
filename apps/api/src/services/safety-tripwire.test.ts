@@ -13,6 +13,7 @@
 
 import {
   detectCatastrophicSafetyTrigger,
+  imageUnscreenedResponse,
   tripwireResponse,
 } from './safety-tripwire';
 
@@ -250,10 +251,17 @@ describe('tripwireResponse', () => {
     expect(msg).toMatch(/helpline/i);
   });
 
-  it('sexual_content_minor response refuses without graphic content and redirects', () => {
+  it('sexual_content_minor response declines narrowly and offers safe learning directions', () => {
     const msg = tripwireResponse('sexual_content_minor');
-    expect(msg).toMatch(/can'?t help/i);
+    expect(msg).toMatch(/can'?t (create|describe)/i);
+    expect(msg).toMatch(/bodies/i);
+    expect(msg).toMatch(/boundaries/i);
+    expect(msg).toMatch(/consent/i);
+    expect(msg).toMatch(/staying safe/i);
     expect(msg).toMatch(/trusted adult/i);
+    expect(msg).not.toMatch(
+      /why did you ask|what were you trying|your intent/i,
+    );
   });
 
   it('abuse_disclosure response validates, absolves fault, and routes to a trusted adult + helpline', () => {
@@ -271,5 +279,13 @@ describe('tripwireResponse', () => {
     const msg = tripwireResponse('abuse_disclosure');
     expect(msg).not.toMatch(/guardian/i);
     expect(msg).not.toMatch(/\bparents?\b/i);
+  });
+
+  it('image-screening uncertainty does not blame the learner and offers two retries', () => {
+    const msg = imageUnscreenedResponse();
+
+    expect(msg).toMatch(/type your question/i);
+    expect(msg).toMatch(/try the photo again/i);
+    expect(msg).not.toMatch(/your image was unsafe|you sent|your fault/i);
   });
 });

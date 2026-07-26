@@ -1,0 +1,41 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The deterministic learner-visible safety response inventory covers suitability soft blocks, catastrophic tripwire responses, image-screening uncertainty, and dangerous-procedure refusal. Only the suitability and sexual-content-minor messages required changes; self-harm, abuse-disclosure, image-screening, and dangerous-procedure responses remain unchanged and covered by the expanded safety regression run.",
+      "pointer": "apps/api/src/services/suitability-gate.test.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The suitability soft block now resets neutrally and offers schoolwork, high-level explanation, and related-question paths. Its regression rejects intent-questioning and second-person blame language.",
+      "pointer": "apps/api/src/services/suitability-gate.ts:90"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The sexual-content-minor tripwire now names the declined content narrowly, offers age-appropriate bodies, boundaries, consent, and staying-safe help, and retains a non-blaming trusted-adult route.",
+      "pointer": "apps/api/src/services/safety-tripwire.ts:235"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Judge route failure still returns the original tutor reply with unavailable=true, while the operator alarm remains a structured metadata-only Inngest event. Tests inject a raw provider/classifier error and prove it never enters the learner response or event payload.",
+      "pointer": "apps/api/src/services/exchanges.crisis-redirect.test.ts:323"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "No detector, threshold, allowlist, category, age gate, feature flag, routing decision, or fail-open control changed. The dangerous-procedure over-block and negative-path suite remains green alongside suitability and catastrophic-tripwire coverage.",
+      "pointer": "apps/api/src/services/dangerous-procedure-gate.test.ts"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Red-green evidence: the new suitability and sexual-content-minor assertions failed against the original messages, then passed after the two production copy changes. Focused final verification passed 169/169 tests; the full API unit surface passed 495/495 suites and 9,764 tests with 9 skipped.",
+      "pointer": "apps/api/src/services/safety-tripwire.test.ts:254"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "No rephrase action, block-to-rephrase observability, false-positive instrumentation, prompt, schema, or UI work was added; WI-2115 remains the owner of those recovery-action and observability changes.",
+      "pointer": "apps/api/src/services/suitability-gate.ts:90"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": "apps/api/src/services/suitability-gate.test.ts:144"
+}
