@@ -419,6 +419,13 @@ export async function evaluateLearningTextByContent(
  * that as their retry / skip signal rather than as a block, since it means the
  * state moved, not that the text is unsafe. Null/undefined is trivially safe:
  * there is no string to persist.
+ *
+ * CALLER CONTRACT — check exactly the bytes you will persist. Pass the same
+ * expression the write uses, not an earlier or unnormalized version of it. A site
+ * that checks `payload.field` and writes `normalize(payload.field)` fails OPEN: the
+ * check clears one string while a different, unevaluated string is persisted. That
+ * mismatch is the one way to defeat this module, and it is invisible to the type
+ * system — nothing here can detect it, so it is a review obligation at every site.
  */
 export function isContentSafe(
   result: LearningTextGateResult,

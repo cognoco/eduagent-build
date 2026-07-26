@@ -561,6 +561,22 @@ describe('[WI-2628] content-addressed keys — evaluate before a transaction, re
     expect(isContentSafe(result, undefined)).toBe(true);
   });
 
+  it('pins the empty string on the FAIL-CLOSED side — it is a string, so it is keyed', async () => {
+    // Deliberately asymmetric with null/undefined above, and the asymmetry is the
+    // ruled behavior rather than an oversight (2026-07-27): `null` short-circuits
+    // before the key is computed, `''` does not. So an empty string the batch never
+    // saw is REFUSED, which is the closed side of a distinction whose two sides
+    // differ in safety direction. Pinned here so it cannot drift loose silently.
+    const unevaluated = await evaluateSet([CLEAR_TEXT]);
+    expect(isContentSafe(unevaluated, '')).toBe(false);
+    expect(isContentSafe(unevaluated, '   ')).toBe(false);
+
+    // And it clears normally once the batch has actually evaluated it, so the
+    // refusal above is "unknown key", not "empty strings are unpersistable".
+    const evaluated = await evaluateSet([CLEAR_TEXT, '']);
+    expect(isContentSafe(evaluated, '')).toBe(true);
+  });
+
   it('collapses duplicates to ONE field, and one judge call', async () => {
     // A merged projection routinely carries the same interest or note in both the
     // existing row and the incoming analysis.
