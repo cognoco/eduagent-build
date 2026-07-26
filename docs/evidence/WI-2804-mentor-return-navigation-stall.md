@@ -2,11 +2,13 @@
 
 ## Scope and authority
 
-Diagnostic-only evidence for BID-48. No hosted target was rerun because WI-2804
+Diagnostic-only evidence for BID-48 (Integration and migration reliability
+Delivery Batch). No hosted target was rerun because WI-2804
 records no hosted-mutation authority. This investigation used the existing GitHub
 Actions record and repository source only. It did not edit the shared V2 smoke
-specification, widen a retry or timeout, implement a repair, or overlap WI-2805's
-close-to-wrap-up work.
+specification, widen a retry or timeout, implement a repair, or overlap WI-2805
+(Diagnose V2 first-session close-to-wrap-up readiness failure; collision owner
+for close-to-wrap-up work).
 
 ## Durable symptom
 
