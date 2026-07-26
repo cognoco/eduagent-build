@@ -1411,6 +1411,49 @@ describe('useMentorNoticePolicy', () => {
     ).not.toBeNull();
   });
 
+  // ── THE DISCLOSED RESIDUAL, PINNED ────────────────────────────────────────
+  //
+  // A corrupt marker over an ENABLED state record. This configuration was covered
+  // by the test the anti-brick fix replaced, and the replacement seeded the marker
+  // ALONE — so the behaviour INVERTED here with nothing left asserting it:
+  //
+  //   before  state {7,false}  suppressed(undefined)=true   suppressed(obs 7,true)=true
+  //   now     state {7,true}   suppressed(undefined)=false  suppressed(obs 7,true)=false
+  //
+  // THIS IS THE ACCEPTED OUTCOME, NOT A BUG — do not "fix" it back. A corrupt
+  // marker's true revision is UNKNOWABLE. The old behaviour asserted one anyway
+  // (disable at the HELD revision), and because markers are never pruned it
+  // re-fired on every hydration and permanently suppressed notices at any deploy
+  // revision. Treating the unknowable revision as 0 is what makes recovery
+  // possible; the cost is exactly this — a corrupt marker cannot override a
+  // legitimately enabled state record. Pinned so the trade stays visible, because
+  // on this Work Item a deleted test was itself green while asserting a defect.
+  it('DISCLOSED RESIDUAL: a corrupt marker does not override an enabled state record', async () => {
+    await seedStored(ACTOR, PROFILE, '{"revision":7,"enabled":true}');
+    await AsyncStorage.setItem(`${floorPrefix(ACTOR, PROFILE)}abc`, '1');
+
+    const { result } = mountPolicy();
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    expect(result.current.state).toEqual({ revision: 7, enabled: true });
+    expect(result.current.suppressed(undefined)).toBe(false);
+    expect(result.current.suppressed(observation(7, true))).toBe(false);
+
+    // The fail-closed floor is unaffected: a PARSEABLE marker at the same revision
+    // still suppresses, so this residual is scoped to the unknowable case alone.
+    await AsyncStorage.setItem(`${floorPrefix(ACTOR, PROFILE)}7`, '1');
+    resetMentorNoticePolicyStoreForTests();
+    const withGoodMarker = mountPolicy();
+    await waitFor(() =>
+      expect(withGoodMarker.result.current.hydrated).toBe(true),
+    );
+    expect(withGoodMarker.result.current.state).toEqual({
+      revision: 7,
+      enabled: false,
+    });
+    expect(withGoodMarker.result.current.suppressed(undefined)).toBe(true);
+  });
+
   // CONTROL, kept separate so the marker path and the state-record path cannot
   // silently converge again. A corrupt STATE RECORD self-heals because the next
   // write OVERWRITES it; that asymmetry is what made the marker case permanent,
