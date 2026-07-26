@@ -60,6 +60,16 @@ export interface RunChallengeRoundGraderInput {
   ageBracket: AgeBracket;
   /** Optional session id for correlation / per-flow metrics. */
   sessionId?: string;
+  /**
+   * [WI-2670] The REAL vendor that produced `askedQuestion` — the caller
+   * (session-exchange.ts's `resolveAskedQuestion`) reads it back from that
+   * turn's persisted `llmProvider`, never from the current turn's own
+   * routing decision (the two can diverge after a mid-session provider
+   * fallback). Declared to the router as `JudgeIndependence`
+   * mode:'model-output' so the grader is never selected from the same
+   * vendor that produced the question it grades.
+   */
+  producerVendor: string;
 }
 
 type DegradedReason =
@@ -119,36 +129,23 @@ export async function runChallengeRoundGrader(
   // 1. Route to the judge (capability:'judge' selects the tier/age-blind
   //    grader path — exempt from the under-18 Gemini-ban gate, WI-1800).
   //
-  // WI-2624 DEFERRED, TRACKED, GATED (not forgotten):
-  //
-  // This grades the LEARNER's answer, but is judged against `askedQuestion`
-  // — the mentor's own prior turn, i.e. tutor output. This is the one
-  // reachable producer-judges-own-output site on the production-default
-  // config (LLM_ROUTING_V2_ENABLED off). AC-3 calls for `model-output`
-  // independence (excluding whichever vendor produced that prior turn), but
-  // no REAL producer vendor is cleanly threadable here today:
-  // `askedQuestion` is sourced from `context.exchangeHistory` (session-
-  // exchange.ts, T6), and history entries carry only `{ role, content,
-  // orphan_reason }` — no per-turn vendor is persisted or threaded. The
-  // current turn's own `result.provider` (session-exchange.ts) is NOT a
-  // substitute — it is the vendor for THIS turn's response, not the vendor
-  // that produced the PRIOR turn's question, and can differ from it (e.g. a
-  // mid-session provider fallback). Guessing would reintroduce exactly the
-  // kind of silent mislabeling WI-2624 exists to remove, so this site is
-  // left `not-applicable` (no producer exclusion, Gemini/Vertex still
-  // banned) rather than a false `model-output` declaration.
-  //
-  // Follow-up: WI-2670 ("Thread per-turn producer vendor through exchange
-  // history and apply producer-exclusion to the Challenge Round grader").
-  // Owner: BID-35 / shepherd:claude:mentor-notice. Gate (not a calendar
-  // date): must land before BID-35 batch graduation — WI-2670 is wired
-  // Blocking→WI-2574, so the zero-open re-audit enforces it. Do not
-  // reclassify this call site without landing WI-2670 first.
+  // [WI-2670] This grades the LEARNER's answer, but is judged against
+  // `askedQuestion` — the mentor's own prior turn, i.e. tutor output. The
+  // caller (session-exchange.ts's `resolveAskedQuestion`) threads the REAL
+  // vendor that produced that prior turn, read back from its persisted
+  // `llmProvider` — never the current turn's own routing decision, which can
+  // diverge after a mid-session provider fallback. Declaring `model-output`
+  // excludes that vendor from judge selection (MMT-ADR-0016 §2), closing the
+  // one reachable producer-judges-own-output site on the production-default
+  // config (LLM_ROUTING_V2_ENABLED off) that WI-2624 deferred.
   let response: string;
   try {
     const result = await routeAndCall(messages, GRADER_RUNG, {
       capability: 'judge',
-      judgeIndependence: { mode: 'not-applicable' },
+      judgeIndependence: {
+        mode: 'model-output',
+        producerVendor: input.producerVendor,
+      },
       flow: GRADER_FLOW,
       responseFormat: 'json',
       conversationLanguage: input.conversationLanguage,
