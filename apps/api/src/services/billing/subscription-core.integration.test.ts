@@ -339,17 +339,6 @@ describe('updateSubscriptionFromWebhookV2', () => {
         expect(preExistingResidue.stripeSubscriptionId).toBe(
           STATIC_WEBHOOK_RESIDUE_ID,
         );
-
-        const { organizationId, ownerId } = await seedV2OrgWithOwner(
-          'webhook-update-residue',
-        );
-        await seedV2SubscriptionDirect({
-          organizationId,
-          ownerId,
-          tier: 'plus',
-          status: 'trial',
-          stripeSubscriptionId: 'sub_webhook_001',
-        });
       }
 
       const { organizationId, ownerId } = await seedV2OrgWithOwner(
