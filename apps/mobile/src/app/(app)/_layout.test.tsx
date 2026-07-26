@@ -1093,7 +1093,15 @@ describe('AppLayout', () => {
   // status bar, no home-indicator gesture area — e.g. iPhone SE-class) to
   // prove the V2 tab bar stays visible and the owning tab's highlight is
   // correct at that viewport, not just that the resolver returns the right
-  // boolean in isolation.
+  // boolean in isolation. Small-phone coverage here IS the inset +
+  // minimum-height-floor guarantee: height = 56 + max(insets.bottom,
+  // V2_TAB_BAR_MIN_BOTTOM_INSET), so at bottom:0 the floor forces height 104
+  // with display!='none' and the bar cannot collapse regardless of viewport
+  // width. The shell reads no window dimension (no useWindowDimensions /
+  // Dimensions.get in the render path), so a viewport mock would be inert;
+  // per operator ruling 2026-07-26 the floor guarantee is the genuine
+  // small-phone signal (docs/evidence/wi2331-rgr-v2-wayfinding.md → "Rework #2
+  // / Axis 3 — small-phone layout").
   it('keeps the V2 tab bar visible with correct tab highlight at a small-phone viewport', async () => {
     const flags = require('../../lib/feature-flags') as {
       FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };

@@ -79,3 +79,27 @@ code. The small-phone axis was retained (not treated as vestigial to the removed
 orchestrator's KEEP recommendation, since bottom-nav visibility/highlight and Back-label
 usability are layout outcomes that can regress at a small viewport even when route resolution
 takes no size input.
+
+## Rework #2 — independent-reviewer findings addressed (2026-07-26)
+
+The independent reviewer returned the item a second time on one finding: the AC-5 per-axis
+regression tests were structural proxies rather than genuine coverage. Resolved as follows,
+stacking on the landed fix (unchanged, still on the base branch).
+
+- Dark/light axis: the theme mock now reads the real design-tokens table keyed by a mutable
+  colour-scheme, and both tab components are asserted under each theme, proving the unfocused
+  colour differs between light and dark. Red-green proven.
+- Own/supporting axis: the test now builds real profile fixtures, distinguishes them via the
+  real isGuardianProfile helper, renders the real app layout, drives the active returnTo through
+  the real search-params seam, and asserts the Back destination differs by context. Red-green
+  proven with two independent breaks.
+- Small-phone axis: resolved by operator scope ruling. The V2 tab-bar layout reads only
+  safe-area insets floored by a minimum height and takes no window-dimension input, so a
+  viewport mock would be inert. The ruling records that the inset plus height-floor guarantee is
+  the genuine small-phone signal for this inset-driven layout; the covering test asserts the
+  floored height and surviving owning-tab highlight at a zero bottom inset. Recorded as an
+  in-repo provenance note; the Cosmo AC field is unchanged.
+
+Verification: mobile suite over the touched files green on Node 22; mobile typecheck and eslint
+clean; production source byte-identical (test-only change). Full red-green detail in
+docs/evidence/wi2331-rgr-v2-wayfinding.md under "Rework #2".
