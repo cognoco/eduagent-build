@@ -164,7 +164,9 @@ async function loadIndexCatalog(pool: Pool): Promise<IndexCatalogRow[]> {
 
 describe('curriculum dedup index repair on disposable Postgres [WI-2791]', () => {
   const baseUrl = requireDisposableDatabaseUrl();
-  const databaseName = `wi2791_repair_${randomBytes(4).toString('hex')}`;
+  const scratchRunId = randomBytes(4).toString('hex');
+  const databaseName = `wi2791_repair_${scratchRunId}`;
+  const scratchApplicationName = `wi2791-repair-${scratchRunId}`;
   const scratchUrl = buildScratchUrl(baseUrl, databaseName);
   const tempDirs: string[] = [];
 
@@ -190,7 +192,10 @@ describe('curriculum dedup index repair on disposable Postgres [WI-2791]', () =>
 
     adminPool = new Pool({ connectionString: baseUrl });
     await adminPool.query(`CREATE DATABASE "${databaseName}"`);
-    scratchPool = new Pool({ connectionString: scratchUrl });
+    scratchPool = new Pool({
+      connectionString: scratchUrl,
+      application_name: scratchApplicationName,
+    });
     await scratchPool.query('CREATE EXTENSION IF NOT EXISTS vector');
     await migrate(drizzle(scratchPool), { migrationsFolder: preRepairDir });
 
@@ -232,6 +237,7 @@ describe('curriculum dedup index repair on disposable Postgres [WI-2791]', () =>
       adminPool,
       scratchPool,
       databaseName,
+      ownedApplicationName: scratchApplicationName,
       tempDirs,
     });
   });
