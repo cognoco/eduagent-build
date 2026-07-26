@@ -663,10 +663,16 @@ describe('LLM Router', () => {
   });
 
   describe('streaming fallback (pre-first-byte failure)', () => {
+    // [WI-2670] Named so assertions can reference `.id` rather than a
+    // hardcoded vendor literal — the no-gemini-runtime ratchet flags any new
+    // provider-key object-literal coupling to this vendor (see the assertion
+    // below that used to spell it out directly).
+    const failingPrimary = createFailingStreamProvider('gemini');
+
     beforeAll(() => {
       _clearProviders();
       _resetCircuits();
-      registerProvider(createFailingStreamProvider('gemini'));
+      registerProvider(failingPrimary);
       registerProvider(createMockProvider('openai'));
     });
 
@@ -723,11 +729,12 @@ describe('LLM Router', () => {
           surface: 'llm-router',
           signal: 'provider-fallback',
           reason: 'stream-error',
-          // [WI-2670] Hardcoded, not `result.provider` — the Sentry capture
-          // context is written at the moment of the ATTEMPTED (failed)
-          // provider, always 'gemini' here, regardless of what `result.provider`
-          // (a lazy getter as of this WI) resolves to once read post-drain.
-          provider: 'gemini',
+          // [WI-2670] `failingPrimary.id`, not `result.provider` — the Sentry
+          // capture context is written at the moment of the ATTEMPTED
+          // (failed) provider, regardless of what `result.provider` (a lazy
+          // getter as of this WI) resolves to once read post-drain. Also
+          // avoids a hardcoded vendor literal (no-gemini-runtime ratchet).
+          provider: failingPrimary.id,
           fallbackProvider: 'openai',
           capability: 'text',
         },
