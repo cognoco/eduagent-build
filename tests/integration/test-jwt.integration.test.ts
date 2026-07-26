@@ -47,7 +47,7 @@ describe('signTestJwt', () => {
     const token = signTestJwt({});
     const [headerB64] = token.split('.');
     const header = JSON.parse(
-      Buffer.from(headerB64!, 'base64url').toString('utf8')
+      Buffer.from(headerB64!, 'base64url').toString('utf8'),
     );
     expect(header.kid).toBe(TEST_KID);
     expect(header.alg).toBe('RS256');
@@ -57,7 +57,7 @@ describe('signTestJwt', () => {
     const token = signTestJwt({});
     const [, payloadB64] = token.split('.');
     const payload = JSON.parse(
-      Buffer.from(payloadB64!, 'base64url').toString('utf8')
+      Buffer.from(payloadB64!, 'base64url').toString('utf8'),
     );
     expect(payload.sub).toBe('user_test');
     expect(payload.email).toBe('test@example.com');
@@ -70,7 +70,7 @@ describe('signTestJwt', () => {
     const token = signTestJwt({ sub: 'custom_user', email: 'x@y.com' });
     const [, payloadB64] = token.split('.');
     const payload = JSON.parse(
-      Buffer.from(payloadB64!, 'base64url').toString('utf8')
+      Buffer.from(payloadB64!, 'base64url').toString('utf8'),
     );
     expect(payload.sub).toBe('custom_user');
     expect(payload.email).toBe('x@y.com');
@@ -109,7 +109,7 @@ describe('signTestJwt + verifyJWT integration', () => {
 
     try {
       const jwks = await fetchJWKS(
-        'https://mock.clerk.test/.well-known/jwks.json'
+        'https://mock.clerk.test/.well-known/jwks.json',
       );
       const jwk = jwks.keys.find((k) => k.kid === TEST_KID);
       expect(jwk).toBeDefined();
@@ -147,6 +147,7 @@ describe('wrong key', () => {
     // Generate a separate key pair unrelated to the test key.
     const { privateKey: otherPrivateKey } = generateKeyPairSync('rsa', {
       modulusLength: 2048,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
       privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
     });
 
@@ -164,13 +165,13 @@ describe('wrong key', () => {
     const signature = sign(
       'sha256',
       Buffer.from(signingInput, 'ascii'),
-      otherPrivateKey
+      otherPrivateKey,
     );
     const token = `${signingInput}.${base64UrlEncode(signature)}`;
 
     const jwk = getTestPublicJwk();
     await expect(verifyJWT(token, jwk)).rejects.toThrow(
-      'signature verification failed'
+      'signature verification failed',
     );
   });
 });

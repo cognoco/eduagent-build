@@ -107,10 +107,12 @@ function createIntegrationDb(): Database {
       await acceptLink(db, initiated.id, {
         actorPersonId: input.supporterPersonId,
         audience: 'supporter',
+        contractVersion: initiated.contractVersion,
       });
       await acceptLink(db, initiated.id, {
         actorPersonId: input.supporteePersonId,
         audience: 'supportee',
+        contractVersion: initiated.contractVersion,
       });
     }
 
@@ -279,10 +281,12 @@ function createIntegrationDb(): Database {
       await acceptLink(db, initiated.id, {
         actorPersonId: input.supporterPersonId,
         audience: 'supporter',
+        contractVersion: initiated.contractVersion,
       });
       await acceptLink(db, initiated.id, {
         actorPersonId: input.supporteePersonId,
         audience: 'supportee',
+        contractVersion: initiated.contractVersion,
       });
     }
 

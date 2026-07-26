@@ -47,5 +47,10 @@ flows/v2/v2-supporter-self-learning-doorway.yaml
 # behavior under test, not test setup.
 flows/v2/v2-supporter-scope-geometry.yaml
 
+# [WI-2242] Cold-relaunches one-sided and completed visibility contracts to
+# prove each ceremony stage survives a process restart. The relaunch is the
+# behavior under test, not test setup.
+flows/v2/v2-supporter-link-ceremony.yaml
+
 # DEFERRED:M1-COMPREHENSIVE — full rewrite needed (theme picker removed, stale More-screen refs)
 flows/post-auth-comprehensive-devclient.yaml

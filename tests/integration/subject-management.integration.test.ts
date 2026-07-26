@@ -25,16 +25,22 @@ const mockSetTag = jest.fn();
 
 jest.mock('@sentry/cloudflare', () => ({
   // gc1-allow: @sentry/cloudflare is an external observability SDK — no real Sentry transport is available in the test environment; the Cloudflare-specific withSentry/withScope wrappers require a live DSN and worker context to initialise
-  withScope: (fn) =>
+  withScope: (
+    fn: (scope: {
+      setUser: (...args: unknown[]) => unknown;
+      setTag: (...args: unknown[]) => unknown;
+      setExtra: (...args: unknown[]) => unknown;
+    }) => void,
+  ) =>
     fn({
-      setUser: (...args) => mockSetUser(...args),
-      setTag: (...args) => mockSetTag(...args),
+      setUser: (...args: unknown[]) => mockSetUser(...args),
+      setTag: (...args: unknown[]) => mockSetTag(...args),
       setExtra: jest.fn(),
     }),
-  captureException: (...args) => mockCaptureException(...args),
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
   captureMessage: jest.fn(),
   addBreadcrumb: jest.fn(),
-  withSentry: (_config, handler) => handler,
+  withSentry: <T>(_config: unknown, handler: T): T => handler,
 }));
 
 import { buildIntegrationEnv, cleanupAccounts } from './helpers';
@@ -248,8 +254,10 @@ describe('Integration: GET /v1/subjects', () => {
     expect(res.status).toBe(200);
     const body = subjectListResponseSchema.parse(await res.json());
     expect(body.subjects).toHaveLength(1);
-    expect(body.subjects[0].id).toBe(subject.id);
-    expect(body.subjects[0].name).toBe('Mathematics');
+    const returnedSubject = body.subjects[0];
+    if (!returnedSubject) throw new Error('Expected one returned subject');
+    expect(returnedSubject.id).toBe(subject.id);
+    expect(returnedSubject.name).toBe('Mathematics');
   });
 
   it('passes includeInactive=true to service', async () => {
@@ -966,11 +974,13 @@ describe('Integration: POST /v1/subjects/classify', () => {
       suggestedSubjectName: null,
     });
     expect(body.candidates).toHaveLength(1);
-    expect(body.candidates[0]).toMatchObject({
+    const candidate = body.candidates[0];
+    if (!candidate) throw new Error('Expected one subject candidate');
+    expect(candidate).toMatchObject({
       subjectId: subject.id,
       subjectName: 'Mathematics',
     });
-    expect(body.candidates[0].confidence).toBeGreaterThanOrEqual(0.9);
+    expect(candidate.confidence).toBeGreaterThanOrEqual(0.9);
     expect(subjectLlmFixture.chatCalls.length).toBeGreaterThan(0);
   });
 });

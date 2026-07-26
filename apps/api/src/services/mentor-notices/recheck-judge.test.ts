@@ -141,8 +141,8 @@ describe('evaluateMentorNoticeRecheck', () => {
   // -------------------------------------------------------------------------
   // [WI-2625 rework] The coupling guard. The Gate-2 bounce was caused by a
   // valid `continue` verdict and an evaluator FAILURE sharing one return
-  // value, which made the caller's turn-3 `not_yet` force terminalize a
-  // deliberate no-transition. This case asserts the two are distinguishable
+  // value, which made the caller's turn-3 `not_yet` terminalization fire over
+  // a deliberate no-transition. This case asserts the two are distinguishable
   // and enumerates EVERY failure mode against the valid-continue result, so
   // the two can never silently re-merge: any change that collapses them fails
   // here, whichever direction it collapses in.
@@ -216,10 +216,11 @@ describe('evaluateMentorNoticeRecheck', () => {
   });
 
   // [WI-2625 rework] Three causes, three distinguishable results. The caller
-  // acts on all three differently — apply the verdict / cap over a valid
-  // continue / cap over an unresolved evaluation — and it records WHICH cause
-  // fired. Any two of these collapsing into one value re-creates the
-  // conflation class, so assert all three pairs are mutually distinct.
+  // acts on all three differently — apply the verdict / end the attempt at the
+  // cap leaving the notice open / terminalize `not_yet` at the cap — and it
+  // records WHICH cause fired. Any two of these collapsing into one value
+  // re-creates the conflation class, so assert all three pairs are mutually
+  // distinct.
   it('keeps all three evaluation variants mutually distinguishable', async () => {
     mockRouteAndCall.mockResolvedValue(
       routeResult(
@@ -242,9 +243,11 @@ describe('evaluateMentorNoticeRecheck', () => {
 
     const kinds = [outcome.kind, validContinue.kind, unresolved.kind];
     expect(new Set(kinds).size).toBe(3);
-    // A `not_yet` VERDICT and a capped-out no-transition both end at status
-    // `not_yet` in the DB — but they must not be the same value here, or the
-    // caller cannot tell "the judge decided not_yet" from "nothing was decided".
+    // A `not_yet` VERDICT and an unresolved evaluation at the cap both end at
+    // status `not_yet` in the DB — but they must not be the same value here, or
+    // the caller cannot tell "the judge decided not_yet" from "nothing was
+    // decided", and a valid `continue` (which must transition NOTHING) could
+    // not be held apart from either.
     expect(outcome).not.toEqual(unresolved);
     expect(outcome).not.toEqual(validContinue);
   });

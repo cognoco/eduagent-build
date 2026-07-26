@@ -21,11 +21,11 @@
 //
 // This evaluator never terminalizes anything and knows nothing about the
 // response cap. The caller (session-exchange.ts) owns the cap as a SEPARATE
-// deterministic mechanism: at the third response it terminalizes the attempt
-// to `not_yet` so no capped-out attempt is left attached to an open notice,
-// recording whether the cap fired over a valid `continue` or over an
-// unresolved evaluation. The judge's verdict is never the thing that
-// terminalizes on a `continue`.
+// deterministic mechanism, and the cap acts on the ATTEMPT rather than the
+// notice: at the third response a valid `continue` ends the attempt and leaves
+// the notice open, unresolved and re-offerable, while an unresolved evaluation
+// terminalizes `not_yet`. A valid `continue` never causes a notice transition
+// at any exchange number.
 //
 // Data minimization: the judge sees the notice's concept/correctionHint
 // (already tutor-visible), the exchange number, and the learner's CURRENT
@@ -92,9 +92,11 @@ export const recheckJudgeRawSchema = z.object({
  *   output, judge unavailable, routing failure, thrown error, missing answer
  *   event). Fail-open: no verdict to apply.
  *
- * Neither no-transition variant terminalizes on its own. The caller's separate
- * response cap does that at the third response, and records which of the two
- * it fired over.
+ * Only `continue` is a deliberate no-transition, and it never terminalizes at
+ * any exchange number: at the caller's separate response cap it merely ends the
+ * attempt, notice preserved. `unresolved` is fail-open rather than a chosen
+ * no-transition — below the cap there is simply no verdict to apply, and AT the
+ * cap it terminalizes `not_yet`.
  */
 export type MentorNoticeRecheckEvaluation =
   | { kind: 'outcome'; outcome: MentorNoticeRecheckOutcome }

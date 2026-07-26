@@ -33,23 +33,30 @@ appId: com.mentomate.app
     id: "sign-in-email"
 - inputText: ${EMAIL}
 
-# Dismiss keyboard before tapping the next field. hideKeyboard is a no-op
-# when the keyboard is closed, so it never falls through to Android Back
-# (the failure mode of the prior `pressKey: back` pattern).
-- hideKeyboard
+# Reveal the next field directly. This remains safe on both soft-keyboard and
+# hardware-keyboard emulators; hideKeyboard can inject Android Back when no
+# IME is open and close the app.
+- scrollUntilVisible:
+    element:
+      id: "sign-in-password"
+    direction: DOWN
+    timeout: 10000
+    speed: 60
+    visibilityPercentage: 50
 
 # 2. Enter password
 - tapOn:
     id: "sign-in-password"
 - inputText: ${PASSWORD}
 
-- hideKeyboard
-
-# 3. Wait for sign-in button and tap it
-- extendedWaitUntil:
-    visible:
+# 3. Reveal the sign-in button without relying on Android Back, then tap it.
+- scrollUntilVisible:
+    element:
       id: "sign-in-button"
     timeout: 10000
+    direction: DOWN
+    speed: 60
+    visibilityPercentage: 50
 
 - tapOn:
     id: "sign-in-button"

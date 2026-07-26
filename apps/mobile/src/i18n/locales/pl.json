@@ -4738,7 +4738,6 @@
       "activeMessage": "Możesz przejrzeć tę umowę tutaj w dowolnym momencie.",
       "revoke": "Zakończ udostępnianie",
       "revoking": "Kończenie udostępniania...",
-      "revoked": "Udostępnianie kończy się. Osoba wspierająca zobaczy powiadomienie.",
       "revokeErrorTitle": "Błąd kończenia udostępniania",
       "missingActor": "Nie mogliśmy zidentyfikować aktywnej osoby.",
       "relationLabel": "Relacja",
