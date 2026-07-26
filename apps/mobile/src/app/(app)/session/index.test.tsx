@@ -3478,6 +3478,19 @@ describe('SessionScreen homework flow', () => {
       testScreen.unmount();
     }, 15000);
 
+    it('[WI-2811] renders wrap-up locally after a successful first-session close', async () => {
+      const testScreen = await renderFirstSessionWrapUp();
+
+      expect(mockCloseSession).toHaveBeenCalled();
+      expect(testScreen.getByTestId('first-session-wrap-up')).toBeTruthy();
+      expect(mockReplace).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: `/session-summary/${SESSION_ID}`,
+        }),
+      );
+      testScreen.unmount();
+    }, 15000);
+
     it('[WI-2095] renders the reflection receipt and settles saving after a successful submit', async () => {
       const testScreen = await renderFirstSessionWrapUp();
 
@@ -3731,7 +3744,7 @@ describe('SessionScreen homework flow', () => {
       captureExceptionSpy.mockRestore();
     }, 15000);
 
-    it('keeps later V2 Mentor sessions on the existing summary path', async () => {
+    it('[WI-2811] routes a later V2 Mentor session to summary', async () => {
       getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
       mockFetch.setRoute('/progress/inventory', {
         profileId: ACTIVE_PROFILE_ID,
