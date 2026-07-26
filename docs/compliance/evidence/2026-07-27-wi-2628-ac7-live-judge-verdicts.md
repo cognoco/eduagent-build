@@ -46,10 +46,17 @@ the production judge branch and not a generic text call.
 passes that shape for LLM-provenance referrals, but `{ mode: 'not-applicable' }` when
 `referral.origin === 'user'`. So the runs below exercise the **`model-output`**
 branch; the user-provenance routing branch itself was not exercised. The verdicts
-still transfer: `'cerebras'` is not in the judge pool, so both modes select the same
-rung-1 occupant (`llm/router.ts:470`), and `buildJudgePrompt` takes no provenance
-argument — the model and the prompt are identical either way. What is untested here
-is the routing branch, not the answer.
+still transfer: judge-vendor selection is decided by `resolveJudgeEligibleVendors`
+(`apps/api/src/services/llm/router.ts`), which returns the full pool under
+`not-applicable` and filters it by the normalized producer under `model-output`.
+`'cerebras'` matches neither pool member, so both modes resolve to the same rung-1
+occupant, and `buildJudgePrompt` takes no provenance argument — the model and the
+prompt are identical either way. What is untested here is the routing branch, not
+the answer.
+
+*Cited by function identity rather than `file:line` deliberately: this is a
+point-in-time audit document, and a line number rots on the next edit to an
+unrelated part of that file.*
 
 | run | scenarios | live calls | failed | quality failures |
 |---|---|---|---|---|
@@ -100,8 +107,9 @@ judge ("always allow" passes the five, "always block" passes LTS05).
 **Does not establish.** The judge is non-deterministic; a handful of agreeing runs is
 evidence of stability, not a guarantee — and the bound is **per scenario**: three
 agreeing runs for LTS01–05, **two** for LTS06–09. Two agreeing observations is a
-weaker stability claim than three, and four of the five ruling strings rest on it. This is *not* the safety property. Safety
-rests on two things this file does not depend on: the deterministic scanner blocks
+weaker stability claim than three, and four of the five ruling strings rest on it.
+
+This is *not* the safety property. Safety rests on two things this file does not depend on: the deterministic scanner blocks
 person attribution in all ten languages at every provenance without consulting the
 judge at all, and `judge.ts` fails closed on every degraded response. If the judge
 began refusing educational text tomorrow, the failure mode is a learner
