@@ -308,7 +308,7 @@ const VOCABULARY_QUESTION: QuizQuestion = {
   isLibraryItem: false,
 };
 
-function quizAuthHeaders(profileId: string): Record<string, string> {
+function quizAuthHeaders(profileId: string): HeadersInit {
   return buildAuthHeaders(
     { sub: QUIZ_AUTH_USER_ID, email: QUIZ_AUTH_EMAIL },
     profileId,

@@ -1,0 +1,31 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The focused non-DB regression was observed red against the original teardown: the test expected a connection-drain handoff and no forced DROP, but the integration source still ended the pool and immediately issued DROP DATABASE WITH (FORCE). After the fix, the same focused suite is green and also exercises delayed backend disappearance plus the timeout path.",
+      "pointer": "apps/api/src/db/profiles-dropped-migrate-replay-teardown.test.ts:7"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "closePoolAndDropScratchDatabase ends the scratch pool, polls pg_stat_activity by the exact scratch database name until the backend count reaches zero, and only then issues a normal DROP DATABASE. A bounded timeout throws instead of escalating to FORCE.",
+      "pointer": "apps/api/src/db/scratch-database-teardown.ts:12"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "The profiles-dropped migration replay suite's afterAll now delegates teardown to the drain-aware helper; admin-pool shutdown and temporary migration-directory removal remain protected by finally blocks.",
+      "pointer": "apps/api/src/db/profiles-dropped-migrate-replay.integration.test.ts:198"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Scratch isolation remains database-name scoped: the helper queries pg_stat_activity with the generated scratch database name as a parameter and drops that same quoted identifier. The unit seam proves repeated nonzero observations are drained before DROP and that a persistent connection leaves the database intact rather than force-killing it.",
+      "pointer": "apps/api/src/db/profiles-dropped-migrate-replay-teardown.test.ts:17"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "The existing CI workflow runs the co-located integration glob containing the profiles-dropped suite against two disposable pgvector Postgres services (the required main lane and the flag-on diagnostic lane), providing two isolated real-database executions for the PR without using the shared staging endpoint.",
+      "pointer": ".github/workflows/ci.yml:435"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": "apps/api/src/db/profiles-dropped-migrate-replay-teardown.test.ts:7"
+}

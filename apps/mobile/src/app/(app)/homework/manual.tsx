@@ -192,25 +192,43 @@ function ManualHomeworkEntry({
                 {t('homework.loadingSubjects')}
               </Text>
             </View>
-          ) : null}
-          {activeSubjects.map((subject) => (
-            <Pressable
-              key={subject.id}
-              testID={`subject-pick-${subject.id}`}
-              onPress={() =>
-                setSelectedSubject({ id: subject.id, name: subject.name })
-              }
-              className="mb-2 min-h-[48px] justify-center rounded-button bg-surface-elevated px-4 py-3"
-              accessibilityLabel={t('homework.selectSubjectLabel', {
-                name: subject.name,
-              })}
-              accessibilityRole="button"
-            >
-              <Text className="text-body text-text-primary">
-                {subject.name}
+          ) : activeSubjects.length === 0 ? (
+            <View className="py-3" testID="subject-picker-empty">
+              <Text className="text-body-sm text-text-secondary mb-3">
+                {t('homework.noSubjectsYet')}
               </Text>
-            </Pressable>
-          ))}
+              <Pressable
+                testID="subject-picker-create"
+                onPress={() => router.push('/create-subject' as Href)}
+                className="min-h-[48px] items-center justify-center rounded-button bg-primary px-4 py-3"
+                accessibilityLabel={t('homework.createNewSubjectLabel')}
+                accessibilityRole="button"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  {t('homework.createSubject')}
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            activeSubjects.map((subject) => (
+              <Pressable
+                key={subject.id}
+                testID={`subject-pick-${subject.id}`}
+                onPress={() =>
+                  setSelectedSubject({ id: subject.id, name: subject.name })
+                }
+                className="mb-2 min-h-[48px] justify-center rounded-button bg-surface-elevated px-4 py-3"
+                accessibilityLabel={t('homework.selectSubjectLabel', {
+                  name: subject.name,
+                })}
+                accessibilityRole="button"
+              >
+                <Text className="text-body text-text-primary">
+                  {subject.name}
+                </Text>
+              </Pressable>
+            ))
+          )}
         </View>
       ) : (
         <Text className="mt-6 text-body-sm text-text-secondary">

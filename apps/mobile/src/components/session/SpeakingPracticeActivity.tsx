@@ -46,6 +46,7 @@ export function SpeakingPracticeActivity({
   const {
     isListening,
     transcript,
+    isFinalTranscript,
     startListening,
     stopListening,
     clearTranscript,
@@ -54,6 +55,7 @@ export function SpeakingPracticeActivity({
   const [feedback, setFeedback] = useState<AttemptFeedback | null>(null);
   const [attemptFailed, setAttemptFailed] = useState(false);
   const wasListeningRef = useRef(false);
+  const hasSubmittedCycleRef = useRef(false);
   const discardListeningCycleRef = useRef(false);
   const attemptGenerationRef = useRef(0);
   const { t } = useTranslation();
@@ -66,6 +68,7 @@ export function SpeakingPracticeActivity({
     attemptGenerationRef.current += 1;
     discardListeningCycleRef.current = true;
     wasListeningRef.current = false;
+    hasSubmittedCycleRef.current = false;
     setFeedback(null);
     setAttemptFailed(false);
 
@@ -79,49 +82,64 @@ export function SpeakingPracticeActivity({
     speakingPractice?.locale,
   ]);
 
-  // Submits exactly once per stop-listening transition, when a non-empty
-  // transcript exists. Guarded by `wasListeningRef` so a late STT `result`
-  // event arriving after `isListening` has already flipped to false (which
-  // re-triggers this effect via the `transcript` dependency) does not
-  // double-submit — the ref only enables the false-transition branch once.
+  // Stop-listening and final-transcript-ready are distinct signals: the STT
+  // hook can flip `isListening` false (the engine enters `processing`) well
+  // before its real final result lands, so gating on `isListening` alone
+  // submits the last interim guess instead of the true final. Submission
+  // waits for `isFinalTranscript`, and then uses whatever `transcript` holds
+  // at that moment — a late final arriving after the mic already stopped
+  // replaces the interim text that was showing. `hasSubmittedCycleRef` bounds
+  // this to at most once per recording cycle; a cycle that ends without ever
+  // producing a final (cancelled, or an `error` status) simply never submits.
   useEffect(() => {
     if (discardListeningCycleRef.current) {
       if (!isListening) discardListeningCycleRef.current = false;
       wasListeningRef.current = false;
+      hasSubmittedCycleRef.current = false;
       return;
     }
 
-    if (wasListeningRef.current && !isListening) {
-      const trimmed = transcript.trim();
-      if (trimmed && speakingPractice) {
-        const attemptGeneration = ++attemptGenerationRef.current;
-        setAttemptFailed(false);
-        void (async () => {
-          try {
-            const result = await recordAttempt.mutateAsync({
-              sessionId,
-              subjectId,
-              mode: 'repeat_after_me',
-              targetText: speakingPractice.targetText,
-              transcript: trimmed,
-              locale: speakingPractice.locale,
-            });
-            if (attemptGeneration !== attemptGenerationRef.current) return;
-            setFeedback({
-              missingWords: result.missingWords,
-              extraWords: result.extraWords,
-              isComplete: result.isComplete,
-            });
-          } catch {
-            if (attemptGeneration !== attemptGenerationRef.current) return;
-            setAttemptFailed(true);
-          }
-        })();
-      }
+    if (isListening) {
+      wasListeningRef.current = true;
+      hasSubmittedCycleRef.current = false;
+      return;
     }
-    wasListeningRef.current = isListening;
+
+    if (!wasListeningRef.current || hasSubmittedCycleRef.current) return;
+    if (!isFinalTranscript) return;
+
+    wasListeningRef.current = false;
+    hasSubmittedCycleRef.current = true;
+
+    const trimmed = transcript.trim();
+    if (trimmed && speakingPractice) {
+      const attemptGeneration = ++attemptGenerationRef.current;
+      setAttemptFailed(false);
+      void (async () => {
+        try {
+          const result = await recordAttempt.mutateAsync({
+            sessionId,
+            subjectId,
+            mode: 'repeat_after_me',
+            targetText: speakingPractice.targetText,
+            transcript: trimmed,
+            locale: speakingPractice.locale,
+          });
+          if (attemptGeneration !== attemptGenerationRef.current) return;
+          setFeedback({
+            missingWords: result.missingWords,
+            extraWords: result.extraWords,
+            isComplete: result.isComplete,
+          });
+        } catch {
+          if (attemptGeneration !== attemptGenerationRef.current) return;
+          setAttemptFailed(true);
+        }
+      })();
+    }
   }, [
     isListening,
+    isFinalTranscript,
     transcript,
     speakingPractice,
     sessionId,
