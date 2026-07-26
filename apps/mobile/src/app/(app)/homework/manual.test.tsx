@@ -10,6 +10,7 @@ import ManualHomeworkScreen from './manual';
 
 const ORIGINAL_E2E_FLAG = process.env.EXPO_PUBLIC_E2E;
 const mockReplace = jest.fn();
+const mockPush = jest.fn();
 const mockRedirect = jest.fn();
 let mockSearchParams: Record<string, string | string[] | undefined> = {};
 
@@ -25,7 +26,7 @@ jest.mock('expo-router', () => ({
     return <View testID="manual-route-redirect" />;
   },
   useLocalSearchParams: () => mockSearchParams,
-  useRouter: () => ({ replace: mockReplace }),
+  useRouter: () => ({ replace: mockReplace, push: mockPush }),
 }));
 
 const SUBJECT_ID = '00000000-0000-7000-a000-000000000301';
@@ -159,5 +160,50 @@ describe('ManualHomeworkScreen', () => {
         problemText: PROBLEM,
       }),
     });
+  });
+
+  it('names the zero-active-Subject condition and offers a Subject-creation escape, keeping confirmation disabled', async () => {
+    mockSearchParams = { entrySource: 'mentor', returnTo: 'mentor' };
+    const rendered = renderScreen(<ManualHomeworkScreen />, {
+      routes: {
+        subjects: {
+          subjects: [
+            {
+              id: '00000000-0000-7000-a000-000000000401',
+              profileId: '00000000-0000-7000-a000-000000000201',
+              name: 'Retired History',
+              status: 'archived',
+              pedagogyMode: 'socratic',
+              createdAt: '2026-07-20T00:00:00.000Z',
+              updatedAt: '2026-07-20T00:00:00.000Z',
+            },
+          ],
+        },
+      },
+    });
+    cleanups.push(rendered.cleanup);
+
+    // The Subject list finished loading (an archived Subject exists) but has
+    // zero ACTIVE Subjects — distinct from the loading case (subject-picker-loading)
+    // and from having an active Subject (homework-subject-resolution-ready).
+    await waitFor(() => {
+      expect(screen.getByTestId('subject-picker-empty')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('subject-picker-loading')).toBeNull();
+    expect(
+      screen.queryByTestId('homework-subject-resolution-ready'),
+    ).toBeNull();
+    expect(screen.getByText("You don't have any subjects yet.")).toBeTruthy();
+
+    fireEvent.changeText(screen.getByTestId('result-text-input'), PROBLEM);
+
+    expect(
+      screen.getByTestId('confirm-button').props.accessibilityState,
+    ).toEqual({ disabled: true });
+
+    fireEvent.press(screen.getByTestId('subject-picker-create'));
+
+    expect(mockPush).toHaveBeenCalledWith('/create-subject');
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 });

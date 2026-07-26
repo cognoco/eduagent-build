@@ -50,7 +50,7 @@ import { ForbiddenError } from '@eduagent/schemas';
 
 import { cleanupAccounts, createIntegrationDb } from './helpers';
 import { clearFetchCalls, getFetchCalls } from './fetch-interceptor';
-import { mockVoyageAI, type MockHandle } from './external-mocks';
+import { mockVoyageAI } from './external-mocks';
 
 // ---------------------------------------------------------------------------
 // External boundary mocks — must be declared before importing the handler
@@ -60,13 +60,18 @@ const mockCaptureException = jest.fn();
 
 jest.mock('@sentry/cloudflare', () => ({
   // gc1-allow: @sentry/cloudflare is an external observability SDK — no real Sentry transport is available in the test environment; the Cloudflare-specific withSentry/withScope wrappers require a live DSN and worker context to initialise
-  withScope: (fn: (scope) => void) =>
-    fn({ setUser: jest.fn(), setTag: jest.fn(), setExtra: jest.fn() }),
-  captureException: (...args) => mockCaptureException(...args),
+  withScope: (
+    fn: (scope: {
+      setUser: (...args: unknown[]) => unknown;
+      setTag: (...args: unknown[]) => unknown;
+      setExtra: (...args: unknown[]) => unknown;
+    }) => void,
+  ) => fn({ setUser: jest.fn(), setTag: jest.fn(), setExtra: jest.fn() }),
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
   captureMessage: jest.fn(),
   addBreadcrumb: jest.fn(),
   // withSentry is called at module-level in apps/api/src/index.ts
-  withSentry: (_config, handler) => handler,
+  withSentry: <T>(_config: unknown, handler: T): T => handler,
 }));
 
 import { sessionCompleted } from '../../apps/api/src/inngest/functions/session-completed';
@@ -74,8 +79,6 @@ import { sessionCompleted } from '../../apps/api/src/inngest/functions/session-c
 // ---------------------------------------------------------------------------
 // Voyage AI fetch interceptor handle
 // ---------------------------------------------------------------------------
-
-let voyageHandle: MockHandle;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -253,7 +256,7 @@ async function seedScenario(options?: {
     await db.insert(retentionCards).values({
       profileId: profileId,
       topicId: topic!.id,
-      easeFactor: '2.50',
+      easeFactor: 2.5,
       intervalDays: 3,
       repetitions: 3,
       lastReviewedAt: new Date('2026-02-21T10:00:00.000Z'),
@@ -296,7 +299,7 @@ async function seedParentLink(childProfileId: string) {
     chargePersonId: childProfileId,
   });
 
-  return profileId;
+  return { accountId, profileId };
 }
 
 // ---------------------------------------------------------------------------
@@ -339,7 +342,7 @@ async function loadSessionSummary(sessionId: string) {
 beforeAll(() => {
   // Register Voyage AI fetch interceptor — the real embeddings service
   // calls fetch('https://api.voyageai.com/...') which we intercept
-  voyageHandle = mockVoyageAI();
+  mockVoyageAI();
 });
 
 beforeEach(async () => {
@@ -475,13 +478,15 @@ describe('session-completed Inngest pipeline (integration)', () => {
     // Embedding was attempted for the session content via the real Voyage AI fetch
     const voyageCalls = getFetchCalls('voyageai');
     expect(voyageCalls).toHaveLength(1);
-    expect(voyageCalls[0].method).toBe('POST');
+    const voyageCall = voyageCalls[0];
+    if (!voyageCall) throw new Error('Expected one captured Voyage AI call');
+    expect(voyageCall.method).toBe('POST');
 
-    const voyageBody = JSON.parse(voyageCalls[0].body!);
+    const voyageBody = JSON.parse(voyageCall.body!);
     expect(voyageBody.input[0]).toContain('What is photosynthesis?');
 
     // Verify the Authorization header used the right API key
-    expect(voyageCalls[0].headers['Authorization']).toBe(
+    expect(voyageCall.headers['Authorization']).toBe(
       'Bearer voyage-stab-pipeline-test-key',
     );
   });
@@ -547,26 +552,19 @@ describe('session-completed Inngest pipeline (integration)', () => {
 
   it('stores narrative recap fields and exposes them through dashboard session detail', async () => {
     registerProvider({
-      id: 'gemini',
+      ...createMockProvider('gemini'),
       async chat() {
-        return JSON.stringify({
-          highlight: 'Practiced equivalent fractions',
-          narrative:
-            'They compared fraction sizes and fixed one shaky step after a hint.',
-          conversationPrompt: 'Which fraction felt easiest to compare today?',
-          engagementSignal: 'curious',
-          confidence: 'high',
-        });
-      },
-      async *chatStream() {
-        yield JSON.stringify({
-          highlight: 'Practiced equivalent fractions',
-          narrative:
-            'They compared fraction sizes and fixed one shaky step after a hint.',
-          conversationPrompt: 'Which fraction felt easiest to compare today?',
-          engagementSignal: 'curious',
-          confidence: 'high',
-        });
+        return {
+          content: JSON.stringify({
+            highlight: 'Practiced equivalent fractions',
+            narrative:
+              'They compared fraction sizes and fixed one shaky step after a hint.',
+            conversationPrompt: 'Which fraction felt easiest to compare today?',
+            engagementSignal: 'curious',
+            confidence: 'high',
+          }),
+          stopReason: 'stop',
+        };
       },
     });
 
@@ -592,7 +590,8 @@ describe('session-completed Inngest pipeline (integration)', () => {
         },
       ],
     });
-    const parentProfileId = await seedParentLink(scenario.profileId);
+    const { accountId: parentAccountId, profileId: parentProfileId } =
+      await seedParentLink(scenario.profileId);
 
     await executeChain({
       profileId: scenario.profileId,
@@ -627,6 +626,8 @@ describe('session-completed Inngest pipeline (integration)', () => {
         parentProfileId,
         scenario.profileId,
         scenario.sessionId,
+        parentProfileId,
+        parentAccountId,
       ),
     ).rejects.toThrow(ForbiddenError);
   });

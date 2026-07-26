@@ -12,6 +12,7 @@
     "test": "node scripts/doppler-run.mjs run -- nx run-many -t test",
     "test:api:unit": "jest --config apps/api/jest.config.cjs --runInBand",
     "test:api:integration": "node scripts/doppler-run.mjs run -- pnpm exec nx run api:integration-api",
+    "typecheck:integration": "tsc --project tests/integration/tsconfig.json",
     "test:mobile:unit": "jest --config apps/mobile/jest.config.cjs --runInBand --forceExit",
     "test:v2-parity": "node scripts/run-v2-parity.cjs",
     "test:coverage": "nx run-many -t test --coverage",

@@ -253,7 +253,7 @@ async function seedRetentionCards(profileId: string, topicIds: string[]) {
     topicIds.map((topicId, index) => ({
       profileId,
       topicId,
-      easeFactor: '2.50',
+      easeFactor: 2.5,
       intervalDays: 3,
       nextReviewAt: new Date(Date.now() - (index + 1) * 60 * 60 * 1000),
       consecutiveSuccesses: index + 1,
@@ -453,6 +453,7 @@ async function renderRealMobileSession(input: {
       notePromptOffered: false,
       animationCleanupRef: { current: null },
       silenceTimerRef,
+      sessionEndedRef: { current: false },
       lastAiAtRef: { current: null },
       lastExpectedMinutesRef: { current: 10 },
       lastRetryPayloadRef: { current: null },

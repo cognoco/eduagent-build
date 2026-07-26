@@ -41,12 +41,17 @@ import { clearFetchCalls } from './fetch-interceptor';
 const mockCaptureException = jest.fn();
 jest.mock('@sentry/cloudflare', () => ({
   // gc1-allow: @sentry/cloudflare is an external observability SDK — no real Sentry transport is available in the test environment; the Cloudflare-specific withSentry/withScope wrappers require a live DSN and worker context to initialise
-  withScope: (fn) =>
-    fn({ setUser: jest.fn(), setTag: jest.fn(), setExtra: jest.fn() }),
-  captureException: (...args) => mockCaptureException(...args),
+  withScope: (
+    fn: (scope: {
+      setUser: (...args: unknown[]) => unknown;
+      setTag: (...args: unknown[]) => unknown;
+      setExtra: (...args: unknown[]) => unknown;
+    }) => void,
+  ) => fn({ setUser: jest.fn(), setTag: jest.fn(), setExtra: jest.fn() }),
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
   captureMessage: jest.fn(),
   addBreadcrumb: jest.fn(),
-  withSentry: (_config, handler) => handler,
+  withSentry: <T>(_config: unknown, handler: T): T => handler,
 }));
 
 import { app } from '../../apps/api/src/index';
@@ -153,7 +158,7 @@ async function seedRetentionCard(
     .values({
       profileId,
       topicId,
-      easeFactor: '2.50',
+      easeFactor: 2.5,
       intervalDays: 1,
       repetitions: 0,
       failureCount: 0,
@@ -258,7 +263,9 @@ function findCalibrationEvent(): {
 
 async function executeHandler(eventData: unknown) {
   const mockStep = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
+    async run<T>(_name: string, fn: () => T | Promise<T>): Promise<T> {
+      return fn();
+    },
   };
   return handleReviewCalibrationGrade({
     event: { data: eventData },
