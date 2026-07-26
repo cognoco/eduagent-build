@@ -18,6 +18,19 @@ function neverResolves(): Promise<never> {
   });
 }
 
+interface SignUpContentChild {
+  props?: { testID?: string; className?: string };
+  children?: SignUpContentChild[];
+}
+
+// [WI-2769] Some content sections wrap their testID'd element one level
+// deeper (e.g. sign-up-button inside its keyboard-scroll anchor View) — walk
+// the subtree instead of requiring testID to sit on the direct child itself.
+function containsTestID(node: SignUpContentChild, testID: string): boolean {
+  if (node?.props?.testID === testID) return true;
+  return (node?.children ?? []).some((child) => containsTestID(child, testID));
+}
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace, push: mockPush }),
   useLocalSearchParams: () => ({}),
@@ -134,11 +147,13 @@ describe('SignUpScreen', () => {
     render(<SignUpScreen />);
 
     const content = screen.getByTestId('sign-up-content');
-    const siblings = content.children as {
-      props?: { testID?: string };
-    }[];
-    const signUpButtonIndex = siblings.findIndex(
-      (c) => c?.props?.testID === 'sign-up-button',
+    const siblings = content.children as SignUpContentChild[];
+    // [WI-2769] sign-up-button is now wrapped in a plain View (the
+    // onSubmitButtonLayout anchor for keyboard-scroll) — search each direct
+    // child's subtree rather than requiring an exact testID match, so the
+    // section-adjacency check still holds regardless of that wrapper.
+    const signUpButtonIndex = siblings.findIndex((c) =>
+      containsTestID(c, 'sign-up-button'),
     );
     const signInRowIndex = siblings.findIndex(
       (c) => c?.props?.testID === 'sign-up-back-to-sign-in-row',
@@ -276,9 +291,13 @@ describe('SignUpScreen', () => {
     });
   });
 
+  // [WI-2768] extractClerkError now maps Clerk's locale-independent `code` to
+  // localized copy rather than surfacing the raw English longMessage.
   it('displays error on sign-up failure', async () => {
     mockCreate.mockRejectedValue({
-      errors: [{ longMessage: 'Email already in use' }],
+      errors: [
+        { code: 'form_identifier_exists', longMessage: 'Email already in use' },
+      ],
     });
 
     render(<SignUpScreen />);
@@ -291,7 +310,7 @@ describe('SignUpScreen', () => {
     fireEvent.press(screen.getByTestId('sign-up-button'));
 
     await waitFor(() => {
-      screen.getByText('Email already in use');
+      screen.getByText('An account with that email already exists.');
     });
   });
 
@@ -577,11 +596,13 @@ describe('SignUpScreen', () => {
     ).toEqual(expect.objectContaining({ busy: false, disabled: false }));
   });
 
+  // [WI-2768] form_code_incorrect is mapped to a localized message — the raw
+  // English message is never surfaced.
   it('displays error on verification failure', async () => {
     mockCreate.mockResolvedValue(undefined);
     mockPrepareVerification.mockResolvedValue(undefined);
     mockAttemptVerification.mockRejectedValue({
-      errors: [{ message: 'Incorrect code' }],
+      errors: [{ code: 'form_code_incorrect', message: 'Incorrect code' }],
     });
 
     render(<SignUpScreen />);
@@ -602,7 +623,7 @@ describe('SignUpScreen', () => {
     fireEvent.press(screen.getByTestId('sign-up-verify-button'));
 
     await waitFor(() => {
-      screen.getByText('Incorrect code');
+      screen.getByText("That code doesn't match. Please try again.");
     });
   });
 
