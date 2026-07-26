@@ -1464,6 +1464,30 @@ describe('[WI-2627] the fold must be reachable, and must precede publication', (
     expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
       '{"revision":7,"enabled":false}',
     );
+
+    // RECOVERY: fail-closed must be sticky, not permanent. Holding the revision
+    // rather than dropping it to 0 is precisely what leaves a strictly higher
+    // revision able to lift the disable — without this, one corrupt response
+    // would blacken this surface on the device forever, which is what extending
+    // the sticky-disable class to three surfaces would otherwise risk.
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(
+        jsonResponse({
+          scope: 'self',
+          items: [OVERFLOW_NOTICE_ITEM, PLAIN_ITEM],
+          mentorNoticePolicy: policy(8, true),
+        }),
+      ),
+    );
+    await act(async () => {
+      await result.current.refetch();
+    });
+    await waitFor(() =>
+      expect(result.current.data?.items.map((item) => item.kind)).toEqual([
+        'mentor_notice',
+        'retention_due',
+      ]),
+    );
   });
 
   // "It is correct after the effect" IS the bug, so this asserts on every

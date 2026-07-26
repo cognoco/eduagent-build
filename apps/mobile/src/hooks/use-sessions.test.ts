@@ -2227,6 +2227,18 @@ describe('[WI-2627] mentor-notice policy observation reaches its consumers', () 
       expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
         '{"revision":7,"enabled":false}',
       );
+
+      // RECOVERY: fail-closed must be sticky, not permanent. Holding the
+      // revision rather than dropping it to 0 is what leaves a strictly higher
+      // revision able to lift the disable — without this, one corrupt response
+      // would blacken this surface on the device forever.
+      mockFetch.mockResolvedValue(summaryResponse(policy(8, true), true));
+      await act(async () => {
+        await result.current.refetch();
+      });
+      await waitFor(() =>
+        expect(result.current.data?.mentorNotice?.concept).toBe('sign flip'),
+      );
     });
 
     it('keeps the receipt when the summary carries NO observation', async () => {
