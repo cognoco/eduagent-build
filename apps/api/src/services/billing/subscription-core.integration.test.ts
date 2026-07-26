@@ -33,6 +33,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
+import { randomUUID } from 'node:crypto';
 import { resolve } from 'path';
 import { getQuotaPool } from './subscription-core';
 // [WI-1239 / 779-strip] updateSubscriptionFromWebhook, linkStripeCustomer,
@@ -78,6 +79,11 @@ function createIntegrationDb(): Database {
 // ---------------------------------------------------------------------------
 
 const PREFIX = 'integration-subcore';
+const RUN_ID = randomUUID();
+
+function stripeSubscriptionId(tag: string, runId = RUN_ID): string {
+  return `sub_${PREFIX}_${tag}_${runId}`;
+}
 
 // Keep a registry so cleanupTestAccounts() can sweep everything this file
 // inserted, regardless of test order or failure mid-test.
@@ -284,35 +290,54 @@ describe('updateSubscriptionFromWebhookV2', () => {
     expect(result).toBeNull();
   });
 
-  it('updates a subscription from a valid webhook event', async () => {
-    const db = createIntegrationDb();
-    const { organizationId, ownerId } =
-      await seedV2OrgWithOwner('webhook-update');
-    const sub = await seedV2SubscriptionDirect({
-      organizationId,
-      ownerId,
-      tier: 'plus',
-      status: 'trial',
-      stripeSubscriptionId: 'sub_webhook_001',
-    });
+  it.each([
+    ['clean shared database', false],
+    ['dirty shared database with residue from an earlier process', true],
+  ])(
+    'updates a subscription from a valid webhook event in a %s',
+    async (_, seedResidue) => {
+      const db = createIntegrationDb();
+      if (seedResidue) {
+        const { organizationId, ownerId } = await seedV2OrgWithOwner(
+          'webhook-update-residue',
+        );
+        await seedV2SubscriptionDirect({
+          organizationId,
+          ownerId,
+          tier: 'plus',
+          status: 'trial',
+          stripeSubscriptionId: stripeSubscriptionId(
+            'webhook-update',
+            randomUUID(),
+          ),
+        });
+      }
 
-    const ts = new Date('2026-06-01T10:00:00.000Z').toISOString();
-    const updated = await updateSubscriptionFromWebhookV2(
-      db,
-      'sub_webhook_001',
-      {
+      const { organizationId, ownerId } =
+        await seedV2OrgWithOwner('webhook-update');
+      const stripeId = stripeSubscriptionId('webhook-update');
+      const sub = await seedV2SubscriptionDirect({
+        organizationId,
+        ownerId,
+        tier: 'plus',
+        status: 'trial',
+        stripeSubscriptionId: stripeId,
+      });
+
+      const ts = new Date('2026-06-01T10:00:00.000Z').toISOString();
+      const updated = await updateSubscriptionFromWebhookV2(db, stripeId, {
         status: 'active',
         lastStripeEventTimestamp: ts,
         currentPeriodStart: new Date('2026-06-01T00:00:00.000Z').toISOString(),
         currentPeriodEnd: new Date('2026-07-01T00:00:00.000Z').toISOString(),
-      },
-    );
+      });
 
-    expect(updated).not.toBeNull();
-    expect(updated!.id).toBe(sub.id);
-    expect(updated!.status).toBe('active');
-    expect(updated!.lastStripeEventTimestamp).toBe(ts);
-  });
+      expect(updated).not.toBeNull();
+      expect(updated!.id).toBe(sub.id);
+      expect(updated!.status).toBe('active');
+      expect(updated!.lastStripeEventTimestamp).toBe(ts);
+    },
+  );
 
   it('skips update when incoming event timestamp is older (idempotency)', async () => {
     const db = createIntegrationDb();
@@ -321,12 +346,13 @@ describe('updateSubscriptionFromWebhookV2', () => {
 
     // Seed with a recent timestamp already stored
     const newerTs = new Date('2026-06-10T10:00:00.000Z');
+    const stripeId = stripeSubscriptionId('webhook-stale');
     await seedV2SubscriptionDirect({
       organizationId,
       ownerId,
       tier: 'plus',
       status: 'active',
-      stripeSubscriptionId: 'sub_stale_001',
+      stripeSubscriptionId: stripeId,
       lastStripeEventTimestamp: newerTs,
     });
     const existing = await db.query.subscription.findFirst({
@@ -336,7 +362,7 @@ describe('updateSubscriptionFromWebhookV2', () => {
 
     // Attempt to update with an OLDER event timestamp
     const staleTs = new Date('2026-06-01T00:00:00.000Z').toISOString();
-    const result = await updateSubscriptionFromWebhookV2(db, 'sub_stale_001', {
+    const result = await updateSubscriptionFromWebhookV2(db, stripeId, {
       status: 'cancelled',
       lastStripeEventTimestamp: staleTs,
     });
@@ -354,25 +380,22 @@ describe('updateSubscriptionFromWebhookV2', () => {
     );
 
     const ts = new Date('2026-06-10T10:00:00.000Z');
+    const stripeId = stripeSubscriptionId('webhook-same-second');
     await seedV2SubscriptionDirect({
       organizationId,
       ownerId,
       tier: 'plus',
       status: 'active',
-      stripeSubscriptionId: 'sub_same_second_001',
+      stripeSubscriptionId: stripeId,
       lastStripeEventTimestamp: ts,
       lastStripeEventId: 'evt_same_second_first',
     });
 
-    const result = await updateSubscriptionFromWebhookV2(
-      db,
-      'sub_same_second_001',
-      {
-        status: 'cancelled',
-        lastStripeEventTimestamp: ts.toISOString(),
-        stripeEventId: 'evt_same_second_second',
-      },
-    );
+    const result = await updateSubscriptionFromWebhookV2(db, stripeId, {
+      status: 'cancelled',
+      lastStripeEventTimestamp: ts.toISOString(),
+      stripeEventId: 'evt_same_second_second',
+    });
 
     expect(result).not.toBeNull();
     expect(result!.status).toBe('cancelled');
@@ -392,25 +415,22 @@ describe('updateSubscriptionFromWebhookV2', () => {
     );
 
     const ts = new Date('2026-06-10T10:00:00.000Z');
+    const stripeId = stripeSubscriptionId('webhook-past-due');
     await seedV2SubscriptionDirect({
       organizationId,
       ownerId,
       tier: 'plus',
       status: 'active',
-      stripeSubscriptionId: 'sub_same_second_past_due_001',
+      stripeSubscriptionId: stripeId,
       lastStripeEventTimestamp: ts,
       lastStripeEventId: 'evt_payment_succeeded_same_second',
     });
 
-    const result = await updateSubscriptionFromWebhookV2(
-      db,
-      'sub_same_second_past_due_001',
-      {
-        status: 'past_due',
-        lastStripeEventTimestamp: ts.toISOString(),
-        stripeEventId: 'evt_payment_failed_same_second',
-      },
-    );
+    const result = await updateSubscriptionFromWebhookV2(db, stripeId, {
+      status: 'past_due',
+      lastStripeEventTimestamp: ts.toISOString(),
+      stripeEventId: 'evt_payment_failed_same_second',
+    });
 
     expect(result).toEqual(
       expect.objectContaining({
@@ -434,25 +454,22 @@ describe('updateSubscriptionFromWebhookV2', () => {
     );
 
     const ts = new Date('2026-06-10T10:00:00.000Z');
+    const stripeId = stripeSubscriptionId('webhook-active-recovery');
     await seedV2SubscriptionDirect({
       organizationId,
       ownerId,
       tier: 'plus',
       status: 'past_due',
-      stripeSubscriptionId: 'sub_same_second_active_recovery_001',
+      stripeSubscriptionId: stripeId,
       lastStripeEventTimestamp: ts,
       lastStripeEventId: 'evt_payment_failed_same_second',
     });
 
-    const result = await updateSubscriptionFromWebhookV2(
-      db,
-      'sub_same_second_active_recovery_001',
-      {
-        status: 'active',
-        lastStripeEventTimestamp: ts.toISOString(),
-        stripeEventId: 'evt_payment_succeeded_same_second',
-      },
-    );
+    const result = await updateSubscriptionFromWebhookV2(db, stripeId, {
+      status: 'active',
+      lastStripeEventTimestamp: ts.toISOString(),
+      stripeEventId: 'evt_payment_succeeded_same_second',
+    });
 
     expect(result).toEqual(
       expect.objectContaining({
@@ -481,12 +498,13 @@ describe('updateSubscriptionFromWebhookV2', () => {
     const { organizationId, ownerId } = await seedV2OrgWithOwner(
       'webhook-invalid-transition',
     );
+    const stripeId = stripeSubscriptionId('webhook-invalid-transition');
     await seedV2SubscriptionDirect({
       organizationId,
       ownerId,
       tier: 'plus',
       status: 'expired',
-      stripeSubscriptionId: 'sub_invalid_001',
+      stripeSubscriptionId: stripeId,
       lastStripeEventTimestamp: new Date('2026-01-01T00:00:00.000Z'),
     });
 
@@ -496,7 +514,7 @@ describe('updateSubscriptionFromWebhookV2', () => {
     // this test uses expired -> trial, which remains illegitimate.)
     const ts = new Date('2026-06-20T00:00:00.000Z').toISOString();
     await expect(
-      updateSubscriptionFromWebhookV2(db, 'sub_invalid_001', {
+      updateSubscriptionFromWebhookV2(db, stripeId, {
         status: 'trial',
         lastStripeEventTimestamp: ts,
       }),
@@ -642,11 +660,12 @@ describe('activateSubscriptionFromCheckoutV2', () => {
   it('creates a new subscription when none exists', async () => {
     const db = createIntegrationDb();
     const { organizationId } = await seedV2OrgWithOwner('activate-new');
+    const stripeId = stripeSubscriptionId('activate-new');
 
     const result = await activateSubscriptionFromCheckoutV2(
       db,
       organizationId,
-      'sub_activate_new_001',
+      stripeId,
       'plus',
       new Date('2026-06-01T10:00:00.000Z').toISOString(),
     );
@@ -654,7 +673,7 @@ describe('activateSubscriptionFromCheckoutV2', () => {
     expect(result).not.toBeNull();
     expect(result!.tier).toBe('plus');
     expect(result!.status).toBe('active');
-    expect(result!.stripeSubscriptionId).toBe('sub_activate_new_001');
+    expect(result!.stripeSubscriptionId).toBe(stripeId);
 
     // Quota pool created with plus tier limits. createSubscriptionV2's
     // fresh-insert path dual-writes the legacy subscriptions parent row
@@ -677,16 +696,17 @@ describe('activateSubscriptionFromCheckoutV2', () => {
     expect(sub.stripeSubscriptionId).toBeNull();
 
     const ts = new Date('2026-06-01T10:00:00.000Z').toISOString();
+    const stripeId = stripeSubscriptionId('activate-bridge');
     const result = await activateSubscriptionFromCheckoutV2(
       db,
       organizationId,
-      'sub_bridge_001',
+      stripeId,
       'plus',
       ts,
     );
 
     expect(result!.id).toBe(sub.id);
-    expect(result!.stripeSubscriptionId).toBe('sub_bridge_001');
+    expect(result!.stripeSubscriptionId).toBe(stripeId);
     expect(result!.tier).toBe('plus');
     expect(result!.status).toBe('active');
     expect(result!.lastStripeEventTimestamp).toBe(ts);
@@ -696,11 +716,12 @@ describe('activateSubscriptionFromCheckoutV2', () => {
     const db = createIntegrationDb();
     const { organizationId } = await seedV2OrgWithOwner('activate-idempotent');
     const ts = new Date('2026-06-01T10:00:00.000Z').toISOString();
+    const stripeId = stripeSubscriptionId('activate-idempotent');
 
     const first = await activateSubscriptionFromCheckoutV2(
       db,
       organizationId,
-      'sub_idempotent_001',
+      stripeId,
       'plus',
       ts,
     );
@@ -708,13 +729,13 @@ describe('activateSubscriptionFromCheckoutV2', () => {
     const second = await activateSubscriptionFromCheckoutV2(
       db,
       organizationId,
-      'sub_idempotent_001',
+      stripeId,
       'plus',
       ts,
     );
 
     expect(second!.id).toBe(first!.id);
-    expect(second!.stripeSubscriptionId).toBe('sub_idempotent_001');
+    expect(second!.stripeSubscriptionId).toBe(stripeId);
   });
 
   it('applies newer incoming Stripe sub when existing lastStripeEventTimestamp is older', async () => {
@@ -725,6 +746,8 @@ describe('activateSubscriptionFromCheckoutV2', () => {
 
     const olderTs = new Date('2026-05-01T00:00:00.000Z').toISOString();
     const newerTs = new Date('2026-06-01T00:00:00.000Z').toISOString();
+    const oldStripeId = stripeSubscriptionId('activate-divergent-old');
+    const newStripeId = stripeSubscriptionId('activate-divergent-new');
 
     // Seed subscription with an older event timestamp already linked
     const sub = await seedV2SubscriptionDirect({
@@ -732,7 +755,7 @@ describe('activateSubscriptionFromCheckoutV2', () => {
       ownerId,
       tier: 'plus',
       status: 'active',
-      stripeSubscriptionId: 'sub_old_diverge_001',
+      stripeSubscriptionId: oldStripeId,
       lastStripeEventTimestamp: new Date(olderTs),
       withQuotaPool: {},
     });
@@ -741,14 +764,14 @@ describe('activateSubscriptionFromCheckoutV2', () => {
     const result = await activateSubscriptionFromCheckoutV2(
       db,
       organizationId,
-      'sub_new_diverge_002',
+      newStripeId,
       'pro',
       newerTs,
     );
 
     // Newer incoming should override
     expect(result).not.toBeNull();
-    expect(result!.stripeSubscriptionId).toBe('sub_new_diverge_002');
+    expect(result!.stripeSubscriptionId).toBe(newStripeId);
     expect(result!.tier).toBe('pro');
 
     // Quota pool limit synced to new tier
@@ -764,6 +787,8 @@ describe('activateSubscriptionFromCheckoutV2', () => {
 
     const newerTs = new Date('2026-06-10T00:00:00.000Z').toISOString();
     const olderTs = new Date('2026-05-01T00:00:00.000Z').toISOString();
+    const existingStripeId = stripeSubscriptionId('activate-existing');
+    const staleStripeId = stripeSubscriptionId('activate-stale-replay');
 
     // Seed subscription with a newer event timestamp already linked
     await seedV2SubscriptionDirect({
@@ -771,7 +796,7 @@ describe('activateSubscriptionFromCheckoutV2', () => {
       ownerId,
       tier: 'plus',
       status: 'active',
-      stripeSubscriptionId: 'sub_keep_existing_001',
+      stripeSubscriptionId: existingStripeId,
       lastStripeEventTimestamp: new Date(newerTs),
       withQuotaPool: { usedThisMonth: 10, usedToday: 2 },
     });
@@ -780,14 +805,14 @@ describe('activateSubscriptionFromCheckoutV2', () => {
     const result = await activateSubscriptionFromCheckoutV2(
       db,
       organizationId,
-      'sub_stale_replay_002',
+      staleStripeId,
       'family',
       olderTs,
     );
 
     // Should keep the existing subscription unchanged
     expect(result).not.toBeNull();
-    expect(result!.stripeSubscriptionId).toBe('sub_keep_existing_001');
+    expect(result!.stripeSubscriptionId).toBe(existingStripeId);
     expect(result!.tier).toBe('plus');
   });
 });
