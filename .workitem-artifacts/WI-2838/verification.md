@@ -54,13 +54,58 @@ The exact head does not contain WI-2822 commit `c0002155`; the hosted result is
 therefore independent WI-2838 strict-green evidence, not a combined or skipped
 suite.
 
+## Hosted bounce and corrected lifecycle
+
+GitHub Actions E2E Web run `30223075316` on later exact head `fe52d114` exposed
+the remaining lifecycle mismatch. The WI-2234 journey timed out at
+`page.waitForResponse` on both the initial attempt and workflow retry; the gate
+reported `FAILURE_CLASS=product` and `GATE_DECISION=fail`. One unrelated
+homework case was flaky and passed its retry; 14 other V2 cases passed.
+
+The deterministic focused seam reproduced that a later response Request wrapper
+can retain the original URL after `route.continue({ url })`. It exited 1 with
+the expected `true` versus received `false`. The corrected route-owned
+fetch/fulfill seam then exited 0 with 5/5 cases passing. Fresh Prettier, ESLint,
+and mobile typecheck gates passed. The independently corrected named staging
+journey passed 5/5 with one worker, retries disabled, and no dependency projects.
+
+The corrected complete V2 release project was then rerun with retries disabled
+and normal four-worker parallelism. The WI-2234 journey passed; the result was
+15/16 with only the same independently owned WI-2822 nav-shell stale-doorway
+assertion failing. No WI-2838 failure remained in the local aggregate run.
+
+## Hosted corrected-implementation aggregate
+
+GitHub Actions E2E Web run `30224090382` executed on exact corrected
+implementation head `83c6d29d075feec909680aae9610ca3fef5452db` and completed
+successfully:
+
+- V2 release: 16/16 passed in 3.8 minutes, including the WI-2234
+  returning-learner journey;
+- classifier: `FAILURE_CLASS=success`, `GATE_DECISION=pass`;
+- required-stable legacy Playwright: 24/24 passed in 3.3 minutes;
+- the `run-smoke` and required `Playwright web smoke` jobs concluded success.
+
+The subsequent review follow-up adds only a focused mismatch-response unit case
+and clarifies the timezone notation in this evidence; it does not change the
+hosted implementation exercised by that run.
+
 ## Scope audit
 
 - No timeout value changed.
 - No retries were added or widened.
 - No product assertion was removed.
+- The route-owned response wait retains the prior 15-second bound, clears its
+  timer on success or failure, and emits a specific timeout diagnostic.
 - The Session-held boundary, response success/freshness, Mentor arrival, and
   both exact returning-learner card assertions remain in the named journey.
+
+## Review follow-up coverage
+
+The focused helper suite now also exercises a fetched response whose URL differs
+from the discriminator. It asserts the exact mismatch error and proves that
+`route.fulfill` is never called, while retaining the exact-response success case.
+The focused Jest command exits 0 with 5/5 tests passing.
 
 ## Exact-head provenance after base synchronization
 
@@ -75,7 +120,8 @@ then recorded that event and became the hosted strict-green evidence head.
   `732b684eb69d1ffaa8613c59318e804f18566fbe`, and second parent
   `f8aa11b086e8787f672c6d326018ee4bcfc32c6f`.
 - The branch and HEAD reflogs both record `merge origin/main: Merge made by the
-  'ort' strategy` at 2026-07-27 00:06:04 +0200.
+  'ort' strategy` at 2026-07-27 00:06:04 +0200 (2026-07-26 22:06:04 UTC); the
+  differing calendar dates are the same instant expressed in CEST and UTC.
 - `git ls-remote` recorded `refs/heads/WI-2838` and
   `refs/pull/2664/head` at `d3caddaa`; `refs/heads/main` remained `f8aa11b`.
 - The WI patch before synchronization (`2b277b9..732b684`) and after it
@@ -87,3 +133,56 @@ then recorded that event and became the hosted strict-green evidence head.
   Jest (3/3), Prettier, ESLint, evidence JSON parse, mobile typecheck, and the
   branch-scoped fast TypeScript build gate. `complete --validate` also passed
   without lifecycle writes after the provenance evidence was added.
+
+## Subsequent head provenance
+
+Evidence-only commit `8256149708720c35054ae9f8afb8f680a5163e87` followed
+`aaff1546`, then merge commit `fe52d114192d15373ef5ba215c19b19e3e24ebda`
+added current `origin/main` as second parent
+`69b1818a6bf0674af1cb3d01c01fbf394952f3dc`. GitHub PushEvent actor was
+`jojorgen`; both commits use the shared Lord Vetinari Git identity, so repository
+evidence cannot distinguish the initiating local session. The merge added only
+six `zdx-config.yaml` lines from main. The three WI E2E code-file diff hashes
+before and after that merge were identical:
+`df8b8db132d35dbbf8390bb5669df1538cd6d23482cba8ba2cc9d20a362b082e`.
+
+## Independent rework and reconciliation
+
+An isolated rework reproduced the response-wrapper URL-loss failure before
+implementation (focused Jest: 1 failed, 3 passed), then established a route-owned
+fetch/verify/fulfill seam. Removing `route.fulfill` after green caused the
+lifecycle test to fail (1 failed, 4 passed); restoring it produced the final 5/5.
+The final guard requires the exact `/v1/now` pathname, `scope=self`, GET, capture
+enabled, and absence of an existing `__e2e_request` correlation.
+
+Independent local verification:
+
+- focused Jest: 5/5 passed;
+- targeted Prettier and ESLint: exit 0;
+- GC1: no internal `jest.mock` in the changed test;
+- mobile typecheck and all six dependencies: exit 0;
+- full mobile lint: exit 0 with 54 pre-existing warnings and no errors;
+- branch-scoped fast gate: 1 passed, 0 failed, 0 skipped;
+- exact named Playwright journey: 5/5 in 2.2 minutes with
+  `--workers=1 --retries=0 --repeat-each=5 --no-deps`.
+
+The first browser invocation exited before web startup or test seeding because
+port 19006 was held by the orphan web server from the earlier aborted local run.
+That exact process belonged to this isolated worktree, was terminated gracefully,
+and the successful command was then executed from a clear local port.
+
+Hosted E2E Web run `30224090382` on exact implementation head `83c6d29d` passed
+V2 16/16 in 3.8 minutes (`FAILURE_CLASS=success`, `GATE_DECISION=pass`),
+required-stable legacy 24/24 in 3.3 minutes, and the final staging reset. The
+separate Flag-ON CI job failed only
+`weekly-progress-push.integration.test.ts` because `queuedParents` was zero; the
+WI-2838 diff contains no API files, while 151 other API suites and 1160 tests
+passed.
+
+Independent patch commit `6de10687d9d82e13c61ac38f985f82de20623ed2`
+was committed locally, then remote head
+`83c6d29d075feec909680aae9610ca3fef5452db` was normal-merged. Both are retained
+as reconciliation parents; no rebase, reset, amend, or force-push was used. The
+two conflicted helper files were resolved byte-for-byte to the independently
+verified blobs, and the journey already matched exactly. The reconciled head must
+obtain fresh hosted required checks before landing.

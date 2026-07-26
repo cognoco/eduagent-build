@@ -40,3 +40,54 @@ The complete `v2-release` project was also executed with `--retries=0`. Its
 WI-2234 journey passed. The run finished with 15 passing cases and one failure
 in `nav-shell.spec.ts`; that independent stale doorway assertion is already
 owned by WI-2822 and corrected on open PR #2658.
+
+## BOUNCE RED — continued URL absent from response wrapper
+
+Hosted exact-head E2E Web run `30223075316` on `fe52d114` timed out at the
+response matcher in the WI-2234 journey on both the initial attempt and its
+workflow retry. The gate classified the failure as product, demonstrating that
+`route.continue({ url })` did not provide a stable correlated URL through the
+later `response.request()` wrapper.
+
+The focused lifecycle seam then reproduced that mismatch deterministically: a
+routed request created the correlated discriminator while the later synthetic
+response wrapper retained the original URL. The focused Jest command exited 1;
+`keeps ownership when the response lifecycle hides the continued URL rewrite`
+failed with `Expected: true`, `Received: false` (1 failed, 3 passed).
+
+## BOUNCE GREEN — route-owned exact response
+
+The capture-guarded route now owns the lifecycle after release: it fetches the
+exact correlated GET URL, verifies the returned response URL, fulfills the
+browser route with that response, and resolves the route-owned response promise.
+No response-side Request wrapper is used. The same focused Jest command exited
+0 with 4/4 passing, including the retained and cleared 15-second response bound.
+A subsequent coverage case asserts that a mismatched fetched URL rejects without
+fulfilling the route. The stronger guard also requires the exact `/v1/now`
+pathname and rejects requests that already carry the correlation query. The
+current focused suite exits 0 with 5/5 passing while retaining the success case.
+
+The independently corrected named staging journey then passed 5/5 in 2.2 minutes
+with `--workers=1 --retries=0 --repeat-each=5 --no-deps`, retaining every original
+Session, response success/freshness, Mentor, and exact-card assertion.
+
+## MUTATION RED — route fulfillment is required
+
+After the route-owned green was established, `route.fulfill({ response })` was
+temporarily removed. The focused command exited 1: the lifecycle test expected
+`['fetch', 'fulfill']` and received only `['fetch']` (1 failed, 4 passed). Restoring
+the fulfillment call returned the same suite to 5/5. This proves the regression
+test is sensitive to browser-route completion, not merely to returning a fetched
+response.
+
+## HOSTED GREEN — route-owned core strategy
+
+E2E Web run `30224090382` on exact head `83c6d29d` passed the complete V2 gate
+16/16 in 3.8 minutes, with `FAILURE_CLASS=success` and `GATE_DECISION=pass`; the
+required-stable legacy suite passed 24/24 and the staging reset completed. That
+head established the core fetch/fulfill strategy. The independent patch retains
+that mechanism while tightening exact-path and already-correlated-request guards.
+
+Flag-ON CI failure on the same head is not a contradictory WI-2838 red: its only
+failure was an API timezone integration assertion in
+`weekly-progress-push.integration.test.ts`, while WI-2838 changes no API files.
