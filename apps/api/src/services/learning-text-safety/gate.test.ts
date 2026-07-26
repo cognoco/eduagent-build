@@ -606,8 +606,20 @@ describe('[WI-2628] content-addressed keys — evaluate before a transaction, re
     // `scan.ts` normalizes for MATCHING only. Two strings that normalize alike are
     // still different strings to persist, so keying on the normalized form would
     // let a cleared one launder an unevaluated one.
+    //
+    // Both pairs below exercise a DIFFERENT folding mechanism in
+    // `normalizeForMatching`, because a pair that folds under only one of them
+    // would leave the other mechanism's laundering channel untested:
+    //   - whitespace runs collapse to a single space (`scan.ts:551`)
+    //   - default-ignorable codepoints are stripped (`scan.ts:548`)
+    // Verified by probe: a zero-width space inside a protected lexeme classifies
+    // identically to the plain form, so it really does fold.
     const result = await evaluateSet(['We read about volcanoes.']);
     expect(isContentSafe(result, 'We read about volcanoes.')).toBe(true);
+    // Mechanism 1 — whitespace collapse.
     expect(isContentSafe(result, 'We  read  about  volcanoes.')).toBe(false);
+    // Mechanism 2 — default-ignorable strip. A zero-width space sits inside
+    // "volcanoes", so the bytes differ while the normalized form does not.
+    expect(isContentSafe(result, 'We read about volc\u200Banoes.')).toBe(false);
   });
 });
