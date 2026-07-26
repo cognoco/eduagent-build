@@ -28,9 +28,10 @@
  */
 import type { ZodType } from 'zod';
 import { ApiResponseShapeError } from '@eduagent/schemas';
+import type { ApiResponse } from './assert-ok';
 
 export async function parseJson<T>(
-  res: Response,
+  res: Pick<ApiResponse, 'json'>,
   schema: ZodType<T>,
   context?: string,
 ): Promise<T> {

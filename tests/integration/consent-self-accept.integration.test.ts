@@ -107,7 +107,7 @@ async function clearArt6Grants(personId: string): Promise<void> {
     );
 }
 
-function acceptRequest(headers: Record<string, string>) {
+function acceptRequest(headers: HeadersInit) {
   return app.request(
     '/v1/consent/self/accept',
     { method: 'POST', headers },

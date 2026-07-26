@@ -35,9 +35,11 @@ export interface ApiResponseError extends Error {
   bodyText?: string;
 }
 
+export type ApiResponse = Pick<Response, 'json' | 'ok' | 'status' | 'text'>;
+
 type AssertedOk<T> = T extends { ok: false } ? never : T;
 
-export async function assertOk<T extends Response>(
+export async function assertOk<T extends ApiResponse>(
   res: T,
 ): Promise<AssertedOk<T>> {
   if (res.ok) return res as AssertedOk<T>;
