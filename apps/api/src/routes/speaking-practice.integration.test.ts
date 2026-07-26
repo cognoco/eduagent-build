@@ -258,6 +258,15 @@ describe('Integration: POST /v1/language/speaking-practice/attempts', () => {
       code: ERROR_CODES.FORBIDDEN,
       message: 'Profile does not belong to this account',
     });
+
+    const db = createIntegrationDb();
+    const rows = await db.query.speakingPracticeAttempts.findMany({
+      where: inArray(speakingPracticeAttempts.profileId, [
+        primaryProfile.id,
+        otherFixture.profile.id,
+      ]),
+    });
+    expect(rows).toHaveLength(0);
   });
 
   it('returns 403 PROXY_MODE when the write omits an explicit profile binding', async () => {
@@ -275,6 +284,12 @@ describe('Integration: POST /v1/language/speaking-practice/attempts', () => {
       code: 'PROXY_MODE',
       message: 'Not available in proxy mode',
     });
+
+    const db = createIntegrationDb();
+    const rows = await db.query.speakingPracticeAttempts.findMany({
+      where: eq(speakingPracticeAttempts.profileId, fixture.profile.id),
+    });
+    expect(rows).toHaveLength(0);
   });
 
   it('returns 400 VALIDATION_ERROR for a malformed request without calling the service', async () => {
