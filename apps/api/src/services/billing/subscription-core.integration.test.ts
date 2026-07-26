@@ -80,6 +80,7 @@ function createIntegrationDb(): Database {
 
 const PREFIX = 'integration-subcore';
 const RUN_ID = randomUUID();
+const STATIC_WEBHOOK_RESIDUE_ID = 'sub_webhook_001';
 
 function stripeSubscriptionId(tag: string, runId = RUN_ID): string {
   return `sub_${PREFIX}_${tag}_${runId}`;
@@ -203,6 +204,42 @@ async function seedV2SubscriptionDirect(input: {
   return subV2!;
 }
 
+async function ensureSuiteExternalWebhookResidue() {
+  const db = createIntegrationDb();
+  const existing = await db.query.subscription.findFirst({
+    where: eq(
+      subscriptionV2Table.stripeSubscriptionId,
+      STATIC_WEBHOOK_RESIDUE_ID,
+    ),
+  });
+  if (existing) return existing;
+
+  const [org] = await db
+    .insert(organization)
+    .values({ name: `${PREFIX}-v2-webhook-update-residue-${RUN_ID}` })
+    .returning();
+  const [owner] = await db
+    .insert(person)
+    .values({
+      displayName: 'Prior-process owner',
+      birthDate: '1985-01-01',
+      residenceJurisdiction: 'EU',
+    })
+    .returning();
+  await db.insert(membership).values({
+    personId: owner!.id,
+    organizationId: org!.id,
+    roles: ['admin'],
+  });
+  return seedV2SubscriptionDirect({
+    organizationId: org!.id,
+    ownerId: owner!.id,
+    tier: 'plus',
+    status: 'trial',
+    stripeSubscriptionId: STATIC_WEBHOOK_RESIDUE_ID,
+  });
+}
+
 async function cleanupV2() {
   if (V2_ORG_IDS.length === 0) return;
   const db = createIntegrationDb();
@@ -298,6 +335,11 @@ describe('updateSubscriptionFromWebhookV2', () => {
     async (_, seedResidue) => {
       const db = createIntegrationDb();
       if (seedResidue) {
+        const preExistingResidue = await ensureSuiteExternalWebhookResidue();
+        expect(preExistingResidue.stripeSubscriptionId).toBe(
+          STATIC_WEBHOOK_RESIDUE_ID,
+        );
+
         const { organizationId, ownerId } = await seedV2OrgWithOwner(
           'webhook-update-residue',
         );
