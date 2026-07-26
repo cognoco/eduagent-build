@@ -89,10 +89,13 @@ stacking on the landed fix (unchanged, still on the base branch).
 - Dark/light axis: the theme mock now reads the real design-tokens table keyed by a mutable
   colour-scheme, and both tab components are asserted under each theme, proving the unfocused
   colour differs between light and dark. Red-green proven.
-- Own/supporting axis: the test now builds real profile fixtures, distinguishes them via the
-  real isGuardianProfile helper, renders the real app layout, drives the active returnTo through
-  the real search-params seam, and asserts the Back destination differs by context. Red-green
-  proven with two independent breaks.
+- Own/supporting axis: split along the seam the fix actually changed. The token-origin proof is
+  driven from the real producers in their co-located tests — own-learning emits its own-scope
+  return token for a reachable guardian fixture (asserted no redirect), and the recap detail
+  screen emits the supporting-scope token off its real navigation push — each resolved through
+  the shared home-destination helper. The layout test keeps the consumer half (given a supplied
+  token, resolve the correct owning tab and distinct Back destination), with the misleading
+  profile fixtures removed. Red-green proven on each producer and on the consumer.
 - Small-phone axis: resolved by operator scope ruling. The V2 tab-bar layout reads only
   safe-area insets floored by a minimum height and takes no window-dimension input, so a
   viewport mock would be inert. The ruling records that the inset plus height-floor guarantee is

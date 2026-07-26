@@ -1,4 +1,8 @@
 import { render, screen, fireEvent } from '@testing-library/react-native';
+import {
+  FAMILY_RECAPS_RETURN_TO,
+  homeHrefForReturnTo,
+} from '../../../lib/navigation';
 
 jest.mock('react-i18next', () => ({
   // gc1-allow: i18n init requires full provider tree — not available in JSDOM unit test environment
@@ -16,6 +20,7 @@ const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockCanGoBack = jest.fn(() => true);
 const mockGoBackOrReplace = jest.fn();
+const mockPush = jest.fn();
 
 jest.mock('expo-router', () => ({
   // gc1-allow: expo-router requires native navigation context — cannot run in JSDOM
@@ -23,7 +28,7 @@ jest.mock('expo-router', () => ({
     back: mockBack,
     canGoBack: mockCanGoBack,
     replace: mockReplace,
-    push: jest.fn(),
+    push: mockPush,
   }),
   useLocalSearchParams: () => ({ recapId: 'recap-001' }),
   Redirect: ({ href }: { href: string }) => {
@@ -39,9 +44,8 @@ jest.mock('react-native-safe-area-context', () => ({
 
 // prettier-ignore
 jest.mock('../../../lib/navigation', () => ({ // gc1-allow: imports expo-router Router type; goBackOrReplace calls router.back which requires native navigation context
+  ...jest.requireActual('../../../lib/navigation'),
   goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-  FAMILY_RECAPS_HREF: '/(app)/recaps',
-  FAMILY_RECAPS_RETURN_TO: 'family-recaps',
 }));
 
 // prettier-ignore
@@ -224,6 +228,44 @@ describe('RecapDetailScreen', () => {
     it('renders the back button', () => {
       render(<RecapDetailScreen />);
       expect(screen.getByTestId('recap-detail-back')).toBeTruthy();
+    });
+
+    // [WI-2331 rework #2, F2 / AC-5 supporting-scope producer] the REAL
+    // emission site: handleOpenChildSession ([recapId].tsx:44-57) pushes
+    // `returnTo: FAMILY_RECAPS_RETURN_TO` when a guardian opens a linked
+    // child's session from their recap — asserted here off the actual
+    // mockPush call, not injected. Feeding that emitted token into the same
+    // homeHrefForReturnTo() the child-session/topic-relearn Back controls
+    // use proves the supporting-scope path lands back on the recap detail,
+    // not the Mentor tab.
+    it('emits FAMILY_RECAPS_RETURN_TO via handleOpenChildSession, resolving to the recap Back destination', () => {
+      render(<RecapDetailScreen />);
+
+      fireEvent.press(screen.getByTestId('recap-detail-open-session'));
+
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/child/[profileId]/session/[sessionId]',
+        params: {
+          profileId: RECAP_DATA.childProfileId,
+          sessionId: RECAP_DATA.sessionId,
+          returnTo: FAMILY_RECAPS_RETURN_TO,
+          returnId: RECAP_DATA.recapId,
+        },
+      });
+
+      const [{ params: emittedParams }] = mockPush.mock.calls[0] as [
+        { params: { returnTo: string; returnId: string } },
+      ];
+      expect(
+        homeHrefForReturnTo(
+          emittedParams.returnTo,
+          emittedParams.returnId,
+          true,
+        ),
+      ).toEqual({
+        pathname: '/(app)/recaps/[recapId]',
+        params: { recapId: RECAP_DATA.recapId },
+      });
     });
 
     it('renders the verified-proof block with quote and retention state', () => {

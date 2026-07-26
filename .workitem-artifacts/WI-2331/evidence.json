@@ -47,8 +47,18 @@
     },
     {
       "acRef": "AC-5",
-      "description": "AC-5 representative regression coverage identified PER AXIS (closing the reviewer's finding-2 over-claim): all three tabs (resolveV2TabIsActive Mentor/Subjects/Journal cases); own vs supporting context ('resolves identically for own-scope and supporter-scope returnTo tokens'); deep links ('resolves a cold deep-link landing to its owning tab'); dark/light themes ('TabIcon / TabLabel theme-token wiring' — focused colors.accent / unfocused colors.textSecondary, the semantic-token mechanism); small-phone layout ('keeps the V2 tab bar visible with correct tab highlight at a small-phone viewport'). The per-axis table is in docs/evidence/wi2331-rgr-v2-wayfinding.md Rework Finding 2.",
+      "description": "AC-5 representative regression coverage identified PER AXIS (closing the reviewer's finding-2 over-claim): all three tabs (resolveV2TabIsActive Mentor/Subjects/Journal cases); own vs supporting context — CONSUMER half here ('resolves the owning tab and Back destination for a supplied own-scope/supporting-scope token'; token-origin proof lives in the two producer tests below); deep links ('resolves a cold deep-link landing to its owning tab'); dark/light themes ('TabIcon / TabLabel theme-token wiring' run under both themes via it.each); small-phone layout ('keeps the V2 tab bar visible with correct tab highlight at a small-phone viewport'). The per-axis detail is in docs/evidence/wi2331-rgr-v2-wayfinding.md Rework #2.",
       "pointer": "apps/mobile/src/app/(app)/_layout.test.tsx"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "AC-5 own-scope PRODUCER proof (rework #2): own-learning.tsx emits returnToTab=OWN_LEARNING_RETURN_TO for a reachable guardian fixture (asserted no /(app)/home redirect), read back off the real captured prop (not injected) and resolved through homeHrefForReturnTo to OWN_LEARNING_HREF. Red-green in docs/evidence/wi2331-rgr-v2-wayfinding.md Rework #2.",
+      "pointer": "apps/mobile/src/app/(app)/own-learning.test.tsx"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "AC-5 supporting-scope PRODUCER proof (rework #2): handleOpenChildSession pushes returnTo=FAMILY_RECAPS_RETURN_TO when a guardian opens a linked child's session from a recap, asserted off the real router.push call (not injected) and resolved through homeHrefForReturnTo to the recap-detail href. Red-green in docs/evidence/wi2331-rgr-v2-wayfinding.md Rework #2.",
+      "pointer": "apps/mobile/src/app/(app)/recaps/[recapId].test.tsx"
     },
     {
       "acRef": "AC-5",

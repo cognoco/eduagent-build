@@ -220,15 +220,34 @@ Base `accent` is the same token value in both themes in design-tokens, so the cr
 differ-proof is anchored on `textSecondary`. Red-green: hardcoding the light token for the dark
 case fails the dark assertion; restore → green.
 
-### Axis 2 — own vs supporting context: made genuine
-The prior test fed hand-written `returnTo` strings to the pure resolver. The replacement builds
-real profile fixtures (solo owner vs owner + linked child), distinguishes them via the real
-`isGuardianProfile()` helper, renders the real `AppLayout`, drives the active `returnTo` through
-the real `useGlobalSearchParams` seam, invokes the real captured `Tabs.Screen` `tabBarIcon`
-closures (Mentor highlights, Subjects does not), and asserts the real `homeHrefForReturnTo` Back
-destination **differs** by context (own → own-learning; supporting → family-recaps). Red-green:
-two independent breaks (swap the own-learning href map; force the catch-all resolver to `false`)
-each fail; restore → green.
+### Axis 2 — own vs supporting context: made genuine (producer / consumer split)
+The prior test fed hand-written `returnTo` strings to the pure resolver, and a follow-up round
+paired a **solo-owner** fixture with the own-learning flow — but `own-learning.tsx` redirects a
+solo owner (`!familyCapable && tabShape !== 'guardian'`) to `/(app)/home`, so that state is
+unreachable, and the token was still injected rather than produced. Corrected by splitting the
+axis along the seam WI-2331 actually changed (the `returnTo` **consumer**), with the token-origin
+proof driven from the real **producers** — which live behind their own screens' mock infra, so
+the proof lives in those screens' co-located tests (no new internal mocks in the layout test):
+
+- **Own-scope producer** — `own-learning.test.tsx`: a reachable family-capable/guardian fixture
+  (owner + linked child) renders `OwnLearningScreen`, asserts it does **not** redirect to
+  `/(app)/home` (reachability), reads the **real emitted** `returnToTab` prop
+  (`own-learning.tsx` wires `returnToTab={OWN_LEARNING_RETURN_TO}` into `LearnerScreen`), and
+  resolves that emitted token through `homeHrefForReturnTo` to `OWN_LEARNING_HREF`. Red-green:
+  break `own-learning.tsx`'s emitted token → the own test fails; restore → green.
+- **Supporting-scope producer** — `recaps/[recapId].test.tsx`: renders the loaded recap detail,
+  fires `recap-detail-open-session`, and asserts the **real** `router.push` call carries
+  `returnTo: FAMILY_RECAPS_RETURN_TO` (`handleOpenChildSession`), then resolves that emitted
+  token through `homeHrefForReturnTo` to the recap-detail href. Red-green: break the pushed
+  token → the supporting test fails; restore → green.
+- **Consumer** — `_layout.test.tsx`: given a *supplied* own vs supporting token, `AppLayout`'s
+  real `Tabs.Screen` wiring + `homeHrefForReturnTo` resolve the correct owning tab and the
+  **distinct** Back destination. Profile fixtures were removed (they implied a token origin this
+  test does not prove); a single neutral profile mounts the layout, and the assertion weight is
+  on the Back destination (both tokens share the Mentor catch-all highlight, so the destination
+  is the real differentiator). Red-green: swap the own-learning branch of `homeHrefForReturnTo`
+  → the own-scope case fails while the supporting-scope case still passes (proving the two are
+  independent), restore → green.
 
 ### Axis 3 — small-phone layout: operator scope ruling (2026-07-26)
 The reviewer asked for a test that "supplies a small viewport/window dimension." The V2 shell

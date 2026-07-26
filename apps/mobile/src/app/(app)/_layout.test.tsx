@@ -263,7 +263,6 @@ const {
   FAMILY_RECAPS_HREF,
   homeHrefForReturnTo,
 } = require('../../lib/navigation');
-const { isGuardianProfile } = require('../../lib/profile');
 
 describe('mode tab helpers', () => {
   it('returns Study tabs for study mode', () => {
@@ -1186,54 +1185,58 @@ describe('AppLayout', () => {
     }
   });
 
-  // [WI-2331 rework #2, F2 / AC-5] "own vs supporting context" coverage.
-  // Unlike the prior round (a pure resolver fed hand-written returnTo
-  // strings), this exercises the REAL own-vs-supporting profile context via
-  // useProfile() (real isGuardianProfile()) and the REAL production wiring:
-  // AppLayout's Tabs.Screen entries close over resolveV2TabIsActive keyed off
-  // activeReturnTo, which comes only from useGlobalSearchParams
-  // (mockUseGlobalSearchParams here). own-learning.tsx (own scope) pushes
-  // OWN_LEARNING_RETURN_TO; the family recap/progress dashboards (supporting
-  // a linked child) push FAMILY_RECAPS_RETURN_TO — this test drives both
-  // real tokens through the actual Tabs.Screen closures captured off
-  // AppLayout's render, instead of calling resolveV2TabIsActive directly.
+  // [WI-2331 rework #2, F2 / AC-5] CONSUMER-side wiring test: given a
+  // supplied returnTo token, does AppLayout's real production wiring
+  // (Tabs.Screen closures over resolveV2TabIsActive + homeHrefForReturnTo)
+  // resolve the correct owning tab and Back destination? Injection is
+  // legitimate HERE — this test is deliberately scoped to the consumer half
+  // of the own/supporting axis. It does NOT prove where OWN_LEARNING_RETURN_TO
+  // or FAMILY_RECAPS_RETURN_TO actually come from in production; that
+  // producer proof lives in own-learning.test.tsx ("emits
+  // OWN_LEARNING_RETURN_TO as returnToTab...") and
+  // recaps/[recapId].test.tsx ("emits FAMILY_RECAPS_RETURN_TO via
+  // handleOpenChildSession..."), which render the real producer screens and
+  // assert on their real emitted params — no profile fixture is needed here
+  // to make that point, so this test uses ONE neutral profile purely to
+  // mount AppLayout.
+  //
+  // Both tokens collapse to the SAME Mentor tab highlight (accountReturnToken's
+  // catch-all — see resolveV2TabIsActive's doc comment), so the highlight
+  // check below is a light sanity check; the genuine differentiator this
+  // test weighs on is the Back DESTINATION, which genuinely differs by token.
   it.each([
     {
-      context: 'own scope (solo owner, no linked children)' as const,
-      profiles: [
-        { id: 'p1', displayName: 'Parent', isOwner: true, birthYear: 1990 },
-      ],
+      context: 'own-scope returnTo (own-learning)' as const,
       returnTo: OWN_LEARNING_RETURN_TO,
       backDestination: OWN_LEARNING_HREF,
     },
     {
-      context: 'supporting scope (guardian viewing a linked child)' as const,
-      profiles: [
-        { id: 'p1', displayName: 'Parent', isOwner: true, birthYear: 1990 },
-        { id: 'c1', displayName: 'Child', isOwner: false, birthYear: 2014 },
-      ],
+      context: 'supporting-scope returnTo (family-recaps)' as const,
       returnTo: FAMILY_RECAPS_RETURN_TO,
       backDestination: FAMILY_RECAPS_HREF,
     },
   ])(
-    'resolves the owning tab and Back label for $context',
-    async ({ profiles, returnTo, backDestination }) => {
+    'resolves the owning tab and Back destination for a supplied $context token',
+    async ({ returnTo, backDestination }) => {
       const flags = require('../../lib/feature-flags') as {
         FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
       };
       const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
       try {
         flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED = true;
-        const activeProfile = profiles[0];
-        // The two contexts are genuinely distinguished by the real
-        // isGuardianProfile() helper, not a hand-picked label.
-        expect(isGuardianProfile(activeProfile, profiles)).toBe(
-          profiles.length > 1,
-        );
-
+        // One neutral profile — just enough for AppLayout to mount. Its
+        // shape is irrelevant here; the token is supplied directly below,
+        // not derived from this fixture.
         mockUseProfile.mockReturnValue({
-          profiles,
-          activeProfile,
+          profiles: [
+            { id: 'p1', displayName: 'Parent', isOwner: true, birthYear: 1990 },
+          ],
+          activeProfile: {
+            id: 'p1',
+            displayName: 'Parent',
+            isOwner: true,
+            birthYear: 1990,
+          },
           isLoading: false,
           profileWasRemoved: false,
           acknowledgeProfileRemoval: jest.fn(),
@@ -1246,12 +1249,9 @@ describe('AppLayout', () => {
         renderLayout();
         await screen.findByTestId('tabs');
 
-        // The real Tabs.Screen `tabBarIcon` closure for "mentor" resolves
-        // focused via resolveV2TabIsActive(pathname, 'mentor', v2Enabled,
-        // focused, activeReturnTo) — call it exactly as React Navigation
-        // would (reactNavigationFocused=false, so the true positive can only
-        // come from the returnTo/pathname resolution, not a stray
-        // Navigation focus state).
+        // Sanity check: both tokens resolve to the same Mentor highlight
+        // (the catch-all), via the real captured Tabs.Screen tabBarIcon
+        // closures — not by calling resolveV2TabIsActive directly.
         const mentorOptions = capturedTabScreenOptions.mentor;
         const subjectsOptions = capturedTabScreenOptions.subjects;
         expect(mentorOptions?.tabBarIcon).toBeDefined();
@@ -1267,14 +1267,11 @@ describe('AppLayout', () => {
           tokens.light.colors.textSecondary,
         );
 
-        // Back destination: the SAME production resolver real pushed
-        // screens use (child/[profileId]/session/[sessionId].tsx,
-        // topic/relearn.tsx) for their Back control. Both own-learning and
-        // family-recaps highlight Mentor as the owning TAB (asserted above),
-        // but their actual Back DESTINATION differs by context — own scope
-        // returns to the owner's own-learning screen, supporting scope
-        // returns to the child's recap — proving the two contexts are
-        // genuinely distinguished, not collapsed to one outcome.
+        // The genuine differentiator: Back DESTINATION, via the SAME
+        // production resolver real pushed screens use
+        // (child/[profileId]/session/[sessionId].tsx, topic/relearn.tsx) for
+        // their Back control. own-scope returns to the owner's own-learning
+        // screen; supporting-scope returns to the child's recap.
         expect(homeHrefForReturnTo(returnTo, undefined, true)).toBe(
           backDestination,
         );
