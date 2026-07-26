@@ -306,16 +306,14 @@ describe('updateSubscriptionFromWebhookV2', () => {
           ownerId,
           tier: 'plus',
           status: 'trial',
-          stripeSubscriptionId: stripeSubscriptionId(
-            'webhook-update',
-            randomUUID(),
-          ),
+          stripeSubscriptionId: 'sub_webhook_001',
         });
       }
 
-      const { organizationId, ownerId } =
-        await seedV2OrgWithOwner('webhook-update');
-      const stripeId = stripeSubscriptionId('webhook-update');
+      const { organizationId, ownerId } = await seedV2OrgWithOwner(
+        `webhook-update-${seedResidue ? 'dirty' : 'clean'}`,
+      );
+      const stripeId = 'sub_webhook_001';
       const sub = await seedV2SubscriptionDirect({
         organizationId,
         ownerId,
