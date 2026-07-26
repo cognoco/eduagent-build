@@ -335,10 +335,14 @@ describe('updateSubscriptionFromWebhookV2', () => {
     async (_, seedResidue) => {
       const db = createIntegrationDb();
       if (seedResidue) {
-        const preExistingResidue = await ensureSuiteExternalWebhookResidue();
+        const [preExistingResidue, concurrentResidue] = await Promise.all([
+          ensureSuiteExternalWebhookResidue(),
+          ensureSuiteExternalWebhookResidue(),
+        ]);
         expect(preExistingResidue.stripeSubscriptionId).toBe(
           STATIC_WEBHOOK_RESIDUE_ID,
         );
+        expect(concurrentResidue.id).toBe(preExistingResidue.id);
       }
 
       const { organizationId, ownerId } = await seedV2OrgWithOwner(
