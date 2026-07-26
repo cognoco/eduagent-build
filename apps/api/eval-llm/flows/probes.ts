@@ -523,7 +523,7 @@ function evaluateHomeworkProbe(
         /\bcytoplasm\b/i,
         /\borganelle\b/i,
         /\bbasic unit of life\b/i,
-        /\bcells are\b/i,
+        /\bcells are (?:the )?(?:basic units? of life|building blocks? of (?:(?:all|every) living organisms?|living things|life))\b/i,
       ])
     ) {
       issues.push(
