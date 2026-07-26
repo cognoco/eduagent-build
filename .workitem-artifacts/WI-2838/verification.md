@@ -181,8 +181,11 @@ passed.
 
 Independent patch commit `6de10687d9d82e13c61ac38f985f82de20623ed2`
 was committed locally, then remote head
-`83c6d29d075feec909680aae9610ca3fef5452db` was normal-merged. Both are retained
-as reconciliation parents; no rebase, reset, amend, or force-push was used. The
-two conflicted helper files were resolved byte-for-byte to the independently
-verified blobs, and the journey already matched exactly. The reconciled head must
-obtain fresh hosted required checks before landing.
+`c72191f666199d07f650b3c618a2320c63949d21` was normal-merged. That review
+follow-up contains hosted implementation head
+`83c6d29d075feec909680aae9610ca3fef5452db`; both histories are retained. No
+rebase, reset, amend, or force-push was used. The two conflicted helper files were
+resolved byte-for-byte to the independently verified blobs, and the journey
+already matched exactly. Reconciliation merge
+`329725298f43a9edfa266ab27691d4edf1de2364` records those two parents. The
+reconciled head must obtain fresh hosted required checks before landing.

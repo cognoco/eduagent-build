@@ -50,5 +50,6 @@ are recorded in `verification.md` and `evidence.json`.
 
 After that executor disappeared, an independent rework in an isolated worktree
 produced commit `6de10687`, verified the stronger exact guard locally, and then
-normal-merged remote head `83c6d29d`. No rebase, reset, force-push, or history
-replacement was used; both histories remain in the reconciled ancestry.
+normal-merged remote review-follow-up head `c72191f6`, which contains hosted
+implementation head `83c6d29d`. No rebase, reset, force-push, or history
+replacement was used; reconciliation merge `3297252f` retains both histories.

@@ -33,10 +33,12 @@
     "bounceCorrectionE2EConclusion": "success",
     "bounceCorrectionPendingHosted": false,
     "independentPatchCommit": "6de10687d9d82e13c61ac38f985f82de20623ed2",
+    "remoteReviewFollowupHead": "c72191f666199d07f650b3c618a2320c63949d21",
     "reconciliationParents": [
       "6de10687d9d82e13c61ac38f985f82de20623ed2",
-      "83c6d29d075feec909680aae9610ca3fef5452db"
+      "c72191f666199d07f650b3c618a2320c63949d21"
     ],
+    "reconciliationMergeHead": "329725298f43a9edfa266ab27691d4edf1de2364",
     "reconciledHeadHostedPending": true,
     "parents": [
       "732b684eb69d1ffaa8613c59318e804f18566fbe",
