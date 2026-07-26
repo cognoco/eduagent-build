@@ -80,7 +80,7 @@ type AppLike = {
     input: string,
     init?: RequestInit,
     env?: Record<string, string>,
-  ) => Promise<Response>;
+  ) => Response | Promise<Response>;
 };
 
 export interface AuthFixtureUser {
@@ -532,7 +532,7 @@ export async function seedAssessmentRecord(input: {
   sessionId?: string | null;
   verificationDepth?: 'recall' | 'explain' | 'transfer';
   status?: 'in_progress' | 'passed' | 'failed';
-  masteryScore?: string | number | null;
+  masteryScore?: number | null;
   qualityRating?: number | null;
   exchangeHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
   overrides?: Partial<typeof assessments.$inferInsert>;
@@ -547,8 +547,7 @@ export async function seedAssessmentRecord(input: {
       sessionId: input.sessionId ?? null,
       verificationDepth: input.verificationDepth ?? 'recall',
       status: input.status ?? 'in_progress',
-      masteryScore:
-        input.masteryScore == null ? null : String(input.masteryScore),
+      masteryScore: input.masteryScore ?? null,
       qualityRating: input.qualityRating ?? null,
       exchangeHistory: input.exchangeHistory ?? [],
       ...input.overrides,

@@ -440,6 +440,17 @@ export function useNowOverflow(
         { query: { scope: 'self' } },
         { init: { signal } },
       ),
+    // [WI-2627 rework] `select` runs AFTER the wrapper's parse, so a malformed
+    // `mentorNoticePolicy` fails the whole schema and the fold below is never
+    // reached — and TanStack Query then RETAINS the prior notice-bearing page
+    // and keeps rendering it with policy still enabled. `onParseError` is the
+    // wrapper's seam for exactly that: it fires before the error propagates, so
+    // the store goes fail-closed and the suppression memo below re-evaluates
+    // and strips the data the query kept.
+    //
+    // Deliberately over-broad, as in `useNowFeed`: a body we cannot parse is one
+    // whose policy we cannot confirm, and notices are the private feature.
+    onParseError: () => policy.observeMalformed(),
     // [WI-2627] The fold happens HERE, not in an effect. `useApiQuery` runs
     // `select` inside the query fn, i.e. BEFORE the query publishes — which is
     // the only place a fold can sit without the surface painting a frame first.
@@ -454,7 +465,8 @@ export function useNowOverflow(
     // for the same reason.
     //
     // The STRIP stays outside `select` — baked into the cache entry it would
-    // never re-evaluate when a sibling surface observes a disable.
+    // never re-evaluate when a sibling surface observes a disable, and it is
+    // what blanks data the query RETAINED across a failed refetch.
     select: (json) => {
       policy.observe(json.mentorNoticePolicy);
       return json;

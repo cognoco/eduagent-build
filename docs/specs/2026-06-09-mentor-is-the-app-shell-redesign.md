@@ -199,6 +199,8 @@ The artifact wall ("never her chats/notes") is deliberately **not** stated at th
 
 ## 4. Scope model — the chip
 
+> **Amended 2026-07-26 by MMT-ADR-0037 (operator-ruled, WI-2777):** (a) the Support-hub pill is now **conditional** — 0 supportees → hub is the cold-start landing (§3.2 unchanged); exactly 1 → land directly in the person scope, no hub pill, supporter-addressed modules fold into that scope; 2+ → hub returns as the overview. This supersedes §4.2's "keep hub and person scopes separate even with a single linked person" for the single-supportee case. (b) The **Me scope is always present** in the supporter chip, with a "start your own learning" / "learn along" empty-state doorway — superseding §4.1's "[ Me — after first real self-learning state ]" and §4.2 state 3's appear-on-activity rule. See `docs/adr/MMT-ADR-0037-person-first-supporter-ia-and-v1-presentation-reuse.md` and `docs/specs/2026-07-26-supporter-surface-v1-presentation-over-v2-logic.md`.
+
 **A scope is not a person's world — it is a relationship lens.** Me scope = my relationship with my own learning. Emma scope = my relationship with *Emma's* learning. Its **structural layer** (subjects, mastery, activity, next-up) is read **live from Emma's data through a server-enforced permission mask** — not a separate edge-replicated copy — and **never her artifacts** (notes, Journal, mentor memory, chats), for which **no supporter read path exists on any edge**. The phrase "never from Emma's private space" scopes precisely to those artifacts, not to the grades layer (this resolves the §4↔§6.3 tension; see §6.1). Scope-switching is never impersonation and never proxy. Same chip, same three tabs in every scope; only the lens changes.
 
 ### 4.1 Two account shapes, one shell

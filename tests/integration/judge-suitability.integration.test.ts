@@ -21,7 +21,6 @@
  * - Sentry (captureException)
  */
 
-import { and, eq } from 'drizzle-orm';
 import { subjects, learningSessions, sessionEvents } from '@eduagent/database';
 
 import {
@@ -33,6 +32,7 @@ import { buildAuthHeaders } from './test-keys';
 import { mockInngestEvents } from './mocks';
 import { clearFetchCalls } from './fetch-interceptor';
 import { registerProvider } from '../../apps/api/src/services/llm';
+import { createMockProvider } from '../../apps/api/src/services/llm/test-utils';
 
 // ---------------------------------------------------------------------------
 // Mocks — must be declared before importing modules that use them
@@ -40,12 +40,17 @@ import { registerProvider } from '../../apps/api/src/services/llm';
 
 const mockCaptureException = jest.fn();
 jest.mock('@sentry/cloudflare', () => ({
-  withScope: (fn) =>
-    fn({ setUser: jest.fn(), setTag: jest.fn(), setExtra: jest.fn() }),
-  captureException: (...args) => mockCaptureException(...args),
+  withScope: (
+    fn: (scope: {
+      setUser: (...args: unknown[]) => unknown;
+      setTag: (...args: unknown[]) => unknown;
+      setExtra: (...args: unknown[]) => unknown;
+    }) => void,
+  ) => fn({ setUser: jest.fn(), setTag: jest.fn(), setExtra: jest.fn() }),
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
   captureMessage: jest.fn(),
   addBreadcrumb: jest.fn(),
-  withSentry: (_config, handler) => handler,
+  withSentry: <T>(_config: unknown, handler: T): T => handler,
 }));
 
 import { app } from '../../apps/api/src/index';
@@ -82,21 +87,15 @@ let judgeResponse = VERDICT_JSON;
 
 function registerJudgeProvider(): void {
   registerProvider({
-    id: 'anthropic',
+    ...createMockProvider('anthropic'),
     async chat() {
       return { content: judgeResponse, stopReason: 'stop' };
-    },
-    async *chatStream() {
-      yield judgeResponse;
     },
   });
   registerProvider({
-    id: 'openai',
+    ...createMockProvider('openai'),
     async chat() {
       return { content: judgeResponse, stopReason: 'stop' };
-    },
-    async *chatStream() {
-      yield judgeResponse;
     },
   });
 }
@@ -209,7 +208,9 @@ function buildEvent(
 
 async function executeHandler(eventData: unknown) {
   const mockStep = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
+    async run<T>(_name: string, fn: () => T | Promise<T>): Promise<T> {
+      return fn();
+    },
   };
   return handleSuitabilityJudge({
     event: { data: eventData },

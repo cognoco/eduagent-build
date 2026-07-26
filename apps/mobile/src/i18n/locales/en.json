@@ -258,7 +258,8 @@
       "passwordPlaceholder": "Enter your password",
       "forgotPassword": "Forgot password?",
       "signInButton": "Sign in",
-      "sendVerificationCode": "Send verification code"
+      "sendVerificationCode": "Send verification code",
+      "verificationStartFailed": "We could not start verification. Please try signing in again."
     },
     "signUp": {
       "title": "Create account",
@@ -315,6 +316,27 @@
       "backToSignIn": "Back to sign in",
       "emailPlaceholder": "you@example.com",
       "sendResetCode": "Send reset code"
+    },
+    "errors": {
+      "generic": "Something didn't go through. Please try again.",
+      "form_identifier_not_found": "We couldn't find an account with that email.",
+      "form_password_incorrect": "That password doesn't look right. Please try again.",
+      "form_password_or_identifier_incorrect": "That email or password doesn't look right. Please try again.",
+      "form_password_pwned": "This password has appeared in a data breach. Please choose a different password.",
+      "form_password_compromised": "This password isn't safe to use. Please choose a different password.",
+      "form_password_not_strong_enough": "This password isn't strong enough. Please add more variety.",
+      "form_password_length_too_short": "Password is too short. Please use at least 8 characters.",
+      "form_password_length_too_long": "Password is too long. Please use a shorter one.",
+      "form_password_no_uppercase": "Password needs at least one uppercase letter.",
+      "form_password_no_lowercase": "Password needs at least one lowercase letter.",
+      "form_password_no_number": "Password needs at least one number.",
+      "form_password_no_special_char": "Password needs at least one special character.",
+      "form_password_validation_failed": "That password doesn't meet the requirements.",
+      "form_code_incorrect": "That code doesn't match. Please try again.",
+      "form_identifier_exists": "An account with that email already exists.",
+      "form_param_format_invalid": "That doesn't look like a valid email address.",
+      "captcha_invalid": "We couldn't verify you're human. Please try again.",
+      "signup_rate_limit_exceeded": "Too many sign-up attempts. Please try again later."
     }
   },
   "guards": {
@@ -4319,7 +4341,6 @@
       "activeMessage": "You can review this agreement here any time.",
       "revoke": "End sharing",
       "revoking": "Ending sharing...",
-      "revoked": "Sharing is ending. The supporter will see a notice.",
       "revokeErrorTitle": "Couldn't end sharing",
       "missingActor": "We could not identify the active person."
     },

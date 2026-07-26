@@ -1364,6 +1364,132 @@ describe('[WI-2627] the fold must be reachable, and must precede publication', (
     await waitFor(() => expect(result.current.data?.cards).toEqual([]));
   });
 
+  // [WI-2627 rework, finding 1] The same defect on the OVERFLOW surface, which
+  // the first pass left fail-OPEN.
+  //
+  // `useApiQuery` parsed inside its own query fn, BEFORE running the `select`
+  // callback that held the fold — so a malformed policy threw at the wrapper and
+  // the fold was unreachable. TanStack Query then retained the prior
+  // notice-bearing page and kept handing it to the surface with policy still
+  // enabled.
+  //
+  // The assertion is deliberately about what the surface EXPOSES while the query
+  // sits in an error state holding retained data — not about the schema, and not
+  // about whether `observeMalformed` was called. Both of those pass on code that
+  // still renders the retained notice.
+  it('goes fail-closed when the OVERFLOW response fails to parse, and suppresses the RETAINED notice item', async () => {
+    const PLAIN_ITEM = {
+      kind: 'retention_due',
+      templateKey: 'now.retention_due.default',
+      params: { subjectName: 'Physics' },
+      deepLink: { route: 'retention.review', params: {}, chain: [] },
+      scope: 'self',
+    };
+    const OVERFLOW_NOTICE_ITEM = {
+      kind: 'mentor_notice',
+      templateKey: 'now.mentor_notice.default',
+      params: {
+        noticeId: '11111111-1111-4111-8111-111111111111',
+        concept: 'sign flip',
+      },
+      deepLink: { route: 'notice.recheck', params: {}, chain: [] },
+      scope: 'self',
+    };
+
+    // First fetch: a good notice-bearing overflow page at revision 7, rollout on.
+    mockFetch.mockImplementationOnce(() =>
+      Promise.resolve(
+        jsonResponse({
+          scope: 'self',
+          items: [OVERFLOW_NOTICE_ITEM, PLAIN_ITEM],
+          mentorNoticePolicy: policy(7, true),
+        }),
+      ),
+    );
+
+    const { result } = renderHook(() => useNowOverflow(true), {
+      wrapper: createHookWrapper().wrapper,
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    // NON-TRIVIALITY CONTROL: at a revision the store accepts with rollout ON,
+    // the notice item really does render. An implementation that suppressed
+    // unconditionally would fail here, so the suppression assertion below is not
+    // vacuously satisfiable.
+    expect(result.current.data?.items.map((item) => item.kind)).toEqual([
+      'mentor_notice',
+      'retention_due',
+    ]);
+    await waitFor(async () =>
+      expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
+        '{"revision":7,"enabled":true}',
+      ),
+    );
+
+    // Refetch returns a MALFORMED observation — negative revision, which the
+    // whole `nowOverflowResponseSchema` rejects, so no observation value ever
+    // reaches `observe`.
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(
+        jsonResponse({
+          scope: 'self',
+          items: [OVERFLOW_NOTICE_ITEM, PLAIN_ITEM],
+          mentorNoticePolicy: {
+            rolloutRevision: -1,
+            rolloutEnabled: true,
+            projectionEpoch: 'notice-policy-v1:bad',
+          },
+        }),
+      ),
+    );
+
+    await act(async () => {
+      await result.current.refetch();
+    });
+
+    // The query IS in an error state and IS still holding the prior successful
+    // page — that retention is the exposure, so it has to be established rather
+    // than assumed.
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.data).toBeDefined();
+    // THE CRITERION'S LAYER: what the surface exposes off that retained page.
+    // The plain item survives (proving the page really was retained and is not
+    // merely gone); the notice item and its notice.recheck deep link do not.
+    await waitFor(() =>
+      expect(result.current.data?.items.map((item) => item.kind)).toEqual([
+        'retention_due',
+      ]),
+    );
+    // And the mechanism behind it: fail-closed at the held revision, never
+    // dropped to 0.
+    expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
+      '{"revision":7,"enabled":false}',
+    );
+
+    // RECOVERY: fail-closed must be sticky, not permanent. Holding the revision
+    // rather than dropping it to 0 is precisely what leaves a strictly higher
+    // revision able to lift the disable — without this, one corrupt response
+    // would blacken this surface on the device forever, which is what extending
+    // the sticky-disable class to three surfaces would otherwise risk.
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(
+        jsonResponse({
+          scope: 'self',
+          items: [OVERFLOW_NOTICE_ITEM, PLAIN_ITEM],
+          mentorNoticePolicy: policy(8, true),
+        }),
+      ),
+    );
+    await act(async () => {
+      await result.current.refetch();
+    });
+    await waitFor(() =>
+      expect(result.current.data?.items.map((item) => item.kind)).toEqual([
+        'mentor_notice',
+        'retention_due',
+      ]),
+    );
+  });
+
   // "It is correct after the effect" IS the bug, so this asserts on every
   // COMMITTED render rather than on eventual state.
   it('never publishes a rollback-bearing overflow payload — not even for one frame', async () => {

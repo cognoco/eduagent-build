@@ -121,6 +121,8 @@ export interface DraftedChallengeNoteEvent {
 export interface StreamDoneEvent {
   type: 'done';
   exchangeCount: number;
+  /** Persisted assistant event id for idempotent client reconciliation. */
+  aiEventId?: string;
   /** Present on learning sessions; absent on interview done events. */
   escalationRung?: number;
   /** Present on interview done events; absent on learning sessions. */

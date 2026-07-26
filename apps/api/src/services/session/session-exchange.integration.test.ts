@@ -315,6 +315,11 @@ function createBranchingLlm() {
   let tutorResponse = TUTOR_ENVELOPE_NO_EVAL;
   let graderResponse = GRADER_VERDICT_SOLID;
   let noticeRecheckJudgeResponse = NOTICE_RECHECK_JUDGE_VERDICT_CONTINUE;
+  // [WI-2625 rework #4] AC-4 names malformed OR UNAVAILABLE judgment. When set,
+  // every provider throws for the judge call (and only for it), so `routeAndCall`
+  // exhausts its fallback chain and throws — the real route-error path that
+  // `evaluateMentorNoticeRecheck` fail-opens to `{ kind: 'unresolved' }`.
+  let noticeRecheckJudgeUnavailable = false;
   let streamFailurePhase: TutorStreamFailurePhase | undefined;
   let tutorChatCalls = 0;
   let tutorChatStreamCalls = 0;
@@ -324,6 +329,9 @@ function createBranchingLlm() {
     calls.push(messages);
     if (isGraderMessages(messages)) return graderResponse;
     if (isNoticeRecheckJudgeMessages(messages)) {
+      if (noticeRecheckJudgeUnavailable) {
+        throw new Error('injected notice-recheck judge unavailability');
+      }
       return noticeRecheckJudgeResponse;
     }
     return tutorResponse;
@@ -392,6 +400,9 @@ function createBranchingLlm() {
     setNoticeRecheckJudgeResponse(content: string): void {
       noticeRecheckJudgeResponse = content;
     },
+    setNoticeRecheckJudgeUnavailable(unavailable: boolean): void {
+      noticeRecheckJudgeUnavailable = unavailable;
+    },
     setStreamFailurePhase(phase: TutorStreamFailurePhase | undefined): void {
       streamFailurePhase = phase;
     },
@@ -421,6 +432,7 @@ function createBranchingLlm() {
       tutorResponse = TUTOR_ENVELOPE_NO_EVAL;
       graderResponse = GRADER_VERDICT_SOLID;
       noticeRecheckJudgeResponse = NOTICE_RECHECK_JUDGE_VERDICT_CONTINUE;
+      noticeRecheckJudgeUnavailable = false;
       streamFailurePhase = undefined;
       tutorChatCalls = 0;
       tutorChatStreamCalls = 0;
@@ -1690,10 +1702,37 @@ describeIfDb('session exchange production-path integration', () => {
           status: mentorNotices.status,
           lastRecheckOutcome: mentorNotices.lastRecheckOutcome,
           recheckAttemptCount: mentorNotices.recheckAttemptCount,
+          resolvedAt: mentorNotices.resolvedAt,
         })
         .from(mentorNotices)
         .where(eq(mentorNotices.id, noticeId));
       return row ?? null;
+    }
+
+    /**
+     * [WI-2625 rework #4] The session-side ATTEMPT bookkeeping — the two keys
+     * that bind one notice to one session and anchor the per-attempt exchange
+     * counter (offer.ts). Read as raw metadata so "the keys are gone" is
+     * observable, not inferred.
+     */
+    async function readAttemptBookkeeping(sessionId: string): Promise<{
+      recheckNoticeId?: unknown;
+      recheckOfferExchangeCount?: unknown;
+    }> {
+      const [row] = await db
+        .select({ metadata: learningSessions.metadata })
+        .from(learningSessions)
+        .where(eq(learningSessions.id, sessionId));
+      const metadata = (row?.metadata as Record<string, unknown> | null) ?? {};
+      const bookkeeping: Record<string, unknown> = {};
+      if ('recheckNoticeId' in metadata) {
+        bookkeeping.recheckNoticeId = metadata.recheckNoticeId;
+      }
+      if ('recheckOfferExchangeCount' in metadata) {
+        bookkeeping.recheckOfferExchangeCount =
+          metadata.recheckOfferExchangeCount;
+      }
+      return bookkeeping;
     }
 
     it.each([
@@ -1831,18 +1870,27 @@ describeIfDb('session exchange production-path integration', () => {
     });
 
     // -----------------------------------------------------------------------
-    // [WI-2625 rework] THREE causes, three named cases, both transports.
+    // [WI-2625 rework #4] THREE causes, both transports — under the operator
+    // ruling of 2026-07-26 ("Recommendation B").
     //
-    // Two mechanisms decide a re-check outcome and must never be conflated:
-    // the judge's verdict, and the ratified three-response cap. The causes:
-    //   1. valid `continue` BELOW the cap  → no transition   (the judge)
-    //   2. valid `continue` AT the cap     → not_yet         (the cap)
-    //   3. unresolved evaluation AT the cap → not_yet        (the cap)
+    // Two mechanisms act during a re-check and must never be conflated: the
+    // judge's verdict, and the ratified three-response attempt cap. The cap
+    // acts on the ATTEMPT lifecycle, which is separate bookkeeping from notice
+    // status. The causes:
+    //   1. valid `continue` BELOW the cap   → no transition        (the judge)
+    //   2. valid `continue` AT the cap      → no transition; the ATTEMPT ends,
+    //      the notice stays open, unresolved and RE-OFFERABLE       (the cap)
+    //   3. unresolved evaluation AT the cap → not_yet               (the cap)
     //
-    // Case 1 is what proves AC-3 survives cases 2 and 3: the judge's
-    // `continue` does not itself terminalize. Cases 2 and 3 reach the same DB
-    // state by ruling, and are told apart by the cap's recorded `cause` — the
-    // only place they observably differ, so that is what gets asserted.
+    // Cases 1 and 2 together are AC-3 as written: a valid `continue` makes no
+    // mentor-notice transition at ANY exchange number, including the third.
+    // Case 3 is AC-4, unchanged.
+    //
+    // Cases 2 and 3 are the NON-TRIVIALITY CONTROL for each other, and the
+    // tightest available one: same transport, same turn count, same cap, one
+    // variable changed (the judge's output). An implementation that always
+    // transitions fails case 2; one that never transitions fails case 3. No
+    // always-X implementation can satisfy both.
     //
     // Both transports throughout: processMessage and streamMessage each derive
     // their own context, so one does not prove the other.
@@ -1946,6 +1994,15 @@ describeIfDb('session exchange production-path integration', () => {
           .map((entry) => entry.context?.cause);
       }
 
+      /** The `not_yet` terminalization is emitted ONLY by the AC-4 cap path. */
+      function capTerminalizations(entries: LogEntry[]): unknown[] {
+        return entries
+          .filter((entry) =>
+            entry.message.includes('response cap reached — terminalizing'),
+          )
+          .map((entry) => entry.context?.cause);
+      }
+
       // ---- Cause 1: the judge's own valid `continue`, BELOW the cap. --------
       // This is the AC-3 anchor: the judge's `continue` demonstrably does not
       // itself terminalize, because here — one exchange short of the cap — it
@@ -1973,32 +2030,59 @@ describeIfDb('session exchange production-path integration', () => {
       );
 
       // ---- Cause 2: the CAP, over a valid `continue`. -----------------------
-      // NOTE — this INVERTS what this suite asserted at the previous head
-      // (valid continue at exchange 3 → no transition). Ruled 2026-07-26 after
-      // Codex found that leaving the notice open past the cap traps the
-      // learner: resolveMentorNoticeRecheckContext returns null from exchange
-      // 4 (offer.ts), so the judge is never consulted again while the notice
-      // keeps surfacing in the Now feed. AC-3 still holds — the judge's
-      // `continue` caused no transition (proved by the case above); the cap
-      // did, and the emitted `cause` says so.
+      // AC-3 at the exchange number that matters. The cap ends the ATTEMPT —
+      // the session's attempt bookkeeping is detached — and transitions NOTHING
+      // on the notice: still `open`, no recorded outcome, no resolvedAt, no
+      // attempt-count increment. Ruled 2026-07-26 ("Recommendation B") after
+      // three Gate-2 bounces over a cap-driven `not_yet` here.
       it.each(['processMessage', 'streamMessage'] as const)(
-        '%s: the CAP terminalizes not_yet after a valid continue at the cap',
+        '%s: a valid continue AT the cap makes NO transition — the attempt ends, the notice is preserved',
         async (transport) => {
           const { profileId, session, noticeId } =
             await seedOpenMentorNoticeRecheckTurn();
           llm.setNoticeRecheckJudgeResponse(
             JSON.stringify({ verdict: 'continue', reason: 'unclear' }),
           );
+          expect(await readAttemptBookkeeping(session.id)).toEqual({
+            recheckNoticeId: noticeId,
+          });
+          // An unrelated metadata key, to prove the detach is targeted surgery
+          // on the two attempt keys and not a metadata reset.
+          await db
+            .update(learningSessions)
+            .set({
+              metadata: { recheckNoticeId: noticeId, continuationDepth: 'mid' },
+            })
+            .where(eq(learningSessions.id, session.id));
 
           const entries = await captureLogs(() =>
             runTwoRecheckTurns(transport, profileId, session.id),
           );
 
+          // The cap DID fire at exchange 3 (so this is not a vacuous pass over
+          // an attempt that never reached it) — and it fired without any
+          // `not_yet` terminalization.
           expectLastJudgeCallWasExchange(3);
           expect(capCauses(entries)).toEqual(['valid_continue']);
+          expect(capTerminalizations(entries)).toEqual([]);
+
+          // The notice: untouched.
           const row = await readNotice(noticeId);
-          expect(row?.status).toBe('not_yet');
-          expect(row?.lastRecheckOutcome).toBe('not_yet');
+          expect(row?.status).toBe('open');
+          expect(row?.lastRecheckOutcome).toBeNull();
+          expect(row?.resolvedAt).toBeNull();
+          expect(row?.recheckAttemptCount).toBe(0);
+
+          // The attempt: ended. Both keys removed, so nothing holds the notice
+          // to this now-spent session — and unrelated metadata survives.
+          expect(await readAttemptBookkeeping(session.id)).toEqual({});
+          const [sessionRow] = await db
+            .select({ metadata: learningSessions.metadata })
+            .from(learningSessions)
+            .where(eq(learningSessions.id, session.id));
+          expect(sessionRow?.metadata).toMatchObject({
+            continuationDepth: 'mid',
+          });
         },
       );
 
@@ -2015,21 +2099,159 @@ describeIfDb('session exchange production-path integration', () => {
           );
 
           expectLastJudgeCallWasExchange(3);
-          // Same DB end state as cause 2, DIFFERENT recorded cause — the two
-          // remain distinguishable exactly where the ruling requires it.
+          // The discriminating pair: identical setup to cause 2 except the
+          // judge's output, and the OPPOSITE end state. This is what forbids an
+          // always-no-transition implementation from satisfying cause 2.
           expect(capCauses(entries)).toEqual(['evaluator_unresolved']);
+          expect(capTerminalizations(entries)).toEqual([
+            'evaluator_unresolved',
+          ]);
           const row = await readNotice(noticeId);
           expect(row?.status).toBe('not_yet');
           expect(row?.lastRecheckOutcome).toBe('not_yet');
         },
       );
 
-      // ---- The end state is not trapped. -----------------------------------
-      // Asserts the learner-visible consequence, not the internal field: after
-      // a valid continue at the cap the notice must be gone from the Now feed
-      // AND the re-check entry point must refuse to hand back a session. Those
-      // two are the trap's arms (now-feed.ts filters status='open';
-      // startMentorNoticeRecheck throws 'terminal' once status leaves 'open').
+      // ---- Cause 3b: unavailable judgment AT the cap. -----------------------
+      // AC-4 names "malformed OR unavailable". Cause 3 above covers malformed
+      // (unparseable output); this covers unavailable — the judge call itself
+      // fails, which `evaluateMentorNoticeRecheck` fail-opens to `unresolved`
+      // via its route-error path. Same deterministic turn-3 `not_yet`.
+      it.each(['processMessage', 'streamMessage'] as const)(
+        '%s: the CAP terminalizes not_yet after UNAVAILABLE judgment at the cap',
+        async (transport) => {
+          const { profileId, session, noticeId } =
+            await seedOpenMentorNoticeRecheckTurn();
+          llm.setNoticeRecheckJudgeUnavailable(true);
+
+          const entries = await captureLogs(() =>
+            runTwoRecheckTurns(transport, profileId, session.id),
+          );
+
+          expectLastJudgeCallWasExchange(3);
+          expect(capTerminalizations(entries)).toEqual([
+            'evaluator_unresolved',
+          ]);
+          const row = await readNotice(noticeId);
+          expect(row?.status).toBe('not_yet');
+          expect(row?.lastRecheckOutcome).toBe('not_yet');
+        },
+      );
+
+      // ---- THE HEADLINE: a later re-offer is genuinely REACHABLE. -----------
+      //
+      // The ruling's claim is about a SUBSEQUENT offer cycle, so the evidence
+      // has to sit at the layer where offers are produced — not merely at "no
+      // turn-3 `not_yet` write was made", which is a layer below it.
+      //
+      // Suppressing the cap's write WITHOUT ending the attempt would leave a
+      // zombie notice: `resolveMentorNoticeRecheckContext` returns null in the
+      // spent session from exchange 4 on (offer.ts), while
+      // `startMentorNoticeRecheck` keeps handing that same session back — a
+      // trapped learner in a new costume. This case forbids that end state by
+      // driving the ordinary entry point and requiring it to PRODUCE a live new
+      // attempt: a different session, the per-attempt exchange counter reset to
+      // 1, and the notice actually completable in it.
+      it.each(['processMessage', 'streamMessage'] as const)(
+        '%s: after a valid continue at the cap the notice is genuinely re-offerable — a fresh attempt at exchange 1 completes it',
+        async (transport) => {
+          const { profileId, session, noticeId } =
+            await seedOpenMentorNoticeRecheckTurn();
+          llm.setNoticeRecheckJudgeResponse(
+            JSON.stringify({ verdict: 'continue', reason: 'unclear' }),
+          );
+
+          // Spend the whole attempt on valid `continue` verdicts: turn 2, then
+          // turn 3 (the cap).
+          await runTwoRecheckTurns(transport, profileId, session.id);
+          expectLastJudgeCallWasExchange(3);
+          expect((await readNotice(noticeId))?.status).toBe('open');
+
+          // THE RE-OFFER, at the layer that produces offers. The learner-facing
+          // re-check entry point must mint a NEW session rather than hand back
+          // the spent one — that identity check is the anti-zombie assertion.
+          const reoffer = await startMentorNoticeRecheck(
+            db,
+            profileId,
+            noticeId,
+          );
+          expect(reoffer.sessionId).not.toBe(session.id);
+
+          // And the new attempt is genuinely LIVE, not merely allocated: the
+          // per-attempt exchange counter restarts at 1 (proving the counter is
+          // attempt-scoped, not session-scoped), and a `locked_in` verdict in it
+          // resolves the notice the learner was previously stuck on.
+          llm.setNoticeRecheckJudgeResponse(
+            JSON.stringify({ verdict: 'locked_in', reason: 'demonstrated' }),
+          );
+          await runOneRecheckTurn(transport, profileId, reoffer.sessionId);
+
+          expectLastJudgeCallWasExchange(1);
+          const resolved = await readNotice(noticeId);
+          expect(resolved?.status).toBe('locked_in');
+          expect(resolved?.lastRecheckOutcome).toBe('locked_in');
+        },
+      );
+
+      // ---- The cycle REPEATS: attempt N+1 behaves like attempt N. -----------
+      // "A new session exists and one turn can complete it" is weaker than the
+      // ruling's claim. If the re-offered attempt's per-attempt counter drifted
+      // (e.g. because the fresh session seeds no `recheckOfferExchangeCount`),
+      // the second attempt would cap early or never — a one-shot escape hatch
+      // rather than the ordinary lifecycle. So walk the whole second attempt:
+      // exchanges 1 → 2 → 3, then its own cap, then a THIRD attempt.
+      it.each(['processMessage', 'streamMessage'] as const)(
+        '%s: the re-offered attempt runs its own full 1→2→3 cycle and caps the same way, and is itself re-offerable',
+        async (transport) => {
+          const { profileId, session, noticeId } =
+            await seedOpenMentorNoticeRecheckTurn();
+          llm.setNoticeRecheckJudgeResponse(
+            JSON.stringify({ verdict: 'continue', reason: 'unclear' }),
+          );
+
+          // Attempt 1: exchanges 2 and 3 (the seeded session starts at
+          // exchangeCount 1), then the cap detaches.
+          await runTwoRecheckTurns(transport, profileId, session.id);
+          const second = await startMentorNoticeRecheck(
+            db,
+            profileId,
+            noticeId,
+          );
+          expect(second.sessionId).not.toBe(session.id);
+
+          // Attempt 2 is a FRESH session (exchangeCount 0), so it walks the
+          // full 1 → 2 → 3 and the cap fires only on the third.
+          const entries = await captureLogs(async () => {
+            for (const expected of [1, 2, 3]) {
+              await runOneRecheckTurn(transport, profileId, second.sessionId);
+              expectLastJudgeCallWasExchange(expected);
+              // Never terminalized along the way, at any exchange number.
+              expect((await readNotice(noticeId))?.status).toBe('open');
+            }
+          });
+
+          // Exactly one cap firing — on exchange 3, not earlier — and again no
+          // terminalization.
+          expect(capCauses(entries)).toEqual(['valid_continue']);
+          expect(capTerminalizations(entries)).toEqual([]);
+          const afterSecondCap = await readNotice(noticeId);
+          expect(afterSecondCap?.status).toBe('open');
+          expect(afterSecondCap?.lastRecheckOutcome).toBeNull();
+          expect(await readAttemptBookkeeping(second.sessionId)).toEqual({});
+
+          // And the lifecycle keeps going: a third attempt is reachable too.
+          const third = await startMentorNoticeRecheck(db, profileId, noticeId);
+          expect(third.sessionId).not.toBe(second.sessionId);
+          expect(third.sessionId).not.toBe(session.id);
+        },
+      );
+
+      // ---- The notice stays live on both learner-facing arms. ---------------
+      // The complement of the case above, at the two surfaces the learner
+      // actually sees. Under the ruling the notice is unresolved and eligible
+      // after the cap, so BOTH arms must still work — the anti-trap property is
+      // no longer "the notice disappears" but "the re-check entry point never
+      // hands back the spent session".
       /** Notice ids the Now feed currently surfaces to this learner. */
       async function surfacedNoticeIds(profileId: string): Promise<unknown[]> {
         const feed = await buildNowFeed(db, profileId, 'self', {
@@ -2044,7 +2266,7 @@ describeIfDb('session exchange production-path integration', () => {
       }
 
       it.each(['processMessage', 'streamMessage'] as const)(
-        '%s: after a valid continue at the cap the learner is not trapped in the notice',
+        '%s: after a valid continue at the cap the notice stays live in the Now feed and the entry point never returns the spent session',
         async (transport) => {
           const { profileId, session, noticeId } =
             await seedOpenMentorNoticeRecheckTurn();
@@ -2052,23 +2274,47 @@ describeIfDb('session exchange production-path integration', () => {
             JSON.stringify({ verdict: 'continue', reason: 'unclear' }),
           );
 
-          // BELOW the cap the notice is still live on both arms — this is the
-          // positive control that makes the post-cap assertions meaningful
-          // rather than passing against an always-empty feed.
+          // BELOW the cap the attempt is still running, so the entry point
+          // correctly resumes THIS session rather than opening a second one.
           await runOneRecheckTurn(transport, profileId, session.id);
           expect(await surfacedNoticeIds(profileId)).toContain(noticeId);
-          await expect(
-            startMentorNoticeRecheck(db, profileId, noticeId),
-          ).resolves.toBeDefined();
+          const midAttempt = await startMentorNoticeRecheck(
+            db,
+            profileId,
+            noticeId,
+          );
+          expect(midAttempt.sessionId).toBe(session.id);
 
-          // AT the cap both arms of the trap must be gone.
+          // AT the cap the notice is still surfaced (unresolved and eligible),
+          // but the spent session is no longer what the learner gets handed.
           await runOneRecheckTurn(transport, profileId, session.id);
-          expect(await surfacedNoticeIds(profileId)).not.toContain(noticeId);
-          await expect(
-            startMentorNoticeRecheck(db, profileId, noticeId),
-          ).rejects.toThrow(MentorNoticeUnavailableError);
+          expect(await surfacedNoticeIds(profileId)).toContain(noticeId);
+          const afterCap = await startMentorNoticeRecheck(
+            db,
+            profileId,
+            noticeId,
+          );
+          expect(afterCap.sessionId).not.toBe(session.id);
         },
       );
+
+      // A terminal notice is still refused outright — the `MentorNoticeUnavailableError`
+      // arm must not have been softened into "always mint a session". AC-4's
+      // unresolved-at-cap terminalization is the shortest route to a terminal
+      // notice through the exchange path, so use it.
+      it('a notice terminalized at the cap by unresolved judgment is refused by the re-check entry point', async () => {
+        const { profileId, session, noticeId } =
+          await seedOpenMentorNoticeRecheckTurn();
+        llm.setNoticeRecheckJudgeResponse('not valid json at all');
+
+        await runTwoRecheckTurns('processMessage', profileId, session.id);
+        expect((await readNotice(noticeId))?.status).toBe('not_yet');
+
+        await expect(
+          startMentorNoticeRecheck(db, profileId, noticeId),
+        ).rejects.toThrow(MentorNoticeUnavailableError);
+        expect(await surfacedNoticeIds(profileId)).not.toContain(noticeId);
+      });
     });
 
     it('a retried (duplicate clientId) send does not re-invoke the judge or double-apply the outcome', async () => {

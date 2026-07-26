@@ -2453,11 +2453,135 @@ describe('updateRetentionFromSession', () => {
     expect(db.update).not.toHaveBeenCalled();
   });
 
-  it('skips SM-2 when card.updatedAt >= sessionTimestamp', async () => {
-    // Card was updated at 11:00, session started at 10:00
-    const card = mockRetentionCardRow();
-    card.updatedAt = new Date('2026-02-15T11:00:00.000Z');
-    setupScopedRepo({ retentionCardFindFirst: card });
+  it.each([
+    ['equals', '2026-02-15T10:00:00.000Z', '2026-02-15T10:00:00.000Z'],
+    ['is ahead of', '2026-02-15T10:00:00.001Z', '2026-02-15T10:00:00.000Z'],
+  ])(
+    '[WI-2531] a virgin card reaches the repetitionsZero CAS when updatedAt %s sessionTimestamp',
+    async (_relationship, updatedAt, sessionTimestamp) => {
+      const virginCard = mockRetentionCardRow();
+      Object.assign(virginCard, {
+        repetitions: 0,
+        lastReviewedAt: null,
+        createdAt: new Date(updatedAt),
+        updatedAt: new Date(updatedAt),
+      });
+      setupScopedRepo({ retentionCardFindFirst: virginCard });
+
+      let capturedWhere: unknown = null;
+      const db = createMockDb();
+      (db.update as jest.Mock).mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockImplementation((expr: unknown) => {
+            capturedWhere = expr;
+            const p = Promise.resolve(undefined);
+            (p as unknown as Record<string, unknown>).returning = jest
+              .fn()
+              .mockResolvedValue([{}]);
+            return p;
+          }),
+        }),
+      });
+
+      await updateRetentionFromSession(
+        db,
+        profileId,
+        topicId,
+        5,
+        sessionTimestamp,
+      );
+
+      expect(capturedWhere).not.toBeNull();
+      const { PgDialect } = await import('drizzle-orm/pg-core');
+      const dialect = new PgDialect();
+      const rendered = dialect.sqlToQuery(capturedWhere as never).sql;
+      expect(rendered).toMatch(/"repetitions"\s*=\s*\$\d+/);
+      expect(rendered).toMatch(/"last_reviewed_at"\s+is\s+null/);
+      expect(rendered).toMatch(
+        /"updated_at"\s*=\s*"retention_cards"\."created_at"/,
+      );
+      expect(rendered).not.toMatch(/"updated_at"\s*=\s*\$\d+/);
+    },
+  );
+
+  it('[WI-2531] a virgin card still reports a lost repetitionsZero CAS despite database clock skew', async () => {
+    const virginCard = mockRetentionCardRow();
+    Object.assign(virginCard, {
+      repetitions: 0,
+      lastReviewedAt: null,
+      createdAt: new Date('2026-02-15T10:00:00.001Z'),
+      updatedAt: new Date('2026-02-15T10:00:00.001Z'),
+    });
+    setupScopedRepo({ retentionCardFindFirst: virginCard });
+
+    const db = createMockDb();
+    (db.update as jest.Mock).mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockImplementation(() => {
+          const p = Promise.resolve(undefined);
+          (p as unknown as Record<string, unknown>).returning = jest
+            .fn()
+            .mockResolvedValue([]);
+          return p;
+        }),
+      }),
+    });
+
+    const warnSpy = jest.spyOn(console, 'warn').mockReturnValue(undefined);
+    try {
+      await updateRetentionFromSession(
+        db,
+        profileId,
+        topicId,
+        5,
+        '2026-02-15T10:00:00.000Z',
+      );
+
+      expect(db.update).toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Optimistic lock conflict'),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it.each([
+    ['equals', '2026-02-15T10:00:00.000Z'],
+    ['is ahead of', '2026-02-15T11:00:00.000Z'],
+  ])(
+    '[WI-2531] a reviewed card skips SM-2 when updatedAt %s sessionTimestamp',
+    async (_relationship, updatedAt) => {
+      const reviewedCard = mockRetentionCardRow();
+      Object.assign(reviewedCard, {
+        lastReviewedAt: new Date('2026-02-14T10:00:00.000Z'),
+        updatedAt: new Date(updatedAt),
+      });
+      setupScopedRepo({ retentionCardFindFirst: reviewedCard });
+
+      const db = createMockDb();
+
+      await updateRetentionFromSession(
+        db,
+        profileId,
+        topicId,
+        4,
+        '2026-02-15T10:00:00.000Z',
+      );
+
+      expect(db.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it('[WI-2531] a stale completion stays suppressed for a relearn-reset card with actual history', async () => {
+    const relearnResetCard = mockRetentionCardRow();
+    Object.assign(relearnResetCard, {
+      repetitions: 0,
+      lastReviewedAt: null,
+      createdAt: new Date('2026-02-01T10:00:00.000Z'),
+      updatedAt: new Date('2026-02-15T10:00:00.000Z'),
+    });
+    setupScopedRepo({ retentionCardFindFirst: relearnResetCard });
 
     const db = createMockDb();
 
@@ -2469,8 +2593,48 @@ describe('updateRetentionFromSession', () => {
       '2026-02-15T10:00:00.000Z',
     );
 
-    // SM-2 should NOT run — card was already updated after session started
     expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('[WI-2531] a current relearn-reset card keeps the updatedAt optimistic-lock CAS', async () => {
+    const relearnResetCard = mockRetentionCardRow();
+    Object.assign(relearnResetCard, {
+      repetitions: 0,
+      lastReviewedAt: null,
+      createdAt: new Date('2026-02-01T10:00:00.000Z'),
+      updatedAt: new Date('2026-02-15T09:59:59.000Z'),
+    });
+    setupScopedRepo({ retentionCardFindFirst: relearnResetCard });
+
+    let capturedWhere: unknown = null;
+    const db = createMockDb();
+    (db.update as jest.Mock).mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockImplementation((expr: unknown) => {
+          capturedWhere = expr;
+          const p = Promise.resolve(undefined);
+          (p as unknown as Record<string, unknown>).returning = jest
+            .fn()
+            .mockResolvedValue([{}]);
+          return p;
+        }),
+      }),
+    });
+
+    await updateRetentionFromSession(
+      db,
+      profileId,
+      topicId,
+      4,
+      '2026-02-15T10:00:00.000Z',
+    );
+
+    expect(capturedWhere).not.toBeNull();
+    const { PgDialect } = await import('drizzle-orm/pg-core');
+    const dialect = new PgDialect();
+    const rendered = dialect.sqlToQuery(capturedWhere as never).sql;
+    expect(rendered).toMatch(/"updated_at"\s*=\s*\$\d+/);
+    expect(rendered).not.toMatch(/"repetitions"\s*=\s*\$\d+/);
   });
 
   it('runs SM-2 when card.updatedAt < sessionTimestamp', async () => {
@@ -2595,7 +2759,7 @@ describe('updateRetentionFromSession', () => {
     }
   });
 
-  it('[WI-1445] a never-reviewed EXISTING card (lastReviewedAt === null) guards on repetitionsZero, not the optimistic-lock timestamp', async () => {
+  it('[WI-1445/WI-2531] a virgin EXISTING card guards on repetitionsZero, not the optimistic-lock timestamp', async () => {
     // A retention card can pre-exist NEVER reviewed by any JS writer without
     // THIS call having created it (e.g. auto-created earlier by
     // topic-probe-extract.ts's own ensureRetentionCard call, or by
@@ -2605,10 +2769,10 @@ describe('updateRetentionFromSession', () => {
     // mismatch. `isNew` stays strictly "this call inserted the row" (existing
     // is truthy here → isNew: false); the guard falls back to
     // `repetitionsZero` (integer equality — immune to timestamp precision).
-    // The discriminator is `lastReviewedAt === null`, NOT `repetitions === 0`
-    // alone — a reviewed-then-reset card also has repetitions 0 but a
-    // JS-precision updatedAt and must keep the optimistic lock (see the
-    // sibling test below).
+    // The discriminator is null lastReviewedAt plus unchanged, equal DB
+    // defaults for createdAt/updatedAt, NOT repetitions === 0 alone — a
+    // relearn reset also has null lastReviewedAt and repetitions 0 but must
+    // keep the optimistic lock (see the WI-2531 sibling tests above).
     const virginCard = mockRetentionCardRow();
     Object.assign(virginCard, { repetitions: 0, lastReviewedAt: null });
     setupScopedRepo({ retentionCardFindFirst: virginCard });

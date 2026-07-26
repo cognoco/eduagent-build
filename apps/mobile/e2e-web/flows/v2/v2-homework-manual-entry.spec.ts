@@ -1,7 +1,18 @@
-import { expect, test, type Page, type Request } from '@playwright/test';
+import {
+  expect,
+  test,
+  type Dialog,
+  type Page,
+  type Request,
+  type Response as PlaywrightResponse,
+} from '@playwright/test';
 
-import type { LearningSessionResponse } from '@eduagent/schemas';
+import {
+  closeResultSchema,
+  type LearningSessionResponse,
+} from '@eduagent/schemas';
 
+import { buildCloseBoundaryEvidence } from '../../helpers/close-boundary-evidence';
 import { apiBaseUrl } from '../../helpers/runtime';
 import { pressableClick } from '../../helpers/pressable';
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
@@ -16,6 +27,13 @@ function isSessionCreate(request: Request): boolean {
   return (
     request.method() === 'POST' &&
     /^\/v1\/subjects\/[^/]+\/sessions$/.test(pathname)
+  );
+}
+
+function isSessionClose(request: Request, sessionId: string): boolean {
+  return (
+    request.method() === 'POST' &&
+    new URL(request.url()).pathname === `/v1/sessions/${sessionId}/close`
   );
 }
 
@@ -180,14 +198,71 @@ test('V2 Mentor trial-active manual homework creates one associated session, rec
   });
   expect(sessionCreateRequests).toHaveLength(1);
 
-  page.once('dialog', async (dialog) => {
-    expect(dialog.message()).toContain('End session?');
-    await dialog.accept();
-  });
-  await pressableClick(page.getByTestId('finish-homework-chip'));
-  await expect(page.getByTestId('first-session-wrap-up')).toBeVisible({
-    timeout: 30_000,
-  });
+  let recoveryDialogAppeared = false;
+  const handleCloseDialog = async (dialog: Dialog): Promise<void> => {
+    if (dialog.message().includes('End session?')) {
+      await dialog.accept();
+      return;
+    }
+    if (dialog.message().includes('Could not end this session cleanly')) {
+      recoveryDialogAppeared = true;
+    }
+    await dialog.dismiss();
+  };
+  page.on('dialog', handleCloseDialog);
+
+  let closeResponse: PlaywrightResponse | null = null;
+  let closeResponseBody: unknown = null;
+  try {
+    const closeResponsePromise = page.waitForResponse(
+      (response) => isSessionClose(response.request(), createdSession.id),
+      { timeout: 30_000 },
+    );
+    await pressableClick(page.getByTestId('finish-homework-chip'));
+    closeResponse = await closeResponsePromise;
+    try {
+      closeResponseBody = await closeResponse.json();
+    } catch {
+      closeResponseBody = null;
+    }
+
+    console.info(
+      `[v2-close-boundary] ${JSON.stringify(
+        buildCloseBoundaryEvidence({
+          closeResponse: {
+            status: closeResponse.status(),
+            body: closeResponseBody,
+          },
+          pageUrl: page.url(),
+          recoveryDialogAppeared,
+        }),
+      )}`,
+    );
+
+    await expect(page.getByTestId('first-session-wrap-up')).toBeVisible({
+      timeout: 30_000,
+    });
+    expect(closeResponse.status()).toBe(200);
+    expect(closeResultSchema.safeParse(closeResponseBody).success).toBe(true);
+  } catch (error) {
+    console.error(
+      `[v2-close-boundary:failure] ${JSON.stringify(
+        buildCloseBoundaryEvidence({
+          closeResponse: closeResponse
+            ? {
+                status: closeResponse.status(),
+                body: closeResponseBody,
+              }
+            : null,
+          pageUrl: page.url(),
+          recoveryDialogAppeared,
+        }),
+      )}`,
+    );
+    throw error;
+  } finally {
+    page.off('dialog', handleCloseDialog);
+  }
   await pressableClick(page.getByTestId('chat-shell-back'));
 
   await expect(page).toHaveURL(/\/mentor(?:\?.*)?$/);

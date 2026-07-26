@@ -22,6 +22,7 @@ import type {
   SessionAnalyticsEventInput,
   SessionStartResult,
   SessionSummary,
+  SessionSummaryGetResponse,
   SkipSummaryResponse,
   SubmitSummaryResult,
   TranscriptResponse,
@@ -647,11 +648,26 @@ export function useSessionSummary(
           { init: { signal } },
         );
         await assertOk(res);
-        const data = await parseJson(
-          res,
-          sessionSummaryGetResponseSchema,
-          'GET /sessions/:sessionId/summary',
-        );
+        let data: SessionSummaryGetResponse;
+        try {
+          data = await parseJson(
+            res,
+            sessionSummaryGetResponseSchema,
+            'GET /sessions/:sessionId/summary',
+          );
+        } catch (err) {
+          // [WI-2627 rework] A malformed `mentorNoticePolicy` fails the WHOLE
+          // response schema, so the fold below is never REACHED — and TanStack
+          // Query then RETAINS the prior receipt-bearing summary and keeps
+          // rendering it with policy still enabled. Folding fail-closed here
+          // both records the untrustworthy observation and blanks the retained
+          // payload, because the suppression memo below re-evaluates against
+          // the now-disabled store. Deliberately over-broad, as on the two Now
+          // surfaces: a body we cannot parse is one whose policy we cannot
+          // confirm, and notices are the private feature.
+          policy.observeMalformed();
+          throw err;
+        }
         // [WI-2627] The whole response, not `data.summary`. Returning the
         // summary alone discarded the sibling observation here, downstream of a
         // correct parse — see `SessionSummaryQueryResult` above.

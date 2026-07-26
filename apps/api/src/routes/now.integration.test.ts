@@ -297,10 +297,12 @@ async function seedAcceptedContract(
   await acceptLink(database, initiated.id, {
     actorPersonId: supporterPersonId,
     audience: 'supporter',
+    contractVersion: initiated.contractVersion,
   });
   const accepted = await acceptLink(database, initiated.id, {
     actorPersonId: supporteePersonId,
     audience: 'supportee',
+    contractVersion: initiated.contractVersion,
   });
 
   if (accepted.status !== 'accepted') {

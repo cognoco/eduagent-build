@@ -310,6 +310,15 @@ jobs:
           GITHUB_BASE_REF: ${{ github.base_ref }}
         run: pnpm exec tsx scripts/check-migration-immutability.ts
 
+      # Forward-only migration safety: new numbered SQL migrations that add a
+      # PostgreSQL enum value must be replay-safe. Historical migrations are
+      # grandfathered by scanning Added files only in the PR diff.
+      - name: Migration enum ADD VALUE idempotency guard (WI-2649)
+        if: github.event_name == 'pull_request' && steps.scope.outputs.docs_only != 'true'
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: pnpm run check:migration-enum-idempotency
+
       - name: GitHub workflow supply-chain check
         if: github.event_name == 'push' || (github.event_name == 'pull_request' && steps.scope.outputs.workflow_security == 'true')
         run: pnpm run check:github-workflow-security

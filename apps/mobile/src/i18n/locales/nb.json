@@ -234,7 +234,8 @@
       "passwordPlaceholder": "Skriv inn passordet ditt",
       "forgotPassword": "Glemt passord?",
       "signInButton": "Logg inn",
-      "sendVerificationCode": "Send bekreftelseskode"
+      "sendVerificationCode": "Send bekreftelseskode",
+      "verificationStartFailed": "Vi kunne ikke starte verifiseringen. Prøv å logge inn på nytt."
     },
     "signUp": {
       "title": "Opprett konto",
@@ -291,6 +292,27 @@
       "backToSignIn": "Tilbake til innlogging",
       "emailPlaceholder": "du@eksempel.com",
       "sendResetCode": "Send tilbakestillingskode"
+    },
+    "errors": {
+      "generic": "Noe gikk galt. Vennligst prøv igjen.",
+      "form_identifier_not_found": "Vi fant ingen konto med den e-postadressen.",
+      "form_password_incorrect": "Det passordet ser ikke riktig ut. Vennligst prøv igjen.",
+      "form_password_or_identifier_incorrect": "E-postadressen eller passordet ser ikke riktig ut. Prøv igjen.",
+      "form_password_pwned": "Dette passordet har dukket opp i en datalekkasje. Velg et annet passord.",
+      "form_password_compromised": "Dette passordet er ikke trygt å bruke. Velg et annet passord.",
+      "form_password_not_strong_enough": "Dette passordet er ikke sterkt nok. Legg til mer variasjon.",
+      "form_password_length_too_short": "Passordet er for kort. Bruk minst 8 tegn.",
+      "form_password_length_too_long": "Passordet er for langt. Bruk et kortere et.",
+      "form_password_no_uppercase": "Passordet må ha minst én stor bokstav.",
+      "form_password_no_lowercase": "Passordet må ha minst én liten bokstav.",
+      "form_password_no_number": "Passordet må inneholde minst ett tall.",
+      "form_password_no_special_char": "Passordet må inneholde minst ett spesialtegn.",
+      "form_password_validation_failed": "Passordet oppfyller ikke kravene.",
+      "form_code_incorrect": "Koden stemmer ikke. Prøv igjen.",
+      "form_identifier_exists": "En konto med den e-postadressen finnes allerede.",
+      "form_param_format_invalid": "Det ser ikke ut som en gyldig e-postadresse.",
+      "captcha_invalid": "Vi kunne ikke bekrefte at du er et menneske. Prøv igjen.",
+      "signup_rate_limit_exceeded": "For mange registreringsforsøk. Prøv igjen senere."
     }
   },
   "guards": {
@@ -4546,7 +4568,6 @@
       "activeMessage": "Du kan se over denne avtalen her når som helst.",
       "revoke": "Avslutt deling",
       "revoking": "Avslutter deling ...",
-      "revoked": "Delingen avsluttes. Støttespilleren vil se et varsel.",
       "revokeErrorTitle": "Kunne ikke avslutte deling",
       "missingActor": "Vi kunne ikke identifisere den aktive personen.",
       "relationLabel": "Relasjon",

@@ -4,6 +4,7 @@ import {
   reportableFactSchema,
   sharedRecordSchema,
   visibilityContractSchema,
+  visibilityLinkAcceptSchema,
   visibilityMomentPayloadSchema,
 } from './visibility-contract.js';
 
@@ -62,6 +63,25 @@ describe('visibility contract schemas', () => {
         updatedAt: NOW,
       }),
     ).toThrow();
+  });
+
+  it('requires acceptance to name the exact positive contract version reviewed', () => {
+    const input = {
+      actorPersonId: UUID_1,
+      audience: 'supporter',
+      contractVersion: 2,
+    };
+    expect(visibilityLinkAcceptSchema.parse(input)).toEqual(input);
+    expect(
+      visibilityLinkAcceptSchema.safeParse({
+        actorPersonId: UUID_1,
+        audience: 'supporter',
+      }).success,
+    ).toBe(false);
+    expect(
+      visibilityLinkAcceptSchema.safeParse({ ...input, contractVersion: 0 })
+        .success,
+    ).toBe(false);
   });
 
   it('keeps shared-record fact ids equivalent across both views', () => {
