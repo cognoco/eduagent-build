@@ -17,13 +17,15 @@
     },
     {
       "acRef": "AC-4",
-      "description": "The named journey passed repeatedly with retries disabled; the full no-retry V2 gate passed WI-2234 and exposed only the separately owned WI-2822 dependency.",
+      "description": "The named journey passed repeatedly with retries disabled; hosted exact-head E2E Web run 30222631190 then passed the complete V2 release project 16/16 and the required legacy lane 24/24 without containing WI-2822's commit.",
       "pointer": ".workitem-artifacts/WI-2838/verification.md"
     }
   ],
   "headProvenance": {
     "executorAuthoredMerge": false,
-    "head": "d3caddaa3ece0a187cc3b34ec3625f3c6aebbb3c",
+    "baseSyncHead": "d3caddaa3ece0a187cc3b34ec3625f3c6aebbb3c",
+    "strictGreenEvidenceHead": "aaff1546c8d1e241bf56016bdd3c23988dac0a6e",
+    "strictGreenE2ERun": 30222631190,
     "parents": [
       "732b684eb69d1ffaa8613c59318e804f18566fbe",
       "f8aa11b086e8787f672c6d326018ee4bcfc32c6f"

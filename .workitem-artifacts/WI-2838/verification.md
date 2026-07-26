@@ -38,6 +38,22 @@ while current product behavior intentionally renders it. This is pre-existing,
 independently tracked WI-2822; PR #2658 at branch WI-2822 updates that exact
 contract. WI-2838 does not copy or absorb that colliding work.
 
+## Hosted exact-head aggregate
+
+GitHub Actions E2E Web run `30222631190` executed on exact head
+`aaff1546c8d1e241bf56016bdd3c23988dac0a6e` after the base synchronization and
+provenance-only commit. It completed strict green:
+
+- V2 release: 16/16 passed in 3.5 minutes, including both the WI-2234
+  returning-learner journey and the nav-shell journey;
+- classifier: `FAILURE_CLASS=success`, `GATE_DECISION=pass`;
+- required-stable legacy Playwright: 24/24 passed;
+- `run-smoke` and the required `Playwright web smoke` check concluded success.
+
+The exact head does not contain WI-2822 commit `c0002155`; the hosted result is
+therefore independent WI-2838 strict-green evidence, not a combined or skipped
+suite.
+
 ## Scope audit
 
 - No timeout value changed.
@@ -50,8 +66,9 @@ contract. WI-2838 does not copy or absorb that colliding work.
 
 PR #2664 was externally advanced after the executor published `732b684`.
 The executor did not author or initiate the merge and did not reset, rebase, or
-force-push it. The preserved exact head is
-`d3caddaa3ece0a187cc3b34ec3625f3c6aebbb3c`.
+force-push it. The base-synchronization merge head is
+`d3caddaa3ece0a187cc3b34ec3625f3c6aebbb3c`; provenance-only commit `aaff1546`
+then recorded that event and became the hosted strict-green evidence head.
 
 - `git show --no-patch --pretty=raw` records tree
   `7df708ac08df6a4531d9fa41d0eddfff9e396b72`, first parent

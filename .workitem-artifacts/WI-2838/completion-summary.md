@@ -15,18 +15,23 @@ correlation, adjacent scopes, and the wrong method. No production code changed.
 
 The matcher seam was executed red then green. The real returning-learner
 journey passed repeatedly against staging with retries disabled, while retaining
-the original Session-held, fresh-response, Mentor, and card guarantees. Style,
-lint, GC1, focused Jest, and mobile typecheck gates passed.
+the original Session-held, fresh-response, Mentor, and card guarantees. Exact
+provenance evidence head then passed hosted E2E Web run
+`30222631190`: the complete V2 release project passed 16/16 and the required
+legacy lane passed 24/24. Style, lint, GC1, focused Jest, mobile typecheck, and
+the local change-class gates passed. The final evidence-only head must
+re-establish every required hosted check before landing.
 
 ## Caveats / Follow-ups
 
-The complete no-retry V2 project passed the WI-2234 journey but remains blocked
-from aggregate strict green by WI-2822's independently owned stale nav-shell
-doorway assertion. Its existing PR #2658 contains the exact contract update;
-this change does not duplicate or absorb it.
+An earlier local no-retry V2 project passed the WI-2234 journey and exposed
+WI-2822's independently owned stale nav-shell doorway assertion. The later
+hosted exact-head gate passed both journeys without retries or a copied WI-2822
+change. WI-2822 remains separately owned through PR #2658; this change does not
+duplicate or absorb it. No WI-2838 caveat remains open.
 
 After the implementation commit was published, the branch was externally
 advanced by merging current `origin/main`. The executor did not author or
-initiate that merge. Exact provenance, reflog and remote-ref evidence, and an
-identical before/after WI patch hash are recorded in `verification.md` and
-`evidence.json`.
+initiate that merge. Exact provenance, reflog and remote-ref evidence, an
+identical before/after WI patch hash, and the subsequent exact-head hosted gate
+are recorded in `verification.md` and `evidence.json`.
