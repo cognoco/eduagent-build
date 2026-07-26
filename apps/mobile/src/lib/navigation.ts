@@ -169,6 +169,30 @@ export function homeHrefForReturnTo(
 }
 
 /**
+ * WI-2331 rework: `accountReturnToken` collapses every non-tab `returnTo`
+ * token (practice, family-recaps, own-learning, home, …) to `'mentor'`, but
+ * `homeHrefForReturnTo` routes those same tokens to their real, non-tab
+ * destinations. A "Back to {tab}" label built from `accountReturnToken`
+ * therefore lies whenever the actual Back destination isn't a tab root. This
+ * helper resolves the Back destination the same way `homeHrefForReturnTo`
+ * does and returns the owning tab ONLY when that destination genuinely is
+ * one of the three V2 tab roots — null otherwise, so callers fall back to a
+ * generic label instead of mislabeling.
+ */
+export function resolvedV2TabForReturnTo(
+  returnTo: string | string[] | undefined,
+  returnId: string | string[] | undefined,
+  v2Enabled: boolean,
+): V2AccountReturnToken | null {
+  if (!v2Enabled) return null;
+  const href = homeHrefForReturnTo(returnTo, returnId, v2Enabled);
+  if (href === MENTOR_HREF) return 'mentor';
+  if (href === SUBJECTS_HREF) return 'subjects';
+  if (href === JOURNAL_HREF) return 'journal';
+  return null;
+}
+
+/**
  * Navigate back in the stack, or replace the current screen with `fallbackHref`
  * when there is nowhere to go back to.
  *

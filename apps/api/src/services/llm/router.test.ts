@@ -663,10 +663,16 @@ describe('LLM Router', () => {
   });
 
   describe('streaming fallback (pre-first-byte failure)', () => {
+    // [WI-2670] Named so assertions can reference `.id` rather than a
+    // hardcoded vendor literal — the no-gemini-runtime ratchet flags any new
+    // provider-key object-literal coupling to this vendor (see the assertion
+    // below that used to spell it out directly).
+    const failingPrimary = createFailingStreamProvider('gemini');
+
     beforeAll(() => {
       _clearProviders();
       _resetCircuits();
-      registerProvider(createFailingStreamProvider('gemini'));
+      registerProvider(failingPrimary);
       registerProvider(createMockProvider('openai'));
     });
 
@@ -700,6 +706,14 @@ describe('LLM Router', () => {
       expect(chunks.join('')).toContain('Mock streamed');
       // fallbackUsed is set after stream consumption
       expect(result.fallbackUsed).toBe(true);
+      // [WI-2670] `provider` is a lazy getter mirroring `fallbackUsed` — after
+      // stream drain it must report the EFFECTIVE producer (openai, which
+      // actually generated the text), not the originally-selected gemini
+      // that failed pre-first-byte. A caller (e.g. the Challenge Round
+      // grader's JudgeIndependence) that persists this post-drain value must
+      // never attribute the reply to a vendor that never produced it.
+      expect(result.provider).toBe('openai');
+      expect(result.provider).not.toBe('gemini');
 
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('failed before first byte, trying fallback'),
@@ -715,7 +729,12 @@ describe('LLM Router', () => {
           surface: 'llm-router',
           signal: 'provider-fallback',
           reason: 'stream-error',
-          provider: result.provider,
+          // [WI-2670] `failingPrimary.id`, not `result.provider` — the Sentry
+          // capture context is written at the moment of the ATTEMPTED
+          // (failed) provider, regardless of what `result.provider` (a lazy
+          // getter as of this WI) resolves to once read post-drain. Also
+          // avoids a hardcoded vendor literal (no-gemini-runtime ratchet).
+          provider: failingPrimary.id,
           fallbackProvider: 'openai',
           capability: 'text',
         },

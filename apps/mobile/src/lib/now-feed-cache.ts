@@ -1,5 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { nowResponseSchema, type NowResponse } from '@eduagent/schemas';
+import {
+  nowResponseSchema,
+  type NowOverflowResponse,
+  type NowResponse,
+} from '@eduagent/schemas';
 
 import { Sentry } from './sentry';
 import {
@@ -107,7 +111,10 @@ export function buildNowFeedCacheKey(binding: NowFeedCacheBinding): string {
  * [WI-2498] Cards that carry mentor-notice evidence, across BOTH producing
  * server collectors: the open-notice card and the locked-in ledger moment.
  */
-function isNoticeBearingCard(card: NowResponse['cards'][number]): boolean {
+function isNoticeBearingCard(card: {
+  kind: string;
+  params?: unknown;
+}): boolean {
   if (card.kind === 'mentor_notice') return true;
   return (
     card.kind === 'ledger_moment' &&
@@ -127,6 +134,22 @@ export function stripNoticeCards(feed: NowResponse): NowResponse {
   const cards = feed.cards.filter((card) => !isNoticeBearingCard(card));
   if (cards.length === feed.cards.length) return feed;
   return { ...feed, cards };
+}
+
+/**
+ * [WI-2627] The overflow list's equivalent of `stripNoticeCards`.
+ *
+ * The overflow page is the DEEP-LINK surface: its items carry the same
+ * notice-bearing kinds and a `deepLink` that routes straight into a notice
+ * recheck. It is not persisted, but it does sit warm in memory across a
+ * rollback, so a suppressed policy must empty it too.
+ */
+export function stripNoticeOverflowItems(
+  overflow: NowOverflowResponse,
+): NowOverflowResponse {
+  const items = overflow.items.filter((item) => !isNoticeBearingCard(item));
+  if (items.length === overflow.items.length) return overflow;
+  return { ...overflow, items };
 }
 
 export async function writeCachedNowFeed(

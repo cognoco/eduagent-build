@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { mentorNoticePolicyObservationField } from './mentor-notices.ts';
+
 export const nowScopeSchema = z.enum(['self', 'supporter-hub', 'person']);
 export type NowScope = z.infer<typeof nowScopeSchema>;
 
@@ -125,6 +127,12 @@ export const nowResponseSchema = z.object({
   overflowCount: z.number().int().min(0),
   generatedAt: z.string(),
   mentorNoticePolicyEpoch: mentorNoticePolicyEpochField,
+  /**
+   * [WI-2627] The orderable observation. Travels alongside the opaque epoch
+   * above, which it does not replace: the epoch remains the cache-binding
+   * token, and `mentorNoticePolicy.projectionEpoch` is the same string.
+   */
+  mentorNoticePolicy: mentorNoticePolicyObservationField,
 });
 export type NowResponse = z.infer<typeof nowResponseSchema>;
 
@@ -132,5 +140,6 @@ export const nowOverflowResponseSchema = z.object({
   scope: nowScopeSchema,
   items: z.array(nowOverflowItemSchema),
   mentorNoticePolicyEpoch: mentorNoticePolicyEpochField,
+  mentorNoticePolicy: mentorNoticePolicyObservationField,
 });
 export type NowOverflowResponse = z.infer<typeof nowOverflowResponseSchema>;

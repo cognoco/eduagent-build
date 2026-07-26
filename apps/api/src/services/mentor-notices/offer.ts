@@ -14,6 +14,19 @@ interface SessionForNoticeOffer {
   metadata?: unknown;
 }
 
+/**
+ * [WI-2625 rework] The ratified three-response re-check cap, single-sourced.
+ *
+ * Two readers, deliberately OPPOSITE comparisons — keep them complementary:
+ *  - here (`exchangeNumber <= MAX`) GATES the re-check context: past the cap
+ *    the context is null and the judge is never consulted again.
+ *  - session-exchange.ts (`exchangeNumber >= MAX`) FIRES the cap, terminalizing
+ *    the attempt to `not_yet`.
+ * An off-by-one in the gate caps a turn early; one in the fire leaves a
+ * capped-out attempt attached to an open notice — the trap Codex found.
+ */
+export const MENTOR_NOTICE_RECHECK_MAX_EXCHANGES = 3;
+
 export interface MentorNoticeRecheckContext {
   id: string;
   concept: string;
@@ -64,7 +77,7 @@ export async function resolveMentorNoticeRecheckContext(
       return null;
     }
     const exchangeNumber = session.exchangeCount - startCount + 1;
-    return exchangeNumber <= 3
+    return exchangeNumber <= MENTOR_NOTICE_RECHECK_MAX_EXCHANGES
       ? {
           id: notice.id,
           concept: notice.concept,

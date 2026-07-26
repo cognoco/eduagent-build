@@ -2260,11 +2260,15 @@ async function* wrapStreamWithCircuitBreaker(
 /**
  * Streaming variant of routeAndCall.
  *
- * NOTE: The `provider` and `model` fields in the returned StreamResult
- * reflect the initially selected provider. If wrapStreamWithCircuitBreaker
- * transparently falls back (pre-first-byte failure), these fields still
- * report the original provider. Callers using these fields for cost
- * attribution or observability should be aware of this limitation.
+ * [WI-2670] The `provider` and `model` fields on the returned StreamResult
+ * are lazy getters (mirroring `fallbackUsed` on the same object): they
+ * report the EFFECTIVE provider — the fallback's, if
+ * `wrapStreamWithCircuitBreaker` transparently fell back before the first
+ * byte — not the originally-selected one. Read them only after the stream
+ * has drained (or after `fallbackUsed`/`stopReasonPromise` has settled);
+ * reading them earlier (e.g. destructuring `{ provider }` or spreading the
+ * result immediately after this function resolves) captures the
+ * pre-fallback value, because the fallback only happens during iteration.
  */
 export async function routeAndStream(
   messages: ChatMessage[],
@@ -2402,8 +2406,20 @@ export async function routeAndStream(
       });
     return {
       stream,
-      provider: config.provider,
-      model: config.model,
+      // [WI-2670] Lazy getters — same closure as `fallbackUsed` below.
+      // Read the fallback's config once a pre-first-byte transparent
+      // fallback has fired; otherwise the primary's. See the JSDoc above
+      // this function for why these must not be read before stream drain.
+      get provider() {
+        return fallbackFired && fallbackConfig
+          ? fallbackConfig.provider
+          : config.provider;
+      },
+      get model() {
+        return fallbackFired && fallbackConfig
+          ? fallbackConfig.model
+          : config.model;
+      },
       stopReasonPromise,
       get fallbackUsed() {
         return fallbackFired;

@@ -185,3 +185,16 @@ export const NOW_FEED_CACHE_KEY_PREFIX = 'now-feed-cache';
  * Full key: `now-feed-policy-epoch::<actorId>::<profileId>`
  */
 export const NOW_FEED_POLICY_EPOCH_KEY_PREFIX = 'now-feed-policy-epoch';
+
+/**
+ * [WI-2627] The ORDERABLE mentor-notice rollout state this device last folded
+ * in, per actor+profile: `{ revision, enabled }` as JSON. AsyncStorage, same
+ * double-colon construction in the consumer.
+ *
+ * Stored separately from the epoch above because it answers a different
+ * question — the epoch is the opaque cache key (equality only), this is the
+ * ordered rollback state. See `lib/mentor-notice-policy.ts`.
+ * Full key: `mentor-notice-policy-state::<actorId>::<profileId>`
+ */
+export const MENTOR_NOTICE_POLICY_STATE_KEY_PREFIX =
+  'mentor-notice-policy-state';

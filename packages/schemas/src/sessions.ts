@@ -7,7 +7,10 @@ import {
   pendingCelebrationSchema,
 } from './progress.ts';
 import { languageSessionSummarySchema } from './language.ts';
-import { mentorNoticeAcceptedSchema } from './mentor-notices.ts';
+import {
+  mentorNoticeAcceptedSchema,
+  mentorNoticePolicyObservationField,
+} from './mentor-notices.ts';
 
 export const orphanReasonSchema = z.enum([
   'llm_stream_error',
@@ -772,6 +775,24 @@ export const messageResultSchema = z.object({
   exchangeCount: z.number(),
   expectedResponseMinutes: z.number(),
   aiEventId: z.string().optional(),
+  /**
+   * [WI-2627] MUST be declared, not merely tolerated.
+   *
+   * A non-strict `z.object` does not THROW on an unknown key — but it still
+   * STRIPS it. Those are two consequences of the same fact, and only the first
+   * one is about backward compatibility: an old client survives a new field
+   * precisely because the field is discarded. So "the schema is non-strict,
+   * therefore the added field is safe" is true for old clients and, for new
+   * ones, guarantees the field never arrives. The server emits the observation
+   * on this route; without this line Zod deletes it before any consumer sees
+   * it, and the non-stream message surface silently cannot feed the monotonic
+   * store — leaving it able to apply a reply that predates a rollback.
+   *
+   * Declared here rather than inside `mentorNotice` because the observation
+   * describes the POLICY, not the notice: it must arrive on turns that carry no
+   * notice at all, which are exactly the turns a rollback happens on.
+   */
+  mentorNoticePolicy: mentorNoticePolicyObservationField,
 });
 export type MessageResult = z.infer<typeof messageResultSchema>;
 
@@ -803,6 +824,15 @@ export type HomeworkStateSyncResponse = z.infer<
 // SessionSummaryGetResponse — GET /sessions/:sessionId/summary → 200
 export const sessionSummaryGetResponseSchema = z.object({
   summary: sessionSummarySchema.nullable(),
+  /**
+   * [WI-2627] The summary carries the mentor-notice RECEIPT, so it is a
+   * notice-bearing surface and must observe the same policy the Now feed does.
+   * WI-2504 deliberately left the epoch OFF this response because the summary
+   * is not persisted and so had nothing to invalidate; ordering is a different
+   * requirement from invalidation — a client holding a warm summary needs to
+   * know whether the receipt it is painting predates a rollback.
+   */
+  mentorNoticePolicy: mentorNoticePolicyObservationField,
 });
 export type SessionSummaryGetResponse = z.infer<
   typeof sessionSummaryGetResponseSchema
