@@ -425,11 +425,35 @@ describe('WI-2498: V’s rollout conjunct', () => {
 // the epoch a client binds its cache to is proven to track the same conjunct
 // that decides visibility, per denial reason.
 describe('WI-2498: resolveMentorNoticeVisibility conjuncts', () => {
-  const EPOCH_VISIBLE = 'notice-policy-v1:on:self:consented';
-  const EPOCH_ROLLOUT_OFF = 'notice-policy-v1:off';
-  const EPOCH_PROXY = 'notice-policy-v1:on:proxy';
-  const EPOCH_OTHER_SUBJECT = 'notice-policy-v1:on:other-subject';
-  const EPOCH_CONSENT_WITHDRAWN = 'notice-policy-v1:on:self:withdrawn';
+  // [WI-2627] Epochs now carry the policy revision as a segment (AC-5), so a
+  // revision bump alone re-keys an already-shipped client's persisted
+  // projection. These cases pass no revision binding, so they pin the `r0`
+  // default; `expected()` below also pins the OBSERVATION each branch reports —
+  // in particular that every per-request tightening keeps `rolloutEnabled: true`,
+  // because the DEPLOYMENT rollout is on and only the request was narrowed.
+  const EPOCH_VISIBLE = 'notice-policy-v1:r0:on:self:consented';
+  const EPOCH_ROLLOUT_OFF = 'notice-policy-v1:r0:off';
+  const EPOCH_PROXY = 'notice-policy-v1:r0:on:proxy';
+  const EPOCH_OTHER_SUBJECT = 'notice-policy-v1:r0:on:other-subject';
+  const EPOCH_CONSENT_WITHDRAWN = 'notice-policy-v1:r0:on:self:withdrawn';
+
+  function expected(
+    visible: boolean,
+    policyEpoch: string,
+    rolloutEnabled: boolean,
+  ) {
+    return {
+      visible,
+      policyEpoch,
+      observation: {
+        rolloutRevision: 0,
+        rolloutEnabled,
+        // Same string as `policyEpoch` — one derivation, so no branch can gate
+        // on one epoch and publish another.
+        projectionEpoch: policyEpoch,
+      },
+    };
+  }
 
   /** The narrow context shape the predicate reads — nothing else is consulted,
    *  which is itself the proof that no request header can reach the decision
@@ -450,7 +474,7 @@ describe('WI-2498: resolveMentorNoticeVisibility conjuncts', () => {
         fixture.childProfileId,
         'true',
       ),
-    ).resolves.toEqual({ visible: true, policyEpoch: EPOCH_VISIBLE });
+    ).resolves.toEqual(expected(true, EPOCH_VISIBLE, true));
   });
 
   it('is false when the rollout flag is off', async () => {
@@ -460,7 +484,7 @@ describe('WI-2498: resolveMentorNoticeVisibility conjuncts', () => {
         fixture.childProfileId,
         'false',
       ),
-    ).resolves.toEqual({ visible: false, policyEpoch: EPOCH_ROLLOUT_OFF });
+    ).resolves.toEqual(expected(false, EPOCH_ROLLOUT_OFF, false));
   });
 
   it('is false when the caller is not the subject (selfhood conjunct)', async () => {
@@ -470,7 +494,7 @@ describe('WI-2498: resolveMentorNoticeVisibility conjuncts', () => {
         fixture.childProfileId,
         'true',
       ),
-    ).resolves.toEqual({ visible: false, policyEpoch: EPOCH_OTHER_SUBJECT });
+    ).resolves.toEqual(expected(false, EPOCH_OTHER_SUBJECT, true));
   });
 
   it('is false when caller identity is unresolved (fail closed)', async () => {
@@ -480,7 +504,7 @@ describe('WI-2498: resolveMentorNoticeVisibility conjuncts', () => {
         fixture.childProfileId,
         'true',
       ),
-    ).resolves.toEqual({ visible: false, policyEpoch: EPOCH_OTHER_SUBJECT });
+    ).resolves.toEqual(expected(false, EPOCH_OTHER_SUBJECT, true));
   });
 
   it('X-Proxy-Mode can only TIGHTEN: true forces false for a genuine self-read', async () => {
@@ -491,7 +515,7 @@ describe('WI-2498: resolveMentorNoticeVisibility conjuncts', () => {
         'true',
         { proxyModeHeader: 'true' },
       ),
-    ).resolves.toEqual({ visible: false, policyEpoch: EPOCH_PROXY });
+    ).resolves.toEqual(expected(false, EPOCH_PROXY, true));
   });
 
   it('X-Proxy-Mode cannot ESTABLISH selfhood: absent header does not help a non-subject caller', async () => {
@@ -502,7 +526,7 @@ describe('WI-2498: resolveMentorNoticeVisibility conjuncts', () => {
         'true',
         { proxyModeHeader: undefined },
       ),
-    ).resolves.toEqual({ visible: false, policyEpoch: EPOCH_OTHER_SUBJECT });
+    ).resolves.toEqual(expected(false, EPOCH_OTHER_SUBJECT, true));
   });
 
   it('is false when the SUBJECT has withdrawn consent (consent conjunct)', async () => {
@@ -522,10 +546,7 @@ describe('WI-2498: resolveMentorNoticeVisibility conjuncts', () => {
           fixture.childProfileId,
           'true',
         ),
-      ).resolves.toEqual({
-        visible: false,
-        policyEpoch: EPOCH_CONSENT_WITHDRAWN,
-      });
+      ).resolves.toEqual(expected(false, EPOCH_CONSENT_WITHDRAWN, true));
     } finally {
       await setProfileConsentStatusForTest({
         profileId: fixture.childProfileId,

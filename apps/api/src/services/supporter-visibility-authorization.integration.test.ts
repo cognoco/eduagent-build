@@ -152,6 +152,7 @@ function createIntegrationDb(): Database {
       const contract = await acceptLink(db, seeded.contract.id, {
         actorPersonId: seeded.supporterId,
         audience: 'supporter',
+        contractVersion: seeded.contract.contractVersion,
         now: NOW,
       });
       expect(contract.status).toBe('pending');
@@ -167,6 +168,7 @@ function createIntegrationDb(): Database {
       const contract = await acceptLink(db, seeded.contract.id, {
         actorPersonId: seeded.supporteeId,
         audience: 'supportee',
+        contractVersion: seeded.contract.contractVersion,
         now: NOW,
       });
       expect(contract.status).toBe('accepted');

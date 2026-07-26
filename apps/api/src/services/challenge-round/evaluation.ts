@@ -4,7 +4,10 @@ import {
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
-import type { ChallengeRoundEvaluationItem } from '@eduagent/schemas';
+import type {
+  ChallengeRoundEvaluationItem,
+  ChallengeRoundQuestionIdentity,
+} from '@eduagent/schemas';
 
 /**
  * Per-answer evaluation outcomes and mastery decision for a finished
@@ -81,6 +84,35 @@ function normalizeIdentityPart(value: string): string {
     .replace(/\s+/g, ' ');
 }
 
+function noveltyBasisMatchesStructuredDifference(
+  identity: ChallengeRoundQuestionIdentity,
+  priorIdentities: ChallengeRoundQuestionIdentity[],
+): boolean {
+  if (!identity.noveltyBasis) return false;
+
+  switch (identity.noveltyBasis) {
+    case 'new_minimal_learning_claim':
+      return priorIdentities.every(
+        (prior) =>
+          normalizeIdentityPart(prior.minimalLearningClaim) !==
+          normalizeIdentityPart(identity.minimalLearningClaim),
+      );
+    case 'new_material_evidence_or_context':
+      return priorIdentities.every(
+        (prior) =>
+          normalizeIdentityPart(prior.materialContext) !==
+          normalizeIdentityPart(identity.materialContext),
+      );
+    case 'new_reasoning':
+      // Cognitive operation is the deterministic reasoning dimension in the
+      // identity contract. A same-operation free-text novelty assertion cannot
+      // independently prove new reasoning, so it fails closed.
+      return priorIdentities.every(
+        (prior) => prior.cognitiveOperation !== identity.cognitiveOperation,
+      );
+  }
+}
+
 function countDistinctProbes(evals: ChallengeRoundEvaluationItem[]): number {
   const identities = evals.flatMap((evaluation) =>
     evaluation.questionIdentity ? [evaluation.questionIdentity] : [],
@@ -99,15 +131,19 @@ function countDistinctProbes(evals: ChallengeRoundEvaluationItem[]): number {
     );
 
     if (!repeatsExactQuestion) {
-      const introducesNewOperation = priorIdentities.every(
-        (prior) => prior.cognitiveOperation !== identity.cognitiveOperation,
+      const sameOperationPriors = priorIdentities.filter(
+        (prior) => prior.cognitiveOperation === identity.cognitiveOperation,
       );
+      const introducesNewOperation = sameOperationPriors.length === 0;
 
       // Natural-language claim/context mismatches are ambiguous: they may be
-      // synonyms rather than new evidence. They cannot create mastery breadth
-      // unless the grader supplies the explicit, history-relative novelty
-      // classification defined by the schema.
-      if (introducesNewOperation || identity.noveltyBasis) {
+      // synonyms rather than new evidence. A history-relative novelty basis
+      // can create breadth only when its declared structured dimension also
+      // differs from every earlier probe using this operation.
+      if (
+        introducesNewOperation ||
+        noveltyBasisMatchesStructuredDifference(identity, sameOperationPriors)
+      ) {
         distinctCount += 1;
       }
     }

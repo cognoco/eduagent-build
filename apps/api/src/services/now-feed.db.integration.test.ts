@@ -262,6 +262,79 @@ describe('now-feed derive-on-read projections — real DB (WI-1121)', () => {
     );
   });
 
+  // -------------------------------------------------------------------------
+  // [WI-2627] AC-6 — collection applies the SAME 21-day inactivity window the
+  // nightly fade writes with, so a re-enable cannot reveal stale records.
+  //
+  // Named red: collection had NO inactivity bound. A notice that stayed `open`
+  // past the fade window — because it aged during a rollout-off period when fade
+  // short-circuited, or simply between nightly cron runs — was collectable the
+  // instant the feature came back. Eligibility depended on whether a cron had
+  // happened to run, not on the record.
+  //
+  // The window must be measured from LAST ACTIVITY, not `createdAt`: the second
+  // case below is the near-miss a `createdAt`-only filter would fail, hiding a
+  // notice the learner touched yesterday.
+  // -------------------------------------------------------------------------
+  it('excludes an open notice whose last activity is older than the 21-day fade window, even with the feature enabled', async () => {
+    const fixture = await seedFixture(db, 'mentor-notice-stale');
+    const sessionId = await seedSession(db, fixture);
+    const longAgo = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+    const [notice] = await db
+      .insert(mentorNotices)
+      .values({
+        profileId: fixture.profileId,
+        subjectId: fixture.subjectId,
+        topicId: fixture.topicId,
+        sourceSessionId: sessionId,
+        concept: 'Changing signs across the equals sign',
+        // Still `open` — precisely the row a flag-off period banks, because fade
+        // never ran to retire it.
+        createdAt: longAgo,
+      })
+      .returning({ id: mentorNotices.id });
+    if (!notice) throw new Error('stale mentor notice insert failed');
+
+    const feed = await buildNowFeed(db, fixture.profileId, 'self', {
+      mentorNoticeEnabled: true,
+    });
+    expect(feed.cards.some((card) => card.kind === 'mentor_notice')).toBe(
+      false,
+    );
+  });
+
+  it('still surfaces an OLD notice whose most recent activity is inside the window — the window tracks last activity, not creation', async () => {
+    const fixture = await seedFixture(db, 'mentor-notice-old-active');
+    const sessionId = await seedSession(db, fixture);
+    const longAgo = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+    const [notice] = await db
+      .insert(mentorNotices)
+      .values({
+        profileId: fixture.profileId,
+        subjectId: fixture.subjectId,
+        topicId: fixture.topicId,
+        sourceSessionId: sessionId,
+        concept: 'Changing signs across the equals sign',
+        createdAt: longAgo,
+        // Re-checked two days ago: ACTIVE, and the fade job would not touch it.
+        // Deliberately NOT lastDeferredAt, which the learning-day rule below
+        // would suppress for its own unrelated reason.
+        lastRecheckAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      })
+      .returning({ id: mentorNotices.id });
+    if (!notice) throw new Error('old-but-active mentor notice insert failed');
+
+    const feed = await buildNowFeed(db, fixture.profileId, 'self', {
+      mentorNoticeEnabled: true,
+    });
+    expect(feed.cards).toContainEqual(
+      expect.objectContaining({
+        kind: 'mentor_notice',
+        params: expect.objectContaining({ noticeId: notice.id }),
+      }),
+    );
+  });
+
   it('hides a mentor notice deferred during the current shifted learning day', async () => {
     const fixture = await seedFixture(db, 'mentor-notice-deferred');
     const sessionId = await seedSession(db, fixture);

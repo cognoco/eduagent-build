@@ -20,7 +20,11 @@ import {
 } from '../services/mentor-notices';
 
 type MentorNoticeRouteEnv = {
-  Bindings: RouteEnv['Bindings'] & { MENTOR_NOTICE_ENABLED?: string };
+  Bindings: RouteEnv['Bindings'] & {
+    MENTOR_NOTICE_ENABLED?: string;
+    // [WI-2627] Orders rollout observations across deployments.
+    MENTOR_NOTICE_POLICY_REVISION?: string;
+  };
   Variables: RouteEnv['Variables'] & {
     // [WI-2498] See routes/now.ts — server-resolved caller identity, read by
     // the mentor-notice visibility predicate's selfhood conjunct.
@@ -50,19 +54,21 @@ export const mentorNoticeRoutes = new Hono<MentorNoticeRouteEnv>()
       // narrower (adds caller-is-subject and subject consent) and these
       // responses echo notice data, so routing them through the one predicate
       // keeps every notice-bearing boundary on a single seam.
-      // [WI-2504] Same seam; the epoch is derived here but not surfaced —
+      // [WI-2504] Same seam; the epoch was derived here but not surfaced —
       // these are mutations, not persisted projections, and a flag-off
       // answers 404 rather than returning a body to invalidate.
-      if (
-        !(
-          await resolveMentorNoticeVisibility(
-            c,
-            profileId,
-            c.env.MENTOR_NOTICE_ENABLED,
-            { proxyModeHeader: c.req.header('X-Proxy-Mode') },
-          )
-        ).visible
-      ) {
+      // [WI-2627] The SUCCESS body now carries the observation. Invalidation is
+      // still not the point; ORDERING is: a mutation's success is a fresh
+      // authenticated reading of the live policy, and the client must be able to
+      // order it against what the Now feed last told it.
+      const policy = await resolveMentorNoticeVisibility(
+        c,
+        profileId,
+        c.env.MENTOR_NOTICE_ENABLED,
+        { proxyModeHeader: c.req.header('X-Proxy-Mode') },
+        c.env.MENTOR_NOTICE_POLICY_REVISION,
+      );
+      if (!policy.visible) {
         return apiError(
           c,
           404,
@@ -76,7 +82,12 @@ export const mentorNoticeRoutes = new Hono<MentorNoticeRouteEnv>()
           profileId,
           c.req.valid('param').noticeId,
         );
-        return c.json(mentorNoticeRecheckResponseSchema.parse(result));
+        return c.json(
+          mentorNoticeRecheckResponseSchema.parse({
+            ...result,
+            mentorNoticePolicy: policy.observation,
+          }),
+        );
       } catch (err) {
         if (err instanceof MentorNoticeUnavailableError)
           return unavailable(c, err);
@@ -94,19 +105,16 @@ export const mentorNoticeRoutes = new Hono<MentorNoticeRouteEnv>()
       // narrower (adds caller-is-subject and subject consent) and these
       // responses echo notice data, so routing them through the one predicate
       // keeps every notice-bearing boundary on a single seam.
-      // [WI-2504] Same seam; the epoch is derived here but not surfaced —
-      // these are mutations, not persisted projections, and a flag-off
-      // answers 404 rather than returning a body to invalidate.
-      if (
-        !(
-          await resolveMentorNoticeVisibility(
-            c,
-            profileId,
-            c.env.MENTOR_NOTICE_ENABLED,
-            { proxyModeHeader: c.req.header('X-Proxy-Mode') },
-          )
-        ).visible
-      ) {
+      // [WI-2504] Same seam; see the recheck handler above for why WI-2627 now
+      // surfaces the observation on the success body.
+      const policy = await resolveMentorNoticeVisibility(
+        c,
+        profileId,
+        c.env.MENTOR_NOTICE_ENABLED,
+        { proxyModeHeader: c.req.header('X-Proxy-Mode') },
+        c.env.MENTOR_NOTICE_POLICY_REVISION,
+      );
+      if (!policy.visible) {
         return apiError(
           c,
           404,
@@ -126,7 +134,12 @@ export const mentorNoticeRoutes = new Hono<MentorNoticeRouteEnv>()
             learningDayStart: getLearningDayStart(now, timezone),
           },
         );
-        return c.json(mentorNoticeDeferResponseSchema.parse(result));
+        return c.json(
+          mentorNoticeDeferResponseSchema.parse({
+            ...result,
+            mentorNoticePolicy: policy.observation,
+          }),
+        );
       } catch (err) {
         if (err instanceof MentorNoticeUnavailableError)
           return unavailable(c, err);

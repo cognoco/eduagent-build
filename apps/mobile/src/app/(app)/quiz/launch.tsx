@@ -16,7 +16,10 @@ import {
   homeHrefForReturnTo,
   PRACTICE_HREF,
   PRACTICE_RETURN_TO,
+  resolvedV2TabForReturnTo,
+  V2_TAB_TITLE_KEYS,
 } from '../../../lib/navigation';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { resolveLoadingMotionPreset } from '../../../lib/motion-presets';
 import { useThemeColors } from '../../../lib/theme';
 import {
@@ -129,7 +132,11 @@ export default function QuizLaunchScreen(): React.ReactElement {
       ? routeReturnTo
       : (returnTo ?? null);
   const exitHref = effectiveReturnTo
-    ? homeHrefForReturnTo(effectiveReturnTo)
+    ? homeHrefForReturnTo(
+        effectiveReturnTo,
+        undefined,
+        FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+      )
     : ('/(app)/quiz' as Href);
   const handleExit = useCallback(() => {
     if (effectiveReturnTo === PRACTICE_RETURN_TO) {
@@ -145,6 +152,35 @@ export default function QuizLaunchScreen(): React.ReactElement {
     }
     router.replace(exitHref as Href);
   }, [effectiveReturnTo, exitHref, routePracticeReturnTo, router]);
+
+  // WI-2331 rework, F1b: the error-state secondary action always calls
+  // handleExit — the SAME exit function above — so it names the actual
+  // destination handleExit resolves to (Practice, the owning V2 tab named by
+  // effectiveReturnTo, or this quiz flow's own root when neither is set)
+  // instead of the generic `common.goBack` it showed before. The loading
+  // state's own "Cancel" secondary action is left untouched: it cancels the
+  // in-flight round generation rather than exiting the screen. When
+  // effectiveReturnTo names a non-tab destination, resolvedV2TabForReturnTo
+  // returns null and the label falls back to this quiz flow's own root
+  // instead of mislabeling as a tab handleExit isn't actually routing to.
+  const effectiveReturnToBackTab =
+    effectiveReturnTo && effectiveReturnTo !== PRACTICE_RETURN_TO
+      ? resolvedV2TabForReturnTo(
+          effectiveReturnTo,
+          undefined,
+          FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+        )
+      : null;
+  const exitLabel = FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+    ? t('common.backTo', {
+        destination:
+          effectiveReturnTo === PRACTICE_RETURN_TO
+            ? t('practiceHub.title')
+            : effectiveReturnToBackTab
+              ? t(V2_TAB_TITLE_KEYS[effectiveReturnToBackTab])
+              : t('quiz.index.title'),
+      })
+    : t('common.goBack');
   const generateRound = useGenerateRound();
   const seededRound = useFetchRound(e2eRoundId);
   const seededRoundData = seededRound.data;
@@ -354,7 +390,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
             testID: 'quiz-launch-retry',
           }}
           secondaryAction={{
-            label: t('common.goBack'),
+            label: exitLabel,
             onPress: handleExit,
             testID: 'quiz-launch-back',
           }}
@@ -408,7 +444,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
                 }
           }
           secondaryAction={{
-            label: t('common.goBack'),
+            label: exitLabel,
             onPress: handleExit,
             testID: 'quiz-launch-back',
           }}

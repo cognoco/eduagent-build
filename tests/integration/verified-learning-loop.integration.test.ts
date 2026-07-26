@@ -185,12 +185,15 @@ async function seedCurriculumTopic(
   db: Database,
   subjectId: string,
 ): Promise<string> {
-  const [{ id: curriculumId }] = await db
+  const [curriculum] = await db
     .insert(curricula)
     .values({ subjectId })
     .returning({ id: curricula.id });
+  if (!curriculum) {
+    throw new Error('Expected curriculum seed insert to return an id');
+  }
 
-  const [{ id: bookId }] = await db
+  const [book] = await db
     .insert(curriculumBooks)
     .values({
       subjectId,
@@ -198,20 +201,26 @@ async function seedCurriculumTopic(
       sortOrder: 1,
     })
     .returning({ id: curriculumBooks.id });
+  if (!book) {
+    throw new Error('Expected curriculum book seed insert to return an id');
+  }
 
-  const [{ id: topicId }] = await db
+  const [topic] = await db
     .insert(curriculumTopics)
     .values({
-      bookId,
-      curriculumId,
+      bookId: book.id,
+      curriculumId: curriculum.id,
       title: 'Photosynthesis',
       description: 'Light reactions and Calvin cycle.',
       sortOrder: 1,
       estimatedMinutes: 20,
     })
     .returning({ id: curriculumTopics.id });
+  if (!topic) {
+    throw new Error('Expected curriculum topic seed insert to return an id');
+  }
 
-  return topicId;
+  return topic.id;
 }
 
 /** Learner text shared deliberately with the note draft so the lexical-overlap
@@ -368,6 +377,7 @@ async function driveVerifiedChallengeRound(
     session,
     meta,
     {
+      source_concepts: ['photosynthesis'],
       source_answer_event_ids: [answerEventId],
       content: NOTE_DRAFT_CONTENT,
     },
@@ -771,6 +781,9 @@ describeIfDb('Verified-learning loop (WI-1666, S8)', () => {
     );
 
     expect(proof.hasProof).toBe(true);
+    if (!proof.hasProof) {
+      throw new Error('Expected a verified proof receipt');
+    }
     expect(proof.topicId).toBe(topicId);
     expect(proof.topicTitle).toBe('Photosynthesis');
     expect(proof.masteryVerificationState).toBe('fresh');

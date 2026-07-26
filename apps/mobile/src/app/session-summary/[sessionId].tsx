@@ -48,6 +48,7 @@ import {
   JOURNAL_HREF,
   JOURNAL_RETURN_TO,
 } from '../../lib/navigation';
+import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { platformAlert } from '../../lib/platform-alert';
 import { formatApiError, classifyApiError } from '../../lib/format-api-error';
 import { Sentry } from '../../lib/sentry';
@@ -111,7 +112,11 @@ export default function SessionSummaryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const resolvedReturnTo = Array.isArray(returnTo) ? returnTo[0] : returnTo;
-  const summaryHomeHref = homeHrefForReturnTo(resolvedReturnTo);
+  const summaryHomeHref = homeHrefForReturnTo(
+    resolvedReturnTo,
+    undefined,
+    FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+  );
   const colors = useThemeColors();
   const { t } = useTranslation();
   const announce = useAnnounce();

@@ -21,9 +21,12 @@ import {
   goBackOrReplace,
   homeHrefForReturnTo,
   isSessionForwardableReturnTo,
+  resolvedV2TabForReturnTo,
   SETTINGS_RETURN_TO,
   SUBJECTS_RETURN_TO,
+  V2_TAB_TITLE_KEYS,
 } from '../../../lib/navigation';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 
 const NATIVE_LANGUAGE_OPTIONS = [
@@ -139,11 +142,21 @@ export default function LanguageSetup() {
     // BUG-692-FOLLOWUP: Mark the mutation as cancelled so the post-await
     // router.replace in handleContinue does not fire after back-navigation.
     cancelledRef.current = true;
+    const v2Enabled = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
     if (returnTo === SETTINGS_RETURN_TO) {
-      goBackOrReplace(router, '/(app)/more' as Href);
+      // WI-2331 AC-3: `/(app)/more` is dead in V2 (not one of the three
+      // tabs) — route through the same owning-tab contract AC-1's tab
+      // highlight uses instead of the retired More tab.
+      goBackOrReplace(
+        router,
+        (v2Enabled ? '/(app)/mentor' : '/(app)/more') as Href,
+      );
       return;
     }
-    goBackOrReplace(router, homeHrefForReturnTo(returnTo));
+    goBackOrReplace(
+      router,
+      homeHrefForReturnTo(returnTo, undefined, v2Enabled),
+    );
   }, [returnTo, router]);
 
   const handleContinue = async () => {
@@ -194,8 +207,36 @@ export default function LanguageSetup() {
     }
   };
 
-  const guardActionLabel =
-    returnTo === SETTINGS_RETURN_TO || returnTo === SUBJECTS_RETURN_TO
+  // WI-2331 rework, F1b: handleBack always exits this screen — to Mentor
+  // (the settings-return case, since `/(app)/more` is dead in V2) or the
+  // owning V2 tab named by returnTo otherwise — so the header Back control
+  // names that destination instead of the generic `common.goBack` it showed
+  // before. `accountReturnToken` used to build this label, but it collapses
+  // every non-tab returnTo (practice, family-recaps, …) to 'mentor' even
+  // though handleBack routes those elsewhere — resolvedV2TabForReturnTo
+  // resolves the label the same way handleBack resolves the destination, and
+  // only names a tab when that destination genuinely is one, else falls back
+  // to the generic label. `homeHrefForReturnTo(SETTINGS_RETURN_TO, …, true)`
+  // already resolves to Mentor (its unrecognized-token default), so no
+  // explicit SETTINGS_RETURN_TO branch is needed here.
+  const backTab = resolvedV2TabForReturnTo(
+    returnTo,
+    undefined,
+    FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+  );
+  const backLabel =
+    FEATURE_FLAGS.MODE_NAV_V2_ENABLED && backTab
+      ? t('common.backTo', { destination: t(V2_TAB_TITLE_KEYS[backTab]) })
+      : t('common.goBack');
+
+  // The "no subject selected" guard button also calls handleBack, so under
+  // V2 it must name the same destination backLabel does instead of the
+  // generic goBack/goHome split (a V0/V1-only distinction — settings/subjects
+  // return "back", everything else "home" — that doesn't hold once V2 routes
+  // every case through a named tab/Mentor destination).
+  const guardActionLabel = FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+    ? backLabel
+    : returnTo === SETTINGS_RETURN_TO || returnTo === SUBJECTS_RETURN_TO
       ? t('common.goBack')
       : t('common.goHome');
 
@@ -230,7 +271,7 @@ export default function LanguageSetup() {
         <Pressable
           onPress={handleBack}
           className="mb-3 min-w-[44px] min-h-[44px] justify-center self-start"
-          accessibilityLabel={t('common.goBack')}
+          accessibilityLabel={backLabel}
           accessibilityRole="button"
           testID="language-setup-back"
         >
