@@ -34,6 +34,15 @@ export async function createMentorNoticeFromExchange(
     session: NoticeSourceSession;
     signal: NoticedGapSignal;
     isMentorNoticeRecheck?: boolean;
+    /**
+     * [WI-2628] The vendor whose model produced `signal` — the real producer of
+     * the notice copy. Threaded so the shared multilingual gate can refer
+     * ambiguous copy to the INDEPENDENT judge with that vendor excluded from
+     * judge selection. Omitting it is not a neutral default: AC-4 fails closed on
+     * an unknown producer, so ambiguous copy would block outright and the notice
+     * would never be written.
+     */
+    producerVendor?: string | null;
   },
 ): Promise<MentorNoticeAccepted | null> {
   if (input.isMentorNoticeRecheck) return null;
@@ -55,5 +64,6 @@ export async function createMentorNoticeFromExchange(
     answerEventId: evidence.answerEventId,
     concept: evidence.concept,
     correctionHint: evidence.correctionHint,
+    producerVendor: input.producerVendor,
   });
 }

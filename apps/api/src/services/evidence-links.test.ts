@@ -262,6 +262,68 @@ describe('verified Challenge artifact persistence', () => {
     },
   );
 
+  // [WI-2628] The row above is English-only, so it passed under the shipped
+  // English-only guard too — it never established the property this Work Item
+  // exists for. These do: each string was returned UNCHANGED by
+  // `scrubClinicalInferenceFromLearningRecord` (i.e. would have been persisted),
+  // and each must now be refused BEFORE the transaction opens. Asserted at the
+  // write boundary, not on the gate's return value: `transaction` is the only
+  // capability the stub has, so "nothing was written" is what is checked.
+  it.each([
+    ['Czech', 'Petr má dyslexii a potřebuje pomoc.'],
+    ['Spanish', 'El alumno tiene TEA.'],
+    ['German', 'Der Schüler hat ADS.'],
+    ['Norwegian', 'Eleven har ADD.'],
+    ['Japanese', '田中さんは自閉症です。'],
+    [
+      'English genitive of an attributed-only acronym',
+      "Emma's TEA is documented in the file.",
+    ],
+  ])(
+    'rejects a %s Art-9 clinical inference before opening the transaction',
+    async (_language, conceptKey) => {
+      const transaction = jest.fn();
+      const insert = jest.fn();
+      const db = { transaction, insert } as unknown as Database;
+
+      await expect(
+        persistVerifiedChallengeArtifacts(db, {
+          profileId: PROFILE_ID,
+          topicId: TOPIC_ID,
+          sessionId: SESSION_ID,
+          artifacts: [
+            {
+              artifactSource: 'challenge_solid_quote',
+              conceptKey,
+              sourceEventIds: [EVENT_ID],
+            },
+          ],
+        }),
+      ).rejects.toBeInstanceOf(BadRequestError);
+      expect(transaction).not.toHaveBeenCalled();
+      expect(insert).not.toHaveBeenCalled();
+    },
+  );
+
+  it('still admits a safe concept key past the gate and into the transaction', async () => {
+    // Non-triviality control for the rows above: a gate that refused every
+    // artifact would satisfy all six for free.
+    const { db, artifacts } = createPersistenceDb();
+    await persistVerifiedChallengeArtifacts(db, {
+      profileId: PROFILE_ID,
+      topicId: TOPIC_ID,
+      sessionId: SESSION_ID,
+      artifacts: [
+        {
+          artifactSource: 'challenge_solid_quote',
+          conceptKey: 'equivalent fractions',
+          sourceEventIds: [EVENT_ID],
+        },
+      ],
+    });
+    expect(artifacts).toHaveLength(1);
+  });
+
   it('persists the artifact and its opaque provenance in one transaction', async () => {
     const { db, artifacts, links } = createPersistenceDb();
 
