@@ -287,6 +287,66 @@ type Entry = {
   snapshot: MentorNoticePolicySnapshot;
   listeners: Set<() => void>;
   hydrating: boolean;
+  /**
+   * [WI-2627 rework] The ONE storage-operation chain for this pair. Every read
+   * and every write goes through it, so no two storage operations for the same
+   * key are ever in flight together. See `enqueue`.
+   */
+  chain: Promise<void>;
+  /**
+   * Whether a flush is already queued behind the chain. A queued flush reads
+   * the CURRENT state when it runs, so further requests coalesce into it rather
+   * than each carrying their own snapshot.
+   */
+  flushQueued: boolean;
+  /**
+   * The record this device believes is durably on disk, or `null` when there is
+   * nothing to defend (no record stored, or a stored record that would not
+   * parse). Guards the write so a flush can never LOWER the durable revision.
+   *
+   * `null` means "nothing trustworthy is THERE" — it does NOT mean "we could not
+   * look". Those two are different and conflating them is what `readUntrusted`
+   * below exists to prevent.
+   */
+  durable: MentorNoticePolicyState | null;
+  /**
+   * [WI-2627 rework 2] The last read of this key FAILED, so the disk contents
+   * are UNKNOWN rather than known-empty.
+   *
+   * This distinction is the whole point. `durable === null` was originally
+   * treated as "safe to write current state unguarded", which is right for an
+   * absent or unparseable record and catastrophically wrong for a read that
+   * threw: a higher-revision DISABLE can be sitting on disk, un-clobbered and
+   * invisible to us. At cold start in-memory is the bootstrap `{0, false}` — no
+   * revision to defend with — so any well-formed enabled observation above 0 is
+   * `newer`, adopted wholesale, and written straight over that disable. The
+   * durable revision drops, `enabled` flips back to true, and the next launch
+   * shows notices again. That is the exact breach this Work Item closes, and it
+   * was reproduced on the previous head.
+   *
+   * So while this is set AND no `durable` has been established, `flush` decides
+   * by the DIRECTION of the candidate: an ENABLED candidate is withheld (it is
+   * the one that can resurrect notices), a DISABLED candidate is written anyway
+   * (withholding the kill-switch is worse than any record it can overwrite).
+   * See the full trade in `flush`. In-session state stays fail-closed either
+   * way.
+   */
+  readUntrusted: boolean;
+  /**
+   * [WI-2627 rework 3] A well-formed OBSERVATION carrying `enabled: false` has
+   * been folded into this entry — i.e. the server actually told this device the
+   * rollout is off.
+   *
+   * Needed because "the store is currently disabled" is NOT the same as "we hold
+   * a disable worth persisting blind". A failed read folds `'malformed'`, which
+   * disables at the held revision — so after a blind read the state reads
+   * disabled even when the only thing the server ever said was ENABLED. Gating
+   * the blind write on `state.enabled` alone therefore wrote a disable
+   * manufactured by our own read failure, lowering the durable floor for
+   * nothing. This flag distinguishes a genuine kill-switch, which is worth the
+   * floor cost, from our own fail-closed reaction to blindness, which is not.
+   */
+  observedDisable: boolean;
 };
 
 const UNBOUND_SNAPSHOT: MentorNoticePolicySnapshot = {
@@ -316,6 +376,11 @@ function getEntry(key: string): Entry {
       },
       listeners: new Set(),
       hydrating: false,
+      chain: Promise.resolve(),
+      flushQueued: false,
+      durable: null,
+      readUntrusted: false,
+      observedDisable: false,
     };
     entries.set(key, entry);
   }
@@ -353,10 +418,58 @@ function delay(ms: number): Promise<void> {
 }
 
 /**
+ * [WI-2627 rework] Serialize one storage operation per pair, in order.
+ *
+ * The whole durable-monotonicity argument rests on this: reads and writes for a
+ * given key are totally ordered, so hydration always precedes any write on that
+ * entry (which is what lets `durableCandidate` compare against a known record),
+ * and no two writes for the same key can ever be resolving concurrently.
+ *
+ * `work` is expected to absorb its own failures; the `catch` is a floor so one
+ * rejection cannot poison the chain for every later operation.
+ */
+function enqueue(entry: Entry, work: () => Promise<void>): void {
+  entry.chain = entry.chain.then(work).catch(() => undefined);
+}
+
+/**
+ * [WI-2627 rework] What a flush should write RIGHT NOW.
+ *
+ * Two properties, and the defect this replaced had neither:
+ *
+ *   read-latest — the candidate is the CURRENT in-memory state, read at the
+ *     moment of the attempt, never a snapshot captured when the observation
+ *     arrived. Every retry therefore re-reads too, so a retry that lands late
+ *     writes today's state rather than resurrecting the state that failed.
+ *
+ *   revision-guarded — WHEN a durable record is known, the candidate is folded
+ *     against it through the same monotonic reducer the in-memory state uses, so
+ *     the write cannot lower that revision nor re-enable at the revision it
+ *     holds. This is what covers retry-AFTER-EXHAUSTION: a flush whose retries
+ *     all failed leaves `durable` stale, and the next flush still cannot regress
+ *     it.
+ *
+ * `durable === null` means nothing trustworthy is THERE — a fresh install, or a
+ * record that would not parse (its revision is unknowable and the in-memory
+ * state, already fail-closed by the malformed fold, is the better record).
+ * Writing the current state unguarded is correct in both of those.
+ *
+ * It is NOT the whole story when the READ itself failed, because then a
+ * higher-revision disable may be on disk unseen. `flush` handles that case
+ * before reaching here: it retries the read, and if still blind it withholds an
+ * ENABLED candidate outright while letting a DISABLED one through unguarded.
+ */
+function durableCandidate(entry: Entry): MentorNoticePolicyState {
+  const current = entry.snapshot.state;
+  if (entry.durable === null) return current;
+  return reduceMentorNoticePolicy(entry.durable, current);
+}
+
+/**
  * [WI-2627] Retry a disable-write across transient `setItem` failures.
  *
- * `persist` is fire-and-forget (`void persist(...)`) and its only caller
- * already committed the correct state to memory before calling it — so a
+ * `flush` is fire-and-forget (via `schedulePersist`) and its only caller
+ * already committed the correct state to memory before scheduling it — so a
  * failed write never corrupts THIS session. What it can corrupt is the NEXT
  * one: a relaunch reads whatever `setItem` last durably wrote, and a single
  * rejected write silently leaves that durable record at its previous,
@@ -374,21 +487,93 @@ function delay(ms: number): Promise<void> {
  *
  * Retrying with backoff is the defensible shape: it recovers the common
  * transient failure (the case this device most likely to hit) without
- * inventing a second fallible write path. RESIDUAL, recorded rather than
- * papered over: under sustained/unbounded failure (e.g. disk genuinely
- * full for the retry window), the write can still never land, and a
- * relaunch during that window can still read a stale record. In-session
- * behaviour stays fail-closed throughout — only the durable record can lag.
+ * inventing a second fallible write path. Under sustained failure (disk
+ * genuinely full for the retry window) the write still never lands and the
+ * durable record lags — but it lags at an OLDER revision that no later flush
+ * can be tricked into re-adopting, and in-session behaviour is fail-closed
+ * throughout.
  */
-async function persist(
-  key: string,
-  state: MentorNoticePolicyState,
-): Promise<void> {
-  const payload = JSON.stringify(state);
+async function flush(key: string, entry: Entry): Promise<void> {
+  entry.flushQueued = false;
+
+  // [WI-2627 rework 3] A failed READ leaves the disk contents UNKNOWN, and a
+  // higher-revision disable may be sitting there unseen. Retry the read on the
+  // same ladder the write gets — called directly rather than enqueued, because
+  // this already runs ON the chain. Zero-backoff was not a retry: it gave a
+  // read one microtask to recover, so "blind" was effectively permanent for
+  // anything but the narrowest hiccup. Recovering the read is by far the best
+  // outcome, because it restores the ordinary guarded write and moots every
+  // trade below.
+  if (entry.readUntrusted) {
+    for (
+      let attempt = 0;
+      entry.readUntrusted && attempt <= PERSIST_RETRY_DELAYS_MS.length;
+      attempt++
+    ) {
+      await readAndFold(key, entry);
+      if (!entry.readUntrusted) break;
+      const backoff = PERSIST_RETRY_DELAYS_MS[attempt];
+      if (backoff !== undefined) await delay(backoff);
+    }
+
+    // Still blind, with nothing established to guard against. The choice is
+    // between two bad writes, and the DIRECTION of the candidate decides which
+    // one we take — the previous pass withheld unconditionally and that was
+    // wrong, because it swallowed the kill-switch itself.
+    if (entry.readUntrusted && entry.durable === null) {
+      if (entry.snapshot.state.enabled || !entry.observedDisable) {
+        // Nothing worth persisting blind → WITHHOLD. Two shapes land here:
+        //
+        //   an ENABLED candidate — the original breach. At cold start in-memory
+        //     is the bootstrap, so any enabled observation above revision 0 is
+        //     `newer` and would be written straight over an intact
+        //     higher-revision disable, flipping the durable record to enabled
+        //     and resurrecting notices on the next launch.
+        //
+        //   a disabled candidate with NO genuine disable behind it — the state
+        //     our own failed read manufactured by folding 'malformed'. Writing
+        //     it would lower the durable floor and persist nothing the server
+        //     ever said.
+        //
+        // Withholding costs only a DELAYED enable, which is fail-closed and
+        // self-corrects on the next successful write.
+        Sentry.captureMessage('mentor_notice_policy: durable write withheld', {
+          level: 'warning',
+          tags: { feature: 'mentor_notice_policy', op: 'write_withheld' },
+        });
+        return;
+      }
+      // DISABLED candidate → WRITE IT ANYWAY. A disable is the emergency
+      // kill-switch, and withholding it is strictly worse than any record it
+      // can overwrite:
+      //   - if the unknown disk held an ENABLED record, withholding leaves that
+      //     record and the next launch shows notices — the kill-switch silently
+      //     swallowed;
+      //   - if the disk held NOTHING (fresh install, first read throws),
+      //     withholding leaves it absent, and an absent record hydrates as
+      //     NEVER-TOLD, which `noticesSuppressedForPayload` treats as "not
+      //     suppressed" and lets a cached projection paint. That is precisely
+      //     the hazard `removeItem` was rejected for above, reintroduced.
+      // Writing the disable cannot do either. Its one real cost is the FLOOR:
+      // if the unknown disk held a disable at a HIGHER revision, we lower the
+      // bar a later enabled observation must clear. That leaves the device
+      // disabled either way — it only widens the window in which a stale
+      // enabled reply could re-enable — so it is the lesser harm by a wide
+      // margin. Tagged distinctly so the trade is observable in production
+      // rather than only asserted here.
+      Sentry.captureMessage('mentor_notice_policy: blind disable write', {
+        level: 'warning',
+        tags: { feature: 'mentor_notice_policy', op: 'write_blind_disable' },
+      });
+    }
+  }
+
   let lastError: unknown;
   for (let attempt = 0; attempt <= PERSIST_RETRY_DELAYS_MS.length; attempt++) {
+    const candidate = durableCandidate(entry);
     try {
-      await AsyncStorage.setItem(key, payload);
+      await AsyncStorage.setItem(key, JSON.stringify(candidate));
+      entry.durable = candidate;
       return;
     } catch (err) {
       lastError = err;
@@ -399,6 +584,24 @@ async function persist(
   Sentry.captureException(lastError, {
     tags: { feature: 'mentor_notice_policy', op: 'write' },
   });
+}
+
+/**
+ * [WI-2627 rework] Queue a durable write of the current state.
+ *
+ * Hydration is requested FIRST so it is ordered ahead of the write on the same
+ * chain — a fold can reach this before any hook has mounted, and an unhydrated
+ * entry has no `durable` record to guard against.
+ *
+ * Coalescing is safe precisely because the queued flush reads the latest state:
+ * a second observation arriving while a flush is pending needs no write of its
+ * own, since the pending one will carry it.
+ */
+function schedulePersist(key: string, entry: Entry): void {
+  hydrateOnce(key, entry);
+  if (entry.flushQueued) return;
+  entry.flushQueued = true;
+  enqueue(entry, () => flush(key, entry));
 }
 
 /**
@@ -414,11 +617,26 @@ async function readAndFold(key: string, entry: Entry): Promise<void> {
   let signal: MentorNoticePolicySignal;
   try {
     signal = storedSignal(await AsyncStorage.getItem(key));
+    // [WI-2627 rework] Seed the write guard from what is actually on disk. Only
+    // a PARSEABLE record tells us a durable revision; 'absent' means there is
+    // genuinely nothing to regress, and 'malformed' means its revision is
+    // unknowable — in both of those the guard stays off (`null`).
+    //
+    // [rework 2] This read SUCCEEDED, so the disk contents are known either way
+    // and the write path is unblocked.
+    entry.durable = typeof signal === 'object' ? signal : null;
+    entry.readUntrusted = false;
   } catch (err) {
     Sentry.captureException(err, {
       tags: { feature: 'mentor_notice_policy', op: 'read' },
     });
     signal = 'malformed';
+    // [WI-2627 rework 2] We could not LOOK. Do NOT null `durable`: a record
+    // established by an earlier successful read or write is still the best guard
+    // we have, and discarding it would hand the write path a blank cheque. And
+    // do not treat the absence of knowledge as knowledge of absence — that is
+    // what `readUntrusted` records, and what makes `flush` withhold.
+    entry.readUntrusted = true;
   }
   commit(
     entry,
@@ -434,7 +652,7 @@ async function readAndFold(key: string, entry: Entry): Promise<void> {
 function hydrateOnce(key: string, entry: Entry): void {
   if (entry.hydrating || entry.snapshot.hydrated) return;
   entry.hydrating = true;
-  void readAndFold(key, entry);
+  enqueue(entry, () => readAndFold(key, entry));
 }
 
 /** Test seam: drop all in-memory policy state. */
@@ -466,9 +684,20 @@ export function foldMentorNoticePolicyFor(
   if (!signalIsObservation(signal)) return;
   const key = storageKey(actorId, profileId);
   const entry = getEntry(key);
+  // [WI-2627 rework 3] Record that a GENUINE disable arrived, before the fold —
+  // `flush` needs to tell a server kill-switch from the fail-closed state its
+  // own failed read manufactures. Only a well-formed observation counts;
+  // 'malformed' does not.
+  if (typeof signal === 'object' && !signal.enabled) {
+    entry.observedDisable = true;
+  }
   const next = reduceMentorNoticePolicy(entry.snapshot.state, signal);
   commit(entry, next, true, entry.snapshot.hydrated);
-  void persist(key, next);
+  // [WI-2627 rework] Not `persist(key, next)`. The write must carry whatever the
+  // store holds when it actually reaches the disk, not this observation's
+  // snapshot — otherwise a retried older ENABLED write can land after a newer
+  // DISABLED one and hand the next launch a resurrected notice.
+  schedulePersist(key, entry);
 }
 
 /**
@@ -564,7 +793,10 @@ export function useMentorNoticePolicy(
     if (!key) return undefined;
     const sub = AppState.addEventListener('change', (next) => {
       if (next !== 'active') return;
-      void readAndFold(key, getEntry(key));
+      const entry = getEntry(key);
+      // On the shared chain, so a foreground re-read can never interleave with
+      // an in-flight write of the same key.
+      enqueue(entry, () => readAndFold(key, entry));
     });
     return () => sub.remove();
   }, [key]);
