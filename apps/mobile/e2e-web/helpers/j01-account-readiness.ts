@@ -24,8 +24,12 @@ export interface J01AccountReadinessObservation {
 export function armJ01AccountReadiness(
   page: Page,
 ): J01AccountReadinessObservation {
+  const phaseSampleIntervalMs = 100;
   let profileRequestState = 'not-requested';
   let primaryProfileRequest: Request | null = null;
+  let retainedPhase: J01AccountReadinessPhase | null = null;
+  let phaseSampleInFlight = false;
+  let disposed = false;
   const onRequest = (request: Request): void => {
     const url = new URL(request.url());
     if (
@@ -108,10 +112,31 @@ export function armJ01AccountReadiness(
     return 'unknown';
   }
 
+  async function retainVisiblePhase(): Promise<void> {
+    if (disposed || phaseSampleInFlight) return;
+    phaseSampleInFlight = true;
+    try {
+      const committedPath = new URL(page.url()).pathname;
+      const phase = await visiblePhase(committedPath);
+      if (!disposed && phase !== 'unknown') retainedPhase = phase;
+    } finally {
+      phaseSampleInFlight = false;
+    }
+  }
+
+  void retainVisiblePhase();
+  const phaseSampleTimer = setInterval(() => {
+    void retainVisiblePhase();
+  }, phaseSampleIntervalMs);
+
   return {
     async failureMessage(timeout) {
       const committedPath = new URL(page.url()).pathname;
-      const phase = await visiblePhase(committedPath);
+      const visibleFailurePhase = await visiblePhase(committedPath);
+      const phase =
+        visibleFailurePhase === 'unknown'
+          ? (retainedPhase ?? visibleFailurePhase)
+          : visibleFailurePhase;
 
       return (
         `[J-01 account-readiness:${phase}] account-avatar-shell remained absent within ${timeout}ms; ` +
@@ -119,6 +144,8 @@ export function armJ01AccountReadiness(
       );
     },
     dispose() {
+      disposed = true;
+      clearInterval(phaseSampleTimer);
       page.off('request', onRequest);
       page.off('requestfailed', onRequestFailed);
       page.off('response', onResponse);
