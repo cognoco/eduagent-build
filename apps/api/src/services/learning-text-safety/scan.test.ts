@@ -796,12 +796,24 @@ describe('[WI-2628] attributed-only lexeme scope', () => {
     'I have tea with breakfast every morning.',
     'The user has ads blocked in the browser.',
     'You can add two numbers to get a sum.',
+    // THE ENGLISH `'s` GENITIVE — ordinary prose, no clinical content. Absent
+    // from the first matrix, which enumerated only language-native possessive
+    // DETERMINERS (`Su TEA`, `Seine ADS`, `Elevens ADD` — those are intended
+    // blocks). The genitive namedPattern was being built for every cased corpus,
+    // so once the attributed-only sets went always-on these blocked in all ten
+    // declared languages. A matrix is only as good as the FORMS enumerated in
+    // it, not the number of cells.
+    "Emma's tea went cold during the lesson.",
+    "We discussed Google's ads policy.",
+    "Tom's ads are effective.",
+    "Anna's add was a small one.",
+    "Sarah's tea preference is green tea.",
   ];
 
   it('covers all ten declared languages in the matrix', () => {
     expect(ALL_LANGUAGES).toHaveLength(10);
     expect(ATTRIBUTED_STRINGS).toHaveLength(6);
-    expect(MUST_STAY_CLEAR).toHaveLength(9);
+    expect(MUST_STAY_CLEAR).toHaveLength(14);
   });
 
   describe.each(ALL_LANGUAGES)('declared %s', (language) => {

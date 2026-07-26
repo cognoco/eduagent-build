@@ -370,7 +370,19 @@ function buildPatternSet(
         ),
       );
     }
-    if (corpus.scriptHasCase) {
+    // THE `'s` GENITIVE IS ENGLISH SYNTAX, so it is built for the ENGLISH
+    // corpus only — not for every cased script. Spanish, German and Norwegian do
+    // not form possession this way, and bolting the English genitive onto their
+    // attributed-only slot made ordinary English prose block in all ten declared
+    // languages once those sets became always-on: `Emma's tea went cold.`,
+    // `We discussed Google's ads policy.`, `Anna's add was a small one.`
+    // Standalone behaviour is unaffected — English is co-compiled into every
+    // non-English grammar, so the genitive still runs everywhere against the
+    // broad slot, exactly as before. Gating any WIDER (dropping namedPatterns
+    // from the attributed-only sets) would break `Petr tiene TEA.` @es and
+    // `Elevens ADD er dokumentert.` @nb, which ride the name and possessive
+    // machinery respectively.
+    if (corpus.language === 'en') {
       namedPatterns.push(
         new RegExp(
           `${LATIN_LEFT_BOUNDARY}(?<person>[\\p{Lu}][\\p{L}\\p{M}'’-]{1,39})['’]s\\s+${postVerb}${lexeme}${LATIN_RIGHT_BOUNDARY}`,
