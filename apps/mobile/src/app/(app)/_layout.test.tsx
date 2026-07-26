@@ -26,6 +26,7 @@ import {
   extractJsonBody,
   fetchCallsMatching,
 } from '../../test-utils/mock-api-routes';
+import { tokens } from '../../lib/design-tokens';
 
 const mockFetch = createRoutedMockFetch();
 
@@ -41,6 +42,20 @@ const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockCanGoBack = jest.fn(() => false);
 const mockClerkSignOut = jest.fn();
+// [WI-2331 rework #2, AC-5 own/supporting axis] the real production wiring
+// for each Tabs.Screen entry closes over resolveV2TabIsActive(pathname,
+// tabName, v2Enabled, focused, activeReturnTo) inside its `tabBarIcon` /
+// `tabBarLabel` options (see _layout.tsx). Capturing those `options` objects
+// by route name — rather than re-deriving `resolveV2TabIsActive` results by
+// hand — lets a test invoke the SAME closures AppLayout actually wires up,
+// driven only by activeReturnTo (see mockUseGlobalSearchParams below).
+const capturedTabScreenOptions: Record<
+  string,
+  {
+    tabBarIcon?: (p: { focused: boolean }) => React.ReactElement;
+    tabBarLabel?: (p: { focused: boolean }) => React.ReactElement;
+  }
+> = {};
 const mockTabs = Object.assign(
   ({
     children,
@@ -67,8 +82,27 @@ const mockTabs = Object.assign(
     );
   },
   {
-    Screen: () => null,
+    Screen: ({
+      name,
+      options,
+    }: {
+      name: string;
+      options?: (typeof capturedTabScreenOptions)[string];
+    }) => {
+      if (options) capturedTabScreenOptions[name] = options;
+      return null;
+    },
   },
+);
+
+// mockUseGlobalSearchParams is the ONLY seam feeding `returnTo` into
+// resolveV2TabIsActive's real call sites (see AppLayout's `activeReturnTo`) —
+// making it dynamic (mirroring mockUsePathname) lets a test drive the exact
+// same own-scope / supporting-scope returnTo tokens the real own-learning
+// and family-recap/-progress screens push, instead of calling
+// resolveV2TabIsActive by hand.
+const mockUseGlobalSearchParams = jest.fn<{ returnTo?: string }, []>(
+  () => ({}),
 );
 
 jest.mock('expo-router', () => ({
@@ -78,7 +112,7 @@ jest.mock('expo-router', () => ({
   },
   Tabs: mockTabs,
   usePathname: () => mockUsePathname(),
-  useGlobalSearchParams: () => ({}),
+  useGlobalSearchParams: () => mockUseGlobalSearchParams(),
   useRouter: () => ({
     push: jest.fn(),
     replace: mockReplace,
@@ -144,23 +178,17 @@ jest.mock(
 // use-consent uses useApiClient — mocked at the fetch boundary via mockFetch.
 // Routes: GET /consent/my-status, POST /consent/request
 
+// [WI-2331 rework #2, AC-5 dark/light axis] colorScheme is mutable per-test
+// (see the "TabIcon / TabLabel theme-token wiring" describe below) and
+// useThemeColors reads the REAL design-token table keyed by that scheme, so
+// dark-vs-light assertions exercise genuine token values instead of a fixed
+// fixture that could never fail a real theme regression.
+let mockColorScheme: 'light' | 'dark' = 'light';
 // prettier-ignore
 jest.mock('../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
-  useTheme: () => ({ colorScheme: 'light' }),
-  useThemeColors: () => ({
-    accent: '#0ea5e9',
-    border: '#d4d4d8',
-    muted: '#71717a',
-    surface: '#ffffff',
-    textInverse: '#ffffff',
-    textPrimary: '#18181b',
-    textSecondary: '#52525b',
-    warning: '#a16207',
-    proxyPreviewBackground: '#fff7ed',
-    proxyPreviewBorder: '#f59e0b',
-    proxyPreviewSceneBackground: '#fffaf3',
-    proxyPreviewTabBackground: '#fff7ed',
-  }),
+  useTheme: () => ({ colorScheme: mockColorScheme }),
+  useThemeColors: () =>
+    require('../../lib/design-tokens').tokens[mockColorScheme].colors,
   useTokenVars: () => ({}),
 }));
 
@@ -228,6 +256,14 @@ const {
   resolveTabShape,
 } = require('../../lib/legacy-navigation-contract');
 const { resolveNavigationContract } = require('../../lib/navigation-contract');
+const {
+  OWN_LEARNING_RETURN_TO,
+  OWN_LEARNING_HREF,
+  FAMILY_RECAPS_RETURN_TO,
+  FAMILY_RECAPS_HREF,
+  homeHrefForReturnTo,
+} = require('../../lib/navigation');
+const { isGuardianProfile } = require('../../lib/profile');
 
 describe('mode tab helpers', () => {
   it('returns Study tabs for study mode', () => {
@@ -345,6 +381,7 @@ describe('AppLayout', () => {
     mockClerkSignOut.mockReset();
     mockClerkSignOut.mockResolvedValue(undefined);
     mockUsePathname.mockReturnValue('/home');
+    mockUseGlobalSearchParams.mockReturnValue({});
     mockSpeechGetPermissions.mockResolvedValue({
       granted: true,
       canAskAgain: true,
@@ -1126,16 +1163,118 @@ describe('AppLayout', () => {
       expect(subjectsFocused).toBe(false);
 
       render(<TabLabel title="Mentor" focused={mentorFocused} />);
-      expect(screen.getByText('Mentor')).toHaveStyle({ color: '#0ea5e9' });
+      expect(screen.getByText('Mentor')).toHaveStyle({
+        color: tokens.light.colors.accent,
+      });
 
       render(<TabLabel title="Subjects" focused={subjectsFocused} />);
-      expect(screen.getByText('Subjects')).toHaveStyle({ color: '#52525b' });
+      expect(screen.getByText('Subjects')).toHaveStyle({
+        color: tokens.light.colors.textSecondary,
+      });
     } finally {
       (
         flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
       ).MODE_NAV_V2_ENABLED = original;
     }
   });
+
+  // [WI-2331 rework #2, F2 / AC-5] "own vs supporting context" coverage.
+  // Unlike the prior round (a pure resolver fed hand-written returnTo
+  // strings), this exercises the REAL own-vs-supporting profile context via
+  // useProfile() (real isGuardianProfile()) and the REAL production wiring:
+  // AppLayout's Tabs.Screen entries close over resolveV2TabIsActive keyed off
+  // activeReturnTo, which comes only from useGlobalSearchParams
+  // (mockUseGlobalSearchParams here). own-learning.tsx (own scope) pushes
+  // OWN_LEARNING_RETURN_TO; the family recap/progress dashboards (supporting
+  // a linked child) push FAMILY_RECAPS_RETURN_TO — this test drives both
+  // real tokens through the actual Tabs.Screen closures captured off
+  // AppLayout's render, instead of calling resolveV2TabIsActive directly.
+  it.each([
+    {
+      context: 'own scope (solo owner, no linked children)' as const,
+      profiles: [
+        { id: 'p1', displayName: 'Parent', isOwner: true, birthYear: 1990 },
+      ],
+      returnTo: OWN_LEARNING_RETURN_TO,
+      backDestination: OWN_LEARNING_HREF,
+    },
+    {
+      context: 'supporting scope (guardian viewing a linked child)' as const,
+      profiles: [
+        { id: 'p1', displayName: 'Parent', isOwner: true, birthYear: 1990 },
+        { id: 'c1', displayName: 'Child', isOwner: false, birthYear: 2014 },
+      ],
+      returnTo: FAMILY_RECAPS_RETURN_TO,
+      backDestination: FAMILY_RECAPS_HREF,
+    },
+  ])(
+    'resolves the owning tab and Back label for $context',
+    async ({ profiles, returnTo, backDestination }) => {
+      const flags = require('../../lib/feature-flags') as {
+        FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+      };
+      const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      try {
+        flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED = true;
+        const activeProfile = profiles[0];
+        // The two contexts are genuinely distinguished by the real
+        // isGuardianProfile() helper, not a hand-picked label.
+        expect(isGuardianProfile(activeProfile, profiles)).toBe(
+          profiles.length > 1,
+        );
+
+        mockUseProfile.mockReturnValue({
+          profiles,
+          activeProfile,
+          isLoading: false,
+          profileWasRemoved: false,
+          acknowledgeProfileRemoval: jest.fn(),
+          switchProfile: jest.fn(),
+          isExplicitProxyMode: false,
+        });
+        mockUsePathname.mockReturnValue('/practice');
+        mockUseGlobalSearchParams.mockReturnValue({ returnTo });
+
+        renderLayout();
+        await screen.findByTestId('tabs');
+
+        // The real Tabs.Screen `tabBarIcon` closure for "mentor" resolves
+        // focused via resolveV2TabIsActive(pathname, 'mentor', v2Enabled,
+        // focused, activeReturnTo) — call it exactly as React Navigation
+        // would (reactNavigationFocused=false, so the true positive can only
+        // come from the returnTo/pathname resolution, not a stray
+        // Navigation focus state).
+        const mentorOptions = capturedTabScreenOptions.mentor;
+        const subjectsOptions = capturedTabScreenOptions.subjects;
+        expect(mentorOptions?.tabBarIcon).toBeDefined();
+        const mentorIcon = mentorOptions!.tabBarIcon!({ focused: false });
+        render(mentorIcon);
+        expect(screen.UNSAFE_getByType(Ionicons).props.color).toBe(
+          tokens.light.colors.accent,
+        );
+
+        const subjectsIcon = subjectsOptions!.tabBarIcon!({ focused: false });
+        render(subjectsIcon);
+        expect(screen.UNSAFE_getByType(Ionicons).props.color).toBe(
+          tokens.light.colors.textSecondary,
+        );
+
+        // Back destination: the SAME production resolver real pushed
+        // screens use (child/[profileId]/session/[sessionId].tsx,
+        // topic/relearn.tsx) for their Back control. Both own-learning and
+        // family-recaps highlight Mentor as the owning TAB (asserted above),
+        // but their actual Back DESTINATION differs by context — own scope
+        // returns to the owner's own-learning screen, supporting scope
+        // returns to the child's recap — proving the two contexts are
+        // genuinely distinguished, not collapsed to one outcome.
+        expect(homeHrefForReturnTo(returnTo, undefined, true)).toBe(
+          backDestination,
+        );
+      } finally {
+        flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED = original;
+      }
+    },
+  );
 
   it.each(
     [
@@ -2465,45 +2604,79 @@ describe('resolveV2TabIsActive [WI-2331 AC-1]', () => {
   });
 });
 
-// [WI-2331 rework, F2 / AC-5] "dark/light theme" coverage: TabIcon and
+// [WI-2331 rework #2, F2 / AC-5] "dark/light theme" coverage: TabIcon and
 // TabLabel (the two components every V2 tab button renders — see the
 // Tabs.Screen `tabBarIcon`/`tabBarLabel` wiring above, all fed by
 // resolveV2TabIsActive's boolean result) never hardcode a hex color. They
 // read `colors.accent` / `colors.textSecondary` from useThemeColors() —
-// semantic tokens that resolve differently per theme — and switch between
-// them purely on the `focused` boolean. This test proves that MECHANISM: an
-// active tab (focused=true, i.e. resolveV2TabIsActive returned true) renders
-// with colors.accent, an inactive one (focused=false) with
-// colors.textSecondary, for both the icon and the label. Because the color
-// is a token lookup rather than a literal, the same assertion holds
-// regardless of which values light/dark theme resolves those tokens to —
-// this is the adaptation mechanism, not a snapshot of one theme's hex codes.
+// semantic tokens that resolve differently per theme. Unlike the prior round
+// (a single fixed light-theme mock, dark never exercised), `mockColorScheme`
+// (declared with the theme mock near the top of this file) is flipped
+// between 'light' and 'dark' for each render below, and useThemeColors()
+// resolves against the REAL design-token table — so this proves the wiring
+// against genuine per-theme values, not a fixture that can't fail. Base
+// `accent` happens to be the same hex in both themes (design-tokens.ts), so
+// the "resolves differently per theme" claim is proven on `textSecondary`
+// (the unfocused color), which does differ — light '#525252' vs dark
+// '#94a3b8'.
 describe('TabIcon / TabLabel theme-token wiring [WI-2331 rework, AC-5 dark/light axis]', () => {
-  // Mirrors the useThemeColors() mock's accent/textSecondary values declared
-  // near the top of this file.
-  const ACCENT = '#0ea5e9';
-  const TEXT_SECONDARY = '#52525b';
-
-  it('TabIcon colors the icon with colors.accent when focused, colors.textSecondary when not', () => {
-    const focused = resolveV2TabIsActive('/mentor', 'mentor', true, true);
-    render(<TabIcon name="Home" focused={focused} />);
-    expect(screen.UNSAFE_getByType(Ionicons).props.color).toBe(ACCENT);
-
-    const notFocused = resolveV2TabIsActive('/subjects', 'mentor', true, true);
-    render(<TabIcon name="Home" focused={notFocused} />);
-    expect(screen.UNSAFE_getByType(Ionicons).props.color).toBe(TEXT_SECONDARY);
+  afterEach(() => {
+    mockColorScheme = 'light';
   });
 
-  it('TabLabel colors the label text with colors.accent when focused, colors.textSecondary when not', () => {
-    const focused = resolveV2TabIsActive('/journal', 'journal', true, true);
-    render(<TabLabel title="Journal" focused={focused} />);
-    expect(screen.UNSAFE_getByType(Text).props.style.color).toBe(ACCENT);
+  it.each(['light', 'dark'] as const)(
+    'TabIcon colors the icon with %s theme colors.accent when focused, colors.textSecondary when not',
+    (scheme) => {
+      mockColorScheme = scheme;
+      const focused = resolveV2TabIsActive('/mentor', 'mentor', true, true);
+      render(<TabIcon name="Home" focused={focused} />);
+      expect(screen.UNSAFE_getByType(Ionicons).props.color).toBe(
+        tokens[scheme].colors.accent,
+      );
 
-    const notFocused = resolveV2TabIsActive('/mentor', 'journal', true, true);
-    render(<TabLabel title="Journal" focused={notFocused} />);
-    expect(screen.UNSAFE_getByType(Text).props.style.color).toBe(
-      TEXT_SECONDARY,
-    );
+      const notFocused = resolveV2TabIsActive(
+        '/subjects',
+        'mentor',
+        true,
+        true,
+      );
+      render(<TabIcon name="Home" focused={notFocused} />);
+      expect(screen.UNSAFE_getByType(Ionicons).props.color).toBe(
+        tokens[scheme].colors.textSecondary,
+      );
+    },
+  );
+
+  it.each(['light', 'dark'] as const)(
+    'TabLabel colors the label text with %s theme colors.accent when focused, colors.textSecondary when not',
+    (scheme) => {
+      mockColorScheme = scheme;
+      const focused = resolveV2TabIsActive('/journal', 'journal', true, true);
+      render(<TabLabel title="Journal" focused={focused} />);
+      expect(screen.UNSAFE_getByType(Text).props.style.color).toBe(
+        tokens[scheme].colors.accent,
+      );
+
+      const notFocused = resolveV2TabIsActive('/mentor', 'journal', true, true);
+      render(<TabLabel title="Journal" focused={notFocused} />);
+      expect(screen.UNSAFE_getByType(Text).props.style.color).toBe(
+        tokens[scheme].colors.textSecondary,
+      );
+    },
+  );
+
+  it('resolves a different unfocused color for dark than for light (proves the theme is genuinely wired, not hardcoded)', () => {
+    mockColorScheme = 'light';
+    render(<TabLabel title="Journal" focused={false} />);
+    const lightColor = screen.UNSAFE_getByType(Text).props.style.color;
+
+    mockColorScheme = 'dark';
+    render(<TabLabel title="Journal" focused={false} />);
+    const darkColor = screen.UNSAFE_getByType(Text).props.style.color;
+
+    expect(lightColor).not.toBe(darkColor);
+    expect(lightColor).toBe(tokens.light.colors.textSecondary);
+    expect(darkColor).toBe(tokens.dark.colors.textSecondary);
   });
 });
 
