@@ -198,7 +198,26 @@ export function useNowFeed(): NowFeedQueryResult {
           { init: { signal } },
         );
         const okRes = await assertOk(res);
-        const data = await parseJson(okRes, nowResponseSchema, 'GET /now');
+        let data: NowResponse;
+        try {
+          data = await parseJson(okRes, nowResponseSchema, 'GET /now');
+        } catch (err) {
+          // [WI-2627] A malformed `mentorNoticePolicy` fails the WHOLE response
+          // schema, so `parseJson` throws and the fold below never runs. Left
+          // there, the reducer is never REACHED: TanStack Query retains the
+          // prior notice-bearing `data` after a failed background refetch,
+          // policy stays enabled, and those cards keep rendering indefinitely —
+          // "missing/malformed never exposes data" defeated by a route that
+          // never gets to the reducer.
+          //
+          // Deliberately over-broad: this fires on ANY unparseable /now body,
+          // not only a bad policy field, because we cannot tell which field
+          // failed without a second read of a single-use body. That is the
+          // correct side to err on — a response we cannot parse is one whose
+          // policy we cannot confirm, and notices are the private feature.
+          policy.observeMalformed();
+          throw err;
+        }
         // [WI-2627] This response is also the ORDERED observation. Fold it
         // before the cache write below, so a response that carries a rollback
         // is not persisted with its own notice cards intact.
@@ -421,19 +440,28 @@ export function useNowOverflow(
         { query: { scope: 'self' } },
         { init: { signal } },
       ),
-    select: (json) => json,
+    // [WI-2627] The fold happens HERE, not in an effect. `useApiQuery` runs
+    // `select` inside the query fn, i.e. BEFORE the query publishes — which is
+    // the only place a fold can sit without the surface painting a frame first.
+    //
+    // In an effect it was too late: the preceding committed render evaluated
+    // `policy.suppressed(observation)` against the still-enabled store, judged
+    // the newer payload non-stale, and handed its notice items and their
+    // notice.recheck deep links to NowCardStack; they disappeared only once the
+    // effect forced another render. A rollback-bearing response therefore
+    // painted for one frame, which is precisely the exposure the emergency
+    // rollback boundary exists to prevent. `useNowFeed` folds in its query fn
+    // for the same reason.
+    //
+    // The STRIP stays outside `select` — baked into the cache entry it would
+    // never re-evaluate when a sibling surface observes a disable.
+    select: (json) => {
+      policy.observe(json.mentorNoticePolicy);
+      return json;
+    },
   });
 
-  // [WI-2627] `useApiQuery` runs `select` inside the query fn, so a strip done
-  // there would be baked into the cache entry and would never re-evaluate when
-  // a sibling surface observes a disable. Fold and suppress out here instead.
   const observation = query.data?.mentorNoticePolicy;
-  useEffect(() => {
-    policy.observe(observation);
-    // `policy.observe` is stable per (actor, profile); re-running on every
-    // `policy` identity change would re-fold the same observation harmlessly,
-    // but the fold is idempotent either way.
-  }, [observation, policy]);
 
   const noticeSafeData = useMemo(() => {
     if (!query.data) return query.data;

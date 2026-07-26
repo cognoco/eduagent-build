@@ -395,6 +395,65 @@ export function resetMentorNoticePolicyStoreForTests(): void {
 }
 
 /**
+ * [WI-2627] Fold a signal for an EXPLICIT (actor, profile) pair, outside React.
+ *
+ * The hook's `observe`/`suppressed` read whatever pair is bound at the current
+ * render. That is wrong for any operation that OUTLIVES a render — an in-flight
+ * XHR stream, most of all. The response belongs to the profile that was active
+ * when the request went out, so its observation must be folded into THAT pair's
+ * store, not whichever pair happens to be active when the stream terminates.
+ * Folding into the wrong pair persists one profile's rollout state under
+ * another's key and judges one profile's notice against another's history —
+ * breaking the actor-keying guarantee WI-2498/WI-2504 established.
+ *
+ * `null`/`undefined` on either id means there is no pair to fold into; the call
+ * is a no-op rather than a write under a guessed key.
+ */
+export function foldMentorNoticePolicyFor(
+  actorId: string | null | undefined,
+  profileId: string | null | undefined,
+  signal: MentorNoticePolicySignal,
+): void {
+  if (!actorId || !profileId) return;
+  if (!signalIsObservation(signal)) return;
+  const key = storageKey(actorId, profileId);
+  const entry = getEntry(key);
+  const next = reduceMentorNoticePolicy(entry.snapshot.state, signal);
+  commit(entry, next, true, entry.snapshot.hydrated);
+  void persist(key, next);
+}
+
+/**
+ * [WI-2627] The payload-suppression verdict for an EXPLICIT (actor, profile)
+ * pair, outside React. Same reason as `foldMentorNoticePolicyFor`: an operation
+ * that outlives a render must ask about the pair its request was issued under.
+ *
+ * An unbound pair has no history and no key, so the payload is judged on its own
+ * observation alone — the same rule the hook applies when auth has not resolved.
+ */
+export function mentorNoticePolicySuppressesPayloadFor(
+  actorId: string | null | undefined,
+  profileId: string | null | undefined,
+  observation: MentorNoticePolicyObservation | undefined,
+): boolean {
+  const signal = observationSignal(observation);
+  if (!actorId || !profileId) {
+    return noticesSuppressedForPayload(
+      {
+        state: reduceMentorNoticePolicy(MENTOR_NOTICE_POLICY_BOOTSTRAP, signal),
+        observed: signalIsObservation(signal),
+        hydrated: true,
+      },
+      observation,
+    );
+  }
+  return noticesSuppressedForPayload(
+    getEntry(storageKey(actorId, profileId)).snapshot,
+    observation,
+  );
+}
+
+/**
  * This device's mentor-notice rollout state for (actor, profile), plus the two
  * verdicts every notice-bearing surface needs.
  *
@@ -417,6 +476,12 @@ export function useMentorNoticePolicy(
   hydrated: boolean;
   /** Fold an observation off any surface into the shared state. */
   observe: (observation: MentorNoticePolicyObservation | undefined) => void;
+  /**
+   * Record a fail-closed `malformed` signal when the observation could not be
+   * reached at all — e.g. the whole response failed schema validation, so no
+   * observation value exists to pass to `observe`.
+   */
+  observeMalformed: () => void;
   /** Whether THIS payload's notice content must be suppressed. */
   suppressed: (
     observation: MentorNoticePolicyObservation | undefined,
@@ -458,21 +523,24 @@ export function useMentorNoticePolicy(
 
   const observe = useCallback(
     (observation: MentorNoticePolicyObservation | undefined) => {
-      if (!key) return;
-      const entry = getEntry(key);
-      const signal = observationSignal(observation);
-      if (!signalIsObservation(signal)) return;
-      const next = reduceMentorNoticePolicy(entry.snapshot.state, signal);
-      commit(entry, next, true, entry.snapshot.hydrated);
-      // Persist even when `next` is unchanged: the first observation of an
-      // already-matching state (e.g. {0,false} arriving at the bootstrap) moves
-      // no revision but DOES move this device from never-told to told, and that
-      // has to survive a relaunch or the next cold start would hand a cached
-      // projection the never-told benefit of the doubt.
-      void persist(key, next);
+      // Persists even when the reduced state is unchanged: the first
+      // observation of an already-matching state (e.g. {0,false} arriving at
+      // the bootstrap) moves no revision but DOES move this device from
+      // never-told to told, and that has to survive a relaunch or the next cold
+      // start would hand a cached projection the never-told benefit of the
+      // doubt. See `foldMentorNoticePolicyFor`.
+      foldMentorNoticePolicyFor(
+        actorId,
+        profileId,
+        observationSignal(observation),
+      );
     },
-    [key],
+    [actorId, profileId],
   );
+
+  const observeMalformed = useCallback(() => {
+    foldMentorNoticePolicyFor(actorId, profileId, 'malformed');
+  }, [actorId, profileId]);
 
   // Reads the LIVE store rather than this render's snapshot. In render the two
   // agree (both come from the same entry, and `useSyncExternalStore` re-renders
@@ -480,33 +548,16 @@ export function useMentorNoticePolicy(
   // just called `observe`: the SSE done frame that carries a notice is also the
   // frame that can carry the disable voiding it, and a snapshot-based answer
   // would be one render stale — it would paint the notice it was told to drop.
+  // Reads the LIVE store rather than this render's snapshot. In render the two
+  // agree (both come from the same entry, and `useSyncExternalStore` re-renders
+  // on every commit). The difference matters in an imperative callback that has
+  // just called `observe`: the SSE done frame that carries a notice is also the
+  // frame that can carry the disable voiding it, and a snapshot-based answer
+  // would be one render stale — it would paint the notice it was told to drop.
   const suppressed = useCallback(
-    (observation: MentorNoticePolicyObservation | undefined) => {
-      if (!key) {
-        // No actor/profile (auth still resolving): there is no per-pair history
-        // to consult and nothing was read or written under a guessed key, so the
-        // payload is judged on its OWN observation alone — fold it onto the
-        // bootstrap and ask about the result. An observation saying disabled
-        // suppresses; one saying enabled renders; no observation renders, which
-        // is the same benefit of the doubt `useObservedPolicyEpoch` gives an
-        // unbound pair. Anything stricter blanks a legitimate notice for the
-        // render or two before `userId` lands.
-        const signal = observationSignal(observation);
-        return noticesSuppressedForPayload(
-          {
-            state: reduceMentorNoticePolicy(
-              MENTOR_NOTICE_POLICY_BOOTSTRAP,
-              signal,
-            ),
-            observed: signalIsObservation(signal),
-            hydrated: true,
-          },
-          observation,
-        );
-      }
-      return noticesSuppressedForPayload(getEntry(key).snapshot, observation);
-    },
-    [key],
+    (observation: MentorNoticePolicyObservation | undefined) =>
+      mentorNoticePolicySuppressesPayloadFor(actorId, profileId, observation),
+    [actorId, profileId],
   );
 
   return useMemo(
@@ -515,6 +566,7 @@ export function useMentorNoticePolicy(
       observed: bound ? snapshot.observed : true,
       hydrated: bound ? snapshot.hydrated : true,
       observe,
+      observeMalformed,
       suppressed,
     }),
     [
@@ -523,6 +575,7 @@ export function useMentorNoticePolicy(
       snapshot.hydrated,
       bound,
       observe,
+      observeMalformed,
       suppressed,
     ],
   );

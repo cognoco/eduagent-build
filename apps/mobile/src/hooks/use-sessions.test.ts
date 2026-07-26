@@ -2352,3 +2352,233 @@ describe('[WI-2627] mentor-notice policy observation reaches its consumers', () 
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// [WI-2627 rework] A stream OUTLIVES the render that started it.
+//
+// The done frame's observation belongs to the profile that was active when the
+// request went out. Reading the policy binding at completion time instead reads
+// whichever pair is active by then — persisting one profile's rollout state
+// under another's key, and judging one profile's notice against another's
+// history. That is the actor-keying guarantee WI-2498/WI-2504 established.
+// ---------------------------------------------------------------------------
+describe('[WI-2627] useStreamMessage binds the policy to the request’s profile', () => {
+  const ACTOR = 'wi2627-stream-actor';
+  const PROFILE_A = 'profile-a-originating';
+  const PROFILE_B = 'profile-b-switched-to';
+  const keyFor = (profileId: string) =>
+    `mentor-notice-policy-state::${ACTOR}::${profileId}`;
+
+  const clerk = require('@clerk/expo') as { useAuth: () => unknown };
+  let useAuthBefore: typeof clerk.useAuth;
+
+  beforeEach(async () => {
+    useAuthBefore = clerk.useAuth;
+    clerk.useAuth = () => ({
+      userId: ACTOR,
+      isLoaded: true,
+      isSignedIn: true,
+      getToken: jest.fn().mockResolvedValue('mock-token'),
+    });
+    resetMentorNoticePolicyStoreForTests();
+    await AsyncStorage.clear();
+  });
+
+  afterEach(() => {
+    clerk.useAuth = useAuthBefore;
+  });
+
+  /**
+   * A wrapper whose active profile can be swapped mid-test. `createHookWrapper`
+   * freezes its context value, and the defect only reproduces when the ACTIVE
+   * profile moves while a stream is in flight.
+   */
+  function createSwappableProfileWrapper() {
+    const { QueryClient, QueryClientProvider } =
+      require('@tanstack/react-query') as typeof import('@tanstack/react-query');
+    const { ProfileContext } =
+      require('../lib/profile') as typeof import('../lib/profile');
+    const { createElement, useState } =
+      require('react') as typeof import('react');
+    const { createTestProfile } =
+      require('../test-utils/app-hook-test-utils') as typeof import('../test-utils/app-hook-test-utils');
+
+    const profileA = createTestProfile({ id: PROFILE_A });
+    const profileB = createTestProfile({ id: PROFILE_B });
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, gcTime: 0 },
+        mutations: { gcTime: 0 },
+      },
+    });
+    let swap: ((id: string) => void) | null = null;
+
+    function Wrapper({ children }: { children: React.ReactNode }) {
+      const [activeId, setActiveId] = useState(PROFILE_A);
+      swap = setActiveId;
+      const activeProfile = activeId === PROFILE_A ? profileA : profileB;
+      return createElement(
+        QueryClientProvider,
+        { client },
+        createElement(
+          ProfileContext.Provider,
+          {
+            value: {
+              profiles: [profileA, profileB],
+              activeProfile,
+              isExplicitProxyMode: false,
+              switchProfile: async () => ({ success: true }),
+              isLoading: false,
+              profileLoadError: null,
+              profileWasRemoved: false,
+              acknowledgeProfileRemoval: () => undefined,
+            },
+          },
+          children,
+        ),
+      );
+    }
+
+    return {
+      wrapper: Wrapper,
+      switchToB: () => {
+        act(() => swap?.(PROFILE_B));
+      },
+    };
+  }
+
+  it('folds the terminal observation into the ORIGINATING profile’s store, not the one active at completion', async () => {
+    const { streamSSEViaXHR } = require('../lib/sse') as {
+      streamSSEViaXHR: jest.Mock;
+    };
+    // Gate the done frame so the profile can change while the stream is open.
+    // Seeded with a no-op rather than null: TS narrows a null-initialised
+    // binding assigned only inside the Promise executor to `never`.
+    let releaseDone: () => void = () => undefined;
+    const doneGate = new Promise<void>((resolve) => {
+      releaseDone = resolve;
+    });
+    streamSSEViaXHR.mockReturnValueOnce({
+      events: (async function* () {
+        yield { type: 'chunk', content: 'partial' };
+        await doneGate;
+        yield {
+          type: 'done',
+          exchangeCount: 1,
+          escalationRung: 1,
+          mentorNoticePolicy: {
+            rolloutRevision: 9,
+            rolloutEnabled: false,
+            projectionEpoch: 'notice-policy-v1:r9:off:self:consented',
+          },
+        };
+      })(),
+      abort: jest.fn(),
+    });
+
+    const { wrapper, switchToB } = createSwappableProfileWrapper();
+    const { result } = renderHook(() => useStreamMessage('session-1'), {
+      wrapper,
+    });
+
+    // Started OUTSIDE act: `isStreaming` is React state, and an enclosing
+    // async act would not flush it until the whole stream had finished — which
+    // is exactly the window this test needs to reach into.
+    let streamed: Promise<void> = Promise.resolve();
+    act(() => {
+      streamed = result.current.stream('Hi', jest.fn(), jest.fn(), 'session-1');
+    });
+
+    // The learner switches profile while the XHR is still open.
+    await waitFor(() => expect(result.current.isStreaming).toBe(true));
+    switchToB();
+
+    releaseDone();
+    await act(async () => {
+      await streamed;
+    });
+
+    // The observation belongs to the profile the request was ISSUED under.
+    await waitFor(async () =>
+      expect(await AsyncStorage.getItem(keyFor(PROFILE_A))).toBe(
+        '{"revision":9,"enabled":false}',
+      ),
+    );
+    // ...and must not have been written under the profile that happened to be
+    // active when the stream terminated.
+    expect(await AsyncStorage.getItem(keyFor(PROFILE_B))).toBeNull();
+  });
+
+  it('judges the frame’s notice against the ORIGINATING profile’s history', async () => {
+    // Profile A has been told the rollout is off at revision 9. Profile B has
+    // been told it is on at a higher revision. A frame issued under A carrying a
+    // stale observation must be judged against A — under B's history it would
+    // look live and paint.
+    await AsyncStorage.setItem(
+      keyFor(PROFILE_A),
+      '{"revision":9,"enabled":false}',
+    );
+    await AsyncStorage.setItem(
+      keyFor(PROFILE_B),
+      '{"revision":12,"enabled":true}',
+    );
+
+    const { streamSSEViaXHR } = require('../lib/sse') as {
+      streamSSEViaXHR: jest.Mock;
+    };
+    // Seeded with a no-op rather than null: TS narrows a null-initialised
+    // binding assigned only inside the Promise executor to `never`.
+    let releaseDone: () => void = () => undefined;
+    const doneGate = new Promise<void>((resolve) => {
+      releaseDone = resolve;
+    });
+    streamSSEViaXHR.mockReturnValueOnce({
+      events: (async function* () {
+        yield { type: 'chunk', content: 'partial' };
+        await doneGate;
+        yield {
+          type: 'done',
+          exchangeCount: 1,
+          escalationRung: 1,
+          mentorNotice: {
+            id: '11111111-1111-4111-8111-111111111111',
+            concept: 'sign flip',
+            correctionHint: null,
+          },
+          mentorNoticePolicy: {
+            rolloutRevision: 9,
+            rolloutEnabled: true,
+            projectionEpoch: 'notice-policy-v1:r9:on:self:consented',
+          },
+        };
+      })(),
+      abort: jest.fn(),
+    });
+
+    const { wrapper, switchToB } = createSwappableProfileWrapper();
+    const onDone = jest.fn();
+    const { result } = renderHook(() => useStreamMessage('session-1'), {
+      wrapper,
+    });
+
+    let streamed: Promise<void> = Promise.resolve();
+    act(() => {
+      streamed = result.current.stream('Hi', jest.fn(), onDone, 'session-1');
+    });
+    await waitFor(() => expect(result.current.isStreaming).toBe(true));
+    switchToB();
+    releaseDone();
+    await act(async () => {
+      await streamed;
+    });
+
+    // Same-revision enabled cannot undo A's disable, so the notice is withheld.
+    expect(onDone).toHaveBeenCalledWith(
+      expect.objectContaining({ mentorNotice: undefined }),
+    );
+    // B's state is untouched — one profile's stream never rewrites another's.
+    expect(await AsyncStorage.getItem(keyFor(PROFILE_B))).toBe(
+      '{"revision":12,"enabled":true}',
+    );
+  });
+});
