@@ -167,6 +167,7 @@ wait_for_entry_screen() {
 run_flow() {
   local scenario="$1"
   local flow="$2"
+  local ui_mode="${3:--}"
   local flow_slug="${flow#flows/}"
   local flow_output="$OUTPUT_DIR/${flow_slug%.yaml}"
   local seed_values
@@ -195,6 +196,20 @@ run_flow() {
     adb shell pm grant "$APP_ID" android.permission.CAMERA >/dev/null 2>&1 || true
   fi
   adb shell pm grant "$APP_ID" android.permission.RECORD_AUDIO >/dev/null 2>&1 || true
+
+  # WI-2548 AC-2: apply this flow's requested system UI mode (declared via
+  # the flow's `uiMode` frontmatter, threaded through ci-maestro-plan.mjs)
+  # BEFORE launching the app, so a visual light/dark flow never inherits
+  # whatever mode a previous flow in this shard left the emulator in. Flows
+  # that don't declare uiMode ('-') leave the emulator's current mode alone.
+  if [ "$ui_mode" = "light" ]; then
+    echo "[ci-maestro] Applying uiMode=light for $flow"
+    adb shell cmd uimode night no >/dev/null 2>&1 || true
+  elif [ "$ui_mode" = "dark" ]; then
+    echo "[ci-maestro] Applying uiMode=dark for $flow"
+    adb shell cmd uimode night yes >/dev/null 2>&1 || true
+  fi
+
   adb logcat -c
   adb shell am start -W -n "$APP_ID/.MainActivity"
   if ! wait_for_entry_screen "$flow_output"; then
@@ -219,10 +234,10 @@ run_flow() {
 }
 
 index=0
-while IFS=$'\t' read -r scenario flow <&3; do
+while IFS=$'\t' read -r scenario flow ui_mode <&3; do
   index=$((index + 1))
-  echo "[ci-maestro] [$index/$FLOW_COUNT] scenario=$scenario flow=$flow"
-  run_flow "$scenario" "$flow"
+  echo "[ci-maestro] [$index/$FLOW_COUNT] scenario=$scenario flow=$flow uiMode=${ui_mode:--}"
+  run_flow "$scenario" "$flow" "${ui_mode:--}"
 done 3< "$PLAN_FILE"
 
 if [ "$index" -ne "$FLOW_COUNT" ]; then

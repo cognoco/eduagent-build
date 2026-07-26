@@ -1,8 +1,26 @@
-# PARKED (WI-1864): Scheduled release CI has neither a deterministic LLM
-# response fixture nor per-flow UI_MODE application, so this visual flow cannot
-# prove light-mode coach-bubble readability. Owner: WI-2548.
-# UNBLOCK: route the nightly worker through a deterministic coaching response,
-# apply UI_MODE=light before launch, and wait on a response-complete oracle.
+# PARKED (WI-2548): deterministic coach-bubble visibility (light mode).
+# AC-1 (hosted deterministic LLM), AC-2 (per-flow UI_MODE application in
+# release Maestro CI), and AC-3 (real response-complete oracle, no timing on
+# chat-input visibility) are wired below:
+#   - AC-1: `apps/api/src/test-utils/maestro-e2e-worker.ts` is the Worker
+#     entrypoint `wrangler dev` boots for hosted Maestro CI (see
+#     .github/workflows/e2e-ci.yml "Start API server"). It pre-registers the
+#     deterministic external-boundary LLM fixture from
+#     `maestro-e2e-llm-provider.ts` before any request — production continues
+#     to boot src/index.ts, which never touches this file.
+#   - AC-2: the `uiMode: light` field below is read by
+#     `apps/mobile/e2e/scripts/ci-maestro-plan.mjs` and applied by
+#     `apps/mobile/e2e/scripts/run-ci-maestro.sh` (adb shell cmd uimode night
+#     no) immediately before this flow's app launch.
+#   - AC-3: waits target the `assistant-response-complete-N` testID
+#     ChatShell's `ChatMessageRow` sets only once an assistant reply is
+#     fully committed, non-streaming, non-empty content
+#     (`ChatShell.tsx`'s `isCompletedAssistantResponse`) — not a proxy like
+#     chat-input visibility (which never changes).
+# AC-4 (verified passing on a real Android release APK) is DEVICE-GATED —
+# this flow stays tagged `blocked` until that device run confirms the
+# message indices below and removes the tag (owner: WI-2548 device pass).
+#
 # Flow: Coach Bubble Visibility (Light Mode)
 # Validates: AI/coach message text is visible in light mode chat bubbles.
 # Regression guard for invisible-ink bug — verifies the fix doesn't break light mode.
@@ -10,9 +28,8 @@
 #
 # Journey: UX Journey 2 (Daily Learning Loop)
 # Prerequisite: Seeded user with subject + coaching card (scenario: learning-active)
-# System theme: light — run with UI_MODE=light:
-#   UI_MODE=light ./e2e/scripts/seed-and-run.sh learning-active flows/learning/coach-bubble-light.yaml
 appId: com.mentomate.app
+uiMode: light
 tags:
   - smoke
   - learning
@@ -42,45 +59,67 @@ tags:
       id: "chat-input"
     timeout: 10000
 
-# 5. Screenshot BEFORE exchange — capture initial AI greeting if present
+# 5. Screenshot BEFORE exchange. The `learning-active` seed pre-populates an
+# active session with one seeded exchange, so the resumed transcript already
+# shows a completed coach bubble at index 1 before we send anything.
+- assertVisible:
+    id: "message-bubble-assistant-1"
 - takeScreenshot: coach-bubble-light-01-session-start
 
-# 6. Send user message
+# 6. Send user message. This is the second user turn in the resumed
+# transcript, landing at index 2.
 - tapOn:
     id: "chat-input"
 - inputText: "Hello, can you help me understand the basics?"
 - pressKey: Enter
 
-# 7. Verify chat-input is still active (message was accepted).
-# NOTE: scrollUntilVisible + text inside FlatList (removeClippedSubviews=true) is
-# unreliable on Android — Maestro cannot see clipped items even mid-scroll.
-# Pattern matches create-subject.yaml which avoids text-in-bubble assertions.
+# 7. Prove the exact submitted turn owns the bubble at its expected index,
+# then wait for its exact successor to become a completed, non-empty
+# assistant response — the real response-complete oracle (AC-3), not a
+# proxy like chat-input visibility (which stays visible throughout).
+- assertVisible:
+    id: "message-bubble-user-2"
+    containsDescendants:
+      - text: "^Hello, can you help me understand the basics\\?$"
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
-    timeout: 10000
-
-# 8. Wait for AI response (coach bubble)
-- extendedWaitUntil:
-    visible:
-      id: "chat-input"
+      id: "assistant-response-complete-3"
+      below:
+        id: "message-bubble-user-2"
     timeout: 30000
 
-# 9. Screenshot AFTER AI response — this is the key visual check.
-# The coach bubble text MUST be readable in light mode (dark text on light background).
+# 8. Screenshot AFTER AI response — this is the key visual check.
+# The coach bubble text MUST be readable in light mode (dark text on light
+# background). Assert the deterministic hosted-Maestro fixture reply
+# (`maestro-e2e-llm-provider.ts`'s default streamResponse) is actually
+# rendered, not just that some content is present.
+- assertVisible:
+    id: "message-bubble-assistant-3"
+    containsDescendants:
+      - text: "^Let's work through this together\\. What have you noticed so far\\?$"
 - takeScreenshot: coach-bubble-light-02-ai-response
 
-# 10. Send follow-up to get a second AI response
+# 9. Send follow-up to get a second AI response
 - tapOn:
     id: "chat-input"
 - inputText: "Can you explain that differently?"
 - pressKey: Enter
 
-# 11. Wait for second AI response (45 s — second exchange may be slower than first)
+# 10. Second exchange lands at index 4 (user) / index 5 (assistant reply).
+- assertVisible:
+    id: "message-bubble-user-4"
+    containsDescendants:
+      - text: "^Can you explain that differently\\?$"
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
+      id: "assistant-response-complete-5"
+      below:
+        id: "message-bubble-user-4"
     timeout: 45000
+- assertVisible:
+    id: "message-bubble-assistant-5"
+    containsDescendants:
+      - text: "^Let's work through this together\\. What have you noticed so far\\?$"
 
-# 12. Final screenshot — multiple coach bubbles visible
+# 11. Final screenshot — multiple coach bubbles visible
 - takeScreenshot: coach-bubble-light-03-multi-exchange
