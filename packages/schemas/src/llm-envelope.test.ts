@@ -1396,12 +1396,14 @@ describe('challengeRoundGraderDegradedEventSchema (T1 — degraded event payload
     expect(result.success).toBe(true);
   });
 
-  it('accepts all four reason enum values', () => {
+  it('accepts all five reason enum values', () => {
     for (const reason of [
       'route_error',
       'no_json',
       'parse_error',
       'schema_invalid',
+      // [WI-2670] producer vendor unresolved — fail-open degraded reason.
+      'producer_vendor_unresolved',
     ] as const) {
       const r = challengeRoundGraderDegradedEventSchema.safeParse({
         ...REQUIRED,
