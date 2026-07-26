@@ -24,3 +24,9 @@ The complete no-retry V2 project passed the WI-2234 journey but remains blocked
 from aggregate strict green by WI-2822's independently owned stale nav-shell
 doorway assertion. Its existing PR #2658 contains the exact contract update;
 this change does not duplicate or absorb it.
+
+After the implementation commit was published, the branch was externally
+advanced by merging current `origin/main`. The executor did not author or
+initiate that merge. Exact provenance, reflog and remote-ref evidence, and an
+identical before/after WI patch hash are recorded in `verification.md` and
+`evidence.json`.

@@ -21,6 +21,16 @@
       "pointer": ".workitem-artifacts/WI-2838/verification.md"
     }
   ],
+  "headProvenance": {
+    "executorAuthoredMerge": false,
+    "head": "d3caddaa3ece0a187cc3b34ec3625f3c6aebbb3c",
+    "parents": [
+      "732b684eb69d1ffaa8613c59318e804f18566fbe",
+      "f8aa11b086e8787f672c6d326018ee4bcfc32c6f"
+    ],
+    "tree": "7df708ac08df6a4531d9fa41d0eddfff9e396b72",
+    "wiPatchSha256": "e2db8f4c352bf32013b5a747ed8f8b0cc167a99dd673079ecab51478772776c5"
+  },
   "noiseBaselineVersion": "2026-07-13",
   "redGreenPointer": "apps/mobile/e2e-web/helpers/held-now-request.test.ts"
 }
