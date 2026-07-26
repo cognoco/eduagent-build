@@ -26,6 +26,7 @@ import {
   CORPUS_LANGUAGES,
   LANGUAGE_CORPORA,
   type LanguageCorpus,
+  type LexemeScope,
 } from './corpus';
 import {
   referralPayloadKey,
@@ -146,26 +147,104 @@ function alternation(literals: readonly string[]): string {
   return unique.length === 0 ? '(?!)' : unique.map(escapeLiteral).join('|');
 }
 
-const ALL_LEXEMES = CORPUS_LANGUAGES.flatMap(
-  (language) => LANGUAGE_CORPORA[language].lexemes,
-);
+// --- lexeme scopes ---------------------------------------------------------
+
 /**
- * Lexeme detection spans ALL ten corpora regardless of the declared language:
- * that is what makes cross-language phrases (an English clinical term embedded
- * in Czech prose) detectable at all.
+ * How a scope's terms may be detected.
+ *
+ * `standalone` — matched anywhere in the text, in any language. A match is by
+ * itself the "protected lexeme present" signal.
+ *
+ * `within-attribution` — matched ONLY inside an attribution construction, and
+ * only through the grammar of the corpus that declares the term. A bare mention
+ * is invisible to the detector, which is what keeps a cross-language homograph
+ * ("tea" the drink, "ads", "add") out of the broad path.
+ */
+type DetectionPolicy = 'standalone' | 'within-attribution';
+
+/**
+ * Every lexeme scope, as a value list that CANNOT drift from the union: the
+ * `satisfies Record<LexemeScope, true>` makes a missing key a compile error.
+ */
+const ALL_LEXEME_SCOPES = Object.keys({
+  broad: true,
+  'attributed-only': true,
+} satisfies Record<LexemeScope, true>) as readonly LexemeScope[];
+
+/**
+ * The scope → policy assignment. Exhaustive by construction — a newly added
+ * `LexemeScope` with no case here fails to compile at the `never` binding, so it
+ * can never fall silently outside BOTH detectors (which is exactly how `TEA`,
+ * `ADS` and `ADD` became unreachable in the first place: omitted from the corpus
+ * outright, and therefore matched by nothing).
+ */
+function detectionPolicyFor(scope: LexemeScope): DetectionPolicy {
+  switch (scope) {
+    case 'broad':
+      return 'standalone';
+    case 'attributed-only':
+      return 'within-attribution';
+    default: {
+      const exhaustive: never = scope;
+      throw new Error(`unhandled lexeme scope: ${String(exhaustive)}`);
+    }
+  }
+}
+
+function termsFor(
+  corpus: LanguageCorpus,
+  policy: DetectionPolicy,
+): readonly string[] {
+  return ALL_LEXEME_SCOPES.filter(
+    (scope) => detectionPolicyFor(scope) === policy,
+  ).flatMap((scope) => corpus.lexemes[scope]);
+}
+
+function termsAcrossCorpora(policy: DetectionPolicy): readonly string[] {
+  return CORPUS_LANGUAGES.flatMap((language) =>
+    termsFor(LANGUAGE_CORPORA[language], policy),
+  );
+}
+
+/**
+ * Latin terms need word boundaries; CJK has none, so it is matched bare. Empty
+ * partitions contribute no regex at all, so an empty term list yields an empty
+ * matcher array rather than a never-matching pattern that still has to be run.
+ */
+function buildLexemeMatchers(terms: readonly string[]): readonly RegExp[] {
+  const latin = terms.filter((term) => !CJK_RE.test(term));
+  const cjk = terms.filter((term) => CJK_RE.test(term));
+  const matchers: RegExp[] = [];
+  if (latin.length) {
+    matchers.push(
+      new RegExp(
+        `${LATIN_LEFT_BOUNDARY}(?:${alternation(latin)})${LATIN_RIGHT_BOUNDARY}`,
+        'giu',
+      ),
+    );
+  }
+  if (cjk.length) {
+    matchers.push(new RegExp(`(?:${alternation(cjk)})`, 'gu'));
+  }
+  return matchers;
+}
+
+const STANDALONE_LEXEMES = termsAcrossCorpora('standalone');
+/**
+ * Standalone lexeme detection spans ALL ten corpora regardless of the declared
+ * language: that is what makes cross-language phrases (an English clinical term
+ * embedded in Czech prose) detectable at all. Terms scoped
+ * `within-attribution` are deliberately ABSENT here.
  */
 const LATIN_LEXEME_ALT = alternation(
-  ALL_LEXEMES.filter((l) => !CJK_RE.test(l)),
+  STANDALONE_LEXEMES.filter((l) => !CJK_RE.test(l)),
 );
-const CJK_LEXEME_ALT = alternation(ALL_LEXEMES.filter((l) => CJK_RE.test(l)));
+const CJK_LEXEME_ALT = alternation(
+  STANDALONE_LEXEMES.filter((l) => CJK_RE.test(l)),
+);
 const ANY_LEXEME_ALT = `${LATIN_LEXEME_ALT}|${CJK_LEXEME_ALT}`;
 
-// Latin terms need word boundaries; CJK has none, so it is matched bare.
-const LATIN_LEXEME_RE = new RegExp(
-  `${LATIN_LEFT_BOUNDARY}(?:${LATIN_LEXEME_ALT})${LATIN_RIGHT_BOUNDARY}`,
-  'giu',
-);
-const CJK_LEXEME_RE = new RegExp(`(?:${CJK_LEXEME_ALT})`, 'gu');
+const STANDALONE_LEXEME_MATCHERS = buildLexemeMatchers(STANDALONE_LEXEMES);
 
 const CONTRACTIONS: ReadonlyArray<readonly [RegExp, string]> = [
   [/\bi['’]m\b/giu, 'I am'],
@@ -176,7 +255,15 @@ const CONTRACTIONS: ReadonlyArray<readonly [RegExp, string]> = [
 ];
 
 const STARTS_WITH_UPPERCASE_LETTER = /^\p{Lu}/u;
-const LEXEME_ONLY_RE = new RegExp(`^(?:${ANY_LEXEME_ALT})$`, 'iu');
+/**
+ * A capture that is nothing but a clinical term. Spans BOTH scopes — an
+ * attributed-only acronym ("TEA es …") must not be mistaken for a person name
+ * any more than a broad one ("Dyslexia is …") is.
+ */
+const LEXEME_ONLY_RE = new RegExp(
+  `^(?:${ANY_LEXEME_ALT}|${alternation(termsAcrossCorpora('within-attribution'))})$`,
+  'iu',
+);
 
 interface CompiledGrammar {
   /** Patterns whose match is by itself person-attribution. */
@@ -184,6 +271,12 @@ interface CompiledGrammar {
   /** Patterns yielding a `person` group that must look like a name. */
   readonly namedPatterns: readonly RegExp[];
   readonly inferenceRe: RegExp | null;
+  /**
+   * Matchers for the `within-attribution` terms of the corpora in play. Used
+   * ONLY to attribute a lexeme count to a found attribution span — never to
+   * detect a lexeme on its own.
+   */
+  readonly attributedOnlyMatchers: readonly RegExp[];
 }
 
 function compileGrammar(declared: ConversationLanguage): CompiledGrammar {
@@ -198,9 +291,21 @@ function compileGrammar(declared: ConversationLanguage): CompiledGrammar {
 
   const patterns: RegExp[] = [];
   const namedPatterns: RegExp[] = [];
-  const lexeme = `(?:${ANY_LEXEME_ALT})`;
 
   for (const corpus of corpora) {
+    // THE LEXEME SLOT IS PER-CORPUS, NOT SHARED. Standalone terms from all ten
+    // corpora, plus the `within-attribution` terms of THIS corpus only. That
+    // language scoping is what keeps the homographs safe: `El alumno tiene TEA`
+    // matches through the Spanish grammar, while the English grammar — compiled
+    // alongside it for every non-English language — has no `tea` in its slot, so
+    // "The learner has tea" cannot match through either. Hoisting this into a
+    // single shared alternation would silently reintroduce exactly the
+    // cross-language false positives the omission was avoiding.
+    const attributedOnly = termsFor(corpus, 'within-attribution');
+    const lexeme = attributedOnly.length
+      ? `(?:${ANY_LEXEME_ALT}|${alternation(attributedOnly)})`
+      : `(?:${ANY_LEXEME_ALT})`;
+
     const determiner = corpus.determiners.length
       ? `(?:(?:${alternation(corpus.determiners)})\\s+)?`
       : '';
@@ -272,6 +377,9 @@ function compileGrammar(declared: ConversationLanguage): CompiledGrammar {
     inferenceRe: markers.length
       ? new RegExp(`(?:${alternation(markers)})`, 'iu')
       : null,
+    attributedOnlyMatchers: buildLexemeMatchers(
+      corpora.flatMap((corpus) => termsFor(corpus, 'within-attribution')),
+    ),
   };
 }
 
@@ -317,22 +425,29 @@ function normalizeForMatching(text: string): string {
   ).replace(/\s+/gu, ' ');
 }
 
-function findProtectedLexemes(normalized: string): ReadonlySet<string> {
+function findLexemes(
+  haystack: string,
+  matchers: readonly RegExp[],
+): ReadonlySet<string> {
   const found = new Set<string>();
-  for (const re of [LATIN_LEXEME_RE, CJK_LEXEME_RE]) {
+  for (const re of matchers) {
     re.lastIndex = 0;
-    for (const match of normalized.matchAll(re))
+    for (const match of haystack.matchAll(re))
       found.add(match[0].toLowerCase());
   }
   return found;
 }
 
-/** Lexemes contributed by a corpus whose `confidence` is 'reviewed'. */
+/** Lexemes contributed by a corpus whose `confidence` is 'reviewed', both scopes. */
 const REVIEWED_LEXEMES = new Set(
   CORPUS_LANGUAGES.filter(
     (language) => LANGUAGE_CORPORA[language].confidence === 'reviewed',
   ).flatMap((language) =>
-    LANGUAGE_CORPORA[language].lexemes.map((lexeme) => lexeme.toLowerCase()),
+    ALL_LEXEME_SCOPES.flatMap((scope) =>
+      LANGUAGE_CORPORA[language].lexemes[scope].map((lexeme) =>
+        lexeme.toLowerCase(),
+      ),
+    ),
   ),
 );
 
@@ -392,7 +507,18 @@ export function scanLearningText(
 ): ScanLearningTextResult {
   const grammar = grammarFor(input.conversationLanguage);
   const normalized = normalizeForMatching(input.text);
-  const matchedLexemes = findProtectedLexemes(normalized);
+  const standaloneLexemes = findLexemes(normalized, STANDALONE_LEXEME_MATCHERS);
+  const attribution = findAttribution(normalized, grammar);
+  // An `attributed-only` term counts as a protected lexeme exactly when it sits
+  // inside a found attribution span — never on its own. Scanning the span rather
+  // than the whole text is what keeps the count honest about WHY the term was
+  // protected here.
+  const matchedLexemes = new Set([
+    ...standaloneLexemes,
+    ...(attribution === null
+      ? []
+      : findLexemes(attribution, grammar.attributedOnlyMatchers)),
+  ]);
   const protectedLexemeCount = matchedLexemes.size;
 
   const base = {
@@ -404,17 +530,12 @@ export function scanLearningText(
     ),
   } as const;
 
-  // No protected lexeme anywhere in any of the ten corpora → clear.
-  if (protectedLexemeCount === 0) {
-    return {
-      ...base,
-      classification: 'clear',
-      disposition: 'clear',
-      reason: null,
-    };
-  }
-
-  const attribution = findAttribution(normalized, grammar);
+  // ATTRIBUTION IS DECIDED FIRST, BEFORE the clear short-circuit. Deliberate:
+  // an attributed-only lexeme contributes to the count only via the span scan
+  // above, so gating the block behind `count > 0` would turn any drift in that
+  // derivation into a SILENT bypass — a block quietly becoming `clear` on a
+  // child-safety boundary. This order makes such drift surface as a
+  // block-with-count-0 instead, which `scan.test.ts` asserts against.
   if (attribution !== null) {
     // A hedge inside the matched span makes this an inference rather than an
     // assertion — both block, with distinguishable reasons.
@@ -424,6 +545,18 @@ export function scanLearningText(
       classification: 'block',
       disposition: 'block',
       reason: hedged ? 'diagnostic_inference' : 'person_attribution',
+    };
+  }
+
+  // No standalone protected lexeme, and no attribution to make an
+  // attributed-only term protected → clear. A bare homograph mention ("a cup of
+  // tea", "ADS ist ein veralteter Begriff") lands here.
+  if (protectedLexemeCount === 0) {
+    return {
+      ...base,
+      classification: 'clear',
+      disposition: 'clear',
+      reason: null,
     };
   }
 

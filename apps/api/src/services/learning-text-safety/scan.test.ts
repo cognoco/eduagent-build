@@ -540,6 +540,230 @@ describe('[WI-2628] regression: the shipped English-only guard is the bug', () =
   );
 });
 
+describe('[WI-2628] attributed-only lexeme scope', () => {
+  // THE DEFECT THIS CLOSES (Stage-3 reachability ruling, 2026-07-26). Spanish
+  // TEA, German ADS and Norwegian ADD were omitted from the corpus outright to
+  // avoid colliding with the English words "tea", "ads" and "add". Because the
+  // gate reaches attribution analysis only AFTER a protected-lexeme match, the
+  // attributed forms classified `clear` and were unreachable by any judge-side
+  // change. They now live in an `attributed-only` scope: matched only inside an
+  // attribution construction, and only through the grammar of the language that
+  // declares them.
+  //
+  // BOTH DIRECTIONS ARE THE FIX. Making direction 1 (attributed → block) pass
+  // while breaking direction 2 (bare mention / homograph → clear) is a
+  // regression, not a fix — it is the exact false-positive class the original
+  // omission was avoiding. The paired rows below share a language and a lexeme
+  // and differ ONLY in attribution, which is what makes them a non-triviality
+  // control: an always-block implementation fails every mention row.
+
+  /**
+   * FIXTURE GUARD — the exact partition, not a subset. Asserting the whole map
+   * fails loudly on an addition, a removal, OR a term migrating between scopes,
+   * so a drifting corpus can never leave these tests quietly exercising the
+   * broad path instead of the attributed-only one.
+   */
+  const EXPECTED_ATTRIBUTED_ONLY: Readonly<
+    Record<ConversationLanguage, readonly string[]>
+  > = {
+    en: [],
+    cs: [],
+    es: ['tea'],
+    fr: [],
+    de: ['ads'],
+    it: [],
+    pt: [],
+    pl: [],
+    ja: [],
+    nb: ['add'],
+  };
+
+  it('pins the attributed-only partition of every corpus exactly', () => {
+    const actual = Object.fromEntries(
+      Object.entries(LANGUAGE_CORPORA).map(([language, corpus]) => [
+        language,
+        corpus.lexemes['attributed-only'],
+      ]),
+    );
+    expect(actual).toEqual(EXPECTED_ATTRIBUTED_ONLY);
+  });
+
+  it('keeps every attributed-only term out of EVERY language broad set', () => {
+    // The cheap wrong fix is adding these to the broad cross-language detector.
+    // If anyone does, "a cup of tea" starts blocking — so assert the absence
+    // structurally rather than trusting a code comment.
+    const broad = new Set(
+      Object.values(LANGUAGE_CORPORA).flatMap((corpus) =>
+        corpus.lexemes.broad.map((lexeme) => lexeme.toLowerCase()),
+      ),
+    );
+    const attributedOnly = Object.values(LANGUAGE_CORPORA).flatMap((corpus) =>
+      corpus.lexemes['attributed-only'].map((lexeme) => lexeme.toLowerCase()),
+    );
+    expect(attributedOnly.length).toBeGreaterThan(0);
+    expect(attributedOnly.filter((lexeme) => broad.has(lexeme))).toEqual([]);
+  });
+
+  it('declares no attributed-only term for English, the homograph host', () => {
+    // English grammar is co-compiled for every non-English language, so an
+    // English-scoped entry here would reintroduce the leak this design prevents.
+    expect(LANGUAGE_CORPORA.en.lexemes['attributed-only']).toEqual([]);
+  });
+
+  interface ScopePair {
+    readonly language: ConversationLanguage;
+    readonly term: string;
+    /** Direction 1 — person-attributed use. Must block. */
+    readonly attributed: string;
+    /** Direction 2 — the same term merely mentioned. Must stay clear. */
+    readonly mention: string;
+  }
+
+  const SCOPE_PAIRS: readonly ScopePair[] = [
+    {
+      language: 'es',
+      term: 'TEA',
+      attributed: 'El alumno tiene TEA.',
+      mention: 'TEA es un término diagnóstico usado en informes.',
+    },
+    {
+      language: 'de',
+      term: 'ADS',
+      attributed: 'Der Schüler hat ADS.',
+      mention: 'ADS ist ein veralteter Begriff aus der Fachliteratur.',
+    },
+    {
+      language: 'nb',
+      term: 'ADD',
+      attributed: 'Eleven har ADD.',
+      mention: 'ADD ble tidligere brukt som begrep i faglitteraturen.',
+    },
+  ];
+
+  it('covers every language that declares an attributed-only term', () => {
+    const declaring = Object.entries(EXPECTED_ATTRIBUTED_ONLY)
+      .filter(([, terms]) => terms.length > 0)
+      .map(([language]) => language)
+      .sort();
+    expect(SCOPE_PAIRS.map((pair) => pair.language).sort()).toEqual(declaring);
+  });
+
+  describe.each(SCOPE_PAIRS)(
+    '$language $term',
+    ({ language, attributed, mention }) => {
+      it('blocks the person-attributed use', () => {
+        const result = scanAsLlm(attributed, language);
+        expect(result.classification).toBe('block');
+        // Guaranteed property: attribution is decided deterministically, so the
+        // text is never handed to the judge and never persisted.
+        expect(result.disposition).toBe('block');
+        expect(result.reason).toBe('person_attribution');
+        // The attributed term IS a protected lexeme in this context.
+        expect(result.protectedLexemeCount).toBeGreaterThan(0);
+      });
+
+      it('keeps the bare mention clear', () => {
+        const result = scanAsLlm(mention, language);
+        expect(result.classification).toBe('clear');
+        expect(result.disposition).toBe('clear');
+        // Asserting the count pins that this took the no-lexeme path, rather
+        // than passing by accident through some other broad term in the
+        // sentence.
+        expect(result.protectedLexemeCount).toBe(0);
+      });
+    },
+  );
+
+  it.each([
+    ['tea the drink', 'I have tea with breakfast every morning.'],
+    ['tea attributed to a learner', 'The learner has tea.'],
+    ['ads as ordinary English', 'The user has ads blocked in the browser.'],
+    ['add as an ordinary verb', 'You can add two numbers to get a sum.'],
+    ['add attributed to a learner', 'The student has add.'],
+  ])('keeps the English homograph clear: %s', (_name, text) => {
+    const result = scanAsLlm(text, 'en');
+    expect(result.classification).toBe('clear');
+    expect(result.protectedLexemeCount).toBe(0);
+  });
+
+  it.each([
+    ['es', 'tea', 'The learner has tea.'],
+    ['de', 'ads', 'The learner has ads.'],
+    // `student` IS an nb personReference, so this stays clear only because
+    // `has` is not an nb attribution phrase — the adversarial case that catches
+    // a future corpus edit widening either list.
+    ['nb', 'add', 'The student has add.'],
+  ])(
+    'does not leak the %s attributed-only term "%s" into the co-compiled English grammar',
+    (language, _term, text) => {
+      // THE DISCRIMINATING TEST. A shared lexeme slot — attributed-only terms of
+      // every corpus in play folded into one alternation — passes every other
+      // assertion in this file while blocking this English sentence. The slot is
+      // per-corpus precisely so this stays clear.
+      const result = scanAsLlm(text, language as ConversationLanguage);
+      expect(result.classification).toBe('clear');
+      expect(result.protectedLexemeCount).toBe(0);
+    },
+  );
+
+  it('blocks a named-person attributed-only attribution', () => {
+    const result = scanAsLlm('Petr tiene TEA.', 'es');
+    expect(result.classification).toBe('block');
+    expect(result.disposition).toBe('block');
+  });
+
+  it('blocks a hedged attributed-only attribution as an inference', () => {
+    const result = scanAsLlm('El alumno probablemente tiene TEA.', 'es');
+    expect(result.classification).toBe('block');
+    expect(result.reason).toBe('diagnostic_inference');
+  });
+
+  it('is not defeated by an invisible codepoint inside the attributed term', () => {
+    // NFKC does not strip U+200B; the Default_Ignorable strip does. The
+    // attributed-only path runs on the same normalized text, so it inherits it.
+    const result = scanAsLlm('El alumno tiene T​EA.', 'es');
+    expect(result.classification).toBe('block');
+    expect(result.disposition).toBe('block');
+  });
+
+  it('reports the model-generated confidence of the corpus that matched', () => {
+    // es/de/nb are all model-generated, so an attributed-only block must never
+    // claim `reviewed` — the same under-claim discipline as the broad scope.
+    for (const pair of SCOPE_PAIRS) {
+      expect(scanAsLlm(pair.attributed, pair.language).corpusConfidence).toBe(
+        'model-generated',
+      );
+    }
+  });
+
+  it('never reports a block with a zero protected-lexeme count', () => {
+    // INVARIANT. Attribution is decided before the clear short-circuit, so a
+    // drift in how attributed-only terms are counted surfaces here as a loud
+    // block-with-count-0 rather than as a silent block-turned-clear bypass.
+    const blocking: ReadonlyArray<[string, ConversationLanguage]> = [
+      ...SCOPE_PAIRS.map(
+        (pair) =>
+          [pair.attributed, pair.language] as [string, ConversationLanguage],
+      ),
+      ['Petr tiene TEA.', 'es'],
+      ['El alumno probablemente tiene TEA.', 'es'],
+      ...LANGUAGE_ROWS.map(
+        (row) =>
+          [row.blockGeneric, row.language] as [string, ConversationLanguage],
+      ),
+      ...LANGUAGE_ROWS.map(
+        (row) =>
+          [row.blockNamed, row.language] as [string, ConversationLanguage],
+      ),
+    ];
+    for (const [text, language] of blocking) {
+      const result = scanAsLlm(text, language);
+      expect(result.classification).toBe('block');
+      expect(result.protectedLexemeCount).toBeGreaterThan(0);
+    }
+  });
+});
+
 describe('[WI-2628] the module is unwired in Stage 1', () => {
   // Stage 1 lands the deterministic core only; Stage 3 rewires the callers.
   // Asserting the unwired state is what makes this PR reversible: the eight
