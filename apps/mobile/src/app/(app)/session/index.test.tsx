@@ -1182,7 +1182,7 @@ describe('SessionScreen homework flow', () => {
     ['Android hardware back', { type: 'GO_BACK' }],
     ['native stack gesture', { type: 'POP' }],
   ])(
-    '[WI-2234] re-arms %s after a failed Mentor refresh and retries without a navigation loop',
+    '[WI-2818] returns %s to Mentor after one failed exact refresh',
     async (_exitKind, action) => {
       (useLocalSearchParams as jest.Mock).mockReturnValue({
         mode: 'learning',
@@ -1196,74 +1196,164 @@ describe('SessionScreen homework flow', () => {
       const testScreen = renderSessionScreen();
       const invalidateSpy = jest
         .spyOn(activeRender!.queryClient, 'invalidateQueries')
-        .mockRejectedValueOnce(new Error('Now feed unavailable'))
-        .mockResolvedValueOnce(undefined);
+        .mockRejectedValueOnce(new Error('Now feed unavailable'));
 
-      act(() => {
+      await act(async () => {
         mockBeforeRemove!({ data: { action } });
+        await Promise.resolve();
+        await Promise.resolve();
       });
 
       await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(1));
-      expect(mockReplace).not.toHaveBeenCalled();
-      expect(mockPreventRemoveEnabled).toBe(true);
-
-      act(() => {
-        mockBeforeRemove!({ data: { action } });
-      });
-
-      await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(2));
       await waitFor(() =>
         expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor'),
       );
       await waitFor(() => expect(mockPreventRemoveEnabled).toBe(true));
+      expect(invalidateSpy).toHaveBeenCalledTimes(1);
       expect(mockReplace).toHaveBeenCalledTimes(1);
 
       testScreen.unmount();
     },
   );
 
-  it('[WI-2234] keeps the learner in Session when the Mentor refresh fails and allows a successful retry', async () => {
+  it('[WI-2818] waits for a successful exact Now-feed refresh before the first Back reaches Mentor', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
       subjectId: SUBJECT_ID,
       subjectName: 'Math',
       topicId: TOPIC_ID,
       topicName: 'Linear equations',
-      sessionId: 'expired-session',
       returnTo: 'mentor',
     });
-    const { NotFoundError } = require('../../../lib/api-client');
-    mockUseSessionTranscript.mockReturnValue({
-      data: null,
-      error: new NotFoundError('Session not found'),
-    } as never);
+
+    const testScreen = renderSessionScreen();
+    const invalidateSpy = jest.spyOn(
+      activeRender!.queryClient,
+      'invalidateQueries',
+    );
+    let releaseInvalidation!: () => void;
+    const invalidation = new Promise<void>((resolve) => {
+      releaseInvalidation = resolve;
+    });
+    invalidateSpy.mockReturnValue(invalidation);
+
+    await act(async () => {
+      fireEvent.press(testScreen.getByTestId('mock-back-button'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      {
+        queryKey: queryKeys.now.feed(
+          NOW_FEED_ACTOR_ID,
+          ACTIVE_PROFILE_ID,
+          NOW_FEED_POLICY_EPOCH,
+        ),
+        exact: true,
+        refetchType: 'all',
+      },
+      { throwOnError: true },
+    );
+    expect(mockReplace).not.toHaveBeenCalled();
+
+    await act(async () => {
+      releaseInvalidation();
+      await invalidation;
+    });
+
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor'),
+    );
+    expect(invalidateSpy.mock.invocationCallOrder[0]).toBeLessThan(
+      mockReplace.mock.invocationCallOrder[0]!,
+    );
+    expect(invalidateSpy).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+
+    testScreen.unmount();
+  });
+
+  it('[WI-2818] returns to Mentor on the first Back when the exact Now-feed refresh rejects', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: SUBJECT_ID,
+      subjectName: 'Math',
+      topicId: TOPIC_ID,
+      topicName: 'Linear equations',
+      returnTo: 'mentor',
+    });
 
     const testScreen = renderSessionScreen();
     const invalidateSpy = jest
       .spyOn(activeRender!.queryClient, 'invalidateQueries')
-      .mockRejectedValueOnce(new Error('Now feed unavailable'))
-      .mockResolvedValueOnce(undefined);
-    const expiredMessage = await waitFor(() =>
-      testScreen.getByTestId('mock-message-session-expired'),
-    );
-    const returnToMentor = within(expiredMessage).getByTestId(
-      'session-expired-go-home',
-    );
+      .mockRejectedValueOnce(new Error('Now feed unavailable'));
 
-    fireEvent.press(returnToMentor);
-
-    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(1));
-    expect(mockReplace).not.toHaveBeenCalled();
-
-    fireEvent.press(returnToMentor);
-
-    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      fireEvent.press(testScreen.getByTestId('mock-back-button'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(invalidateSpy).toHaveBeenCalledTimes(1);
     await waitFor(() =>
       expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor'),
     );
-    expect(invalidateSpy.mock.invocationCallOrder[1]).toBeLessThan(
+    expect(invalidateSpy.mock.invocationCallOrder[0]).toBeLessThan(
       mockReplace.mock.invocationCallOrder[0]!,
     );
+    expect(invalidateSpy).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+
+    testScreen.unmount();
+  });
+
+  it('[WI-2818] bounds a non-settling exact Now-feed refresh on the first Back', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: SUBJECT_ID,
+      subjectName: 'Math',
+      topicId: TOPIC_ID,
+      topicName: 'Linear equations',
+      returnTo: 'mentor',
+    });
+
+    const testScreen = renderSessionScreen();
+    const invalidateSpy = jest
+      .spyOn(activeRender!.queryClient, 'invalidateQueries')
+      .mockReturnValue(new Promise<void>(() => undefined));
+
+    fireEvent.press(testScreen.getByTestId('mock-back-button'));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(invalidateSpy).toHaveBeenCalledTimes(1);
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      {
+        queryKey: queryKeys.now.feed(
+          NOW_FEED_ACTOR_ID,
+          ACTIVE_PROFILE_ID,
+          NOW_FEED_POLICY_EPOCH,
+        ),
+        exact: true,
+        refetchType: 'all',
+      },
+      { throwOnError: true },
+    );
+    expect(mockReplace).not.toHaveBeenCalled();
+
+    await act(async () => {
+      jest.advanceTimersByTime(1999);
+    });
+    expect(mockReplace).not.toHaveBeenCalled();
+
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+    });
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor'),
+    );
+    expect(invalidateSpy).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledTimes(1);
 
     testScreen.unmount();
   });
