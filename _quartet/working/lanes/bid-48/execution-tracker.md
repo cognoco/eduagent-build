@@ -84,12 +84,12 @@ Delivery Batch as `Done`.
 | WI-2809 | Observe `/now` semantic readiness in V2 Mentor cold-start smoke | bounded evidence/test repair | Closed / Done — landed `8d83ecf3`; independent review passed; cleanup complete |
 | WI-2810 | Instrument J-01 Account readiness phases before avatar assertion | bounded evidence/test repair | Executing / blocked by WI-2822 — PR #2652 head `3d797a1e`; rerun exposed distinct stale nav-shell doorway contract, no third rerun |
 | WI-2811 | Preserve V2 first-session close-boundary evidence | bounded evidence/test repair | Closed / Done — landed `b6a2206a`; independent review passed; cleanup complete |
-| WI-2812 | Make reviewer attempt keys unique across same-minute pause and resume | Nexus reviewer-liveness repair | Executing rework — PR #330 at `74e3ee9f` returned to draft after fresh P1 proved the filtered production poll still cannot observe leave/re-entry; typed rework queued |
+| WI-2812 | Make reviewer attempt keys unique across same-minute pause and resume | Nexus reviewer-liveness repair | Executing rework — draft PR #330 at `b875c83a`; persisted filtered-poll visibility edge with mutation proof, focused 90/90 and full Clacks green; fresh review running |
 | WI-2813 | Refresh mobile test-count claim after WI-2801 suite expansion | bounded documentation/CI repair | Executing / blocked by WI-2718 — PR #2649 at `7fd75c84` exact-head green/ready; armed gate cannot obtain path-excluded Claude verdict |
 | WI-2815 | Align reviewer pin-manifest revision assertion with production spec | bounded Nexus Clacks test-contract repair | Ready / blocked by WI-2819 — landed `689d5f56`; two reviews accepted code but host gate checks CI on squash instead of exact PR head |
-| WI-2818 | Prevent failed Now-feed refresh from swallowing first Mentor-return Back | bounded session-boundary repair from WI-2804 | In Review — landed `cfeeaed7`; completion evidence passed and independent global review owns the close disposition |
+| WI-2818 | Prevent failed Now-feed refresh from swallowing first Mentor-return Back | bounded session-boundary repair from WI-2804 | Closed / Done — landed `cfeeaed7`; independent review passed with zero findings; worktree/local/remote branch cleaned |
 | WI-2819 | Verify strict-green PR head when Fixed In is a squash merge commit | ZDX Marketplace reviewer-preflight repair plus Nexus pin surface | Executing — admitted member 31 and claimed; exact fail-closed mapping variants and deployment boundary retained |
-| WI-2822 | Prevent supporter self-learning doorway bleed-through after support-hub Back | bounded nav-shell test-contract repair | Executing — draft PR #2658 at `c0002155`; exact two-file test-only repair, mutation/focused/named Playwright gates green; CI running |
+| WI-2822 | Prevent supporter self-learning doorway bleed-through after support-hub Back | bounded nav-shell test-contract repair | Executing — draft PR #2658 at `c0002155`; local mutation/focused/named Playwright proof green, hosted run-smoke red; original executor is classifying without blind rerun |
 | WI-2826 | Instrument V2 Account owner journey phase timing | credential-safe E2E diagnostic instrumentation | Executing — admitted member 32 and dispatched; local deterministic coverage only, hosted rerun remains operator-gated |
 
 Membership is dynamic: re-query the relation and Brief at every consequential
@@ -164,12 +164,12 @@ for formal membership disposition before execution.
 
 Active typed work is WI-2819's squash-evidence repair, WI-2822's test-contract repair,
 and WI-2826's credential-safe phase instrumentation. WI-2484 is in draft PR #2657 CI;
-WI-2818 is independently In Review after governed landing; WI-2812 is queued for typed
-rework after a valid filtered-poll P1.
+WI-2818 is independently Closed / Done and cleaned; WI-2812 is in typed rework after
+a valid filtered-poll P1.
 WI-2813 remains exact-head green but externally blocked by WI-2718's
 documentation-only review deadlock. WI-2799 and WI-2809 have independently closed
-Done and their worktrees/branches are cleaned. Live membership is 32 with 11 Closed,
-19 Executing, one In Review, and one Ready (blocked WI-2815).
+Done and their worktrees/branches are cleaned. Live membership is 32 with 12 Closed,
+19 Executing, and one Ready (blocked WI-2815).
 WI-2755 is blocked by WI-2794, and its attempted host
 diagnostic runner stopped before DB access because no sanctioned injection was
 available.

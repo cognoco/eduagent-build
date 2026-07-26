@@ -32,14 +32,16 @@ Last reconciled: 2026-07-26 22:55 CEST
   independent review passed and cleanup is complete.
 - WI-2809 — landed `8d83ecf3`; independent review passed; worktree and obsolete
   local/remote branch cleanup is complete.
+- WI-2818 — landed `cfeeaed7`; completion evidence passed, independent global review
+  closed with zero findings, and worktree/local/remote branch cleanup is complete.
 
 ## Active typed work
 
 - WI-2810 — PR #2652 at `3d797a1e` repairs first-visible-phase retention. Its single
   bounded rerun exposed distinct nav-shell doorway defect WI-2822; no third rerun.
-- WI-2812 — Nexus PR #330 at `74e3ee9f` is back to draft after a fresh valid P1:
-  production filtering hides non-Reviewing rows, so leave/re-entry remains unobservable.
-  Typed rework is queued after WI-2822.
+- WI-2812 — draft Nexus PR #330 at `b875c83a`; persisted filtered-poll visibility now
+  detects the exact disappearance/re-entry sequence, mutation proof and focused/full
+  Clacks are green, and fresh review is running.
 - WI-2813 — stale mobile-test count repair discovered from WI-2801's landed suite;
   PR #2649 at `7fd75c84` is exact-head strict green and ready with fresh CodeRabbit
   review, but the armed merge gate cannot obtain the path-excluded Claude verdict.
@@ -48,14 +50,12 @@ Last reconciled: 2026-07-26 22:55 CEST
   review gate still inspects only squash checks. Ready and formally blocked by WI-2819.
 - WI-2804 — diagnostic PR #2653 at `dd006d86` is otherwise green but formally blocked
   by WI-2718's docs-only armed-review repair; no verdict bypass.
-- WI-2818 — landed `cfeeaed7` through the armed gate, execute-completed with resolved
-  AC/red-green evidence, and now owned by the independent global reviewer In Review.
 - WI-2800 — diagnostic PR #2655 at `ac726877`; shared 90s budget exhaustion diagnosed,
   exact slow phase unknowable; WI-2826 captured and being refined.
 - WI-2484 — draft PR #2657 at `3fe6960d`; live dev constraints already correct, so no
   database mutation occurred; dev-only evidence/rollback guard committed, CI pending.
-- WI-2822 — draft PR #2658 at `c0002155`; exact two-file test-only repair with mutation,
-  focused, named Playwright, type/lint/pre-push proof; CI running.
+- WI-2822 — draft PR #2658 at `c0002155`; local mutation/focused/named Playwright proof
+  is green, but hosted run-smoke failed; original executor is classifying without rerun.
 - WI-2819 — member 31, claimed and executing the fail-closed Marketplace/Nexus repair.
 - WI-2826 — member 32, claimed and executing local credential-safe phase timing;
   hosted seeded-account rerun remains operator-gated.
