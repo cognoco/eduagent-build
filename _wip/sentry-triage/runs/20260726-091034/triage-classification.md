@@ -31,7 +31,7 @@ Sentry issue IDs or short IDs it covers.
 | LLM validation/fallback (20, S, E, D, P, R, 1Y) | ~12 | Telemetry + one already-fixed defect | Fallback signals + circuit breaker = designed launch-health telemetry. Quiz ZodError (R) fixed by WI-2190 (landed 2026-07-20, after R's last event) — resolve in Sentry after confirming no post-07-20 events. P/D are the summary-evaluation self-consistency check, handled with user-facing fallback. | — (WI-2765 for levels) |
 | Local-dev tail (Q, 1R, 16-partial, R) | ~10 | Local-dev noise | 10.0.2.2 / 127.0.0.1 requests: Android emulator + wrangler dev; safe-send 2s timeout is by-design non-blocking. | — |
 | PII-scrub guard (C) | 1 | Real minor defect | `topicTitle` is denylisted but sent on `app/filing.completed`; outgoing-event scrubbing replaces it with `[pii-scrubbed]`, corrupting the value consumed by `post-session-suggestions` in its LLM prompt. | WI-2766 |
-| Prod Inngest failure (B) | 6 | Needs Sentry drilldown | Generic fleet catch-all; pull tags.functionId + extra.runId from the event to identify the failing function. Stale since 07-15. | — (action; alerting home: WI-1907) |
+| Prod Inngest failure (B) | 6 | Needs Sentry drill-down | Generic fleet catch-all; pull tags.functionId + extra.runId from the event to identify the failing function. Stale since 07-15. | — (action; alerting home: WI-1907) |
 
 ## Follow-up Work Item evidence
 
