@@ -1,4 +1,12 @@
-import { expect, test, type Request } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
+import { expect, test, type APIResponse } from '@playwright/test';
+import {
+  createHeldNowRequestDiscriminator,
+  fetchAndFulfillHeldNowResponse,
+  isHeldNowCaptureCandidate,
+  type HeldNowRequestDiscriminator,
+  waitForHeldNowResponse,
+} from '../../helpers/held-now-request';
 import { pressableClick } from '../../helpers/pressable';
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 import { fillTextInput } from '../../helpers/text-input';
@@ -90,29 +98,50 @@ test('WI-2234 returning learner: unfinished session resumes, exchanges, and retu
   // navigator keeps Mentor mounted underneath the pushed Session route.
   let capturePostBackNowRequest = false;
   let releasePostBackNowResponse!: () => void;
-  let observePostBackNowRequest!: (request: Request) => void;
-  const postBackNowRequest = new Promise<Request>((resolve) => {
-    observePostBackNowRequest = resolve;
-  });
+  let observePostBackNowRequest!: (
+    discriminator: HeldNowRequestDiscriminator,
+  ) => void;
+  const postBackNowRequest = new Promise<HeldNowRequestDiscriminator>(
+    (resolve) => {
+      observePostBackNowRequest = resolve;
+    },
+  );
   const allowPostBackNowResponse = new Promise<void>((resolve) => {
     releasePostBackNowResponse = resolve;
   });
+  let observePostBackNowResponse!: (response: APIResponse) => void;
+  let rejectPostBackNowResponse!: (error: unknown) => void;
+  const postBackNowResponsePromise = new Promise<APIResponse>(
+    (resolve, reject) => {
+      observePostBackNowResponse = resolve;
+      rejectPostBackNowResponse = reject;
+    },
+  );
+  const postBackNowCorrelation = `wi-2234-${randomUUID()}`;
   await page.route('**/v1/now?*', async (route) => {
     const request = route.request();
-    const url = new URL(request.url());
-    if (
-      request.method() !== 'GET' ||
-      url.searchParams.get('scope') !== 'self' ||
-      !capturePostBackNowRequest
-    ) {
+    if (!isHeldNowCaptureCandidate(request, capturePostBackNowRequest)) {
       await route.continue();
       return;
     }
 
     capturePostBackNowRequest = false;
-    observePostBackNowRequest(request);
+    const discriminator = createHeldNowRequestDiscriminator(
+      request,
+      postBackNowCorrelation,
+    );
+    observePostBackNowRequest(discriminator);
     await allowPostBackNowResponse;
-    await route.continue();
+    try {
+      const response = await fetchAndFulfillHeldNowResponse(
+        route,
+        discriminator,
+      );
+      observePostBackNowResponse(response);
+    } catch (error) {
+      rejectPostBackNowResponse(error);
+      throw error;
+    }
   });
 
   await pressableClick(page.getByTestId('chat-shell-back'), {
@@ -126,11 +155,12 @@ test('WI-2234 returning learner: unfinished session resumes, exchanges, and retu
   const heldPostBackNowRequest = await postBackNowRequest;
   await expect(page).toHaveURL(/\/session(?:\?|$)/);
   await expect(page.getByTestId('session-screen')).toBeVisible();
-  const postBackNowResponsePromise = page.waitForResponse(
-    (response) => response.request() === heldPostBackNowRequest,
+  const boundedPostBackNowResponsePromise = waitForHeldNowResponse(
+    postBackNowResponsePromise,
   );
   releasePostBackNowResponse();
-  const postBackNowResponse = await postBackNowResponsePromise;
+  const postBackNowResponse = await boundedPostBackNowResponsePromise;
+  expect(postBackNowResponse.url()).toBe(heldPostBackNowRequest.url);
   expect(postBackNowResponse.ok()).toBe(true);
   const postBackNowFeed = (await postBackNowResponse.json()) as {
     generatedAt?: unknown;
