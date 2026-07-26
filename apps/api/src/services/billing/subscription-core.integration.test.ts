@@ -204,7 +204,9 @@ async function seedV2SubscriptionDirect(input: {
   return subV2!;
 }
 
-async function ensureSuiteExternalWebhookResidue() {
+async function ensureSuiteExternalWebhookResidue(
+  afterInitialMiss?: () => Promise<void>,
+) {
   const db = createIntegrationDb();
   const existing = await db.query.subscription.findFirst({
     where: eq(
@@ -213,6 +215,7 @@ async function ensureSuiteExternalWebhookResidue() {
     ),
   });
   if (existing) return existing;
+  await afterInitialMiss?.();
 
   const [org] = await db
     .insert(organization)
@@ -335,9 +338,19 @@ describe('updateSubscriptionFromWebhookV2', () => {
     async (_, seedResidue) => {
       const db = createIntegrationDb();
       if (seedResidue) {
+        let releaseConcurrentMisses!: () => void;
+        const concurrentMisses = new Promise<void>((resolve) => {
+          releaseConcurrentMisses = resolve;
+        });
+        let missCount = 0;
+        const waitForConcurrentMiss = async () => {
+          missCount += 1;
+          if (missCount === 2) releaseConcurrentMisses();
+          await concurrentMisses;
+        };
         const [preExistingResidue, concurrentResidue] = await Promise.all([
-          ensureSuiteExternalWebhookResidue(),
-          ensureSuiteExternalWebhookResidue(),
+          ensureSuiteExternalWebhookResidue(waitForConcurrentMiss),
+          ensureSuiteExternalWebhookResidue(waitForConcurrentMiss),
         ]);
         expect(preExistingResidue.stripeSubscriptionId).toBe(
           STATIC_WEBHOOK_RESIDUE_ID,
