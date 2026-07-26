@@ -2,6 +2,7 @@ import { expect, test, type Request } from '@playwright/test';
 import { pressableClick } from '../../helpers/pressable';
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 import { fillTextInput } from '../../helpers/text-input';
+import { observeSeededTranscript } from '../../helpers/transcript-observation';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -38,18 +39,33 @@ test('WI-2234 returning learner: unfinished session resumes, exchanges, and retu
   await expect(unfinishedCard).toBeVisible();
   await expect(dueReviewCard).toBeVisible();
 
+  const transcriptObservationPromise = observeSeededTranscript(page, {
+    sessionId: seeded.ids.sessionId,
+    exchanges: [
+      {
+        role: 'user',
+        content: 'Why did the Romans build so many roads?',
+      },
+      {
+        role: 'assistant',
+        content: 'They connected cities, trade, armies, and new ideas.',
+      },
+    ],
+  });
   await pressableClick(unfinishedCard.getByTestId('now-card-continue'));
   const chatInput = page.getByTestId('chat-input');
   await expect(chatInput).toBeVisible({ timeout: 30_000 });
   await expect
     .poll(() => new URL(page.url()).searchParams.get('sessionId'))
     .toBe(seeded.ids.sessionId);
+  await transcriptObservationPromise;
   await expect(
     page
       .getByTestId('chat-messages')
       .getByText('They connected cities, trade, armies, and new ideas.', {
         exact: true,
       }),
+    '[transcript:hydration] API returned the exact persisted exchange, but the assistant message was not rendered',
   ).toBeVisible();
 
   await fillTextInput(
