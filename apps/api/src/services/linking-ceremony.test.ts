@@ -28,6 +28,8 @@ import {
   supportership,
   type Database,
 } from '@eduagent/database';
+
+import { ConflictError } from '../errors';
 import { initiateLink, acceptLink } from './linking-ceremony';
 
 // ---------------------------------------------------------------------------
@@ -46,9 +48,14 @@ function buildMockDb(opts: {
   failOnAuditInsert?: boolean;
   /** Contract row to return for readContractById (select from supportVisibilityContracts). */
   contractRow?: Record<string, unknown>;
+  /** Successive contract rows returned by readContractById. */
+  contractRows?: Record<string, unknown>[];
+  /** Model a conditional-update loser after a concurrent state change. */
+  updateReturnsNoRows?: boolean;
 }) {
   const log: LogEntry[] = [];
   let transactionCalled = false;
+  let contractReadCount = 0;
 
   const now = new Date('2026-06-01T00:00:00.000Z');
 
@@ -88,26 +95,33 @@ function buildMockDb(opts: {
   //  - awaitable directly (for audit inserts: await db.insert(t).values({...}))
   //  - AND has a .returning() method (for supportership/contract inserts)
   function makeInsertChain(table: TableRef) {
+    const executeReturning = async () => {
+      if (opts.failOnAuditInsert && table === supportVisibilityAuditEvents) {
+        throw new Error(
+          'Injected failure: insert into supportVisibilityAuditEvents',
+        );
+      }
+      log.push({ op: 'insert', table });
+      if (table === supportership) return [makeMockEdgeRow()];
+      if (table === supportVisibilityContracts) return [makeMockContractRow()];
+      return [{}];
+    };
     const valuesResult = {
       // .returning() path — used by supportership and contract inserts
-      returning: async () => {
-        if (opts.failOnAuditInsert && table === supportVisibilityAuditEvents) {
-          throw new Error(
-            'Injected failure: insert into supportVisibilityAuditEvents',
-          );
-        }
-        log.push({ op: 'insert', table });
-        if (table === supportership) return [makeMockEdgeRow()];
-        if (table === supportVisibilityContracts) return [makeMockContractRow()];
-        return [{}];
-      },
+      returning: executeReturning,
+      onConflictDoNothing: (_config: unknown) => ({
+        returning: executeReturning,
+      }),
       // Thenable — allows `await db.insert(t).values({})` without .returning()
       then: (
         resolve: (value: unknown) => unknown,
         reject?: (reason: unknown) => unknown,
       ) => {
         const exec = async () => {
-          if (opts.failOnAuditInsert && table === supportVisibilityAuditEvents) {
+          if (
+            opts.failOnAuditInsert &&
+            table === supportVisibilityAuditEvents
+          ) {
             throw new Error(
               'Injected failure: insert into supportVisibilityAuditEvents',
             );
@@ -129,6 +143,7 @@ function buildMockDb(opts: {
       set: (_data: unknown) => ({
         where: (_cond: unknown) => ({
           returning: async () => {
+            if (opts.updateReturnsNoRows) return [];
             log.push({ op: 'update', table: supportVisibilityContracts });
             return [makeMockContractRow()];
           },
@@ -143,10 +158,14 @@ function buildMockDb(opts: {
     select: () => ({
       from: (_table: unknown) => ({
         where: (_cond: unknown) => ({
-          limit: (_n: number) =>
-            Promise.resolve(
-              opts.contractRow != null ? [opts.contractRow] : [],
-            ),
+          limit: async (_n: number) => {
+            const row =
+              opts.contractRows?.[
+                Math.min(contractReadCount, opts.contractRows.length - 1)
+              ] ?? opts.contractRow;
+            contractReadCount += 1;
+            return row != null ? [row] : [];
+          },
         }),
         innerJoin: (_joinTable: unknown, _cond: unknown) => ({
           where: (_w: unknown) => ({
@@ -273,6 +292,7 @@ describe('[WI-1060] acceptLink — transaction wrapping', () => {
   const BASE_ACCEPT_INPUT = {
     actorPersonId: 'person-supporter',
     audience: 'supporter' as const,
+    contractVersion: 1,
     now: new Date('2026-06-01T00:00:00.000Z'),
   };
 
@@ -327,6 +347,63 @@ describe('[WI-1060] acceptLink — transaction wrapping', () => {
       id: 'contract-1',
       supporterPersonId: 'person-supporter',
     });
+  });
+
+  it('treats a repeated acceptance as a side-effect-free success', async () => {
+    const acceptedAt = new Date('2026-06-01T00:01:00.000Z');
+    const mock = buildMockDb({
+      contractRow: {
+        ...MOCK_CONTRACT_ROW,
+        status: 'accepted',
+        supporterAcceptedAt: acceptedAt,
+        supporteeAcceptedAt: acceptedAt,
+      },
+    });
+
+    const result = await acceptLink(mock.db, CONTRACT_ID, BASE_ACCEPT_INPUT);
+
+    expect(result.status).toBe('accepted');
+    expect(result.supporterAcceptedAt).toBe(acceptedAt.toISOString());
+    expect(mock.transactionCalled).toBe(false);
+    expect(mock.log).toHaveLength(0);
+  });
+
+  it.each(['lapsed', 'revoked'] as const)(
+    'refuses to resurrect a %s contract',
+    async (status) => {
+      const mock = buildMockDb({
+        contractRow: {
+          ...MOCK_CONTRACT_ROW,
+          status,
+        },
+      });
+
+      await expect(
+        acceptLink(mock.db, CONTRACT_ID, BASE_ACCEPT_INPUT),
+      ).rejects.toBeInstanceOf(ConflictError);
+      expect(mock.transactionCalled).toBe(false);
+      expect(mock.log).toHaveLength(0);
+    },
+  );
+
+  it('rejects a stale acceptance when a concurrent restamp advances the contract version', async () => {
+    const restampedRow = {
+      ...MOCK_CONTRACT_ROW,
+      status: 'restamped',
+      contractVersion: 2,
+    };
+    const mock = buildMockDb({
+      contractRows: [MOCK_CONTRACT_ROW, restampedRow],
+      updateReturnsNoRows: true,
+    });
+
+    await expect(
+      acceptLink(mock.db, CONTRACT_ID, BASE_ACCEPT_INPUT),
+    ).rejects.toThrow(
+      'This visibility contract changed. Review the current version before accepting.',
+    );
+    expect(mock.transactionCalled).toBe(true);
+    expect(mock.log).toHaveLength(0);
   });
 });
 
