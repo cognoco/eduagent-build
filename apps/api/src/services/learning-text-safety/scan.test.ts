@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { ConversationLanguage } from '@eduagent/schemas';
 import { scrubClinicalInferenceFromLearningRecord } from '../persisted-learning-text-guard';
+import { referralPayloadKey } from './referral';
 import { LANGUAGE_CORPORA } from './corpus';
 import { scanLearningText } from './scan';
 
@@ -390,8 +391,45 @@ describe('[WI-2628] deterministic fail-closed provenance matrix (ADR-0036 §4.6)
     expect(result.reason).toBeNull();
   });
 
+  // [WI-2628 operator ruling 2026-07-26] USER-authored ambiguity MOVED from this
+  // fail-closed list to `refer`. Blocking it outright refused educational text
+  // the shipped English-only guard allowed, and left AC-4's
+  // `allow/educational_reference` unreachable in production. The row is FLIPPED
+  // below, not deleted — and note it moves to the JUDGE, not to allowed: an
+  // unavailable or malformed judge still blocks it (judge.test.ts).
+  it('refers user-authored ambiguity to the judge, with no producer vendor', () => {
+    const result = scanLearningText({
+      text: AMBIGUOUS_TEXT,
+      conversationLanguage: 'en',
+      provenance: 'user',
+      fieldKind: 'note_text',
+    });
+    expect(result.classification).toBe('ambiguous');
+    expect(result.disposition).toBe('refer');
+    expect(result.reason).toBeNull();
+  });
+
+  it('does not invent a producer vendor for user-authored text', () => {
+    // A learner is not a vendor. Supplying one would make the router exclude a
+    // vendor that produced nothing; the payload variant has no such field, so
+    // this is a type-level guarantee re-asserted at runtime.
+    const result = scanLearningText({
+      text: AMBIGUOUS_TEXT,
+      conversationLanguage: 'en',
+      provenance: 'user',
+      // Deliberately passed and deliberately ignored for user provenance.
+      producerVendor: 'anthropic',
+      fieldKind: 'note_text',
+    });
+    expect(result[referralPayloadKey]).toEqual({
+      origin: 'user',
+      text: AMBIGUOUS_TEXT,
+    });
+  });
+
+  // EVERYTHING ELSE STAYS FAIL-CLOSED. The ruling moved one case; these are
+  // untouched and must remain so.
   it.each([
-    ['user-authored ambiguity', 'user' as const, 'anthropic'],
     ['migration/backfill ambiguity', 'migration' as const, 'anthropic'],
     ['LLM ambiguity with a missing producer', 'llm' as const, undefined],
     ['LLM ambiguity with a null producer', 'llm' as const, null],
@@ -440,10 +478,13 @@ describe('[WI-2628] block reason codes', () => {
   });
 
   it('reports unclear only for fail-closed ambiguity', () => {
+    // Provenance changed from `user` to `migration` by the 2026-07-26 ruling:
+    // user-authored ambiguity now REFERS (reason null), so it is no longer an
+    // example of the fail-closed reason. Migration is, and still must be.
     const result = scanLearningText({
       text: 'This chapter explains what dyslexia is.',
       conversationLanguage: 'en',
-      provenance: 'user',
+      provenance: 'migration',
       fieldKind: 'note_text',
     });
     expect(result.reason).toBe('unclear');

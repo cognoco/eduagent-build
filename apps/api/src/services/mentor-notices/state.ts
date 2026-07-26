@@ -14,6 +14,14 @@ import { inngest } from '../../inngest/client';
 interface MentorNoticeCopyInput {
   concept: string;
   correctionHint?: string | null;
+  /**
+   * [WI-2628] The vendor whose model authored this copy. Present on the exchange
+   * path (`result.provider`, the same `result` that produced `noticedGap`), so
+   * the gate can refer ambiguous copy to a judge that excludes it. Nullable
+   * because an untyped or future caller may not have it — and a genuinely
+   * unknown producer must fail closed, which AC-4 requires and the scan enforces.
+   */
+  producerVendor?: string | null;
 }
 
 interface AcceptMentorNoticeInput extends MentorNoticeCopyInput {
@@ -45,11 +53,15 @@ interface AcceptMentorNoticeInput extends MentorNoticeCopyInput {
  * judge. The single caller (`acceptMentorNotice`) already awaited, and this runs
  * before its `db.insert`, so no LLM round-trip happens inside a transaction.
  *
- * `producerVendor: null` — the vendor that authored this copy is not reachable
- * here. Under AC-4 a missing producer fails CLOSED: ambiguous copy blocks with
- * reason `unclear` rather than being referred to the judge, and the protected
- * text never leaves the process. That is the specified behaviour for an unknown
- * producer, not a shortcut around it.
+ * `producerVendor` is THREADED, not defaulted. An earlier revision hard-coded
+ * null here with a comment claiming the vendor was "not reachable" — that was
+ * false: the exchange path has `result.provider` in scope and already passes it
+ * as `tutorVendor` a few lines below its `createMentorNoticeFromExchange` call.
+ * Hard-coding null meant every ambiguous notice concept blocked with `unclear`
+ * and the notice was never written at all, with the judge never consulted.
+ * AC-4's fail-closed-on-missing-producer exists for a GENUINELY unknown
+ * producer, not for one the caller declined to thread. It still applies when the
+ * value really is absent.
  *
  * `conversationLanguage: undefined` — no profile read on this path; the gate then
  * scans all ten attribution grammars and keeps the strictest verdict. Stricter
@@ -65,7 +77,7 @@ export async function prepareMentorNoticeCopy(
   const gate = await evaluateLearningTextFields({
     conversationLanguage: undefined,
     provenance: 'llm',
-    producerVendor: null,
+    producerVendor: input.producerVendor,
     fields: [
       {
         key: 'concept',

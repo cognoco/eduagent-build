@@ -295,7 +295,11 @@ describe('[WI-2628 AC-4] the batch inherits the judge fail-closed matrix', () =>
   });
 
   it.each([
-    ['user-authored ambiguous text', 'user' as const, PRODUCER_VENDOR],
+    // [operator ruling 2026-07-26] 'user-authored ambiguous text' MOVED off this
+    // list — it now reaches the judge (asserted immediately after this block).
+    // The other two stay: migration/backfill has no live author, and an LLM
+    // producer that cannot be named must not have its output judged by a vendor
+    // the router failed to exclude.
     [
       'migration/backfill ambiguous text',
       'migration' as const,
@@ -314,6 +318,42 @@ describe('[WI-2628 AC-4] the batch inherits the judge fail-closed matrix', () =>
       expect(mockRouteAndCall).not.toHaveBeenCalled();
     },
   );
+
+  it('routes user-authored ambiguous text to the judge and honours an allow', async () => {
+    // The other half of the ruling: AC-4's allow/educational_reference is now
+    // reachable in production, which it was not while user provenance blocked
+    // outright.
+    judgeSays('allow', 'educational_reference');
+    const result = await evaluateOne(AMBIGUOUS_TEXT, 'user');
+    expect(result.isSafe('f')).toBe(true);
+    expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
+  });
+
+  it('still blocks user-authored ambiguous text when the judge blocks it', async () => {
+    // "Goes to the judge" is not "passes" — the ruling moved the case, not the
+    // fail-closed floor.
+    judgeSays('block', 'person_attribution');
+    const result = await evaluateOne(AMBIGUOUS_TEXT, 'user');
+    expect(result.isSafe('f')).toBe(false);
+    expect(result.reasonFor('f')).toBe('person_attribution');
+  });
+
+  it('still blocks user-authored ambiguous text when the judge is unavailable', async () => {
+    mockRouteAndCall.mockRejectedValue(new Error('circuit open'));
+    const result = await evaluateOne(AMBIGUOUS_TEXT, 'user');
+    expect(result.isSafe('f')).toBe(false);
+    expect(result.reasonFor('f')).toBe('unclear');
+  });
+
+  it('still blocks a user-authored PERSON ATTRIBUTION without consulting the judge', async () => {
+    // The ruling moved ambiguous educational text only. Attribution is decided
+    // deterministically, before the provenance matrix is reached, so it never
+    // becomes a judge question at any provenance.
+    const result = await evaluateOne(BLOCKED_TEXT, 'user');
+    expect(result.isSafe('f')).toBe(false);
+    expect(result.reasonFor('f')).toBe('person_attribution');
+    expect(mockRouteAndCall).not.toHaveBeenCalled();
+  });
 });
 
 describe('[WI-2628 AC-6] observability records field kind, reason and count — never the text', () => {

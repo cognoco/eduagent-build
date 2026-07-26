@@ -4512,6 +4512,11 @@ export async function processMessage(
         session,
         signal: result.noticedGap,
         isMentorNoticeRecheck: Boolean(context.mentorNoticeRecheck),
+        // [WI-2628] The SAME `result` produced `noticedGap`, so `result.provider`
+        // is genuinely the producer of this copy — the same value passed as
+        // `tutorVendor` to the re-check judge below. Threading it lets the gate
+        // refer ambiguous copy to an independent judge instead of failing closed.
+        producerVendor: result.provider,
       })) ?? undefined;
   }
 
@@ -5160,6 +5165,11 @@ export async function streamMessage(
             session,
             signal: parsed.noticedGap,
             isMentorNoticeRecheck: Boolean(context.mentorNoticeRecheck),
+            // [WI-2628] `parsed` is the parsed envelope of the SAME `result`
+            // whose `.provider` is recorded throughout this block (and passed as
+            // `tutorVendor` to the re-check judge below), so this is genuinely
+            // the vendor that produced `noticedGap` — not a guess.
+            producerVendor: result.provider,
           })) ?? undefined;
       }
 

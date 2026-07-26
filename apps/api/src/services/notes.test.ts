@@ -1,3 +1,11 @@
+jest.mock(
+  './llm' /* gc1-allow: mocks the routeAndCall LLM boundary. The [WI-2628] gate now refers user-authored ambiguous text to an independent judge, so asserting the educational-allowance path reaches the write requires a judge verdict; routeAndCall cannot be exercised without a provider registration. Same escape and reasoning as learning-text-safety/judge.test.ts and gate.test.ts. */,
+  () => {
+    const actual = jest.requireActual('./llm') as typeof import('./llm');
+    return { ...actual, routeAndCall: jest.fn() };
+  },
+);
+
 /**
  * notes.ts unit tests
  *
@@ -32,6 +40,7 @@ import {
 } from './notes';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { BadRequestError } from '../errors';
+import { routeAndCall } from './llm';
 
 // ---------------------------------------------------------------------------
 // Shared stub factory
@@ -744,8 +753,11 @@ describe('[WI-2628 AC-5] unsafe learning text never reaches the notes write', ()
   });
 
   it('lets safe content through to the UPDATE statement', async () => {
-    // The non-triviality control. A gate that refused EVERYTHING would satisfy
-    // every assertion above for free; this is what makes them meaningful.
+    // Weak-but-necessary control: proves the write path works at all. It is NOT
+    // sufficient on its own — 'volcanoes' contains no protected lexeme, so this
+    // row passes whether or not the educational allowance survives. That gap is
+    // exactly why the closed educational path shipped unnoticed; the
+    // protected-lexeme controls below are the real ones.
     const updatedRow = {
       id: 'note-123',
       topicId: 'topic-1',
@@ -762,5 +774,130 @@ describe('[WI-2628 AC-5] unsafe learning text never reaches the notes write', ()
       'We read two chapters about volcanoes today.',
     );
     expect(result.content).toBe('We read two chapters about volcanoes today.');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2628, operator ruling 2026-07-26] The EDUCATIONAL ALLOWANCE must survive.
+//
+// A non-triviality control has to CONTAIN THE THING UNDER TEST. The control
+// above ('…volcanoes…') has no protected lexeme, so nothing in this file
+// asserted that educational use of a protected term still reaches the write —
+// which is how `notes.ts` came to return 400 on text the shipped English-only
+// guard allowed, unnoticed.
+//
+// Under the ruling this text is REFERRED to the independent judge rather than
+// blocked outright, so these rows stub the judge verdict. Both directions are
+// asserted: an allowing judge lets the write proceed, a blocking or unavailable
+// judge still refuses it. "Goes to the judge" is not "passes".
+// ---------------------------------------------------------------------------
+describe('[WI-2628] educational use of a protected term still reaches the write', () => {
+  const mockRouteAndCall = routeAndCall as jest.MockedFunction<
+    typeof routeAndCall
+  >;
+
+  /** Allowed by the shipped English-only guard; must not regress to a 400. */
+  const EDUCATIONAL = [
+    'This chapter explains what dyslexia is.',
+    'Dyslexia is a reading difference that affects decoding.',
+    'dyslexia',
+    'We practised strategies used for ADHD support.',
+    'Autism spectrum conditions vary widely.',
+  ] as const;
+
+  const judgeVerdict = (verdict: string, reason: string): void => {
+    mockRouteAndCall.mockResolvedValue({
+      response: JSON.stringify({ verdict, reason }),
+      provider: 'anthropic',
+      model: 'notes-gate-test-model',
+      latencyMs: 5,
+      stopReason: 'stop',
+    } as Awaited<ReturnType<typeof routeAndCall>>);
+  };
+
+  beforeEach(() => {
+    mockRouteAndCall.mockReset();
+  });
+
+  it.each(EDUCATIONAL)(
+    'writes %s when the judge allows it as an educational reference',
+    async (content) => {
+      judgeVerdict('allow', 'educational_reference');
+      const updatedRow = {
+        id: 'note-123',
+        topicId: 'topic-1',
+        sessionId: null,
+        content,
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+        updatedAt: new Date('2026-01-02T00:00:00Z'),
+      };
+      const db = makeDbStub({ updateReturning: [[updatedRow]] });
+
+      const result = await updateNote(db, 'profile-1', 'note-123', content);
+
+      expect(result.content).toBe(content);
+      // The judge was actually consulted — without this the row could pass by
+      // the scanner clearing the text, which would not exercise the allowance.
+      expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(EDUCATIONAL)(
+    'still refuses %s when the judge blocks it',
+    async (content) => {
+      judgeVerdict('block', 'diagnostic_inference');
+      const update = jest.fn(() => {
+        throw new Error('db.update was called — the judge blocked this text');
+      });
+      await expect(
+        updateNote(
+          { update } as unknown as Parameters<typeof updateNote>[0],
+          'profile-1',
+          'note-123',
+          content,
+        ),
+      ).rejects.toThrow(BadRequestError);
+      expect(update).not.toHaveBeenCalled();
+    },
+  );
+
+  it('still refuses educational text when the judge is unavailable', async () => {
+    // Fail-closed floor on a user-facing write. The ruling moved the case to the
+    // judge; it did not make a judge outage into an allowance.
+    mockRouteAndCall.mockRejectedValue(new Error('circuit open'));
+    const update = jest.fn();
+    await expect(
+      updateNote(
+        { update } as unknown as Parameters<typeof updateNote>[0],
+        'profile-1',
+        'note-123',
+        'This chapter explains what dyslexia is.',
+      ),
+    ).rejects.toThrow(BadRequestError);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('never consults the judge for a person attribution, in any language', async () => {
+    // Attribution is deterministic and decided before provenance is consulted,
+    // so an allowing judge cannot rescue it. This is the row that proves the
+    // ruling did not widen the gate.
+    judgeVerdict('allow', 'educational_reference');
+    for (const content of [
+      'The learner has ADHD.',
+      'Petr má dyslexii a potřebuje pomoc.',
+      'El alumno tiene TEA.',
+    ]) {
+      const update = jest.fn();
+      await expect(
+        updateNote(
+          { update } as unknown as Parameters<typeof updateNote>[0],
+          'profile-1',
+          'note-123',
+          content,
+        ),
+      ).rejects.toThrow(BadRequestError);
+      expect(update).not.toHaveBeenCalled();
+    }
+    expect(mockRouteAndCall).not.toHaveBeenCalled();
   });
 });

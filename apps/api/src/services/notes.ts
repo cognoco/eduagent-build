@@ -39,6 +39,19 @@ import {
  * silently dropped. Same class and same message as the English-only guard this
  * replaces, so the client-visible contract is unchanged.
  *
+ * [operator ruling 2026-07-26] THIS IS NOW A LIVE LLM CALL SITE ON A USER-FACING
+ * WRITE. Ambiguous educational text (a protected term with no person attributed)
+ * is REFERRED to the independent judge rather than blocked, so a learner saving a
+ * note containing e.g. "dyslexia" incurs one judge round-trip — measured ~1.1-1.2s
+ * at rung 1 in the WI-2628 live eval. Three properties this depends on:
+ *   - it runs BEFORE `db.transaction` below, so no pooled connection is held
+ *     across the call;
+ *   - a judge failure FAILS CLOSED (`judge.ts` returns block/unclear), which on
+ *     this path surfaces as the BadRequestError below — a judge outage turns an
+ *     educational note save into a 400, deliberately, not into an allowance;
+ *   - text with no protected lexeme never reaches the judge at all, so the
+ *     round-trip is confined to notes that actually mention a protected term.
+ *
  * `conversationLanguage: undefined` is deliberate, not a gap. Neither write path
  * here loads the learner's profile, and the gate's unresolved-language branch
  * scans under all ten attribution grammars and keeps the strictest verdict —

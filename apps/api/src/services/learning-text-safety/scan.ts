@@ -736,15 +736,30 @@ export function scanLearningText(
   }
 
   // Protected lexeme, no person attribution → uncertain educational/reference
-  // use. Only LLM-authored text with a KNOWN producer may reach the judge.
-  // Identical predicate to before, restructured so the validated vendor is a
-  // value this function can hand onward rather than a boolean it discards.
-  const producerVendor =
-    input.provenance === 'llm' && typeof input.producerVendor === 'string'
-      ? input.producerVendor.trim()
-      : '';
-
-  if (producerVendor.length === 0) {
+  // use. WHICH provenances may reach the judge is the fail-closed matrix, and
+  // the operator amended it on 2026-07-26:
+  //
+  //   `user`      → REFER (the ruling). Blocking outright made the gate refuse
+  //                 educational text the shipped English-only guard allowed
+  //                 ("This chapter explains what dyslexia is."), which is a
+  //                 learner-capability regression, and it left AC-4's
+  //                 `allow/educational_reference` as dead code because no
+  //                 production path could reach the seam. Note the ruling moves
+  //                 this case to the JUDGE, not to allowed — an unavailable or
+  //                 malformed judge still blocks it, in `judge.ts`.
+  //   `llm`       → REFER only with a KNOWN producer vendor; a missing/blank one
+  //                 still fails closed. Unchanged, and deliberately so: that
+  //                 branch exists for a genuinely unknown producer, and the
+  //                 vendor must be excluded from judge selection or the
+  //                 producing model can bless its own output.
+  //   `migration` → BLOCK. Unchanged. Backfill text has no live author to
+  //                 attribute it to and no learner waiting on the write, so
+  //                 there is nothing to trade for the risk.
+  //
+  // Person attribution never arrives here at all — it returned above, for every
+  // provenance and all ten languages.
+  const referral = resolveReferralPayload(input);
+  if (referral === null) {
     return {
       ...base,
       classification: 'ambiguous',
@@ -758,9 +773,41 @@ export function scanLearningText(
     classification: 'ambiguous',
     disposition: 'refer',
     reason: null,
-    // Binds this referral to the exact text and vendor scanned. Symbol-keyed,
-    // so it never appears in a serialized/logged result — see referral.ts for
-    // the two P1 misuse shapes this makes unrepresentable.
-    [referralPayloadKey]: { text: input.text, producerVendor },
+    // Binds this referral to the exact text scanned, and to the vendor when
+    // there is one. Symbol-keyed, so it never appears in a serialized/logged
+    // result — see referral.ts for the misuse shapes this makes unrepresentable.
+    [referralPayloadKey]: referral,
   };
+}
+
+/**
+ * The referral payload for an ambiguous scan, or null when this provenance must
+ * fail closed instead. Split out so the provenance matrix is one expression with
+ * an exhaustive switch: a future `LearningTextProvenance` member cannot fall
+ * silently into either the refer or the block branch.
+ */
+function resolveReferralPayload(
+  input: ScanLearningTextInput,
+): LearningTextReferralPayload | null {
+  switch (input.provenance) {
+    case 'user':
+      // No vendor field exists on this variant — a learner is not a vendor, and
+      // the judge declares `not-applicable` independence for it.
+      return { origin: 'user', text: input.text };
+    case 'llm': {
+      const producerVendor =
+        typeof input.producerVendor === 'string'
+          ? input.producerVendor.trim()
+          : '';
+      return producerVendor.length === 0
+        ? null
+        : { origin: 'llm', text: input.text, producerVendor };
+    }
+    case 'migration':
+      return null;
+    default: {
+      const exhaustive: never = input.provenance;
+      throw new Error(`unhandled provenance: ${String(exhaustive)}`);
+    }
+  }
 }

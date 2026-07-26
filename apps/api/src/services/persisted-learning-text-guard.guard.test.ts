@@ -58,10 +58,18 @@ describe('[WI-1195] persisted learning-text guard wiring', () => {
     readonly newGateCall: RegExp | null;
   }
 
-  const OLD_GUARD_ASSERT =
-    /learningTextGuard\.assertNoClinicalInferenceInLearningRecord/g;
-  const OLD_GUARD_SCRUB =
-    /learningTextGuard\.scrubClinicalInferenceFromLearningRecord/g;
+  // IMPORT-STYLE-AGNOSTIC, deliberately bare. The prefixed form
+  // (`learningTextGuard.scrub…`) is what most call sites use, but
+  // `mentor-notices/state.ts` used a NAMED import — and that is precisely why the
+  // Stage-1 ratchet never pinned it: the prefixed pattern matched nothing there
+  // and the boundary was silently uncovered. A bare pattern matches both forms,
+  // so switching import style can no longer evade the ratchet.
+  //
+  // Safe from prose false positives: verified that none of the wired files
+  // mentions either symbol in a comment, which would otherwise break the
+  // "zero old-guard calls left" assertion on a correctly-migrated file.
+  const OLD_GUARD_ASSERT = /assertNoClinicalInferenceInLearningRecord/g;
+  const OLD_GUARD_SCRUB = /scrubClinicalInferenceFromLearningRecord/g;
   /** Any reference to the shared gate module, in any import form. */
   const GATE_MODULE = /learning-text-safety\/gate/;
 
@@ -95,11 +103,11 @@ describe('[WI-1195] persisted learning-text guard wiring', () => {
       // guard bare rather than through the `learningTextGuard.` namespace, so
       // neither of the old prefixed patterns matched it and its count was never
       // pinned. Added here, so a second write path in state.ts cannot skip the
-      // gate. Its `oldGuardCall` is deliberately the BARE form for that reason.
+      // gate. Both patterns are bare now, so import style no longer matters.
       file: 'mentor-notices/state.ts',
       control: 'multilingual-gate',
       applications: 1,
-      oldGuardCall: /scrubClinicalInferenceFromLearningRecord/g,
+      oldGuardCall: OLD_GUARD_SCRUB,
       newGateCall: /evaluateLearningTextFields\(/g,
     },
     {
