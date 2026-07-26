@@ -2,7 +2,7 @@
 
 ## Snapshot
 
-- Mobile: ~88 screens, 494 test suites, ~5977 tests
+- Mobile: ~88 screens, 494 test suites, ~5981 tests
 - API: 53 route groups, 329 test suites, ~8380 tests, 78 Inngest functions
 - Cross-package integration tests: 70 suites in `tests/integration/`, ~290 cases
 - Monorepo: `apps/api`, `apps/mobile`, shared packages in `packages/`
