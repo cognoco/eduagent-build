@@ -8,7 +8,10 @@ import {
 } from '@eduagent/schemas';
 
 import { Sentry } from './sentry';
-import { MENTOR_NOTICE_POLICY_STATE_KEY_PREFIX as KEY_PREFIX } from './secure-store-keys';
+import {
+  MENTOR_NOTICE_POLICY_DISABLE_FLOOR_KEY_SUFFIX as FLOOR_SUFFIX,
+  MENTOR_NOTICE_POLICY_STATE_KEY_PREFIX as KEY_PREFIX,
+} from './secure-store-keys';
 
 // ---------------------------------------------------------------------------
 // [WI-2627] Client-side monotonic mentor-notice rollout state
@@ -198,6 +201,39 @@ export function reduceMentorNoticePolicy(
   }
 }
 
+const disableFloorRecordSchema = z.object({
+  revision: z.number().int().nonnegative(),
+});
+
+/**
+ * [WI-2627] Normalise the DISABLE FLOOR record — the suppress-only sidecar.
+ *
+ * Always yields `enabled: false`, so folding it through
+ * `reduceMentorNoticePolicy` can only ever SUPPRESS: at a higher revision it
+ * adopts a disable, at the same revision disabled wins, at a lower revision it
+ * is ignored. There is no value it can hold that re-enables anything. That is
+ * the property the whole mechanism rests on — see the "disable floor" section
+ * over `flush`.
+ *
+ * 'absent' (no sidecar — the overwhelmingly common case) contributes nothing.
+ * A present-but-unparseable sidecar is 'malformed', which disables at the HELD
+ * revision: fail-closed, and still recoverable by a strictly higher server
+ * revision, so a corrupt sidecar can never strand the device.
+ */
+function disableFloorSignal(raw: string | null): MentorNoticePolicySignal {
+  if (raw === null) return 'absent';
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return 'malformed';
+  }
+  const result = disableFloorRecordSchema.safeParse(parsed);
+  return result.success
+    ? { revision: result.data.revision, enabled: false }
+    : 'malformed';
+}
+
 /**
  * What this device knows, as the payload test below needs it.
  *
@@ -281,6 +317,15 @@ function storageKey(actorId: string, profileId: string): string {
   return `${KEY_PREFIX}::${actorId}::${profileId}`;
 }
 
+/**
+ * [WI-2627] The disable-floor sidecar key for a state key. Derived rather than
+ * built from (actor, profile) so there stays exactly ONE key-construction site,
+ * and so the sidecar is unconditionally actor-scoped the way the state key is.
+ */
+function disableFloorKey(stateKey: string): string {
+  return `${stateKey}::${FLOOR_SUFFIX}`;
+}
+
 export type MentorNoticePolicySnapshot = MentorNoticePolicyKnowledge;
 
 type Entry = {
@@ -333,20 +378,27 @@ type Entry = {
    */
   readUntrusted: boolean;
   /**
-   * [WI-2627 rework 3] A well-formed OBSERVATION carrying `enabled: false` has
-   * been folded into this entry — i.e. the server actually told this device the
-   * rollout is off.
+   * [WI-2627 rework 3] The highest revision at which a well-formed OBSERVATION
+   * carrying `enabled: false` has been folded into this entry — i.e. the highest
+   * revision at which the server actually told this device the rollout is off.
+   * `null` when it never has.
    *
    * Needed because "the store is currently disabled" is NOT the same as "we hold
    * a disable worth persisting blind". A failed read folds `'malformed'`, which
    * disables at the held revision — so after a blind read the state reads
    * disabled even when the only thing the server ever said was ENABLED. Gating
    * the blind write on `state.enabled` alone therefore wrote a disable
-   * manufactured by our own read failure, lowering the durable floor for
-   * nothing. This flag distinguishes a genuine kill-switch, which is worth the
-   * floor cost, from our own fail-closed reaction to blindness, which is not.
+   * manufactured by our own read failure. This field distinguishes a genuine
+   * kill-switch from our own fail-closed reaction to blindness.
+   *
+   * [rework 4] It carries the REVISION, not just a flag, because it is now what
+   * the blind write persists. Every value it can ever hold is a revision the
+   * SERVER issued alongside `rolloutEnabled: false` — it is the maximum over
+   * genuinely-observed disables, never a sentinel, never a synthesized bound,
+   * never `revision + 1`. That is what keeps the sidecar honest: it can assert
+   * only disables that actually happened.
    */
-  observedDisable: boolean;
+  observedDisableRevision: number | null;
 };
 
 const UNBOUND_SNAPSHOT: MentorNoticePolicySnapshot = {
@@ -380,7 +432,7 @@ function getEntry(key: string): Entry {
       flushQueued: false,
       durable: null,
       readUntrusted: false,
-      observedDisable: false,
+      observedDisableRevision: null,
     };
     entries.set(key, entry);
   }
@@ -457,7 +509,9 @@ function enqueue(entry: Entry, work: () => Promise<void>): void {
  * It is NOT the whole story when the READ itself failed, because then a
  * higher-revision disable may be on disk unseen. `flush` handles that case
  * before reaching here: it retries the read, and if still blind it withholds an
- * ENABLED candidate outright while letting a DISABLED one through unguarded.
+ * ENABLED candidate outright and diverts a genuine DISABLE to the suppress-only
+ * disable-floor sidecar, so this function is never asked to write the state
+ * record blind.
  */
 function durableCandidate(entry: Entry): MentorNoticePolicyState {
   const current = entry.snapshot.state;
@@ -486,15 +540,28 @@ function durableCandidate(entry: Entry): MentorNoticePolicyState {
  *     keep painting.
  *
  * Retrying with backoff is the defensible shape: it recovers the common
- * transient failure (the case this device most likely to hit) without
- * inventing a second fallible write path. Under sustained failure (disk
- * genuinely full for the retry window) the write still never lands and the
- * durable record lags — but it lags at an OLDER revision that no later flush
- * can be tricked into re-adopting, and in-session behaviour is fail-closed
- * throughout.
+ * transient failure (the case this device most likely to hit). Under sustained
+ * failure (disk genuinely full for the retry window) the write still never
+ * lands and the durable record lags — but it lags at an OLDER revision that no
+ * later flush can be tricked into re-adopting, and in-session behaviour is
+ * fail-closed throughout.
+ *
+ * [rework 4] This function also owns the ONE case where a write goes to the
+ * disable-floor sidecar instead of the state record. The earlier objection to a
+ * second key — "a second fallible write path" — does not hold for a key that can
+ * only ever SUPPRESS: a failed sidecar write leaves the device exactly where it
+ * already was, where a failed STATE-record write is what destroys the floor. See
+ * "THE DISABLE FLOOR" inline.
  */
 async function flush(key: string, entry: Entry): Promise<void> {
   entry.flushQueued = false;
+
+  /**
+   * Non-null when this flush must write the SUPPRESS-ONLY disable-floor sidecar
+   * instead of the state record, because a genuine disable has to be persisted
+   * while the state record cannot be read. See "THE DISABLE FLOOR" below.
+   */
+  let blindFloor: number | null = null;
 
   // [WI-2627 rework 3] A failed READ leaves the disk contents UNKNOWN, and a
   // higher-revision disable may be sitting there unseen. Retry the read on the
@@ -516,13 +583,14 @@ async function flush(key: string, entry: Entry): Promise<void> {
       if (backoff !== undefined) await delay(backoff);
     }
 
-    // Still blind, with nothing established to guard against. The choice is
-    // between two bad writes, and the DIRECTION of the candidate decides which
-    // one we take — the previous pass withheld unconditionally and that was
-    // wrong, because it swallowed the kill-switch itself.
+    // Still blind, with nothing established to guard against.
     if (entry.readUntrusted && entry.durable === null) {
-      if (entry.snapshot.state.enabled || !entry.observedDisable) {
-        // Nothing worth persisting blind → WITHHOLD. Two shapes land here:
+      if (
+        entry.snapshot.state.enabled ||
+        entry.observedDisableRevision === null
+      ) {
+        // Nothing worth persisting at all → WITHHOLD, both keys. Two shapes
+        // land here:
         //
         //   an ENABLED candidate — the original breach. At cold start in-memory
         //     is the bootstrap, so any enabled observation above revision 0 is
@@ -543,37 +611,88 @@ async function flush(key: string, entry: Entry): Promise<void> {
         });
         return;
       }
-      // DISABLED candidate → WRITE IT ANYWAY. A disable is the emergency
-      // kill-switch, and withholding it is strictly worse than any record it
-      // can overwrite:
-      //   - if the unknown disk held an ENABLED record, withholding leaves that
-      //     record and the next launch shows notices — the kill-switch silently
-      //     swallowed;
-      //   - if the disk held NOTHING (fresh install, first read throws),
-      //     withholding leaves it absent, and an absent record hydrates as
-      //     NEVER-TOLD, which `noticesSuppressedForPayload` treats as "not
-      //     suppressed" and lets a cached projection paint. That is precisely
-      //     the hazard `removeItem` was rejected for above, reintroduced.
-      // Writing the disable cannot do either. Its one real cost is the FLOOR:
-      // if the unknown disk held a disable at a HIGHER revision, we lower the
-      // bar a later enabled observation must clear. That leaves the device
-      // disabled either way — it only widens the window in which a stale
-      // enabled reply could re-enable — so it is the lesser harm by a wide
-      // margin. Tagged distinctly so the trade is observable in production
-      // rather than only asserted here.
-      Sentry.captureMessage('mentor_notice_policy: blind disable write', {
+      // ── THE DISABLE FLOOR ────────────────────────────────────────────────
+      //
+      // A GENUINE disable, blind, with nothing established to guard against.
+      // Both obvious moves are wrong, and this is where the previous two passes
+      // each took one of them:
+      //
+      //   withhold entirely — swallows the emergency kill-switch. If the unseen
+      //     disk held an ENABLED record the next launch shows notices; if it
+      //     held NOTHING, the record stays absent and an absent record hydrates
+      //     as NEVER-TOLD, which `noticesSuppressedForPayload` treats as "not
+      //     suppressed" and lets a cached projection paint.
+      //
+      //   write the STATE record anyway — persists the disable, but if the
+      //     unseen disk held a disable at a HIGHER revision it overwrites it and
+      //     LOWERS the floor a later enabled observation must clear. A stale
+      //     intermediate enabled reply then clears the lowered bar and the
+      //     restart shows notices. That is the resurrection path this Work Item
+      //     exists to eliminate, so "it leaves the device disabled for now" does
+      //     not buy it.
+      //
+      // So write NEITHER the state record nor a fabricated revision: write the
+      // disable to its own SUPPRESS-ONLY key, and leave the state record
+      // untouched. The two are folded together additively at hydration
+      // (`readAndFold`), and the effective floor is the higher of them.
+      //
+      // Why this cannot re-enable anything, which is the whole argument:
+      //   - the sidecar record has no `enabled` field to carry. `disableFloorSignal`
+      //     always yields `enabled: false`, so folding it can only adopt a
+      //     disable, keep a disable, or be ignored as older.
+      //   - it holds a revision the SERVER issued with `rolloutEnabled: false`
+      //     (`entry.observedDisableRevision`) — no sentinel, no synthesized
+      //     maximum. A fabricated revision pointed at BLOCKING re-enables could
+      //     strand a device permanently disabled with no recovery path; this
+      //     cannot, because a genuine deploy above that revision still clears it.
+      //   - it is a different KEY, so writing it blind cannot destroy the state
+      //     record, and writing the state record cannot destroy it. Whichever of
+      //     the two a blind write lowers, the other still carries the floor.
+      //
+      // Residual, stated rather than papered over: if the sidecar write itself
+      // never lands (sustained disk pressure through the retry ladder) a device
+      // whose disk held a LOWER enabled record keeps that record, and the
+      // kill-switch is lost on restart. That is the same failure class as any
+      // other exhausted write here, and strictly better than the previous pass
+      // in the case that matters — the unseen higher disable is now preserved
+      // instead of overwritten. In-session behaviour stays fail-closed
+      // throughout. Tagged distinctly so the path is observable in production.
+      Sentry.captureMessage('mentor_notice_policy: blind disable floor write', {
         level: 'warning',
-        tags: { feature: 'mentor_notice_policy', op: 'write_blind_disable' },
+        tags: {
+          feature: 'mentor_notice_policy',
+          op: 'write_blind_disable_floor',
+        },
       });
+      blindFloor = entry.observedDisableRevision;
     }
   }
 
   let lastError: unknown;
   for (let attempt = 0; attempt <= PERSIST_RETRY_DELAYS_MS.length; attempt++) {
-    const candidate = durableCandidate(entry);
+    // read-latest on BOTH branches: recomputed every attempt, so a retry that
+    // lands late carries today's state (see `durableCandidate`) or today's
+    // highest genuine disable, never the one that was current when the
+    // observation arrived.
+    const floor =
+      blindFloor === null
+        ? null
+        : (entry.observedDisableRevision ?? blindFloor);
+    let writeKey = key;
+    let payload: string;
+    let candidate: MentorNoticePolicyState | null = null;
+    if (floor === null) {
+      candidate = durableCandidate(entry);
+      payload = JSON.stringify(candidate);
+    } else {
+      writeKey = disableFloorKey(key);
+      payload = JSON.stringify({ revision: floor });
+    }
     try {
-      await AsyncStorage.setItem(key, JSON.stringify(candidate));
-      entry.durable = candidate;
+      await AsyncStorage.setItem(writeKey, payload);
+      // Only a STATE-record write establishes what is durably there; the sidecar
+      // says nothing about the state record, so the guard stays unestablished.
+      if (candidate !== null) entry.durable = candidate;
       return;
     } catch (err) {
       lastError = err;
@@ -615,8 +734,20 @@ function schedulePersist(key: string, entry: Entry): void {
  */
 async function readAndFold(key: string, entry: Entry): Promise<void> {
   let signal: MentorNoticePolicySignal;
+  // [WI-2627 rework 4] The suppress-only disable floor, folded ADDITIVELY on top
+  // of the state record below. 'absent' — no sidecar, the common case —
+  // contributes nothing.
+  let floor: MentorNoticePolicySignal = 'absent';
   try {
+    // Sequential, state record FIRST, both inside this one `try`. Not
+    // `multiGet`/`Promise.all`: a failing read must short-circuit so ONE
+    // `readAndFold` costs one failed `getItem`, which is what keeps the retry
+    // ladder's read count meaningful. And if EITHER read throws the disk is
+    // unknown, so both facts are discarded together rather than half-trusted.
     signal = storedSignal(await AsyncStorage.getItem(key));
+    floor = disableFloorSignal(
+      await AsyncStorage.getItem(disableFloorKey(key)),
+    );
     // [WI-2627 rework] Seed the write guard from what is actually on disk. Only
     // a PARSEABLE record tells us a durable revision; 'absent' means there is
     // genuinely nothing to regress, and 'malformed' means its revision is
@@ -631,6 +762,7 @@ async function readAndFold(key: string, entry: Entry): Promise<void> {
       tags: { feature: 'mentor_notice_policy', op: 'read' },
     });
     signal = 'malformed';
+    floor = 'absent';
     // [WI-2627 rework 2] We could not LOOK. Do NOT null `durable`: a record
     // established by an earlier successful read or write is still the best guard
     // we have, and discarding it would hand the write path a blank cheque. And
@@ -638,13 +770,24 @@ async function readAndFold(key: string, entry: Entry): Promise<void> {
     // what `readUntrusted` records, and what makes `flush` withhold.
     entry.readUntrusted = true;
   }
+  // ONE commit for both records. Committing the state record first would leave a
+  // window in which a `suppressed()` call reads an enabled state that the floor
+  // is about to disable — the exact fail-open shape this module is about.
   commit(
     entry,
-    reduceMentorNoticePolicy(entry.snapshot.state, signal),
+    reduceMentorNoticePolicy(
+      reduceMentorNoticePolicy(entry.snapshot.state, signal),
+      floor,
+    ),
     // A stored record that EXISTS (even unparseably) means this device was told
     // something and persisted it; only its genuine absence leaves the device
-    // never-told.
-    entry.snapshot.observed || signalIsObservation(signal),
+    // never-told. A disable-floor sidecar counts for the same reason, and MUST:
+    // a blind disable on a fresh install lands there and nowhere else, and
+    // without this the relaunch would hydrate as never-told and let a cached
+    // projection paint.
+    entry.snapshot.observed ||
+      signalIsObservation(signal) ||
+      signalIsObservation(floor),
     true,
   );
 }
@@ -688,8 +831,17 @@ export function foldMentorNoticePolicyFor(
   // `flush` needs to tell a server kill-switch from the fail-closed state its
   // own failed read manufactures. Only a well-formed observation counts;
   // 'malformed' does not.
+  //
+  // [rework 4] Keep the highest such revision, because `flush` now PERSISTS it
+  // to the disable-floor sidecar. Every value this can hold is therefore some
+  // `signal.revision` the server actually sent with `rolloutEnabled: false` —
+  // the max of a set of real observations is a member of that set, so nothing
+  // fabricated ever reaches disk.
   if (typeof signal === 'object' && !signal.enabled) {
-    entry.observedDisable = true;
+    entry.observedDisableRevision = Math.max(
+      entry.observedDisableRevision ?? 0,
+      signal.revision,
+    );
   }
   const next = reduceMentorNoticePolicy(entry.snapshot.state, signal);
   commit(entry, next, true, entry.snapshot.hydrated);

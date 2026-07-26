@@ -3,7 +3,10 @@ import { AppState, type AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { MentorNoticePolicyObservation } from '@eduagent/schemas';
 
-import { MENTOR_NOTICE_POLICY_STATE_KEY_PREFIX } from './secure-store-keys';
+import {
+  MENTOR_NOTICE_POLICY_DISABLE_FLOOR_KEY_SUFFIX,
+  MENTOR_NOTICE_POLICY_STATE_KEY_PREFIX,
+} from './secure-store-keys';
 import {
   MENTOR_NOTICE_POLICY_BOOTSTRAP,
   noticesSuppressedForPayload,
@@ -364,6 +367,11 @@ const PROFILE = 'profile-1';
 
 function stateKey(actorId: string, profileId: string): string {
   return `${MENTOR_NOTICE_POLICY_STATE_KEY_PREFIX}::${actorId}::${profileId}`;
+}
+
+/** The suppress-only disable-floor sidecar for a pair. */
+function floorKey(actorId: string, profileId: string): string {
+  return `${stateKey(actorId, profileId)}::${MENTOR_NOTICE_POLICY_DISABLE_FLOOR_KEY_SUFFIX}`;
 }
 
 async function seedStored(
@@ -923,12 +931,20 @@ describe('useMentorNoticePolicy', () => {
       });
     });
 
-    // The emergency disable LANDS. Withholding it here left disk at
-    // `{"revision":3,"enabled":true}` and the restart showed notices — a
-    // kill-switch silently swallowed, and a regression against `origin/main`,
-    // which writes it.
+    // The emergency disable LANDS — durably, on the suppress-only sidecar.
+    // Withholding it left disk unchanged and the restart showed notices — a
+    // kill-switch silently swallowed.
+    //
+    // [rework 4] Only the ENCODING of "it landed" moved: the disable now goes to
+    // the sidecar and the state record is left ALONE. That is strictly more than
+    // was asserted before — the unseen state record is preserved rather than
+    // overwritten — and the behavioural assertions below (restart state,
+    // suppression) are unchanged.
+    expect(await AsyncStorage.getItem(floorKey(ACTOR, PROFILE))).toBe(
+      '{"revision":9}',
+    );
     expect(await AsyncStorage.getItem(stateKey(ACTOR, PROFILE))).toBe(
-      '{"revision":9,"enabled":false}',
+      '{"revision":3,"enabled":true}',
     );
 
     resetMentorNoticePolicyStoreForTests();
@@ -956,8 +972,11 @@ describe('useMentorNoticePolicy', () => {
       });
     });
 
-    expect(await AsyncStorage.getItem(stateKey(ACTOR, PROFILE))).toBe(
-      '{"revision":9,"enabled":false}',
+    // [rework 4] Encoding only: the disable lands on the sidecar. Nothing was
+    // there to preserve, so the state record legitimately stays absent — and the
+    // never-told check below is what proves the sidecar alone is enough.
+    expect(await AsyncStorage.getItem(floorKey(ACTOR, PROFILE))).toBe(
+      '{"revision":9}',
     );
 
     resetMentorNoticePolicyStoreForTests();
@@ -972,41 +991,186 @@ describe('useMentorNoticePolicy', () => {
     expect(relaunched.result.current.suppressed(undefined)).toBe(true);
   });
 
-  it('ACCEPTED COST: a blind disable can LOWER the durable floor, and stays disabled either way', async () => {
-    // The price of always writing a genuine disable while blind. Disk holds a
-    // HIGHER-revision disable we cannot see; we overwrite it with a lower one,
-    // so the bar a later enabled observation must clear drops 8 → 3.
-    //
-    // Recorded as a test rather than a comment because it is a real weakening,
-    // and because it is NOT a regression: `origin/main` produces the identical
-    // record here. It is strictly the lesser harm — the device stays DISABLED
-    // and suppressed either way, so this only widens the window in which a
-    // stale enabled reply could re-enable, where the two cases above are
-    // outright kill-switch losses.
-    await seedStored(ACTOR, PROFILE, '{"revision":8,"enabled":false}');
+  // ── [WI-2627 rework 4] THE RESURRECTION PATH ITSELF ───────────────────────
+  //
+  // This REPLACES a test that asserted the defect as an accepted cost ("a blind
+  // disable can LOWER the durable floor, and stays disabled either way"). It was
+  // not an inconvenient assertion that got adjusted: it recorded exactly the
+  // weakening this Work Item exists to eliminate, and it stopped at immediate
+  // suppression — one step before the continuation where the lowered floor
+  // actually bites.
+  //
+  // The full sequence, all five steps, ending after a RESTART:
+  //   1. disk holds an UNSEEN rev-8 disable (reads are failing)
+  //   2. a genuine rev-3 disable is written while blind
+  //   3. reads recover; the app foregrounds and re-hydrates
+  //   4. a STALE rev-5 ENABLED reply arrives
+  //   5. restart
+  //
+  // On the previous head step 2 lowered the durable floor 8 → 3, so at step 4
+  // rev-5-enabled was `newer`, adopted, and written — and step 5 showed notices.
+  // The floor must survive step 2 for rev-5 to be `older` and refused.
+  it('closes the resurrection path: a blind disable cannot lower the durable floor, so a stale enabled reply cannot re-enable after restart', async () => {
+    // The AppState seam gives step 3 ("reads recover; hydration") in-session,
+    // which is where the defect sequence puts it.
+    const listeners: ((s: AppStateStatus) => void)[] = [];
+    const originalAddEventListener = AppState.addEventListener;
+    AppState.addEventListener = ((_type: string, handler: unknown) => {
+      listeners.push(handler as (s: AppStateStatus) => void);
+      return { remove: () => undefined };
+    }) as unknown as typeof AppState.addEventListener;
+    restoreAppState = () => {
+      AppState.addEventListener = originalAddEventListener;
+    };
 
-    await whileBlind(async () => {
+    // (1) The emergency rev-8 rollback is on disk, and this device cannot see it.
+    await seedStored(ACTOR, PROFILE, '{"revision":8,"enabled":false}');
+    const originalGetItem = AsyncStorage.getItem;
+    AsyncStorage.getItem = jest.fn(() =>
+      Promise.reject(new Error('storage unavailable')),
+    ) as unknown as typeof AsyncStorage.getItem;
+
+    const { result } = mountPolicy();
+    try {
+      await waitFor(() => expect(result.current.hydrated).toBe(true));
+      // Blind cold start: the bootstrap, which has NO revision to defend with.
+      // This is the precondition that makes the hole reachable.
+      expect(result.current.state).toEqual({ revision: 0, enabled: false });
+
+      // (2) A GENUINE rev-3 disable — a real kill-switch, at a lower revision
+      // than the one already on disk. It must be persisted (losing it is worse
+      // than anything a write can overwrite) WITHOUT lowering the floor.
+      act(() => result.current.observe(observation(3, false)));
+      // Long enough to cover the read and write retry ladders.
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 1200));
+      });
+    } finally {
+      AsyncStorage.getItem = originalGetItem;
+    }
+
+    // THE FLOOR, at the layer the defect lived: the unseen rev-8 disable is
+    // INTACT. This is the assertion the previous head fails — it held
+    // `{"revision":3,"enabled":false}` here.
+    expect(await AsyncStorage.getItem(stateKey(ACTOR, PROFILE))).toBe(
+      '{"revision":8,"enabled":false}',
+    );
+    // ...and the rev-3 kill-switch was NOT swallowed to achieve that. It is
+    // durably recorded on the suppress-only sidecar.
+    expect(await AsyncStorage.getItem(floorKey(ACTOR, PROFILE))).toBe(
+      '{"revision":3}',
+    );
+
+    // (3) Reads recover. Foregrounding re-hydrates, and the intact rev-8 disable
+    // is re-established as what this device holds.
+    await act(async () => {
+      for (const listener of listeners) listener('active');
+    });
+    await waitFor(() =>
+      expect(result.current.state).toEqual({ revision: 8, enabled: false }),
+    );
+
+    // (4) THE STALE INTERMEDIATE REPLY: rev-5, enabled. It left the server
+    // between the rev-3 and rev-8 deploys. Against the LOWERED floor it was
+    // `newer` and re-enabled; against the intact floor it is `older` and refused.
+    act(() => result.current.observe(observation(5, true)));
+    expect(result.current.state).toEqual({ revision: 8, enabled: false });
+    expect(result.current.suppressed(observation(5, true))).toBe(true);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 1200));
+    });
+
+    // (5) RESTART — the step the previous permanent test never reached, and the
+    // only layer at which "notices are exposed" is observable at all.
+    resetMentorNoticePolicyStoreForTests();
+    const relaunched = mountPolicy();
+    await waitFor(() => expect(relaunched.result.current.hydrated).toBe(true));
+    expect(relaunched.result.current.state).toEqual({
+      revision: 8,
+      enabled: false,
+    });
+    // The rollback is still in force: neither a cached projection carrying no
+    // observation nor the stale rev-5 reply may paint.
+    expect(relaunched.result.current.suppressed(undefined)).toBe(true);
+    expect(relaunched.result.current.suppressed(observation(5, true))).toBe(
+      true,
+    );
+  });
+
+  // NON-TRIVIALITY CONTROL for the test above, in the direction that matters
+  // most: "always suppress" and "never let anything re-enable" satisfy every
+  // assertion there. Neither survives this. A device whose floor was set by a
+  // blind disable must still accept a legitimate deploy above it — otherwise the
+  // fix ships a permanently bricked surface with no recovery path, and a suite
+  // that only asserts suppression cannot tell the two apart.
+  it('still accepts a legitimate re-enable above a floor set by a blind disable, so the device is never stranded', async () => {
+    // Fresh install, blind, genuine rev-3 disable → the floor is set and there is
+    // no state record at all, so the sidecar is the ONLY thing holding it.
+    const originalGetItem = AsyncStorage.getItem;
+    AsyncStorage.getItem = jest.fn(() =>
+      Promise.reject(new Error('storage unavailable')),
+    ) as unknown as typeof AsyncStorage.getItem;
+
+    try {
       const { result } = mountPolicy();
       await waitFor(() => expect(result.current.hydrated).toBe(true));
       act(() => result.current.observe(observation(3, false)));
       await act(async () => {
         await new Promise((r) => setTimeout(r, 1200));
       });
-    });
-
-    expect(await AsyncStorage.getItem(stateKey(ACTOR, PROFILE))).toBe(
-      '{"revision":3,"enabled":false}',
+    } finally {
+      AsyncStorage.getItem = originalGetItem;
+    }
+    expect(await AsyncStorage.getItem(floorKey(ACTOR, PROFILE))).toBe(
+      '{"revision":3}',
     );
 
     resetMentorNoticePolicyStoreForTests();
     const relaunched = mountPolicy();
     await waitFor(() => expect(relaunched.result.current.hydrated).toBe(true));
-    // Still disabled, still suppressed — the floor moved, the verdict did not.
     expect(relaunched.result.current.state).toEqual({
       revision: 3,
       enabled: false,
     });
-    expect(relaunched.result.current.suppressed(undefined)).toBe(true);
+
+    // A genuine deploy at a STRICTLY HIGHER revision turns notices back on.
+    act(() => relaunched.result.current.observe(observation(9, true)));
+    expect(relaunched.result.current.state).toEqual({
+      revision: 9,
+      enabled: true,
+    });
+    expect(relaunched.result.current.suppressed(observation(9, true))).toBe(
+      false,
+    );
+    await waitFor(async () => {
+      expect(await AsyncStorage.getItem(stateKey(ACTOR, PROFILE))).toBe(
+        '{"revision":9,"enabled":true}',
+      );
+    });
+
+    // ...and it SURVIVES a restart with the stale rev-3 floor still on disk. The
+    // sidecar is never cleared, and never needs to be: it folds as `older` and is
+    // inert. A floor that re-disabled here would be the stranding failure.
+    resetMentorNoticePolicyStoreForTests();
+    const again = mountPolicy();
+    await waitFor(() => expect(again.result.current.hydrated).toBe(true));
+    expect(again.result.current.state).toEqual({ revision: 9, enabled: true });
+    expect(again.result.current.suppressed(observation(9, true))).toBe(false);
+  });
+
+  it('treats an UNPARSEABLE disable-floor sidecar as fail-closed, not as absent', async () => {
+    await seedStored(ACTOR, PROFILE, '{"revision":7,"enabled":true}');
+    await AsyncStorage.setItem(floorKey(ACTOR, PROFILE), 'not json');
+
+    const { result } = mountPolicy();
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    // Disabled AT THE HELD REVISION — so it cannot re-enable at 7, and a genuine
+    // deploy above 7 still can.
+    expect(result.current.state).toEqual({ revision: 7, enabled: false });
+    expect(result.current.suppressed(observation(7, true))).toBe(true);
+    act(() => result.current.observe(observation(8, true)));
+    expect(result.current.state).toEqual({ revision: 8, enabled: true });
   });
 
   // NON-TRIVIALITY CONTROL for the test above. "Always write disabled" and

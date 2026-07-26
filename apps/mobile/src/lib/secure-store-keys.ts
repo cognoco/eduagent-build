@@ -198,3 +198,18 @@ export const NOW_FEED_POLICY_EPOCH_KEY_PREFIX = 'now-feed-policy-epoch';
  */
 export const MENTOR_NOTICE_POLICY_STATE_KEY_PREFIX =
   'mentor-notice-policy-state';
+
+/**
+ * [WI-2627] Suffix of a SECOND, suppress-only record hanging off the state key
+ * above: `{ revision }` as JSON — the highest deployment revision at which the
+ * server told this device the mentor-notice rollout is OFF.
+ *
+ * Full key: `mentor-notice-policy-state::<actorId>::<profileId>::disable-floor`
+ *
+ * Deliberately a separate KEY rather than a field on the state record: it must
+ * survive a write to the state record that the device makes while it cannot READ
+ * the state record, which is the only way a genuine disable can otherwise
+ * overwrite a higher-revision disable it never saw. See the "disable floor"
+ * section of `lib/mentor-notice-policy.ts`.
+ */
+export const MENTOR_NOTICE_POLICY_DISABLE_FLOOR_KEY_SUFFIX = 'disable-floor';
