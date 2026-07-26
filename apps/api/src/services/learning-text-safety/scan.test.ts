@@ -668,6 +668,19 @@ describe('[WI-2628] attributed-only lexeme scope', () => {
      * rather than inferred from the verb form passing.
      */
     readonly possessive: string;
+    /**
+     * Direction 1 via the ENGLISH `'s` genitive — a real person's name plus the
+     * acronym. Reached NO grammar before this row existed: the plain genitive is
+     * built for the `en` corpus (whose attributed-only slot is empty) and the
+     * es/de/nb attributed-only sets had no genitive at all, because bolting
+     * English possession syntax onto them blocked ordinary prose in all ten
+     * declared languages. It is admitted now only when the LEXEME is written in
+     * acronym form, which is purely additive — every lowercase genitive in
+     * `MUST_STAY_CLEAR` stays clear. Distinct from the acronym-form-on-every-
+     * attributed-only-match change the corpus commit deliberately declined:
+     * that one would have REMOVED blocks.
+     */
+    readonly genitive: string;
     /** Direction 2 — the same term merely mentioned. Must stay clear. */
     readonly mention: string;
   }
@@ -677,6 +690,7 @@ describe('[WI-2628] attributed-only lexeme scope', () => {
       language: 'es',
       term: 'TEA',
       attributed: 'El alumno tiene TEA.',
+      genitive: "Emma's TEA is documented in the file.",
       possessive: 'Su TEA requiere apoyo adicional.',
       mention: 'TEA es un término diagnóstico usado en informes.',
     },
@@ -684,6 +698,7 @@ describe('[WI-2628] attributed-only lexeme scope', () => {
       language: 'de',
       term: 'ADS',
       attributed: 'Der Schüler hat ADS.',
+      genitive: "Emma's ADS ist dokumentiert.",
       possessive: 'Seine ADS ist dokumentiert.',
       mention: 'ADS ist ein veralteter Begriff aus der Fachliteratur.',
     },
@@ -691,6 +706,7 @@ describe('[WI-2628] attributed-only lexeme scope', () => {
       language: 'nb',
       term: 'ADD',
       attributed: 'Eleven har ADD.',
+      genitive: "Emma's ADD er dokumentert.",
       possessive: 'Elevens ADD er dokumentert.',
       mention: 'ADD ble tidligere brukt som begrep i faglitteraturen.',
     },
@@ -785,6 +801,7 @@ describe('[WI-2628] attributed-only lexeme scope', () => {
   const ATTRIBUTED_STRINGS: readonly string[] = SCOPE_PAIRS.flatMap((pair) => [
     pair.attributed,
     pair.possessive,
+    pair.genitive,
   ]);
 
   /** Mentions + English homographs + the cross-grammar leak controls. */
@@ -808,12 +825,18 @@ describe('[WI-2628] attributed-only lexeme scope', () => {
     "Tom's ads are effective.",
     "Anna's add was a small one.",
     "Sarah's tea preference is green tea.",
+    // The acronym in the PERSON slot rather than the lexeme slot. The new
+    // acronym-form genitive requires a plausible person NAME on the left, and
+    // `acronymRejectRe` rejects an all-caps attributed-only term there, so this
+    // matches nothing. Without that half, the pattern would fire on any
+    // sentence pairing the acronym with its own homograph.
+    "TEA's tea is cold.",
   ];
 
   it('covers all ten declared languages in the matrix', () => {
     expect(ALL_LANGUAGES).toHaveLength(10);
-    expect(ATTRIBUTED_STRINGS).toHaveLength(6);
-    expect(MUST_STAY_CLEAR).toHaveLength(14);
+    expect(ATTRIBUTED_STRINGS).toHaveLength(9);
+    expect(MUST_STAY_CLEAR).toHaveLength(15);
   });
 
   describe.each(ALL_LANGUAGES)('declared %s', (language) => {

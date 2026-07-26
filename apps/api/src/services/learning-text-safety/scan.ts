@@ -296,6 +296,26 @@ interface AttributionPatternSet {
   /** Patterns yielding a `person` group that must look like a name. */
   readonly namedPatterns: readonly RegExp[];
   /**
+   * Patterns yielding BOTH a `person` group that must look like a name AND a
+   * `lexeme` group that must be written in the all-caps ACRONYM FORM.
+   *
+   * Exists for exactly one shape: the English `'s` genitive over an
+   * ATTRIBUTED-ONLY slot. `Emma's TEA is documented in the file.` is a person
+   * attribution of an Article-9 label about a minor, and it reached NO grammar —
+   * the plain genitive below is built for the `en` corpus only (whose
+   * attributed-only slot is empty), and the es/de/nb attributed-only sets have no
+   * genitive because bolting English possession syntax onto them blocked ordinary
+   * prose in all ten declared languages (`Emma's tea went cold.`).
+   *
+   * The acronym-form requirement on the LEXEME is what threads that needle, and
+   * it is PURELY ADDITIVE: `Emma's TEA` blocks, every lowercase genitive stays
+   * exactly as it is. Note this is NOT the acronym-form-on-every-attributed-only-
+   * match change the previous commit deliberately declined — that one would have
+   * REMOVED blocks (`el alumno tiene tea` @es → clear). Scoped to this one new
+   * shape, no existing classification changes.
+   */
+  readonly acronymFormNamedPatterns: readonly RegExp[];
+  /**
    * This corpus's attributed-only terms, rejected as a person name ONLY when the
    * capture is written in the all-caps acronym form. `TEA es un trastorno …`
    * (all-caps) is the condition being defined, not a person; `Tea tiene ADHD.`
@@ -316,12 +336,22 @@ interface CompiledGrammar {
   readonly sets: readonly AttributionPatternSet[];
 }
 
+/**
+ * Which kind of set is being built. The `'s`-genitive decisions below turn on
+ * this, not on the corpus alone: the same corpus contributes a standalone set
+ * (slot = every standalone lexeme) and, if it declares any, an attributed-only
+ * set (slot = its own acronyms), and the two need different genitive handling.
+ */
+type SetScope = 'standalone' | 'attributed-only';
+
 function buildPatternSet(
   corpus: LanguageCorpus,
   lexemeSlot: string,
+  setScope: SetScope,
 ): AttributionPatternSet {
   const patterns: RegExp[] = [];
   const namedPatterns: RegExp[] = [];
+  const acronymFormNamedPatterns: RegExp[] = [];
 
   {
     const lexeme = lexemeSlot;
@@ -382,10 +412,25 @@ function buildPatternSet(
     // from the attributed-only sets) would break `Petr tiene TEA.` @es and
     // `Elevens ADD er dokumentert.` @nb, which ride the name and possessive
     // machinery respectively.
-    if (corpus.language === 'en') {
+    if (corpus.language === 'en' && setScope === 'standalone') {
       namedPatterns.push(
         new RegExp(
           `${LATIN_LEFT_BOUNDARY}(?<person>[\\p{Lu}][\\p{L}\\p{M}'’-]{1,39})['’]s\\s+${postVerb}${lexeme}${LATIN_RIGHT_BOUNDARY}`,
+          'giu',
+        ),
+      );
+    }
+    // ...and the SAME English genitive over an attributed-only slot, admitted
+    // only when the lexeme itself is written in acronym form. Without this the
+    // shape reaches no grammar at all (see `acronymFormNamedPatterns`). Built
+    // for every cased script, not just `en`, because the host prose is English
+    // while the acronym belongs to the es/de/nb corpus — that mismatch is the
+    // whole case. `ja` is excluded by `scriptHasCase`: a caseless script has no
+    // acronym form to require, and its structural patterns cover attribution.
+    if (setScope === 'attributed-only' && corpus.scriptHasCase) {
+      acronymFormNamedPatterns.push(
+        new RegExp(
+          `${LATIN_LEFT_BOUNDARY}(?<person>[\\p{Lu}][\\p{L}\\p{M}'’-]{1,39})['’]s\\s+${postVerb}(?<lexeme>${lexeme})${LATIN_RIGHT_BOUNDARY}`,
           'giu',
         ),
       );
@@ -405,6 +450,7 @@ function buildPatternSet(
   return {
     patterns,
     namedPatterns,
+    acronymFormNamedPatterns,
     acronymRejectRe: attributedOnly.length
       ? new RegExp(`^(?:${alternation(attributedOnly)})$`, 'iu')
       : null,
@@ -426,7 +472,13 @@ const ATTRIBUTED_ONLY_SETS: readonly AttributionPatternSet[] =
     const corpus = LANGUAGE_CORPORA[language];
     const terms = termsFor(corpus, 'within-attribution');
     return terms.length
-      ? [buildPatternSet(corpus, `(?:${alternation(terms)})`)]
+      ? [
+          buildPatternSet(
+            corpus,
+            `(?:${alternation(terms)})`,
+            'attributed-only',
+          ),
+        ]
       : [];
   });
 
@@ -450,7 +502,7 @@ function compileGrammar(declared: ConversationLanguage): CompiledGrammar {
   return {
     sets: [
       ...corpora.map((corpus) =>
-        buildPatternSet(corpus, `(?:${ANY_LEXEME_ALT})`),
+        buildPatternSet(corpus, `(?:${ANY_LEXEME_ALT})`, 'standalone'),
       ),
       ...ATTRIBUTED_ONLY_SETS,
     ],
@@ -592,6 +644,24 @@ function findAttribution(
       pattern.lastIndex = 0;
       for (const match of normalized.matchAll(pattern)) {
         if (looksLikePersonName(match.groups?.['person'], set)) {
+          return { span: match[0], inferenceRe: set.inferenceRe };
+        }
+      }
+    }
+    // Both halves must hold: a plausible person name AND a lexeme written in
+    // acronym form. Requiring the acronym form here rather than compiling the
+    // pattern case-sensitively keeps the hedge/determiner slots (which the
+    // corpora enumerate in lowercase) case-insensitive, so `Emma's suspected
+    // TEA …` still matches while `Emma's tea …` still does not.
+    for (const pattern of set.acronymFormNamedPatterns) {
+      pattern.lastIndex = 0;
+      for (const match of normalized.matchAll(pattern)) {
+        const lexeme = match.groups?.['lexeme'];
+        if (
+          lexeme !== undefined &&
+          isAcronymForm(lexeme) &&
+          looksLikePersonName(match.groups?.['person'], set)
+        ) {
           return { span: match[0], inferenceRe: set.inferenceRe };
         }
       }
