@@ -200,16 +200,21 @@ export const MENTOR_NOTICE_POLICY_STATE_KEY_PREFIX =
   'mentor-notice-policy-state';
 
 /**
- * [WI-2627] Suffix of a SECOND, suppress-only record hanging off the state key
- * above: `{ revision }` as JSON — the highest deployment revision at which the
- * server told this device the mentor-notice rollout is OFF.
+ * [WI-2627] Key SEGMENT introducing the suppress-only "disable floor" — a SET of
+ * markers hanging off the state key above, ONE KEY PER REVISION:
  *
- * Full key: `mentor-notice-policy-state::<actorId>::<profileId>::disable-floor`
+ *   `mentor-notice-policy-state::<actorId>::<profileId>::disable-floor::<revision>`
  *
- * Deliberately a separate KEY rather than a field on the state record: it must
- * survive a write to the state record that the device makes while it cannot READ
- * the state record, which is the only way a genuine disable can otherwise
- * overwrite a higher-revision disable it never saw. See the "disable floor"
- * section of `lib/mentor-notice-policy.ts`.
+ * Each marker records that the server told this device the mentor-notice rollout
+ * is OFF at that revision. The revision lives in the KEY, and the key's presence
+ * IS the fact — the stored value is a placeholder and is never read.
+ *
+ * One key per revision, rather than one slot holding the highest, because the
+ * device must be able to record a disable while it cannot READ storage. Writing
+ * a single slot blind can LOWER it (overwriting a higher revision it never saw),
+ * and lowering the floor is what lets a stale intermediate enabled reply
+ * re-enable notices. A set only ever gains members, so the floor — the maximum
+ * over the set — cannot decrease no matter what a blind write adds. See the
+ * "THE DISABLE FLOOR" section of `lib/mentor-notice-policy.ts`.
  */
 export const MENTOR_NOTICE_POLICY_DISABLE_FLOOR_KEY_SUFFIX = 'disable-floor';

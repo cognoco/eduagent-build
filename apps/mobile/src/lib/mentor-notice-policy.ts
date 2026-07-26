@@ -201,37 +201,43 @@ export function reduceMentorNoticePolicy(
   }
 }
 
-const disableFloorRecordSchema = z.object({
-  revision: z.number().int().nonnegative(),
-});
-
 /**
- * [WI-2627] Normalise the DISABLE FLOOR record — the suppress-only sidecar.
+ * [WI-2627 rework 5] Reduce the DISABLE FLOOR key SET to one signal.
  *
- * Always yields `enabled: false`, so folding it through
- * `reduceMentorNoticePolicy` can only ever SUPPRESS: at a higher revision it
- * adopts a disable, at the same revision disabled wins, at a lower revision it
- * is ignored. There is no value it can hold that re-enables anything. That is
- * the property the whole mechanism rests on — see the "disable floor" section
- * over `flush`.
+ * The floor is the MAXIMUM revision across the marker keys. Two properties, and
+ * the single-slot sidecar this replaced had only the first:
  *
- * 'absent' (no sidecar — the overwhelmingly common case) contributes nothing.
- * A present-but-unparseable sidecar is 'malformed', which disables at the HELD
- * revision: fail-closed, and still recoverable by a strictly higher server
- * revision, so a corrupt sidecar can never strand the device.
+ *   suppress-only — the signal always carries `enabled: false`, so folding it
+ *     through `reduceMentorNoticePolicy` can only adopt a disable, keep a
+ *     disable, or be ignored as older. There is no floor value that re-enables.
+ *
+ *   NON-LOWERABLE — a maximum over a set that only ever gains members cannot
+ *     decrease. This is the property that matters, and it is why the floor is a
+ *     set of keys rather than one slot: the device must record a disable while it
+ *     cannot READ, and a blind write to a single slot can overwrite a higher
+ *     revision it never saw. Adding a member cannot.
+ *
+ * A prefix-matching key whose revision suffix does not parse is 'malformed' —
+ * disable at the HELD revision. Fail-closed, and still cleared by a strictly
+ * higher server revision, so garbage under our prefix cannot strand the device.
+ * No prefix match at all is 'absent' and contributes nothing (the common case).
  */
-function disableFloorSignal(raw: string | null): MentorNoticePolicySignal {
-  if (raw === null) return 'absent';
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return 'malformed';
+function disableFloorSignal(
+  allKeys: readonly string[],
+  prefix: string,
+): MentorNoticePolicySignal {
+  let floor: number | null = null;
+  for (const key of allKeys) {
+    if (!key.startsWith(prefix)) continue;
+    const suffix = key.slice(prefix.length);
+    // Strict: `Number` would accept '', ' 3', '3.5', '0x8', 'Infinity'. A
+    // fabricated or unbounded revision is exactly what must never reach the fold.
+    if (!/^\d+$/.test(suffix)) return 'malformed';
+    const revision = Number(suffix);
+    if (!Number.isSafeInteger(revision)) return 'malformed';
+    if (floor === null || revision > floor) floor = revision;
   }
-  const result = disableFloorRecordSchema.safeParse(parsed);
-  return result.success
-    ? { revision: result.data.revision, enabled: false }
-    : 'malformed';
+  return floor === null ? 'absent' : { revision: floor, enabled: false };
 }
 
 /**
@@ -318,13 +324,29 @@ function storageKey(actorId: string, profileId: string): string {
 }
 
 /**
- * [WI-2627] The disable-floor sidecar key for a state key. Derived rather than
- * built from (actor, profile) so there stays exactly ONE key-construction site,
- * and so the sidecar is unconditionally actor-scoped the way the state key is.
+ * [WI-2627] The disable-floor marker namespace for a state key, and the marker
+ * key for one revision within it. Derived from the state key rather than rebuilt
+ * from (actor, profile) so there stays exactly ONE key-construction site, and so
+ * the floor is unconditionally actor-scoped the way the state key is.
+ *
+ * The trailing separator matters: it makes the prefix scan exact, so a marker can
+ * never be confused with the state key itself or with a longer sibling namespace.
  */
-function disableFloorKey(stateKey: string): string {
-  return `${stateKey}::${FLOOR_SUFFIX}`;
+function disableFloorPrefix(stateKey: string): string {
+  return `${stateKey}::${FLOOR_SUFFIX}::`;
 }
+
+function disableFloorKeyFor(stateKey: string, revision: number): string {
+  return `${disableFloorPrefix(stateKey)}${revision}`;
+}
+
+/**
+ * Placeholder value for a floor marker. The REVISION lives in the key and the
+ * key's presence is the whole fact, so this is never read — deliberately, because
+ * a value that had to agree with its key would be a second source of truth for
+ * the same fact, and the two could disagree.
+ */
+const DISABLE_FLOOR_MARKER = '1';
 
 export type MentorNoticePolicySnapshot = MentorNoticePolicyKnowledge;
 
@@ -395,7 +417,7 @@ type Entry = {
    * the blind write persists. Every value it can ever hold is a revision the
    * SERVER issued alongside `rolloutEnabled: false` — it is the maximum over
    * genuinely-observed disables, never a sentinel, never a synthesized bound,
-   * never `revision + 1`. That is what keeps the sidecar honest: it can assert
+   * never `revision + 1`. That is what keeps the floor honest: it can assert
    * only disables that actually happened.
    */
   observedDisableRevision: number | null;
@@ -510,7 +532,7 @@ function enqueue(entry: Entry, work: () => Promise<void>): void {
  * higher-revision disable may be on disk unseen. `flush` handles that case
  * before reaching here: it retries the read, and if still blind it withholds an
  * ENABLED candidate outright and diverts a genuine DISABLE to the suppress-only
- * disable-floor sidecar, so this function is never asked to write the state
+ * disable-floor key set, so this function is never asked to write the state
  * record blind.
  */
 function durableCandidate(entry: Entry): MentorNoticePolicyState {
@@ -547,9 +569,9 @@ function durableCandidate(entry: Entry): MentorNoticePolicyState {
  * fail-closed throughout.
  *
  * [rework 4] This function also owns the ONE case where a write goes to the
- * disable-floor sidecar instead of the state record. The earlier objection to a
+ * disable-floor key set instead of the state record. The earlier objection to a
  * second key — "a second fallible write path" — does not hold for a key that can
- * only ever SUPPRESS: a failed sidecar write leaves the device exactly where it
+ * only ever SUPPRESS: a failed marker write leaves the device exactly where it
  * already was, where a failed STATE-record write is what destroys the floor. See
  * "THE DISABLE FLOOR" inline.
  */
@@ -557,7 +579,7 @@ async function flush(key: string, entry: Entry): Promise<void> {
   entry.flushQueued = false;
 
   /**
-   * Non-null when this flush must write the SUPPRESS-ONLY disable-floor sidecar
+   * Non-null when this flush must add a SUPPRESS-ONLY disable-floor marker
    * instead of the state record, because a genuine disable has to be persisted
    * while the state record cannot be read. See "THE DISABLE FLOOR" below.
    */
@@ -631,32 +653,51 @@ async function flush(key: string, entry: Entry): Promise<void> {
       //     exists to eliminate, so "it leaves the device disabled for now" does
       //     not buy it.
       //
-      // So write NEITHER the state record nor a fabricated revision: write the
-      // disable to its own SUPPRESS-ONLY key, and leave the state record
-      // untouched. The two are folded together additively at hydration
-      // (`readAndFold`), and the effective floor is the higher of them.
+      // So write NEITHER the state record nor a fabricated revision: ADD a
+      // marker to the suppress-only disable-floor key set, and leave the state
+      // record untouched. Hydration folds the floor additively on top of the
+      // state record (`readAndFold`); the effective bar is the higher of them.
+      //
+      // [rework 5] IT MUST BE A SET, NOT A SLOT, and this is the correction that
+      // matters most. A single sidecar slot holding "the highest disable" is
+      // still a slot we cannot READ while blind, so a blind rev-3 write
+      // overwrites an unseen rev-8 marker and lowers the floor exactly as the
+      // state record did. That is reachable in two blind cold starts — the shape
+      // sustained disk pressure actually takes, since it spans restarts — and on
+      // a fresh install the floor is the ONLY carrier, so lowering it lowers the
+      // bar absolutely. "A different key cannot destroy the state record" was
+      // true and answered the wrong question: what must survive is the FLOOR, not
+      // the record.
       //
       // Why this cannot re-enable anything, which is the whole argument:
-      //   - the sidecar record has no `enabled` field to carry. `disableFloorSignal`
-      //     always yields `enabled: false`, so folding it can only adopt a
+      //   - a marker has no `enabled` field to carry. `disableFloorSignal` always
+      //     yields `enabled: false`, so folding the floor can only adopt a
       //     disable, keep a disable, or be ignored as older.
-      //   - it holds a revision the SERVER issued with `rolloutEnabled: false`
-      //     (`entry.observedDisableRevision`) — no sentinel, no synthesized
-      //     maximum. A fabricated revision pointed at BLOCKING re-enables could
-      //     strand a device permanently disabled with no recovery path; this
-      //     cannot, because a genuine deploy above that revision still clears it.
-      //   - it is a different KEY, so writing it blind cannot destroy the state
-      //     record, and writing the state record cannot destroy it. Whichever of
-      //     the two a blind write lowers, the other still carries the floor.
+      //   - NON-LOWERABLE by construction: the floor is the MAXIMUM over the set,
+      //     a blind write only ever ADDS a member, and a maximum over a growing
+      //     set cannot decrease. No read is required for that to hold, which is
+      //     the point — reads are unavailable by hypothesis here.
+      //   - every marker's revision was issued by the SERVER with
+      //     `rolloutEnabled: false` (`entry.observedDisableRevision`) — no
+      //     sentinel, no synthesized maximum. A fabricated revision pointed at
+      //     BLOCKING re-enables could strand a device permanently disabled with
+      //     no recovery path; this cannot, because a genuine deploy above the
+      //     highest marker still clears it.
       //
-      // Residual, stated rather than papered over: if the sidecar write itself
+      // NOT pruned, deliberately. A marker below the state record's revision is
+      // redundant, but pruning is a write, and a prune that misfires is where
+      // bricking gets reintroduced. Note also that a marker AT the state record's
+      // revision is NOT redundant — same-revision disabled-wins is what it
+      // enforces. Growth is one key per distinct revision at which this device
+      // observed a disable *while blind*, which is bounded by emergency rollbacks
+      // during storage failure: realistically none, at ~60 bytes each.
+      //
+      // Residual, stated rather than papered over: if the marker write itself
       // never lands (sustained disk pressure through the retry ladder) a device
       // whose disk held a LOWER enabled record keeps that record, and the
-      // kill-switch is lost on restart. That is the same failure class as any
-      // other exhausted write here, and strictly better than the previous pass
-      // in the case that matters — the unseen higher disable is now preserved
-      // instead of overwritten. In-session behaviour stays fail-closed
-      // throughout. Tagged distinctly so the path is observable in production.
+      // kill-switch is lost on restart. Same failure class as any other exhausted
+      // write here; in-session behaviour stays fail-closed throughout. Tagged
+      // distinctly so the path is observable in production.
       Sentry.captureMessage('mentor_notice_policy: blind disable floor write', {
         level: 'warning',
         tags: {
@@ -685,13 +726,16 @@ async function flush(key: string, entry: Entry): Promise<void> {
       candidate = durableCandidate(entry);
       payload = JSON.stringify(candidate);
     } else {
-      writeKey = disableFloorKey(key);
-      payload = JSON.stringify({ revision: floor });
+      // ADDING a marker, never replacing one: the revision is in the KEY, so
+      // this cannot overwrite a marker for any other revision.
+      writeKey = disableFloorKeyFor(key, floor);
+      payload = DISABLE_FLOOR_MARKER;
     }
     try {
       await AsyncStorage.setItem(writeKey, payload);
-      // Only a STATE-record write establishes what is durably there; the sidecar
-      // says nothing about the state record, so the guard stays unestablished.
+      // Only a STATE-record write establishes what is durably there; a floor
+      // marker says nothing about the state record, so the guard stays
+      // unestablished.
       if (candidate !== null) entry.durable = candidate;
       return;
     } catch (err) {
@@ -735,18 +779,25 @@ function schedulePersist(key: string, entry: Entry): void {
 async function readAndFold(key: string, entry: Entry): Promise<void> {
   let signal: MentorNoticePolicySignal;
   // [WI-2627 rework 4] The suppress-only disable floor, folded ADDITIVELY on top
-  // of the state record below. 'absent' — no sidecar, the common case —
+  // of the state record below. 'absent' — no markers, the common case —
   // contributes nothing.
   let floor: MentorNoticePolicySignal = 'absent';
   try {
     // Sequential, state record FIRST, both inside this one `try`. Not
     // `multiGet`/`Promise.all`: a failing read must short-circuit so ONE
-    // `readAndFold` costs one failed `getItem`, which is what keeps the retry
+    // `readAndFold` costs one failed read, which is what keeps the retry
     // ladder's read count meaningful. And if EITHER read throws the disk is
     // unknown, so both facts are discarded together rather than half-trusted.
     signal = storedSignal(await AsyncStorage.getItem(key));
+    // `getAllKeys` rather than one known key, because the floor is a SET whose
+    // members are not enumerable in advance — their revisions are whatever the
+    // server issued. It runs on hydration AND on every foreground re-read: one
+    // extra index read against a store this app already scans wholesale on
+    // sign-out (`sign-out-cleanup.ts`), bought in exchange for a floor no blind
+    // write can lower.
     floor = disableFloorSignal(
-      await AsyncStorage.getItem(disableFloorKey(key)),
+      await AsyncStorage.getAllKeys(),
+      disableFloorPrefix(key),
     );
     // [WI-2627 rework] Seed the write guard from what is actually on disk. Only
     // a PARSEABLE record tells us a durable revision; 'absent' means there is
@@ -781,7 +832,7 @@ async function readAndFold(key: string, entry: Entry): Promise<void> {
     ),
     // A stored record that EXISTS (even unparseably) means this device was told
     // something and persisted it; only its genuine absence leaves the device
-    // never-told. A disable-floor sidecar counts for the same reason, and MUST:
+    // never-told. A disable-floor marker counts for the same reason, and MUST:
     // a blind disable on a fresh install lands there and nowhere else, and
     // without this the relaunch would hydrate as never-told and let a cached
     // projection paint.
@@ -833,7 +884,7 @@ export function foldMentorNoticePolicyFor(
   // 'malformed' does not.
   //
   // [rework 4] Keep the highest such revision, because `flush` now PERSISTS it
-  // to the disable-floor sidecar. Every value this can hold is therefore some
+  // to the disable-floor key set. Every value this can hold is therefore some
   // `signal.revision` the server actually sent with `rolloutEnabled: false` —
   // the max of a set of real observations is a member of that set, so nothing
   // fabricated ever reaches disk.

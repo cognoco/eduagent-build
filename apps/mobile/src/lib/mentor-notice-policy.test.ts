@@ -369,9 +369,29 @@ function stateKey(actorId: string, profileId: string): string {
   return `${MENTOR_NOTICE_POLICY_STATE_KEY_PREFIX}::${actorId}::${profileId}`;
 }
 
-/** The suppress-only disable-floor sidecar for a pair. */
-function floorKey(actorId: string, profileId: string): string {
-  return `${stateKey(actorId, profileId)}::${MENTOR_NOTICE_POLICY_DISABLE_FLOOR_KEY_SUFFIX}`;
+/** The suppress-only disable-floor marker namespace for a pair. */
+function floorPrefix(actorId: string, profileId: string): string {
+  return `${stateKey(actorId, profileId)}::${MENTOR_NOTICE_POLICY_DISABLE_FLOOR_KEY_SUFFIX}::`;
+}
+
+/**
+ * THE FLOOR — the maximum revision across the marker key set, or `null` when
+ * there are no markers.
+ *
+ * Deliberately asserts the floor rather than any key's bytes: the floor is the
+ * property that must not decrease, and an assertion on one slot's contents is
+ * what let a lowering defect read as "the record is present". Recomputed here
+ * rather than imported so the test is not tautological with the implementation.
+ */
+async function readFloor(
+  actorId: string,
+  profileId: string,
+): Promise<number | null> {
+  const prefix = floorPrefix(actorId, profileId);
+  const revisions = (await AsyncStorage.getAllKeys())
+    .filter((k) => k.startsWith(prefix))
+    .map((k) => Number(k.slice(prefix.length)));
+  return revisions.length === 0 ? null : Math.max(...revisions);
 }
 
 async function seedStored(
@@ -940,9 +960,7 @@ describe('useMentorNoticePolicy', () => {
     // was asserted before — the unseen state record is preserved rather than
     // overwritten — and the behavioural assertions below (restart state,
     // suppression) are unchanged.
-    expect(await AsyncStorage.getItem(floorKey(ACTOR, PROFILE))).toBe(
-      '{"revision":9}',
-    );
+    expect(await readFloor(ACTOR, PROFILE)).toBe(9);
     expect(await AsyncStorage.getItem(stateKey(ACTOR, PROFILE))).toBe(
       '{"revision":3,"enabled":true}',
     );
@@ -975,9 +993,12 @@ describe('useMentorNoticePolicy', () => {
     // [rework 4] Encoding only: the disable lands on the sidecar. Nothing was
     // there to preserve, so the state record legitimately stays absent — and the
     // never-told check below is what proves the sidecar alone is enough.
-    expect(await AsyncStorage.getItem(floorKey(ACTOR, PROFILE))).toBe(
-      '{"revision":9}',
-    );
+    expect(await readFloor(ACTOR, PROFILE)).toBe(9);
+    // ...and the state record is STILL absent — restored after review flagged
+    // that this assertion was dropped rather than re-expressed. It is what makes
+    // the never-told check below load-bearing: the floor marker is the only
+    // record on disk, so it alone has to carry both the disable and `observed`.
+    expect(await AsyncStorage.getItem(stateKey(ACTOR, PROFILE))).toBeNull();
 
     resetMentorNoticePolicyStoreForTests();
     const relaunched = mountPolicy();
@@ -1057,9 +1078,7 @@ describe('useMentorNoticePolicy', () => {
     );
     // ...and the rev-3 kill-switch was NOT swallowed to achieve that. It is
     // durably recorded on the suppress-only sidecar.
-    expect(await AsyncStorage.getItem(floorKey(ACTOR, PROFILE))).toBe(
-      '{"revision":3}',
-    );
+    expect(await readFloor(ACTOR, PROFILE)).toBe(3);
 
     // (3) Reads recover. Foregrounding re-hydrates, and the intact rev-8 disable
     // is re-established as what this device holds.
@@ -1121,9 +1140,7 @@ describe('useMentorNoticePolicy', () => {
     } finally {
       AsyncStorage.getItem = originalGetItem;
     }
-    expect(await AsyncStorage.getItem(floorKey(ACTOR, PROFILE))).toBe(
-      '{"revision":3}',
-    );
+    expect(await readFloor(ACTOR, PROFILE)).toBe(3);
 
     resetMentorNoticePolicyStoreForTests();
     const relaunched = mountPolicy();
@@ -1208,7 +1225,7 @@ describe('useMentorNoticePolicy', () => {
       expect(await AsyncStorage.getItem(stateKey(ACTOR, PROFILE))).toBe(
         expectedDurable,
       );
-      expect(await AsyncStorage.getItem(floorKey(ACTOR, PROFILE))).toBeNull();
+      expect(await readFloor(ACTOR, PROFILE)).toBeNull();
 
       resetMentorNoticePolicyStoreForTests();
       const relaunched = mountPolicy();
@@ -1220,9 +1237,111 @@ describe('useMentorNoticePolicy', () => {
     },
   );
 
-  it('treats an UNPARSEABLE disable-floor sidecar as fail-closed, not as absent', async () => {
+  // ── [WI-2627 rework 5] TWO CONSECUTIVE BLIND COLD STARTS ──────────────────
+  //
+  // The Gate-1 adjudicator's reproducer for PR #2645 head 1bb3f80aa, made
+  // permanent. That head carried the floor in ONE slot, and a slot we cannot read
+  // can be lowered by a blind write exactly as the state record could — so E3
+  // completed end to end, relocated to a different key. Sustained disk pressure
+  // spans restarts by nature, so "blind twice in a row" is this failure's ordinary
+  // shape, not a coincidence; and on a FRESH INSTALL the floor is the ONLY carrier,
+  // so lowering it lowers the bar absolutely.
+  //
+  // "A different key cannot destroy the state record" was true and answered the
+  // wrong question. What has to survive is the FLOOR, not the record.
+  it('closes the relocated resurrection path: two blind cold starts cannot lower the floor, so a stale enabled reply still cannot re-enable', async () => {
+    /** One blind session that persists a genuine disable, then exits. */
+    async function blindSessionWithGenuineDisable(revision: number) {
+      const originalGetItem = AsyncStorage.getItem;
+      AsyncStorage.getItem = jest.fn(() =>
+        Promise.reject(new Error('storage unavailable')),
+      ) as unknown as typeof AsyncStorage.getItem;
+      try {
+        const { result } = mountPolicy();
+        await waitFor(() => expect(result.current.hydrated).toBe(true));
+        act(() => result.current.observe(observation(revision, false)));
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 1200));
+        });
+      } finally {
+        AsyncStorage.getItem = originalGetItem;
+      }
+    }
+
+    // (1) FRESH INSTALL, reads blind. A genuine rev-8 emergency disable is
+    // persisted. It can only land on the floor, so the floor is the ONLY carrier.
+    await blindSessionWithGenuineDisable(8);
+    expect(await readFloor(ACTOR, PROFILE)).toBe(8);
+    expect(await AsyncStorage.getItem(stateKey(ACTOR, PROFILE))).toBeNull();
+
+    // (2) RESTART, reads STILL blind → nothing established to guard against,
+    // again. A genuine rev-3 disable arrives. On the single-slot head this
+    // overwrote the rev-8 marker and the floor fell 8 → 3.
+    resetMentorNoticePolicyStoreForTests();
+    await blindSessionWithGenuineDisable(3);
+    expect(await readFloor(ACTOR, PROFILE)).toBe(8);
+    // Both markers are present — the rev-3 disable was recorded WITHOUT displacing
+    // rev-8. That is the whole mechanism: a set gains members, it never replaces.
+    expect(
+      await AsyncStorage.getItem(`${floorPrefix(ACTOR, PROFILE)}8`),
+    ).not.toBeNull();
+    expect(
+      await AsyncStorage.getItem(`${floorPrefix(ACTOR, PROFILE)}3`),
+    ).not.toBeNull();
+
+    // (3) Reads recover; hydrate. The rev-8 rollback is what this device holds.
+    resetMentorNoticePolicyStoreForTests();
+    const { result } = mountPolicy();
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    expect(result.current.state).toEqual({ revision: 8, enabled: false });
+
+    // (4) THE STALE INTERMEDIATE REPLY: rev-5 enabled. It cleared the lowered bar
+    // on the single-slot head; against the intact floor it is `older`.
+    act(() => result.current.observe(observation(5, true)));
+    expect(result.current.state).toEqual({ revision: 8, enabled: false });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 1200));
+    });
+
+    // (5) RESTART — where notices were exposed.
+    resetMentorNoticePolicyStoreForTests();
+    const relaunched = mountPolicy();
+    await waitFor(() => expect(relaunched.result.current.hydrated).toBe(true));
+    expect(relaunched.result.current.state).toEqual({
+      revision: 8,
+      enabled: false,
+    });
+    expect(relaunched.result.current.suppressed(undefined)).toBe(true);
+    expect(relaunched.result.current.suppressed(observation(5, true))).toBe(
+      true,
+    );
+
+    // RECOVERY, on the same device that just accumulated two markers — the
+    // bricking edge a floor guard reintroduces. A genuine deploy above the
+    // highest marker still turns notices back on, and survives a restart.
+    act(() => relaunched.result.current.observe(observation(9, true)));
+    expect(relaunched.result.current.state).toEqual({
+      revision: 9,
+      enabled: true,
+    });
+    await waitFor(async () => {
+      expect(await AsyncStorage.getItem(stateKey(ACTOR, PROFILE))).toBe(
+        '{"revision":9,"enabled":true}',
+      );
+    });
+    resetMentorNoticePolicyStoreForTests();
+    const again = mountPolicy();
+    await waitFor(() => expect(again.result.current.hydrated).toBe(true));
+    expect(again.result.current.state).toEqual({ revision: 9, enabled: true });
+    expect(again.result.current.suppressed(observation(9, true))).toBe(false);
+  });
+
+  it('treats an UNPARSEABLE disable-floor marker as fail-closed, not as absent', async () => {
     await seedStored(ACTOR, PROFILE, '{"revision":7,"enabled":true}');
-    await AsyncStorage.setItem(floorKey(ACTOR, PROFILE), 'not json');
+    // A key under our prefix whose revision suffix does not parse. There is no
+    // honest revision to read out of it, so it must fail closed rather than be
+    // silently skipped.
+    await AsyncStorage.setItem(`${floorPrefix(ACTOR, PROFILE)}abc`, '1');
 
     const { result } = mountPolicy();
     await waitFor(() => expect(result.current.hydrated).toBe(true));
