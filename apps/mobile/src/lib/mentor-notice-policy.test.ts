@@ -1158,6 +1158,68 @@ describe('useMentorNoticePolicy', () => {
     expect(again.result.current.suppressed(observation(9, true))).toBe(false);
   });
 
+  // THE OTHER BRANCH OF THE BLIND GATE. The sidecar path is reached only when
+  // `readUntrusted && durable === null` — i.e. we have never established what is
+  // on disk. When a read DID succeed and storage goes blind afterwards, the
+  // ordinary revision-guarded write still runs, and it must do both jobs on its
+  // own: land a genuine kill-switch, and refuse to lower a floor. Untested, this
+  // is the gate condition's uncovered half.
+  it.each([
+    // seeded record, disable revision, expected durable record, expected state
+    [
+      'lands a genuine disable ABOVE it',
+      '{"revision":3,"enabled":true}',
+      9,
+      '{"revision":9,"enabled":false}',
+      { revision: 9, enabled: false },
+    ],
+    [
+      'refuses to lower a floor BELOW it',
+      '{"revision":8,"enabled":false}',
+      3,
+      '{"revision":8,"enabled":false}',
+      { revision: 8, enabled: false },
+    ],
+  ])(
+    'after a SUCCESSFUL read, a disable arriving while blind %s',
+    async (_label, seeded, disableRevision, expectedDurable, expectedState) => {
+      await seedStored(ACTOR, PROFILE, seeded as string);
+      const { result } = mountPolicy();
+      await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+      // Storage goes blind only NOW — after the read established `durable`, so
+      // the sidecar path is deliberately NOT taken.
+      const originalGetItem = AsyncStorage.getItem;
+      AsyncStorage.getItem = jest.fn(() =>
+        Promise.reject(new Error('storage unavailable')),
+      ) as unknown as typeof AsyncStorage.getItem;
+      try {
+        act(() =>
+          result.current.observe(observation(disableRevision as number, false)),
+        );
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 1200));
+        });
+      } finally {
+        AsyncStorage.getItem = originalGetItem;
+      }
+
+      // The guarded write carried it: no sidecar was needed or written.
+      expect(await AsyncStorage.getItem(stateKey(ACTOR, PROFILE))).toBe(
+        expectedDurable,
+      );
+      expect(await AsyncStorage.getItem(floorKey(ACTOR, PROFILE))).toBeNull();
+
+      resetMentorNoticePolicyStoreForTests();
+      const relaunched = mountPolicy();
+      await waitFor(() =>
+        expect(relaunched.result.current.hydrated).toBe(true),
+      );
+      expect(relaunched.result.current.state).toEqual(expectedState);
+      expect(relaunched.result.current.suppressed(undefined)).toBe(true);
+    },
+  );
+
   it('treats an UNPARSEABLE disable-floor sidecar as fail-closed, not as absent', async () => {
     await seedStored(ACTOR, PROFILE, '{"revision":7,"enabled":true}');
     await AsyncStorage.setItem(floorKey(ACTOR, PROFILE), 'not json');
