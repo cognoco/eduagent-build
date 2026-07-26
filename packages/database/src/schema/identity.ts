@@ -24,10 +24,13 @@
  *  15. knowledge_assertions — append-only known-age/known-residence history
  *  16. allowed_models   — vetting-pipeline output; router reads this
  *  17. subscription_payers — primary + ≤1 secondary payer join
+ *  18. country_policy_registry — effective-dated country matrix (WI-2690)
  *
  * F-032: scoped single-table reads on these tables must use
  * createScopedRepository(profileId). This file declares the tables;
- * the enforcement pattern is in repository.ts.
+ * the enforcement pattern is in repository.ts. Global reference tables
+ * (regimes, country_policy_registry) are exempt — they carry no profile_id,
+ * so there is no per-profile scope to enforce.
  */
 
 import {
@@ -297,6 +300,7 @@ export const subscription = pgTable(
       .references(() => organization.id, { onDelete: 'restrict' }),
     planTier: text('plan_tier').notNull(),
     status: text('status').notNull(),
+    pastDueAt: timestamp('past_due_at', { withTimezone: true }),
     /**
      * Primary Payer (NOT NULL per data-model.md §2A.4).
      * RESTRICT: a person who is the primary payer cannot be deleted without
@@ -694,6 +698,111 @@ export const policyRules = pgTable(
   ],
 );
 
+/**
+ * [WI-2690] Effective-dated country matrix — the SOLE live source for
+ * country-to-regime mapping, Article 8 threshold, authorization form, launch
+ * status, legal-verification state, AI processing-location class, and source
+ * provenance. Mobile, API, provider routing, and store operations must hold no
+ * copy of any of it.
+ *
+ * Adding a country, correcting a threshold, or enabling a launch wave is an
+ * INSERT of a new effective-dated row — never a migration and never a deploy.
+ * Rows are never edited in place: supersede by inserting a row with a later
+ * `effective_at` (and, where the old row should stop applying independently,
+ * setting its `expires_at`).
+ *
+ * `controller_gates` is a flat object of booleans (one per controller-approved
+ * launch gate). The "every gate must be closed before a country may be
+ * enabled" invariant is enforced by `countryPolicyRecordSchema` at the loader
+ * boundary rather than here: a CHECK constraint cannot iterate a jsonb object
+ * without a subquery, which Postgres does not permit in CHECK.
+ */
+export const countryPolicyRegistry = pgTable(
+  'country_policy_registry',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    countryCode: text('country_code').notNull(),
+    countryName: text('country_name').notNull(),
+    regimeId: uuid('regime_id')
+      .notNull()
+      .references(() => regimes.id, { onDelete: 'restrict' }),
+    article8Threshold: smallint('article8_threshold').notNull(),
+    authorizationForm: text('authorization_form').notNull(),
+    launchStatus: text('launch_status').notNull(),
+    launchBlockReason: text('launch_block_reason'),
+    legalVerificationStatus: text('legal_verification_status').notNull(),
+    legalReviewedAt: timestamp('legal_reviewed_at', {
+      withTimezone: true,
+    }).notNull(),
+    legalReviewValidUntil: timestamp('legal_review_valid_until', {
+      withTimezone: true,
+    }).notNull(),
+    launchDayReviewRequired: boolean('launch_day_review_required')
+      .notNull()
+      .default(false),
+    processingLocationClass: text('processing_location_class').notNull(),
+    policyVersion: text('policy_version').notNull(),
+    effectiveAt: timestamp('effective_at', { withTimezone: true }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    sourceProvenance: jsonb('source_provenance').notNull(),
+    controllerGates: jsonb('controller_gates').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('country_policy_registry_unique').on(
+      table.countryCode,
+      table.effectiveAt,
+    ),
+    index('idx_country_policy_registry_lookup').on(
+      table.countryCode,
+      table.effectiveAt.desc(),
+    ),
+    check(
+      'country_policy_registry_country_code_valid',
+      sql`${table.countryCode} ~ '^[A-Z]{2}$'`,
+    ),
+    check(
+      'country_policy_registry_threshold_valid',
+      sql`${table.article8Threshold} BETWEEN 13 AND 16`,
+    ),
+    check(
+      'country_policy_registry_authorization_form_valid',
+      sql`${table.authorizationForm} IN ('self', 'guardian', 'joint_child_guardian')`,
+    ),
+    check(
+      'country_policy_registry_launch_status_valid',
+      sql`${table.launchStatus} IN ('enabled', 'blocked')`,
+    ),
+    check(
+      'country_policy_registry_legal_verification_valid',
+      sql`${table.legalVerificationStatus} IN ('verified', 'unverified')`,
+    ),
+    check(
+      'country_policy_registry_processing_location_valid',
+      sql`${table.processingLocationClass} IN ('eea_only', 'blocked')`,
+    ),
+    // AC3: enabling a country is a legal-clearance act, so the row cannot be
+    // enabled while its own legal verification is outstanding.
+    check(
+      'country_policy_registry_enabled_requires_verified',
+      sql`${table.launchStatus} <> 'enabled' OR ${table.legalVerificationStatus} = 'verified'`,
+    ),
+    // AC4: a blocked country carries a stable fast-follow reason.
+    check(
+      'country_policy_registry_blocked_requires_reason',
+      sql`${table.launchStatus} <> 'blocked' OR ${table.launchBlockReason} IS NOT NULL`,
+    ),
+    check(
+      'country_policy_registry_effective_window_valid',
+      sql`${table.expiresAt} IS NULL OR ${table.expiresAt} > ${table.effectiveAt}`,
+    ),
+  ],
+);
+
 // 2A.2 Knowledge axes — knowledge_assertions + person cache columns
 // (The person cache columns age_knowing / residence_knowing are on person above.)
 
@@ -839,7 +948,7 @@ export const consentRequest = pgTable(
     organizationId: uuid('organization_id')
       .notNull()
       .references(() => organization.id, { onDelete: 'cascade' }),
-    purpose: text('purpose').notNull().default('platform_use'),
+    purpose: text('purpose').notNull(),
     requestedBasis: text('requested_basis').notNull(),
     /**
      * Nullable: in the child-self-signup flow the responding parent exists only

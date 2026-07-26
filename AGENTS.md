@@ -2,13 +2,13 @@
 
 ## Snapshot
 
-- Mobile: ~88 screens, 470 test suites, ~5130 tests
-- API: 50 route groups, 329 test suites, ~7608 tests, 69 Inngest functions
-- Cross-package integration tests: 57 suites in `tests/integration/`, ~290 cases
+- Mobile: ~88 screens, 494 test suites, ~5644 tests
+- API: 53 route groups, 329 test suites, ~8380 tests, 78 Inngest functions
+- Cross-package integration tests: 70 suites in `tests/integration/`, ~290 cases
 - Monorepo: `apps/api`, `apps/mobile`, shared packages in `packages/`
 - Core docs: `docs/project_context.md`, `docs/architecture.md`, relevant spec/plan under `docs/plans/` or `docs/specs/`
 
-> Counts verified 2026-07-07. Test-case totals are a heuristic grep of `it(` / `test(` line starts; jest-reported totals may be slightly higher due to `it.each(...)` expansion at runtime. Re-verify with `git ls-files | grep '\.test\.'` for suite counts.
+> Counts verified 2026-07-21. Test-case totals are a heuristic grep of `it(` / `test(` line starts; jest-reported totals may be slightly higher due to `it.each(...)` expansion at runtime. Re-verify with `git ls-files | grep '\.test\.'` for suite counts.
 
 ## How to Work
 
@@ -211,7 +211,7 @@ Skills under a **group directory** (currently `tech/`) are an exception to the 1
 
 > **Scope.** This section describes the **current** nav/gating system (live in `apps/mobile/src/lib/navigation-contract.ts`). The **target** identity model being designed in the identity-foundation runway (6-persona set, capability split, "charge" terminology) is **not** this — it lives in `docs/canon/identity/` + `_wip/identity-foundation/CANONICAL-SET.md`. Don't conflate the two.
 
-**For full audience matrix** (which screens/APIs/Inngest jobs serve which user mode, with file:line citations and known gating gaps F1-F14), see `docs/audience-matrix.md`. For the *target* state — one `resolveNavigationContract()` function owning all UI gating — see the now-implemented contract in `apps/mobile/src/lib/navigation-contract.ts` (design rationale archived at `docs/_archive/specs/Done/2026-05-21-navigation-contract.md`). The short version is below.
+**For the reconstructed audience-gating inventory** (screens/APIs/Inngest jobs by user mode, with historical file:line citations and scaffolded findings F1-F14), see `docs/compliance/audience-matrix.md`; verify its leads against current code before relying on them. For the implemented contract — one `resolveNavigationContract()` function owning UI gating — see `apps/mobile/src/lib/navigation-contract.ts` (design rationale archived at `docs/_archive/specs/Done/2026-05-21-navigation-contract.md`). The current short version is below.
 
 > **Nav mode is per-environment — check it whenever the environment under discussion changes; never assume a global default.** The flags are **build-time** (`MODE_NAV_V0_ENABLED` / `MODE_NAV_V1_ENABLED` from `EXPO_PUBLIC_ENABLE_MODE_NAV` / `..._V1`, resolved in `apps/mobile/src/lib/feature-flags.ts:30-31`) and intentionally differ by environment — as of 2026-06-09: production build V0=on/V1=off (`apps/mobile/eas.json`), dev/preview builds and the preview-channel OTA both-on → V1 (`eas.json`, `.github/workflows/ci.yml` OTA env), local `.env.example` flags-off. These can change — read the flag values for the environment in question before making any nav/tab/mode claim, and use the audience × flag-state "Navigation shell matrix" in `docs/flows/mobile-app-flow-inventory.md`. Do not write any flag state into docs or memory as "the default."
 >

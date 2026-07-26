@@ -29,10 +29,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import { MINIMUM_AGE } from '../consent';
-import {
-  DEFAULT_CONSENT_PURPOSE,
-  resolveConsentStatus,
-} from './consent-status-v2';
+import { resolveConsentSetStatus } from './consent-status-v2';
 import { getGuardianPersonIds } from './guardianship';
 
 type SelfReportWindow = {
@@ -145,11 +142,10 @@ export async function listEligibleSelfReportPersonIdsV2(
   // batches. The post-filter preserves the original semantics exactly.
   const consentChecks = await mapInBatches(selfManaged, async (o) => ({
     personId: o.personId,
-    status: await resolveConsentStatus(
+    status: await resolveConsentSetStatus(
       db,
       o.personId,
       o.organizationId,
-      DEFAULT_CONSENT_PURPOSE,
       'gdpr_parental_consent',
     ),
   }));

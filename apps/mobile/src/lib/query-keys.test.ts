@@ -181,6 +181,39 @@ describe('queryKeys mode-scoped factories', () => {
 });
 
 describe('queryKeys non-mode-scoped factories', () => {
+  it('keeps Now projections bound to exact actor/profile/epoch keys', () => {
+    const actorId = 'actor-abc';
+    const profileId = 'prof-abc';
+    const policyEpoch = 'epoch-enabled';
+
+    expect(queryKeys.now.feed(actorId, profileId, policyEpoch)).toEqual([
+      'now-feed',
+      actorId,
+      profileId,
+      policyEpoch,
+    ]);
+    expect(queryKeys.now.overflow(actorId, profileId, policyEpoch)).toEqual([
+      'now-overflow',
+      actorId,
+      profileId,
+      policyEpoch,
+    ]);
+  });
+
+  it.each(['feed', 'overflow'] as const)(
+    'normalizes unloaded Now %s scope IDs',
+    (projection) => {
+      expect(
+        queryKeys.now[projection](null, undefined, 'epoch-enabled'),
+      ).toEqual([
+        projection === 'feed' ? 'now-feed' : 'now-overflow',
+        undefined,
+        undefined,
+        'epoch-enabled',
+      ]);
+    },
+  );
+
   it('[WI-2184] matches only completed-session history keys for one profile', () => {
     const matchProfileHistory = queryKeys.historySessionsMatch('prof-abc');
 

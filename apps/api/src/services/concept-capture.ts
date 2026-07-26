@@ -37,7 +37,7 @@ function displayLabelForConcept(label: string): string {
   return label.trim().replace(/\s+/g, ' ');
 }
 
-function normalizedLabelForConcept(label: string): string {
+export function conceptKeyForLabel(label: string): string {
   return displayLabelForConcept(label).toLowerCase();
 }
 
@@ -50,10 +50,10 @@ function normalizeEvaluations(
     const label = displayLabelForConcept(item.concept);
     if (label.length === 0) continue;
 
-    byNormalizedLabel.set(normalizedLabelForConcept(label), {
+    byNormalizedLabel.set(conceptKeyForLabel(label), {
       ...item,
       label,
-      normalizedLabel: normalizedLabelForConcept(label),
+      normalizedLabel: conceptKeyForLabel(label),
     });
   }
 

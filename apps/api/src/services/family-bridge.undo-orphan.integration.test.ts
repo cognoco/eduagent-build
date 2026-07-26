@@ -41,6 +41,8 @@ import {
   deleteV2IdentitiesForTest,
   ensureV2IdentityForLegacyProfileTest,
 } from '../test-utils/legacy-identity-anchors';
+import { ConflictError } from '../errors';
+import { claimBookForTopicExpansion } from './curriculum';
 import { cloneTopicFromChild, undoCloneFromChild } from './family-bridge';
 
 const RUN = !!process.env.DATABASE_URL;
@@ -314,6 +316,50 @@ async function adultSubjectByName(
           where: eq(curriculumTopics.id, adultExisting.topic.id),
         });
         expect(ownTopic?.id).toBe(adultExisting.topic.id);
+      } finally {
+        await teardown(fixture);
+      }
+    });
+
+    it('[WI-1864] blocks a family-bridge topic insert while expansion owns the destination book', async () => {
+      const fixture = await seedFamily();
+      try {
+        const adultExisting = await seedLearningTree(fixture.db, {
+          profileId: fixture.adultId,
+          subjectName: 'Mathematics',
+          bookTitle: 'Numbers That Matter',
+          topicTitle: 'Decimals',
+          topicDescription: "Parent's existing decimals topic.",
+        });
+        await expect(
+          claimBookForTopicExpansion(
+            fixture.db,
+            fixture.adultId,
+            adultExisting.subject.id,
+            adultExisting.book.id,
+          ),
+        ).resolves.toBeInstanceOf(Date);
+
+        await expect(
+          cloneTopicFromChild(
+            fixture.db,
+            fixture.adultId,
+            {
+              childProfileId: fixture.childId,
+              topicId: fixture.childTopicId,
+              requestId: randomUUID(),
+            },
+            SERVICE_OPTS,
+          ),
+        ).rejects.toBeInstanceOf(ConflictError);
+
+        const fractions = await fixture.db.query.curriculumTopics.findFirst({
+          where: and(
+            eq(curriculumTopics.bookId, adultExisting.book.id),
+            eq(curriculumTopics.title, 'Fractions'),
+          ),
+        });
+        expect(fractions).toBeUndefined();
       } finally {
         await teardown(fixture);
       }

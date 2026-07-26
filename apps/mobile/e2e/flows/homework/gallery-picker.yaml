@@ -31,69 +31,64 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "homework-ready"
+      SEED_SCENARIO: 'homework-ready'
       API_URL: ${API_URL}
 
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 15000
 
 - takeScreenshot: homework-gallery-01-home
 
 - tapOn:
-    id: "home-action-homework"
+    id: 'home-action-homework'
 
 # Camera permission can appear before the viewfinder controls are available.
 - tapOn:
-    id: "grant-permission-button"
-    optional: true  # justified: camera permission prompt only appears on first use or after permission reset
+    id: 'grant-permission-button'
+    optional: true # justified: camera permission prompt only appears on first use or after permission reset
 
 - extendedWaitUntil:
     visible:
-      id: "gallery-button"
+      id: 'gallery-button'
     timeout: 15000
 
 - takeScreenshot: homework-gallery-02-before-picker
 
 - tapOn:
-    id: "gallery-button"
+    id: 'gallery-button'
 
-# Native picker layouts vary by Android version/gallery provider. The planted
-# JPEG may surface by filename, or the picker may need a generic first-tile tap.
+# API-34 Photo Picker exposes each media tile through this stable platform id.
+# AOSP images omit the google package segment that Google API images include,
+# so match exactly those two system-picker variants.
 - extendedWaitUntil:
     visible:
-      text: "dictation-test-image"
+      id: 'com(?:\.google)?\.android\.providers\.media\.module:id/icon_thumbnail'
     timeout: 10000
-    optional: true  # justified: system image picker may not expose the planted filename as selectable text on every Android version
 
 - tapOn:
-    text: "dictation-test-image"
-    optional: true  # justified: filename selector is preferred when exposed, but Android picker UIs vary
-
-- tapOn:
+    id: 'com(?:\.google)?\.android\.providers\.media\.module:id/icon_thumbnail'
     index: 0
-    text: "Photos"
-    optional: true  # justified: fallback first-tile/Photos selector for system picker variants that hide filenames
 
 # Required: reaching preview proves an image was selected from the gallery.
 - extendedWaitUntil:
     visible:
-      id: "photo-preview"
+      id: 'photo-preview'
     timeout: 15000
 
 - assertVisible:
-    id: "camera-use-this-button"
+    id: 'camera-use-this-button'
 
 - takeScreenshot: homework-gallery-03-preview
 
 - tapOn:
-    id: "camera-use-this-button"
+    id: 'camera-use-this-button'
 
 # Required: Use this moved the gallery image into OCR processing.
 - extendedWaitUntil:
     visible:
-      id: "camera-cancel-ocr"
+      id: 'camera-cancel-ocr'
     timeout: 10000
 
 - takeScreenshot: homework-gallery-04-processing
@@ -103,14 +98,14 @@ tags:
 # already reached processing.
 - extendedWaitUntil:
     visible:
-      id: "result-text-input"
+      id: 'result-text-input'
     timeout: 30000
-    optional: true  # justified: gallery OCR may succeed on a planted readable JPEG
+    optional: true # justified: gallery OCR may succeed on a planted readable JPEG
 
 - extendedWaitUntil:
     visible:
-      id: "retry-button"
+      id: 'retry-button'
     timeout: 5000
-    optional: true  # justified: alternate OCR failure branch when the planted JPEG cannot be read by the OCR backend
+    optional: true # justified: alternate OCR failure branch when the planted JPEG cannot be read by the OCR backend
 
 - takeScreenshot: homework-gallery-05-ocr-outcome

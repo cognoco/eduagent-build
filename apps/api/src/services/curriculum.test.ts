@@ -301,7 +301,9 @@ function createMockDb({
     },
     update: jest.fn().mockReturnValue({
       set: jest.fn().mockReturnValue({
-        where: jest.fn().mockResolvedValue(undefined),
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([{ id: BOOK_ID }]),
+        }),
       }),
     }),
     insert: jest.fn().mockReturnValue({
@@ -787,6 +789,13 @@ describe('challengeCurriculum', () => {
       }),
       delete: jest.fn().mockReturnValue({
         where: jest.fn().mockResolvedValue(undefined),
+      }),
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue([{ id: BOOK_ID }]),
+          }),
+        }),
       }),
       select: mockLatestSessionSelect(),
       transaction: jest
@@ -2525,10 +2534,11 @@ describe('isStaleBookGenerationClaim', () => {
 });
 
 describe('repairIncompleteBookGenerationClaim', () => {
-  it('[WI-142 review] classifies fresh incomplete generated books as in progress', async () => {
+  it('[WI-1864] treats a fresh thin generated book as complete, not as an active legacy claim', async () => {
     jest.useFakeTimers().setSystemTime(NOW);
 
     try {
+      const generateBookTopics = jest.fn();
       const result = await repairIncompleteBookGenerationClaim(
         {} as Database,
         PROFILE_ID,
@@ -2567,12 +2577,13 @@ describe('repairIncompleteBookGenerationClaim', () => {
         },
         undefined,
         {
-          generateBookTopics: jest.fn(),
+          generateBookTopics,
           captureException: jest.fn(),
         },
       );
 
-      expect(result.status).toBe('in_progress');
+      expect(result.status).toBe('not_incomplete');
+      expect(generateBookTopics).not.toHaveBeenCalled();
     } finally {
       jest.useRealTimers();
     }
@@ -2596,20 +2607,7 @@ describe('repairIncompleteBookGenerationClaim', () => {
         createdAt: STALE_AT,
         updatedAt: STALE_AT,
       },
-      topics: [
-        {
-          id: 'topic-1',
-          title: 'Pyramids',
-          description: 'Why pyramids mattered',
-          chapter: 'The Story',
-          sortOrder: 1,
-          relevance: 'core',
-          estimatedMinutes: 20,
-          bookId: 'book-1',
-          skipped: false,
-          source: 'generated',
-        },
-      ],
+      topics: [],
       connections: [],
       status: 'NOT_STARTED',
       completedTopicCount: 0,
@@ -2617,10 +2615,26 @@ describe('repairIncompleteBookGenerationClaim', () => {
     };
 
     function makeFakeDb() {
+      const returning = jest
+        .fn()
+        .mockResolvedValue([
+          { claimedAt: new Date('2026-01-01T00:00:00.000Z') },
+        ]);
       return {
+        update: jest.fn(() => ({
+          set: jest.fn(() => ({
+            where: jest.fn(() => ({ returning })),
+          })),
+        })),
         query: {
           person: {
             findFirst: jest.fn().mockResolvedValue({ birthDate: '1990-01-01' }),
+          },
+          curricula: {
+            findFirst: jest.fn().mockResolvedValue({ id: 'curriculum-1' }),
+          },
+          curriculumTopics: {
+            findFirst: jest.fn().mockResolvedValue(undefined),
           },
         },
       } as unknown as Database;
@@ -2649,7 +2663,7 @@ describe('repairIncompleteBookGenerationClaim', () => {
           expect.anything(),
           expect.anything(),
           36,
-          expect.anything(),
+          undefined,
         );
       } finally {
         jest.useRealTimers();
@@ -3515,7 +3529,13 @@ describe('persistNarrowTopics orphan strip', () => {
   it('does not persist a narrow topic that restates the subject name', async () => {
     const db = createMockDb({ curriculumFindFirst: mockCurriculumRow() });
 
-    await persistNarrowTopics(db, 'subject-1', narrowTopics, 'Fractions');
+    await persistNarrowTopics(
+      db,
+      PROFILE_ID,
+      'subject-1',
+      narrowTopics,
+      'Fractions',
+    );
 
     const insertedTopics = (db.insert as jest.Mock).mock.results[0]!.value
       .values.mock.calls[0]![0] as Array<{ title: string }>;
@@ -3528,7 +3548,13 @@ describe('persistNarrowTopics orphan strip', () => {
   it('persists every topic when none restates the subject name', async () => {
     const db = createMockDb({ curriculumFindFirst: mockCurriculumRow() });
 
-    await persistNarrowTopics(db, 'subject-1', narrowTopics, 'Mathematics');
+    await persistNarrowTopics(
+      db,
+      PROFILE_ID,
+      'subject-1',
+      narrowTopics,
+      'Mathematics',
+    );
 
     const insertedTopics = (db.insert as jest.Mock).mock.results[0]!.value
       .values.mock.calls[0]![0] as Array<{ title: string }>;

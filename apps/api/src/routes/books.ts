@@ -28,7 +28,9 @@ import {
   getBookWithTopics,
   persistBookTopics,
   claimBookForGeneration,
+  claimBookForTopicExpansion,
   releaseBookGenerationClaimIfEmpty,
+  releaseBookTopicExpansionClaim,
   repairIncompleteBookGenerationClaim,
   moveTopicToBook,
   expandExistingBookTopics,
@@ -221,7 +223,8 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
 
       try {
         // Atomic CAS: only one concurrent request wins the right to generate.
-        // claimBookForGeneration sets topicsGenerated = true WHERE it's still false.
+        // claimBookForGeneration stamps the dedicated in-flight marker while
+        // topicsGenerated remains false until persistence succeeds.
         const claimed = await claimBookForGeneration(
           db,
           profileId,
@@ -267,21 +270,59 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
               'Book topic generation is still in progress. Please retry shortly.',
             );
           }
+          if (!existing.book.topicsGenerated) {
+            return apiError(
+              c,
+              409,
+              ERROR_CODES.CONFLICT,
+              'Book topic generation is still in progress. Please retry shortly.',
+            );
+          }
           const activeTopicCount = existing.topics.filter(
             (topic) => !topic.skipped,
           ).length;
           if (expandExisting && activeTopicCount < MIN_GENERATED_BOOK_TOPICS) {
-            const learnerAge = await getPersonAge(db, profileId);
-            const expanded = await expandExistingBookTopics(
+            const expansionClaimStartedAt = await claimBookForTopicExpansion(
               db,
               profileId,
               subjectId,
               bookId,
-              existing,
-              priorKnowledge,
-              { learnerAge, generateBookTopics, captureException },
             );
-            return c.json(bookWithTopicsSchema.parse(expanded));
+            if (!expansionClaimStartedAt) {
+              return apiError(
+                c,
+                409,
+                ERROR_CODES.CONFLICT,
+                'Book topic expansion is still in progress. Please retry shortly.',
+              );
+            }
+            try {
+              const learnerAge = await getPersonAge(db, profileId);
+              const expanded = await expandExistingBookTopics(
+                db,
+                profileId,
+                subjectId,
+                bookId,
+                existing,
+                priorKnowledge,
+                {
+                  learnerAge,
+                  generateBookTopics,
+                  captureException,
+                  expansionClaimStartedAt,
+                },
+              );
+              return c.json(bookWithTopicsSchema.parse(expanded));
+            } catch (error) {
+              await releaseBookTopicExpansionClaim(
+                db,
+                profileId,
+                subjectId,
+                bookId,
+                expansionClaimStartedAt,
+              );
+              throw error;
+            }
           }
           return c.json(bookWithTopicsSchema.parse(existing));
         }

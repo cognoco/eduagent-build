@@ -171,6 +171,8 @@ const MOCK_BOOKMARK = {
   subjectName: 'History',
   topicTitle: 'World War I',
   content: 'This is important',
+  artifactSource: 'freeform_keep',
+  verificationState: 'unverified',
   createdAt: '2026-05-01T10:00:00.000Z',
 };
 

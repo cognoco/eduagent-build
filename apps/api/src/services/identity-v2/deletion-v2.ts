@@ -98,6 +98,7 @@ import type {
   AccountDeletionStatusResponse,
   SubscriptionStoreTeardownTarget,
 } from '@eduagent/schemas';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import { ConflictError, NotFoundError } from '../../errors';
 import { captureException } from '../sentry';
 
@@ -623,19 +624,15 @@ export async function deletePersonIfConsentWithdrawnV2(
     // Re-check current GDPR grant under the lock and verify it is withdrawn
     // (optionally at the given timestamp). currentGrant windowing:
     // max(granted_at), tiebreak id.
-    const current = await tx.query.consentGrant.findFirst({
-      where: and(
-        eq(consentGrant.chargePersonId, personId),
-        eq(consentGrant.purpose, 'platform_use'),
-        eq(consentGrant.lawfulBasis, 'gdpr_parental_consent'),
-      ),
-      orderBy: (g, { desc }) => [desc(g.grantedAt), desc(g.id)],
-      columns: { id: true, withdrawnAt: true },
-    });
-    if (!current?.withdrawnAt) return false;
+    const current = await currentGdprGrantSetTx(tx, personId);
+    if (current.length === 0 || current.some((grant) => !grant.withdrawnAt)) {
+      return false;
+    }
     if (
       withdrawnAtDate &&
-      current.withdrawnAt.getTime() !== withdrawnAtDate.getTime()
+      current.some(
+        (grant) => grant.withdrawnAt!.getTime() !== withdrawnAtDate.getTime(),
+      )
     ) {
       return false;
     }
@@ -705,17 +702,13 @@ export async function deletePersonIfNoConsentV2(
     // persist. Mirrors deletePersonIfConsentWithdrawnV2 / the archived sibling.
     await acquirePersonLockTx(tx, personId);
 
-    const current = await tx.query.consentGrant.findFirst({
-      where: and(
-        eq(consentGrant.chargePersonId, personId),
-        eq(consentGrant.purpose, 'platform_use'),
-        eq(consentGrant.lawfulBasis, 'gdpr_parental_consent'),
-      ),
-      orderBy: (g, { desc }) => [desc(g.grantedAt), desc(g.id)],
-      columns: { withdrawnAt: true },
-    });
-    // A current granted+un-withdrawn grant means consent stands — never delete.
-    if (current && !current.withdrawnAt) return false;
+    const current = await currentGdprGrantSetTx(tx, personId);
+    // Any active recorded purpose is valid historical consent and therefore
+    // blocks destructive abandonment. A missing newer purpose remains
+    // fail-closed for processing, but must not erase the earlier grant.
+    if (current.some((grant) => !grant.withdrawnAt)) {
+      return false;
+    }
 
     // Request-generation guard: if this is a generation-scoped run, only delete
     // when an OPEN request of that generation still exists. A newer consent
@@ -796,16 +789,10 @@ export async function deleteArchivedPersonIfStillEligibleV2(
     ) {
       return false;
     }
-    const current = await tx.query.consentGrant.findFirst({
-      where: and(
-        eq(consentGrant.chargePersonId, personId),
-        eq(consentGrant.purpose, 'platform_use'),
-        eq(consentGrant.lawfulBasis, 'gdpr_parental_consent'),
-      ),
-      orderBy: (g, { desc }) => [desc(g.grantedAt), desc(g.id)],
-      columns: { withdrawnAt: true },
-    });
-    if (current && !current.withdrawnAt) return false;
+    const current = await currentGdprGrantSetTx(tx, personId);
+    if (current.some((grant) => !grant.withdrawnAt)) {
+      return false;
+    }
     await rehomeGrantsTx(tx, personId);
     await writeFinancialRecordsForPersonTx(tx, personId);
     await tx.insert(deletionAudit).values({
@@ -882,6 +869,29 @@ async function rehomeGrantsTx(
 }
 
 type DeletionTx = Parameters<Parameters<Database['transaction']>[0]>[0];
+
+async function currentGdprGrantSetTx(
+  tx: DeletionTx,
+  personId: string,
+): Promise<Array<{ purpose: string; withdrawnAt: Date | null }>> {
+  const rows = await Promise.all(
+    CONSENT_PURPOSES.map((purpose) =>
+      tx.query.consentGrant.findFirst({
+        where: and(
+          eq(consentGrant.chargePersonId, personId),
+          eq(consentGrant.purpose, purpose),
+          eq(consentGrant.lawfulBasis, 'gdpr_parental_consent'),
+        ),
+        orderBy: (grant, { desc }) => [desc(grant.grantedAt), desc(grant.id)],
+        columns: { purpose: true, withdrawnAt: true },
+      }),
+    ),
+  );
+  return rows.filter(
+    (row): row is { purpose: string; withdrawnAt: Date | null } =>
+      row !== undefined,
+  );
+}
 
 /**
  * Acquire the per-person serializing advisory lock at the TOP of a deletion

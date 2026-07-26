@@ -38,15 +38,15 @@ jest.mock('../../services/identity-v2/family-v2', () => {
   };
 });
 
-const mockResolveLatestConsentStatusAnyBasis = jest.fn();
+const mockResolveLatestConsentSetStatusAnyBasis = jest.fn();
 jest.mock('../../services/identity-v2/consent-status-v2', () => {
   const actual = jest.requireActual(
     '../../services/identity-v2/consent-status-v2',
   ) as typeof import('../../services/identity-v2/consent-status-v2');
   return {
     ...actual,
-    resolveLatestConsentStatusAnyBasis: (...args: unknown[]) =>
-      mockResolveLatestConsentStatusAnyBasis(...args),
+    resolveLatestConsentSetStatusAnyBasis: (...args: unknown[]) =>
+      mockResolveLatestConsentSetStatusAnyBasis(...args),
   };
 });
 
@@ -114,7 +114,7 @@ beforeEach(() => {
 
   // V2 path defaults
   mockResolveOrgIdForPerson.mockResolvedValue('org-001');
-  mockResolveLatestConsentStatusAnyBasis.mockResolvedValue('WITHDRAWN');
+  mockResolveLatestConsentSetStatusAnyBasis.mockResolvedValue('WITHDRAWN');
   mockGetPersonForConsentRevocationV2.mockResolvedValue({
     displayName: 'Liam',
     birthYear: 2012,
@@ -170,7 +170,7 @@ describe('archiveCleanup (v2 path)', () => {
   });
 
   it('does not delete when v2 consent status is CONSENTED', async () => {
-    mockResolveLatestConsentStatusAnyBasis.mockResolvedValue('CONSENTED');
+    mockResolveLatestConsentSetStatusAnyBasis.mockResolvedValue('CONSENTED');
 
     await executeArchiveCleanup('person-restored-v2');
 
@@ -207,7 +207,7 @@ describe('archiveCleanup (v2 path)', () => {
     await executeArchiveCleanup('person-no-org-v2');
 
     // No consent lookup possible without an org; proceeds to person/delete checks.
-    expect(mockResolveLatestConsentStatusAnyBasis).not.toHaveBeenCalled();
+    expect(mockResolveLatestConsentSetStatusAnyBasis).not.toHaveBeenCalled();
     expect(mockDeleteArchivedPersonIfStillEligibleV2).toHaveBeenCalledWith(
       expect.anything(),
       'person-no-org-v2',

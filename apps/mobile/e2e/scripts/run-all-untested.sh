@@ -123,7 +123,7 @@ run_seeded "onboarding-no-subject" "flows/edge/empty-first-user.yaml"
 
 # Consent flows (seeded, but DON'T use seed-and-sign-in.yaml — custom sign-in)
 run_seeded "consent-withdrawn-solo" "flows/consent/consent-withdrawn-gate.yaml"
-run_seeded "onboarding-complete" "flows/consent/post-approval-landing.yaml"
+run_seeded "post-approval-ready" "flows/consent/post-approval-landing.yaml"
 
 # ─── GROUP 1.5: No-seed flows (need fresh app launch but no seed data) ───
 

@@ -1,0 +1,51 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The recorded before/after table is grounded in the four corrected flow dispositions and the final reviewed implementation.",
+      "pointer": "apps/mobile/e2e/flows/account/more-impersonated-child.yaml"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Planner regression coverage proves prose-PARKED flows require blocked/manual tags and are excluded from scheduled plans.",
+      "pointer": "scripts/e2e-ci-injection-and-smoke-gate.test.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "The duplicate learner populated-memory journey is retired while the supported parent-native route remains scheduled.",
+      "pointer": "apps/mobile/e2e/flows/account/learner-mentor-memory-populated.yaml"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Dictation flows scroll to the current control and the release runner supplies a deterministic media fixture.",
+      "pointer": "apps/mobile/e2e/flows/dictation/dictation-review-flow.yaml"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "Empty learner Mentor Memory returns through the supported More interaction and verifies restored navigation state.",
+      "pointer": "apps/mobile/e2e/flows/account/learner-mentor-memory.yaml"
+    },
+    {
+      "acRef": "AC-6",
+      "description": "The release-APK runner provides required E2E seams and sanitizes retained artifacts without a dev-client or Metro dependency.",
+      "pointer": "apps/mobile/e2e/scripts/run-ci-maestro.sh"
+    },
+    {
+      "acRef": "AC-7",
+      "description": "Structural tests cover plan inclusion/exclusion, overrides, corrected dispositions, and duplicate semantic coverage.",
+      "pointer": "scripts/e2e-ci-injection-and-smoke-gate.test.ts"
+    },
+    {
+      "acRef": "AC-8",
+      "description": "The manual nightly workflow executes all eight release-APK Maestro shards rather than accepting skipped push jobs.",
+      "pointer": ".github/workflows/e2e-ci.yml"
+    },
+    {
+      "acRef": "AC-9",
+      "description": "The machine-generated nightly plan and completion summary record the executable count and final eight-shard receipt.",
+      "pointer": "apps/mobile/e2e/scripts/ci-maestro-plan.mjs"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": "scripts/e2e-ci-injection-and-smoke-gate.test.ts"
+}

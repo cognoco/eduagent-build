@@ -55,6 +55,7 @@ tags:
   - nightly
   - billing
   - consent
+  - blocked
 ---
 # 1. Sign in only — no post-auth recovery (BUG-52 fix).
 # The trial-expired-child seed creates a parent-owned account. Sign-in lands

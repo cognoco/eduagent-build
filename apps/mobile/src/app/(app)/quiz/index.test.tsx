@@ -120,14 +120,20 @@ jest.mock(
 const mockBack = jest.fn();
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+const mockNavigate = jest.fn();
 const mockCanGoBack = jest.fn();
 let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
+  useFocusEffect: (callback: () => void | (() => void)) => {
+    const ReactReq = jest.requireActual<typeof import('react')>('react');
+    ReactReq.useEffect(() => callback(), [callback]);
+  },
   useRouter: () => ({
     back: mockBack,
     push: mockPush,
     replace: mockReplace,
+    navigate: mockNavigate,
     canGoBack: mockCanGoBack,
   }),
   useLocalSearchParams: () => mockSearchParams,
@@ -245,8 +251,42 @@ describe('QuizIndexScreen', () => {
 
     fireEvent.press(screen.getByTestId('quiz-back'));
 
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
+    expect(mockNavigate).toHaveBeenCalledWith('/(app)/practice');
     expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('[WI-1864] restores the upstream Practice destination from Quiz Back', () => {
+    mockSearchParams = {
+      returnTo: 'practice',
+      practiceReturnTo: 'journal',
+    };
+
+    render(<QuizIndexScreen />, { wrapper: Wrapper });
+    fireEvent.press(screen.getByTestId('quiz-back'));
+
+    expect(mockNavigate).toHaveBeenCalledWith({
+      pathname: '/(app)/practice',
+      params: { returnTo: 'journal' },
+    });
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('[WI-1864] consumes Android hardware Back on the cross-tab Quiz root', () => {
+    const { BackHandler } = jest.requireActual(
+      'react-native',
+    ) as typeof import('react-native');
+    const listenerSpy = jest.spyOn(BackHandler, 'addEventListener');
+    mockSearchParams = { returnTo: 'practice' };
+
+    render(<QuizIndexScreen />, { wrapper: Wrapper });
+
+    const handler = listenerSpy.mock.calls.find(
+      ([event]) => event === 'hardwareBackPress',
+    )?.[1] as (() => boolean) | undefined;
+    expect(handler).toBeDefined();
+    expect(handler!()).toBe(true);
+    expect(mockNavigate).toHaveBeenCalledWith('/(app)/practice');
+    listenerSpy.mockRestore();
   });
 
   it('falls back to practice when opened without a return target and no history', () => {
@@ -281,6 +321,27 @@ describe('QuizIndexScreen', () => {
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/quiz/launch',
       params: { activityType: 'capitals', returnTo: 'learner-home' },
+    });
+  });
+
+  it('[WI-1864] forwards the upstream Practice destination when starting a quiz', async () => {
+    mockSearchParams = {
+      returnTo: 'practice',
+      practiceReturnTo: 'journal',
+    };
+
+    render(<QuizIndexScreen />, { wrapper: Wrapper });
+
+    await waitFor(() => screen.getByTestId('quiz-capitals'));
+    fireEvent.press(screen.getByTestId('quiz-capitals'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/quiz/launch',
+      params: {
+        activityType: 'capitals',
+        returnTo: 'practice',
+        practiceReturnTo: 'journal',
+      },
     });
   });
 

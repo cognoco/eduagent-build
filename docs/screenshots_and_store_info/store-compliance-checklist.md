@@ -2,6 +2,8 @@
 
 Date: 2026-05-15
 
+Refreshed: 2026-07-23 — privacy URL, controller identity, 13+ launch floor, and seven-day deletion wording reconciled with current source. Final publication and store-console entries remain subject to DPO/legal/admin sign-off.
+
 Status: working checklist for SC-1 through SC-5 from `docs/audit/2026-05-15-persona-store-compliance-triage.md`. This is not a record of completed App Store Connect or Google Play Console work.
 
 ## Source Snapshot
@@ -13,7 +15,7 @@ Repo evidence reviewed for this checklist:
 - `docs/flows/mobile-app-flow-inventory.md` - current mobile flow inventory as of 2026-05-14.
 - `packages/schemas/src/account.ts` and `apps/api/src/services/export.ts` - exportable data shape.
 - `apps/mobile/src/app/(app)/more/privacy.tsx` and `apps/mobile/src/app/delete-account.tsx` - Privacy & Data, export, and delete-account flows.
-- `apps/api/src/services/consent.ts` - 11+ minimum and parental-consent gating.
+- `packages/schemas/src/age.ts` and identity-v2 consent services - 13+ launch floor and parental-consent gating.
 - `apps/mobile/src/hooks/use-revenuecat.ts`, `apps/mobile/src/app/(app)/subscription.tsx`, and `apps/api/src/routes/revenuecat-webhook.ts` - mobile IAP and product ID evidence.
 - `.claude/memory/project_revenuecat_setup.md`, `.claude/memory/project_apple_enrollment.md`, `.claude/memory/google_play_publishing.md`, and `.claude/memory/billing-payments.md` - historical store/admin blockers and billing decisions. Treat these as context, not current admin truth.
 
@@ -21,7 +23,7 @@ Repo evidence reviewed for this checklist:
 
 Do not mark the store package ready until these are answered by the user or store admin:
 
-- [ ] Live privacy policy URL and final legal entity.
+- [ ] DPO-approved final notice at the configured privacy URL and matching Apple/Google store metadata.
 - [ ] App Store Connect and Google Play Console access/status.
 - [ ] Screenshot scene list, captions, target locales, and final device requirements from the current consoles.
 - [ ] Age-rating questionnaire answers and final Education vs Kids category posture.
@@ -31,19 +33,20 @@ Do not mark the store package ready until these are answered by the user or stor
 
 Current repo fact:
 
-- `apps/mobile/app.json` sets `privacyPolicyUrl` to `https://mentomate.app/privacy`.
+- `apps/mobile/app.json` sets `privacyPolicyUrl` to `https://mentomate.com/privacy`.
 - The mobile Privacy & Data screen opens in-app `/privacy` and `/terms` routes.
-- The triage doc records that DNS lookup for `https://mentomate.app/privacy` failed on 2026-05-15.
+- The historical triage failure concerned the superseded `https://mentomate.app/privacy` domain.
+- Repository notices consistently identify ZWIZZLY AS, Norwegian organisation number 811 696 072, as controller. The DPO evidence package and final publication approval remain open.
 
 Checklist:
 
-- [ ] Confirm final legal entity name, physical/contact address if required, support email, privacy contact, and data controller/processor language.
-- [ ] Publish the policy at `https://mentomate.app/privacy`, or choose a different live URL.
-- [ ] If the URL changes, update `apps/mobile/app.json` and both store metadata entries.
+- [x] Reconcile the repository controller identity, address, support email, and privacy URL.
+- [ ] Publish the DPO-approved final policy at `https://mentomate.com/privacy`.
+- [ ] Update and verify both store metadata entries against the configured URL.
 - [ ] Confirm Terms of Service URL and in-app `/terms` content are live and consistent.
 - [ ] Verify the URL from a clean browser/device before store submission.
 
-Status: blocked on user/admin input. Do not claim complete from repo-only evidence.
+Status: repository URL/controller reconciliation complete; final notice publication and store-console verification remain blocked on DPO/legal/admin input.
 
 ## SC-2 App Privacy And Google Data Safety
 
@@ -109,17 +112,17 @@ Status: blocked on screenshot scene/caption choices and store account/device req
 
 Current repo fact:
 
-- Product posture in memory and docs is strictly 11+.
-- `apps/api/src/services/consent.ts` defines `MINIMUM_AGE = 11`.
-- The current consent check rejects under-11 users and requires parental consent through age 16 using the GDPR-everywhere model.
-- `apps/mobile/src/app/create-profile.tsx` tells users the minimum age is 11.
+- Product launch posture is 13+.
+- `packages/schemas/src/age.ts` defines `PROFILE_MINIMUM_AGE = 13`.
+- Exact-date age checks enforce the launch floor; parental consent applies where required by the user's jurisdiction and remains subject to legal sign-off.
+- Current profile-creation and legal copy state that learners must be at least 13.
 - The store description draft uses category `Education`.
 
 Draft questionnaire guidance, pending final console wording:
 
 | Area | Draft posture from repo evidence | Needs product/legal confirmation |
 | --- | --- | --- |
-| Intended audience | Learners aged 11+ and parents/adult learners. | Exact age band to enter in Apple/Google. |
+| Intended audience | Learners aged 13+ and parents/adult learners. | Exact age band to enter in Apple/Google. |
 | Kids category / Designed for Families | Do not mark as complete without explicit product/legal decision. The app serves teens and adults and uses AI, Sentry, Clerk, RevenueCat, and LLM providers. | Final category posture. |
 | User-generated content | No public social feed found. Learners send private prompts, homework text/images, and transcripts to the AI tutor. | How the console classifies private AI chat/input. |
 | Unrestricted web access | No unrestricted browser feature found in the reviewed app facts. | Confirm before answering. |
@@ -151,4 +154,3 @@ Checklist:
 - [ ] Paste final reviewer notes into each console only after credentials and products are live.
 
 Status: draft exists, but cannot be final until reviewer account and IAP readiness are confirmed.
-

@@ -83,6 +83,7 @@ appId: com.mentomate.app
 tags:
   - nightly
   - account
+  - blocked
 ---
 # 1. Seed & sign in as parent
 - runFlow:

@@ -59,7 +59,12 @@ import {
 } from './linking-ceremony';
 import { getAssessmentEligibleTopics } from './retention-data';
 import { resolveEffectiveAccessTier } from './subscription';
-import { getLearningDayStart, getProfileTimeZone } from './mentor-notices';
+import {
+  getLearningDayStart,
+  getProfileTimeZone,
+  mentorNoticeInactivityCutoff,
+  mentorNoticeLastActivityExpr,
+} from './mentor-notices';
 
 export const PARKED_AGING_WINDOW_DAYS = 7;
 export const DEEPENING_SURFACE_LEAD_DAYS = 2;
@@ -548,13 +553,18 @@ async function collectNowCandidates(
       ? acceptedSupporterAccessExists(db, supporterPersonId, profileId)
       : undefined;
 
+  // [WI-2351] Challenge candidates are intentionally absent. A recently
+  // completed session does not prove the server-owned readiness gate
+  // (struggle, streak, solid-answer evidence, quota, cooldown, and live-round
+  // state). Until Now can project that exact gate or resume a genuinely
+  // offered round, "Start challenge" would be a false action promise.
+
   const [
     billing,
     unfinished,
     mentorNotice,
     dueRetention,
     needsDeepening,
-    challengeReady,
     parked,
     ledgerMoments,
     topicMastered,
@@ -571,12 +581,6 @@ async function collectNowCandidates(
       : Promise.resolve([]),
     collectRetentionDueCandidates(db, profileId, scope, now, accessGuard),
     collectNeedsDeepeningCandidates(db, profileId, scope, now, accessGuard),
-    collectChallengeReadyCandidates(
-      db,
-      profileId,
-      scope,
-      visibility === 'supporter' ? supporterPersonId : undefined,
-    ),
     visibility === 'self'
       ? collectParkedItemCandidates(db, profileId, scope)
       : Promise.resolve([]),
@@ -603,7 +607,6 @@ async function collectNowCandidates(
     ...mentorNotice,
     ...dueRetention,
     ...needsDeepening,
-    ...challengeReady,
     ...parked,
     ...ledgerMoments,
     ...topicMastered,
@@ -697,6 +700,15 @@ async function collectMentorNoticeCandidates(
         eq(mentorNotices.profileId, profileId),
         eq(subjects.profileId, profileId),
         eq(mentorNotices.status, 'open'),
+        // [WI-2627] Read-time inactivity floor, the SAME expression and window
+        // the nightly fade writes with (mentorNoticeLastActivityExpr /
+        // MENTOR_NOTICE_INACTIVITY_DAYS in mentor-notices/state.ts). Collection
+        // previously had no inactivity bound at all, so a still-`open` notice
+        // that had aged past the fade window — because it aged during a
+        // flag-off, or simply between nightly runs — was collectable the moment
+        // the feature came back. This makes eligibility a property of the READ,
+        // not of whether a cron happened to have run yet.
+        gt(mentorNoticeLastActivityExpr(), mentorNoticeInactivityCutoff(now)),
         or(
           isNull(mentorNotices.lastDeferredAt),
           lt(mentorNotices.lastDeferredAt, learningDayStart),

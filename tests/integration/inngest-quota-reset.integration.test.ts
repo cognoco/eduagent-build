@@ -184,7 +184,14 @@ async function executeQuotaReset() {
   };
 
   const result = await (
-    quotaReset as { fn: (input: unknown) => Promise<any> }
+    quotaReset as unknown as {
+      fn: (input: unknown) => Promise<{
+        status: string;
+        timestamp: string;
+        dailyResetCount: number;
+        monthlyResetCount: number;
+      }>;
+    }
   ).fn({ step });
 
   return {

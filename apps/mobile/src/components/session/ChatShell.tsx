@@ -20,7 +20,7 @@ import { useRouter, type Href } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MessageBubble, type VerificationBadge } from './MessageBubble';
+import { MessageBubble } from './MessageBubble';
 import { VoiceRecordButton, VoiceTranscriptPreview } from './VoiceRecordButton';
 import { VoiceToggle } from './VoiceToggle';
 import { VoicePlaybackBar } from './VoicePlaybackBar';
@@ -33,28 +33,7 @@ import { goBackOrReplace } from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
 import { DeskLampAnimation, MagicPenAnimation } from '../common';
 import Animated, { FadeOut } from 'react-native-reanimated';
-import type { MentorNoticeAccepted } from '@eduagent/schemas';
-
-export interface ChatMessage {
-  id: string;
-  role: 'assistant' | 'user';
-  content: string;
-  streaming?: boolean;
-  outboxStatus?: 'pending' | 'permanently-failed';
-  kind?: 'reconnect_prompt' | 'session_expired' | 'quota_exceeded';
-  escalationRung?: number;
-  verificationBadge?: VerificationBadge;
-  eventId?: string;
-  isSystemPrompt?: boolean;
-  /** BUG-373: True for programmatically auto-sent messages (homework OCR, queued
-   *  multi-problem). Used to exclude from userMessageCount so the voice/text
-   *  toggle stays visible until the user deliberately sends a message. */
-  isAutoSent?: boolean;
-  /** Local file URI of a homework image attached to this message */
-  imageUri?: string;
-  /** Durable homework observation accepted on this completed assistant turn. */
-  mentorNotice?: MentorNoticeAccepted;
-}
+import type { ChatMessage } from './session-types';
 
 interface ChatShellProps {
   title: string;
@@ -202,6 +181,17 @@ interface ChatMessageRowProps {
   renderMessageActions?: (message: ChatMessage) => React.ReactNode;
 }
 
+function isCompletedAssistantResponse(message: ChatMessage): boolean {
+  return (
+    message.role === 'assistant' &&
+    message.isResponseComplete === true &&
+    message.content.trim().length > 0 &&
+    message.streaming !== true &&
+    message.kind == null &&
+    message.isSystemPrompt !== true
+  );
+}
+
 const ChatMessageRow = memo(function ChatMessageRow({
   msg,
   index,
@@ -212,7 +202,13 @@ const ChatMessageRow = memo(function ChatMessageRow({
   const [imageFailed, setImageFailed] = useState(false);
 
   return (
-    <View>
+    <View
+      testID={
+        isCompletedAssistantResponse(msg)
+          ? `assistant-response-complete-${index}`
+          : undefined
+      }
+    >
       {msg.imageUri && !imageFailed && (
         <View className="self-end max-w-[85%] mb-1">
           {/* [BUG-NOTION-257] Hint the platform image cache so homework

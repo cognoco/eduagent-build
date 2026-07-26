@@ -56,7 +56,7 @@ tags:
 - assertVisible:
     text: 'History'
 - assertVisible:
-    text: 'Learning'
+    id: 'my-notes-row-sessions-${SESSION_ID}'
 - takeScreenshot: my-notes-02-sessions
 
 - tapOn:

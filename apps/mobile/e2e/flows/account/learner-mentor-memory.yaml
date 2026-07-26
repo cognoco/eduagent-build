@@ -55,7 +55,8 @@ tags:
 
 - takeScreenshot: 01-learner-memory-empty
 
-- pressKey: back
+- tapOn:
+    id: "mentor-memory-back"
 
 # Back returns to More — confirm the screen by its first settings row, then verify
 # sign-out-button is reachable by scrolling to it.

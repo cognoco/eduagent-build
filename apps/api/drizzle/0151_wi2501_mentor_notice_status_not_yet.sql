@@ -1,0 +1,1 @@
+ALTER TYPE "public"."mentor_notice_status" ADD VALUE 'not_yet';

@@ -1,0 +1,9 @@
+{
+  "workItem": "WI-2487",
+  "project": "lingering-violet-30592106",
+  "snapshotBranchId": "br-green-tree-agqa98rt",
+  "parentBranchId": "br-weathered-silence-agw4on4x",
+  "parentLsn": "0/285BF988",
+  "purpose": "Pre-mutation no-compute restore snapshot required by OPQ-136 condition 1",
+  "source": "orchestrator:claude:mentomate"
+}

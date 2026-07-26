@@ -1,0 +1,75 @@
+# WI-2234: returning learner release journey.
+# The composite seed guarantees one unfinished session and one due review.
+appId: com.mentomate.app
+tags:
+  - v2
+  - learning
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: 'v2-returning-learner'
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 30000
+
+# Both exact seeded obligations must reach Mentor; neither assertion is optional.
+- assertVisible:
+    id: 'now-card-unfinished_session'
+- assertVisible:
+    id: 'now-card-retention_due'
+
+# The unfinished session outranks the due review, so its primary action is first.
+- tapOn:
+    id: 'now-card-continue'
+    childOf:
+      id: 'now-card-unfinished_session'
+
+- extendedWaitUntil:
+    visible:
+      id: 'chat-input'
+    timeout: 30000
+
+# The seeded user turn is index 0 and its assistant reply is index 1. The
+# assistant bubble owns the exact seeded transcript as a descendant.
+- assertVisible:
+    id: 'message-bubble-assistant-1'
+    containsDescendants:
+      - text: '^They connected cities, trade, armies, and new ideas\.$'
+
+- tapOn:
+    id: 'chat-input'
+- inputText: 'How did Roman roads help people exchange ideas?'
+- hideKeyboard
+- tapOn:
+    id: 'send-button'
+
+# The seeded turns occupy indexes 0 and 1. Prove the exact submitted learner
+# turn owns the question, then wait for its exact successor to become a
+# completed, non-empty assistant response. The `below` relation additionally
+# prevents an earlier seeded response from satisfying the receipt.
+- assertVisible:
+    id: 'message-bubble-user-2'
+    containsDescendants:
+      - text: '^How did Roman roads help people exchange ideas\?$'
+- extendedWaitUntil:
+    visible:
+      id: 'assistant-response-complete-3'
+      below:
+        id: 'message-bubble-user-2'
+    timeout: 60000
+
+- tapOn:
+    id: 'chat-shell-back'
+
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 30000
+- assertVisible:
+    id: 'now-card-unfinished_session'
+- assertVisible:
+    id: 'now-card-retention_due'

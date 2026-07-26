@@ -1,7 +1,7 @@
-# Progress analytics - home subject tile → subject detail, then progress index recent-sessions expansion
+# Progress analytics - home subject tile → shelf, then progress recent-sessions expansion
 # Tags: nightly, progress
 # Seed: learning-active
-# Covers: home-subject-card → progress/[subjectId] drill-down, progress-subject-bar, recent sessions list
+# Covers: home-subject-card → shelf/[subjectId], recent sessions list
 # Usage: ./scripts/seed-and-run.sh learning-active flows/progress/progress-analytics.yaml
 appId: com.mentomate.app
 tags:
@@ -11,75 +11,108 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
 
-# journey-subject-${SUBJECT_ID} was removed in the progress-screen refactor
-# (d8b288011). Solo learners no longer have a subject list on the progress
-# tab index; the subject detail page is reached via the home-screen subject
-# tile (home-subject-card-${SUBJECT_ID} in LearnerScreen.tsx:638 →
-# progress/[subjectId]).
+# journey-subject-${SUBJECT_ID} was removed in the progress-screen refactor.
+# Solo learners no longer have a subject list on the progress tab index; the
+# home subject tile now opens the subject shelf.
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 10000
+
+# The home subject carousel sits below the recommendation and intent cards on
+# the release-APK viewport. Step 1 uses the non-scrollable section heading to
+# position the outer vertical viewport; the mandatory card lookup in step 2
+# remains the reachability gate for the horizontal carousel.
+- scrollUntilVisible:
+    element:
+      id: 'home-subjects-heading'
+    direction: DOWN
+    timeout: 5000
+    visibilityPercentage: 50
+    centerElement: false
+    optional: true # justified: best-effort outer positioning; mandatory horizontal card lookup below fails closed
 
 - scrollUntilVisible:
     element:
-      id: "home-subject-card-${SUBJECT_ID}"
+      id: 'home-subject-card-${SUBJECT_ID}'
     direction: RIGHT
     timeout: 10000
+    visibilityPercentage: 100
+    centerElement: false
 
 - takeScreenshot: 01-home-subject-tile
 
 - tapOn:
-    id: "home-subject-card-${SUBJECT_ID}"
+    id: 'home-subject-card-${SUBJECT_ID}'
 
 - extendedWaitUntil:
     visible:
-      id: "progress-subject-back"
+      id: 'shelf-screen'
     timeout: 10000
 
 - assertVisible:
-    id: "progress-subject-bar"
+    id: 'shelf-screen'
 
-- takeScreenshot: 02-subject-detail
+- takeScreenshot: 02-subject-shelf
 
 - tapOn:
-    id: "progress-subject-back"
+    id: 'shelf-back'
 
-# Now on progress index. Verify stats and sessions expansion.
+# Shelf Back uses the nightly V1 fallback and returns to Library, not Home.
+- extendedWaitUntil:
+    visible:
+      id: 'library-screen'
+    timeout: 10000
+
+# Move from Library to Progress and verify stats plus sessions expansion.
 - tapOn:
-    id: "tab-progress"
+    id: 'tab-progress'
 
 - extendedWaitUntil:
     visible:
-      id: "progress-screen"
+      id: 'progress-screen'
     timeout: 10000
 
 - scrollUntilVisible:
     element:
-      id: "progress-show-all-sessions"
+      id: 'progress-show-all-sessions'
     direction: DOWN
     timeout: 10000
 
 - extendedWaitUntil:
     visible:
-      id: "progress-show-all-sessions"
+      id: 'progress-show-all-sessions'
     timeout: 10000
 
 - tapOn:
-    id: "progress-show-all-sessions"
+    id: 'progress-show-all-sessions'
 
 - scrollUntilVisible:
     element:
-      id: "recent-sessions-list"
+      id: 'recent-sessions-list'
     direction: DOWN
     timeout: 10000
 
 - extendedWaitUntil:
     visible:
-      id: "recent-sessions-list"
+      id: 'recent-sessions-list'
     timeout: 10000
 
 - assertVisible:
-    id: "recent-sessions-list"
+    id: 'recent-sessions-list'
+
+- scrollUntilVisible:
+    element:
+      id: 'session-card-${SESSION_ID}'
+    direction: DOWN
+    timeout: 10000
+
+- extendedWaitUntil:
+    visible:
+      id: 'session-card-${SESSION_ID}'
+    timeout: 10000
+
+- assertVisible:
+    id: 'session-card-${SESSION_ID}'
 
 - takeScreenshot: 03-recent-sessions-expanded

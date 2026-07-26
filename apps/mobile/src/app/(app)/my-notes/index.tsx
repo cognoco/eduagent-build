@@ -7,7 +7,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   OWN_LEARNING_RETURN_TO,
   homeHrefForReturnTo,
+  resolvedV2TabForReturnTo,
+  V2_TAB_TITLE_KEYS,
 } from '../../../lib/navigation';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { useProfileSessions } from '../../../hooks/use-progress';
 import { useProfile } from '../../../lib/profile';
 import { useThemeColors } from '../../../lib/theme';
@@ -83,7 +86,26 @@ export default function MyNotesHubScreen(): React.ReactElement {
   const colors = useThemeColors();
   const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
   const returnTo = myNotesReturnTo(params.returnTo);
-  const homeHref = homeHrefForReturnTo(returnTo);
+  const v2Enabled = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+  const homeHref = homeHrefForReturnTo(returnTo, undefined, v2Enabled);
+  // WI-2331 AC-2 (core) / AC-5 rework F1a: my-notes is reachable from more
+  // than one owning tab — Mentor's home screen pushes it plain, Journal's
+  // notes archive (JournalNotesArchive.tsx) pushes it with
+  // `returnTo: 'journal'` — so the Back label must name the ACTUAL
+  // destination, not hard-code Mentor. `homeHref` above already resolves the
+  // real destination; derive the label from `resolvedV2TabForReturnTo`, which
+  // resolves the same way and only claims a tab when `homeHref` genuinely is
+  // one, so the two never disagree. The `myNotesReturnTo` default
+  // (own-learning) isn't a tab, so that case — and any other non-tab
+  // returnTo — falls back to the generic label instead of mislabeling as a
+  // tab it isn't going to.
+  const backTab = resolvedV2TabForReturnTo(returnTo, undefined, v2Enabled);
+  const backLabel =
+    v2Enabled && backTab
+      ? t('common.backTo', {
+          destination: t(V2_TAB_TITLE_KEYS[backTab]),
+        })
+      : t('common.back');
   const { activeProfile } = useProfile();
   const sessionsQuery = useProfileSessions(activeProfile?.id);
 
@@ -111,7 +133,7 @@ export default function MyNotesHubScreen(): React.ReactElement {
             onPress={() => router.replace(homeHref)}
             className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityRole="button"
-            accessibilityLabel={t('common.back')}
+            accessibilityLabel={backLabel}
             testID="my-notes-back"
           >
             <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />

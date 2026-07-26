@@ -13,10 +13,11 @@ function readService(relativePath: string): string {
 }
 
 describe('[WI-1195] persisted learning-text guard wiring', () => {
-  it('keeps all three Art 9 persistence boundaries guarded', () => {
+  it('keeps every Art 9 learning-record persistence boundary guarded', () => {
     const memoryMapping = readService('memory/backfill-mapping.ts');
     const memoryDedup = readService('memory/dedup-actions.ts');
     const notes = readService('notes.ts');
+    const evidenceLinks = readService('evidence-links.ts');
     const challengeRound = readService('session/session-exchange.ts');
     const learnerProfile = readService('learner-profile.ts');
 
@@ -35,6 +36,11 @@ describe('[WI-1195] persisted learning-text guard wiring', () => {
         /learningTextGuard\.assertNoClinicalInferenceInLearningRecord/g,
       ),
     ).toHaveLength(2);
+    expect(
+      evidenceLinks.match(
+        /learningTextGuard\.assertNoClinicalInferenceInLearningRecord/g,
+      ),
+    ).toHaveLength(1);
     expect(
       challengeRound.match(
         /learningTextGuard\.scrubClinicalInferenceFromLearningRecord/g,

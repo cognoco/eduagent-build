@@ -13,7 +13,16 @@ Never offer if the learner sounds tired, confused, or is mid-question. Do not of
 // The inline evaluation prose injected into the active prompt when the tutor
 // (not a separate grader) is responsible for emitting challenge_round_evaluation.
 // Extracted so buildChallengeRoundActivePrompt() can gate it on the grader flag.
-const CHALLENGE_ROUND_EVAL_PROSE = `- After EACH learner answer, emit "signals.challenge_round_evaluation" with ONE item describing the concept assessed, result in {solid, partial, missing, misconception}, the learner answer event id, and a short \`learnerQuote\` copied from the learner's answer.`;
+export const challengeRoundNoveltyAlgorithm = `Question identity and novelty algorithm — ordered and fail closed:
+1. Set \`questionText\` to the exact current wording. For equivalent paraphrases, reuse only \`minimalLearningClaim\`, \`cognitiveOperation\`, and \`materialContext\`; never reuse the earlier \`questionText\`.
+2. Compare the current identity with every prior identity in \`<prior_question_identities>\` in round order.
+3. Normalize each \`questionText\` with Unicode NFKC, lowercase it, replace each run of non-letter/non-number characters with one space, trim, and collapse spaces. If the current normalized \`questionText\` matches any prior normalized \`questionText\`, it is a repeat; omit \`noveltyBasis\` regardless of all other fields.
+4. If the current \`cognitiveOperation\` has not appeared in any prior identity, the question is distinct through a new operation; omit \`noveltyBasis\` because the server detects this directly.
+5. When the same \`cognitiveOperation\` has appeared, add \`noveltyBasis\` only if the current question is genuinely distinct from every prior identity, and therefore every earlier Challenge question, after comparison with every prior identity using that operation: use \`new_minimal_learning_claim\` for a materially different minimal claim, \`new_material_evidence_or_context\` for materially new evidence or context rather than cosmetic changes, or \`new_reasoning\` for genuinely different reasoning.
+6. For the first question, a repeat, a paraphrase, a cosmetic context change, or whenever uncertain, omit \`noveltyBasis\`.`;
+
+const CHALLENGE_ROUND_EVAL_PROSE = `- After EACH learner answer, emit "signals.challenge_round_evaluation" with one evaluation item per concept assessed, result in {solid, partial, missing, misconception}, the learner answer event id, a short \`learnerQuote\` copied from the learner's answer, and \`questionIdentity\` for the question answered.
+${challengeRoundNoveltyAlgorithm}`;
 
 function buildActivePromptString(includeEvalProse: boolean): string {
   const evalLine = includeEvalProse ? `\n${CHALLENGE_ROUND_EVAL_PROSE}` : '';
@@ -27,6 +36,7 @@ You are now running a Challenge Round. The learner accepted. Ask ONE deeper ques
 Constraints:
 - Maximum ${MAX_CHALLENGE_QUESTIONS} questions per round (do not exceed; the server will cap).
 - One question per turn. No multi-part questions.
+- Use the prior lesson and earlier Challenge turns as context. A question is a repeat when it tests the same minimal learning claim with the same cognitive operation and no materially new evidence, context, or reasoning; paraphrase and cosmetic context changes are repeats. Exact normalized duplicates are always repeats. Application, comparison, causal explanation, synthesis, or evaluation in a genuinely new context are new.
 - Match the learner's age and energy. Do not use academic jargon.${evalLine}
 - When all questions are answered, proceed to drafting. The server drives the active→drafting transition from the evaluation signals — do not emit any additional field to signal completion.
 

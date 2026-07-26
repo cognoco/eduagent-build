@@ -15,6 +15,21 @@ export interface LogEntry {
   context?: Record<string, unknown>;
 }
 
+export type StructuredLogSink = (
+  entry: Readonly<LogEntry>,
+) => void | Promise<void>;
+
+let structuredLogSink: StructuredLogSink | null = null;
+
+/**
+ * Installs the application-wide structured-log sink used by the production
+ * Worker entry point. This is process configuration, never request-scoped
+ * state. Pass null to clear it in tests.
+ */
+export function setStructuredLogSink(sink: StructuredLogSink | null): void {
+  structuredLogSink = sink;
+}
+
 const LOG_LEVELS: Record<LogLevel, number> = {
   debug: 0,
   info: 1,
@@ -29,13 +44,23 @@ export interface Logger {
   error(message: string, context?: Record<string, unknown>): void;
 }
 
+function reportStructuredLogSinkFailure(): void {
+  console.error(
+    JSON.stringify({
+      timestamp: new Date().toISOString(),
+      level: 'error',
+      message: 'structured_log_sink.failed',
+    } satisfies LogEntry),
+  );
+}
+
 export function createLogger(config?: { level?: LogLevel }): Logger {
   const minLevel = LOG_LEVELS[config?.level ?? 'info'];
 
   function log(
     level: LogLevel,
     message: string,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ): void {
     if (LOG_LEVELS[level] < minLevel) return;
 
@@ -57,6 +82,17 @@ export function createLogger(config?: { level?: LogLevel }): Logger {
         break;
       default:
         console.log(output);
+    }
+
+    try {
+      const sinkResult = structuredLogSink?.(entry);
+      void sinkResult?.catch(() => {
+        reportStructuredLogSinkFailure();
+      });
+    } catch {
+      // A monitoring sink must never turn a successful request into an
+      // application failure. Keep this diagnostic content-free.
+      reportStructuredLogSinkFailure();
     }
   }
 

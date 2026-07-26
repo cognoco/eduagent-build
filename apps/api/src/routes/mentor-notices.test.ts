@@ -48,7 +48,7 @@ const PROFILE_ID = '550e8400-e29b-41d4-a716-446655440001';
 const NOTICE_ID = '550e8400-e29b-41d4-a716-446655440002';
 const SESSION_ID = '550e8400-e29b-41d4-a716-446655440003';
 
-function makeApp(enabled = true) {
+function makeApp(enabled = true, policyRevision: string | undefined = '3') {
   const app = new Hono();
   app.use('*', async (c, next) => {
     c.set('db' as never, { marker: 'db' } as unknown as Database);
@@ -62,7 +62,10 @@ function makeApp(enabled = true) {
     // assertCanWriteProfile, which requires account + callerPersonId.
     c.set('account' as never, { id: 'test-account-id' });
     c.set('callerPersonId' as never, PROFILE_ID);
-    c.env = { MENTOR_NOTICE_ENABLED: enabled ? 'true' : 'false' } as never;
+    c.env = {
+      MENTOR_NOTICE_ENABLED: enabled ? 'true' : 'false',
+      MENTOR_NOTICE_POLICY_REVISION: policyRevision,
+    } as never;
     await next();
   });
   app.route('/v1', mentorNoticeRoutes);
@@ -98,7 +101,18 @@ describe('mentor notice routes', () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ sessionId: SESSION_ID });
+    // [WI-2627] The success body now carries the policy observation so the
+    // client can ORDER this mutation's result against what the Now feed last
+    // told it — a recheck that resolves after an observed rollback must not be
+    // applied as if the rollback had not happened.
+    await expect(response.json()).resolves.toEqual({
+      sessionId: SESSION_ID,
+      mentorNoticePolicy: {
+        rolloutRevision: 3,
+        rolloutEnabled: true,
+        projectionEpoch: 'notice-policy-v1:r3:on:self:consented',
+      },
+    });
     expect(startMentorNoticeRecheck).toHaveBeenCalledWith(
       expect.anything(),
       PROFILE_ID,
@@ -138,6 +152,25 @@ describe('mentor notice routes', () => {
     await expect(response.json()).resolves.toEqual({
       noticeId: NOTICE_ID,
       deferredAt,
+      mentorNoticePolicy: {
+        rolloutRevision: 3,
+        rolloutEnabled: true,
+        projectionEpoch: 'notice-policy-v1:r3:on:self:consented',
+      },
     });
+  });
+
+  // [WI-2627] Only a SUCCESS carries an observation. A 404 must not: a denied
+  // mutation is not an authenticated reading of the live policy, and emitting an
+  // observation from the denial path would tell the client the rollout state on
+  // a response whose whole point is that the notice does not exist for it.
+  it('does not leak an observation on the flag-off 404', async () => {
+    const response = await makeApp(false).request(
+      `/v1/mentor-notices/${NOTICE_ID}/defer`,
+      { method: 'POST' },
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).not.toHaveProperty('mentorNoticePolicy');
   });
 });

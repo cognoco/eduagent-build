@@ -1,0 +1,139 @@
+# WI-2236: V2 Mentor manual-entry homework round trip
+#
+# Case: trial-active learner with guaranteed metering allowance opens homework
+# from Mentor, cancels one manual draft, then enters exactly one visible
+# equation, chooses Help me solve, receives the first homework response, ends
+# the session, and returns to usable Mentor. Every assertion below is
+# mandatory. Camera, gallery, OCR, permissions, shutter, and image persistence
+# remain in WI-2341 device QA.
+appId: com.mentomate.app
+tags:
+  - v2
+  - homework
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: 'trial-active'
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 30000
+- assertVisible:
+    id: 'mentor-bar-input'
+    enabled: true
+
+# The manual-entry cancel escape returns to a usable Mentor surface.
+- tapOn:
+    id: 'mentor-bar-homework-chip'
+- extendedWaitUntil:
+    visible:
+      id: 'homework-entry-mode-manual'
+    timeout: 15000
+- tapOn:
+    id: 'manual-entry-cancel'
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'mentor-bar-input'
+    enabled: true
+
+# Enter one manual problem from the same Mentor surface.
+- tapOn:
+    id: 'mentor-bar-homework-chip'
+- extendedWaitUntil:
+    visible:
+      id: 'homework-entry-mode-manual'
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: 'homework-manual-entry-empty'
+    timeout: 15000
+- tapOn:
+    id: 'result-text-input'
+- inputText: 'Solve 3x + 7 = 22'
+- hideKeyboard
+- assertVisible:
+    id: 'result-text-input'
+    text: 'Solve 3x + 7 = 22'
+
+# The route receives Mentor's active subject or deterministically adopts the
+# first active subject after its own query resolves. Readiness is a hard gate.
+- extendedWaitUntil:
+    visible:
+      id: 'homework-subject-resolution-ready'
+    timeout: 60000
+- assertVisible:
+    id: 'confirm-button'
+    enabled: true
+- tapOn:
+    id: 'confirm-button'
+
+- extendedWaitUntil:
+    visible:
+      id: 'session-screen'
+    timeout: 30000
+- assertVisible:
+    id: 'homework-problem-text-bubble'
+    text: 'Solve 3x + 7 = 22'
+- assertVisible:
+    id: 'homework-help-me-solve'
+    enabled: true
+- assertNotVisible:
+    id: 'session-subject-resolution'
+- tapOn:
+    id: 'homework-help-me-solve'
+
+# The associated problem remains exact and singular after the session starts.
+- extendedWaitUntil:
+    visible:
+      id: 'homework-problem-progress'
+      text: 'Problem 1 of 1'
+    timeout: 30000
+- assertVisible:
+    id: 'homework-problem-text'
+    text: 'Solve 3x + 7 = 22'
+- extendedWaitUntil:
+    visible:
+      id: 'homework-session-associated-once'
+    timeout: 30000
+- assertVisible:
+    id: 'message-bubble-user-1'
+    containsDescendants:
+      - text: 'Solve 3x + 7 = 22'
+- extendedWaitUntil:
+    visible:
+      id: 'homework-first-response-complete'
+    timeout: 60000
+- assertVisible:
+    id: 'message-bubble-assistant-2'
+- assertNotVisible:
+    id: 'thinking-bulb-animation'
+- assertNotVisible:
+    id: 'session-reconnect-.*'
+- assertVisible:
+    id: 'homework-session-associated-once'
+- assertNotVisible:
+    id: 'homework-session-created-more-than-once'
+
+- tapOn:
+    id: 'finish-homework-chip'
+- tapOn:
+    text: 'End Session'
+- extendedWaitUntil:
+    visible:
+      id: 'first-session-wrap-up'
+    timeout: 30000
+- tapOn:
+    id: 'chat-shell-back'
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 30000
+- assertVisible:
+    id: 'mentor-bar-input'
+    enabled: true

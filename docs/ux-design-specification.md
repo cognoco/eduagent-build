@@ -27,6 +27,11 @@ date: '2026-02-14'
 **Author:** Zuzka
 **Date:** 2026-02-14
 
+> **Historical age/compliance assumptions:** The UX concepts remain useful,
+> but this document's 11+ floor and location-neutral consent examples are
+> superseded by
+> [`docs/compliance/2026-07-23-13-plus-eea-launch-country-ruling.md`](compliance/2026-07-23-13-plus-eea-launch-country-ruling.md).
+
 ---
 
 ## Project Understanding

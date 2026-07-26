@@ -34,6 +34,7 @@
 import { resolve } from 'path';
 import { eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import {
   consentGrant,
   createDatabase,
@@ -45,7 +46,6 @@ import {
   type Database,
 } from '@eduagent/database';
 import { getChildDetail, getChildrenForParent } from '../dashboard';
-import { DEFAULT_CONSENT_PURPOSE } from './consent-status-v2';
 import {
   notifyParentToSubscribe,
   sendStruggleNotification,
@@ -369,15 +369,18 @@ const RUN = !!process.env.DATABASE_URL;
         // Seed a WITHDRAWN consent_grant (withdrawn_at ~2 days ago, within the
         // 30-day grace window the banner displays for).
         const withdrawnAt = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
-        await db.insert(consentGrant).values({
-          chargePersonId,
-          organizationId: orgId,
-          purpose: DEFAULT_CONSENT_PURPOSE,
-          lawfulBasis: 'gdpr_parental_consent',
-          granted: true,
-          grantedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-          withdrawnAt,
-        });
+        const grantedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+        await db.insert(consentGrant).values(
+          CONSENT_PURPOSES.map((purpose) => ({
+            chargePersonId,
+            organizationId: orgId,
+            purpose,
+            lawfulBasis: 'gdpr_parental_consent' as const,
+            granted: true,
+            grantedAt,
+            withdrawnAt,
+          })),
+        );
 
         const children = await getChildrenForParent(
           db,
@@ -431,15 +434,18 @@ const RUN = !!process.env.DATABASE_URL;
         await grantGuardianshipEdge(guardianPersonId, chargePersonId);
 
         const withdrawnAt = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
-        await db.insert(consentGrant).values({
-          chargePersonId,
-          organizationId: orgId,
-          purpose: DEFAULT_CONSENT_PURPOSE,
-          lawfulBasis: 'gdpr_parental_consent',
-          granted: true,
-          grantedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-          withdrawnAt,
-        });
+        const grantedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+        await db.insert(consentGrant).values(
+          CONSENT_PURPOSES.map((purpose) => ({
+            chargePersonId,
+            organizationId: orgId,
+            purpose,
+            lawfulBasis: 'gdpr_parental_consent' as const,
+            granted: true,
+            grantedAt,
+            withdrawnAt,
+          })),
+        );
 
         const child = await getChildDetail(
           db,

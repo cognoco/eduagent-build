@@ -16,6 +16,7 @@ import {
 } from './api-client';
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
 import { queryKeys } from './query-keys';
+import { NOW_FEED_CACHE_POLICY_EPOCH } from './now-feed-cache';
 
 // ./secure-storage uses real implementation: expo-secure-store is globally mocked
 // in test-setup.ts with an in-memory store. We control behavior via ExpoSecureStore fns directly.
@@ -140,6 +141,131 @@ describe('ProfileProvider', () => {
     });
     expect(result.current.activeProfile?.id).toBe(CHILD_PROFILE_ID);
     expect(result.current.activeProfile?.displayName).toBe('Alex');
+  });
+
+  it('[WI-2240] keeps navigation loading until persisted parent-proxy state resolves for a restored child', async () => {
+    let resolveProxyRestore!: (value: string | null) => void;
+    const proxyRestore = new Promise<string | null>((resolve) => {
+      resolveProxyRestore = resolve;
+    });
+    jest
+      .mocked(ExpoSecureStore.getItemAsync)
+      .mockImplementation((key: string) => {
+        if (key === 'mentomate_active_profile_id') {
+          return Promise.resolve(CHILD_PROFILE_ID);
+        }
+        if (key === 'parent-proxy-active') {
+          return proxyRestore;
+        }
+        return Promise.resolve(null);
+      });
+
+    const { result } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeProfile?.id).toBe(CHILD_PROFILE_ID);
+    });
+    expect(result.current.isExplicitProxyMode).toBe(false);
+    expect(result.current.isLoading).toBe(true);
+
+    await act(async () => {
+      resolveProxyRestore('true');
+      await proxyRestore;
+    });
+
+    await waitFor(() => {
+      expect(result.current.isExplicitProxyMode).toBe(true);
+      expect(result.current.isLoading).toBe(false);
+    });
+  });
+
+  it('[WI-2240] keeps a restored child fail-closed when persisted parent-proxy state is rejected', async () => {
+    jest
+      .mocked(ExpoSecureStore.getItemAsync)
+      .mockImplementation((key: string) => {
+        if (key === 'mentomate_active_profile_id') {
+          return Promise.resolve(CHILD_PROFILE_ID);
+        }
+        if (key === 'parent-proxy-active') {
+          return Promise.reject(new Error('SecureStore unavailable'));
+        }
+        return Promise.resolve(null);
+      });
+
+    const { result } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeProfile?.id).toBe(CHILD_PROFILE_ID);
+    });
+    expect(result.current.isExplicitProxyMode).toBe(false);
+    expect(result.current.isLoading).toBe(true);
+    expect(setProxyMode).not.toHaveBeenCalledWith(true);
+  });
+
+  it('[WI-2240] keeps a restored child fail-closed while persisted parent-proxy state never settles', async () => {
+    const neverSettles = new Promise<string | null>(() => {
+      /* deliberately never resolves */
+    });
+    jest
+      .mocked(ExpoSecureStore.getItemAsync)
+      .mockImplementation((key: string) => {
+        if (key === 'mentomate_active_profile_id') {
+          return Promise.resolve(CHILD_PROFILE_ID);
+        }
+        if (key === 'parent-proxy-active') {
+          return neverSettles;
+        }
+        return Promise.resolve(null);
+      });
+
+    const { result } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeProfile?.id).toBe(CHILD_PROFILE_ID);
+    });
+    expect(result.current.isExplicitProxyMode).toBe(false);
+    expect(result.current.isLoading).toBe(true);
+    expect(setProxyMode).not.toHaveBeenCalledWith(true);
+  });
+
+  it('[WI-2240] ignores a late persisted proxy result after the provider unmounts', async () => {
+    let resolveProxyRestore!: (value: string | null) => void;
+    const proxyRestore = new Promise<string | null>((resolve) => {
+      resolveProxyRestore = resolve;
+    });
+    jest
+      .mocked(ExpoSecureStore.getItemAsync)
+      .mockImplementation((key: string) => {
+        if (key === 'mentomate_active_profile_id') {
+          return Promise.resolve(CHILD_PROFILE_ID);
+        }
+        if (key === 'parent-proxy-active') {
+          return proxyRestore;
+        }
+        return Promise.resolve(null);
+      });
+
+    const { result, unmount } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeProfile?.id).toBe(CHILD_PROFILE_ID);
+    });
+    unmount();
+
+    await act(async () => {
+      resolveProxyRestore('true');
+      await proxyRestore;
+    });
+
+    expect(setProxyMode).not.toHaveBeenCalledWith(true);
   });
 
   it('falls back to owner when saved ID is stale', async () => {
@@ -417,8 +543,28 @@ describe('ProfileProvider', () => {
         key: ['resume-nudge', OWNER_PROFILE_ID],
         value: { topicId: 'topic-1' },
       },
+      {
+        key: queryKeys.now.feed(
+          'clerk-user-test',
+          OWNER_PROFILE_ID,
+          NOW_FEED_CACHE_POLICY_EPOCH,
+        ),
+        value: { cards: [{ templateKey: 'profile-a-card' }] },
+      },
+      {
+        key: queryKeys.now.overflow(
+          'clerk-user-test',
+          OWNER_PROFILE_ID,
+          NOW_FEED_CACHE_POLICY_EPOCH,
+        ),
+        value: { items: [{ templateKey: 'profile-a-overflow-item' }] },
+      },
     ];
     for (const { key, value } of profileScopedQueries) {
+      // This test proves ProfileProvider's reset rather than TanStack's
+      // inactive-query garbage collection. The shared test wrapper uses a
+      // zero gcTime, so each seeded query needs an explicit retained lifetime.
+      queryClient.setQueryDefaults(key, { gcTime: Infinity });
       queryClient.setQueryData(key, value);
     }
     for (const { key } of profileScopedQueries) {
@@ -485,6 +631,16 @@ describe('ProfileProvider', () => {
       ['quiz-recent', OWNER_PROFILE_ID],
       ['quiz-stats', OWNER_PROFILE_ID],
       ['topic-suggestions', 'subject-1', OWNER_PROFILE_ID],
+      queryKeys.now.feed(
+        'clerk-user-test',
+        OWNER_PROFILE_ID,
+        NOW_FEED_CACHE_POLICY_EPOCH,
+      ),
+      queryKeys.now.overflow(
+        'clerk-user-test',
+        OWNER_PROFILE_ID,
+        NOW_FEED_CACHE_POLICY_EPOCH,
+      ),
     ];
     const scopedPrefixes = new Set(
       [...profileScopedFactoryKeys, ...representativeScopedLiteralKeys].map(

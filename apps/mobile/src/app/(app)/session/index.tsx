@@ -1,11 +1,18 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@clerk/expo';
+import {
+  usePreventRemove,
+  type NavigationAction,
+} from '@react-navigation/native';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { platformAlert } from '../../../lib/platform-alert';
-import { goBackOrReplace } from '../../../lib/navigation';
+import { goBackOrReplace, MENTOR_RETURN_TO } from '../../../lib/navigation';
 import { shouldShowBookLink } from '../../../lib/show-book-link';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import {
   useRouter,
+  useNavigation,
   useLocalSearchParams,
   useFocusEffect,
   type Href,
@@ -15,6 +22,7 @@ import type {
   HomeworkCaptureSource,
   HomeworkProblem,
   InputMode,
+  LearningSession,
   PendingCelebration,
   ChallengeRoundSessionState,
 } from '@eduagent/schemas';
@@ -58,6 +66,7 @@ import {
   useIsFirstSession,
 } from '../../../hooks/use-session-context';
 import { useNetworkStatus } from '../../../hooks/use-network-status';
+import { useObservedPolicyEpoch } from '../../../hooks/use-now-feed';
 import { useApiReachability } from '../../../hooks/use-api-reachability';
 import { useCelebrationLevel } from '../../../hooks/use-settings';
 import { useLearnerProfile } from '../../../hooks/use-learner-profile';
@@ -70,6 +79,7 @@ import {
   useApiClient,
   type QuotaExceededDetails,
 } from '../../../lib/api-client';
+import { queryKeys } from '../../../lib/query-keys';
 import { classifyApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
 import { useCreateNote } from '../../../hooks/use-notes';
@@ -96,6 +106,7 @@ import { BookmarkNudgeTooltip } from '../../../components/session/BookmarkNudgeT
 import {
   SessionToolAccessory,
   SessionAccessory,
+  HomeworkFirstResponseCompleteMarker,
   MentorHomeworkFirstResponse,
 } from '../../../components/session/SessionAccessories';
 import {
@@ -150,7 +161,45 @@ function isChallengeRoundInFlight(
   );
 }
 
+function isExactManualHomeworkSessionAssociated({
+  isE2EBuild,
+  isMentorHomeworkFrame,
+  allocatedSessionIds,
+  activeSessionId,
+  activeSession,
+  effectiveSubjectId,
+  initialProblemText,
+}: {
+  isE2EBuild: boolean;
+  isMentorHomeworkFrame: boolean;
+  allocatedSessionIds: readonly string[];
+  activeSessionId: string | null;
+  activeSession: LearningSession | null | undefined;
+  effectiveSubjectId: string | undefined;
+  initialProblemText: string | undefined;
+}): boolean {
+  const persistedHomework = activeSession?.metadata?.homework;
+  const persistedProblem = persistedHomework?.problems[0];
+
+  return (
+    isE2EBuild &&
+    isMentorHomeworkFrame &&
+    allocatedSessionIds.length === 1 &&
+    allocatedSessionIds[0] === activeSessionId &&
+    activeSession?.id === activeSessionId &&
+    activeSession?.subjectId === effectiveSubjectId &&
+    activeSession?.sessionType === 'homework' &&
+    persistedHomework?.problemCount === 1 &&
+    persistedHomework?.currentProblemIndex === 0 &&
+    persistedHomework?.problems.length === 1 &&
+    persistedProblem?.source === 'manual' &&
+    persistedProblem?.text.trim() === initialProblemText?.trim()
+  );
+}
+
 const MENTOR_BIRTH_SESSION_TIME_SCALE = 0.35;
+// Bound a failed policy-epoch hydration without claiming a refreshed projection.
+const MENTOR_RETURN_EPOCH_WAIT_MS = 2_000;
 
 interface FirstSessionWrapUpCardProps {
   value: string;
@@ -258,6 +307,7 @@ export default function SessionScreen() {
 }
 
 function SessionScreenInner() {
+  const isE2EBuild = process.env.EXPO_PUBLIC_E2E === 'true';
   const {
     mode,
     subjectId,
@@ -302,6 +352,7 @@ function SessionScreenInner() {
     imageMimeType?: string;
   }>();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
   const navigationContract = useNavigationContract();
@@ -357,8 +408,117 @@ function SessionScreenInner() {
   // don't always resolve on web — the chevron looked clickable but the URL
   // never changed. Supplying an explicit handler that uses Expo Router's
   // typed object form makes the navigation reliable across web + native.
+  const { userId } = useAuth();
+  const { epoch: observedNowFeedEpoch, hydrated: nowFeedEpochHydrated } =
+    useObservedPolicyEpoch(userId, activeProfile?.id);
+  const [pendingMentorReturn, setPendingMentorReturn] = useState(false);
+  const [mentorReturnReady, setMentorReturnReady] = useState(false);
+  const [deferredRemovalAction, setDeferredRemovalAction] =
+    useState<NavigationAction | null>(null);
+  const navigation = useNavigation();
+  const canRefreshMentorFeed =
+    returnTo === MENTOR_RETURN_TO &&
+    !!userId &&
+    !!activeProfile?.id &&
+    nowFeedEpochHydrated;
+  const refreshMentorFeedBeforeReturn = useCallback(async () => {
+    if (!userId || !activeProfile?.id) return;
+
+    // The Mentor feed was warm before this session opened. Refetch its exact
+    // actor/profile/epoch projection (including an inactive cache entry) and
+    // wait for that projection before remounting Mentor.
+    await queryClient.invalidateQueries(
+      {
+        queryKey: queryKeys.now.feed(
+          userId,
+          activeProfile.id,
+          observedNowFeedEpoch,
+        ),
+        exact: true,
+        refetchType: 'all',
+      },
+      { throwOnError: true },
+    );
+  }, [activeProfile?.id, observedNowFeedEpoch, queryClient, userId]);
+  const startMentorReturn = useCallback(() => {
+    setMentorReturnReady(false);
+    setPendingMentorReturn(true);
+  }, []);
+  usePreventRemove(
+    returnTo === MENTOR_RETURN_TO &&
+      !mentorReturnReady &&
+      deferredRemovalAction === null,
+    ({ data: { action } }) => {
+      if (action.type !== 'GO_BACK' && action.type !== 'POP') {
+        setDeferredRemovalAction(action);
+        return;
+      }
+      startMentorReturn();
+    },
+  );
+  useEffect(() => {
+    if (!deferredRemovalAction) return;
+    navigation.dispatch(deferredRemovalAction);
+    setDeferredRemovalAction(null);
+  }, [deferredRemovalAction, navigation]);
+  useEffect(() => {
+    if (!pendingMentorReturn) return;
+
+    // An epoch read can fail to settle (for example, a storage failure during
+    // cold start). We must not call that an exact refreshed projection, but a
+    // back action also must not strand the learner in the session forever.
+    if (!nowFeedEpochHydrated) {
+      const timer = setTimeout(() => {
+        setPendingMentorReturn(false);
+        setMentorReturnReady(true);
+      }, MENTOR_RETURN_EPOCH_WAIT_MS);
+      return () => clearTimeout(timer);
+    }
+    // An absent actor/profile cannot identify a scoped Mentor projection.
+    // Leave without invalidating rather than claiming evidence or stranding
+    // the learner behind a binding that may never appear on this screen.
+    if (!userId || !activeProfile?.id) {
+      setPendingMentorReturn(false);
+      setMentorReturnReady(true);
+      return;
+    }
+    if (!canRefreshMentorFeed) return;
+
+    let cancelled = false;
+    async function returnAfterMentorRefresh(): Promise<void> {
+      try {
+        await refreshMentorFeedBeforeReturn();
+        if (cancelled) return;
+        setPendingMentorReturn(false);
+        setMentorReturnReady(true);
+      } catch {
+        if (cancelled) return;
+        setPendingMentorReturn(false);
+      }
+    }
+    void returnAfterMentorRefresh();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeProfile?.id,
+    canRefreshMentorFeed,
+    nowFeedEpochHydrated,
+    pendingMentorReturn,
+    refreshMentorFeedBeforeReturn,
+    userId,
+  ]);
+  useEffect(() => {
+    if (!mentorReturnReady) return;
+    router.replace(homeBackHref as Href);
+    setMentorReturnReady(false);
+  }, [homeBackHref, mentorReturnReady, router]);
   const handleChatBackPress = useCallback(() => {
     if (returnTo) {
+      if (returnTo === MENTOR_RETURN_TO) {
+        startMentorReturn();
+        return;
+      }
       router.replace(homeBackHref as Href);
       return;
     }
@@ -369,16 +529,28 @@ function SessionScreenInner() {
       } as Href);
       return;
     }
-    router.replace('/(app)/home' as Href);
-  }, [returnTo, subjectId, homeBackHref, router]);
+    // WI-2331 AC-3: `/(app)/home` is dead in V2 (not one of the three tabs)
+    // — this last-resort branch (no returnTo, no subjectId) routes through
+    // the same owning-tab contract AC-1's tab highlight uses instead of the
+    // retired Home tab.
+    router.replace(
+      (FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+        ? '/(app)/mentor'
+        : '/(app)/home') as Href,
+    );
+  }, [returnTo, subjectId, homeBackHref, router, startMentorReturn]);
   const handleHomeBack = useCallback(() => {
     if (returnTo) {
+      if (returnTo === MENTOR_RETURN_TO) {
+        startMentorReturn();
+        return;
+      }
       router.replace(homeBackHref as Href);
       return;
     }
 
     goBackOrReplace(router, homeBackHref);
-  }, [homeBackHref, returnTo, router]);
+  }, [homeBackHref, returnTo, router, startMentorReturn]);
   const handleStartNewSession = useCallback(() => {
     router.replace({
       pathname: '/(app)/session',
@@ -447,6 +619,12 @@ function SessionScreenInner() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(
     routeSessionId ?? null,
   );
+  const [e2eAllocatedSessionIds, setE2EAllocatedSessionIds] = useState<
+    string[]
+  >([]);
+  const handleE2ESessionCreated = useCallback((createdSessionId: string) => {
+    setE2EAllocatedSessionIds((current) => [...current, createdSessionId]);
+  }, []);
   const [showMentorBirthMoment, setShowMentorBirthMoment] = useState(false);
   const [pendingClassification, setPendingClassification] = useState(false);
   const [classifyError, setClassifyError] = useState<string | null>(null);
@@ -490,10 +668,11 @@ function SessionScreenInner() {
   const [homeworkMode, setHomeworkMode] = useState<
     'help_me' | 'check_answer' | undefined
   >(undefined);
-  // T23: V2 mentor-homework round-trip. The captured photo lands back in the
-  // session thread as the learner's image bubble with two deterministic
-  // first-response actions (help me solve / check my answer). Once the learner
-  // picks one, the deterministic block is consumed and the tutoring turn begins.
+  // T23: V2 mentor-homework round-trip. The captured photo or manually entered
+  // problem lands back in the session thread as the learner's own bubble with
+  // two deterministic first-response actions (help me solve / check my answer).
+  // Once the learner picks one, the deterministic block is consumed and the
+  // tutoring turn begins.
   const isMentorHomeworkFrame = mentorHomeworkWrapUpFrame === 'mentor-homework';
   const [mentorHomeworkChoice, setMentorHomeworkChoice] = useState<
     'help_me' | 'check_answer' | null
@@ -1027,6 +1206,7 @@ function SessionScreenInner() {
     trigger,
     createLocalMessageId,
     responseHistory,
+    onSessionCreated: isE2EBuild ? handleE2ESessionCreated : undefined,
   });
 
   // BUG-373: Exclude auto-sent messages (homework OCR, queued multi-problem)
@@ -1044,7 +1224,7 @@ function SessionScreenInner() {
     exchangeCount,
   });
 
-  const hasSubject = !!(classifiedSubject?.subjectId || subjectId);
+  const hasSubject = !!(classifiedSubject?.subjectId || effectiveSubjectId);
   const conversationStage = getConversationStage(
     learnerTurnCount,
     hasSubject,
@@ -1076,7 +1256,7 @@ function SessionScreenInner() {
     messages,
     setMessages,
     setResumedBanner,
-    subjectId: subjectId ?? undefined,
+    subjectId: effectiveSubjectId || undefined,
     effectiveMode,
     isV2MentorEntry,
     availableSubjects,
@@ -1184,7 +1364,7 @@ function SessionScreenInner() {
     // T23: For the V2 mentor-homework frame the deterministic help/check
     // buttons are the first actionable response — defer the OCR auto-send
     // until the learner picks one (mentorHomeworkChoice set). This keeps the
-    // image bubble + buttons as the genuine first turn with no LLM/subject
+    // learner problem bubble + buttons as the genuine first turn with no LLM/subject
     // preamble. For every other entry the auto-send fires as before.
     if (isMentorHomeworkFrame && !mentorHomeworkChoice) {
       return undefined;
@@ -1700,12 +1880,13 @@ function SessionScreenInner() {
 
   // T23: Render the deterministic homework first-response only for the V2
   // mentor-homework frame and only until the learner picks help/check. It is
-  // the FIRST actionable response in-thread — image bubble + two buttons, with
-  // no subject-picking preamble.
+  // the FIRST actionable response in-thread — learner problem bubble + two
+  // buttons, with no subject-picking preamble.
   const mentorHomeworkFirstResponse =
     isMentorHomeworkFrame && !mentorHomeworkChoice ? (
       <MentorHomeworkFirstResponse
         imageUri={imageUri}
+        problemText={initialProblemText}
         disabled={isStreaming || isClosing || !!quotaError}
         onHelpMeSolve={handleMentorHomeworkHelpMeSolve}
         onCheckMyAnswer={handleMentorHomeworkCheckMyAnswer}
@@ -1763,6 +1944,19 @@ function SessionScreenInner() {
         handleReconnect,
       },
     });
+
+  const exactManualHomeworkSessionAssociated =
+    isExactManualHomeworkSessionAssociated({
+      isE2EBuild,
+      isMentorHomeworkFrame,
+      allocatedSessionIds: e2eAllocatedSessionIds,
+      activeSessionId,
+      activeSession: activeSession.data,
+      effectiveSubjectId,
+      initialProblemText,
+    });
+  const multipleHomeworkSessionsCreated =
+    isE2EBuild && isMentorHomeworkFrame && e2eAllocatedSessionIds.length > 1;
 
   return (
     <View className="flex-1" testID="session-screen">
@@ -1823,6 +2017,27 @@ function SessionScreenInner() {
         rightAction={headerRight}
         inputAccessory={
           <>
+            {exactManualHomeworkSessionAssociated ? (
+              <View
+                testID="homework-session-associated-once"
+                style={{ width: 1, height: 1 }}
+              />
+            ) : null}
+            {multipleHomeworkSessionsCreated ? (
+              <View
+                testID="homework-session-created-more-than-once"
+                style={{ width: 1, height: 1 }}
+              />
+            ) : null}
+            <HomeworkFirstResponseCompleteMarker
+              active={
+                isE2EBuild && isMentorHomeworkFrame && !!mentorHomeworkChoice
+              }
+              problemText={initialProblemText}
+              messages={messages}
+              isStreaming={isStreaming}
+              hasFailure={sessionExpired || !!quotaError}
+            />
             {challengeBanner}
             {drillStrip}
             {mentorHomeworkFirstResponse}

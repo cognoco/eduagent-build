@@ -171,7 +171,10 @@ export function NowCard({
             {t(copy.cta)}
           </Text>
         </Pressable>
-        {onCompleted && !isBillingAlert ? (
+        {/* [WI-2499] Mentor-notice cards expose Continue and Not now only — no
+            generic Complete/mastery affordance, which would imply a
+            server-unvalidated success. */}
+        {onCompleted && !isBillingAlert && card.kind !== 'mentor_notice' ? (
           <Pressable
             testID="now-card-complete"
             accessibilityRole="button"

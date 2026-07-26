@@ -46,33 +46,15 @@ import {
 // session-crud.ts directly).
 import { ConsentWithdrawnError } from '../session/session-crud';
 import type {
+  ConsentPurpose,
   ConsentStatus,
   ConsentAccountabilityRecord,
 } from '@eduagent/schemas';
-
-/** The default (and original) consent purpose — general platform use. */
-export const DEFAULT_CONSENT_PURPOSE = 'platform_use';
-
-/**
- * [WI-1193] The LLM-disclosure purpose — "per-purpose, separate consent for the
- * LLM-disclosure purpose" per data-model.md §4.8 / MMT-ADR-0011 §3 (`inv 12/27`,
- * `I-PB-B2a`). The canon anticipated this purpose since the consent_grant table
- * was designed; this is its first writer. Independently recorded/revocable from
- * `DEFAULT_CONSENT_PURPOSE` — same key shape (charge × purpose × org × basis),
- * different `purpose` value.
- */
-export const CONSENT_PURPOSE_LLM_DISCLOSURE = 'llm_disclosure';
-
-/**
- * [WI-1193] The purposes recorded for adult self-consent at signup (AC2 purpose
- * split). Each is its own consent_grant row, independently withdrawable via
- * `withdrawAdultSelfConsentV2` (consent-v2.ts) — withdrawing one never touches
- * the other's row.
- */
-export const ADULT_SELF_CONSENT_PURPOSES = [
-  DEFAULT_CONSENT_PURPOSE,
-  CONSENT_PURPOSE_LLM_DISCLOSURE,
-] as const;
+import {
+  CONSENT_PURPOSES,
+  consentPurposeSchema,
+  isoDateField,
+} from '@eduagent/schemas';
 
 /**
  * The regulatory/lawful bases the consent workflow runs per (mirroring the
@@ -228,7 +210,7 @@ function reduceBasisFromRows(rows: BasisRows): BasisReduction {
 async function reduceBasisState(
   db: Database,
   chargePersonId: string,
-  purpose: string,
+  purpose: ConsentPurpose,
   organizationId: string,
   basis: ConsentBasis,
 ): Promise<BasisReduction> {
@@ -303,9 +285,9 @@ function mapRequestStatus(requestStatus: string): ConsentStatus {
       // PARENTAL_CONSENT_REQUESTED until the day-30 delete.
       return 'PARENTAL_CONSENT_REQUESTED';
     case 'approved':
-      // Unreachable: the approval transaction writes the grant too, so a
-      // current grant would have won above. Fall back conservatively.
-      return 'CONSENTED';
+      // Unreachable in a healthy write: approval atomically writes the grant.
+      // A missing grant is not auditable consent, so fail closed.
+      return 'PENDING';
     default:
       // An unknown status should never resolve to a permissive state.
       return 'PARENTAL_CONSENT_REQUESTED';
@@ -329,7 +311,7 @@ export async function resolveConsentStatus(
   db: Database,
   chargePersonId: string,
   organizationId: string,
-  purpose: string,
+  purpose: ConsentPurpose,
   basis: ConsentBasis,
 ): Promise<ConsentStatus | null> {
   const { status } = await reduceBasisState(
@@ -351,7 +333,7 @@ export async function resolveConsentStatusAndWithdrawnAt(
   db: Database,
   chargePersonId: string,
   organizationId: string,
-  purpose: string,
+  purpose: ConsentPurpose,
   basis: ConsentBasis,
 ): Promise<{ status: ConsentStatus; withdrawnAt: Date | null } | null> {
   const { status, withdrawnAt } = await reduceBasisState(
@@ -363,6 +345,98 @@ export async function resolveConsentStatusAndWithdrawnAt(
   );
   if (status === null) return null;
   return { status, withdrawnAt };
+}
+
+/**
+ * Reduce one basis across the complete consent-purpose contract. No rows means
+ * the workflow has never applied. Once any purpose has state, the relationship
+ * fails closed until every purpose has a current unwithdrawn grant.
+ */
+function reduceConsentPurposeSet(
+  reductions: readonly BasisReduction[],
+): BasisReduction {
+  const present = reductions.filter((row) => row.status !== null);
+  if (present.length === 0) {
+    return { status: null, orderingKey: null, withdrawnAt: null };
+  }
+
+  const orderingKeys = present
+    .map((row) => row.orderingKey)
+    .filter((value): value is number => value !== null);
+  const orderingKey =
+    orderingKeys.length > 0 ? Math.max(...orderingKeys) : null;
+  const withdrawnTimes = present
+    .map((row) => row.withdrawnAt?.getTime() ?? null)
+    .filter((value): value is number => value !== null);
+  const withdrawnAt =
+    withdrawnTimes.length > 0 ? new Date(Math.max(...withdrawnTimes)) : null;
+
+  if (present.some((row) => row.status === 'WITHDRAWN')) {
+    return { status: 'WITHDRAWN', orderingKey, withdrawnAt };
+  }
+  if (
+    present.length !== CONSENT_PURPOSES.length ||
+    present.some((row) => row.status === 'PENDING')
+  ) {
+    return { status: 'PENDING', orderingKey, withdrawnAt: null };
+  }
+  if (present.some((row) => row.status === 'PARENTAL_CONSENT_REQUESTED')) {
+    return {
+      status: 'PARENTAL_CONSENT_REQUESTED',
+      orderingKey,
+      withdrawnAt: null,
+    };
+  }
+  if (present.every((row) => row.status === 'CONSENTED')) {
+    return { status: 'CONSENTED', orderingKey, withdrawnAt: null };
+  }
+  return { status: 'PENDING', orderingKey, withdrawnAt: null };
+}
+
+async function reduceConsentSetBasisState(
+  db: Database,
+  chargePersonId: string,
+  organizationId: string,
+  basis: ConsentBasis,
+): Promise<BasisReduction> {
+  const reductions = await Promise.all(
+    CONSENT_PURPOSES.map((purpose) =>
+      reduceBasisState(db, chargePersonId, purpose, organizationId, basis),
+    ),
+  );
+  return reduceConsentPurposeSet(reductions);
+}
+
+/** Resolve the complete guardian/non-adult purpose set for one explicit basis. */
+export async function resolveConsentSetStatus(
+  db: Database,
+  chargePersonId: string,
+  organizationId: string,
+  basis: ConsentBasis,
+): Promise<ConsentStatus | null> {
+  const { status } = await reduceConsentSetBasisState(
+    db,
+    chargePersonId,
+    organizationId,
+    basis,
+  );
+  return status;
+}
+
+/** Set-aware status plus the current withdrawal timestamp for dashboards. */
+export async function resolveConsentSetStatusAndWithdrawnAt(
+  db: Database,
+  chargePersonId: string,
+  organizationId: string,
+  basis: ConsentBasis,
+): Promise<{ status: ConsentStatus; withdrawnAt: Date | null } | null> {
+  const { status, withdrawnAt } = await reduceConsentSetBasisState(
+    db,
+    chargePersonId,
+    organizationId,
+    basis,
+  );
+  return status === null ? null : { status, withdrawnAt };
 }
 
 // ---------------------------------------------------------------------------
@@ -385,7 +459,7 @@ export async function resolveLatestConsentStatusAnyBasis(
   db: Database,
   chargePersonId: string,
   organizationId: string,
-  purpose: string = DEFAULT_CONSENT_PURPOSE,
+  purpose: ConsentPurpose,
 ): Promise<ConsentStatus | null> {
   const reductions = await Promise.all(
     BASIS_PRIORITY.map(async (basis) => ({
@@ -400,6 +474,26 @@ export async function resolveLatestConsentStatusAnyBasis(
     })),
   );
 
+  return pickAnyBasisWinner(reductions);
+}
+
+/** Resolve the latest parental basis after reducing each basis across P. */
+export async function resolveLatestConsentSetStatusAnyBasis(
+  db: Database,
+  chargePersonId: string,
+  organizationId: string,
+): Promise<ConsentStatus | null> {
+  const reductions = await Promise.all(
+    BASIS_PRIORITY.map(async (basis) => ({
+      basis,
+      reduction: await reduceConsentSetBasisState(
+        db,
+        chargePersonId,
+        organizationId,
+        basis,
+      ),
+    })),
+  );
   return pickAnyBasisWinner(reductions);
 }
 
@@ -457,7 +551,7 @@ export async function resolveLatestConsentStatusesAnyBasis(
   db: Database,
   chargePersonIds: readonly string[],
   organizationId: string,
-  purpose: string = DEFAULT_CONSENT_PURPOSE,
+  purpose: ConsentPurpose,
 ): Promise<Map<string, ConsentStatus>> {
   const result = new Map<string, ConsentStatus>();
   if (chargePersonIds.length === 0) return result;
@@ -474,6 +568,37 @@ export async function resolveLatestConsentStatusesAnyBasis(
       basis,
       reduction: reduceBasisFromRows(
         rowsByKey.get(basisRowKey(personId, basis)) ?? EMPTY_BASIS_ROWS,
+      ),
+    }));
+    const status = pickAnyBasisWinner(reductions);
+    if (status !== null) result.set(personId, status);
+  }
+  return result;
+}
+
+/** Batched latest-basis resolution for the complete guardian purpose set. */
+export async function resolveLatestConsentSetStatusesAnyBasis(
+  db: Database,
+  chargePersonIds: readonly string[],
+  organizationId: string,
+): Promise<Map<string, ConsentStatus>> {
+  const result = new Map<string, ConsentStatus>();
+  if (chargePersonIds.length === 0) return result;
+
+  const rowsByPurpose = await Promise.all(
+    CONSENT_PURPOSES.map((purpose) =>
+      fetchConsentBasisRows(db, chargePersonIds, organizationId, purpose),
+    ),
+  );
+  for (const personId of chargePersonIds) {
+    const reductions = BASIS_PRIORITY.map((basis) => ({
+      basis,
+      reduction: reduceConsentPurposeSet(
+        rowsByPurpose.map((rows) =>
+          reduceBasisFromRows(
+            rows.get(basisRowKey(personId, basis)) ?? EMPTY_BASIS_ROWS,
+          ),
+        ),
       ),
     }));
     const status = pickAnyBasisWinner(reductions);
@@ -513,7 +638,7 @@ async function fetchConsentBasisRows(
   db: Database,
   chargePersonIds: readonly string[],
   organizationId: string,
-  purpose: string,
+  purpose: ConsentPurpose,
 ): Promise<Map<string, BasisRows>> {
   const ids = [...chargePersonIds];
   const bases = [...BASIS_PRIORITY] as string[];
@@ -614,7 +739,7 @@ export async function resolveConsentStatusesForBasis(
   db: Database,
   chargePersonIds: readonly string[],
   organizationId: string,
-  purpose: string,
+  purpose: ConsentPurpose,
   basis: ConsentBasis,
 ): Promise<Map<string, { status: ConsentStatus; withdrawnAt: Date | null }>> {
   const result = new Map<
@@ -633,6 +758,42 @@ export async function resolveConsentStatusesForBasis(
       if (row !== null) result.set(personId, row);
     }),
   );
+  return result;
+}
+
+/** Batched basis-explicit status for the complete guardian purpose set. */
+export async function resolveConsentSetStatusesForBasis(
+  db: Database,
+  chargePersonIds: readonly string[],
+  organizationId: string,
+  basis: ConsentBasis,
+): Promise<Map<string, { status: ConsentStatus; withdrawnAt: Date | null }>> {
+  const result = new Map<
+    string,
+    { status: ConsentStatus; withdrawnAt: Date | null }
+  >();
+  if (chargePersonIds.length === 0) return result;
+
+  const rowsByPurpose = await Promise.all(
+    CONSENT_PURPOSES.map((purpose) =>
+      fetchConsentBasisRows(db, chargePersonIds, organizationId, purpose),
+    ),
+  );
+  for (const personId of chargePersonIds) {
+    const reduction = reduceConsentPurposeSet(
+      rowsByPurpose.map((rows) =>
+        reduceBasisFromRows(
+          rows.get(basisRowKey(personId, basis)) ?? EMPTY_BASIS_ROWS,
+        ),
+      ),
+    );
+    if (reduction.status !== null) {
+      result.set(personId, {
+        status: reduction.status,
+        withdrawnAt: reduction.withdrawnAt,
+      });
+    }
+  }
   return result;
 }
 
@@ -663,11 +824,10 @@ export async function isGdprProcessingAllowedV2(
     // No org to anchor consent on — nothing to gate (legacy "no row → allowed").
     return true;
   }
-  const status = await resolveConsentStatus(
+  const status = await resolveConsentSetStatus(
     db,
     profileId,
     membershipRow.organizationId,
-    DEFAULT_CONSENT_PURPOSE,
     'gdpr_parental_consent',
   );
   return status == null || status === 'CONSENTED';
@@ -700,7 +860,7 @@ export async function isLlmExchangeConsentAllowed(
   });
   if (!membershipRow) return true;
 
-  for (const purpose of ADULT_SELF_CONSENT_PURPOSES) {
+  for (const purpose of CONSENT_PURPOSES) {
     const status = await resolveConsentStatus(
       db,
       profileId,
@@ -759,20 +919,38 @@ export function consentedExistsSql(personColumn: ReturnType<typeof sql>) {
   // could satisfy EXISTS even when the true current (higher-id) row is
   // withdrawn — incorrectly passing the gate. Keying on the id of the
   // tie-broken current row closes that.
+  const requiredPurposes = sql.join(
+    CONSENT_PURPOSES.map((purpose) => sql`(${purpose})`),
+    sql`, `,
+  );
   return sql`EXISTS (
-    SELECT 1 FROM consent_grant cg
-    WHERE cg.charge_person_id = ${personColumn}
-      AND cg.purpose = ${DEFAULT_CONSENT_PURPOSE}
-      AND cg.granted AND cg.withdrawn_at IS NULL
-      AND cg.id = (
-        SELECT cg2.id FROM consent_grant cg2
-        WHERE cg2.charge_person_id = cg.charge_person_id
-          AND cg2.purpose = cg.purpose
-          AND cg2.organization_id = cg.organization_id
-          AND cg2.lawful_basis = cg.lawful_basis
-        ORDER BY cg2.granted_at DESC, cg2.id DESC
-        LIMIT 1
+    SELECT 1
+    FROM (
+      SELECT DISTINCT organization_id, lawful_basis
+      FROM consent_grant
+      WHERE charge_person_id = ${personColumn}
+    ) consent_key
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM (VALUES ${requiredPurposes}) AS required(purpose)
+      WHERE NOT EXISTS (
+        SELECT 1 FROM consent_grant cg
+        WHERE cg.charge_person_id = ${personColumn}
+          AND cg.organization_id = consent_key.organization_id
+          AND cg.lawful_basis = consent_key.lawful_basis
+          AND cg.purpose = required.purpose
+          AND cg.granted AND cg.withdrawn_at IS NULL
+          AND cg.id = (
+            SELECT cg2.id FROM consent_grant cg2
+            WHERE cg2.charge_person_id = cg.charge_person_id
+              AND cg2.purpose = cg.purpose
+              AND cg2.organization_id = cg.organization_id
+              AND cg2.lawful_basis = cg.lawful_basis
+            ORDER BY cg2.granted_at DESC, cg2.id DESC
+            LIMIT 1
+          )
       )
+    )
   )`;
 }
 
@@ -809,9 +987,9 @@ export function consentGateSatisfiedSql(personColumn: ReturnType<typeof sql>) {
  * [WI-1193 AC1] `termsAcceptedAt`/`termsVersion` come from the grant's
  * `audit_fact` (the durable terms-acceptance fact recorded at signup, kept
  * SEPARATE from the lawful basis per MMT-ADR-0011), NOT a rename of
- * `granted_at`. `termsAcceptedAt` falls back to `granted_at` and `termsVersion`
- * to null for grants written before the fact was captured, so pre-existing rows
- * still resolve. The withdrawal path MERGES `audit_fact`, so these survive a
+ * `granted_at`. Both fields remain null for grants written before the fact was
+ * captured; a grant or withdrawal timestamp must never fabricate acceptance.
+ * The withdrawal path MERGES `audit_fact`, so captured facts survive a
  * withdrawal — the report proves consent WAS validly obtained even after it is
  * withdrawn.
  *
@@ -846,23 +1024,15 @@ export async function getConsentAccountabilityV2(
   // `minGrantedAt` aggregate above.
   return list.map((r) => {
     const audit = parseAuditFact(r.audit_fact);
-    const acceptedAt =
-      typeof audit?.['termsAcceptedAt'] === 'string'
-        ? (audit['termsAcceptedAt'] as string)
-        : null;
+    const termsFact = parseVersionedTermsFact(audit);
     return {
-      purpose: r.purpose,
+      purpose: consentPurposeSchema.parse(r.purpose),
       lawfulBasis: r.lawful_basis,
       granted: r.granted,
-      // Durable terms-acceptance moment; fall back to granted_at for grants
-      // written before the fact was captured.
-      termsAcceptedAt: acceptedAt
-        ? new Date(acceptedAt)
-        : new Date(r.granted_at),
-      termsVersion:
-        typeof audit?.['termsVersion'] === 'string'
-          ? (audit['termsVersion'] as string)
-          : null,
+      // A missing acceptance fact stays missing. The grant and withdrawal
+      // timestamps describe different events and must not substitute for it.
+      termsAcceptedAt: termsFact?.termsAcceptedAt ?? null,
+      termsVersion: termsFact?.termsVersion ?? null,
       withdrawnAt: r.withdrawn_at ? new Date(r.withdrawn_at) : null,
     };
   });
@@ -895,4 +1065,28 @@ function parseAuditFact(
   } catch {
     return null;
   }
+}
+
+/**
+ * Acceptance is one atomic, versioned fact. Partial or malformed historical
+ * JSON must not assert acceptance and must not make the report endpoint fail.
+ */
+function parseVersionedTermsFact(
+  audit: Record<string, unknown> | null,
+): { termsAcceptedAt: Date; termsVersion: string } | null {
+  const acceptedAt = audit?.['termsAcceptedAt'];
+  const version = audit?.['termsVersion'];
+  if (
+    typeof acceptedAt !== 'string' ||
+    typeof version !== 'string' ||
+    version.trim().length === 0
+  ) {
+    return null;
+  }
+  const parsedAt = isoDateField.safeParse(acceptedAt);
+  if (!parsedAt.success) return null;
+  return {
+    termsAcceptedAt: new Date(parsedAt.data),
+    termsVersion: version,
+  };
 }

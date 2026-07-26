@@ -104,6 +104,7 @@ describe('NudgeActionSheet', () => {
     fireEvent.press(screen.getByTestId('nudge-template-you_got_this'));
 
     await waitFor(() => {
+      screen.getByTestId('nudge-inline-error-rate');
       screen.getByText(
         "You've sent enough encouragement for now - Emma will see it next time they open the app.",
       );

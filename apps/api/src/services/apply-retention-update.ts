@@ -58,7 +58,11 @@ function buildGuardPredicate(guard: RetentionUpdateGuard): SQL | undefined {
     case 'masteredAtNull':
       return isNull(retentionCards.masteredAt);
     case 'repetitionsZero':
-      return eq(retentionCards.repetitions, 0);
+      return and(
+        eq(retentionCards.repetitions, 0),
+        isNull(retentionCards.lastReviewedAt),
+        eq(retentionCards.updatedAt, retentionCards.createdAt),
+      );
   }
 }
 

@@ -31,6 +31,7 @@ import type { ChatMessage, RouteResult } from './llm/types';
 import { extractFirstJsonObject } from './llm/extract-json';
 import { escapeXml } from './llm/sanitize';
 import { captureException } from './sentry';
+import { assertBookTopicWriteAvailable } from './curriculum-core';
 
 const MAX_TOPIC_SUMMARIES = 50;
 
@@ -622,22 +623,7 @@ export async function resolveFilingResult(
       }
     }
 
-    // --- 2. Ensure curriculum exists for this shelf ---
-    const existingCurriculum = await txDb.query.curricula.findFirst({
-      where: eq(curricula.subjectId, shelfId),
-    });
-    let curriculumId: string;
-    if (existingCurriculum) {
-      curriculumId = existingCurriculum.id;
-    } else {
-      const newCurrId = generateUUIDv7();
-      await txDb
-        .insert(curricula)
-        .values({ id: newCurrId, subjectId: shelfId, version: 1 });
-      curriculumId = newCurrId;
-    }
-
-    // --- 3. Resolve book ---
+    // --- 2. Resolve book ---
     let bookId: string;
     let bookName: string;
     let isNewBook = false;
@@ -734,6 +720,32 @@ export async function resolveFilingResult(
           // isNewBook stays false — the other worker created it
         }
       }
+    }
+
+    // Serialize filing with topic expansion/legacy repair. The conditional
+    // update both observes the expansion marker and takes a conflicting row
+    // lock, so a repair that revalidates an empty book cannot have a filing
+    // topic appear between its check and fenced persistence. Because all
+    // filing writes share this transaction, a conflict rolls back any shelf,
+    // curriculum, or book work performed above.
+    await assertBookTopicWriteAvailable(txDb, profileId, shelfId, bookId);
+
+    // --- 3. Ensure curriculum exists for this shelf ---
+    // Lock order is book → curriculum, matching expansion persistence. Doing
+    // this before the book fence creates a deadlock window on legacy books
+    // whose curriculum row has not been materialized yet.
+    const existingCurriculum = await txDb.query.curricula.findFirst({
+      where: eq(curricula.subjectId, shelfId),
+    });
+    let curriculumId: string;
+    if (existingCurriculum) {
+      curriculumId = existingCurriculum.id;
+    } else {
+      const newCurrId = generateUUIDv7();
+      await txDb
+        .insert(curricula)
+        .values({ id: newCurrId, subjectId: shelfId, version: 1 });
+      curriculumId = newCurrId;
     }
 
     // --- 4. Resolve chapter name ---

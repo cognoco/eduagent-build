@@ -474,8 +474,9 @@ describe('subjectPrewarmCurriculum', () => {
     // [WI-2396] Basis-inclusive gate: switched from isGdprProcessingAllowedV2
     // (parental basis only) to isLlmExchangeConsentAllowed, which ALSO honors
     // an adult's independently-withdrawable self-consent (art6_1_a). Sequence
-    // is [gdpr_parental_consent, art6_1_a-platform_use] — CONSENTED then
-    // WITHDRAWN, within the FIRST (load-prewarm-context) gate call — proving
+    // is [gdpr platform_use, gdpr llm_disclosure,
+    // art6_1_a-platform_use] — both parental purposes CONSENTED, then adult
+    // platform_use WITHDRAWN within the FIRST gate call — proving
     // the adult leg alone (parental leg passes) now blocks, which
     // isGdprProcessingAllowedV2 alone would have missed.
     it('[WI-2396] skips LLM when GDPR consent is granted but adult self-consent (art6_1_a) is withdrawn', async () => {
@@ -483,6 +484,11 @@ describe('subjectPrewarmCurriculum', () => {
         createBook({ topicsGenerated: false }),
       );
       mockDb.query.consentGrant.findFirst
+        .mockResolvedValueOnce({
+          granted: true,
+          withdrawnAt: null,
+          grantedAt: now,
+        })
         .mockResolvedValueOnce({
           granted: true,
           withdrawnAt: null,
@@ -512,12 +518,15 @@ describe('subjectPrewarmCurriculum', () => {
         .mockResolvedValueOnce(createBook({ topicsGenerated: false }))
         .mockResolvedValueOnce(createBook({ topicsGenerated: false }))
         .mockResolvedValueOnce(createBook({ topicsGenerated: false }));
-      // [WI-2396] isLlmExchangeConsentAllowed fires up to 3 consentGrant.findFirst
-      // calls per gate invocation (1 gdpr_parental_consent + up to 2 art6_1_a
-      // purposes, short-circuiting on the first WITHDRAWN). load-prewarm-context's
-      // gate must fully pass (3 CONSENTED) before generate-and-persist-topics's
-      // gate sees WITHDRAWN on its first (gdpr) check.
+      // [WI-2396/WI-2386] The first gate must fully pass its two-purpose
+      // parental set and both adult purposes (four CONSENTED reads) before the
+      // generate step sees WITHDRAWN.
       mockDb.query.consentGrant.findFirst
+        .mockResolvedValueOnce({
+          granted: true,
+          withdrawnAt: null,
+          grantedAt: now,
+        })
         .mockResolvedValueOnce({
           granted: true,
           withdrawnAt: null,

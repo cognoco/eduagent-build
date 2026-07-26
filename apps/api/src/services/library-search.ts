@@ -129,6 +129,10 @@ export async function searchLibrary(
         and(
           eq(topicNotes.profileId, profileId),
           eq(subjects.profileId, profileId),
+          or(
+            isNull(topicNotes.artifactSource),
+            eq(topicNotes.artifactSource, 'learner_authored_note'),
+          ),
           sql`${topicNotes.content} ILIKE ${pattern} ESCAPE '\\'`,
         ),
       )

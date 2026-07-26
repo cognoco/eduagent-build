@@ -61,4 +61,37 @@ describe('validateNoticeEvidence', () => {
 
     expect(result).toBeNull();
   });
+
+  // [WI-2629] learnerQuote is optional: when absent, the lexical-overlap
+  // check is skipped, but full provenance (event exists, is a user_message,
+  // and matches the requested profile + session via the scoped repo +
+  // sessionId filter) must still be enforced.
+  describe('absent learnerQuote (WI-2629)', () => {
+    const { learnerQuote: _learnerQuote, ...signalWithoutQuote } = signal;
+
+    it('accepts a grounded event with no overlap check when learnerQuote is absent', async () => {
+      const result = await validateNoticeEvidence(
+        makeDb({
+          id: signal.answerEventId,
+          content: 'a completely unrelated learner message',
+        }),
+        '00000000-0000-4000-8000-000000000002',
+        '00000000-0000-4000-8000-000000000003',
+        signalWithoutQuote,
+      );
+
+      expect(result).toEqual(signalWithoutQuote);
+    });
+
+    it('still rejects when the event does not belong to this profile/session (security floor)', async () => {
+      const result = await validateNoticeEvidence(
+        makeDb(null), // scoped repo finds nothing for a mismatched profile/session
+        '00000000-0000-4000-8000-000000000099',
+        '00000000-0000-4000-8000-000000000098',
+        signalWithoutQuote,
+      );
+
+      expect(result).toBeNull();
+    });
+  });
 });

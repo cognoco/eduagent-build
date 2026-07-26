@@ -10,14 +10,22 @@
  *   - Mastery-verified side-effect: `finalizeChallengeRoundIfReady` writes an
  *     `assessments` row when all evaluations are solid.
  *
+ * Also covers the [WI-2625] mentor-notice re-check judge: the producing
+ * tutor model no longer self-reports a re-check verdict — an independent
+ * server-side judge (evaluateMentorNoticeRecheck, recheck-judge.ts) decides
+ * it after the learner turn is persisted. The same branching fixture below
+ * recognises that judge's distinctive system prompt the same way it
+ * recognises the grader's.
+ *
  * Integration-mock-guard compliant (apps/api `*.integration.test.ts`):
  *   - The LLM is stubbed at the PROVIDER-REGISTRY boundary — `routeAndCall`
  *     runs REAL and delegates to a branching fixture provider. The provider is
- *     registered under every id the router fallback may select so BOTH the
- *     tutor turn and the (vendor-independent) judge grader call land on it; the
- *     grader call is recognised by its distinctive rubric system prompt. This
- *     replaces the old internal-module mock of the `../llm` barrel, which the
- *     integration internal-mock guard correctly rejects
+ *     registered under every id the router fallback may select so the tutor
+ *     turn AND every (vendor-independent) judge call — Challenge Round grader,
+ *     mentor-notice re-check judge — land on it; each judge call is
+ *     recognised by its distinctive system prompt. This replaces the old
+ *     internal-module mock of the `../llm` barrel, which the integration
+ *     internal-mock guard correctly rejects
  *     (see test-utils/integration-mock-guard.test.ts).
  *   - The Inngest client is the one allowlisted internal boundary stub.
  *
@@ -73,7 +81,13 @@ import {
   insertRetentionCardIfAbsent,
 } from '../apply-retention-update';
 import { deleteV2IdentitiesForTest } from '../../test-utils/legacy-identity-anchors';
-import { getProfileTimeZone } from '../mentor-notices';
+import {
+  getProfileTimeZone,
+  MentorNoticeUnavailableError,
+  startMentorNoticeRecheck,
+} from '../mentor-notices';
+import { buildNowFeed } from '../now-feed';
+import { setStructuredLogSink, type LogEntry } from '../logger';
 import {
   _resetCircuits,
   registerProvider,
@@ -167,10 +181,10 @@ const NOTICE_DO_NOT_FAKE = [
   'clearTimeout',
 ] as const;
 
-function tutorEnvelopeDeferringNotice(
-  noticeId: string,
-  answerEventId: string,
-): string {
+// [WI-2625] The tutor no longer emits any re-check verdict — its envelope is
+// neutral. The recheck outcome comes from the notice-recheck judge fixture
+// instead (see `llm.setNoticeRecheckJudgeResponse` at each call site below).
+function tutorEnvelopeDuringNoticeRecheck(): string {
   return JSON.stringify({
     reply: 'Let us come back to that one another time.',
     signals: {
@@ -178,12 +192,6 @@ function tutorEnvelopeDeferringNotice(
       needs_deepening: false,
       understanding_check: false,
       ready_to_finish: false,
-      notice_recheck: {
-        noticeId,
-        verdict: 'deferred',
-        answerEventId,
-        learnerQuote: NOTICE_LEARNER_ANSWER,
-      },
     },
     ui_hints: {
       note_prompt: { show: false, post_session: false },
@@ -223,16 +231,49 @@ const TUTOR_ENVELOPE_WITH_ANSWER_EVALUATION = JSON.stringify({
 const GRADER_VERDICT_SOLID = JSON.stringify({
   items: [
     {
+      concept: 'photosynthesis stages',
+      result: 'solid',
+      evidence: 'Learner correctly identified both main stages.',
+      learnerQuote: 'The light reactions and the Calvin cycle.',
+      questionIdentity: {
+        questionText: 'What are the two main stages of photosynthesis?',
+        minimalLearningClaim:
+          'photosynthesis has light reactions and the Calvin cycle',
+        cognitiveOperation: 'comparison',
+        materialContext: 'the two main stages of photosynthesis',
+      },
+    },
+  ],
+});
+
+const GRADER_VERDICT_SOLID_INPUTS = JSON.stringify({
+  items: [
+    {
       concept: 'photosynthesis inputs',
       result: 'solid',
       evidence: 'Learner correctly identified CO2, water, and sunlight.',
       learnerQuote: 'Plants use CO2, water, and sunlight.',
+      questionIdentity: {
+        questionText: 'What inputs does photosynthesis require?',
+        minimalLearningClaim:
+          'photosynthesis uses carbon dioxide water and sunlight',
+        cognitiveOperation: 'explanation',
+        materialContext: '',
+      },
     },
   ],
 });
 
 /** Degraded grader verdict — an empty `items` array → fail-open ([]) in the service. */
 const GRADER_VERDICT_EMPTY = JSON.stringify({ items: [] });
+
+// [WI-2625] Default notice-recheck judge verdict: "continue" makes no
+// transition, so a test that doesn't care about the recheck outcome is
+// unaffected unless it opts in via `llm.setNoticeRecheckJudgeResponse`.
+const NOTICE_RECHECK_JUDGE_VERDICT_CONTINUE = JSON.stringify({
+  verdict: 'continue',
+  reason: 'unclear',
+});
 
 // ---------------------------------------------------------------------------
 // Branching provider fixture — keeps `routeAndCall` real (provider-registry
@@ -246,6 +287,12 @@ const GRADER_VERDICT_EMPTY = JSON.stringify({ items: [] });
 // ---------------------------------------------------------------------------
 
 const GRADER_SYSTEM_MARKER = 'You are a precise grading assistant';
+// [WI-2625] The mentor-notice re-check judge's system prompt opens with this
+// unique marker (recheck-judge.ts) — detected the same way as the Challenge
+// Round grader above, so its (vendor-independent) judge call lands on this
+// fixture regardless of routing.
+const NOTICE_RECHECK_JUDGE_SYSTEM_MARKER =
+  'You are an independent re-check judge for an educational mentor app';
 const FALLBACK_PROVIDER_IDS = ['gemini', 'anthropic', 'cerebras', 'openai'];
 type TutorStreamFailurePhase = 'setup' | 'pre-first-byte' | 'mid-stream';
 
@@ -256,9 +303,23 @@ function isGraderMessages(messages: ChatMessage[]): boolean {
   );
 }
 
+function isNoticeRecheckJudgeMessages(messages: ChatMessage[]): boolean {
+  return messages.some(
+    (m) =>
+      typeof m.content === 'string' &&
+      m.content.includes(NOTICE_RECHECK_JUDGE_SYSTEM_MARKER),
+  );
+}
+
 function createBranchingLlm() {
   let tutorResponse = TUTOR_ENVELOPE_NO_EVAL;
   let graderResponse = GRADER_VERDICT_SOLID;
+  let noticeRecheckJudgeResponse = NOTICE_RECHECK_JUDGE_VERDICT_CONTINUE;
+  // [WI-2625 rework #4] AC-4 names malformed OR UNAVAILABLE judgment. When set,
+  // every provider throws for the judge call (and only for it), so `routeAndCall`
+  // exhausts its fallback chain and throws — the real route-error path that
+  // `evaluateMentorNoticeRecheck` fail-opens to `{ kind: 'unresolved' }`.
+  let noticeRecheckJudgeUnavailable = false;
   let streamFailurePhase: TutorStreamFailurePhase | undefined;
   let tutorChatCalls = 0;
   let tutorChatStreamCalls = 0;
@@ -266,7 +327,14 @@ function createBranchingLlm() {
 
   function respond(messages: ChatMessage[]): string {
     calls.push(messages);
-    return isGraderMessages(messages) ? graderResponse : tutorResponse;
+    if (isGraderMessages(messages)) return graderResponse;
+    if (isNoticeRecheckJudgeMessages(messages)) {
+      if (noticeRecheckJudgeUnavailable) {
+        throw new Error('injected notice-recheck judge unavailability');
+      }
+      return noticeRecheckJudgeResponse;
+    }
+    return tutorResponse;
   }
 
   const providers: LLMProvider[] = FALLBACK_PROVIDER_IDS.map((id) => ({
@@ -275,14 +343,20 @@ function createBranchingLlm() {
       messages: ChatMessage[],
       _config: ModelConfig,
     ): Promise<ChatResult> {
-      if (!isGraderMessages(messages)) tutorChatCalls++;
+      if (
+        !isGraderMessages(messages) &&
+        !isNoticeRecheckJudgeMessages(messages)
+      ) {
+        tutorChatCalls++;
+      }
       return { content: respond(messages), stopReason: 'stop' };
     },
     chatStream(messages: ChatMessage[], _config: ModelConfig) {
-      const graderCall = isGraderMessages(messages);
-      if (!graderCall) tutorChatStreamCalls++;
+      const nonTutorCall =
+        isGraderMessages(messages) || isNoticeRecheckJudgeMessages(messages);
+      if (!nonTutorCall) tutorChatStreamCalls++;
       const content = respond(messages);
-      const tutorStreamFailure = graderCall ? undefined : streamFailurePhase;
+      const tutorStreamFailure = nonTutorCall ? undefined : streamFailurePhase;
       if (tutorStreamFailure === 'setup') {
         throw new Error('injected provider setup failure');
       }
@@ -323,6 +397,12 @@ function createBranchingLlm() {
     setGraderResponse(content: string): void {
       graderResponse = content;
     },
+    setNoticeRecheckJudgeResponse(content: string): void {
+      noticeRecheckJudgeResponse = content;
+    },
+    setNoticeRecheckJudgeUnavailable(unavailable: boolean): void {
+      noticeRecheckJudgeUnavailable = unavailable;
+    },
     setStreamFailurePhase(phase: TutorStreamFailurePhase | undefined): void {
       streamFailurePhase = phase;
     },
@@ -335,9 +415,24 @@ function createBranchingLlm() {
     graderCallCount(): number {
       return calls.filter(isGraderMessages).length;
     },
+    graderMessages(): ChatMessage[][] {
+      return calls.filter(isGraderMessages);
+    },
+    noticeRecheckJudgeCallCount(): number {
+      return calls.filter(isNoticeRecheckJudgeMessages).length;
+    },
+    // [WI-2625 rework] Recorded judge prompts — lets a test PROVE which
+    // re-check exchange number a turn actually reached (buildJudgePrompt
+    // embeds "Re-check exchange N of at most 3"), rather than inferring it
+    // from the number of processMessage calls made.
+    noticeRecheckJudgeMessages(): ChatMessage[][] {
+      return calls.filter(isNoticeRecheckJudgeMessages);
+    },
     reset(): void {
       tutorResponse = TUTOR_ENVELOPE_NO_EVAL;
       graderResponse = GRADER_VERDICT_SOLID;
+      noticeRecheckJudgeResponse = NOTICE_RECHECK_JUDGE_VERDICT_CONTINUE;
+      noticeRecheckJudgeUnavailable = false;
       streamFailurePhase = undefined;
       tutorChatCalls = 0;
       tutorChatStreamCalls = 0;
@@ -432,14 +527,15 @@ async function seedCurriculumTopic(
 
 /**
  * Seed a session with a challenge round already in `active` state.
- * `questionIndex=0, totalQuestions=1` so the NEXT answer_complete fires
- * immediately transitions to `drafting`.
+ * `questionIndex=0`; callers choose how many successful answers are required
+ * before the round transitions to `drafting`.
  */
 async function seedActiveSession(
   db: Database,
   profileId: string,
   subjectId: string,
   topicId: string,
+  totalQuestions = 1,
 ): Promise<ReturnType<typeof mapSessionRow>> {
   const [row] = await db
     .insert(learningSessions)
@@ -459,7 +555,7 @@ async function seedActiveSession(
           topicId,
           declinedDontAskAgain: false,
           questionIndex: 0,
-          totalQuestions: 1,
+          totalQuestions,
           startedAt: new Date().toISOString(),
           evaluations: [],
           questionsAsked: 0,
@@ -505,7 +601,8 @@ async function seedOrdinarySession(
 }
 
 /**
- * Seed a session already in `drafting` state with one solid evaluation.
+ * Seed a session already in `drafting` state with two non-equivalent solid
+ * evaluations.
  * Used for the finalizeChallengeRoundIfReady mastery-verification test.
  */
 async function seedDraftingSession(
@@ -515,6 +612,7 @@ async function seedDraftingSession(
   topicId: string,
   answerEventId: string,
 ): Promise<ReturnType<typeof mapSessionRow>> {
+  const comparisonAnswerEventId = generateUUIDv7();
   const [row] = await db
     .insert(learningSessions)
     .values({
@@ -532,10 +630,10 @@ async function seedDraftingSession(
           offerCount: 1,
           topicId,
           declinedDontAskAgain: false,
-          questionIndex: 1,
-          totalQuestions: 1,
+          questionIndex: 2,
+          totalQuestions: 2,
           startedAt: new Date().toISOString(),
-          questionsAsked: 1,
+          questionsAsked: 2,
           evaluations: [
             {
               concept: 'photosynthesis',
@@ -543,6 +641,31 @@ async function seedDraftingSession(
               evidence: 'Clear explanation of the light reactions.',
               answerEventId,
               learnerQuote: 'Plants use sunlight to split water.',
+              questionIdentity: {
+                questionText:
+                  'Why does a plant use sunlight during photosynthesis?',
+                minimalLearningClaim:
+                  'photosynthesis converts light into chemical energy',
+                cognitiveOperation: 'causal_explanation',
+                materialContext: 'a plant in sunlight',
+              },
+            },
+            {
+              concept: 'energy capture in darkness',
+              result: 'solid',
+              evidence:
+                'Correctly compared energy capture in sunlight and darkness.',
+              answerEventId: comparisonAnswerEventId,
+              learnerQuote:
+                'In darkness the plant cannot capture new light energy.',
+              questionIdentity: {
+                questionText:
+                  'Compare a plant capturing energy in sunlight and darkness.',
+                minimalLearningClaim:
+                  'photosynthesis converts light into chemical energy',
+                cognitiveOperation: 'comparison',
+                materialContext: 'a plant in sunlight and darkness',
+              },
             },
           ],
         },
@@ -550,16 +673,28 @@ async function seedDraftingSession(
     })
     .returning();
 
-  await db.insert(sessionEvents).values({
-    id: answerEventId,
-    profileId,
-    subjectId,
-    sessionId: row!.id,
-    topicId,
-    eventType: 'user_message',
-    content: 'Plants use sunlight to split water.',
-    metadata: { source: 'test' },
-  });
+  await db.insert(sessionEvents).values([
+    {
+      id: answerEventId,
+      profileId,
+      subjectId,
+      sessionId: row!.id,
+      topicId,
+      eventType: 'user_message',
+      content: 'Plants use sunlight to split water.',
+      metadata: { source: 'test' },
+    },
+    {
+      id: comparisonAnswerEventId,
+      profileId,
+      subjectId,
+      sessionId: row!.id,
+      topicId,
+      eventType: 'user_message',
+      content: 'In darkness the plant cannot capture new light energy.',
+      metadata: { source: 'test' },
+    },
+  ]);
 
   return mapSessionRow(row!);
 }
@@ -567,6 +702,13 @@ async function seedDraftingSession(
 /**
  * Seed a minimal `ai_response` session event so there is at least one prior
  * mentor question in `exchangeHistory` (used by T6 askedQuestion extraction).
+ *
+ * [WI-2670] `metadata.llmProvider` mirrors what `persistExchangeResult`
+ * always writes for a real ai_response row — the Challenge Round grader's
+ * `producerVendor` threading (`resolveAskedQuestion`) reads it back from
+ * here. Without it, this fixture would simulate a legacy pre-tracking row
+ * (unrealistic for any session created after this WI) and the grader would
+ * correctly, but here unrealistically, fail open.
  */
 async function seedPriorAiResponse(
   db: Database,
@@ -583,7 +725,7 @@ async function seedPriorAiResponse(
     topicId,
     eventType: 'ai_response',
     content,
-    metadata: { source: 'server' },
+    metadata: { source: 'server', llmProvider: 'anthropic' },
   });
 }
 
@@ -892,8 +1034,8 @@ describeIfDb('session exchange production-path integration', () => {
     const meta = await readSessionChallengeRound(db, session.id);
     expect(meta?.state).toBe('drafting');
 
-    // seedDraftingSession's evaluation is a single solid item → outcome
-    // 'verified' (lastOutcome 2). Finalize must overwrite the stale decline
+    // seedDraftingSession's evaluations are two non-equivalent solid probes →
+    // outcome 'verified' (lastOutcome 2). Finalize must overwrite the stale decline
     // row via onConflictDoUpdate, not throw a unique-constraint violation.
     const result = await finalizeChallengeRoundIfReady(
       db,
@@ -962,6 +1104,7 @@ describeIfDb('session exchange production-path integration', () => {
       .select({
         content: topicNotes.content,
         artifactSource: topicNotes.artifactSource,
+        artifactConceptKey: topicNotes.artifactConceptKey,
       })
       .from(topicNotes)
       .where(
@@ -972,9 +1115,26 @@ describeIfDb('session exchange production-path integration', () => {
         ),
       );
 
-    expect(noteRows).toHaveLength(1);
-    expect(noteRows[0]!.artifactSource).toBe('challenge_drafted_note');
-    expect(noteRows[0]!.content).toBe('Plants use sunlight to split water.');
+    expect(noteRows).toHaveLength(3);
+    expect(noteRows).toEqual(
+      expect.arrayContaining([
+        {
+          artifactSource: 'challenge_solid_quote',
+          content: 'photosynthesis',
+          artifactConceptKey: 'photosynthesis',
+        },
+        {
+          artifactSource: 'challenge_solid_quote',
+          content: 'energy capture in darkness',
+          artifactConceptKey: 'energy capture in darkness',
+        },
+        {
+          artifactSource: 'challenge_drafted_note',
+          content: 'Plants use sunlight to split water.',
+          artifactConceptKey: null,
+        },
+      ]),
+    );
   });
 
   // -------------------------------------------------------------------------
@@ -1089,10 +1249,16 @@ describeIfDb('session exchange production-path integration', () => {
   // This test verifies the branch now fires on `currentUserMessage` instead.
   // -------------------------------------------------------------------------
 
-  it('[T7 RED→GREEN] flag=ON: grader provides solid evaluation → challenge round completes', async () => {
+  it('[T7 RED→GREEN] flag=ON: two distinct solid grader probes complete the challenge round', async () => {
     const { profileId, subjectId } = await seedProfileAndSubject(db);
     const topicId = await seedCurriculumTopic(db, subjectId);
-    const session = await seedActiveSession(db, profileId, subjectId, topicId);
+    const session = await seedActiveSession(
+      db,
+      profileId,
+      subjectId,
+      topicId,
+      2,
+    );
 
     // Seed a prior ai_response so exchangeHistory has at least one assistant turn
     // (T6: askedQuestion sourced from last assistant message).
@@ -1105,8 +1271,9 @@ describeIfDb('session exchange production-path integration', () => {
       'What are the two main stages of photosynthesis?',
     );
 
-    // Defaults: tutor → envelope WITHOUT eval; grader → solid verdict.
-    const result = await processMessage(
+    // First distinct probe: the grader fires, but one solid answer cannot
+    // verify mastery under WI-2464's breadth contract.
+    const firstResult = await processMessage(
       db,
       profileId,
       session.id,
@@ -1117,26 +1284,53 @@ describeIfDb('session exchange production-path integration', () => {
       },
     );
 
-    // The challenge round must have advanced through drafting into terminal
-    // completion once the solid grader evaluation satisfies finalization.
+    expect(firstResult.challengeRound?.state).toBe('active');
+    expect(firstResult.challengeRound?.evaluations).toHaveLength(1);
+    expect(firstResult.challengeRound?.questionsAsked).toBe(1);
+    expect(
+      await readAssessmentsForSession(db, profileId, session.id),
+    ).toHaveLength(0);
+
+    // Second probe assesses a different minimal claim and operation.
+    llm.setGraderResponse(GRADER_VERDICT_SOLID_INPUTS);
+    const result = await processMessage(
+      db,
+      profileId,
+      session.id,
+      { message: 'Plants use CO2, water, and sunlight.' },
+      {
+        challengeRoundRuntimeEnabled: true,
+        challengeRoundGraderEnabled: true,
+      },
+    );
+
     expect(result.challengeRound).toBeDefined();
     expect(result.challengeRound?.state).toBe('complete');
-    expect(result.challengeRound?.evaluations).toHaveLength(1);
-    expect(result.challengeRound?.evaluations[0]?.result).toBe('solid');
-    // T9: questionsAsked must be incremented
-    expect(result.challengeRound?.questionsAsked).toBe(1);
+    expect(result.challengeRound?.evaluations).toHaveLength(2);
+    expect(
+      result.challengeRound?.evaluations.every(
+        (evaluation) => evaluation.result === 'solid',
+      ),
+    ).toBe(true);
+    expect(result.challengeRound?.questionsAsked).toBe(2);
 
     // Verify DB state matches the returned state
     const persisted = await readSessionChallengeRound(db, session.id);
     expect(persisted?.state).toBe('complete');
-    expect((persisted?.evaluations as unknown[])?.length).toBe(1);
+    expect((persisted?.evaluations as unknown[])?.length).toBe(2);
 
     const rows = await readAssessmentsForSession(db, profileId, session.id);
     expect(rows).toHaveLength(1);
     expect(rows[0]!.masteryChallengeVerifiedAt).not.toBeNull();
 
     // Verify the grader was actually called (not the inline tutor path)
-    expect(llm.graderCallCount()).toBe(1);
+    expect(llm.graderCallCount()).toBe(2);
+    expect(
+      llm
+        .graderMessages()[1]!
+        .map((message) => message.content)
+        .join('\n'),
+    ).toContain('photosynthesis has light reactions and the Calvin cycle');
   });
 
   // -------------------------------------------------------------------------
@@ -1283,21 +1477,6 @@ describeIfDb('session exchange production-path integration', () => {
         .where(eq(organization.id, link.organizationId));
       expect(await getProfileTimeZone(db, profileId)).toBe('America/Santiago');
 
-      // The learner turn the notice_recheck signal must cite as evidence.
-      const [answerEvent] = await db
-        .insert(sessionEvents)
-        .values({
-          profileId,
-          subjectId,
-          sessionId: session.id,
-          topicId,
-          eventType: 'user_message',
-          content: NOTICE_LEARNER_ANSWER,
-          metadata: {},
-        })
-        .returning({ id: sessionEvents.id });
-      if (!answerEvent) throw new Error('answer event insert failed');
-
       const [notice] = await db
         .insert(mentorNotices)
         .values({
@@ -1320,8 +1499,9 @@ describeIfDb('session exchange production-path integration', () => {
         .set({ metadata: { recheckNoticeId: notice.id } })
         .where(eq(learningSessions.id, session.id));
 
-      llm.setTutorResponse(
-        tutorEnvelopeDeferringNotice(notice.id, answerEvent.id),
+      llm.setTutorResponse(tutorEnvelopeDuringNoticeRecheck());
+      llm.setNoticeRecheckJudgeResponse(
+        JSON.stringify({ verdict: 'deferred', reason: 'explicit_not_now' }),
       );
       return { profileId, session, noticeId: notice.id };
     }
@@ -1376,6 +1556,860 @@ describeIfDb('session exchange production-path integration', () => {
       await result.onComplete();
 
       expect(await readLastDeferredAt(noticeId)).toEqual(NOTICE_SANTIAGO_NOW);
+    });
+  });
+
+  // [WI-2501 AC-5] Both exchange recheck-outcome call sites — processMessage
+  // and streamMessage — must terminalize a completed 'not_yet' re-check, not
+  // just the 'deferred' branch covered above. The regression in
+  // `tests/integration/mentor-notice-lifecycle.integration.test.ts` calls
+  // `applyMentorNoticeOutcome` directly and would pass even if one of these
+  // two call sites regressed to leaving the notice 'open'.
+  describe('mentor-notice not_yet terminalization through the exchange call sites', () => {
+    async function seedMentorNoticeNotYetTurn() {
+      const { profileId, subjectId } = await seedProfileAndSubject(db);
+      const topicId = await seedCurriculumTopic(db, subjectId);
+      const session = await seedOrdinarySession(
+        db,
+        profileId,
+        subjectId,
+        topicId,
+      );
+
+      const [notice] = await db
+        .insert(mentorNotices)
+        .values({
+          profileId,
+          subjectId,
+          sourceSessionId: session.id,
+          concept: 'Changing signs across the equals sign',
+          correctionHint: 'Apply the inverse operation to both sides.',
+          status: 'open',
+          lastOfferedSessionId: session.id,
+          lastOfferedAt: NOTICE_OFFERED_AT,
+        })
+        .returning({ id: mentorNotices.id });
+      if (!notice) throw new Error('mentor notice insert failed');
+
+      await db
+        .update(learningSessions)
+        .set({ metadata: { recheckNoticeId: notice.id } })
+        .where(eq(learningSessions.id, session.id));
+
+      llm.setTutorResponse(tutorEnvelopeDuringNoticeRecheck());
+      llm.setNoticeRecheckJudgeResponse(
+        JSON.stringify({ verdict: 'not_yet', reason: 'insufficient' }),
+      );
+      return { profileId, session, noticeId: notice.id };
+    }
+
+    async function readNoticeStatus(
+      noticeId: string,
+    ): Promise<{ status: string; lastRecheckOutcome: string | null } | null> {
+      const [row] = await db
+        .select({
+          status: mentorNotices.status,
+          lastRecheckOutcome: mentorNotices.lastRecheckOutcome,
+        })
+        .from(mentorNotices)
+        .where(eq(mentorNotices.id, noticeId));
+      return row ?? null;
+    }
+
+    it('processMessage terminalizes a completed not_yet re-check to a non-open status', async () => {
+      const { profileId, session, noticeId } =
+        await seedMentorNoticeNotYetTurn();
+
+      await processMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+      );
+
+      const row = await readNoticeStatus(noticeId);
+      expect(row?.status).toBe('not_yet');
+      expect(row?.status).not.toBe('open');
+      expect(row?.lastRecheckOutcome).toBe('not_yet');
+    });
+
+    it('streamMessage terminalizes a completed not_yet re-check to a non-open status', async () => {
+      const { profileId, session, noticeId } =
+        await seedMentorNoticeNotYetTurn();
+
+      const result = await streamMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+      );
+      for await (const chunk of result.stream) void chunk;
+      await result.onComplete();
+
+      const row = await readNoticeStatus(noticeId);
+      expect(row?.status).toBe('not_yet');
+      expect(row?.status).not.toBe('open');
+      expect(row?.lastRecheckOutcome).toBe('not_yet');
+    });
+  });
+
+  // [WI-2625] The independent judge is the ONLY source of a re-check verdict
+  // now — these cover the remaining outcomes (locked_in, dismissed), the
+  // fail-open "no transition" cases (continue, malformed judge output), the
+  // deterministic turn-3 not_yet force over those fail-open cases, and the
+  // retry/replay idempotency boundary (a duplicate clientId send must not
+  // re-invoke the judge or double-apply an outcome).
+  describe('mentor-notice recheck judge outcomes and idempotency (WI-2625)', () => {
+    async function seedOpenMentorNoticeRecheckTurn() {
+      const { profileId, subjectId } = await seedProfileAndSubject(db);
+      const topicId = await seedCurriculumTopic(db, subjectId);
+      const session = await seedOrdinarySession(
+        db,
+        profileId,
+        subjectId,
+        topicId,
+      );
+
+      const [notice] = await db
+        .insert(mentorNotices)
+        .values({
+          profileId,
+          subjectId,
+          sourceSessionId: session.id,
+          concept: 'Changing signs across the equals sign',
+          correctionHint: 'Apply the inverse operation to both sides.',
+          status: 'open',
+          lastOfferedSessionId: session.id,
+          lastOfferedAt: NOTICE_OFFERED_AT,
+        })
+        .returning({ id: mentorNotices.id });
+      if (!notice) throw new Error('mentor notice insert failed');
+
+      await db
+        .update(learningSessions)
+        .set({ metadata: { recheckNoticeId: notice.id } })
+        .where(eq(learningSessions.id, session.id));
+
+      llm.setTutorResponse(tutorEnvelopeDuringNoticeRecheck());
+      return { profileId, session, noticeId: notice.id };
+    }
+
+    async function readNotice(noticeId: string) {
+      const [row] = await db
+        .select({
+          status: mentorNotices.status,
+          lastRecheckOutcome: mentorNotices.lastRecheckOutcome,
+          recheckAttemptCount: mentorNotices.recheckAttemptCount,
+          resolvedAt: mentorNotices.resolvedAt,
+        })
+        .from(mentorNotices)
+        .where(eq(mentorNotices.id, noticeId));
+      return row ?? null;
+    }
+
+    /**
+     * [WI-2625 rework #4] The session-side ATTEMPT bookkeeping — the two keys
+     * that bind one notice to one session and anchor the per-attempt exchange
+     * counter (offer.ts). Read as raw metadata so "the keys are gone" is
+     * observable, not inferred.
+     */
+    async function readAttemptBookkeeping(sessionId: string): Promise<{
+      recheckNoticeId?: unknown;
+      recheckOfferExchangeCount?: unknown;
+    }> {
+      const [row] = await db
+        .select({ metadata: learningSessions.metadata })
+        .from(learningSessions)
+        .where(eq(learningSessions.id, sessionId));
+      const metadata = (row?.metadata as Record<string, unknown> | null) ?? {};
+      const bookkeeping: Record<string, unknown> = {};
+      if ('recheckNoticeId' in metadata) {
+        bookkeeping.recheckNoticeId = metadata.recheckNoticeId;
+      }
+      if ('recheckOfferExchangeCount' in metadata) {
+        bookkeeping.recheckOfferExchangeCount =
+          metadata.recheckOfferExchangeCount;
+      }
+      return bookkeeping;
+    }
+
+    it.each([
+      ['locked_in', 'demonstrated'],
+      ['dismissed', 'explicit_stop'],
+    ] as const)(
+      'processMessage terminalizes a %s judge verdict',
+      async (verdict, reason) => {
+        const { profileId, session, noticeId } =
+          await seedOpenMentorNoticeRecheckTurn();
+        llm.setNoticeRecheckJudgeResponse(JSON.stringify({ verdict, reason }));
+
+        await processMessage(
+          db,
+          profileId,
+          session.id,
+          { message: NOTICE_LEARNER_ANSWER },
+          { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+        );
+
+        const row = await readNotice(noticeId);
+        expect(row?.status).toBe(verdict);
+        expect(row?.lastRecheckOutcome).toBe(verdict);
+      },
+    );
+
+    // [WI-2625] `deferred` is NOT terminal like locked_in/dismissed/not_yet —
+    // applyMentorNoticeOutcome's deferred branch (state.ts) intentionally
+    // leaves `status` at 'open' (the notice stays re-offerable later) and
+    // only stamps lastRecheckOutcome/lastDeferredAt. This is the judge
+    // reaching the SAME direct-not-now outcome the deterministic
+    // deferMentorNotice() API path also produces (recheck.ts) — proving the
+    // judge integration routes into the pre-existing defer machinery
+    // correctly, not a new terminal state.
+    it('processMessage applies a deferred judge verdict without closing the notice', async () => {
+      const { profileId, session, noticeId } =
+        await seedOpenMentorNoticeRecheckTurn();
+      llm.setNoticeRecheckJudgeResponse(
+        JSON.stringify({ verdict: 'deferred', reason: 'explicit_not_now' }),
+      );
+
+      await processMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+      );
+
+      const row = await readNotice(noticeId);
+      expect(row?.status).toBe('open');
+      expect(row?.lastRecheckOutcome).toBe('deferred');
+    });
+
+    // [WI-2625] streamMessage variant of the terminal-verdict case above —
+    // proves the judge integration is identical across both call sites, not
+    // just processMessage. locked_in is representative; not_yet's streaming
+    // parity is already covered by the "not_yet terminalization" describe
+    // block above.
+    it('streamMessage terminalizes a locked_in judge verdict', async () => {
+      const { profileId, session, noticeId } =
+        await seedOpenMentorNoticeRecheckTurn();
+      llm.setNoticeRecheckJudgeResponse(
+        JSON.stringify({ verdict: 'locked_in', reason: 'demonstrated' }),
+      );
+
+      const result = await streamMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+      );
+      for await (const chunk of result.stream) void chunk;
+      await result.onComplete();
+
+      const row = await readNotice(noticeId);
+      expect(row?.status).toBe('locked_in');
+      expect(row?.lastRecheckOutcome).toBe('locked_in');
+    });
+
+    // [WI-2625 rework] The below-cap `continue` case moved into the
+    // causes block below, where it sits beside the two cap cases and is
+    // parameterized over both transports — see "recheck outcome causes".
+
+    it('malformed judge output makes no transition before turn 3 (fail-open)', async () => {
+      const { profileId, session, noticeId } =
+        await seedOpenMentorNoticeRecheckTurn();
+      llm.setNoticeRecheckJudgeResponse('not valid json at all');
+
+      await processMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+      );
+
+      const row = await readNotice(noticeId);
+      expect(row?.status).toBe('open');
+      expect(row?.lastRecheckOutcome).toBeNull();
+    });
+
+    it('deterministically terminalizes not_yet on turn 3 when the judge never resolves', async () => {
+      const { profileId, session, noticeId } =
+        await seedOpenMentorNoticeRecheckTurn();
+      // Every turn the judge fails open (malformed) — exercises the turn-3
+      // hard cap rather than the judge ever producing not_yet itself.
+      // `seedOrdinarySession` seeds `exchangeCount: 1`, so the FIRST call
+      // here already lands on re-check exchange 2 (still under the cap);
+      // the SECOND call lands on exchange 3, where the cap forces not_yet.
+      llm.setNoticeRecheckJudgeResponse('still not valid json');
+
+      await processMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+      );
+      const midRow = await readNotice(noticeId);
+      expect(midRow?.status).toBe('open');
+
+      await processMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+      );
+
+      const finalRow = await readNotice(noticeId);
+      expect(finalRow?.status).toBe('not_yet');
+      expect(finalRow?.lastRecheckOutcome).toBe('not_yet');
+    });
+
+    // -----------------------------------------------------------------------
+    // [WI-2625 rework #4] THREE causes, both transports — under the operator
+    // ruling of 2026-07-26 ("Recommendation B").
+    //
+    // Two mechanisms act during a re-check and must never be conflated: the
+    // judge's verdict, and the ratified three-response attempt cap. The cap
+    // acts on the ATTEMPT lifecycle, which is separate bookkeeping from notice
+    // status. The causes:
+    //   1. valid `continue` BELOW the cap   → no transition        (the judge)
+    //   2. valid `continue` AT the cap      → no transition; the ATTEMPT ends,
+    //      the notice stays open, unresolved and RE-OFFERABLE       (the cap)
+    //   3. unresolved evaluation AT the cap → not_yet               (the cap)
+    //
+    // Cases 1 and 2 together are AC-3 as written: a valid `continue` makes no
+    // mentor-notice transition at ANY exchange number, including the third.
+    // Case 3 is AC-4, unchanged.
+    //
+    // Cases 2 and 3 are the NON-TRIVIALITY CONTROL for each other, and the
+    // tightest available one: same transport, same turn count, same cap, one
+    // variable changed (the judge's output). An implementation that always
+    // transitions fails case 2; one that never transitions fails case 3. No
+    // always-X implementation can satisfy both.
+    //
+    // Both transports throughout: processMessage and streamMessage each derive
+    // their own context, so one does not prove the other.
+    //
+    // Every case asserts which re-check exchange it ACTUALLY reached by
+    // reading the judge prompt the evaluator sent, so a regression that stops
+    // advancing the exchange number cannot make a cap assertion vacuous.
+    // -----------------------------------------------------------------------
+    describe('recheck outcome causes — judge verdict vs response cap (both transports)', () => {
+      /** exchangeNumber = session.exchangeCount - recheckOfferExchangeCount + 1 (offer.ts). seedOrdinarySession seeds exchangeCount: 1 and the seed sets no offer count, so the FIRST turn is re-check exchange 2 (one short of the cap) and the SECOND is exchange 3 (the cap). */
+      async function runRecheckTurns(
+        transport: 'processMessage' | 'streamMessage',
+        profileId: string,
+        sessionId: string,
+        turns: number,
+      ): Promise<void> {
+        for (let turn = 0; turn < turns; turn++) {
+          if (transport === 'processMessage') {
+            await processMessage(
+              db,
+              profileId,
+              sessionId,
+              { message: NOTICE_LEARNER_ANSWER },
+              {
+                semanticMemoryRetrievalEnabled: false,
+                mentorNoticeEnabled: true,
+              },
+            );
+          } else {
+            const result = await streamMessage(
+              db,
+              profileId,
+              sessionId,
+              { message: NOTICE_LEARNER_ANSWER },
+              {
+                semanticMemoryRetrievalEnabled: false,
+                mentorNoticeEnabled: true,
+              },
+            );
+            for await (const chunk of result.stream) void chunk;
+            await result.onComplete();
+          }
+        }
+      }
+
+      const runOneRecheckTurn = (
+        transport: 'processMessage' | 'streamMessage',
+        profileId: string,
+        sessionId: string,
+      ) => runRecheckTurns(transport, profileId, sessionId, 1);
+
+      const runTwoRecheckTurns = (
+        transport: 'processMessage' | 'streamMessage',
+        profileId: string,
+        sessionId: string,
+      ) => runRecheckTurns(transport, profileId, sessionId, 2);
+
+      /**
+       * Proves the LAST judge call this test made was for the named re-check
+       * exchange — read off the prompt the evaluator actually sent
+       * (buildJudgePrompt embeds it), never inferred from the call count. A
+       * regression that stops advancing the exchange number fails here instead
+       * of silently making a cap assertion vacuous.
+       */
+      function expectLastJudgeCallWasExchange(expected: number): void {
+        const judgeCalls = llm.noticeRecheckJudgeMessages();
+        expect(judgeCalls.length).toBeGreaterThan(0);
+        const lastUserMessage = judgeCalls[judgeCalls.length - 1]?.find(
+          (m) => m.role === 'user',
+        );
+        expect(String(lastUserMessage?.content)).toContain(
+          `Re-check exchange ${expected} of at most 3`,
+        );
+      }
+
+      /**
+       * Captures the structured-log entries emitted during `run()` via the
+       * logger's own sink seam — the cap's `cause` field is the only place the
+       * two cap causes are observably different (both end at status
+       * `not_yet` by ruling), so this is real evidence rather than a
+       * code-shape assertion.
+       */
+      async function captureLogs(
+        run: () => Promise<void>,
+      ): Promise<LogEntry[]> {
+        const entries: LogEntry[] = [];
+        setStructuredLogSink((entry) => {
+          entries.push(entry);
+        });
+        try {
+          await run();
+        } finally {
+          setStructuredLogSink(null);
+        }
+        return entries;
+      }
+
+      function capCauses(entries: LogEntry[]): unknown[] {
+        return entries
+          .filter((entry) => entry.message.includes('response cap reached'))
+          .map((entry) => entry.context?.cause);
+      }
+
+      /** The `not_yet` terminalization is emitted ONLY by the AC-4 cap path. */
+      function capTerminalizations(entries: LogEntry[]): unknown[] {
+        return entries
+          .filter((entry) =>
+            entry.message.includes('response cap reached — terminalizing'),
+          )
+          .map((entry) => entry.context?.cause);
+      }
+
+      // ---- Cause 1: the judge's own valid `continue`, BELOW the cap. --------
+      // This is the AC-3 anchor: the judge's `continue` demonstrably does not
+      // itself terminalize, because here — one exchange short of the cap — it
+      // transitions nothing. Keep this case adjacent to the two cap cases; it
+      // is what makes them readable as "the cap did it, not the judge".
+      it.each(['processMessage', 'streamMessage'] as const)(
+        '%s: a valid continue verdict BELOW the cap makes no transition (the judge never terminalizes)',
+        async (transport) => {
+          const { profileId, session, noticeId } =
+            await seedOpenMentorNoticeRecheckTurn();
+          llm.setNoticeRecheckJudgeResponse(
+            JSON.stringify({ verdict: 'continue', reason: 'unclear' }),
+          );
+
+          const entries = await captureLogs(() =>
+            runOneRecheckTurn(transport, profileId, session.id),
+          );
+
+          expectLastJudgeCallWasExchange(2);
+          expect(capCauses(entries)).toEqual([]);
+          const row = await readNotice(noticeId);
+          expect(row?.status).toBe('open');
+          expect(row?.lastRecheckOutcome).toBeNull();
+        },
+      );
+
+      // ---- Cause 2: the CAP, over a valid `continue`. -----------------------
+      // AC-3 at the exchange number that matters. The cap ends the ATTEMPT —
+      // the session's attempt bookkeeping is detached — and transitions NOTHING
+      // on the notice: still `open`, no recorded outcome, no resolvedAt, no
+      // attempt-count increment. Ruled 2026-07-26 ("Recommendation B") after
+      // three Gate-2 bounces over a cap-driven `not_yet` here.
+      it.each(['processMessage', 'streamMessage'] as const)(
+        '%s: a valid continue AT the cap makes NO transition — the attempt ends, the notice is preserved',
+        async (transport) => {
+          const { profileId, session, noticeId } =
+            await seedOpenMentorNoticeRecheckTurn();
+          llm.setNoticeRecheckJudgeResponse(
+            JSON.stringify({ verdict: 'continue', reason: 'unclear' }),
+          );
+          expect(await readAttemptBookkeeping(session.id)).toEqual({
+            recheckNoticeId: noticeId,
+          });
+          // An unrelated metadata key, to prove the detach is targeted surgery
+          // on the two attempt keys and not a metadata reset.
+          await db
+            .update(learningSessions)
+            .set({
+              metadata: { recheckNoticeId: noticeId, continuationDepth: 'mid' },
+            })
+            .where(eq(learningSessions.id, session.id));
+
+          const entries = await captureLogs(() =>
+            runTwoRecheckTurns(transport, profileId, session.id),
+          );
+
+          // The cap DID fire at exchange 3 (so this is not a vacuous pass over
+          // an attempt that never reached it) — and it fired without any
+          // `not_yet` terminalization.
+          expectLastJudgeCallWasExchange(3);
+          expect(capCauses(entries)).toEqual(['valid_continue']);
+          expect(capTerminalizations(entries)).toEqual([]);
+
+          // The notice: untouched.
+          const row = await readNotice(noticeId);
+          expect(row?.status).toBe('open');
+          expect(row?.lastRecheckOutcome).toBeNull();
+          expect(row?.resolvedAt).toBeNull();
+          expect(row?.recheckAttemptCount).toBe(0);
+
+          // The attempt: ended. Both keys removed, so nothing holds the notice
+          // to this now-spent session — and unrelated metadata survives.
+          expect(await readAttemptBookkeeping(session.id)).toEqual({});
+          const [sessionRow] = await db
+            .select({ metadata: learningSessions.metadata })
+            .from(learningSessions)
+            .where(eq(learningSessions.id, session.id));
+          expect(sessionRow?.metadata).toMatchObject({
+            continuationDepth: 'mid',
+          });
+        },
+      );
+
+      // ---- Cause 3: the CAP, over an unresolved evaluation. -----------------
+      it.each(['processMessage', 'streamMessage'] as const)(
+        '%s: the CAP terminalizes not_yet after malformed judge output at the cap',
+        async (transport) => {
+          const { profileId, session, noticeId } =
+            await seedOpenMentorNoticeRecheckTurn();
+          llm.setNoticeRecheckJudgeResponse('not valid json at all');
+
+          const entries = await captureLogs(() =>
+            runTwoRecheckTurns(transport, profileId, session.id),
+          );
+
+          expectLastJudgeCallWasExchange(3);
+          // The discriminating pair: identical setup to cause 2 except the
+          // judge's output, and the OPPOSITE end state. This is what forbids an
+          // always-no-transition implementation from satisfying cause 2.
+          expect(capCauses(entries)).toEqual(['evaluator_unresolved']);
+          expect(capTerminalizations(entries)).toEqual([
+            'evaluator_unresolved',
+          ]);
+          const row = await readNotice(noticeId);
+          expect(row?.status).toBe('not_yet');
+          expect(row?.lastRecheckOutcome).toBe('not_yet');
+        },
+      );
+
+      // ---- Cause 3b: unavailable judgment AT the cap. -----------------------
+      // AC-4 names "malformed OR unavailable". Cause 3 above covers malformed
+      // (unparseable output); this covers unavailable — the judge call itself
+      // fails, which `evaluateMentorNoticeRecheck` fail-opens to `unresolved`
+      // via its route-error path. Same deterministic turn-3 `not_yet`.
+      it.each(['processMessage', 'streamMessage'] as const)(
+        '%s: the CAP terminalizes not_yet after UNAVAILABLE judgment at the cap',
+        async (transport) => {
+          const { profileId, session, noticeId } =
+            await seedOpenMentorNoticeRecheckTurn();
+          llm.setNoticeRecheckJudgeUnavailable(true);
+
+          const entries = await captureLogs(() =>
+            runTwoRecheckTurns(transport, profileId, session.id),
+          );
+
+          expectLastJudgeCallWasExchange(3);
+          expect(capTerminalizations(entries)).toEqual([
+            'evaluator_unresolved',
+          ]);
+          const row = await readNotice(noticeId);
+          expect(row?.status).toBe('not_yet');
+          expect(row?.lastRecheckOutcome).toBe('not_yet');
+        },
+      );
+
+      // ---- THE HEADLINE: a later re-offer is genuinely REACHABLE. -----------
+      //
+      // The ruling's claim is about a SUBSEQUENT offer cycle, so the evidence
+      // has to sit at the layer where offers are produced — not merely at "no
+      // turn-3 `not_yet` write was made", which is a layer below it.
+      //
+      // Suppressing the cap's write WITHOUT ending the attempt would leave a
+      // zombie notice: `resolveMentorNoticeRecheckContext` returns null in the
+      // spent session from exchange 4 on (offer.ts), while
+      // `startMentorNoticeRecheck` keeps handing that same session back — a
+      // trapped learner in a new costume. This case forbids that end state by
+      // driving the ordinary entry point and requiring it to PRODUCE a live new
+      // attempt: a different session, the per-attempt exchange counter reset to
+      // 1, and the notice actually completable in it.
+      it.each(['processMessage', 'streamMessage'] as const)(
+        '%s: after a valid continue at the cap the notice is genuinely re-offerable — a fresh attempt at exchange 1 completes it',
+        async (transport) => {
+          const { profileId, session, noticeId } =
+            await seedOpenMentorNoticeRecheckTurn();
+          llm.setNoticeRecheckJudgeResponse(
+            JSON.stringify({ verdict: 'continue', reason: 'unclear' }),
+          );
+
+          // Spend the whole attempt on valid `continue` verdicts: turn 2, then
+          // turn 3 (the cap).
+          await runTwoRecheckTurns(transport, profileId, session.id);
+          expectLastJudgeCallWasExchange(3);
+          expect((await readNotice(noticeId))?.status).toBe('open');
+
+          // THE RE-OFFER, at the layer that produces offers. The learner-facing
+          // re-check entry point must mint a NEW session rather than hand back
+          // the spent one — that identity check is the anti-zombie assertion.
+          const reoffer = await startMentorNoticeRecheck(
+            db,
+            profileId,
+            noticeId,
+          );
+          expect(reoffer.sessionId).not.toBe(session.id);
+
+          // And the new attempt is genuinely LIVE, not merely allocated: the
+          // per-attempt exchange counter restarts at 1 (proving the counter is
+          // attempt-scoped, not session-scoped), and a `locked_in` verdict in it
+          // resolves the notice the learner was previously stuck on.
+          llm.setNoticeRecheckJudgeResponse(
+            JSON.stringify({ verdict: 'locked_in', reason: 'demonstrated' }),
+          );
+          await runOneRecheckTurn(transport, profileId, reoffer.sessionId);
+
+          expectLastJudgeCallWasExchange(1);
+          const resolved = await readNotice(noticeId);
+          expect(resolved?.status).toBe('locked_in');
+          expect(resolved?.lastRecheckOutcome).toBe('locked_in');
+        },
+      );
+
+      // ---- The cycle REPEATS: attempt N+1 behaves like attempt N. -----------
+      // "A new session exists and one turn can complete it" is weaker than the
+      // ruling's claim. If the re-offered attempt's per-attempt counter drifted
+      // (e.g. because the fresh session seeds no `recheckOfferExchangeCount`),
+      // the second attempt would cap early or never — a one-shot escape hatch
+      // rather than the ordinary lifecycle. So walk the whole second attempt:
+      // exchanges 1 → 2 → 3, then its own cap, then a THIRD attempt.
+      it.each(['processMessage', 'streamMessage'] as const)(
+        '%s: the re-offered attempt runs its own full 1→2→3 cycle and caps the same way, and is itself re-offerable',
+        async (transport) => {
+          const { profileId, session, noticeId } =
+            await seedOpenMentorNoticeRecheckTurn();
+          llm.setNoticeRecheckJudgeResponse(
+            JSON.stringify({ verdict: 'continue', reason: 'unclear' }),
+          );
+
+          // Attempt 1: exchanges 2 and 3 (the seeded session starts at
+          // exchangeCount 1), then the cap detaches.
+          await runTwoRecheckTurns(transport, profileId, session.id);
+          const second = await startMentorNoticeRecheck(
+            db,
+            profileId,
+            noticeId,
+          );
+          expect(second.sessionId).not.toBe(session.id);
+
+          // Attempt 2 is a FRESH session (exchangeCount 0), so it walks the
+          // full 1 → 2 → 3 and the cap fires only on the third.
+          const entries = await captureLogs(async () => {
+            for (const expected of [1, 2, 3]) {
+              await runOneRecheckTurn(transport, profileId, second.sessionId);
+              expectLastJudgeCallWasExchange(expected);
+              // Never terminalized along the way, at any exchange number.
+              expect((await readNotice(noticeId))?.status).toBe('open');
+            }
+          });
+
+          // Exactly one cap firing — on exchange 3, not earlier — and again no
+          // terminalization.
+          expect(capCauses(entries)).toEqual(['valid_continue']);
+          expect(capTerminalizations(entries)).toEqual([]);
+          const afterSecondCap = await readNotice(noticeId);
+          expect(afterSecondCap?.status).toBe('open');
+          expect(afterSecondCap?.lastRecheckOutcome).toBeNull();
+          expect(await readAttemptBookkeeping(second.sessionId)).toEqual({});
+
+          // And the lifecycle keeps going: a third attempt is reachable too.
+          const third = await startMentorNoticeRecheck(db, profileId, noticeId);
+          expect(third.sessionId).not.toBe(second.sessionId);
+          expect(third.sessionId).not.toBe(session.id);
+        },
+      );
+
+      // ---- The notice stays live on both learner-facing arms. ---------------
+      // The complement of the case above, at the two surfaces the learner
+      // actually sees. Under the ruling the notice is unresolved and eligible
+      // after the cap, so BOTH arms must still work — the anti-trap property is
+      // no longer "the notice disappears" but "the re-check entry point never
+      // hands back the spent session".
+      /** Notice ids the Now feed currently surfaces to this learner. */
+      async function surfacedNoticeIds(profileId: string): Promise<unknown[]> {
+        const feed = await buildNowFeed(db, profileId, 'self', {
+          mentorNoticeEnabled: true,
+        });
+        // Guard against a false "not surfaced": if anything were pushed past
+        // the 3-card cut this assertion could pass vacuously.
+        expect(feed.overflowCount).toBe(0);
+        return feed.cards
+          .filter((card) => card.kind === 'mentor_notice')
+          .map((card) => card.params?.noticeId);
+      }
+
+      it.each(['processMessage', 'streamMessage'] as const)(
+        '%s: after a valid continue at the cap the notice stays live in the Now feed and the entry point never returns the spent session',
+        async (transport) => {
+          const { profileId, session, noticeId } =
+            await seedOpenMentorNoticeRecheckTurn();
+          llm.setNoticeRecheckJudgeResponse(
+            JSON.stringify({ verdict: 'continue', reason: 'unclear' }),
+          );
+
+          // BELOW the cap the attempt is still running, so the entry point
+          // correctly resumes THIS session rather than opening a second one.
+          await runOneRecheckTurn(transport, profileId, session.id);
+          expect(await surfacedNoticeIds(profileId)).toContain(noticeId);
+          const midAttempt = await startMentorNoticeRecheck(
+            db,
+            profileId,
+            noticeId,
+          );
+          expect(midAttempt.sessionId).toBe(session.id);
+
+          // AT the cap the notice is still surfaced (unresolved and eligible),
+          // but the spent session is no longer what the learner gets handed.
+          await runOneRecheckTurn(transport, profileId, session.id);
+          expect(await surfacedNoticeIds(profileId)).toContain(noticeId);
+          const afterCap = await startMentorNoticeRecheck(
+            db,
+            profileId,
+            noticeId,
+          );
+          expect(afterCap.sessionId).not.toBe(session.id);
+        },
+      );
+
+      // A terminal notice is still refused outright — the `MentorNoticeUnavailableError`
+      // arm must not have been softened into "always mint a session". AC-4's
+      // unresolved-at-cap terminalization is the shortest route to a terminal
+      // notice through the exchange path, so use it.
+      it('a notice terminalized at the cap by unresolved judgment is refused by the re-check entry point', async () => {
+        const { profileId, session, noticeId } =
+          await seedOpenMentorNoticeRecheckTurn();
+        llm.setNoticeRecheckJudgeResponse('not valid json at all');
+
+        await runTwoRecheckTurns('processMessage', profileId, session.id);
+        expect((await readNotice(noticeId))?.status).toBe('not_yet');
+
+        await expect(
+          startMentorNoticeRecheck(db, profileId, noticeId),
+        ).rejects.toThrow(MentorNoticeUnavailableError);
+        expect(await surfacedNoticeIds(profileId)).not.toContain(noticeId);
+      });
+    });
+
+    it('a retried (duplicate clientId) send does not re-invoke the judge or double-apply the outcome', async () => {
+      const { profileId, session, noticeId } =
+        await seedOpenMentorNoticeRecheckTurn();
+      llm.setNoticeRecheckJudgeResponse(
+        JSON.stringify({ verdict: 'locked_in', reason: 'demonstrated' }),
+      );
+      const clientId = 'wi-2625-retry-client-id';
+
+      await processMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        {
+          semanticMemoryRetrievalEnabled: false,
+          mentorNoticeEnabled: true,
+          clientId,
+        },
+      );
+      expect(llm.noticeRecheckJudgeCallCount()).toBe(1);
+      const firstRow = await readNotice(noticeId);
+      expect(firstRow?.status).toBe('locked_in');
+      expect(firstRow?.recheckAttemptCount).toBe(1);
+
+      // Retry: same clientId, same message — the exchange's onConflictDoNothing
+      // dedup means `persisted.persistedUserMessage` is false, so the mentor-
+      // notice recheck block (gated on that flag) never re-enters, and the
+      // judge is never called a second time.
+      await processMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        {
+          semanticMemoryRetrievalEnabled: false,
+          mentorNoticeEnabled: true,
+          clientId,
+        },
+      );
+
+      expect(llm.noticeRecheckJudgeCallCount()).toBe(1);
+      const secondRow = await readNotice(noticeId);
+      expect(secondRow?.status).toBe('locked_in');
+      expect(secondRow?.recheckAttemptCount).toBe(1);
+    });
+
+    // [WI-2625] streamMessage variant of the retry-idempotency case above —
+    // the dedup gate (persisted.persistedUserMessage) is the same shared
+    // exchange-persistence code both call sites go through.
+    it('streamMessage: a retried (duplicate clientId) send does not re-invoke the judge or double-apply the outcome', async () => {
+      const { profileId, session, noticeId } =
+        await seedOpenMentorNoticeRecheckTurn();
+      llm.setNoticeRecheckJudgeResponse(
+        JSON.stringify({ verdict: 'locked_in', reason: 'demonstrated' }),
+      );
+      const clientId = 'wi-2625-stream-retry-client-id';
+
+      const first = await streamMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        {
+          semanticMemoryRetrievalEnabled: false,
+          mentorNoticeEnabled: true,
+          clientId,
+        },
+      );
+      for await (const chunk of first.stream) void chunk;
+      await first.onComplete();
+      expect(llm.noticeRecheckJudgeCallCount()).toBe(1);
+      const firstRow = await readNotice(noticeId);
+      expect(firstRow?.status).toBe('locked_in');
+      expect(firstRow?.recheckAttemptCount).toBe(1);
+
+      const second = await streamMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        {
+          semanticMemoryRetrievalEnabled: false,
+          mentorNoticeEnabled: true,
+          clientId,
+        },
+      );
+      for await (const chunk of second.stream) void chunk;
+      await second.onComplete();
+
+      expect(llm.noticeRecheckJudgeCallCount()).toBe(1);
+      const secondRow = await readNotice(noticeId);
+      expect(secondRow?.status).toBe('locked_in');
+      expect(secondRow?.recheckAttemptCount).toBe(1);
     });
   });
 

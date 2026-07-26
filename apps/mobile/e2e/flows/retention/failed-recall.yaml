@@ -1,6 +1,7 @@
-# Flow N2: Failed Recall Remediation — 3x Failures Trigger Relearn
-# Validates: user with 3 failed recalls sees remediation card after submitting
-# another incorrect answer in recall test, then can navigate to relearn screen.
+# Flow N2: Failed Recall Remediation — Fourth Failure Triggers Relearn
+# Validates: a learner with 3 failed recalls submits one more deterministic
+# failed attempt, sees the server-authoritative remediation card, and starts
+# relearning the exact seeded topic.
 # Tags: nightly, retention
 #
 # Journey: UX Journey 2 (Recall phase — failure path)
@@ -9,111 +10,90 @@
 #               (scenario: failed-recall-3x)
 #
 # testID mapping:
-#   - recall-test-screen    -> screen wrapper
-#   - chat-input            -> text input (from ChatShell)
-#   - remediation-card      -> shown after 3+ failures
-#   - review-retest-button  -> "Review and Re-test" on remediation card
-#   - relearn-topic-button  -> "Relearn Topic" on remediation card
-#   - relearn-topics-phase  -> topic selection phase on relearn screen
-#   - relearn-method-phase  -> method selection phase on relearn screen
+#   - recall-test-screen             -> recall ChatShell wrapper
+#   - recall-dont-remember-button    -> deterministic failed attempt
+#   - remediation-card              -> server-authoritative parked-topic UI
+#   - review-retest-button           -> remediation review action
+#   - relearn-topic-button           -> remediation relearn action
+#   - relearn-method-phase           -> direct-entry method picker
+#   - relearn-method-step_by_step    -> stable teaching-method action
+#   - chat-input                     -> started relearn session receipt
 appId: com.mentomate.app
 tags:
   - nightly
   - retention
 ---
-# 1. Seed & sign in with failed-recall scenario
+# 1. Seed & sign in with exactly three prior failed recall assessments.
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "failed-recall-3x"
+      SEED_SCENARIO: 'failed-recall-3x'
       API_URL: ${API_URL}
 
-# 2. Home screen
+# 2. Wait for authenticated app bootstrap before firing the leaf-route link.
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 15000
 
-# 3. Intent card stack should be visible (replaced coaching card)
+# 3. Enter the exact seeded recall route. The coach band now opens the generic
+# overdue-topic picker, so it cannot prove the fourth-failure off-ramp.
+- openLink: 'mentomate:///topic/recall-test?topicId=${TOPIC_ID}&subjectId=${SUBJECT_ID}'
+
+- extendedWaitUntil:
+    visible:
+      id: 'recall-test-screen'
+    timeout: 15000
+
 - assertVisible:
-    id: "home-subject-carousel"
+    id: 'recall-dont-remember-button'
 
-# 4. Tap intent-continue to start recall (handles review-due topics)
+# 4. failureCount=3 + one deterministic dont_remember submission reaches the
+# server-owned topic_parked branch without depending on LLM grading.
 - tapOn:
-    id: "home-coach-band-continue"
-    optional: true  # justified: home-coach-band-continue only renders when recall-due topics exist in seed data
+    id: 'recall-dont-remember-button'
 
-# 5. If coaching card didn't navigate, try direct recall prompt
-- tapOn:
-    text: "Review"
-    optional: true  # justified: fallback path when coach band is absent or didn't navigate to recall
-
-# 6. Wait for session screen (ChatShell)
-# BUG-40 fix: The app uses ChatShell for retention/recall reviews, not a dedicated
-# recall-test-screen. Wait for chat-input which is always present in ChatShell.
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
-    timeout: 10000
-
-# 7. Enter an answer in recall test
-- tapOn:
-    id: "chat-input"
-- inputText: "I think it has something to do with the main idea"
-
-# 8. Submit answer
-# BUG-35: keyboard covers send button on Android. Use keyboard Enter key
-# (returnKeyType="send" triggers onSubmitEditing). send-button tapOn removed
-# per E2E integrity rules — optional: true on a mandatory UI element is prohibited.
-- pressKey: Enter
-
-# 9. Wait for AI to evaluate and return feedback
-- extendedWaitUntil:
-    visible:
-      id: "chat-input"
+      id: 'remediation-card'
     timeout: 15000
 
-# 10. Verify remediation/relearn card appears (after 3+ failures)
-- extendedWaitUntil:
-    visible:
-      id: "remediation-card"
+- scrollUntilVisible:
+    element:
+      id: 'review-retest-button'
+    direction: DOWN
     timeout: 10000
+    visibilityPercentage: 100
+    centerElement: true
+    optional: false
 
-# 11. Screenshot of remediation card
+- assertVisible:
+    id: 'review-retest-button'
+
+- assertVisible:
+    id: 'relearn-topic-button'
+
 - takeScreenshot: failed-recall-remediation
 
-# 12. Verify "Review and Re-test" button on remediation card
-- assertVisible:
-    id: "review-retest-button"
-
-# 13. Verify "Relearn Topic" button on remediation card
-- assertVisible:
-    id: "relearn-topic-button"
-
-# 14. Tap "Relearn Topic" to navigate to relearn screen
+# 5. Follow the remediation action into direct-entry relearn and start a
+# stable method, proving the card is actionable rather than decorative.
 - tapOn:
-    id: "relearn-topic-button"
-
-# 15. Verify relearn screen loads with "Relearn Topic" heading
-- extendedWaitUntil:
-    visible:
-      text: "Relearn Topic"
-    timeout: 10000
-
-# 16. Verify the topics phase or method phase is present.
-#     When entering from remediation card with a specific topic, relearn opens
-#     directly at method phase (directEntry=true). Otherwise topics phase.
-- extendedWaitUntil:
-    visible:
-      id: "relearn-method-phase"
-    timeout: 10000
-    optional: true  # justified: routing bifurcation — directEntry=true skips topics phase; either screen may appear
+    id: 'relearn-topic-button'
 
 - extendedWaitUntil:
     visible:
-      id: "relearn-topics-phase"
-    timeout: 5000
-    optional: true  # justified: alternative phase — appears when relearn entered without directEntry params
+      id: 'relearn-method-phase'
+    timeout: 15000
 
-# 17. Screenshot of relearn screen reached from remediation card
-- takeScreenshot: failed-recall-to-relearn
+- assertVisible:
+    id: 'relearn-method-step_by_step'
+
+- tapOn:
+    id: 'relearn-method-step_by_step'
+
+- extendedWaitUntil:
+    visible:
+      id: 'chat-input'
+    timeout: 15000
+
+- takeScreenshot: failed-recall-relearn-started

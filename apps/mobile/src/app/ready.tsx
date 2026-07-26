@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, Platform, Dimensions } from 'react-native';
+import { View, Text, Platform, Dimensions, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -126,13 +126,21 @@ export default function ReadyScreen() {
       }}
       testID="ready-screen"
     >
-      <View
-        className="flex-1 items-center px-6"
+      <ScrollView
+        className="flex-1"
         style={
           Platform.OS === 'web'
             ? { maxWidth: 480, width: '100%', alignSelf: 'center' }
             : undefined
         }
+        contentContainerStyle={{
+          flexGrow: 1,
+          alignItems: 'center',
+          paddingHorizontal: 24,
+          paddingBottom: 24,
+        }}
+        showsVerticalScrollIndicator={false}
+        testID="ready-scroll"
       >
         <View className="items-center mt-8 mb-4">
           <MentorBirthErrorBoundary componentTag="ready-mentor-birth">
@@ -186,7 +194,7 @@ export default function ReadyScreen() {
             testID="ready-start"
           />
         </View>
-      </View>
+      </ScrollView>
     </View>
   );
 }

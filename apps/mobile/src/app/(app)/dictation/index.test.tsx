@@ -10,15 +10,29 @@ jest.mock('react-native-safe-area-context', () => ({
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+const mockNavigate = jest.fn();
+const mockDismissTo = jest.fn();
 const mockCanGoBack = jest.fn(() => true);
 const mockBack = jest.fn();
+let mockReturnTo: string | undefined;
+let mockPracticeReturnTo: string | undefined;
 
 jest.mock('expo-router', () => ({
+  useFocusEffect: (callback: () => void | (() => void)) => {
+    const ReactReq = jest.requireActual<typeof import('react')>('react');
+    ReactReq.useEffect(() => callback(), [callback]);
+  },
   useRouter: () => ({
     push: mockPush,
     replace: mockReplace,
+    navigate: mockNavigate,
+    dismissTo: mockDismissTo,
     back: mockBack,
     canGoBack: mockCanGoBack,
+  }),
+  useLocalSearchParams: () => ({
+    returnTo: mockReturnTo,
+    practiceReturnTo: mockPracticeReturnTo,
   }),
 }));
 
@@ -116,11 +130,14 @@ describe('DictationChoiceScreen', () => {
     mockGenerateReset.mockReset();
     jest.useFakeTimers();
     mockGenerateIsPending = false;
+    mockReturnTo = undefined;
+    mockPracticeReturnTo = undefined;
   });
 
   afterEach(() => {
     jest.clearAllTimers();
     jest.useRealTimers();
+    jest.restoreAllMocks();
   });
 
   it('renders choice cards', () => {
@@ -129,7 +146,7 @@ describe('DictationChoiceScreen', () => {
     getByTestId('dictation-surprise');
   });
 
-  it('returns to the practice hub from the choice screen', () => {
+  it('uses the native back stack when no explicit return destination is present', () => {
     const { getByTestId } = render(<DictationChoiceScreen />);
 
     fireEvent.press(getByTestId('dictation-choice-back'));
@@ -142,6 +159,56 @@ describe('DictationChoiceScreen', () => {
       expect.anything(),
       '/(app)/practice',
     );
+  });
+
+  it('[WI-1864] navigates to the sibling Practice tab when opened from the Practice hub', () => {
+    mockReturnTo = 'practice';
+    mockCanGoBack.mockReturnValue(true);
+    const { getByTestId } = render(<DictationChoiceScreen />);
+
+    fireEvent.press(getByTestId('dictation-choice-back'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('/(app)/practice');
+    expect(mockDismissTo).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
+  });
+
+  it('[WI-1864] restores the Practice tab upstream return destination', () => {
+    mockReturnTo = 'practice';
+    mockPracticeReturnTo = 'journal';
+    const { getByTestId } = render(<DictationChoiceScreen />);
+
+    fireEvent.press(getByTestId('dictation-choice-back'));
+
+    expect(mockNavigate).toHaveBeenCalledWith({
+      pathname: '/(app)/practice',
+      params: { returnTo: 'journal' },
+    });
+    expect(mockDismissTo).not.toHaveBeenCalled();
+  });
+
+  it('[WI-1864] consumes Android hardware Back and navigates to the sibling Practice tab', () => {
+    const { BackHandler } = jest.requireActual(
+      'react-native',
+    ) as typeof import('react-native');
+    const listenerSpy = jest.spyOn(BackHandler, 'addEventListener');
+    mockReturnTo = 'practice';
+
+    render(<DictationChoiceScreen />);
+
+    const calls = listenerSpy.mock.calls.filter(
+      ([event]) => event === 'hardwareBackPress',
+    );
+    const handler = calls[calls.length - 1]?.[1] as (() => boolean) | undefined;
+    expect(handler).toBeDefined();
+
+    const consumed = handler!();
+
+    expect(consumed).toBe(true);
+    expect(mockNavigate).toHaveBeenCalledWith('/(app)/practice');
+    expect(mockDismissTo).not.toHaveBeenCalled();
+    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 
   it('calls generateMutation when Surprise Me is pressed', async () => {

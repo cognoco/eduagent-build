@@ -17,6 +17,7 @@
 import { resolve } from 'path';
 import { eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import {
   createDatabase,
   consentGrant,
@@ -251,13 +252,15 @@ const RUN = !!process.env.DATABASE_URL;
     const org = await seedOrg('Org');
     const owner = await seedMember(org, { name: 'Owner', roles: ['admin'] });
     const child = await seedMember(org, { name: 'Child', roles: ['learner'] });
-    await db.insert(consentGrant).values({
-      chargePersonId: child,
-      organizationId: org,
-      purpose: 'platform_use',
-      lawfulBasis: 'gdpr_parental_consent',
-      granted: true,
-    });
+    await db.insert(consentGrant).values(
+      CONSENT_PURPOSES.map((purpose) => ({
+        chargePersonId: child,
+        organizationId: org,
+        purpose,
+        lawfulBasis: 'gdpr_parental_consent' as const,
+        granted: true,
+      })),
+    );
 
     const list = await listProfilesV2(db, org);
     const byId = new Map(list.map((p) => [p.id, p]));

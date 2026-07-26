@@ -9,7 +9,10 @@ import {
   vocabulary,
   type Database,
 } from '@eduagent/database';
-import { ensureDefaultBook } from './curriculum-core';
+import {
+  assertBookTopicWriteAvailable,
+  ensureDefaultBook,
+} from './curriculum-core';
 import {
   languageNextPracticePointerSchema,
   parseLanguageLearningSummary,
@@ -399,6 +402,12 @@ export async function regenerateLanguageCurriculum(
       );
     }
 
+    // Lock the destination book before touching curricula. Expansion
+    // persistence uses the same book → curriculum order; reversing it here
+    // would reintroduce a deadlock window on regeneration.
+    const bookId = await ensureDefaultBook(tx, subjectId, languageLabel);
+    await assertBookTopicWriteAvailable(tx, profileId, subjectId, bookId);
+
     // Delete old curricula — topics, progress, etc. cascade-delete via FKs.
     // This prevents unique-constraint violations when the same bookId is reused.
     await tx.delete(curricula).where(eq(curricula.subjectId, subjectId));
@@ -417,11 +426,6 @@ export async function regenerateLanguageCurriculum(
 
     if (!curriculum)
       throw new Error('Insert into curricula did not return a row');
-    // Known Drizzle pattern: PgTransaction → Database cast (see
-    // feedback_drizzle_transaction_cast.md). `tx` is already a Database here
-    // (either the real db or a cast tx handle), so pass it through directly.
-    const bookId = await ensureDefaultBook(tx, subjectId, languageLabel);
-
     await tx.insert(curriculumTopics).values(
       topics.map((topic, index) => ({
         curriculumId: curriculum.id,

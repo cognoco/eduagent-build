@@ -1,4 +1,9 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import {
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react-native';
 import {
   renderScreen,
   type RenderScreenResult,
@@ -490,6 +495,32 @@ describe('PracticeScreen', () => {
     });
   });
 
+  it('[WI-1864] forwards the Practice upstream return destination into Dictation', async () => {
+    mockSearchParams = { returnTo: 'journal' };
+    mount();
+    await waitFor(() => screen.getByTestId('practice-dictation'));
+
+    fireEvent.press(screen.getByTestId('practice-dictation'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/dictation',
+      params: { returnTo: 'practice', practiceReturnTo: 'journal' },
+    });
+  });
+
+  it('[WI-1864] forwards the Practice upstream return destination into Quiz History', async () => {
+    mockSearchParams = { returnTo: 'journal' };
+    mount();
+    await waitFor(() => screen.getByTestId('practice-quiz-history'));
+
+    fireEvent.press(screen.getByTestId('practice-quiz-history'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/quiz/history',
+      params: { returnTo: 'practice', practiceReturnTo: 'journal' },
+    });
+  });
+
   it('renders and routes a vocabulary quiz for every active language subject', async () => {
     mount({
       subjects: [
@@ -650,6 +681,19 @@ describe('PracticeScreen', () => {
       'practice-recitation',
       'practice-quiz-history',
     ]);
+  });
+
+  it('exposes a non-scrollable Other practice heading for outer-viewport navigation', async () => {
+    mount();
+
+    await waitFor(() => {
+      screen.getByTestId('practice-other-practice-heading');
+    });
+    const slider = screen.getByTestId('practice-other-practice-slider');
+    within(slider).getByTestId('practice-recitation');
+    expect(
+      within(slider).queryByTestId('practice-other-practice-heading'),
+    ).toBeNull();
   });
 
   it('renders quiz history as a quiet recent-progress row', async () => {

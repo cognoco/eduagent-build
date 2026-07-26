@@ -1,12 +1,19 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { ENGAGEMENT_SIGNALS } from '@eduagent/schemas';
+import { CONSENT_PURPOSES, ENGAGEMENT_SIGNALS } from '@eduagent/schemas';
 import {
+  learningSessions,
   profileQuotaUsage,
   person,
   login,
   membership,
+  consentGrant,
+  consentRequest,
+  quizRounds,
+  retentionCards,
+  sessionEvents,
+  subjects,
   usageEvents,
   type Database,
 } from '@eduagent/database';
@@ -25,6 +32,7 @@ import {
   type SeedScenario,
 } from './test-seed';
 import { getTierConfig } from './subscription';
+import { addMonthsClamped } from './billing/billing-shared';
 
 // ---------------------------------------------------------------------------
 // Mock DB factory
@@ -59,7 +67,13 @@ function createMockDb(): Database {
 
   return {
     insert: jest.fn().mockReturnValue({
-      values: jest.fn().mockResolvedValue(undefined),
+      values: jest.fn().mockReturnValue({
+        onConflictDoNothing: jest.fn().mockReturnValue({
+          returning: jest
+            .fn()
+            .mockResolvedValue([{ id: 'mock-practice-activity-event-id' }]),
+        }),
+      }),
     }),
     update: jest.fn().mockReturnValue(updateChain),
     select: jest.fn().mockReturnValue(selectChain),
@@ -106,7 +120,9 @@ describe('VALID_SCENARIOS', () => {
     expect(VALID_SCENARIOS).toEqual([
       'onboarding-complete',
       'onboarding-no-subject',
+      'post-approval-ready',
       'learning-active',
+      'v2-returning-learner',
       'retention-due',
       'failed-recall-3x',
       'parent-with-children',
@@ -182,6 +198,8 @@ describe('VALID_SCENARIOS', () => {
       'mentor-audit-family-owner-daily-quota-with-child',
       'mentor-audit-bridge-backstack',
       'wi-2194-stale-family-cycle',
+      // [WI-2239] Self-owned V2 Journal paper trail.
+      'v2-journal-paper-trail',
       // [WI-2241] Supportership-aware v2 seed.
       'v2-supporter-accepted',
       // [WI-2226 owner-gate corroboration] Same-org managed cold-start seed.
@@ -249,6 +267,38 @@ describe('child paywall seed shape', () => {
         usedThisMonth: freeTier.childMonthlyQuota,
         dailyLimit: freeTier.childDailyQuota,
         usedToday: freeTier.childDailyQuota,
+        cycleResetAt: expect.any(Date),
+      }),
+    );
+  });
+});
+
+describe('[WI-1864] owner monthly quota seed shape', () => {
+  it('exhausts the owner row read by per-profile free-tier metering', async () => {
+    const db = createMockDb();
+    const result = await seedScenario(
+      db,
+      'quota-exceeded',
+      'quota-exceeded@example.com',
+    );
+    const freeTier = getTierConfig('free');
+    const insertMock = db.insert as unknown as jest.Mock;
+    const profileQuotaInsertIndex = insertMock.mock.calls.findIndex(
+      ([table]) => table === profileQuotaUsage,
+    );
+    const profileQuotaInsert = insertMock.mock.results[profileQuotaInsertIndex]
+      ?.value as { values: jest.Mock } | undefined;
+
+    expect(profileQuotaInsertIndex).toBeGreaterThanOrEqual(0);
+    expect(profileQuotaInsert?.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subscriptionId: result.ids.subscriptionId,
+        profileId: result.profileId,
+        role: 'owner',
+        monthlyLimit: freeTier.ownerMonthlyQuota ?? freeTier.monthlyQuota,
+        usedThisMonth: freeTier.ownerMonthlyQuota ?? freeTier.monthlyQuota,
+        dailyLimit: freeTier.dailyLimit,
+        usedToday: 2,
         cycleResetAt: expect.any(Date),
       }),
     );
@@ -349,6 +399,58 @@ describe('seedScenario', () => {
     ).rejects.toThrow('Unknown scenario: nonexistent');
   });
 
+  it('[WI-2234] seeds one unfinished session and due review on distinct topics with scoped transcript events', async () => {
+    const db = createMockDb();
+    const result = await seedScenario(
+      db,
+      'v2-returning-learner' as SeedScenario,
+      'returning@example.com',
+    );
+    const insertMock = db.insert as unknown as jest.Mock;
+    const valuesMock = insertMock.mock.results[0]?.value.values as jest.Mock;
+    const insertedRowsFor = (table: unknown): unknown[] =>
+      insertMock.mock.calls.flatMap(([insertedTable], index) => {
+        if (insertedTable !== table) return [];
+        const value = valuesMock.mock.calls[index]?.[0];
+        return Array.isArray(value) ? value : [value];
+      });
+
+    const seededSessions = insertedRowsFor(learningSessions) as Array<{
+      id: string;
+      status: string;
+      topicId: string;
+    }>;
+    const seededReviews = insertedRowsFor(retentionCards) as Array<{
+      id: string;
+      nextReviewAt: Date;
+      topicId: string;
+    }>;
+    const transcriptEvents = insertedRowsFor(sessionEvents) as Array<{
+      sessionId: string;
+      topicId?: string;
+    }>;
+
+    expect(seededSessions).toHaveLength(1);
+    expect(seededSessions[0]).toMatchObject({
+      id: result.ids.sessionId,
+      status: 'active',
+    });
+    expect(seededReviews).toHaveLength(1);
+    expect(seededReviews[0]).toMatchObject({
+      id: result.ids.retentionCardId,
+    });
+    expect(seededReviews[0]!.nextReviewAt.getTime()).toBeLessThan(Date.now());
+    expect(seededReviews[0]!.topicId).not.toBe(seededSessions[0]!.topicId);
+    expect(transcriptEvents).not.toHaveLength(0);
+    expect(
+      transcriptEvents.every(
+        (event) =>
+          event.sessionId === seededSessions[0]!.id &&
+          event.topicId === seededSessions[0]!.topicId,
+      ),
+    ).toBe(true);
+  });
+
   it('uses SEED_CLERK_PREFIX in clerkUserId for all scenarios', async () => {
     const db = createMockDb();
     const result = await seedScenario(
@@ -419,6 +521,39 @@ describe('seedScenario', () => {
         name: 'Child Learning Data',
       }),
     );
+  });
+
+  it('[WI-2240] exposes the parent-multi-child owner learner subject separately from every child subject', async () => {
+    const db = createMockDb();
+    const result = await seedScenario(
+      db,
+      'parent-multi-child',
+      'owner@example.com',
+    );
+    const insertResult = (db.insert as jest.Mock).mock.results[0]?.value as
+      | { values?: jest.Mock }
+      | undefined;
+    const insertedRows =
+      insertResult?.values?.mock.calls.map(([row]) => row) ?? [];
+
+    expect(insertedRows).toContainEqual(
+      expect.objectContaining({
+        id: result.profileId,
+        displayName: 'Test Parent',
+      }),
+    );
+    expect(insertedRows).toContainEqual(
+      expect.objectContaining({
+        id: result.ids.ownerSubjectId,
+        profileId: result.profileId,
+        name: 'General Knowledge',
+      }),
+    );
+    expect([
+      result.ids.subject1Id,
+      result.ids.subject2Id,
+      result.ids.subject3Id,
+    ]).not.toContain(result.ids.ownerSubjectId);
   });
 
   it.each([
@@ -1036,7 +1171,7 @@ describe('new Stage-0 scenarios return required IDs', () => {
     },
     {
       scenario: 'quiz-deterministic-wrong-answer',
-      requiredIds: ['subjectId', 'roundId', 'wrongOptionIndex'],
+      requiredIds: ['subjectId', 'roundId', 'wrongAnswer', 'correctAnswer'],
     },
     {
       scenario: 'quiz-answer-check-fails',
@@ -1076,6 +1211,141 @@ describe('new Stage-0 scenarios return required IDs', () => {
     },
   );
 
+  it('[WI-1864] keeps the answer-check-failure fixture completed but non-final', async () => {
+    const mockDb = createMockDb();
+
+    await seedScenario(mockDb, 'quiz-answer-check-fails', 'test@example.com');
+
+    const insertMock = mockDb.insert as unknown as jest.Mock;
+    const insertedRound = insertMock.mock.calls
+      .flatMap(([table], index) => {
+        if (table !== quizRounds) return [];
+        const valuesMock = insertMock.mock.results[index]?.value
+          .values as jest.Mock;
+        return valuesMock.mock.calls.map(([value]) => value);
+      })
+      .find(
+        (value) =>
+          value?.status === 'completed' && value?.theme === 'European Capitals',
+      ) as
+      | {
+          questions: unknown[];
+          status: string;
+          total: number;
+        }
+      | undefined;
+
+    expect(insertedRound).toBeDefined();
+    expect(insertedRound?.status).toBe('completed');
+    expect(insertedRound?.total).toBe(2);
+    expect(insertedRound?.questions).toHaveLength(2);
+  });
+
+  it('[WI-1864] seeds a non-final dispute round with stable wrong and correct answer text', async () => {
+    const mockDb = createMockDb();
+    const result = await seedScenario(
+      mockDb,
+      'quiz-deterministic-wrong-answer' as SeedScenario,
+      'test@example.com',
+    );
+
+    expect(result.ids).toEqual(
+      expect.objectContaining({
+        roundId: expect.any(String),
+        wrongAnswer: 'goodbye',
+        correctAnswer: 'thanks',
+      }),
+    );
+    const valuesMock = (mockDb.insert as jest.Mock).mock.results[0]?.value
+      .values as jest.Mock;
+    expect(valuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: result.ids.roundId,
+        activityType: 'vocabulary',
+        status: 'active',
+        total: 3,
+        questions: [
+          expect.objectContaining({
+            type: 'vocabulary',
+            term: 'bonjour',
+            correctAnswer: 'hello',
+            distractors: expect.arrayContaining(['goodbye']),
+          }),
+          expect.objectContaining({
+            type: 'vocabulary',
+            term: 'merci',
+            correctAnswer: 'thanks',
+          }),
+          expect.objectContaining({
+            type: 'vocabulary',
+            term: 'au revoir',
+            correctAnswer: 'goodbye',
+          }),
+        ],
+      }),
+    );
+  });
+
+  it('[WI-1864] seeds post-approval landing with approved consent and zero subjects', async () => {
+    const mockDb = createMockDb();
+    const result = await seedScenario(
+      mockDb,
+      'post-approval-ready' as SeedScenario,
+      'test@example.com',
+    );
+    const insertMock = mockDb.insert as jest.Mock;
+    const valuesMock = insertMock.mock.results[0]?.value.values as jest.Mock;
+    const insertedValues = valuesMock.mock.calls.flatMap(([value]) =>
+      Array.isArray(value) ? value : [value],
+    ) as Array<Record<string, unknown>>;
+    const grants = insertedValues.filter(
+      (value) =>
+        value.chargePersonId === result.profileId && value.granted === true,
+    );
+    const requests = insertedValues.filter(
+      (value) =>
+        value.chargePersonId === result.profileId &&
+        value.status === 'approved',
+    );
+
+    expect(
+      insertMock.mock.calls.some(([table]) => table === consentGrant),
+    ).toBe(true);
+    expect(
+      insertMock.mock.calls.some(([table]) => table === consentRequest),
+    ).toBe(true);
+    expect(grants).toHaveLength(CONSENT_PURPOSES.length);
+    expect(grants.map(({ purpose }) => purpose).sort()).toEqual(
+      [...CONSENT_PURPOSES].sort(),
+    );
+    expect(requests).toHaveLength(CONSENT_PURPOSES.length);
+    expect(requests.map(({ purpose }) => purpose).sort()).toEqual(
+      [...CONSENT_PURPOSES].sort(),
+    );
+    for (const grant of grants) {
+      expect(grant).toEqual(
+        expect.objectContaining({
+          organizationId: result.accountId,
+          lawfulBasis: 'gdpr_parental_consent',
+          granted: true,
+        }),
+      );
+      expect(requests).toContainEqual(
+        expect.objectContaining({
+          organizationId: result.accountId,
+          purpose: grant.purpose,
+          requestedBasis: 'gdpr_parental_consent',
+          guardianEmail: 'parent-e2e-test@example.com',
+          status: 'approved',
+          consentGrantId: grant.id,
+        }),
+      );
+    }
+    expect(insertMock.mock.calls.some(([table]) => table === subjects)).toBe(
+      false,
+    );
+  });
+
   it('[WI-2190] seeds a completed quiz round in the schema-valid graded detail shape', async () => {
     const mockDb = createMockDb();
     const result = await seedScenario(
@@ -1112,6 +1382,47 @@ describe('new Stage-0 scenarios return required IDs', () => {
       }),
     );
   });
+});
+
+describe('[WI-1864] shared-pool seed cycle coherence', () => {
+  it.each([
+    'subscription-pro-active',
+    'subscription-family-active',
+    'mentor-audit-family-pool-members',
+  ] as const)(
+    '%s derives its subscription end and pool reset from one monthly anchor',
+    async (scenario) => {
+      const captured: unknown[] = [];
+      const db = createMockDb();
+      db.insert = jest.fn().mockImplementation(() => ({
+        values: jest.fn().mockImplementation((row: unknown) => {
+          captured.push(row);
+          return Promise.resolve();
+        }),
+      }));
+
+      await seedScenario(db, scenario, 'test@example.com');
+
+      const rows = captured.filter(
+        (row): row is Record<string, unknown> =>
+          typeof row === 'object' && row !== null && !Array.isArray(row),
+      );
+      const subscriptionRow = rows.find(
+        (row) => 'periodStartAt' in row && 'periodEndAt' in row,
+      );
+      const quotaRow = rows.find((row) => 'cycleResetAt' in row);
+      const periodStartAt = subscriptionRow?.periodStartAt;
+
+      expect(periodStartAt).toBeInstanceOf(Date);
+      if (!(periodStartAt instanceof Date)) {
+        throw new Error(`${scenario} did not persist a periodStartAt Date`);
+      }
+
+      const expectedResetAt = addMonthsClamped(periodStartAt, 1);
+      expect(subscriptionRow?.periodEndAt).toEqual(expectedResetAt);
+      expect(quotaRow?.cycleResetAt).toEqual(expectedResetAt);
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------

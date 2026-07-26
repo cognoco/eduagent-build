@@ -94,16 +94,20 @@ tags:
     timeout: 5000
 - tapOn:
     id: 'create-subject-submit'
+# Wait for a durable resolver outcome before evaluating one-shot branches.
+# The generic suggestion card is the ambiguous result and fails closed below.
 - extendedWaitUntil:
     visible:
-      id: 'subject-resolve-loading'
-    timeout: 15000
+      id: '^(ready-screen|subject-confident-card|subject-single-suggestion-card|subject-no-match-card|subject-suggestion-card)$'
+    timeout: 60000
 - extendedWaitUntil:
     notVisible:
       id: 'subject-resolve-loading'
     timeout: 60000
 - assertNotVisible:
     id: 'subject-suggestion-card'
+# Each owned branch proves the action is a descendant before tapping its ID.
+# Do not require childOf: action buttons can sit below layout wrappers.
 - runFlow:
     when:
       visible:
@@ -115,8 +119,6 @@ tags:
             - id: 'subject-suggestion-accept'
       - tapOn:
           id: 'subject-suggestion-accept'
-          childOf:
-            id: 'subject-confident-card'
 - runFlow:
     when:
       visible:
@@ -128,8 +130,6 @@ tags:
             - id: 'subject-suggestion-accept'
       - tapOn:
           id: 'subject-suggestion-accept'
-          childOf:
-            id: 'subject-single-suggestion-card'
 - runFlow:
     when:
       visible:
@@ -141,12 +141,16 @@ tags:
             - id: 'subject-use-my-words'
       - tapOn:
           id: 'subject-use-my-words'
-          childOf:
-            id: 'subject-no-match-card'
 - extendedWaitUntil:
     visible:
       id: 'ready-screen'
     timeout: 60000
+- extendedWaitUntil:
+    visible:
+      text: 'Starting with Photosynthesis'
+    timeout: 10000
+- assertVisible:
+    text: 'Starting with Photosynthesis'
 - assertVisible:
     id: 'ready-start'
 - tapOn:
@@ -165,7 +169,9 @@ tags:
     timeout: 15000
 - extendedWaitUntil:
     visible:
-      text: 'Photosynthesis'
+      id: '^subjects-browse-row-.*$'
+      text: 'Open Photosynthesis'
     timeout: 15000
 - assertVisible:
-    text: 'Photosynthesis'
+    id: '^subjects-browse-row-.*$'
+    text: 'Open Photosynthesis'

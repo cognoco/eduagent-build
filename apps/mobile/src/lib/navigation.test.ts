@@ -4,6 +4,7 @@ import {
   homeHrefForReturnTo,
   isSessionForwardableReturnTo,
   goBackOrReplace,
+  returnJournalReportToCaller,
   pushLearningResumeTarget,
   pushChildReport,
   pushChildWeeklyReport,
@@ -25,6 +26,9 @@ import {
   FAMILY_CHILDREN_HREF,
   FAMILY_CHILDREN_RETURN_TO,
   FAMILY_HOME_RETURN_TO,
+  accountReturnHref,
+  accountReturnTokenForPathname,
+  resolvedV2TabForReturnTo,
 } from './navigation';
 import type { LearningResumeTarget } from '@eduagent/schemas';
 import type { Router } from 'expo-router';
@@ -80,6 +84,10 @@ describe('homeHrefForReturnTo', () => {
     expect(homeHrefForReturnTo(JOURNAL_RETURN_TO)).toBe(JOURNAL_HREF);
   });
 
+  it('[WI-2234] returns the Mentor href only for the Mentor session token', () => {
+    expect(homeHrefForReturnTo('mentor')).toBe('/(app)/mentor');
+  });
+
   it('returns the V2 Subjects tab for the subjects return token', () => {
     expect(homeHrefForReturnTo(SUBJECTS_RETURN_TO)).toBe(SUBJECTS_HREF);
   });
@@ -117,6 +125,68 @@ describe('homeHrefForReturnTo', () => {
   // [WI-1658]
   it('resolves FAMILY_HOME_RETURN_TO to FAMILY_HOME_PATH', () => {
     expect(homeHrefForReturnTo(FAMILY_HOME_RETURN_TO)).toBe(FAMILY_HOME_PATH);
+  });
+
+  // [WI-2331 AC-2/AC-5] The trailing catch-all used to be an unconditional
+  // dead `/(app)/home` (not a V2 tab) reachable from every root pushed screen
+  // whose returnTo is absent or unrecognized. With V2 on it now routes through
+  // the owning-tab contract (unknown -> Mentor); with V2 off it must not
+  // regress the legacy home fallback.
+  it('routes the unrecognized/absent catch-all to the Mentor tab when V2 is on', () => {
+    expect(homeHrefForReturnTo('something-else', undefined, true)).toBe(
+      '/(app)/mentor',
+    );
+    expect(homeHrefForReturnTo(undefined, undefined, true)).toBe(
+      '/(app)/mentor',
+    );
+  });
+
+  it('leaves recognized tokens and the V0/V1 catch-all unchanged under V2', () => {
+    // A recognized token resolves identically regardless of the V2 flag …
+    expect(homeHrefForReturnTo(SUBJECTS_RETURN_TO, undefined, true)).toBe(
+      SUBJECTS_HREF,
+    );
+    // … and with V2 off the catch-all still lands on the legacy home.
+    expect(homeHrefForReturnTo('something-else', undefined, false)).toBe(
+      '/(app)/home',
+    );
+  });
+});
+
+// [WI-2331 rework] resolvedV2TabForReturnTo must only claim a tab when
+// homeHrefForReturnTo's resolved destination genuinely is that tab root —
+// otherwise a "Back to {tab}" label lies about where Back actually goes.
+describe('resolvedV2TabForReturnTo', () => {
+  it('returns the owning tab token for each V2 tab root', () => {
+    expect(resolvedV2TabForReturnTo('mentor', undefined, true)).toBe('mentor');
+    expect(resolvedV2TabForReturnTo(SUBJECTS_RETURN_TO, undefined, true)).toBe(
+      'subjects',
+    );
+    expect(resolvedV2TabForReturnTo(JOURNAL_RETURN_TO, undefined, true)).toBe(
+      'journal',
+    );
+  });
+
+  it('returns null for non-tab destinations', () => {
+    expect(
+      resolvedV2TabForReturnTo(PRACTICE_RETURN_TO, undefined, true),
+    ).toBeNull();
+    expect(
+      resolvedV2TabForReturnTo(FAMILY_RECAPS_RETURN_TO, 'recap-1', true),
+    ).toBeNull();
+    expect(
+      resolvedV2TabForReturnTo(OWN_LEARNING_RETURN_TO, undefined, true),
+    ).toBeNull();
+    expect(
+      resolvedV2TabForReturnTo(FAMILY_HOME_RETURN_TO, undefined, true),
+    ).toBeNull();
+  });
+
+  it('returns null when V2 is disabled, regardless of token', () => {
+    expect(resolvedV2TabForReturnTo(SUBJECTS_RETURN_TO, undefined, false)).toBe(
+      null,
+    );
+    expect(resolvedV2TabForReturnTo(undefined, undefined, false)).toBeNull();
   });
 });
 
@@ -185,6 +255,85 @@ describe('goBackOrReplace', () => {
     expect(router.back).not.toHaveBeenCalled();
     expect(router.replace).toHaveBeenCalledTimes(1);
     expect(router.replace).toHaveBeenCalledWith(parentHref);
+  });
+});
+
+describe('returnJournalReportToCaller [WI-2239]', () => {
+  function createRouter() {
+    return {
+      dismissTo: jest.fn(),
+      replace: jest.fn(),
+    } satisfies Pick<Router, 'dismissTo' | 'replace'>;
+  }
+
+  it('replaces the web report with its exact Journal caller', () => {
+    const router = createRouter();
+
+    returnJournalReportToCaller(router, 'web');
+
+    expect(router.replace).toHaveBeenCalledWith(JOURNAL_HREF);
+    expect(router.dismissTo).not.toHaveBeenCalled();
+  });
+
+  it('dismisses the complete native report stack to Journal', () => {
+    const router = createRouter();
+
+    returnJournalReportToCaller(router, 'native');
+
+    expect(router.dismissTo).toHaveBeenCalledWith(JOURNAL_HREF);
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+});
+
+describe('V2 account return contract [WI-2240]', () => {
+  it.each([
+    ['/mentor', 'mentor'],
+    ['/subjects', 'subjects'],
+    ['/subjects/subject-1', 'subjects'],
+    ['/subject/subject-1', 'subjects'],
+    ['/subject-hub/subject-1', 'subjects'],
+    ['/topic/topic-1', 'subjects'],
+    ['/pick-book/subject-1', 'subjects'],
+    ['/vocabulary/subject-1', 'subjects'],
+    ['/shelf/subject-1/book/book-1', 'subjects'],
+    ['/child/child-1/curriculum', 'subjects'],
+    ['/child/child-1/subjects/subject-1', 'subjects'],
+    ['/child/child-1/topic/topic-1', 'subjects'],
+    ['/journal', 'journal'],
+    ['/journal/practice', 'journal'],
+  ] as const)('maps %s to the initiating V2 tab token', (pathname, token) => {
+    expect(accountReturnTokenForPathname(pathname)).toBe(token);
+  });
+
+  it('uses Mentor as the strict V2 fallback for an unknown initiating path', () => {
+    expect(accountReturnTokenForPathname('/unexpected')).toBe('mentor');
+    expect(accountReturnTokenForPathname('/child/child-1')).toBe('mentor');
+    expect(accountReturnTokenForPathname('/child/child-1/reports')).toBe(
+      'mentor',
+    );
+    expect(
+      accountReturnTokenForPathname('/child/child-1/session/session-1'),
+    ).toBe('mentor');
+    expect(accountReturnTokenForPathname('/child/child-1/subjects')).toBe(
+      'mentor',
+    );
+    expect(
+      accountReturnTokenForPathname('/child/child-1/subject/subject-1'),
+    ).toBe('mentor');
+    expect(accountReturnHref(undefined, true)).toBe('/(app)/mentor');
+    expect(accountReturnHref('unexpected', true)).toBe('/(app)/mentor');
+  });
+
+  it.each([
+    ['mentor', '/(app)/mentor'],
+    ['subjects', '/(app)/subjects'],
+    ['journal', '/(app)/journal'],
+  ] as const)('resolves %s to its exact V2 tab root', (token, href) => {
+    expect(accountReturnHref(token, true)).toBe(href);
+  });
+
+  it('preserves the legacy home fallback when V2 is disabled', () => {
+    expect(accountReturnHref('journal', false)).toBe('/(app)/home');
   });
 });
 

@@ -92,7 +92,8 @@
     "tryAgainAction": "Erneut versuchen",
     "dismiss": "Schließen",
     "pleaseTryAgain": "Bitte versuche es erneut.",
-    "mentorImageAlt": "Dein Mentor"
+    "mentorImageAlt": "Dein Mentor",
+    "backTo": "Zurück zu {{destination}}"
   },
   "quota": {
     "parent": {
@@ -233,7 +234,8 @@
       "passwordPlaceholder": "Passwort eingeben",
       "forgotPassword": "Passwort vergessen?",
       "signInButton": "Anmelden",
-      "sendVerificationCode": "Bestätigungscode senden"
+      "sendVerificationCode": "Bestätigungscode senden",
+      "verificationStartFailed": "Wir konnten die Verifizierung nicht starten. Bitte versuche erneut, dich anzumelden."
     },
     "signUp": {
       "title": "Konto erstellen",
@@ -290,6 +292,27 @@
       "backToSignIn": "Zurück zur Anmeldung",
       "emailPlaceholder": "du@beispiel.com",
       "sendResetCode": "Reset-Code senden"
+    },
+    "errors": {
+      "generic": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+      "form_identifier_not_found": "Wir konnten kein Konto mit dieser E-Mail-Adresse finden.",
+      "form_password_incorrect": "Das Passwort ist nicht richtig. Bitte versuche es erneut.",
+      "form_password_or_identifier_incorrect": "E-Mail-Adresse oder Passwort ist falsch. Bitte versuche es erneut.",
+      "form_password_pwned": "Dieses Passwort ist bei einem Datenleck aufgetaucht. Bitte wähle ein anderes Passwort.",
+      "form_password_compromised": "Dieses Passwort ist nicht sicher. Bitte wähle ein anderes Passwort.",
+      "form_password_not_strong_enough": "Dieses Passwort ist nicht stark genug. Bitte sorge für mehr Abwechslung.",
+      "form_password_length_too_short": "Das Passwort ist zu kurz. Bitte verwende mindestens 8 Zeichen.",
+      "form_password_length_too_long": "Das Passwort ist zu lang. Bitte verwende ein kürzeres.",
+      "form_password_no_uppercase": "Das Passwort muss mindestens einen Großbuchstaben enthalten.",
+      "form_password_no_lowercase": "Das Passwort muss mindestens einen Kleinbuchstaben enthalten.",
+      "form_password_no_number": "Das Passwort muss mindestens eine Ziffer enthalten.",
+      "form_password_no_special_char": "Das Passwort muss mindestens ein Sonderzeichen enthalten.",
+      "form_password_validation_failed": "Dieses Passwort erfüllt die Anforderungen nicht.",
+      "form_code_incorrect": "Dieser Code ist nicht korrekt. Bitte versuche es erneut.",
+      "form_identifier_exists": "Ein Konto mit dieser E-Mail-Adresse existiert bereits.",
+      "form_param_format_invalid": "Das scheint keine gültige E-Mail-Adresse zu sein.",
+      "captcha_invalid": "Wir konnten dich nicht verifizieren. Bitte versuche es erneut.",
+      "signup_rate_limit_exceeded": "Zu viele Registrierungsversuche. Bitte versuche es später erneut."
     }
   },
   "guards": {
@@ -322,8 +345,8 @@
       "proxySessionSummariesBody": "{{name}}s Notizen bleiben privat, aber du kannst elterngeeignete Sitzungszusammenfassungen im Profil sehen.",
       "proxySessionSummariesCta": "{{name}}s Sitzungszusammenfassungen ansehen",
       "momentum": {
-        "topicLearned": "{{n}} topic learned",
-        "topicsLearned": "{{n}} topics learned"
+        "topicLearned": "{{n}} Thema gelernt",
+        "topicsLearned": "{{n}} Themen gelernt"
       },
       "intentActions": {
         "homework": {
@@ -339,7 +362,7 @@
           "subtitle": "Starte ein Thema oder erstelle ein Fach"
         }
       },
-      "greeting": "Hey {{name}}!",
+      "greeting": "Hallo {{name}}!",
       "greetingNoName": "Hallo!",
       "myNotes": "Meine Notizen",
       "subjectsLoadError": "Wir konnten deine Fächer gerade nicht laden",
@@ -358,9 +381,9 @@
       "coachBandRevisitTopic": "Wiederhole {{topic}} – bereit für eine schnelle Auffrischung."
     },
     "notices": {
-      "consentArchivedTitle": "{{name}}'s account was archived",
+      "consentArchivedTitle": "Das Konto von {{name}} wurde archiviert",
       "consentArchivedBody": "Daten werden 30 Tage lang aufbewahrt und dann gelöscht.",
-      "consentDeletedTitle": "{{name}}'s account was deleted",
+      "consentDeletedTitle": "Das Konto von {{name}} wurde gelöscht",
       "consentDeletedBody": "Die Widerrufsfrist ist abgelaufen."
     },
     "parent": {
@@ -394,7 +417,7 @@
       "childCard": {
         "statusPending": "Überprüfen",
         "reportsAction": "Berichte",
-        "nudgeAction": "Nudge",
+        "nudgeAction": "Anstupsen",
         "learnTogetherAction": "Gemeinsam lernen"
       },
       "card": {
@@ -503,15 +526,15 @@
   "family": {
     "orientationCueDismiss": "Verstanden",
     "withdrawal": {
-      "bannerTitleSingle": "{{name}}'s account closes in {{days}} {{daysWord}}",
-      "bannerTitleMulti": "{{count}} accounts closing soon",
+      "bannerTitleSingle": "Das Konto von {{name}} wird in {{days}} {{daysWord}} geschlossen",
+      "bannerTitleMulti": "{{count}} Konten werden bald geschlossen",
       "bannerCta": "Rückgängig machen",
-      "bannerCtaShort": "Undo",
-      "daysOne": "day",
-      "daysOther": "days",
+      "bannerCtaShort": "Rückgängig",
+      "daysOne": "Tag",
+      "daysOther": "Tagen",
       "restoreErrorTitle": "Rücknahme konnte nicht rückgängig gemacht werden",
       "restoreErrorBody": "Versuche es gleich noch einmal.",
-      "restoreSuccessToast": "Withdrawal reversed for {{name}}"
+      "restoreSuccessToast": "Der Widerruf der Einwilligung für {{name}} wurde rückgängig gemacht"
     }
   },
   "more": {
@@ -642,7 +665,7 @@
       "notNow": "Nicht jetzt",
       "dontAskAgain": "Nicht mehr fragen",
       "banner": {
-        "question": "Question {{index}} of {{total}}"
+        "question": "Frage {{index}} von {{total}}"
       },
       "draft": {
         "title": "Das weißt du jetzt",
@@ -819,7 +842,6 @@
     "speakingPractice": {
       "title": "Sprich es nach",
       "subtitle": "Wiederhole den Satz",
-      "subtitleShadowing": "Sprich mit der Audioaufnahme mit, einen Schlag dahinter",
       "playAudioLabel": "Zielsatz abspielen",
       "stopAudioLabel": "Audio stoppen",
       "startRecordingLabel": "Sprechversuch starten",
@@ -830,7 +852,7 @@
       "retryWithMissingWords": "Versuch es nochmal: {{words}}",
       "retry": "Nochmal",
       "retryLabel": "Sprechversuch wiederholen",
-      "extraWords": "Extra: {{words}}",
+      "extraWords": "Zusätzlich: {{words}}",
       "attemptError": "Dieser Versuch konnte nicht gespeichert werden. Nimm erneut auf."
     },
     "chatShell": {
@@ -1136,7 +1158,7 @@
       "loadingAlmost": "Fast fertig...",
       "challengeTitle": "Herausforderungsrunde",
       "challengeBody": "Du hast einen Streak. Diese Runde ist schwieriger.",
-      "challengeStart": "Start",
+      "challengeStart": "Starten",
       "challengeLabel": "Herausforderungsrunde. Diese Runde ist schwieriger als sonst.",
       "challengeStartLabel": "Herausforderungsrunde starten",
       "hardTimeoutTitle": "Quiz dauert zu lange",
@@ -1899,33 +1921,37 @@
   "legal": {
     "privacy": {
       "title": "Datenschutzrichtlinie",
-      "lastUpdated": "Letzte Aktualisierung: März 2026",
+      "lastUpdated": "Zuletzt aktualisiert: Juli 2026",
       "s1Title": "1. Wer wir sind",
-      "s1Body": "MentoMate ist eine KI-gestützte Mentoring-Plattform, die von Zwizzly (\"wir\", \"uns\", \"unser\") betrieben wird. Wir verpflichten uns, die Privatsphäre all unserer Nutzer, insbesondere von Kindern im Alter von 11–17 Jahren, zu schützen. Wir verarbeiten personenbezogene Daten gemäß der EU-Datenschutz-Grundverordnung (DSGVO).",
+      "s1Body": "MentoMate ist eine KI-gestützte Lernplattform, die von ZWIZZLY AS, norwegische Organisationsnummer 811 696 072, mit Sitz in Fiskekroken 3B, 0139 Oslo, Norwegen („wir“, „uns“, „unser“) betrieben wird. MentoMate ist für Lernende ab 13 Jahren. Da einige unserer Nutzer minderjährig sind, wenden wir zusätzliche Schutzmaßnahmen für die Daten von Kindern an, wie unten beschrieben.",
       "s2Title": "2. Daten, die wir erheben",
-      "s2Body1": "Kontodaten: E-Mail-Adresse, Anzeigename und Profilinformationen, die du bei der Registrierung angibst.",
-      "s2Body2": "Lerndaten: Fächer, Interview-Antworten, Lehrplanfortschritt, Sitzungsaustausch, Bewertungsergebnisse, Behaltenswerte und XP.",
+      "s2Body1": "Kontodaten: E-Mail-Adresse, Anzeigename, Geburtsdatum sowie Sprach- und Pronomenpräferenzen, die du bei der Registrierung angibst.",
+      "s2Body2": "Lerndaten: die Fächer, die du lernst, deine Antworten aus dem Interview und Onboarding, Lehrplan- und Themenfortschritte, die während der Lernsitzungen ausgetauschten Nachrichten, Beurteilungs- und Beherrschungsergebnisse, Bewertungsergebnisse und XP. Einige dieser Daten bilden ein dauerhaftes Lerngedächtnis, damit sich der Mentor daran erinnern kann, was du bereits gelernt hast (siehe Abschnitt 8).",
       "s2Body3": "Gerätedaten: Push-Benachrichtigungs-Token, Gerätetyp und App-Version zur Zustellung von Benachrichtigungen und zur Aufrechterhaltung der Servicequalität.",
-      "s2Body4": "Wir erheben KEINE Standortdaten, Kontakte, Fotos (außer Hausaufgabenbilder, die du explizit aufnimmst) oder den Browserverlauf.",
+      "s2Body4": "Kamera und Mikrofon: Die App fordert Kamerazugriff für Hausaufgabenbilder und Mikrofonzugriff für sprachbasiertes Lernen an. Mikrofoneingaben werden auf deinem Gerät in Text umgewandelt; MentoMate empfängt oder speichert die Audioaufnahme nicht. Wir verwenden diese Eingaben nur, wenn du sie ausdrücklich aktivierst.",
       "s3Title": "3. Wie wir deine Daten verwenden",
-      "s3Body": "Um personalisiertes KI-Mentoring mit sokratischem Dialog und räumlicher Wiederholung bereitzustellen. Um Lehrpläne, Lernerkenntnisse und Fortschrittsberichte zu erstellen. Um Wiederholungserinnerungen und Benachrichtigungen zu senden, die du abonniert hast. Um unseren Service durch anonymisierte, aggregierte Analysen zu verbessern.",
-      "s4Title": "4. Elterliche Zustimmung",
-      "s4Body1": "Für Nutzer unter 16 Jahren benötigen wir eine nachweisbare elterliche Zustimmung, bevor wir personenbezogene Daten verarbeiten. Ein Elternteil oder Erziehungsberechtigter muss das Konto des Kindes per E-Mail genehmigen, bevor Lerndaten erhoben werden.",
-      "s4Body2": "Eltern können die Zustimmung jederzeit über das Eltern-Dashboard widerrufen. Nach dem Widerruf treten die Daten des Kindes in eine 7-tägige Frist ein und werden dann endgültig gelöscht.",
+      "s3Body": "Wir verwenden deine Daten, um personalisiertes KI-gestütztes Lernen anzubieten, Konzepte zu erklären, dein Verständnis zu überprüfen, Wiederholungen mittels Spaced Repetition zu planen, Lehrpläne und Fortschrittsberichte zu erstellen und den Unterricht auf dich zuzuschneiden. Dieses Profiling wird nur zur Personalisierung deines Unterrichts verwendet; es hat keine rechtlichen oder ähnlich erheblichen Auswirkungen auf dich. Wir verwenden Daten auch, um dir Benachrichtigungen zu senden, die du abonniert hast, und um den Dienst durch Fehler- und Leistungsüberwachung zu warten und zu verbessern. Wir verwenden deine Daten nicht für Werbung und verkaufen sie nicht.",
+      "s4Title": "4. Elterliche Zustimmung (DSGVO und COPPA)",
+      "s4Body1": "Wenn ein Nutzer unter dem geltenden Alter für die digitale Einwilligung liegt – das in der EU/EWR je nach Land zwischen 13 und 16 Jahren und im Vereinigten Königreich sowie unter COPPA in den Vereinigten Staaten bei 13 Jahren liegt – benötigen wir eine nachweisbare elterliche Zustimmung, bevor wir die personenbezogenen Daten des Kindes verarbeiten. Ein Elternteil oder Erziehungsberechtigter muss das Konto des Kindes genehmigen, bevor Lerndaten erfasst werden.",
+      "s4Body2": "Eltern können ihre Zustimmung jederzeit widerrufen. Die Zustimmung kann während einer 7-tägigen Frist wiederhergestellt werden. Am Ende dieser Frist werden Profile von Nutzern, die 13 Jahre oder jünger sind, gelöscht. Profile älterer Kinder können stattdessen je nach Aufbewahrungspräferenz des Kontoinhabers für 30 Tage archiviert und anschließend gelöscht werden.",
       "s5Title": "5. KI-Verarbeitung",
-      "s5Body": "Lernsitzungen werden von Drittanbietern von KI-Modellen verarbeitet, um Bildungsantworten zu generieren. Sitzungsinhalte können zur Verarbeitung an KI-Anbieter gesendet werden, werden aber nicht zum Trainieren ihrer Modelle verwendet. Wir geben keine personenbezogenen Daten an KI-Anbieter weiter – nur Lerninhalte.",
+      "s5Body": "Inhalte von Lernsitzungen werden von Drittanbietern von KI-Modellen verarbeitet, um lehrreiche Antworten zu generieren. Wir senden nur die Inhalte und den Kontext, die zur Generierung einer Antwort erforderlich sind. Bei Minderjährigen schließen wir Namen und Kontokennungen aus den an KI-Anbieter gesendeten Inhalten aus. Bei eindeutig erwachsenen Kontoinhabern kann zur Personalisierung ein Anzeigename enthalten sein. Wir verlangen von den Anbietern, dass sie Kundeninhalte nicht zum Trainieren ihrer allgemeinen Modelle verwenden; die Anbieterverträge und Einstellungen, die diese Anforderung unterstützen, werden im Rahmen unseres Compliance-Prozesses vor der Einführung überprüft.",
       "s6Title": "6. Datenweitergabe",
-      "s6Body1": "Wir verkaufen deine Daten nicht. Wir geben Daten nur weiter an: Authentifizierungsanbieter (Clerk) für die Anmeldung; KI-Anbieter für Lernsitzungen; E-Mail-Anbieter (Resend) für Benachrichtigungen; Fehlerverfolgung (Sentry) für die App-Stabilität; In-App-Kaufverwaltung (RevenueCat) für die Abonnementverarbeitung; Zahlungsabwickler für die Abonnementverwaltung.",
-      "s6Body2": "Für Nutzer unter 13 Jahren ist die Fehlerverfolgung (Sentry) deaktiviert, bis die elterliche Zustimmung erteilt wird. Sie wird erneut deaktiviert, wenn die Zustimmung widerrufen wird.",
-      "s7Title": "7. Datenspeicherung",
-      "s7Body": "Wir speichern deine Daten, solange dein Konto aktiv ist. Wenn du dein Konto löschst, treten deine Daten in eine 7-tägige Frist ein (während der du die Löschung abbrechen kannst), nach der sie endgültig entfernt werden.",
-      "s8Title": "8. Deine Rechte",
-      "s8Body1": "Du hast das Recht auf: Zugriff auf deine Daten (über die Exportfunktion in den Einstellungen); Korrektur unrichtiger Daten; Löschung deines Kontos und aller zugehörigen Daten; Widerruf der Zustimmung zur Datenverarbeitung; Widerspruch gegen die Verarbeitung; Datenübertragbarkeit.",
-      "s8Body2": "Um diese Rechte auszuüben, nutze die In-App-Einstellungen oder kontaktiere uns unter privacy@mentomate.com.",
-      "s9Title": "9. Sicherheit",
-      "s9Body": "Wir verwenden branchenübliche Sicherheitsmaßnahmen, einschließlich verschlüsselter Verbindungen (TLS), sicherer Authentifizierung und profilbezogener Datenisolierung, um sicherzustellen, dass jeder Nutzer nur auf seine eigenen Daten zugreifen kann.",
-      "s10Title": "10. Kontaktiere uns",
-      "s10Body": "Bei Fragen oder Bedenken zum Datenschutz kontaktiere unseren Datenschutzbeauftragten unter privacy@mentomate.com."
+      "s6Body1": "Wir verkaufen deine Daten nicht. Wir geben Daten nur an Dienstleister weiter, die für den Betrieb von MentoMate erforderlich sind.",
+      "s6Body2": "Zu diesen Anbietern gehören Clerk für die Anmeldung, Anbieter von KI-Modellen und Embeddings für Lernantworten und das Lerngedächtnis, Neon und Cloudflare für Datenbank- und Anwendungs-Hosting, Resend für E-Mails, Sentry für Fehler- und Leistungsüberwachung, Expo, Apple und Google für Push-Benachrichtigungen sowie Apple, Google und RevenueCat für Zahlungen und Abonnements.",
+      "s7Title": "7. Internationale Datenübermittlungen",
+      "s7Body": "Einige Auftragsverarbeiter haben ihren Sitz außerhalb der EU/des EWR und des Vereinigten Königreichs, einschließlich in den Vereinigten Staaten. Wenn Daten international übermittelt werden, stützen wir uns auf geeignete Garantien gemäß der DSGVO und der UK-DSGVO, wie die EU-Standardvertragsklauseln, den britischen Zusatz zur internationalen Datenübermittlung oder einen anwendbaren Angemessenheitsmechanismus.",
+      "s8Title": "8. Datenspeicherung",
+      "s8Body1": "Chat-Transkripte: Der vollständige Text deiner Nachrichten aus Lernsitzungen wird 30 Tage nach Erstellung der Lernzusammenfassung aufbewahrt und dann automatisch gelöscht. Wenn sich die Verarbeitung der Zusammenfassung verzögert, kennzeichnen betriebliche Schutzmaßnahmen die Verzögerung zur Lösung.",
+      "s8Body2": "Lerngedächtnis: Zusammenfassungen dessen, was du gelernt hast – einschließlich Fächer, Fortschritt, Beherrschungsergebnisse, Notizen, Wiederholungen und manchmal kurze Zitate aus deinen Nachrichten – werden aufbewahrt, solange dein Konto aktiv ist, damit sich der Mentor im Laufe der Zeit an deinen Lernprozess erinnern kann. Dieses Lerngedächtnis wird nur zur Gewährleistung der Kontinuität des Lernens verwendet; es wird nicht für Werbung, Marketingprofile oder das Training von KI-Modellen von Drittanbietern genutzt.",
+      "s9Title": "9. Deine Rechte",
+      "s9Body": "Du hast das Recht auf Auskunft über deine Daten, auf Berichtigung unrichtiger Daten, auf Löschung deines Kontos und der zugehörigen persönlichen und Lerndaten (vorbehaltlich der in Abschnitt 8 beschriebenen begrenzten Aufbewahrungsausnahmen), auf Widerruf deiner Einwilligung, auf Widerspruch gegen die Verarbeitung und auf Datenübertragbarkeit. Um diese Rechte auszuüben, verwende die In-App-Einstellungen oder kontaktiere support@mentomate.com.",
+      "s10Title": "10. Sicherheit",
+      "s10Body": "Wir verwenden branchenübliche Sicherheitsmaßnahmen, einschließlich verschlüsselter Verbindungen (TLS), sicherer Authentifizierung und profilbezogener Datenisolierung, um sicherzustellen, dass jeder Nutzer nur auf seine eigenen Daten zugreifen kann.",
+      "s2Body5": "Wir erfassen keine Standortdaten, Kontakte, deine Fotobibliothek (außer den von dir ausdrücklich ausgewählten Hausaufgabenbildern) oder den Browserverlauf.",
+      "s8Body3": "Kontolöschung: Wenn du dein Konto löschst, beginnt eine 7-tägige Frist, in der du die Löschung abbrechen kannst. Nach Ablauf der Frist werden dein Konto und die zugehörigen persönlichen Daten und Lerndaten dauerhaft entfernt, mit Ausnahme begrenzter Aufzeichnungen, die aus rechtlichen, sicherheits-, betrugspräventiven oder buchhalterischen Gründen aufbewahrt werden.",
+      "s11Title": "11. Kontakt",
+      "s11Body": "ZWIZZLY AS ist der Verantwortliche für deine personenbezogenen Daten. Bei Fragen zum Datenschutz oder zur Ausübung deiner Datenschutzrechte sende eine E-Mail an support@mentomate.com oder schreibe an ZWIZZLY AS, Fiskekroken 3B, 0139 Oslo, Norwegen."
     },
     "terms": {
       "title": "Nutzungsbedingungen",
@@ -1933,7 +1959,7 @@
       "s1Title": "1. Annahme der Bedingungen",
       "s1Body": "Durch die Erstellung eines Kontos oder die Nutzung von MentoMate stimmst du diesen Nutzungsbedingungen zu. Wenn du unter 18 Jahre alt bist, muss ein Elternteil oder Erziehungsberechtigter in deinem Namen zustimmen.",
       "s2Title": "2. Beschreibung des Dienstes",
-      "s2Body": "MentoMate ist eine KI-gestützte Mentoring-Plattform, die personalisiertes Lernen durch sokratischen Dialog, räumliche Wiederholung und adaptive Lehrpläne bietet. Der Dienst ist für Schüler im Alter von 11-15 Jahren mit elterlicher Aufsicht konzipiert.",
+      "s2Body": "MentoMate ist eine KI-gestützte Mentoring-Plattform, die personalisiertes Lernen durch sokratischen Dialog, Spaced Repetition und adaptive Lehrpläne bietet. Der Dienst ist für Lernende ab 13 Jahren konzipiert, mit elterlicher Aufsicht für Minderjährige.",
       "s3Title": "3. Kontoverantwortung",
       "s3Body": "Du bist für die Geheimhaltung deiner Kontodaten verantwortlich. Du musst bei der Registrierung genaue Informationen angeben. Du darfst dein Konto nicht mit anderen teilen oder mehrere Konten erstellen.",
       "s4Title": "4. Akzeptable Nutzung",
@@ -2149,7 +2175,7 @@
     "register": {
       "child": {
         "growthSubtitle": "Deine wöchentlichen Erfolge",
-        "masteredTopicsHero": "You learned {{count}} topics. Steady wins.",
+        "masteredTopicsHero": "Gelernte Themen: {{count}}. Weiter so.",
         "retentionStrong": "Was dir diese Woche wieder eingefallen ist.",
         "retentionFading": "Einen schnellen Auffrischer wert.",
         "retentionWeak": "Sollte wiederholt werden."
@@ -2363,14 +2389,14 @@
         "label": "Braucht einen neuen Durchgang"
       },
       "elapsed": {
-        "remembered_one": "Remembered after {{count}} day",
-        "remembered_other": "Remembered after {{count}} days",
-        "fading_one": "Getting fuzzy after {{count}} day",
-        "fading_other": "Getting fuzzy after {{count}} days",
-        "weak_one": "Ready for a refresh after {{count}} day",
-        "weak_other": "Ready for a refresh after {{count}} days",
-        "forgotten_one": "Last seen {{count}} day ago",
-        "forgotten_other": "Last seen {{count}} days ago"
+        "remembered_one": "Nach {{count}} Tag erinnert",
+        "remembered_other": "Nach {{count}} Tagen erinnert",
+        "fading_one": "Wird nach {{count}} Tag unklar",
+        "fading_other": "Wird nach {{count}} Tagen unklar",
+        "weak_one": "Bereit für eine Auffrischung nach {{count}} Tag",
+        "weak_other": "Bereit für eine Auffrischung nach {{count}} Tagen",
+        "forgotten_one": "Zuletzt vor {{count}} Tag gesehen",
+        "forgotten_other": "Zuletzt vor {{count}} Tagen gesehen"
       }
     },
     "previousReports": {
@@ -2381,24 +2407,24 @@
     "latestReport": {
       "title": "Neuester Bericht",
       "open": "Bericht öffnen",
-      "openWithDate": "Open report for {{date}}",
+      "openWithDate": "Bericht für {{date}} öffnen",
       "empty": "Dein nächster Wochen- oder Monatsbericht erscheint hier, sobald genügend Lernfortschritt zusammengefasst werden kann.",
       "error": "Der neueste Bericht konnte gerade nicht geladen werden.",
       "sessions": "Sitzungen",
-      "time": "Time",
+      "time": "Zeit",
       "topics": "Themen",
-      "words": "Words",
-      "practiceLessons_one": "{{count}} practice lesson",
-      "practiceLessons_other": "{{count}} practice lessons",
-      "practicePoints_one": "{{count}} practice point",
-      "practicePoints_other": "{{count}} practice points"
+      "words": "Wörter",
+      "practiceLessons_one": "{{count}} Übungslektion",
+      "practiceLessons_other": "{{count}} Übungslektionen",
+      "practicePoints_one": "{{count}} Übungspunkt",
+      "practicePoints_other": "{{count}} Übungspunkte"
     },
     "recentFocus": {
       "title": "Letzte Sitzungen",
       "showAll": "Alle Sitzungen anzeigen",
       "empty": "Letzte Sitzungen erscheinen hier, sobald du mit dem Lernen beginnst.",
       "error": "Die letzten Sitzungen konnten gerade nicht geladen werden.",
-      "sessionFallback": "Studied {{date}}"
+      "sessionFallback": "Gelernt am {{date}}"
     },
     "guardian": {
       "summaryFallback": "Noch keine Zusammenfassung verfügbar. Eine erscheint nach der nächsten Sitzung.",
@@ -2517,10 +2543,10 @@
     },
     "ready": {
       "title": "Alles ist bereit.",
-      "introWithLearner": "For {{learner}}:",
+      "introWithLearner": "Für {{learner}}:",
       "intro": "Das ist eingerichtet:",
       "rowTone": "Dein Mentor spricht mit dir auf die richtige Weise",
-      "rowSubject": "Starting with {{subject}}",
+      "rowSubject": "Start mit {{subject}}",
       "rowSubjectNoSubject": "Dein erstes Thema ist bereit",
       "rowPace": "Das Tempo passt sich deiner Geschwindigkeit an – nie gehetzt",
       "reassurance": "Die meisten Lernenden spüren den Unterschied in der ersten Sitzung.",
@@ -2580,7 +2606,7 @@
       "progressNudgeStartSubtitle": "Öffne {{subject}}, sieh, was bereit ist, und probiere selbst eine kurze Lektion, damit du helfen kannst.",
       "openProgressNudgeAction": "{{subject}} öffnen",
       "subjects": "Fächer",
-      "subjectsDescription": "{{name}}'s active subjects, with the most recent activity first.",
+      "subjectsDescription": "Die aktiven Fächer von {{name}}, mit der letzten Aktivität zuerst.",
       "subjectRawInputAudit": "Dein Kind hat nach \"{{rawInput}}\" gesucht",
       "openSubjectProgress": "Fortschritt in {{subject}} öffnen",
       "recentSessions": "Letzte Sitzungen",
@@ -2604,7 +2630,7 @@
       "cancelDeletion": "Löschung abbrechen",
       "withdrawConsent": "Zustimmung widerrufen",
       "withdrawConsentConfirmTitle": "Zustimmung widerrufen?",
-      "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
+      "withdrawConsentBody": "Das Konto und die Lerndaten von {{childName}} werden nach einer 7-tägigen Frist gelöscht. (Bei Konten von unter 13-Jährigen erfolgt die Löschung aus Datenschutzgründen sofort nach Ablauf der Frist.)",
       "confirmWithdrawConsent": "Bestätigen – Zustimmung widerrufen",
       "curriculumTitle": "Lehrplan",
       "curriculumSubtitle": "Entdecke die Fächer und Themen von {{name}}",
@@ -2727,7 +2753,7 @@
       "openTopicWithTitle": "{{title}} öffnen",
       "backToChildProfile": "Zurück zum Kinderprofil",
       "engagementChip": {
-        "accessibilityLabel": "Engagement: {{label}}",
+        "accessibilityLabel": "Lernverhalten: {{label}}",
         "labels": {
           "curious": "Neugierig",
           "stuck": "Arbeite mich durch",
@@ -2749,9 +2775,9 @@
       "topicsNewLearnerBody": "Dies kann nach frühen Sitzungen oder freiem Stöbern vorkommen. Die letzten Sitzungen unten zeigen weiterhin, was passiert ist.",
       "noTopicsYetTitle": "Noch keine Lernthemen",
       "noTopicsYetBody": "Sitzungen können hier noch existieren, bevor der Mentor genügend Fortschritt auf Lektionsebene hat, um ihn anzuzeigen.",
-      "description": "This is your child's progress in {{subject}}. Topics appear once sessions connect to a lesson step.",
-      "recentSubjectSessions": "Recent {{subject}} sessions",
-      "viewSessionFrom": "View session from {{date}}"
+      "description": "Dies ist der Fortschritt deines Kindes in {{subject}}. Themen erscheinen, sobald Sitzungen mit einem Lektionsschritt verbunden sind.",
+      "recentSubjectSessions": "Letzte {{subject}}-Sitzungen",
+      "viewSessionFrom": "Sitzung vom {{date}} ansehen"
     },
     "topic": {
       "topic": "Thema",
@@ -2978,7 +3004,24 @@
     "subjects": "Fächer",
     "subjectsLabel": "Fächer",
     "journal": "Tagebuch",
-    "journalLabel": "Tagebuch"
+    "journalLabel": "Tagebuch",
+    "adultSelfConsent": {
+      "title": "Bestätige, wie wir deine Daten verwenden",
+      "intro": "Bevor du weitermachst, brauchen wir deine Zustimmung zu zwei Dingen bezüglich deines Kontos.",
+      "platformUseHeading": "Nutzung von MentoMate",
+      "platformUseBody": "Wir verarbeiten deine Konto- und Lerndaten, damit die App für dich funktioniert – deine Fächer, Sitzungen und Fortschritte.",
+      "llmDisclosureHeading": "KI-Mentor",
+      "llmDisclosureBody": "Deine Nachrichten an deinen KI-Mentor werden an einen KI-Modellanbieter gesendet, damit er antworten und lehren kann. Wir verkaufen deine Daten niemals.",
+      "legalIntro": "Lies dir die vollständigen Details durch, bevor du zustimmst:",
+      "termsLink": "Nutzungsbedingungen",
+      "privacyLink": "Datenschutzrichtlinie",
+      "accept": "Ich stimme zu",
+      "submitting": "Speichern…",
+      "errorTitle": "Wir konnten deine Zustimmung nicht speichern",
+      "errorBody": "Das hat bei uns nicht geklappt. Bitte versuche es erneut.",
+      "retry": "Erneut versuchen",
+      "signOut": "Stattdessen abmelden"
+    }
   },
   "subscription": {
     "trial": {
@@ -3010,15 +3053,15 @@
     "childPaywall": {
       "headline": "Bisher tolle Arbeit!",
       "greatStart": "Du hast viel entdeckt und gelernt – ein toller Start!",
-      "xpStats_one": "You learned {{count}} topic and earned {{xp}} XP — great work!",
-      "xpStats_other": "You learned {{count}} topics and earned {{xp}} XP — great work!",
+      "xpStats_one": "Du hast {{count}} Thema gelernt und {{xp}} XP verdient – tolle Arbeit!",
+      "xpStats_other": "Du hast {{count}} Themen gelernt und {{xp}} XP verdient – tolle Arbeit!",
       "usedAllQuestions": "Du hast alle deine kostenlosen Fragen aufgebraucht. Bitte deine Eltern, ein Upgrade durchzuführen, damit du weiterlernen kannst.",
       "quotaUsedAllQuestions": "Du hast deine Fragen fürs Erste aufgebraucht. Du kannst es nach {{resetAt}} erneut versuchen oder deine Eltern benachrichtigen, wenn du mehr Spielraum brauchst.",
       "notifyButton": "Eltern benachrichtigen",
       "notifyButtonNotified": "Eltern benachrichtigt",
       "notifyButtonAccessibilityNotified": "Eltern bereits benachrichtigt",
       "notifyButtonAccessibilityNotify": "Eltern benachrichtigen",
-      "cooldownReminder": "You can remind them again in {{label}}.",
+      "cooldownReminder": "Du kannst sie in {{label}} erneut erinnern.",
       "notifiedExploreText": "Deine Eltern wurden benachrichtigt! Während du wartest, kannst du noch Folgendes erkunden:",
       "waitText": "Während du wartest, kannst du deine Bibliothek durchsuchen und deinen Fortschritt sehen.",
       "browseLibrary": "Bibliothek durchsuchen",
@@ -3027,10 +3070,10 @@
       "seeProgressAccessibilityLabel": "Fortschritt ansehen",
       "goHome": "Startseite",
       "goHomeAccessibilityLabel": "Zur Startseite",
-      "back": "Back",
+      "back": "Zurück",
       "backAccessibilityLabel": "Zurückgehen",
       "alerts": {
-        "sentTitle": "Sent!",
+        "sentTitle": "Gesendet!",
         "sentBody": "Wir haben deine Eltern informiert!",
         "askParentTitle": "Frage deine Eltern",
         "askParentBody": "Bitte deine Eltern, die App zu öffnen und zu abonnieren.",
@@ -3063,7 +3106,7 @@
       "alerts": {
         "successTitle": "Warteliste",
         "successBody": "Du wurdest der BYOK-Warteliste hinzugefügt.",
-        "errorTitle": "Error",
+        "errorTitle": "Fehler",
         "errorBody": "Beitritt zur Warteliste fehlgeschlagen. Erneut versuchen."
       }
     },
@@ -3378,7 +3421,7 @@
     "detailLoadErrorMessage": "Versuche es erneut oder kehre zur Rückblicksliste zurück.",
     "notFoundTitle": "Rückblick nicht gefunden",
     "notFoundMessage": "Dieser Rückblick ist nicht mehr verfügbar.",
-    "exchangesCount": "{{count}} exchanges",
+    "exchangesCount": "Austausche: {{count}}",
     "whatHappened": "Was geschah",
     "detailPending": "Dieser Rückblick wird noch vorbereitet.",
     "tryAsking": "Versuche zu fragen",
@@ -3386,6 +3429,7 @@
     "emptyCtaStartSession": "Sitzung starten",
     "verifiedProof": {
       "holdsStrong": "ist stichhaltig",
+      "lookupUnavailable": "Der verifizierte Nachweis ist vorübergehend nicht verfügbar",
       "recheckDue": "Erneute Prüfung fällig am {{date}}"
     }
   },
@@ -3645,7 +3689,7 @@
         },
         "card2": {
           "subjects": {
-            "math": "Math",
+            "math": "Mathe",
             "history": "Geschichte",
             "spanish": "Spanisch"
           },
@@ -3697,15 +3741,17 @@
     "bridge": {
       "headline": "Mache aus „Ich verstehe es nicht“ ein „Ich hab's!“",
       "supporting": "Erstelle ein kostenloses Konto, damit dein Mentor deine Fächer, Notizen und Fortschritte speichern kann.",
+      "parentHeadline": "Fahre mit deinem Konto fort, um den Lernenden zu unterstützen.",
+      "parentSupporting": "Melde dich an oder registriere dich, um die Einladung anzunehmen und die Unterstützung einzurichten. Dein Konto gewährt keinen Zugriff auf Lernaktivitäten, solange der Lernende dies nicht autorisiert.",
       "primaryCta": "Kostenloses Konto erstellen",
       "secondaryCta": "Ich habe bereits ein Konto"
     },
-    "next": "Next",
+    "next": "Weiter",
     "letsStart": "Los geht's",
     "a11y": {
       "previous": "Vorherige Karte",
       "next": "Nächste Karte",
-      "dots": "Page {{current}} of {{total}}",
+      "dots": "Seite {{current}} von {{total}}",
       "bridgePrimary": "Kostenloses Konto erstellen",
       "bridgeSecondary": "Bei bestehendem Konto anmelden"
     }
@@ -4344,7 +4390,9 @@
   },
   "accountAdmin": {
     "title": "Konto",
-    "openAccount": "Kontoeinstellungen öffnen",
+    "openAccount": "Kontoeinstellungen für {{name}} öffnen",
+    "openAccountNoName": "Kontoeinstellungen öffnen",
+    "backTo": "Zurück zu {{destination}}",
     "security": "Kontosicherheit",
     "familySettings": "Familieneinstellungen"
   },
@@ -4520,7 +4568,6 @@
       "activeMessage": "Du kannst diese Vereinbarung hier jederzeit überprüfen.",
       "revoke": "Freigabe beenden",
       "revoking": "Freigabe wird beendet ...",
-      "revoked": "Die Freigabe wird beendet. Der Unterstützer erhält eine Benachrichtigung.",
       "revokeErrorTitle": "Freigabe konnte nicht beendet werden",
       "missingActor": "Wir konnten die aktive Person nicht identifizieren.",
       "relationLabel": "Beziehung",
@@ -4557,7 +4604,7 @@
       "message": "Hilf {{name}} beim Einstieg.",
       "hint": "Die Zusammenfassungen und Fortschritte erscheinen hier, sobald es losgeht.",
       "cta": "{{name}} ermutigen",
-      "nudgeStep1": "Deine Ermutigung hat {{name}} erreicht. {{name}} hat noch nicht angefangen – die meisten Lernenden starten in der ersten Woche.",
+      "nudgeStep1": "Deine Ermutigung hat {{name}} erreicht. Der Lernstart steht noch aus – die meisten Lernenden starten in der ersten Woche.",
       "nudgeStep2": "Wenn du das nächste Mal bei {{name}} bist, startet gemeinsam die erste Sitzung.",
       "nudgeStep3": "Probiere die Lernerfahrung selbst aus – und hilf {{name}} beim Einstieg.",
       "nudgeStep4": "Lerne selbst weiter, während {{name}} den richtigen Moment findet."

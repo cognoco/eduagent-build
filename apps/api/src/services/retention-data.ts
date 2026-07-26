@@ -81,6 +81,8 @@ import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { NotFoundError } from '../errors';
 import { captureException } from './sentry';
 import { createLogger } from './logger';
+import { inngest } from '../inngest/client';
+import { safeSend } from './safe-non-core';
 import {
   assertOwnedCurriculumTopic,
   findOwnedCurriculumTopic,
@@ -89,6 +91,8 @@ import {
 
 const logger = createLogger();
 const DAY_MS = 1000 * 60 * 60 * 24;
+const RECALL_QUALITY_FLOW = 'retention.recall_quality';
+const RECALL_QUALITY_DEGRADED_EVENT = 'app/retention.recall_quality_degraded';
 
 // ---------------------------------------------------------------------------
 // Mappers
@@ -218,20 +222,71 @@ export const recallGradeJsonSchema = z
 
 /**
  * Parse the grader's JSON envelope. Tolerates surrounding prose / code fences
- * by extracting the first balanced object. Returns null on any failure so the
- * caller falls back honestly rather than inventing a score.
+ * by extracting the first balanced object. Classifies failures without
+ * retaining the raw response so the caller can observe degradation safely.
  */
-function parseRecallGradeJson(
-  raw: string,
-): z.infer<typeof recallGradeJsonSchema> | null {
+type RecallQualityDegradedReason =
+  | 'route_error'
+  | 'no_json'
+  | 'parse_error'
+  | 'schema_invalid';
+
+type RecallGradeParseResult =
+  | {
+      success: true;
+      data: z.infer<typeof recallGradeJsonSchema>;
+    }
+  | {
+      success: false;
+      reason: Exclude<RecallQualityDegradedReason, 'route_error'>;
+    };
+
+const recallQualityDegradedEventSchema = z.object({
+  timestamp: z.string().datetime(),
+  profileId: z.string().min(1),
+  flow: z.literal(RECALL_QUALITY_FLOW),
+  reason: z.enum(['route_error', 'no_json', 'parse_error', 'schema_invalid']),
+});
+
+async function emitRecallQualityDegraded(
+  profileId: string,
+  reason: RecallQualityDegradedReason,
+): Promise<void> {
+  const payload = recallQualityDegradedEventSchema.parse({
+    timestamp: new Date().toISOString(),
+    profileId,
+    flow: RECALL_QUALITY_FLOW,
+    reason,
+  });
+
+  await safeSend(
+    () =>
+      inngest.send({
+        // orphan-allow: observability-only event — the honest fallback remains
+        // non-advancing; this event feeds degraded-rate monitoring.
+        name: RECALL_QUALITY_DEGRADED_EVENT,
+        data: payload,
+      }),
+    RECALL_QUALITY_FLOW,
+    { reason },
+  );
+}
+
+function parseRecallGradeJson(raw: string): RecallGradeParseResult {
   const jsonText = extractFirstJsonObject(raw);
-  if (jsonText === null) return null;
+  if (jsonText === null) return { success: false, reason: 'no_json' };
+
+  let candidate: unknown;
   try {
-    const parsed = recallGradeJsonSchema.safeParse(JSON.parse(jsonText));
-    return parsed.success ? parsed.data : null;
+    candidate = JSON.parse(jsonText);
   } catch {
-    return null;
+    return { success: false, reason: 'parse_error' };
   }
+
+  const parsed = recallGradeJsonSchema.safeParse(candidate);
+  return parsed.success
+    ? { success: true, data: parsed.data }
+    : { success: false, reason: 'schema_invalid' };
 }
 
 /**
@@ -309,6 +364,7 @@ export function buildRecallGradeMessages(
 export async function evaluateRecallQuality(
   answer: string,
   topicTitle: string,
+  profileId: string,
   topicDescription?: string,
   // [WI-1454] Optional open weak-concept labels to focus the grade on; see
   // buildRecallGradeMessages. Absent/empty preserves whole-topic grading.
@@ -316,37 +372,67 @@ export async function evaluateRecallQuality(
   // [WI-2114] Learner's tutor-prose language for the feedback strings (AC-4).
   conversationLanguage?: ConversationLanguage,
 ): Promise<RecallGrade> {
+  const fallback: RecallGrade = {
+    graded: false,
+    gradedBy: 'fallback_heuristic',
+  };
+
+  const messages = buildRecallGradeMessages(
+    answer,
+    topicTitle,
+    topicDescription,
+    focusConcepts,
+    conversationLanguage,
+  );
+
+  let response: string;
   try {
-    const messages = buildRecallGradeMessages(
-      answer,
-      topicTitle,
-      topicDescription,
-      focusConcepts,
-      conversationLanguage,
-    );
-
     const result = await routeAndCall(messages, 1);
-    const parsed = parseRecallGradeJson(result.response);
-
-    if (!parsed) {
-      return { graded: false, gradedBy: 'fallback_heuristic' };
-    }
-
-    return {
-      graded: true,
-      quality: parsed.quality,
-      gradedBy: 'llm',
-      verdict: parsed.verdict,
-      rationale: parsed.rationale ?? null,
-      misconception: parsed.misconception ?? null,
-      rung: 1,
-      // [WI-2114] Pass through the grader's answer-specific feedback; null when
-      // the grader omitted it so the caller leaves response.feedback unset.
-      feedback: parsed.feedback ?? null,
-    };
-  } catch {
-    return { graded: false, gradedBy: 'fallback_heuristic' };
+    response = result.response;
+  } catch (error) {
+    logger.warn('[retention.recall-quality] degraded — route error', {
+      flow: RECALL_QUALITY_FLOW,
+      reason: 'route_error',
+    });
+    captureException(
+      new Error('Recall quality grading route failed', {
+        cause: {
+          errorKind: error instanceof Error ? 'error' : 'non_error',
+        },
+      }),
+      {
+        extra: {
+          surface: RECALL_QUALITY_FLOW,
+          reason: 'route_error',
+        },
+      },
+    );
+    await emitRecallQualityDegraded(profileId, 'route_error');
+    return fallback;
   }
+
+  const parsed = parseRecallGradeJson(response);
+  if (!parsed.success) {
+    logger.warn('[retention.recall-quality] degraded — invalid response', {
+      flow: RECALL_QUALITY_FLOW,
+      reason: parsed.reason,
+    });
+    await emitRecallQualityDegraded(profileId, parsed.reason);
+    return fallback;
+  }
+
+  return {
+    graded: true,
+    quality: parsed.data.quality,
+    gradedBy: 'llm',
+    verdict: parsed.data.verdict,
+    rationale: parsed.data.rationale ?? null,
+    misconception: parsed.data.misconception ?? null,
+    rung: 1,
+    // [WI-2114] Pass through the grader's answer-specific feedback; null when
+    // the grader omitted it so the caller leaves response.feedback unset.
+    feedback: parsed.data.feedback ?? null,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1155,6 +1241,7 @@ export async function processRecallTest(
       : await evaluateRecallQuality(
           input.answer ?? '',
           topicTitle,
+          profileId,
           topic.topicDescription ?? undefined,
           focusConcepts,
           conversationLanguage,
@@ -1886,9 +1973,20 @@ export async function updateRetentionFromSession(
     : await ensureRetentionCard(db, profileId, topicId);
   const card = ensured.card;
 
-  // D-01: skip double-counting guard for newly created cards
+  // A relearn reset also clears lastReviewedAt, but preserves the timestamp
+  // written by the card's real review history. Only a DB-seeded virgin row
+  // has both defaultNow() columns still equal.
+  const isVirginExistingCard =
+    !ensured.isNew &&
+    card.lastReviewedAt === null &&
+    card.createdAt.getTime() === card.updatedAt.getTime();
+
+  // D-01: skip double-counting guard for newly created or virgin cards.
+  // A virgin existing row gets its updatedAt from PostgreSQL defaultNow(), so
+  // database/app clock skew must not prevent the repetitionsZero CAS below.
   if (
     !ensured.isNew &&
+    !isVirginExistingCard &&
     sessionTimestamp &&
     card.updatedAt &&
     card.updatedAt.getTime() >= new Date(sessionTimestamp).getTime()
@@ -1933,30 +2031,16 @@ export async function updateRetentionFromSession(
     // each other to overwrite stale reads. If a non-JS writer (raw SQL,
     // background job in another language, etc.) is ever introduced, revisit
     // this comparison rather than re-widening it blindly.
-    // [WI-1445] A never-reviewed EXISTING card is the one exception —
-    // discriminated by `lastReviewedAt === null`, NOT `repetitions === 0`.
+    // [WI-1445/WI-2531] A virgin EXISTING card is the one exception.
     // `repetitions` alone is ambiguous: SM-2 resets it to 0 on every FAILED
-    // review too, so a card with real prior history (failureCount > 0,
-    // xpStatus: 'decayed') can also read repetitions === 0 while its
-    // `updatedAt` was set by a JS writer on that very reset (every SM-2
-    // write sets `lastReviewedAt` alongside `updatedAt`) — for that card the
-    // strict updatedAt-equality CAS above is exactly correct and must not be
-    // downgraded, or two concurrent writers racing on it could both match
-    // and the loser's stale write would silently clobber ease/interval.
-    // `lastReviewedAt === null` means the row has NEVER been touched by any
-    // JS writer (only `insertRetentionCardIfAbsent`'s SQL defaultNow()) — for
-    // that case ONLY, the timestamp can carry sub-millisecond precision a JS
-    // Date read-back truncates, so the strict equality would silently match
-    // 0 rows. Guard on `repetitionsZero` instead (integer equality, immune to
-    // timestamp precision) — same established primitive
-    // topic-probe-extract.ts's seedRetentionCard uses for this exact
-    // never-reviewed-card scenario. Both branches still detect a genuine
-    // concurrent writer: if another session already advanced repetitions (or
-    // updatedAt) between our read and this write, the WHERE clause fails to
-    // match and `updateResult.updated` is false.
+    // review, while a relearn reset also clears `lastReviewedAt`. A virgin row
+    // is therefore identified by null lastReviewedAt plus unchanged, equal DB
+    // defaults for createdAt/updatedAt. Its strict timestamp parameter CAS can
+    // lose PostgreSQL sub-millisecond precision, so use the repetitionsZero
+    // guard; historical cards retain the exact updatedAt lock.
     guard: ensured.isNew
       ? { kind: 'none' }
-      : card.lastReviewedAt === null
+      : isVirginExistingCard
         ? { kind: 'repetitionsZero' }
         : { kind: 'optimisticLock', updatedAt: card.updatedAt },
     updatedAt: new Date(),

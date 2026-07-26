@@ -336,7 +336,7 @@ describe('ChildReportsScreen', () => {
   });
 
   describe('reports list', () => {
-    it('renders reports header summary from latest weekly report', () => {
+    it('opens the sole latest weekly report from its header summary', () => {
       mockUseChildWeeklyReports.mockReturnValue({
         data: [
           {
@@ -377,6 +377,18 @@ describe('ChildReportsScreen', () => {
         0,
       );
       expect(screen.getAllByText('+2 vs last week').length).toBeGreaterThan(0);
+
+      const latestReport = screen.getByTestId('weekly-report-card-wr-1');
+      expect(latestReport).toHaveProp(
+        'accessibilityLabel',
+        'progress.latestReport.openWithDate:{"date":"May 5 – May 11, 2026"}',
+      );
+      fireEvent.press(latestReport);
+
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/child/[profileId]/weekly-report/[weeklyReportId]',
+        params: { profileId: 'child-001', weeklyReportId: 'wr-1' },
+      });
     });
 
     // [BUG-604] Tapping a weekly report card must navigate to the weekly
@@ -671,7 +683,7 @@ describe('getNextReportInfo', () => {
 
   it('[WI-2186] chooses Monday weekly delivery instead of the later month-end schedule', () => {
     const wednesday = new Date(Date.UTC(2026, 5, 3, 12, 0, 0));
-    const result = getNextReportInfo(wednesday);
+    const result = getNextReportInfo(wednesday, 'en-US');
 
     expect(result.date).toContain('June 8');
     expect(result.date).not.toContain('July');
@@ -679,7 +691,7 @@ describe('getNextReportInfo', () => {
 
   it('chooses monthly delivery when the 1st arrives before next Monday', () => {
     const tuesday = new Date(Date.UTC(2026, 8, 29, 12, 0, 0));
-    const result = getNextReportInfo(tuesday);
+    const result = getNextReportInfo(tuesday, 'en-US');
 
     expect(result.date).toContain('October 1');
     expect(result.runAt.toISOString()).toBe('2026-10-01T10:00:00.000Z');
@@ -687,37 +699,37 @@ describe('getNextReportInfo', () => {
 
   it('returns the 1st before 10:00 UTC as the earliest monthly run', () => {
     const jan1_8am = new Date(Date.UTC(2026, 0, 1, 8, 0, 0));
-    const result = getNextReportInfo(jan1_8am);
+    const result = getNextReportInfo(jan1_8am, 'en-US');
     expect(result.date).toContain('January 1');
   });
 
   it('returns next Monday on the 1st after the monthly run', () => {
     const jan1_11am = new Date(Date.UTC(2026, 0, 1, 11, 0, 0));
-    const result = getNextReportInfo(jan1_11am);
+    const result = getNextReportInfo(jan1_11am, 'en-US');
     expect(result.date).toContain('January 5');
   });
 
   it('returns the earlier monthly run when 3 or fewer days remain', () => {
     const dec30 = new Date(Date.UTC(2025, 11, 30, 12, 0, 0));
-    const result = getNextReportInfo(dec30);
+    const result = getNextReportInfo(dec30, 'en-US');
     expect(result.date).toContain('January');
   });
 
   it('returns the earlier weekly run when the monthly run is weeks away', () => {
     const jan15 = new Date(Date.UTC(2026, 0, 15, 12, 0, 0));
-    const result = getNextReportInfo(jan15);
+    const result = getNextReportInfo(jan15, 'en-US');
     expect(result.date).toContain('January 19');
   });
 
   it('handles the weekly boundary correctly in short months', () => {
     const feb15 = new Date(Date.UTC(2026, 1, 15, 12, 0, 0));
-    const result = getNextReportInfo(feb15);
+    const result = getNextReportInfo(feb15, 'en-US');
     expect(result.date).toContain('February 16');
   });
 
   it('handles year boundary (December → January)', () => {
     const dec15 = new Date(Date.UTC(2025, 11, 15, 12, 0, 0));
-    const result = getNextReportInfo(dec15);
+    const result = getNextReportInfo(dec15, 'en-US');
     expect(result.date).toContain('December 22');
     expect(result.date).toContain('2025');
   });

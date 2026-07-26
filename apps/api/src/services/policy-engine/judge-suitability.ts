@@ -16,9 +16,7 @@ import {
   type JudgeVerdict,
 } from '@eduagent/schemas';
 import { extractFirstJsonObject, routeAndCall } from '../llm';
-import type { PreferredLlmProvider } from '../llm';
 import { createLogger } from '../logger';
-import { resolveJudgeConfig } from './judge';
 import { buildSuitabilityJudgePrompt } from './judge-suitability-prompt';
 
 const logger = createLogger();
@@ -45,28 +43,12 @@ export interface RunSuitabilityJudgeInput {
 }
 
 /**
- * Pick a judge provider that is vendor-independent of the tutor (MMT-ADR-0016
- * §2). Consults `resolveJudgeConfig`'s `!<vendor>` constraint so the scaffold's
- * invariant drives the pick. Prefers Anthropic (Haiku — master.md judge row);
- * falls to OpenAI only when Anthropic is the excluded vendor. Never Gemini
- * (under-18 + judge-vendor constraint).
- */
-export function selectJudgeProvider(tutorVendor: string): PreferredLlmProvider {
-  const { vendorConstraint } = resolveJudgeConfig({ tutorVendor });
-  const excluded = vendorConstraint.replace(/^!/, '').trim().toLowerCase();
-  const preferred: PreferredLlmProvider = 'anthropic';
-  return excluded === preferred ? 'openai' : preferred;
-}
-
-/**
  * Run the post-display suitability judge over a single tutor reply. Returns the
  * parsed verdict, or null on any failure (fail-open). Never throws.
  */
 export async function runSuitabilityJudge(
   input: RunSuitabilityJudgeInput,
 ): Promise<JudgeVerdict | null> {
-  const preferredProvider = selectJudgeProvider(input.tutorVendor);
-
   const messages = buildSuitabilityJudgePrompt({
     reply: input.reply,
     precedingLearnerMessage: input.precedingLearnerMessage,
@@ -78,8 +60,19 @@ export async function runSuitabilityJudge(
   try {
     const result = await routeAndCall(messages, JUDGE_RUNG, {
       capability: 'judge',
+      // WI-2624: this judge grades `input.reply`, the tutor's own output —
+      // model-output independence, excluding the REAL producer vendor. This
+      // replaces the old `selectJudgeProvider` → `preferredProvider` hack,
+      // which preselected the opposite vendor and fed it back into the
+      // router as a preference hint; the legacy `getModelConfig` judge
+      // branch then re-derived its own "tutor vendor" FROM that already-
+      // flipped preference and excluded THAT, flipping back onto the real
+      // producer (the double-flip this WI fixes).
+      judgeIndependence: {
+        mode: 'model-output',
+        producerVendor: input.tutorVendor,
+      },
       flow: JUDGE_SUITABILITY_FLOW,
-      preferredProvider,
       ageBracket: input.ageBracket,
       conversationLanguage: input.conversationLanguage,
       responseFormat: 'json',

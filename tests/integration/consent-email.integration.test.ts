@@ -104,11 +104,13 @@ describe('Integration: Consent email delivery', () => {
     // Verify Resend API was called with the correct key
     const calls = getFetchCalls('resend.com');
     expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe('https://api.resend.com/emails');
-    expect(calls[0].headers['Authorization']).toBe(`Bearer ${FAKE_RESEND_KEY}`);
+    const call = calls[0];
+    if (!call) throw new Error('Expected one captured Resend call');
+    expect(call.url).toBe('https://api.resend.com/emails');
+    expect(call.headers['Authorization']).toBe(`Bearer ${FAKE_RESEND_KEY}`);
 
     // Verify email payload
-    const emailBody = JSON.parse(calls[0].body!);
+    const emailBody = JSON.parse(call.body!);
     expect(emailBody.to).toContain(PARENT_EMAIL);
     expect(emailBody.from).toBe('test@mentomate.test');
     expect(emailBody.subject).toContain('consent');
@@ -124,7 +126,9 @@ describe('Integration: Consent email delivery', () => {
         }),
       }),
     ]);
-    expect(inngestEvents[0].data).not.toHaveProperty('parentEmail');
+    const event = inngestEvents[0];
+    if (!event) throw new Error('Expected one captured Inngest event');
+    expect(event.data).not.toHaveProperty('parentEmail');
   });
 
   it('returns emailStatus "failed" when RESEND_API_KEY is missing from env', async () => {

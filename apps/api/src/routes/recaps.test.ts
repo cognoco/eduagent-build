@@ -170,7 +170,7 @@ function makeRecapItem(overrides: Partial<{ recapId: string }> = {}) {
     engagementSignal: null,
     nextTopicTitle: null,
     nextTopicReason: null,
-    verifiedProof: null,
+    verifiedProof: { status: 'absent' as const },
   };
 }
 

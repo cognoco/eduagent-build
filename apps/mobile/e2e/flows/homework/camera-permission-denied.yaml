@@ -8,11 +8,9 @@
 # Prerequisite: Seeded user with completed learning session + subject
 #               (scenario: homework-ready) AND camera permission pre-revoked.
 #
-# IMPORTANT: This flow must be invoked via seed-and-run-permdenied.sh, NOT
-#            seed-and-run.sh. The permdenied wrapper calls:
-#              adb shell pm clear com.mentomate.app
-#              adb shell pm revoke com.mentomate.app android.permission.CAMERA
-#            which puts the device in "permission denied, cannot ask again" state.
+# IMPORTANT: This flow requires the deterministic permanently-denied state.
+#            The hosted runner applies it for this exact flow after pm clear;
+#            local runs must use seed-and-run-permdenied.sh.
 #
 # Run command:
 #   ./e2e/scripts/seed-and-run-permdenied.sh homework-ready e2e/flows/homework/camera-permission-denied.yaml

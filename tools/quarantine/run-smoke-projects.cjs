@@ -10,7 +10,7 @@ const {
 const VALID_LANES = new Set(['core', 'advisory']);
 
 function parseLaneArgument(args) {
-  return args[0] === '--' ? args[1] : args[0];
+  return (args[0] === '--' ? args[1] : args[0]) ?? 'core';
 }
 
 function resolveLaneProjects(lane, now = new Date(), entries = loadRegistry()) {

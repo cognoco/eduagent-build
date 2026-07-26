@@ -30,6 +30,7 @@
  */
 import { Hono } from 'hono';
 import type { Database } from '@eduagent/database';
+import { CONSENT_PURPOSES, type ConsentPurpose } from '@eduagent/schemas';
 import { consentWebRoutes } from './consent-web';
 
 // ─── DB stub (external boundary) ───────────────────────────────────────────
@@ -42,8 +43,8 @@ interface StubConsentRow {
   id: string;
   chargePersonId: string;
   organizationId: string;
-  purpose: string;
-  requestedBasis: string;
+  purpose: ConsentPurpose;
+  requestedBasis: 'gdpr_parental_consent';
   policyVersion: string;
   token: string;
   status: 'pending' | 'approved' | 'denied';
@@ -56,8 +57,8 @@ function makeRow(overrides: Partial<StubConsentRow> = {}): StubConsentRow {
     id: 'consent-1',
     chargePersonId: 'person-child-1',
     organizationId: 'org-1',
-    purpose: 'GDPR_CHILD',
-    requestedBasis: 'parental_consent',
+    purpose: CONSENT_PURPOSES[0],
+    requestedBasis: 'gdpr_parental_consent',
     policyVersion: 'v1-test',
     token: 'valid-token',
     status: 'pending',
@@ -79,20 +80,39 @@ function makeDb(opts: {
   displayName?: string | null;
 }): Database {
   const { row, displayName = 'Emma' } = opts;
+  const requestRows = row
+    ? CONSENT_PURPOSES.map((purpose, index) => ({
+        ...row,
+        id: `consent-${index + 1}`,
+        purpose,
+      }))
+    : [];
   // Approval path: tx.insert(consentGrant).values(...).returning({id})
-  const insertReturning = jest.fn().mockResolvedValue([{ id: 'grant-1' }]);
+  const insertReturning = jest.fn().mockResolvedValue(
+    CONSENT_PURPOSES.map((purpose, index) => ({
+      id: `grant-${index + 1}`,
+      purpose,
+    })),
+  );
   const insertValues = jest
     .fn()
     .mockReturnValue({ returning: insertReturning });
   const insertChain = { values: insertValues };
   // Update path: tx.update(X).set(...).where(...).returning({id})
-  const updateReturning = jest
-    .fn()
-    .mockResolvedValue(row ? [{ id: row.id }] : []);
+  let approvedUpdateIndex = 0;
   const updateChain = {
-    set: jest.fn().mockReturnValue({
-      where: jest.fn().mockReturnValue({ returning: updateReturning }),
-    }),
+    set: jest.fn().mockImplementation((values: { status?: string }) => ({
+      where: jest.fn().mockReturnValue({
+        returning: jest.fn().mockImplementation(async () => {
+          if (values.status === 'denied') {
+            return requestRows.map((requestRow) => ({ id: requestRow.id }));
+          }
+          const requestRow = requestRows[approvedUpdateIndex];
+          approvedUpdateIndex++;
+          return requestRow ? [{ id: requestRow.id }] : [];
+        }),
+      }),
+    })),
   };
   const deleteChain = { where: jest.fn().mockResolvedValue(undefined) };
   const txMock = {
@@ -104,12 +124,19 @@ function makeDb(opts: {
     // deleting. None of these fixtures seed a subscription (ordinary
     // managed-child deny), so this stays empty — matching the no-op path.
     query: {
+      consentRequest: {
+        findMany: jest.fn().mockResolvedValue(requestRows),
+      },
       subscription: { findMany: jest.fn().mockResolvedValue([]) },
     },
+    execute: jest.fn().mockResolvedValue({ rowCount: 1 }),
   };
   return {
     query: {
-      consentRequest: { findFirst: jest.fn().mockResolvedValue(row) },
+      consentRequest: {
+        findFirst: jest.fn().mockResolvedValue(row),
+        findMany: jest.fn().mockResolvedValue(requestRows),
+      },
       person: {
         findFirst: jest
           .fn()

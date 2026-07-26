@@ -359,8 +359,11 @@ export async function evaluateAssessmentAnswer(
   // vendor gate WI-2432 threads (the judge branch is evaluated first and never
   // returns Gemini by construction, MMT-ADR-0016 §2/§10.1); ageBracket is still
   // threaded because it drives the safety preamble, not vendor selection.
+  // WI-2624: grades the LEARNER's answer, not any model's output —
+  // not-applicable (no producer vendor to exclude).
   const result = await routeAndCall(messages, 2, {
     capability: 'judge',
+    judgeIndependence: { mode: 'not-applicable' },
     flow: 'assessment.evaluate',
     responseFormat: 'json',
     conversationLanguage: options?.conversationLanguage,
@@ -681,8 +684,11 @@ export async function evaluateQuickCheckAnswer(
   // [WI-2433] Quick-check answer grading is a judge task — same routing posture
   // as evaluateAssessmentAnswer above (capability:'judge' → vendor-independent,
   // tier/age-blind GRADER_MODEL). See that call site for the rationale.
+  // WI-2624: grades the LEARNER's answer, not any model's output —
+  // not-applicable (no producer vendor to exclude).
   const result = await routeAndCall(messages, 2, {
     capability: 'judge',
+    judgeIndependence: { mode: 'not-applicable' },
     flow: 'assessment.evaluate',
     responseFormat: 'json',
     conversationLanguage: options?.conversationLanguage,

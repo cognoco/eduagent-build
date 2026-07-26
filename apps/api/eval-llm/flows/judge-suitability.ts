@@ -17,14 +17,15 @@
 // ROUTING FIDELITY (WI-1877 rework #2 — reviewer finding)
 // ---------------------------------------------------------------------------
 // The first cut of this eval called `runHarnessLlm` with no `capability` or
-// `preferredProvider`, so it fell through to the default content-derived
+// `judgeIndependence`, so it fell through to the default content-derived
 // 'text' capability — a DIFFERENT router branch than production. Production
 // `runSuitabilityJudge` (judge-suitability.ts) always passes
 // `capability: 'judge'` (selects the tier/age-blind, vendor-independent
 // grader branch — `resolveGraderConfig` in router.ts, exempt from the
-// under-18 Gemini gate, WI-1800/WI-1826) plus a tutor-vendor-derived
-// `preferredProvider` (`selectJudgeProvider(tutorVendor)`). Without those, a
-// "verdict not flipped" result only proves the fence holds against WHATEVER
+// under-18 Gemini gate, WI-1800/WI-1826) plus a `judgeIndependence` declaring
+// the real tutor vendor to exclude (WI-2624 — this replaced the old
+// `selectJudgeProvider(tutorVendor)` → `preferredProvider` hack). Without
+// those, a "verdict not flipped" result only proves the fence holds against WHATEVER
 // generic model the harness happened to route to — not the real production
 // judge path. `runLive` below now mirrors both options so the behavioral
 // proof exercises actual production routing. `flow` cannot be mirrored:
@@ -49,7 +50,6 @@
 
 import type { AgeBracket, ConversationLanguage } from '@eduagent/schemas';
 import { judgeVerdictSchema } from '@eduagent/schemas';
-import { selectJudgeProvider } from '../../src/services/policy-engine/judge-suitability';
 import { buildSuitabilityJudgePrompt } from '../../src/services/policy-engine/judge-suitability-prompt';
 import type { EvalProfile } from '../fixtures/profiles';
 import type {
@@ -75,9 +75,9 @@ export interface JudgeSuitabilityEvalInput {
 // profile matrix.
 const PROFILE_ID = '15yo-football-gaming';
 
-// Representative tutor vendor for deriving the judge's `preferredProvider`
-// exactly as production does (`selectJudgeProvider(tutorVendor)` in
-// judge-suitability.ts). This eval calls the judge directly with no real
+// Representative tutor vendor for the judge's `judgeIndependence` declaration
+// exactly as production does (`runSuitabilityJudge` in judge-suitability.ts,
+// WI-2624). This eval calls the judge directly with no real
 // tutor turn in play, so 'cerebras' is used as the stand-in — it is the V2
 // universal default text model's vendor (`CEREBRAS_DEFAULT_MODEL`, router.ts)
 // and matches this harness's own tutor-turn convention (`MENTOR_MODEL =
@@ -175,8 +175,14 @@ export const judgeSuitabilityFlow: FlowDefinition<JudgeSuitabilityEvalInput> = {
         // `flow`, which runHarnessLlm hardcodes — see the header comment
         // above) so this behavioral proof exercises the real production
         // judge routing branch, not the default 'text' capability.
+        // WI-2624: production now declares `judgeIndependence` (model-output +
+        // the real producer vendor) instead of preselecting a provider via the
+        // old `selectJudgeProvider`/`preferredProvider` hack — mirror that here.
         capability: 'judge',
-        preferredProvider: selectJudgeProvider(REPRESENTATIVE_TUTOR_VENDOR),
+        judgeIndependence: {
+          mode: 'model-output',
+          producerVendor: REPRESENTATIVE_TUTOR_VENDOR,
+        },
         responseFormat: 'json',
         ageBracket: input.ageBracket,
         conversationLanguage: input.conversationLanguage,

@@ -111,7 +111,11 @@ async function seedRetentionCard(params: {
     return null;
   }
 
-  const grade = await evaluateRecallQuality(learnerMessage, topicTitle);
+  const grade = await evaluateRecallQuality(
+    learnerMessage,
+    topicTitle,
+    profileId,
+  );
   // [Flow 2 / T7] Never seed SM-2 state from a guess. If the grader was
   // unavailable, skip seeding entirely — the card stays unseeded and a later
   // real grade can seed it.

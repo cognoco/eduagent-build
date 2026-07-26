@@ -6,7 +6,8 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import { AccessibilityInfo, Alert, AppState, Linking } from 'react-native';
-import { ChatShell, type ChatMessage } from './ChatShell';
+import { ChatShell } from './ChatShell';
+import type { ChatMessage } from './session-types';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -183,6 +184,75 @@ describe('ChatShell', () => {
 
     screen.getByTestId('message-bubble-assistant-0');
     screen.getByTestId('message-bubble-user-1');
+  });
+
+  it('[WI-2234] marks only non-empty completed assistant responses', () => {
+    renderChatShell({
+      isStreaming: true,
+      messages: [
+        {
+          id: 'completed',
+          role: 'assistant',
+          content: 'Roman roads connected communities and ideas.',
+          isResponseComplete: true,
+        },
+        {
+          id: 'opening',
+          role: 'assistant',
+          content: 'What would you like to explore?',
+        },
+        {
+          id: 'empty',
+          role: 'assistant',
+          content: '   ',
+          isResponseComplete: true,
+        },
+        {
+          id: 'streaming',
+          role: 'assistant',
+          content: 'Roman roads connected',
+          streaming: true,
+          isResponseComplete: true,
+        },
+        {
+          id: 'reconnect',
+          role: 'assistant',
+          content: 'Connection lost — Try again',
+          kind: 'reconnect_prompt',
+          isResponseComplete: true,
+        },
+        {
+          id: 'fallback',
+          role: 'assistant',
+          content: "I didn't have a reply — tap to try again.",
+          kind: 'reconnect_prompt',
+          isResponseComplete: true,
+        },
+        {
+          id: 'system',
+          role: 'assistant',
+          content: 'Previous send restored.',
+          isSystemPrompt: true,
+          kind: 'session_expired',
+          isResponseComplete: true,
+        },
+        {
+          id: 'learner',
+          role: 'user',
+          content: 'How did Roman roads help people exchange ideas?',
+          isResponseComplete: true,
+        },
+      ],
+    });
+
+    screen.getByTestId('assistant-response-complete-0');
+    expect(screen.queryByTestId('assistant-response-complete-1')).toBeNull();
+    expect(screen.queryByTestId('assistant-response-complete-2')).toBeNull();
+    expect(screen.queryByTestId('assistant-response-complete-3')).toBeNull();
+    expect(screen.queryByTestId('assistant-response-complete-4')).toBeNull();
+    expect(screen.queryByTestId('assistant-response-complete-5')).toBeNull();
+    expect(screen.queryByTestId('assistant-response-complete-6')).toBeNull();
+    expect(screen.queryByTestId('assistant-response-complete-7')).toBeNull();
   });
 
   it('shows the input mode toggle when hideInputModeToggle is false [BUG-887]', () => {

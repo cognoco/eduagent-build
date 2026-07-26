@@ -34,6 +34,7 @@
 import { resolve } from 'path';
 import { and, eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import {
   consentGrant,
   consentReceipt,
@@ -544,15 +545,19 @@ const RUN = !!process.env.DATABASE_URL;
         const childId = await seedManagedChild(orgId, ownerId);
         // A withdrawn GDPR grant so the consent predicate passes and the delete
         // is reached (the FK, not the predicate, is what fails pre-fix).
-        await db.insert(consentGrant).values({
-          chargePersonId: childId,
-          organizationId: orgId,
-          purpose: 'platform_use',
-          lawfulBasis: 'gdpr_parental_consent',
-          granted: false,
-          grantedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-          withdrawnAt: new Date(),
-        });
+        const grantedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+        const withdrawnAt = new Date();
+        await db.insert(consentGrant).values(
+          CONSENT_PURPOSES.map((purpose) => ({
+            chargePersonId: childId,
+            organizationId: orgId,
+            purpose,
+            lawfulBasis: 'gdpr_parental_consent' as const,
+            granted: false,
+            grantedAt,
+            withdrawnAt,
+          })),
+        );
 
         const deleted = await deletePersonIfConsentWithdrawnV2(db, childId);
         expect(deleted).toBe(true);

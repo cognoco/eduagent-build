@@ -1,257 +1,104 @@
 # Flow QUIZ-12: Wrong-Answer Dispute (BUG-927)
 # Validates:
-#   (a) After a wrong answer, quiz-dispute-button is visible.
-#   (b) Tapping quiz-dispute-button shows quiz-dispute-noted and hides the button.
-#   (c) quiz-dispute-button is NOT visible after a correct answer.
-# Tags: nightly, quiz
+#   (a) A wrong answer exposes quiz-dispute-button.
+#   (b) Tapping it shows quiz-dispute-noted and hides the button.
+#   (c) A correct answer does not expose quiz-dispute-button.
 #
-# Journey: UX Journey 3 (Practice & Reinforcement)
-# Epics: Epic 13 (Quiz Activities)
-# Prerequisite: Seeded profile with a deterministic wrong-answer round
-#               (scenario: quiz-deterministic-wrong-answer)
-#               Seed provides:
-#                 ROUND_ID           — pre-inserted active round (France capital)
-#                 WRONG_OPTION_INDEX — always '1' (London, Berlin, or Madrid)
-#               Correct answer is at index 0 (Paris) after server shuffle.
-#
-# ARCHITECTURE NOTE (2026-05-04):
-#   play.tsx reads round data from QuizFlowContext (in-memory, set by launch.tsx).
-#   There is no URL-param path to inject a specific roundId into the play screen.
-#   The seeded round (correctAnswer=Paris, wrong distractors at index 1+) is in the
-#   DB as 'active', but POST /quiz/rounds always generates a fresh LLM round.
-#
-#   This flow uses the LLM-generated round from the normal launch path. Since
-#   the round questions and option order are not deterministic, we:
-#     - Tap quiz-option-0 (any option) to submit an answer.
-#     - Check BOTH outcomes: wrong (dispute-button visible) and correct (dispute-button absent).
-#     - The key assertion is: after a correct answer, quiz-dispute-button is NOT visible.
-#       After a wrong answer (optional, since we don't know which option is wrong),
-#       quiz-dispute-button IS visible and can be tapped.
-#
-#   To make the wrong-answer path deterministic, play.tsx would need a ?roundId=
-#   URL param that loads the seeded round via GET /quiz/rounds/:id. That source
-#   change is tracked as a follow-up. This YAML asserts the dispute UI behavior
-#   for whatever answer state the LLM-generated round produces.
-#
-# testIDs verified against:
-#   - apps/mobile/src/app/(app)/quiz/play.tsx:628    (quiz-play-screen)
-#   - apps/mobile/src/app/(app)/quiz/play.tsx:789    (quiz-option-0)
-#   - apps/mobile/src/app/(app)/quiz/play.tsx:848    (quiz-answer-feedback)
-#   - apps/mobile/src/app/(app)/quiz/play.tsx:861    (quiz-dispute-button)
-#   - apps/mobile/src/app/(app)/quiz/play.tsx:872    (quiz-dispute-noted)
-#   - apps/mobile/src/app/(app)/quiz/index.tsx:241   (quiz-capitals)
-#   - apps/mobile/src/components/home/LearnerScreen.tsx (learner-screen)
-#   - apps/mobile/src/app/(app)/practice.tsx          (practice-screen, practice-quiz)
+# The seed returns an active three-question vocabulary round plus stable answer
+# text. The launch route accepts roundId only in EXPO_PUBLIC_E2E builds, so this
+# exercises the real API check/dispute UI without generating a random round or
+# adding a production deep-link surface.
 appId: com.mentomate.app
 tags:
   - nightly
   - quiz
 ---
-# 1. Seed & sign in (quiz-deterministic-wrong-answer scenario)
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "quiz-deterministic-wrong-answer"
+      SEED_SCENARIO: 'quiz-deterministic-wrong-answer'
       API_URL: ${API_URL}
 
-# 2. Wait for learner home screen
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 30000
 
-- takeScreenshot: quiz-dispute-01-home
-
-# 3. Navigate to Practice tab
-- scrollUntilVisible:
-    element:
-      id: "home-action-practice"
-    direction: DOWN
-    timeout: 5000
-
-- tapOn:
-    id: "home-action-practice"
+- openLink: 'mentomate:///quiz/launch?activityType=vocabulary&subjectId=${SUBJECT_ID}&roundId=${ROUND_ID}'
 
 - extendedWaitUntil:
     visible:
-      id: "practice-screen"
-    timeout: 10000
-
-# 4. Navigate to Quiz from Practice
-# [BUG-967] practice-quiz sits below the fold on 5.8" devices — scroll first.
-- scrollUntilVisible:
-    element:
-      id: "practice-quiz"
-    direction: DOWN
-    timeout: 5000
-
-- tapOn:
-    id: "practice-quiz"
-
-- extendedWaitUntil:
-    visible:
-      id: "quiz-index-screen"
-    timeout: 10000
-
-# 5. Tap Capitals to generate a round via launch.tsx
-- assertVisible:
-    id: "quiz-capitals"
-
-- tapOn:
-    id: "quiz-capitals"
-
-# 6. Wait for launch loading (optional — may be very fast)
-- extendedWaitUntil:
-    visible:
-      id: "quiz-launch-loading"
-    timeout: 10000
-    optional: true  # justified: loading screen is transient; fast devices/network may skip it before Maestro polls
-
-# 7. Dismiss challenge banner if present
-- extendedWaitUntil:
-    visible:
-      id: "quiz-challenge-start"
-    timeout: 5000
-    optional: true  # justified: challenge banner only appears on difficulty-bump runs, not every session
-
-- tapOn:
-    id: "quiz-challenge-start"
-    optional: true  # justified: only tappable when challenge banner appeared (line above)
-
-# 8. Wait for play screen
-- extendedWaitUntil:
-    visible:
-      id: "quiz-play-screen"
+      id: 'quiz-play-screen'
     timeout: 30000
 
-- takeScreenshot: quiz-dispute-02-play
+- takeScreenshot: quiz-dispute-01-seeded-round
 
-# 9. Submit answer via quiz-option-1 (deterministically wrong per seed design:
-#    seed places correctAnswer at index 0, distractors at indices 1-3).
-#    On the LLM-generated round (normal path), option index 1 may or may not be wrong.
-#    We tap it and check outcome.
+# Question 1: select the seed's known-wrong answer. Option positions are
+# intentionally ignored because the API shuffles them on every fetch.
+- tapOn:
+    text: '${WRONG_ANSWER}'
+
 - extendedWaitUntil:
     visible:
-      id: "quiz-option-1"
+      id: 'quiz-next-question-footer'
+    timeout: 10000
+
+- extendedWaitUntil:
+    visible:
+      id: 'quiz-dispute-button'
+    timeout: 10000
+
+- tapOn:
+    id: 'quiz-dispute-button'
+
+- extendedWaitUntil:
+    visible:
+      id: 'quiz-dispute-noted'
+    timeout: 5000
+
+- assertNotVisible:
+    id: 'quiz-dispute-button'
+
+- takeScreenshot: quiz-dispute-02-dispute-noted
+
+- tapOn:
+    id: 'quiz-next-question'
+
+# Question 2: select the seed's known-correct answer and prove the dispute
+# affordance remains absent. This is deliberately not the final question,
+# avoiding the final-answer auto-submit path as a false suppression receipt.
+- extendedWaitUntil:
+    visible: '${CORRECT_ANSWER}'
+    timeout: 10000
+
+- tapOn:
+    text: '${CORRECT_ANSWER}'
+
+- extendedWaitUntil:
+    visible:
+      id: 'quiz-next-question-footer'
+    timeout: 10000
+
+- assertNotVisible:
+    id: 'quiz-dispute-button'
+
+- takeScreenshot: quiz-dispute-03-correct-no-dispute
+
+# Leave the still-active three-question round through the real quit path.
+- tapOn:
+    id: 'quiz-play-quit'
+
+- extendedWaitUntil:
+    visible:
+      id: 'quiz-quit-modal-backdrop'
     timeout: 5000
 
 - tapOn:
-    id: "quiz-option-1"
-
-# 10. Wait for answer-check to complete (checking state clears)
-- extendedWaitUntil:
-    visible:
-      id: "quiz-answer-feedback"
-    timeout: 10000
-
-- takeScreenshot: quiz-dispute-03-answer-submitted
-
-# ── WRONG ANSWER PATH ──
-# 11a. If answer was wrong: dispute button is visible, noted text is absent
-- extendedWaitUntil:
-    visible:
-      id: "quiz-dispute-button"
-    timeout: 3000
-    optional: true  # justified: AI/LLM response — option-1 correctness is non-deterministic on LLM-generated rounds; dispute button only appears on wrong answers
-
-- takeScreenshot: quiz-dispute-04-dispute-button-visible
-
-# 11b. Tap dispute button — should show quiz-dispute-noted and hide quiz-dispute-button
-- tapOn:
-    id: "quiz-dispute-button"
-    optional: true  # justified: only tappable when wrong-answer path was taken (line above)
+    id: 'quiz-quit-confirm'
 
 - extendedWaitUntil:
     visible:
-      id: "quiz-dispute-noted"
-    timeout: 5000
-    optional: true  # justified: quiz-dispute-noted only appears after tapping dispute button, which requires wrong-answer path
-
-- assertNotVisible:
-    id: "quiz-dispute-button"
-    optional: true  # justified: assertNotVisible for button after dispute tap — only meaningful in wrong-answer path
-
-- takeScreenshot: quiz-dispute-05-dispute-noted
-
-# ── CORRECT ANSWER PATH ──
-# 12. If option-1 was correct: quiz-dispute-button must NOT be visible
-#     [BUG-927] Dispute button is suppressed on correct answers — assert it.
-- assertNotVisible:
-    id: "quiz-dispute-button"
-    optional: true  # justified: AI/LLM response — option-1 may be correct or wrong; assertNotVisible is only valid assertion in correct-answer branch; in wrong-answer branch the button IS visible, so optional is required to avoid false failure
-
-# 13. Continue to next question or results
-- tapOn:
-    id: "quiz-play-body"
-    optional: true  # justified: quiz-play-body tap advances the round; may not apply if round auto-advanced or ended
-
-- takeScreenshot: quiz-dispute-06-after-dispute
-
-# ── PART 2: Verify correct-answer branch suppresses dispute button ──
-# After advancing past question 1, submit a correct answer on question 2
-# to verify quiz-dispute-button is not rendered after a correct response.
-# We tap quiz-option-0 on the next question (first option, often correct
-# on LLM-generated rounds, but not guaranteed — checking absence is valid
-# regardless of outcome since only wrong answers show the button).
-- extendedWaitUntil:
-    visible:
-      id: "quiz-option-0"
-    timeout: 10000
-    optional: true  # justified: question 2 may not exist if quiz ended after question 1 or round had only 1 question
-
-- tapOn:
-    id: "quiz-option-0"
-    optional: true  # justified: only tappable when question 2 is rendered (line above)
-
-- extendedWaitUntil:
-    visible:
-      id: "quiz-answer-feedback"
-    timeout: 10000
-    optional: true  # justified: answer feedback only appears after question 2 answer submission; question 2 may not have been reached
-
-# After a correct answer, quiz-dispute-button must not be present
-# [BUG-927] Core assertion: dispute button only shows on wrong answers
-- assertNotVisible:
-    id: "quiz-dispute-button"
-    optional: true  # justified: AI/LLM response — option-0 correctness is non-deterministic; assertNotVisible is valid for both correct and wrong paths (wrong path also has no button after dispute was already tapped)
-
-- takeScreenshot: quiz-dispute-07-correct-no-dispute-button
-
-# 14. Quit back to quiz index (cleanup)
-# Strategy: quiz-play-quit may be absent if the round auto-advanced to a
-# results screen. Poll for it (optional), and if it appears, tap it — then
-# the modal and index-return are mandatory so we know cleanup actually ran.
-# The final assertVisible on quiz-index-screen is unconditional: if the quit
-# path was skipped, the round must have ended and Maestro should be on the
-# index screen via the results auto-return. Either way the test must land on
-# quiz-index-screen before completing.
-- extendedWaitUntil:
-    visible:
-      id: "quiz-play-quit"
-    timeout: 3000
-    optional: true  # justified: quit button is absent when round auto-completed to results screen before this step
-
-- tapOn:
-    id: "quiz-play-quit"
-    optional: true  # justified: only present when the optional poll above found it (round still in progress)
-
-- extendedWaitUntil:
-    visible:
-      id: "quiz-quit-modal-backdrop"
-    timeout: 5000
-    optional: true  # justified: modal only appears when quit button was tapped (line above was optional)
-
-- tapOn:
-    id: "quiz-quit-confirm"
-    optional: true  # justified: confirm is only required when the quit modal appeared (line above was optional)
-
-- takeScreenshot: quiz-dispute-08-done
-
-# Mandatory: verify clean nav-state return — the flow must end on quiz-index-screen
-# regardless of which path was taken (quit modal or auto-return from results).
-# [BUG-625] This assertion was absent; without it the cleanup chain could silently
-# fail and leave subsequent tests in a dirty nav state.
-- extendedWaitUntil:
-    visible:
-      id: "quiz-index-screen"
+      id: 'quiz-index-screen'
     timeout: 15000
+
+- takeScreenshot: quiz-dispute-04-done

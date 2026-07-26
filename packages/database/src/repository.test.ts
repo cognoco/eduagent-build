@@ -25,6 +25,7 @@ import {
   pendingNotices,
   speakingPracticeAttempts,
   mentorNotices,
+  evidenceLinks,
 } from './schema/index.js';
 import { createScopedRepository } from './repository.js';
 import type { Database } from './client.js';
@@ -76,6 +77,7 @@ describe('createScopedRepository', () => {
     ['retentionCards', retentionCards],
     ['xpLedger', xpLedger],
     ['bookmarks', bookmarks],
+    ['evidenceLinks', evidenceLinks],
     ['parkingLotItems', parkingLotItems],
     ['teachingPreferences', teachingPreferences],
     ['curriculumAdaptations', curriculumAdaptations],
@@ -115,6 +117,7 @@ describe('createScopedRepository', () => {
     ['retentionCards', retentionCards],
     ['xpLedger', xpLedger],
     ['bookmarks', bookmarks],
+    ['evidenceLinks', evidenceLinks],
     ['parkingLotItems', parkingLotItems],
     ['teachingPreferences', teachingPreferences],
     ['curriculumAdaptations', curriculumAdaptations],
@@ -362,6 +365,30 @@ describe('createScopedRepository', () => {
     });
   });
 
+  describe('sessionEvents.findId', () => {
+    it('selects only id while composing the profileId filter', async () => {
+      const limit = jest.fn().mockResolvedValue([{ id: 'event-1' }]);
+      const where = jest.fn(() => ({ limit }));
+      const from = jest.fn(() => ({ where }));
+      const select = jest.fn(() => ({ from }));
+      const db = {
+        query: {},
+        select,
+      } as unknown as Database;
+      const repo = createScopedRepository(db, TEST_PROFILE_ID);
+      const extra = eq(sessionEvents.id, 'event-1');
+
+      await repo.sessionEvents.findId(extra);
+
+      expect(select).toHaveBeenCalledWith({ id: sessionEvents.id });
+      expect(from).toHaveBeenCalledWith(sessionEvents);
+      expect(where).toHaveBeenCalledWith(
+        and(eq(sessionEvents.profileId, TEST_PROFILE_ID), extra),
+      );
+      expect(limit).toHaveBeenCalledWith(1);
+    });
+  });
+
   // ---------------------------------------------------------------------------
   // needsDeepeningTopics — findMany only
   // ---------------------------------------------------------------------------
@@ -397,6 +424,7 @@ describe('createScopedRepository', () => {
       expect(repo).toHaveProperty('sessionEvents');
       expect(repo).toHaveProperty('sessionSummaries');
       expect(repo).toHaveProperty('bookmarks');
+      expect(repo).toHaveProperty('evidenceLinks');
       expect(repo).toHaveProperty('needsDeepeningTopics');
       expect(repo).toHaveProperty('parkingLotItems');
       expect(repo).toHaveProperty('teachingPreferences');

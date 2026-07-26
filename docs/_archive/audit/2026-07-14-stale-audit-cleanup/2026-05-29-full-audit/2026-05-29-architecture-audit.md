@@ -109,7 +109,7 @@ Ordered by compounding impact. Severity per finding uses the project scale (GREE
 ### Finding 6 — Documentation / LLM-friendliness (GREEN-YELLOW)
 
 - **Severity:** GREEN-YELLOW (low urgency)
-- **Evidence:** JSDoc on services ≈ 46% (251 blocks / 543 exported decls, heuristic). Giants are under-documented relative to complexity. Offsetting strengths: detailed `CLAUDE.md`, `docs/architecture.md`, `docs/audience-matrix.md`; named invariants (BUG-NNN, CR-dates) cited in comments; forward-only ratchet guards (GC1, persona-fossil, i18n-keep-rot); structured `event:`-tagged errors.
+- **Evidence:** JSDoc on services ≈ 46% (251 blocks / 543 exported decls, heuristic). Giants are under-documented relative to complexity. Offsetting strengths: detailed `CLAUDE.md`, `docs/architecture.md`, `docs/compliance/audience-matrix.md`; named invariants (BUG-NNN, CR-dates) cited in comments; forward-only ratchet guards (GC1, persona-fossil, i18n-keep-rot); structured `event:`-tagged errors.
 - **Why it matters:** AI-assisted edits are hardest exactly in the giants, where per-module responsibility headers are missing.
 - **Anticipated effort:** minutes per file, opportunistically.
 - **Suggested track:** C — add a file-header JSDoc (single-responsibility + pipeline position) when splitting the Finding-4 giants; no blanket sweep.

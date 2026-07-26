@@ -31,6 +31,8 @@ import {
   JOURNAL_HREF,
   JOURNAL_RETURN_TO,
   PRACTICE_RETURN_TO,
+  resolvedV2TabForReturnTo,
+  V2_TAB_TITLE_KEYS,
 } from '../../../lib/navigation';
 import { useReviewSummary } from '../../../hooks/use-progress';
 import { useEntryGate } from '../../../hooks/use-entry-gate';
@@ -164,11 +166,18 @@ function getLanguageDisplayName(
   }
 }
 
-function SectionLabel({ children }: { children: string }): React.ReactElement {
+function SectionLabel({
+  children,
+  testID,
+}: {
+  children: string;
+  testID?: string;
+}): React.ReactElement {
   return (
     <Text
       className="text-caption font-bold text-text-secondary"
       style={styles.sectionLabel}
+      testID={testID}
     >
       {children}
     </Text>
@@ -393,6 +402,9 @@ export default function PracticeScreen(): React.ReactElement {
       ? t('practiceHub.history.roundsPlayed', { count: totalRoundsPlayed })
       : t('practiceHub.history.noRoundsYet');
   const practiceReturnParams = { returnTo: PRACTICE_RETURN_TO } as const;
+  const practiceChildReturnParams = returnTo
+    ? { ...practiceReturnParams, practiceReturnTo: returnTo }
+    : practiceReturnParams;
 
   const handleBack = () => {
     if (returnTo === JOURNAL_RETURN_TO) {
@@ -400,8 +412,35 @@ export default function PracticeScreen(): React.ReactElement {
       return;
     }
 
-    goBackOrReplace(router, homeHrefForReturnTo(returnTo));
+    goBackOrReplace(
+      router,
+      homeHrefForReturnTo(
+        returnTo,
+        undefined,
+        FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+      ),
+    );
   };
+
+  // WI-2331 rework, F1b: handleBack always exits this screen (Journal
+  // directly, or the owning V2 tab named by returnTo/the Mentor default via
+  // homeHrefForReturnTo), so the header Back control names that destination
+  // instead of the generic `common.goBack` it showed before. When returnTo
+  // names a non-tab destination (practice/family-recaps/own-learning/…) —
+  // reachable here via a forwarded `practiceReturnTo` — resolvedV2TabForReturnTo
+  // returns null and the label falls back to the generic action rather than
+  // mislabeling as a tab it isn't going to.
+  const practiceBackTab = resolvedV2TabForReturnTo(
+    returnTo,
+    undefined,
+    FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+  );
+  const backLabel =
+    FEATURE_FLAGS.MODE_NAV_V2_ENABLED && practiceBackTab
+      ? t('common.backTo', {
+          destination: t(V2_TAB_TITLE_KEYS[practiceBackTab]),
+        })
+      : t('common.goBack');
 
   const openQuiz = () =>
     router.push({
@@ -463,7 +502,7 @@ export default function PracticeScreen(): React.ReactElement {
               pointerStyle(),
             ]}
             accessibilityRole="button"
-            accessibilityLabel={t('common.goBack')}
+            accessibilityLabel={backLabel}
             testID="practice-back"
           >
             <Ionicons name="arrow-back" size={24} color={colors.ink} />
@@ -820,7 +859,7 @@ export default function PracticeScreen(): React.ReactElement {
           </View>
 
           <View className="gap-3">
-            <SectionLabel>
+            <SectionLabel testID="practice-other-practice-heading">
               {t('practiceHub.sections.otherPractice')}
             </SectionLabel>
             <ScrollView
@@ -906,7 +945,7 @@ export default function PracticeScreen(): React.ReactElement {
                 onPress={() =>
                   router.push({
                     pathname: '/(app)/dictation',
-                    params: practiceReturnParams,
+                    params: practiceChildReturnParams,
                   } as Href)
                 }
                 accessibilityRole="button"
@@ -998,7 +1037,7 @@ export default function PracticeScreen(): React.ReactElement {
               onPress={() =>
                 router.push({
                   pathname: '/(app)/quiz/history',
-                  params: practiceReturnParams,
+                  params: practiceChildReturnParams,
                 } as Href)
               }
               accessibilityRole="button"

@@ -46,21 +46,26 @@ tags:
 # Tap Recitation card
 # practice-recitation is the SECOND card inside the "Other practice" horizontal
 # ScrollView (practice-other-practice-slider, practice/index.tsx:799).
-# Step 1: scroll the outer vertical container DOWN until the slider is in the
-# viewport (practice-dictation is the first card — confirmed working in
-# dictation-full-flow.yaml).
+# Step 1: best-effort outer positioning. Maestro can report the heading as
+# invisible after scrolling it into view, so the mandatory horizontal card
+# lookup in step 2 remains the actual reachability gate.
 # Step 2: scroll RIGHT inside the horizontal slider to reach practice-recitation.
 - scrollUntilVisible:
     element:
-      id: 'practice-dictation'
+      id: 'practice-other-practice-heading'
     direction: DOWN
     timeout: 5000
+    visibilityPercentage: 50
+    centerElement: false
+    optional: true # justified: best-effort outer positioning; the mandatory horizontal card lookup below fails closed
 
 - scrollUntilVisible:
     element:
       id: 'practice-recitation'
     direction: RIGHT
-    timeout: 5000
+    timeout: 10000
+    visibilityPercentage: 100
+    centerElement: true
 
 - tapOn:
     id: 'practice-recitation'
@@ -84,12 +89,13 @@ tags:
 - extendedWaitUntil:
     visible:
       id: 'message-bubble-assistant-2'
-      text: '(?i).*(ready|begin|start|go ahead|recite).*'
     timeout: 60000
 
+- assertVisible:
+    text: '(?i)^ready when you are.*begin your recitation from memory[.]?$'
+
 - assertNotVisible:
-    id: 'message-bubble-assistant-2'
-    text: '(?i).*(what|which).*(recite|recitation|poem)|.*(title|author|model answer|polished version|start with:|traveller from an antique land|vast and trunkless legs|look on my works|lone and level sands).*'
+    text: '(?i)^I don.t have reliable source material.*'
 
 - takeScreenshot: recitation-03-message-sent
 
@@ -115,10 +121,20 @@ tags:
 - tapOn:
     id: 'end-session-button'
 
+- tapOn:
+    text: '(?i)^end session$'
+
+- extendedWaitUntil:
+    visible:
+      id: 'summary-close-button'
+    timeout: 20000
+
+- tapOn:
+    id: 'summary-close-button'
+
 - extendedWaitUntil:
     visible:
       id: 'practice-screen'
     timeout: 10000
-    optional: true # justified: end-session-button may show a confirmation dialog before navigating; practice-screen appears only after confirmation
 
 - takeScreenshot: recitation-04-exited

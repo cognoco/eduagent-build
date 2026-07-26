@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MentoMate MVP — roadmap comprehension views (2026-07-16)</title>
+<title>MentoMate MVP — roadmap comprehension views (framework 2026-07-16 · refreshed 2026-07-23)</title>
 <style>
 :root[data-theme="dark"]{--bg:#14161a;--panel:#1d2026;--panel2:#23262e;--ink:#e6e8ee;--mut:#9aa0ad;--line:#343945;
   --b1:#e0a83c;--b2:#5b9bd5;--b3:#c678dd;--gate:#e06c75;--go:#7fb069;--wave1:#7fb069;--wave2:#5b9bd5;--track:#8a8f9c;--badge:#3a2f1a}
@@ -79,7 +79,7 @@ details ul{margin:3px 0;padding-left:10px}
 <div class="view" id="viewB">
   <h2>Phase × executor roadmap <span class="mut small">(phases bounded only by gates — SEQ-1)</span></h2>
   <table class="rm" id="rmtable"></table>
-  <p class="mut small">Wave overlay = <b>comprehension lens only</b> (D2, premise-check 2026-07-17 — no standing Wave-2 trigger). Dispatch model: <b>BID-1 Preview vehicle + BID-2 CI &amp; gates dispatch at hold-lift, in parallel</b>; every subsequent batch kickoff is a joint operator+PM decision informed by observed lane throughput/capacity. <span class="wtag one">W1</span>/<span class="wtag two">W2</span> tint below only groups the feasible set for reading. Batches are formed at kickoff sittings by co-execution affinity (SEQ-6) as Delivery Batch pages; BID-1 + BID-2 dispatched 2026-07-17 (Interim Delivery Protocol, shepherd-per-batch); BID-3/4 Ready — next dispatch by joint operator+PM decision.</p>
+  <p class="mut small">Wave overlay = <b>comprehension lens only</b> (D2, premise-check 2026-07-17 — no standing Wave-2 trigger). Dispatch model: <b>BID-1 Preview vehicle + BID-2 CI &amp; gates dispatch at hold-lift, in parallel</b>; every subsequent batch kickoff is a joint operator+PM decision informed by observed lane throughput/capacity. <span class="wtag one">W1</span>/<span class="wtag two">W2</span> tint below only groups the feasible set for reading. Batches are formed at kickoff sittings by co-execution affinity (SEQ-6) as Delivery Batch pages. State 2026-07-23: ~8 lanes running under the post-reboot PM/orchestrator split (BID-19/35/37/39/40/41 active; BID-44 billing/test-hardening + BID-45 UI-polish formed today; six no-regrets singles activated); dispatch mechanics owned by the orchestrator.</p>
 </div>
 
 <script src="roadmap-data.js"></script>
@@ -176,11 +176,11 @@ document.getElementById('rmtable').innerHTML=`
  <td>Nothing new — paper already consumed by WI-1577</td>
  <td>—</td></tr>
 <tr><td class="who">Jørn (operator)</td>
- <td><b>Kickoff sitting (committed, by 07-21 backstop):</b> clock-starts OPQ-22 / OPQ-102 / OPQ-110 + operator-row burn-down (${D.opq.length} rows open) · D1 internal tiers (2026-07-17 record)${opqRows(['OPQ-114','OPQ-25'])}</td>
+ <td><b>Operator-queue burn-down (${D.opq.length} rows open):</b> recommended order OPQ-147 → 37 → 136+137 (137 may be moot) → 135 → 61 → 138 → 128; legal clocks ⏰ OPQ-102/110 due 07-24, OPQ-24 due 07-25, OPQ-22 counsel packet undispatched${opqRows(['OPQ-102','OPQ-110','OPQ-24'])}</td>
  <td>Store console actions (country config, declarations sign-off, submission)${opqRows(['OPQ-60'])}</td>
  <td>Beta cohort go / public-launch decision</td></tr>
 <tr><td class="who">Zuzka (product)</td>
- <td><b>Kickoff sitting (committed):</b> D1 internal tiers — 15 Zuzka rows (2026-07-17 record)${opqRows(['OPQ-40','OPQ-115','OPQ-58'])}<div class="small mut">OPQ-117/118 ruled ✓</div></td>
+ <td>D1 internal tiers — Zuzka rows (2026-07-17 record; several since ruled)${opqRows(['OPQ-40','OPQ-115','OPQ-58'])}<div class="small mut">OPQ-117/118 ruled ✓ · OPQ-139–143 closed offline 07-23</div></td>
  <td>Store listing copy review</td>
  <td>Beta feedback triage (scope authority for Q2 items)</td></tr>
 <tr><td class="who">Agent fleet</td>

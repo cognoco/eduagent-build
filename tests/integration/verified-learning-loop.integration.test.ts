@@ -53,6 +53,7 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import { deleteV2IdentitiesForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { finalizeChallengeRoundIfReady } from '../../apps/api/src/services/session/session-exchange';
 import { mapSessionRow } from '../../apps/api/src/services/session/session-events';
@@ -168,26 +169,31 @@ async function seedConsented(
   profileId: string,
   orgId: string,
 ): Promise<void> {
-  await db.insert(consentGrant).values({
-    chargePersonId: profileId,
-    organizationId: orgId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-    grantedAt: new Date(),
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      chargePersonId: profileId,
+      organizationId: orgId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent' as const,
+      granted: true,
+      grantedAt: new Date(),
+    })),
+  );
 }
 
 async function seedCurriculumTopic(
   db: Database,
   subjectId: string,
 ): Promise<string> {
-  const [{ id: curriculumId }] = await db
+  const [curriculum] = await db
     .insert(curricula)
     .values({ subjectId })
     .returning({ id: curricula.id });
+  if (!curriculum) {
+    throw new Error('Expected curriculum seed insert to return an id');
+  }
 
-  const [{ id: bookId }] = await db
+  const [book] = await db
     .insert(curriculumBooks)
     .values({
       subjectId,
@@ -195,20 +201,26 @@ async function seedCurriculumTopic(
       sortOrder: 1,
     })
     .returning({ id: curriculumBooks.id });
+  if (!book) {
+    throw new Error('Expected curriculum book seed insert to return an id');
+  }
 
-  const [{ id: topicId }] = await db
+  const [topic] = await db
     .insert(curriculumTopics)
     .values({
-      bookId,
-      curriculumId,
+      bookId: book.id,
+      curriculumId: curriculum.id,
       title: 'Photosynthesis',
       description: 'Light reactions and Calvin cycle.',
       sortOrder: 1,
       estimatedMinutes: 20,
     })
     .returning({ id: curriculumTopics.id });
+  if (!topic) {
+    throw new Error('Expected curriculum topic seed insert to return an id');
+  }
 
-  return topicId;
+  return topic.id;
 }
 
 /** Learner text shared deliberately with the note draft so the lexical-overlap
@@ -325,6 +337,7 @@ async function driveVerifiedChallengeRound(
   topicId: string,
 ): Promise<{ sessionId: string; result: ChallengeRoundRuntimeOutcome }> {
   const answerEventId = nextAnswerEventId();
+  const applicationAnswerEventId = nextAnswerEventId();
   const session = await seedDraftingSession(db, profileId, subjectId, topicId, [
     {
       concept: 'photosynthesis inputs',
@@ -332,6 +345,29 @@ async function driveVerifiedChallengeRound(
       evidence: 'Learner correctly named all three inputs.',
       answerEventId,
       learnerQuote: LEARNER_ANSWER,
+      questionIdentity: {
+        questionText: 'What inputs does a plant use for photosynthesis?',
+        minimalLearningClaim:
+          'photosynthesis uses sunlight water and carbon dioxide to make food',
+        cognitiveOperation: 'explanation',
+        materialContext: '',
+      },
+    },
+    {
+      concept: 'photosynthesis inputs in a greenhouse',
+      result: 'solid',
+      evidence:
+        'Learner correctly applied the same inputs to a carbon-dioxide-limited greenhouse.',
+      answerEventId: applicationAnswerEventId,
+      learnerQuote: LEARNER_ANSWER,
+      questionIdentity: {
+        questionText:
+          'How would limited carbon dioxide affect a greenhouse plant making food?',
+        minimalLearningClaim:
+          'photosynthesis uses sunlight water and carbon dioxide to make food',
+        cognitiveOperation: 'application',
+        materialContext: 'a greenhouse plant with limited carbon dioxide',
+      },
     },
   ]);
   const meta = await readSessionChallengeRound(db, profileId, session.id);
@@ -341,6 +377,7 @@ async function driveVerifiedChallengeRound(
     session,
     meta,
     {
+      source_concepts: ['photosynthesis'],
       source_answer_event_ids: [answerEventId],
       content: NOTE_DRAFT_CONTENT,
     },
@@ -392,7 +429,8 @@ describeIfDb('Verified-learning loop (WI-1666, S8)', () => {
     );
 
     expect(result.challengeRoundVerdict).toEqual({
-      solidCount: 1,
+      outcome: 'verified',
+      solidCount: 2,
       partialCount: 0,
       missingCount: 0,
       misconceptionCount: 0,
@@ -467,6 +505,7 @@ describeIfDb('Verified-learning loop (WI-1666, S8)', () => {
     expect(result).not.toBeNull();
 
     expect(result!.challengeRoundVerdict).toEqual({
+      outcome: 'partial',
       solidCount: 0,
       partialCount: 1,
       missingCount: 0,
@@ -536,6 +575,7 @@ describeIfDb('Verified-learning loop (WI-1666, S8)', () => {
     expect(result).not.toBeNull();
 
     expect(result!.challengeRoundVerdict).toEqual({
+      outcome: 'partial',
       solidCount: 0,
       partialCount: 0,
       missingCount: 0,
@@ -741,6 +781,9 @@ describeIfDb('Verified-learning loop (WI-1666, S8)', () => {
     );
 
     expect(proof.hasProof).toBe(true);
+    if (!proof.hasProof) {
+      throw new Error('Expected a verified proof receipt');
+    }
     expect(proof.topicId).toBe(topicId);
     expect(proof.topicTitle).toBe('Photosynthesis');
     expect(proof.masteryVerificationState).toBe('fresh');

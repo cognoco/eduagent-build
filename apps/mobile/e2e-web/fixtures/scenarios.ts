@@ -21,6 +21,14 @@ export const authScenarios = {
     // lands in the owner's own Mentor shell.
     landingTestId: 'mentor-screen',
   },
+  nonOwnerChild: {
+    key: 'non-owner-child',
+    seedScenario: 'v2-account-non-owner-child',
+    email: buildSeedEmail('non-owner-child'),
+    storageStatePath: path.join(authStateDir, 'non-owner-child.json'),
+    landingPath: '/mentor',
+    landingTestId: 'mentor-screen',
+  },
 } as const;
 
 /**

@@ -38,6 +38,7 @@ export type {
   LlmProviderPolicy,
   OpenAIAdvancedModel,
   PreferredLlmProvider,
+  JudgeIndependence,
 } from './router';
 export {
   parseEnvelope,

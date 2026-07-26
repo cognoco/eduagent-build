@@ -36,6 +36,7 @@ import {
   dashboardChildSchema,
   pendingNoticeTypeSchema,
   pendingNoticeSchema,
+  verifiedProofResponseSchema,
   dashboardDataSchema,
   coachingCardTypeSchema,
   curriculumCompleteCardSchema,
@@ -88,6 +89,51 @@ import {
   getFamilyPoolBreakdownSharingResponseSchema,
   updateFamilyPoolBreakdownSharingResponseSchema,
 } from './progress.js';
+
+describe('verifiedProofResponseSchema evidence availability', () => {
+  const proof = {
+    hasProof: true,
+    topicId: '55555555-5555-4555-8555-555555555555',
+    topicTitle: 'Fractions',
+    subjectId: '44444444-4444-4444-8444-444444444444',
+    sessionId: '33333333-3333-4333-8333-333333333333',
+    verifiedAt: '2026-05-20T10:25:00.000Z',
+    masteryVerificationState: 'fresh',
+  } as const;
+
+  it('requires typed evidence availability for a proof-bearing receipt', () => {
+    expect(
+      verifiedProofResponseSchema.safeParse({
+        ...proof,
+        quote: 'Equivalent fractions name the same amount.',
+      }).success,
+    ).toBe(false);
+    expect(
+      verifiedProofResponseSchema.safeParse({
+        ...proof,
+        evidenceAvailability: 'available',
+        quote: 'Equivalent fractions name the same amount.',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects a quote when its evidence is unavailable', () => {
+    expect(
+      verifiedProofResponseSchema.safeParse({
+        ...proof,
+        evidenceAvailability: 'source_unavailable',
+        quote: 'Must not render',
+      }).success,
+    ).toBe(false);
+    expect(
+      verifiedProofResponseSchema.safeParse({
+        ...proof,
+        evidenceAvailability: 'source_unavailable',
+        quote: null,
+      }).success,
+    ).toBe(true);
+  });
+});
 
 // Test data factory — UUIDs must be RFC 9562 compliant (version 4, variant 1)
 const TEST_UUID = '550e8400-e29b-41d4-a716-446655440000';

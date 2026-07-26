@@ -73,6 +73,29 @@ export interface EmailResult {
   reason?: string;
 }
 
+export type EmailTransport = (
+  payload: EmailPayload,
+  options?: EmailOptions,
+) => Promise<EmailResult>;
+
+let emailTransportForTesting: EmailTransport | undefined;
+
+/**
+ * Installs a process-local email boundary for test-only Worker entrypoints.
+ * Production boot never calls this function, so its send path remains Resend.
+ */
+export function registerEmailTransportForTesting(
+  transport: EmailTransport,
+): () => void {
+  const previous = emailTransportForTesting;
+  emailTransportForTesting = transport;
+  return () => {
+    if (emailTransportForTesting === transport) {
+      emailTransportForTesting = previous;
+    }
+  };
+}
+
 const RESEND_API_URL = 'https://api.resend.com/emails';
 
 // ---------------------------------------------------------------------------
@@ -89,6 +112,10 @@ export async function sendEmail(
   payload: EmailPayload,
   options?: EmailOptions,
 ): Promise<EmailResult> {
+  if (emailTransportForTesting) {
+    return emailTransportForTesting(payload, options);
+  }
+
   const apiKey = options?.resendApiKey;
   if (!apiKey) {
     logger.warn('[email] RESEND_API_KEY not configured — skipping email send');

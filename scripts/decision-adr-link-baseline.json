@@ -6,5 +6,9 @@
   {
     "file": "docs/specs/2026-06-27-journal-redesign.md",
     "heading": "Open decisions (small)"
+  },
+  {
+    "file": "docs/specs/2026-07-24-trust-package-design.md",
+    "heading": "1. Decision and scope"
   }
 ]

@@ -9,12 +9,35 @@
 
 import { createDatabaseModuleMock } from '../../test-utils/database-module';
 import { seedConsentState } from '../../test-utils/consent-seed';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import {
   createInngestStepRunner,
   type InngestStepRunnerOptions,
 } from '../../test-utils/inngest-step-runner';
 
 const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
+
+function mockWithdrawnGrantSet(
+  consentGrantFindFirst: jest.Mock,
+  withdrawnAt: Date,
+): void {
+  let grantReadCount = 0;
+  consentGrantFindFirst.mockImplementation(async () => {
+    const purpose = CONSENT_PURPOSES[grantReadCount % CONSENT_PURPOSES.length];
+    if (!purpose) {
+      throw new Error('consent purpose contract is empty');
+    }
+    grantReadCount++;
+    return {
+      id: `grant-${purpose}`,
+      purpose,
+      granted: true,
+      withdrawnAt,
+      grantedAt: new Date('2026-01-01T00:00:00.000Z'),
+      withdrawalTokenId: 'withdrawal-token-id',
+    };
+  });
+}
 
 jest.mock(
   '@eduagent/database' /* gc1-allow: external-boundary */,
@@ -539,11 +562,10 @@ describe('consentRevocation', () => {
         state: 'WITHDRAWN',
       },
     );
-    consentGrantFindFirst.mockResolvedValue({
-      granted: true,
-      withdrawnAt: new Date('2026-01-15T00:00:00.000Z'),
-      grantedAt: new Date('2026-01-01T00:00:00.000Z'),
-    });
+    mockWithdrawnGrantSet(
+      consentGrantFindFirst,
+      new Date('2026-01-15T00:00:00.000Z'),
+    );
     seedPerson(mockDatabaseModule.db as Record<string, unknown>, {
       displayName: 'Liam',
       birthDate: '2012-06-15',
@@ -581,11 +603,10 @@ describe('consentRevocation', () => {
         state: 'WITHDRAWN',
       },
     );
-    consentGrantFindFirst.mockResolvedValue({
-      granted: true,
-      withdrawnAt: new Date('2026-01-15T00:00:00.000Z'),
-      grantedAt: new Date('2026-01-01T00:00:00.000Z'),
-    });
+    mockWithdrawnGrantSet(
+      consentGrantFindFirst,
+      new Date('2026-01-15T00:00:00.000Z'),
+    );
     seedPerson(mockDatabaseModule.db as Record<string, unknown>, {
       displayName: 'Liam',
       birthDate: '2012-01-01',
@@ -829,11 +850,10 @@ describe('archive path — auto preference, age 14', () => {
         state: 'WITHDRAWN',
       },
     );
-    consentGrantFindFirst.mockResolvedValue({
-      granted: true,
-      withdrawnAt: new Date('2026-01-10T10:00:00.000Z'),
-      grantedAt: new Date('2026-01-01T00:00:00.000Z'),
-    });
+    mockWithdrawnGrantSet(
+      consentGrantFindFirst,
+      new Date('2026-01-10T10:00:00.000Z'),
+    );
     // [WI-867] v2: simulate the GDPR lock failing (consent restored between
     // steps) by having archivePersonOnRevocationV2 (the mocked WRITE fn) return
     // false → SUT returns { status: 'restored' }. Persistent (not Once): the

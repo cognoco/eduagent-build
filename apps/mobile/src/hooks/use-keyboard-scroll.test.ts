@@ -69,3 +69,104 @@ describe('useKeyboardScroll — timer lifecycle (BUG-826)', () => {
     });
   });
 });
+
+// [WI-2769] The submit button had no anchor: scrolling always targeted
+// `focusedFieldY - 140`, a fixed offset calibrated for one device (S10e).
+// On shorter viewports that offset leaves too little of the (post-keyboard)
+// viewport below the field, cutting the submit button off below the fold.
+describe('useKeyboardScroll — submit-button anchor (WI-2769)', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+  afterEach(() => {
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
+  });
+
+  function focusAndDrain(
+    result: { current: ReturnType<typeof useKeyboardScroll> },
+    fieldName: string,
+  ) {
+    act(() => {
+      result.current.onFieldFocus(fieldName)();
+      jest.advanceTimersByTime(300);
+    });
+  }
+
+  it('anchors on the submit button bottom (minus viewport height, plus margin) when both are registered, ignoring the field offset', () => {
+    const { result } = renderHook(() => useKeyboardScroll());
+    const scrollSpy = jest.fn();
+    (
+      result.current.scrollRef as { current: { scrollTo: jest.Mock } | null }
+    ).current = { scrollTo: scrollSpy };
+
+    act(() => {
+      result.current.onFieldLayout('password')({
+        nativeEvent: { layout: { x: 0, y: 300, width: 0, height: 0 } },
+      } as never);
+      // Post-keyboard-resize viewport is short (compact device) — 400px.
+      result.current.onScrollViewLayout({
+        nativeEvent: { layout: { x: 0, y: 0, width: 0, height: 400 } },
+      } as never);
+      // Submit button sits at y=520, 48px tall → bottom = 568.
+      result.current.onSubmitButtonLayout({
+        nativeEvent: { layout: { x: 0, y: 520, width: 0, height: 48 } },
+      } as never);
+    });
+
+    focusAndDrain(result, 'password');
+
+    // target = max(0, buttonBottom - viewportHeight + margin)
+    //        = max(0, 568 - 400 + 16) = 184
+    // NOT the old field-relative value (max(0, 300 - 140) = 160).
+    expect(scrollSpy).toHaveBeenCalledTimes(1);
+    expect(scrollSpy).toHaveBeenCalledWith({ y: 184, animated: true });
+  });
+
+  it('clamps to 0 when the button already fits within the known viewport', () => {
+    const { result } = renderHook(() => useKeyboardScroll());
+    const scrollSpy = jest.fn();
+    (
+      result.current.scrollRef as { current: { scrollTo: jest.Mock } | null }
+    ).current = { scrollTo: scrollSpy };
+
+    act(() => {
+      result.current.onFieldLayout('email')({
+        nativeEvent: { layout: { x: 0, y: 100, width: 0, height: 0 } },
+      } as never);
+      result.current.onScrollViewLayout({
+        nativeEvent: { layout: { x: 0, y: 0, width: 0, height: 800 } },
+      } as never);
+      result.current.onSubmitButtonLayout({
+        nativeEvent: { layout: { x: 0, y: 300, width: 0, height: 48 } },
+      } as never);
+    });
+
+    focusAndDrain(result, 'email');
+
+    expect(scrollSpy).toHaveBeenCalledTimes(1);
+    expect(scrollSpy).toHaveBeenCalledWith({ y: 0, animated: true });
+  });
+
+  it('falls back to the field-relative offset when the button/viewport are not registered', () => {
+    const { result } = renderHook(() => useKeyboardScroll());
+    const scrollSpy = jest.fn();
+    (
+      result.current.scrollRef as { current: { scrollTo: jest.Mock } | null }
+    ).current = { scrollTo: scrollSpy };
+
+    act(() => {
+      result.current.onFieldLayout('email')({
+        nativeEvent: { layout: { x: 0, y: 250, width: 0, height: 0 } },
+      } as never);
+    });
+
+    focusAndDrain(result, 'email');
+
+    expect(scrollSpy).toHaveBeenCalledTimes(1);
+    expect(scrollSpy).toHaveBeenCalledWith({
+      y: Math.max(0, 250 - 140),
+      animated: true,
+    });
+  });
+});

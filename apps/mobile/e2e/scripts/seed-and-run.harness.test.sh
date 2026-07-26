@@ -208,23 +208,24 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 PENDING_FILE="${REPO_ROOT}/apps/mobile/src/lib/pending-auth-redirect.ts"
 SEED_ROUTE="${REPO_ROOT}/apps/mobile/src/app/dev-only/seed-pending-redirect.tsx"
 
-# CASE 11: seedPendingAuthRedirectForTesting body contains a production guard
+# CASE 11: seedPendingAuthRedirectForTesting requires the explicit E2E bundle
+# flag even in release mode. Store bundles leave this flag unset.
 if [ -f "$PENDING_FILE" ] && \
    grep -q "seedPendingAuthRedirectForTesting" "$PENDING_FILE" && \
-   grep -q "NODE_ENV.*production" "$PENDING_FILE" && \
-   grep -q "EXPO_PUBLIC_E2E" "$PENDING_FILE"; then
-  _tpass "pending-auth-redirect.ts gates seedPendingAuthRedirectForTesting on NODE_ENV + EXPO_PUBLIC_E2E"
+   grep -q "process.env.EXPO_PUBLIC_E2E !== 'true'" "$PENDING_FILE" && \
+   ! grep -q "process.env.NODE_ENV === 'production'" "$PENDING_FILE"; then
+  _tpass "pending-auth-redirect.ts gates seedPendingAuthRedirectForTesting on EXPO_PUBLIC_E2E in release mode"
 else
-  _tfail "pending-auth-redirect.ts missing production guard on seedPendingAuthRedirectForTesting (NODE_ENV / EXPO_PUBLIC_E2E)"
+  _tfail "pending-auth-redirect.ts must use EXPO_PUBLIC_E2E as the sole release-E2E seed guard"
 fi
 
-# CASE 12: dev-only seed route is gated on EXPO_PUBLIC_E2E and NODE_ENV
+# CASE 12: dev-only seed route uses the same explicit release-E2E gate.
 if [ -f "$SEED_ROUTE" ] && \
-   grep -q "EXPO_PUBLIC_E2E" "$SEED_ROUTE" && \
-   grep -q "NODE_ENV" "$SEED_ROUTE"; then
-  _tpass "dev-only/seed-pending-redirect.tsx gates rendering on NODE_ENV + EXPO_PUBLIC_E2E"
+   grep -q "const IS_E2E_BUILD = process.env.EXPO_PUBLIC_E2E === 'true';" "$SEED_ROUTE" && \
+   ! grep -q "process.env.NODE_ENV" "$SEED_ROUTE"; then
+  _tpass "dev-only/seed-pending-redirect.tsx gates rendering on EXPO_PUBLIC_E2E in release mode"
 else
-  _tfail "dev-only/seed-pending-redirect.tsx missing build-time gate on NODE_ENV + EXPO_PUBLIC_E2E"
+  _tfail "dev-only/seed-pending-redirect.tsx must use EXPO_PUBLIC_E2E as the sole release-E2E render guard"
 fi
 
 # CASE 13: the seed route redirects to bare sign-in (no redirectTo param),

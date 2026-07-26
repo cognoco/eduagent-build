@@ -18,7 +18,6 @@ import type { LLMTier } from '../subscription';
 import { createLogger } from '../logger';
 import {
   resolveExchangeRouter,
-  resolveJudgeConfig,
   NoEligibleModelError,
   type ExchangeRouterRow,
 } from '../policy-engine';
@@ -28,11 +27,38 @@ import {
   getLlmRequestRoutingV2Enabled,
   readLlmRequestKillSwitch,
 } from './request-context';
+import { recordLlmFallbackRateSample } from '../llm-fallback-rate-signal';
 const logger = createLogger();
 
 export type PreferredLlmProvider = 'gemini' | 'openai' | 'anthropic';
 export type LlmProviderPolicy = 'default' | 'gemini_only';
 export type LlmCapability = 'text' | 'vision' | 'judge';
+
+// ---------------------------------------------------------------------------
+// JudgeIndependence (WI-2624 — MMT-ADR-0016 §2 vendor-independence contract).
+//
+// Every `capability:'judge'` routeAndCall site must declare ONE of these.
+// This replaces the old "preselect the opposite vendor and pass it in as
+// `preferredProvider`" hack (judge-suitability.ts's former `selectJudgeProvider`),
+// which double-flipped through the legacy `getModelConfig` judge branch: that
+// branch re-derived a "tutorConfig" via a recursive `getModelConfig(...,
+// 'text')` call using the ALREADY-FLIPPED `preferredProvider` as its own
+// preferred-provider hint, so `tutorConfig.provider` resolved to the flipped
+// vendor rather than the real producer; `resolveGraderConfig` then excluded
+// THAT vendor, flipping back to the real producer — defeating independence.
+//
+// - 'model-output': the judge is grading a specific tutor/model reply.
+//   `producerVendor` MUST be the vendor that actually produced that reply —
+//   never a preselected/derived stand-in. The router excludes this vendor
+//   (normalized) from judge selection.
+// - 'not-applicable': the judge is grading the LEARNER's input (an answer,
+//   an explanation), not any model's output — there is no producer vendor to
+//   exclude. The router still never selects Gemini/Vertex for a judge (§10.1)
+//   but applies no producer exclusion.
+// ---------------------------------------------------------------------------
+export type JudgeIndependence =
+  | { mode: 'model-output'; producerVendor: string }
+  | { mode: 'not-applicable' };
 
 function getMessageCapability(messages: ChatMessage[]): LlmCapability {
   return messages.some(
@@ -648,33 +674,120 @@ const V2_ADVANCED_MODEL_MIN_RUNG = 4;
 const FALLBACK_FORBIDDEN: ReadonlySet<string> = new Set(['gemini', 'vertex']);
 
 /**
- * Resolve the ModelConfig for the judge/grader capability (ADR-0016 §2).
- * Vendor-independent: grader never shares provider with the tutor.
- * Non-reasoning: `reasoningEffort` is absent so the Anthropic adapter
- * passes the model verbatim without extended-thinking headers.
- *
- * The logic mirrors `selectJudgeProvider()` in judge-suitability.ts —
- * inlined here to avoid a circular dependency (judge-suitability.ts imports
- * `routeAndCall` from this module, so router.ts cannot import from it).
- * `resolveJudgeConfig` from policy-engine is safe to import because
- * policy-engine/judge.ts has no dependency on router.ts.
+ * Judge/grader vendor pool (ADR-0016 §2). Gemini/Vertex is never a candidate
+ * (§10.1 — under-18 ban, and the judge role never wants Gemini regardless of
+ * age). Order matters: Anthropic first, OpenAI second (spec + WI-2624).
  */
-function resolveGraderConfig(tutorVendor: string): ModelConfig {
-  const { vendorConstraint } = resolveJudgeConfig({ tutorVendor });
-  const excluded = vendorConstraint.replace(/^!/, '').trim().toLowerCase();
-  // Prefer anthropic; fall to openai only when anthropic IS the excluded
-  // vendor.  Never Gemini (under-18 compliance, ADR-0016 §10.1).
-  const graderProvider: ModelConfig['provider'] =
-    excluded === 'anthropic' ? 'openai' : 'anthropic';
+const JUDGE_VENDOR_ORDER: ReadonlyArray<'anthropic' | 'openai'> = [
+  'anthropic',
+  'openai',
+];
+
+/**
+ * Normalize a producer vendor string for exclusion comparison. "google" and
+ * "vertex" are the Gemini family under different naming — normalized so a
+ * Gemini-family producer maps onto the same exclusion key the router already
+ * uses elsewhere (`FALLBACK_FORBIDDEN`'s 'gemini'/'vertex' pair, §10.1).
+ * Gemini is never in `JUDGE_VENDOR_ORDER` anyway, so this normalization only
+ * matters for correctly recognizing a Gemini-family producer as "not
+ * anthropic/openai" — it can never accidentally match/exclude one of the two
+ * real judge candidates.
+ */
+function normalizeVendorForExclusion(vendor: string): string {
+  const normalized = vendor.trim().toLowerCase();
+  return normalized === 'google' || normalized === 'vertex'
+    ? 'gemini'
+    : normalized;
+}
+
+/**
+ * Resolve the eligible judge vendor pool for this independence declaration,
+ * in preference order (Anthropic first, OpenAI second). Always excludes
+ * Gemini/Vertex (they are simply never in `JUDGE_VENDOR_ORDER`). Under
+ * 'model-output', additionally excludes the declared producer vendor. Never
+ * returns an empty array from a single exclusion — the pool has 2 members
+ * and a producer can match at most 1.
+ */
+function resolveJudgeEligibleVendors(
+  independence: JudgeIndependence | undefined,
+): ReadonlyArray<'anthropic' | 'openai'> {
+  if (independence?.mode !== 'model-output') return JUDGE_VENDOR_ORDER;
+  const excluded = normalizeVendorForExclusion(independence.producerVendor);
+  return JUDGE_VENDOR_ORDER.filter((vendor) => vendor !== excluded);
+}
+
+function judgeVendorModelConfig(
+  vendor: 'anthropic' | 'openai',
+  shared?: Pick<ModelConfig, 'responseFormat' | 'conversationLanguage'>,
+): ModelConfig {
   return {
-    provider: graderProvider,
-    // GRADER_MODEL is the anthropic occupant.  If the vendor guard forces
-    // openai, use the V2 lightweight secondary (OPENAI_MINI_MODEL) which is
-    // the smallest available OpenAI model in the V2 matrix.
-    model: graderProvider === 'anthropic' ? GRADER_MODEL : OPENAI_MINI_MODEL,
+    provider: vendor,
+    // GRADER_MODEL is the anthropic occupant. When the vendor guard forces
+    // openai, use the V2 lightweight secondary (OPENAI_MINI_MODEL) — the
+    // smallest available OpenAI model in the V2 matrix.
+    model: vendor === 'anthropic' ? GRADER_MODEL : OPENAI_MINI_MODEL,
     maxTokens: MIN_REPLY_MAX_TOKENS,
+    ...shared,
     // reasoningEffort intentionally absent — non-reasoning per ADR-0016 §2.
   };
+}
+
+/**
+ * Resolve the PRIMARY ModelConfig for the judge/grader capability (ADR-0016
+ * §2). Vendor-independent: grader never shares a producer vendor with the
+ * declared `JudgeIndependence`. Non-reasoning: `reasoningEffort` is absent so
+ * the Anthropic adapter passes the model verbatim without extended-thinking
+ * headers. Never returns Gemini/Vertex (§10.1).
+ */
+function resolveGraderConfig(
+  independence: JudgeIndependence | undefined,
+): ModelConfig {
+  const eligible = resolveJudgeEligibleVendors(independence);
+  const primaryVendor = eligible[0];
+  if (!primaryVendor) {
+    // Unreachable: JUDGE_VENDOR_ORDER has 2 members and a single producer
+    // exclusion removes at most 1, so this always resolves. Guarded (rather
+    // than a non-null assertion) so a future change to JUDGE_VENDOR_ORDER
+    // fails loudly instead of silently routing an unservable config.
+    throw new Error(
+      'resolveGraderConfig: no eligible judge vendor (unreachable)',
+    );
+  }
+  return judgeVendorModelConfig(primaryVendor);
+}
+
+/**
+ * Resolve the FALLBACK ModelConfig for the judge/grader capability when the
+ * primary judge provider's circuit is open or the primary call failed
+ * (WI-2624 AC-2/AC-4 — closes the fallback leak: `getFallbackConfig`/
+ * `getFallbackConfigV2` previously fell through to their generic,
+ * vendor-agnostic candidate ladder for a failed judge primary, which could
+ * silently fail back onto the excluded producer vendor).
+ *
+ * Excludes both the declared producer vendor (model-output mode) AND the
+ * primary's own vendor (the one that just failed). When that leaves no
+ * eligible vendor — the decisive case: producer=Anthropic → primary=OpenAI
+ * → OpenAI's circuit trips → the only remaining candidate is Anthropic, the
+ * excluded producer — there is no safe fallback. Surfaces via the SAME
+ * mapping `pickThroughExchangeRouter` uses for an emptied eligible set, so
+ * callers do not need a new error type to handle.
+ */
+function resolveGraderFallbackConfig(
+  primary: ModelConfig,
+  independence: JudgeIndependence | undefined,
+): ModelConfig {
+  const shared = {
+    responseFormat: primary.responseFormat,
+    conversationLanguage: primary.conversationLanguage,
+  } satisfies Pick<ModelConfig, 'responseFormat' | 'conversationLanguage'>;
+
+  const fallbackVendor = resolveJudgeEligibleVendors(independence).find(
+    (vendor) => vendor !== primary.provider,
+  );
+  if (!fallbackVendor) {
+    throw new CircuitOpenError('policy-engine', 'policy:no-eligible-model');
+  }
+  return judgeVendorModelConfig(fallbackVendor, shared);
 }
 
 /**
@@ -686,13 +799,16 @@ function getModelConfigV2(
   rung: EscalationRung,
   llmTier: LLMTier,
   capability: LlmCapability,
+  judgeIndependence?: JudgeIndependence,
 ): ModelConfig {
   // Judge capability: tier/age/region-blind, vendor-independent (ADR-0016 §2).
-  // Derive the tutor vendor from the V2 text matrix (same rung/tier) so the
-  // grader is always on a different vendor.
+  // WI-2624: the caller declares the JudgeIndependence explicitly (which
+  // vendor produced the output under review, or 'not-applicable') instead of
+  // this function re-deriving a "tutor vendor" from the V2 text matrix — that
+  // re-derivation was a guess, not the real producer, and could silently
+  // agree with a preselected/flipped `preferredProvider` hint from the caller.
   if (capability === 'judge') {
-    const tutorConfig = getModelConfigV2Matrix(rung, llmTier, 'text');
-    return resolveGraderConfig(tutorConfig.provider);
+    return resolveGraderConfig(judgeIndependence);
   }
   return pickThroughExchangeRouter(
     getModelConfigV2Matrix(rung, llmTier, capability),
@@ -869,6 +985,7 @@ function getModelConfig(
   providerPolicy: LlmProviderPolicy = 'default',
   capability: LlmCapability = 'text',
   ageBracket?: AgeBracket,
+  judgeIndependence?: JudgeIndependence,
 ): ModelConfig {
   // V2 cutover: the §1.5 matrix is authoritative for ALL tiers/policies. It is
   // checked before every legacy branch (including gemini_only and
@@ -876,25 +993,23 @@ function getModelConfig(
   // The judge capability is passed through to getModelConfigV2 which handles
   // it independently, keeping V2 and legacy paths in sync.
   if (getLlmRequestRoutingV2Enabled(routingV2Enabled)) {
-    return getModelConfigV2(rung, llmTier, capability);
+    return getModelConfigV2(rung, llmTier, capability, judgeIndependence);
   }
 
   // Legacy path: judge capability is tier/age/region-blind (ADR-0016 §2), and
   // resolveGraderConfig never returns Gemini by construction (§10.1) — so it
   // is exempt from (evaluated before) the under-18 gate below. A minor's
   // Challenge Round grading call must resolve to the vetted grader, not the
-  // generic text fallback (WI-1800). Derive tutor vendor via a recursive
-  // text-routing call (not circular — the recursive call uses 'text'
-  // capability, never re-enters this branch).
+  // generic text fallback (WI-1800).
+  //
+  // WI-2624: this branch used to re-derive a "tutor vendor" via a recursive
+  // `getModelConfig(..., 'text')` call using the caller's (already-flipped,
+  // for judge-suitability.ts) `preferredProvider` as ITS preferred-provider
+  // hint — so the derived tutorConfig.provider was the flipped vendor, not
+  // the real producer, and excluding it flipped back to the real producer.
+  // The caller now declares `judgeIndependence` explicitly; no re-derivation.
   if (capability === 'judge') {
-    const tutorConfig = getModelConfig(
-      rung,
-      llmTier,
-      preferredProvider,
-      providerPolicy,
-      'text',
-    );
-    return resolveGraderConfig(tutorConfig.provider);
+    return resolveGraderConfig(judgeIndependence);
   }
 
   // [WI-1052] Under-18 learners are policy-banned from Gemini (MMT-ADR-0016
@@ -1032,7 +1147,18 @@ function getFallbackConfig(
   llmTier: LLMTier = 'standard',
   capability: LlmCapability = 'text',
   ageBracket?: AgeBracket,
+  judgeIndependence?: JudgeIndependence,
 ): ModelConfig | null {
+  // WI-2624 (AC-2/AC-4 fallback leak): judge capability never falls through
+  // to the generic vendor-agnostic candidate ladder below — that ladder does
+  // not know about (and cannot re-apply) the producer-vendor exclusion, so a
+  // judge whose primary tripped could silently fail back onto the excluded
+  // producer. `resolveGraderFallbackConfig` re-applies the same exclusion and
+  // throws the standard no-eligible-model CircuitOpenError when exhausted.
+  if (capability === 'judge') {
+    return resolveGraderFallbackConfig(primary, judgeIndependence);
+  }
+
   // V2 cutover: compliance-driven, allow-list fallback (MMT-ADR-0016 §1.5 +
   // §10.1). Never returns Gemini/Vertex; fails closed when no compliant
   // provider is registered. providerPolicy is not consulted under V2 (its
@@ -1216,6 +1342,7 @@ export function getFallbackConfigForTest(
     llmTier?: LLMTier;
     capability?: LlmCapability;
     ageBracket?: AgeBracket;
+    judgeIndependence?: JudgeIndependence;
   },
 ): ModelConfig | null {
   return getFallbackConfig(
@@ -1225,6 +1352,7 @@ export function getFallbackConfigForTest(
     opts?.llmTier,
     opts?.capability,
     opts?.ageBracket,
+    opts?.judgeIndependence,
   );
 }
 
@@ -1242,6 +1370,7 @@ export function getModelConfigForTest(
     providerPolicy?: LlmProviderPolicy;
     capability?: LlmCapability;
     ageBracket?: AgeBracket;
+    judgeIndependence?: JudgeIndependence;
   },
 ): ModelConfig {
   return getModelConfig(
@@ -1251,6 +1380,7 @@ export function getModelConfigForTest(
     opts?.providerPolicy,
     opts?.capability,
     opts?.ageBracket,
+    opts?.judgeIndependence,
   );
 }
 
@@ -1572,35 +1702,52 @@ async function withRetry<T>(
 // Core orchestrator — all LLM calls go through here (MMT-ADR-0017)
 // ---------------------------------------------------------------------------
 
+interface RouteAndCallBaseOptions {
+  correlationId?: string;
+  llmTier?: LLMTier;
+  preferredProvider?: PreferredLlmProvider;
+  providerPolicy?: LlmProviderPolicy;
+  ageBracket?: AgeBracket;
+  // BKT-C.1 — profile-level personalization. Optional so existing callers
+  // compile unchanged; wired through session-exchange.ts from the active
+  // profile's conversation_language and pronouns.
+  conversationLanguage?: ConversationLanguage;
+  pronouns?: string | null;
+  // [LLM-TRUNCATE-01] Flow label + session id — used for the llm.stop_reason
+  // metric dashboard query (count by stop_reason, flow over 24h). Optional
+  // so existing callers compile; callers wanting per-flow dashboards pass
+  // both. Phase 1 Task 3.
+  flow?: string;
+  sessionId?: string;
+  responseFormat?: 'json';
+  /** Cancels provider work and suppresses retry/fallback after caller timeout. */
+  signal?: AbortSignal;
+}
+
+// Explicit capability override for judge routing (ADR-0016 §2 T3). Only
+// 'judge' is valid as an explicit override; 'text' and 'vision' are always
+// derived from message content (inline_data detection) and must not be set
+// explicitly — callers do not need to thread image detection.
+//
+// WI-2624: a `capability:'judge'` call MUST declare `judgeIndependence` — the
+// discriminated union below makes this a compile-time requirement rather
+// than a convention. There is no default: a judge call site that cannot
+// state whether it is grading model output (and whose) or learner input is
+// exactly the ambiguity that produced the double-flip bug.
+export type RouteAndCallOptions =
+  | (RouteAndCallBaseOptions & {
+      capability?: never;
+      judgeIndependence?: never;
+    })
+  | (RouteAndCallBaseOptions & {
+      capability: 'judge';
+      judgeIndependence: JudgeIndependence;
+    });
+
 export async function routeAndCall(
   messages: ChatMessage[],
   rung: EscalationRung = 1,
-  _options?: {
-    correlationId?: string;
-    llmTier?: LLMTier;
-    preferredProvider?: PreferredLlmProvider;
-    providerPolicy?: LlmProviderPolicy;
-    ageBracket?: AgeBracket;
-    // BKT-C.1 — profile-level personalization. Optional so existing callers
-    // compile unchanged; wired through session-exchange.ts from the active
-    // profile's conversation_language and pronouns.
-    conversationLanguage?: ConversationLanguage;
-    pronouns?: string | null;
-    // [LLM-TRUNCATE-01] Flow label + session id — used for the llm.stop_reason
-    // metric dashboard query (count by stop_reason, flow over 24h). Optional
-    // so existing callers compile; callers wanting per-flow dashboards pass
-    // both. Phase 1 Task 3.
-    flow?: string;
-    sessionId?: string;
-    responseFormat?: 'json';
-    /** Cancels provider work and suppresses retry/fallback after caller timeout. */
-    signal?: AbortSignal;
-    // Explicit capability override for judge routing (ADR-0016 §2 T3).
-    // Only 'judge' is valid as an explicit override; 'text' and 'vision' are
-    // always derived from message content (inline_data detection) and must not
-    // be set explicitly — callers do not need to thread image detection.
-    capability?: 'judge';
-  },
+  _options?: RouteAndCallOptions,
 ): Promise<RouteResult> {
   // WI-1505 — kill switch is the FIRST thing routeAndCall does: before the
   // i18n tripwire, before getModelConfig, before any provider is touched.
@@ -1622,6 +1769,12 @@ export async function routeAndCall(
   // Explicit capability option overrides content-derived value.  Currently
   // only 'judge' is a valid explicit override (see option JSDoc above).
   const capability: LlmCapability = _options?.capability ?? messageCapability;
+  // WI-2624: only present (and only meaningful) when capability === 'judge' —
+  // the discriminated RouteAndCallOptions union guarantees it was supplied.
+  const judgeIndependence: JudgeIndependence | undefined =
+    _options && _options.capability === 'judge'
+      ? _options.judgeIndependence
+      : undefined;
   const safeMessages = withSafetyPreamble(messages, _options?.ageBracket, {
     conversationLanguage: _options?.conversationLanguage,
     pronouns: _options?.pronouns,
@@ -1634,6 +1787,7 @@ export async function routeAndCall(
       _options?.providerPolicy,
       capability,
       _options?.ageBracket,
+      judgeIndependence,
     ),
     ...(_options?.responseFormat ? { responseFormat: 'json' as const } : {}),
     // [BUG-895] Thread the learner's tutor-prose language onto the provider
@@ -1672,6 +1826,12 @@ export async function routeAndCall(
         sessionId: _options?.sessionId,
         responseChars: result.content.length,
         usage: result.usage,
+      });
+      recordLlmFallbackRateSample({
+        environment: getLlmRequestEnvironment(llmEnvironment),
+        fallbackUsed: false,
+        provider: config.provider,
+        capability,
       });
       return {
         response: result.content,
@@ -1714,6 +1874,7 @@ export async function routeAndCall(
         _options?.llmTier,
         capability,
         _options?.ageBracket,
+        judgeIndependence,
       );
       if (!fallbackConfig) throw err;
 
@@ -1756,6 +1917,7 @@ export async function routeAndCall(
     _options?.llmTier,
     capability,
     _options?.ageBracket,
+    judgeIndependence,
   );
   if (fallbackConfig) {
     logger.warn('[llm] Primary provider circuit open, using fallback', {
@@ -1831,6 +1993,12 @@ async function attemptProvider(
       sessionId: metricContext.sessionId,
       responseChars: result.content.length,
       usage: result.usage,
+    });
+    recordLlmFallbackRateSample({
+      environment: getLlmRequestEnvironment(llmEnvironment),
+      fallbackUsed: true,
+      provider: config.provider,
+      capability: metricContext.capability,
     });
     return {
       response: result.content,
@@ -1908,6 +2076,7 @@ async function* wrapStreamWithCircuitBreaker(
   // the provider that actually produced the bytes.
   onUsage: (u: LlmUsage | undefined) => void,
   onFallback?: () => void,
+  fallbackUsed = false,
 ): AsyncIterable<string> {
   let chunksYielded = 0;
   let forwardedStopReason = false;
@@ -1965,6 +2134,8 @@ async function* wrapStreamWithCircuitBreaker(
           metricContext,
           onStopReason,
           onUsage,
+          undefined,
+          true,
         );
         let signalled = false;
         for await (const chunk of fallbackStream) {
@@ -1981,6 +2152,12 @@ async function* wrapStreamWithCircuitBreaker(
 
     recordSuccess(circuitKey);
     recordVolumeMetric(providerId);
+    recordLlmFallbackRateSample({
+      environment: getLlmRequestEnvironment(llmEnvironment),
+      fallbackUsed,
+      provider: providerId,
+      capability,
+    });
     // Forward usage before the stop reason: the router logs on the stop-reason
     // promise, so usage must already be settled when that fires (WI-1827).
     onUsage(await innerUsagePromise);
@@ -2050,6 +2227,8 @@ async function* wrapStreamWithCircuitBreaker(
           metricContext,
           onStopReason,
           onUsage,
+          undefined,
+          true,
         );
         let signalled = false;
         for await (const chunk of fallbackStream) {
@@ -2081,11 +2260,15 @@ async function* wrapStreamWithCircuitBreaker(
 /**
  * Streaming variant of routeAndCall.
  *
- * NOTE: The `provider` and `model` fields in the returned StreamResult
- * reflect the initially selected provider. If wrapStreamWithCircuitBreaker
- * transparently falls back (pre-first-byte failure), these fields still
- * report the original provider. Callers using these fields for cost
- * attribution or observability should be aware of this limitation.
+ * [WI-2670] The `provider` and `model` fields on the returned StreamResult
+ * are lazy getters (mirroring `fallbackUsed` on the same object): they
+ * report the EFFECTIVE provider — the fallback's, if
+ * `wrapStreamWithCircuitBreaker` transparently fell back before the first
+ * byte — not the originally-selected one. Read them only after the stream
+ * has drained (or after `fallbackUsed`/`stopReasonPromise` has settled);
+ * reading them earlier (e.g. destructuring `{ provider }` or spreading the
+ * result immediately after this function resolves) captures the
+ * pre-fallback value, because the fallback only happens during iteration.
  */
 export async function routeAndStream(
   messages: ChatMessage[],
@@ -2223,8 +2406,20 @@ export async function routeAndStream(
       });
     return {
       stream,
-      provider: config.provider,
-      model: config.model,
+      // [WI-2670] Lazy getters — same closure as `fallbackUsed` below.
+      // Read the fallback's config once a pre-first-byte transparent
+      // fallback has fired; otherwise the primary's. See the JSDoc above
+      // this function for why these must not be read before stream drain.
+      get provider() {
+        return fallbackFired && fallbackConfig
+          ? fallbackConfig.provider
+          : config.provider;
+      },
+      get model() {
+        return fallbackFired && fallbackConfig
+          ? fallbackConfig.model
+          : config.model;
+      },
       stopReasonPromise,
       get fallbackUsed() {
         return fallbackFired;
@@ -2306,6 +2501,8 @@ async function attemptStreamProvider(
   const providerResult = normalizeStreamResult(
     provider.chatStream(messages, config),
   );
+  // This helper is reached only from the direct-fallback branch above, so the
+  // stream and returned result are intentionally marked as fallback usage.
   const stream = wrapStreamWithCircuitBreaker(
     providerResult.stream,
     config.provider,
@@ -2322,6 +2519,8 @@ async function attemptStreamProvider(
     },
     resolveStop,
     resolveUsage,
+    undefined,
+    true,
   );
   // [LLM-TRUNCATE-01] Metric emission on drain.
   stopReasonPromise
@@ -2347,5 +2546,6 @@ async function attemptStreamProvider(
     provider: config.provider,
     model: config.model,
     stopReasonPromise,
+    fallbackUsed: true,
   };
 }

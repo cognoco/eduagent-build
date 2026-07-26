@@ -33,19 +33,19 @@ tags:
 # 1. Wait for sign-in screen (seed-and-run.sh handles app launch + dev-client)
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: 'sign-in-button'
     timeout: 120000
 
 # 2. Sign in with seeded credentials (from seed-and-run.sh env vars)
 - tapOn:
-    id: "sign-in-email"
+    id: 'sign-in-email'
 - inputText: ${EMAIL}
 
 # Dismiss keyboard (pressKey: back — keyboard is open after inputText)
 - hideKeyboard
 
 - tapOn:
-    id: "sign-in-password"
+    id: 'sign-in-password'
 - inputText: ${PASSWORD}
 
 # Dismiss keyboard (pressKey: back — keyboard is open after inputText)
@@ -54,11 +54,11 @@ tags:
 # Wait for sign-in button to be visible after keyboard dismissal
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: 'sign-in-button'
     timeout: 10000
 
 - tapOn:
-    id: "sign-in-button"
+    id: 'sign-in-button'
 
 # ============================================================
 # CONSENT PENDING GATE — Core UI Verification
@@ -69,30 +69,30 @@ tags:
 #    renders the gate. Allow 30s for WHPX emulator API latency.
 - extendedWaitUntil:
     visible:
-      id: "consent-pending-gate"
+      id: 'consent-pending-gate'
     timeout: 30000
 
 # 4. Verify heading text
 - assertVisible:
-    text: "Waiting for approval"
+    text: 'Hang tight!'
 
 # 5. Verify informational message
 - assertVisible:
-    text: "Once they approve, you'll have full access."
+    text: 'Once they say yes, you can start exploring!'
 
 # 6. Verify "Check again" button
 - assertVisible:
-    id: "consent-check-again"
+    id: 'consent-check-again'
 
 # 7. Tap "Check again" — should refresh profiles but stay on gate
 #    (consent is still pending)
 - tapOn:
-    id: "consent-check-again"
+    id: 'consent-check-again'
 
 # 8. Wait briefly and verify we're still on the gate
 - extendedWaitUntil:
     visible:
-      id: "consent-pending-gate"
+      id: 'consent-pending-gate'
     timeout: 10000
 
 # 9. Screenshot after check-again
@@ -104,45 +104,43 @@ tags:
 
 # 10. Verify "Browse subjects" preview button is visible
 - assertVisible:
-    id: "preview-browse-subjects"
+    id: 'preview-browse-subjects'
 
 # 11. Tap "Browse subjects" to enter preview mode
 - tapOn:
-    id: "preview-browse-subjects"
+    id: 'preview-browse-subjects'
 
 # 12. Wait for PreviewSubjectBrowser to render
 - extendedWaitUntil:
     visible:
-      id: "preview-subject-browser"
+      id: 'preview-subject-browser'
     timeout: 5000
 
 # 13. Verify preview subjects are shown (static list)
 - assertVisible:
-    text: "Browse Subjects"
+    text: 'Browse Subjects'
 
 - assertVisible:
-    text: "Mathematics"
+    text: 'Mathematics'
 
 - assertVisible:
-    text: "Science"
+    text: 'Science'
 
-# 14. Verify the preview disclaimer
-# BUG-57: Maestro can't reliably match substrings inside React Native <Text> on Android.
-# Match the full text content of the disclaimer node (JSX whitespace collapses to single spaces).
+# 14. Verify the current preview description.
 - assertVisible:
-    text: "Here's a preview of what you can learn. You'll unlock these once your parent approves."
+    text: 'Explore what you can learn with your mentor'
 
 # 15. Screenshot of subject browser preview
 - takeScreenshot: consent-preview-subject-browser
 
 # 16. Tap "Back" to return to the pending gate
 - tapOn:
-    text: "Back"
+    text: 'Back'
 
 # 17. Verify we're back on the consent pending gate
 - extendedWaitUntil:
     visible:
-      id: "consent-pending-gate"
+      id: 'consent-pending-gate'
     timeout: 5000
 
 # ============================================================
@@ -151,32 +149,32 @@ tags:
 
 # 18. Verify "Sample coaching" preview button is visible
 - assertVisible:
-    id: "preview-sample-coaching"
+    id: 'preview-sample-coaching'
 
 # 19. Tap "Sample coaching" to enter preview mode
 - tapOn:
-    id: "preview-sample-coaching"
+    id: 'preview-sample-coaching'
 
 # 20. Wait for PreviewSampleCoaching to render
 - extendedWaitUntil:
     visible:
-      id: "preview-sample-coaching"
+      id: 'preview-sample-coaching'
     timeout: 5000
 
 # 21. Verify coaching preview content
 - assertVisible:
-    text: "See how it works"
+    text: 'See how it works'
 
 - assertVisible:
-    text: "Homework help"
+    text: 'Homework help'
 
 - assertVisible:
-    text: "How your mentor helps"
+    text: 'How your mentor helps'
 
 # 22. Verify the preview footer disclaimer (at bottom of ScrollView — scroll to it)
 - scrollUntilVisible:
     element:
-      text: "This is a preview — full access unlocks once your parent approves"
+      text: 'This is a preview — full access unlocks once your parent approves'
     direction: DOWN
     timeout: 5000
 
@@ -185,31 +183,38 @@ tags:
 
 # 24. Tap "Back" to return to the pending gate
 - tapOn:
-    text: "Back"
+    text: 'Back'
 
 # 25. Verify we're back on the consent pending gate
 - extendedWaitUntil:
     visible:
-      id: "consent-pending-gate"
+      id: 'consent-pending-gate'
     timeout: 5000
 
 # ============================================================
 # SIGN OUT from consent pending gate
 # ============================================================
 
-# 26. Verify sign-out button is present
+# 26. Bring the below-fold sign-out control into the small viewport.
+- scrollUntilVisible:
+    element:
+      id: 'consent-sign-out'
+    direction: DOWN
+    timeout: 5000
+
+# 27. Verify sign-out button is present
 - assertVisible:
-    id: "consent-sign-out"
+    id: 'consent-sign-out'
 
-# 27. Tap sign out
+# 28. Tap sign out
 - tapOn:
-    id: "consent-sign-out"
+    id: 'consent-sign-out'
 
-# 28. Verify we return to the auth/sign-in screen
+# 29. Verify we return to the auth/sign-in screen
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: 'sign-in-button'
     timeout: 15000
 
-# 29. Final screenshot — back at auth screen after sign-out
+# 30. Final screenshot — back at auth screen after sign-out
 - takeScreenshot: consent-pending-gate-signed-out

@@ -97,7 +97,6 @@ test('single learner UX screenshot crawl', async ({ page }) => {
   await expect(
     page
       .getByTestId('quiz-history-screen')
-      .or(page.getByTestId('quiz-history-empty'))
       .or(page.getByTestId('quiz-history-error')),
   ).toBeVisible({ timeout: 30_000 });
   await capture(page, '10-quiz-history');

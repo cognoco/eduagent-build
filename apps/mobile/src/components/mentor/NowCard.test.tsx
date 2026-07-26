@@ -82,6 +82,33 @@ describe('NowCard', () => {
     expect(onDecline).toHaveBeenCalledWith(notice);
   });
 
+  // [WI-2499 AC-1] A mentor-notice card must expose Continue and Not now
+  // only — no generic Complete/mastery affordance, even when the caller
+  // (NowCardStack) passes onCompleted for the anchor/module slot generically.
+  it('[WI-2499 AC-1] never renders the generic Complete action for a mentor notice, even when onCompleted is supplied', () => {
+    const notice = card({
+      kind: 'mentor_notice',
+      templateKey: 'now.mentor_notice.default',
+      params: { concept: 'changing signs', subjectName: 'Algebra' },
+      deepLink: {
+        route: 'notice.recheck',
+        params: { noticeId: 'notice-1', subjectId: 'subject-1' },
+        chain: [],
+      },
+    });
+    const rendered = render(
+      <NowCard
+        card={notice}
+        onContinue={jest.fn()}
+        onDecline={jest.fn()}
+        onCompleted={jest.fn()}
+      />,
+    );
+
+    expect(rendered.queryByTestId('now-card-complete')).toBeNull();
+    expect(rendered.queryByText('Done')).toBeNull();
+  });
+
   it('fires continue, decline, and completion callbacks with the card', () => {
     const value = card({ kind: 'retention_due' });
     const onContinue = jest.fn();

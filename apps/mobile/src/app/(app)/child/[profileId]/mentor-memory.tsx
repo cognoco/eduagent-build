@@ -356,7 +356,11 @@ export default function ChildMentorMemoryScreen() {
   }
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+    <View
+      className="flex-1 bg-background"
+      style={{ paddingTop: insets.top }}
+      testID="child-mentor-memory-screen"
+    >
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
           onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
@@ -523,8 +527,14 @@ export default function ChildMentorMemoryScreen() {
         ) : null}
 
         {/* Curated categories from memory endpoint */}
-        {memory?.categories.map((cat) => (
-          <MemorySection key={cat.label} title={cat.label}>
+        {memory?.categories.map((cat, index) => (
+          <MemorySection
+            key={cat.label}
+            title={cat.label}
+            testID={
+              index === 0 ? 'child-mentor-memory-populated-category' : undefined
+            }
+          >
             {cat.items.map((item) => (
               <MemoryRow
                 key={`${item.category}-${item.value}`}
@@ -545,7 +555,10 @@ export default function ChildMentorMemoryScreen() {
 
         {/* Empty state when no categories */}
         {memory && memory.categories.length === 0 && (
-          <View className="bg-surface rounded-card p-6 mt-4">
+          <View
+            className="bg-surface rounded-card p-6 mt-4"
+            testID="child-mentor-memory-empty-state"
+          >
             <Text className="text-text-secondary text-center text-base">
               {t('parentView.mentorMemory.noObservationsYet', {
                 name: child?.displayName ?? t('parentView.index.yourChild'),

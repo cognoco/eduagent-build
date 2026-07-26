@@ -27,13 +27,12 @@ import {
   xpLedger,
   type Database,
 } from '@eduagent/database';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import {
   buildAuthHeaders as buildSignedAuthHeaders,
   type TestJWTClaims,
 } from './test-keys';
 import { createIntegrationDb } from './helpers';
-
-const TEST_CONSENT_PURPOSE = 'platform_use';
 
 function consentTypeToBasis(consentType: 'GDPR' | 'COPPA') {
   return consentType === 'COPPA'
@@ -81,7 +80,7 @@ type AppLike = {
     input: string,
     init?: RequestInit,
     env?: Record<string, string>,
-  ) => Promise<Response>;
+  ) => Response | Promise<Response>;
 };
 
 export interface AuthFixtureUser {
@@ -303,7 +302,6 @@ export async function setProfileConsentStatusForTest(input: {
       and(
         eq(consentRequest.chargePersonId, input.profileId),
         eq(consentRequest.organizationId, input.accountId),
-        eq(consentRequest.purpose, TEST_CONSENT_PURPOSE),
         eq(consentRequest.requestedBasis, basis),
       ),
     );
@@ -313,7 +311,6 @@ export async function setProfileConsentStatusForTest(input: {
       and(
         eq(consentGrant.chargePersonId, input.profileId),
         eq(consentGrant.organizationId, input.accountId),
-        eq(consentGrant.purpose, TEST_CONSENT_PURPOSE),
         eq(consentGrant.lawfulBasis, basis),
       ),
     );
@@ -322,41 +319,47 @@ export async function setProfileConsentStatusForTest(input: {
     input.status === 'PENDING' ||
     input.status === 'PARENTAL_CONSENT_REQUESTED'
   ) {
-    await db.insert(consentRequest).values({
-      chargePersonId: input.profileId,
-      organizationId: input.accountId,
-      purpose: TEST_CONSENT_PURPOSE,
-      requestedBasis: basis,
-      guardianPersonId: input.guardianPersonId ?? null,
-      guardianEmail: input.parentEmail ?? null,
-      status:
-        input.status === 'PARENTAL_CONSENT_REQUESTED' ? 'requested' : 'pending',
-      token:
-        input.status === 'PARENTAL_CONSENT_REQUESTED'
-          ? `integration-v2-consent-${input.profileId}`
-          : null,
-      tokenExpiresAt:
-        input.status === 'PARENTAL_CONSENT_REQUESTED'
-          ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-          : null,
-      requestedAt: new Date(),
-    });
+    await db.insert(consentRequest).values(
+      CONSENT_PURPOSES.map((purpose) => ({
+        chargePersonId: input.profileId,
+        organizationId: input.accountId,
+        purpose,
+        requestedBasis: basis,
+        guardianPersonId: input.guardianPersonId ?? null,
+        guardianEmail: input.parentEmail ?? null,
+        status:
+          input.status === 'PARENTAL_CONSENT_REQUESTED'
+            ? ('requested' as const)
+            : ('pending' as const),
+        token:
+          input.status === 'PARENTAL_CONSENT_REQUESTED'
+            ? `integration-v2-consent-${input.profileId}`
+            : null,
+        tokenExpiresAt:
+          input.status === 'PARENTAL_CONSENT_REQUESTED'
+            ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+            : null,
+        requestedAt: new Date(),
+      })),
+    );
     return;
   }
 
-  await db.insert(consentGrant).values({
-    chargePersonId: input.profileId,
-    organizationId: input.accountId,
-    purpose: TEST_CONSENT_PURPOSE,
-    lawfulBasis: basis,
-    granted: true,
-    withdrawnAt: input.status === 'WITHDRAWN' ? new Date() : null,
-    priorValue: input.status === 'WITHDRAWN' ? true : null,
-    auditFact: {
-      source: 'integration_test',
-      guardianPersonId: input.guardianPersonId ?? null,
-    },
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      chargePersonId: input.profileId,
+      organizationId: input.accountId,
+      purpose,
+      lawfulBasis: basis,
+      granted: true,
+      withdrawnAt: input.status === 'WITHDRAWN' ? new Date() : null,
+      priorValue: input.status === 'WITHDRAWN' ? true : null,
+      auditFact: {
+        source: 'integration_test',
+        guardianPersonId: input.guardianPersonId ?? null,
+      },
+    })),
+  );
 }
 
 export async function setSubscriptionTierForProfile(
@@ -529,7 +532,7 @@ export async function seedAssessmentRecord(input: {
   sessionId?: string | null;
   verificationDepth?: 'recall' | 'explain' | 'transfer';
   status?: 'in_progress' | 'passed' | 'failed';
-  masteryScore?: string | number | null;
+  masteryScore?: number | null;
   qualityRating?: number | null;
   exchangeHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
   overrides?: Partial<typeof assessments.$inferInsert>;
@@ -544,8 +547,7 @@ export async function seedAssessmentRecord(input: {
       sessionId: input.sessionId ?? null,
       verificationDepth: input.verificationDepth ?? 'recall',
       status: input.status ?? 'in_progress',
-      masteryScore:
-        input.masteryScore == null ? null : String(input.masteryScore),
+      masteryScore: input.masteryScore ?? null,
       qualityRating: input.qualityRating ?? null,
       exchangeHistory: input.exchangeHistory ?? [],
       ...input.overrides,
@@ -594,18 +596,23 @@ export async function seedConsentRequest(input: {
   });
 
   if (status === 'PENDING' || status === 'PARENTAL_CONSENT_REQUESTED') {
-    await db.insert(consentRequest).values({
-      chargePersonId: input.profileId,
-      organizationId: accountId,
-      purpose: TEST_CONSENT_PURPOSE,
-      requestedBasis: consentTypeToBasis(consentType),
-      guardianEmail: parentEmail,
-      status: status === 'PARENTAL_CONSENT_REQUESTED' ? 'requested' : 'pending',
-      token: status === 'PARENTAL_CONSENT_REQUESTED' ? input.token : null,
-      tokenExpiresAt:
-        status === 'PARENTAL_CONSENT_REQUESTED' ? expiresAt : null,
-      requestedAt: new Date(),
-    });
+    await db.insert(consentRequest).values(
+      CONSENT_PURPOSES.map((purpose) => ({
+        chargePersonId: input.profileId,
+        organizationId: accountId,
+        purpose,
+        requestedBasis: consentTypeToBasis(consentType),
+        guardianEmail: parentEmail,
+        status:
+          status === 'PARENTAL_CONSENT_REQUESTED'
+            ? ('requested' as const)
+            : ('pending' as const),
+        token: status === 'PARENTAL_CONSENT_REQUESTED' ? input.token : null,
+        tokenExpiresAt:
+          status === 'PARENTAL_CONSENT_REQUESTED' ? expiresAt : null,
+        requestedAt: new Date(),
+      })),
+    );
     return;
   }
 

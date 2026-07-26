@@ -31,6 +31,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import { ConsentRequiredError, RateLimitedError } from '@eduagent/schemas';
 
 import {
@@ -102,14 +103,17 @@ async function seedConsent(
   childProfileId: string,
   organizationId: string,
 ): Promise<void> {
-  await db.insert(consentGrant).values({
-    chargePersonId: childProfileId,
-    organizationId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-    grantedAt: new Date(),
-  });
+  const grantedAt = new Date();
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      chargePersonId: childProfileId,
+      organizationId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent' as const,
+      granted: true,
+      grantedAt,
+    })),
+  );
 }
 
 async function seedPushToken(profileId: string): Promise<void> {
@@ -559,15 +563,18 @@ describeIfPostDrop('createNudge v2 consent gate (integration)', () => {
   }
 
   it('[BLOCK] flag-on: a WITHDRAWN GDPR grant blocks the nudge via the v2 gate (no legacy consent_states row exists)', async () => {
-    await v2db.insert(consentGrant).values({
-      chargePersonId: childPersonId,
-      organizationId: orgId,
-      purpose: 'platform_use',
-      lawfulBasis: 'gdpr_parental_consent',
-      granted: true,
-      grantedAt: new Date(),
-      withdrawnAt: new Date(),
-    });
+    const withdrawnAt = new Date();
+    await v2db.insert(consentGrant).values(
+      CONSENT_PURPOSES.map((purpose) => ({
+        chargePersonId: childPersonId,
+        organizationId: orgId,
+        purpose,
+        lawfulBasis: 'gdpr_parental_consent' as const,
+        granted: true,
+        grantedAt: withdrawnAt,
+        withdrawnAt,
+      })),
+    );
 
     await expect(
       createNudge(
@@ -591,14 +598,17 @@ describeIfPostDrop('createNudge v2 consent gate (integration)', () => {
   });
 
   it('flag-on: a CONSENTED GDPR grant lets the nudge through end-to-end', async () => {
-    await v2db.insert(consentGrant).values({
-      chargePersonId: childPersonId,
-      organizationId: orgId,
-      purpose: 'platform_use',
-      lawfulBasis: 'gdpr_parental_consent',
-      granted: true,
-      grantedAt: new Date(),
-    });
+    const grantedAt = new Date();
+    await v2db.insert(consentGrant).values(
+      CONSENT_PURPOSES.map((purpose) => ({
+        chargePersonId: childPersonId,
+        organizationId: orgId,
+        purpose,
+        lawfulBasis: 'gdpr_parental_consent' as const,
+        granted: true,
+        grantedAt,
+      })),
+    );
 
     const result = await createNudge(
       v2db,

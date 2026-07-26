@@ -6,6 +6,7 @@ import type { LanguageLearningActivityEvent } from '../../lib/sse';
 let mockSttState = {
   status: 'idle' as string,
   transcript: '',
+  isFinalTranscript: false,
   error: null as string | null,
   isListening: false,
 };
@@ -39,6 +40,16 @@ const mockMutateAsync = jest.fn();
 // prettier-ignore
 jest.mock('../../hooks/use-speaking-practice-api', () => ({ useRecordSpeakingPracticeAttempt: () => ({ mutateAsync: mockMutateAsync }) })); // gc1-allow: network-mutation hook — API client integration covered by attempt.integration.test.ts
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 function makeActivity(): LanguageLearningActivityEvent {
   return {
     strand: 'fluency',
@@ -56,12 +67,46 @@ function makeActivity(): LanguageLearningActivityEvent {
   };
 }
 
+function activityView(sessionId = 'session-1') {
+  return (
+    <SpeakingPracticeActivity
+      activity={makeActivity()}
+      sessionId={sessionId}
+      subjectId="subject-1"
+    />
+  );
+}
+
+async function submitTranscript(
+  rerender: ReturnType<typeof render>['rerender'],
+  transcript: string,
+  sessionId = 'session-1',
+) {
+  mockSttState = {
+    status: 'listening',
+    transcript,
+    isFinalTranscript: false,
+    error: null,
+    isListening: true,
+  };
+  rerender(activityView(sessionId));
+  mockSttState = {
+    ...mockSttState,
+    isListening: false,
+    isFinalTranscript: true,
+  };
+  await act(async () => {
+    rerender(activityView(sessionId));
+  });
+}
+
 describe('SpeakingPracticeActivity', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSttState = {
       status: 'idle',
       transcript: '',
+      isFinalTranscript: false,
       error: null,
       isListening: false,
     };
@@ -96,11 +141,10 @@ describe('SpeakingPracticeActivity', () => {
     screen.getByText('I would like a cup of tea.');
   });
 
-  // WI-1777 rework: the server's activityType/speakingPractice.type
-  // (previously always 'repeat_after_me') now genuinely alternates to
-  // 'shadowing' — confirm this component renders the shadowing-specific
-  // instruction, not the repeat-after-me one, when that's what it receives.
-  it('renders the shadowing instruction when the activity selects the shadowing mode', () => {
+  // WI-1777 Option-B rework: legacy/cache events may still carry the
+  // schema-supported shadowing value, but the MVP UI must not instruct a
+  // learner to speak along when playback and recognition are independent.
+  it('renders the honest repeat-after-me instruction for a legacy shadowing event', () => {
     const shadowingActivity: LanguageLearningActivityEvent = {
       ...makeActivity(),
       activityType: 'shadowing',
@@ -116,8 +160,10 @@ describe('SpeakingPracticeActivity', () => {
         subjectId="subject-1"
       />,
     );
-    screen.getByText('Speak along with the audio, a beat behind');
-    expect(screen.queryByText('Repeat the line')).toBeNull();
+    screen.getByText('Repeat the line');
+    expect(
+      screen.queryByText('Speak along with the audio, a beat behind'),
+    ).toBeNull();
   });
 
   it('submits an attempt exactly once when recording stops with a transcript', async () => {
@@ -141,6 +187,7 @@ describe('SpeakingPracticeActivity', () => {
     mockSttState = {
       status: 'listening',
       transcript: 'I like cup tea',
+      isFinalTranscript: false,
       error: null,
       isListening: true,
     };
@@ -155,6 +202,7 @@ describe('SpeakingPracticeActivity', () => {
     mockSttState = {
       status: 'idle',
       transcript: 'I like cup tea',
+      isFinalTranscript: true,
       error: null,
       isListening: false,
     };
@@ -182,6 +230,191 @@ describe('SpeakingPracticeActivity', () => {
     await screen.findByText('Try again: would, a, of');
   });
 
+  // WI-2714: the stop-listening transition and final-transcript readiness are
+  // distinct signals. Recognition can sit in `processing` — `isListening`
+  // already false — for a while before the engine's real final result lands.
+  // Submission must wait for that final, and must use it (not whatever
+  // interim text was showing when the mic stopped) once it arrives.
+  it('waits through processing and submits the late final transcript, not the interim it replaces', async () => {
+    mockMutateAsync.mockResolvedValue({
+      attemptNumber: 1,
+      lexicalMatchScore: 1,
+      missingWords: [],
+      extraWords: [],
+      isComplete: true,
+    });
+
+    const { rerender } = render(activityView());
+
+    mockSttState = {
+      status: 'listening',
+      transcript: 'I like cup tea',
+      isFinalTranscript: false,
+      error: null,
+      isListening: true,
+    };
+    rerender(activityView());
+
+    // Mic stopped (isListening false), but the engine has not delivered its
+    // final result yet — status is `processing`, isFinalTranscript is still
+    // false. No attempt may be submitted from this interim transcript.
+    mockSttState = {
+      status: 'processing',
+      transcript: 'I like cup tea',
+      isFinalTranscript: false,
+      error: null,
+      isListening: false,
+    };
+    await act(async () => {
+      rerender(activityView());
+    });
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+
+    // The late final result lands, correcting the transcript. Only now may
+    // the attempt submit, and it must use the corrected final text.
+    mockSttState = {
+      status: 'idle',
+      transcript: 'I would like a cup of tea',
+      isFinalTranscript: true,
+      error: null,
+      isListening: false,
+    };
+    await act(async () => {
+      rerender(activityView());
+    });
+
+    expect(mockMutateAsync).toHaveBeenCalledTimes(1);
+    expect(mockMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ transcript: 'I would like a cup of tea' }),
+    );
+  });
+
+  // WI-2714: empty/cancelled/error terminations never produce a final
+  // transcript. These must settle (not hang waiting for a final that will
+  // never arrive) without ever submitting the leftover interim text.
+  it('never submits when recognition ends without a final transcript (cancelled)', async () => {
+    const { rerender } = render(activityView());
+
+    mockSttState = {
+      status: 'listening',
+      transcript: 'partial phrase',
+      isFinalTranscript: false,
+      error: null,
+      isListening: true,
+    };
+    rerender(activityView());
+
+    // The engine's terminal `end` event fires (native session cancelled)
+    // without ever having delivered a final result.
+    mockSttState = {
+      status: 'idle',
+      transcript: 'partial phrase',
+      isFinalTranscript: false,
+      error: null,
+      isListening: false,
+    };
+    await act(async () => {
+      rerender(activityView());
+    });
+
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+
+    // A later, unrelated re-render (e.g. a sibling state change) must not
+    // retroactively trigger a submission either — bounded means settled.
+    await act(async () => {
+      rerender(activityView());
+    });
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('never submits when speech recognition errors before a final transcript arrives', async () => {
+    const { rerender } = render(activityView());
+
+    mockSttState = {
+      status: 'listening',
+      transcript: 'partial phrase',
+      isFinalTranscript: false,
+      error: null,
+      isListening: true,
+    };
+    rerender(activityView());
+
+    mockSttState = {
+      status: 'error',
+      transcript: 'partial phrase',
+      isFinalTranscript: false,
+      error: 'Speech recognition failed',
+      isListening: false,
+    };
+    await act(async () => {
+      rerender(activityView());
+    });
+
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('persists legacy shadowing events as repeat-after-me attempts', async () => {
+    mockMutateAsync.mockResolvedValue({
+      attemptNumber: 1,
+      lexicalMatchScore: 1,
+      missingWords: [],
+      extraWords: [],
+      isComplete: true,
+    });
+    const shadowingActivity: LanguageLearningActivityEvent = {
+      ...makeActivity(),
+      activityType: 'shadowing',
+      speakingPractice: {
+        ...makeActivity().speakingPractice!,
+        type: 'shadowing',
+      },
+    };
+
+    const { rerender } = render(
+      <SpeakingPracticeActivity
+        activity={shadowingActivity}
+        sessionId="session-1"
+        subjectId="subject-1"
+      />,
+    );
+
+    mockSttState = {
+      status: 'listening',
+      transcript: 'I would like a cup of tea',
+      isFinalTranscript: false,
+      error: null,
+      isListening: true,
+    };
+    rerender(
+      <SpeakingPracticeActivity
+        activity={shadowingActivity}
+        sessionId="session-1"
+        subjectId="subject-1"
+      />,
+    );
+
+    mockSttState = {
+      status: 'idle',
+      transcript: 'I would like a cup of tea',
+      isFinalTranscript: true,
+      error: null,
+      isListening: false,
+    };
+    await act(async () => {
+      rerender(
+        <SpeakingPracticeActivity
+          activity={shadowingActivity}
+          sessionId="session-1"
+          subjectId="subject-1"
+        />,
+      );
+    });
+
+    expect(mockMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'repeat_after_me' }),
+    );
+  });
+
   it('does not submit when recording stops with an empty transcript', async () => {
     const { rerender } = render(
       <SpeakingPracticeActivity
@@ -194,6 +427,7 @@ describe('SpeakingPracticeActivity', () => {
     mockSttState = {
       status: 'listening',
       transcript: '',
+      isFinalTranscript: false,
       error: null,
       isListening: true,
     };
@@ -208,6 +442,7 @@ describe('SpeakingPracticeActivity', () => {
     mockSttState = {
       status: 'idle',
       transcript: '',
+      isFinalTranscript: true,
       error: null,
       isListening: false,
     };
@@ -238,6 +473,7 @@ describe('SpeakingPracticeActivity', () => {
     mockSttState = {
       status: 'listening',
       transcript: 'I like cup tea',
+      isFinalTranscript: false,
       error: null,
       isListening: true,
     };
@@ -251,6 +487,7 @@ describe('SpeakingPracticeActivity', () => {
     mockSttState = {
       status: 'idle',
       transcript: 'I like cup tea',
+      isFinalTranscript: true,
       error: null,
       isListening: false,
     };
@@ -272,10 +509,185 @@ describe('SpeakingPracticeActivity', () => {
     expect(screen.queryByTestId('speaking-practice-missing')).toBeNull();
   });
 
+  it('keeps later successful feedback when an earlier attempt resolves last', async () => {
+    const attemptA = deferred<{
+      missingWords: string[];
+      extraWords: string[];
+      isComplete: boolean;
+    }>();
+    const attemptB = deferred<{
+      missingWords: string[];
+      extraWords: string[];
+      isComplete: boolean;
+    }>();
+    mockMutateAsync
+      .mockReturnValueOnce(attemptA.promise)
+      .mockReturnValueOnce(attemptB.promise);
+
+    const { rerender } = render(activityView());
+    await submitTranscript(rerender, 'attempt A');
+    fireEvent.press(screen.getByTestId('speaking-practice-record'));
+    await submitTranscript(rerender, 'I would like a cup of tea');
+
+    await act(async () => {
+      attemptB.resolve({
+        missingWords: [],
+        extraWords: [],
+        isComplete: true,
+      });
+      await attemptB.promise;
+    });
+    screen.getByText('Matched');
+
+    await act(async () => {
+      attemptA.resolve({
+        missingWords: ['would'],
+        extraWords: [],
+        isComplete: false,
+      });
+      await attemptA.promise;
+    });
+
+    screen.getByText('Matched');
+    expect(screen.queryByText('Try again: would')).toBeNull();
+  });
+
+  it('does not replace later feedback with an earlier attempt error', async () => {
+    const attemptA = deferred<never>();
+    const attemptB = deferred<{
+      missingWords: string[];
+      extraWords: string[];
+      isComplete: boolean;
+    }>();
+    mockMutateAsync
+      .mockReturnValueOnce(attemptA.promise)
+      .mockReturnValueOnce(attemptB.promise);
+
+    const { rerender } = render(activityView());
+    await submitTranscript(rerender, 'attempt A');
+    fireEvent.press(screen.getByTestId('speaking-practice-record'));
+    await submitTranscript(rerender, 'I would like a cup of tea');
+
+    await act(async () => {
+      attemptB.resolve({
+        missingWords: [],
+        extraWords: [],
+        isComplete: true,
+      });
+      await attemptB.promise;
+    });
+
+    await act(async () => {
+      attemptA.reject(new Error('attempt A cancelled'));
+      await attemptA.promise.catch(() => undefined);
+    });
+
+    screen.getByText('Matched');
+    expect(screen.queryByTestId('speaking-practice-attempt-error')).toBeNull();
+  });
+
+  it('invalidates an outstanding attempt when navigation changes the session', async () => {
+    const attemptA = deferred<{
+      missingWords: string[];
+      extraWords: string[];
+      isComplete: boolean;
+    }>();
+    mockMutateAsync.mockReturnValueOnce(attemptA.promise);
+
+    const { rerender } = render(activityView());
+    await submitTranscript(rerender, 'attempt A');
+
+    rerender(activityView('session-2'));
+    await act(async () => {
+      attemptA.resolve({
+        missingWords: ['would'],
+        extraWords: [],
+        isComplete: false,
+      });
+      await attemptA.promise;
+    });
+
+    expect(screen.queryByText('Try again: would')).toBeNull();
+    expect(screen.queryByTestId('speaking-practice-attempt-error')).toBeNull();
+  });
+
+  it('does not submit the previous recording after navigation changes the session', async () => {
+    const { rerender } = render(activityView());
+
+    mockSttState = {
+      status: 'listening',
+      transcript: 'attempt from session 1',
+      isFinalTranscript: false,
+      error: null,
+      isListening: true,
+    };
+    rerender(activityView());
+
+    rerender(activityView('session-2'));
+
+    mockSttState = {
+      status: 'idle',
+      transcript: 'attempt from session 1',
+      isFinalTranscript: true,
+      error: null,
+      isListening: false,
+    };
+    await act(async () => {
+      rerender(activityView('session-2'));
+    });
+
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+
+    mockMutateAsync.mockResolvedValueOnce({
+      missingWords: [],
+      extraWords: [],
+      isComplete: true,
+    });
+    fireEvent.press(screen.getByTestId('speaking-practice-record'));
+    await submitTranscript(rerender, 'attempt from session 2', 'session-2');
+
+    expect(mockMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'session-2',
+        transcript: 'attempt from session 2',
+      }),
+    );
+    await screen.findByText('Matched');
+  });
+
+  it('does not read or apply an outstanding response after unmount', async () => {
+    const feedbackRead = jest.fn();
+    const attempt = deferred<{
+      missingWords: string[];
+      extraWords: string[];
+      isComplete: boolean;
+    }>();
+    mockMutateAsync.mockReturnValueOnce(attempt.promise);
+
+    const { rerender, unmount } = render(activityView());
+    await submitTranscript(rerender, 'attempt A');
+    unmount();
+
+    await act(async () => {
+      attempt.resolve({
+        get missingWords() {
+          feedbackRead();
+          return [];
+        },
+        extraWords: [],
+        isComplete: true,
+      });
+      await attempt.promise;
+    });
+
+    expect(feedbackRead).not.toHaveBeenCalled();
+  });
+
   it('shows no verdict while listening/interim transcript is streaming, before the server has scored anything (M1)', () => {
     mockSttState = {
       status: 'listening',
       transcript: 'I would like a cup of tea',
+      isFinalTranscript: false,
       error: null,
       isListening: true,
     };
@@ -309,6 +721,7 @@ describe('SpeakingPracticeActivity', () => {
     mockSttState = {
       status: 'idle',
       transcript: 'I like cup tea',
+      isFinalTranscript: false,
       error: null,
       isListening: false,
     };
@@ -328,7 +741,11 @@ describe('SpeakingPracticeActivity', () => {
         subjectId="subject-1"
       />,
     );
-    mockSttState = { ...mockSttState, isListening: false };
+    mockSttState = {
+      ...mockSttState,
+      isListening: false,
+      isFinalTranscript: true,
+    };
     await act(async () => {
       rerender(
         <SpeakingPracticeActivity

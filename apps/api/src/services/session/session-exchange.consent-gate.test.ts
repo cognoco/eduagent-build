@@ -37,11 +37,11 @@ function withdrawnParentalDb(): Database {
 
 function withdrawnAdultLlmDisclosureDb(): Database {
   const db = createMockDb() as unknown as Database;
-  // [0] gdpr basis: no parental row. [1] platform_use art6_1_a: CONSENTED.
-  // [2] llm_disclosure art6_1_a: WITHDRAWN.
+  // [0..1] complete GDPR set: no parental rows. [2] platform_use art6_1_a:
+  // CONSENTED. [3] llm_disclosure art6_1_a: WITHDRAWN.
   seedConsentState(db as unknown as Record<string, unknown>, {
     personId: TEST_PROFILE_ID,
-    state: [null, 'CONSENTED', 'WITHDRAWN'],
+    state: [null, null, 'CONSENTED', 'WITHDRAWN'],
   });
   return db;
 }
@@ -50,7 +50,7 @@ function activeConsentDb(): Database {
   const db = createMockDb() as unknown as Database;
   seedConsentState(db as unknown as Record<string, unknown>, {
     personId: TEST_PROFILE_ID,
-    state: [null, 'CONSENTED', 'CONSENTED'],
+    state: [null, null, 'CONSENTED', 'CONSENTED'],
   });
   return db;
 }

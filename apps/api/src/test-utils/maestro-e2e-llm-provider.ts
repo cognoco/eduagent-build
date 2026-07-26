@@ -1,7 +1,238 @@
 import {
   llmEnvelopeReply,
   registerLlmProviderFixture,
+  type LlmFixtureContent,
 } from './llm-provider-fixtures';
+import { getTextContent, type ChatMessage } from '../services/llm/types';
+
+const DICTATION_SYSTEM_MARKER = 'You are a dictation review assistant.';
+const DICTATION_PREPARATION_SYSTEM_MARKER =
+  'You are a dictation preparation assistant.';
+const SUBJECT_SYSTEM_MARKER =
+  'You are a subject name classifier for an educational tutoring app';
+const SUMMARY_EVALUATION_SYSTEM_MARKER =
+  "You are MentoMate's summary evaluator.";
+
+function resolveSummaryEvaluation(
+  messages: ChatMessage[],
+): LlmFixtureContent | undefined {
+  const systemPrompt = messages.find(({ role }) => role === 'system');
+  if (
+    !systemPrompt ||
+    !getTextContent(systemPrompt.content).includes(
+      SUMMARY_EVALUATION_SYSTEM_MARKER,
+    )
+  ) {
+    return undefined;
+  }
+
+  return {
+    feedback: 'Good summary — you connected the key concepts to practice.',
+    hasUnderstandingGaps: false,
+    gapAreas: [],
+    isAccepted: true,
+  };
+}
+
+function resolveDictationPreparation(
+  messages: ChatMessage[],
+): LlmFixtureContent | undefined {
+  const systemPrompt = messages.find(({ role }) => role === 'system');
+  if (
+    !systemPrompt ||
+    !getTextContent(systemPrompt.content).includes(
+      DICTATION_PREPARATION_SYSTEM_MARKER,
+    )
+  ) {
+    return undefined;
+  }
+
+  const homeworkText = messages
+    .filter(({ role }) => role === 'user')
+    .map(({ content }) => getTextContent(content))
+    .join('\n')
+    .match(/<homework_text>([^<]+)<\/homework_text>/)?.[1];
+
+  const sentenceFixtures = {
+    'The sun is warm.': {
+      text: 'The sun is warm.',
+      withPunctuation: 'The sun is warm period',
+      wordCount: 4,
+      chunks: ['The sun is warm.'],
+      chunksWithPunctuation: ['The sun is warm period'],
+    },
+    'Birds can sing.': {
+      text: 'Birds can sing.',
+      withPunctuation: 'Birds can sing period',
+      wordCount: 3,
+      chunks: ['Birds can sing.'],
+      chunksWithPunctuation: ['Birds can sing period'],
+    },
+  } as const;
+
+  if (homeworkText === 'The sun is warm.') {
+    return { sentences: [sentenceFixtures[homeworkText]], language: 'en' };
+  }
+  if (homeworkText === 'The sun is warm. Birds can sing.') {
+    return {
+      sentences: [
+        sentenceFixtures['The sun is warm.'],
+        sentenceFixtures['Birds can sing.'],
+      ],
+      language: 'en',
+    };
+  }
+
+  throw new Error(
+    'Hosted Maestro received unrecognized dictation preparation text',
+  );
+}
+
+function resolveDictationReview(
+  messages: ChatMessage[],
+): LlmFixtureContent | undefined {
+  const systemPrompt = messages.find(({ role }) => role === 'system');
+  if (
+    !systemPrompt ||
+    !getTextContent(systemPrompt.content).includes(DICTATION_SYSTEM_MARKER)
+  ) {
+    return undefined;
+  }
+
+  const userPrompt = messages
+    .filter(({ role }) => role === 'user')
+    .map(({ content }) => getTextContent(content))
+    .join('\n');
+
+  if (
+    userPrompt.includes('1. The sun is warm.') &&
+    userPrompt.includes('2. Birds can sing.')
+  ) {
+    return { totalSentences: 2, correctCount: 2, mistakes: [] };
+  }
+
+  if (
+    userPrompt.includes('1. The sun is warm.') &&
+    !userPrompt.includes('\n2.')
+  ) {
+    return {
+      totalSentences: 1,
+      correctCount: 0,
+      mistakes: [
+        {
+          sentenceIndex: 0,
+          original: 'The sun is warm.',
+          written: 'The sune is warm.',
+          error: 'spelling',
+          correction: 'The sun is warm.',
+          explanation: 'Write sun without an extra e.',
+        },
+      ],
+    };
+  }
+
+  throw new Error(
+    'Hosted Maestro received an unrecognized dictation review fixture',
+  );
+}
+
+function resolveSubjectRequest(
+  messages: ChatMessage[],
+): LlmFixtureContent | undefined {
+  const systemPrompt = messages.find(({ role }) => role === 'system');
+  if (
+    !systemPrompt ||
+    !getTextContent(systemPrompt.content).includes(SUBJECT_SYSTEM_MARKER)
+  ) {
+    return undefined;
+  }
+
+  const userPrompt = messages
+    .filter(({ role }) => role === 'user')
+    .map(({ content }) => getTextContent(content))
+    .join('\n');
+  const subject = userPrompt.match(
+    /<subject_request>([^<]+)<\/subject_request>/,
+  )?.[1];
+
+  if (subject === 'Phsics') {
+    return {
+      status: 'corrected',
+      resolvedName: 'Physics',
+      focus: null,
+      focusDescription: null,
+      suggestions: [
+        {
+          name: 'Physics',
+          description: 'Forces, motion, energy and the laws of the universe',
+        },
+      ],
+      displayMessage: 'Did you mean **Physics**?',
+    };
+  }
+
+  if (subject) {
+    return {
+      status: 'direct_match',
+      resolvedName: subject,
+      focus: null,
+      focusDescription: null,
+      suggestions: [
+        {
+          name: subject,
+          description: `A deterministic learning path for ${subject}`,
+        },
+      ],
+      displayMessage: '',
+    };
+  }
+
+  throw new Error('Hosted Maestro received a subject fixture without input');
+}
+
+function resolveMaestroChat(
+  messages: ChatMessage[],
+): LlmFixtureContent | undefined {
+  return (
+    resolveSummaryEvaluation(messages) ??
+    resolveDictationPreparation(messages) ??
+    resolveDictationReview(messages) ??
+    resolveSubjectRequest(messages)
+  );
+}
+
+function recitationEnvelopeReply(reply: string): LlmFixtureContent {
+  return {
+    reply,
+    signals: {},
+    private_sources: {
+      relied_on: ['recitation_text'],
+      insufficient: false,
+      reason:
+        'Deterministic hosted Maestro recitation fixture uses only learner-provided recitation text.',
+    },
+  };
+}
+
+function resolveMaestroStream(
+  messages: ChatMessage[],
+): LlmFixtureContent | undefined {
+  const systemPrompt = messages.find(({ role }) => role === 'system');
+  const instructions = systemPrompt ? getTextContent(systemPrompt.content) : '';
+
+  if (instructions.includes('SERVER-OWNED SETUP ACTION: INVITE TO BEGIN')) {
+    return recitationEnvelopeReply(
+      'Ready when you are — begin your recitation from memory.',
+    );
+  }
+  if (instructions.includes('SERVER-OWNED SETUP ACTION: COACH RECITATION')) {
+    return recitationEnvelopeReply(
+      'Good recall. Keep the wording steady and continue when you are ready.',
+    );
+  }
+
+  return undefined;
+}
 
 /** Register the deterministic external-boundary LLM used by hosted Maestro. */
 export function registerMaestroE2eLlmProvider(): void {
@@ -10,24 +241,11 @@ export function registerMaestroE2eLlmProvider(): void {
     // the fixture under that existing provider id exercises the real router
     // and subject-response parser without making an external request.
     id: 'openai',
+    chatResponseResolver: (messages) => resolveMaestroChat(messages),
+    streamResponseResolver: (messages) => resolveMaestroStream(messages),
     streamResponse: llmEnvelopeReply(
       "Let's work through this together. What have you noticed so far?",
     ),
-    chatResponses: [
-      {
-        status: 'direct_match',
-        resolvedName: 'Photosynthesis',
-        focus: null,
-        focusDescription: null,
-        suggestions: [
-          {
-            name: 'Photosynthesis',
-            description: 'How plants turn light into energy',
-          },
-        ],
-        displayMessage: '',
-      },
-    ],
     // The named E2E case creates this subject immediately after resolution.
     // Keep all subsequent generation attempts valid and deterministic so the
     // case never depends on the production parser's failure fallback.

@@ -29,6 +29,7 @@ import {
   createDatabase,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import { resolve } from 'path';
 
 import { app } from '../index';
@@ -131,15 +132,18 @@ async function seedConsentToken(opts: {
     organizationId: org!.id,
     roles: ['learner'],
   });
-  await db.insert(consentRequest).values({
-    chargePersonId: p!.id,
-    organizationId: org!.id,
-    requestedBasis: 'gdpr_parental_consent',
-    token,
-    tokenExpiresAt: expiresAt,
-    status: 'pending',
-    guardianEmail: 'parent@example.com',
-  });
+  await db.insert(consentRequest).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      chargePersonId: p!.id,
+      organizationId: org!.id,
+      purpose,
+      requestedBasis: 'gdpr_parental_consent' as const,
+      token,
+      tokenExpiresAt: expiresAt,
+      status: 'pending' as const,
+      guardianEmail: 'parent@example.com',
+    })),
+  );
 
   return { accountId: org!.id, profileId: p!.id, token };
 }
@@ -842,18 +846,21 @@ describe('P0 email-parent withdrawal/restore (identity-v2)', () => {
     // the mismatch check in the service layer sees a live, matching link.
     const withdrawalTokenId = crypto.randomUUID();
     if (opts.grant !== false) {
-      await db.insert(consentGrant).values({
-        chargePersonId: p!.id,
-        organizationId: org!.id,
-        purpose: 'platform_use',
-        lawfulBasis: 'gdpr_parental_consent',
-        granted: true,
-        grantedAt: new Date(),
-        priorValue: null,
-        withdrawnAt: opts.withdrawnAt ?? null,
-        auditFact: { source: 'consent_response_approved' },
-        withdrawalTokenId,
-      });
+      const grantedAt = new Date();
+      await db.insert(consentGrant).values(
+        CONSENT_PURPOSES.map((purpose) => ({
+          chargePersonId: p!.id,
+          organizationId: org!.id,
+          purpose,
+          lawfulBasis: 'gdpr_parental_consent' as const,
+          granted: true,
+          grantedAt,
+          priorValue: null,
+          withdrawnAt: opts.withdrawnAt ?? null,
+          auditFact: { source: 'consent_response_approved' },
+          withdrawalTokenId,
+        })),
+      );
     }
     const token = signWithdrawalToken(p!.id, org!.id, WITHDRAW_SECRET, {
       tokenId: withdrawalTokenId,
@@ -1035,8 +1042,8 @@ describe('P0 email-parent withdrawal/restore (identity-v2)', () => {
     });
     // No new row was appended, and the original grant is still withdrawn —
     // the link had zero mutating effect.
-    expect(grants).toHaveLength(1);
-    expect(grants[0]!.withdrawnAt).toBeTruthy();
+    expect(grants).toHaveLength(CONSENT_PURPOSES.length);
+    expect(grants.every((grant) => grant.withdrawnAt !== null)).toBe(true);
   });
 
   it('POST restore: forged/invalid token → 400 invalid-link page (unchanged; still never mutates)', async () => {
@@ -1073,17 +1080,21 @@ describe('P0 email-parent withdrawal/restore (identity-v2)', () => {
     // A newer grant minted after 'Cora's, carrying a withdrawalTokenId —
     // simulates a fresh re-consent cycle under the post-migration code.
     const db = createIntegrationDb();
-    await db.insert(consentGrant).values({
-      chargePersonId: childId,
-      organizationId: orgId,
-      purpose: 'platform_use',
-      lawfulBasis: 'gdpr_parental_consent',
-      granted: true,
-      grantedAt: new Date(),
-      priorValue: null,
-      auditFact: { source: 'consent_response_approved' },
-      withdrawalTokenId: crypto.randomUUID(),
-    });
+    const withdrawalTokenId = crypto.randomUUID();
+    const grantedAt = new Date();
+    await db.insert(consentGrant).values(
+      CONSENT_PURPOSES.map((purpose) => ({
+        chargePersonId: childId,
+        organizationId: orgId,
+        purpose,
+        lawfulBasis: 'gdpr_parental_consent' as const,
+        granted: true,
+        grantedAt,
+        priorValue: null,
+        auditFact: { source: 'consent_response_approved' },
+        withdrawalTokenId,
+      })),
+    );
 
     const legacyToken = forgeCw1Token(childId, orgId);
     const res = await postW('/v1/consent-page/withdraw', {

@@ -118,10 +118,14 @@ describe('Integration: WI-297 — profile creation full-date age gate', () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.profile.birthYear).toBe(birthYear);
-    // The gate consumes the full date transiently, while creation persists a
-    // year-only date; the response contract includes null month/day fields.
-    expect(body.profile.birthMonth).toBeNull();
-    expect(body.profile.birthDay).toBeNull();
+    // Creation persists the full date used by the gate. The canonical profile
+    // mapper returns that month/day except for YYYY-01-01, the established
+    // year-only sentinel, which is represented as null/null.
+    const isYearOnlySentinel = today.month === 1 && today.day === 1;
+    expect(body.profile.birthMonth).toBe(
+      isYearOnlySentinel ? null : today.month,
+    );
+    expect(body.profile.birthDay).toBe(isYearOnlySentinel ? null : today.day);
   });
 
   it('year-only path (no birthMonth/birthDay) still works for age >= 13', async () => {

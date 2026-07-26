@@ -1,0 +1,99 @@
+[release] Device connected. Preparing release APK test...
+Success
+[release] Launching app...
+Starting: Intent { cmp=com.mentomate.app/.MainActivity }
+[release] Waiting for auth entry (max 30s)...
+UI hierchary dumped to: /sdcard/ui_dump.xml
+[release] Auth entry reached after 2s.
+[release] Seeding scenario='parent-with-children' nativeSeedSlot='native-03' ...
+[ci-maestro] Seed env keys: EMAIL,PASSWORD,ACCOUNT_ID,PROFILE_ID,PARENT_PROFILE_ID,CHILD_PROFILE_ID,SUBJECT_ID,SESSION_ID,TOPIC_ID
+[ci-maestro] Seed ID mappings: parentProfileId->PARENT_PROFILE_ID,childProfileId->CHILD_PROFILE_ID,subjectId->SUBJECT_ID,sessionId->SESSION_ID,topicId->TOPIC_ID
+[release] Seed prepared for scenario='parent-with-children'.
+[release] Running: C:/tools/maestro/bin/maestro test --config /c/Dev/Projects/Products/Apps/eduagent-build/.worktrees/WI-1655/apps/mobile/e2e/scripts/../config-release.yaml flows/parent/consent-management.yaml
+Running on New_Device
+ > Flow consent-management
+Run ../_setup/seed-and-sign-in.yaml...
+[engine] WARNING: Unable to load the TruffleAttach library.
+As a result, the optimized Truffle runtime is unavailable, and Truffle cannot provide native access to languages and tools.
+To customize the behavior of this warning, use the 'polyglotimpl.AttachLibraryFailureAction' system property.
+Allowed values are:
+  - ignore:    Do not print this warning.
+  - warn:      Print this warning (default value).
+  - diagnose:  Print this warning along with the exception cause.
+  - throw:     Throw an exception instead of printing this warning.
+
+  Run nav-welcome-to-sign-in.yaml...
+    Assert that id: welcome-chooser is visible... COMPLETED
+    Tap on id: welcome-chooser-learner... COMPLETED
+    Assert that id: welcome-card-1 is visible... COMPLETED
+    Repeat 5 times...
+      Tap on (Optional) id: welcome-next-button... COMPLETED
+      Assert that (Optional) id: welcome-start-button is visible... WARNED
+    Repeat 5 times... COMPLETED
+    Assert that id: welcome-start-button is visible... COMPLETED
+    Tap on id: welcome-start-button... COMPLETED
+    Assert that id: pre-auth-bridge is visible... COMPLETED
+    Tap on id: pre-auth-bridge-secondary... COMPLETED
+    Assert that id: sign-in-button is visible... COMPLETED
+  Run nav-welcome-to-sign-in.yaml... COMPLETED
+  Assert that id: sign-in-button is visible... COMPLETED
+  Take screenshot signin-01-screen-loaded... COMPLETED
+  Tap on id: sign-in-email... COMPLETED
+  Input text ${EMAIL}... COMPLETED
+  Take screenshot signin-02-email-keyboard-open... COMPLETED
+  Hide Keyboard... COMPLETED
+  Tap on id: sign-in-password... COMPLETED
+  Input text ${PASSWORD}... COMPLETED
+  Take screenshot signin-03-password-keyboard-open... COMPLETED
+  Hide Keyboard... COMPLETED
+  Assert that id: sign-in-button is visible... COMPLETED
+  Tap on id: sign-in-button... COMPLETED
+  Assert that (Optional) id: learner-screen is visible... WARNED
+  Assert that (Optional) id: dashboard-scroll is visible... WARNED
+  Assert that (Optional) id: parent-home-screen is visible... COMPLETED
+  Run dismiss-post-approval.yaml when "You're approved!" is visible...
+  Run dismiss-post-approval.yaml when "You're approved!" is visible... SKIPPED
+  Tap on (Optional) "Skip for now"... WARNED
+  Assert that id: profile-load-error is not visible... COMPLETED
+  Run return-to-home-safe.yaml when id: learner-screen is not visible...
+    Run flow when id: mentor-screen is not visible...
+      Run flow when id: support-hub-mentor-tab is not visible...
+        Run return-to-home-check-parent-home.yaml when id: dashboard-scroll is not visible...
+          Run return-to-home-check-gateway.yaml when id: parent-home-screen is not visible...
+          Run return-to-home-check-gateway.yaml when id: parent-home-screen is not visible... SKIPPED
+        Run return-to-home-check-parent-home.yaml when id: dashboard-scroll is not visible... COMPLETED
+      Run flow when id: support-hub-mentor-tab is not visible... COMPLETED
+    Run flow when id: mentor-screen is not visible... COMPLETED
+  Run return-to-home-safe.yaml when id: learner-screen is not visible... COMPLETED
+  Assert that (Optional) id: learner-screen is visible... WARNED
+  Assert that (Optional) id: parent-home-screen is visible... COMPLETED
+  Assert that (Optional) id: mentor-screen is visible... WARNED
+  Assert that (Optional) id: support-hub-mentor-tab is visible... WARNED
+  Take screenshot signin-04-home-reached... COMPLETED
+  Run dismiss-notifications.yaml when "send you notifications" is visible...
+  Run dismiss-notifications.yaml when "send you notifications" is visible... SKIPPED
+Run ../_setup/seed-and-sign-in.yaml... COMPLETED
+Assert that id: parent-home-screen is visible... COMPLETED
+Tap on id: parent-home-child-profile-${CHILD_PROFILE_ID}... COMPLETED
+Assert that id: child-detail-scroll is visible... COMPLETED
+Scrolling DOWN until id: withdraw-consent-button is visible with speed 60, visibility percentage 50%, timeout 20000 ms, wait to settle 1000 ms, with centering enabled... COMPLETED
+Take screenshot consent-mgmt-01-consent-section... COMPLETED
+Assert that id: withdraw-consent-button is visible... COMPLETED
+Tap on id: withdraw-consent-button... COMPLETED
+Assert that (Optional) "Withdraw consent" is visible... WARNED
+
+
+ Warning: Assertion is false: "Withdraw consent" is visible
+Take screenshot consent-mgmt-02-confirm-dialog... COMPLETED
+Tap on "(?i)confirm.*withdraw consent"... COMPLETED
+Assert that id: consent-withdrawn-empty-state is visible... COMPLETED
+Assert that id: consent-withdrawn-request-cta is visible... COMPLETED
+Take screenshot consent-mgmt-03-withdrawn-empty-state... COMPLETED
+Tap on id: consent-withdrawn-request-cta... COMPLETED
+Assert that id: child-detail-scroll is visible... COMPLETED
+Scrolling DOWN until id: withdraw-consent-button is visible with speed 60, visibility percentage 50%, timeout 20000 ms, wait to settle 1000 ms, with centering enabled... COMPLETED
+Take screenshot consent-mgmt-04-consent-restored... COMPLETED
+Tap on id: back-button... COMPLETED
+Take screenshot consent-mgmt-05-complete... COMPLETED
+[release] Cleaning seeded DB graph for native slot prefix='test-e2e-native-03' (preserving Clerk user) ...
+{"message":"Database reset complete","deletedCount":1,"clerkUsersDeleted":0}

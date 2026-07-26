@@ -157,6 +157,15 @@ function createFakeDb(opts: { failTopicInsert: boolean }) {
       // regenerateLanguageCurriculum deletes old curricula before reinsert.
       where: async () => undefined,
     }),
+    update: () => ({
+      set: () => ({
+        where: () => ({
+          // The active-topic writer fence locks the destination book before
+          // the curriculum swap. This fake has no competing expansion claim.
+          returning: async () => [{ id: 'book-1' }],
+        }),
+      }),
+    }),
     async transaction<T>(cb: (tx: Database) => Promise<T>): Promise<T> {
       // Open a fresh staging buffer for this transaction.
       const previous = staged;

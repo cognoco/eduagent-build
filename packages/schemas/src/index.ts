@@ -8,6 +8,8 @@ export * from './health';
 // Profiles
 export * from './profiles';
 export * from './consent';
+// Habitual-residence country matrix + jurisdiction decision (WI-2690)
+export * from './country-policy';
 export * from './family-join';
 export * from './account';
 
@@ -17,6 +19,7 @@ export * from './sessions';
 export * from './mentor-notices';
 export * from './language';
 export * from './bookmarks';
+export * from './evidence-links';
 
 // Assessment & Retention (Epic 3)
 export * from './assessments';

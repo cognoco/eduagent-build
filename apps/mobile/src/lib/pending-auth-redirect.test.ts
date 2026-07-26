@@ -117,24 +117,20 @@ describe('seedPendingAuthRedirectForTesting', () => {
     }
   });
 
-  it('throws when NODE_ENV is production regardless of E2E flag', () => {
-    // jest.replaceProperty handles the Jest-locked NODE_ENV correctly.
-    // jest.replaceProperty returns the value to its original after the test
-    // when used with afterEach restore — but here we rely on jest's own
-    // auto-restore because replaceProperty is integrated with Jest's mock
-    // lifecycle.
+  it('[WI-1864] supports the release-mode native E2E bundle when its explicit flag is true', () => {
     jest.replaceProperty(process.env, 'NODE_ENV', 'production');
     process.env.EXPO_PUBLIC_E2E = 'true';
-    expect(() => seedPendingAuthRedirectForTesting('/library', 0)).toThrow(
-      'seedPendingAuthRedirectForTesting is dev-only',
-    );
+    expect(() =>
+      seedPendingAuthRedirectForTesting('/library', FIVE_MIN_MS + 60_000),
+    ).not.toThrow();
+    expect(peekPendingAuthRedirect()).toBeNull();
     jest.restoreAllMocks();
   });
 
   it('throws when EXPO_PUBLIC_E2E is not set', () => {
     delete process.env.EXPO_PUBLIC_E2E;
     expect(() => seedPendingAuthRedirectForTesting('/library', 0)).toThrow(
-      'seedPendingAuthRedirectForTesting is dev-only',
+      'seedPendingAuthRedirectForTesting is E2E-only',
     );
   });
 
@@ -151,7 +147,7 @@ describe('seedPendingAuthRedirectForTesting', () => {
   it('throws when EXPO_PUBLIC_E2E is "false"', () => {
     process.env.EXPO_PUBLIC_E2E = 'false';
     expect(() => seedPendingAuthRedirectForTesting('/library', 0)).toThrow(
-      'seedPendingAuthRedirectForTesting is dev-only',
+      'seedPendingAuthRedirectForTesting is E2E-only',
     );
   });
 

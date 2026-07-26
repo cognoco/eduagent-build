@@ -100,10 +100,12 @@ import { applyAppHelpSignalGuard, isAppHelpQuery } from '../app-help-map';
 import {
   applyMentorNoticeOutcome,
   createMentorNoticeFromExchange,
+  detachMentorNoticeRecheckAttempt,
+  evaluateMentorNoticeRecheck,
   getLearningDayStart,
   getProfileTimeZone,
+  MENTOR_NOTICE_RECHECK_MAX_EXCHANGES,
   resolveMentorNoticeRecheckContext,
-  validateNoticeEvidence,
 } from '../mentor-notices';
 import { generateEmbedding } from '../embeddings';
 import { retrieveRelevantMemory } from '../memory';
@@ -123,7 +125,10 @@ import { shouldTriggerEvaluate } from '../evaluate';
 import { shouldTriggerTeachBack } from '../teach-back';
 import { getRetentionStatus, type RetentionState } from '../retention';
 import { extractInterestLabels } from '../graded-input-generation';
-import { createNoteForSession } from '../notes';
+import {
+  persistVerifiedChallengeArtifact,
+  persistVerifiedChallengeArtifacts,
+} from '../evidence-links';
 import type {
   EscalationRung,
   LlmProviderPolicy,
@@ -178,6 +183,7 @@ import {
 import {
   CONCEPT_CAPTURE_ENABLED,
   captureConceptMastery,
+  conceptKeyForLabel,
 } from '../concept-capture';
 import { MAX_CHALLENGE_QUESTIONS } from '../challenge-round/caps';
 import {
@@ -245,6 +251,79 @@ async function recordSessionPracticeActivityEvent(
 }
 
 const logger = createLogger();
+
+// ---------------------------------------------------------------------------
+// [WI-2625 rework #4] Mentor-notice re-check CAP — the attempt lifecycle is
+// SEPARATE bookkeeping from notice status (operator ruling, 2026-07-26).
+//
+// A valid `continue` makes NO mentor-notice transition at any exchange number,
+// including the third (AC-3, as written). The three-response cap therefore ends
+// the ATTEMPT, not the notice: `endMentorNoticeRecheckAttemptAtCap` detaches the
+// session's attempt bookkeeping and leaves the notice `open` and unresolved, so
+// it stays eligible for a later re-offer under the ordinary eligibility/cooldown
+// rules — a fresh attempt, counted from exchange 1, in a fresh session.
+//
+// Detaching is what makes that re-offer genuinely reachable rather than a
+// zombie: while the attempt keys survive on a session already past the cap,
+// `resolveMentorNoticeRecheckContext` returns null there forever AND
+// `startMentorNoticeRecheck` keeps handing that same dead session back. See
+// `detachMentorNoticeRecheckAttempt` (offer.ts) for the full argument.
+//
+// Malformed or unavailable judgment at the cap is the ONE case that still
+// terminalizes `not_yet` (AC-4), because there no valid verdict was ever
+// obtained — nothing to preserve for a later attempt.
+// ---------------------------------------------------------------------------
+
+/**
+ * [AC-3] The cap fired over a VALID `continue`: end the attempt, transition
+ * nothing. The notice stays open and re-offerable.
+ */
+async function endMentorNoticeRecheckAttemptAtCap(
+  db: Database,
+  input: { profileId: string; sessionId: string; exchangeNumber: number },
+): Promise<void> {
+  if (input.exchangeNumber < MENTOR_NOTICE_RECHECK_MAX_EXCHANGES) return;
+  logger.info(
+    '[mentor-notice-recheck] response cap reached after a valid continue — attempt ended, notice preserved',
+    {
+      cause: 'valid_continue',
+      exchangeNumber: input.exchangeNumber,
+      maxExchanges: MENTOR_NOTICE_RECHECK_MAX_EXCHANGES,
+    },
+  );
+  await detachMentorNoticeRecheckAttempt(db, {
+    profileId: input.profileId,
+    sessionId: input.sessionId,
+  });
+}
+
+/**
+ * [AC-4] The cap fired over an UNRESOLVED evaluation (malformed output, judge
+ * unavailable, routing failure): deterministically terminalize `not_yet`.
+ */
+async function terminalizeUnresolvedMentorNoticeRecheckAtCap(
+  db: Database,
+  input: {
+    profileId: string;
+    noticeId: string;
+    exchangeNumber: number;
+  },
+): Promise<void> {
+  if (input.exchangeNumber < MENTOR_NOTICE_RECHECK_MAX_EXCHANGES) return;
+  logger.info(
+    '[mentor-notice-recheck] response cap reached — terminalizing not_yet',
+    {
+      cause: 'evaluator_unresolved',
+      exchangeNumber: input.exchangeNumber,
+      maxExchanges: MENTOR_NOTICE_RECHECK_MAX_EXCHANGES,
+    },
+  );
+  await applyMentorNoticeOutcome(db, {
+    profileId: input.profileId,
+    noticeId: input.noticeId,
+    outcome: 'not_yet',
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Correct-answer streak computation (pure — testable in isolation)
@@ -459,6 +538,7 @@ export function buildCorrectStreakOfferTelemetry(
 }
 
 export interface ChallengeRoundVerdict {
+  outcome: MasteryOutcome;
   solidCount: number;
   partialCount: number;
   missingCount: number;
@@ -784,9 +864,11 @@ export async function persistActiveChallengeRoundTransition(
 
 function verdictFromEvaluations(
   evaluations: ChallengeRoundEvaluationItem[],
+  outcome: MasteryOutcome,
 ): ChallengeRoundVerdict {
   const summary = summarizeEvaluation(evaluations);
   return {
+    outcome,
     solidCount: summary.solid,
     partialCount: summary.partial,
     missingCount: summary.missing,
@@ -832,14 +914,30 @@ function buildFallbackDraft(
  * here should only happen if an answer row becomes unreadable between that
  * claim and the note-draft guard.
  */
+function wholeEventVerifiedSolidItems(
+  evaluations: ChallengeRoundEvaluationItem[],
+): ChallengeRoundEvaluationItem[] {
+  const nonSolidEventIds = new Set(
+    evaluations
+      .filter((item) => item.result !== 'solid')
+      .map((item) => item.answerEventId),
+  );
+  return evaluations.filter(
+    (item) =>
+      item.result === 'solid' && !nonSolidEventIds.has(item.answerEventId),
+  );
+}
+
 async function fetchVerifiedSolidContents(
   db: Database,
   profileId: string,
   sessionId: string,
   evaluations: ChallengeRoundEvaluationItem[],
 ): Promise<string[] | null> {
-  const solidItems = evaluations.filter((item) => item.result === 'solid');
-  if (solidItems.length === 0) return [];
+  const allSolidItems = evaluations.filter((item) => item.result === 'solid');
+  const solidItems = wholeEventVerifiedSolidItems(evaluations);
+  if (allSolidItems.length === 0) return [];
+  if (solidItems.length === 0) return null;
   try {
     const verified = await validateEvaluationEventIds(
       db,
@@ -863,9 +961,7 @@ function buildValidatedDraft(
   verifiedSolidContents: string[] | null,
 ): DraftedChallengeNote | undefined {
   const solidEventIds = new Set(
-    evaluations
-      .filter((item) => item.result === 'solid')
-      .map((item) => item.answerEventId),
+    wholeEventVerifiedSolidItems(evaluations).map((item) => item.answerEventId),
   );
   const solidAnswerEventIds = Array.from(solidEventIds);
   if (!noteDraft) {
@@ -1201,6 +1297,7 @@ const COMPLETION_COOLDOWN_OUTCOME_CODE: Record<
   verified: 2,
   partial: 1,
   reteach: 3,
+  insufficient_breadth: 4,
 };
 
 export async function finalizeChallengeRoundIfReady(
@@ -1371,6 +1468,36 @@ export async function finalizeChallengeRoundIfReady(
     verifiedSolidContents,
   );
 
+  // Persist only DB-confirmed solid answers whose whole source event is solid.
+  // If the same event also carries partial/misconception/missing content, the
+  // unsliced event cannot safely become verified evidence.
+  if (verifiedSolidContents !== null) {
+    const solidItems = wholeEventVerifiedSolidItems(evaluations);
+    await safeWrite(
+      async () => {
+        await persistVerifiedChallengeArtifacts(db, {
+          profileId,
+          topicId,
+          sessionId: session.id,
+          artifacts: solidItems.flatMap((item, index) => {
+            const eventContent = verifiedSolidContents[index];
+            return eventContent
+              ? [
+                  {
+                    artifactSource: 'challenge_solid_quote' as const,
+                    conceptKey: conceptKeyForLabel(item.concept),
+                    sourceEventIds: [item.answerEventId],
+                  },
+                ]
+              : [];
+          }),
+        });
+      },
+      'challenge-round.finalize.solid-quote-persist',
+      { profileId, sessionId: session.id, topicId },
+    );
+  }
+
   // [WI-1658] Persist the validated draft as the durable verified-proof artifact,
   // ONLY on a fully-verified round (every evaluation item solid). This sidesteps
   // the event-grain gap the Artifact Provenance Contract flags for mixed rounds:
@@ -1381,14 +1508,16 @@ export async function finalizeChallengeRoundIfReady(
   // persistChallengeRoundMasteryEvidence above.
   if (decision.outcome === 'verified' && draftedNote?.body) {
     await safeWrite(
-      () =>
-        createNoteForSession(db, {
+      async () => {
+        await persistVerifiedChallengeArtifact(db, {
           profileId,
           topicId,
           sessionId: session.id,
           content: draftedNote.body as string,
           artifactSource: 'challenge_drafted_note',
-        }),
+          sourceEventIds: draftedNote.sourceAnswerEventIds,
+        });
+      },
       'challenge-round.finalize.note-persist',
       { profileId, sessionId: session.id, topicId },
     );
@@ -1403,7 +1532,10 @@ export async function finalizeChallengeRoundIfReady(
 
   return {
     challengeRound: complete,
-    challengeRoundVerdict: verdictFromEvaluations(evaluations),
+    challengeRoundVerdict: verdictFromEvaluations(
+      evaluations,
+      decision.outcome,
+    ),
     ...(draftedNote ? { draftedNote } : {}),
   };
 }
@@ -1476,6 +1608,49 @@ async function validateChallengeRoundEvaluationItems(
   });
 }
 
+function bindAskedQuestionToEvaluationIdentities(
+  evaluations: ChallengeRoundEvaluationItem[],
+  askedQuestion: string | undefined,
+): ChallengeRoundEvaluationItem[] {
+  if (!askedQuestion?.trim()) return evaluations;
+  return evaluations.map((evaluation) =>
+    evaluation.questionIdentity
+      ? {
+          ...evaluation,
+          questionIdentity: {
+            ...evaluation.questionIdentity,
+            questionText: askedQuestion,
+          },
+        }
+      : evaluation,
+  );
+}
+
+/**
+ * [WI-2670] T6 extension: source the most recent mentor question AND its REAL
+ * producing vendor from the last assistant turn in `exchangeHistory` — no DB
+ * read. `producerVendor` comes from that turn's persisted `llmProvider` (see
+ * `extractProducerVendor`/`buildExchangeHistory`), never the CURRENT turn's
+ * own routing decision: the two can diverge after a mid-session provider
+ * fallback, which is exactly the substitution the Challenge Round grader's
+ * `JudgeIndependence` declaration must not make (root-cause note removed from
+ * grader.ts — see WI-2670).
+ */
+export function resolveAskedQuestion(
+  exchangeHistory: ReturnType<typeof buildExchangeHistory>,
+): { askedQuestion: string; producerVendor?: string } {
+  const lastAssistant = exchangeHistory
+    .filter((e) => e.role === 'assistant')
+    .at(-1);
+  if (!lastAssistant) return { askedQuestion: '' };
+  return {
+    askedQuestion: projectAiResponseContent(lastAssistant.content, {
+      silent: true,
+    }),
+    producerVendor: lastAssistant.producerVendor,
+  };
+}
+
 async function applyChallengeRoundRuntimeSignals(
   db: Database,
   profileId: string,
@@ -1491,6 +1666,12 @@ async function applyChallengeRoundRuntimeSignals(
     // assistant message in exchangeHistory. Passed to the grader judge so it
     // has the question context without a DB round-trip.
     askedQuestion?: string;
+    // [WI-2670] The REAL vendor that produced `askedQuestion` — sourced by the
+    // caller from that same last assistant turn's persisted `llmProvider`
+    // (see `resolveAskedQuestion`). Required for the grader to declare
+    // `JudgeIndependence` mode:'model-output'; undefined only when the
+    // producer genuinely cannot be resolved.
+    askedQuestionProducerVendor?: string;
     // T8: true when CHALLENGE_ROUND_GRADER_ENABLED env binding is 'true'.
     // Threaded from processMessage/streamMessage options.
     challengeRoundGraderEnabled?: boolean;
@@ -1543,11 +1724,23 @@ async function applyChallengeRoundRuntimeSignals(
 
     // Call the judge (fail-open: emits a structured degraded event and returns
     // [] on any error — never throws into this path).
+    //
+    // [WI-2670] `producerVendor` is threaded from the asked question's
+    // persisted `llmProvider` (see `resolveAskedQuestion`) — every
+    // ai_response event written by `persistExchangeResult` carries it, so
+    // this should always resolve in practice. grader.ts owns the
+    // "producer unresolved" fail-open branch (never fabricates a vendor,
+    // emits its own structured `producer_vendor_unresolved` degraded event)
+    // rather than this call site special-casing it.
     const graderEvaluation = await runChallengeRoundGrader({
       profileId,
       askedQuestion: payload.askedQuestion ?? '',
       learnerAnswer: payload.currentUserMessage.content,
       answerEventId: payload.currentUserMessage.id,
+      producerVendor: payload.askedQuestionProducerVendor,
+      priorQuestionIdentities: current.evaluations.flatMap((evaluation) =>
+        evaluation.questionIdentity ? [evaluation.questionIdentity] : [],
+      ),
       conversationLanguage: context.conversationLanguage,
       ageBracket,
       sessionId: context.sessionId,
@@ -1585,7 +1778,10 @@ async function applyChallengeRoundRuntimeSignals(
         db,
         profileId,
         session.id,
-        graderEvaluation,
+        bindAskedQuestionToEvaluationIdentities(
+          graderEvaluation,
+          payload.askedQuestion,
+        ),
         payload.currentUserMessage,
       );
     } catch (err) {
@@ -1653,7 +1849,10 @@ async function applyChallengeRoundRuntimeSignals(
         db,
         profileId,
         session.id,
-        payload.challengeRoundEvaluation,
+        bindAskedQuestionToEvaluationIdentities(
+          payload.challengeRoundEvaluation,
+          payload.askedQuestion,
+        ),
         payload.currentUserMessage,
       );
     } catch (err) {
@@ -2176,10 +2375,32 @@ function isReplayableSystemPrompt(event: ExchangeHistoryEvent): boolean {
   return source === undefined || source === 'server';
 }
 
+/**
+ * [WI-2670] The REAL vendor that produced an `ai_response` event, read back
+ * from the `llmProvider` field persisted on `session_events.metadata` at
+ * write time (see `persistExchangeResult`'s `aiMetadata.llmProvider`). Every
+ * `ai_response` row written by this file's persistence path carries it
+ * unconditionally; a missing/malformed value (e.g. a pre-tracking legacy row)
+ * resolves to `undefined` rather than throwing — callers must treat that as
+ * "producer unresolved," never guess.
+ */
+function extractProducerVendor(metadata: unknown): string | undefined {
+  if (
+    !metadata ||
+    typeof metadata !== 'object' ||
+    !('llmProvider' in metadata)
+  ) {
+    return undefined;
+  }
+  const value = (metadata as { llmProvider?: unknown }).llmProvider;
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
 export function buildExchangeHistory(events: ExchangeHistoryEvent[]): Array<{
   role: 'user' | 'system' | 'assistant';
   content: string;
   orphan_reason?: string;
+  producerVendor?: string;
 }> {
   return events
     .filter(
@@ -2196,6 +2417,12 @@ export function buildExchangeHistory(events: ExchangeHistoryEvent[]): Array<{
             ? ('system' as const)
             : ('assistant' as const),
       ...(e.orphanReason ? { orphan_reason: e.orphanReason } : {}),
+      ...(e.eventType === 'ai_response'
+        ? (() => {
+            const producerVendor = extractProducerVendor(e.metadata);
+            return producerVendor ? { producerVendor } : {};
+          })()
+        : {}),
       content:
         e.eventType === 'ai_response'
           ? (() => {
@@ -4112,13 +4339,10 @@ export async function processMessage(
   // (the mentor's most recent question, assembled before this LLM call — no DB
   // read). `content` is a re-wrapped JSON envelope; projectAiResponseContent
   // extracts clean prose. Falls back to '' if history is empty (first turn).
-  const askedQuestion = (() => {
-    const lastAssistant = context.exchangeHistory
-      .filter((e) => e.role === 'assistant')
-      .at(-1);
-    if (!lastAssistant) return '';
-    return projectAiResponseContent(lastAssistant.content, { silent: true });
-  })();
+  // [WI-2670] Also sources that turn's real producer vendor — see
+  // `resolveAskedQuestion`.
+  const { askedQuestion, producerVendor: askedQuestionProducerVendor } =
+    resolveAskedQuestion(context.exchangeHistory);
 
   let challengeRoundRuntime = await applyChallengeRoundRuntimeSignals(
     db,
@@ -4134,6 +4358,7 @@ export async function processMessage(
         ? { id: currentUserMessageEventId, content: input.message }
         : undefined,
       // T6 + T7 + T8
+      askedQuestionProducerVendor,
       askedQuestion,
       challengeRoundGraderEnabled: options?.challengeRoundGraderEnabled,
     },
@@ -4261,29 +4486,60 @@ export async function processMessage(
   if (
     options?.mentorNoticeEnabled === true &&
     context.mentorNoticeRecheck &&
-    persisted.persistedUserMessage
+    persisted.persistedUserMessage &&
+    persisted.userMessageEventId
   ) {
-    const proposed = result.noticeRecheck;
-    const valid =
-      proposed?.noticeId === context.mentorNoticeRecheck.id
-        ? await validateNoticeEvidence(db, profileId, sessionId, proposed)
-        : null;
-    if (valid) {
-      const now = new Date();
-      const timezone = await getProfileTimeZone(db, profileId);
-      await applyMentorNoticeOutcome(db, {
-        profileId,
-        noticeId: context.mentorNoticeRecheck.id,
-        outcome: valid.verdict,
-        occurredAt: now,
-        learningDayStart: getLearningDayStart(now, timezone),
-      });
-    } else if (context.mentorNoticeRecheck.exchangeNumber >= 3) {
-      await applyMentorNoticeOutcome(db, {
-        profileId,
-        noticeId: context.mentorNoticeRecheck.id,
-        outcome: 'not_yet',
-      });
+    // [WI-2625] Independent server-side judge decides the re-check outcome —
+    // the tutor is never asked for a verdict. `persisted.persistedUserMessage`
+    // is also the retry/replay idempotency gate: a duplicate client send
+    // that hits the exchange's clientId dedup path never re-enters this
+    // block, so the judge is called at most once per genuinely new turn.
+    const evaluation = await evaluateMentorNoticeRecheck(db, {
+      profileId,
+      sessionId,
+      notice: context.mentorNoticeRecheck,
+      answerEventId: persisted.userMessageEventId,
+      conversationLanguage: context.conversationLanguage,
+      tutorVendor: result.provider,
+    });
+    // [WI-2625 rework #4] Exhaustive switch on the evaluation variant. The
+    // judge's verdict and the response cap are separate mechanisms, and the cap
+    // acts on the ATTEMPT, not the notice: a valid `continue` transitions
+    // nothing at ANY exchange number (AC-3) — at the cap the attempt is merely
+    // detached, leaving the notice open and re-offerable. Only an unresolved
+    // evaluation at the cap terminalizes `not_yet` (AC-4). The `never` default
+    // makes any future re-merging of these facts a compile error.
+    switch (evaluation.kind) {
+      case 'outcome': {
+        const now = new Date();
+        const timezone = await getProfileTimeZone(db, profileId);
+        await applyMentorNoticeOutcome(db, {
+          profileId,
+          noticeId: context.mentorNoticeRecheck.id,
+          outcome: evaluation.outcome,
+          occurredAt: now,
+          learningDayStart: getLearningDayStart(now, timezone),
+        });
+        break;
+      }
+      case 'continue':
+        await endMentorNoticeRecheckAttemptAtCap(db, {
+          profileId,
+          sessionId,
+          exchangeNumber: context.mentorNoticeRecheck.exchangeNumber,
+        });
+        break;
+      case 'unresolved':
+        await terminalizeUnresolvedMentorNoticeRecheckAtCap(db, {
+          profileId,
+          noticeId: context.mentorNoticeRecheck.id,
+          exchangeNumber: context.mentorNoticeRecheck.exchangeNumber,
+        });
+        break;
+      default: {
+        const exhaustive: never = evaluation;
+        void exhaustive;
+      }
     }
   }
 
@@ -4729,15 +4985,10 @@ export async function streamMessage(
       // T6: source the asked-question from the last assistant turn in history.
       // Same pattern as processMessage — no DB read; projectAiResponseContent
       // extracts clean prose from the re-wrapped JSON envelope.
-      const askedQuestion = (() => {
-        const lastAssistant = context.exchangeHistory
-          .filter((e) => e.role === 'assistant')
-          .at(-1);
-        if (!lastAssistant) return '';
-        return projectAiResponseContent(lastAssistant.content, {
-          silent: true,
-        });
-      })();
+      // [WI-2670] Also sources that turn's real producer vendor — see
+      // `resolveAskedQuestion`.
+      const { askedQuestion, producerVendor: askedQuestionProducerVendor } =
+        resolveAskedQuestion(context.exchangeHistory);
 
       let challengeRoundRuntime = await applyChallengeRoundRuntimeSignals(
         db,
@@ -4753,6 +5004,7 @@ export async function streamMessage(
             ? { id: currentUserMessageEventId, content: input.message }
             : undefined,
           // T6 + T7 + T8
+          askedQuestionProducerVendor,
           askedQuestion,
           challengeRoundGraderEnabled: options?.challengeRoundGraderEnabled,
         },
@@ -4882,29 +5134,55 @@ export async function streamMessage(
       if (
         options?.mentorNoticeEnabled === true &&
         context.mentorNoticeRecheck &&
-        persisted.persistedUserMessage
+        persisted.persistedUserMessage &&
+        persisted.userMessageEventId
       ) {
-        const proposed = parsed.noticeRecheck;
-        const valid =
-          proposed?.noticeId === context.mentorNoticeRecheck.id
-            ? await validateNoticeEvidence(db, profileId, sessionId, proposed)
-            : null;
-        if (valid) {
-          const now = new Date();
-          const timezone = await getProfileTimeZone(db, profileId);
-          await applyMentorNoticeOutcome(db, {
-            profileId,
-            noticeId: context.mentorNoticeRecheck.id,
-            outcome: valid.verdict,
-            occurredAt: now,
-            learningDayStart: getLearningDayStart(now, timezone),
-          });
-        } else if (context.mentorNoticeRecheck.exchangeNumber >= 3) {
-          await applyMentorNoticeOutcome(db, {
-            profileId,
-            noticeId: context.mentorNoticeRecheck.id,
-            outcome: 'not_yet',
-          });
+        // [WI-2625] Independent server-side judge decides the re-check
+        // outcome — mirrors the processMessage call site above.
+        const evaluation = await evaluateMentorNoticeRecheck(db, {
+          profileId,
+          sessionId,
+          notice: context.mentorNoticeRecheck,
+          answerEventId: persisted.userMessageEventId,
+          conversationLanguage: context.conversationLanguage,
+          tutorVendor: result.provider,
+        });
+        // [WI-2625 rework #4] Same exhaustive variant switch and same cap
+        // handling as the processMessage call site above — a valid `continue`
+        // transitions nothing at any exchange number; at the cap the ATTEMPT is
+        // detached and the notice stays open and re-offerable. Only an
+        // unresolved evaluation at the cap terminalizes `not_yet`.
+        switch (evaluation.kind) {
+          case 'outcome': {
+            const now = new Date();
+            const timezone = await getProfileTimeZone(db, profileId);
+            await applyMentorNoticeOutcome(db, {
+              profileId,
+              noticeId: context.mentorNoticeRecheck.id,
+              outcome: evaluation.outcome,
+              occurredAt: now,
+              learningDayStart: getLearningDayStart(now, timezone),
+            });
+            break;
+          }
+          case 'continue':
+            await endMentorNoticeRecheckAttemptAtCap(db, {
+              profileId,
+              sessionId,
+              exchangeNumber: context.mentorNoticeRecheck.exchangeNumber,
+            });
+            break;
+          case 'unresolved':
+            await terminalizeUnresolvedMentorNoticeRecheckAtCap(db, {
+              profileId,
+              noticeId: context.mentorNoticeRecheck.id,
+              exchangeNumber: context.mentorNoticeRecheck.exchangeNumber,
+            });
+            break;
+          default: {
+            const exhaustive: never = evaluation;
+            void exhaustive;
+          }
         }
       }
 
