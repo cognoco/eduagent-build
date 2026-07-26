@@ -92,10 +92,11 @@ export const recheckJudgeRawSchema = z.object({
  *   output, judge unavailable, routing failure, thrown error, missing answer
  *   event). Fail-open: no verdict to apply.
  *
- * Neither no-transition variant terminalizes on its own, and `continue` never
- * terminalizes at all: at the caller's separate response cap a `continue` only
- * ends the attempt (notice preserved), while `unresolved` terminalizes
- * `not_yet`.
+ * Only `continue` is a deliberate no-transition, and it never terminalizes at
+ * any exchange number: at the caller's separate response cap it merely ends the
+ * attempt, notice preserved. `unresolved` is fail-open rather than a chosen
+ * no-transition — below the cap there is simply no verdict to apply, and AT the
+ * cap it terminalizes `not_yet`.
  */
 export type MentorNoticeRecheckEvaluation =
   | { kind: 'outcome'; outcome: MentorNoticeRecheckOutcome }

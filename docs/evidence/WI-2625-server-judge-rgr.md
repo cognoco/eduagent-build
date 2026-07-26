@@ -137,6 +137,22 @@ unavailable judgment at turn 3 still terminalizes `not_yet` (AC-4).
 Worktree `.worktrees/wi-2625-rework-b`, branch `wi-2625-rework-b`, from
 `origin/main` at `98500d4e617e7a70f7b4a8b7a9eedf7d7f3e9d8d`.
 
+## Note on the suite totals below — 40 in RED, 42 in GREEN
+
+A red→green pair cannot legitimately differ in total, so the difference is
+called out rather than left to look like a contradiction. **The RGR sequence
+below was executed in full at commit `2728b232c`, where the suite held 40
+tests.** The later commit `66162cbb6` is **test-file and evidence-doc only** — it
+added the two repeat-cycle cases (`'%s: the re-offered attempt runs its own full
+1→2→3 cycle …'`), taking the suite 40 → 42, and changed **no production code**.
+
+So the RED below exercised production code that is byte-identical at head, and
+the sha256 pin in the GREEN section still holds at head. The GREEN figure is
+quoted at head (42/42) because that is the currently reproducible number; the
+RED figure is quoted as observed (40 total). The RGR was deliberately **not**
+re-run for the two added test cases — they add coverage above the injected
+defect's layer and cannot change its outcome.
+
 ## The property under test
 
 The ruling's claim is about a **subsequent offer cycle**, so the property is not
@@ -175,7 +191,7 @@ DATABASE_URL='postgres://postgres@127.0.0.1:54331/eduagent_wi2625' \
   -t 'the cap'
 ```
 
-Result: **6 failed, 7 passed, 27 skipped, 40 total.** The headline failure is the
+Result (at `2728b232c` — see the totals note above): **6 failed, 7 passed, 27 skipped, 40 total.** The headline failure is the
 re-offer assertion, at the offer-producing layer:
 
 ```
@@ -202,7 +218,7 @@ $ shasum -a 256 apps/api/src/services/session/session-exchange.ts
 5aff4531a08ac84a34ad97ccd5a8874a49721f2f73235250addec2846b75ddf8   (post-restore)
 ```
 
-Full suite after restore: **42 passed, 42 total** (1 suite).
+Full suite after restore, re-verified at head `66162cbb6`: **42 passed, 42 total** (1 suite). At `2728b232c`, where the injection/restore happened, the same suite was 40/40.
 
 ## The cycle repeats — attempt N+1 behaves like attempt N
 
