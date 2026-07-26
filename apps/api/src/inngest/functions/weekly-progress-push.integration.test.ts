@@ -406,12 +406,26 @@ interface WeeklyPushCronResult {
   queuedParents: number;
 }
 
-async function executeCronSteps(): Promise<{
+interface ExecuteCronStepsOptions {
+  weekWindow?: {
+    nowUtcMs: number;
+    currentWeekStartMs: number;
+  };
+}
+
+async function executeCronSteps(
+  options: ExecuteCronStepsOptions = {},
+): Promise<{
   result: WeeklyPushCronResult;
   step: { run: jest.Mock; sendEvent: jest.Mock };
 }> {
   const step = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
+    run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
+      if (name === 'resolve-week-window' && options.weekWindow) {
+        return options.weekWindow;
+      }
+      return fn();
+    }),
     sendEvent: jest.fn().mockResolvedValue(undefined),
   };
 
@@ -653,8 +667,9 @@ describe('weekly progress push integration', () => {
     });
   });
 
-  it('queues only parents whose real account timezone resolves to local 9am', async () => {
-    const now = new Date();
+  it('uses the memoized evaluation instant when the wall clock is one hour later', async () => {
+    const wallClockNow = new Date();
+    const now = new Date(wallClockNow.getTime() - 60 * 60 * 1000);
     const matchingTimezone = findTimezoneForHour(9, now);
     const nonMatchingTimezone = findTimezoneNotHour(9, now, matchingTimezone);
 
@@ -682,7 +697,12 @@ describe('weekly progress push integration', () => {
     await seedFamilyLink(queuedParentId, queuedChildId);
     await seedFamilyLink(skippedParentId, skippedChildId);
 
-    const { result, step } = await executeCronSteps();
+    const currentWeekStartMs = new Date(
+      `${weekStartIso(now)}T00:00:00.000Z`,
+    ).getTime();
+    const { result, step } = await executeCronSteps({
+      weekWindow: { nowUtcMs: now.getTime(), currentWeekStartMs },
+    });
 
     // The exact count may exceed 1 when other accounts in the shared DB
     // happen to match the 9am timezone window. Assert the test-created parent
@@ -707,7 +727,7 @@ describe('weekly progress push integration', () => {
       expect.any(String),
       expect.arrayContaining([
         expect.objectContaining({
-          data: { parentId: skippedParentId },
+          data: expect.objectContaining({ parentId: skippedParentId }),
         }),
       ]),
     );
