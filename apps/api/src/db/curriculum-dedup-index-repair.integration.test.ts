@@ -7,13 +7,7 @@
  */
 
 import { randomBytes } from 'node:crypto';
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -23,7 +17,7 @@ import { Pool } from 'pg';
 
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 
-import { closePoolAndDropScratchDatabase } from './scratch-database-teardown';
+import { cleanupCurriculumDedupIndexRepairTest } from './curriculum-dedup-index-repair-cleanup';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -234,21 +228,12 @@ describe('curriculum dedup index repair on disposable Postgres [WI-2791]', () =>
   });
 
   afterAll(async () => {
-    try {
-      await closePoolAndDropScratchDatabase({
-        adminPool,
-        scratchPool,
-        databaseName,
-      });
-    } finally {
-      try {
-        await adminPool?.end();
-      } finally {
-        for (const dir of tempDirs) {
-          rmSync(dir, { recursive: true, force: true });
-        }
-      }
-    }
+    await cleanupCurriculumDedupIndexRepairTest({
+      adminPool,
+      scratchPool,
+      databaseName,
+      tempDirs,
+    });
   });
 
   it('starts with both indexes absent despite the earlier migrations being ledgered', async () => {
