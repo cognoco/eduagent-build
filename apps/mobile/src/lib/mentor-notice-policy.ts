@@ -340,17 +340,65 @@ function commit(
   for (const listener of entry.listeners) listener();
 }
 
+/**
+ * Backoff delays between retried `setItem` attempts. Sized for the transient
+ * case this exists to cover — a momentary OS-level write hiccup or lock, not
+ * sustained disk pressure — so a real disable-write recovers within a couple
+ * hundred milliseconds instead of being lost to a single rejected call.
+ */
+const PERSIST_RETRY_DELAYS_MS = [50, 150, 400];
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * [WI-2627] Retry a disable-write across transient `setItem` failures.
+ *
+ * `persist` is fire-and-forget (`void persist(...)`) and its only caller
+ * already committed the correct state to memory before calling it — so a
+ * failed write never corrupts THIS session. What it can corrupt is the NEXT
+ * one: a relaunch reads whatever `setItem` last durably wrote, and a single
+ * rejected write silently leaves that durable record at its previous,
+ * more-permissive value. A disable the device believes it recorded can then
+ * be resurrected on relaunch even though the in-memory fold was correct the
+ * whole time.
+ *
+ * Two shapes considered and rejected:
+ *   - A dirty marker written into the same store is not sound: it fails
+ *     under exactly the disk-full case this exists to cover, since both
+ *     writes fail together.
+ *   - `removeItem` on write failure alone is insufficient: an absent record
+ *     hydrates as never-told, and never-told lets the cached projection
+ *     keep painting.
+ *
+ * Retrying with backoff is the defensible shape: it recovers the common
+ * transient failure (the case this device most likely to hit) without
+ * inventing a second fallible write path. RESIDUAL, recorded rather than
+ * papered over: under sustained/unbounded failure (e.g. disk genuinely
+ * full for the retry window), the write can still never land, and a
+ * relaunch during that window can still read a stale record. In-session
+ * behaviour stays fail-closed throughout — only the durable record can lag.
+ */
 async function persist(
   key: string,
   state: MentorNoticePolicyState,
 ): Promise<void> {
-  try {
-    await AsyncStorage.setItem(key, JSON.stringify(state));
-  } catch (err) {
-    Sentry.captureException(err, {
-      tags: { feature: 'mentor_notice_policy', op: 'write' },
-    });
+  const payload = JSON.stringify(state);
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= PERSIST_RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      await AsyncStorage.setItem(key, payload);
+      return;
+    } catch (err) {
+      lastError = err;
+      const backoff = PERSIST_RETRY_DELAYS_MS[attempt];
+      if (backoff !== undefined) await delay(backoff);
+    }
   }
+  Sentry.captureException(lastError, {
+    tags: { feature: 'mentor_notice_policy', op: 'write' },
+  });
 }
 
 /**
@@ -542,12 +590,6 @@ export function useMentorNoticePolicy(
     foldMentorNoticePolicyFor(actorId, profileId, 'malformed');
   }, [actorId, profileId]);
 
-  // Reads the LIVE store rather than this render's snapshot. In render the two
-  // agree (both come from the same entry, and `useSyncExternalStore` re-renders
-  // on every commit). The difference matters in an imperative callback that has
-  // just called `observe`: the SSE done frame that carries a notice is also the
-  // frame that can carry the disable voiding it, and a snapshot-based answer
-  // would be one render stale — it would paint the notice it was told to drop.
   // Reads the LIVE store rather than this render's snapshot. In render the two
   // agree (both come from the same entry, and `useSyncExternalStore` re-renders
   // on every commit). The difference matters in an imperative callback that has

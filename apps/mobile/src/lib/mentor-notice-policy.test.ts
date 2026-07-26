@@ -622,4 +622,54 @@ describe('useMentorNoticePolicy', () => {
     act(() => result.current.observe(observation(9, true)));
     expect(result.current.state).toEqual({ revision: 0, enabled: false });
   });
+
+  // ── The write path's own rollback boundary ─────────────────────────────────
+  // The read half above is fail-closed and tested. This is the write half: a
+  // disable-write whose FIRST `setItem` attempt is rejected (a transient OS
+  // hiccup, not sustained disk pressure) must still land durably, so a
+  // relaunch during the retry window does not resurrect the notice the
+  // in-session state already correctly suppressed.
+  it('recovers a disable-write after a transient setItem rejection, so a relaunch does not resurrect the notice', async () => {
+    await seedStored(ACTOR, PROFILE, '{"revision":6,"enabled":true}');
+    const { result } = mountPolicy();
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    expect(result.current.state).toEqual({ revision: 6, enabled: true });
+
+    const originalSetItem = AsyncStorage.setItem;
+    let rejectedOnce = false;
+    AsyncStorage.setItem = jest.fn((k: string, v: string) => {
+      if (!rejectedOnce) {
+        rejectedOnce = true;
+        return Promise.reject(new Error('transient disk write failure'));
+      }
+      return originalSetItem(k, v);
+    }) as unknown as typeof AsyncStorage.setItem;
+
+    try {
+      act(() => result.current.observe(observation(7, false)));
+
+      // In-session state is correct immediately — the fold is synchronous and
+      // does not wait on the write.
+      expect(result.current.suppressed(undefined)).toBe(true);
+
+      // The retried write eventually lands durably...
+      await waitFor(async () => {
+        const raw = await AsyncStorage.getItem(stateKey(ACTOR, PROFILE));
+        expect(raw).toBe('{"revision":7,"enabled":false}');
+      });
+    } finally {
+      AsyncStorage.setItem = originalSetItem;
+    }
+
+    // ...so a relaunch (fresh in-memory store, storage intact) reads the
+    // disable, not the pre-rollback record.
+    resetMentorNoticePolicyStoreForTests();
+    const relaunched = mountPolicy();
+    await waitFor(() => expect(relaunched.result.current.hydrated).toBe(true));
+    expect(relaunched.result.current.state).toEqual({
+      revision: 7,
+      enabled: false,
+    });
+    expect(relaunched.result.current.suppressed(undefined)).toBe(true);
+  });
 });
