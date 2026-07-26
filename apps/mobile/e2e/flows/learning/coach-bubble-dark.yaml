@@ -96,7 +96,7 @@ tags:
 - assertVisible:
     id: "message-bubble-assistant-3"
     containsDescendants:
-      - text: "^Let's work through this together\\. What have you noticed so far\\?$"
+      - text: "^Let['’]s work through this together\\. What have you noticed so far\\?$"
 - takeScreenshot: coach-bubble-dark-02-ai-response
 
 # 9. Send follow-up to get a second AI response
@@ -119,7 +119,7 @@ tags:
 - assertVisible:
     id: "message-bubble-assistant-5"
     containsDescendants:
-      - text: "^Let's work through this together\\. What have you noticed so far\\?$"
+      - text: "^Let['’]s work through this together\\. What have you noticed so far\\?$"
 
 # 11. Final screenshot — multiple coach bubbles visible
 - takeScreenshot: coach-bubble-dark-03-multi-exchange
