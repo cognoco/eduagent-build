@@ -844,7 +844,10 @@ async function readAndFold(key: string, entry: Entry): Promise<void> {
   // Explicit arrow rather than passing the reducer to `reduce` directly: `reduce`
   // would also hand it the index and the array, and a two-parameter safety fold
   // silently absorbing extra arguments is not something to leave to inspection.
-  const folded = floorSignals.reduce(
+  // The explicit generic is required, not decoration: without it `reduce` infers
+  // the accumulator from the ELEMENT type (`MentorNoticePolicySignal`) rather than
+  // from the seed, and the fold stops type-checking.
+  const folded = floorSignals.reduce<MentorNoticePolicyState>(
     (state, next) => reduceMentorNoticePolicy(state, next),
     reduceMentorNoticePolicy(entry.snapshot.state, signal),
   );
