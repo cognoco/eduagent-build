@@ -8,7 +8,7 @@ The suitability soft block now uses a neutral reset and offers three constructiv
 
 ## Verification
 
-The test-first RED run failed only the two intended copy assertions (140 of 142 tests already passed). Final focused verification passed 169 of 169 tests across suitability, catastrophic tripwire, dangerous-procedure, and exchange-alarm suites. The full API unit run passed 495 of 495 suites and 9,764 tests, with 9 skipped. API typecheck passed; API lint passed with zero errors (55 pre-existing warnings); changed-file Prettier and `git diff --check` passed. Independent adversarial review found no merge-blocking defect and confirmed that no safety gate, threshold, allowlist, flag, or routing behavior changed.
+The test-first RED run failed only the two intended copy assertions (140 of 142 tests already passed). Final focused verification passed 170 of 170 tests across suitability, catastrophic tripwire, dangerous-procedure, and exchange-alarm suites. The full API unit run passed 495 of 495 suites and 9,764 tests, with 9 skipped, before the review-only route assertion was added. API typecheck passed; API lint passed with zero errors (55 pre-existing warnings); changed-file Prettier and `git diff --check` passed. Independent adversarial review found no merge-blocking defect and confirmed that no safety gate, threshold, allowlist, flag, or routing behavior changed.
 
 ## Caveats / Follow-ups
 

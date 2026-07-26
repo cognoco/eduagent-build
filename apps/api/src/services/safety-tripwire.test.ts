@@ -254,6 +254,7 @@ describe('tripwireResponse', () => {
   it('sexual_content_minor response declines narrowly and offers safe learning directions', () => {
     const msg = tripwireResponse('sexual_content_minor');
     expect(msg).toMatch(/can'?t (create|describe)/i);
+    expect(msg).toMatch(/sexual content involving a child/i);
     expect(msg).toMatch(/bodies/i);
     expect(msg).toMatch(/boundaries/i);
     expect(msg).toMatch(/consent/i);

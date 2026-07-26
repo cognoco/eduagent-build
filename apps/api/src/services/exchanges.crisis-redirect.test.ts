@@ -8,6 +8,16 @@
 // safety event and the envelope plumbing that feeds it.
 // ---------------------------------------------------------------------------
 
+jest.mock('./llm', () => {
+  // gc1-allow (external boundary): routeAndCall is the sanctioned LLM boundary;
+  // the exchange pipeline and suitability gate remain real in this suite.
+  const actual = jest.requireActual('./llm') as typeof import('./llm');
+  return {
+    ...actual,
+    routeAndCall: jest.fn(),
+  };
+});
+
 import {
   emitCrisisRedirectEvent,
   emitDangerousProcedureBlockedEvent,
@@ -19,8 +29,13 @@ import {
   streamExchange,
 } from './exchanges';
 import type { ExchangeContext, ImageData } from './exchanges';
+import { routeAndCall, type RouteResult } from './llm';
 import { resetOcrProvider, setOcrProvider, type OcrProvider } from './ocr';
 import type { OcrResult } from '@eduagent/schemas';
+
+const mockRouteAndCall = routeAndCall as jest.MockedFunction<
+  typeof routeAndCall
+>;
 
 // Inngest dispatch surface — the external Inngest boundary (a real dispatch
 // here would fire a network send), kept in the sanctioned `jest.requireActual`
@@ -67,6 +82,7 @@ let warnSpy: jest.SpyInstance;
 let errorSpy: jest.SpyInstance;
 
 beforeEach(() => {
+  mockRouteAndCall.mockReset();
   mockInngestSend.mockClear();
   mockCaptureMessage.mockClear();
   mockCaptureException.mockClear();
@@ -321,6 +337,59 @@ describe('[WI-1691] blocked-safety digest event identity', () => {
 });
 
 describe('[WI-1898] suitability-judge unavailable alarm', () => {
+  it('keeps the learner reply unchanged and alarms when the route-level judge fails', async () => {
+    const originalReply = "Let's work through this one step at a time.";
+    const tutorResult: RouteResult = {
+      response: JSON.stringify({ reply: originalReply, signals: {} }),
+      provider: 'cerebras',
+      model: 'tutor-test-model',
+      latencyMs: 12,
+      stopReason: 'stop',
+    };
+    const rawJudgeError = 'raw provider classifier error: upstream body';
+    mockRouteAndCall
+      .mockResolvedValueOnce(tutorResult)
+      .mockRejectedValueOnce(new Error(rawJudgeError));
+
+    const result = await processExchange(
+      {
+        sessionId: 'sess-suitability-route-failure',
+        profileId: 'prof-suitability-route-failure',
+        subjectName: 'Mathematics',
+        topicTitle: 'Quadratic equations',
+        topicDescription: 'Solving equations step by step',
+        sessionType: 'learning',
+        escalationRung: 1,
+        exchangeHistory: [],
+        birthYear: new Date().getFullYear() - 14,
+      },
+      'Can you help me solve this equation?',
+      undefined,
+      { judgeEnforcementEnabled: true },
+    );
+
+    expect(mockRouteAndCall).toHaveBeenCalledTimes(2);
+    expect(result.response).toBe(originalReply);
+    expect(result.response).not.toContain(rawJudgeError);
+    expect(mockInngestSend).toHaveBeenCalledTimes(1);
+    const sent = mockInngestSend.mock.calls[0][0] as {
+      name: string;
+      data: Record<string, unknown>;
+    };
+    expect(sent.name).toBe('app/safety.suitability_judge_unavailable');
+    expect(sent.data).toEqual(
+      expect.objectContaining({
+        flow: 'exchange.process',
+        sessionId: 'sess-suitability-route-failure',
+        profileId: 'prof-suitability-route-failure',
+        provider: 'cerebras',
+        model: 'judge:suitability_enforcement',
+        tutorModel: 'tutor-test-model',
+      }),
+    );
+    expect(JSON.stringify(sent.data)).not.toContain(rawJudgeError);
+  });
+
   it('fails open through a metadata-only structured operator event', async () => {
     await emitSuitabilityJudgeUnavailableEvent({
       sessionId: 'sess-suitability-unavailable',

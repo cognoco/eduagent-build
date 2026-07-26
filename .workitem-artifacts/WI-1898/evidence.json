@@ -17,7 +17,7 @@
     },
     {
       "acRef": "AC-2",
-      "description": "Judge route failure still returns the original tutor reply with unavailable=true, while the operator alarm remains a structured metadata-only Inngest event. Tests inject a raw provider/classifier error and prove it never enters the learner response or event payload.",
+      "description": "A real processExchange call runs the tutor route, injects a raw provider/classifier error on the enforcing judge route, and proves the original tutor reply passes unchanged while a structured metadata-only unavailable-judge alarm fires without the raw error in either learner response or event payload.",
       "pointer": "apps/api/src/services/exchanges.crisis-redirect.test.ts:323"
     },
     {
@@ -27,7 +27,7 @@
     },
     {
       "acRef": "AC-4",
-      "description": "Red-green evidence: the new suitability and sexual-content-minor assertions failed against the original messages, then passed after the two production copy changes. Focused final verification passed 169/169 tests; the full API unit surface passed 495/495 suites and 9,764 tests with 9 skipped.",
+      "description": "Red-green evidence: the new suitability and sexual-content-minor assertions failed against the original messages, then passed after the two production copy changes. Focused final verification passed 170/170 tests; the full API unit surface passed 495/495 suites and 9,764 tests with 9 skipped before the review-only route assertion was added.",
       "pointer": "apps/api/src/services/safety-tripwire.test.ts:254"
     },
     {
