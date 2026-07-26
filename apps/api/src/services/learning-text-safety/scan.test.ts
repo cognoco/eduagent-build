@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { ConversationLanguage } from '@eduagent/schemas';
 import { scrubClinicalInferenceFromLearningRecord } from '../persisted-learning-text-guard';
+import { referralPayloadKey } from './referral';
 import { LANGUAGE_CORPORA } from './corpus';
 import { scanLearningText } from './scan';
 
@@ -390,8 +391,45 @@ describe('[WI-2628] deterministic fail-closed provenance matrix (ADR-0036 §4.6)
     expect(result.reason).toBeNull();
   });
 
+  // [WI-2628 operator ruling 2026-07-26] USER-authored ambiguity MOVED from this
+  // fail-closed list to `refer`. Blocking it outright refused educational text
+  // the shipped English-only guard allowed, and left AC-4's
+  // `allow/educational_reference` unreachable in production. The row is FLIPPED
+  // below, not deleted — and note it moves to the JUDGE, not to allowed: an
+  // unavailable or malformed judge still blocks it (judge.test.ts).
+  it('refers user-authored ambiguity to the judge, with no producer vendor', () => {
+    const result = scanLearningText({
+      text: AMBIGUOUS_TEXT,
+      conversationLanguage: 'en',
+      provenance: 'user',
+      fieldKind: 'note_text',
+    });
+    expect(result.classification).toBe('ambiguous');
+    expect(result.disposition).toBe('refer');
+    expect(result.reason).toBeNull();
+  });
+
+  it('does not invent a producer vendor for user-authored text', () => {
+    // A learner is not a vendor. Supplying one would make the router exclude a
+    // vendor that produced nothing; the payload variant has no such field, so
+    // this is a type-level guarantee re-asserted at runtime.
+    const result = scanLearningText({
+      text: AMBIGUOUS_TEXT,
+      conversationLanguage: 'en',
+      provenance: 'user',
+      // Deliberately passed and deliberately ignored for user provenance.
+      producerVendor: 'anthropic',
+      fieldKind: 'note_text',
+    });
+    expect(result[referralPayloadKey]).toEqual({
+      origin: 'user',
+      text: AMBIGUOUS_TEXT,
+    });
+  });
+
+  // EVERYTHING ELSE STAYS FAIL-CLOSED. The ruling moved one case; these are
+  // untouched and must remain so.
   it.each([
-    ['user-authored ambiguity', 'user' as const, 'anthropic'],
     ['migration/backfill ambiguity', 'migration' as const, 'anthropic'],
     ['LLM ambiguity with a missing producer', 'llm' as const, undefined],
     ['LLM ambiguity with a null producer', 'llm' as const, null],
@@ -440,10 +478,13 @@ describe('[WI-2628] block reason codes', () => {
   });
 
   it('reports unclear only for fail-closed ambiguity', () => {
+    // Provenance changed from `user` to `migration` by the 2026-07-26 ruling:
+    // user-authored ambiguity now REFERS (reason null), so it is no longer an
+    // example of the fail-closed reason. Migration is, and still must be.
     const result = scanLearningText({
       text: 'This chapter explains what dyslexia is.',
       conversationLanguage: 'en',
-      provenance: 'user',
+      provenance: 'migration',
       fieldKind: 'note_text',
     });
     expect(result.reason).toBe('unclear');
@@ -668,6 +709,19 @@ describe('[WI-2628] attributed-only lexeme scope', () => {
      * rather than inferred from the verb form passing.
      */
     readonly possessive: string;
+    /**
+     * Direction 1 via the ENGLISH `'s` genitive — a real person's name plus the
+     * acronym. Reached NO grammar before this row existed: the plain genitive is
+     * built for the `en` corpus (whose attributed-only slot is empty) and the
+     * es/de/nb attributed-only sets had no genitive at all, because bolting
+     * English possession syntax onto them blocked ordinary prose in all ten
+     * declared languages. It is admitted now only when the LEXEME is written in
+     * acronym form, which is purely additive — every lowercase genitive in
+     * `MUST_STAY_CLEAR` stays clear. Distinct from the acronym-form-on-every-
+     * attributed-only-match change the corpus commit deliberately declined:
+     * that one would have REMOVED blocks.
+     */
+    readonly genitive: string;
     /** Direction 2 — the same term merely mentioned. Must stay clear. */
     readonly mention: string;
   }
@@ -677,6 +731,7 @@ describe('[WI-2628] attributed-only lexeme scope', () => {
       language: 'es',
       term: 'TEA',
       attributed: 'El alumno tiene TEA.',
+      genitive: "Emma's TEA is documented in the file.",
       possessive: 'Su TEA requiere apoyo adicional.',
       mention: 'TEA es un término diagnóstico usado en informes.',
     },
@@ -684,6 +739,7 @@ describe('[WI-2628] attributed-only lexeme scope', () => {
       language: 'de',
       term: 'ADS',
       attributed: 'Der Schüler hat ADS.',
+      genitive: "Emma's ADS ist dokumentiert.",
       possessive: 'Seine ADS ist dokumentiert.',
       mention: 'ADS ist ein veralteter Begriff aus der Fachliteratur.',
     },
@@ -691,6 +747,7 @@ describe('[WI-2628] attributed-only lexeme scope', () => {
       language: 'nb',
       term: 'ADD',
       attributed: 'Eleven har ADD.',
+      genitive: "Emma's ADD er dokumentert.",
       possessive: 'Elevens ADD er dokumentert.',
       mention: 'ADD ble tidligere brukt som begrep i faglitteraturen.',
     },
@@ -785,6 +842,7 @@ describe('[WI-2628] attributed-only lexeme scope', () => {
   const ATTRIBUTED_STRINGS: readonly string[] = SCOPE_PAIRS.flatMap((pair) => [
     pair.attributed,
     pair.possessive,
+    pair.genitive,
   ]);
 
   /** Mentions + English homographs + the cross-grammar leak controls. */
@@ -808,12 +866,18 @@ describe('[WI-2628] attributed-only lexeme scope', () => {
     "Tom's ads are effective.",
     "Anna's add was a small one.",
     "Sarah's tea preference is green tea.",
+    // The acronym in the PERSON slot rather than the lexeme slot. The new
+    // acronym-form genitive requires a plausible person NAME on the left, and
+    // `acronymRejectRe` rejects an all-caps attributed-only term there, so this
+    // matches nothing. Without that half, the pattern would fire on any
+    // sentence pairing the acronym with its own homograph.
+    "TEA's tea is cold.",
   ];
 
   it('covers all ten declared languages in the matrix', () => {
     expect(ALL_LANGUAGES).toHaveLength(10);
-    expect(ATTRIBUTED_STRINGS).toHaveLength(6);
-    expect(MUST_STAY_CLEAR).toHaveLength(14);
+    expect(ATTRIBUTED_STRINGS).toHaveLength(9);
+    expect(MUST_STAY_CLEAR).toHaveLength(15);
   });
 
   describe.each(ALL_LANGUAGES)('declared %s', (language) => {
@@ -910,31 +974,102 @@ describe('[WI-2628] attributed-only lexeme scope', () => {
   });
 });
 
-describe('[WI-2628] the module is unwired in Stage 1', () => {
-  // Stage 1 lands the deterministic core only; Stage 3 rewires the callers.
-  // Asserting the unwired state is what makes this PR reversible: the eight
-  // existing write-time guard call sites, and the shipped guard itself, must
-  // still be untouched by this change-set.
-  const EXISTING_GUARD_CALL_SITES = [
-    'persisted-learning-text-guard.ts',
+describe('[WI-2628 AC-5] persistence-boundary wiring guard (forward-only)', () => {
+  // Replaces Stage 1's "the module is unwired" assertions. That block's list of
+  // eight files IS the call-site inventory, so inverting it is the acceptance
+  // signal for AC-5 — and it is forward-only: a NEW write path added to a wired
+  // file cannot quietly skip the gate while the old guard's symbols are gone.
+  //
+  // TWO LISTS, not one, because the wiring is PARTIAL and that must be visible in
+  // the test rather than inferable from an absence. The split is not arbitrary and
+  // it is not "whatever was easy": it is the TRANSACTION BOUNDARY.
+  //
+  //   WIRED — the gate is evaluated before any transaction opens, because the text
+  //   is known from the call's own parameters. The gate can make an LLM round-trip
+  //   (the independent judge), and an LLM call inside an open transaction pins a
+  //   pooled connection for its whole duration.
+  //
+  //   PENDING — the text is derived from a read taken INSIDE a transaction, so the
+  //   gate cannot be evaluated before it without restructuring:
+  //     learner-profile.ts       12 sites on `mergedState`, which merges the
+  //                              in-transaction profile row with analysis output.
+  //     memory/backfill-mapping  `dedupeMemoryFactRows`, reached from BOTH
+  //                              consumers inside a transaction — learner-profile.ts
+  //                              (via writeMemoryFactsForAnalysis) and
+  //                              inngest/functions/memory-facts-backfill.ts.
+  //     memory/dedup-actions.ts  `applyDedupAction` operates on the caller's `tx`.
+  //   Closing those needs a pre-transaction read plus an evaluated-set lookup that
+  //   fails closed on any string not in the set (`isSafe` already has that
+  //   property). That is a separate change-set; AC-5 is NOT fully met until it
+  //   lands, and this test says so out loud rather than reading as an oversight.
+  const GATE_MODULE = 'learning-text-safety';
+  /** The English-only guard's exported symbols. Absence is what makes it wired. */
+  const RETIRED_SYMBOLS = [
+    'scrubClinicalInferenceFromLearningRecord',
+    'assertNoClinicalInferenceInLearningRecord',
+  ] as const;
+
+  const WIRED_CALL_SITES = [
     'mentor-notices/state.ts',
     'evidence-links.ts',
-    'learner-profile.ts',
-    'memory/backfill-mapping.ts',
-    'memory/dedup-actions.ts',
     'notes.ts',
     'session/session-exchange.ts',
   ] as const;
 
-  it.each(EXISTING_GUARD_CALL_SITES)(
-    '%s does not reference the new gate yet',
+  const PENDING_CALL_SITES = [
+    'learner-profile.ts',
+    'memory/backfill-mapping.ts',
+    'memory/dedup-actions.ts',
+  ] as const;
+
+  const read = (relativePath: string): string =>
+    readFileSync(resolve(__dirname, '..', relativePath), 'utf8');
+
+  it('covers every call site from the Stage-1 inventory exactly once', () => {
+    // The Stage-1 list held eight entries: seven call sites plus the guard module
+    // itself. Partitioning must lose none of them and duplicate none.
+    const all = [...WIRED_CALL_SITES, ...PENDING_CALL_SITES];
+    expect(new Set(all).size).toBe(all.length);
+    expect(all).toHaveLength(7);
+  });
+
+  describe.each(WIRED_CALL_SITES)('wired: %s', (relativePath) => {
+    it('routes through the shared multilingual gate', () => {
+      expect(read(relativePath)).toContain(GATE_MODULE);
+    });
+
+    it.each(RETIRED_SYMBOLS)('no longer references %s', (symbol) => {
+      // The half that makes this forward-only. Asserting only the presence of the
+      // gate import passes on a file that imports it and still calls the old
+      // English-only guard on the write path.
+      expect(read(relativePath)).not.toContain(symbol);
+    });
+  });
+
+  it.each(PENDING_CALL_SITES)(
+    'pending: %s still uses the English-only guard (tracked, not forgotten)',
     (relativePath) => {
-      const source = readFileSync(
-        resolve(__dirname, '..', relativePath),
-        'utf8',
+      const source = read(relativePath);
+      expect(source).not.toContain(GATE_MODULE);
+      expect(RETIRED_SYMBOLS.some((symbol) => source.includes(symbol))).toBe(
+        true,
       );
-      expect(source).not.toContain('learning-text-safety');
-      expect(source).not.toContain('scanLearningText');
     },
   );
+
+  it('keeps the English-only guard alive while any call site still needs it', () => {
+    // Not deleted and not wrapped in a delegate. It is still the live control for
+    // the three pending files, so removing it now would leave them ungated; and
+    // making it delegate to the async gate is impossible — it is synchronous, and
+    // a sync deterministic-only delegate would look wired while never reaching the
+    // judge, which is the shape Gate-2 rejected.
+    const guard = readFileSync(
+      resolve(__dirname, '..', 'persisted-learning-text-guard.ts'),
+      'utf8',
+    );
+    for (const symbol of RETIRED_SYMBOLS) {
+      expect(guard).toContain(symbol);
+    }
+    expect(guard).not.toContain(GATE_MODULE);
+  });
 });
