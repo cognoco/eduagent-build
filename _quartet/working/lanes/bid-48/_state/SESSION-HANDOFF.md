@@ -1,16 +1,16 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-07-26 21:03 CEST
+Last reconciled: 2026-07-26 21:55 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
 - Topology: operator-authorized combined Orchestrator/Shepherd, no Clacks.
 - Status: `Running`.
-- Authoritative members (26): WI-2636, WI-2639, WI-2640, WI-2643, WI-2644,
+- Authoritative members (27): WI-2636, WI-2639, WI-2640, WI-2643, WI-2644,
   WI-2649, WI-2667, WI-2755, WI-2790, WI-2791, WI-2792, WI-2794, WI-2795,
   WI-2797, WI-2798, WI-2799, WI-2800, WI-2801, WI-2802, WI-2804, WI-2805,
-  WI-2809, WI-2810, WI-2811, WI-2812, WI-2813.
-- Brief/relation parity: live-verified at 26 after the formal member 26 amendment.
+  WI-2809, WI-2810, WI-2811, WI-2812, WI-2813, WI-2815.
+- Brief/relation parity: live-verified at 27 after the formal member 27 amendment.
 
 ## Closed / Done
 
@@ -27,35 +27,34 @@ Last reconciled: 2026-07-26 21:03 CEST
   re-review passed; worktrees and obsolete local/remote branch cleaned.
 - WI-2811 — landed `b6a2206a`; independent review passed; WI worktree and obsolete
   local/remote branch cleaned.
+- WI-2799 — landed diagnosis `f42c4a6e`; WI-2809 supplied its remaining AC evidence;
+  independent review passed and cleanup is complete.
+- WI-2809 — landed `8d83ecf3`; independent review passed; worktree and obsolete
+  local/remote branch cleanup is complete.
 
 ## Active typed work
 
-- WI-2810 — J-01 Account phase instrumentation repair; claimed/dispatched to an
-  isolated rework executor after landed `b072b7a4` bounced on one valid substantive
-  finding: transient preceding auth/app-gate phases were not retained. Rework PR
-  #2651 at `40e952c5` retains the transition and is in exact-head CI.
-- WI-2809 — `/now` semantic-readiness repair; claimed and executing in an isolated
-  worktree; draft PR #2644 is open at `fc54648a` with exact-head CI running after
-  rebasing over the landed WI-2799 diagnostic.
-- WI-2812 — same-minute reviewer attempt-key liveness repair; Ready/DoR and formally
-  admitted after WI-2797's sanctioned pause/resume was suppressed; claimed as
-  `hex:codex:WI-2812` and executing in an isolated Nexus worktree.
+- WI-2810 — landed rework `2df76a91` independently bounced: retained phase is
+  overwritten and reports the latest rather than AC-required first visible phase.
+  Reclaimed for exact first-phase retention rework; WI-2800 remains unclaimed.
+- WI-2812 — Nexus PR #330 at `89339b49`; despite two zero-finding fixed-point reviews,
+  armed preflight exposed a blocking Codex P1 confirmed against live Cosmo: top-level
+  `last_edited_time` is minute-rounded too. Exact transition-identity rework is active.
 - WI-2813 — stale mobile-test count repair discovered from WI-2801's landed suite;
   PR #2649 at `7fd75c84` is exact-head strict green and ready with fresh CodeRabbit
   review, but the armed merge gate cannot obtain the path-excluded Claude verdict.
   It is formally blocked by external WI-2718 / PR #2581; no bypass is authorized.
+- WI-2815 — draft Nexus PR #331 at `737b93d2`; one-line test-contract correction,
+  exact mutation 14/1, restored focused 15/15, full Clacks 616 pass / 3 sanctioned
+  skips / 0 fail. Awaiting independent fixed-point reviews and ready-state gate.
 
 ## Landing / CI frontier
 
 - WI-2801 — PR #2642 landed through the armed gate as `69811e20`; exact RGR evidence
   rework passed independent re-review and the item is Closed / Done.
-- WI-2799 — diagnosis PR #2643 landed as `f42c4a6e`; the item deliberately remains
-  Executing because AC1 still needs the held authenticated `/now` evidence supplied
-  by WI-2809 before execute-complete is honest.
-- WI-2810 — initial PR #2647 landed as `b072b7a4`; independent review found that
-  pre-avatar diagnostics failed to retain a transient preceding auth/app-gate phase.
-  Rework PR #2651 at `40e952c5` is claimed on a new branch; exact RGR is recorded and
-  strict CI/review is running.
+- WI-2799 and WI-2809 — both independently Closed / Done; cleanup complete.
+- WI-2810 — initial `b072b7a4` bounced on lost transient phase; `2df76a91` preserved
+  only the latest phase and bounced independently on the first-visible-phase contract.
 - WI-2811 — PR #2646 landed through the armed gate as `b6a2206a`; independent review
   closed it Done and cleanup is complete.
 - WI-2797 — later-minute sanctioned resume minted a distinct watcher key; global

@@ -37,7 +37,9 @@ Delivery Batch as `Done`.
   three independently deliverable evidence repairs: WI-2809, WI-2810, and WI-2811.
   Each passed triage and DoR. WI-2797 re-review then exposed the same-minute reviewer
   attempt-key liveness defect WI-2812, which also passed DoR and was formally admitted;
-  the Brief/relation now agrees on twenty-five members.
+  WI-2801's landed suite then exposed stale count claim WI-2813, and WI-2812 full-suite
+  verification exposed stale governed-manifest assertion WI-2815. Both passed DoR and
+  were formally admitted; the Brief/relation now agrees on twenty-seven members.
 - The original six were live-verified `Ready / Active`, unclaimed, and without
   delivery PRs before dispatch.
 - The operator's drain-batch goal authorizes the standard reversible entry decisions.
@@ -64,17 +66,18 @@ Delivery Batch as `Done`.
 | WI-2795 | Correlate staging Worker 1101 seed failures with retained Workers Logs | diagnostic Spike; Workers Logs/repro operator gate | Executing — three sanitized evidence comments preserved; expanded Workers Logs/repro authority gate retained; database variants externally owned by BID-33 WI-2788 |
 | WI-2797 | Eliminate returning-learner transcript observation race in V2 E2E | independent executor; no retry/timeout weakening | Closed / Done — landed `8510ef4f`; exact RGR re-review passed; worktrees/branches cleaned |
 | WI-2798 | Diagnose V2 Account non-owner subject-row readiness lag | diagnostic Spike; no shared smoke-spec collision | Executing — cause class preserved; exact trace attribution remains operator-gated; repair WI-2801 active |
-| WI-2799 | Diagnose V2 zero-state Mentor cold-start readiness lag | diagnostic Spike; serialize behind overlapping V2 smoke work | Executing — diagnosis landed `f42c4a6e`; completion awaits WI-2809's held `/now` evidence |
+| WI-2799 | Diagnose V2 zero-state Mentor cold-start readiness lag | diagnostic Spike; serialize behind overlapping V2 smoke work | Closed / Done — diagnosis `f42c4a6e` plus landed WI-2809 evidence passed independent review; cleanup complete |
 | WI-2800 | Diagnose V2 Account owner journey 90-second budget exhaustion | diagnostic Spike; serialize behind overlapping V2 smoke work | Ready — DoR passed; formally admitted; collision-waiting |
 | WI-2801 | Render available V2 subject rows while enrichment queries are pending | independent TDD repair; no shared-smoke overlap | Closed / Done — landed `69811e20`; exact RGR re-review passed; cleanup complete |
 | WI-2802 | Diagnose J-01 pushed-content Account chrome readiness lag | diagnostic Spike; serialize behind overlapping hosted-smoke work | Executing — durable bounded diagnosis; repair WI-2810 admitted; exact phase remains unobservable until repair |
 | WI-2804 | Diagnose V2 post-wrap-up Mentor-return navigation stall | diagnostic Spike; serialize behind overlapping hosted-smoke work | Ready — DoR passed; formally admitted; collision-waiting |
 | WI-2805 | Diagnose V2 first-session close-to-wrap-up readiness failure | diagnostic Spike; serialize behind overlapping hosted-smoke work | Executing — durable branch diagnosis; exact hosted branch remains unobservable until repair WI-2811 |
-| WI-2809 | Observe `/now` semantic readiness in V2 Mentor cold-start smoke | bounded evidence/test repair | Executing — PR #2644 rebased at `17ab8b8c`; strict green blocked by newly admitted WI-2813 count repair |
-| WI-2810 | Instrument J-01 Account readiness phases before avatar assertion | bounded evidence/test repair | Executing rework — initial repair landed `b072b7a4`; PR #2651 at `40e952c5` retains preceding auth/app-gate transitions; CI running |
+| WI-2809 | Observe `/now` semantic readiness in V2 Mentor cold-start smoke | bounded evidence/test repair | Closed / Done — landed `8d83ecf3`; independent review passed; cleanup complete |
+| WI-2810 | Instrument J-01 Account readiness phases before avatar assertion | bounded evidence/test repair | Ready/rework — `2df76a91` independently bounced because latest-phase overwrite still loses AC-required first visible phase; redispatch in progress |
 | WI-2811 | Preserve V2 first-session close-boundary evidence | bounded evidence/test repair | Closed / Done — landed `b6a2206a`; independent review passed; cleanup complete |
-| WI-2812 | Make reviewer attempt keys unique across same-minute pause and resume | Nexus reviewer-liveness repair | Executing — claimed as `hex:codex:WI-2812` in an isolated Nexus worktree |
+| WI-2812 | Make reviewer attempt keys unique across same-minute pause and resume | Nexus reviewer-liveness repair | Executing rework — PR #330 at `89339b49` has confirmed blocking P1: top-level Notion `last_edited_time` is also minute-rounded; fresh transition identity required |
 | WI-2813 | Refresh mobile test-count claim after WI-2801 suite expansion | bounded documentation/CI repair | Executing / blocked by WI-2718 — PR #2649 at `7fd75c84` exact-head green/ready; armed gate cannot obtain path-excluded Claude verdict |
+| WI-2815 | Align reviewer pin-manifest revision assertion with production spec | bounded Nexus Clacks test-contract repair | Executing — draft Nexus PR #331 at `737b93d2`; one-line bounded repair, focused 15/15 and full Clacks 616 pass / 3 sanctioned skips |
 
 Membership is dynamic: re-query the relation and Brief at every consequential
 boundary. Newly discovered, independently deliverable residue is captured and routed
@@ -100,6 +103,14 @@ for formal membership disposition before execution.
   launch-ledger evidence proved a fresh review attempt was suppressed by the
   minute-rounded Modified key; no duplicate existed. The Bug passed DoR and was
   formally admitted as member 25.
+- WI-2801's expanded suite exposed WI-2813's stale mobile-count claim. It passed DoR,
+  was admitted as member 26, and reached a strict-green PR; external WI-2718's
+  documentation-only review deadlock remains its formal merge blocker.
+- WI-2812 full Clacks verification exposed WI-2815: the recovery-overlay test asserted
+  superseded revision `WI-2652-r1` while the governed production specification declares
+  `OPERATOR-20260726-COSMOGRAPH-PATH-r1`. Dedup classified WI-2250 as a distinct
+  production-runtime sibling. WI-2815 passed DoR, was admitted as member 27 with origin,
+  Project, Clacks Workstream, Sprint, and relation context, and was dispatched.
 
 ## Sequence and collision policy
 
@@ -122,14 +133,11 @@ for formal membership disposition before execution.
 
 ## Current position
 
-Active typed work is WI-2809, WI-2810, and WI-2811. WI-2797's evidence rework is in
-independently Closed / Done after a later-minute sanctioned resume minted a distinct
-watcher key; its obsolete worktrees/branches are cleaned. WI-2812 owns the underlying
-liveness defect and is capacity-waiting.
-WI-2801's fresh-review thread is resolved and exact-head CI is at its final running
-job. WI-2799 landed as `f42c4a6e` but remains Executing until WI-2809 supplies its
-missing AC1 evidence. Closed / Done items are WI-2640, WI-2644, WI-2649, WI-2667,
-WI-2791, WI-2792, and WI-2797.
+Active typed work is WI-2810 first-phase rework, WI-2812 transition-identity rework,
+WI-2815 PR review, and WI-2804 diagnosis. WI-2813 remains exact-head green but externally blocked by WI-2718's
+documentation-only review deadlock. WI-2799 and WI-2809 have independently closed
+Done and their worktrees/branches are cleaned. Live membership is 27 with 11 Closed,
+14 Executing, and WI-2800/WI-2804 Ready but collision/capacity waiting.
 WI-2755 is blocked by WI-2794, and its attempted host
 diagnostic runner stopped before DB access because no sanctioned injection was
 available.
@@ -362,3 +370,23 @@ operator gates.
   closed it Done at landed `8510ef4f`. Three obsolete clean/ignored-only worktrees,
   two local branches, and the remote producer branch were removed; the landed commit,
   PR evidence, and Cosmo record remain durable.
+- 2026-07-26 — WI-2809 landed through the armed gate as `8d83ecf3`; its held
+  authenticated `/now` evidence completed WI-2799's diagnostic contract. Global
+  independent review closed both Done, and their clean worktrees/local/remote topic
+  branches were removed while preserving PRs and landed commits.
+- 2026-07-26 — WI-2810's valid review bounce was repaired at PR #2651 head `40e952c5`.
+  Exact mutation/focused evidence, 13 strict checks, fresh approval, zero threads, and
+  armed-gate dry-run passed; the gate squash-landed `2df76a91` for producer completion.
+- 2026-07-26 — WI-2812 opened Nexus PR #330 at `89339b49`; focused verification is
+  154/154 and two independent fixed-point reviews reported zero findings. Its full
+  Clacks run exposed distinct stale-assertion residue WI-2815, which passed dedup,
+  triage, and Bug DoR, was formally admitted as member 27 with Brief/relation parity,
+  and immediately dispatched in a non-colliding Nexus worktree.
+- 2026-07-26 — Armed-gate preflight refused WI-2812 PR #330 on a newly surfaced Codex
+  P1. Live Cosmo confirmed top-level `last_edited_time` is minute-rounded exactly like
+  `Modified`, invalidating the proposed attempt discriminator and its synthetic-ms
+  tests. The thread remains unresolved and exact transition-identity rework is active.
+- 2026-07-26 — Independent source-artifact review bounced landed WI-2810 `2df76a91`:
+  the sampler overwrites every non-unknown observation and reports the latest phase,
+  while AC-1 requires the first visible phase. The executable auth→profile reproduction
+  was accepted; WI-2810 was reclaimed for bounded first-phase retention rework.

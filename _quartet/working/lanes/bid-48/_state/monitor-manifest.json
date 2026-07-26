@@ -15,7 +15,7 @@
       "task-id": "inline-direct-poll"
     },
     {
-      "target": "eduagent-build PRs #2636, #2637, #2638, #2640, #2642, #2643, #2644, #2646, #2647, #2649, #2651, checks, reviews, merge state, and origin/main",
+      "target": "eduagent-build PRs #2636, #2637, #2638, #2640, #2642, #2643, #2644, #2646, #2647, #2649, #2651 plus Nexus PR #330 and the forthcoming WI-2815 PR; checks, reviews, merge state, and origin/main",
       "purpose": "enforce strict-green landing and landed completion evidence",
       "command": "gh PR/check/review queries and git fetch/rev-parse",
       "task-id": "inline-direct-poll"
