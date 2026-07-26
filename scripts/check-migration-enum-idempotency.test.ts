@@ -54,6 +54,38 @@ describe('findEnumAddValueViolations', () => {
       ),
     ).toEqual([]);
   });
+
+  it('detects an unsafe enum addition after a single-quoted comment opener', () => {
+    expect(
+      findEnumAddValueViolations(
+        'apps/api/drizzle/9999_add_status.sql',
+        `COMMENT ON TYPE status IS '--'; ALTER TYPE status ADD VALUE 'ready';`,
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('detects an unsafe enum addition after an escaped quote and comment opener', () => {
+    expect(
+      findEnumAddValueViolations(
+        'apps/api/drizzle/9999_add_status.sql',
+        `COMMENT ON TYPE status IS E'it\\'s -- literal'; ALTER TYPE status ADD VALUE 'ready';`,
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('ignores dollar-quoted contents but detects unsafe SQL after the body', () => {
+    expect(
+      findEnumAddValueViolations(
+        'apps/api/drizzle/9999_add_status.sql',
+        `DO $body$ BEGIN RAISE NOTICE '-- ALTER TYPE fake ADD VALUE ''ignored'';'; END $body$; ALTER TYPE status ADD VALUE 'ready';`,
+      ),
+    ).toEqual([
+      {
+        path: 'apps/api/drizzle/9999_add_status.sql',
+        statement: `ALTER TYPE status ADD VALUE 'ready'`,
+      },
+    ]);
+  });
 });
 
 describe('addedNumberedMigrationPaths', () => {

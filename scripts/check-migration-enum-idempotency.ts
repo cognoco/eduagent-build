@@ -15,8 +15,75 @@ export interface EnumAddValueViolation {
   statement: string;
 }
 
-export function stripSqlComments(sql: string): string {
-  return sql.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\r\n]*/g, '');
+function maskSqlNonCode(sql: string): string {
+  const masked = sql.split('');
+  const blank = (index: number): void => {
+    if (masked[index] !== '\n' && masked[index] !== '\r') masked[index] = ' ';
+  };
+
+  let index = 0;
+  while (index < sql.length) {
+    if (sql.startsWith('--', index)) {
+      while (index < sql.length && sql[index] !== '\n') blank(index++);
+      continue;
+    }
+
+    if (sql.startsWith('/*', index)) {
+      let depth = 0;
+      while (index < sql.length) {
+        if (sql.startsWith('/*', index)) {
+          depth += 1;
+          blank(index++);
+          blank(index++);
+        } else if (sql.startsWith('*/', index)) {
+          depth -= 1;
+          blank(index++);
+          blank(index++);
+          if (depth === 0) break;
+        } else {
+          blank(index++);
+        }
+      }
+      continue;
+    }
+
+    if (sql[index] === "'" || sql[index] === '"') {
+      const quote = sql[index];
+      blank(index++);
+      while (index < sql.length) {
+        if (sql[index] === '\\' && index + 1 < sql.length) {
+          blank(index++);
+          blank(index++);
+        } else if (sql[index] === quote) {
+          blank(index++);
+          if (sql[index] === quote) {
+            blank(index++);
+          } else {
+            break;
+          }
+        } else {
+          blank(index++);
+        }
+      }
+      continue;
+    }
+
+    if (sql[index] === '$') {
+      const delimiter = /^\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/.exec(
+        sql.slice(index),
+      )?.[0];
+      if (delimiter) {
+        const end = sql.indexOf(delimiter, index + delimiter.length);
+        const quotedEnd = end === -1 ? sql.length : end + delimiter.length;
+        while (index < quotedEnd) blank(index++);
+        continue;
+      }
+    }
+
+    index += 1;
+  }
+
+  return masked.join('');
 }
 
 export function addedNumberedMigrationPaths(rawNameStatus: string): string[] {
@@ -32,15 +99,28 @@ export function findEnumAddValueViolations(
   filePath: string,
   sql: string,
 ): EnumAddValueViolation[] {
-  return stripSqlComments(sql)
-    .split(';')
-    .map((statement) => statement.trim())
-    .filter((statement) =>
+  const masked = maskSqlNonCode(sql);
+  const violations: EnumAddValueViolation[] = [];
+  let statementStart = 0;
+
+  for (let index = 0; index <= masked.length; index += 1) {
+    if (index !== masked.length && masked[index] !== ';') continue;
+
+    const code = masked.slice(statementStart, index);
+    if (
       /\balter\s+type\b[\s\S]*?\badd\s+value\b(?!\s+if\s+not\s+exists\b)/i.test(
-        statement,
-      ),
-    )
-    .map((statement) => ({ path: filePath, statement }));
+        code,
+      )
+    ) {
+      violations.push({
+        path: filePath,
+        statement: sql.slice(statementStart, index).trim(),
+      });
+    }
+    statementStart = index + 1;
+  }
+
+  return violations;
 }
 
 function runCli(): void {
