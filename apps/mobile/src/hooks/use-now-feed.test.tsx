@@ -9,6 +9,7 @@ import {
 import { createHookWrapper } from '../test-utils/app-hook-test-utils';
 import { NetworkError, setActiveProfileId } from '../lib/api-client';
 import { buildNowFeedCacheKey, readCachedNowFeed } from '../lib/now-feed-cache';
+import { resetMentorNoticePolicyStoreForTests } from '../lib/mentor-notice-policy';
 
 import {
   useMentorNoticeActions,
@@ -931,5 +932,309 @@ describe('useMentorNoticeActions', () => {
     expect(rendered.result.current.defer.isSuccess).toBe(false);
 
     queryClient.clear();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2627] The ORDERED rollout observation on the Now-feed surfaces.
+//
+// Distinct from the WI-2504 epoch coverage above and deliberately not a
+// replacement for it: the epoch is the opaque cache key (equality only), this is
+// the order. The cases that only the order can express are the ones here — a
+// payload arriving out of order, and a re-enable that must require a strictly
+// higher revision.
+// ---------------------------------------------------------------------------
+describe('[WI-2627] orderable mentor-notice rollout observation', () => {
+  const ACTOR = 'wi2498-test-actor';
+  const PROFILE = 'test-profile-id';
+  const POLICY_KEY = `mentor-notice-policy-state::${ACTOR}::${PROFILE}`;
+
+  let mockFetch: jest.Mock;
+  let originalFetch: typeof globalThis.fetch;
+
+  function policy(revision: number, enabled: boolean) {
+    return {
+      rolloutRevision: revision,
+      rolloutEnabled: enabled,
+      projectionEpoch: `notice-policy-v1:r${revision}:${
+        enabled ? 'on' : 'off'
+      }:self:consented`,
+    };
+  }
+
+  function jsonResponse(body: unknown): Response {
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const NOTICE_CARD = {
+    kind: 'mentor_notice',
+    templateKey: 'now.mentor_notice.default',
+    params: {
+      noticeId: '11111111-1111-4111-8111-111111111111',
+      concept: 'sign flip',
+    },
+    deepLink: { route: 'notice.recheck', params: {}, chain: [] },
+    scope: 'self',
+  };
+
+  beforeEach(async () => {
+    originalFetch = globalThis.fetch;
+    mockFetch = jest.fn();
+    globalThis.fetch = mockFetch as unknown as typeof globalThis.fetch;
+    setActiveProfileId(PROFILE);
+    resetMentorNoticePolicyStoreForTests();
+    await AsyncStorage.clear();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    setActiveProfileId(undefined);
+  });
+
+  describe('GET /now', () => {
+    it('folds the observation it arrives with and paints the cards at that revision', async () => {
+      mockFetch.mockResolvedValue(
+        jsonResponse({
+          scope: 'self',
+          cards: [NOTICE_CARD],
+          overflowCount: 0,
+          generatedAt: FRESH_CACHE_TIMESTAMP,
+          mentorNoticePolicy: policy(7, true),
+        }),
+      );
+
+      const { result } = renderHook(() => useNowFeed(), {
+        wrapper: createHookWrapper().wrapper,
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      // Positive control for the suppression tests below.
+      expect(result.current.data?.cards.map((c) => c.kind)).toEqual([
+        'mentor_notice',
+      ]);
+      await waitFor(async () =>
+        expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
+          '{"revision":7,"enabled":true}',
+        ),
+      );
+    });
+
+    // The case the epoch cannot express. The epoch is comparable for equality
+    // only, so this response's cards would render on the strength of arriving
+    // last.
+    it('does not paint the cards of a response that PREDATES the rollback we know about', async () => {
+      await AsyncStorage.setItem(POLICY_KEY, '{"revision":7,"enabled":false}');
+      mockFetch.mockResolvedValue(
+        jsonResponse({
+          scope: 'self',
+          cards: [NOTICE_CARD],
+          overflowCount: 0,
+          generatedAt: FRESH_CACHE_TIMESTAMP,
+          mentorNoticePolicy: policy(6, true),
+        }),
+      );
+
+      const { result } = renderHook(() => useNowFeed(), {
+        wrapper: createHookWrapper().wrapper,
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data?.cards).toEqual([]);
+      // The fold refused it too: the stored revision did not regress to 6.
+      await waitFor(async () =>
+        expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
+          '{"revision":7,"enabled":false}',
+        ),
+      );
+    });
+
+    it('does not persist the cards of a suppressed response, so the next cold start cannot read them back', async () => {
+      await AsyncStorage.setItem(POLICY_KEY, '{"revision":7,"enabled":false}');
+      // `mockImplementation`, not `mockResolvedValue`: this response carries an
+      // epoch, which re-keys the query and fires a second fetch — and a Response
+      // body is single-use, so a shared instance would fail the refetch.
+      mockFetch.mockImplementation(() =>
+        Promise.resolve(
+          jsonResponse({
+            scope: 'self',
+            cards: [NOTICE_CARD],
+            overflowCount: 0,
+            generatedAt: FRESH_CACHE_TIMESTAMP,
+            mentorNoticePolicyEpoch: 'notice-policy-v1:r7:off',
+            mentorNoticePolicy: policy(7, false),
+          }),
+        ),
+      );
+
+      const { result } = renderHook(() => useNowFeed(), {
+        wrapper: createHookWrapper().wrapper,
+      });
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+      await waitFor(async () => {
+        const persisted = await readCachedNowFeed(
+          {
+            actorId: ACTOR,
+            profileId: PROFILE,
+            policyEpoch: 'notice-policy-v1:r7:off',
+          },
+          Date.parse('2999-06-14T08:00:00.000Z'),
+        );
+        expect(persisted?.cards ?? []).toEqual([]);
+      });
+    });
+
+    it('re-enables only on a STRICTLY HIGHER revision', async () => {
+      await AsyncStorage.setItem(POLICY_KEY, '{"revision":7,"enabled":false}');
+      // Same revision, enabled — refused, so the cards stay suppressed.
+      mockFetch.mockResolvedValue(
+        jsonResponse({
+          scope: 'self',
+          cards: [NOTICE_CARD],
+          overflowCount: 0,
+          generatedAt: FRESH_CACHE_TIMESTAMP,
+          mentorNoticePolicy: policy(7, true),
+        }),
+      );
+
+      const sameRevision = renderHook(() => useNowFeed(), {
+        wrapper: createHookWrapper().wrapper,
+      });
+      await waitFor(() =>
+        expect(sameRevision.result.current.isSuccess).toBe(true),
+      );
+      expect(sameRevision.result.current.data?.cards).toEqual([]);
+      sameRevision.unmount();
+
+      // A deploy bumps the revision. That, and only that, brings them back.
+      resetMentorNoticePolicyStoreForTests();
+      mockFetch.mockResolvedValue(
+        jsonResponse({
+          scope: 'self',
+          cards: [NOTICE_CARD],
+          overflowCount: 0,
+          generatedAt: FRESH_CACHE_TIMESTAMP,
+          mentorNoticePolicy: policy(8, true),
+        }),
+      );
+
+      const higher = renderHook(() => useNowFeed(), {
+        wrapper: createHookWrapper().wrapper,
+      });
+      await waitFor(() => expect(higher.result.current.isSuccess).toBe(true));
+      await waitFor(() =>
+        expect(higher.result.current.data?.cards.map((c) => c.kind)).toEqual([
+          'mentor_notice',
+        ]),
+      );
+    });
+  });
+
+  describe('GET /now/overflow — the deep-link surface', () => {
+    const OVERFLOW_ITEM = {
+      kind: 'mentor_notice',
+      templateKey: 'now.mentor_notice.default',
+      params: {
+        noticeId: '11111111-1111-4111-8111-111111111111',
+        concept: 'sign flip',
+      },
+      deepLink: { route: 'notice.recheck', params: {}, chain: [] },
+      scope: 'self',
+    };
+
+    it('serves its notice-bearing items at the observed revision', async () => {
+      mockFetch.mockResolvedValue(
+        jsonResponse({
+          scope: 'self',
+          items: [OVERFLOW_ITEM],
+          mentorNoticePolicy: policy(7, true),
+        }),
+      );
+
+      const { result } = renderHook(() => useNowOverflow(true), {
+        wrapper: createHookWrapper().wrapper,
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      await waitFor(() =>
+        expect(result.current.data?.items.map((i) => i.kind)).toEqual([
+          'mentor_notice',
+        ]),
+      );
+    });
+
+    it('drops its notice-bearing items — and their notice deep links — once the rollout is off', async () => {
+      await AsyncStorage.setItem(POLICY_KEY, '{"revision":7,"enabled":false}');
+      mockFetch.mockResolvedValue(
+        jsonResponse({
+          scope: 'self',
+          items: [OVERFLOW_ITEM],
+          mentorNoticePolicy: policy(7, false),
+        }),
+      );
+
+      const { result } = renderHook(() => useNowOverflow(true), {
+        wrapper: createHookWrapper().wrapper,
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      await waitFor(() => expect(result.current.data?.items).toEqual([]));
+    });
+  });
+
+  describe('recheck / defer mutations', () => {
+    it('folds the observation a successful recheck echoes', async () => {
+      mockFetch.mockResolvedValue(
+        jsonResponse({
+          sessionId: '660e8400-e29b-41d4-a716-446655440000',
+          mentorNoticePolicy: policy(9, false),
+        }),
+      );
+
+      const { result } = renderHook(() => useMentorNoticeActions(), {
+        wrapper: createHookWrapper().wrapper,
+      });
+
+      await act(async () => {
+        await result.current.recheck.mutateAsync(
+          '11111111-1111-4111-8111-111111111111',
+        );
+      });
+
+      await waitFor(async () =>
+        expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
+          '{"revision":9,"enabled":false}',
+        ),
+      );
+    });
+
+    it('folds the observation a successful defer echoes', async () => {
+      mockFetch.mockResolvedValue(
+        jsonResponse({
+          noticeId: '11111111-1111-4111-8111-111111111111',
+          deferredAt: '2026-07-26T08:00:00.000Z',
+          mentorNoticePolicy: policy(4, true),
+        }),
+      );
+
+      const { result } = renderHook(() => useMentorNoticeActions(), {
+        wrapper: createHookWrapper().wrapper,
+      });
+
+      await act(async () => {
+        await result.current.defer.mutateAsync(
+          '11111111-1111-4111-8111-111111111111',
+        );
+      });
+
+      await waitFor(async () =>
+        expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
+          '{"revision":4,"enabled":true}',
+        ),
+      );
+    });
   });
 });
