@@ -4546,7 +4546,6 @@
       "activeMessage": "Puedes revisar este acuerdo aquí en cualquier momento.",
       "revoke": "Dejar de compartir",
       "revoking": "Finalizando uso compartido...",
-      "revoked": "El uso compartido está finalizando. El mentor verá un aviso.",
       "revokeErrorTitle": "No se pudo dejar de compartir",
       "missingActor": "No pudimos identificar a la persona activa.",
       "relationLabel": "Relación",

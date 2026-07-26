@@ -4546,7 +4546,6 @@
       "activeMessage": "この同意書はいつでもここで確認できます。",
       "revoke": "共有を終了",
       "revoking": "共有を終了中...",
-      "revoked": "共有を終了します。サポーターに通知が表示されます。",
       "revokeErrorTitle": "共有を終了できませんでした",
       "missingActor": "アクティブなユーザーを特定できませんでした。",
       "relationLabel": "関係",
