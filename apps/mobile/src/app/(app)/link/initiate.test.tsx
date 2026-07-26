@@ -294,7 +294,7 @@ describe('InitiateLinkScreen', () => {
       expect(mockReplace).not.toHaveBeenCalled();
     });
 
-    it('the picker back button falls back to router.replace("/(app)/home") on a historyless entry (deep link / cold start)', () => {
+    it('the picker back button falls back to the V2 Mentor root on a historyless entry', () => {
       mockCanGoBack.mockReturnValue(false);
       renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });
 
@@ -302,7 +302,7 @@ describe('InitiateLinkScreen', () => {
         screen.getByTestId('visibility-link-initiate-picker-back'),
       );
 
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor');
       expect(mockBack).not.toHaveBeenCalled();
     });
 
@@ -360,7 +360,7 @@ describe('InitiateLinkScreen', () => {
       expect(mockReplace).not.toHaveBeenCalled();
     });
 
-    it('the confirmation back button falls back to router.replace("/(app)/home") on a historyless pre-filled entry', () => {
+    it('the confirmation back button falls back to the V2 Mentor root on a historyless pre-filled entry', () => {
       mockCanGoBack.mockReturnValue(false);
       mockParams = {
         supporteePersonId: NAMED_PROFILES.linkedChild.id,
@@ -372,7 +372,7 @@ describe('InitiateLinkScreen', () => {
         screen.getByTestId('visibility-link-initiate-confirm-back'),
       );
 
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor');
       expect(mockBack).not.toHaveBeenCalled();
     });
 

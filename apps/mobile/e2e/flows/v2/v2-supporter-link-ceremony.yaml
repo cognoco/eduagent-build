@@ -26,25 +26,13 @@
 # itself (initiateLink/acceptLink) is reachable and correct via that deep
 # link, which is what this AC's happy path names.
 #
-# [Disclosure] Written and testID-verified against source (initiate.tsx,
-# [contractId].tsx, ContractCard.tsx, linking-ceremony.ts,
-# test-seed-v2-supporter.ts's seedV2SupporterPendingLink), and registered in
-# ci-maestro-manifest.json / scripts/e2e-ci-injection-and-smoke-gate.test.ts's
-# exhaustive v2-suite plan assertion (that consistency check IS runnable and
-# was run locally without an emulator — ci-maestro-plan.mjs fails closed on a
-# v2-tagged flow missing from the manifest, or a scenario mismatch against
-# this file's SEED_SCENARIO comment). What was NOT run is the flow itself: no
-# Android emulator or staging DB is reachable in this build environment, so
-# the actual Maestro walk (this file's tapOn/assertVisible steps against a
-# real app, and the sign-out/sign-in-only cross-login it relies on) has not
-# been executed — do not read a passing CI run into this file until the `v2`
-# workflow-dispatch suite has actually run it. The real, DB-backed proof of
-# the create -> accept -> accept sequence (including the NO-EARLY-AUTH
-# boundary and recovery variants) is
-# test-seed-v2-supporter.integration.test.ts's
-# "[WI-2242] v2-supporter-pending-link seed" suite (runnable in CI against a
-# real DB); this flow proves the on-device walk those server-side assertions
-# back.
+# [Disclosure] This explicit-lane flow covers Android Back, process relaunch,
+# offline retry, lapsed/invalid recovery, and both login handoffs in
+# addition to the happy path. Completion evidence must cite an executed green
+# run; source presence alone is not a receipt. DB-backed scenario-state
+# assertions live in test-seed-v2-supporter.integration.test.ts; concurrent
+# acceptance and audit side-effect invariants live in
+# linking-ceremony.integration.test.ts.
 #
 # SEED_SCENARIO: 'v2-supporter-pending-link'
 appId: com.mentomate.app
@@ -75,6 +63,24 @@ tags:
     timeout: 15000
 - assertVisible:
     id: 'visibility-link-create'
+
+# NAVIGATION — Android hardware Back from the deep-linked initiate route must
+# return to the V2 Mentor root, never legacy Home/Recaps. Reopen to prove the
+# pending ceremony remains reachable after the round trip.
+- pressKey: back
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 15000
+- assertNotVisible:
+    id: 'home-screen'
+- assertNotVisible:
+    id: 'recaps-screen'
+- openLink: 'mentomate:///link/initiate?supporteePersonId=${SUPPORTEE_PERSON_ID}&relation=other'
+- extendedWaitUntil:
+    visible:
+      id: 'visibility-link-initiate-screen'
+    timeout: 15000
 
 # CEREMONY: open the seeded pending contract and accept as supporter. Status
 # stays 'pending' until the supportee also accepts (linking-ceremony.ts's
@@ -112,6 +118,58 @@ tags:
       EMAIL: ${SUPPORTEE_EMAIL}
       PASSWORD: ${SUPPORTEE_PASSWORD}
 
+# NAVIGATION — a cold process relaunch preserves the one-sided/pending stage.
+# The supportee still sees their Accept control while the completed review is
+# absent, proving the supporter's earlier acceptance survived the handoff.
+- stopApp
+- launchApp:
+    clearState: false
+- openLink: 'mentomate:///link/${CONTRACT_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'visibility-contract-card'
+    timeout: 30000
+- assertVisible:
+    id: 'visibility-contract-accept'
+- assertNotVisible:
+    id: 'visibility-link-review'
+
+# RECOVERY — navigate away, then force an uncached contract's first read
+# offline and use the real retry control after restoring connectivity.
+- pressKey: back
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 15000
+- setAirplaneMode: enabled
+- openLink: 'mentomate:///link/${LAPSED_CONTRACT_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'visibility-link-error'
+    timeout: 30000
+- setAirplaneMode: disabled
+- tapOn:
+    id: 'visibility-link-error-retry'
+- extendedWaitUntil:
+    visible:
+      id: 'visibility-contract-card'
+    timeout: 15000
+
+# RECOVERY — representative expired invite. The lapsed contract is visible to
+# its party but terminal: no Accept/review/revoke action, with a safe V2 exit.
+- assertNotVisible:
+    id: 'visibility-contract-accept'
+- assertNotVisible:
+    id: 'visibility-link-review'
+- assertNotVisible:
+    id: 'visibility-contract-revoke'
+- tapOn:
+    id: 'visibility-link-back'
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 15000
+
 - openLink: 'mentomate:///link/${CONTRACT_ID}'
 - extendedWaitUntil:
     visible:
@@ -139,11 +197,38 @@ tags:
 - runFlow:
     file: ../_setup/sign-in-only-returning.yaml
 
+# NAVIGATION — completed stage also survives a cold process relaunch.
+- stopApp
+- launchApp:
+    clearState: false
 - openLink: 'mentomate:///link/${CONTRACT_ID}'
 - extendedWaitUntil:
     visible:
       id: 'visibility-link-review'
+    timeout: 30000
+
+# RECOVERY — a nonexistent contract fails closed and its explicit Back action
+# returns to V2 Mentor.
+- pressKey: back
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
     timeout: 15000
+- openLink: 'mentomate:///link/00000000-0000-7000-8000-000000000099'
+- extendedWaitUntil:
+    visible:
+      id: 'visibility-link-error'
+    timeout: 30000
+- tapOn:
+    id: 'visibility-link-error-back'
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 15000
+- assertNotVisible:
+    id: 'home-screen'
+- assertNotVisible:
+    id: 'recaps-screen'
 
 - openLink: 'mentomate:///mentor'
 - extendedWaitUntil:

@@ -37,6 +37,8 @@ export async function restampGraduationContracts(
       .set({
         status: 'restamped',
         contractVersion: row.contract.contractVersion + 1,
+        supporterAcceptedAt: null,
+        supporteeAcceptedAt: null,
         updatedAt: occurredAt,
       })
       .where(eq(supportVisibilityContracts.id, row.contract.id));

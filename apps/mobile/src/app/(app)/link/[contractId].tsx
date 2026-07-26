@@ -51,6 +51,7 @@ export default function LinkContractScreen(): React.ReactElement {
   const client = useApiClient();
   const queryClient = useQueryClient();
   const { activeProfile } = useProfile();
+  const [isAcceptRecovering, setIsAcceptRecovering] = React.useState(false);
 
   const contractQuery = useApiQuery({
     queryKey: ['visibility-contract', contractId],
@@ -75,7 +76,11 @@ export default function LinkContractScreen(): React.ReactElement {
       }
       const res = await client.visibility.links[':id'].accept.$post({
         param: { id: input.contract.id },
-        json: { actorPersonId, audience: input.audience },
+        json: {
+          actorPersonId,
+          audience: input.audience,
+          contractVersion: input.contract.contractVersion,
+        },
       });
       const okRes = await assertOk(res);
       return parseJson(
@@ -103,7 +108,10 @@ export default function LinkContractScreen(): React.ReactElement {
       );
     },
     onSuccess: () => {
-      void contractQuery.refetch();
+      queryClient.removeQueries({
+        queryKey: ['visibility-contract', contractId],
+      });
+      router.replace('/(app)/mentor');
     },
   });
 
@@ -116,7 +124,7 @@ export default function LinkContractScreen(): React.ReactElement {
           message={t('visibility.link.missingMessage')}
           primaryAction={{
             label: t('common.goBack'),
-            onPress: () => goBackOrReplace(router, '/(app)/home'),
+            onPress: () => goBackOrReplace(router, '/(app)/mentor'),
             testID: 'visibility-link-missing-back',
           }}
           testID="visibility-link-missing"
@@ -158,7 +166,7 @@ export default function LinkContractScreen(): React.ReactElement {
           }}
           secondaryAction={{
             label: t('common.goBack'),
-            onPress: () => goBackOrReplace(router, '/(app)/home'),
+            onPress: () => goBackOrReplace(router, '/(app)/mentor'),
             testID: 'visibility-link-error-back',
           }}
           testID="visibility-link-error"
@@ -179,10 +187,12 @@ export default function LinkContractScreen(): React.ReactElement {
       : audience === 'supportee'
         ? Boolean(contract.supporteeAcceptedAt)
         : true;
-  const active =
-    contract.status === 'accepted' || contract.status === 'restamped';
+  const active = contract.status === 'accepted';
   const canRevoke = active && audience === 'supportee';
-  const canAccept = actionableAudience !== undefined && !accepted;
+  const canAccept =
+    actionableAudience !== undefined &&
+    !accepted &&
+    (contract.status === 'pending' || contract.status === 'restamped');
 
   return (
     <ScrollView
@@ -195,7 +205,7 @@ export default function LinkContractScreen(): React.ReactElement {
         accessibilityRole="button"
         accessibilityLabel={t('common.goBack')}
         className="min-h-[44px] flex-row items-center gap-2 self-start rounded-button border border-border px-4 py-2"
-        onPress={() => goBackOrReplace(router, '/(app)/home')}
+        onPress={() => goBackOrReplace(router, '/(app)/mentor')}
         testID="visibility-link-back"
       >
         <Ionicons name="chevron-back" size={18} color={colors.textSecondary} />
@@ -221,7 +231,10 @@ export default function LinkContractScreen(): React.ReactElement {
         supporteeName={supporteeName}
         supporterName={supporterName}
         onAccept={
-          canAccept && actionableAudience
+          canAccept &&
+          actionableAudience &&
+          !acceptMutation.isError &&
+          !isAcceptRecovering
             ? () =>
                 acceptMutation.mutate({
                   contract,
@@ -237,12 +250,16 @@ export default function LinkContractScreen(): React.ReactElement {
           primaryAction={{
             label: t('common.tryAgain'),
             onPress: () => {
-              if (actionableAudience) {
-                acceptMutation.mutate({
-                  contract,
-                  audience: actionableAudience,
-                });
-              }
+              // The contract may have been restamped after this screen loaded.
+              // Refetch first so a stale-version conflict can never loop or
+              // silently accept terms the user has not reviewed. A fresh,
+              // explicit Accept is still required after the new card renders.
+              if (isAcceptRecovering) return;
+              setIsAcceptRecovering(true);
+              void contractQuery.refetch().then((result) => {
+                if (result.isSuccess) acceptMutation.reset();
+                setIsAcceptRecovering(false);
+              });
             },
             testID: 'visibility-link-accept-retry',
           }}

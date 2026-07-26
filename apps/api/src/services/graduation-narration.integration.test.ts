@@ -158,6 +158,8 @@ function createIntegrationDb(): Database {
       });
       expect(contract!.status).toBe('restamped');
       expect(contract!.contractVersion).toBe(2);
+      expect(contract!.supporterAcceptedAt).toBeNull();
+      expect(contract!.supporteeAcceptedAt).toBeNull();
 
       // Audit row records the prior version for the trail.
       const audit = await db.query.supportVisibilityAuditEvents.findMany({

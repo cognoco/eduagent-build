@@ -131,7 +131,7 @@ export default function InitiateLinkScreen(): React.ReactElement {
             historyless direct/deep-link entry, which falls back to the same
             V2 home used by the sibling `[contractId].tsx` back button. */}
         <LinkCeremonyBackButton
-          onPress={() => goBackOrReplace(router, '/(app)/home')}
+          onPress={() => goBackOrReplace(router, '/(app)/mentor')}
           testID="visibility-link-initiate-picker-back"
         />
         <SupporteePicker
@@ -195,7 +195,7 @@ export default function InitiateLinkScreen(): React.ReactElement {
           // entry) they take out of this step.
           hasExitedRef.current = true;
           if (paramSupporteePersonId) {
-            goBackOrReplace(router, '/(app)/home');
+            goBackOrReplace(router, '/(app)/mentor');
             return;
           }
           // Reset the mutation alongside the state change: without this, a

@@ -187,5 +187,6 @@ export type VisibilityLinkInitiate = z.infer<
 export const visibilityLinkAcceptSchema = z.object({
   actorPersonId: z.string().uuid(),
   audience: renderAudienceSchema,
+  contractVersion: z.number().int().positive(),
 });
 export type VisibilityLinkAccept = z.infer<typeof visibilityLinkAcceptSchema>;

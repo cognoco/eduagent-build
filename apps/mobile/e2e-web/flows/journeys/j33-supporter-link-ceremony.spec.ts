@@ -30,30 +30,26 @@ import { seedScenario } from '../../helpers/test-seed';
  * mechanism itself (initiateLink/acceptLink) is reachable and correct via
  * that deep link, which is what this AC's happy path names.
  *
- * [Disclosure] The Playwright web E2E harness does not run in this build
- * environment (no dev-server/staging DB reachable) — same constraint
- * documented in J-29/J-31/J-32 (`j29-supporter-scope-journey.spec.ts`,
- * `j31-supporter-coldstart-mount.spec.ts`,
- * `j32-supporter-self-learning-doorway.spec.ts`). This spec is written and
- * testID-verified against the source it exercises (`initiate.tsx`,
- * `[contractId].tsx`, `ContractCard.tsx`, `linking-ceremony.ts`,
- * `test-seed-v2-supporter.ts`'s `seedV2SupporterPendingLink`) but has NOT
- * been executed here — do not read a green run into this PR. The real,
- * DB-backed proof of the create -> accept -> accept sequence (including the
- * NO-EARLY-AUTH boundary and recovery variants) is
- * `test-seed-v2-supporter.integration.test.ts`'s
- * `[WI-2242] v2-supporter-pending-link seed` suite (runnable in CI against a
- * real DB); this journey proves the UI-level walk those server-side
- * assertions back.
+ * [Disclosure] This journey is intended for the staging-backed explicit
+ * Playwright lane. It covers the two-party ceremony plus browser history,
+ * transport retry, terminal/foreign/invalid recovery, and safe V2 returns.
+ * Real DB-backed scenario-state assertions live in
+ * `test-seed-v2-supporter.integration.test.ts`; concurrent acceptance and
+ * audit side-effect invariants live in `linking-ceremony.integration.test.ts`.
  */
 test('J-33 supporter <-> supportee: reach the link ceremony via deep-link initiate, both sides accept, chain into Support hub', async ({
   page,
   browser,
 }) => {
+  test.setTimeout(360_000);
   const suffix = randomBytes(2).toString('hex');
   const seeded = await seedScenario({
     scenario: 'v2-supporter-pending-link',
     email: buildSeedEmail(`j33-link-ceremony-${suffix}`),
+  });
+  const foreignSeed = await seedScenario({
+    scenario: 'v2-supporter-pending-link',
+    email: buildSeedEmail(`j33-foreign-contract-${suffix}`),
   });
 
   const supporterPersonId = seeded.profileId;
@@ -61,6 +57,8 @@ test('J-33 supporter <-> supportee: reach the link ceremony via deep-link initia
   const supporteeEmail = seeded.ids.supporteeEmail;
   const supporteePassword = seeded.ids.supporteePassword;
   const contractId = seeded.ids.contractId;
+  const lapsedContractId = seeded.ids.lapsedContractId;
+  const foreignContractId = foreignSeed.ids.contractId;
   // Literal displayName set in test-seed-v2-supporter.ts's
   // seedV2SupporterPendingLink — used below to prove the SAME person/edge is
   // active post-acceptance, matching J-29's convention.
@@ -112,7 +110,28 @@ test('J-33 supporter <-> supportee: reach the link ceremony via deep-link initia
       activeProfileId: supporteePersonId,
     });
 
+    let failContractRequest = true;
+    const contractRequestPattern = new RegExp(
+      `/visibility/links/${contractId}/contract(?:\\?|$)`,
+    );
+    await supporteePage.route(contractRequestPattern, async (route) => {
+      if (failContractRequest) {
+        await route.abort('failed');
+        return;
+      }
+      await route.continue();
+    });
+
+    // RECOVERY — network retry: the first contract read fails at transport,
+    // then the same visible retry action succeeds after connectivity returns.
     await supporteePage.goto(`/link/${contractId}`);
+    await expect(
+      supporteePage.getByTestId('visibility-link-error'),
+    ).toBeVisible();
+    failContractRequest = false;
+    await pressableClick(
+      supporteePage.getByTestId('visibility-link-error-retry'),
+    );
     await expect(
       supporteePage.getByTestId('visibility-link-screen'),
     ).toBeVisible();
@@ -120,11 +139,48 @@ test('J-33 supporter <-> supportee: reach the link ceremony via deep-link initia
       supporteePage.getByTestId('visibility-contract-accept'),
     );
     await expect(
+      supporteePage.getByTestId('visibility-contract-accept'),
+    ).toHaveCount(0);
+    await expect(
       supporteePage.getByTestId('visibility-link-review'),
     ).toBeVisible();
     await expect(
       supporteePage.getByTestId('visibility-contract-revoke'),
     ).toBeVisible();
+
+    // RECOVERY — lapsed invite: the terminal contract is readable by the
+    // party but cannot be accepted or treated as active, and Back returns to
+    // the safe V2 Mentor root.
+    await supporteePage.goto('/mentor');
+    await supporteePage.goto(`/link/${lapsedContractId}`);
+    await expect(
+      supporteePage.getByTestId('visibility-link-screen'),
+    ).toBeVisible();
+    await expect(
+      supporteePage.getByTestId('visibility-contract-accept'),
+    ).toHaveCount(0);
+    await expect(
+      supporteePage.getByTestId('visibility-link-review'),
+    ).toHaveCount(0);
+    await pressableClick(supporteePage.getByTestId('visibility-link-back'));
+    await expect(supporteePage).toHaveURL(/\/mentor$/);
+
+    // RECOVERY — existing foreign contract (403) and nonexistent contract
+    // (404) both fail closed and offer the same safe V2 return.
+    for (const inaccessibleId of [
+      foreignContractId,
+      '00000000-0000-7000-8000-000000000099',
+    ]) {
+      await supporteePage.goto(`/link/${inaccessibleId}`);
+      await expect(
+        supporteePage.getByTestId('visibility-link-error'),
+      ).toBeVisible();
+      await pressableClick(
+        supporteePage.getByTestId('visibility-link-error-back'),
+      );
+      await expect(supporteePage).toHaveURL(/\/mentor$/);
+      await expect(supporteePage.getByTestId('mentor-screen')).toBeVisible();
+    }
   } finally {
     await supporteeContext.close();
   }
@@ -166,10 +222,59 @@ test('J-33 supporter <-> supportee: reach the link ceremony via deep-link initia
   );
   await expect(journalPlaceholder).toBeVisible();
   await expect(
-    journalPlaceholder.getByText(supporteeDisplayName),
+    journalPlaceholder.getByText(supporteeDisplayName, { exact: true }),
   ).toBeVisible();
   await expect(page.getByTestId('visibility-shared-record')).toHaveCount(0);
   await expect(
     page.getByTestId('person-scope-journal-empty-lamp'),
   ).toBeVisible();
+
+  // NAVIGATION — a real browser Back/Forward round trip preserves the
+  // completed ceremony's active person scope instead of falling into a
+  // legacy Home/Recaps route.
+  await page.goBack();
+  await expect(page).toHaveURL(/\/mentor$/);
+  await expect(page.getByTestId('person-scope-mentor-tab')).toBeVisible();
+  await expect(
+    page.getByTestId(`scope-chip-option-person-${supporteePersonId}`),
+  ).toBeVisible();
+  await expect(page.getByTestId('support-hub-mentor-tab')).toHaveCount(0);
+
+  await page.goForward();
+  await expect(page).toHaveURL(/\/journal$/);
+  await expect(journalPlaceholder).toBeVisible();
+
+  // RECOVERY — revoke through the production supportee action, then prove
+  // both the supportee's safe return and the supporter's fail-closed scope.
+  const revocationContext = await browser.newContext();
+  const revocationPage = await revocationContext.newPage();
+  try {
+    await signIn(revocationPage, {
+      email: supporteeEmail,
+      password: supporteePassword,
+      landingTestId: 'mentor-screen',
+      landingPath: '/mentor',
+      activeProfileId: supporteePersonId,
+    });
+    await revocationPage.goto(`/link/${contractId}`);
+    await expect(
+      revocationPage.getByTestId('visibility-contract-revoke'),
+    ).toBeVisible();
+    await pressableClick(
+      revocationPage.getByTestId('visibility-contract-revoke'),
+    );
+    await expect(revocationPage).toHaveURL(/\/mentor$/);
+    await expect(revocationPage.getByTestId('mentor-screen')).toBeVisible();
+    await expect(revocationPage.getByTestId('home-screen')).toHaveCount(0);
+    await expect(revocationPage.getByTestId('recaps-screen')).toHaveCount(0);
+  } finally {
+    await revocationContext.close();
+  }
+
+  await page.goto('/mentor');
+  await page.reload({ waitUntil: 'commit' });
+  await expect(page.getByTestId('mentor-screen')).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(page.getByTestId('support-hub-mentor-tab')).toHaveCount(0);
 });
