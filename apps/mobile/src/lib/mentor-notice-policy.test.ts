@@ -774,6 +774,117 @@ describe('useMentorNoticePolicy', () => {
     ).toEqual([]);
   });
 
+  // ── [WI-2627 rework 2] A failed READ must not license a write ─────────────
+  //
+  // The breach this closes, reproduced by an independent adjudicator against the
+  // previous head. `readAndFold`'s catch nulled `entry.durable`, and
+  // `durableCandidate` reads `null` as "no guard, write current state". Those are
+  // two different facts wearing one value: "nothing trustworthy is THERE" versus
+  // "we could not LOOK, and a higher-revision disable may be sitting there".
+  //
+  // At cold start in-memory is the bootstrap `{0,false}`, so it has no revision
+  // to defend with, and a well-formed enabled observation at ANY revision above 0
+  // is `newer` and adopted wholesale — then written straight over an intact
+  // higher-revision disable on disk. Observed on the previous head: durable
+  // `{8,false}` became `{3,true}`, and the restart showed notices.
+  //
+  // Note this is the module's OWN stated threat model (see the header): "a reply
+  // that left the server before an emergency flag-off, arriving after one that
+  // left after it". A rev-3-enabled reply reaching a device whose disk says
+  // rev-8-disabled is precisely that.
+  it('does not regress the durable record when the READ threw, so a restart after a blind write does not resurrect notices', async () => {
+    // Disk holds a HIGH-revision DISABLE — the emergency rollback. Note the
+    // asymmetry with the read-throw test above, which seeds an ENABLED record and
+    // asserts only in-memory: that axis cannot reach this hole.
+    await seedStored(ACTOR, PROFILE, '{"revision":8,"enabled":false}');
+
+    // ...and the read of it fails, so this device is blind to it.
+    const originalGetItem = AsyncStorage.getItem;
+    const originalSetItem = AsyncStorage.setItem;
+    let readsFailed = 0;
+    let writesAttempted = 0;
+    AsyncStorage.getItem = jest.fn(() => {
+      readsFailed += 1;
+      return Promise.reject(new Error('storage unavailable'));
+    }) as unknown as typeof AsyncStorage.getItem;
+    // Passthrough spy: this must NOT change behaviour, only let the test tell
+    // "the write path has finished" from "it has not run yet".
+    AsyncStorage.setItem = jest.fn((k: string, v: string) => {
+      writesAttempted += 1;
+      return originalSetItem(k, v);
+    }) as unknown as typeof AsyncStorage.setItem;
+
+    try {
+      const { result } = mountPolicy();
+      await waitFor(() => expect(result.current.hydrated).toBe(true));
+      // Cold start + failed read: the bootstrap, which has NO revision to defend
+      // with. This is the precondition that makes the hole reachable.
+      expect(result.current.state).toEqual({ revision: 0, enabled: false });
+
+      // A well-formed observation at a LOWER revision than the disable on disk,
+      // saying notices are ON. Against the bootstrap it is legitimately 'newer',
+      // so in-memory adopting it is correct and expected.
+      act(() => result.current.observe(observation(3, true)));
+      expect(result.current.state).toEqual({ revision: 3, enabled: true });
+
+      // Wait for the write path to have FINISHED, by a condition both the fixed
+      // and the broken implementation satisfy — otherwise this wait would itself
+      // become the assertion and the durable check below would never be reached.
+      // Fixed: the read is retried (2 reads) and no write is attempted. Broken:
+      // one read, then a write straight over the disable.
+      await waitFor(() =>
+        expect(readsFailed + writesAttempted).toBeGreaterThanOrEqual(2),
+      );
+    } finally {
+      AsyncStorage.getItem = originalGetItem;
+      AsyncStorage.setItem = originalSetItem;
+    }
+
+    // THE DURABLE RECORD: untouched. Not lowered 8 → 3, and `enabled` not flipped
+    // false → true. Withholding is the fail-closed direction here: whatever is on
+    // disk is at least as strict as what we would have written.
+    expect(await AsyncStorage.getItem(stateKey(ACTOR, PROFILE))).toBe(
+      '{"revision":8,"enabled":false}',
+    );
+
+    // THE CRITERION'S OWN LAYER: restart. Storage is readable again, as it would
+    // be on a fresh launch. The rollback is still in force and notices stay gone.
+    resetMentorNoticePolicyStoreForTests();
+    const relaunched = mountPolicy();
+    await waitFor(() => expect(relaunched.result.current.hydrated).toBe(true));
+    expect(relaunched.result.current.state).toEqual({
+      revision: 8,
+      enabled: false,
+    });
+    expect(relaunched.result.current.suppressed(undefined)).toBe(true);
+    // ...and the stale enabled observation still cannot re-enable it.
+    expect(relaunched.result.current.suppressed(observation(3, true))).toBe(
+      true,
+    );
+    // Corroboration on the mechanism: the write was WITHHELD, not merely
+    // guarded into a no-op.
+    expect(writesAttempted).toBe(0);
+    // ...and the blindness was retried rather than assumed permanent.
+    expect(readsFailed).toBeGreaterThanOrEqual(2);
+  });
+
+  // The other half of the read-throw split: a genuinely ABSENT record is
+  // "nothing trustworthy is there", not "we could not look", and must NOT
+  // withhold — otherwise the fix above would silently stop every fresh install
+  // from ever persisting anything.
+  it('still writes when the read SUCCEEDS and finds no record, so the withhold is scoped to failed reads', async () => {
+    const { result } = mountPolicy();
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    act(() => result.current.observe(observation(4, true)));
+
+    await waitFor(async () => {
+      expect(await AsyncStorage.getItem(stateKey(ACTOR, PROFILE))).toBe(
+        '{"revision":4,"enabled":true}',
+      );
+    });
+  });
+
   // NON-TRIVIALITY CONTROL for the test above. "Always write disabled" and
   // "always hydrate disabled" would both satisfy every assertion there; neither
   // survives this. A clean enabled observation must reach disk as enabled and

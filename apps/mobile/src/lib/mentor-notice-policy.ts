@@ -300,11 +300,36 @@ type Entry = {
    */
   flushQueued: boolean;
   /**
-   * The record this device believes is durably on disk, or `null` when unknown
-   * or untrusted (nothing stored, or a stored record that would not parse).
-   * Guards the write so a flush can never LOWER the durable revision.
+   * The record this device believes is durably on disk, or `null` when there is
+   * nothing to defend (no record stored, or a stored record that would not
+   * parse). Guards the write so a flush can never LOWER the durable revision.
+   *
+   * `null` means "nothing trustworthy is THERE" — it does NOT mean "we could not
+   * look". Those two are different and conflating them is what `readUntrusted`
+   * below exists to prevent.
    */
   durable: MentorNoticePolicyState | null;
+  /**
+   * [WI-2627 rework 2] The last read of this key FAILED, so the disk contents
+   * are UNKNOWN rather than known-empty.
+   *
+   * This distinction is the whole point. `durable === null` was originally
+   * treated as "safe to write current state unguarded", which is right for an
+   * absent or unparseable record and catastrophically wrong for a read that
+   * threw: a higher-revision DISABLE can be sitting on disk, un-clobbered and
+   * invisible to us. At cold start in-memory is the bootstrap `{0, false}` — no
+   * revision to defend with — so any well-formed enabled observation above 0 is
+   * `newer`, adopted wholesale, and written straight over that disable. The
+   * durable revision drops, `enabled` flips back to true, and the next launch
+   * shows notices again. That is the exact breach this Work Item closes, and it
+   * was reproduced on the previous head.
+   *
+   * So while this is set AND no `durable` has been established, a flush writes
+   * NOTHING (see `flush`). In-session state stays fail-closed regardless — only
+   * the durable record is left alone, which is correct precisely because it may
+   * already hold the stronger disable.
+   */
+  readUntrusted: boolean;
 };
 
 const UNBOUND_SNAPSHOT: MentorNoticePolicySnapshot = {
@@ -337,6 +362,7 @@ function getEntry(key: string): Entry {
       chain: Promise.resolve(),
       flushQueued: false,
       durable: null,
+      readUntrusted: false,
     };
     entries.set(key, entry);
   }
@@ -398,18 +424,21 @@ function enqueue(entry: Entry, work: () => Promise<void>): void {
  *     arrived. Every retry therefore re-reads too, so a retry that lands late
  *     writes today's state rather than resurrecting the state that failed.
  *
- *   revision-guarded — folded against what is believed to be on disk through
- *     the same monotonic reducer the in-memory state uses, so a write can never
- *     lower the durable revision nor re-enable at the revision it holds. This is
- *     what covers retry-AFTER-EXHAUSTION: a flush whose retries all failed
- *     leaves `durable` stale, and the next flush still cannot regress it.
+ *   revision-guarded — WHEN a durable record is known, the candidate is folded
+ *     against it through the same monotonic reducer the in-memory state uses, so
+ *     the write cannot lower that revision nor re-enable at the revision it
+ *     holds. This is what covers retry-AFTER-EXHAUSTION: a flush whose retries
+ *     all failed leaves `durable` stale, and the next flush still cannot regress
+ *     it.
  *
- * `durable === null` means nothing trustworthy is on disk (fresh install, or a
- * record that would not parse — in which case its revision is unknowable and
- * the in-memory state, already fail-closed by the malformed fold, is the better
- * record). Writing the current state unguarded is correct in both cases, and
- * because hydration is serialized ahead of every write, `null` here never means
- * "we have not looked yet".
+ * `durable === null` means nothing trustworthy is THERE — a fresh install, or a
+ * record that would not parse (its revision is unknowable and the in-memory
+ * state, already fail-closed by the malformed fold, is the better record).
+ * Writing the current state unguarded is correct in both of those.
+ *
+ * It is NOT correct when the read itself failed, because then a higher-revision
+ * disable may be on disk unseen. That case never reaches here: `flush` withholds
+ * the write entirely while `readUntrusted` is set and no `durable` is known.
  */
 function durableCandidate(entry: Entry): MentorNoticePolicyState {
   const current = entry.snapshot.state;
@@ -447,6 +476,27 @@ function durableCandidate(entry: Entry): MentorNoticePolicyState {
  */
 async function flush(key: string, entry: Entry): Promise<void> {
   entry.flushQueued = false;
+
+  // [WI-2627 rework 2] A failed READ leaves the disk contents unknown, and a
+  // higher-revision disable may be sitting there. Retry the read once here —
+  // called directly rather than enqueued, because this already runs ON the
+  // chain — so a transient failure clears and the normal guarded write proceeds.
+  if (entry.readUntrusted) {
+    await readAndFold(key, entry);
+    if (entry.readUntrusted && entry.durable === null) {
+      // Still blind, and nothing established to guard against. WITHHOLD: writing
+      // current state here is what regressed a durable `{8,false}` to `{3,true}`
+      // and resurrected notices across a restart. Withholding cannot resurrect
+      // anything — it leaves whatever is on disk, which is at least as strict as
+      // what we would write. In-session state is already fail-closed.
+      Sentry.captureMessage('mentor_notice_policy: durable write withheld', {
+        level: 'warning',
+        tags: { feature: 'mentor_notice_policy', op: 'write_withheld' },
+      });
+      return;
+    }
+  }
+
   let lastError: unknown;
   for (let attempt = 0; attempt <= PERSIST_RETRY_DELAYS_MS.length; attempt++) {
     const candidate = durableCandidate(entry);
@@ -498,15 +548,24 @@ async function readAndFold(key: string, entry: Entry): Promise<void> {
     signal = storedSignal(await AsyncStorage.getItem(key));
     // [WI-2627 rework] Seed the write guard from what is actually on disk. Only
     // a PARSEABLE record tells us a durable revision; 'absent' means there is
-    // nothing to regress, and 'malformed' means its revision is unknowable — in
-    // both of those the guard stays off (`null`) rather than guessing.
+    // genuinely nothing to regress, and 'malformed' means its revision is
+    // unknowable — in both of those the guard stays off (`null`).
+    //
+    // [rework 2] This read SUCCEEDED, so the disk contents are known either way
+    // and the write path is unblocked.
     entry.durable = typeof signal === 'object' ? signal : null;
+    entry.readUntrusted = false;
   } catch (err) {
     Sentry.captureException(err, {
       tags: { feature: 'mentor_notice_policy', op: 'read' },
     });
     signal = 'malformed';
-    entry.durable = null;
+    // [WI-2627 rework 2] We could not LOOK. Do NOT null `durable`: a record
+    // established by an earlier successful read or write is still the best guard
+    // we have, and discarding it would hand the write path a blank cheque. And
+    // do not treat the absence of knowledge as knowledge of absence — that is
+    // what `readUntrusted` records, and what makes `flush` withhold.
+    entry.readUntrusted = true;
   }
   commit(
     entry,
