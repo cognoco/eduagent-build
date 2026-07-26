@@ -111,6 +111,16 @@ function makeArgs(opts: {
     mergedText: string | null;
     modelVersion: string;
   } | null;
+  /**
+   * The row the post-insert BUG-402 re-read finds, when it differs from the row
+   * this pass tried to insert — i.e. a concurrent dedup pass won the
+   * `onConflictDoNothing`. Unset leaves the re-read behaving as before.
+   */
+  postInsertRow?: {
+    decision: 'merge' | 'supersede' | 'keep_both' | 'discard_new';
+    mergedText: string | null;
+    modelVersion: string;
+  };
   llmResult?: DedupLlmResult;
   actionOutcome?: DedupActionOutcome;
   profileId?: string;
@@ -142,10 +152,20 @@ function makeArgs(opts: {
     memoryFacts: fakeScopedMemoryFacts,
   } as unknown as ScopedRepository;
 
+  // Call 1 is the memo lookup; call 2 is the post-insert BUG-402 re-read. They are
+  // separable so a test can model a LOST race — no memo, then a different row
+  // landing under `onConflictDoNothing`.
+  let memoSelectCallCount = 0;
   const memoSelect = {
     from: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
-    limit: jest.fn().mockResolvedValue(opts.memoRow ? [opts.memoRow] : []),
+    limit: jest.fn().mockImplementation(() => {
+      memoSelectCallCount += 1;
+      if (memoSelectCallCount > 1 && opts.postInsertRow) {
+        return Promise.resolve([opts.postInsertRow]);
+      }
+      return Promise.resolve(opts.memoRow ? [opts.memoRow] : []);
+    }),
   };
 
   const insertChain = {
@@ -359,6 +379,53 @@ describe('runDedupForProfile', () => {
     // "the referral was never constructed" from "the referral failed". Asserting
     // the judge boundary is never reached is what makes this test detect a future
     // change that starts consulting the judge with an unknown producer.
+    expect(mockRouteAndCall).not.toHaveBeenCalled();
+  });
+
+  // [WI-2628] BUG-402 race. `onConflictDoNothing` means a concurrent pass can win,
+  // and the re-read then re-points `decision` at THAT row — so the text about to be
+  // gated was produced by a call this pass never made, and this pass's provider does
+  // not describe it. The vendor must be dropped, which shows up as the judge never
+  // being consulted even though the LLM path ran and returned a real vendor.
+  it('drops the producing vendor when a concurrent pass won the insert', async () => {
+    const ourText = 'Dyslexia affects decoding.';
+    const landedText =
+      'Dyslexia is a reading difference that affects decoding.';
+    const candidate = makeFact({
+      id: 'c1',
+      text: landedText,
+      textNormalized: 'dyslexia is a reading difference that affects decoding',
+    });
+    const neighbour = makeFact({
+      id: 'n1',
+      text: ourText,
+      textNormalized: 'dyslexia affects decoding',
+    });
+
+    const args = makeArgs({
+      candidates: [candidate],
+      neighbours: [neighbour],
+      memoRow: null,
+      llmResult: {
+        ok: true,
+        decision: { action: 'merge', merged_text: ourText },
+        modelVersion: 'v1',
+        provider: 'anthropic',
+      },
+      // A DIFFERENT merge text landed — the concurrent winner's.
+      postInsertRow: {
+        decision: 'merge',
+        mergedText: landedText,
+        modelVersion: 'v-other',
+      },
+    });
+
+    const { report } = await runDedupForProfile(args);
+    expect(report.llmCalls).toBe(1);
+    expect(report.merges).toBe(0);
+    expect(report.failures).toBe(1);
+    // The discriminating assertion: our vendor was real, so without the race check
+    // the referral would be constructed and the judge consulted.
     expect(mockRouteAndCall).not.toHaveBeenCalled();
   });
 
