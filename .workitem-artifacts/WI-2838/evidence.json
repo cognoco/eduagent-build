@@ -1,0 +1,26 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The held request receives a unique correlation before release and response matching uses GET plus the exact correlated URL rather than wrapper identity.",
+      "pointer": "apps/mobile/e2e-web/helpers/held-now-request.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "The named journey preserves the held Session boundary, successful fresh response, Mentor destination, and both exact returning-learner cards.",
+      "pointer": "apps/mobile/e2e-web/flows/v2/returning-learner-resume.spec.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Executed red-green evidence reproduces the legacy wrapper-identity failure and proves the stable matcher across distinct wrappers.",
+      "pointer": ".workitem-artifacts/WI-2838/red-green.md"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "The named journey passed repeatedly with retries disabled; the full no-retry V2 gate passed WI-2234 and exposed only the separately owned WI-2822 dependency.",
+      "pointer": ".workitem-artifacts/WI-2838/verification.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": "apps/mobile/e2e-web/helpers/held-now-request.test.ts"
+}
