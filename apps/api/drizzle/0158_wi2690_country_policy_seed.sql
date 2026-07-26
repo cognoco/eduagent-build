@@ -1,12 +1,16 @@
--- 0157_wi2690_country_policy_seed — WI-2690, seed data for the country policy
--- registry created by 0156_wi2690_country_policy_registry.sql.
+-- 0158_wi2690_country_policy_seed — WI-2690, seed data for the country policy
+-- registry created by 0157_wi2690_country_policy_registry.sql.
 --
 -- Source: docs/compliance/2026-07-23-13-plus-eea-launch-country-ruling.md
 --
 -- Every row in this migration seeds launch_status = 'blocked' and
 -- legal_verification_status = 'unverified' by design, so the registry fails
 -- closed for every jurisdiction until counsel sign-off is recorded as a
--- later effective-dated row.
+-- later effective-dated row. legal_review_valid_until deliberately equals
+-- legal_reviewed_at (a zero-length review window): no counsel review has
+-- actually been recorded yet, so every row is stale-by-construction and the
+-- resolver reports LEGAL_REVIEW_STALE until a real review lands as a newer
+-- effective-dated row with a genuine validity horizon.
 
 -- PART A — seed regimes (currently empty).
 INSERT INTO "regimes" ("id", "code", "description")

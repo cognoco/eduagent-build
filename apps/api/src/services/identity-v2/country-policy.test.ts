@@ -143,10 +143,7 @@ const residenceAssurance = {
 
 describe('resolveCountryPolicy', () => {
   it.each(
-    EEA_COUNTRIES.map((countryCode) => [
-      countryCode,
-      THRESHOLDS[countryCode],
-    ]),
+    EEA_COUNTRIES.map((countryCode) => [countryCode, THRESHOLDS[countryCode]]),
   )(
     'resolves the configured threshold for %s without a country branch',
     (countryCode, threshold) => {
@@ -175,9 +172,7 @@ describe('resolveCountryPolicy', () => {
       });
 
       expect(decision.launchDecision).toBe('allowed');
-      expect(decision.consentDecision?.ageBand).toBe(
-        'consent_capable_minor',
-      );
+      expect(decision.consentDecision?.ageBand).toBe('consent_capable_minor');
       expect(decision.authorizationForm).toBe('self');
       expect(decision.reasonCodes).toEqual([]);
     },
@@ -271,9 +266,7 @@ describe('resolveCountryPolicy', () => {
     });
 
     expect(decision.launchDecision).toBe('blocked');
-    expect(decision.reasonCodes).toContain(
-      'RESIDENCE_ASSURANCE_INSUFFICIENT',
-    );
+    expect(decision.reasonCodes).toContain('RESIDENCE_ASSURANCE_INSUFFICIENT');
   });
 
   it('fails closed when the policy is not yet effective or has expired', () => {
@@ -402,6 +395,144 @@ describe('resolveCountryPolicy', () => {
     expect(onBirthday.consentDecision?.ageBand).toBe('consent_capable_minor');
   });
 
+  it.each([
+    ['AT', 14, '2012-07-24', '2012-07-25'],
+    ['CZ', 15, '2011-07-24', '2011-07-25'],
+  ] as const)(
+    'treats the %s threshold-%i birthday as the boundary, to the day',
+    (countryCode, threshold, onBirthday, dayBefore) => {
+      const enabled = [
+        policy(countryCode, threshold, {
+          launchStatus: 'enabled',
+          launchBlockReason: null,
+          controllerGates: allControllerGatesClosed,
+        }),
+      ];
+      const asOf = new Date('2026-07-24T12:00:00Z');
+
+      const stillBelow = resolveCountryPolicy({
+        policies: enabled,
+        habitualResidence: countryCode,
+        birthDate: dayBefore,
+        residenceAssurance,
+        asOf,
+      });
+      const atThreshold = resolveCountryPolicy({
+        policies: enabled,
+        habitualResidence: countryCode,
+        birthDate: onBirthday,
+        residenceAssurance,
+        asOf,
+      });
+
+      expect(stillBelow.authorizationForm).toBe('guardian');
+      expect(stillBelow.consentDecision?.ageBand).toBe(
+        'guardian_required_minor',
+      );
+      expect(atThreshold.authorizationForm).toBe('self');
+      expect(atThreshold.consentDecision?.ageBand).toBe(
+        'consent_capable_minor',
+      );
+    },
+  );
+
+  it('re-resolves a residence change against the new country’s row', () => {
+    // AC9: the same learner, resolved before and after moving, must follow
+    // the new habitual residence — the resolver is stateless, so a residence
+    // change is simply a re-resolution and nothing from the old country leaks.
+    const before = resolveCountryPolicy({
+      policies,
+      habitualResidence: 'BE',
+      birthDate: '2010-07-23',
+      residenceAssurance,
+      asOf: new Date('2026-07-24T12:00:00Z'),
+    });
+    const after = resolveCountryPolicy({
+      policies,
+      habitualResidence: 'DE',
+      birthDate: '2010-07-23',
+      residenceAssurance,
+      asOf: new Date('2026-07-24T12:00:00Z'),
+    });
+
+    expect(before.habitualResidence).toBe('BE');
+    expect(before.launchDecision).toBe('allowed');
+    expect(before.article8Threshold).toBe(13);
+    expect(after.habitualResidence).toBe('DE');
+    expect(after.launchDecision).toBe('blocked');
+    expect(after.article8Threshold).toBe(16);
+  });
+
+  it('never lets a store-country corroborating signal replace habitual residence', () => {
+    // AC6/AC9: a storefront-country signal that disagrees with the asserted
+    // habitual residence may corroborate but never silently replace it — the
+    // decision is keyed to the primary assertion whether or not the store
+    // signal is present. (The assurance shape records which methods
+    // corroborated, not the country each asserted; observability of the
+    // mismatch itself is a consumer-side concern outside this boundary.)
+    const withoutStoreSignal = resolveCountryPolicy({
+      policies,
+      habitualResidence: 'BE',
+      birthDate: '2010-07-23',
+      residenceAssurance: {
+        method: 'self_report' as const,
+        confidence: 0.8,
+        assertedAt: new Date('2026-07-24T09:00:00Z'),
+        corroboratingMethods: [],
+      },
+      asOf: new Date('2026-07-24T12:00:00Z'),
+    });
+    const withStoreSignal = resolveCountryPolicy({
+      policies,
+      habitualResidence: 'BE',
+      birthDate: '2010-07-23',
+      residenceAssurance: {
+        method: 'self_report' as const,
+        confidence: 0.8,
+        assertedAt: new Date('2026-07-24T09:00:00Z'),
+        corroboratingMethods: ['storefront_country' as const],
+      },
+      asOf: new Date('2026-07-24T12:00:00Z'),
+    });
+
+    expect(withStoreSignal.habitualResidence).toBe('BE');
+    expect(withStoreSignal.regimeKey).toBe(withoutStoreSignal.regimeKey);
+    expect(withStoreSignal.launchDecision).toBe(
+      withoutStoreSignal.launchDecision,
+    );
+    expect(withStoreSignal.reasonCodes).toEqual(withoutStoreSignal.reasonCodes);
+  });
+
+  it('reports a stable eea_only processing-location class across policy versions', () => {
+    const decision = resolveCountryPolicy({
+      policies,
+      habitualResidence: 'BE',
+      birthDate: '2010-07-23',
+      residenceAssurance,
+      asOf: new Date('2026-07-24T12:00:00Z'),
+    });
+    const acrossVersions = resolveCountryPolicy({
+      policies: [
+        policy('NO', 13, {
+          policyVersion: '2026-07-01.1',
+          effectiveAt: new Date('2026-07-01T00:00:00Z'),
+        }),
+        policy('NO', 13, {
+          policyVersion: '2026-07-24.2',
+          effectiveAt: new Date('2026-07-24T00:00:00Z'),
+        }),
+      ],
+      habitualResidence: 'NO',
+      birthDate: '2000-01-01',
+      residenceAssurance,
+      asOf: new Date('2026-07-24T12:00:00Z'),
+    });
+
+    expect(decision.processingLocationClass).toBe('eea_only');
+    expect(acrossVersions.processingLocationClass).toBe('eea_only');
+    expect(acrossVersions.policyVersion).toBe('2026-07-24.2');
+  });
+
   it('selects the newest active effective-dated policy row', () => {
     const decision = resolveCountryPolicy({
       policies: [
@@ -421,8 +552,6 @@ describe('resolveCountryPolicy', () => {
     });
 
     expect(decision.policyVersion).toBe('2026-07-24.2');
-    expect(decision.effectiveAt).toEqual(
-      new Date('2026-07-24T00:00:00Z'),
-    );
+    expect(decision.effectiveAt).toEqual(new Date('2026-07-24T00:00:00Z'));
   });
 });
