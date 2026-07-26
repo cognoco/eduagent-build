@@ -2287,8 +2287,18 @@ export async function streamExchange(
     stream: cleanReplyStream,
     rawResponsePromise,
     newEscalationRung: context.escalationRung,
-    provider: result.provider,
-    model: result.model,
+    // [WI-2670] Lazy getters, not a value captured at this synchronous
+    // return — `result.provider`/`result.model` are themselves lazy getters
+    // on the router's StreamResult (see routeAndStream's JSDoc). Capturing
+    // them here as plain properties would freeze the pre-fallback value
+    // before the stream (and any transparent fallback) has even started,
+    // defeating the router-level fix for every caller of streamExchange.
+    get provider() {
+      return result.provider;
+    },
+    get model() {
+      return result.model;
+    },
     sourceEvidence,
     get fallbackUsed() {
       return result.fallbackUsed;
