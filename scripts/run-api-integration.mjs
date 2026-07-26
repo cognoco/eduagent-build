@@ -10,6 +10,7 @@ const SCRIPT = fileURLToPath(import.meta.url);
 const DOPPLER_WRAPPER = join(REPO_ROOT, 'scripts', 'doppler-run.mjs');
 const PACKAGE_JSON = join(REPO_ROOT, 'package.json');
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+const LOCAL_DATABASE_MARKER = /(^|[_-])(test|tests|integration)([_-]|$)/i;
 const PROTECTED_LABEL = /(^|[._-])(stg|staging|prd|prod|production)([._-]|$)/i;
 
 function refuse(reason) {
@@ -104,6 +105,8 @@ function assertDatabaseContract() {
   const dopplerProject = process.env.DOPPLER_PROJECT?.trim();
   const dopplerConfig = process.env.DOPPLER_CONFIG?.trim();
   const dopplerEnvironment = process.env.DOPPLER_ENVIRONMENT?.trim();
+  const normalizedHost =
+    host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host;
 
   if (dopplerProject && dopplerProject !== 'mentomate') {
     refuse(
@@ -121,8 +124,8 @@ function assertDatabaseContract() {
     );
   }
 
-  if (LOCAL_HOSTS.has(host)) {
-    if (!/(test|integration)/i.test(databaseName)) {
+  if (LOCAL_HOSTS.has(normalizedHost)) {
+    if (!LOCAL_DATABASE_MARKER.test(databaseName)) {
       refuse(
         `local database metadata "${databaseName}" is not explicitly test/integration-scoped.`,
       );

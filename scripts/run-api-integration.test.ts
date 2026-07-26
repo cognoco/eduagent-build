@@ -218,6 +218,27 @@ describe('run-api-integration.mjs', () => {
     expect(readMarker(pnpmMarker)).toBe('');
   });
 
+  test('accepts an IPv6 loopback database with explicit integration metadata', () => {
+    const result = run(['--jest'], {
+      DATABASE_URL:
+        'postgresql://test:test@[::1]:5433/eduagent_integration_test',
+    });
+
+    expect(result.status).toBe(0);
+    expect(readMarker(corepackMarker)).toContain('pnpm exec jest');
+  });
+
+  test('refuses a local database whose ordinary name only contains test letters', () => {
+    const result = run(['--jest'], {
+      DATABASE_URL:
+        'postgresql://test:test@127.0.0.1:5433/customer_contest_data',
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/not explicitly test\/integration-scoped/i);
+    expect(readMarker(corepackMarker)).toBe('');
+  });
+
   test('local target refuses ambient staging Doppler metadata before Jest', () => {
     const result = run(['--jest'], {
       ...localDatabase,
