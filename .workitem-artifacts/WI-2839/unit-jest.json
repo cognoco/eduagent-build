@@ -1,0 +1,513 @@
+{
+  "numFailedTestSuites": 0,
+  "numFailedTests": 0,
+  "numPassedTestSuites": 1,
+  "numPassedTests": 29,
+  "numPendingTestSuites": 0,
+  "numPendingTests": 0,
+  "numRuntimeErrorTestSuites": 0,
+  "numTodoTests": 0,
+  "numTotalTestSuites": 1,
+  "numTotalTests": 29,
+  "openHandles": [],
+  "snapshot": {
+    "added": 0,
+    "didUpdate": false,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0
+  },
+  "startTime": 1785108226885,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "[BUG-260] weeklyProgressPushGenerate concurrency"
+          ],
+          "duration": 2,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "[BUG-260] weeklyProgressPushGenerate concurrency declares a concurrency limit on the receiver",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "startAt": 1785108229660,
+          "status": "passed",
+          "title": "declares a concurrency limit on the receiver"
+        },
+        {
+          "ancestorTitles": [
+            "[CR-2026-05-21-033] weeklyProgressPushGenerate idempotency"
+          ],
+          "duration": 1,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "[CR-2026-05-21-033] weeklyProgressPushGenerate idempotency has idempotency keyed on event.data.parentId + \"-\" + event.data.reportWeekStart",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "startAt": 1785108229663,
+          "status": "passed",
+          "title": "has idempotency keyed on event.data.parentId + \"-\" + event.data.reportWeekStart"
+        },
+        {
+          "ancestorTitles": [
+            "[WI-368] weekly progress push GDPR consent helper consolidation"
+          ],
+          "duration": 1,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "[WI-368] weekly progress push GDPR consent helper consolidation uses isGdprProcessingAllowedV2 instead of an inline GDPR consent query",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 8,
+          "retryReasons": [],
+          "startAt": 1785108229664,
+          "status": "passed",
+          "title": "uses isGdprProcessingAllowedV2 instead of an inline GDPR consent query"
+        },
+        {
+          "ancestorTitles": [
+            "[WI-368] weekly progress push GDPR consent helper consolidation"
+          ],
+          "duration": 5,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "[WI-368] weekly progress push GDPR consent helper consolidation skips child digest generation when latest GDPR consent is PENDING",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 5,
+          "retryReasons": [],
+          "startAt": 1785108229665,
+          "status": "passed",
+          "title": "skips child digest generation when latest GDPR consent is PENDING"
+        },
+        {
+          "ancestorTitles": [
+            "[WI-368] weekly progress push GDPR consent helper consolidation"
+          ],
+          "duration": 2,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "[WI-368] weekly progress push GDPR consent helper consolidation skips child digest generation when latest GDPR consent is PARENTAL_CONSENT_REQUESTED",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 5,
+          "retryReasons": [],
+          "startAt": 1785108229670,
+          "status": "passed",
+          "title": "skips child digest generation when latest GDPR consent is PARENTAL_CONSENT_REQUESTED"
+        },
+        {
+          "ancestorTitles": [
+            "[WI-368] weekly progress push GDPR consent helper consolidation"
+          ],
+          "duration": 1,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "[WI-368] weekly progress push GDPR consent helper consolidation skips child digest generation when latest GDPR consent is WITHDRAWN",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 5,
+          "retryReasons": [],
+          "startAt": 1785108229672,
+          "status": "passed",
+          "title": "skips child digest generation when latest GDPR consent is WITHDRAWN"
+        },
+        {
+          "ancestorTitles": [
+            "[WI-368] weekly progress push GDPR consent helper consolidation"
+          ],
+          "duration": 4,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "[WI-368] weekly progress push GDPR consent helper consolidation includes child digest generation when latest GDPR consent is CONSENTED",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 3,
+          "retryReasons": [],
+          "startAt": 1785108229673,
+          "status": "passed",
+          "title": "includes child digest generation when latest GDPR consent is CONSENTED"
+        },
+        {
+          "ancestorTitles": [
+            "[WI-368] weekly progress push GDPR consent helper consolidation"
+          ],
+          "duration": 1,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "[WI-368] weekly progress push GDPR consent helper consolidation includes child digest generation when latest GDPR consent is absent",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 3,
+          "retryReasons": [],
+          "startAt": 1785108229677,
+          "status": "passed",
+          "title": "includes child digest generation when latest GDPR consent is absent"
+        },
+        {
+          "ancestorTitles": [
+            "weekly-progress-push isLocalHour9 (BUG-640 / J-4)"
+          ],
+          "duration": 40,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly-progress-push isLocalHour9 (BUG-640 / J-4) fires for each parent exactly once across the 24 Monday-UTC hours",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 10,
+          "retryReasons": [],
+          "startAt": 1785108229678,
+          "status": "passed",
+          "title": "fires for each parent exactly once across the 24 Monday-UTC hours"
+        },
+        {
+          "ancestorTitles": [
+            "weekly-progress-push isLocalHour9 (BUG-640 / J-4)"
+          ],
+          "duration": 1,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly-progress-push isLocalHour9 (BUG-640 / J-4) null timezone falls back to UTC 09:00",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "startAt": 1785108229718,
+          "status": "passed",
+          "title": "null timezone falls back to UTC 09:00"
+        },
+        {
+          "ancestorTitles": [
+            "weekly-progress-push isLocalHour9 (BUG-640 / J-4)"
+          ],
+          "duration": 0,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly-progress-push isLocalHour9 (BUG-640 / J-4) invalid timezone string falls back to UTC 09:00 (no crash)",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "startAt": 1785108229719,
+          "status": "passed",
+          "title": "invalid timezone string falls back to UTC 09:00 (no crash)"
+        },
+        {
+          "ancestorTitles": [
+            "weekly-progress-push isLocalHour9 (BUG-640 / J-4)"
+          ],
+          "duration": 0,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly-progress-push isLocalHour9 (BUG-640 / J-4) Europe/Prague (UTC+2 DST) matches at 07:00 UTC on a DST Monday",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "startAt": 1785108229720,
+          "status": "passed",
+          "title": "Europe/Prague (UTC+2 DST) matches at 07:00 UTC on a DST Monday"
+        },
+        {
+          "ancestorTitles": [
+            "[BUG-850 / F-SVC-021] weekly-progress-push fan-out error escalation"
+          ],
+          "duration": 2,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "[BUG-850 / F-SVC-021] weekly-progress-push fan-out error escalation continues batching after a sendEvent failure and reports partial",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 10,
+          "retryReasons": [],
+          "startAt": 1785108229720,
+          "status": "passed",
+          "title": "continues batching after a sendEvent failure and reports partial"
+        },
+        {
+          "ancestorTitles": ["weekly progress parent eligibility"],
+          "duration": 3,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly progress parent eligibility queues an email-only parent even when push is disabled",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "startAt": 1785108229722,
+          "status": "passed",
+          "title": "queues an email-only parent even when push is disabled"
+        },
+        {
+          "ancestorTitles": ["weekly progress parent eligibility"],
+          "duration": 1,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly progress parent eligibility [WI-86] does not queue parents missing from the active-profile timezone query",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "startAt": 1785108229725,
+          "status": "passed",
+          "title": "[WI-86] does not queue parents missing from the active-profile timezone query"
+        },
+        {
+          "ancestorTitles": ["weekly progress parent eligibility"],
+          "duration": 1,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly progress parent eligibility queues eligible self-report profiles through the proven weekly fan-out",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 3,
+          "retryReasons": [],
+          "startAt": 1785108229726,
+          "status": "passed",
+          "title": "queues eligible self-report profiles through the proven weekly fan-out"
+        },
+        {
+          "ancestorTitles": ["weekly progress generate practice summary"],
+          "duration": 1,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly progress generate practice summary loads practice activity summary for the report week before generating the digest",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 4,
+          "retryReasons": [],
+          "startAt": 1785108229727,
+          "status": "passed",
+          "title": "loads practice activity summary for the report week before generating the digest"
+        },
+        {
+          "ancestorTitles": ["weekly progress generate practice summary"],
+          "duration": 1,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly progress generate practice summary [WI-86] generates weekly child reports from active-subject-filtered cached metrics",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 4,
+          "retryReasons": [],
+          "startAt": 1785108229729,
+          "status": "passed",
+          "title": "[WI-86] generates weekly child reports from active-subject-filtered cached metrics"
+        },
+        {
+          "ancestorTitles": ["weekly progress generate practice summary"],
+          "duration": 31,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly progress generate practice summary [WI-86] records only digest-contributing child ids for delivery rechecks",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 5,
+          "retryReasons": [],
+          "startAt": 1785108229730,
+          "status": "passed",
+          "title": "[WI-86] records only digest-contributing child ids for delivery rechecks"
+        },
+        {
+          "ancestorTitles": ["weekly progress generate practice summary"],
+          "duration": 2,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly progress generate practice summary [WI-1863] skips credentialed charges while retaining managed charges",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "startAt": 1785108229761,
+          "status": "passed",
+          "title": "[WI-1863] skips credentialed charges while retaining managed charges"
+        },
+        {
+          "ancestorTitles": ["weekly progress generate practice summary"],
+          "duration": 0,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly progress generate practice summary [WI-86] skips weekly push and email when parent is archived after preparation",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 3,
+          "retryReasons": [],
+          "startAt": 1785108229763,
+          "status": "passed",
+          "title": "[WI-86] skips weekly push and email when parent is archived after preparation"
+        },
+        {
+          "ancestorTitles": ["weekly progress generate practice summary"],
+          "duration": 0,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly progress generate practice summary [WI-86] skips weekly push and email when a child is archived after preparation",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 3,
+          "retryReasons": [],
+          "startAt": 1785108229764,
+          "status": "passed",
+          "title": "[WI-86] skips weekly push and email when a child is archived after preparation"
+        },
+        {
+          "ancestorTitles": ["weekly progress generate practice summary"],
+          "duration": 1,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly progress generate practice summary [WI-86] ignores archived children that did not render into the prepared digest",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 3,
+          "retryReasons": [],
+          "startAt": 1785108229764,
+          "status": "passed",
+          "title": "[WI-86] ignores archived children that did not render into the prepared digest"
+        },
+        {
+          "ancestorTitles": ["weekly progress generate practice summary"],
+          "duration": 1,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly progress generate practice summary persists a self report without child links when includeSelfReport is set",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 4,
+          "retryReasons": [],
+          "startAt": 1785108229765,
+          "status": "passed",
+          "title": "persists a self report without child links when includeSelfReport is set"
+        },
+        {
+          "ancestorTitles": ["memoized step-state PII break test [F-085]"],
+          "duration": 1,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "memoized step-state PII break test [F-085] never memoizes child names, struggle topics, or the parent email; sends still carry the content",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 7,
+          "retryReasons": [],
+          "startAt": 1785108229767,
+          "status": "passed",
+          "title": "never memoizes child names, struggle topics, or the parent email; sends still carry the content"
+        },
+        {
+          "ancestorTitles": [
+            "send-step rehydration is pinned to the prepare-time snapshot"
+          ],
+          "duration": 1,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "send-step rehydration is pinned to the prepare-time snapshot re-pins a delayed retry to the memoized snapshotDate when a newer snapshot exists",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 4,
+          "retryReasons": [],
+          "startAt": 1785108229768,
+          "status": "passed",
+          "title": "re-pins a delayed retry to the memoized snapshotDate when a newer snapshot exists"
+        },
+        {
+          "ancestorTitles": [
+            "[BUG-842] email send and notificationLog write are atomic"
+          ],
+          "duration": 1,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "[BUG-842] email send and notificationLog write are atomic [BUG-842] notificationLog is written inside the send step — log survives a step-boundary failure",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 5,
+          "retryReasons": [],
+          "startAt": 1785108229769,
+          "status": "passed",
+          "title": "[BUG-842] notificationLog is written inside the send step — log survives a step-boundary failure"
+        },
+        {
+          "ancestorTitles": [
+            "[BUG-842] email send and notificationLog write are atomic"
+          ],
+          "duration": 0,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "[BUG-842] email send and notificationLog write are atomic [BUG-842] notificationLog is not written when email send returns sent:false",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "startAt": 1785108229770,
+          "status": "passed",
+          "title": "[BUG-842] notificationLog is not written when email send returns sent:false"
+        },
+        {
+          "ancestorTitles": [
+            "[WI-998] push dedup read is inside the send step (retry-safe atomicity)"
+          ],
+          "duration": 1,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "[WI-998] push dedup read is inside the send step (retry-safe atomicity) [BREAK] does not re-send the push when the step retries after logNotification commits",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "startAt": 1785108229770,
+          "status": "passed",
+          "title": "[BREAK] does not re-send the push when the step retries after logNotification commits"
+        }
+      ],
+      "endTime": 1785108229772,
+      "message": "",
+      "name": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2839/apps/api/src/inngest/functions/weekly-progress-push.test.ts",
+      "startTime": 1785108227087,
+      "status": "passed",
+      "summary": ""
+    }
+  ],
+  "wasInterrupted": false
+}
