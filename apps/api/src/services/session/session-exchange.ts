@@ -100,6 +100,7 @@ import { applyAppHelpSignalGuard, isAppHelpQuery } from '../app-help-map';
 import {
   applyMentorNoticeOutcome,
   createMentorNoticeFromExchange,
+  detachMentorNoticeRecheckAttempt,
   evaluateMentorNoticeRecheck,
   getLearningDayStart,
   getProfileTimeZone,
@@ -252,37 +253,67 @@ async function recordSessionPracticeActivityEvent(
 const logger = createLogger();
 
 // ---------------------------------------------------------------------------
-// [WI-2625 rework] Mentor-notice re-check CAP — a separate deterministic
-// mechanism from the judge's verdict.
+// [WI-2625 rework #4] Mentor-notice re-check CAP — the attempt lifecycle is
+// SEPARATE bookkeeping from notice status (operator ruling, 2026-07-26).
 //
-// The judge's valid `continue` never itself terminalizes a notice (AC-3). But
-// `resolveMentorNoticeRecheckContext` stops returning a context once the
-// session passes the cap (offer.ts, `exchangeNumber <= MAX`), so from the next
-// exchange the judge is never consulted again while the notice stays `open` —
-// it keeps surfacing in the Now feed and `startMentorNoticeRecheck` keeps
-// handing back the same active session. That traps the learner in a re-check
-// that can never complete. So at the cap the CAP terminalizes the attempt to
-// `not_yet`, whatever the judge said; the two causes stay distinguishable in
-// code (the `cause` discriminant) and in logs (the emitted `cause` field).
+// A valid `continue` makes NO mentor-notice transition at any exchange number,
+// including the third (AC-3, as written). The three-response cap therefore ends
+// the ATTEMPT, not the notice: `endMentorNoticeRecheckAttemptAtCap` detaches the
+// session's attempt bookkeeping and leaves the notice `open` and unresolved, so
+// it stays eligible for a later re-offer under the ordinary eligibility/cooldown
+// rules — a fresh attempt, counted from exchange 1, in a fresh session.
+//
+// Detaching is what makes that re-offer genuinely reachable rather than a
+// zombie: while the attempt keys survive on a session already past the cap,
+// `resolveMentorNoticeRecheckContext` returns null there forever AND
+// `startMentorNoticeRecheck` keeps handing that same dead session back. See
+// `detachMentorNoticeRecheckAttempt` (offer.ts) for the full argument.
+//
+// Malformed or unavailable judgment at the cap is the ONE case that still
+// terminalizes `not_yet` (AC-4), because there no valid verdict was ever
+// obtained — nothing to preserve for a later attempt.
 // ---------------------------------------------------------------------------
 
-/** Why the cap fired — the judge's own valid `continue`, or an unusable evaluator result. */
-type MentorNoticeRecheckCapCause = 'valid_continue' | 'evaluator_unresolved';
+/**
+ * [AC-3] The cap fired over a VALID `continue`: end the attempt, transition
+ * nothing. The notice stays open and re-offerable.
+ */
+async function endMentorNoticeRecheckAttemptAtCap(
+  db: Database,
+  input: { profileId: string; sessionId: string; exchangeNumber: number },
+): Promise<void> {
+  if (input.exchangeNumber < MENTOR_NOTICE_RECHECK_MAX_EXCHANGES) return;
+  logger.info(
+    '[mentor-notice-recheck] response cap reached after a valid continue — attempt ended, notice preserved',
+    {
+      cause: 'valid_continue',
+      exchangeNumber: input.exchangeNumber,
+      maxExchanges: MENTOR_NOTICE_RECHECK_MAX_EXCHANGES,
+    },
+  );
+  await detachMentorNoticeRecheckAttempt(db, {
+    profileId: input.profileId,
+    sessionId: input.sessionId,
+  });
+}
 
-async function terminalizeMentorNoticeRecheckAtCap(
+/**
+ * [AC-4] The cap fired over an UNRESOLVED evaluation (malformed output, judge
+ * unavailable, routing failure): deterministically terminalize `not_yet`.
+ */
+async function terminalizeUnresolvedMentorNoticeRecheckAtCap(
   db: Database,
   input: {
     profileId: string;
     noticeId: string;
     exchangeNumber: number;
-    cause: MentorNoticeRecheckCapCause;
   },
 ): Promise<void> {
   if (input.exchangeNumber < MENTOR_NOTICE_RECHECK_MAX_EXCHANGES) return;
   logger.info(
     '[mentor-notice-recheck] response cap reached — terminalizing not_yet',
     {
-      cause: input.cause,
+      cause: 'evaluator_unresolved',
       exchangeNumber: input.exchangeNumber,
       maxExchanges: MENTOR_NOTICE_RECHECK_MAX_EXCHANGES,
     },
@@ -4471,12 +4502,13 @@ export async function processMessage(
       conversationLanguage: context.conversationLanguage,
       tutorVendor: result.provider,
     });
-    // [WI-2625 rework] Exhaustive switch on the evaluation variant. The
-    // judge's verdict and the response cap are separate mechanisms: a valid
-    // `continue` never itself transitions the notice, and at the cap the CAP
-    // terminalizes `not_yet` (see terminalizeMentorNoticeRecheckAtCap) so no
-    // capped-out attempt is left attached to an open notice. The `never`
-    // default makes any future re-merging of these facts a compile error.
+    // [WI-2625 rework #4] Exhaustive switch on the evaluation variant. The
+    // judge's verdict and the response cap are separate mechanisms, and the cap
+    // acts on the ATTEMPT, not the notice: a valid `continue` transitions
+    // nothing at ANY exchange number (AC-3) — at the cap the attempt is merely
+    // detached, leaving the notice open and re-offerable. Only an unresolved
+    // evaluation at the cap terminalizes `not_yet` (AC-4). The `never` default
+    // makes any future re-merging of these facts a compile error.
     switch (evaluation.kind) {
       case 'outcome': {
         const now = new Date();
@@ -4491,19 +4523,17 @@ export async function processMessage(
         break;
       }
       case 'continue':
-        await terminalizeMentorNoticeRecheckAtCap(db, {
+        await endMentorNoticeRecheckAttemptAtCap(db, {
           profileId,
-          noticeId: context.mentorNoticeRecheck.id,
+          sessionId,
           exchangeNumber: context.mentorNoticeRecheck.exchangeNumber,
-          cause: 'valid_continue',
         });
         break;
       case 'unresolved':
-        await terminalizeMentorNoticeRecheckAtCap(db, {
+        await terminalizeUnresolvedMentorNoticeRecheckAtCap(db, {
           profileId,
           noticeId: context.mentorNoticeRecheck.id,
           exchangeNumber: context.mentorNoticeRecheck.exchangeNumber,
-          cause: 'evaluator_unresolved',
         });
         break;
       default: {
@@ -5117,9 +5147,11 @@ export async function streamMessage(
           conversationLanguage: context.conversationLanguage,
           tutorVendor: result.provider,
         });
-        // [WI-2625 rework] Same exhaustive variant switch and same cap
-        // handling as the processMessage call site above — the judge's valid
-        // `continue` never itself terminalizes; the cap does.
+        // [WI-2625 rework #4] Same exhaustive variant switch and same cap
+        // handling as the processMessage call site above — a valid `continue`
+        // transitions nothing at any exchange number; at the cap the ATTEMPT is
+        // detached and the notice stays open and re-offerable. Only an
+        // unresolved evaluation at the cap terminalizes `not_yet`.
         switch (evaluation.kind) {
           case 'outcome': {
             const now = new Date();
@@ -5134,19 +5166,17 @@ export async function streamMessage(
             break;
           }
           case 'continue':
-            await terminalizeMentorNoticeRecheckAtCap(db, {
+            await endMentorNoticeRecheckAttemptAtCap(db, {
               profileId,
-              noticeId: context.mentorNoticeRecheck.id,
+              sessionId,
               exchangeNumber: context.mentorNoticeRecheck.exchangeNumber,
-              cause: 'valid_continue',
             });
             break;
           case 'unresolved':
-            await terminalizeMentorNoticeRecheckAtCap(db, {
+            await terminalizeUnresolvedMentorNoticeRecheckAtCap(db, {
               profileId,
               noticeId: context.mentorNoticeRecheck.id,
               exchangeNumber: context.mentorNoticeRecheck.exchangeNumber,
-              cause: 'evaluator_unresolved',
             });
             break;
           default: {

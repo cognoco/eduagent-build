@@ -122,3 +122,91 @@ scenarios — one per accepted verdict/reason pair, an off-topic "continue"
 case, and a prompt-injection case asserting the fence holds. All six passed
 against `claude-sonnet-4-6` in this run (see the flow file's header comment
 and commit `452ec0ae1` for detail); Tier-1 snapshots are checked in.
+
+---
+
+# Rework #4 — attempt lifecycle vs notice status (2026-07-26)
+
+Operator ruling of 2026-07-26 ("Recommendation B"): a valid `continue`/`unclear`
+result makes **no** mentor-notice transition at any exchange number, including
+the third. On reaching the three-response cap after a valid continue the current
+re-check **attempt** ends, while the **notice** stays unresolved and eligible for
+a later re-offer under ordinary eligibility/cooldown rules. Malformed or
+unavailable judgment at turn 3 still terminalizes `not_yet` (AC-4).
+
+Worktree `.worktrees/wi-2625-rework-b`, branch `wi-2625-rework-b`, from
+`origin/main` at `98500d4e617e7a70f7b4a8b7a9eedf7d7f3e9d8d`.
+
+## The property under test
+
+The ruling's claim is about a **subsequent offer cycle**, so the property is not
+"no turn-3 `not_yet` write happens" (one layer below) but:
+
+> after the cap fires following a valid continue, the ordinary offer path
+> actually produces a NEW live attempt for the same notice.
+
+Mechanically: the two session-metadata keys that constitute the attempt
+(`recheckNoticeId`, `recheckOfferExchangeCount`) are detached at the cap. Without
+that detach the notice is a **zombie** — `resolveMentorNoticeRecheckContext`
+returns null in the spent session forever while `startMentorNoticeRecheck` keeps
+handing that same session back.
+
+## RED — revert the detach (the zombie)
+
+`apps/api/src/services/session/session-exchange.ts`, inside
+`endMentorNoticeRecheckAttemptAtCap`:
+
+```diff
+-  await detachMentorNoticeRecheckAttempt(db, {
+-    profileId: input.profileId,
+-    sessionId: input.sessionId,
+-  });
++  // RGR-DEFECT-INJECT: attempt bookkeeping RETAINED — the zombie-notice defect.
++  void detachMentorNoticeRecheckAttempt;
++  void input.sessionId;
+```
+
+Command:
+
+```
+DATABASE_URL='postgres://postgres@127.0.0.1:54331/eduagent_wi2625' \
+  node_modules/.bin/jest --config apps/api/jest.integration.config.cjs \
+  --runInBand apps/api/src/services/session/session-exchange.integration.test.ts \
+  -t 'the cap'
+```
+
+Result: **6 failed, 7 passed, 27 skipped, 40 total.** The headline failure is the
+re-offer assertion, at the offer-producing layer:
+
+```
+● processMessage: after a valid continue at the cap the notice is genuinely
+  re-offerable — a fresh attempt at exchange 1 completes it
+
+    expect(received).not.toBe(expected) // Object.is equality
+    Expected: not "019f9e8c-ed2c-7950-a7e5-cdad35133ff0"
+    > 2177 |           expect(reoffer.sessionId).not.toBe(session.id);
+```
+
+`startMentorNoticeRecheck` hands back the **spent** session — the trapped
+learner. Both transports fail identically. The AC-4 cap terminalization cases
+(malformed and unavailable judgment at the cap) stay GREEN throughout, confirming
+the injected defect is isolated to the attempt-lifecycle property.
+
+## GREEN — restore
+
+Restore verified byte-identical:
+
+```
+$ shasum -a 256 apps/api/src/services/session/session-exchange.ts
+5aff4531a08ac84a34ad97ccd5a8874a49721f2f73235250addec2846b75ddf8   (pre-injection)
+5aff4531a08ac84a34ad97ccd5a8874a49721f2f73235250addec2846b75ddf8   (post-restore)
+```
+
+Full suite after restore: **40 passed, 40 total** (1 suite).
+
+## Non-triviality control
+
+`continue`@cap → no transition vs `unresolved`@cap → `not_yet` are the same
+transport, same turn count, same cap, one variable changed (the judge's output).
+An always-transition implementation fails the first; an always-no-transition
+implementation fails the second. Neither can satisfy both.
