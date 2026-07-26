@@ -6,7 +6,7 @@
 #   scripts/check-change-class.sh --staged     # staged files only
 #   scripts/check-change-class.sh --branch     # diff vs main
 #   scripts/check-change-class.sh --run        # execute all identified validation
-#   scripts/check-change-class.sh --run --fast  # execute only non-mutating fast commands
+#   scripts/check-change-class.sh --run --fast  # exclude database/Doppler actions; may write workspace artifacts
 #
 # Exit codes:
 #   0 — no validation needed, or advisory mode (validation identified but not run)
@@ -251,7 +251,8 @@ while [[ $# -gt 0 ]]; do
       echo "  --staged          Check only staged files"
       echo "  --branch          Check all changes vs main (or vs origin/\$BASE_REF if set)"
       echo "  --run             Execute identified validation commands"
-      echo "  --fast            With --run: execute only non-mutating fast commands"
+      echo "  --fast            With --run: exclude database/Doppler actions"
+      echo "                    Fast commands may still write workspace artifacts"
       echo "                    Database actions require --run without --fast and separate authorization"
       echo "  --github-output   Also emit router flags (classes, integration, eval, docs_only)"
       echo "                    to \$GITHUB_OUTPUT for CI step gating (WI-452)"
@@ -668,7 +669,7 @@ if [[ "$MODE" == "advisory" ]]; then
   fi
 
   echo "Run: scripts/check-change-class.sh --run"
-  echo "     scripts/check-change-class.sh --run --fast  (non-mutating; skip slow/database actions)"
+  echo "     scripts/check-change-class.sh --run --fast  (database-/Doppler-free; may write workspace artifacts)"
   exit 0
 fi
 

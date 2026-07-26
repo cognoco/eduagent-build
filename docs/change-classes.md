@@ -5,16 +5,17 @@
 ```bash
 scripts/check-change-class.sh              # what do I need to validate?
 scripts/check-change-class.sh --run        # run all validation
-scripts/check-change-class.sh --run --fast # run only non-mutating fast commands
+scripts/check-change-class.sh --run --fast # run only database-/Doppler-free fast commands
 scripts/check-change-class.sh --staged     # check staged files only
 scripts/check-change-class.sh --branch     # check all changes vs main
 ```
 
-`--run --fast` is non-mutating by contract: database and Doppler-backed
-commands are reported under **Skipped (slow)** and are never executed. The
-explicit full-run path, `--run` without `--fast`, executes those database
-validation steps and therefore requires separate authorization for the target
-environment.
+`--run --fast` is database- and Doppler-free by contract: those commands are
+reported under **Skipped (slow)** and are never executed. Fast commands may
+still update workspace artifacts; for example, `eval:llm` can rewrite prompt
+snapshots or its zero-drift receipt. The explicit full-run path, `--run`
+without `--fast`, executes database validation steps and therefore requires
+separate authorization for the target environment.
 
 Naming note: `test:api:integration` is the local wrapper for the
 `apps/api/src/**/*.integration.test.ts` co-located API suite

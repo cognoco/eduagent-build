@@ -212,7 +212,7 @@ describe('check-change-class.sh', () => {
     expect(readFileSync(pnpmLog, 'utf8')).toContain('exec tsc --build');
   });
 
-  it('keeps schema database actions out of the non-mutating fast run', () => {
+  it('keeps schema database actions out of the fast run', () => {
     mkdirSync(join(repo, 'packages', 'database', 'src', 'schema'), {
       recursive: true,
     });
@@ -243,7 +243,7 @@ describe('check-change-class.sh', () => {
     );
   });
 
-  it('keeps migration database actions out of the non-mutating fast run', () => {
+  it('keeps migration database actions out of the fast run', () => {
     mkdirSync(join(repo, 'apps', 'api', 'drizzle', 'meta'), {
       recursive: true,
     });
@@ -312,15 +312,27 @@ describe('check-change-class.sh', () => {
     expect(calls).not.toContain('db:generate:dev');
   });
 
-  it('documents that fast runs are non-mutating and database validation is explicit', () => {
+  it('documents that fast runs exclude database actions but may write workspace artifacts', () => {
     const output = String(
       runChangeClass(repo, ['--help'], { encoding: 'utf8' }),
     );
+    const docs = readFileSync(
+      join(__dirname, '..', 'docs/change-classes.md'),
+      'utf8',
+    );
 
-    expect(output).toContain('execute only non-mutating fast commands');
+    expect(output).toContain('exclude database/Doppler actions');
+    expect(output).toContain(
+      'Fast commands may still write workspace artifacts',
+    );
     expect(output).toContain(
       'Database actions require --run without --fast and separate authorization',
     );
+    expect(docs).toContain('is database- and Doppler-free by contract');
+    expect(docs).toMatch(
+      /Fast commands may\s+still update workspace artifacts/,
+    );
+    expect(docs).not.toContain('is non-mutating by contract');
   });
 
   // ── --github-output router mode (WI-452) ──────────────────────────────
