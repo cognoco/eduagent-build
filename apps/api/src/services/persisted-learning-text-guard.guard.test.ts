@@ -134,11 +134,16 @@ describe('[WI-1195] persisted learning-text guard wiring', () => {
       newGateCall: null,
     },
     {
+      // MOVED to the gate by the AC-5 remainder work. `applyDedupAction` runs
+      // inside the CALLER's transaction (`dedup-pass.ts` opens it), so it consumes
+      // a CONTENT-ADDRESSED decision the caller pre-computed before opening —
+      // never an in-transaction LLM round-trip. One application: the single
+      // `isContentSafe` check over the merge text.
       file: 'memory/dedup-actions.ts',
-      control: 'english-only-guard',
+      control: 'multilingual-gate',
       applications: 1,
       oldGuardCall: OLD_GUARD_SCRUB,
-      newGateCall: null,
+      newGateCall: /isContentSafe\(/g,
     },
     {
       file: 'learner-profile.ts',

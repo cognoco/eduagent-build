@@ -25,8 +25,11 @@ import { routeAndCall } from '../llm';
 import { setStructuredLogSink, type LogEntry } from '../logger';
 import {
   assertLearningTextSafe,
+  evaluateLearningTextByContent,
   evaluateLearningTextFields,
+  isContentSafe,
   isLearningTextSafe,
+  learningTextContentKey,
 } from './gate';
 import { scanLearningText } from './scan';
 
@@ -511,5 +514,84 @@ describe('[WI-2628] isLearningTextSafe — the single-field convenience', () => 
       }),
     ).resolves.toBe(false);
     expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('[WI-2628] content-addressed keys — evaluate before a transaction, re-verify inside', () => {
+  const evaluateSet = (texts: readonly (string | null | undefined)[]) =>
+    evaluateLearningTextByContent({
+      texts,
+      fieldKind: 'learner_profile_field',
+      conversationLanguage: DECLARED_LANGUAGE,
+      provenance: 'migration',
+    });
+
+  it('clears a string it evaluated and refuses one it did not', async () => {
+    const result = await evaluateSet([CLEAR_TEXT]);
+    expect(isContentSafe(result, CLEAR_TEXT)).toBe(true);
+    // THE PROPERTY THE WHOLE DESIGN RESTS ON. A caller that pre-evaluates before
+    // its transaction and re-derives the merged text inside it gets `false` for a
+    // string that was not in the batch — which is what makes "the state moved
+    // under me" indistinguishable from "this was never cleared". Both are unsafe
+    // to persist, and neither requires a new failure mode.
+    expect(isContentSafe(result, 'A different sentence entirely.')).toBe(false);
+  });
+
+  it('refuses a string that CHANGED after evaluation, even by one character', async () => {
+    // The label-keyed failure this replaces: with a caller-chosen key, mutating
+    // the text behind the label leaves the decision reading "safe". Keying on
+    // content makes that unrepresentable.
+    const result = await evaluateSet([CLEAR_TEXT]);
+    expect(isContentSafe(result, CLEAR_TEXT)).toBe(true);
+    expect(isContentSafe(result, `${CLEAR_TEXT} `)).toBe(false);
+    expect(isContentSafe(result, CLEAR_TEXT.replace('two', 'three'))).toBe(
+      false,
+    );
+  });
+
+  it('carries the block verdict for an unsafe string it evaluated', async () => {
+    const result = await evaluateSet([CLEAR_TEXT, BLOCKED_TEXT]);
+    expect(isContentSafe(result, CLEAR_TEXT)).toBe(true);
+    expect(isContentSafe(result, BLOCKED_TEXT)).toBe(false);
+  });
+
+  it('treats null and undefined as trivially safe — there is no string to persist', async () => {
+    const result = await evaluateSet([CLEAR_TEXT, null, undefined]);
+    expect(isContentSafe(result, null)).toBe(true);
+    expect(isContentSafe(result, undefined)).toBe(true);
+  });
+
+  it('collapses duplicates to ONE field, and one judge call', async () => {
+    // A merged projection routinely carries the same interest or note in both the
+    // existing row and the incoming analysis.
+    judgeSays('allow', 'educational_reference');
+    const result = await evaluateLearningTextByContent({
+      texts: [AMBIGUOUS_TEXT, AMBIGUOUS_TEXT, AMBIGUOUS_TEXT],
+      fieldKind: 'learner_profile_field',
+      conversationLanguage: DECLARED_LANGUAGE,
+      provenance: 'llm',
+      producerVendor: PRODUCER_VENDOR,
+    });
+    expect(result.decisions).toHaveLength(1);
+    expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
+    expect(isContentSafe(result, AMBIGUOUS_TEXT)).toBe(true);
+  });
+
+  it('produces a stable key that leaks no learner text', async () => {
+    const key = learningTextContentKey(SENTINEL_TEXT);
+    expect(key).toBe(learningTextContentKey(SENTINEL_TEXT));
+    expect(key).toMatch(/^[0-9a-f]{64}$/);
+    // The digest is safe to log — it is an observability correlator that cannot
+    // violate AC-6, unlike the text or a caller label built from it.
+    expect(key).not.toContain('quibblefrotz');
+  });
+
+  it('does NOT let two strings that merely normalize alike clear each other', async () => {
+    // `scan.ts` normalizes for MATCHING only. Two strings that normalize alike are
+    // still different strings to persist, so keying on the normalized form would
+    // let a cleared one launder an unevaluated one.
+    const result = await evaluateSet(['We read about volcanoes.']);
+    expect(isContentSafe(result, 'We read about volcanoes.')).toBe(true);
+    expect(isContentSafe(result, 'We  read  about  volcanoes.')).toBe(false);
   });
 });

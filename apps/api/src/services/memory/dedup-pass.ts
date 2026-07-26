@@ -9,6 +9,7 @@ import {
 } from '@eduagent/database';
 
 import { applyDedupAction } from './dedup-actions';
+import { evaluateLearningTextByContent } from '../learning-text-safety/gate';
 import { runDedupLlm } from './dedup-llm';
 import type { DedupResponse } from './dedup-prompt';
 import { isSuppressedFact } from './suppressed-prewrite';
@@ -236,6 +237,28 @@ export async function runDedupForProfile(
       }
     }
 
+    // [WI-2628] Evaluate the merge text against the shared multilingual gate HERE,
+    // before the transaction opens. `decision` is already resolved at this point,
+    // so the text is known; the gate may call the independent judge, and an LLM
+    // round-trip inside an open transaction pins a pooled connection for its whole
+    // duration. Keyed by CONTENT, so `applyDedupAction` cannot apply this decision
+    // to different text, and text that was never evaluated resolves unsafe.
+    //
+    // `provenance: 'llm'` — merge text is authored by the dedup model.
+    // `producerVendor: modelVersion` is the vendor/model that produced THIS merge
+    // text, so the judge excludes it rather than grading its own output. When it is
+    // absent the scan fails closed per AC-4, which is the correct reading of an
+    // unknown producer.
+    const learningTextGate = await evaluateLearningTextByContent({
+      texts: [decision.action === 'merge' ? decision.merged_text : null],
+      fieldKind: 'memory_dedup_action',
+      // No profile read on this path; the gate then scans all ten attribution
+      // grammars and keeps the strictest verdict. Never `'en'`.
+      conversationLanguage: undefined,
+      provenance: 'llm',
+      producerVendor: modelVersion,
+    });
+
     const outcome = await args.db.transaction(async (tx) => {
       const [freshCandidate] = await tx
         .select()
@@ -269,6 +292,7 @@ export async function runDedupForProfile(
         action: decision,
         candidate: freshCandidate as MemoryFactRow,
         neighbour: freshNeighbour as MemoryFactRow,
+        learningTextGate,
       });
     });
 

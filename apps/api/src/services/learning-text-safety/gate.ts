@@ -31,6 +31,7 @@
 // Keeping the decision itself verdict-only is what lets one gate serve both.
 // ---------------------------------------------------------------------------
 
+import { createHash } from 'crypto';
 import {
   conversationLanguageSchema,
   type ConversationLanguage,
@@ -336,4 +337,93 @@ export async function isLearningTextSafe(
     fields: [{ key: 'field', fieldKind: input.fieldKind, text: input.text }],
   });
   return result.isSafe('field');
+}
+
+// ---------------------------------------------------------------------------
+// CONTENT-ADDRESSED KEYS — for callers that must evaluate BEFORE a transaction
+// and re-verify INSIDE it.
+//
+// Three of the persisted-learning-text boundaries gate text that is only
+// derived from a read taken inside their transaction (`learner-profile.ts`'s
+// merged analysis projection, and the two memory paths reached from it). They
+// cannot evaluate inside — the gate can make an LLM round-trip, and holding a
+// pooled connection across one is a connection-exhaustion hazard.
+//
+// The resolution is to key the decision on the TEXT rather than on a
+// caller-chosen label: pre-evaluate the candidate set before the transaction,
+// then inside it re-derive the merged text, recompute its key, and look the
+// decision up. `isSafe` already fails closed on a key it never evaluated, so
+// "this exact string was cleared" and "something moved under me" collapse into
+// the same safe fact FOR FREE — no new failure mode, and no way for a caller to
+// accidentally look up a decision belonging to a different string.
+//
+// That is the property this module's header claims and, before content keys,
+// only half-delivered: a label-keyed decision stays "safe" even when the text
+// behind the label changes.
+// ---------------------------------------------------------------------------
+
+/**
+ * Content-addressed key for one candidate string.
+ *
+ * sha256 of the exact bytes — NOT the normalized form. Normalization is
+ * match-only and never escapes `scan.ts`, and two strings that normalize alike
+ * are still different strings to persist, so keying on the normalized form would
+ * let one clear the other.
+ *
+ * Synchronous by design: it is recomputed INSIDE a transaction, where an async
+ * hop is avoidable noise. `nodejs_compat` is enabled for this worker and
+ * `createHash` is already used on production paths
+ * (`inngest/functions/account-security-notification.ts`).
+ *
+ * The digest is not a secret and carries no learner text — it is safe to log,
+ * which is why it can also serve as an observability correlator without
+ * violating AC-6.
+ */
+export function learningTextContentKey(text: string): string {
+  return createHash('sha256').update(text, 'utf8').digest('hex');
+}
+
+/**
+ * Pre-evaluate a SET of candidate strings, each keyed by its own content.
+ *
+ * Duplicates collapse to one field (and therefore at most one judge call),
+ * which is the common case for a merged projection where the same interest or
+ * note appears in both the existing row and the incoming analysis.
+ * Null/undefined entries are skipped — they are looked up through
+ * `isContentSafe`, which treats them as trivially safe because there is no
+ * string to persist.
+ */
+export async function evaluateLearningTextByContent(
+  input: Omit<EvaluateLearningTextFieldsInput, 'fields'> & {
+    readonly fieldKind: LearningTextFieldKind;
+    readonly texts: readonly (string | null | undefined)[];
+  },
+): Promise<LearningTextGateResult> {
+  const seen = new Set<string>();
+  const fields: LearningTextField[] = [];
+  for (const text of input.texts) {
+    if (typeof text !== 'string') continue;
+    const key = learningTextContentKey(text);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    fields.push({ key, fieldKind: input.fieldKind, text });
+  }
+  return evaluateLearningTextFields({ ...input, fields });
+}
+
+/**
+ * Whether THIS EXACT string was cleared by the batch.
+ *
+ * Returns false for any string the batch did not evaluate — including one whose
+ * content changed after the pre-evaluation. Callers inside a transaction treat
+ * that as their retry / skip signal rather than as a block, since it means the
+ * state moved, not that the text is unsafe. Null/undefined is trivially safe:
+ * there is no string to persist.
+ */
+export function isContentSafe(
+  result: LearningTextGateResult,
+  text: string | null | undefined,
+): boolean {
+  if (typeof text !== 'string') return true;
+  return result.isSafe(learningTextContentKey(text));
 }
