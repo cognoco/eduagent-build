@@ -399,14 +399,68 @@ describe('judgeReferredLearningText — no external disclosure', () => {
     },
   );
 
-  it('logs no scanned text when the judge is unavailable', async () => {
-    mockRouteAndCall.mockRejectedValue(new Error('provider 503'));
+  /**
+   * A thrown error's `message` is NOT logged. Provider errors are content-free
+   * by construction (llm/providers/errors.ts), but a message from anywhere else
+   * in the router can echo the request body — which on this path IS the
+   * candidate text. Only the structurally-derived class name is recorded.
+   */
+  it('logs the error class but never the error message when the judge is unavailable', async () => {
+    class FakeProviderError extends Error {}
+    mockRouteAndCall.mockRejectedValue(
+      new FakeProviderError(
+        `content_filter rejected input: ${SENTINEL_TEXT} / ${JUDGE_PROSE}`,
+      ),
+    );
+    await callJudge({ text: SENTINEL_TEXT });
+
+    const logs = allLogOutput();
+    expect(logs).not.toContain('quibblefrotz'); // the scanned text, echoed by the vendor
+    expect(logs).not.toContain('Petr');
+    expect(logs).not.toContain('content_filter rejected input');
+    expect(logs).toContain('FakeProviderError'); // the class name IS recorded
+  });
+
+  it('records a non-Error throw by type, not by value', async () => {
+    mockRouteAndCall.mockRejectedValue(SENTINEL_TEXT);
     await callJudge({ text: SENTINEL_TEXT });
 
     const logs = allLogOutput();
     expect(logs).not.toContain('quibblefrotz');
-    // The router diagnostic IS recorded — it is provider state, not learner text.
-    expect(logs).toContain('provider 503');
+    expect(logs).toContain('string');
+  });
+
+  /**
+   * The sibling of the cross-product property: a caller must not be able to
+   * tell an UNAVAILABLE judge from a judge that read the text and blocked it,
+   * nor from a scan that was never referred. All three return the identical
+   * value. Fails if anyone later differentiates them (a `degraded` flag, a
+   * `route_error` reason code) and hands the caller a disclosure channel.
+   */
+  it('returns an identical decision whether the judge was unavailable, blocked unclear, or was never consulted', async () => {
+    mockRouteAndCall.mockRejectedValue(new Error('circuit open'));
+    const unavailable = await callJudge({ text: SENTINEL_TEXT });
+
+    mockRouteAndCall.mockResolvedValue(
+      routeResult(JSON.stringify({ verdict: 'block', reason: 'unclear' })),
+    );
+    const judgedBlock = await callJudge({ text: SENTINEL_TEXT });
+
+    const userScan = scanLearningText({
+      text: SENTINEL_TEXT,
+      conversationLanguage: 'en',
+      provenance: 'user',
+      fieldKind: 'note_text',
+      producerVendor: PRODUCER_VENDOR,
+    });
+    const neverConsulted = await judgeReferredLearningText({
+      scan: userScan,
+      text: SENTINEL_TEXT,
+      producerVendor: PRODUCER_VENDOR,
+    });
+
+    expect(unavailable).toEqual(judgedBlock);
+    expect(unavailable).toEqual(neverConsulted);
   });
 
   it('logs no scanned text when a non-referred scan is refused', async () => {

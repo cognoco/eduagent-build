@@ -24,8 +24,12 @@
 // NO EXTERNAL DISCLOSURE. The caller learns a decision and a reason code and
 // nothing else. The judge's own prose never reaches the caller (the response is
 // parsed in-memory to the two enum fields and discarded) and never reaches the
-// logs: every degraded-path log carries only a machine reason, the flow label
-// and the field kind — never the scanned text, never the judge's words.
+// logs. Every degraded-path log carries only machine-derived values — a fixed
+// reason token, the flow label, the field kind, and on the specific branches
+// that add anything: the judge's verdict enum, zod issue PATHS, or a thrown
+// error's CLASS NAME. No free text from the judge, the provider or the scanned
+// text is logged on any branch; in particular `error.message` is deliberately
+// NOT recorded (see the route-error catch below).
 // ---------------------------------------------------------------------------
 
 import { z } from 'zod';
@@ -258,11 +262,19 @@ export async function judgeReferredLearningText(
     });
     response = result.response;
   } catch (error) {
-    // An unavailable judge blocks. The error message is a router/provider
-    // diagnostic, not learner text, so it is safe to record — but the scanned
-    // text still never appears in a log line.
+    // An unavailable judge blocks. Only the error's CLASS NAME is recorded —
+    // never `error.message`. Provider errors are content-free by construction
+    // (`llm/providers/errors.ts`), but a `message` from anywhere else in the
+    // router (a vendor SDK, a JSON/zod failure, a fetch TypeError) can echo the
+    // request body, which on this path IS the candidate learner text. The class
+    // name is structurally derived and cannot carry content, and it is the part
+    // that has diagnostic value anyway (`CircuitOpenError` vs `TypeError`).
+    // Same reasoning as the `gov/no-raw-error-to-sentry` lint rule.
     logDegraded('route_error', fieldKind, {
-      message: error instanceof Error ? error.message : String(error),
+      errorClass:
+        error instanceof Error
+          ? (error.constructor?.name ?? 'Error')
+          : typeof error,
     });
     return BLOCKED_UNCLEAR;
   }
