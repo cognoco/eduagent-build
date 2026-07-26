@@ -50,3 +50,32 @@ sweep (the tail of AC-2) were split to follow-up items rather than built here.
   WI-2678.
 - Scope reconciliation and the PM-ruling provenance are recorded in
   docs/evidence/wi2331-rgr-v2-wayfinding.md.
+
+## Rework — independent-reviewer findings addressed (2026-07-25)
+
+The independent reviewer returned the item to rework with two substantive findings; both
+are resolved, stacking on the original landed fix (unchanged).
+
+- Finding 1a (AC-1/2/5, multi-origin route): the owning-tab resolver was pathname-only, so a
+  my-notes screen reached from the Journal tab wrongly highlighted Mentor and its Back label
+  read "Back to Mentor" while actually returning to Journal. The resolver is now returnTo-aware
+  (a definitive Subjects/Journal pathname owner still wins; the Mentor catch-all defers to the
+  same returnTo→tab mapping the Back destination already used), and the my-notes hub label is
+  derived from returnTo. Red-green-revert proven.
+- Finding 1b (AC-2, remaining generic Back labels): every "fixed this pass" screen was
+  re-audited across its chevron, loading-state, and error-state controls; the remaining generic
+  Back labels — including the reviewer-named progress and quiz launch screens — now name their
+  semantic destination, V2-gated, V0/V1 copy unchanged. Deliberately-different controls
+  (phase-stepping chevrons, in-flight Cancel, icon-only camera buttons) were left as-is.
+- Finding 2 (AC-5 coverage): representative regression coverage is now identified per axis —
+  all three tabs, own vs supporting context, deep links, dark/light themes (the semantic
+  accent-token mechanism), and small-phone layout (tab bar stays visible and highlighted, and a
+  representative named Back control stays usable, at a small viewport) — rather than asserted in
+  the aggregate. The per-axis mapping is in the red-green-revert evidence document.
+
+Verification: mobile typecheck clean; the full related-test run across every changed file is
+green on Node 22; lint is clean apart from two warnings confirmed pre-existing in untouched
+code. The small-phone axis was retained (not treated as vestigial to the removed AC-4) per the
+orchestrator's KEEP recommendation, since bottom-nav visibility/highlight and Back-label
+usability are layout outcomes that can regress at a small viewport even when route resolution
+takes no size input.

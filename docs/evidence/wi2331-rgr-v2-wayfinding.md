@@ -128,3 +128,78 @@ in the resolution. Re-verified on the merged head (Node 22): `jest --findRelated
 the three reconciled files plus `navigation.ts` and `_layout.tsx` → **96 suites / 2239
 tests pass**, covering both the WI-2331 AC guards above and the WI-2234/WI-2239 additions;
 mobile `tsc --noEmit` clean.
+
+## Rework (reviewer:codex:global bounce, 2026-07-25)
+
+The independent reviewer returned WI-2331 to rework with two substantive findings.
+Both are addressed below; the original landed fix (3 defects above) is unchanged and
+this rework stacks on top of it.
+
+### Rework Defect A — AC-1/AC-2/AC-5: multi-origin route highlights the wrong tab
+
+**Finding:** `accountReturnTokenForPathname` (pathname-only) maps every `/my-notes/*`
+route to the Mentor catch-all, but `/my-notes` is **multi-origin** — `LearnerScreen`
+(Mentor) pushes it with `returnTo=<own tab>`, and `JournalNotesArchive` (Journal) pushes
+`/my-notes/[kind]` with `returnTo='journal'`. So a Journal-origin visit wrongly
+highlighted Mentor, and `my-notes/index.tsx` hard-coded its Back **label** to
+`V2_TAB_TITLE_KEYS.mentor` even though its Back **destination** already honoured
+`returnTo` — "Back to Mentor" while actually returning to Journal.
+
+**Fix:** `resolveV2TabIsActive` (`_layout.tsx`) gains a `returnTo` param: a definitive
+`subjects`/`journal` pathname owner still wins, but the Mentor catch-all now defers to
+`accountReturnToken(returnTo)` — the same resolver `homeHrefForReturnTo` uses for the Back
+destination, so highlight and Back always agree. The active leaf's `returnTo` is read at
+the tab layout via `useGlobalSearchParams` and threaded into all six tab
+icon/label call sites. `my-notes/index.tsx`'s `backLabel` now derives from
+`accountReturnToken(returnTo)` too. Backward-compatible: catch-all + no `returnTo` →
+`accountReturnToken(undefined)` = `mentor` (unchanged).
+
+**Guard tests:** `_layout.test.tsx` → `'disambiguates the multi-origin /my-notes/* catch-all via returnTo'`
+and `'never lets returnTo override a definitive subjects/journal pathname owner'`;
+`my-notes/index.test.tsx` → `'labels and routes Back to Journal when returnTo is journal'`
++ the Mentor-origin counterpart.
+
+```text
+### GREEN baseline (fix present)
+_layout.test.tsx + my-notes/index.test.tsx: 133 passed, 133 total
+### REVERT A (resolveV2TabIsActive -> pathname-only; my-notes backLabel -> hard-coded mentor)
+### RED
+  ✕ disambiguates the multi-origin /my-notes/* catch-all via returnTo
+  ✕ labels and routes Back to Journal when returnTo is journal
+2 failed, 131 passed, 133 total
+### RESTORE + GREEN again
+133 passed, 133 total
+```
+
+### Rework Defect B — AC-2: remaining generic Back labels on "fixed this pass" screens
+
+The reviewer named `progress/[subjectId]` and `quiz/launch` as still-generic; treated as a
+class. Every "Fixed this pass" screen was re-audited (chevron + loading + error controls).
+Generic `common.goBack`/`common.back` Back controls now name their semantic destination
+(`t('common.backTo', { destination: t(V2_TAB_TITLE_KEYS[<token>]) })`), V2-gated, V0/V1
+copy unchanged, in: `my-notes/index.tsx`, `topic/relearn.tsx`, `homework/camera.tsx`
+(permission-denied exit), `quiz/index.tsx`, `quiz/launch.tsx` (error-state exits),
+`progress/[subjectId]/index.tsx` (all 5 sites unified, incl. two previously
+hard-coded), `practice/index.tsx`, `onboarding/language-setup.tsx`,
+`child/[profileId]/session/[sessionId].tsx`. Phase-stepping chevrons, icon-only
+camera-modal buttons, and in-flight "Cancel" actions were deliberately left (not exit
+controls). The ~57 un-audited files remain WI-2677.
+
+### Rework Finding 2 — AC-5 representative coverage, identified per axis
+
+AC-5's required coverage axes, each mapped to the specific executable test that exercises
+it (no blanket "representative coverage" assertion):
+
+| AC-5 axis | Covering test |
+|-----------|---------------|
+| All three tabs | `_layout.test.tsx` `resolveV2TabIsActive` cases (Mentor/Subjects/Journal owning-tab resolution) |
+| Own vs supporting context | `_layout.test.tsx` → `'resolves identically for own-scope and supporter-scope returnTo tokens (both fall to the Mentor catch-all)'` |
+| Deep links | `_layout.test.tsx` → `'resolves a cold deep-link landing (no returnTo, reactNavigationFocused=false) to its owning tab'` |
+| Small-phone layout | `_layout.test.tsx` → `'keeps the V2 tab bar visible with correct tab highlight at a small-phone viewport'` (inset top:20/bottom:0; tab bar not collapsed, owning-tab accent) + `my-notes/index.test.tsx` → `'keeps the named Back control usable at a small-phone viewport'` |
+| Dark/light themes | `_layout.test.tsx` → `'TabIcon / TabLabel theme-token wiring'` (focused → `colors.accent`, unfocused → `colors.textSecondary` — the semantic-token mechanism that adapts to either theme) |
+
+The small-phone axis was retained (not treated as vestigial to the removed AC-4) per the
+orchestrator's KEEP recommendation: AC-1/AC-2 are integrated UI outcomes — tab-bar
+visibility/highlight and Back-label usability can regress through layout at a small
+viewport even though the route-resolution logic itself takes no size input, so the axis is
+covered rather than reasoned away.

@@ -11,6 +11,8 @@ import {
   goBackOrReplace,
   homeHrefForReturnTo,
   pushLearningResumeTarget,
+  resolvedV2TabForReturnTo,
+  V2_TAB_TITLE_KEYS,
 } from '../../../../lib/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback, TimeoutLoader } from '../../../../components/common';
@@ -137,13 +139,31 @@ export default function ProgressSubjectScreen(): React.ReactElement {
     subjectId: string;
     returnTo?: string;
   }>();
+  const v2Enabled = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
   const backFallback = returnTo
-    ? homeHrefForReturnTo(
-        returnTo,
-        undefined,
-        FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
-      )
+    ? homeHrefForReturnTo(returnTo, undefined, v2Enabled)
     : ('/(app)/progress' as const);
+  // WI-2331 rework, F1b: every Back control below (loading, error, header)
+  // routes to this SAME backFallback, so all of them name the actual
+  // destination — the owning V2 tab named by returnTo (via
+  // resolvedV2TabForReturnTo, which only claims a tab when backFallback
+  // genuinely resolves to one), or Progress itself (this screen's real,
+  // unchanged parent when returnTo is absent) — instead of the generic
+  // `common.goBack` they showed before. When returnTo names a non-tab
+  // destination the label falls back to the generic action rather than
+  // mislabeling as a tab it isn't going to.
+  const returnToBackTab = returnTo
+    ? resolvedV2TabForReturnTo(returnTo, undefined, v2Enabled)
+    : null;
+  const backLabel = v2Enabled
+    ? returnTo
+      ? returnToBackTab
+        ? t('common.backTo', {
+            destination: t(V2_TAB_TITLE_KEYS[returnToBackTab]),
+          })
+        : t('common.goBack')
+      : t('progress.subject.backToProgress')
+    : t('common.goBack');
   const inventoryQuery = useProgressInventory();
   const subjectProgressQuery = useSubjectProgress(subjectId ?? '');
   const resumeTargetQuery = useLearningResumeTarget({
@@ -276,11 +296,11 @@ export default function ProgressSubjectScreen(): React.ReactElement {
           onPress={() => router.replace(backFallback as Href)}
           className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           accessibilityRole="button"
-          accessibilityLabel={t('progress.subject.backToProgress')}
+          accessibilityLabel={backLabel}
           testID="progress-subject-missing-back"
         >
           <Text className="text-body font-semibold text-text-inverse">
-            {t('progress.subject.backToProgress')}
+            {backLabel}
           </Text>
         </Pressable>
       </View>
@@ -304,7 +324,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
             testID: 'progress-subject-skeleton-timeout-retry',
           }}
           secondaryAction={{
-            label: t('common.goBack'),
+            label: backLabel,
             onPress: () => goBackOrReplace(router, backFallback),
             testID: 'progress-subject-skeleton-timeout-back',
           }}
@@ -325,11 +345,11 @@ export default function ProgressSubjectScreen(): React.ReactElement {
                 onPress={() => goBackOrReplace(router, backFallback)}
                 className="mt-6 rounded-button bg-surface-elevated px-6 py-3 min-h-[48px] items-center justify-center"
                 accessibilityRole="button"
-                accessibilityLabel={t('common.goBack')}
+                accessibilityLabel={backLabel}
                 testID="progress-subject-loading-back"
               >
                 <Text className="text-body font-semibold text-text-primary">
-                  {t('common.goBack')}
+                  {backLabel}
                 </Text>
               </Pressable>
             </View>
@@ -360,7 +380,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
             testID: 'progress-subject-error-retry',
           }}
           secondaryAction={{
-            label: t('common.goBack'),
+            label: backLabel,
             onPress: () => router.replace(backFallback as Href),
             testID: 'progress-subject-error-back',
           }}
@@ -381,7 +401,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
             onPress={() => goBackOrReplace(router, backFallback)}
             className="me-3 py-2 pe-2"
             accessibilityRole="button"
-            accessibilityLabel={t('common.goBack')}
+            accessibilityLabel={backLabel}
             testID="progress-subject-back"
           >
             <Text className="text-body font-semibold text-primary">
@@ -888,11 +908,11 @@ export default function ProgressSubjectScreen(): React.ReactElement {
               onPress={() => router.replace(backFallback as Href)}
               className="bg-primary rounded-button px-4 py-3 items-center mt-4 min-h-[48px] justify-center"
               accessibilityRole="button"
-              accessibilityLabel={t('progress.subject.backToProgress')}
+              accessibilityLabel={backLabel}
               testID="progress-subject-gone-back"
             >
               <Text className="text-body font-semibold text-text-inverse">
-                {t('progress.subject.backToProgress')}
+                {backLabel}
               </Text>
             </Pressable>
           </View>
