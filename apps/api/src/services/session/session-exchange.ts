@@ -269,9 +269,21 @@ const logger = createLogger();
 // `startMentorNoticeRecheck` keeps handing that same dead session back. See
 // `detachMentorNoticeRecheckAttempt` (offer.ts) for the full argument.
 //
-// Malformed or unavailable judgment at the cap is the ONE case that still
-// terminalizes `not_yet` (AC-4), because there no valid verdict was ever
-// obtained — nothing to preserve for a later attempt.
+// What still terminalizes `not_yet` at the cap (AC-4) is an UNRESOLVED
+// evaluation — `evaluation.kind === 'unresolved'`, the discriminant the switch
+// below actually branches on. The rationale is the discriminant's meaning, not a
+// list of causes: unresolved means no valid verdict was ever obtained, so there
+// is nothing to preserve for a later attempt.
+//
+// Deliberately NOT enumerated. This comment previously said "malformed or
+// unavailable judgment … is the ONE case", which was untrue of the code beneath
+// it: `recheck-judge.ts` reaches `UNRESOLVED` from SEVEN sites, and two of them
+// are neither malformed nor unavailable — an answer event the server cannot find
+// (`answer_event_missing`), and a verdict whose reason does not match its
+// outcome (`mismatched_pair`). Merged canon (WI-2623, 23441a032) states the
+// unresolved set is explicitly not closed by any illustrative list, so naming
+// members here would drift from canon the moment a site is added. Branch on the
+// discriminant; read `recheck-judge.ts` for the current causes.
 // ---------------------------------------------------------------------------
 
 /**
