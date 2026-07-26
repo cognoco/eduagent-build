@@ -927,6 +927,89 @@ describe('finalizeChallengeRoundIfReady — idempotent under concurrent/retry fi
     expect(state.deepeningRows).toHaveLength(1);
     expect(state.deepeningRows[0]?.misconception).toBeNull();
   });
+
+  // [WI-2628] The row above is English-only, so the shipped English-only guard
+  // satisfied it too — it never established the multilingual property. Each
+  // string below was returned UNCHANGED by
+  // `scrubClinicalInferenceFromLearningRecord` (i.e. would have been persisted
+  // verbatim into `needs_deepening_topics.misconception`). Derived write, so the
+  // AC-5 disposition is DROP: the row still lands, with the field nulled.
+  // Asserted on the row that was actually written, not on the gate's verdict.
+  it.each([
+    ['Czech', 'Žák má dyslexii.'],
+    ['Spanish', 'El alumno tiene TEA.'],
+    ['German', 'Der Schüler hat ADS.'],
+    ['Norwegian', 'Eleven har ADD.'],
+    ['Japanese', '田中さんは自閉症です。'],
+  ])(
+    '[WI-2628] drops a %s clinical inference before persisting a misconception',
+    async (_language, evidence) => {
+      const challengeRound = draftingState([
+        {
+          concept: 'equivalent fractions',
+          result: 'misconception',
+          evidence,
+          answerEventId: ANSWER_EVENT_ID,
+          learnerQuote: 'One half is smaller than two fourths.',
+          correction: 'One half and two fourths represent the same amount.',
+        },
+      ]);
+      const state: FakeDbState = {
+        sessionMetadata: { challengeRound },
+        masteryInserts: [],
+        deepeningRows: [],
+        deepeningInsertCount: 0,
+      };
+      const db = makeFakeDb(state);
+
+      await finalizeChallengeRoundIfReady(
+        db,
+        PROFILE_ID,
+        makeSession(state.sessionMetadata),
+        challengeRound,
+        null,
+      );
+
+      expect(state.deepeningRows).toHaveLength(1);
+      expect(state.deepeningRows[0]?.misconception).toBeNull();
+    },
+  );
+
+  it('[WI-2628] still persists a safe misconception verbatim', async () => {
+    // Non-triviality control for every row above, including the WI-1195 one: a
+    // gate that nulled EVERY misconception would satisfy all of them for free,
+    // and the feature would be silently dead.
+    const safeEvidence =
+      'The learner treated the denominators as if they were addends.';
+    const challengeRound = draftingState([
+      {
+        concept: 'equivalent fractions',
+        result: 'misconception',
+        evidence: safeEvidence,
+        answerEventId: ANSWER_EVENT_ID,
+        learnerQuote: 'One half is smaller than two fourths.',
+        correction: 'One half and two fourths represent the same amount.',
+      },
+    ]);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+    };
+    const db = makeFakeDb(state);
+
+    await finalizeChallengeRoundIfReady(
+      db,
+      PROFILE_ID,
+      makeSession(state.sessionMetadata),
+      challengeRound,
+      null,
+    );
+
+    expect(state.deepeningRows).toHaveLength(1);
+    expect(state.deepeningRows[0]?.misconception).toBe(safeEvidence);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -89,6 +89,20 @@ describe('[WI-1195] persisted learning-text guard wiring', () => {
       newGateCall: /assertLearningTextSafe\(/g,
     },
     {
+      // Notice concept + correction hint, both evaluated in ONE batch, so the
+      // application count is 1 (the batch), not 2 (the fields). This boundary was
+      // absent from the Stage-1 ratchet entirely — state.ts imported the old
+      // guard bare rather than through the `learningTextGuard.` namespace, so
+      // neither of the old prefixed patterns matched it and its count was never
+      // pinned. Added here, so a second write path in state.ts cannot skip the
+      // gate. Its `oldGuardCall` is deliberately the BARE form for that reason.
+      file: 'mentor-notices/state.ts',
+      control: 'multilingual-gate',
+      applications: 1,
+      oldGuardCall: /scrubClinicalInferenceFromLearningRecord/g,
+      newGateCall: /evaluateLearningTextFields\(/g,
+    },
+    {
       // The needs-deepening `misconception` update AND insert. Derived writes,
       // so they DROP via a local helper over a batch hoisted above the
       // transaction (an LLM round-trip must not run inside one).
@@ -133,7 +147,7 @@ describe('[WI-1195] persisted learning-text guard wiring', () => {
     return source.match(new RegExp(pattern.source, 'g'))?.length ?? 0;
   }
 
-  it('covers exactly the six Art 9 persistence boundaries, with no duplicates', () => {
+  it('covers exactly the seven Art 9 persistence boundaries, with no duplicates', () => {
     // Guards the LIST itself. Every assertion below is per-row, so quietly
     // deleting a row would drop a boundary from the ratchet while leaving it
     // green — the one failure mode a table-driven ratchet invites.
@@ -144,6 +158,7 @@ describe('[WI-1195] persisted learning-text guard wiring', () => {
       'learner-profile.ts',
       'memory/backfill-mapping.ts',
       'memory/dedup-actions.ts',
+      'mentor-notices/state.ts',
       'notes.ts',
       'session/session-exchange.ts',
     ]);
