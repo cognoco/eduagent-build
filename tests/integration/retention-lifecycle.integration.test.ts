@@ -172,7 +172,7 @@ async function seedRetentionCard(
     .values({
       profileId,
       topicId,
-      easeFactor: '2.50',
+      easeFactor: 2.5,
       intervalDays: 1,
       repetitions: 0,
       failureCount: 0,
@@ -639,7 +639,7 @@ describe('Integration: POST /v1/retention/relearn', () => {
     ]);
     // Seed a card with some progress to verify reset
     await seedRetentionCard(profileId, topicIds[0]!, {
-      easeFactor: '2.70',
+      easeFactor: 2.7,
       intervalDays: 10,
       repetitions: 5,
       failureCount: 3,

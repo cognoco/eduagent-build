@@ -6,7 +6,7 @@ import {
 import type { ZodType } from 'zod';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
-import { assertOk } from '../lib/assert-ok';
+import { assertOk, type ApiResponse } from '../lib/assert-ok';
 import { parseJson } from '../lib/parse-json';
 
 type RetryOption =
@@ -34,7 +34,7 @@ export function useApiQuery<TResponse, TData = TResponse>(opts: {
   timeoutMs?: number;
   schema: ZodType<TResponse>;
   context?: string;
-  fetch: (signal: AbortSignal) => Promise<Response>;
+  fetch: (signal: AbortSignal) => Promise<ApiResponse>;
   select: (json: TResponse) => TData;
   notFoundFallback?: TData | (() => TData);
 }): UseQueryResult<TData> {
