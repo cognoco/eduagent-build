@@ -6,6 +6,7 @@ const createVisibilityNoticeMock = jest.fn();
 jest.mock(
   './linking-ceremony' /* gc1-allow: deterministic DB fault injection proves graduation-restamp transaction rollback */,
   () => ({
+    ...jest.requireActual('./linking-ceremony'),
     writeVisibilityAuditEvent: (...args: unknown[]) =>
       writeVisibilityAuditEventMock(...args),
   }),
@@ -14,6 +15,7 @@ jest.mock(
 jest.mock(
   './visibility-moment-projections' /* gc1-allow: deterministic DB fault injection proves graduation-restamp transaction rollback */,
   () => ({
+    ...jest.requireActual('./visibility-moment-projections'),
     createVisibilityNotice: (...args: unknown[]) =>
       createVisibilityNoticeMock(...args),
   }),
