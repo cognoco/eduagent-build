@@ -1,7 +1,7 @@
 # MMT-ADR-0036 autonomous remediation sequence
 
 **Status:** Executing  
-**Decision authority:** MentoMate operator, interactive rulings on 2026-07-22  
+**Decision authority:** MentoMate operator, interactive rulings on 2026-07-22 and 2026-07-26  
 **Delivery batch:** BID-35 — Mentor-notice feature completion  
 **Final acceptance gate:** WI-2574 — Run final mentor-notice MVP acceptance audit against MMT-ADR-0036
 
@@ -93,7 +93,7 @@ Refresh the bounced review findings and reconcile the existing worktree before p
   - `deferred/explicit_not_now`
   - `continue/unclear`
 - A valid `continue` makes no notice transition at any turn, including turn three. Implement attempt lifecycle separately from notice status: reaching the three-response cap after a valid `continue` ends the attempt and detaches its bookkeeping, leaving the notice unresolved and re-offerable.
-- Malformed or unavailable judging makes no transition before turn three. At turn three, an unresolved evaluation — and only an unresolved evaluation — deterministically terminalizes `not_yet`.
+- An unresolved evaluation makes no transition before turn three. At turn three, an unresolved evaluation — and only an unresolved evaluation — deterministically terminalizes `not_yet`. Treat unresolved as an open set, illustrated by malformed or unavailable judging, an unfindable referenced answer event, and a mismatched verdict/reason pair; every member fails in the same safe direction.
 - Reuse the landed WI-2501 idempotency primitive so a valid transition applies once under retries.
 - Persist only event identity needed for idempotency, never answer text, judge reasoning, or confidence.
 - Put the server-committed transition in non-stream responses and SSE done frames; mobile renders only that transition.

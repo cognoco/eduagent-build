@@ -1134,7 +1134,7 @@ A mentor notice is a quiet, learner-only acknowledgement that the Mentor recorde
 | State | Primary action | Secondary behavior |
 |---|---|---|
 | Eligible open notice | `Continue` starts or resumes a focused re-check capped at three learner responses; if the learner is still unclear at the cap, that attempt simply ends and the notice may be offered again later | `Not now` defers until the next learning day, measured from local 04:00 in the learner's IANA time zone; an invalid or unavailable zone uses the same 04:00 boundary and civil date in UTC |
-| Re-check evaluation unavailable at the cap | End the current offer as `not_yet` with encouraging copy | Only an unavailable or malformed evaluation at the third response ends the offer this way; never a valid continue |
+| Re-check evaluation unresolved at the cap | End the current offer as `not_yet` with encouraging copy | Only an unresolved evaluation at the third response ends the offer this way — for example judging that is unavailable or malformed; never a valid continue |
 | Independent server judge commits `locked_in` | Show concise acknowledgement from the committed server transition | The tutor's prose never self-certifies understanding; do not inflate into a diagnosis or expose it to a proxy viewer |
 | Independent server judge commits `not_yet` | End the current offer with encouraging copy | Do not claim mastery; a later notice requires new evidence |
 | Learner explicitly asks to stop | Dismiss terminally | Do not resurface the record |
