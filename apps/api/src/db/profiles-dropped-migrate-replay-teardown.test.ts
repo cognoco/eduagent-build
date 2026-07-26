@@ -55,6 +55,41 @@ describe('profiles-dropped migration replay teardown [WI-2755]', () => {
     ]);
   });
 
+  it('continues past the observed ten-second backend linger before dropping', async () => {
+    const events: string[] = [];
+    const connectionCounts = ['1', '0'];
+    const query = jest.fn(async (sql: string) => {
+      if (sql.includes('pg_stat_activity')) {
+        const connectionCount = connectionCounts.shift() ?? '0';
+        events.push(`connections:${connectionCount}`);
+        return { rows: [{ connection_count: connectionCount }] };
+      }
+      events.push('drop');
+      return { rows: [] };
+    });
+    const nowValues = [0, 10_000];
+
+    await closePoolAndDropScratchDatabase({
+      adminPool: { query } as unknown as Pick<Pool, 'query'>,
+      scratchPool: {
+        end: jest.fn(async () => events.push('pool:end')),
+      } as unknown as Pick<Pool, 'end'>,
+      databaseName: 'wi2755_replay_test',
+      now: () => nowValues.shift() ?? 10_001,
+      sleep: jest.fn(async (delayMs: number) => {
+        events.push(`sleep:${delayMs}`);
+      }),
+    });
+
+    expect(events).toEqual([
+      'pool:end',
+      'connections:1',
+      'sleep:25',
+      'connections:0',
+      'drop',
+    ]);
+  });
+
   it('times out without force-dropping a database that still has connections', async () => {
     const query = jest.fn(async (sql: string) => {
       expect(sql).toContain('pg_stat_activity');
