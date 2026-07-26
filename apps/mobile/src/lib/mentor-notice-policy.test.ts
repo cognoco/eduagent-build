@@ -885,6 +885,130 @@ describe('useMentorNoticePolicy', () => {
     });
   });
 
+  // ── The other DIRECTION of blindness ──────────────────────────────────────
+  //
+  // The first withhold was unconditional, and that traded the original breach
+  // for two NEW kill-switch fail-opens that `origin/main` does not have: a
+  // genuine emergency disable was silently swallowed. Both cases below were
+  // measured against `origin/main` as well as head — a single-source run cannot
+  // tell a regression from a residual, which is exactly how that shipped.
+  //
+  // The rule that resolves it: while blind, an ENABLED candidate is withheld
+  // (it can resurrect notices), a genuine DISABLE is written anyway (losing the
+  // kill-switch is strictly worse than anything the write can overwrite).
+
+  /** Fail every `getItem` for the duration of `run`. */
+  async function whileBlind(run: () => Promise<void>): Promise<void> {
+    const originalGetItem = AsyncStorage.getItem;
+    AsyncStorage.getItem = jest.fn(() =>
+      Promise.reject(new Error('storage unavailable')),
+    ) as unknown as typeof AsyncStorage.getItem;
+    try {
+      await run();
+    } finally {
+      AsyncStorage.getItem = originalGetItem;
+    }
+  }
+
+  it('writes a GENUINE disable while blind, over a lower-revision enabled record it cannot see', async () => {
+    await seedStored(ACTOR, PROFILE, '{"revision":3,"enabled":true}');
+
+    await whileBlind(async () => {
+      const { result } = mountPolicy();
+      await waitFor(() => expect(result.current.hydrated).toBe(true));
+      act(() => result.current.observe(observation(9, false)));
+      // Long enough to cover the read and write retry ladders.
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 1200));
+      });
+    });
+
+    // The emergency disable LANDS. Withholding it here left disk at
+    // `{"revision":3,"enabled":true}` and the restart showed notices — a
+    // kill-switch silently swallowed, and a regression against `origin/main`,
+    // which writes it.
+    expect(await AsyncStorage.getItem(stateKey(ACTOR, PROFILE))).toBe(
+      '{"revision":9,"enabled":false}',
+    );
+
+    resetMentorNoticePolicyStoreForTests();
+    const relaunched = mountPolicy();
+    await waitFor(() => expect(relaunched.result.current.hydrated).toBe(true));
+    expect(relaunched.result.current.state).toEqual({
+      revision: 9,
+      enabled: false,
+    });
+    expect(relaunched.result.current.suppressed(undefined)).toBe(true);
+  });
+
+  it('persists a disable on a FRESH INSTALL whose first read throws, so it cannot hydrate as never-told', async () => {
+    // No stored record at all — the case that needs no pre-existing state to
+    // reach. Withholding here left the record ABSENT, and an absent record
+    // hydrates as NEVER-TOLD, which `noticesSuppressedForPayload` treats as
+    // "not suppressed" and lets a cached projection paint. That is precisely
+    // the hazard `removeItem` was rejected for, reintroduced by the withhold.
+    await whileBlind(async () => {
+      const { result } = mountPolicy();
+      await waitFor(() => expect(result.current.hydrated).toBe(true));
+      act(() => result.current.observe(observation(9, false)));
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 1200));
+      });
+    });
+
+    expect(await AsyncStorage.getItem(stateKey(ACTOR, PROFILE))).toBe(
+      '{"revision":9,"enabled":false}',
+    );
+
+    resetMentorNoticePolicyStoreForTests();
+    const relaunched = mountPolicy();
+    await waitFor(() => expect(relaunched.result.current.hydrated).toBe(true));
+    expect(relaunched.result.current.state).toEqual({
+      revision: 9,
+      enabled: false,
+    });
+    // The never-told check: a payload carrying no observation of its own must
+    // still be suppressed. A never-told device answers `false` here.
+    expect(relaunched.result.current.suppressed(undefined)).toBe(true);
+  });
+
+  it('ACCEPTED COST: a blind disable can LOWER the durable floor, and stays disabled either way', async () => {
+    // The price of always writing a genuine disable while blind. Disk holds a
+    // HIGHER-revision disable we cannot see; we overwrite it with a lower one,
+    // so the bar a later enabled observation must clear drops 8 → 3.
+    //
+    // Recorded as a test rather than a comment because it is a real weakening,
+    // and because it is NOT a regression: `origin/main` produces the identical
+    // record here. It is strictly the lesser harm — the device stays DISABLED
+    // and suppressed either way, so this only widens the window in which a
+    // stale enabled reply could re-enable, where the two cases above are
+    // outright kill-switch losses.
+    await seedStored(ACTOR, PROFILE, '{"revision":8,"enabled":false}');
+
+    await whileBlind(async () => {
+      const { result } = mountPolicy();
+      await waitFor(() => expect(result.current.hydrated).toBe(true));
+      act(() => result.current.observe(observation(3, false)));
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 1200));
+      });
+    });
+
+    expect(await AsyncStorage.getItem(stateKey(ACTOR, PROFILE))).toBe(
+      '{"revision":3,"enabled":false}',
+    );
+
+    resetMentorNoticePolicyStoreForTests();
+    const relaunched = mountPolicy();
+    await waitFor(() => expect(relaunched.result.current.hydrated).toBe(true));
+    // Still disabled, still suppressed — the floor moved, the verdict did not.
+    expect(relaunched.result.current.state).toEqual({
+      revision: 3,
+      enabled: false,
+    });
+    expect(relaunched.result.current.suppressed(undefined)).toBe(true);
+  });
+
   // NON-TRIVIALITY CONTROL for the test above. "Always write disabled" and
   // "always hydrate disabled" would both satisfy every assertion there; neither
   // survives this. A clean enabled observation must reach disk as enabled and

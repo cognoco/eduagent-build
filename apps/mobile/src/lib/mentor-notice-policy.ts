@@ -324,12 +324,29 @@ type Entry = {
    * shows notices again. That is the exact breach this Work Item closes, and it
    * was reproduced on the previous head.
    *
-   * So while this is set AND no `durable` has been established, a flush writes
-   * NOTHING (see `flush`). In-session state stays fail-closed regardless — only
-   * the durable record is left alone, which is correct precisely because it may
-   * already hold the stronger disable.
+   * So while this is set AND no `durable` has been established, `flush` decides
+   * by the DIRECTION of the candidate: an ENABLED candidate is withheld (it is
+   * the one that can resurrect notices), a DISABLED candidate is written anyway
+   * (withholding the kill-switch is worse than any record it can overwrite).
+   * See the full trade in `flush`. In-session state stays fail-closed either
+   * way.
    */
   readUntrusted: boolean;
+  /**
+   * [WI-2627 rework 3] A well-formed OBSERVATION carrying `enabled: false` has
+   * been folded into this entry — i.e. the server actually told this device the
+   * rollout is off.
+   *
+   * Needed because "the store is currently disabled" is NOT the same as "we hold
+   * a disable worth persisting blind". A failed read folds `'malformed'`, which
+   * disables at the held revision — so after a blind read the state reads
+   * disabled even when the only thing the server ever said was ENABLED. Gating
+   * the blind write on `state.enabled` alone therefore wrote a disable
+   * manufactured by our own read failure, lowering the durable floor for
+   * nothing. This flag distinguishes a genuine kill-switch, which is worth the
+   * floor cost, from our own fail-closed reaction to blindness, which is not.
+   */
+  observedDisable: boolean;
 };
 
 const UNBOUND_SNAPSHOT: MentorNoticePolicySnapshot = {
@@ -363,6 +380,7 @@ function getEntry(key: string): Entry {
       flushQueued: false,
       durable: null,
       readUntrusted: false,
+      observedDisable: false,
     };
     entries.set(key, entry);
   }
@@ -436,9 +454,10 @@ function enqueue(entry: Entry, work: () => Promise<void>): void {
  * state, already fail-closed by the malformed fold, is the better record).
  * Writing the current state unguarded is correct in both of those.
  *
- * It is NOT correct when the read itself failed, because then a higher-revision
- * disable may be on disk unseen. That case never reaches here: `flush` withholds
- * the write entirely while `readUntrusted` is set and no `durable` is known.
+ * It is NOT the whole story when the READ itself failed, because then a
+ * higher-revision disable may be on disk unseen. `flush` handles that case
+ * before reaching here: it retries the read, and if still blind it withholds an
+ * ENABLED candidate outright while letting a DISABLED one through unguarded.
  */
 function durableCandidate(entry: Entry): MentorNoticePolicyState {
   const current = entry.snapshot.state;
@@ -477,23 +496,75 @@ function durableCandidate(entry: Entry): MentorNoticePolicyState {
 async function flush(key: string, entry: Entry): Promise<void> {
   entry.flushQueued = false;
 
-  // [WI-2627 rework 2] A failed READ leaves the disk contents unknown, and a
-  // higher-revision disable may be sitting there. Retry the read once here —
-  // called directly rather than enqueued, because this already runs ON the
-  // chain — so a transient failure clears and the normal guarded write proceeds.
+  // [WI-2627 rework 3] A failed READ leaves the disk contents UNKNOWN, and a
+  // higher-revision disable may be sitting there unseen. Retry the read on the
+  // same ladder the write gets — called directly rather than enqueued, because
+  // this already runs ON the chain. Zero-backoff was not a retry: it gave a
+  // read one microtask to recover, so "blind" was effectively permanent for
+  // anything but the narrowest hiccup. Recovering the read is by far the best
+  // outcome, because it restores the ordinary guarded write and moots every
+  // trade below.
   if (entry.readUntrusted) {
-    await readAndFold(key, entry);
+    for (
+      let attempt = 0;
+      entry.readUntrusted && attempt <= PERSIST_RETRY_DELAYS_MS.length;
+      attempt++
+    ) {
+      await readAndFold(key, entry);
+      if (!entry.readUntrusted) break;
+      const backoff = PERSIST_RETRY_DELAYS_MS[attempt];
+      if (backoff !== undefined) await delay(backoff);
+    }
+
+    // Still blind, with nothing established to guard against. The choice is
+    // between two bad writes, and the DIRECTION of the candidate decides which
+    // one we take — the previous pass withheld unconditionally and that was
+    // wrong, because it swallowed the kill-switch itself.
     if (entry.readUntrusted && entry.durable === null) {
-      // Still blind, and nothing established to guard against. WITHHOLD: writing
-      // current state here is what regressed a durable `{8,false}` to `{3,true}`
-      // and resurrected notices across a restart. Withholding cannot resurrect
-      // anything — it leaves whatever is on disk, which is at least as strict as
-      // what we would write. In-session state is already fail-closed.
-      Sentry.captureMessage('mentor_notice_policy: durable write withheld', {
+      if (entry.snapshot.state.enabled || !entry.observedDisable) {
+        // Nothing worth persisting blind → WITHHOLD. Two shapes land here:
+        //
+        //   an ENABLED candidate — the original breach. At cold start in-memory
+        //     is the bootstrap, so any enabled observation above revision 0 is
+        //     `newer` and would be written straight over an intact
+        //     higher-revision disable, flipping the durable record to enabled
+        //     and resurrecting notices on the next launch.
+        //
+        //   a disabled candidate with NO genuine disable behind it — the state
+        //     our own failed read manufactured by folding 'malformed'. Writing
+        //     it would lower the durable floor and persist nothing the server
+        //     ever said.
+        //
+        // Withholding costs only a DELAYED enable, which is fail-closed and
+        // self-corrects on the next successful write.
+        Sentry.captureMessage('mentor_notice_policy: durable write withheld', {
+          level: 'warning',
+          tags: { feature: 'mentor_notice_policy', op: 'write_withheld' },
+        });
+        return;
+      }
+      // DISABLED candidate → WRITE IT ANYWAY. A disable is the emergency
+      // kill-switch, and withholding it is strictly worse than any record it
+      // can overwrite:
+      //   - if the unknown disk held an ENABLED record, withholding leaves that
+      //     record and the next launch shows notices — the kill-switch silently
+      //     swallowed;
+      //   - if the disk held NOTHING (fresh install, first read throws),
+      //     withholding leaves it absent, and an absent record hydrates as
+      //     NEVER-TOLD, which `noticesSuppressedForPayload` treats as "not
+      //     suppressed" and lets a cached projection paint. That is precisely
+      //     the hazard `removeItem` was rejected for above, reintroduced.
+      // Writing the disable cannot do either. Its one real cost is the FLOOR:
+      // if the unknown disk held a disable at a HIGHER revision, we lower the
+      // bar a later enabled observation must clear. That leaves the device
+      // disabled either way — it only widens the window in which a stale
+      // enabled reply could re-enable — so it is the lesser harm by a wide
+      // margin. Tagged distinctly so the trade is observable in production
+      // rather than only asserted here.
+      Sentry.captureMessage('mentor_notice_policy: blind disable write', {
         level: 'warning',
-        tags: { feature: 'mentor_notice_policy', op: 'write_withheld' },
+        tags: { feature: 'mentor_notice_policy', op: 'write_blind_disable' },
       });
-      return;
     }
   }
 
@@ -613,6 +684,13 @@ export function foldMentorNoticePolicyFor(
   if (!signalIsObservation(signal)) return;
   const key = storageKey(actorId, profileId);
   const entry = getEntry(key);
+  // [WI-2627 rework 3] Record that a GENUINE disable arrived, before the fold —
+  // `flush` needs to tell a server kill-switch from the fail-closed state its
+  // own failed read manufactures. Only a well-formed observation counts;
+  // 'malformed' does not.
+  if (typeof signal === 'object' && !signal.enabled) {
+    entry.observedDisable = true;
+  }
   const next = reduceMentorNoticePolicy(entry.snapshot.state, signal);
   commit(entry, next, true, entry.snapshot.hydrated);
   // [WI-2627 rework] Not `persist(key, next)`. The write must carry whatever the
