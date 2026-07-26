@@ -163,6 +163,14 @@ export async function runDedupForProfile(
 
     let decision = memo[0] ? decisionFromMemo(memo[0]) : null;
     let modelVersion = memo[0]?.modelVersion ?? 'memo';
+    // [WI-2628] The producing VENDOR, tracked separately from `modelVersion` and
+    // deliberately starting at null. `modelVersion` holds `result.model` (and the
+    // literal 'memo' on a memo hit); neither is a vendor, and the judge's
+    // independence exclusion filters a vendor pool — so passing either would
+    // exclude nothing and let a vendor grade its own output. Null on every path
+    // where the vendor is not known FOR THE TEXT BEING GATED, which fails the
+    // scan closed rather than asserting a producer we cannot substantiate.
+    let producerVendor: string | null = null;
     if (decision) report.memoHits += 1;
 
     if (!decision) {
@@ -200,6 +208,7 @@ export async function runDedupForProfile(
 
       const llmDecision = llmResult.decision;
       modelVersion = llmResult.modelVersion;
+      producerVendor = llmResult.provider;
       await args.db
         .insert(memoryDedupDecisions)
         .values({
@@ -232,6 +241,18 @@ export async function runDedupForProfile(
         // in that edge case so decision is always non-null below.
         decision = decisionFromMemo(persisted[0]) ?? llmDecision;
         modelVersion = persisted[0].modelVersion;
+        // [WI-2628] The vendor is ours only if the row that landed is the row WE
+        // inserted. Under `onConflictDoNothing` a concurrent pass may have won,
+        // in which case the merged text about to be gated was produced by a call
+        // this pass never made — so our provider does not describe it. Compare the
+        // gated VALUE, not a proxy like the model string: identical models across
+        // providers are possible, and "same model implies same vendor" is the
+        // inference class that produced this bug.
+        const landedMergedText =
+          persisted[0].decision === 'merge' ? persisted[0].mergedText : null;
+        const ourMergedText =
+          llmDecision.action === 'merge' ? llmDecision.merged_text : null;
+        if (landedMergedText !== ourMergedText) producerVendor = null;
       } else {
         decision = llmDecision;
       }
@@ -245,10 +266,13 @@ export async function runDedupForProfile(
     // to different text, and text that was never evaluated resolves unsafe.
     //
     // `provenance: 'llm'` — merge text is authored by the dedup model.
-    // `producerVendor: modelVersion` is the vendor/model that produced THIS merge
-    // text, so the judge excludes it rather than grading its own output. When it is
-    // absent the scan fails closed per AC-4, which is the correct reading of an
-    // unknown producer.
+    // `producerVendor` is the real VENDOR (`result.provider`) that produced THIS
+    // merge text, so the judge excludes it rather than grading its own output. It
+    // is null whenever the vendor is not known for this exact text — a memo hit
+    // (the stored row keeps only `model_version`, so the vendor is unrecoverable)
+    // or a concurrent pass winning the insert. Null fails the scan closed per
+    // AC-4, which is the correct reading of an unknown producer; a confidently
+    // wrong vendor would silently defeat the independence guarantee instead.
     const learningTextGate = await evaluateLearningTextByContent({
       texts: [decision.action === 'merge' ? decision.merged_text : null],
       fieldKind: 'memory_dedup_action',
@@ -256,7 +280,7 @@ export async function runDedupForProfile(
       // grammars and keeps the strictest verdict. Never `'en'`.
       conversationLanguage: undefined,
       provenance: 'llm',
-      producerVendor: modelVersion,
+      producerVendor,
     });
 
     const outcome = await args.db.transaction(async (tx) => {

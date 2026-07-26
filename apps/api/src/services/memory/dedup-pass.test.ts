@@ -297,6 +297,80 @@ describe('runDedupForProfile', () => {
     expect(report.llmCalls).toBe(0);
   });
 
+  // [WI-2628] A memo hit stores only `model_version` — the producing VENDOR is not
+  // persisted and is therefore unrecoverable. The gate must then treat the producer
+  // as unknown and fail CLOSED, rather than asserting a vendor it cannot
+  // substantiate (the previous code passed the literal 'memo', which is not a vendor
+  // at all and excluded nothing from the judge pool).
+  //
+  // Both cases below keep `merged_text`'s tokens inside the two source facts. That
+  // is load-bearing: `findNewContentTokens` rejects a merge introducing new tokens
+  // BEFORE the gate is consulted, so a merged string built from unrelated words
+  // fails for that reason instead and the test would assert nothing about the gate.
+  it('drops a memo-hit merge whose text needs the judge, because the producing vendor is unrecoverable', async () => {
+    const merged = 'Dyslexia is a reading difference that affects decoding.';
+    const candidate = makeFact({
+      id: 'c1',
+      text: merged,
+      textNormalized: 'dyslexia is a reading difference that affects decoding',
+    });
+    const neighbour = makeFact({
+      id: 'n1',
+      text: 'Dyslexia affects decoding.',
+      textNormalized: 'dyslexia affects decoding',
+    });
+    const args = makeArgs({
+      candidates: [candidate],
+      neighbours: [neighbour],
+      memoRow: {
+        decision: 'merge' as const,
+        // Ambiguous EDUCATIONAL text: a protected lexeme with no person attributed,
+        // so the deterministic scan returns `refer` and the verdict belongs to the
+        // judge. With no producer vendor the referral cannot be constructed, so it
+        // resolves unsafe — the fail-closed behaviour under assertion.
+        mergedText: merged,
+        modelVersion: 'memo',
+      },
+    });
+
+    const { report } = await runDedupForProfile(args);
+    expect(report.memoHits).toBe(1);
+    expect(report.merges).toBe(0);
+    expect(report.failures).toBe(1);
+  });
+
+  // The control that makes the case above about the GATE rather than about memo hits
+  // in general: an otherwise identical memo-hit merge whose text carries no protected
+  // lexeme still merges. Without this pair, "every memo-hit merge is broken" would
+  // satisfy the assertion above just as well.
+  it('still applies a memo-hit merge when the text needs no judge at all', async () => {
+    const merged = 'We read two chapters about volcanoes today.';
+    const candidate = makeFact({
+      id: 'c1',
+      text: merged,
+      textNormalized: 'we read two chapters about volcanoes today',
+    });
+    const neighbour = makeFact({
+      id: 'n1',
+      text: 'We read about volcanoes.',
+      textNormalized: 'we read about volcanoes',
+    });
+    const args = makeArgs({
+      candidates: [candidate],
+      neighbours: [neighbour],
+      memoRow: {
+        decision: 'merge' as const,
+        mergedText: merged,
+        modelVersion: 'memo',
+      },
+    });
+
+    const { report } = await runDedupForProfile(args);
+    expect(report.memoHits).toBe(1);
+    expect(report.failures).toBe(0);
+    expect(report.merges).toBe(1);
+  });
+
   it('does not call LLM when cap is already hit', async () => {
     const candidate = makeFact({ id: 'c1' });
     const neighbour = makeFact({ id: 'n1', text: 'neighbour' });
@@ -310,6 +384,7 @@ describe('runDedupForProfile', () => {
         ok: true,
         decision: { action: 'keep_both' },
         modelVersion: 'v1',
+        provider: 'anthropic',
       },
     });
 
@@ -339,6 +414,7 @@ describe('runDedupForProfile', () => {
       ok: true,
       decision: { action: 'merge', merged_text: 'fractions arithmetic' },
       modelVersion: 'v1',
+      provider: 'anthropic',
     };
 
     // Build a tx that returns fresh candidate and fresh neighbour for the in-tx selects
@@ -425,6 +501,7 @@ describe('runDedupForProfile', () => {
       ok: true,
       decision: { action: 'supersede' },
       modelVersion: 'v1',
+      provider: 'anthropic',
     };
 
     const freshCandidate = makeFact({ id: 'c1', supersededBy: null });
@@ -506,6 +583,7 @@ describe('runDedupForProfile', () => {
       ok: true,
       decision: { action: 'keep_both' },
       modelVersion: 'v1',
+      provider: 'anthropic',
     };
 
     const freshCandidate = makeFact({ id: 'c1', supersededBy: null });
@@ -587,6 +665,7 @@ describe('runDedupForProfile', () => {
       ok: true,
       decision: { action: 'discard_new' },
       modelVersion: 'v1',
+      provider: 'anthropic',
     };
 
     const freshCandidate = makeFact({ id: 'c1', supersededBy: null });
