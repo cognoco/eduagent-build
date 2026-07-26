@@ -464,10 +464,55 @@ describe('[WI-2628] false-positive controls', () => {
     expect(result.classification).toBe('ambiguous');
   });
 
-  it('does not treat a bare clinical term as a person name', () => {
+  // THE PERSON-NAME RULE, IN THREE PARTS. A blanket "any clinical term is never
+  // a person name" is WRONG and was a measured regression: it rejected `Tea` and
+  // `Add` as person names in every language and downgraded `Tea has ADHD.` from
+  // `block` to `refer`. The rule is scope-limited and, for the attributed-only
+  // acronyms, case-sensitive. All three parts below must hold together.
+  it('does not treat a bare STANDALONE clinical term as a person name', () => {
     // "Dyslexia is a reading difference" — capitalized lexeme, not a person.
     const result = scanAsLlm('Dyslexia is a reading difference.', 'en');
     expect(result.classification).not.toBe('block');
+  });
+
+  it('does not treat an all-caps attributed-only ACRONYM as a person name', () => {
+    // `TEA` is the condition being defined here, not someone called Tea. Without
+    // the acronym rejection this matches a named pattern with person="TEA" and
+    // hard-blocks a definitional sentence with no judge appeal.
+    const result = scanAsLlm('TEA es un trastorno del espectro autista.', 'es');
+    expect(result.classification).not.toBe('block');
+    expect(result.classification).toBe('ambiguous');
+  });
+
+  it('DOES treat a title-case homograph of an acronym as a person name', () => {
+    // `Tea` is a real given name (Italian, Croatian, Finnish, Albanian), so a
+    // clinical attribution to it is known-person attribution under AC-3 and must
+    // block deterministically — in Spanish too, where TEA is also the acronym.
+    for (const [text, language] of [
+      ['Tea has ADHD.', 'en'],
+      ['Add has dyslexia.', 'en'],
+      ['Tea ha ADHD.', 'it'],
+      ['Tea tiene ADHD.', 'es'],
+    ] as ReadonlyArray<[string, ConversationLanguage]>) {
+      const result = scanAsLlm(text, language);
+      expect(result.classification).toBe('block');
+      expect(result.disposition).toBe('block');
+      expect(result.reason).toBe('person_attribution');
+    }
+  });
+
+  it('keeps the person-name block on user provenance, with the right reason', () => {
+    // Not just "still blocks": the reason code must stay `person_attribution`.
+    // The widening downgraded this to the fail-closed `unclear`, which reports a
+    // different finding for the same text.
+    const result = scanLearningText({
+      text: 'Tea has ADHD.',
+      conversationLanguage: 'en',
+      provenance: 'user',
+      fieldKind: 'note_text',
+    });
+    expect(result.disposition).toBe('block');
+    expect(result.reason).toBe('person_attribution');
   });
 
   it('keeps ordinary subject matter clear across all ten languages', () => {
@@ -724,6 +769,72 @@ describe('[WI-2628] attributed-only lexeme scope', () => {
       expect(result.protectedLexemeCount).toBe(0);
     },
   );
+
+  // THE MATRIX, not a diagonal. The declaring-language diagonal (each string
+  // under its own language) is the direction we already believed in, and testing
+  // only along it hid a hole: the attributed-only grammars were per-declared-
+  // language, so `El alumno tiene TEA.` classified `clear` under all nine other
+  // declared languages while the standalone path fails closed under all ten.
+  // AC-2 requires cross-language phrases to be caught, and this module's
+  // `cross-language phrases` suite already asserts that symmetry for the
+  // standalone scope. Every row below crosses the axis instead of following it.
+  const ALL_LANGUAGES = Object.keys(
+    LANGUAGE_CORPORA,
+  ) as readonly ConversationLanguage[];
+
+  const ATTRIBUTED_STRINGS: readonly string[] = SCOPE_PAIRS.flatMap((pair) => [
+    pair.attributed,
+    pair.possessive,
+  ]);
+
+  /** Mentions + English homographs + the cross-grammar leak controls. */
+  const MUST_STAY_CLEAR: readonly string[] = [
+    ...SCOPE_PAIRS.map((pair) => pair.mention),
+    'The learner has tea.',
+    'The learner has ads.',
+    'The student has add.',
+    'I have tea with breakfast every morning.',
+    'The user has ads blocked in the browser.',
+    'You can add two numbers to get a sum.',
+  ];
+
+  it('covers all ten declared languages in the matrix', () => {
+    expect(ALL_LANGUAGES).toHaveLength(10);
+    expect(ATTRIBUTED_STRINGS).toHaveLength(6);
+    expect(MUST_STAY_CLEAR).toHaveLength(9);
+  });
+
+  describe.each(ALL_LANGUAGES)('declared %s', (language) => {
+    it.each(ATTRIBUTED_STRINGS)(
+      'blocks the attributed use regardless of declared language: %s',
+      (text) => {
+        const result = scanAsLlm(text, language);
+        expect(result.classification).toBe('block');
+        expect(result.disposition).toBe('block');
+        expect(result.protectedLexemeCount).toBeGreaterThan(0);
+      },
+    );
+
+    it.each(MUST_STAY_CLEAR)(
+      'keeps the mention/homograph clear regardless of declared language: %s',
+      (text) => {
+        const result = scanAsLlm(text, language);
+        expect(result.classification).toBe('clear');
+        expect(result.disposition).toBe('clear');
+        expect(result.protectedLexemeCount).toBe(0);
+      },
+    );
+  });
+
+  it('takes the hedge reason from the set that matched, not the declared language', () => {
+    // A Spanish hedge under a declared `en`: the always-on Spanish set matches,
+    // and `probablemente` is in NO English marker list. Reading the declared
+    // language's markers here reports `person_attribution` for what is plainly a
+    // diagnostic inference.
+    const result = scanAsLlm('El alumno probablemente tiene TEA.', 'en');
+    expect(result.classification).toBe('block');
+    expect(result.reason).toBe('diagnostic_inference');
+  });
 
   it('blocks a named-person attributed-only attribution', () => {
     const result = scanAsLlm('Petr tiene TEA.', 'es');

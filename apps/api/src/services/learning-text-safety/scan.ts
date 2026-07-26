@@ -266,56 +266,65 @@ const CONTRACTIONS: ReadonlyArray<readonly [RegExp, string]> = [
 
 const STARTS_WITH_UPPERCASE_LETTER = /^\p{Lu}/u;
 /**
- * A capture that is nothing but a clinical term. Spans BOTH scopes — an
- * attributed-only acronym ("TEA es …") must not be mistaken for a person name
- * any more than a broad one ("Dyslexia is …") is.
+ * A capture that is nothing but a STANDALONE clinical term ("Dyslexia is a
+ * reading difference"). Scope-limited on purpose: adding the `attributed-only`
+ * acronyms here globally rejected `Tea`/`Add` as person names in EVERY language
+ * and downgraded `Tea has ADHD.` from `block` to `refer` — `Tea` is a real given
+ * name (Italian, Croatian, Finnish, Albanian). The acronym case is handled
+ * per-set and case-sensitively instead; see `acronymRejectRe`.
  */
-const LEXEME_ONLY_RE = new RegExp(
-  `^(?:${ANY_LEXEME_ALT}|${alternation(termsAcrossCorpora('within-attribution'))})$`,
-  'iu',
-);
+const LEXEME_ONLY_RE = new RegExp(`^(?:${ANY_LEXEME_ALT})$`, 'iu');
 
-interface CompiledGrammar {
+/**
+ * One corpus's attribution constructions, compiled against ONE lexeme slot.
+ *
+ * Two kinds of set exist, and the split is the whole design:
+ *   - a STANDALONE set — the declared language + English, slot = every
+ *     standalone lexeme. Identical to the pre-attributed-only behaviour.
+ *   - an ATTRIBUTED-ONLY set — one per corpus that declares such terms, slot =
+ *     ONLY that corpus's own attributed-only terms, and ALWAYS ACTIVE whatever
+ *     the declared language. `El alumno tiene TEA` must block when a learner's
+ *     declared language is English too (AC-2's "catches cross-language phrases",
+ *     and the symmetry the `cross-language phrases` suite already asserts for
+ *     the standalone scope). Independent per-language grammars, NOT a shared
+ *     slot: "The learner has tea" still cannot match, because Spanish
+ *     attribution phrases do not match English syntax.
+ */
+interface AttributionPatternSet {
   /** Patterns whose match is by itself person-attribution. */
   readonly patterns: readonly RegExp[];
   /** Patterns yielding a `person` group that must look like a name. */
   readonly namedPatterns: readonly RegExp[];
-  readonly inferenceRe: RegExp | null;
   /**
-   * Matchers for the `within-attribution` terms of the corpora in play. Used
-   * ONLY to attribute a lexeme count to a found attribution span — never to
-   * detect a lexeme on its own.
+   * This corpus's attributed-only terms, rejected as a person name ONLY when the
+   * capture is written in the all-caps acronym form. `TEA es un trastorno …`
+   * (all-caps) is the condition being defined, not a person; `Tea tiene ADHD.`
+   * (title case) is a person. Casing is the one deterministic signal that
+   * separates them, so both stay correct. Null when the corpus declares none.
    */
-  readonly attributedOnlyMatchers: readonly RegExp[];
+  readonly acronymRejectRe: RegExp | null;
+  /** Hedge markers of THIS set's corpus — the reason code follows the match. */
+  readonly inferenceRe: RegExp | null;
 }
 
-function compileGrammar(declared: ConversationLanguage): CompiledGrammar {
-  // Grammar = the declared language PLUS English. English is the near-universal
-  // embedding host ("Petr má ADHD", "the learner has dyslexie"), and applying
-  // every language's grammar to every text invites cross-language false
-  // positives on the hard-fail path.
-  const corpora: LanguageCorpus[] =
-    declared === 'en'
-      ? [LANGUAGE_CORPORA.en]
-      : [LANGUAGE_CORPORA[declared], LANGUAGE_CORPORA.en];
+interface CompiledGrammar {
+  /**
+   * Standalone sets for the declared language (+ English) followed by the
+   * always-on attributed-only sets. Order is irrelevant to correctness — the
+   * first match wins and every match blocks.
+   */
+  readonly sets: readonly AttributionPatternSet[];
+}
 
+function buildPatternSet(
+  corpus: LanguageCorpus,
+  lexemeSlot: string,
+): AttributionPatternSet {
   const patterns: RegExp[] = [];
   const namedPatterns: RegExp[] = [];
 
-  for (const corpus of corpora) {
-    // THE LEXEME SLOT IS PER-CORPUS, NOT SHARED. Standalone terms from all ten
-    // corpora, plus the `within-attribution` terms of THIS corpus only. That
-    // language scoping is what keeps the homographs safe: `El alumno tiene TEA`
-    // matches through the Spanish grammar, while the English grammar — compiled
-    // alongside it for every non-English language — has no `tea` in its slot, so
-    // "The learner has tea" cannot match through either. Hoisting this into a
-    // single shared alternation would silently reintroduce exactly the
-    // cross-language false positives the omission was avoiding.
-    const attributedOnly = termsFor(corpus, 'within-attribution');
-    const lexeme = attributedOnly.length
-      ? `(?:${ANY_LEXEME_ALT}|${alternation(attributedOnly)})`
-      : `(?:${ANY_LEXEME_ALT})`;
-
+  {
+    const lexeme = lexemeSlot;
     const determiner = corpus.determiners.length
       ? `(?:(?:${alternation(corpus.determiners)})\\s+)?`
       : '';
@@ -380,16 +389,59 @@ function compileGrammar(declared: ConversationLanguage): CompiledGrammar {
     }
   }
 
-  const markers = corpora.flatMap((corpus) => corpus.inferenceMarkers);
+  const attributedOnly = termsFor(corpus, 'within-attribution');
   return {
     patterns,
     namedPatterns,
-    inferenceRe: markers.length
-      ? new RegExp(`(?:${alternation(markers)})`, 'iu')
+    acronymRejectRe: attributedOnly.length
+      ? new RegExp(`^(?:${alternation(attributedOnly)})$`, 'iu')
       : null,
-    attributedOnlyMatchers: buildLexemeMatchers(
-      corpora.flatMap((corpus) => termsFor(corpus, 'within-attribution')),
-    ),
+    inferenceRe: corpus.inferenceMarkers.length
+      ? new RegExp(`(?:${alternation(corpus.inferenceMarkers)})`, 'iu')
+      : null,
+  };
+}
+
+/**
+ * ALWAYS-ON, one per declaring corpus. Built once at module load: these do not
+ * depend on the declared language, which is the point — an attributed-only term
+ * is otherwise reachable by no grammar at all outside its own language, so the
+ * ruling's three named strings would classify `clear` in nine of ten declared
+ * languages while the standalone path fails closed in all ten.
+ */
+const ATTRIBUTED_ONLY_SETS: readonly AttributionPatternSet[] =
+  CORPUS_LANGUAGES.flatMap((language) => {
+    const corpus = LANGUAGE_CORPORA[language];
+    const terms = termsFor(corpus, 'within-attribution');
+    return terms.length
+      ? [buildPatternSet(corpus, `(?:${alternation(terms)})`)]
+      : [];
+  });
+
+/** Matchers for EVERY corpus's attributed-only terms — count attribution only. */
+const ATTRIBUTED_ONLY_MATCHERS = buildLexemeMatchers(
+  termsAcrossCorpora('within-attribution'),
+);
+
+function compileGrammar(declared: ConversationLanguage): CompiledGrammar {
+  // Standalone grammar = the declared language PLUS English. English is the
+  // near-universal embedding host ("Petr má ADHD", "the learner has dyslexie"),
+  // and applying every language's grammar to every text invites cross-language
+  // false positives on the hard-fail path. The attributed-only sets are exempt
+  // from that concern precisely because their slot holds three acronyms rather
+  // than every clinical term in ten languages.
+  const corpora: LanguageCorpus[] =
+    declared === 'en'
+      ? [LANGUAGE_CORPORA.en]
+      : [LANGUAGE_CORPORA[declared], LANGUAGE_CORPORA.en];
+
+  return {
+    sets: [
+      ...corpora.map((corpus) =>
+        buildPatternSet(corpus, `(?:${ANY_LEXEME_ALT})`),
+      ),
+      ...ATTRIBUTED_ONLY_SETS,
+    ],
   };
 }
 
@@ -481,28 +533,56 @@ function resolveCorpusConfidence(
     : 'model-generated';
 }
 
+/** A capture written entirely in caps — the acronym form, not a name form. */
+function isAcronymForm(person: string): boolean {
+  // The lowercase comparison keeps a caseless script (which equals its own
+  // upper-case form) from trivially satisfying "all caps".
+  return person === person.toUpperCase() && person !== person.toLowerCase();
+}
+
 /** A `person` capture that is a plausible name, not a bare clinical term. */
-function looksLikePersonName(person: string | undefined): boolean {
-  return (
-    person !== undefined &&
-    STARTS_WITH_UPPERCASE_LETTER.test(person) &&
-    !LEXEME_ONLY_RE.test(person)
-  );
+function looksLikePersonName(
+  person: string | undefined,
+  set: AttributionPatternSet,
+): boolean {
+  if (person === undefined) return false;
+  if (!STARTS_WITH_UPPERCASE_LETTER.test(person)) return false;
+  if (LEXEME_ONLY_RE.test(person)) return false;
+  // Scope-limited AND case-sensitive: reject `TEA` (the Spanish acronym being
+  // defined) while accepting `Tea` (a given name in several languages).
+  if (
+    set.acronymRejectRe !== null &&
+    isAcronymForm(person) &&
+    set.acronymRejectRe.test(person)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+interface AttributionMatch {
+  readonly span: string;
+  /** Hedge markers of the SET that matched — never the declared language's. */
+  readonly inferenceRe: RegExp | null;
 }
 
 function findAttribution(
   normalized: string,
   grammar: CompiledGrammar,
-): string | null {
-  for (const pattern of grammar.patterns) {
-    pattern.lastIndex = 0;
-    const match = pattern.exec(normalized);
-    if (match) return match[0];
-  }
-  for (const pattern of grammar.namedPatterns) {
-    pattern.lastIndex = 0;
-    for (const match of normalized.matchAll(pattern)) {
-      if (looksLikePersonName(match.groups?.['person'])) return match[0];
+): AttributionMatch | null {
+  for (const set of grammar.sets) {
+    for (const pattern of set.patterns) {
+      pattern.lastIndex = 0;
+      const match = pattern.exec(normalized);
+      if (match) return { span: match[0], inferenceRe: set.inferenceRe };
+    }
+    for (const pattern of set.namedPatterns) {
+      pattern.lastIndex = 0;
+      for (const match of normalized.matchAll(pattern)) {
+        if (looksLikePersonName(match.groups?.['person'], set)) {
+          return { span: match[0], inferenceRe: set.inferenceRe };
+        }
+      }
     }
   }
   return null;
@@ -527,7 +607,7 @@ export function scanLearningText(
     ...standaloneLexemes,
     ...(attribution === null
       ? []
-      : findLexemes(attribution, grammar.attributedOnlyMatchers)),
+      : findLexemes(attribution.span, ATTRIBUTED_ONLY_MATCHERS)),
   ]);
   const protectedLexemeCount = matchedLexemes.size;
 
@@ -548,8 +628,11 @@ export function scanLearningText(
   // block-with-count-0 instead, which `scan.test.ts` asserts against.
   if (attribution !== null) {
     // A hedge inside the matched span makes this an inference rather than an
-    // assertion — both block, with distinguishable reasons.
-    const hedged = grammar.inferenceRe?.test(attribution) ?? false;
+    // assertion — both block, with distinguishable reasons. The markers come
+    // from the set that MATCHED, not from the declared language: an always-on
+    // attributed-only set can match Spanish prose under a declared `en`, whose
+    // marker list has no `probablemente`.
+    const hedged = attribution.inferenceRe?.test(attribution.span) ?? false;
     return {
       ...base,
       classification: 'block',
