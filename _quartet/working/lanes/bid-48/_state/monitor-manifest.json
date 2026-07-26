@@ -1,0 +1,48 @@
+{
+  "_comment": "Standalone no-Clacks topology: these are required direct authoritative polling loops, not bus watchers.",
+  "role": "shepherd",
+  "monitors": [
+    {
+      "target": "BID-48 live Brief, membership relation, Status, and gates",
+      "purpose": "detect membership drift, new authority gates, and batch-state changes",
+      "command": "Notion fetch/query of BID-48 and its Work Items; direct data-source REST query when connector query quota is exhausted",
+      "task-id": "inline-direct-poll"
+    },
+    {
+      "target": "BID-48 Work Item claims and lifecycle state",
+      "purpose": "detect expired claims, review bounces, and ordinary lifecycle work",
+      "command": "Cosmo execute fetch plus live Work Item relation query (connector or authenticated REST fallback)",
+      "task-id": "inline-direct-poll"
+    },
+    {
+      "target": "eduagent-build PRs #2636, #2637, #2638, #2640, #2642, #2643, #2644, #2646, #2647, #2649, #2651, checks, reviews, merge state, and origin/main",
+      "purpose": "enforce strict-green landing and landed completion evidence",
+      "command": "gh PR/check/review queries and git fetch/rev-parse",
+      "task-id": "inline-direct-poll"
+    },
+    {
+      "target": "cosmo-reviewer-watch.service and Reviewing BID-48 members",
+      "purpose": "detect independent-review pickup, source-artifact outcomes, bounces, and Close",
+      "command": "systemd journal plus direct Cosmo Work Item state queries",
+      "task-id": "inline-direct-poll"
+    },
+    {
+      "target": "external WI-2718 / WI-2725 and eduagent-build PR #2581",
+      "purpose": "detect release of WI-2636's recorded documentation-review dependency without taking over its authority",
+      "command": "Cosmo relation query plus gh PR/check/review queries",
+      "task-id": "inline-direct-poll"
+    },
+    {
+      "target": "external BID-19 member WI-2239 and rework PR #2591",
+      "purpose": "detect release of the cross-batch strict-green dependency while preserving BID-19 ownership",
+      "command": "direct Cosmo Work Item query plus gh PR/check/review queries",
+      "task-id": "inline-direct-poll"
+    },
+    {
+      "target": "external WI-2788",
+      "purpose": "track the separately owned database seed/reset variants that bound WI-2795's diagnostic scope",
+      "command": "direct Cosmo Work Item and Delivery Batch queries",
+      "task-id": "inline-direct-poll"
+    }
+  ]
+}
