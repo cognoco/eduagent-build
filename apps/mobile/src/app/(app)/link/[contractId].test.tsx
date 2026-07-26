@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -19,6 +20,7 @@ jest.mock(
 
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
+const mockCanGoBack = jest.fn(() => true);
 let mockActiveProfileId = '00000000-0000-4000-8000-000000000003';
 const mockParams: Record<string, string> = {
   contractId: '00000000-0000-4000-8000-000000000001',
@@ -28,10 +30,15 @@ const mockParams: Record<string, string> = {
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
-  useRouter: () => ({ back: mockBack, replace: mockReplace }),
+  useRouter: () => ({
+    back: mockBack,
+    canGoBack: mockCanGoBack,
+    replace: mockReplace,
+  }),
 }));
 
-jest.mock( /* gc1-allow: route test controls active person identity for supporter/supportee branches */
+jest.mock(
+  /* gc1-allow: route test controls active person identity for supporter/supportee branches */
   '../../../lib/profile',
   () => ({
     useProfile: () => ({
@@ -42,7 +49,8 @@ jest.mock( /* gc1-allow: route test controls active person identity for supporte
 
 const mockFetch = createRoutedMockFetch();
 
-jest.mock( /* gc1-allow: transport-boundary test uses routed Hono fetch mock */
+jest.mock(
+  /* gc1-allow: transport-boundary test uses routed Hono fetch mock */
   '../../../lib/api-client',
   () => {
     const {
@@ -91,50 +99,50 @@ describe('LinkContractScreen', () => {
     mockParams.supporteeName = 'Emma';
     mockParams.supporterName = 'Zuzana';
     mockActiveProfileId = CONTRACT.supporterPersonId;
+    mockCanGoBack.mockReturnValue(true);
   });
 
-  it(
-    'loads the visibility contract and accepts for the active side',
-    async () => {
-      mockFetch.setRoute(
-        '/visibility/links/',
-        (url: string, init?: RequestInit) => {
-          if (url.endsWith('/contract')) return CONTRACT;
-          if (url.endsWith('/accept')) {
-            return {
-              ...CONTRACT,
-              supporterAcceptedAt: '2026-06-20T12:01:00.000Z',
-            };
-          }
-          return new Response(JSON.stringify({}), {
-            status: 404,
-            headers: { 'Content-Type': 'application/json' },
-          });
-        },
-      );
+  it('loads the visibility contract and accepts for the active side', async () => {
+    mockFetch.setRoute(
+      '/visibility/links/',
+      (url: string, init?: RequestInit) => {
+        if (url.endsWith('/contract')) return CONTRACT;
+        if (url.endsWith('/accept')) {
+          return {
+            ...CONTRACT,
+            supporterAcceptedAt: '2026-06-20T12:01:00.000Z',
+          };
+        }
+        return new Response(JSON.stringify({}), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    );
 
-      renderScreen();
+    renderScreen();
 
-      await screen.findByTestId('visibility-contract-card');
-      screen.getByText('Visibility contract');
-      screen.getByText('You are asking to support Emma.');
-      screen.getByText('Private chats, notes and journal artifacts stay hidden.');
+    await screen.findByTestId('visibility-contract-card');
+    screen.getByText('Visibility contract');
+    screen.getByText('You are asking to support Emma.');
+    screen.getByText('Private chats, notes and journal artifacts stay hidden.');
 
-      fireEvent.press(screen.getByTestId('visibility-contract-accept'));
+    fireEvent.press(screen.getByTestId('visibility-contract-accept'));
 
-      await waitFor(() =>
-        expect(fetchCallsMatching(mockFetch, '/accept')).toHaveLength(1),
-      );
-      const body = extractJsonBody<{ actorPersonId: string; audience: string }>(
-        fetchCallsMatching(mockFetch, '/accept')[0]?.init,
-      );
-      expect(body).toEqual({
-        actorPersonId: '00000000-0000-4000-8000-000000000003',
-        audience: 'supporter',
-      });
-    },
-    10_000,
-  );
+    await waitFor(() =>
+      expect(fetchCallsMatching(mockFetch, '/accept')).toHaveLength(1),
+    );
+    const body = extractJsonBody<{
+      actorPersonId: string;
+      audience: string;
+      contractVersion: number;
+    }>(fetchCallsMatching(mockFetch, '/accept')[0]?.init);
+    expect(body).toEqual({
+      actorPersonId: '00000000-0000-4000-8000-000000000003',
+      audience: 'supporter',
+      contractVersion: CONTRACT.contractVersion,
+    });
+  }, 10_000);
 
   it('shows review and revoke actions after both sides accepted', async () => {
     mockActiveProfileId = CONTRACT.supporteePersonId;
@@ -174,6 +182,9 @@ describe('LinkContractScreen', () => {
     const revokeCall = fetchCallsMatching(mockFetch, '/revoke')[0];
     expect(revokeCall?.url).toContain(CONTRACT.supportershipId);
     expect(revokeCall?.url).not.toContain(CONTRACT.id);
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor'),
+    );
   });
 
   it('does not expose agreement actions to a non-party viewer', async () => {
@@ -196,5 +207,149 @@ describe('LinkContractScreen', () => {
 
     expect(screen.queryByTestId('visibility-contract-accept')).toBeNull();
     expect(screen.queryByTestId('visibility-contract-revoke')).toBeNull();
+  });
+
+  it('returns a historyless contract deep link to the V2 Mentor root', async () => {
+    mockCanGoBack.mockReturnValue(false);
+    mockFetch.setRoute('/visibility/links/', (url: string) => {
+      if (url.endsWith('/contract')) return CONTRACT;
+      return {};
+    });
+
+    renderScreen();
+
+    await screen.findByTestId('visibility-contract-card');
+    fireEvent.press(screen.getByTestId('visibility-link-back'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('fails closed for a lapsed invite and keeps a safe return action', async () => {
+    mockActiveProfileId = CONTRACT.supporteePersonId;
+    mockFetch.setRoute('/visibility/links/', (url: string) => {
+      if (url.endsWith('/contract')) {
+        return {
+          ...CONTRACT,
+          status: 'lapsed',
+          supporterAcceptedAt: null,
+          supporteeAcceptedAt: null,
+        };
+      }
+      return {};
+    });
+
+    renderScreen();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('visibility-contract-card')).toBeTruthy(),
+    );
+    expect(screen.queryByTestId('visibility-contract-accept')).toBeNull();
+    expect(screen.queryByTestId('visibility-link-review')).toBeNull();
+    expect(screen.queryByTestId('visibility-contract-revoke')).toBeNull();
+    expect(screen.getByTestId('visibility-link-back')).toBeTruthy();
+  });
+
+  it('requires both sides to reaccept a restamped contract', async () => {
+    mockActiveProfileId = CONTRACT.supporteePersonId;
+    mockFetch.setRoute('/visibility/links/', (url: string) => {
+      if (url.endsWith('/contract')) {
+        return {
+          ...CONTRACT,
+          status: 'restamped',
+          contractVersion: 2,
+          supporterAcceptedAt: null,
+          supporteeAcceptedAt: null,
+        };
+      }
+      return {};
+    });
+
+    renderScreen();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('visibility-contract-card')).toBeTruthy(),
+    );
+    expect(screen.getByTestId('visibility-contract-accept')).toBeTruthy();
+    expect(screen.queryByTestId('visibility-link-review')).toBeNull();
+    expect(screen.queryByTestId('visibility-contract-revoke')).toBeNull();
+  });
+
+  it('refetches after a stale-version conflict and requires a fresh explicit accept', async () => {
+    let contractReads = 0;
+    let acceptCalls = 0;
+    let resolveRestampedContract!: (value: unknown) => void;
+    const restampedContract = {
+      ...CONTRACT,
+      status: 'restamped' as const,
+      contractVersion: 2,
+    };
+    const deferredRestampedContract = new Promise<unknown>((resolve) => {
+      resolveRestampedContract = resolve;
+    });
+    mockFetch.setRoute(
+      '/visibility/links/',
+      (url: string, init?: RequestInit) => {
+        if (url.endsWith('/contract')) {
+          contractReads += 1;
+          return contractReads === 1 ? CONTRACT : deferredRestampedContract;
+        }
+        if (url.endsWith('/accept')) {
+          acceptCalls += 1;
+          if (acceptCalls === 1) {
+            return new Response(
+              JSON.stringify({
+                code: 'CONFLICT',
+                message:
+                  'This visibility contract changed. Review the current version before accepting.',
+              }),
+              {
+                status: 409,
+                headers: { 'Content-Type': 'application/json' },
+              },
+            );
+          }
+          return {
+            ...CONTRACT,
+            status: 'restamped',
+            contractVersion: 2,
+            supporterAcceptedAt: '2026-06-20T12:03:00.000Z',
+          };
+        }
+        return new Response(JSON.stringify({}), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    );
+
+    renderScreen();
+    fireEvent.press(await screen.findByTestId('visibility-contract-accept'));
+    await screen.findByTestId('visibility-link-accept-error');
+
+    fireEvent.press(screen.getByTestId('visibility-link-accept-retry'));
+    await waitFor(() => expect(contractReads).toBe(2));
+    expect(fetchCallsMatching(mockFetch, '/accept')).toHaveLength(1);
+    expect(screen.queryByTestId('visibility-contract-accept')).toBeNull();
+    expect(screen.getByTestId('visibility-link-accept-error')).toBeTruthy();
+
+    await act(async () => {
+      resolveRestampedContract(restampedContract);
+      await deferredRestampedContract;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('visibility-contract-accept')).toBeTruthy(),
+    );
+    expect(screen.queryByTestId('visibility-link-accept-error')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('visibility-contract-accept'));
+    await waitFor(() =>
+      expect(fetchCallsMatching(mockFetch, '/accept')).toHaveLength(2),
+    );
+    const body = extractJsonBody<{ contractVersion: number }>(
+      fetchCallsMatching(mockFetch, '/accept')[1]?.init,
+    );
+    expect(body?.contractVersion).toBe(2);
   });
 });

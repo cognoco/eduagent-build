@@ -4546,7 +4546,6 @@
       "activeMessage": "Du kannst diese Vereinbarung hier jederzeit überprüfen.",
       "revoke": "Freigabe beenden",
       "revoking": "Freigabe wird beendet ...",
-      "revoked": "Die Freigabe wird beendet. Der Unterstützer erhält eine Benachrichtigung.",
       "revokeErrorTitle": "Freigabe konnte nicht beendet werden",
       "missingActor": "Wir konnten die aktive Person nicht identifizieren.",
       "relationLabel": "Beziehung",
