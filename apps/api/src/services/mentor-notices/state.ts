@@ -273,6 +273,37 @@ export async function applyMentorNoticeOutcome(
   return updated;
 }
 
+/**
+ * [WI-2627] The inactivity window a mentor notice must stay inside to remain
+ * eligible, in days. ONE constant, because it now bounds two different things:
+ * the nightly fade WRITE and the read-time collection FILTER. Two numbers would
+ * drift, and a collection window wider than the fade window is exactly the
+ * re-enable hole this closes.
+ */
+export const MENTOR_NOTICE_INACTIVITY_DAYS = 21;
+
+/**
+ * [WI-2627] "Last activity" for a mentor notice — the newest of its creation and
+ * any offer / defer / recheck touch.
+ *
+ * Extracted from {@link fadeStaleMentorNotices}, whose WHERE clause was the only
+ * definition, so the read-time filter in `now-feed.ts`'s
+ * `collectMentorNoticeCandidates` applies the SAME expression. Filtering on
+ * `createdAt` alone there would have been the near-miss: an old notice the
+ * learner deferred yesterday is ACTIVE, and excluding it would hide a live
+ * notice rather than a stale one.
+ */
+export function mentorNoticeLastActivityExpr() {
+  return sql`greatest(${mentorNotices.createdAt}, coalesce(${mentorNotices.lastOfferedAt}, '-infinity'::timestamptz), coalesce(${mentorNotices.lastDeferredAt}, '-infinity'::timestamptz), coalesce(${mentorNotices.lastRecheckAt}, '-infinity'::timestamptz))`;
+}
+
+/** [WI-2627] The inactivity cutoff instant for a given `now`. */
+export function mentorNoticeInactivityCutoff(now: Date): Date {
+  return new Date(
+    now.getTime() - MENTOR_NOTICE_INACTIVITY_DAYS * 24 * 60 * 60 * 1000,
+  );
+}
+
 export async function fadeStaleMentorNotices(
   db: Database,
   cutoff: Date,
@@ -288,10 +319,7 @@ export async function fadeStaleMentorNotices(
     .where(
       and(
         eq(mentorNotices.status, 'open'),
-        lt(
-          sql`greatest(${mentorNotices.createdAt}, coalesce(${mentorNotices.lastOfferedAt}, '-infinity'::timestamptz), coalesce(${mentorNotices.lastDeferredAt}, '-infinity'::timestamptz), coalesce(${mentorNotices.lastRecheckAt}, '-infinity'::timestamptz))`,
-          cutoff,
-        ),
+        lt(mentorNoticeLastActivityExpr(), cutoff),
       ),
     )
     .returning({ id: mentorNotices.id });

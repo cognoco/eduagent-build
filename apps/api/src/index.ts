@@ -207,6 +207,8 @@ type Bindings = {
   CHALLENGE_ROUND_RUNTIME_ENABLED?: string;
   ANSWER_EVALUATION_RUNTIME_ENABLED?: string;
   MENTOR_NOTICE_ENABLED?: string;
+  // [WI-2627] Nonnegative integer ordering rollout observations; default 0.
+  MENTOR_NOTICE_POLICY_REVISION?: string;
   MENTOR_NOTICE_PUSH_POST_MVP_ENABLED?: string;
   CHALLENGE_ROUND_COHORT_PROFILE_IDS?: string;
   CHALLENGE_ROUND_GRADER_ENABLED?: string;

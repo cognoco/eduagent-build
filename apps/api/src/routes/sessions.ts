@@ -155,6 +155,8 @@ type SessionRouteEnv = {
     CHALLENGE_ROUND_RUNTIME_ENABLED?: string;
     ANSWER_EVALUATION_RUNTIME_ENABLED?: string;
     MENTOR_NOTICE_ENABLED?: string;
+    // [WI-2627] Orders rollout observations across deployments.
+    MENTOR_NOTICE_POLICY_REVISION?: string;
     CHALLENGE_ROUND_COHORT_PROFILE_IDS?: string;
     REVIEW_CALLBACK_OPENER_ENABLED?: string;
     CHALLENGE_ROUND_GRADER_ENABLED?: string;
@@ -533,6 +535,21 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const mentorNoticeEnabled = isMentorNoticeEnabled(
         c.env.MENTOR_NOTICE_ENABLED,
       );
+      // [WI-2627] The exchange surfaces can carry a mentorNotice, so they emit
+      // the policy observation too. Derived through the SAME predicate every
+      // other notice-bearing surface uses rather than reconstructed from the
+      // flag here: an exchange is always self + consented (assertNotProxyMode
+      // plus assertExchangeConsent), so the epoch is derivable by hand — but a
+      // second derivation site is a second place the epoch can drift out of
+      // agreement with `/now`'s, and the client keys its cache on that string.
+      // Cost is one extra consent read per exchange while the rollout is ON.
+      const noticePolicy = await resolveMentorNoticeVisibility(
+        c,
+        profileId,
+        c.env.MENTOR_NOTICE_ENABLED,
+        { proxyModeHeader: c.req.header('X-Proxy-Mode') },
+        c.env.MENTOR_NOTICE_POLICY_REVISION,
+      );
       const reviewCallbackOpenerEnabled = isReviewCallbackOpenerEnabled(
         c.env.REVIEW_CALLBACK_OPENER_ENABLED,
       );
@@ -585,7 +602,10 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         // session deterministically. Do NOT strip readyToFinish here.
         const { sourceAudit: privateSourceAudit, ...clientResult } = result;
         void privateSourceAudit;
-        return c.json(clientResult);
+        return c.json({
+          ...clientResult,
+          mentorNoticePolicy: noticePolicy.observation,
+        });
       } catch (err) {
         if (err instanceof SessionExchangeLimitError) {
           return apiError(
@@ -682,6 +702,21 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const mentorNoticeEnabled = isMentorNoticeEnabled(
         c.env.MENTOR_NOTICE_ENABLED,
       );
+      // [WI-2627] The exchange surfaces can carry a mentorNotice, so they emit
+      // the policy observation too. Derived through the SAME predicate every
+      // other notice-bearing surface uses rather than reconstructed from the
+      // flag here: an exchange is always self + consented (assertNotProxyMode
+      // plus assertExchangeConsent), so the epoch is derivable by hand — but a
+      // second derivation site is a second place the epoch can drift out of
+      // agreement with `/now`'s, and the client keys its cache on that string.
+      // Cost is one extra consent read per exchange while the rollout is ON.
+      const noticePolicy = await resolveMentorNoticeVisibility(
+        c,
+        profileId,
+        c.env.MENTOR_NOTICE_ENABLED,
+        { proxyModeHeader: c.req.header('X-Proxy-Mode') },
+        c.env.MENTOR_NOTICE_POLICY_REVISION,
+      );
       const reviewCallbackOpenerEnabled = isReviewCallbackOpenerEnabled(
         c.env.REVIEW_CALLBACK_OPENER_ENABLED,
       );
@@ -728,6 +763,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               c.env?.CHALLENGE_ROUND_GRADER_ENABLED,
             ),
           },
+          noticePolicyObservation: noticePolicy.observation,
           createSseResponse: (handler) => streamSSEUtf8(c, handler),
           deps: {
             streamMessage,
@@ -957,26 +993,30 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       // caller authority (self or guardian of an uncredentialed charge).
       await assertCanReadProfile(c, profileId);
       const { sessionId } = c.req.valid('param');
+      // [WI-2627] Resolved BEFORE the summary read so the same policy answer
+      // both gates the receipt enrichment and goes on the wire — one
+      // derivation, so the emitted observation can never describe a different
+      // policy state than the one the enrichment was gated on.
+      const noticePolicy = await resolveMentorNoticeVisibility(
+        c,
+        profileId,
+        c.env.MENTOR_NOTICE_ENABLED,
+        { proxyModeHeader: c.req.header('X-Proxy-Mode') },
+        c.env.MENTOR_NOTICE_POLICY_REVISION,
+      );
       const summary = await getSessionSummary(db, profileId, sessionId, {
         // [WI-2498] V — rollout ∧ caller-is-subject ∧ subject consent. Note
         // this is strictly narrower than assertCanReadProfile above: a guardian
         // legitimately READS an uncredentialed charge's summary, but must not
         // receive the learner-private notice receipt embedded in it. V gates
         // the enrichment only, never the read.
-        // [WI-2504] Same seam; only `.visible` is consumed here. The summary
-        // is not a persisted client projection — with the flag off the server
-        // simply omits the notice receipt — so there is nothing for the epoch
-        // to invalidate and it is not put on this response.
-        mentorNoticeEnabled: (
-          await resolveMentorNoticeVisibility(
-            c,
-            profileId,
-            c.env.MENTOR_NOTICE_ENABLED,
-            { proxyModeHeader: c.req.header('X-Proxy-Mode') },
-          )
-        ).visible,
+        // [WI-2504] Same seam. [WI-2627] The observation IS now put on this
+        // response: WI-2504's reasoning was about cache invalidation (of which
+        // this surface has none), not about ORDERING a receipt against a
+        // rollback the client may already have observed elsewhere.
+        mentorNoticeEnabled: noticePolicy.visible,
       });
-      return c.json({ summary });
+      return c.json({ summary, mentorNoticePolicy: noticePolicy.observation });
     },
   )
 

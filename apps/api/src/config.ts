@@ -180,6 +180,11 @@ const envSchema = z.object({
   // prompt proposals, durable acceptance, read surfaces, routes, and jobs.
   MENTOR_NOTICE_ENABLED: z.enum(['true', 'false']).default('false'),
 
+  // [WI-2627] Monotonic ordering for mentor-notice rollout observations. See
+  // resolveMentorNoticePolicyRevision below for why a malformed value clamps
+  // to 0 rather than throwing.
+  MENTOR_NOTICE_POLICY_REVISION: z.string().optional(),
+
   // [WI-2573] Post-MVP mentor-notice PUSH boundary — separate from the in-app
   // kill switch above. MMT-ADR-0036 §3.1 makes the MVP in-app only; the nudge
   // scan/send path stays dormant behind this binding, which no MVP deployment
@@ -363,6 +368,38 @@ export function isChallengeRoundRuntimeEnabled(
 
 export function isMentorNoticeEnabled(value: string | undefined): boolean {
   return value === 'true';
+}
+
+/**
+ * [WI-2627] The mentor-notice POLICY REVISION — a nonnegative integer that
+ * orders rollout observations across deployments.
+ *
+ * WHY A REVISION AT ALL. {@link isMentorNoticeEnabled} answers "is the rollout
+ * on right now?". It cannot order two answers: a client that receives
+ * `enabled=false` and then, out of order, an older in-flight `enabled=true`
+ * has no way to know the second response is stale, so a cached notice surface
+ * can be re-enabled after an emergency flag-off. The revision is the ordering
+ * the flag alone does not carry: a client only re-enables on a STRICTLY HIGHER
+ * revision, so no arrival order can resurrect a disabled surface.
+ *
+ * DEFAULT 0 AND MALFORMED-CLAMPS-TO-0 ARE THE SAME SAFETY PROPERTY, not
+ * leniency. 0 is the LOWEST admissible revision, so a missing, non-numeric,
+ * fractional, or negative binding can never RAISE the revision a client has
+ * already observed — and re-enabling requires a strictly higher revision.
+ * A malformed value is therefore incapable of re-enabling a disabled client,
+ * which is exactly the fail-closed outcome. Throwing instead would take the
+ * whole worker down for a typo in an ordering hint, trading a contained
+ * non-event for an outage.
+ */
+export function resolveMentorNoticePolicyRevision(
+  value: string | undefined,
+): number {
+  if (value === undefined) return 0;
+  const trimmed = value.trim();
+  if (trimmed === '') return 0;
+  const parsed = Number(trimmed);
+  if (!Number.isSafeInteger(parsed) || parsed < 0) return 0;
+  return parsed;
 }
 
 /**
