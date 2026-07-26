@@ -5,8 +5,10 @@
 // callers" design that `persisted-learning-text-guard.ts` implements).
 //
 // This module lands UNWIRED. It changes no call site and no existing behavior.
-//   Stage 1 (this PR): deterministic scan + disposition + corpus + tests.
-//   Stage 2: attach the independent judge to `disposition === 'refer'`.
+//   Stage 1 (landed, 546359665): deterministic scan + disposition + corpus.
+//   Stage 2 (landed): the independent judge behind `disposition === 'refer'`.
+//   Stage 2.5 (this PR): the attributed-only lexeme scope — the corpus
+//     reachability correction the Stage-3 ruling requires before wiring.
 //   Stage 3: rewire the 8 write-time call sites + observability.
 //
 // TWO OUTPUTS, DELIBERATELY:
@@ -89,7 +91,15 @@ export interface ScanLearningTextResult {
   /** Set iff `disposition === 'block'`. Null otherwise. */
   readonly reason: LearningTextBlockReason | null;
   readonly fieldKind: LearningTextFieldKind;
-  /** Number of distinct protected lexemes found. Observability-safe (a count). */
+  /**
+   * Number of distinct protected lexemes found. Observability-safe (a count).
+   *
+   * SCOPE-DEPENDENT, so a Stage-3 log line is not over-read: a `broad` lexeme
+   * counts wherever it appears, but an `attributed-only` lexeme counts ONLY when
+   * it was found inside a matched attribution span — a bare homograph mention
+   * contributes nothing. So this is "protected lexemes that were protected HERE",
+   * not "corpus terms present in the text".
+   */
   readonly protectedLexemeCount: number;
   /**
    * Confidence of the corpora actually consulted for THIS result — the declared

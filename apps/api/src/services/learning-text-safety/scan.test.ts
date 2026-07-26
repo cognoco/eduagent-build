@@ -613,8 +613,16 @@ describe('[WI-2628] attributed-only lexeme scope', () => {
   interface ScopePair {
     readonly language: ConversationLanguage;
     readonly term: string;
-    /** Direction 1 — person-attributed use. Must block. */
+    /** Direction 1 — person-attributed use via personReference + verb. Must block. */
     readonly attributed: string;
+    /**
+     * Direction 1 via the OTHER attribution shape — a possessive determiner with
+     * no verb at all ("attribution without a verb", per the corpus). The
+     * per-corpus lexeme slot feeds every attribution pattern, so each shape that
+     * AC-3's "known-person attribution" covers is asserted at its own layer
+     * rather than inferred from the verb form passing.
+     */
+    readonly possessive: string;
     /** Direction 2 — the same term merely mentioned. Must stay clear. */
     readonly mention: string;
   }
@@ -624,18 +632,21 @@ describe('[WI-2628] attributed-only lexeme scope', () => {
       language: 'es',
       term: 'TEA',
       attributed: 'El alumno tiene TEA.',
+      possessive: 'Su TEA requiere apoyo adicional.',
       mention: 'TEA es un término diagnóstico usado en informes.',
     },
     {
       language: 'de',
       term: 'ADS',
       attributed: 'Der Schüler hat ADS.',
+      possessive: 'Seine ADS ist dokumentiert.',
       mention: 'ADS ist ein veralteter Begriff aus der Fachliteratur.',
     },
     {
       language: 'nb',
       term: 'ADD',
       attributed: 'Eleven har ADD.',
+      possessive: 'Elevens ADD er dokumentert.',
       mention: 'ADD ble tidligere brukt som begrep i faglitteraturen.',
     },
   ];
@@ -650,7 +661,15 @@ describe('[WI-2628] attributed-only lexeme scope', () => {
 
   describe.each(SCOPE_PAIRS)(
     '$language $term',
-    ({ language, attributed, mention }) => {
+    ({ language, attributed, possessive, mention }) => {
+      it('blocks the possessive attribution, which carries no verb', () => {
+        const result = scanAsLlm(possessive, language);
+        expect(result.classification).toBe('block');
+        expect(result.disposition).toBe('block');
+        expect(result.reason).toBe('person_attribution');
+        expect(result.protectedLexemeCount).toBeGreaterThan(0);
+      });
+
       it('blocks the person-attributed use', () => {
         const result = scanAsLlm(attributed, language);
         expect(result.classification).toBe('block');
@@ -744,6 +763,10 @@ describe('[WI-2628] attributed-only lexeme scope', () => {
       ...SCOPE_PAIRS.map(
         (pair) =>
           [pair.attributed, pair.language] as [string, ConversationLanguage],
+      ),
+      ...SCOPE_PAIRS.map(
+        (pair) =>
+          [pair.possessive, pair.language] as [string, ConversationLanguage],
       ),
       ['Petr tiene TEA.', 'es'],
       ['El alumno probablemente tiene TEA.', 'es'],
