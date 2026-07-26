@@ -203,3 +203,71 @@ orchestrator's KEEP recommendation: AC-1/AC-2 are integrated UI outcomes — tab
 visibility/highlight and Back-label usability can regress through layout at a small
 viewport even though the route-resolution logic itself takes no size input, so the axis is
 covered rather than reasoned away.
+
+## Rework #2 (reviewer:codex:global bounce, 2026-07-26)
+
+The independent reviewer returned the item again with one finding: the AC-5 per-axis tests
+from Rework Finding 2 were **structural proxies** — they passed without genuinely exercising
+their axis (dark/light ran only one theme; own/supporting fed hand-written `returnTo` strings
+to the pure resolver; small-phone changed only insets). Two axes were made genuine; the third
+is resolved by an operator scope ruling.
+
+### Axis 1 — dark/light themes: made genuine
+The theme mock now reads the real `design-tokens.ts` table keyed by a mutable colour-scheme,
+and the describe block runs `it.each(['light','dark'])` over `TabIcon`/`TabLabel`, asserting
+the unfocused colour **differs** between themes (`light.textSecondary` vs `dark.textSecondary`).
+Base `accent` is the same token value in both themes in design-tokens, so the cross-theme
+differ-proof is anchored on `textSecondary`. Red-green: hardcoding the light token for the dark
+case fails the dark assertion; restore → green.
+
+### Axis 2 — own vs supporting context: made genuine (producer / consumer split)
+The prior test fed hand-written `returnTo` strings to the pure resolver, and a follow-up round
+paired a **solo-owner** fixture with the own-learning flow — but `own-learning.tsx` redirects a
+solo owner (`!familyCapable && tabShape !== 'guardian'`) to `/(app)/home`, so that state is
+unreachable, and the token was still injected rather than produced. Corrected by splitting the
+axis along the seam WI-2331 actually changed (the `returnTo` **consumer**), with the token-origin
+proof driven from the real **producers** — which live behind their own screens' mock infra, so
+the proof lives in those screens' co-located tests (no new internal mocks in the layout test):
+
+- **Own-scope producer** — `own-learning.test.tsx`: a reachable family-capable/guardian fixture
+  (owner + linked child) renders `OwnLearningScreen`, asserts it does **not** redirect to
+  `/(app)/home` (reachability), reads the **real emitted** `returnToTab` prop
+  (`own-learning.tsx` wires `returnToTab={OWN_LEARNING_RETURN_TO}` into `LearnerScreen`), and
+  resolves that emitted token through `homeHrefForReturnTo` to `OWN_LEARNING_HREF`. Red-green:
+  break `own-learning.tsx`'s emitted token → the own test fails; restore → green.
+- **Supporting-scope producer** — `recaps/[recapId].test.tsx`: renders the loaded recap detail,
+  fires `recap-detail-open-session`, and asserts the **real** `router.push` call carries
+  `returnTo: FAMILY_RECAPS_RETURN_TO` (`handleOpenChildSession`), then resolves that emitted
+  token through `homeHrefForReturnTo` to the recap-detail href. Red-green: break the pushed
+  token → the supporting test fails; restore → green.
+- **Consumer** — `_layout.test.tsx`: given a *supplied* own vs supporting token, `AppLayout`'s
+  real `Tabs.Screen` wiring + `homeHrefForReturnTo` resolve the correct owning tab and the
+  **distinct** Back destination. Profile fixtures were removed (they implied a token origin this
+  test does not prove); a single neutral profile mounts the layout, and the assertion weight is
+  on the Back destination (both tokens share the Mentor catch-all highlight, so the destination
+  is the real differentiator). Red-green: swap the own-learning branch of `homeHrefForReturnTo`
+  → the own-scope case fails while the supporting-scope case still passes (proving the two are
+  independent), restore → green.
+
+### Axis 3 — small-phone layout: operator scope ruling (2026-07-26)
+The reviewer asked for a test that "supplies a small viewport/window dimension." The V2 shell
+has none to supply: tab-bar sizing reads only safe-area **insets**, floored by a minimum —
+`height = 56 + Math.max(insets.bottom, V2_TAB_BAR_MIN_BOTTOM_INSET)` in `_layout.tsx`
+(`V2_TAB_BAR_MIN_BOTTOM_INSET = 48`). There is **no `useWindowDimensions` / `Dimensions.get`
+anywhere in the render path** (`_layout.tsx`, `my-notes/index.tsx`), so a mocked viewport width
+would be inert — a fourth structural proxy, not a genuine test.
+
+**Ruling (operator, 2026-07-26): the inset + minimum-height-floor behaviour IS the genuine
+small-phone signal for this inset-driven layout.** The floor structurally guarantees the AC-1
+"bottom navigation remains visible on a small phone" invariant *regardless* of screen width: at
+`bottom: 0` (a small phone with no home-indicator gesture area) the floor forces `height: 104`
+(`56 + 48`) with `display !== 'none'`. The covering test (`'keeps the V2 tab bar visible with
+correct tab highlight at a small-phone viewport'`, alongside the all-zero-inset chrome test)
+asserts exactly this floored height and the surviving owning-tab highlight — it proves the
+guarantee the reviewer's viewport test was standing in for. Making the layout viewport-responsive
+(adding a `useWindowDimensions` read) would be net-new product behaviour, out of scope for this
+test-only Bug rework, and was declined in favour of testing the guarantee the shipped code
+actually provides. Provenance note only; the Cosmo AC-5 field is unchanged.
+
+Verification: mobile suite over the touched files green on Node 22 (144 pass / 0 fail); mobile
+typecheck and eslint clean; production source byte-identical (test-only change).
