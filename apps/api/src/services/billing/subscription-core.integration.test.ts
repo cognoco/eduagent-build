@@ -22,7 +22,7 @@
  * (no DSN / event key in test env → non-fatal).
  */
 
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import {
   membership,
   organization,
@@ -217,29 +217,47 @@ async function ensureSuiteExternalWebhookResidue(
   if (existing) return existing;
   await afterInitialMiss?.();
 
-  const [org] = await db
-    .insert(organization)
-    .values({ name: `${PREFIX}-v2-webhook-update-residue-${RUN_ID}` })
-    .returning();
-  const [owner] = await db
-    .insert(person)
-    .values({
-      displayName: 'Prior-process owner',
-      birthDate: '1985-01-01',
-      residenceJurisdiction: 'EU',
-    })
-    .returning();
-  await db.insert(membership).values({
-    personId: owner!.id,
-    organizationId: org!.id,
-    roles: ['admin'],
-  });
-  return seedV2SubscriptionDirect({
-    organizationId: org!.id,
-    ownerId: owner!.id,
-    tier: 'plus',
-    status: 'trial',
-    stripeSubscriptionId: STATIC_WEBHOOK_RESIDUE_ID,
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${STATIC_WEBHOOK_RESIDUE_ID}, 0))`,
+    );
+    const residueCreatedByConcurrentSuite =
+      await tx.query.subscription.findFirst({
+        where: eq(
+          subscriptionV2Table.stripeSubscriptionId,
+          STATIC_WEBHOOK_RESIDUE_ID,
+        ),
+      });
+    if (residueCreatedByConcurrentSuite) return residueCreatedByConcurrentSuite;
+
+    const [org] = await tx
+      .insert(organization)
+      .values({ name: `${PREFIX}-v2-webhook-update-residue-${RUN_ID}` })
+      .returning();
+    const [owner] = await tx
+      .insert(person)
+      .values({
+        displayName: 'Prior-process owner',
+        birthDate: '1985-01-01',
+        residenceJurisdiction: 'EU',
+      })
+      .returning();
+    await tx.insert(membership).values({
+      personId: owner!.id,
+      organizationId: org!.id,
+      roles: ['admin'],
+    });
+    const [subscription] = await tx
+      .insert(subscriptionV2Table)
+      .values({
+        organizationId: org!.id,
+        planTier: 'plus',
+        status: 'trial',
+        payerPersonId: owner!.id,
+        stripeSubscriptionId: STATIC_WEBHOOK_RESIDUE_ID,
+      })
+      .returning();
+    return subscription!;
   });
 }
 
