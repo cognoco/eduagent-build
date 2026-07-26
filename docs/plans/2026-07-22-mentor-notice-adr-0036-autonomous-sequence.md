@@ -92,7 +92,8 @@ Refresh the bounced review findings and reconcile the existing worktree before p
   - `dismissed/explicit_stop`
   - `deferred/explicit_not_now`
   - `continue/unclear`
-- Before turn three, `continue` and malformed or unavailable judging make no transition. At turn three, any evaluation that does not commit `locked_in`, `not_yet`, `dismissed`, or `deferred`—including valid `continue` or malformed or unavailable judging—deterministically terminalizes `not_yet`.
+- A valid `continue` makes no notice transition at any turn, including turn three. Implement attempt lifecycle separately from notice status: reaching the three-response cap after a valid `continue` ends the attempt and detaches its bookkeeping, leaving the notice unresolved and re-offerable.
+- Malformed or unavailable judging makes no transition before turn three. At turn three, an unresolved evaluation — and only an unresolved evaluation — deterministically terminalizes `not_yet`.
 - Reuse the landed WI-2501 idempotency primitive so a valid transition applies once under retries.
 - Persist only event identity needed for idempotency, never answer text, judge reasoning, or confidence.
 - Put the server-committed transition in non-stream responses and SSE done frames; mobile renders only that transition.
@@ -116,8 +117,8 @@ Tests cover cold/warm start, lower/same/higher revisions, storage failure, malfo
 - Introduce one async batch evaluator receiving named fields, Conversation Language, provenance (`user`, `llm`, or `migration`), and producer vendor for LLM output.
 - Apply NFKC/Unicode deterministic detection across English, Czech, Spanish, French, German, Italian, Portuguese, Polish, Japanese, and Norwegian Bokmål, including cross-language phrases.
 - Classify known-person attribution as block, absence of protected lexemes as clear, and uncertain educational/reference uses as ambiguous.
-- Send only ambiguous LLM-authored text with known producer identity to the independent judge. Strict allowance is `allow/educational_reference`; block reasons are `person_attribution`, `diagnostic_inference`, or `unclear`.
-- Block ambiguity from users, migrations/backfills, missing producers, unavailable judging, and malformed output without external disclosure.
+- Send ambiguous text with known producer identity to the independent judge, whether that producer is a model or a user. Strict allowance is `allow/educational_reference`; block reasons are `person_attribution`, `diagnostic_inference`, or `unclear`.
+- Refer ambiguous text to the independent judge regardless of provenance, including user-authored educational text. Block ambiguity from migrations/backfills, missing producers, unavailable judging, and malformed output without external disclosure.
 - Gate notices, notes, session-analysis Learning Profile fields, memory facts/backfill/dedup, and Needs-Deepening persistence.
 - Derived writes drop unsafe fields/records; user mutations retain `BadRequestError`. Observability records only field kind, reason, and count.
 
