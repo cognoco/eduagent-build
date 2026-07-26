@@ -981,7 +981,7 @@ Ask Anything starts without a required topic. It can resolve or ask for a subjec
 - FR5: Users can switch between learner profiles
 - FR6: Parents can switch into child's profile for full access to learning history
 - FR7: Users aged 13–17 below the Article 8 threshold for their EEA country of habitual residence can request guardian authorization during registration
-- FR8: US registration and COPPA flows are dormant because the United States and all under-13 users are outside the launch perimeter
+- FR8: Under-13 users are outside the launch perimeter, keeping COPPA parental-consent flows dormant. The United States is inside the launch perimeter via the non-EEA admission screen (`docs/compliance/2026-07-26-launch-perimeter-ruling-screen-based-allowlist.md`, Route 2; screen record `2026-07-26-us-launch-screen-record.md`), with the 13+ floor keeping COPPA dormant; US admission remains conditional on the screen's open items (DPO concurrence, WI-1116 App Store Accountability Acts resolution, risk-acceptance signature)
 - FR9: Parents can approve or decline consent via email link
 - FR10: If parent declines consent, child account is deleted immediately with no data retained
 - FR11: Users can delete their accounts and all associated data (GDPR)
