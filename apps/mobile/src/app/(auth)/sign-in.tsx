@@ -297,11 +297,19 @@ export default function SignInScreen() {
   // True when SESSION_TRANSITION_MS has elapsed but the auth guard still hasn't
   // redirected — show ErrorFallback instead of bare spinner.
   const [transitionStuck, setTransitionStuck] = useState(false);
-  const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
+  const {
+    scrollRef,
+    onFieldLayout,
+    onFieldFocus,
+    onScrollViewLayout,
+    onSubmitButtonLayout,
+  } = useKeyboardScroll();
   const {
     scrollRef: verifyScrollRef,
     onFieldLayout: onVerifyFieldLayout,
     onFieldFocus: onVerifyFieldFocus,
+    onScrollViewLayout: onVerifyScrollViewLayout,
+    onSubmitButtonLayout: onVerifySubmitButtonLayout,
   } = useKeyboardScroll();
 
   useEffect(() => {
@@ -894,10 +902,7 @@ export default function SignInScreen() {
       await startVerificationFlow(verificationOffer);
     } catch (err: unknown) {
       setError(
-        extractClerkError(
-          err,
-          'We could not start verification. Please try signing in again.',
-        ),
+        extractClerkError(err, t('auth.signIn.verificationStartFailed')),
       );
     } finally {
       setLoading(false);
@@ -907,6 +912,7 @@ export default function SignInScreen() {
     isLoaded,
     startVerificationFlow,
     verificationOffer,
+    t,
   ]);
 
   const onVerifyPress = useCallback(async () => {
@@ -952,9 +958,7 @@ export default function SignInScreen() {
       }
     } catch (err: unknown) {
       if (__DEV__) console.warn('[AUTH-DEBUG] onVerifyPress → THREW', err);
-      setError(
-        extractClerkError(err, 'Invalid verification code. Please try again.'),
-      );
+      setError(extractClerkError(err));
     } finally {
       setLoading(false);
     }
@@ -1112,6 +1116,7 @@ export default function SignInScreen() {
           }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
+          onLayout={onVerifyScrollViewLayout}
         >
           <View className="flex-1" style={{ minHeight: 40 }} />
           <Text className="text-h2 font-bold text-text-primary mb-1">
@@ -1178,14 +1183,16 @@ export default function SignInScreen() {
             />
           </View>
 
-          <Button
-            variant="primary"
-            label={t('auth.signIn.verifyButton')}
-            onPress={onVerifyPress}
-            disabled={!canSubmitCode}
-            loading={loading}
-            testID="sign-in-verify-button"
-          />
+          <View onLayout={onVerifySubmitButtonLayout}>
+            <Button
+              variant="primary"
+              label={t('auth.signIn.verifyButton')}
+              onPress={onVerifyPress}
+              disabled={!canSubmitCode}
+              loading={loading}
+              testID="sign-in-verify-button"
+            />
+          </View>
 
           {activationFailureContext === 'verification' &&
           pendingSessionActivationId ? (
@@ -1250,6 +1257,7 @@ export default function SignInScreen() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
           testID="sign-in-scroll"
+          onLayout={onScrollViewLayout}
         >
           <View testID="sign-in-content">
             <View className="items-center mt-2 mb-1">
@@ -1459,19 +1467,28 @@ export default function SignInScreen() {
                 variant="tertiary"
                 size="small"
                 label={t('auth.signIn.forgotPassword')}
-                onPress={() => router.push('/(auth)/forgot-password')}
+                onPress={() =>
+                  router.push({
+                    pathname: '/(auth)/forgot-password',
+                    params: emailAddress.trim()
+                      ? { email: emailAddress.trim() }
+                      : undefined,
+                  })
+                }
                 testID="forgot-password-link"
               />
             </View>
 
-            <Button
-              variant="primary"
-              label={t('auth.signIn.signInButton')}
-              onPress={onSignInPress}
-              disabled={!canSubmit}
-              loading={loading}
-              testID="sign-in-button"
-            />
+            <View onLayout={onSubmitButtonLayout}>
+              <Button
+                variant="primary"
+                label={t('auth.signIn.signInButton')}
+                onPress={onSignInPress}
+                disabled={!canSubmit}
+                loading={loading}
+                testID="sign-in-button"
+              />
+            </View>
             {/* BUG-414: Explain why button is disabled when fields are empty */}
             {!canSubmit && !loading && (
               <Text
