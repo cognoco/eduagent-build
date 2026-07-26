@@ -359,11 +359,13 @@ async function seedFixture(): Promise<Fixture> {
   await acceptLink(db, contract.id, {
     actorPersonId: supporter.profileId,
     audience: 'supporter',
+    contractVersion: contract.contractVersion,
     now: new Date(),
   });
   const accepted = await acceptLink(db, contract.id, {
     actorPersonId: supportee.profileId,
     audience: 'supportee',
+    contractVersion: contract.contractVersion,
     now: new Date(),
   });
   if (accepted.status !== 'accepted') {

@@ -203,6 +203,45 @@ describe('InitiateLinkScreen', () => {
     expect(body?.relation).toBe('sibling');
   }, 10_000);
 
+  it('disables create while the request is pending and does not submit twice', async () => {
+    let resolveCreate: (value: unknown) => void = () => undefined;
+    const pendingCreate = new Promise((resolve) => {
+      resolveCreate = resolve;
+    });
+    mockParams = {
+      supporteePersonId: NAMED_PROFILES.linkedChild.id,
+      supporteeName: NAMED_PROFILES.linkedChild.displayName,
+      relation: 'teacher',
+    };
+    const InitiateLinkScreen = require('./initiate').default;
+    const rendered = renderScreen(<InitiateLinkScreen />, {
+      profile: NAMED_PROFILES.guardian,
+      routes: { '/visibility/links': () => pendingCreate },
+    });
+    cleanupRender = rendered.cleanup;
+    const { routedFetch } = rendered;
+
+    fireEvent.press(screen.getByTestId('visibility-link-create'));
+    await waitFor(() =>
+      expect(fetchCallsMatching(routedFetch, '/visibility/links')).toHaveLength(
+        1,
+      ),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('visibility-link-create')).toBeDisabled(),
+    );
+    fireEvent.press(screen.getByTestId('visibility-link-create'));
+    expect(fetchCallsMatching(routedFetch, '/visibility/links')).toHaveLength(
+      1,
+    );
+
+    await act(async () => {
+      resolveCreate(CONTRACT);
+      await pendingCreate;
+    });
+  });
+
   it('selecting an existing family member shows a not-yet-available state instead of a fake flow', () => {
     renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });
 
@@ -294,7 +333,7 @@ describe('InitiateLinkScreen', () => {
       expect(mockReplace).not.toHaveBeenCalled();
     });
 
-    it('the picker back button falls back to router.replace("/(app)/home") on a historyless entry (deep link / cold start)', () => {
+    it('the picker back button falls back to the V2 Mentor root on a historyless entry', () => {
       mockCanGoBack.mockReturnValue(false);
       renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });
 
@@ -302,7 +341,7 @@ describe('InitiateLinkScreen', () => {
         screen.getByTestId('visibility-link-initiate-picker-back'),
       );
 
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor');
       expect(mockBack).not.toHaveBeenCalled();
     });
 
@@ -360,7 +399,7 @@ describe('InitiateLinkScreen', () => {
       expect(mockReplace).not.toHaveBeenCalled();
     });
 
-    it('the confirmation back button falls back to router.replace("/(app)/home") on a historyless pre-filled entry', () => {
+    it('the confirmation back button falls back to the V2 Mentor root on a historyless pre-filled entry', () => {
       mockCanGoBack.mockReturnValue(false);
       mockParams = {
         supporteePersonId: NAMED_PROFILES.linkedChild.id,
@@ -372,7 +411,7 @@ describe('InitiateLinkScreen', () => {
         screen.getByTestId('visibility-link-initiate-confirm-back'),
       );
 
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor');
       expect(mockBack).not.toHaveBeenCalled();
     });
 

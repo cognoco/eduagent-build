@@ -4319,7 +4319,6 @@
       "activeMessage": "You can review this agreement here any time.",
       "revoke": "End sharing",
       "revoking": "Ending sharing...",
-      "revoked": "Sharing is ending. The supporter will see a notice.",
       "revokeErrorTitle": "Couldn't end sharing",
       "missingActor": "We could not identify the active person."
     },
