@@ -1683,6 +1683,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(plan.every(({ shard }) => shard >= 1 && shard <= 8)).toBe(true);
   });
 
+  // Executed red/green/revert/restore receipt: docs/evidence/WI-1864/report.md
   it('[WI-1864] keeps every prose-parked flow machine-excluded from scheduled suites', () => {
     const e2eRoot = join(repoRoot, 'apps/mobile/e2e');
     const flowsRoot = join(e2eRoot, 'flows');
