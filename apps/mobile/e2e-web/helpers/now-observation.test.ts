@@ -1,7 +1,7 @@
 import type { Page, Response } from '@playwright/test';
 import {
+  armEmptySelfNowFeedObservation,
   describeMentorRenderedBranch,
-  observeEmptySelfNowFeed,
 } from './now-observation';
 
 function responseWith(
@@ -35,40 +35,31 @@ function responseWith(
   } as unknown as Response;
 }
 
-describe('observeEmptySelfNowFeed', () => {
-  it('stays pending at shell readiness until the exact authenticated empty feed arrives', async () => {
-    let resolveResponse!: (response: Response) => void;
-    let responsePredicate!: (response: Response) => boolean;
-    const responsePromise = new Promise<Response>((resolve) => {
-      resolveResponse = resolve;
-    });
+describe('armEmptySelfNowFeedObservation', () => {
+  it('does not start the bounded response wait during pre-request account readiness', async () => {
+    let onResponse!: (response: Response) => void;
     const page = {
-      waitForResponse: jest.fn((predicate: (response: Response) => boolean) => {
-        responsePredicate = predicate;
-        return responsePromise;
+      on: jest.fn((event: string, listener: (response: Response) => void) => {
+        if (event === 'response') onResponse = listener;
       }),
+      off: jest.fn(),
+      waitForResponse: jest.fn(() => new Promise<Response>(() => undefined)),
     } as unknown as Page;
 
-    const observation = observeEmptySelfNowFeed(page);
-    let settled = false;
-    void observation.then(() => {
-      settled = true;
-    });
+    const observer = armEmptySelfNowFeedObservation(page);
 
-    // The Mentor shell can already be visible while this response is held.
+    // Account bootstrap may consume the full default response timeout before
+    // the authenticated request is issued under hosted-suite contention.
     await Promise.resolve();
-    expect(settled).toBe(false);
-    expect(
-      responsePredicate(
-        responseWith({}, { url: 'https://example.test/v1/now?scope=person' }),
-      ),
-    ).toBe(false);
+    expect(page.waitForResponse).not.toHaveBeenCalled();
+    onResponse(
+      responseWith({}, { url: 'https://example.test/v1/now?scope=person' }),
+    );
 
     const response = responseWith();
-    expect(responsePredicate(response)).toBe(true);
-    resolveResponse(response);
+    onResponse(response);
 
-    await expect(observation).resolves.toEqual({
+    await expect(observer.settle()).resolves.toEqual({
       status: 200,
       authenticated: true,
       classification: {
@@ -78,11 +69,15 @@ describe('observeEmptySelfNowFeed', () => {
         generatedAtPresent: true,
       },
     });
+    expect(page.waitForResponse).not.toHaveBeenCalled();
+    observer.dispose();
   });
 
   it('reports a non-empty feed without retaining card content', async () => {
     const secretCardText = 'credential-shaped card content';
     const page = {
+      on: jest.fn(),
+      off: jest.fn(),
       waitForResponse: jest.fn().mockResolvedValue(
         responseWith({
           cards: [
@@ -98,12 +93,14 @@ describe('observeEmptySelfNowFeed', () => {
       ),
     } as unknown as Page;
 
-    await expect(observeEmptySelfNowFeed(page)).rejects.toThrow(
+    const firstObserver = armEmptySelfNowFeedObservation(page);
+    await expect(firstObserver.settle()).rejects.toThrow(
       '[now:semantic] Expected an empty self feed, received 1 card(s)',
     );
-    await expect(observeEmptySelfNowFeed(page)).rejects.not.toThrow(
-      secretCardText,
-    );
+    firstObserver.dispose();
+    const secondObserver = armEmptySelfNowFeedObservation(page);
+    await expect(secondObserver.settle()).rejects.not.toThrow(secretCardText);
+    secondObserver.dispose();
   });
 });
 

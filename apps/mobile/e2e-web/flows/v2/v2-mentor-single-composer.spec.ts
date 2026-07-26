@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 
 import {
+  armEmptySelfNowFeedObservation,
   describeMentorRenderedBranch,
-  observeEmptySelfNowFeed,
 } from '../../helpers/now-observation';
 import { pressableClick } from '../../helpers/pressable';
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
@@ -31,7 +31,7 @@ test('V2 zero-state Mentor renders one enabled free-form composer with secondary
     await route.continue();
   });
 
-  const nowObservationPromise = observeEmptySelfNowFeed(page);
+  const nowObserver = armEmptySelfNowFeedObservation(page);
   await seedAndSignIn(page, {
     scenario: 'onboarding-no-subject',
     alias: 'wi-2129-single-composer',
@@ -46,7 +46,9 @@ test('V2 zero-state Mentor renders one enabled free-form composer with secondary
 
   holdSelfNow = false;
   releaseNow();
-  const nowObservation = await nowObservationPromise;
+  const nowObservation = await nowObserver
+    .settle()
+    .finally(() => nowObserver.dispose());
   expect(nowObservation).toEqual({
     status: 200,
     authenticated: true,
