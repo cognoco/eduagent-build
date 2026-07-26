@@ -202,7 +202,18 @@ $ shasum -a 256 apps/api/src/services/session/session-exchange.ts
 5aff4531a08ac84a34ad97ccd5a8874a49721f2f73235250addec2846b75ddf8   (post-restore)
 ```
 
-Full suite after restore: **40 passed, 40 total** (1 suite).
+Full suite after restore: **42 passed, 42 total** (1 suite).
+
+## The cycle repeats — attempt N+1 behaves like attempt N
+
+"A new session exists and one turn completes it" is weaker than the ruling's
+claim, so the second attempt is walked in full: a fresh session seeds no
+`recheckOfferExchangeCount`, and its `exchangeCount` starts at 0, so the
+per-attempt counter reads 1 → 2 → 3 across three turns, the notice stays `open`
+at every one of them, the cap then fires exactly once (`cause: valid_continue`,
+no terminalization) and detaches again — and a THIRD attempt is reachable after
+that. Both transports. Test: `'%s: the re-offered attempt runs its own full
+1→2→3 cycle and caps the same way, and is itself re-offerable'`.
 
 ## Non-triviality control
 

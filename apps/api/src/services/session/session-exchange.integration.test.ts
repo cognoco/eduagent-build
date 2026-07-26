@@ -1715,9 +1715,7 @@ describeIfDb('session exchange production-path integration', () => {
      * counter (offer.ts). Read as raw metadata so "the keys are gone" is
      * observable, not inferred.
      */
-    async function readAttemptBookkeeping(
-      sessionId: string,
-    ): Promise<{
+    async function readAttemptBookkeeping(sessionId: string): Promise<{
       recheckNoticeId?: unknown;
       recheckOfferExchangeCount?: unknown;
     }> {
@@ -2192,6 +2190,59 @@ describeIfDb('session exchange production-path integration', () => {
           const resolved = await readNotice(noticeId);
           expect(resolved?.status).toBe('locked_in');
           expect(resolved?.lastRecheckOutcome).toBe('locked_in');
+        },
+      );
+
+      // ---- The cycle REPEATS: attempt N+1 behaves like attempt N. -----------
+      // "A new session exists and one turn can complete it" is weaker than the
+      // ruling's claim. If the re-offered attempt's per-attempt counter drifted
+      // (e.g. because the fresh session seeds no `recheckOfferExchangeCount`),
+      // the second attempt would cap early or never — a one-shot escape hatch
+      // rather than the ordinary lifecycle. So walk the whole second attempt:
+      // exchanges 1 → 2 → 3, then its own cap, then a THIRD attempt.
+      it.each(['processMessage', 'streamMessage'] as const)(
+        '%s: the re-offered attempt runs its own full 1→2→3 cycle and caps the same way, and is itself re-offerable',
+        async (transport) => {
+          const { profileId, session, noticeId } =
+            await seedOpenMentorNoticeRecheckTurn();
+          llm.setNoticeRecheckJudgeResponse(
+            JSON.stringify({ verdict: 'continue', reason: 'unclear' }),
+          );
+
+          // Attempt 1: exchanges 2 and 3 (the seeded session starts at
+          // exchangeCount 1), then the cap detaches.
+          await runTwoRecheckTurns(transport, profileId, session.id);
+          const second = await startMentorNoticeRecheck(
+            db,
+            profileId,
+            noticeId,
+          );
+          expect(second.sessionId).not.toBe(session.id);
+
+          // Attempt 2 is a FRESH session (exchangeCount 0), so it walks the
+          // full 1 → 2 → 3 and the cap fires only on the third.
+          const entries = await captureLogs(async () => {
+            for (const expected of [1, 2, 3]) {
+              await runOneRecheckTurn(transport, profileId, second.sessionId);
+              expectLastJudgeCallWasExchange(expected);
+              // Never terminalized along the way, at any exchange number.
+              expect((await readNotice(noticeId))?.status).toBe('open');
+            }
+          });
+
+          // Exactly one cap firing — on exchange 3, not earlier — and again no
+          // terminalization.
+          expect(capCauses(entries)).toEqual(['valid_continue']);
+          expect(capTerminalizations(entries)).toEqual([]);
+          const afterSecondCap = await readNotice(noticeId);
+          expect(afterSecondCap?.status).toBe('open');
+          expect(afterSecondCap?.lastRecheckOutcome).toBeNull();
+          expect(await readAttemptBookkeeping(second.sessionId)).toEqual({});
+
+          // And the lifecycle keeps going: a third attempt is reachable too.
+          const third = await startMentorNoticeRecheck(db, profileId, noticeId);
+          expect(third.sessionId).not.toBe(second.sessionId);
+          expect(third.sessionId).not.toBe(session.id);
         },
       );
 
