@@ -111,6 +111,7 @@ function makeAcceptBody(overrides: Record<string, unknown> = {}) {
   return {
     actorPersonId: SUPPORTER_PERSON_ID,
     audience: 'supporter',
+    contractVersion: 1,
     ...overrides,
   };
 }
