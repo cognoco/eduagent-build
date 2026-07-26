@@ -363,7 +363,18 @@ export const challengeRoundGraderDegradedEventSchema = z.object({
   sessionId: z.string().optional(),
   answerEventId: z.string().optional(),
   timestamp: z.string(),
-  reason: z.enum(['route_error', 'no_json', 'parse_error', 'schema_invalid']),
+  // [WI-2670] 'producer_vendor_unresolved': the caller could not provably
+  // identify the vendor that produced the graded question (e.g. a legacy
+  // ai_response row predating per-turn vendor tracking) — the grader never
+  // fabricates a producerVendor, so this is a distinct, structurally loud
+  // degradation reason rather than being silently folded into another one.
+  reason: z.enum([
+    'route_error',
+    'no_json',
+    'parse_error',
+    'schema_invalid',
+    'producer_vendor_unresolved',
+  ]),
 });
 export type ChallengeRoundGraderDegradedEvent = z.infer<
   typeof challengeRoundGraderDegradedEventSchema

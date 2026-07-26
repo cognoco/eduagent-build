@@ -346,6 +346,40 @@ describe('runChallengeRoundGrader', () => {
     });
   });
 
+  // [WI-2670] The grader never fabricates a producerVendor. When the caller
+  // could not resolve one (e.g. a legacy ai_response row predating per-turn
+  // vendor tracking), it fails open exactly like every other degradation —
+  // structured Inngest event with its own reason code, no LLM call attempted.
+  describe('[WI-2670] producer vendor unresolved → fail-open + degraded event', () => {
+    it('returns [] and never calls routeAndCall when producerVendor is absent', async () => {
+      const { producerVendor: _producerVendor, ...inputWithoutVendor } =
+        BASE_INPUT;
+
+      const items = await runChallengeRoundGrader(inputWithoutVendor);
+
+      expect(items).toEqual([]);
+      expect(mockRouteAndCall).not.toHaveBeenCalled();
+    });
+
+    it('fires app/challenge-round.grader_degraded with reason:producer_vendor_unresolved', async () => {
+      const { producerVendor: _producerVendor, ...inputWithoutVendor } =
+        BASE_INPUT;
+
+      await runChallengeRoundGrader(inputWithoutVendor);
+
+      expect(mockInngestSend).toHaveBeenCalledTimes(1);
+      expect(mockInngestSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/challenge-round.grader_degraded',
+          data: expect.objectContaining({
+            reason: 'producer_vendor_unresolved',
+            profileId: BASE_INPUT.profileId,
+          }),
+        }),
+      );
+    });
+  });
+
   // Routing options are passed correctly.
   describe('routing options', () => {
     it('routes with capability:judge, flow:challenge.grader, and responseFormat:json', async () => {

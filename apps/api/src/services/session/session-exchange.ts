@@ -1650,35 +1650,26 @@ async function applyChallengeRoundRuntimeSignals(
     // Call the judge (fail-open: emits a structured degraded event and returns
     // [] on any error — never throws into this path).
     //
-    // [WI-2670] The grader requires a real `producerVendor` to declare
-    // JudgeIndependence mode:'model-output' (see grader.ts) — it is never
-    // called with a fabricated vendor. If the asked question's producer
-    // cannot be resolved (should not happen in practice: every ai_response
-    // event persists `llmProvider` at write time — see
-    // `persistExchangeResult`), this turn fails open exactly like any other
-    // grader degradation: no evaluation, same downstream stall handling.
-    let graderEvaluation: ChallengeRoundEvaluationItem[];
-    if (payload.askedQuestionProducerVendor) {
-      graderEvaluation = await runChallengeRoundGrader({
-        profileId,
-        askedQuestion: payload.askedQuestion ?? '',
-        learnerAnswer: payload.currentUserMessage.content,
-        answerEventId: payload.currentUserMessage.id,
-        producerVendor: payload.askedQuestionProducerVendor,
-        priorQuestionIdentities: current.evaluations.flatMap((evaluation) =>
-          evaluation.questionIdentity ? [evaluation.questionIdentity] : [],
-        ),
-        conversationLanguage: context.conversationLanguage,
-        ageBracket,
-        sessionId: context.sessionId,
-      });
-    } else {
-      logger.warn(
-        '[challenge-round] grader skipped — producer vendor unresolved for asked question',
-        { sessionId: context.sessionId },
-      );
-      graderEvaluation = [];
-    }
+    // [WI-2670] `producerVendor` is threaded from the asked question's
+    // persisted `llmProvider` (see `resolveAskedQuestion`) — every
+    // ai_response event written by `persistExchangeResult` carries it, so
+    // this should always resolve in practice. grader.ts owns the
+    // "producer unresolved" fail-open branch (never fabricates a vendor,
+    // emits its own structured `producer_vendor_unresolved` degraded event)
+    // rather than this call site special-casing it.
+    const graderEvaluation = await runChallengeRoundGrader({
+      profileId,
+      askedQuestion: payload.askedQuestion ?? '',
+      learnerAnswer: payload.currentUserMessage.content,
+      answerEventId: payload.currentUserMessage.id,
+      producerVendor: payload.askedQuestionProducerVendor,
+      priorQuestionIdentities: current.evaluations.flatMap((evaluation) =>
+        evaluation.questionIdentity ? [evaluation.questionIdentity] : [],
+      ),
+      conversationLanguage: context.conversationLanguage,
+      ageBracket,
+      sessionId: context.sessionId,
+    });
 
     if (!graderEvaluation.length) {
       // Grader fail-opened. Check T9 stall guard before persisting.

@@ -68,15 +68,21 @@ export interface RunChallengeRoundGraderInput {
    * fallback). Declared to the router as `JudgeIndependence`
    * mode:'model-output' so the grader is never selected from the same
    * vendor that produced the question it grades.
+   *
+   * Optional because the caller cannot always resolve it (e.g. a legacy
+   * `ai_response` row persisted before per-turn vendor tracking existed) —
+   * see the `producer_vendor_unresolved` fail-open branch below. The grader
+   * never fabricates a vendor to fill this in.
    */
-  producerVendor: string;
+  producerVendor?: string;
 }
 
 type DegradedReason =
   | 'route_error'
   | 'no_json'
   | 'parse_error'
-  | 'schema_invalid';
+  | 'schema_invalid'
+  | 'producer_vendor_unresolved';
 
 async function emitDegradedEvent(
   reason: DegradedReason,
@@ -118,6 +124,28 @@ async function emitDegradedEvent(
 export async function runChallengeRoundGrader(
   input: RunChallengeRoundGraderInput,
 ): Promise<ChallengeRoundEvaluationItem[]> {
+  // 0. [WI-2670] Never fabricate a producerVendor. If the caller could not
+  //    provably identify who produced the graded question (e.g. a legacy
+  //    ai_response row predating per-turn vendor tracking — should not
+  //    happen for any row written after this WI), fail open the same way
+  //    every other degradation does: structured Inngest event with a
+  //    distinct reason code (feeds the degraded-rate dashboard — AGENTS.md
+  //    "silent recovery without escalation is banned"), never a bare
+  //    console warn standing in for real observability. No routeAndCall is
+  //    attempted — there is no safe way to declare JudgeIndependence
+  //    without a real vendor to exclude.
+  if (!input.producerVendor) {
+    logger.warn(
+      '[challenge-round.grader] degraded — producer vendor unresolved',
+      {
+        reason: 'producer_vendor_unresolved',
+        flow: GRADER_FLOW,
+      },
+    );
+    await emitDegradedEvent('producer_vendor_unresolved', input);
+    return [];
+  }
+
   const messages = buildChallengeRoundGraderPrompt({
     askedQuestion: input.askedQuestion,
     learnerAnswer: input.learnerAnswer,
