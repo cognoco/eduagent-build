@@ -1,3 +1,11 @@
+jest.mock(
+  '../llm' /* gc1-allow: mocks the routeAndCall LLM boundary so the memo-path test can assert the independent judge is never CONSULTED. routeAndCall cannot be exercised without a provider registration, and real-router coverage lives in the llm/router suite. */,
+  () => {
+    const actual = jest.requireActual('../llm') as typeof import('../llm');
+    return { ...actual, routeAndCall: jest.fn() };
+  },
+);
+
 import {
   memoryDedupDecisions as _memoryDedupDecisions,
   memoryFacts as _memoryFacts,
@@ -5,6 +13,7 @@ import {
   type ScopedRepository,
 } from '@eduagent/database';
 
+import { routeAndCall } from '../llm';
 import type { DedupActionOutcome } from './dedup-actions';
 import type { DedupLlmResult } from './dedup-llm';
 import {
@@ -13,6 +22,14 @@ import {
   type DedupPassArgs,
   type DedupEventTuple,
 } from './dedup-pass';
+
+const mockRouteAndCall = routeAndCall as jest.MockedFunction<
+  typeof routeAndCall
+>;
+
+beforeEach(() => {
+  mockRouteAndCall.mockReset();
+});
 
 describe('dedupPairKey', () => {
   it('is independent of pair order', () => {
@@ -337,6 +354,12 @@ describe('runDedupForProfile', () => {
     expect(report.memoHits).toBe(1);
     expect(report.merges).toBe(0);
     expect(report.failures).toBe(1);
+    // Pins the MECHANISM, not just the outcome. Dropping the merge is also what a
+    // consulted-but-unavailable judge produces, so the outcome alone cannot tell
+    // "the referral was never constructed" from "the referral failed". Asserting
+    // the judge boundary is never reached is what makes this test detect a future
+    // change that starts consulting the judge with an unknown producer.
+    expect(mockRouteAndCall).not.toHaveBeenCalled();
   });
 
   // The control that makes the case above about the GATE rather than about memo hits
