@@ -22,7 +22,7 @@
  * (no DSN / event key in test env → non-fatal).
  */
 
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import {
   membership,
   organization,
@@ -80,6 +80,7 @@ function createIntegrationDb(): Database {
 
 const PREFIX = 'integration-subcore';
 const RUN_ID = randomUUID();
+const STATIC_WEBHOOK_RESIDUE_ID = 'sub_webhook_001';
 
 function stripeSubscriptionId(tag: string, runId = RUN_ID): string {
   return `sub_${PREFIX}_${tag}_${runId}`;
@@ -203,6 +204,63 @@ async function seedV2SubscriptionDirect(input: {
   return subV2!;
 }
 
+async function ensureSuiteExternalWebhookResidue(
+  afterInitialMiss?: () => Promise<void>,
+) {
+  const db = createIntegrationDb();
+  const existing = await db.query.subscription.findFirst({
+    where: eq(
+      subscriptionV2Table.stripeSubscriptionId,
+      STATIC_WEBHOOK_RESIDUE_ID,
+    ),
+  });
+  if (existing) return existing;
+  await afterInitialMiss?.();
+
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${STATIC_WEBHOOK_RESIDUE_ID}, 0))`,
+    );
+    const residueCreatedByConcurrentSuite =
+      await tx.query.subscription.findFirst({
+        where: eq(
+          subscriptionV2Table.stripeSubscriptionId,
+          STATIC_WEBHOOK_RESIDUE_ID,
+        ),
+      });
+    if (residueCreatedByConcurrentSuite) return residueCreatedByConcurrentSuite;
+
+    const [org] = await tx
+      .insert(organization)
+      .values({ name: `${PREFIX}-v2-webhook-update-residue-${RUN_ID}` })
+      .returning();
+    const [owner] = await tx
+      .insert(person)
+      .values({
+        displayName: 'Prior-process owner',
+        birthDate: '1985-01-01',
+        residenceJurisdiction: 'EU',
+      })
+      .returning();
+    await tx.insert(membership).values({
+      personId: owner!.id,
+      organizationId: org!.id,
+      roles: ['admin'],
+    });
+    const [subscription] = await tx
+      .insert(subscriptionV2Table)
+      .values({
+        organizationId: org!.id,
+        planTier: 'plus',
+        status: 'trial',
+        payerPersonId: owner!.id,
+        stripeSubscriptionId: STATIC_WEBHOOK_RESIDUE_ID,
+      })
+      .returning();
+    return subscription!;
+  });
+}
+
 async function cleanupV2() {
   if (V2_ORG_IDS.length === 0) return;
   const db = createIntegrationDb();
@@ -298,16 +356,24 @@ describe('updateSubscriptionFromWebhookV2', () => {
     async (_, seedResidue) => {
       const db = createIntegrationDb();
       if (seedResidue) {
-        const { organizationId, ownerId } = await seedV2OrgWithOwner(
-          'webhook-update-residue',
-        );
-        await seedV2SubscriptionDirect({
-          organizationId,
-          ownerId,
-          tier: 'plus',
-          status: 'trial',
-          stripeSubscriptionId: 'sub_webhook_001',
+        let releaseConcurrentMisses!: () => void;
+        const concurrentMisses = new Promise<void>((resolve) => {
+          releaseConcurrentMisses = resolve;
         });
+        let missCount = 0;
+        const waitForConcurrentMiss = async () => {
+          missCount += 1;
+          if (missCount === 2) releaseConcurrentMisses();
+          await concurrentMisses;
+        };
+        const [preExistingResidue, concurrentResidue] = await Promise.all([
+          ensureSuiteExternalWebhookResidue(waitForConcurrentMiss),
+          ensureSuiteExternalWebhookResidue(waitForConcurrentMiss),
+        ]);
+        expect(preExistingResidue.stripeSubscriptionId).toBe(
+          STATIC_WEBHOOK_RESIDUE_ID,
+        );
+        expect(concurrentResidue.id).toBe(preExistingResidue.id);
       }
 
       const { organizationId, ownerId } = await seedV2OrgWithOwner(
