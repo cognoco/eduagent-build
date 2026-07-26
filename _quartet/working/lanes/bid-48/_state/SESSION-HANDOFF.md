@@ -1,17 +1,17 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-07-26 22:45 CEST
+Last reconciled: 2026-07-26 22:55 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
 - Topology: operator-authorized combined Orchestrator/Shepherd, no Clacks.
 - Status: `Running`.
-- Authoritative members (31): WI-2484, WI-2636, WI-2639, WI-2640, WI-2643, WI-2644,
+- Authoritative members (32): WI-2484, WI-2636, WI-2639, WI-2640, WI-2643, WI-2644,
   WI-2649, WI-2667, WI-2755, WI-2790, WI-2791, WI-2792, WI-2794, WI-2795,
   WI-2797, WI-2798, WI-2799, WI-2800, WI-2801, WI-2802, WI-2804, WI-2805,
   WI-2809, WI-2810, WI-2811, WI-2812, WI-2813, WI-2815, WI-2818, WI-2819,
-  WI-2822.
-- Brief/relation parity: live-verified at 31 after formal WI-2822/WI-2819 admission.
+  WI-2822, WI-2826.
+- Brief/relation parity: live-verified at 32 after formal WI-2826 admission.
 
 ## Closed / Done
 
@@ -48,19 +48,21 @@ Last reconciled: 2026-07-26 22:45 CEST
   review gate still inspects only squash checks. Ready and formally blocked by WI-2819.
 - WI-2804 — diagnostic PR #2653 at `dd006d86` is otherwise green but formally blocked
   by WI-2718's docs-only armed-review repair; no verdict bypass.
-- WI-2818 — PR #2654 at `0bbcac16`; mutation-sensitive repair and all CI green; marked
-  ready and fresh fixed-point Codex review requested.
+- WI-2818 — landed `cfeeaed7` through the armed gate, execute-completed with resolved
+  AC/red-green evidence, and now owned by the independent global reviewer In Review.
 - WI-2800 — diagnostic PR #2655 at `ac726877`; shared 90s budget exhaustion diagnosed,
   exact slow phase unknowable; WI-2826 captured and being refined.
-- WI-2484 — member 29, claimed and executing cleanly under the strict dev-only boundary.
-- WI-2822 — member 30, claimed and executing the test-only four-surface contract repair.
-- WI-2819 — member 31, Ready; exact GitHub squash mapping and fail-closed DoR complete,
-  next P1 executor assignment because it blocks WI-2815.
+- WI-2484 — draft PR #2657 at `3fe6960d`; live dev constraints already correct, so no
+  database mutation occurred; dev-only evidence/rollback guard committed, CI pending.
+- WI-2822 — draft PR #2658 at `c0002155`; exact two-file test-only repair with mutation,
+  focused, named Playwright, type/lint/pre-push proof; CI running.
+- WI-2819 — member 31, claimed and executing the fail-closed Marketplace/Nexus repair.
+- WI-2826 — member 32, claimed and executing local credential-safe phase timing;
+  hosted seeded-account rerun remains operator-gated.
 
 ## Captured / refining before membership
 
-- WI-2826 — Account-owner shared-budget diagnosis lacks phase timing. Captured from
-  WI-2800 and now in typed triage/refinement; no implementation or membership mutation yet.
+- None currently awaiting membership disposition.
 
 ## Landing / CI frontier
 

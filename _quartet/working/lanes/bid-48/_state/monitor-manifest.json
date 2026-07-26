@@ -15,7 +15,7 @@
       "task-id": "inline-direct-poll"
     },
     {
-      "target": "eduagent-build PRs #2636, #2637, #2638, #2640, #2642, #2643, #2644, #2646, #2647, #2649, #2651, #2652, #2653, #2654, #2655 and Nexus PRs #330/#331; checks, reviews, merge state, and origin/main",
+      "target": "eduagent-build PRs #2636, #2637, #2638, #2640, #2642, #2643, #2644, #2646, #2647, #2649, #2651, #2652, #2653, #2654, #2655, #2657, #2658 and Nexus PRs #330/#331; checks, reviews, merge state, and origin/main",
       "purpose": "enforce strict-green landing and landed completion evidence",
       "command": "gh PR/check/review queries and git fetch/rev-parse",
       "task-id": "inline-direct-poll"
