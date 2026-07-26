@@ -2510,17 +2510,18 @@ describe('[WI-2627] useStreamMessage binds the policy to the request’s profile
   });
 
   it('judges the frame’s notice against the ORIGINATING profile’s history', async () => {
-    // Profile A has been told the rollout is off at revision 9. Profile B has
-    // been told it is on at a higher revision. A frame issued under A carrying a
-    // stale observation must be judged against A — under B's history it would
-    // look live and paint.
+    // The two histories are chosen so the SAME observation gets opposite
+    // verdicts, which is what makes this test discriminate at all:
+    //   under A {9,off}  — same revision, disabled wins -> stays off -> withheld
+    //   under B {5,on}   — 9 > 5, adopt enabled         -> not stale  -> PAINTS
+    // A frame issued under A must therefore be judged against A.
     await AsyncStorage.setItem(
       keyFor(PROFILE_A),
       '{"revision":9,"enabled":false}',
     );
     await AsyncStorage.setItem(
       keyFor(PROFILE_B),
-      '{"revision":12,"enabled":true}',
+      '{"revision":5,"enabled":true}',
     );
 
     const { streamSSEViaXHR } = require('../lib/sse') as {
@@ -2578,7 +2579,7 @@ describe('[WI-2627] useStreamMessage binds the policy to the request’s profile
     );
     // B's state is untouched — one profile's stream never rewrites another's.
     expect(await AsyncStorage.getItem(keyFor(PROFILE_B))).toBe(
-      '{"revision":12,"enabled":true}',
+      '{"revision":5,"enabled":true}',
     );
   });
 });
