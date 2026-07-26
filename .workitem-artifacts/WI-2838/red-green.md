@@ -62,6 +62,9 @@ exact correlated GET URL, verifies the returned response URL, fulfills the
 browser route with that response, and resolves the route-owned response promise.
 No response-side Request wrapper is used. The same focused Jest command exited
 0 with 4/4 passing, including the retained and cleared 15-second response bound.
+A subsequent review-coverage case asserts that a mismatched fetched URL rejects
+with the exact diagnostic without fulfilling the route; the current focused
+suite exits 0 with 5/5 passing while retaining the success case.
 
 The corrected named staging journey then passed 3/3 with
 `--workers=1 --retries=0 --repeat-each=3 --no-deps`, retaining every original

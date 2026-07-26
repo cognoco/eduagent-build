@@ -15,22 +15,28 @@ own the lifecycle. No production code changed.
 ## Verification
 
 The original matcher seam and the later continued-URL lifecycle mismatch were
-both executed red then green. The corrected focused seam passes 4/4, including
-the retained and cleared 15-second response bound. The real returning-learner
-journey passes 3/3 against staging with retries disabled while retaining the
-original Session-held, fresh-response, Mentor, and card guarantees. Style, lint,
-GC1, mobile typecheck, and the branch-scoped TypeScript build gate pass. The
-complete local V2 gate passed WI-2234 under normal four-worker parallelism and
-failed only the independently owned WI-2822 assertion. The published correction
-must re-establish every required hosted check before landing.
+both executed red then green. The corrected focused seam initially passed 4/4,
+including the retained and cleared 15-second response bound. Review follow-up
+coverage also proves that a mismatched fetched URL rejects with the exact
+diagnostic and never fulfills the route; the current focused suite passes 5/5.
+The real returning-learner journey passes 3/3 against staging with retries
+disabled while retaining the original Session-held, fresh-response, Mentor, and
+card guarantees. Style, lint, GC1, mobile typecheck, and the branch-scoped
+TypeScript build gate pass. The complete local V2 gate passed WI-2234 under
+normal four-worker parallelism and failed only the independently owned WI-2822
+assertion. Hosted E2E Web run `30224090382` on implementation head `83c6d29d`
+then passed V2 16/16 and required-stable legacy 24/24.
 
 ## Caveats / Follow-ups
 
 Hosted E2E Web run `30223075316` on the pre-correction head demonstrated the
 continued-URL response-wrapper mismatch by timing out the WI-2234 journey twice.
-The deterministic seam now reproduces and corrects that exact failure, but the
-new head still requires fresh hosted strict-green evidence. WI-2822 remains
-separately owned through PR #2658; this change does not duplicate or absorb it.
+The deterministic seam reproduces and corrects that exact failure, and hosted
+run `30224090382` re-established E2E strict green on the corrected implementation.
+The review follow-up changes only focused test coverage and evidence wording;
+its resulting head still requires the normal required checks before landing.
+WI-2822 remains separately owned through PR #2658; this change does not duplicate
+or absorb it.
 
 After the implementation commit was published, the branch was externally
 advanced by merging current `origin/main`. The executor did not author or

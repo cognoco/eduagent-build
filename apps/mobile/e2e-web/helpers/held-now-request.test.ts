@@ -42,6 +42,30 @@ describe('held Now request discriminator', () => {
     expect(lifecycle).toEqual(['fetch', 'fulfill']);
   });
 
+  it('rejects a mismatched fetched response without fulfilling the route', async () => {
+    const discriminator = createHeldNowRequestDiscriminator(
+      requestView('GET', 'https://api-stg.mentomate.com/v1/now?scope=self'),
+      'wi-2234',
+    );
+    const mismatchedUrl =
+      'https://api-stg.mentomate.com/v1/now?scope=supporter-hub';
+    const mismatchedResponse = { url: () => mismatchedUrl };
+    const route = {
+      fetch: jest.fn().mockResolvedValue(mismatchedResponse),
+      fulfill: jest.fn().mockResolvedValue(undefined),
+    };
+
+    await expect(
+      fetchAndFulfillHeldNowResponse(route, discriminator),
+    ).rejects.toEqual(
+      new Error(
+        `Held Now response URL mismatch: expected ${discriminator.url}, received ${mismatchedUrl}`,
+      ),
+    );
+    expect(route.fetch).toHaveBeenCalledWith(discriminator);
+    expect(route.fulfill).not.toHaveBeenCalled();
+  });
+
   it('adds an explicit correlation to the exact held request URL', () => {
     expect(
       createHeldNowRequestDiscriminator(

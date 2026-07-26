@@ -17,7 +17,7 @@
     },
     {
       "acRef": "AC-4",
-      "description": "The corrected named journey passed 3/3 with retries disabled and the full four-worker local V2 gate passed WI-2234; hosted run 30223075316 reproduced the pre-correction timeout twice, so fresh hosted verification is required.",
+      "description": "The corrected named journey passed 3/3 with retries disabled, the full four-worker local V2 gate passed WI-2234, and hosted E2E run 30224090382 passed V2 16/16 plus required-stable legacy 24/24 on exact implementation head 83c6d29d.",
       "pointer": ".workitem-artifacts/WI-2838/verification.md"
     }
   ],
@@ -28,7 +28,10 @@
     "strictGreenE2ERun": 30222631190,
     "bounceHead": "fe52d114192d15373ef5ba215c19b19e3e24ebda",
     "bounceE2ERun": 30223075316,
-    "bounceCorrectionPendingHosted": true,
+    "bounceCorrectionHead": "83c6d29d075feec909680aae9610ca3fef5452db",
+    "bounceCorrectionE2ERun": 30224090382,
+    "bounceCorrectionE2EConclusion": "success",
+    "bounceCorrectionPendingHosted": false,
     "parents": [
       "732b684eb69d1ffaa8613c59318e804f18566fbe",
       "f8aa11b086e8787f672c6d326018ee4bcfc32c6f"

@@ -74,6 +74,22 @@ and normal four-worker parallelism. The WI-2234 journey passed; the result was
 15/16 with only the same independently owned WI-2822 nav-shell stale-doorway
 assertion failing. No WI-2838 failure remained in the local aggregate run.
 
+## Hosted corrected-implementation aggregate
+
+GitHub Actions E2E Web run `30224090382` executed on exact corrected
+implementation head `83c6d29d075feec909680aae9610ca3fef5452db` and completed
+successfully:
+
+- V2 release: 16/16 passed in 3.8 minutes, including the WI-2234
+  returning-learner journey;
+- classifier: `FAILURE_CLASS=success`, `GATE_DECISION=pass`;
+- required-stable legacy Playwright: 24/24 passed in 3.3 minutes;
+- the `run-smoke` and required `Playwright web smoke` jobs concluded success.
+
+The subsequent review follow-up adds only a focused mismatch-response unit case
+and clarifies the timezone notation in this evidence; it does not change the
+hosted implementation exercised by that run.
+
 ## Scope audit
 
 - No timeout value changed.
@@ -83,6 +99,13 @@ assertion failing. No WI-2838 failure remained in the local aggregate run.
   timer on success or failure, and emits a specific timeout diagnostic.
 - The Session-held boundary, response success/freshness, Mentor arrival, and
   both exact returning-learner card assertions remain in the named journey.
+
+## Review follow-up coverage
+
+The focused helper suite now also exercises a fetched response whose URL differs
+from the discriminator. It asserts the exact mismatch error and proves that
+`route.fulfill` is never called, while retaining the exact-response success case.
+The focused Jest command exits 0 with 5/5 tests passing.
 
 ## Exact-head provenance after base synchronization
 
@@ -97,7 +120,8 @@ then recorded that event and became the hosted strict-green evidence head.
   `732b684eb69d1ffaa8613c59318e804f18566fbe`, and second parent
   `f8aa11b086e8787f672c6d326018ee4bcfc32c6f`.
 - The branch and HEAD reflogs both record `merge origin/main: Merge made by the
-  'ort' strategy` at 2026-07-27 00:06:04 +0200.
+  'ort' strategy` at 2026-07-27 00:06:04 +0200 (2026-07-26 22:06:04 UTC); the
+  differing calendar dates are the same instant expressed in CEST and UTC.
 - `git ls-remote` recorded `refs/heads/WI-2838` and
   `refs/pull/2664/head` at `d3caddaa`; `refs/heads/main` remained `f8aa11b`.
 - The WI patch before synchronization (`2b277b9..732b684`) and after it
