@@ -28,6 +28,7 @@ import {
   computeFilingRefetchInterval,
 } from './use-sessions';
 import { queryKeys } from '../lib/query-keys';
+import { resetMentorNoticePolicyStoreForTests } from '../lib/mentor-notice-policy';
 
 const mockFetch = jest.fn();
 const originalFetch = globalThis.fetch;
@@ -2019,5 +2020,335 @@ describe('profile-switch cache isolation', () => {
       undefined,
     );
     expect(keyDefined).not.toEqual(keyUndefined);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2627] The observation must reach the CONSUMER, not merely survive the
+// schema parse.
+//
+// Those are different properties and only the second is what the monotonic store
+// depends on. `packages/schemas` declares `mentorNoticePolicy` on all three of
+// these responses, and a schema-level test would have passed on the pre-fix code
+// in every case below — the field died AFTER a correct parse, at the consumer:
+// `useSessionSummary` returned `data.summary` (discarding the sibling), and
+// `useStreamMessage`'s onDone rebuilt a plain object from ~13 named event.*
+// properties without it. So every assertion here is against what the hook hands
+// its caller, or against a policy effect only reachable through the store.
+// ---------------------------------------------------------------------------
+describe('[WI-2627] mentor-notice policy observation reaches its consumers', () => {
+  const ACTOR = 'wi2627-actor';
+  const POLICY_KEY = `mentor-notice-policy-state::${ACTOR}::test-profile-id`;
+  const NOTICE = {
+    id: '11111111-1111-4111-8111-111111111111',
+    concept: 'sign flip',
+    correctionHint: null,
+  };
+
+  function policy(revision: number, enabled: boolean) {
+    return {
+      rolloutRevision: revision,
+      rolloutEnabled: enabled,
+      projectionEpoch: `notice-policy-v1:r${revision}:${
+        enabled ? 'on' : 'off'
+      }:self:consented`,
+    };
+  }
+
+  const clerk = require('@clerk/expo') as { useAuth: () => unknown };
+  let useAuthBefore: typeof clerk.useAuth;
+
+  beforeEach(async () => {
+    useAuthBefore = clerk.useAuth;
+    clerk.useAuth = () => ({
+      userId: ACTOR,
+      isLoaded: true,
+      isSignedIn: true,
+      getToken: jest.fn().mockResolvedValue('mock-token'),
+    });
+    resetMentorNoticePolicyStoreForTests();
+    await AsyncStorage.clear();
+  });
+
+  afterEach(() => {
+    clerk.useAuth = useAuthBefore;
+  });
+
+  function summaryResponse(
+    observation: ReturnType<typeof policy> | undefined,
+    withNotice: boolean,
+  ): Response {
+    return new Response(
+      JSON.stringify({
+        summary: {
+          id: '880e8400-e29b-41d4-a716-446655440001',
+          sessionId: '660e8400-e29b-41d4-a716-446655440000',
+          content: 'I learned about gravity',
+          aiFeedback: 'Good summary',
+          status: 'accepted',
+          closingLine: null,
+          learnerRecap: null,
+          nextTopicId: null,
+          nextTopicTitle: null,
+          nextTopicReason: null,
+          ...(withNotice ? { mentorNotice: NOTICE } : {}),
+        },
+        ...(observation ? { mentorNoticePolicy: observation } : {}),
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
+
+  describe('GET session summary (useSessionSummary)', () => {
+    // RED-GREEN ANCHOR. Pre-fix, the query fn's `return data.summary` dropped
+    // the sibling observation, so this expectation read `undefined` while the
+    // receipt rendered and every schema test stayed green.
+    it('hands the arriving observation to its caller', async () => {
+      mockFetch.mockResolvedValueOnce(summaryResponse(policy(7, true), true));
+
+      const { result } = renderHook(() => useSessionSummary('session-1'), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+      expect(result.current.mentorNoticePolicy).toEqual(policy(7, true));
+      // Positive control: with policy ON at the arriving revision the receipt
+      // renders, so the suppression assertions below are not vacuous.
+      expect(result.current.data?.mentorNotice?.concept).toBe('sign flip');
+    });
+
+    it('folds the observation into the shared store, so it survives the hook', async () => {
+      mockFetch.mockResolvedValueOnce(summaryResponse(policy(7, true), true));
+
+      const { result, unmount } = renderHook(
+        () => useSessionSummary('session-1'),
+        { wrapper: createWrapper() },
+      );
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+      // Only reachable if the observation got past the query fn: the store
+      // persists what it folds.
+      await waitFor(async () =>
+        expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
+          '{"revision":7,"enabled":true}',
+        ),
+      );
+      unmount();
+    });
+
+    it('drops the receipt on a STALE summary — one observed before a rollback', async () => {
+      await AsyncStorage.setItem(POLICY_KEY, '{"revision":7,"enabled":true}');
+      // A summary that left the server at revision 6 and lands after the client
+      // already knows revision 7. The fold correctly ignores its observation;
+      // its RECEIPT is a separate problem, and this is the assertion for it.
+      mockFetch.mockResolvedValueOnce(summaryResponse(policy(6, true), true));
+
+      const { result } = renderHook(() => useSessionSummary('session-1'), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data?.content).toBe('I learned about gravity');
+      expect(result.current.data?.mentorNotice).toBeUndefined();
+    });
+
+    it('drops the receipt when the summary itself carries the disable', async () => {
+      // Same revision, disabled — NOT stale (only strictly-older is), so this
+      // has to be caught by the fold's disabled-wins rule rather than by the
+      // staleness test.
+      await AsyncStorage.setItem(POLICY_KEY, '{"revision":7,"enabled":true}');
+      mockFetch.mockResolvedValueOnce(summaryResponse(policy(7, false), true));
+
+      const { result } = renderHook(() => useSessionSummary('session-1'), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data?.mentorNotice).toBeUndefined();
+    });
+
+    it('keeps the receipt when the summary carries NO observation', async () => {
+      // A pre-field worker. Absence is not a rollback signal in either
+      // direction, and the server has already stripped notice data if the flag
+      // is off.
+      mockFetch.mockResolvedValueOnce(summaryResponse(undefined, true));
+
+      const { result } = renderHook(() => useSessionSummary('session-1'), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.mentorNoticePolicy).toBeUndefined();
+      expect(result.current.data?.mentorNotice?.concept).toBe('sign flip');
+    });
+  });
+
+  describe('non-stream message turn (useSendMessage)', () => {
+    it('hands the arriving observation to its caller and folds it', async () => {
+      mockFetch.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            response: 'AI response',
+            escalationRung: 1,
+            isUnderstandingCheck: false,
+            exchangeCount: 1,
+            expectedResponseMinutes: 0,
+            mentorNoticePolicy: policy(9, false),
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+
+      const { result } = renderHook(() => useSendMessage('session-1'), {
+        wrapper: createWrapper(),
+      });
+
+      await act(async () => {
+        result.current.mutate({ message: 'What is gravity?' });
+      });
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+      expect(result.current.data?.mentorNoticePolicy).toEqual(policy(9, false));
+      await waitFor(async () =>
+        expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
+          '{"revision":9,"enabled":false}',
+        ),
+      );
+    });
+  });
+
+  describe('SSE done frame (useStreamMessage)', () => {
+    function doneFrame(extra: Record<string, unknown>) {
+      return {
+        type: 'done' as const,
+        exchangeCount: 1,
+        escalationRung: 1,
+        ...extra,
+      };
+    }
+
+    // RED-GREEN ANCHOR. Pre-fix, onDone rebuilt its result field-by-field from
+    // ~13 named `event.*` properties and `mentorNoticePolicy` was not among
+    // them, so this read `undefined` — and `StreamDoneEvent` in lib/sse.ts did
+    // not even declare the field, so the read would not have compiled.
+    it('passes the observation through onDone to its caller', async () => {
+      const { streamSSEViaXHR } = require('../lib/sse') as {
+        streamSSEViaXHR: jest.Mock;
+      };
+      streamSSEViaXHR.mockReturnValueOnce({
+        events: (async function* () {
+          yield doneFrame({
+            mentorNotice: NOTICE,
+            mentorNoticePolicy: policy(7, true),
+          });
+        })(),
+        abort: jest.fn(),
+      });
+      const onDone = jest.fn();
+
+      const { result } = renderHook(() => useStreamMessage('session-1'), {
+        wrapper: createWrapper(),
+      });
+      await act(async () => {
+        await result.current.stream('Hi', jest.fn(), onDone, 'session-1');
+      });
+
+      expect(onDone).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mentorNoticePolicy: policy(7, true),
+          // Positive control — policy ON at this revision, so the notice rides
+          // through and the suppression assertion below is not vacuous.
+          mentorNotice: NOTICE,
+        }),
+      );
+    });
+
+    it('folds the observation, so a later surface sees the rollback', async () => {
+      const { streamSSEViaXHR } = require('../lib/sse') as {
+        streamSSEViaXHR: jest.Mock;
+      };
+      streamSSEViaXHR.mockReturnValueOnce({
+        events: (async function* () {
+          yield doneFrame({ mentorNoticePolicy: policy(9, false) });
+        })(),
+        abort: jest.fn(),
+      });
+
+      const { result } = renderHook(() => useStreamMessage('session-1'), {
+        wrapper: createWrapper(),
+      });
+      await act(async () => {
+        await result.current.stream('Hi', jest.fn(), jest.fn(), 'session-1');
+      });
+
+      await waitFor(async () =>
+        expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
+          '{"revision":9,"enabled":false}',
+        ),
+      );
+    });
+
+    it('withholds a notice carried on the very frame that disables the rollout', async () => {
+      // The frame carrying the notice is also the frame carrying the disable.
+      // This is why the hook folds BEFORE asking, and why `suppressed` reads
+      // the live store rather than the render snapshot — a snapshot answer
+      // would be one render stale and would paint the notice.
+      await AsyncStorage.setItem(POLICY_KEY, '{"revision":7,"enabled":true}');
+      const { streamSSEViaXHR } = require('../lib/sse') as {
+        streamSSEViaXHR: jest.Mock;
+      };
+      streamSSEViaXHR.mockReturnValueOnce({
+        events: (async function* () {
+          yield doneFrame({
+            mentorNotice: NOTICE,
+            mentorNoticePolicy: policy(7, false),
+          });
+        })(),
+        abort: jest.fn(),
+      });
+      const onDone = jest.fn();
+
+      const { result } = renderHook(() => useStreamMessage('session-1'), {
+        wrapper: createWrapper(),
+      });
+      await waitFor(() => expect(result.current.isStreaming).toBe(false));
+      await act(async () => {
+        await result.current.stream('Hi', jest.fn(), onDone, 'session-1');
+      });
+
+      expect(onDone).toHaveBeenCalledWith(
+        expect.objectContaining({ mentorNotice: undefined }),
+      );
+    });
+
+    it('withholds a notice on a STALE done frame', async () => {
+      await AsyncStorage.setItem(POLICY_KEY, '{"revision":7,"enabled":true}');
+      const { streamSSEViaXHR } = require('../lib/sse') as {
+        streamSSEViaXHR: jest.Mock;
+      };
+      streamSSEViaXHR.mockReturnValueOnce({
+        events: (async function* () {
+          yield doneFrame({
+            mentorNotice: NOTICE,
+            mentorNoticePolicy: policy(6, true),
+          });
+        })(),
+        abort: jest.fn(),
+      });
+      const onDone = jest.fn();
+
+      const { result } = renderHook(() => useStreamMessage('session-1'), {
+        wrapper: createWrapper(),
+      });
+      await waitFor(() => expect(result.current.isStreaming).toBe(false));
+      await act(async () => {
+        await result.current.stream('Hi', jest.fn(), onDone, 'session-1');
+      });
+
+      expect(onDone).toHaveBeenCalledWith(
+        expect.objectContaining({ mentorNotice: undefined }),
+      );
+    });
   });
 });
