@@ -27,6 +27,7 @@ import {
   LANGUAGE_CORPORA,
   type LanguageCorpus,
 } from './corpus';
+import { REFERRAL_PAYLOAD, type LearningTextReferralPayload } from './referral';
 
 /** Who authored the text reaching the persistence boundary. */
 export type LearningTextProvenance = 'user' | 'llm' | 'migration';
@@ -95,6 +96,18 @@ export interface ScanLearningTextResult {
    * language alone.
    */
   readonly corpusConfidence: LanguageCorpus['confidence'];
+  /**
+   * Present ONLY when `disposition === 'refer'`, and set only by
+   * `scanLearningText`. Binds the referral to the exact text and validated
+   * producer vendor this scan saw, so Stage 2 DERIVES both instead of accepting
+   * them as separate parameters that could disagree. Symbol-keyed, so it is
+   * absent from `JSON.stringify` / `Object.keys` and cannot leak the text into
+   * a log line — Stage 1's "a scan result never carries the scanned text"
+   * invariant still holds for every serialization path. Optional in the type,
+   * so a hand-built `refer` object still compiles — the judge treats a missing
+   * payload as fail-closed rather than trusting the shape.
+   */
+  readonly [REFERRAL_PAYLOAD]?: LearningTextReferralPayload;
 }
 
 // --- regex construction ----------------------------------------------------
@@ -413,15 +426,30 @@ export function scanLearningText(
 
   // Protected lexeme, no person attribution → uncertain educational/reference
   // use. Only LLM-authored text with a KNOWN producer may reach the judge.
-  const referable =
-    input.provenance === 'llm' &&
-    typeof input.producerVendor === 'string' &&
-    input.producerVendor.trim().length > 0;
+  // Identical predicate to before, restructured so the validated vendor is a
+  // value this function can hand onward rather than a boolean it discards.
+  const producerVendor =
+    input.provenance === 'llm' && typeof input.producerVendor === 'string'
+      ? input.producerVendor.trim()
+      : '';
+
+  if (producerVendor.length === 0) {
+    return {
+      ...base,
+      classification: 'ambiguous',
+      disposition: 'block',
+      reason: 'unclear',
+    };
+  }
 
   return {
     ...base,
     classification: 'ambiguous',
-    disposition: referable ? 'refer' : 'block',
-    reason: referable ? null : 'unclear',
+    disposition: 'refer',
+    reason: null,
+    // Binds this referral to the exact text and vendor scanned. Symbol-keyed,
+    // so it never appears in a serialized/logged result — see referral.ts for
+    // the two P1 misuse shapes this makes unrepresentable.
+    [REFERRAL_PAYLOAD]: { text: input.text, producerVendor },
   };
 }

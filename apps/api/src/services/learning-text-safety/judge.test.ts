@@ -28,6 +28,7 @@ import {
   buildJudgePrompt,
   judgeReferredLearningText,
 } from './judge';
+import { REFERRAL_PAYLOAD } from './referral';
 import {
   scanLearningText,
   type LearningTextProvenance,
@@ -56,13 +57,16 @@ const routeResult = (response: string): RouteResult => ({
 });
 
 /** A REAL Stage-1 scan that reaches the judge seam. */
-function referredScan(text = AMBIGUOUS_TEXT): ScanLearningTextResult {
+function referredScan(
+  text = AMBIGUOUS_TEXT,
+  producerVendor = PRODUCER_VENDOR,
+): ScanLearningTextResult {
   const scan = scanLearningText({
     text,
     conversationLanguage: 'en',
     provenance: 'llm',
     fieldKind: 'note_text',
-    producerVendor: PRODUCER_VENDOR,
+    producerVendor,
   });
   // Guards the fixture: if Stage 1 ever stops referring this text, these tests
   // must fail loudly rather than silently exercise a different path.
@@ -75,12 +79,16 @@ function callJudge(
 ) {
   return judgeReferredLearningText({
     scan: referredScan(),
-    text: AMBIGUOUS_TEXT,
     conversationLanguage: 'en',
-    producerVendor: PRODUCER_VENDOR,
     sessionId: '00000000-0000-4000-8000-000000000002',
     ...overrides,
   });
+}
+
+/** The text the judge actually sent out, read off the router call. */
+function textSentToJudge(): string {
+  const [messages] = mockRouteAndCall.mock.calls[0]!;
+  return messages.map((m) => String(m.content)).join('\n');
 }
 
 let logEntries: LogEntry[];
@@ -248,8 +256,17 @@ describe('judgeReferredLearningText — fails CLOSED on every degraded path', ()
     });
   });
 
-  it('blocks unclear when the producer vendor is blank — a JudgeIndependence descriptor that excludes nothing is never sent', async () => {
-    await expect(callJudge({ producerVendor: '   ' })).resolves.toEqual({
+  it('blocks unclear on a forged referral whose vendor is blank — a JudgeIndependence descriptor that excludes nothing is never sent', async () => {
+    // Unreachable through scanLearningText (it refuses to refer a blank
+    // vendor), so the only way to reach this defensive branch is a forged
+    // payload. A blank vendor would exclude NOTHING and let the producer judge
+    // its own output, silently — so it must not be buyable.
+    const forged: ScanLearningTextResult = {
+      ...referredScan(),
+      [REFERRAL_PAYLOAD]: { text: AMBIGUOUS_TEXT, producerVendor: '   ' },
+    };
+
+    await expect(judgeReferredLearningText({ scan: forged })).resolves.toEqual({
       disposition: 'block',
       reason: 'unclear',
     });
@@ -295,9 +312,7 @@ describe('judgeReferredLearningText — non-referred scans never reach the judge
 
       const decision = await judgeReferredLearningText({
         scan,
-        text: AMBIGUOUS_TEXT,
         conversationLanguage: 'en',
-        producerVendor: producerVendor ?? 'anthropic',
       });
 
       expect(decision).toEqual({ disposition: 'block', reason: 'unclear' });
@@ -317,13 +332,10 @@ describe('judgeReferredLearningText — non-referred scans never reach the judge
 
     // The judge is a terminal decision for REFERRED text only. Handing it an
     // already-cleared scan must not produce a clear (and must not call out).
-    await expect(
-      judgeReferredLearningText({
-        scan,
-        text: 'This chapter explains long division.',
-        producerVendor: PRODUCER_VENDOR,
-      }),
-    ).resolves.toEqual({ disposition: 'block', reason: 'unclear' });
+    await expect(judgeReferredLearningText({ scan })).resolves.toEqual({
+      disposition: 'block',
+      reason: 'unclear',
+    });
     expect(mockRouteAndCall).not.toHaveBeenCalled();
   });
 });
@@ -348,7 +360,7 @@ describe('judgeReferredLearningText — no external disclosure', () => {
       ),
     );
 
-    const decision = await callJudge({ text: SENTINEL_TEXT });
+    const decision = await callJudge({ scan: referredScan(SENTINEL_TEXT) });
 
     expect(Object.keys(decision).sort()).toEqual(['disposition', 'reason']);
     const serialized = JSON.stringify(decision);
@@ -389,7 +401,7 @@ describe('judgeReferredLearningText — no external disclosure', () => {
     async (_label, response) => {
       mockRouteAndCall.mockResolvedValue(routeResult(response));
 
-      const decision = await callJudge({ text: SENTINEL_TEXT });
+      const decision = await callJudge({ scan: referredScan(SENTINEL_TEXT) });
       expect(decision.disposition).toBe('block');
 
       const logs = allLogOutput();
@@ -412,7 +424,7 @@ describe('judgeReferredLearningText — no external disclosure', () => {
         `content_filter rejected input: ${SENTINEL_TEXT} / ${JUDGE_PROSE}`,
       ),
     );
-    await callJudge({ text: SENTINEL_TEXT });
+    await callJudge({ scan: referredScan(SENTINEL_TEXT) });
 
     const logs = allLogOutput();
     expect(logs).not.toContain('quibblefrotz'); // the scanned text, echoed by the vendor
@@ -423,7 +435,7 @@ describe('judgeReferredLearningText — no external disclosure', () => {
 
   it('records a non-Error throw by type, not by value', async () => {
     mockRouteAndCall.mockRejectedValue(SENTINEL_TEXT);
-    await callJudge({ text: SENTINEL_TEXT });
+    await callJudge({ scan: referredScan(SENTINEL_TEXT) });
 
     const logs = allLogOutput();
     expect(logs).not.toContain('quibblefrotz');
@@ -439,12 +451,12 @@ describe('judgeReferredLearningText — no external disclosure', () => {
    */
   it('returns an identical decision whether the judge was unavailable, blocked unclear, or was never consulted', async () => {
     mockRouteAndCall.mockRejectedValue(new Error('circuit open'));
-    const unavailable = await callJudge({ text: SENTINEL_TEXT });
+    const unavailable = await callJudge({ scan: referredScan(SENTINEL_TEXT) });
 
     mockRouteAndCall.mockResolvedValue(
       routeResult(JSON.stringify({ verdict: 'block', reason: 'unclear' })),
     );
-    const judgedBlock = await callJudge({ text: SENTINEL_TEXT });
+    const judgedBlock = await callJudge({ scan: referredScan(SENTINEL_TEXT) });
 
     const userScan = scanLearningText({
       text: SENTINEL_TEXT,
@@ -453,11 +465,7 @@ describe('judgeReferredLearningText — no external disclosure', () => {
       fieldKind: 'note_text',
       producerVendor: PRODUCER_VENDOR,
     });
-    const neverConsulted = await judgeReferredLearningText({
-      scan: userScan,
-      text: SENTINEL_TEXT,
-      producerVendor: PRODUCER_VENDOR,
-    });
+    const neverConsulted = await judgeReferredLearningText({ scan: userScan });
 
     expect(unavailable).toEqual(judgedBlock);
     expect(unavailable).toEqual(neverConsulted);
@@ -473,11 +481,7 @@ describe('judgeReferredLearningText — no external disclosure', () => {
     });
     expect(scan.disposition).toBe('block');
 
-    await judgeReferredLearningText({
-      scan,
-      text: SENTINEL_TEXT,
-      producerVendor: PRODUCER_VENDOR,
-    });
+    await judgeReferredLearningText({ scan });
 
     expect(allLogOutput()).not.toContain('quibblefrotz');
   });
@@ -495,7 +499,7 @@ describe('judgeReferredLearningText — independence', () => {
       ),
     );
 
-    await callJudge({ producerVendor: 'openai' });
+    await callJudge({ scan: referredScan(AMBIGUOUS_TEXT, 'openai') });
 
     expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
     const [, rung, options] = mockRouteAndCall.mock.calls[0]!;
@@ -516,12 +520,152 @@ describe('judgeReferredLearningText — independence', () => {
     );
 
     await expect(
-      judgeReferredLearningText({
-        scan: referredScan(),
-        text: AMBIGUOUS_TEXT,
-        producerVendor: PRODUCER_VENDOR,
-      }),
+      judgeReferredLearningText({ scan: referredScan() }),
     ).resolves.toEqual({ disposition: 'clear', reason: null });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Bound to the scan — the two P1 misuse shapes, each unrepresentable
+// ---------------------------------------------------------------------------
+
+describe('judgeReferredLearningText — the referral is bound to the scan', () => {
+  const CLEAN_ALLOW = JSON.stringify({
+    verdict: 'allow',
+    reason: 'educational_reference',
+  });
+
+  /**
+   * P1 #1 — a `refer` from one field must not authorize sending a DIFFERENT
+   * field's text to the external judge. Two scans exist simultaneously, as they
+   * would in Stage 3's batch; whichever scan is handed over is the only text
+   * that can leave the process. There is no `text` parameter to mis-pair.
+   */
+  it('sends the text THIS scan saw, never another concurrently-scanned field', async () => {
+    mockRouteAndCall.mockResolvedValue(routeResult(CLEAN_ALLOW));
+
+    const conceptScan = referredScan(AMBIGUOUS_TEXT);
+    const noteScan = referredScan(SENTINEL_TEXT);
+    // Both are live and referable — the batching shape that produced the P1.
+    expect(conceptScan.disposition).toBe('refer');
+    expect(noteScan.disposition).toBe('refer');
+
+    await judgeReferredLearningText({ scan: noteScan });
+
+    const sent = textSentToJudge();
+    expect(sent).toContain('quibblefrotz'); // noteScan's text
+    expect(sent).not.toContain('This chapter explains what dyslexia is'); // conceptScan's
+  });
+
+  /**
+   * The same property from the fail-closed side: a `refer` scan can only be
+   * paired with the user- or migration-authored text of another field by
+   * FORGING a scan object, and a forged object has no referral payload. So the
+   * user-authored text is never sent, and the allowance is never obtainable.
+   */
+  it('blocks a forged refer scan with no referral payload, and sends nothing', async () => {
+    mockRouteAndCall.mockResolvedValue(routeResult(CLEAN_ALLOW));
+
+    const userScan = scanLearningText({
+      text: SENTINEL_TEXT,
+      conversationLanguage: 'en',
+      provenance: 'user',
+      fieldKind: 'note_text',
+      producerVendor: PRODUCER_VENDOR,
+    });
+    expect(userScan.disposition).toBe('block');
+
+    // The decoupling a caller would have to attempt: relabel user-authored
+    // ambiguity as referred, hoping the judge takes the disposition on trust.
+    const forged: ScanLearningTextResult = {
+      ...userScan,
+      classification: 'ambiguous',
+      disposition: 'refer',
+      reason: null,
+    };
+
+    await expect(judgeReferredLearningText({ scan: forged })).resolves.toEqual({
+      disposition: 'block',
+      reason: 'unclear',
+    });
+    expect(mockRouteAndCall).not.toHaveBeenCalled();
+    expect(allLogOutput()).not.toContain('quibblefrotz');
+  });
+
+  /**
+   * P1 #2 — the excluded vendor must be the vendor that actually produced the
+   * text. The scan is the only source, so an Anthropic-produced field can never
+   * be judged with OpenAI named as the producer (which would exclude OpenAI and
+   * leave Anthropic free to judge its own output).
+   */
+  it.each([['anthropic'], ['openai'], ['cerebras']])(
+    'excludes exactly the vendor the scan recorded (%s), with no way to name another',
+    async (vendor) => {
+      mockRouteAndCall.mockResolvedValue(routeResult(CLEAN_ALLOW));
+
+      await judgeReferredLearningText({
+        scan: referredScan(AMBIGUOUS_TEXT, vendor),
+      });
+
+      const [, , options] = mockRouteAndCall.mock.calls[0]!;
+      expect(options?.judgeIndependence).toEqual({
+        mode: 'model-output',
+        producerVendor: vendor,
+      });
+    },
+  );
+
+  it('carries the vendor trimmed, so a padded value cannot silently widen the exclusion', async () => {
+    mockRouteAndCall.mockResolvedValue(routeResult(CLEAN_ALLOW));
+
+    await judgeReferredLearningText({
+      scan: referredScan(AMBIGUOUS_TEXT, '  anthropic  '),
+    });
+
+    const [, , options] = mockRouteAndCall.mock.calls[0]!;
+    expect(options?.judgeIndependence).toEqual({
+      mode: 'model-output',
+      producerVendor: 'anthropic',
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The referral payload must not become a new leak surface
+// ---------------------------------------------------------------------------
+
+describe('scanLearningText referral payload', () => {
+  it('is absent from every serialization path, so logging a scan result cannot leak the text', () => {
+    const scan = referredScan(SENTINEL_TEXT);
+
+    expect(JSON.stringify(scan)).not.toContain('quibblefrotz');
+    expect(Object.keys(scan)).not.toContain('text');
+    expect(JSON.stringify(Object.entries(scan))).not.toContain('quibblefrotz');
+    // Stage 3 logs scan results; this is the property that keeps that safe.
+    expect(JSON.stringify({ scan })).not.toContain('quibblefrotz');
+  });
+
+  it('is stamped ONLY on a refer disposition', () => {
+    const cleared = scanLearningText({
+      text: 'This chapter explains long division.',
+      conversationLanguage: 'en',
+      provenance: 'llm',
+      fieldKind: 'note_text',
+      producerVendor: PRODUCER_VENDOR,
+    });
+    const blocked = scanLearningText({
+      text: AMBIGUOUS_TEXT,
+      conversationLanguage: 'en',
+      provenance: 'user',
+      fieldKind: 'note_text',
+    });
+
+    expect(cleared[REFERRAL_PAYLOAD]).toBeUndefined();
+    expect(blocked[REFERRAL_PAYLOAD]).toBeUndefined();
+    expect(referredScan()[REFERRAL_PAYLOAD]).toEqual({
+      text: AMBIGUOUS_TEXT,
+      producerVendor: PRODUCER_VENDOR,
+    });
   });
 });
 

@@ -16,6 +16,13 @@
 // a thrown route error, no JSON, unparseable JSON, an off-contract verdict or
 // reason, and a verdict paired with a reason that does not belong to it.
 //
+// BOUND TO THE SCAN, NOT TO CALLER ARGUMENTS. The scan result is the single
+// source of both the text under evaluation and the producer vendor to exclude —
+// this function takes neither as a parameter. Pairing a `refer` with unrelated
+// text, or naming a vendor other than the one that made the scan referable, are
+// unrepresentable rather than merely wrong. Rationale + the two misuse shapes:
+// `referral.ts`.
+//
 // STRICT OUTPUT CONTRACT (AC-4, verbatim): `allow` with `educational_reference`,
 // or `block` with one of `person_attribution | diagnostic_inference | unclear`.
 // A mismatched pair is MALFORMED, not a hint — it is never coerced toward the
@@ -36,6 +43,7 @@ import { z } from 'zod';
 import type { ConversationLanguage } from '@eduagent/schemas';
 import { escapeXml, extractFirstJsonObject, routeAndCall } from '../llm';
 import { createLogger } from '../logger';
+import { REFERRAL_PAYLOAD } from './referral';
 import type {
   LearningTextBlockReason,
   LearningTextFieldKind,
@@ -107,19 +115,15 @@ const BLOCKED_UNCLEAR: JudgeLearningTextDecision = {
 
 export interface JudgeReferredLearningTextInput {
   /**
-   * The Stage-1 scan result for this text. Only `disposition === 'refer'` is
-   * judgeable; see the precondition guard in `judgeReferredLearningText`.
+   * The Stage-1 scan result — the SINGLE source of the text under evaluation
+   * and of the producer vendor to exclude. There is deliberately no `text` and
+   * no `producerVendor` parameter: both are derived from the scan's referral
+   * payload, so a caller cannot pair a `refer` with unrelated text, and cannot
+   * name a vendor that disagrees with the one that made the scan referable.
+   * See `referral.ts` for the two misuse shapes this closes.
    */
   readonly scan: ScanLearningTextResult;
-  /** The text the scan was run over. Never logged, never returned. */
-  readonly text: string;
   readonly conversationLanguage?: ConversationLanguage;
-  /**
-   * The REAL vendor that produced this LLM-authored text — passed to the router
-   * as the `JudgeIndependence` producer so the producing vendor is excluded
-   * from judging its own output.
-   */
-  readonly producerVendor: string;
   /** Optional: several Stage-3 call sites (learner profile fields, notes) have no session. */
   readonly sessionId?: string;
 }
@@ -237,15 +241,27 @@ export async function judgeReferredLearningText(
     return BLOCKED_UNCLEAR;
   }
 
-  // A blank vendor would produce a JudgeIndependence descriptor that excludes
-  // nothing, silently letting the producing vendor judge its own output. That
-  // is this module's own contract with the router, not Stage 1's matrix.
-  if (input.producerVendor.trim().length === 0) {
+  // The referral payload is the binding. Only `scanLearningText` stamps it, so
+  // its absence on a `refer` scan means the object did not come from a real
+  // scan (hand-built, deserialized, or mutated) — there is no text this judge
+  // is entitled to send anywhere, and no vendor it can safely exclude.
+  const referral = input.scan[REFERRAL_PAYLOAD];
+  if (referral === undefined) {
+    logDegraded('missing_referral_payload', fieldKind);
+    return BLOCKED_UNCLEAR;
+  }
+
+  // Defense in depth. `scanLearningText` cannot produce a `refer` with a blank
+  // vendor, so this is unreachable through the public API — it exists because a
+  // blank vendor would yield a JudgeIndependence descriptor that excludes
+  // NOTHING, letting the producing vendor judge its own output, and that
+  // failure is silent. A forged payload must not be able to buy that.
+  if (referral.producerVendor.trim().length === 0) {
     logDegraded('missing_producer_vendor', fieldKind);
     return BLOCKED_UNCLEAR;
   }
 
-  const messages = buildJudgePrompt({ text: input.text, fieldKind });
+  const messages = buildJudgePrompt({ text: referral.text, fieldKind });
 
   let response: string;
   try {
@@ -253,7 +269,10 @@ export async function judgeReferredLearningText(
       capability: 'judge',
       judgeIndependence: {
         mode: 'model-output',
-        producerVendor: input.producerVendor,
+        // Derived from the scan, never from a caller argument — this is what
+        // makes "the excluded vendor is the vendor that actually produced the
+        // text" a property rather than a caller obligation.
+        producerVendor: referral.producerVendor,
       },
       flow: JUDGE_LEARNING_TEXT_SAFETY_FLOW,
       conversationLanguage: input.conversationLanguage,
