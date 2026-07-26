@@ -37,7 +37,10 @@ import {
   supportership,
   type Database,
 } from '@eduagent/database';
-import { visibilityLinkInitiateSchema } from '@eduagent/schemas';
+import {
+  visibilityLinkInitiateSchema,
+  type VisibilityContract,
+} from '@eduagent/schemas';
 
 import { ForbiddenError } from '../errors';
 import {
@@ -108,6 +111,56 @@ function createIntegrationDb(): Database {
     }
 
     // ---- T5a ----------------------------------------------------------------
+
+    it('returns the same active contract for simultaneous duplicate creates without duplicate rows or audit events', async () => {
+      const { supporterId, supporteeId } = await seedTwoPersons();
+      const input = {
+        supporterPersonId: supporterId,
+        supporteePersonId: supporteeId,
+        relation: 'other' as const,
+        managedTier: false,
+        managedTierActive: false,
+        now: NOW,
+      };
+
+      const attempts = await Promise.allSettled([
+        initiateLink(db, input),
+        initiateLink(db, input),
+      ]);
+
+      const edges = await db.query.supportership.findMany({
+        where: and(
+          eq(supportership.supporterPersonId, supporterId),
+          eq(supportership.supporteePersonId, supporteeId),
+        ),
+      });
+      supportershipIds.push(...edges.map((edge) => edge.id));
+
+      const fulfilled = attempts.filter(
+        (attempt): attempt is PromiseFulfilledResult<VisibilityContract> =>
+          attempt.status === 'fulfilled',
+      );
+      expect(
+        attempts.filter((attempt) => attempt.status === 'rejected'),
+      ).toHaveLength(0);
+      expect(fulfilled).toHaveLength(2);
+      expect(fulfilled[0]?.value.id).toBe(fulfilled[1]?.value.id);
+      expect(edges).toHaveLength(1);
+
+      const contracts = await db.query.supportVisibilityContracts.findMany({
+        where: eq(supportVisibilityContracts.supportershipId, edges[0]!.id),
+      });
+      expect(contracts).toHaveLength(1);
+
+      const initiatedAudits =
+        await db.query.supportVisibilityAuditEvents.findMany({
+          where: and(
+            eq(supportVisibilityAuditEvents.supportershipId, edges[0]!.id),
+            eq(supportVisibilityAuditEvents.eventType, 'contract_initiated'),
+          ),
+        });
+      expect(initiatedAudits).toHaveLength(1);
+    });
 
     it('blocks the supporter read until BOTH sides accept [T5a]', async () => {
       const { supporterId, supporteeId } = await seedTwoPersons();

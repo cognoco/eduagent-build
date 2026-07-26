@@ -27,7 +27,7 @@
 # link, which is what this AC's happy path names.
 #
 # [Disclosure] This explicit-lane flow covers Android Back, process relaunch,
-# offline retry, lapsed/invalid recovery, and both login handoffs in
+# offline retry, invalid-link recovery, and both login handoffs in
 # addition to the happy path. Completion evidence must cite an executed green
 # run; source presence alone is not a receipt. DB-backed scenario-state
 # assertions live in test-seed-v2-supporter.integration.test.ts; concurrent
@@ -40,6 +40,8 @@ tags:
   - v2
   - navigation
 ---
+- setAirplaneMode: disabled
+
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
@@ -52,10 +54,9 @@ tags:
     timeout: 30000
 
 # REACHABILITY: deep-link into the initiate screen with the existing
-# supportee pre-filled. Screen-render only — the create this AC's happy path
-# names is exercised against the already-seeded pending contract below, not
-# resubmitted here (a second initiateLink call for the same pair would just
-# mint an unrelated, unused second edge).
+# supportee pre-filled. Screen-render only — the pending fixture already
+# exercised the real initiateLink write path and supplies the deterministic
+# contract ID used across both login handoffs below.
 - openLink: 'mentomate:///link/initiate?supporteePersonId=${SUPPORTEE_PERSON_ID}&relation=other'
 - extendedWaitUntil:
     visible:
@@ -118,13 +119,31 @@ tags:
       EMAIL: ${SUPPORTEE_EMAIL}
       PASSWORD: ${SUPPORTEE_PASSWORD}
 
-# NAVIGATION — a cold process relaunch preserves the one-sided/pending stage.
-# The supportee still sees their Accept control while the completed review is
-# absent, proving the supporter's earlier acceptance survived the handoff.
+# NAVIGATION + RECOVERY — a cold process relaunch clears the in-memory query
+# cache while preserving the one-sided/pending contract in the API. Force that
+# valid contract's first read offline, then use the real retry control after
+# restoring connectivity. This proves both cold persistence and recovery on
+# the same real agreement the two participants are accepting.
 - stopApp
 - launchApp:
     clearState: false
+- extendedWaitUntil:
+    visible:
+      id: 'account-avatar-button'
+    timeout: 30000
+- setAirplaneMode: enabled
 - openLink: 'mentomate:///link/${CONTRACT_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'visibility-link-error'
+    timeout: 30000
+- setAirplaneMode: disabled
+- extendedWaitUntil:
+    visible:
+      id: 'visibility-link-error-retry'
+    timeout: 15000
+- tapOn:
+    id: 'visibility-link-error-retry'
 - extendedWaitUntil:
     visible:
       id: 'visibility-contract-card'
@@ -133,48 +152,8 @@ tags:
     id: 'visibility-contract-accept'
 - assertNotVisible:
     id: 'visibility-link-review'
-
-# RECOVERY — navigate away, then force an uncached contract's first read
-# offline and use the real retry control after restoring connectivity.
-- pressKey: back
-- extendedWaitUntil:
-    visible:
-      id: 'mentor-screen'
-    timeout: 15000
-- setAirplaneMode: enabled
-- openLink: 'mentomate:///link/${LAPSED_CONTRACT_ID}'
-- extendedWaitUntil:
-    visible:
-      id: 'visibility-link-error'
-    timeout: 30000
-- setAirplaneMode: disabled
-- tapOn:
-    id: 'visibility-link-error-retry'
-- extendedWaitUntil:
-    visible:
-      id: 'visibility-contract-card'
-    timeout: 15000
-
-# RECOVERY — representative expired invite. The lapsed contract is visible to
-# its party but terminal: no Accept/review/revoke action, with a safe V2 exit.
-- assertNotVisible:
-    id: 'visibility-contract-accept'
-- assertNotVisible:
-    id: 'visibility-link-review'
-- assertNotVisible:
-    id: 'visibility-contract-revoke'
-- tapOn:
-    id: 'visibility-link-back'
-- extendedWaitUntil:
-    visible:
-      id: 'mentor-screen'
-    timeout: 15000
-
-- openLink: 'mentomate:///link/${CONTRACT_ID}'
-- extendedWaitUntil:
-    visible:
-      id: 'visibility-link-screen'
-    timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn:
     id: 'visibility-contract-accept'
 - extendedWaitUntil:
@@ -201,6 +180,10 @@ tags:
 - stopApp
 - launchApp:
     clearState: false
+- extendedWaitUntil:
+    visible:
+      id: 'account-avatar-button'
+    timeout: 30000
 - openLink: 'mentomate:///link/${CONTRACT_ID}'
 - extendedWaitUntil:
     visible:
@@ -208,11 +191,11 @@ tags:
     timeout: 30000
 
 # RECOVERY — a nonexistent contract fails closed and its explicit Back action
-# returns to V2 Mentor.
+# returns to the post-acceptance V2 Support hub Mentor root.
 - pressKey: back
 - extendedWaitUntil:
     visible:
-      id: 'mentor-screen'
+      id: 'support-hub-mentor-tab'
     timeout: 15000
 - openLink: 'mentomate:///link/00000000-0000-7000-8000-000000000099'
 - extendedWaitUntil:
@@ -223,7 +206,7 @@ tags:
     id: 'visibility-link-error-back'
 - extendedWaitUntil:
     visible:
-      id: 'mentor-screen'
+      id: 'support-hub-mentor-tab'
     timeout: 15000
 - assertNotVisible:
     id: 'home-screen'

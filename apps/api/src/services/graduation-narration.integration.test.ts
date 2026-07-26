@@ -36,6 +36,7 @@ import {
   type Database,
 } from '@eduagent/database';
 
+import { acceptLink } from './linking-ceremony';
 import { restampGraduationContracts } from './graduation-narration';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
@@ -194,6 +195,145 @@ function createIntegrationDb(): Database {
         occurredAt: GRADUATED_AT.toISOString(),
         contractVersion: 2,
       });
+    });
+
+    it('does not restamp or duplicate side effects when the same graduation event is retried', async () => {
+      const seeded = await seedAcceptedContract();
+
+      const first = await restampGraduationContracts(db, {
+        personId: seeded.supporteeId,
+        occurredAt: GRADUATED_AT,
+      });
+      const retry = await restampGraduationContracts(db, {
+        personId: seeded.supporteeId,
+        occurredAt: GRADUATED_AT,
+      });
+
+      expect(first.restamped).toBe(1);
+      expect(retry.restamped).toBe(0);
+
+      const contract = await db.query.supportVisibilityContracts.findFirst({
+        where: eq(supportVisibilityContracts.id, seeded.contractId),
+      });
+      expect(contract).toMatchObject({
+        status: 'restamped',
+        contractVersion: 2,
+      });
+
+      const audit = await db.query.supportVisibilityAuditEvents.findMany({
+        where: eq(
+          supportVisibilityAuditEvents.supportershipId,
+          seeded.supportershipId,
+        ),
+      });
+      expect(
+        audit.filter((event) => event.eventType === 'graduation_restamped'),
+      ).toHaveLength(1);
+
+      const notices = await db.query.supportVisibilityNotices.findMany({
+        where: eq(
+          supportVisibilityNotices.supportershipId,
+          seeded.supportershipId,
+        ),
+      });
+      expect(notices).toHaveLength(1);
+    });
+
+    it('does not reapply a retried graduation event after the contract is reaccepted', async () => {
+      const seeded = await seedAcceptedContract();
+      await restampGraduationContracts(db, {
+        personId: seeded.supporteeId,
+        occurredAt: GRADUATED_AT,
+      });
+
+      await acceptLink(db, seeded.contractId, {
+        actorPersonId: seeded.supporterId,
+        audience: 'supporter',
+        contractVersion: 2,
+        now: new Date('2026-06-29T10:00:00.000Z'),
+      });
+      await acceptLink(db, seeded.contractId, {
+        actorPersonId: seeded.supporteeId,
+        audience: 'supportee',
+        contractVersion: 2,
+        now: new Date('2026-06-29T10:01:00.000Z'),
+      });
+
+      const retry = await restampGraduationContracts(db, {
+        personId: seeded.supporteeId,
+        occurredAt: GRADUATED_AT,
+      });
+      expect(retry.restamped).toBe(0);
+
+      const contract = await db.query.supportVisibilityContracts.findFirst({
+        where: eq(supportVisibilityContracts.id, seeded.contractId),
+      });
+      expect(contract).toMatchObject({
+        status: 'accepted',
+        contractVersion: 2,
+      });
+
+      const audit = await db.query.supportVisibilityAuditEvents.findMany({
+        where: eq(
+          supportVisibilityAuditEvents.supportershipId,
+          seeded.supportershipId,
+        ),
+      });
+      expect(
+        audit.filter((event) => event.eventType === 'graduation_restamped'),
+      ).toHaveLength(1);
+
+      const notices = await db.query.supportVisibilityNotices.findMany({
+        where: eq(
+          supportVisibilityNotices.supportershipId,
+          seeded.supportershipId,
+        ),
+      });
+      expect(notices).toHaveLength(1);
+    });
+
+    it('applies concurrent calls for the same graduation event exactly once', async () => {
+      const seeded = await seedAcceptedContract();
+
+      const results = await Promise.all([
+        restampGraduationContracts(db, {
+          personId: seeded.supporteeId,
+          occurredAt: GRADUATED_AT,
+        }),
+        restampGraduationContracts(db, {
+          personId: seeded.supporteeId,
+          occurredAt: GRADUATED_AT,
+        }),
+      ]);
+      expect(results.reduce((sum, result) => sum + result.restamped, 0)).toBe(
+        1,
+      );
+
+      const contract = await db.query.supportVisibilityContracts.findFirst({
+        where: eq(supportVisibilityContracts.id, seeded.contractId),
+      });
+      expect(contract).toMatchObject({
+        status: 'restamped',
+        contractVersion: 2,
+      });
+
+      const audit = await db.query.supportVisibilityAuditEvents.findMany({
+        where: eq(
+          supportVisibilityAuditEvents.supportershipId,
+          seeded.supportershipId,
+        ),
+      });
+      expect(
+        audit.filter((event) => event.eventType === 'graduation_restamped'),
+      ).toHaveLength(1);
+
+      const notices = await db.query.supportVisibilityNotices.findMany({
+        where: eq(
+          supportVisibilityNotices.supportershipId,
+          seeded.supportershipId,
+        ),
+      });
+      expect(notices).toHaveLength(1);
     });
   },
 );

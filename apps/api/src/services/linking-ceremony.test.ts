@@ -95,20 +95,23 @@ function buildMockDb(opts: {
   //  - awaitable directly (for audit inserts: await db.insert(t).values({...}))
   //  - AND has a .returning() method (for supportership/contract inserts)
   function makeInsertChain(table: TableRef) {
+    const executeReturning = async () => {
+      if (opts.failOnAuditInsert && table === supportVisibilityAuditEvents) {
+        throw new Error(
+          'Injected failure: insert into supportVisibilityAuditEvents',
+        );
+      }
+      log.push({ op: 'insert', table });
+      if (table === supportership) return [makeMockEdgeRow()];
+      if (table === supportVisibilityContracts) return [makeMockContractRow()];
+      return [{}];
+    };
     const valuesResult = {
       // .returning() path — used by supportership and contract inserts
-      returning: async () => {
-        if (opts.failOnAuditInsert && table === supportVisibilityAuditEvents) {
-          throw new Error(
-            'Injected failure: insert into supportVisibilityAuditEvents',
-          );
-        }
-        log.push({ op: 'insert', table });
-        if (table === supportership) return [makeMockEdgeRow()];
-        if (table === supportVisibilityContracts)
-          return [makeMockContractRow()];
-        return [{}];
-      },
+      returning: executeReturning,
+      onConflictDoNothing: (_config: unknown) => ({
+        returning: executeReturning,
+      }),
       // Thenable — allows `await db.insert(t).values({})` without .returning()
       then: (
         resolve: (value: unknown) => unknown,

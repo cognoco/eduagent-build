@@ -203,6 +203,45 @@ describe('InitiateLinkScreen', () => {
     expect(body?.relation).toBe('sibling');
   }, 10_000);
 
+  it('disables create while the request is pending and does not submit twice', async () => {
+    let resolveCreate: (value: unknown) => void = () => undefined;
+    const pendingCreate = new Promise((resolve) => {
+      resolveCreate = resolve;
+    });
+    mockParams = {
+      supporteePersonId: NAMED_PROFILES.linkedChild.id,
+      supporteeName: NAMED_PROFILES.linkedChild.displayName,
+      relation: 'teacher',
+    };
+    const InitiateLinkScreen = require('./initiate').default;
+    const rendered = renderScreen(<InitiateLinkScreen />, {
+      profile: NAMED_PROFILES.guardian,
+      routes: { '/visibility/links': () => pendingCreate },
+    });
+    cleanupRender = rendered.cleanup;
+    const { routedFetch } = rendered;
+
+    fireEvent.press(screen.getByTestId('visibility-link-create'));
+    await waitFor(() =>
+      expect(fetchCallsMatching(routedFetch, '/visibility/links')).toHaveLength(
+        1,
+      ),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('visibility-link-create')).toBeDisabled(),
+    );
+    fireEvent.press(screen.getByTestId('visibility-link-create'));
+    expect(fetchCallsMatching(routedFetch, '/visibility/links')).toHaveLength(
+      1,
+    );
+
+    await act(async () => {
+      resolveCreate(CONTRACT);
+      await pendingCreate;
+    });
+  });
+
   it('selecting an existing family member shows a not-yet-available state instead of a fake flow', () => {
     renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });
 

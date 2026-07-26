@@ -78,9 +78,45 @@ export async function initiateLink(
         createdAt: now,
         updatedAt: now,
       })
+      .onConflictDoNothing({
+        target: [
+          supportership.supporterPersonId,
+          supportership.supporteePersonId,
+        ],
+        where: isNull(supportership.revokedAt),
+      })
       .returning();
     const edge = edgeRows[0];
-    if (!edge) throw new Error('Supportership insert returned no row');
+    if (!edge) {
+      // The active-pair unique index is the atomic idempotency arbiter. A
+      // concurrent request waits for the winning transaction, then reaches
+      // this branch without inserting. Return the winner's current active
+      // contract rather than surfacing a unique-constraint error or writing a
+      // duplicate initiation audit event.
+      const existingRows = await tx
+        .select({ contract: supportVisibilityContracts })
+        .from(supportVisibilityContracts)
+        .innerJoin(
+          supportership,
+          eq(supportVisibilityContracts.supportershipId, supportership.id),
+        )
+        .where(
+          and(
+            eq(supportership.supporterPersonId, input.supporterPersonId),
+            eq(supportership.supporteePersonId, input.supporteePersonId),
+            isNull(supportership.revokedAt),
+            inArray(supportVisibilityContracts.status, [
+              'pending',
+              'accepted',
+              'restamped',
+            ]),
+          ),
+        )
+        .limit(1);
+      const existing = existingRows[0]?.contract;
+      if (existing) return mapContract(existing);
+      throw new ConflictError('An active support link already exists.');
+    }
 
     const contractRows = await tx
       .insert(supportVisibilityContracts)

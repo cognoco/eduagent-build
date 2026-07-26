@@ -7,9 +7,9 @@ import { seedScenario } from '../../helpers/test-seed';
 
 /**
  * J-33 [WI-2242] supporter <-> supportee link ceremony: two independent
- * logins (browser contexts, J-13's two-context pattern) drive the real
- * create -> accept -> accept sequence end to end via the UI, then chain into
- * J-29's post-acceptance shape.
+ * logins (browser contexts, J-13's two-context pattern) prove initiate-screen
+ * reachability, then drive both sides of the service-created pending contract
+ * through acceptance via the UI and chain into J-29's post-acceptance shape.
  *
  * Seeded with `v2-supporter-pending-link` (test-seed-v2-supporter.ts) — a
  * supporter + ONE independent supportee identity with a contract already
@@ -75,10 +75,9 @@ test('J-33 supporter <-> supportee: reach the link ceremony via deep-link initia
   });
 
   // --- REACHABILITY: deep-link into the initiate screen with the existing
-  // supportee pre-filled. Screen-render only — the create this AC's happy
-  // path names is exercised against the already-seeded pending contract
-  // below, not resubmitted here (a second `initiateLink` call for the same
-  // pair would just mint an unrelated, unused second edge).
+  // supportee pre-filled. Screen-render only — the pending fixture already
+  // exercised the real `initiateLink` write path and supplies the deterministic
+  // contract ID used across both independent logins below.
   await page.goto(
     `/link/initiate?supporteePersonId=${supporteePersonId}&relation=other`,
   );
@@ -165,8 +164,8 @@ test('J-33 supporter <-> supportee: reach the link ceremony via deep-link initia
     await pressableClick(supporteePage.getByTestId('visibility-link-back'));
     await expect(supporteePage).toHaveURL(/\/mentor$/);
 
-    // RECOVERY — existing foreign contract (403) and nonexistent contract
-    // (404) both fail closed and offer the same safe V2 return.
+    // RECOVERY — existing foreign and nonexistent contracts both fail closed
+    // and offer the same safe V2 return.
     for (const inaccessibleId of [
       foreignContractId,
       '00000000-0000-7000-8000-000000000099',

@@ -294,11 +294,6 @@ export default function LinkContractScreen(): React.ReactElement {
           </Text>
         </Pressable>
       ) : null}
-      {revokeMutation.isSuccess ? (
-        <Text className="text-body-sm text-text-secondary">
-          {t('visibility.link.revoked')}
-        </Text>
-      ) : null}
       {revokeMutation.isError ? (
         <ErrorFallback
           title={t('visibility.link.revokeErrorTitle')}

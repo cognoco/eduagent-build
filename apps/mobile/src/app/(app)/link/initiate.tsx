@@ -129,7 +129,8 @@ export default function InitiateLinkScreen(): React.ReactElement {
             here — canGoBack() is true for support-hub entry (mentor.tsx /
             subjects.tsx push this screen as a single push), false for a
             historyless direct/deep-link entry, which falls back to the same
-            V2 home used by the sibling `[contractId].tsx` back button. */}
+            V2 Mentor root used by the sibling `[contractId].tsx` back
+            button. */}
         <LinkCeremonyBackButton
           onPress={() => goBackOrReplace(router, '/(app)/mentor')}
           testID="visibility-link-initiate-picker-back"
@@ -238,6 +239,7 @@ export default function InitiateLinkScreen(): React.ReactElement {
         accessibilityRole="button"
         accessibilityLabel={t('visibility.link.createAction')}
         className="min-h-[48px] items-center justify-center rounded-button bg-primary px-4 py-3"
+        disabled={createMutation.isPending}
         onPress={() => {
           hasExitedRef.current = false;
           createMutation.mutate();
