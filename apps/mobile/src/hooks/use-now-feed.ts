@@ -25,8 +25,11 @@ import {
   observePolicyEpoch,
   readCachedNowFeed,
   readObservedPolicyEpoch,
+  stripNoticeCards,
+  stripNoticeOverflowItems,
   writeCachedNowFeed,
 } from '../lib/now-feed-cache';
+import { useMentorNoticePolicy } from '../lib/mentor-notice-policy';
 import { useNavigationDataScopeContract } from './use-navigation-contract';
 import { parseJson } from '../lib/parse-json';
 import { useApiQuery } from './use-api-query';
@@ -153,6 +156,9 @@ export function useNowFeed(): NowFeedQueryResult {
     hydrated: epochHydrated,
     observe,
   } = useObservedPolicyEpoch(userId, profileId);
+  // [WI-2627] Ordering, alongside the epoch's invalidation. Two seams because
+  // they answer two questions — see lib/mentor-notice-policy.ts.
+  const policy = useMentorNoticePolicy(userId, profileId);
 
   // [WI-2498] Cache entries are actor/profile/policy-bound, so one actor's
   // projection can never be rehydrated for another. Server-side V remains the
@@ -193,6 +199,11 @@ export function useNowFeed(): NowFeedQueryResult {
         );
         const okRes = await assertOk(res);
         const data = await parseJson(okRes, nowResponseSchema, 'GET /now');
+        // [WI-2627] This response is also the ORDERED observation. Fold it
+        // before the cache write below, so a response that carries a rollback
+        // is not persisted with its own notice cards intact.
+        policy.observe(data.mentorNoticePolicy);
+        const noticesAllowed = !policy.suppressed(data.mentorNoticePolicy);
         const binding = cacheBindingRef.current;
         if (binding) {
           // [WI-2504] This response IS the observation. An absent epoch means
@@ -211,7 +222,10 @@ export function useNowFeed(): NowFeedQueryResult {
             observe(epoch);
           }
           void writeCachedNowFeed({ ...binding, policyEpoch: epoch }, data, {
-            noticesVisible,
+            // [WI-2627] `noticesVisible` was the proxy strip alone; a payload
+            // the policy suppresses must not be persisted with its cards
+            // either, or the next cold start reads them straight back.
+            noticesVisible: noticesVisible && noticesAllowed,
           });
         }
         return data;
@@ -286,12 +300,42 @@ export function useNowFeed(): NowFeedQueryResult {
     query.isFetching,
   ]);
 
+  // [WI-2627] Bind each payload to the observation it arrived with, then apply
+  // the policy. Three distinct suppressions, all through the one store:
+  //   - `query.data` — the live response, suppressed if IT is stale (a reply
+  //     that left the server at revision 6 landing after the client learned
+  //     revision 7 carries pre-rollback cards; the fold correctly ignores its
+  //     observation and does nothing about its cards);
+  //   - `fallbackFeed` — the persisted projection, which carries NO observation
+  //     of its own, so it is suppressed purely on stored policy state. This is
+  //     the cached-resurrection case the store exists for;
+  //   - and both re-evaluate on any store change, because a sibling surface
+  //     observing a disable must blank this one too.
+  const noticeSafeData = useMemo(() => {
+    if (!query.data) return query.data;
+    return policy.suppressed(query.data.mentorNoticePolicy)
+      ? stripNoticeCards(query.data)
+      : query.data;
+  }, [query.data, policy]);
+
+  const noticeSafeFallback = useMemo(() => {
+    if (!fallbackFeed) return fallbackFeed;
+    return policy.suppressed(undefined)
+      ? stripNoticeCards(fallbackFeed)
+      : fallbackFeed;
+  }, [fallbackFeed, policy]);
+
+  // The cast is the `UseQueryResult` discriminated union, not a type escape:
+  // overriding `data` on a spread widens it to `NowResponse | undefined`, which
+  // no longer narrows against the success/pending members. `noticeSafeData` is
+  // `undefined` exactly when `query.data` is, so the runtime shape is unchanged.
   return {
     ...query,
-    fallbackFeed,
+    data: noticeSafeData,
+    fallbackFeed: noticeSafeFallback,
     isSlowFallback,
     observedEpoch,
-  };
+  } as NowFeedQueryResult;
 }
 
 export function useMentorNoticeActions() {
@@ -300,6 +344,10 @@ export function useMentorNoticeActions() {
   const { activeProfile } = useProfile();
   const { userId } = useAuth();
   const issuedForProfileId = activeProfile?.id;
+  // [WI-2627] Recheck and defer echo the observation on SUCCESS. A learner who
+  // acts on a notice mid-rollback must not have that success applied under a
+  // policy state the client has since superseded.
+  const policy = useMentorNoticePolicy(userId, issuedForProfileId);
 
   const invalidate = async (): Promise<void> => {
     await Promise.all([
@@ -318,11 +366,13 @@ export function useMentorNoticeActions() {
         ':noticeId'
       ].recheck.$post({ param: { noticeId } });
       const ok = await assertOk(response);
-      return parseJson(
+      const result = await parseJson(
         ok,
         mentorNoticeRecheckResponseSchema,
         'POST /mentor-notices/:noticeId/recheck',
       );
+      policy.observe(result.mentorNoticePolicy);
+      return result;
     },
     onSuccess: invalidate,
   });
@@ -332,11 +382,13 @@ export function useMentorNoticeActions() {
         param: { noticeId },
       });
       const ok = await assertOk(response);
-      return parseJson(
+      const result = await parseJson(
         ok,
         mentorNoticeDeferResponseSchema,
         'POST /mentor-notices/:noticeId/defer',
       );
+      policy.observe(result.mentorNoticePolicy);
+      return result;
     },
     onSuccess: invalidate,
   });
@@ -357,8 +409,9 @@ export function useNowOverflow(
   // so the overflow list cannot outlive the policy the client observed.
   const { epoch: observedEpoch, hydrated: epochHydrated } =
     useObservedPolicyEpoch(userId, profileId);
+  const policy = useMentorNoticePolicy(userId, profileId);
 
-  return useApiQuery({
+  const query = useApiQuery({
     // [WI-2498] Actor-bound, matching the now-feed key above.
     queryKey: queryKeys.now.overflow(userId, profileId, observedEpoch),
     enabled: enabled && epochHydrated,
@@ -370,4 +423,27 @@ export function useNowOverflow(
       ),
     select: (json) => json,
   });
+
+  // [WI-2627] `useApiQuery` runs `select` inside the query fn, so a strip done
+  // there would be baked into the cache entry and would never re-evaluate when
+  // a sibling surface observes a disable. Fold and suppress out here instead.
+  const observation = query.data?.mentorNoticePolicy;
+  useEffect(() => {
+    policy.observe(observation);
+    // `policy.observe` is stable per (actor, profile); re-running on every
+    // `policy` identity change would re-fold the same observation harmlessly,
+    // but the fold is idempotent either way.
+  }, [observation, policy]);
+
+  const noticeSafeData = useMemo(() => {
+    if (!query.data) return query.data;
+    return policy.suppressed(observation)
+      ? stripNoticeOverflowItems(query.data)
+      : query.data;
+  }, [query.data, observation, policy]);
+
+  return {
+    ...query,
+    data: noticeSafeData,
+  } as UseQueryResult<NowOverflowResponse>;
 }

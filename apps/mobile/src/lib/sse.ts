@@ -147,6 +147,24 @@ export interface StreamDoneEvent {
   topicOpenedPendingContent?: boolean;
   /** Server-accepted homework observation; never present on token/fallback frames. */
   mentorNotice?: import('@eduagent/schemas').MentorNoticeAccepted;
+  /**
+   * [WI-2627] The orderable rollout observation on the terminal frame.
+   *
+   * This parser never STRIPPED the field — but it never DECLARED it either, and
+   * an undeclared field is just as unreachable to a consumer: `use-stream-message.ts`
+   * cannot read `event.mentorNoticePolicy` off `StreamDoneEvent` without this
+   * line. Third variant of the same trap as the two consumer drops the item
+   * fixes: a field can die at a schema strip, at a validator, at a consumer's
+   * field-by-field reconstruction, OR at a client-side event type that was
+   * never widened — and only the first is visible from `packages/schemas`.
+   *
+   * Deliberately NOT runtime-validated in `isValidStreamEvent` below (unlike
+   * `mentorNotice`): `reduceMentorNoticePolicy` treats a malformed observation
+   * as a fail-closed disable at the held revision, which is strictly safer than
+   * dropping the field here — dropping it would read as "absent", i.e. no
+   * signal at all.
+   */
+  mentorNoticePolicy?: import('@eduagent/schemas').MentorNoticePolicyObservation;
 }
 
 export interface StreamErrorEvent {

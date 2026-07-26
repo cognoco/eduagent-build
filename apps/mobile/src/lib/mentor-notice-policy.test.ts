@@ -246,56 +246,108 @@ describe('reduceMentorNoticePolicy — fail-closed paths', () => {
 });
 
 describe('noticesSuppressedForPayload', () => {
-  const enabledAt7: MentorNoticePolicyState = { revision: 7, enabled: true };
+  const enabledAt7 = {
+    state: { revision: 7, enabled: true } as MentorNoticePolicyState,
+    observed: true,
+    hydrated: true,
+  };
 
   it('suppresses until hydrated, whatever the payload says', () => {
     expect(
-      noticesSuppressedForPayload(enabledAt7, false, observation(7, true)),
+      noticesSuppressedForPayload(
+        { ...enabledAt7, hydrated: false },
+        observation(7, true),
+      ),
     ).toBe(true);
   });
 
   it('suppresses while policy is disabled', () => {
     expect(
       noticesSuppressedForPayload(
-        { revision: 7, enabled: false },
-        true,
+        { ...enabledAt7, state: { revision: 7, enabled: false } },
         observation(7, true),
       ),
     ).toBe(true);
   });
 
   it('suppresses a STALE payload — one whose observation predates what we hold', () => {
-    expect(
-      noticesSuppressedForPayload(enabledAt7, true, observation(6, true)),
-    ).toBe(true);
+    expect(noticesSuppressedForPayload(enabledAt7, observation(6, true))).toBe(
+      true,
+    );
   });
 
   it('does NOT suppress a payload at the revision we hold', () => {
-    expect(
-      noticesSuppressedForPayload(enabledAt7, true, observation(7, true)),
-    ).toBe(false);
+    expect(noticesSuppressedForPayload(enabledAt7, observation(7, true))).toBe(
+      false,
+    );
   });
 
   it('does NOT suppress a payload from a HIGHER revision', () => {
     // The fold will have adopted it moments earlier; a newer payload is never
     // stale.
-    expect(
-      noticesSuppressedForPayload(enabledAt7, true, observation(8, true)),
-    ).toBe(false);
-  });
-
-  it('does NOT suppress a payload carrying NO observation', () => {
-    // A pre-field worker's response. It carries no rollback signal, and the
-    // server has already stripped notice data if the flag is off.
-    expect(noticesSuppressedForPayload(enabledAt7, true, undefined)).toBe(
+    expect(noticesSuppressedForPayload(enabledAt7, observation(8, true))).toBe(
       false,
     );
   });
 
   it('suppresses a payload carrying a MALFORMED observation', () => {
-    expect(noticesSuppressedForPayload(enabledAt7, true, { junk: 1 })).toBe(
-      true,
-    );
+    expect(noticesSuppressedForPayload(enabledAt7, { junk: 1 })).toBe(true);
+  });
+
+  // ── The never-told / told-disabled split ───────────────────────────────────
+  // `{revision: 0, enabled: false}` is both "nothing was ever observed" and
+  // "policy is off at revision 0". A payload carrying no observation of its own
+  // must be treated differently in each case, and collapsing them inverts a
+  // shipped WI-2504 guarantee in one direction or leaves the cached-resurrection
+  // hole open in the other.
+  describe('a payload carrying NO observation', () => {
+    it('renders on a device that has never been told anything', () => {
+      // A pre-field worker's response, or a legitimately cached projection on a
+      // device that has only ever been offline. The server predicate V is the
+      // control and has already stripped notice data if the flag is off.
+      expect(
+        noticesSuppressedForPayload(
+          {
+            state: MENTOR_NOTICE_POLICY_BOOTSTRAP,
+            observed: false,
+            hydrated: true,
+          },
+          undefined,
+        ),
+      ).toBe(false);
+    });
+
+    it('renders on a device told the rollout is ON', () => {
+      expect(noticesSuppressedForPayload(enabledAt7, undefined)).toBe(false);
+    });
+
+    it('is BLANKED on a device told the rollout is OFF — cached resurrection', () => {
+      expect(
+        noticesSuppressedForPayload(
+          {
+            state: { revision: 7, enabled: false },
+            observed: true,
+            hydrated: true,
+          },
+          undefined,
+        ),
+      ).toBe(true);
+    });
+
+    it('is BLANKED when the device was told something unparseable at revision 0', () => {
+      // Same {0,false} state as the never-told case above, opposite verdict —
+      // this is exactly the distinction `observed` carries.
+      expect(
+        noticesSuppressedForPayload(
+          {
+            state: MENTOR_NOTICE_POLICY_BOOTSTRAP,
+            observed: true,
+            hydrated: true,
+          },
+          undefined,
+        ),
+      ).toBe(true);
+    });
   });
 });
 
@@ -552,12 +604,22 @@ describe('useMentorNoticePolicy', () => {
     expect(result.current.state.enabled).toBe(true);
   });
 
-  it('reports an unbound (actor-less) pair as hydrated but fully suppressed', () => {
+  it('judges an unbound (actor-less) payload on its OWN observation alone', () => {
     const { result } = mountPolicy(null);
 
     // Nothing to hydrate FROM, so callers gating on `hydrated` are not blocked
-    // while auth resolves; but no notices may render either.
+    // while auth resolves. There is also no per-pair history to consult, so the
+    // payload's own observation is the whole answer — anything stricter blanks a
+    // legitimate notice for the render or two before `userId` lands, which is
+    // what a session-summary screen mounting mid-auth actually does.
     expect(result.current.hydrated).toBe(true);
-    expect(result.current.suppressed(observation(9, true))).toBe(true);
+    expect(result.current.suppressed(observation(9, true))).toBe(false);
+    expect(result.current.suppressed(observation(9, false))).toBe(true);
+    expect(result.current.suppressed(undefined)).toBe(false);
+    expect(result.current.suppressed({ junk: 1 } as never)).toBe(true);
+
+    // ...and it writes nothing: no actor means no key to persist under.
+    act(() => result.current.observe(observation(9, true)));
+    expect(result.current.state).toEqual({ revision: 0, enabled: false });
   });
 });

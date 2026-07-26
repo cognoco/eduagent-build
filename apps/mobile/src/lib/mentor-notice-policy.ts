@@ -199,6 +199,37 @@ export function reduceMentorNoticePolicy(
 }
 
 /**
+ * What this device knows, as the payload test below needs it.
+ *
+ * `observed` is the distinction the bootstrap alone cannot express, and getting
+ * it wrong inverts a shipped guarantee. `{revision: 0, enabled: false}` is BOTH
+ * "this device has been told nothing" and "policy is off at revision 0", and
+ * those two must behave differently for a payload that carries no observation of
+ * its own: a never-told device keeps serving what it legitimately cached
+ * (WI-2504's rule, and its tests), while a device that HAS been told the rollout
+ * is off must blank that same cache. Tracked outside
+ * `MentorNoticePolicyState` because it is not something revisions order — it is
+ * whether any ordering has happened at all.
+ */
+export type MentorNoticePolicyKnowledge = {
+  state: MentorNoticePolicyState;
+  /** Has any real signal — wire or stored — ever been folded in? */
+  observed: boolean;
+  hydrated: boolean;
+};
+
+/**
+ * Whether a signal counts as having been TOLD something.
+ *
+ * 'malformed' does: a record or field was present and could not be trusted, so
+ * the device is not entitled to the never-told benefit of the doubt. 'absent'
+ * does not — nothing arrived.
+ */
+export function signalIsObservation(signal: MentorNoticePolicySignal): boolean {
+  return signal !== 'absent';
+}
+
+/**
  * Whether a PAYLOAD's notice content must be suppressed, given what this device
  * knows.
  *
@@ -206,29 +237,40 @@ export function reduceMentorNoticePolicy(
  * correct; this keeps a single response from painting notices even when state is
  * already correct — a `/now` reply that left the server at revision 6 and lands
  * after the client learned revision 7 carries pre-rollback cards, and the fold
- * (which correctly ignores it) does nothing about the cards themselves.
+ * (which correctly ignores its observation) does nothing about its cards.
  *
  * Suppressed when any of:
  *   - not hydrated: nothing may render off a projection before the stored
  *     observation is back (the cold-offline-launch case WI-2504 established);
- *   - policy disabled at the revision we hold;
- *   - the payload's own observation is STRICTLY OLDER than what we hold.
+ *   - the payload's own observation is malformed;
+ *   - the payload carries NO observation and this device HAS been told the
+ *     rollout is off — the cached-resurrection case this store exists for;
+ *   - the payload carries an observation, and policy is off at the revision we
+ *     hold, or that observation is STRICTLY OLDER than the revision we hold.
  *
- * Note the asymmetry: an observation at the SAME revision is not stale even
- * when it says disabled — it must still disable, which the fold does, and the
- * `!state.enabled` clause then suppresses. Only strictly-older is stale.
+ * NOT suppressed when the payload carries no observation and this device has
+ * never been told anything: the server's predicate V is the control and has
+ * already stripped notice data if the flag is off, so a pre-field worker's
+ * response (or a legitimately cached projection on a device that has only ever
+ * been offline) must keep rendering. Treating that as a disable would blank
+ * notices fleet-wide the moment a pre-field worker answered.
+ *
+ * Note the asymmetry in the last clause: an observation at the SAME revision is
+ * not stale even when it says disabled — it must still disable, which the fold
+ * does, and the `!enabled` check then suppresses. Only strictly-older is stale.
  */
 export function noticesSuppressedForPayload(
-  state: MentorNoticePolicyState,
-  hydrated: boolean,
+  knowledge: MentorNoticePolicyKnowledge,
   observation: MentorNoticePolicyObservation | undefined | unknown,
 ): boolean {
-  if (!hydrated) return true;
-  if (!state.enabled) return true;
+  if (!knowledge.hydrated) return true;
   const signal = observationSignal(observation);
-  if (signal === 'absent') return false;
   if (signal === 'malformed') return true;
-  return compareRevision(signal.revision, state.revision) === 'older';
+  if (signal === 'absent') {
+    return knowledge.observed ? !knowledge.state.enabled : false;
+  }
+  if (!knowledge.state.enabled) return true;
+  return compareRevision(signal.revision, knowledge.state.revision) === 'older';
 }
 
 // ---------------------------------------------------------------------------
@@ -239,10 +281,7 @@ function storageKey(actorId: string, profileId: string): string {
   return `${KEY_PREFIX}::${actorId}::${profileId}`;
 }
 
-export type MentorNoticePolicySnapshot = {
-  state: MentorNoticePolicyState;
-  hydrated: boolean;
-};
+export type MentorNoticePolicySnapshot = MentorNoticePolicyKnowledge;
 
 type Entry = {
   snapshot: MentorNoticePolicySnapshot;
@@ -252,6 +291,7 @@ type Entry = {
 
 const UNBOUND_SNAPSHOT: MentorNoticePolicySnapshot = {
   state: MENTOR_NOTICE_POLICY_BOOTSTRAP,
+  observed: false,
   hydrated: false,
 };
 
@@ -269,7 +309,11 @@ function getEntry(key: string): Entry {
   let entry = entries.get(key);
   if (!entry) {
     entry = {
-      snapshot: { state: MENTOR_NOTICE_POLICY_BOOTSTRAP, hydrated: false },
+      snapshot: {
+        state: MENTOR_NOTICE_POLICY_BOOTSTRAP,
+        observed: false,
+        hydrated: false,
+      },
       listeners: new Set(),
       hydrating: false,
     };
@@ -281,12 +325,18 @@ function getEntry(key: string): Entry {
 function commit(
   entry: Entry,
   state: MentorNoticePolicyState,
+  observed: boolean,
   hydrated: boolean,
 ): void {
-  if (entry.snapshot.state === state && entry.snapshot.hydrated === hydrated) {
+  const previous = entry.snapshot;
+  if (
+    previous.state === state &&
+    previous.observed === observed &&
+    previous.hydrated === hydrated
+  ) {
     return;
   }
-  entry.snapshot = { state, hydrated };
+  entry.snapshot = { state, observed, hydrated };
   for (const listener of entry.listeners) listener();
 }
 
@@ -322,7 +372,15 @@ async function readAndFold(key: string, entry: Entry): Promise<void> {
     });
     signal = 'malformed';
   }
-  commit(entry, reduceMentorNoticePolicy(entry.snapshot.state, signal), true);
+  commit(
+    entry,
+    reduceMentorNoticePolicy(entry.snapshot.state, signal),
+    // A stored record that EXISTS (even unparseably) means this device was told
+    // something and persisted it; only its genuine absence leaves the device
+    // never-told.
+    entry.snapshot.observed || signalIsObservation(signal),
+    true,
+  );
 }
 
 function hydrateOnce(key: string, entry: Entry): void {
@@ -354,6 +412,8 @@ export function useMentorNoticePolicy(
   profileId: string | null | undefined,
 ): {
   state: MentorNoticePolicyState;
+  /** Whether any real signal has ever been folded in for this pair. */
+  observed: boolean;
   hydrated: boolean;
   /** Fold an observation off any surface into the shared state. */
   observe: (observation: MentorNoticePolicyObservation | undefined) => void;
@@ -400,38 +460,70 @@ export function useMentorNoticePolicy(
     (observation: MentorNoticePolicyObservation | undefined) => {
       if (!key) return;
       const entry = getEntry(key);
-      const previous = entry.snapshot.state;
-      const next = reduceMentorNoticePolicy(
-        previous,
-        observationSignal(observation),
-      );
-      if (next === previous) return;
-      commit(entry, next, entry.snapshot.hydrated);
+      const signal = observationSignal(observation);
+      if (!signalIsObservation(signal)) return;
+      const next = reduceMentorNoticePolicy(entry.snapshot.state, signal);
+      commit(entry, next, true, entry.snapshot.hydrated);
+      // Persist even when `next` is unchanged: the first observation of an
+      // already-matching state (e.g. {0,false} arriving at the bootstrap) moves
+      // no revision but DOES move this device from never-told to told, and that
+      // has to survive a relaunch or the next cold start would hand a cached
+      // projection the never-told benefit of the doubt.
       void persist(key, next);
     },
     [key],
   );
 
+  // Reads the LIVE store rather than this render's snapshot. In render the two
+  // agree (both come from the same entry, and `useSyncExternalStore` re-renders
+  // on every commit). The difference matters in an imperative callback that has
+  // just called `observe`: the SSE done frame that carries a notice is also the
+  // frame that can carry the disable voiding it, and a snapshot-based answer
+  // would be one render stale — it would paint the notice it was told to drop.
   const suppressed = useCallback(
-    (observation: MentorNoticePolicyObservation | undefined) =>
-      noticesSuppressedForPayload(
-        snapshot.state,
-        // An unbound pair has nothing to hydrate FROM and reads/writes no
-        // projection; reporting it unhydrated would suppress forever rather
-        // than fail closed on a real read.
-        bound ? snapshot.hydrated : true,
-        observation,
-      ),
-    [snapshot.state, snapshot.hydrated, bound],
+    (observation: MentorNoticePolicyObservation | undefined) => {
+      if (!key) {
+        // No actor/profile (auth still resolving): there is no per-pair history
+        // to consult and nothing was read or written under a guessed key, so the
+        // payload is judged on its OWN observation alone — fold it onto the
+        // bootstrap and ask about the result. An observation saying disabled
+        // suppresses; one saying enabled renders; no observation renders, which
+        // is the same benefit of the doubt `useObservedPolicyEpoch` gives an
+        // unbound pair. Anything stricter blanks a legitimate notice for the
+        // render or two before `userId` lands.
+        const signal = observationSignal(observation);
+        return noticesSuppressedForPayload(
+          {
+            state: reduceMentorNoticePolicy(
+              MENTOR_NOTICE_POLICY_BOOTSTRAP,
+              signal,
+            ),
+            observed: signalIsObservation(signal),
+            hydrated: true,
+          },
+          observation,
+        );
+      }
+      return noticesSuppressedForPayload(getEntry(key).snapshot, observation);
+    },
+    [key],
   );
 
   return useMemo(
     () => ({
       state: snapshot.state,
+      observed: bound ? snapshot.observed : true,
       hydrated: bound ? snapshot.hydrated : true,
       observe,
       suppressed,
     }),
-    [snapshot.state, snapshot.hydrated, bound, observe, suppressed],
+    [
+      snapshot.state,
+      snapshot.observed,
+      snapshot.hydrated,
+      bound,
+      observe,
+      suppressed,
+    ],
   );
 }
