@@ -1595,6 +1595,31 @@ function bindAskedQuestionToEvaluationIdentities(
   );
 }
 
+/**
+ * [WI-2670] T6 extension: source the most recent mentor question AND its REAL
+ * producing vendor from the last assistant turn in `exchangeHistory` — no DB
+ * read. `producerVendor` comes from that turn's persisted `llmProvider` (see
+ * `extractProducerVendor`/`buildExchangeHistory`), never the CURRENT turn's
+ * own routing decision: the two can diverge after a mid-session provider
+ * fallback, which is exactly the substitution the Challenge Round grader's
+ * `JudgeIndependence` declaration must not make (root-cause note removed from
+ * grader.ts — see WI-2670).
+ */
+export function resolveAskedQuestion(
+  exchangeHistory: ReturnType<typeof buildExchangeHistory>,
+): { askedQuestion: string; producerVendor?: string } {
+  const lastAssistant = exchangeHistory
+    .filter((e) => e.role === 'assistant')
+    .at(-1);
+  if (!lastAssistant) return { askedQuestion: '' };
+  return {
+    askedQuestion: projectAiResponseContent(lastAssistant.content, {
+      silent: true,
+    }),
+    producerVendor: lastAssistant.producerVendor,
+  };
+}
+
 async function applyChallengeRoundRuntimeSignals(
   db: Database,
   profileId: string,
@@ -1610,6 +1635,12 @@ async function applyChallengeRoundRuntimeSignals(
     // assistant message in exchangeHistory. Passed to the grader judge so it
     // has the question context without a DB round-trip.
     askedQuestion?: string;
+    // [WI-2670] The REAL vendor that produced `askedQuestion` — sourced by the
+    // caller from that same last assistant turn's persisted `llmProvider`
+    // (see `resolveAskedQuestion`). Required for the grader to declare
+    // `JudgeIndependence` mode:'model-output'; undefined only when the
+    // producer genuinely cannot be resolved.
+    askedQuestionProducerVendor?: string;
     // T8: true when CHALLENGE_ROUND_GRADER_ENABLED env binding is 'true'.
     // Threaded from processMessage/streamMessage options.
     challengeRoundGraderEnabled?: boolean;
@@ -1662,11 +1693,20 @@ async function applyChallengeRoundRuntimeSignals(
 
     // Call the judge (fail-open: emits a structured degraded event and returns
     // [] on any error — never throws into this path).
+    //
+    // [WI-2670] `producerVendor` is threaded from the asked question's
+    // persisted `llmProvider` (see `resolveAskedQuestion`) — every
+    // ai_response event written by `persistExchangeResult` carries it, so
+    // this should always resolve in practice. grader.ts owns the
+    // "producer unresolved" fail-open branch (never fabricates a vendor,
+    // emits its own structured `producer_vendor_unresolved` degraded event)
+    // rather than this call site special-casing it.
     const graderEvaluation = await runChallengeRoundGrader({
       profileId,
       askedQuestion: payload.askedQuestion ?? '',
       learnerAnswer: payload.currentUserMessage.content,
       answerEventId: payload.currentUserMessage.id,
+      producerVendor: payload.askedQuestionProducerVendor,
       priorQuestionIdentities: current.evaluations.flatMap((evaluation) =>
         evaluation.questionIdentity ? [evaluation.questionIdentity] : [],
       ),
@@ -2304,10 +2344,32 @@ function isReplayableSystemPrompt(event: ExchangeHistoryEvent): boolean {
   return source === undefined || source === 'server';
 }
 
+/**
+ * [WI-2670] The REAL vendor that produced an `ai_response` event, read back
+ * from the `llmProvider` field persisted on `session_events.metadata` at
+ * write time (see `persistExchangeResult`'s `aiMetadata.llmProvider`). Every
+ * `ai_response` row written by this file's persistence path carries it
+ * unconditionally; a missing/malformed value (e.g. a pre-tracking legacy row)
+ * resolves to `undefined` rather than throwing — callers must treat that as
+ * "producer unresolved," never guess.
+ */
+function extractProducerVendor(metadata: unknown): string | undefined {
+  if (
+    !metadata ||
+    typeof metadata !== 'object' ||
+    !('llmProvider' in metadata)
+  ) {
+    return undefined;
+  }
+  const value = (metadata as { llmProvider?: unknown }).llmProvider;
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
 export function buildExchangeHistory(events: ExchangeHistoryEvent[]): Array<{
   role: 'user' | 'system' | 'assistant';
   content: string;
   orphan_reason?: string;
+  producerVendor?: string;
 }> {
   return events
     .filter(
@@ -2324,6 +2386,12 @@ export function buildExchangeHistory(events: ExchangeHistoryEvent[]): Array<{
             ? ('system' as const)
             : ('assistant' as const),
       ...(e.orphanReason ? { orphan_reason: e.orphanReason } : {}),
+      ...(e.eventType === 'ai_response'
+        ? (() => {
+            const producerVendor = extractProducerVendor(e.metadata);
+            return producerVendor ? { producerVendor } : {};
+          })()
+        : {}),
       content:
         e.eventType === 'ai_response'
           ? (() => {
@@ -4240,13 +4308,10 @@ export async function processMessage(
   // (the mentor's most recent question, assembled before this LLM call — no DB
   // read). `content` is a re-wrapped JSON envelope; projectAiResponseContent
   // extracts clean prose. Falls back to '' if history is empty (first turn).
-  const askedQuestion = (() => {
-    const lastAssistant = context.exchangeHistory
-      .filter((e) => e.role === 'assistant')
-      .at(-1);
-    if (!lastAssistant) return '';
-    return projectAiResponseContent(lastAssistant.content, { silent: true });
-  })();
+  // [WI-2670] Also sources that turn's real producer vendor — see
+  // `resolveAskedQuestion`.
+  const { askedQuestion, producerVendor: askedQuestionProducerVendor } =
+    resolveAskedQuestion(context.exchangeHistory);
 
   let challengeRoundRuntime = await applyChallengeRoundRuntimeSignals(
     db,
@@ -4262,6 +4327,7 @@ export async function processMessage(
         ? { id: currentUserMessageEventId, content: input.message }
         : undefined,
       // T6 + T7 + T8
+      askedQuestionProducerVendor,
       askedQuestion,
       challengeRoundGraderEnabled: options?.challengeRoundGraderEnabled,
     },
@@ -4889,15 +4955,10 @@ export async function streamMessage(
       // T6: source the asked-question from the last assistant turn in history.
       // Same pattern as processMessage — no DB read; projectAiResponseContent
       // extracts clean prose from the re-wrapped JSON envelope.
-      const askedQuestion = (() => {
-        const lastAssistant = context.exchangeHistory
-          .filter((e) => e.role === 'assistant')
-          .at(-1);
-        if (!lastAssistant) return '';
-        return projectAiResponseContent(lastAssistant.content, {
-          silent: true,
-        });
-      })();
+      // [WI-2670] Also sources that turn's real producer vendor — see
+      // `resolveAskedQuestion`.
+      const { askedQuestion, producerVendor: askedQuestionProducerVendor } =
+        resolveAskedQuestion(context.exchangeHistory);
 
       let challengeRoundRuntime = await applyChallengeRoundRuntimeSignals(
         db,
@@ -4913,6 +4974,7 @@ export async function streamMessage(
             ? { id: currentUserMessageEventId, content: input.message }
             : undefined,
           // T6 + T7 + T8
+          askedQuestionProducerVendor,
           askedQuestion,
           challengeRoundGraderEnabled: options?.challengeRoundGraderEnabled,
         },

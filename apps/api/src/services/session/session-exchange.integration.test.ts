@@ -690,6 +690,13 @@ async function seedDraftingSession(
 /**
  * Seed a minimal `ai_response` session event so there is at least one prior
  * mentor question in `exchangeHistory` (used by T6 askedQuestion extraction).
+ *
+ * [WI-2670] `metadata.llmProvider` mirrors what `persistExchangeResult`
+ * always writes for a real ai_response row — the Challenge Round grader's
+ * `producerVendor` threading (`resolveAskedQuestion`) reads it back from
+ * here. Without it, this fixture would simulate a legacy pre-tracking row
+ * (unrealistic for any session created after this WI) and the grader would
+ * correctly, but here unrealistically, fail open.
  */
 async function seedPriorAiResponse(
   db: Database,
@@ -706,7 +713,7 @@ async function seedPriorAiResponse(
     topicId,
     eventType: 'ai_response',
     content,
-    metadata: { source: 'server' },
+    metadata: { source: 'server', llmProvider: 'anthropic' },
   });
 }
 
