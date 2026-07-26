@@ -207,12 +207,46 @@ describe('evaluateMentorNoticeRecheck', () => {
 
     for (const mode of failureModes) {
       const failure = await mode.run();
-      // Every failure mode lands on the ONE variant the turn-3 not_yet force
-      // acts on — and none of them equals the valid-continue result.
+      // Every failure mode lands on the ONE variant that means "no usable
+      // verdict" — and none of them equals the valid-continue result.
       expect(failure).toEqual({ kind: 'unresolved' });
       expect(failure).not.toEqual(validContinue);
       expect(failure.kind).not.toBe(validContinue.kind);
     }
+  });
+
+  // [WI-2625 rework] Three causes, three distinguishable results. The caller
+  // acts on all three differently — apply the verdict / cap over a valid
+  // continue / cap over an unresolved evaluation — and it records WHICH cause
+  // fired. Any two of these collapsing into one value re-creates the
+  // conflation class, so assert all three pairs are mutually distinct.
+  it('keeps all three evaluation variants mutually distinguishable', async () => {
+    mockRouteAndCall.mockResolvedValue(
+      routeResult(
+        JSON.stringify({ verdict: 'not_yet', reason: 'insufficient' }),
+      ),
+    );
+    const outcome = await evaluateMentorNoticeRecheck(db(), baseInput);
+
+    mockRouteAndCall.mockResolvedValue(
+      routeResult(JSON.stringify({ verdict: 'continue', reason: 'unclear' })),
+    );
+    const validContinue = await evaluateMentorNoticeRecheck(db(), baseInput);
+
+    mockRouteAndCall.mockResolvedValue(routeResult('not valid json at all'));
+    const unresolved = await evaluateMentorNoticeRecheck(db(), baseInput);
+
+    expect(outcome).toEqual({ kind: 'outcome', outcome: 'not_yet' });
+    expect(validContinue).toEqual({ kind: 'continue' });
+    expect(unresolved).toEqual({ kind: 'unresolved' });
+
+    const kinds = [outcome.kind, validContinue.kind, unresolved.kind];
+    expect(new Set(kinds).size).toBe(3);
+    // A `not_yet` VERDICT and a capped-out no-transition both end at status
+    // `not_yet` in the DB — but they must not be the same value here, or the
+    // caller cannot tell "the judge decided not_yet" from "nothing was decided".
+    expect(outcome).not.toEqual(unresolved);
+    expect(outcome).not.toEqual(validContinue);
   });
 
   it('routes with the judge flow, JSON format, and a model-output judgeIndependence naming the real tutor producer', async () => {

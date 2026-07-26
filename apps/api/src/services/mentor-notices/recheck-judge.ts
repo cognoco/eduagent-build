@@ -8,18 +8,24 @@
 //
 // Fail-open (mirrors judge-suitability.ts): any error, missing/malformed
 // judge output, or a `verdict`/`reason` pair outside the five accepted
-// combinations resolves to `{ kind: 'unresolved' }` — the caller
-// (session-exchange.ts) applies the deterministic turn-3 `not_yet` force over
-// exactly that variant.
+// combinations resolves to `{ kind: 'unresolved' }`.
 //
 // The result is a THREE-variant discriminated union, not a nullable outcome,
 // because "the judge validly said continue" and "the judge failed" are
-// different facts with different turn-3 consequences: a valid `continue`
-// (`{ kind: 'continue' }`) makes no transition at ANY exchange number, while
-// only `unresolved` terminalizes `not_yet` at turn 3. Collapsing both into one
-// return value is what made a valid turn-3 `continue` terminalize (the defect
-// this rework fixes); the union makes re-merging them a type error at both
-// call sites, which exhaustively switch on `kind`.
+// different facts: a valid `continue` (`{ kind: 'continue' }`) is a deliberate
+// no-transition, while `unresolved` means there was no usable verdict at all.
+// Collapsing both into one return value is what made a valid turn-3 `continue`
+// get reinterpreted as an evaluator failure (the defect this rework fixes);
+// the union makes re-merging them a type error at both call sites, which
+// exhaustively switch on `kind`.
+//
+// This evaluator never terminalizes anything and knows nothing about the
+// response cap. The caller (session-exchange.ts) owns the cap as a SEPARATE
+// deterministic mechanism: at the third response it terminalizes the attempt
+// to `not_yet` so no capped-out attempt is left attached to an open notice,
+// recording whether the cap fired over a valid `continue` or over an
+// unresolved evaluation. The judge's verdict is never the thing that
+// terminalizes on a `continue`.
 //
 // Data minimization: the judge sees the notice's concept/correctionHint
 // (already tutor-visible), the exchange number, and the learner's CURRENT
@@ -80,12 +86,15 @@ export const recheckJudgeRawSchema = z.object({
  * The re-check evaluation result. Three variants, deliberately distinct:
  *
  * - `outcome` — a valid terminal/defer verdict to apply now.
- * - `continue` — a VALID `continue`/`unclear` verdict: deliberately no
- *   transition, at every exchange number including 3 and beyond.
+ * - `continue` — a VALID `continue`/`unclear` verdict: the judge deliberately
+ *   makes no transition. Never itself terminalizes, at any exchange number.
  * - `unresolved` — the evaluator could not get a valid verdict (malformed
  *   output, judge unavailable, routing failure, thrown error, missing answer
- *   event). Fail-open: no transition before turn 3, and the caller's
- *   deterministic turn-3 `not_yet` force applies to THIS variant only.
+ *   event). Fail-open: no verdict to apply.
+ *
+ * Neither no-transition variant terminalizes on its own. The caller's separate
+ * response cap does that at the third response, and records which of the two
+ * it fired over.
  */
 export type MentorNoticeRecheckEvaluation =
   | { kind: 'outcome'; outcome: MentorNoticeRecheckOutcome }
@@ -100,8 +109,8 @@ const UNRESOLVED: MentorNoticeRecheckEvaluation = { kind: 'unresolved' };
  * a malformed, self-contradicting response and is rejected, not coerced.
  * `continue` resolves to the `continue` variant rather than a persisted
  * status: it is a valid, recognized judge answer meaning "not resolved yet,
- * but not decided either" — and, unlike `unresolved`, it is never subject to
- * the caller's turn-3 `not_yet` force.
+ * but not decided either" — distinct from `unresolved`, which means no usable
+ * verdict was obtained at all.
  */
 const ACCEPTED_PAIRS: Record<
   (typeof recheckVerdictValues)[number],
@@ -206,9 +215,9 @@ export interface EvaluateMentorNoticeRecheckInput {
  * hits the `onConflictDoNothing` dedup path never re-invokes this function).
  *
  * Returns a `MentorNoticeRecheckEvaluation`: `outcome` (apply it now),
- * `continue` (a VALID no-transition verdict — never terminalized, at any
- * exchange number), or `unresolved` (fail-open; the caller applies the
- * deterministic turn-3 `not_yet` force over this variant only).
+ * `continue` (a VALID no-transition verdict), or `unresolved` (fail-open — no
+ * usable verdict). This function never terminalizes and never applies the
+ * response cap; the caller owns the cap.
  */
 export async function evaluateMentorNoticeRecheck(
   db: Database,

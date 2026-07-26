@@ -103,6 +103,7 @@ import {
   evaluateMentorNoticeRecheck,
   getLearningDayStart,
   getProfileTimeZone,
+  MENTOR_NOTICE_RECHECK_MAX_EXCHANGES,
   resolveMentorNoticeRecheckContext,
 } from '../mentor-notices';
 import { generateEmbedding } from '../embeddings';
@@ -249,6 +250,49 @@ async function recordSessionPracticeActivityEvent(
 }
 
 const logger = createLogger();
+
+// ---------------------------------------------------------------------------
+// [WI-2625 rework] Mentor-notice re-check CAP — a separate deterministic
+// mechanism from the judge's verdict.
+//
+// The judge's valid `continue` never itself terminalizes a notice (AC-3). But
+// `resolveMentorNoticeRecheckContext` stops returning a context once the
+// session passes the cap (offer.ts, `exchangeNumber <= MAX`), so from the next
+// exchange the judge is never consulted again while the notice stays `open` —
+// it keeps surfacing in the Now feed and `startMentorNoticeRecheck` keeps
+// handing back the same active session. That traps the learner in a re-check
+// that can never complete. So at the cap the CAP terminalizes the attempt to
+// `not_yet`, whatever the judge said; the two causes stay distinguishable in
+// code (the `cause` discriminant) and in logs (the emitted `cause` field).
+// ---------------------------------------------------------------------------
+
+/** Why the cap fired — the judge's own valid `continue`, or an unusable evaluator result. */
+type MentorNoticeRecheckCapCause = 'valid_continue' | 'evaluator_unresolved';
+
+async function terminalizeMentorNoticeRecheckAtCap(
+  db: Database,
+  input: {
+    profileId: string;
+    noticeId: string;
+    exchangeNumber: number;
+    cause: MentorNoticeRecheckCapCause;
+  },
+): Promise<void> {
+  if (input.exchangeNumber < MENTOR_NOTICE_RECHECK_MAX_EXCHANGES) return;
+  logger.info(
+    '[mentor-notice-recheck] response cap reached — terminalizing not_yet',
+    {
+      cause: input.cause,
+      exchangeNumber: input.exchangeNumber,
+      maxExchanges: MENTOR_NOTICE_RECHECK_MAX_EXCHANGES,
+    },
+  );
+  await applyMentorNoticeOutcome(db, {
+    profileId: input.profileId,
+    noticeId: input.noticeId,
+    outcome: 'not_yet',
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Correct-answer streak computation (pure — testable in isolation)
@@ -4361,11 +4405,12 @@ export async function processMessage(
       conversationLanguage: context.conversationLanguage,
       tutorVendor: result.provider,
     });
-    // [WI-2625 rework] Exhaustive switch on the evaluation variant. A valid
-    // `continue` verdict makes NO transition at any exchange number; only
-    // `unresolved` (malformed / unavailable judge) is subject to the
-    // deterministic turn-3 `not_yet` force. The `never` default makes any
-    // future re-merging of those two facts a compile error.
+    // [WI-2625 rework] Exhaustive switch on the evaluation variant. The
+    // judge's verdict and the response cap are separate mechanisms: a valid
+    // `continue` never itself transitions the notice, and at the cap the CAP
+    // terminalizes `not_yet` (see terminalizeMentorNoticeRecheckAtCap) so no
+    // capped-out attempt is left attached to an open notice. The `never`
+    // default makes any future re-merging of these facts a compile error.
     switch (evaluation.kind) {
       case 'outcome': {
         const now = new Date();
@@ -4380,15 +4425,20 @@ export async function processMessage(
         break;
       }
       case 'continue':
+        await terminalizeMentorNoticeRecheckAtCap(db, {
+          profileId,
+          noticeId: context.mentorNoticeRecheck.id,
+          exchangeNumber: context.mentorNoticeRecheck.exchangeNumber,
+          cause: 'valid_continue',
+        });
         break;
       case 'unresolved':
-        if (context.mentorNoticeRecheck.exchangeNumber >= 3) {
-          await applyMentorNoticeOutcome(db, {
-            profileId,
-            noticeId: context.mentorNoticeRecheck.id,
-            outcome: 'not_yet',
-          });
-        }
+        await terminalizeMentorNoticeRecheckAtCap(db, {
+          profileId,
+          noticeId: context.mentorNoticeRecheck.id,
+          exchangeNumber: context.mentorNoticeRecheck.exchangeNumber,
+          cause: 'evaluator_unresolved',
+        });
         break;
       default: {
         const exhaustive: never = evaluation;
@@ -5005,9 +5055,9 @@ export async function streamMessage(
           conversationLanguage: context.conversationLanguage,
           tutorVendor: result.provider,
         });
-        // [WI-2625 rework] Same exhaustive variant switch as the
-        // processMessage call site above — a valid `continue` never
-        // terminalizes, only `unresolved` hits the turn-3 `not_yet` force.
+        // [WI-2625 rework] Same exhaustive variant switch and same cap
+        // handling as the processMessage call site above — the judge's valid
+        // `continue` never itself terminalizes; the cap does.
         switch (evaluation.kind) {
           case 'outcome': {
             const now = new Date();
@@ -5022,15 +5072,20 @@ export async function streamMessage(
             break;
           }
           case 'continue':
+            await terminalizeMentorNoticeRecheckAtCap(db, {
+              profileId,
+              noticeId: context.mentorNoticeRecheck.id,
+              exchangeNumber: context.mentorNoticeRecheck.exchangeNumber,
+              cause: 'valid_continue',
+            });
             break;
           case 'unresolved':
-            if (context.mentorNoticeRecheck.exchangeNumber >= 3) {
-              await applyMentorNoticeOutcome(db, {
-                profileId,
-                noticeId: context.mentorNoticeRecheck.id,
-                outcome: 'not_yet',
-              });
-            }
+            await terminalizeMentorNoticeRecheckAtCap(db, {
+              profileId,
+              noticeId: context.mentorNoticeRecheck.id,
+              exchangeNumber: context.mentorNoticeRecheck.exchangeNumber,
+              cause: 'evaluator_unresolved',
+            });
             break;
           default: {
             const exhaustive: never = evaluation;
