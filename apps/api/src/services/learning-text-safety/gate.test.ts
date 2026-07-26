@@ -210,6 +210,51 @@ describe('[WI-2628 AC-1] evaluateLearningTextFields composes scan and judge acro
   });
 });
 
+describe('[WI-2628] an unresolved declared language scans under every language', () => {
+  const evaluateWithoutLanguage = (text: string) =>
+    evaluateLearningTextFields({
+      fields: [{ key: 'f', fieldKind: 'note_text', text }],
+      // What `parseConversationLanguage` returns for a null column or an
+      // unrecognised code. Callers pass it straight through — the alternative,
+      // substituting 'en', reinstates the English-only bug this WI removes.
+      conversationLanguage: undefined,
+      provenance: 'user',
+    });
+
+  it.each([
+    ['Czech', 'Petr má dyslexii a potřebuje pomoc.'],
+    ['Spanish', 'El alumno tiene TEA.'],
+    ['German', 'Der Schüler hat ADS.'],
+    ['Norwegian', 'Eleven har ADD.'],
+    ['Japanese', '田中さんは自閉症です。'],
+    ['English', 'Petr has dyslexia.'],
+  ])(
+    'blocks the %s person attribution with no declared language',
+    async (_name, text) => {
+      // The discriminating case. Under a declared 'en' the Czech/Spanish/German/
+      // Norwegian/Japanese grammars are never compiled, so each of these would
+      // classify ambiguous rather than block — i.e. defaulting an unresolved
+      // language to 'en' silently restores the shipped guard's behavior.
+      const result = await evaluateWithoutLanguage(text);
+      expect(result.isSafe('f')).toBe(false);
+    },
+  );
+
+  it('still keeps an ordinary sentence clear', async () => {
+    // Scanning all ten grammars is more conservative, not indiscriminate — a
+    // branch that blocked everything would pass the rows above for free.
+    const result = await evaluateWithoutLanguage(CLEAR_TEXT);
+    expect(result.isSafe('f')).toBe(true);
+  });
+
+  it('keeps a homograph mention clear across all ten grammars', async () => {
+    const result = await evaluateWithoutLanguage(
+      'I have tea with breakfast every morning.',
+    );
+    expect(result.isSafe('f')).toBe(true);
+  });
+});
+
 describe('[WI-2628 AC-4] the batch inherits the judge fail-closed matrix', () => {
   const evaluateOne = (
     text: string,
@@ -276,7 +321,9 @@ describe('[WI-2628 AC-6] observability records field kind, reason and count — 
 
   beforeEach(() => {
     entries = [];
-    setStructuredLogSink((entry) => entries.push(entry));
+    setStructuredLogSink((entry) => {
+      entries.push(entry);
+    });
   });
 
   afterEach(() => {

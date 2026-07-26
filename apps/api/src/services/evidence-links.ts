@@ -13,7 +13,10 @@ import {
   type EvidenceLinkResolution,
   type EvidenceLink,
 } from '@eduagent/schemas';
-import * as learningTextGuard from './persisted-learning-text-guard';
+import {
+  assertLearningTextSafe,
+  evaluateLearningTextFields,
+} from './learning-text-safety/gate';
 
 type EvidenceLinkWriter = Pick<Database, 'insert'>;
 
@@ -68,10 +71,39 @@ export async function persistVerifiedChallengeArtifacts(
   },
 ): Promise<void> {
   if (params.artifacts.length === 0) return;
-  for (const artifact of params.artifacts) {
-    learningTextGuard.assertNoClinicalInferenceInLearningRecord(
-      storedArtifactContent(artifact),
-    );
+
+  // [WI-2628] Evaluated as ONE batch, before `db.transaction` opens below — the
+  // gate can make an LLM round-trip, and holding a pooled connection across it
+  // would be a connection-exhaustion hazard. Batching also means N artifacts
+  // cost at most one judge call per distinct (fieldKind, text).
+  //
+  // KEEPS THROWING, deliberately, and this is a documented deviation from AC-5's
+  // "derived writes drop unsafe data". These are server-owned Challenge
+  // artifacts, so by provenance they are a derived write and AC-5 would have them
+  // dropped. But the throw is load-bearing CONTROL FLOW here, not an accident:
+  // it aborts the whole artifact set, and the caller
+  // (`session-exchange.ts` -> `safeWrite`) swallows it into Sentry. Converting to
+  // a per-artifact drop would silently change all-or-nothing into partial
+  // persistence for a verified-evidence set. Fail-closed either way; changing a
+  // caller's atomicity contract is not this change-set's business. Flagged for
+  // the operator rather than done quietly.
+  const gate = await evaluateLearningTextFields({
+    // No profile read on this path — the gate scans all ten attribution
+    // grammars and keeps the strictest verdict. Never `'en'`.
+    conversationLanguage: undefined,
+    provenance: 'llm',
+    // Not reachable here; AC-4 makes a missing producer fail closed to
+    // block/unclear rather than referring to the judge.
+    producerVendor: null,
+    fields: params.artifacts.map((artifact, index) => ({
+      key: `artifact-${index}`,
+      fieldKind: 'evidence_link_context' as const,
+      text: storedArtifactContent(artifact),
+    })),
+  });
+
+  for (const [index, artifact] of params.artifacts.entries()) {
+    assertLearningTextSafe(gate, `artifact-${index}`);
     if (new Set(artifact.sourceEventIds).size === 0) {
       throw new Error('Verified Challenge artifact requires provenance');
     }

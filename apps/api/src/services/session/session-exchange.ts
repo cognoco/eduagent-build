@@ -153,7 +153,7 @@ import {
 import { createLogger } from '../logger';
 import { captureException } from '../sentry';
 import { safeSend, safeWrite } from '../safe-non-core';
-import * as learningTextGuard from '../persisted-learning-text-guard';
+import { evaluateLearningTextFields } from '../learning-text-safety/gate';
 import {
   buildResumeContext,
   loadPriorSessionMeta,
@@ -1092,6 +1092,44 @@ async function persistChallengeRoundReviewTargets(
     decision.reviewTargets.map((target) => [target.concept, target]),
   );
 
+  // [WI-2628] Gate every review target's `misconception` HERE, above the
+  // transaction. The gate can make an LLM round-trip (the independent judge), and
+  // an LLM call inside an open transaction pins a pooled connection for its whole
+  // duration — a connection-exhaustion hazard under load. The text is already
+  // known from `decision.reviewTargets`, so nothing forces the evaluation inside.
+  // One batch, so N targets cost at most one judge call per distinct text.
+  //
+  // DERIVED WRITE — unsafe data is DROPPED (the field is written null), never
+  // raised, which is the AC-5 asymmetry and matches exactly what the English-only
+  // guard did at these two sites.
+  const misconceptionGate = await evaluateLearningTextFields({
+    // Not loaded on this path; the gate then scans all ten attribution grammars
+    // and keeps the strictest verdict. Never `'en'` — that is the bug being fixed.
+    conversationLanguage: undefined,
+    provenance: 'llm',
+    // Not reachable here. AC-4: a missing producer fails closed to block/unclear
+    // rather than referring the text to the judge.
+    producerVendor: null,
+    sessionId: session.id,
+    fields: [...targetsByConcept.values()].map((target) => ({
+      key: target.concept,
+      fieldKind: 'needs_deepening' as const,
+      text: target.misconception,
+    })),
+  });
+  /**
+   * Null when the gate refused the value. `isSafe` fails closed on a concept the
+   * batch never evaluated, so a target added to the loop without being added to
+   * the batch above drops its misconception rather than persisting it ungated.
+   */
+  const safeMisconception = (target: {
+    concept: string;
+    misconception?: string | null;
+  }): string | null =>
+    misconceptionGate.isSafe(target.concept)
+      ? (target.misconception ?? null)
+      : null;
+
   // [WI-1060] Read existing rows + the per-target update/insert loop run in one
   // transaction. Each review target is a separate update-or-insert; a crash
   // mid-loop would persist some weak concepts as deepening targets and drop
@@ -1126,10 +1164,7 @@ async function persistChallengeRoundReviewTargets(
         await txDb
           .update(needsDeepeningTopics)
           .set({
-            misconception:
-              learningTextGuard.scrubClinicalInferenceFromLearningRecord(
-                target.misconception,
-              ),
+            misconception: safeMisconception(target),
             correction: target.correction,
             ...(existing.status === 'pending_review'
               ? { pendingExpiresAt }
@@ -1153,10 +1188,7 @@ async function persistChallengeRoundReviewTargets(
         status: 'pending_review',
         source: 'challenge_round',
         concept: target.concept,
-        misconception:
-          learningTextGuard.scrubClinicalInferenceFromLearningRecord(
-            target.misconception,
-          ),
+        misconception: safeMisconception(target),
         correction: target.correction,
         pendingExpiresAt,
         updatedAt: now,

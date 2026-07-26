@@ -24,12 +24,14 @@
 
 import {
   listAllNotes,
+  createNoteForSession,
   updateNote,
   deleteNoteById,
   getNotesForTopic,
   getTopicIdsWithNotes,
 } from './notes';
 import { PgDialect } from 'drizzle-orm/pg-core';
+import { BadRequestError } from '../errors';
 
 // ---------------------------------------------------------------------------
 // Shared stub factory
@@ -656,5 +658,109 @@ describe('deleteNoteById — profile isolation', () => {
     expect(rendered.params).toEqual(
       expect.arrayContaining(['learner_authored_note', 'unverified']),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2628 AC-5] The gate stops unsafe text AT the write boundary.
+//
+// The criterion is "unsafe text does not reach a write", so the assertion has to
+// sit at the write, not one layer above it. Asserting that the gate returns
+// `block` would pass even if `updateNote` ignored the verdict and issued the
+// UPDATE anyway — the defect and success would look identical. So these tests
+// inject a recording `db` and assert on STATEMENTS ISSUED.
+//
+// `db` is a constructor parameter of every function here, so this needs no
+// internal jest.mock (GC1/GC6): the real `updateNote`, the real gate, the real
+// scanner and the real judge fail-closed matrix all run.
+// ---------------------------------------------------------------------------
+describe('[WI-2628 AC-5] unsafe learning text never reaches the notes write', () => {
+  /** A db whose only capability is to record that it was asked to write. */
+  function makeRecordingDb(): {
+    db: Parameters<typeof updateNote>[0];
+    update: jest.Mock;
+  } {
+    const update = jest.fn(() => {
+      throw new Error(
+        'db.update was called — unsafe text reached the write boundary',
+      );
+    });
+    return {
+      db: { update } as unknown as Parameters<typeof updateNote>[0],
+      update,
+    };
+  }
+
+  /**
+   * Non-English person attributions. Every one of these was returned UNCHANGED by
+   * the shipped English-only guard — i.e. persisted — which is this Work Item's
+   * root cause. The English row is the control that already worked.
+   */
+  const UNSAFE_BY_LANGUAGE: ReadonlyArray<readonly [string, string]> = [
+    ['Czech', 'Petr má dyslexii a potřebuje pomoc.'],
+    ['Spanish', 'El alumno tiene TEA.'],
+    ['German', 'Der Schüler hat ADS.'],
+    ['Norwegian', 'Eleven har ADD.'],
+    ['Japanese', '田中さんは自閉症です。'],
+    [
+      'English genitive of an attributed-only acronym',
+      "Emma's TEA is documented in the file.",
+    ],
+    [
+      'English (control — the shipped guard already blocked this)',
+      'Petr has dyslexia.',
+    ],
+  ];
+
+  it.each(UNSAFE_BY_LANGUAGE)(
+    'updateNote refuses %s and issues NO statement',
+    async (_name, content) => {
+      const { db, update } = makeRecordingDb();
+      await expect(
+        updateNote(db, 'profile-1', 'note-123', content),
+      ).rejects.toThrow(BadRequestError);
+      // THE PROPERTY. Not "the gate said block" — "nothing was written".
+      expect(update).not.toHaveBeenCalled();
+    },
+  );
+
+  it('createNoteForSession refuses unsafe content and issues NO statement', async () => {
+    // The other write path into insertNoteWithCap. A stub with no `transaction`
+    // and no `insert` at all: if the gate did not stop this, the call would fail
+    // with a TypeError rather than BadRequestError, so the assertion cannot pass
+    // by accident.
+    const insert = jest.fn();
+    const transaction = jest.fn();
+    await expect(
+      createNoteForSession({ insert, transaction } as never, {
+        profileId: 'profile-1',
+        topicId: 'topic-1',
+        sessionId: 'session-1',
+        content: 'Žák má dyslexii.',
+      }),
+    ).rejects.toThrow(BadRequestError);
+    expect(insert).not.toHaveBeenCalled();
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('lets safe content through to the UPDATE statement', async () => {
+    // The non-triviality control. A gate that refused EVERYTHING would satisfy
+    // every assertion above for free; this is what makes them meaningful.
+    const updatedRow = {
+      id: 'note-123',
+      topicId: 'topic-1',
+      sessionId: null,
+      content: 'We read two chapters about volcanoes today.',
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+      updatedAt: new Date('2026-01-02T00:00:00Z'),
+    };
+    const db = makeDbStub({ updateReturning: [[updatedRow]] });
+    const result = await updateNote(
+      db,
+      'profile-1',
+      'note-123',
+      'We read two chapters about volcanoes today.',
+    );
+    expect(result.content).toBe('We read two chapters about volcanoes today.');
   });
 });

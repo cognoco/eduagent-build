@@ -31,7 +31,10 @@
 // Keeping the decision itself verdict-only is what lets one gate serve both.
 // ---------------------------------------------------------------------------
 
-import type { ConversationLanguage } from '@eduagent/schemas';
+import {
+  conversationLanguageSchema,
+  type ConversationLanguage,
+} from '@eduagent/schemas';
 import { BadRequestError } from '../../errors';
 import { createLogger } from '../logger';
 import { judgeReferredLearningText } from './judge';
@@ -40,9 +43,17 @@ import {
   type LearningTextBlockReason,
   type LearningTextFieldKind,
   type LearningTextProvenance,
+  type ScanLearningTextResult,
 } from './scan';
 
 const logger = createLogger();
+
+/**
+ * All ten declared languages, from the schema rather than a local literal, so a
+ * newly supported locale is covered here the moment it is added to the enum.
+ */
+const ALL_CONVERSATION_LANGUAGES: readonly ConversationLanguage[] =
+  conversationLanguageSchema.options;
 
 /** Observability flow label — mirrors the judge's per-flow dashboard tag. */
 const GATE_FLOW = 'gate.learning_text_safety';
@@ -70,7 +81,19 @@ export interface LearningTextField {
 
 export interface EvaluateLearningTextFieldsInput {
   readonly fields: readonly LearningTextField[];
-  readonly conversationLanguage: ConversationLanguage;
+  /**
+   * The learner's declared conversation language, or `undefined` when it cannot
+   * be resolved — `parseConversationLanguage` collapses a null column and any
+   * unrecognised code to `undefined`, and callers pass that straight through.
+   *
+   * NEVER substitute `'en'` for an unresolved value. The declared language
+   * selects which attribution GRAMMAR is co-compiled (declared + English), so
+   * defaulting to English is precisely the English-only behaviour this Work Item
+   * exists to remove: `Petr má dyslexii.` would classify ambiguous instead of
+   * block. `undefined` is handled by scanning under every language and keeping
+   * the strictest verdict — see `scanField`.
+   */
+  readonly conversationLanguage: ConversationLanguage | undefined;
   readonly provenance: LearningTextProvenance;
   /**
    * The vendor that produced LLM-authored text. Required for a field to be
@@ -112,22 +135,59 @@ export interface LearningTextGateResult {
  * produce the same verdict, so sending both would spend twice the budget to
  * risk two different answers to one question.
  */
+function scanField(
+  field: LearningTextField,
+  input: EvaluateLearningTextFieldsInput,
+): ScanLearningTextResult | null {
+  // A null/undefined field is not scanned at all — there is no text.
+  if (typeof field.text !== 'string') return null;
+
+  const base = {
+    text: field.text,
+    provenance: input.provenance,
+    fieldKind: field.fieldKind,
+    producerVendor: input.producerVendor,
+  };
+
+  if (input.conversationLanguage !== undefined) {
+    return scanLearningText({
+      ...base,
+      conversationLanguage: input.conversationLanguage,
+    });
+  }
+
+  // UNRESOLVED DECLARED LANGUAGE — scan under every language and keep the
+  // strictest verdict. This is the fail-closed reading, and it is cheap: lexeme
+  // detection already spans all ten corpora regardless of declared language, so
+  // the only thing varying across iterations is which attribution grammar is
+  // compiled, and `grammarFor` memoizes each one. Ten pure synchronous passes,
+  // no I/O. Strictly more conservative than any single language could be, which
+  // is why it needs no policy decision about WHICH language to assume.
+  let referred: ScanLearningTextResult | null = null;
+  let cleared: ScanLearningTextResult | null = null;
+  for (const language of ALL_CONVERSATION_LANGUAGES) {
+    const result = scanLearningText({
+      ...base,
+      conversationLanguage: language,
+    });
+    // `block` is the strictest outcome available, so no later language can
+    // change the answer — return immediately.
+    if (result.disposition === 'block') return result;
+    if (result.disposition === 'refer') referred ??= result;
+    else cleared ??= result;
+  }
+  // `refer` outranks `clear`: if ANY language finds a protected lexeme worth
+  // referring, the judge decides rather than a clear from another grammar
+  // silently winning.
+  return referred ?? cleared;
+}
+
 export async function evaluateLearningTextFields(
   input: EvaluateLearningTextFieldsInput,
 ): Promise<LearningTextGateResult> {
   const scans = input.fields.map((field) => ({
     field,
-    // A null/undefined field is not scanned at all — there is no text.
-    scan:
-      typeof field.text === 'string'
-        ? scanLearningText({
-            text: field.text,
-            conversationLanguage: input.conversationLanguage,
-            provenance: input.provenance,
-            fieldKind: field.fieldKind,
-            producerVendor: input.producerVendor,
-          })
-        : null,
+    scan: scanField(field, input),
   }));
 
   // One judge call per distinct (fieldKind, text) that the scan referred.
