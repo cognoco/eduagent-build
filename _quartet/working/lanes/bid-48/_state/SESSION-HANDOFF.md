@@ -1,16 +1,16 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-07-26 21:55 CEST
+Last reconciled: 2026-07-26 22:33 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
 - Topology: operator-authorized combined Orchestrator/Shepherd, no Clacks.
 - Status: `Running`.
-- Authoritative members (27): WI-2636, WI-2639, WI-2640, WI-2643, WI-2644,
+- Authoritative members (29): WI-2484, WI-2636, WI-2639, WI-2640, WI-2643, WI-2644,
   WI-2649, WI-2667, WI-2755, WI-2790, WI-2791, WI-2792, WI-2794, WI-2795,
   WI-2797, WI-2798, WI-2799, WI-2800, WI-2801, WI-2802, WI-2804, WI-2805,
-  WI-2809, WI-2810, WI-2811, WI-2812, WI-2813, WI-2815.
-- Brief/relation parity: live-verified at 27 after the formal member 27 amendment.
+  WI-2809, WI-2810, WI-2811, WI-2812, WI-2813, WI-2815, WI-2818.
+- Brief/relation parity: live-verified at 29 after reconciling externally admitted WI-2484.
 
 ## Closed / Done
 
@@ -34,19 +34,31 @@ Last reconciled: 2026-07-26 21:55 CEST
 
 ## Active typed work
 
-- WI-2810 — landed rework `2df76a91` independently bounced: retained phase is
-  overwritten and reports the latest rather than AC-required first visible phase.
-  Reclaimed for exact first-phase retention rework; WI-2800 remains unclaimed.
-- WI-2812 — Nexus PR #330 at `89339b49`; despite two zero-finding fixed-point reviews,
-  armed preflight exposed a blocking Codex P1 confirmed against live Cosmo: top-level
-  `last_edited_time` is minute-rounded too. Exact transition-identity rework is active.
+- WI-2810 — PR #2652 at `3d797a1e` repairs first-visible-phase retention. Its single
+  bounded rerun exposed distinct nav-shell doorway defect WI-2822; no third rerun.
+- WI-2812 — Nexus PR #330 at `431880ed`; minute-rounded state-machine rework now covers
+  pause/resume plus applied re-finalization and idempotent Active escalation; fresh
+  exact-head review is pending.
 - WI-2813 — stale mobile-test count repair discovered from WI-2801's landed suite;
   PR #2649 at `7fd75c84` is exact-head strict green and ready with fresh CodeRabbit
   review, but the armed merge gate cannot obtain the path-excluded Claude verdict.
   It is formally blocked by external WI-2718 / PR #2581; no bypass is authorized.
-- WI-2815 — draft Nexus PR #331 at `737b93d2`; one-line test-contract correction,
-  exact mutation 14/1, restored focused 15/15, full Clacks 616 pass / 3 sanctioned
-  skips / 0 fail. Awaiting independent fixed-point reviews and ready-state gate.
+- WI-2815 — landed `689d5f56`; code/mutation/full-suite proof accepted twice, but host
+  review gate still inspects only squash checks. Ready and formally blocked by WI-2819.
+- WI-2804 — diagnostic PR #2653 rework head `dd006d86`; first-mention review finding
+  repaired; fresh review/gate pending.
+- WI-2818 — draft PR #2654 at `0bbcac16`; mutation-sensitive success/rejection/non-settlement
+  repair, focused 5/5 and Session 80/80; strict CI pending.
+- WI-2800 — claimed/dispatched for durable-evidence diagnosis; no hosted rerun.
+- WI-2484 — externally admitted by operator-authorized post-Govern disposition; Ready,
+  zero-gap DoR, no surviving old artifact/claim, bounded to clean dev-only execution.
+
+## Captured / refining before membership
+
+- WI-2819 — reviewer host gate must map exact strict-green PR head to landed squash.
+  No duplicate; Backlog pending typed host-gate surface preflight and Bug DoR. Blocks WI-2815.
+- WI-2822 — support-hub Back leaves supporter self-learning doorway visible. Six
+  candidates classified siblings; Backlog pending typed root-cause refinement. Blocks WI-2810 strict green.
 
 ## Landing / CI frontier
 
@@ -69,7 +81,7 @@ Last reconciled: 2026-07-26 21:55 CEST
 - WI-2805 — durable branch proof distinguishes the three code outcomes, but the failed
   retry retained none of the close/route/dialog evidence needed to select one; WI-2811
   owns that repair.
-- WI-2800 and WI-2804 remain Ready and collision/capacity waiting.
+- WI-2800 is executing; no Ready member is sitting undispatched while capacity exists.
 - WI-2755 remains blocked by WI-2794; do not extend its cleanup timeout again.
 
 ## Operator authority gates
