@@ -1,4 +1,8 @@
-import { fireEvent, waitFor, act } from '@testing-library/react-native';
+import {
+  fireEvent,
+  waitFor as testingLibraryWaitFor,
+  act,
+} from '@testing-library/react-native';
 import { Alert, StyleSheet } from 'react-native';
 import type { RoutedMockFetch } from '../../../test-utils/mock-api-routes';
 import {
@@ -171,6 +175,12 @@ function renderPickBook() {
     installGlobalFetch: false,
   });
 }
+
+// The screen deliberately holds its loading state for at least 800ms. Keep
+// this suite's async assertions above that boundary without changing the
+// repository-wide RNTL timeout; callers can still override it when needed.
+const waitFor: typeof testingLibraryWaitFor = (expectation, options) =>
+  testingLibraryWaitFor(expectation, { timeout: 3000, ...options });
 
 describe('PickBookScreen', () => {
   beforeEach(() => {
