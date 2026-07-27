@@ -1,6 +1,7 @@
 import { evaluateLearningTextByContent } from '../learning-text-safety/gate';
 import {
   buildBackfillRowsForProfile,
+  buildMemoryFactRowsFromProjection,
   filterGatedMemoryFactRows,
   normalizeMemoryText,
   type MemoryFactInsert,
@@ -145,5 +146,66 @@ describe('memory facts backfill mapping', () => {
     expect(
       filterGatedMemoryFactRows(rows, gate).map((row) => row.text),
     ).toEqual([CLEAR_EDUCATIONAL]);
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-2628] CASE 3 — the pre-evaluation saw non-empty text, and the value
+  // re-derived inside the transaction is null/undefined.
+  //
+  // Reachable here in a way it is not on the dedup chain: these consumers
+  // re-derive rows from a row read under `FOR UPDATE`, and a JSONB field that
+  // held a string at pre-read time can be null by then. `isContentSafe(gate,
+  // null)` is TRUE by contract — there is no string to persist — and the trap is
+  // reading that true as "this batch is cleared, proceed". It clears exactly one
+  // absent value and nothing around it.
+  // -------------------------------------------------------------------------
+  it('[WI-2628] a null-text row is trivially safe and does NOT clear an unsafe sibling', async () => {
+    const rows = buildNotesProfile([CLINICAL_CS, CLEAR_EDUCATIONAL]).rows;
+    // Stand in for the in-transaction re-derive yielding no string for a row the
+    // pre-evaluation saw as non-empty text.
+    const withAbsentText: MemoryFactInsert[] = [
+      { ...rows[0]!, text: null as unknown as string },
+      ...rows,
+    ];
+
+    const gate = await evaluateLearningTextByContent({
+      texts: rows.map((row) => row.text),
+      fieldKind: 'learner_profile_field',
+      conversationLanguage: undefined,
+      provenance: 'migration',
+    });
+
+    const survivors = filterGatedMemoryFactRows(withAbsentText, gate).map(
+      (row) => row.text,
+    );
+    // The absent value passes (nothing to persist). The Czech attribution it was
+    // derived from is still dropped — a safe-on-null verdict is not a
+    // proceed-signal for the surrounding write.
+    expect(survivors).toEqual([null, CLEAR_EDUCATIONAL]);
+    expect(survivors).not.toContain(CLINICAL_CS);
+  });
+
+  it('[WI-2628] buildMemoryFactRowsFromProjection no longer applies the retired English-only scrub', () => {
+    // The legacy scrub used to run inside this builder's dedupe step, so an
+    // English clinical row never reached a caller. It is gone: the builder emits
+    // candidates and the gate decides. Asserted on the ENGLISH case specifically,
+    // because that is the only one the retired guard ever caught — a green here on
+    // the Czech row would prove nothing about the removal.
+    const rows = buildMemoryFactRowsFromProjection(
+      '018f8f3e-0000-7000-8000-000000000001',
+      {
+        strengths: [],
+        struggles: [],
+        interests: [],
+        communicationNotes: [CLINICAL_EN, CLEAR_EDUCATIONAL],
+        suppressedInferences: [],
+        interestTimestamps: {},
+        createdAt: new Date('2026-05-01T00:00:00.000Z'),
+      },
+    );
+    expect(rows.map((row) => row.text)).toEqual([
+      CLINICAL_EN,
+      CLEAR_EDUCATIONAL,
+    ]);
   });
 });

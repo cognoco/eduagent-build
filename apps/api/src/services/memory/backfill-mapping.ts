@@ -13,7 +13,6 @@ import {
   isContentSafe,
   type LearningTextGateResult,
 } from '../learning-text-safety/gate';
-import * as learningTextGuard from '../persisted-learning-text-guard';
 
 export type MemoryFactCategory =
   | 'strength'
@@ -185,11 +184,20 @@ function pushStringRows(
   }
 }
 
+/**
+ * Identity dedupe ONLY — safety is the caller's, via `filterGatedMemoryFactRows`.
+ *
+ * [WI-2628] Both consumers of this builder are now on the multilingual gate:
+ * `memory-facts.ts`'s `replaceActiveMemoryFactsForProfile` (reached from
+ * `learner-profile.ts`) filters the result, and the Inngest backfill uses
+ * `buildBackfillRowsForProfile` + the same filter. Never persist this function's
+ * output unfiltered.
+ */
 export function buildMemoryFactRowsFromProjection(
   profileId: string,
   projection: MemoryProjection,
 ): MemoryFactInsert[] {
-  return dedupeMemoryFactRows([
+  return dedupeMemoryFactRowsByIdentity([
     ...projection.strengths.map((entry) =>
       mapStrengthToFact(profileId, entry, projection.createdAt),
     ),
@@ -227,32 +235,6 @@ export function memoryFactIdentityKey(row: MemoryFactInsert): string {
     typeof metadata['context'] === 'string' ? metadata['context'] : '',
     row.textNormalized,
   ].join('\u001f');
-}
-
-/**
- * Identity dedupe + the LEGACY English-only safety filter.
- *
- * [WI-2628] Still the path for `buildMemoryFactRowsFromProjection`, whose only
- * consumer chain runs through `learner-profile.ts` and is not migrated yet. This
- * file is therefore deliberately MID-MIGRATION and carries both controls: the
- * legacy scrub here, the multilingual gate on the backfill builder below. It stays
- * in the old-guard column of both wiring guards until that chain lands — the guards
- * describe reality rather than intent.
- */
-export function dedupeMemoryFactRows(
-  rows: MemoryFactInsert[],
-): MemoryFactInsert[] {
-  const byIdentity = new Map<string, MemoryFactInsert>();
-  for (const row of rows) {
-    if (
-      learningTextGuard.scrubClinicalInferenceFromLearningRecord(row.text) ===
-      null
-    ) {
-      continue;
-    }
-    byIdentity.set(memoryFactIdentityKey(row), row);
-  }
-  return [...byIdentity.values()];
 }
 
 /**
