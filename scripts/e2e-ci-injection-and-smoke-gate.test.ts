@@ -1743,7 +1743,11 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       .filter((path) => /^# PARKED\b/m.test(readFileSync(path, 'utf8')))
       .map((path) => relative(e2eRoot, path).replaceAll('\\', '/'));
 
-    expect(parkedFlows.length).toBeGreaterThanOrEqual(10);
+    // Corpus-size canary proving the PARKED-prose detector still detects —
+    // calibrated to the current parked corpus, not a policy target. WI-2548
+    // un-parked the two coach-bubble flows (11 → 9); re-calibrate when flows
+    // are parked or un-parked, never to paper over a detector regression.
+    expect(parkedFlows.length).toBeGreaterThanOrEqual(9);
 
     for (const flow of parkedFlows) {
       const source = readFileSync(
