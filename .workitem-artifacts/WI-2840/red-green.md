@@ -18,4 +18,4 @@ Command:
 pnpm exec jest --config scripts/jest.config.cjs scripts/claude-review-scope-workflow.test.ts scripts/check-github-workflow-security.test.ts --runInBand --no-coverage
 ```
 
-After the repair: 2 suites passed, 49 tests passed. The PR #2664-shaped normal-merge case now emits `REVIEW_SCOPE_CORRUPTION`, sets `merge_eligible: false`, identifies the base-only path, and exits non-zero. In-diff findings, no-finding approval, unchanged-head rerun, malformed metadata, and absent fresh-verdict variants also pass their distinct assertions.
+After the repair: 2 suites passed, 50 tests passed. The PR #2664-shaped normal-merge case now emits `REVIEW_SCOPE_CORRUPTION`, sets `merge_eligible: false`, identifies the base-only path, and exits non-zero. In-diff findings, no-finding approval, unchanged-head rerun, malformed metadata, absent fresh-verdict, and removed post-capture head-check variants also pass their distinct assertions.

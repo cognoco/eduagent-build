@@ -10,11 +10,11 @@ Bound Claude review findings to an exact-head manifest generated from GitHub's p
 - The reviewer prompt reads that manifest and records the exact reviewed head.
 - The evaluator preserves trusted-bot and run-start freshness selection, adds exact-head selection, parses finding-table paths, checks declared counts/polarity, and authorizes only complete clean approvals whose finding scope is valid.
 - A behavioral fixture executes the workflow's actual shell steps for the PR #2664 normal-merge incident and the required variants.
-- The workflow-security checker now ratchets the manifest, freshness/head, prompt, comparison, and fail-closed exit wiring.
+- The workflow-security checker now ratchets the manifest, both pre- and post-capture head checks, freshness/head selection, prompt, comparison, and fail-closed exit wiring.
 
 ## Verification
 
-See `verification.md` and `red-green.md`. Local result: 59 script suites / 1,033 tests passed; change-class fast validation passed 3/3; live PR #2664 evidence still reproduces 8 authoritative paths versus 3 out-of-scope finding paths.
+See `verification.md` and `red-green.md`. Local result: 59 script suites / 1,034 tests passed; change-class fast validation passed 3/3; live PR #2664 evidence still reproduces 8 authoritative paths versus 3 out-of-scope finding paths.
 
 ## Caveats
 
@@ -23,4 +23,4 @@ See `verification.md` and `red-green.md`. Local result: 59 script suites / 1,033
 
 ## Follow-ups
 
-Landing order and any conflict reconciliation with PR #2581 belong to the shepherd. No independent product/code residue was found.
+Landing order and any conflict reconciliation with PR #2581 belong to the shepherd. Independent inherited residue: `bash scripts/validate-doc-versions.sh` reports 5,999 mobile tests against the `AGENTS.md` claim of approximately 5,644; WI-2840 does not change that unrelated documentation.

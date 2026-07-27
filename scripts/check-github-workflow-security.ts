@@ -327,6 +327,10 @@ function validateClaudeReviewScopeContract(
     ) &&
     captureRun.includes('api_head') &&
     captureRun.includes('"$api_head" != "$HEAD_SHA"') &&
+    captureRun.includes(
+      'api_head_after="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq \'.head.sha\')"',
+    ) &&
+    captureRun.includes('"$api_head_after" != "$HEAD_SHA"') &&
     captureRun.includes('--arg head_sha "$HEAD_SHA"') &&
     captureRun.includes('{head_sha: $head_sha, paths: $paths}') &&
     captureRun.includes('> "$CHANGED_FILES_MANIFEST"');
