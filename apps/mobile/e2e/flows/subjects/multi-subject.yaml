@@ -14,6 +14,15 @@
 #     home-subject-carousel, home-subject-card-${id})
 #   - apps/mobile/src/app/(app)/library.tsx (shelves-list)
 #   - apps/mobile/src/app/(app)/_layout.tsx (tab-library, tab-home)
+#   - apps/mobile/src/app/(app)/progress/[subjectId]/index.tsx
+#     (progress-subject-back, progress-subject-error)
+#
+# Subject progress leg (WI-2600, restoring the WI-2596-quarantined assertion):
+#   Home subject cards route to shelf/[subjectId] since a148e4811 (2026-06-12),
+#   so the progress screen is entered through its supported direct route
+#   (openLink, mirroring flows/progress/resume-progress-subject.yaml). The flow
+#   asserts the loaded state (progress-subject-back) and the absence of the
+#   error state (progress-subject-error) for the seeded active subject.
 appId: com.mentomate.app
 tags:
   - pr-blocking
@@ -127,5 +136,37 @@ tags:
       id: 'learner-screen'
     timeout: 10000
 
-# 15. Final screenshot
+# 15. Enter the subject progress screen for the seeded active subject via its
+#     supported direct route (home cards open the shelf since a148e4811; the
+#     retained progress/[subjectId] route is deep-link/direct entry — see the
+#     architecture note in flows/progress/resume-progress-subject.yaml).
+- openLink: 'mentomate:///progress/${ACTIVE_SUBJECT_ID}'
+
+# 16. Subject progress screen renders its LOADED state: the back control is
+#     present and the error state is absent (WI-2600 AC-2; assertion restored
+#     un-weakened per WI-2596 AC-5).
+- extendedWaitUntil:
+    visible:
+      id: 'progress-subject-back'
+    timeout: 15000
+
+- assertNotVisible:
+    id: 'progress-subject-error'
+
+# 17. Screenshot: subject progress loaded state
+- takeScreenshot: multi-subject-04-subject-progress
+
+# 18. Leave through the screen's own back control (exercises the restored
+#     control, not just its presence).
+- tapOn:
+    id: 'progress-subject-back'
+
+# 19. Verify back on home screen (deep link pushed onto the home stack, so
+#     the back control pops to Home).
+- extendedWaitUntil:
+    visible:
+      id: 'learner-screen'
+    timeout: 10000
+
+# 20. Final screenshot
 - takeScreenshot: multi-subject-03-back-home
