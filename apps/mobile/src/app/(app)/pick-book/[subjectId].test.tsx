@@ -20,12 +20,16 @@ let mockFetch: RoutedMockFetch;
 jest.mock(
   '../../../lib/api-client', // gc1-allow: transport-boundary — routed mock fetch drives real hooks
   () => {
+    const actual = jest.requireActual('../../../lib/api-client');
     const {
       createRoutedMockFetch,
-      mockApiClientFactory,
     } = require('../../../test-utils/mock-api-routes');
+    const { hc } = require('hono/client');
     mockFetch = createRoutedMockFetch();
-    return mockApiClientFactory(mockFetch);
+    return {
+      ...actual,
+      useApiClient: () => hc('http://localhost', { fetch: mockFetch }),
+    };
   },
 );
 
