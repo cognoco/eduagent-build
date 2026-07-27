@@ -1,0 +1,36 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The exact final route-owned fetch, URL verification, fulfill, and bounded response seam is identified in the landed helper and named WI-2234 journey.",
+      "pointer": "apps/mobile/e2e-web/helpers/held-now-request.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "The landed route-owned implementation passed the exact named staging journey with one worker, retries disabled, and dependency projects disabled before mutation.",
+      "pointer": ".workitem-artifacts/WI-2842/red-green.md"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "The controlled legacy response-wrapper mutation recreated the missing-correlation lifecycle behavior and the same named journey failed at page.waitForResponse with the original 15000ms timeout.",
+      "pointer": ".workitem-artifacts/WI-2842/controlled-mutation-diff.md"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Both source files were restored to their landed blob identities and the identical named command passed green after restoration.",
+      "pointer": ".workitem-artifacts/WI-2842/verification.md"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "The evidence records the exact command shape, landed revision, full controlled mutation, failure excerpt, restored blob IDs, and final result, with explicit rejection of non-qualifying attempts.",
+      "pointer": ".workitem-artifacts/WI-2842/red-green.md"
+    },
+    {
+      "acRef": "AC-6",
+      "description": "The recurrence is recorded against WI-2838 and external systemic owner WI-2564; immutable Cosmo comment IDs are recorded in the final verification artifact.",
+      "pointer": ".workitem-artifacts/WI-2842/verification.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": ".workitem-artifacts/WI-2842/red-green.md"
+}

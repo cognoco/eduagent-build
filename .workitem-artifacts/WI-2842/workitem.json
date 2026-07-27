@@ -1,0 +1,18 @@
+{
+  "pageId": "3aa8bce9-1f7c-81ca-be66-c931d8295797",
+  "id": "WI-2842",
+  "name": "Restore exact red-green-revert proof for the WI-2838 held-response fix",
+  "description": "An independent post-close audit found that WI-2838's recorded mutation removed route.fulfill and failed a lifecycle-array assertion, rather than reverting the final route-owned held-response strategy and reproducing the original Playwright timeout. The product fix is landed and verified; this item restores the canonical Bug DoD proof required for the BID-19 member's closure evidence.",
+  "acceptanceCriteria": "Root cause: WI-2838's accepted mutation disabled route fulfillment and proved only lifecycle-array sensitivity; it did not revert the final route-owned fetch/fulfill strategy to the legacy response-wrapper matcher, so it could not reproduce the original held-response timeout. Variant search: one behavioral variant exists—the capture-enabled GET /v1/now?scope=self request whose continued URL rewrite is absent from the later response wrapper; adjacent methods, scopes, paths, and already-correlated requests are exclusion guards, not separate symptom variants. 1. Identify the exact final WI-2838 route-owned fetch/fulfill seam. 2. At the landed commit in an isolated worktree, run the named held-response journey green with the final fix present. 3. Revert only that final strategy to the legacy response-wrapper matcher, rerun the same journey with one worker and retries disabled, and capture the original held-response timeout. 4. Restore the exact landed fix and rerun the same command green. 5. Attach exact commands, commit identity, controlled mutation diff, failure excerpt, and restored-green result; cross-link them to WI-2838. 6. Record the recurrence against WI-2564's armed mutation-sensitivity gate. Make no production behavior change unless this proof exposes a distinct defect, which must be captured separately.",
+  "riskImpact": "P1 lifecycle-integrity impact: BID-19 cannot honestly claim every member satisfied the ratified Bug DoD while this exact proof is absent. The landed product behavior is currently green; the risk is evidence integrity and a false-positive review gate.",
+  "type": "Incident",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "",
+  "bodyText": ""
+}
