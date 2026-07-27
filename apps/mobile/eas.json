@@ -11,7 +11,9 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.mentomate.com",
-        "EXPO_PUBLIC_ENABLE_MODE_NAV": "true",
+        "EXPO_PUBLIC_ENABLE_MODE_NAV": "false",
+        "EXPO_PUBLIC_ENABLE_MODE_NAV_V1": "true",
+        "EXPO_PUBLIC_ENABLE_MODE_NAV_V2": "true",
         "SENTRY_DISABLE_AUTO_UPLOAD": "false"
       }
     },
@@ -63,7 +65,10 @@
   },
   "submit": {
     "production": {
-      "android": {},
+      "android": {
+        "serviceAccountKeyPath": "./.eas-submit/google-play-service-account.json",
+        "track": "internal"
+      },
       "ios": {}
     }
   }
