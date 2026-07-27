@@ -667,6 +667,50 @@ describe('weekly progress push integration', () => {
     });
   });
 
+  it('queues a matching parent through the real same-hour week-window step', async () => {
+    const evaluationNow = new Date();
+    const matchingTimezone = findTimezoneForHour(9, evaluationNow);
+
+    const { profileId: queuedParentId } = await seedProfile({
+      displayName: 'Same-hour Parent',
+      timezone: matchingTimezone,
+    });
+    const { profileId: queuedChildId } = await seedProfile({
+      displayName: 'Same-hour Child',
+      timezone: matchingTimezone,
+      credentialed: false,
+    });
+
+    await seedWeeklyPushPrefs(queuedParentId);
+    await seedFamilyLink(queuedParentId, queuedChildId);
+
+    const dateNowSpy = jest
+      .spyOn(Date, 'now')
+      .mockReturnValue(evaluationNow.getTime());
+
+    try {
+      const { result, step } = await executeCronSteps();
+
+      expect(result.status).toBe('completed');
+      expect(result.queuedParents).toBeGreaterThanOrEqual(1);
+      expect(step.run).toHaveBeenCalledWith(
+        'resolve-week-window',
+        expect.any(Function),
+      );
+      expect(step.sendEvent).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: 'app/weekly-progress-push.generate',
+            data: expect.objectContaining({ parentId: queuedParentId }),
+          }),
+        ]),
+      );
+    } finally {
+      dateNowSpy.mockRestore();
+    }
+  });
+
   it('uses the memoized evaluation instant when the wall clock is one hour later', async () => {
     const wallClockNow = new Date();
     const now = new Date(wallClockNow.getTime() - 60 * 60 * 1000);
