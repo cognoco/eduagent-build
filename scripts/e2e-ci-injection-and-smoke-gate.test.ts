@@ -5107,6 +5107,16 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         typeof tapOn === 'object' &&
         tapOn.id === 'progress-subject-back',
     );
+    // Direct-entry back routes to the screen's backFallback — the Progress
+    // tab — not Home (device-verified 2026-07-27), so the flow must wait for
+    // progress-screen before returning home via the tab bar.
+    const progressBackLanding = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > progressBackTap &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'progress-screen' &&
+        extendedWaitUntil.optional !== true,
+    );
 
     expect(subject).toBeGreaterThan(-1);
     expect(shelf).toBeGreaterThan(subject);
@@ -5118,6 +5128,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(progressDetail).toBeGreaterThan(progressDeepLink);
     expect(progressNoError).toBeGreaterThan(progressDetail);
     expect(progressBackTap).toBeGreaterThan(progressNoError);
+    expect(progressBackLanding).toBeGreaterThan(progressBackTap);
   });
 
   it('[WI-1864] scrolls through every off-screen populated recap control before using it', () => {

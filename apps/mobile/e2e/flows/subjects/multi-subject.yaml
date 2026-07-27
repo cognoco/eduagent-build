@@ -157,12 +157,22 @@ tags:
 - takeScreenshot: multi-subject-04-subject-progress
 
 # 18. Leave through the screen's own back control (exercises the restored
-#     control, not just its presence).
+#     control, not just its presence). Direct/deep-link entry has no stack to
+#     pop, so goBackOrReplace routes to the screen's backFallback — the
+#     Progress tab (progress/[subjectId]/index.tsx, backFallback when
+#     returnTo is absent). Device-verified 2026-07-27.
 - tapOn:
     id: 'progress-subject-back'
 
-# 19. Verify back on home screen (deep link pushed onto the home stack, so
-#     the back control pops to Home).
+- extendedWaitUntil:
+    visible:
+      id: 'progress-screen'
+    timeout: 10000
+
+# 19. Return to Home via the tab bar.
+- tapOn:
+    id: 'tab-home'
+
 - extendedWaitUntil:
     visible:
       id: 'learner-screen'
