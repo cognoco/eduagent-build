@@ -1,7 +1,8 @@
 ## What was done
 
-Completed the V2 Subjects release-proof coverage across browser and release-APK
-journeys. The preserved implementation covers browse/search/no-results, exact
+Implemented the V2 Subjects release-proof coverage across browser and release-APK
+journeys. Local validation is complete; hosted-gate and lifecycle completion
+remain pending. The preserved implementation covers browse/search/no-results, exact
 Subject Hub ownership, active-session resume, due review, recovery and
 curriculum-preparing states, Android/browser Back ancestry, and first-subject
 creation without duplicating the WI-2215 product path.

@@ -1,7 +1,9 @@
 ## Summary
 
-Completes WI-2238's V2 Subjects release proof without rebuilding the existing
-product creation path: six browser cases, three release-APK journeys, exact
+Implements WI-2238's V2 Subjects release proof without rebuilding the existing
+product creation path. Local validation is complete; hosted-gate and lifecycle
+completion remain pending. The change covers six browser cases, three
+release-APK journeys, exact
 identity/ownership assertions, recovery states, and verified navigation
 ancestry through browser and Android Back.
 
