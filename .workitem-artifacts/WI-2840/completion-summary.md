@@ -14,13 +14,10 @@ Bound Claude review findings to an exact-head manifest generated from GitHub's p
 
 ## Verification
 
-See `verification.md` and `red-green.md`. Local result: 59 script suites / 1,034 tests passed; change-class fast validation passed 3/3; live PR #2664 evidence still reproduces 8 authoritative paths versus 3 out-of-scope finding paths.
+See `verification.md` and `red-green.md`. The full script suite and change-class fast validation passed; live PR #2664 evidence still reproduces eight authoritative paths versus three out-of-scope finding paths.
 
-## Caveats
+## Caveats / Follow-ups
 
 - A PR that edits `claude-code-review.yml` is expected to hit the Claude action's self-referential workflow validation guard until the workflow content exists on `main`; the executor will report the exact live check result and will not self-waive it.
-- Open PR #2581 (`origin/WI-2718`) overlaps `.github/workflows/claude-code-review.yml`, `scripts/check-github-workflow-security.ts`, and `scripts/check-github-workflow-security.test.ts`. Its `validateClaudeReviewContract` and fixture block occupy the same checker/test region as WI-2840's `validateClaudeReviewScopeContract`, so a textual merge conflict is likely if both land without refresh. WI-2840 does not take its all-PR trigger, bounded-attempt, timeout, initializer/recovery artifact, fallback-sequence, or AGENTS changes. `scripts/claude-review-scope-workflow.test.ts` and all WI-2840 lifecycle artifacts are unique.
-
-## Follow-ups
-
-Landing order and any conflict reconciliation with PR #2581 belong to the shepherd. Independent inherited residue: `bash scripts/validate-doc-versions.sh` reports 5,999 mobile tests against the `AGENTS.md` claim of approximately 5,644; WI-2840 does not change that unrelated documentation.
+- Open PR #2581 (`origin/WI-2718`) overlaps `.github/workflows/claude-code-review.yml`, `scripts/check-github-workflow-security.ts`, and `scripts/check-github-workflow-security.test.ts`. Its `validateClaudeReviewContract` and fixture block occupy the same checker/test region as WI-2840's `validateClaudeReviewScopeContract`, so a textual merge conflict is likely if both land without refresh. WI-2840 does not take its all-PR trigger, bounded-attempt, timeout, initializer/recovery artifact, fallback-sequence, or AGENTS changes. `scripts/claude-review-scope-workflow.test.ts` and all WI-2840 lifecycle artifacts are unique. Landing order and any conflict reconciliation with PR #2581 belong to the shepherd.
+- Independent inherited residue: `bash scripts/validate-doc-versions.sh` reports a mobile-test count mismatch against `AGENTS.md`; WI-2840 does not change that unrelated documentation.
