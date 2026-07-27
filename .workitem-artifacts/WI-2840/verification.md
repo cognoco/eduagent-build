@@ -6,7 +6,7 @@ Verified on 2026-07-27 in `.worktrees/WI-2840`.
 |---|---|
 | `pnpm exec jest --config scripts/jest.config.cjs scripts/claude-review-scope-workflow.test.ts scripts/check-github-workflow-security.test.ts --runInBand --no-coverage` | PASS — 2 suites, 50 tests |
 | `bash scripts/check-change-class.sh --run --fast` | PASS — 3/3: full `tsc --build`, no-Gemini ratchet, workflow-security guard |
-| `pnpm exec jest --config scripts/jest.config.cjs --runInBand --no-coverage` | PASS — 59 suites, 1,034 tests |
+| `pnpm exec jest --config scripts/jest.config.cjs --runInBand --no-coverage` | PASS — 59 suites, 1,036 tests after normal integration of current `origin/main` |
 | `pnpm check:github-workflow-security` | PASS |
 | `pnpm exec prettier --check .github/workflows/claude-code-review.yml scripts/check-github-workflow-security.ts scripts/check-github-workflow-security.test.ts scripts/claude-review-scope-workflow.test.ts` | PASS |
 | `git diff --check` | PASS |
