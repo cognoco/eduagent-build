@@ -45,6 +45,9 @@ describe('WI-1341 production EAS submit contract', () => {
       'doppler run -c prd -- pnpm mobile:submit:prepare',
     );
     expect(runbook).toContain('OPQ-37');
+    expect(runbook).toContain('OPQ-155');
+    expect(runbook).toContain('does not itself build, upload, or release');
+    expect(runbook).toContain('production Doppler flag triple');
     expect(runbook).toContain('V0-retirement ruling');
     expect(runbook).toContain('spec section 13 S6');
     expect(runbook).toContain('Play internal');

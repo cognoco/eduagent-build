@@ -4,11 +4,9 @@ Operator path for the Config-T production build and first store submissions. Thi
 
 ## Gate
 
-Do not merge the Config-T production flag change, materialize store credentials, trigger a production build, or submit to a store until **OPQ-37** records all three:
+Credential provisioning was completed under **OPQ-37** on 2026-07-27. Do not merge the Config-T production flag change, change the production Doppler flag triple, trigger a production build, or submit to a store until **OPQ-155** records product approval of the Config-T store candidate.
 
-1. the product owner explicitly executes the V0-retirement ruling required by the mentor-is-the-app spec section 13 S6 gate, or cites the separate recorded ruling;
-2. the cross-lane M6 go-ahead for Config T; and
-3. approved Google Play and Apple submission credentials for the real store records.
+Before that ruling, agents may refresh the branch and run static, unit, export, and configuration checks needed to present a current candidate. OPQ-155 is the current authority home for the V0-retirement ruling required by the mentor-is-the-app spec section 13 S6 gate and the M6 product go-ahead; approval does not itself build, upload, or release the app.
 
 The committed Android profile targets **Play internal** testing. The iOS profile relies on EAS-managed App Store Connect credentials and targets TestFlight through the normal EAS submit path. No Apple identifier or private key belongs in `eas.json`.
 
@@ -45,7 +43,7 @@ eas build:list --platform android --limit 3
 eas build:list --platform ios --limit 3
 ```
 
-The production profile must classify as Config T: V0 off, V1 on, V2 on. Stop if the worktree is dirty, OPQ-37 is not approved, a production build already covers the intended commit, or the credential path is absent/ignored incorrectly.
+The production profile must classify as Config T: V0 off, V1 on, V2 on. Stop if the worktree is dirty, OPQ-155 is not approved, a production build already covers the intended commit, or the credential path is absent/ignored incorrectly. The production Doppler flag triple must also be aligned to Config T before running `pnpm env:sync`; otherwise that sync will restore V0 and invalidate the candidate.
 
 ## Build
 
