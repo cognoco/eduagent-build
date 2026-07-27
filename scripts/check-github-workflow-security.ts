@@ -290,6 +290,85 @@ function validateVerdictGateAuthorFilter(
   };
 }
 
+const CLAUDE_REVIEW_WORKFLOW = '.github/workflows/claude-code-review.yml';
+const CLAUDE_REVIEW_SCOPE_CONTRACT_MESSAGE =
+  'Claude review must bind findings to GitHub-authoritative pull files for the exact head and fail closed on scope corruption';
+
+function validateClaudeReviewScopeContract(
+  file: string,
+  parsed: Record<string, unknown>,
+): { file: string; message: string } | null {
+  if (file.replaceAll('\\', '/') !== CLAUDE_REVIEW_WORKFLOW) return null;
+  if (!isRecord(parsed.jobs) || !isRecord(parsed.jobs['claude-review'])) {
+    return { file, message: CLAUDE_REVIEW_SCOPE_CONTRACT_MESSAGE };
+  }
+
+  const job = parsed.jobs['claude-review'];
+  const steps = getSteps(job);
+  const captureStep = steps.find(
+    (step) => step.name === 'Capture authoritative PR files',
+  );
+  const evaluateStep = steps.find(
+    (step) => step.name === 'Evaluate review verdict',
+  );
+  const captureRun =
+    typeof captureStep?.run === 'string' ? captureStep.run : '';
+  const evaluateRun =
+    typeof evaluateStep?.run === 'string' ? evaluateStep.run : '';
+  const prompt =
+    isRecord(job.env) && typeof job.env.CLAUDE_REVIEW_PROMPT === 'string'
+      ? job.env.CLAUDE_REVIEW_PROMPT
+      : '';
+  const expectedHeadExpression = '${{ github.event.pull_request.head.sha }}';
+
+  const capturesAuthoritativeExactHeadManifest =
+    captureRun.includes(
+      'repos/${REPO}/pulls/${PR_NUMBER}/files?per_page=100',
+    ) &&
+    captureRun.includes('api_head') &&
+    captureRun.includes('"$api_head" != "$HEAD_SHA"') &&
+    captureRun.includes('--arg head_sha "$HEAD_SHA"') &&
+    captureRun.includes('{head_sha: $head_sha, paths: $paths}') &&
+    captureRun.includes('> "$CHANGED_FILES_MANIFEST"');
+  const selectsLatestFreshExactHeadVerdict =
+    isRecord(evaluateStep?.env) &&
+    evaluateStep.env.HEAD_SHA === expectedHeadExpression &&
+    evaluateRun.includes('.created_at >= $started') &&
+    evaluateRun.includes('--arg expected_head "$HEAD_SHA"') &&
+    evaluateRun.includes('index("- Reviewed head SHA: \\($expected_head)")') &&
+    evaluateRun.includes('| sort_by(.created_at)') &&
+    evaluateRun.includes('| last // empty');
+  const validatesFindingPaths =
+    evaluateRun.includes('finding_paths=') &&
+    evaluateRun.includes('--slurpfile manifest "$CHANGED_FILES_MANIFEST"') &&
+    evaluateRun.includes('$findings - $manifest[0].paths | unique') &&
+    evaluateRun.includes('out_of_scope_paths=') &&
+    evaluateRun.includes('REVIEW_SCOPE_CORRUPTION') &&
+    evaluateRun.includes('merge_eligible:') &&
+    /if \[\[ "\$scope_valid" != "true" \]\]; then[\s\S]*?exit 1/.test(
+      evaluateRun,
+    );
+  const promptUsesManifest =
+    prompt.includes(
+      'Read `.trusted-actions/claude-review-changed-files.json`',
+    ) &&
+    prompt.includes(
+      'Review only paths listed in the authoritative changed-files manifest.',
+    ) &&
+    prompt.includes(`- Reviewed head SHA: ${expectedHeadExpression}`);
+
+  if (
+    capturesAuthoritativeExactHeadManifest &&
+    selectsLatestFreshExactHeadVerdict &&
+    validatesFindingPaths &&
+    promptUsesManifest
+  ) {
+    return null;
+  }
+
+  return { file, message: CLAUDE_REVIEW_SCOPE_CONTRACT_MESSAGE };
+}
+
 // A job that invokes the secret-backed Claude agent on an `@claude` mention
 // from issue/PR comment/review events must also gate on a trusted
 // author_association, or any external account can trigger the secret-backed
@@ -484,6 +563,12 @@ function collectFileViolations(rootDir: string, file: string): Violation[] {
   }
 
   if (!isRecord(parsed)) return violations;
+
+  const claudeReviewScopeViolation = validateClaudeReviewScopeContract(
+    file,
+    parsed,
+  );
+  if (claudeReviewScopeViolation) violations.push(claudeReviewScopeViolation);
 
   const workflowOn = getWorkflowOn(parsed);
   const pullRequestWorkflow =

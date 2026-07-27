@@ -777,6 +777,51 @@ describe('checkGithubWorkflowSecurity', () => {
     expect(checkGithubWorkflowSecurity(root)).toEqual([]);
   });
 
+  it('rejects the Claude review workflow when authoritative pull-file capture is removed', () => {
+    const workflow = readFileSync(
+      join(process.cwd(), '.github/workflows/claude-code-review.yml'),
+      'utf8',
+    ).replace(
+      'repos/${REPO}/pulls/${PR_NUMBER}/files?per_page=100',
+      'repos/${REPO}/commits/${HEAD_SHA}',
+    );
+    writeFixture(root, '.github/workflows/claude-code-review.yml', workflow);
+
+    expect(messages(root)).toContain(
+      'Claude review must bind findings to GitHub-authoritative pull files for the exact head and fail closed on scope corruption',
+    );
+  });
+
+  it('rejects the Claude review workflow when the post-capture head check is removed', () => {
+    const workflow = readFileSync(
+      join(process.cwd(), '.github/workflows/claude-code-review.yml'),
+      'utf8',
+    ).replace(
+      'api_head_after="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq \'.head.sha\')"',
+      'api_head_after="$HEAD_SHA"',
+    );
+    writeFixture(root, '.github/workflows/claude-code-review.yml', workflow);
+
+    expect(messages(root)).toContain(
+      'Claude review must bind findings to GitHub-authoritative pull files for the exact head and fail closed on scope corruption',
+    );
+  });
+
+  it('rejects the Claude review workflow when out-of-diff findings stop failing closed', () => {
+    const workflow = readFileSync(
+      join(process.cwd(), '.github/workflows/claude-code-review.yml'),
+      'utf8',
+    ).replace(
+      'echo "::error::Claude review scope corruption: finding paths are outside GitHub\'s authoritative PR diff: $(jq -c \'.\' <<< "$out_of_scope_paths")"\n            exit 1',
+      'echo "::warning::Ignoring review scope mismatch"',
+    );
+    writeFixture(root, '.github/workflows/claude-code-review.yml', workflow);
+
+    expect(messages(root)).toContain(
+      'Claude review must bind findings to GitHub-authoritative pull files for the exact head and fail closed on scope corruption',
+    );
+  });
+
   // [F-119] A secret-backed @claude agent job triggered by issue/comment/review
   // events must gate on a trusted author_association, or any external account
   // can invoke the secret-backed path by mentioning @claude.
