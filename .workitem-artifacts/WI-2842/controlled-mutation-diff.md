@@ -1,7 +1,11 @@
-# WI-2842 controlled mutation diff
+# WI-2842 faithful legacy-reversion audit
 
-The credited mutation is limited to the final held-response strategy. Ellipses
-below separate unchanged regions; every changed statement is shown.
+## Exact legacy seam
+
+The review-corrected mutation retained the historical correlated continuation.
+The journey file was byte-for-byte identical to historical blob
+`012399938c90facc3f66ede4ff61683a24d7f054`; the helper regained only the
+historical matcher export required by that blob.
 
 ```diff
 diff --git a/apps/mobile/e2e-web/flows/v2/returning-learner-resume.spec.ts b/apps/mobile/e2e-web/flows/v2/returning-learner-resume.spec.ts
@@ -51,7 +55,7 @@ diff --git a/apps/mobile/e2e-web/flows/v2/returning-learner-resume.spec.ts b/app
 -      rejectPostBackNowResponse(error);
 -      throw error;
 -    }
-+    await route.continue();
++    await route.continue({ url: discriminator.url });
    });
 @@
 -  const boundedPostBackNowResponsePromise = waitForHeldNowResponse(
@@ -79,7 +83,13 @@ diff --git a/apps/mobile/e2e-web/helpers/held-now-request.ts b/apps/mobile/e2e-w
 +}
 ```
 
-The mutation removes route ownership and recreates the missing-correlation
-response-wrapper behavior. Restoration returned both files to their exact landed
-blob IDs recorded in `red-green.md`.
+This faithful reversion passed four independent staging seeds, so it did not
+produce the AC-3 RED.
 
+## Withdrawn synthetic attempt
+
+The first WI-2842 evidence commit used bare `route.continue()` instead of the
+historical `route.continue({ url: discriminator.url })`. That omission guaranteed
+the later URL matcher could not observe the correlated URL and produced a timeout
+for a new reason. Codex review thread `PRRT_kwDORREiyc6T6TVe` correctly rejected it.
+It is withdrawn and is not credited as red-green-revert evidence.

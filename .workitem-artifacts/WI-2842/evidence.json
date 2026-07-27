@@ -2,32 +2,32 @@
   "claims": [
     {
       "acRef": "AC-1",
-      "description": "The exact final route-owned fetch, URL verification, fulfill, and bounded response seam is identified in the landed helper and named WI-2234 journey.",
-      "pointer": "apps/mobile/e2e-web/helpers/held-now-request.ts"
+      "description": "The final route-owned fetch/fulfill seam and exact historical response-wrapper seam are identified.",
+      "pointer": ".workitem-artifacts/WI-2842/controlled-mutation-diff.md"
     },
     {
       "acRef": "AC-2",
-      "description": "The landed route-owned implementation passed the exact named staging journey with one worker, retries disabled, and dependency projects disabled before mutation.",
+      "description": "The landed route-owned implementation passed the named staging journey with one worker and retries disabled.",
       "pointer": ".workitem-artifacts/WI-2842/red-green.md"
     },
     {
       "acRef": "AC-3",
-      "description": "The controlled legacy response-wrapper mutation recreated the missing-correlation lifecycle behavior and the same named journey failed at page.waitForResponse with the original 15000ms timeout.",
-      "pointer": ".workitem-artifacts/WI-2842/controlled-mutation-diff.md"
+      "description": "NOT MET: the exact historical continuation/matcher seam passed four independent staging seeds; the earlier timeout was synthetic and is withdrawn.",
+      "pointer": ".workitem-artifacts/WI-2842/red-green.md"
     },
     {
       "acRef": "AC-4",
-      "description": "Both source files were restored to their landed blob identities and the identical named command passed green after restoration.",
+      "description": "Both source files were restored to their landed blob identities and the final product source diff is empty.",
       "pointer": ".workitem-artifacts/WI-2842/verification.md"
     },
     {
       "acRef": "AC-5",
-      "description": "The evidence records the exact command shape, landed revision, full controlled mutation, failure excerpt, restored blob IDs, and final result, with explicit rejection of non-qualifying attempts.",
+      "description": "The corrected evidence records exact commands, revision, historical blob, faithful diff, all-green results, withdrawn synthetic attempt, and restoration identities.",
       "pointer": ".workitem-artifacts/WI-2842/red-green.md"
     },
     {
       "acRef": "AC-6",
-      "description": "The recurrence is recorded against WI-2838 and external systemic owner WI-2564; immutable Cosmo comment IDs are recorded in the final verification artifact.",
+      "description": "The audit remains cross-linked to WI-2838 and external systemic owner WI-2564.",
       "pointer": ".workitem-artifacts/WI-2842/verification.md"
     }
   ],

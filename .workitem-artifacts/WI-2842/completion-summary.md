@@ -1,16 +1,15 @@
 ## What was done
 
-Re-established WI-2838's missing exact red-green-revert proof at its landed browser seam. The named returning-learner journey was run green, subjected to a controlled legacy response-wrapper mutation that recreated the missing-correlation timeout, restored byte-for-byte, and run green again.
+Audited WI-2838's historical held-response seam after an automated review found that WI-2842's first mutation removed the correlated URL continuation. Re-ran the exact historical continuation/matcher implementation across four independent staging seeds.
 
 ## What changed
 
-No production behavior changed. This delivery adds only immutable WI-2842 evidence: the exact command shape, mutation diff, timeout excerpt, restored blob identities, and cross-links to the originating WI-2838 item and the external systemic mutation-gate item.
+No product behavior changed. The synthetic timeout claim is withdrawn, the evidence now records the faithful historical reversion and its all-green result, and both product files are restored byte-for-byte.
 
 ## Verification
 
-The staging journey passed before mutation, failed at `page.waitForResponse` after 15 seconds under the credited mutation, and passed after exact restoration. Every credited run used one worker, retries disabled, and dependency projects disabled. Source blobs matched the landed revision and the final product diff was empty.
+The exact historical journey blob with `route.continue({ url: discriminator.url })` passed four independent staging runs with one worker, zero retries, and dependency projects disabled. The landed route-owned strategy also passed. Final product blob identities match the landed revision and the source diff is empty.
 
 ## Caveats / Follow-ups
 
-The exact historical pre-final source passed under today's browser lifecycle and was therefore rejected as mutation RED; the credited mutation explicitly recreates the documented missing-rewrite behavior while preserving the legacy response-wrapper matcher. The external systemic gate remains owned by WI-2564 and is not absorbed into BID-19. No additional product defect was exposed.
-
+WI-2842 AC-3 cannot be met: the original held-response timeout is not reproducible at the exact legacy seam. The item must not be marked Done or merged on synthetic evidence. Independent review should disposition it Not Reproducible, close PR #2670 unmerged, and formally remove it from BID-19. External mutation-gate work remains owned by WI-2564.
