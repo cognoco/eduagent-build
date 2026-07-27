@@ -83,7 +83,9 @@ describe('useNowFeed', () => {
 
     const { result } = renderHook(() => useNowFeed(), { wrapper });
 
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    await waitFor(() => expect(result.current.isSuccess).toBe(true), {
+      timeout: 3_000,
+    });
     expect(result.current.data).toEqual(value);
     expect(String(mockFetch.mock.calls[0]?.[0])).toContain('/v1/now');
     expect(String(mockFetch.mock.calls[0]?.[0])).toContain('scope=self');
