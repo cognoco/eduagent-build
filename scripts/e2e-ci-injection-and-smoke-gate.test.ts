@@ -6866,54 +6866,68 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(noMatchInput).toBeGreaterThan(-1);
   });
 
-  it('[WI-2238 gate] dismisses the Mentor draft keyboard before exercising the Homework starter', () => {
+  it('[WI-2741] dismisses the Mentor keyboard before selecting the hard Homework starter case', () => {
     const source = readFileSync(
       join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-mentor-single-composer.yaml'),
       'utf8',
     );
-    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<
-      | string
-      | {
-          assertVisible?: { id?: string; text?: string };
-          tapOn?: { id?: string };
-        }
-    >;
-    const draftConfirmed = commands.findIndex(
-      (command) =>
-        typeof command === 'object' &&
-        command.assertVisible?.id === 'mentor-bar-input' &&
-        command.assertVisible.text === 'Teach me something new please',
-    );
-    const keyboardDismiss = commands.findIndex(
-      (command, index) => index > draftConfirmed && command === 'hideKeyboard',
-    );
-    const homeworkStarter = commands.findIndex(
-      (command, index) =>
-        index > keyboardDismiss &&
-        typeof command === 'object' &&
-        command.tapOn?.id === 'cold-start-chip-homework',
-    );
-    const homeworkReply = commands.findIndex(
-      (command, index) =>
-        index > homeworkStarter &&
-        typeof command === 'object' &&
-        command.assertVisible?.id === 'cold-start-homework-reply',
-    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as unknown[];
+    const expectedSequence: unknown[] = [
+      { tapOn: { id: 'cold-start-chip-learn' } },
+      { inputText: ' please' },
+      {
+        assertVisible: {
+          id: 'mentor-bar-input',
+          text: 'Teach me something new please',
+        },
+      },
+      { assertVisible: { id: 'mentor-bar-send', enabled: true } },
+      'hideKeyboard',
+      { assertVisible: { id: 'cold-start-chip-homework' } },
+      { tapOn: { id: 'cold-start-chip-homework' } },
+      { assertVisible: { id: 'cold-start-homework-reply' } },
+      { assertVisible: { id: 'mentor-bar-camera' } },
+      { assertNotVisible: { text: '^Camera$', index: 1 } },
+      {
+        assertVisible: {
+          id: 'mentor-bar-input',
+          text: 'Teach me something new please',
+        },
+      },
+    ];
+    const hasExactSequence = (candidate: unknown[]): boolean =>
+      candidate.some((_, index) =>
+        isDeepStrictEqual(
+          candidate.slice(index, index + expectedSequence.length),
+          expectedSequence,
+        ),
+      );
 
-    expect([
-      draftConfirmed,
-      keyboardDismiss,
-      homeworkStarter,
-      homeworkReply,
-    ]).toEqual(
-      [
-        draftConfirmed,
-        keyboardDismiss,
-        homeworkStarter,
-        homeworkReply,
-      ].toSorted((left, right) => left - right),
-    );
-    expect(draftConfirmed).toBeGreaterThan(-1);
+    expect(hasExactSequence(commands)).toBe(true);
+
+    for (const mutate of [
+      (candidate: unknown[]) =>
+        candidate.filter((command) => command !== 'hideKeyboard'),
+      (candidate: unknown[]) => {
+        const keyboardIndex = candidate.indexOf('hideKeyboard');
+        const [keyboardDismiss] = candidate.splice(keyboardIndex, 1);
+        candidate.splice(keyboardIndex + 2, 0, keyboardDismiss);
+        return candidate;
+      },
+      (candidate: unknown[]) =>
+        candidate.map((command) =>
+          isDeepStrictEqual(command, {
+            assertVisible: { id: 'cold-start-chip-homework' },
+          })
+            ? {
+                assertVisible: { id: 'cold-start-chip-homework' },
+                optional: true,
+              }
+            : command,
+        ),
+    ]) {
+      expect(hasExactSequence(mutate(structuredClone(commands)))).toBe(false);
+    }
   });
 
   it('[WI-1406] keeps native MFA placeholders explicitly non-executable until OPQ-26 fixtures exist', () => {
