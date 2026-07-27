@@ -5117,6 +5117,19 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         extendedWaitUntil.visible.id === 'progress-screen' &&
         extendedWaitUntil.optional !== true,
     );
+    const progressReturnHome = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > progressBackLanding &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'tab-home',
+    );
+    const progressFinalHome = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > progressReturnHome &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'learner-screen' &&
+        extendedWaitUntil.optional !== true,
+    );
 
     expect(subject).toBeGreaterThan(-1);
     expect(shelf).toBeGreaterThan(subject);
@@ -5129,6 +5142,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(progressNoError).toBeGreaterThan(progressDetail);
     expect(progressBackTap).toBeGreaterThan(progressNoError);
     expect(progressBackLanding).toBeGreaterThan(progressBackTap);
+    expect(progressReturnHome).toBeGreaterThan(progressBackLanding);
+    expect(progressFinalHome).toBeGreaterThan(progressReturnHome);
   });
 
   it('[WI-1864] scrolls through every off-screen populated recap control before using it', () => {
