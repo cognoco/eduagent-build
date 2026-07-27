@@ -5028,13 +5028,15 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(source).not.toContain('progress-subject-back');
   });
 
-  it('[WI-1864] opens a multi-subject home card on its shelf before returning home', () => {
+  it('[WI-1864][WI-2600] opens a multi-subject home card on its shelf, then verifies the subject progress screen through its direct route', () => {
     const source = readFileSync(
       join(repoRoot, 'apps/mobile/e2e/flows/subjects/multi-subject.yaml'),
       'utf8',
     );
     const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
       tapOn?: { id?: string } | string;
+      openLink?: string;
+      assertNotVisible?: { id?: string; optional?: boolean } | string;
       extendedWaitUntil?: {
         visible?: { id?: string } | string;
         optional?: boolean;
@@ -5074,10 +5076,59 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         extendedWaitUntil.visible.id === 'learner-screen' &&
         extendedWaitUntil.optional !== true,
     );
-    const staleProgressWait = commands.findIndex(
-      ({ extendedWaitUntil }) =>
+    // [WI-2600] The WI-2596-quarantined progress assertion is restored: after
+    // the shelf round-trip the flow MUST enter the subject progress screen
+    // through its supported direct route (home cards navigate to the shelf
+    // since a148e4811, so a tapOn cannot reach it) and assert the loaded
+    // state — back control present, error state absent. This supersedes the
+    // earlier WI-1864 interim guard that required the wait to be absent.
+    const progressDeepLink = commands.findIndex(
+      ({ openLink }, index) =>
+        index > home &&
+        openLink === 'mentomate:///progress/${ACTIVE_SUBJECT_ID}',
+    );
+    const progressDetail = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > progressDeepLink &&
         typeof extendedWaitUntil?.visible === 'object' &&
-        extendedWaitUntil.visible.id === 'progress-subject-back',
+        extendedWaitUntil.visible.id === 'progress-subject-back' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const progressNoError = commands.findIndex(
+      ({ assertNotVisible }, index) =>
+        index > progressDetail &&
+        typeof assertNotVisible === 'object' &&
+        assertNotVisible.id === 'progress-subject-error' &&
+        assertNotVisible.optional !== true,
+    );
+    const progressBackTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > progressNoError &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'progress-subject-back',
+    );
+    // Direct-entry back routes to the screen's backFallback — the Progress
+    // tab — not Home (device-verified 2026-07-27), so the flow must wait for
+    // progress-screen before returning home via the tab bar.
+    const progressBackLanding = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > progressBackTap &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'progress-screen' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const progressReturnHome = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > progressBackLanding &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'tab-home',
+    );
+    const progressFinalHome = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > progressReturnHome &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'learner-screen' &&
+        extendedWaitUntil.optional !== true,
     );
 
     expect(subject).toBeGreaterThan(-1);
@@ -5086,7 +5137,13 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(library).toBeGreaterThan(back);
     expect(homeTab).toBeGreaterThan(library);
     expect(home).toBeGreaterThan(homeTab);
-    expect(staleProgressWait).toBe(-1);
+    expect(progressDeepLink).toBeGreaterThan(home);
+    expect(progressDetail).toBeGreaterThan(progressDeepLink);
+    expect(progressNoError).toBeGreaterThan(progressDetail);
+    expect(progressBackTap).toBeGreaterThan(progressNoError);
+    expect(progressBackLanding).toBeGreaterThan(progressBackTap);
+    expect(progressReturnHome).toBeGreaterThan(progressBackLanding);
+    expect(progressFinalHome).toBeGreaterThan(progressReturnHome);
   });
 
   it('[WI-1864] scrolls through every off-screen populated recap control before using it', () => {
