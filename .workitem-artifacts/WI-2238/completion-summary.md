@@ -23,12 +23,13 @@ creation without duplicating the WI-2215 product path.
 
 ## Verification
 
-After normally integrating the latest `origin/main`, Jest reported 15/15
-directly affected suites and 394/394 assertions, the WI-2238 structural gate
-reported 5/5 cases, the Maestro validator reported 7/7 checks, TypeScript built
-cleanly, and the V2 Playwright catalog listed all expected cases. The canonical
-serialized mobile run reported 515/515 suites and 6,806/6,806 assertions in
-331.19 seconds. Changed-file Prettier and diff integrity passed; ESLint
+After normally integrating the latest `origin/main`, including the landed
+WI-2741 prerequisite, Jest reported 15/15 directly affected suites and 394/394
+assertions, the complete structural gate reported 167/167 cases, the Maestro
+validator reported 7/7 checks, TypeScript built cleanly, and the V2 Playwright
+catalog listed all expected cases. The canonical serialized mobile run reported
+515/515 suites and 6,806/6,806 assertions in 329.215 seconds. Changed-file
+Prettier and diff integrity passed; ESLint
 reported zero errors and one inherited warning on an unchanged May line.
 Exact-head hosted browser, release-APK, CI, and review receipts will be attached
 to the Work Item before governed landing.
@@ -36,6 +37,7 @@ to the Work Item before governed landing.
 ## Caveats / Follow-ups
 
 The release-APK workflow is intentionally required again at the newly
-published exact head because its older diagnostic failures predated the landed
-WI-2836 PowerShell portability repair. No schema, external API, deployment, or
-data migration is part of this item. Rollback is a commit revert.
+published exact head because the prior exact-head receipt stopped at the
+keyboard-dismissal boundary now repaired by landed WI-2741. No schema, external
+API, deployment, or data migration is part of this item. Rollback is a commit
+revert.

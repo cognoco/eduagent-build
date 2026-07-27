@@ -32,7 +32,7 @@
     },
     {
       "acRef": "AC-7",
-      "description": "Final current-main local evidence is 15/15 affected suites and 394/394 tests; WI-2238 guard 5/5; Maestro 7/7; TypeScript green; V2 catalog 22 tests; canonical mobile 515/515 suites and 6806/6806 tests in 331.19 seconds. Exact-head hosted browser, release-APK, CI, and review receipts are required before landing.",
+      "description": "Final current-main local evidence after integrating landed WI-2741 is 15/15 affected suites and 394/394 tests; complete structural gate 167/167; Maestro 7/7; TypeScript green; V2 catalog 22 tests; canonical mobile 515/515 suites and 6806/6806 tests in 329.215 seconds. Exact-head hosted browser, release-APK, CI, and review receipts are required before landing.",
       "pointer": ".workitem-artifacts/WI-2238/verification.md"
     }
   ],

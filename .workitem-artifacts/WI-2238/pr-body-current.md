@@ -21,11 +21,11 @@ ancestry through browser and Android Back.
 ## Verification
 
 - 15/15 affected mobile suites; 394/394 tests.
-- WI-2238 structural gate: 5/5.
+- Complete structural gate: 167/167; focused WI-2238/WI-2741 slice: 5/5.
 - Maestro validator: 7/7, zero violations.
 - TypeScript build: green.
 - V2 Playwright catalog: 22 tests in 10 files.
-- Canonical mobile: 515/515 suites; 6,806/6,806 tests; 331.19 s.
+- Canonical mobile: 515/515 suites; 6,806/6,806 tests; 329.215 s.
 - Changed-file Prettier and diff integrity: green.
 - Changed-file ESLint: zero errors; one inherited warning on an unchanged line.
 
@@ -33,8 +33,8 @@ ancestry through browser and Android Back.
 
 The newly published exact head must pass ordinary CI, the six-case V2 browser
 workflow, the three-case release-APK workflow, and a fresh zero-blocking Claude
-review before governed landing. Older native failures are diagnostic because
-they predate the landed WI-2836 PowerShell portability repair.
+review before governed landing. The prior native failure is diagnostic because
+it stopped at the keyboard boundary now repaired by landed WI-2741.
 
 ## Failure modes
 
