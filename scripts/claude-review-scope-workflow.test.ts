@@ -22,6 +22,10 @@ interface WorkflowStep {
   run?: string;
 }
 
+interface RunReviewOptions {
+  tamperManifestPaths?: string[];
+}
+
 const INCIDENT_HEAD = 'a9d5f5ed6524d503f953844fce3cd5f96a816a7f';
 const INCIDENT_CHANGED_PATHS = [
   '.workitem-artifacts/WI-2838/completion-summary.md',
@@ -92,7 +96,10 @@ function trustedComment(
   };
 }
 
-function runReviewSteps(comments: ReviewComment[]) {
+function runReviewSteps(
+  comments: ReviewComment[],
+  { tamperManifestPaths }: RunReviewOptions = {},
+) {
   const root = mkdtempSync(join(tmpdir(), 'claude-review-scope-'));
   const fixturePath = join(root, 'github-fixture.json');
   const manifestPath = join(root, 'changed-files.json');
@@ -150,6 +157,26 @@ esac
     rmSync(root, { recursive: true, force: true });
     throw new Error(`manifest step failed: ${manifest.stderr}`);
   }
+  if (tamperManifestPaths) {
+    writeFileSync(
+      manifestPath,
+      JSON.stringify({ head_sha: INCIDENT_HEAD, paths: tamperManifestPaths }),
+    );
+    const refresh = spawnSync(
+      'bash',
+      [
+        '-euo',
+        'pipefail',
+        '-c',
+        workflowStep('Refresh authoritative PR files'),
+      ],
+      { cwd: root, encoding: 'utf8', env },
+    );
+    if (refresh.status !== 0) {
+      rmSync(root, { recursive: true, force: true });
+      throw new Error(`manifest refresh failed: ${refresh.stderr}`);
+    }
+  }
   const evaluation = spawnSync(
     'bash',
     ['-uo', 'pipefail', '-c', workflowStep('Evaluate review verdict')],
@@ -186,6 +213,33 @@ describe('Claude review authoritative-diff scope', () => {
       status: 'REVIEW_SCOPE_CORRUPTION',
       merge_eligible: false,
       head_sha: INCIDENT_HEAD,
+      out_of_scope_paths: [BASE_ONLY_PATH],
+    });
+  });
+
+  it('refreshes the manifest after writable reviewer tampering', () => {
+    const result = runReviewSteps(
+      [
+        trustedComment(
+          reviewBody({
+            verdict: 'CHANGES_REQUESTED',
+            paths: [BASE_ONLY_PATH],
+          }),
+        ),
+      ],
+      {
+        tamperManifestPaths: [...INCIDENT_CHANGED_PATHS, BASE_ONLY_PATH],
+      },
+    );
+
+    expect(result.manifest).toEqual({
+      head_sha: INCIDENT_HEAD,
+      paths: INCIDENT_CHANGED_PATHS,
+    });
+    expect(result.evaluation.status).not.toBe(0);
+    expect(result.artifact).toMatchObject({
+      status: 'REVIEW_SCOPE_CORRUPTION',
+      merge_eligible: false,
       out_of_scope_paths: [BASE_ONLY_PATH],
     });
   });

@@ -308,11 +308,16 @@ function validateClaudeReviewScopeContract(
   const captureStep = steps.find(
     (step) => step.name === 'Capture authoritative PR files',
   );
+  const refreshStep = steps.find(
+    (step) => step.name === 'Refresh authoritative PR files',
+  );
   const evaluateStep = steps.find(
     (step) => step.name === 'Evaluate review verdict',
   );
   const captureRun =
     typeof captureStep?.run === 'string' ? captureStep.run : '';
+  const refreshRun =
+    typeof refreshStep?.run === 'string' ? refreshStep.run : '';
   const evaluateRun =
     typeof evaluateStep?.run === 'string' ? evaluateStep.run : '';
   const prompt =
@@ -321,19 +326,34 @@ function validateClaudeReviewScopeContract(
       : '';
   const expectedHeadExpression = '${{ github.event.pull_request.head.sha }}';
 
-  const capturesAuthoritativeExactHeadManifest =
-    captureRun.includes(
-      'repos/${REPO}/pulls/${PR_NUMBER}/files?per_page=100',
-    ) &&
-    captureRun.includes('api_head') &&
-    captureRun.includes('"$api_head" != "$HEAD_SHA"') &&
-    captureRun.includes(
+  const writesAuthoritativeExactHeadManifest = (run: string) =>
+    run.includes('repos/${REPO}/pulls/${PR_NUMBER}/files?per_page=100') &&
+    run.includes('api_head') &&
+    run.includes('"$api_head" != "$HEAD_SHA"') &&
+    run.includes(
       'api_head_after="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq \'.head.sha\')"',
     ) &&
-    captureRun.includes('"$api_head_after" != "$HEAD_SHA"') &&
-    captureRun.includes('--arg head_sha "$HEAD_SHA"') &&
-    captureRun.includes('{head_sha: $head_sha, paths: $paths}') &&
-    captureRun.includes('> "$CHANGED_FILES_MANIFEST"');
+    run.includes('"$api_head_after" != "$HEAD_SHA"') &&
+    run.includes('--arg head_sha "$HEAD_SHA"') &&
+    run.includes('{head_sha: $head_sha, paths: $paths}') &&
+    run.includes('> "$CHANGED_FILES_MANIFEST"');
+  const capturesAuthoritativeExactHeadManifest =
+    writesAuthoritativeExactHeadManifest(captureRun);
+  const refreshIndex = steps.indexOf(refreshStep!);
+  const evaluateIndex = steps.indexOf(evaluateStep!);
+  const writableReviewerIndexes = steps.flatMap((step, index) =>
+    typeof step.uses === 'string' &&
+    step.uses.startsWith('anthropics/claude-code-action@')
+      ? [index]
+      : [],
+  );
+  const lastReviewerIndex = Math.max(-1, ...writableReviewerIndexes);
+  const refreshesAfterWritableReview =
+    writesAuthoritativeExactHeadManifest(refreshRun) &&
+    refreshStep?.if === 'always()' &&
+    writableReviewerIndexes.length > 0 &&
+    refreshIndex > lastReviewerIndex &&
+    refreshIndex < evaluateIndex;
   const selectsLatestFreshExactHeadVerdict =
     isRecord(evaluateStep?.env) &&
     evaluateStep.env.HEAD_SHA === expectedHeadExpression &&
@@ -363,6 +383,7 @@ function validateClaudeReviewScopeContract(
 
   if (
     capturesAuthoritativeExactHeadManifest &&
+    refreshesAfterWritableReview &&
     selectsLatestFreshExactHeadVerdict &&
     validatesFindingPaths &&
     promptUsesManifest

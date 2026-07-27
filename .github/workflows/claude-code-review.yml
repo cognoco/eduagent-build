@@ -290,6 +290,44 @@ jobs:
           prompt: ${{ env.CLAUDE_REVIEW_PROMPT }}
           claude_args: ${{ env.CLAUDE_REVIEW_ARGS }}
 
+      # The reviewer has the Write tool, so the prompt-facing manifest is not
+      # authoritative after the model step. Rebuild it from GitHub before any
+      # verdict path is accepted.
+      - name: Refresh authoritative PR files
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          pull_json="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}")"
+          api_head="$(jq -r '.head.sha // empty' <<< "$pull_json")"
+          if [[ -z "$api_head" || "$api_head" != "$HEAD_SHA" ]]; then
+            echo "::error::Pull request head changed while capturing review scope; expected ${HEAD_SHA}, got ${api_head:-missing}."
+            exit 1
+          fi
+
+          changed_paths="$(
+            gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/files?per_page=100" --jq '.[]' \
+              | jq -sce '[.[].filename] | unique'
+          )"
+          if ! jq -e 'length > 0 and all(.[]; type == "string" and length > 0)' <<< "$changed_paths" > /dev/null; then
+            echo "::error::GitHub returned an empty or malformed changed-file manifest."
+            exit 1
+          fi
+
+          api_head_after="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq '.head.sha')"
+          if [[ "$api_head_after" != "$HEAD_SHA" ]]; then
+            echo "::error::Pull request head changed while capturing review scope; expected ${HEAD_SHA}, got ${api_head_after:-missing}."
+            exit 1
+          fi
+
+          jq -n \
+            --arg head_sha "$HEAD_SHA" \
+            --argjson paths "$changed_paths" \
+            '{head_sha: $head_sha, paths: $paths}' > "$CHANGED_FILES_MANIFEST"
+
       - name: Verify review completed
         if: always()
         run: |

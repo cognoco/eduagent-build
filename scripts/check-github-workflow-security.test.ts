@@ -807,6 +807,21 @@ describe('checkGithubWorkflowSecurity', () => {
     );
   });
 
+  it('rejects the Claude review workflow when the post-review manifest refresh is removed', () => {
+    const workflow = readFileSync(
+      join(process.cwd(), '.github/workflows/claude-code-review.yml'),
+      'utf8',
+    ).replace(
+      '      - name: Refresh authoritative PR files\n',
+      '      - name: Unchecked PR manifest\n',
+    );
+    writeFixture(root, '.github/workflows/claude-code-review.yml', workflow);
+
+    expect(messages(root)).toContain(
+      'Claude review must bind findings to GitHub-authoritative pull files for the exact head and fail closed on scope corruption',
+    );
+  });
+
   it('rejects the Claude review workflow when out-of-diff findings stop failing closed', () => {
     const workflow = readFileSync(
       join(process.cwd(), '.github/workflows/claude-code-review.yml'),
