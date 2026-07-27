@@ -15,11 +15,12 @@ confirmed this was a file-wide boundary rather than a filing-path defect.
 
 ## Verification
 
-- Five fresh focused processes passed the complete 30-test PickBookScreen suite.
-- The post-repair 6,144 MB serialized mobile suite passed 514/514 suites and
-  6,726/6,726 tests in 334.302 seconds; PickBookScreen passed 30/30 in-suite.
-- WI-2845 independently owns the default-heap exhaustion in the canonical
-  runner.
+- Five repair processes, three post-main-integration processes, and three
+  exact-final-head processes passed the complete 30-test PickBookScreen suite.
+- After normal integration of landed WI-2845 and WI-2846 plus the preserved
+  remote seam clarification, the exact-final-head canonical mobile command
+  passed 514/514 suites and 6,726/6,726 tests in 338.192 seconds;
+  PickBookScreen and useNowFeed both passed in-suite.
 - Targeted Prettier and diff integrity passed.
 
 No production file or global timeout changed.

@@ -35,14 +35,24 @@ for its one caller.
 Five fresh focused processes passed 30/30 tests on 2026-07-27 after the complete
 repair, in 20.592 s, 20.166 s, 20.113 s, 20.145 s, and 20.146 s.
 
+After normally integrating landed WI-2845 and WI-2846, three further fresh
+focused processes passed 30/30 in 20.092 s, 20.145 s, and 20.052 s before the
+ordinary merge of remote commit `500da0b97`; that commit only clarified the
+targeted api-client mock seam. After that merge, three exact-final-head focused
+processes passed 30/30 in 20.603 s, 20.097 s, and 20.123 s.
+
 Each run used:
 
 ```text
 pnpm exec jest --config apps/mobile/jest.config.cjs --runInBand --forceExit --silent --runTestsByPath "apps/mobile/src/app/(app)/pick-book/[subjectId].test.tsx"
 ```
 
-The post-repair serialized full suite passed 514/514 suites and 6,726/6,726
-tests in 334.302 seconds with a 6,144 MB Node heap. The PickBookScreen suite ran
-first and passed all 30 tests in 20.002 seconds. The separate WI-2845 runner
-defect records why the canonical default-heap command can exhaust V8's
-approximately 4.5 GB default before reporting the complete suite result.
+The final canonical `pnpm test:mobile:unit --silent` run inherited WI-2845's
+portable 6,144 MB heap contract and WI-2846's bounded useNowFeed success wait.
+The post-main control passed 514/514 suites and 6,726/6,726 tests in 329.527
+seconds. After preserving remote commit `500da0b97`, the exact-final-head run
+again passed 514/514 suites and 6,726/6,726 tests in 338.192 seconds.
+PickBookScreen ran first and passed 30/30 in 20.015 seconds; useNowFeed also
+passed under full load. `/usr/bin/time -v` reported 6,026,368 KB maximum RSS,
+zero swaps, and exit status 0. This is the exact integrated proof required
+before publication.
