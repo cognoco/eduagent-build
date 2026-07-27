@@ -18,9 +18,8 @@ non-matching parent remains excluded.
 The named regression failed before the production change with `queuedParents=0`
 and passed afterward. A deliberate mutation restoring the old parent wall-clock
 read left the same-hour control green and failed the rollover regression at the
-exact created-parent assertion. At the
-[verified implementation commit](https://github.com/cognoco/eduagent-build/commit/80e9aaa4987525cbd2a58eec896d09e76b6fe947),
-the focused pair passed 2/2, the
+exact created-parent assertion. At the verified implementation commit recorded
+in the evidence manifest, the focused pair passed 2/2, the
 full weekly-progress-push integration file passed 10/10 with V2 identity enabled,
 and the companion unit file passed 29/29. API typecheck, targeted ESLint, and
 targeted Prettier passed. A separate deliberate mutation that queued the excluded
