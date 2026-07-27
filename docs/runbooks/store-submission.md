@@ -60,6 +60,13 @@ Record each build ID, commit, profile, flag classification, and link. Verify the
 
 Android's `track: internal` is the dry-run destination; it is a real upload to Play internal testing, not a no-op command:
 
+Google Play requires the first AAB for a new app to be uploaded manually before
+API-based submission can take over. For MentoMate, verify the existing app bundle
+and version in Play Console before running `eas submit`; that existing bundle is
+the bootstrap upload. If a future app has no bundle listed, upload its first AAB
+manually in Play Console and complete the release setup there before using this
+command.
+
 ```powershell
 cd apps/mobile
 eas submit -p android --profile production --id <android-build-id> --non-interactive --wait
