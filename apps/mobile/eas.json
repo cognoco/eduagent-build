@@ -14,7 +14,7 @@
         "EXPO_PUBLIC_ENABLE_MODE_NAV": "false",
         "EXPO_PUBLIC_ENABLE_MODE_NAV_V1": "true",
         "EXPO_PUBLIC_ENABLE_MODE_NAV_V2": "true",
-        "SENTRY_DISABLE_AUTO_UPLOAD": "false"
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
     "development": {
