@@ -12,6 +12,10 @@ export const PRACTICE_RETURN_TO = 'practice';
 export const PRACTICE_HREF = '/(app)/practice';
 export const JOURNAL_RETURN_TO = 'journal';
 export const JOURNAL_HREF = '/(app)/journal';
+export const JOURNAL_REPORTS_HREF = {
+  pathname: JOURNAL_HREF,
+  params: { section: 'reports' },
+} as const;
 export const MENTOR_RETURN_TO = 'mentor';
 export const MENTOR_HREF = '/(app)/mentor';
 export const SUBJECTS_RETURN_TO = 'subjects';
@@ -235,19 +239,22 @@ export function goBackOrReplace(
  * Return a Journal-origin report to Journal without leaving Reports behind.
  *
  * Web replaces the report with Journal because Expo Router's stack can point
- * at the hidden Progress ancestor instead of the visible Journal caller.
- * Native dismisses the complete cross-tab Progress ancestry to Journal.
+ * at the hidden Progress ancestor instead of the visible Journal caller. Native
+ * first replaces the report leaf with Progress root so the report cannot
+ * resurrect when Progress is revisited, then uses the tab-supported NAVIGATE
+ * action to restore Journal Reports. POP_TO is unhandled across sibling tabs.
  */
 export function returnJournalReportToCaller(
-  router: Pick<Router, 'dismissTo' | 'replace'>,
+  router: Pick<Router, 'navigate' | 'replace'>,
   platform: 'web' | 'native',
 ): void {
   if (platform === 'web') {
-    router.replace(JOURNAL_HREF);
+    router.replace(JOURNAL_REPORTS_HREF);
     return;
   }
 
-  router.dismissTo(JOURNAL_HREF);
+  router.replace(STUDY_PROGRESS_HREF);
+  router.navigate(JOURNAL_REPORTS_HREF);
 }
 
 export function pushLearningResumeTarget(

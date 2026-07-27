@@ -678,7 +678,7 @@ const FALLBACK_FORBIDDEN: ReadonlySet<string> = new Set(['gemini', 'vertex']);
  * (§10.1 — under-18 ban, and the judge role never wants Gemini regardless of
  * age). Order matters: Anthropic first, OpenAI second (spec + WI-2624).
  */
-const JUDGE_VENDOR_ORDER: ReadonlyArray<'anthropic' | 'openai'> = [
+export const JUDGE_VENDOR_ORDER: ReadonlyArray<'anthropic' | 'openai'> = [
   'anthropic',
   'openai',
 ];
@@ -708,7 +708,7 @@ function normalizeVendorForExclusion(vendor: string): string {
  * returns an empty array from a single exclusion — the pool has 2 members
  * and a producer can match at most 1.
  */
-function resolveJudgeEligibleVendors(
+export function resolveJudgeEligibleVendors(
   independence: JudgeIndependence | undefined,
 ): ReadonlyArray<'anthropic' | 'openai'> {
   if (independence?.mode !== 'model-output') return JUDGE_VENDOR_ORDER;

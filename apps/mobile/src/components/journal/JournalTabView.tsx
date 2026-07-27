@@ -318,10 +318,25 @@ function ActiveSection({
 
 export function JournalTabView(): React.ReactElement {
   const { t } = useTranslation();
+  const router = useRouter();
   const { section } = useLocalSearchParams<{ section?: string | string[] }>();
   const [organicSection, setOrganicSection] =
     useState<JournalSectionId>('sessions');
-  const activeSection = journalSectionOverride(section) ?? organicSection;
+  const routeSection = journalSectionOverride(section);
+  const activeSection = routeSection ?? organicSection;
+  const selectSection = (nextSection: JournalSectionId): void => {
+    setOrganicSection(nextSection);
+    // Web history must own Reports before a later report click pushes its leaf.
+    // Keeping these as separate user events prevents the router from coalescing
+    // both states into the final report entry.
+    if (Platform.OS === 'web' && nextSection === 'reports') {
+      router.setParams({ section: 'reports' });
+      return;
+    }
+    if (routeSection) {
+      router.setParams({ section: undefined });
+    }
+  };
 
   return (
     <ScrollView
@@ -340,10 +355,7 @@ export function JournalTabView(): React.ReactElement {
 
       <JournalMomentsStrip />
 
-      <JournalSegmentedControl
-        value={activeSection}
-        onChange={setOrganicSection}
-      />
+      <JournalSegmentedControl value={activeSection} onChange={selectSection} />
       <Text className="text-body-sm text-text-secondary">
         {sectionSubtitle(activeSection, t)}
       </Text>

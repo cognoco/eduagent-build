@@ -14,6 +14,7 @@ import {
   PRACTICE_HREF,
   PRACTICE_RETURN_TO,
   JOURNAL_HREF,
+  JOURNAL_REPORTS_HREF,
   JOURNAL_RETURN_TO,
   SUBJECTS_HREF,
   SUBJECTS_RETURN_TO,
@@ -262,8 +263,9 @@ describe('returnJournalReportToCaller [WI-2239]', () => {
   function createRouter() {
     return {
       dismissTo: jest.fn(),
+      navigate: jest.fn(),
       replace: jest.fn(),
-    } satisfies Pick<Router, 'dismissTo' | 'replace'>;
+    } satisfies Pick<Router, 'dismissTo' | 'navigate' | 'replace'>;
   }
 
   it('replaces the web report with its exact Journal caller', () => {
@@ -271,17 +273,22 @@ describe('returnJournalReportToCaller [WI-2239]', () => {
 
     returnJournalReportToCaller(router, 'web');
 
-    expect(router.replace).toHaveBeenCalledWith(JOURNAL_HREF);
+    expect(router.replace).toHaveBeenCalledWith(JOURNAL_REPORTS_HREF);
+    expect(router.navigate).not.toHaveBeenCalled();
     expect(router.dismissTo).not.toHaveBeenCalled();
   });
 
-  it('dismisses the complete native report stack to Journal', () => {
+  it('resets native Progress state before navigating across tabs to exact Journal Reports', () => {
     const router = createRouter();
 
     returnJournalReportToCaller(router, 'native');
 
-    expect(router.dismissTo).toHaveBeenCalledWith(JOURNAL_HREF);
-    expect(router.replace).not.toHaveBeenCalled();
+    expect(router.replace).toHaveBeenCalledWith(STUDY_PROGRESS_HREF);
+    expect(router.navigate).toHaveBeenCalledWith(JOURNAL_REPORTS_HREF);
+    expect(router.dismissTo).not.toHaveBeenCalled();
+    expect(router.replace.mock.invocationCallOrder[0]).toBeLessThan(
+      router.navigate.mock.invocationCallOrder[0]!,
+    );
   });
 });
 
