@@ -7,7 +7,18 @@ import {
 } from './dedup-prompt';
 
 export type DedupLlmResult =
-  | { ok: true; decision: DedupResponse; modelVersion: string }
+  | {
+      ok: true;
+      decision: DedupResponse;
+      modelVersion: string;
+      /**
+       * [WI-2628] The VENDOR that produced this decision (`result.provider`), kept
+       * separate from `modelVersion` (`result.model`). The judge's independence
+       * exclusion matches against the vendor pool, so a model string excludes
+       * nothing and lets a vendor grade its own output.
+       */
+      provider: string;
+    }
   | {
       ok: false;
       reason: 'invalid_response' | 'transient' | 'no_api_key';
@@ -28,6 +39,7 @@ export async function runDedupLlm(
 
   let raw: string;
   let modelVersion: string;
+  let provider: string;
   try {
     // conversationLanguage not threaded: output is a similarity decision, not prose
     const result = await (deps.caller ?? routeAndCall)(messages, 1, {
@@ -36,6 +48,7 @@ export async function runDedupLlm(
     });
     raw = result.response;
     modelVersion = result.model;
+    provider = result.provider;
   } catch (err) {
     return {
       ok: false,
@@ -75,5 +88,5 @@ export async function runDedupLlm(
       message: result.error.message,
     };
   }
-  return { ok: true, decision: result.data, modelVersion };
+  return { ok: true, decision: result.data, modelVersion, provider };
 }
