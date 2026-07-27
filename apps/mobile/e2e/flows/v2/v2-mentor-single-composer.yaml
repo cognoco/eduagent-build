@@ -54,6 +54,8 @@ tags:
 # known-open IME before selecting the starter below it; otherwise Maestro taps
 # the keyboard overlay while reporting the obscured accessibility node tapped.
 - hideKeyboard
+- assertVisible:
+    id: 'cold-start-chip-homework'
 
 # The homework starter preserves the learner's existing draft while the
 # composer's canonical Camera action remains available and no second Camera
