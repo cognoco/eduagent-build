@@ -1014,12 +1014,16 @@ describe('[WI-2628 AC-5] persistence-boundary wiring guard (forward-only)', () =
     'evidence-links.ts',
     'notes.ts',
     'session/session-exchange.ts',
+    // Moved by the AC-5 remainder work: `applyDedupAction` runs inside the
+    // caller's transaction, so it consumes a CONTENT-ADDRESSED decision that
+    // `dedup-pass.ts` pre-computes before opening it — the content key is what
+    // makes "the state moved under me" fail closed for free.
+    'memory/dedup-actions.ts',
   ] as const;
 
   const PENDING_CALL_SITES = [
     'learner-profile.ts',
     'memory/backfill-mapping.ts',
-    'memory/dedup-actions.ts',
   ] as const;
 
   const read = (relativePath: string): string =>
@@ -1030,6 +1034,8 @@ describe('[WI-2628 AC-5] persistence-boundary wiring guard (forward-only)', () =
     // itself. Partitioning must lose none of them and duplicate none.
     const all = [...WIRED_CALL_SITES, ...PENDING_CALL_SITES];
     expect(new Set(all).size).toBe(all.length);
+    // Still seven — the partition moves members between columns, it never loses
+    // one. This assertion is what makes a silently-dropped boundary fail.
     expect(all).toHaveLength(7);
   });
 
