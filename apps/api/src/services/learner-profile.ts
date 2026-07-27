@@ -1506,12 +1506,40 @@ function evaluatedTextSet(
  * The gate for the profile's own free-text JSONB fields and the struggle
  * notifications derived alongside them.
  *
- * `provenance: 'llm'` with a null `producerVendor`: this text is session-analysis
- * output merged into the stored row, and no vendor identity survives to this
- * point. Null fails the scan closed on anything ambiguous (AC-4), which is the
- * correct reading of an unknown producer — a confidently wrong vendor would
- * silently defeat the judge's independence guarantee instead. Same reasoning,
- * same shape as `dedup-pass.ts`.
+ * `provenance: 'llm'` with a null `producerVendor` — INTERIM, and deliberately
+ * the strictest of the available readings. Null fails the scan closed on anything
+ * ambiguous (AC-4), so nothing unsafe can ride through while the question below is
+ * open; a confidently wrong vendor would silently defeat the judge's independence
+ * guarantee instead.
+ *
+ * THE OPEN QUESTION, recorded here so it is not re-derived as "vendor
+ * unrecoverable". The vendor is NOT unrecoverable — it is DISCARDED one frame
+ * above. `analyzeSessionTranscript` has `routeAndCall`'s result in hand (see its
+ * call at the bottom of this file) and returns only `SessionAnalysisOutput`,
+ * dropping `result.provider`. Worse, provenance at this boundary is not even
+ * uniform: it is a property of the CALLER, and `applyAnalysis` cannot see which.
+ *
+ *   inngest/functions/session-completed.ts  → 'llm'; vendor available, discarded
+ *   services/learner-input.ts (LLM path)    → 'llm'; vendor available, discarded
+ *   services/learner-input.ts (fallback)    → 'user'. `fallbackAnalysis` regexes
+ *                                             the learner's OWN typed words into
+ *                                             `interests[]` and `struggles[].topic`
+ *                                             verbatim — no model involved.
+ *
+ * That third row is why this is a product/safety decision and not a cleanup:
+ * `'user'` is the one provenance that REACHES the judge, and it exists precisely
+ * because a learner describing themselves is a different call from a model
+ * inferring a diagnosis about them. Under today's uniform fail-closed reading a
+ * learner's own self-disclosure is DROPPED rather than judged. Widening it is not
+ * this change-set's call to make.
+ *
+ * WHEN THREADING A VENDOR HERE, pass the VENDOR (`anthropic`), never the model id
+ * (`claude-sonnet-4-6`). Judge exclusion matches vendor names, so a model id
+ * matches no pool member and the producing vendor ends up grading its own output.
+ * It does NOT fail closed — the guard rejects only a BLANK vendor — and both
+ * fields are typed `string`, so the compiler will not catch it. The only real
+ * guard is a test asserting the producing vendor is absent from the RESOLVED judge
+ * pool, asserted against the real resolver rather than behind a mock.
  */
 function evaluateProfileFieldTexts(
   texts: readonly (string | null | undefined)[],
@@ -1536,11 +1564,23 @@ function evaluateProfileFieldTexts(
  * different string from any field it was built out of — clearing the parts does
  * not clear the whole. `fieldKind: 'memory_fact'` names it accordingly.
  *
- * `provenance` differs by path: session analysis is LLM-authored, while the
- * delete/unsuppress paths re-project text that is already stored and has no
- * identifiable author for THIS write. Both fail closed on `refer` identically
- * (`'migration'` never consults the judge; `'llm'` with a null vendor cannot),
- * so this is a declaration-honesty choice, not a behavioural one.
+ * `provenance` differs by path, and the two calls are NOT interchangeable:
+ *
+ *   'llm'       — `applyAnalysis`. Session-analysis output merged into the stored
+ *                 row. See `evaluateProfileFieldTexts` above for the open question
+ *                 about its vendor, which applies identically here.
+ *   'migration' — `deleteMemoryItem` / `unsuppressInference`. Determined from the
+ *                 code, not copied from the backfill: the only text these project
+ *                 is text ALREADY STORED on the row, with no identifiable author
+ *                 for this write. The caller's `value` argument is used solely to
+ *                 REMOVE an entry — it never contributes text to the projection —
+ *                 so `'user'` would be a mis-declaration despite a user driving
+ *                 the request.
+ *
+ * Both fail closed on `refer` today (`'migration'` never consults the judge;
+ * `'llm'` with a null vendor cannot), so the two are currently
+ * behaviour-equivalent — but only because the vendor is null. Do not read that
+ * equivalence as licence to collapse them.
  */
 function evaluateMemoryFactTexts(
   texts: readonly (string | null | undefined)[],
