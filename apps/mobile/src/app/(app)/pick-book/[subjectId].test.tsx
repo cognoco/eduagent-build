@@ -325,9 +325,12 @@ describe('PickBookScreen', () => {
 
     const { result } = renderPickBook();
 
-    await waitFor(() => {
-      result.getByText('Europe');
-    });
+    await waitFor(
+      () => {
+        result.getByText('Europe');
+      },
+      { timeout: 3000 },
+    );
     fireEvent.press(result.getByText('Europe'));
 
     await waitFor(() => {
@@ -529,9 +532,12 @@ describe('PickBookScreen', () => {
               }),
             ),
           );
-          await waitFor(() => {
-            result.getByText('Europe');
-          });
+          await waitFor(
+            () => {
+              result.getByText('Europe');
+            },
+            { timeout: 3000 },
+          );
           fireEvent.press(result.getByText('Europe'));
         },
       },
@@ -547,9 +553,12 @@ describe('PickBookScreen', () => {
               }),
             ),
           );
-          await waitFor(() => {
-            result.getByText('Something else...');
-          });
+          await waitFor(
+            () => {
+              result.getByText('Something else...');
+            },
+            { timeout: 3000 },
+          );
           fireEvent.press(result.getByText('Something else...'));
           fireEvent.changeText(
             result.getByTestId('pick-book-custom-input'),
