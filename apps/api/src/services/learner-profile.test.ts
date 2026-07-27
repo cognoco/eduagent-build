@@ -2538,17 +2538,27 @@ describe('[WI-2628] applyAnalysis / deleteMemoryItem — multilingual gate at th
   }
 
   /**
-   * @param preReadProfile row the UNLOCKED outer pre-read returns
+   * BOTH reads are sequenced per attempt, because a retry that only re-reads
+   * under the lock proves the loop iterates, not that it converges. In
+   * production the world MOVES and the retry's fresh unlocked pre-read is what
+   * catches up; a frozen pre-read can only ever succeed by the locked row
+   * reverting, which is the opposite situation.
+   *
+   * @param preReadProfiles rows the UNLOCKED outer pre-read returns, one per
+   *   attempt (the last repeats once exhausted)
    * @param lockedProfiles rows the in-transaction FOR UPDATE read returns, one
-   *   per transaction attempt (the last one repeats once exhausted)
+   *   per attempt (the last repeats once exhausted)
    */
   function makeHarness(
-    preReadProfile: Record<string, unknown>,
+    preReadProfiles: Record<string, unknown>[],
     lockedProfiles: Record<string, unknown>[],
   ) {
     const setCalls: Array<Record<string, unknown>> = [];
     const insertedFactRows: Array<Record<string, unknown>[]> = [];
     let txCount = 0;
+    let preReadCount = 0;
+    const at = (rows: Record<string, unknown>[], index: number) =>
+      rows[Math.min(index, rows.length - 1)]!;
 
     const makeWriter = (profileRow: Record<string, unknown>) => ({
       // `.select()` with no argument = the profile lock read; `.select({...})`
@@ -2587,16 +2597,31 @@ describe('[WI-2628] applyAnalysis / deleteMemoryItem — multilingual gate at th
       .fn()
       .mockImplementation(
         async (callback: (tx: unknown) => Promise<unknown>) => {
-          const locked =
-            lockedProfiles[Math.min(txCount, lockedProfiles.length - 1)]!;
+          const locked = at(lockedProfiles, txCount);
           txCount += 1;
           return callback({ ...makeWriter(locked), query: consentQueries() });
         },
       );
 
+    // The outer pre-read is resolved LAZILY per `select()` so each attempt's
+    // unlocked read advances the sequence, mirroring a moving world.
+    const outerWriter = makeWriter(at(preReadProfiles, 0));
     const db = {
       transaction,
-      ...makeWriter(preReadProfile),
+      ...outerWriter,
+      select: jest.fn().mockImplementation((columns?: unknown) => {
+        const row = at(preReadProfiles, preReadCount);
+        if (columns === undefined) preReadCount += 1;
+        return {
+          from: jest.fn().mockReturnValue({
+            where: jest
+              .fn()
+              .mockImplementation(() =>
+                whereResult(columns === undefined ? [row] : []),
+              ),
+          }),
+        };
+      }),
       query: consentQueries(),
     } as unknown as Database;
 
@@ -2617,7 +2642,7 @@ describe('[WI-2628] applyAnalysis / deleteMemoryItem — multilingual gate at th
 
   it('drops a Czech clinical note from BOTH the profile update and the memory facts', async () => {
     const row = profileRow();
-    const harness = makeHarness(row, [row]);
+    const harness = makeHarness([row], [row]);
 
     await applyAnalysis(
       harness.db,
@@ -2635,14 +2660,19 @@ describe('[WI-2628] applyAnalysis / deleteMemoryItem — multilingual gate at th
     expect(harness.factTexts()).toEqual([CLEAR_NOTE]);
   });
 
-  it('treats an unevaluated string as a COVERAGE MISS and retries, rather than dropping it', async () => {
-    // Attempt 1's locked row carries a note the unlocked pre-read never saw, so
-    // the pre-evaluated batch cannot cover it. Attempt 2 sees a locked row that
-    // matches the pre-read. The surviving note must be the one from the SECOND
-    // attempt — proving the miss was retried, not filtered away.
-    const preRead = profileRow();
-    const stale = profileRow({ communicationNotes: ['Unseen prior note.'] });
-    const harness = makeHarness(preRead, [stale, preRead]);
+  it('treats an unevaluated string as a COVERAGE MISS and CONVERGES on the moved state', async () => {
+    // The world moves between attempt 1's pre-read and its locked read, and then
+    // STAYS moved — which is the production shape. Attempt 1 misses (the locked
+    // row carries a note its batch never saw); attempt 2's fresh pre-read sees
+    // the moved row and evaluates it, so the locked read is covered.
+    //
+    // The assertion that makes this convergence rather than mere iteration: the
+    // surviving text includes `MOVED_NOTE`, which ONLY the moved row carries. A
+    // loop that retried without re-reading could never produce it.
+    const MOVED_NOTE = 'The learner asked to revisit long division.';
+    const original = profileRow();
+    const moved = profileRow({ communicationNotes: [MOVED_NOTE] });
+    const harness = makeHarness([original, moved], [moved, moved]);
 
     await applyAnalysis(
       harness.db,
@@ -2652,7 +2682,9 @@ describe('[WI-2628] applyAnalysis / deleteMemoryItem — multilingual gate at th
     );
 
     expect(harness.transaction).toHaveBeenCalledTimes(2);
-    expect(harness.factTexts()).toEqual([CLEAR_NOTE]);
+    expect(harness.factTexts()).toEqual(
+      expect.arrayContaining([MOVED_NOTE, CLEAR_NOTE]),
+    );
   });
 
   it('FAILS CLOSED when the retry bound is exhausted — applyAnalysis writes nothing', async () => {
@@ -2664,7 +2696,7 @@ describe('[WI-2628] applyAnalysis / deleteMemoryItem — multilingual gate at th
     const foreverStale = profileRow({
       communicationNotes: ['Unseen prior note.'],
     });
-    const harness = makeHarness(preRead, [foreverStale]);
+    const harness = makeHarness([preRead], [foreverStale]);
 
     const result = await applyAnalysis(
       harness.db,
@@ -2685,7 +2717,7 @@ describe('[WI-2628] applyAnalysis / deleteMemoryItem — multilingual gate at th
       interests: ['astronomy'],
       communicationNotes: ['Unseen prior note.'],
     });
-    const harness = makeHarness(preRead, [foreverStale]);
+    const harness = makeHarness([preRead], [foreverStale]);
 
     await expect(
       deleteMemoryItem(
@@ -2700,6 +2732,69 @@ describe('[WI-2628] applyAnalysis / deleteMemoryItem — multilingual gate at th
     expect(harness.transaction).toHaveBeenCalledTimes(3);
     expect(harness.setCalls).toEqual([]);
     expect(harness.insertedFactRows).toEqual([]);
+  });
+
+  it('derives the SAME gated text twice for a populated profile — no clock value reaches a gated expression', async () => {
+    // THE LOAD-BEARING ASSUMPTION of the whole retry design: the derivation
+    // (`buildAnalysisUpdates` → `mergeProfileState` → sanitiser → row mappers) is
+    // a pure function of the profile row. If any clock value reached a gated text
+    // expression, EVERY call would miss coverage three times and write nothing —
+    // a total silent regression that no other test here would catch, because the
+    // other fixtures leave the time-sensitive collections empty.
+    //
+    // This one populates exactly the paths where `nowIso()` lives —
+    // `mergeStruggles` stamps `lastSeen`, `mergeInterests` stamps
+    // `interestTimestamps` — and drives them with a real incoming analysis so the
+    // merge actually runs. The composed row texts embed `confidence` and
+    // `attempts`, both derived from a COUNT, never from the clock; `lastSeen` and
+    // the timestamps reach `observedAt`/`metadata` only.
+    //
+    // One transaction call is the whole assertion: identical pre-read and locked
+    // rows must produce identical strings, so coverage holds first time.
+    const populated = profileRow({
+      interests: ['astronomy'],
+      interestTimestamps: { astronomy: '2026-01-01T00:00:00.000Z' },
+      struggles: [
+        {
+          subject: 'Math',
+          topic: 'long division',
+          confidence: 'low',
+          attempts: 1,
+          lastSeen: '2026-01-01T00:00:00.000Z',
+          source: 'inferred',
+        },
+      ],
+      strengths: [
+        {
+          subject: 'Reading',
+          topics: ['comprehension'],
+          confidence: 'high',
+          source: 'inferred',
+        },
+      ],
+    });
+    const harness = makeHarness([populated], [populated]);
+
+    await applyAnalysis(
+      harness.db,
+      profileId,
+      {
+        confidence: 'high',
+        interests: ['geology'],
+        strengths: null,
+        struggles: [{ subject: 'Math', topic: 'long division' }],
+        resolvedTopics: null,
+        communicationNotes: [CLEAR_NOTE],
+        engagementLevel: null,
+        explanationEffectiveness: null,
+      } as unknown as SessionAnalysisOutput,
+      null,
+    );
+
+    expect(harness.transaction).toHaveBeenCalledTimes(1);
+    // And the write actually happened — a green "called once" would otherwise be
+    // satisfiable by an early return that never reached the coverage check.
+    expect(harness.factTexts()).toEqual(expect.arrayContaining([CLEAR_NOTE]));
   });
 
   // -------------------------------------------------------------------------
@@ -2725,7 +2820,7 @@ describe('[WI-2628] applyAnalysis / deleteMemoryItem — multilingual gate at th
     // Locked: the same entry with a NULL subject. Null is never a coverage miss,
     // so the attempt proceeds — and the clinical topic must still be dropped.
     const locked = profileRow({ struggles: struggleWith(null) });
-    const harness = makeHarness(preRead, [locked]);
+    const harness = makeHarness([preRead], [locked]);
 
     await applyAnalysis(harness.db, profileId, analysisWithNotes([]), null);
 

@@ -1434,10 +1434,14 @@ function filterSafeStruggleNotifications(
 // pre-read and the lock". Filtering on that alone would silently discard a
 // learner's whole memory projection whenever a concurrent write landed in the
 // window. So coverage is checked FIRST, against the exact set of strings that
-// was evaluated, and a miss is a RETRY rather than a block. `version` — bumped
-// by every write to the row — is the token the retry re-reads at, not the
-// trigger: a concurrent write that touched no gated text bumps `version` while
-// leaving coverage intact, and that case must proceed, not spend a retry.
+// was evaluated, and a miss is a RETRY rather than a block.
+//
+// The retry itself does NOT consult `version` — it simply re-runs step 1 against
+// whatever the row now holds, and the fresh batch is what converges. `version`
+// appears only in the miss/exhaustion log lines, as the observability handle for
+// how far the row had moved. Deliberately not the trigger: a concurrent write
+// that touched no gated text bumps `version` while leaving coverage intact, and
+// that case must proceed rather than spend a retry.
 // ---------------------------------------------------------------------------
 
 /**
