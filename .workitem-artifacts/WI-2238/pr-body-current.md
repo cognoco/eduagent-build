@@ -17,6 +17,8 @@ ancestry through browser and Android Back.
 - Keeps inactive Subjects management-only and withholds every study/retry or
   curriculum-generation action.
 - Registers bounded V2 Playwright and Maestro cases and mutation guards.
+- Hard-scrolls the exact Biology Topic 1 row into view after due-review Android
+  Back before retaining its exact ID/name assertion.
 
 ## Verification
 
@@ -31,10 +33,12 @@ ancestry through browser and Android Back.
 
 ## Hosted gates
 
-The newly published exact head must pass ordinary CI, the six-case V2 browser
-workflow, the three-case release-APK workflow, and a fresh zero-blocking Claude
-review before governed landing. The prior native failure is diagnostic because
-it stopped at the keyboard boundary now repaired by landed WI-2741.
+The repaired exact head must pass ordinary CI, the six-case V2 browser workflow,
+the three-case release-APK workflow, and a fresh zero-blocking Claude review
+before governed landing. Native diagnostic run `30239971576` proved the owning
+Biology Hub but exposed that the separately ID-bound General row was below the
+360x760 viewport after Back; its artifact drove the explicit scroll repair and
+structural red/green proof.
 
 ## Failure modes
 

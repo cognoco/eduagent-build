@@ -7836,6 +7836,13 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       },
       exactBiologyHubTitle,
       {
+        scrollUntilVisible: {
+          element: { id: 'subject-hub-topic-${TOPIC_ID}' },
+          direction: 'DOWN',
+          timeout: 15000,
+        },
+      },
+      {
         assertVisible: {
           id: 'subject-hub-topic-${TOPIC_ID}',
           containsDescendants: [{ text: '^Biology Topic 1$' }],
@@ -7885,6 +7892,34 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       for (const mutation of dueReviewTitleMutations(checkpoint)) {
         expect(hasExactCommandSequence(mutation, checkpoint)).toBe(false);
       }
+    }
+    for (const mutation of [
+      // The exact topic row is below the fold after returning to the Hub.
+      exactDueReviewPostTopicBack.filter((_, index) => index !== 3),
+      // Scrolling toward an adjacent owner cannot synchronize the exact row.
+      exactDueReviewPostTopicBack.with(3, {
+        scrollUntilVisible: {
+          element: { id: 'subject-hub-topic-adjacent-topic' },
+          direction: 'DOWN',
+          timeout: 15000,
+        },
+      }),
+      // The row is below the fold, so the synchronization direction is owned.
+      exactDueReviewPostTopicBack.with(3, {
+        scrollUntilVisible: {
+          element: { id: 'subject-hub-topic-${TOPIC_ID}' },
+          direction: 'UP',
+          timeout: 15000,
+        },
+      }),
+      // Synchronization must precede the hard exact-owner assertion.
+      exactDueReviewPostTopicBack
+        .with(3, exactDueReviewPostTopicBack[4]!)
+        .with(4, exactDueReviewPostTopicBack[3]!),
+    ]) {
+      expect(
+        hasExactCommandSequence(mutation, exactDueReviewPostTopicBack),
+      ).toBe(false);
     }
     for (const mutation of [
       // No-result row-absence removal.

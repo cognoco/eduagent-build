@@ -20,6 +20,10 @@ creation without duplicating the WI-2215 product path.
   every learning, curriculum-generation, and retry action.
 - Added component, hook, navigation, and structural mutation coverage for the
   contracts exercised by the end-to-end journeys.
+- Added an exact-owner scroll synchronization after due-review Android Back so
+  the below-fold Biology Topic 1 row is brought into the viewport before its
+  existing hard ID/name assertion; mutations reject missing, adjacent,
+  wrong-direction, and reordered synchronization.
 
 ## Verification
 
@@ -31,13 +35,15 @@ catalog listed all expected cases. The canonical serialized mobile run reported
 515/515 suites and 6,806/6,806 assertions in 329.215 seconds. Changed-file
 Prettier and diff integrity passed; ESLint
 reported zero errors and one inherited warning on an unchanged May line.
-Exact-head hosted browser, release-APK, CI, and review receipts will be attached
-to the Work Item before governed landing.
+The first post-prerequisite hosted head passed all 20 PR checks, fresh Claude
+review, and 22/22 V2 plus 24/24 stable browser cases. Its hard native run exposed
+the below-fold post-Back row synchronization, which was reproduced by artifact,
+made structurally red, and repaired locally. All hosted gates will be re-earned
+at the repaired exact head before governed landing.
 
 ## Caveats / Follow-ups
 
-The release-APK workflow is intentionally required again at the newly
-published exact head because the prior exact-head receipt stopped at the
-keyboard-dismissal boundary now repaired by landed WI-2741. No schema, external
-API, deployment, or data migration is part of this item. Rollback is a commit
-revert.
+The release-APK workflow is intentionally required again at the repaired exact
+head because run `30239971576` proved the owning Hub but exposed the below-fold
+General-row synchronization. No schema, external API, deployment, or data
+migration is part of this item. Rollback is a commit revert.

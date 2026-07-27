@@ -78,6 +78,11 @@ tags:
 - assertVisible:
     id: 'subject-hub-title-${SUBJECT_ID}'
     text: '^Biology$'
+- scrollUntilVisible:
+    element:
+      id: 'subject-hub-topic-${TOPIC_ID}'
+    direction: DOWN
+    timeout: 15000
 - assertVisible:
     id: 'subject-hub-topic-${TOPIC_ID}'
     containsDescendants:

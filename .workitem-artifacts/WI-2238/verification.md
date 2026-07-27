@@ -14,5 +14,15 @@
 - Changed-file ESLint: zero errors; one inherited `react-hooks/exhaustive-deps`
   warning on a May-authored unchanged line in Session.
 - Changed-file Prettier and `git diff --check`: passed.
-- Hosted exact-head browser, release-APK, ordinary CI, automated-review, and
-  governed merge receipts: pending publication of the evidence commit.
+- First post-prerequisite hosted head `ee7a3dde7cfc8f14e113d85204d3e6142149a101`:
+  20/20 PR checks green; fresh Claude APPROVED with zero must/should findings;
+  browser run `30239971545` passed V2 22/22 and stable legacy 24/24.
+- Native diagnostic run `30239971576`: API integration green; V2 shard reached
+  case 10/15 and failed only because the exact Biology Topic 1 General row was
+  below the 360x760 viewport after Back. Artifact `8643295547` and screenshot
+  are preserved under `hosted/native-30239971576/`.
+- Post-diagnostic repair: focused structural RED before YAML change; then 4/4
+  focused and 167/167 complete structural tests green, Maestro validator 7/7,
+  changed-file Prettier and diff integrity green.
+- Repaired exact-head browser, release-APK, ordinary CI, automated-review, and
+  governed merge receipts: required before landing.
