@@ -1,10 +1,11 @@
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
+import { DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS } from '@eduagent/schemas';
 import {
   createHookWrapper,
   createTestProfile,
 } from '../test-utils/app-hook-test-utils';
-import { setActiveProfileId } from '../lib/api-client';
+import { NetworkError, setActiveProfileId } from '../lib/api-client';
 import {
   useDeleteAccount,
   useCancelDeletion,
@@ -261,6 +262,27 @@ describe('useDeletionStatus', () => {
     );
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
+
+  it('does not restart bounded transport replay after terminal NetworkError', async () => {
+    jest.useFakeTimers();
+    try {
+      mockFetch.mockRejectedValue(new Error('Network request failed'));
+
+      const { result } = renderHook(() => useDeletionStatus(), {
+        wrapper: createWrapper(),
+      });
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(7_500);
+      });
+
+      expect(result.current.isError).toBe(true);
+      expect(result.current.error).toBeInstanceOf(NetworkError);
+      expect(mockFetch).toHaveBeenCalledTimes(5);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });
 
 describe('useExportData', () => {
@@ -269,6 +291,8 @@ describe('useExportData', () => {
       account: { email: 'user@example.com', createdAt: '2026-01-01T00:00:00Z' },
       profiles: [],
       consentStates: [],
+      subscriptionFieldDescriptions:
+        DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
       exportedAt: '2026-02-17T00:00:00Z',
     };
     mockFetch.mockResolvedValueOnce(

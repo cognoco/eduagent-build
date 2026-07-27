@@ -45,11 +45,17 @@ let mockProfileData: unknown = {
 
 let mockActiveProfileBirthYear: number | undefined;
 let mockIsExplicitProxyMode = false;
+let mockSafeAreaTop = 0;
 
 const mockPlatformAlert = jest.fn();
 
 jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => ({
+    top: mockSafeAreaTop,
+    bottom: 0,
+    left: 0,
+    right: 0,
+  }),
 }));
 
 const mockRouter = {
@@ -117,13 +123,21 @@ jest.mock(
 // (blocked = isParentProxy) and V1 (blocked = !canEnter). WI-274 tests set
 // this to true so the screen body renders while isParentProxy=true (V1 uses
 // canEnter=true to skip the redirect, then the screen shows disabled controls).
+let mockModeNavV0Enabled = false;
 let mockModeNavV1Enabled = false;
+let mockModeNavV2Enabled = false;
 jest.mock(
   '../../lib/feature-flags' /* gc1-allow: compile-time constant that switches redirect branch; needed to test V1-mode proxy write guards */,
   () => ({
     FEATURE_FLAGS: {
+      get MODE_NAV_V0_ENABLED() {
+        return mockModeNavV0Enabled;
+      },
       get MODE_NAV_V1_ENABLED() {
         return mockModeNavV1Enabled;
+      },
+      get MODE_NAV_V2_ENABLED() {
+        return mockModeNavV2Enabled;
       },
     },
   }),
@@ -219,8 +233,106 @@ describe('MentorMemoryScreen — interests null guard', () => {
     mockProfileData = { ...mockProfileBase, interests: [] };
     mockSearchParams = {};
     mockIsParentProxy = false;
+    mockModeNavV0Enabled = false;
     mockModeNavV1Enabled = false;
+    mockModeNavV2Enabled = false;
+    mockSafeAreaTop = 0;
+    mockFetch.setRoute('learner-profile', () => ({
+      profile: mockProfileData,
+    }));
     jest.clearAllMocks();
+  });
+
+  it.each([
+    { shell: 'flags-off', v0: false, v1: false, v2: false, expected: 47 },
+    { shell: 'V0', v0: true, v1: false, v2: false, expected: 47 },
+    { shell: 'V1', v0: true, v1: true, v2: false, expected: 47 },
+    { shell: 'V2', v0: true, v1: true, v2: true, expected: 47 },
+  ])(
+    'owns the native top inset on $shell',
+    async ({ v0, v1, v2, expected }) => {
+      mockModeNavV0Enabled = v0;
+      mockModeNavV1Enabled = v1;
+      mockModeNavV2Enabled = v2;
+      mockSafeAreaTop = 47;
+
+      render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+      expect(
+        (await screen.findByTestId('mentor-memory-screen')).props.style
+          ?.paddingTop ?? 0,
+      ).toBe(expected);
+    },
+  );
+
+  it('owns the native top inset while Mentor Memory loads in V2', async () => {
+    mockModeNavV0Enabled = true;
+    mockModeNavV1Enabled = true;
+    mockModeNavV2Enabled = true;
+    mockSafeAreaTop = 47;
+    mockFetch.setRoute(
+      'learner-profile',
+      () => new Promise<never>(() => undefined),
+    );
+
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    expect(
+      (await screen.findByTestId('mentor-memory-loading-screen')).props.style
+        ?.paddingTop ?? 0,
+    ).toBe(47);
+  });
+
+  it('owns the native top inset when Mentor Memory fails to load in V2', async () => {
+    mockModeNavV0Enabled = true;
+    mockModeNavV1Enabled = true;
+    mockModeNavV2Enabled = true;
+    mockSafeAreaTop = 47;
+    mockFetch.setRoute(
+      'learner-profile',
+      () => new Response('Internal server error', { status: 500 }),
+    );
+
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    expect(
+      (await screen.findByTestId('mentor-memory-error-screen')).props.style
+        ?.paddingTop ?? 0,
+    ).toBe(47);
+  });
+
+  // [WI-2331 AC-2 core] `/(app)/more` is dead in V2 (not one of the three
+  // tabs) — mentor-memory has no parent more specific than its owning tab
+  // (Mentor), so the Back control must name and target that tab under V2,
+  // while leaving the legacy `/(app)/more` behavior untouched under V0/V1.
+  it('names and targets the owning Mentor tab for Back under V2', async () => {
+    mockModeNavV0Enabled = true;
+    mockModeNavV1Enabled = true;
+    mockModeNavV2Enabled = true;
+    // goBackOrReplace only exercises the fallback target (this fix's
+    // surface) when there is no history to pop — force that branch.
+    mockRouter.canGoBack.mockReturnValueOnce(false);
+
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    const backButton = await screen.findByTestId('mentor-memory-back');
+    expect(backButton.props.accessibilityLabel).toBe('Back to Mentor');
+
+    fireEvent.press(backButton);
+    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/mentor');
+    expect(mockRouter.replace).not.toHaveBeenCalledWith('/(app)/more');
+  });
+
+  it('preserves the legacy More target and generic label when V2 is off', async () => {
+    mockRouter.canGoBack.mockReturnValueOnce(false);
+
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    const backButton = await screen.findByTestId('mentor-memory-back');
+    expect(backButton.props.accessibilityLabel).toBe('Go Back');
+
+    fireEvent.press(backButton);
+    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/more');
   });
 
   it('does not crash when profile.interests is undefined', () => {
@@ -616,6 +728,33 @@ describe('MentorMemoryScreen — explicit return target from More', () => {
     fireEvent.press(backButton);
 
     expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/more');
+    expect(mockRouter.back).not.toHaveBeenCalled();
+  });
+});
+
+describe('MentorMemoryScreen — Journal round trip', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockIsParentProxy = false;
+    mockModeNavV1Enabled = false;
+    mockSearchParams = { returnTo: 'journal' };
+    mockProfileData = {
+      ...mockProfileBase,
+      interests: [],
+      memoryConsentStatus: 'granted',
+    };
+  });
+
+  afterEach(() => {
+    mockSearchParams = {};
+  });
+
+  it('returns the exact Journal caller when opened from its Memory section', async () => {
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    fireEvent.press(await screen.findByTestId('mentor-memory-back'));
+
+    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/journal');
     expect(mockRouter.back).not.toHaveBeenCalled();
   });
 });

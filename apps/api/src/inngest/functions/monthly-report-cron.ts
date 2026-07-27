@@ -34,7 +34,7 @@ import {
 } from '../../services/monthly-report';
 import { getPracticeActivitySummary } from '../../services/practice-activity-summary';
 import { listEligibleSelfReportPersonIdsV2 } from '../../services/identity-v2/solo-progress-reports-v2';
-import { isGdprProcessingAllowedV2 } from '../../services/identity-v2/consent-status-v2';
+import { isLlmExchangeConsentAllowed } from '../../services/identity-v2/consent-status-v2';
 import { isGuardianOf } from '../../services/identity-v2/guardianship';
 import { isPersonLive } from '../../services/identity-v2/helpers';
 import {
@@ -59,6 +59,7 @@ import {
   progressMetricsSchema,
 } from '@eduagent/schemas';
 import { parseConversationLanguage } from '../../services/llm';
+import { filterUncredentialedCharges } from '../../services/family-access';
 
 // [BUG-848] Validate the JSONB `metrics` column at runtime instead of casting.
 // Older snapshot rows may have a different shape from what current code
@@ -147,25 +148,32 @@ export const monthlyReportCron = inngest.createFunction(
       const activeChildIds = activeRows.map((r) => r.childProfileId);
       // Parent/child pairs for active children: v2 = active guardianship edges
       // whose charge is an active child; legacy = family_links rows.
-      const linkedPairs = activeChildIds.length
-        ? (
-            await db
-              .select({
-                parentProfileId: guardianship.guardianPersonId,
-                childProfileId: guardianship.chargePersonId,
-              })
-              .from(guardianship)
-              .where(
-                and(
-                  inArray(guardianship.chargePersonId, activeChildIds),
-                  isNull(guardianship.revokedAt),
-                ),
-              )
-          ).map((l) => ({
-            parentId: l.parentProfileId,
-            childId: l.childProfileId,
-          }))
+      const guardianshipRows = activeChildIds.length
+        ? await db
+            .select({
+              parentProfileId: guardianship.guardianPersonId,
+              childProfileId: guardianship.chargePersonId,
+            })
+            .from(guardianship)
+            .where(
+              and(
+                inArray(guardianship.chargePersonId, activeChildIds),
+                isNull(guardianship.revokedAt),
+              ),
+            )
         : [];
+      const managedChargeIds = new Set(
+        await filterUncredentialedCharges(
+          db,
+          guardianshipRows.map((row) => row.childProfileId),
+        ),
+      );
+      const linkedPairs = guardianshipRows
+        .filter((row) => managedChargeIds.has(row.childProfileId))
+        .map((row) => ({
+          parentId: row.parentProfileId,
+          childId: row.childProfileId,
+        }));
 
       const selfWin = {
         start: lastMonthStart,
@@ -292,7 +300,11 @@ export const monthlyReportGenerate = inngest.createFunction(
         // Consent gate (parity with weekly-progress-push and sendStruggleNotification):
         // skip child if their most-recent GDPR consent state is anything other than
         // CONSENTED. Missing row = no restriction (pre-consent-flow accounts).
-        const gdprOk = await isGdprProcessingAllowedV2(db, childId);
+        // [WI-2396] isLlmExchangeConsentAllowed also honors the subject's
+        // adult self-consent (art6_1_a) withdrawal — relevant for the
+        // isSelfReport case (parentId === childId) — before the LLM-generated
+        // report highlights below (generateReportHighlights).
+        const gdprOk = await isLlmExchangeConsentAllowed(db, childId);
         if (!gdprOk) {
           return { status: 'skipped' as const, reason: 'consent_not_granted' };
         }

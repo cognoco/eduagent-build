@@ -18,6 +18,7 @@
  * 4. XSS escaping — child name containing <script> is escaped in every HTML response
  */
 
+import { createHmac } from 'node:crypto';
 import { eq, inArray } from 'drizzle-orm';
 import {
   consentGrant,
@@ -28,6 +29,7 @@ import {
   createDatabase,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import { resolve } from 'path';
 
 import { app } from '../index';
@@ -130,15 +132,18 @@ async function seedConsentToken(opts: {
     organizationId: org!.id,
     roles: ['learner'],
   });
-  await db.insert(consentRequest).values({
-    chargePersonId: p!.id,
-    organizationId: org!.id,
-    requestedBasis: 'gdpr_parental_consent',
-    token,
-    tokenExpiresAt: expiresAt,
-    status: 'pending',
-    guardianEmail: 'parent@example.com',
-  });
+  await db.insert(consentRequest).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      chargePersonId: p!.id,
+      organizationId: org!.id,
+      purpose,
+      requestedBasis: 'gdpr_parental_consent' as const,
+      token,
+      tokenExpiresAt: expiresAt,
+      status: 'pending' as const,
+      guardianEmail: 'parent@example.com',
+    })),
+  );
 
   return { accountId: org!.id, profileId: p!.id, token };
 }
@@ -765,6 +770,19 @@ const WITHDRAW_ENV: Record<string, string> = {
   CONSENT_WITHDRAWAL_TOKEN_SECRET: WITHDRAW_SECRET,
 };
 
+// [WI-2347] Replicates the legacy `cw1` wire format — no live production code
+// path mints these anymore (signWithdrawalToken only mints cw2), but real
+// links minted before this change are still in parents' inboxes, so
+// verifyWithdrawalToken must keep accepting them.
+function forgeCw1Token(chargePersonId: string, organizationId: string): string {
+  const payload = `cw1:${chargePersonId}:${organizationId}`;
+  const encodedPayload = Buffer.from(payload, 'utf8').toString('base64url');
+  const sig = createHmac('sha256', WITHDRAW_SECRET)
+    .update(encodedPayload)
+    .digest('base64url');
+  return `${encodedPayload}.${sig}`;
+}
+
 describe('P0 email-parent withdrawal/restore (identity-v2)', () => {
   const v2OrgIds: string[] = [];
   const v2PersonIds: string[] = [];
@@ -823,20 +841,30 @@ describe('P0 email-parent withdrawal/restore (identity-v2)', () => {
       organizationId: org!.id,
       roles: ['learner'],
     });
+    // [WI-2347] The tokenId a `cw2` link is bound to — set on the seeded
+    // grant row exactly as `processConsentResponseV2` would on approve, so
+    // the mismatch check in the service layer sees a live, matching link.
+    const withdrawalTokenId = crypto.randomUUID();
     if (opts.grant !== false) {
-      await db.insert(consentGrant).values({
-        chargePersonId: p!.id,
-        organizationId: org!.id,
-        purpose: 'platform_use',
-        lawfulBasis: 'gdpr_parental_consent',
-        granted: true,
-        grantedAt: new Date(),
-        priorValue: null,
-        withdrawnAt: opts.withdrawnAt ?? null,
-        auditFact: { source: 'consent_response_approved' },
-      });
+      const grantedAt = new Date();
+      await db.insert(consentGrant).values(
+        CONSENT_PURPOSES.map((purpose) => ({
+          chargePersonId: p!.id,
+          organizationId: org!.id,
+          purpose,
+          lawfulBasis: 'gdpr_parental_consent' as const,
+          granted: true,
+          grantedAt,
+          priorValue: null,
+          withdrawnAt: opts.withdrawnAt ?? null,
+          auditFact: { source: 'consent_response_approved' },
+          withdrawalTokenId,
+        })),
+      );
     }
-    const token = signWithdrawalToken(p!.id, org!.id, WITHDRAW_SECRET);
+    const token = signWithdrawalToken(p!.id, org!.id, WITHDRAW_SECRET, {
+      tokenId: withdrawalTokenId,
+    });
     return { orgId: org!.id, childId: p!.id, token };
   }
 
@@ -881,7 +909,41 @@ describe('P0 email-parent withdrawal/restore (identity-v2)', () => {
     expect(html).toContain('/v1/consent-page/withdraw');
   });
 
-  it('GET withdraw: valid token + already withdrawn (in grace) → undo landing', async () => {
+  // [RIDER — WI-2372 Finding 1, MEDIUM-hardening, PM-ratified onto WI-2396]
+  // WI-2372's original bounce (AC5 truthfulness): withdrawConfirmBody /
+  // withdrawnLandingBody claimed "stops MentoMate from processing X's data" /
+  // "We've stopped processing their data" — a blanket claim the landed
+  // enforcement didn't fully back at the time. Fixed in 48a52cb3a to name
+  // what actually stops ("learning sessions") instead. This regression pair
+  // guards that exact defect class from being reintroduced by a future copy
+  // edit: assert the truthful claim as a named case, AND assert the absence
+  // of the overstatement class — same sweep-audit pattern 48a52cb3a used
+  // (`rg -niE "stop(ped|s)? (all )?processing|we've stopped|processing (your|their|his|her) data"`)
+  // — on both the confirm page (GET, pre-withdrawal) and the landing page
+  // (POST, post-withdrawal).
+  it('[RIDER / WI-2372 Finding 1] confirm + landing copy states "learning sessions" truthfully and never overstates as "processing"', async () => {
+    const OVERSTATEMENT_PATTERN =
+      /stop(ped|s)? (all )?processing|we've stopped|processing (your|their|his|her) data/i;
+    const { token } = await seedApprovedGrant({ displayName: 'Riley' });
+
+    // Confirm page (GET, pre-withdrawal) — "learning sessions" truthful case.
+    const confirmRes = await getW(
+      `/v1/consent-page/withdraw?token=${encodeURIComponent(token)}`,
+    );
+    expect(confirmRes.status).toBe(200);
+    const confirmHtml = await confirmRes.text();
+    expect(confirmHtml).toContain('learning sessions');
+    expect(confirmHtml).not.toMatch(OVERSTATEMENT_PATTERN);
+
+    // Landing page (POST, post-withdrawal) — same pair.
+    const landingRes = await postW('/v1/consent-page/withdraw', { token });
+    expect(landingRes.status).toBe(200);
+    const landingHtml = await landingRes.text();
+    expect(landingHtml).toContain('learning sessions');
+    expect(landingHtml).not.toMatch(OVERSTATEMENT_PATTERN);
+  });
+
+  it('GET withdraw: valid token + already withdrawn (in grace) → informational landing, no restore form [WI-2348]', async () => {
     const { token } = await seedApprovedGrant({
       displayName: 'Wade',
       withdrawnAt: new Date(),
@@ -892,8 +954,11 @@ describe('P0 email-parent withdrawal/restore (identity-v2)', () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain('Consent withdrawn');
-    expect(html).toContain('Undo — restore consent');
-    expect(html).toContain('/v1/consent-page/restore');
+    expect(html).toContain('signing in');
+    // [WI-2348 / OPQ-114] bearer possession no longer restores — the page
+    // must not offer a self-service restore form/action anymore.
+    expect(html).not.toContain('Undo — restore consent');
+    expect(html).not.toContain('/v1/consent-page/restore');
   });
 
   it('GET withdraw: valid token but no grant → "nothing to withdraw"', async () => {
@@ -954,7 +1019,13 @@ describe('P0 email-parent withdrawal/restore (identity-v2)', () => {
     expect(html).toContain('Invalid link');
   });
 
-  it('POST restore: within grace re-grants → "consent restored"', async () => {
+  // [WI-2348 / OPQ-114, AC-3] The negative path this WI exists to prove: a
+  // bare bearer link — valid, unexpired, within the restore grace window —
+  // must NOT be able to restore consent anymore. Possession of the link is
+  // the only thing this request presents; no authenticated session. The
+  // guaranteed property is that the grant stays withdrawn and no new row is
+  // appended, not merely that the response text changed.
+  it('POST restore: a valid bearer link within grace CANNOT restore consent — no authenticated session (AC-3)', async () => {
     const { childId, token } = await seedApprovedGrant({
       displayName: 'Remy',
       withdrawnAt: new Date(Date.now() - 60_000),
@@ -962,38 +1033,81 @@ describe('P0 email-parent withdrawal/restore (identity-v2)', () => {
     const res = await postW('/v1/consent-page/restore', { token });
     expect(res.status).toBe(200);
     const html = await res.text();
-    expect(html).toContain('Consent restored');
+    expect(html).not.toContain('Consent restored');
+    expect(html).toContain('Sign in');
 
     const db = createIntegrationDb();
     const grants = await db.query.consentGrant.findMany({
       where: eq(consentGrant.chargePersonId, childId),
     });
-    // Restore APPENDS a new un-withdrawn grant (does not un-stamp the old one).
-    const restored = grants.find(
-      (g) => g.priorValue === false && g.withdrawnAt === null,
-    );
-    expect(restored?.granted).toBe(true);
+    // No new row was appended, and the original grant is still withdrawn —
+    // the link had zero mutating effect.
+    expect(grants).toHaveLength(CONSENT_PURPOSES.length);
+    expect(grants.every((grant) => grant.withdrawnAt !== null)).toBe(true);
   });
 
-  it('POST restore: after the 7-day grace → 410 grace-expired page', async () => {
-    const { token } = await seedApprovedGrant({
-      displayName: 'Gus',
-      withdrawnAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+  it('POST restore: forged/invalid token → 400 invalid-link page (unchanged; still never mutates)', async () => {
+    const res = await postW('/v1/consent-page/restore', {
+      token: 'forged.token',
     });
-    const res = await postW('/v1/consent-page/restore', { token });
-    expect(res.status).toBe(410);
+    expect(res.status).toBe(400);
     const html = await res.text();
-    expect(html).toContain('Grace period has expired');
+    expect(html).toContain('Invalid link');
   });
 
   it('the signed withdrawal token round-trips through verifyWithdrawalToken', async () => {
     const { childId, orgId, token } = await seedApprovedGrant({
       displayName: 'Val',
     });
-    expect(verifyWithdrawalToken(token, WITHDRAW_SECRET)).toEqual({
+    const decoded = verifyWithdrawalToken(token, WITHDRAW_SECRET);
+    expect(decoded).toMatchObject({
       chargePersonId: childId,
       organizationId: orgId,
     });
+    // [WI-2347] cw2 also carries the per-link tokenId.
+    expect(typeof decoded?.tokenId).toBe('string');
+  });
+
+  // [WI-2347 review, CONSIDER-2] End-to-end through the actual route (not
+  // just the service layer): a legacy cw1 link — no tokenId embedded at
+  // all — must be rejected once the grant it names has been superseded by a
+  // newer cw2-minted grant. This is the case the route's `payload.tokenId ??
+  // null` conversion exists to close: without it, a bare `undefined` would
+  // skip the id check entirely rather than being treated as "cw1, expect
+  // null".
+  it('POST withdraw: a legacy cw1 link is rejected as "nothing to withdraw" once superseded by a newer cw2-minted grant', async () => {
+    const { orgId, childId } = await seedApprovedGrant({ displayName: 'Cora' });
+    // A newer grant minted after 'Cora's, carrying a withdrawalTokenId —
+    // simulates a fresh re-consent cycle under the post-migration code.
+    const db = createIntegrationDb();
+    const withdrawalTokenId = crypto.randomUUID();
+    const grantedAt = new Date();
+    await db.insert(consentGrant).values(
+      CONSENT_PURPOSES.map((purpose) => ({
+        chargePersonId: childId,
+        organizationId: orgId,
+        purpose,
+        lawfulBasis: 'gdpr_parental_consent' as const,
+        granted: true,
+        grantedAt,
+        priorValue: null,
+        auditFact: { source: 'consent_response_approved' },
+        withdrawalTokenId,
+      })),
+    );
+
+    const legacyToken = forgeCw1Token(childId, orgId);
+    const res = await postW('/v1/consent-page/withdraw', {
+      token: legacyToken,
+    });
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('Nothing to withdraw');
+
+    const grants = await db.query.consentGrant.findMany({
+      where: eq(consentGrant.chargePersonId, childId),
+    });
+    expect(grants.every((g) => g.withdrawnAt === null)).toBe(true);
   });
 });
 
@@ -1136,10 +1250,13 @@ describe('POST /v1/consent-page/confirm — approval mints withdrawal email (ide
       const withdrawalUrl = extractUrl(payload.body);
       const urlToken = new URL(withdrawalUrl).searchParams.get('token');
       expect(urlToken).toBeTruthy();
-      expect(verifyWithdrawalToken(urlToken!, WITHDRAW_SECRET)).toEqual({
+      const decoded = verifyWithdrawalToken(urlToken!, WITHDRAW_SECRET);
+      expect(decoded).toMatchObject({
         chargePersonId: childId,
         organizationId: orgId,
       });
+      // [WI-2347] cw2 also carries the per-link tokenId.
+      expect(typeof decoded?.tokenId).toBe('string');
     } finally {
       emailSpy.mockRestore();
     }

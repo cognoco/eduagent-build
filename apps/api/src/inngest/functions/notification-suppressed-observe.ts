@@ -21,7 +21,7 @@ import {
 } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
-import { captureException } from '../../services/sentry';
+import { captureException, captureMessage } from '../../services/sentry';
 
 const logger = createLogger();
 
@@ -49,6 +49,7 @@ export const notificationSuppressedObserve = inngest.createFunction(
         rawData: summarizeRawPayload(event.data),
       });
       captureException(err, {
+        tags: { surface: 'notification', signal: 'schema-drift' },
         extra: {
           context: 'notification-suppressed-observe:invalid_payload',
           issues: parsed.error.issues,
@@ -65,6 +66,15 @@ export const notificationSuppressedObserve = inngest.createFunction(
       notificationType: data.notificationType,
       reason: data.reason,
       timestamp: data.timestamp,
+    });
+    captureMessage('notification.suppressed', {
+      level: 'warning',
+      tags: {
+        surface: 'notification',
+        signal: 'suppressed',
+        notificationType: data.notificationType,
+      },
+      extra: { eventTimestamp: data.timestamp },
     });
 
     return {

@@ -234,10 +234,42 @@ jest.mock(
   }),
 );
 
+// [WI-2398] assertNotProxyMode now also calls assertCanWriteProfile, which
+// calls verifyPersonOwnershipV2 — a raw db.select() membership query the
+// fully-mocked DB module cannot satisfy. Every scenario in this file that
+// reaches assertNotProxyMode's allow path is a caller-self write (the header
+// profile equals the authenticated caller's own person id, both
+// 'test-profile-id', via the seeded v2 identity graph); the cross-account
+// write attack this guard exists to close is covered by the real-DB break
+// test in tests/integration/wi2398-write-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's mock DB environment.
+jest.mock('../services/identity-v2/ownership-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/ownership-v2'),
+  verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+}));
+
+// [WI-2396] assertLlmConsent (called by POST /ocr) runs
+// isLlmExchangeConsentAllowed, which reads db.query.membership /
+// consentGrant — real queries with no controllable behavior on this file's
+// mock DB. Defaults to allowed (resolves undefined = no throw); the
+// consent-withdrawal test suite below overrides with
+// mockRejectedValueOnce(new ConsentWithdrawnError()) to exercise the
+// refusal path. Mirrors the subjects.test.ts pattern.
+// gc1-allow: isLlmExchangeConsentAllowed runs real db.query.membership /
+// consentGrant reads with no real implementation available in this file's
+// mock-DB environment (same class as verifyPersonOwnershipV2 above).
+jest.mock('../services/identity-v2/consent-status-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/consent-status-v2'),
+  assertLlmConsent: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { captureException } from '../services/sentry';
-import { OCR_CONSTRAINTS } from '@eduagent/schemas';
+import { ERROR_CODES, OCR_CONSTRAINTS } from '@eduagent/schemas';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
+import { ConsentWithdrawnError } from '../services/session';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -746,6 +778,64 @@ describe('homework routes', () => {
       );
 
       expect(res.status).toBe(403);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon
+  // R5). getOcrProvider().extractText unconditionally dispatches the LLM
+  // vision model.
+  // -------------------------------------------------------------------------
+  describe('[WI-2396] OCR consent-withdrawal gate', () => {
+    const assertLlmConsentMock = jest.mocked(assertLlmConsent);
+    const { 'Content-Type': _omit, ...OCR_HEADERS } = makeAuthHeaders({
+      'X-Profile-Id': 'test-profile-id',
+    });
+
+    function makeFormData() {
+      const formData = new FormData();
+      formData.append(
+        'image',
+        new File([new ArrayBuffer(100)], 'test.jpg', { type: 'image/jpeg' }),
+      );
+      return formData;
+    }
+
+    it('refuses with 403 CONSENT_WITHDRAWN and never calls the OCR provider when consent is withdrawn', async () => {
+      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+      const { getOcrProvider } = require('../services/ocr') as {
+        getOcrProvider: jest.Mock;
+      };
+
+      const res = await app.request(
+        '/v1/ocr',
+        {
+          method: 'POST',
+          headers: OCR_HEADERS,
+          body: makeFormData(),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
+      expect(getOcrProvider).not.toHaveBeenCalled();
+    });
+
+    it('proceeds (LLM dispatched) when consent is active', async () => {
+      const res = await app.request(
+        '/v1/ocr',
+        {
+          method: 'POST',
+          headers: OCR_HEADERS,
+          body: makeFormData(),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(assertLlmConsentMock.mock.calls[0]?.[1]).toBe('test-profile-id');
     });
   });
 });

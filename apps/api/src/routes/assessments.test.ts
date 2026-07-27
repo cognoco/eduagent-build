@@ -85,6 +85,34 @@ jest.mock(
   },
 );
 
+// [WI-2398] assertNotProxyMode now also calls assertCanWriteProfile, which
+// calls verifyPersonOwnershipV2 — a raw db.select() membership query the
+// stub `db` in this file's mini Hono app cannot satisfy. Every isOwner:true
+// scenario in this file is a caller-self write (makeApp sets callerPersonId
+// equal to profileId below); the cross-account write attack this guard
+// exists to close is covered by the real-DB break test in
+// tests/integration/wi2398-write-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's stub-db environment.
+jest.mock('../services/identity-v2/ownership-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/ownership-v2'),
+  verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+}));
+
+// [WI-2396] assertLlmConsent (called by POST /assessments/:id/answer and
+// POST /sessions/:id/quick-check) runs isLlmExchangeConsentAllowed, which
+// reads db.query.membership — makeStubDb() below has no `.query` property.
+// Defaults to allowed (resolves undefined = no throw); individual tests
+// override with mockRejectedValueOnce(new ConsentWithdrawnError()) to
+// exercise the refusal path.
+// gc1-allow: isLlmExchangeConsentAllowed runs real db.query.membership /
+// consentGrant reads with no real implementation available in this file's
+// stub-db environment (same class as verifyPersonOwnershipV2 above).
+jest.mock('../services/identity-v2/consent-status-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/consent-status-v2'),
+  assertLlmConsent: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { Database } from '@eduagent/database';
@@ -98,8 +126,9 @@ import {
   evaluateQuickCheckAnswer,
   submitAssessmentAnswer,
 } from '../services/assessments';
-import { getSession } from '../services/session';
+import { getSession, ConsentWithdrawnError } from '../services/session';
 import { refundQuotaOrEscalate } from '../services/billing';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { assessmentRoutes } from './assessments';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { TEST_PROFILE_ID, TEST_SESSION_ID } from '@eduagent/test-utils';
@@ -125,6 +154,9 @@ type TestEnv = {
     db: Database;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
+    // [WI-2398] Required by assertCanWriteProfile (see makeApp below).
+    account: { id: string } | undefined;
+    callerPersonId: string | undefined;
   };
 };
 
@@ -136,6 +168,13 @@ function makeApp(opts?: { isOwner?: boolean; profileId?: string }) {
   app.use('*', async (c, next) => {
     c.set('db', makeStubDb() as unknown as Database);
     c.set('profileId', profileId);
+    // [WI-2398] Caller-self identity — assertNotProxyMode now also calls
+    // assertCanWriteProfile, which requires account + callerPersonId.
+    // callerPersonId equal to profileId mirrors the legitimate
+    // owner-acting-as-self flow (verifyPersonOwnershipV2 is mocked to
+    // succeed at file scope regardless of the stub `db`).
+    c.set('account', { id: 'test-account-id' });
+    c.set('callerPersonId', profileId);
     c.set('profileMeta', {
       birthYear: 2000,
       location: 'EU',
@@ -165,6 +204,13 @@ function makeApp(opts?: { isOwner?: boolean; profileId?: string }) {
     }
     if (errName === 'NotFoundError') {
       return c.json({ code: 'NOT_FOUND', message: errMessage }, 404);
+    }
+    // [WI-2396] Mirrors index.ts's global ConsentWithdrawnError -> 403 mapping.
+    if (errName === 'ConsentWithdrawnError') {
+      return c.json(
+        { code: ERROR_CODES.CONSENT_WITHDRAWN, message: errMessage },
+        403,
+      );
     }
     return c.json({ code: 'INTERNAL_ERROR', message: errMessage }, 500);
   });
@@ -201,6 +247,9 @@ function makeMeteredApp(opts?: {
   app.use('*', async (c, next) => {
     c.set('db', makeStubDb() as unknown as Database);
     c.set('profileId', profileId);
+    // [WI-2398] Caller-self identity — see makeApp's comment above.
+    c.set('account', { id: 'test-account-id' });
+    c.set('callerPersonId', profileId);
     c.set('profileMeta', {
       birthYear: 2000,
       location: 'EU',
@@ -246,6 +295,7 @@ const evaluateQuickCheckAnswerMock = jest.mocked(evaluateQuickCheckAnswer);
 const submitAssessmentAnswerMock = jest.mocked(submitAssessmentAnswer);
 const getSessionMock = jest.mocked(getSession);
 const refundQuotaOrEscalateMock = jest.mocked(refundQuotaOrEscalate);
+const assertLlmConsentMock = jest.mocked(assertLlmConsent);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -288,7 +338,7 @@ describe('POST /v1/subjects/:subjectId/topics/:topicId/assessments', () => {
     expect(createAssessmentIfNoneActiveMock).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when profileId is absent (missing profile context)', async () => {
+  it('returns 403 when profileId is absent (missing profile context)', async () => {
     const app = new Hono<TestEnv>();
     app.use('*', async (c, next) => {
       c.set('db', makeStubDb() as unknown as Database);
@@ -302,13 +352,20 @@ describe('POST /v1/subjects/:subjectId/topics/:topicId/assessments', () => {
         isOwner: true,
         resolvedVia: 'explicit-header',
       });
+      // Deliberately omit account/callerPersonId too — this state (profileMeta
+      // present, profileId absent) never occurs in production: real
+      // profileScopeMiddleware always sets profileId and profileMeta together.
       await next();
     });
     app.route('/v1', assessmentRoutes);
 
     const res = await app.request(path, { method: 'POST' });
-    // requireProfileId throws HTTPException(400) when profileId is undefined
-    expect(res.status).toBe(400);
+    // [WI-2398] assertNotProxyMode now fails closed (403) when profileId is
+    // absent, before requireProfileId's own 400 ever runs — the safer
+    // response when write authority cannot be established. Pre-WI-2398 this
+    // asserted 400 from requireProfileId; that later check is now
+    // unreachable for this synthetic (production-impossible) state.
+    expect(res.status).toBe(403);
   });
 });
 
@@ -412,7 +469,10 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
       PROFILE_ID,
       ASSESSMENT_ID,
       'Water is H2O',
-      { conversationLanguage: 'en' },
+      // [WI-2432] ageBracket now threads from profileMeta.birthYear (2000 ->
+      // always 'adult', since 2000 + PARENT_ACCOUNT_MINIMUM_AGE(18) has long
+      // passed) alongside conversationLanguage.
+      { conversationLanguage: 'en', ageBracket: 'adult' },
     );
   });
 
@@ -473,6 +533,35 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
     expect(res.status).toBe(409);
   });
 
+  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5).
+  describe('[WI-2396] consent-withdrawal gate', () => {
+    it('refuses with 403 CONSENT_WITHDRAWN and never calls submitAssessmentAnswer when consent is withdrawn', async () => {
+      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+
+      const res = await makeApp().request(path, validAnswerBody());
+
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
+      expect(submitAssessmentAnswerMock).not.toHaveBeenCalled();
+    });
+
+    it('proceeds (LLM dispatched) when consent is active', async () => {
+      submitAssessmentAnswerMock.mockResolvedValue(
+        makeSubmitAnswerResult({ status: 'in_progress' }),
+      );
+
+      const res = await makeApp().request(path, validAnswerBody());
+
+      expect(res.status).toBe(200);
+      expect(assertLlmConsentMock).toHaveBeenCalledWith(
+        expect.anything(),
+        PROFILE_ID,
+      );
+      expect(submitAssessmentAnswerMock).toHaveBeenCalled();
+    });
+  });
+
   // [F-146] App-help early-return must refund quota, not charge the learner
   // for a canned response that made no LLM call.
   describe('[BREAK] app-help early-return quota refund', () => {
@@ -528,6 +617,9 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
       app.use('*', async (c, next) => {
         c.set('db', makeStubDb() as unknown as Database);
         c.set('profileId', PROFILE_ID);
+        // [WI-2398] Caller-self identity — see makeApp's comment above.
+        c.set('account', { id: 'test-account-id' });
+        c.set('callerPersonId', PROFILE_ID);
         c.set('profileMeta', {
           birthYear: 2000,
           location: 'EU',
@@ -627,6 +719,9 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
       innerApp.use('*', async (c, next) => {
         c.set('db', makeStubDb() as unknown as Database);
         c.set('profileId', PROFILE_ID);
+        // [WI-2398] Caller-self identity — see makeApp's comment above.
+        c.set('account', { id: 'test-account-id' });
+        c.set('callerPersonId', PROFILE_ID);
         c.set('profileMeta', {
           birthYear: 2000,
           location: 'EU',
@@ -798,6 +893,44 @@ describe('POST /v1/sessions/:sessionId/quick-check', () => {
       'other-profile-id',
       SESSION_ID,
     );
+  });
+
+  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5).
+  describe('[WI-2396] consent-withdrawal gate', () => {
+    it('refuses with 403 CONSENT_WITHDRAWN and never calls evaluateQuickCheckAnswer when consent is withdrawn', async () => {
+      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+
+      const res = await makeApp().request(path, validQuickCheckBody());
+
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
+      expect(getSessionMock).not.toHaveBeenCalled();
+      expect(evaluateQuickCheckAnswerMock).not.toHaveBeenCalled();
+    });
+
+    it('proceeds (LLM dispatched) when consent is active', async () => {
+      getSessionMock.mockResolvedValue(makeSessionRecord());
+      loadAssessmentTopicContextMock.mockResolvedValue(makeTopicContext());
+      evaluateQuickCheckAnswerMock.mockResolvedValue({
+        feedback: 'Good work!',
+        passed: true,
+        shouldEscalateDepth: false,
+        masteryScore: 0.8,
+        qualityRating: 4,
+        nextDepth: undefined,
+        weakAreas: [],
+      });
+
+      const res = await makeApp().request(path, validQuickCheckBody());
+
+      expect(res.status).toBe(200);
+      expect(assertLlmConsentMock).toHaveBeenCalledWith(
+        expect.anything(),
+        PROFILE_ID,
+      );
+      expect(evaluateQuickCheckAnswerMock).toHaveBeenCalled();
+    });
   });
 });
 

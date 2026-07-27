@@ -123,7 +123,7 @@ describe('MentorBirthAnimation', () => {
     );
   });
 
-  it('calls onComplete when reduced motion is enabled', () => {
+  it('[WI-2105 AC-4] calls onComplete when reduced motion is enabled', () => {
     require('react-native-reanimated').useReducedMotion = () => true;
     completeTimingCallbacksSynchronously();
 

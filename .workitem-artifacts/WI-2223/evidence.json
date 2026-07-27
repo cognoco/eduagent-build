@@ -1,0 +1,66 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "pushNowDeepLink calls setActiveScope({kind:'supporter-hub'}) before router.push whenever the route being pushed is support.hub, via a new optional setActiveScope callback on PushNowDeepLinkOptions.",
+      "pointer": "apps/mobile/src/lib/now-deep-link.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "LearnerMentorScreen threads setActiveScope from useScopeContext() into all three pushNowDeepLink call sites (card continue, bar-intent jump, error-cache resume fallback).",
+      "pointer": "apps/mobile/src/app/(app)/mentor.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Spy-ordering test proves setActiveScope({kind:'supporter-hub'}) fires strictly before router.push('/(app)/mentor') for a support.hub-linked NowCard at the mentor.tsx caller.",
+      "pointer": "apps/mobile/src/app/(app)/mentor.test.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "JournalMomentsStrip threads setActiveScope from useScopeContext() into its pushNowDeepLink call.",
+      "pointer": "apps/mobile/src/components/journal/JournalMomentsStrip.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Spy-ordering test against the real JournalMomentsStrip proves setActiveScope fires before router.push for a support.hub-linked ledger moment at the second caller.",
+      "pointer": "apps/mobile/src/components/journal/JournalTabView.test.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Direct unit test proves pushNowDeepLink calls setActiveScope before router.push for a support.hub route, and never calls setActiveScope for a non-support.hub route.",
+      "pointer": "apps/mobile/src/lib/now-deep-link.test.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Tests against the real ScopeContextProvider (not a mock) prove a support.hub pointer resolves to supporter-hub scope without throwing from Me scope and from a person scope.",
+      "pointer": "apps/mobile/src/lib/now-deep-link.test.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "[rework, WI-2223 rejection fix] Genuine stale-edge test: a persisted SecureStore scope key for a person scope predates the CURRENT scope list (which no longer contains that edge — a real disk-persisted state, not a hand-set object), and the real ScopeContextProvider fallback resolves it safely to the default scope with no throw before the support.hub pointer is followed and resolves to supporter-hub. The prior version's scope list still contained the person scope, so it exercised an ordinary transition, not a stale edge.",
+      "pointer": "apps/mobile/src/lib/now-deep-link.test.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Dispatch-level mutual-exclusivity check (scope-context mocked, per that file's existing gc1-allow note): a Me-scope render taken independently of a Support-hub render shows no Support-hub content. Supplementary coverage; superseded as primary AC-3 evidence by the real-mechanism test below.",
+      "pointer": "apps/mobile/src/app/(app)/mentor.test.tsx"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "[rework, WI-2223 rejection fix] Real-mechanism return-path test (new co-located file; ScopeContextProvider UNMOCKED): drives the real support.hub push (real pushNowDeepLink + real setActiveScope) from Me to Support-hub, then drives the real 'return to Me' switch via the same setActiveScope the ScopeChip (_layout.tsx) calls, and asserts the Me surface renders with zero Support-hub content. scope-context.tsx has no navigation-event listener (no useFocusEffect/blur handler) and ScopeContextProvider mounts above the Tabs navigator at _layout.tsx root, so activeScope is structurally unaffected by back/pop navigation — 'return to Me' is this explicit scope switch, not a router.back() consequence, which is why this test drives that mechanism instead of a literal back(). The prior version did two independent renders with a hand-swapped mocked activeScope and never drove a transition.",
+      "pointer": "apps/mobile/src/app/(app)/mentor.support-hub-return.test.tsx"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "[second rework, PM-ruled correction] The prior rework's evidence claim that the co-located jest alone satisfies AC-3's e2e clause ('any visible layout claim via a named full nav-shell.spec.ts case') was ruled out of budget by the PM: substituting a component-level jest for a named e2e case is not a revision an executor may make unilaterally. This new named case (support-hub-, not config-f-scoped) drives a real Tabs mount, a real cross-tab Pressable navigation, and a real page.goBack() against a live browser — the visible-layout claim the jest structurally cannot make (ScopeContextProvider mounts above the Tabs navigator with no navigation listener, so only a real nav stack shows what Back actually renders). It proves, via real testID presence/absence on the real rendered page: after a real Back, the supporter-hub scope's own surface (support-hub-mentor-tab / support-hub-journal-tab) renders and the learner Mentor surface (mentor-screen) never bleeds through. It also proves at runtime (not by inference) that the v2-supporter-accepted seed fixture has no reachable path to Me scope (scope-chip-option-me and supporter-self-learning-doorway both assert to zero), so the AC's 'does not duplicate support content into the Me scope' clause is evidenced by the co-located jest only, not by this e2e case — an honest scope limit of the current seed fixture, not a substitution.",
+      "pointer": "apps/mobile/e2e-web/flows/v2/nav-shell.spec.ts"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Test against the real ScopeContextProvider proves a learner-shape (me-only) account is unaffected: setActiveScope early-returns (activeScope stays 'me') while navigation still proceeds unchanged.",
+      "pointer": "apps/mobile/src/lib/now-deep-link.test.ts"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-19",
+  "redGreenPointer": "docs/evidence/wi2223-rgr-support-hub-scope.md"
+}

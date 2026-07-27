@@ -9,6 +9,10 @@ import {
 } from '../test-utils/jwks-interceptor';
 import { clearJWKSCache } from '../middleware/jwt';
 import { TEST_PROFILE_ID, TEST_PROFILE_ID_2 } from '@eduagent/test-utils';
+import {
+  DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
+  ERROR_CODES,
+} from '@eduagent/schemas';
 
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
@@ -155,6 +159,8 @@ jest.mock('../services/export', () => {
       },
       profiles: [],
       consentStates: [],
+      subscriptionFieldDescriptions:
+        DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
       exportedAt: new Date().toISOString(),
     }),
   };
@@ -310,6 +316,8 @@ jest.mock('../services/identity-v2/export-v2', () => {
       },
       profiles: [],
       consentStates: [],
+      subscriptionFieldDescriptions:
+        DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
       exportedAt: new Date().toISOString(),
     }),
   };
@@ -339,7 +347,6 @@ import { captureException, captureMessage } from '../services/sentry';
 import { generateExport } from '../services/export';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { NotFoundError } from '../errors';
-import { ERROR_CODES } from '@eduagent/schemas';
 import {
   scheduleDeletionV2,
   cancelDeletionV2,

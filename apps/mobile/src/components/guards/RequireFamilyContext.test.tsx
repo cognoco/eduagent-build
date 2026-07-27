@@ -64,6 +64,8 @@ const adultOwner: Profile = {
   displayName: 'Adult Owner',
   avatarUrl: null,
   birthYear: 1985,
+  birthMonth: null,
+  birthDay: null,
   location: null,
   isOwner: true,
   hasPremiumLlm: false,
@@ -83,6 +85,8 @@ const childProfile: Profile = {
   displayName: 'Child',
   isOwner: false,
   birthYear: 2014,
+  birthMonth: null,
+  birthDay: null,
   linkCreatedAt: '2026-01-02T00:00:00.000Z',
 };
 

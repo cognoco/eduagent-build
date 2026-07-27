@@ -742,6 +742,7 @@ export async function createSubjectWithStructure(
 
     await persistNarrowTopics(
       db,
+      profileId,
       subject.id,
       fallbackStructure.topics,
       subject.name,
@@ -781,7 +782,7 @@ export async function createSubjectWithStructure(
         ? narrowFallbackStructure.topics
         : [];
   if (topics.length > 0) {
-    await persistNarrowTopics(db, subject.id, topics, subject.name);
+    await persistNarrowTopics(db, profileId, subject.id, topics, subject.name);
   }
 
   return {

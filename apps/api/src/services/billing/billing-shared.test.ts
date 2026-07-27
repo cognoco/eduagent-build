@@ -4,11 +4,28 @@
 
 import { getTierConfig } from '../subscription';
 import {
+  addMonthsClamped,
   nextMonthlyReset,
   getProfileQuotaLimits,
   mapProfileQuotaUsageRow,
   extractTierQuota,
 } from './billing-shared';
+
+describe('addMonthsClamped', () => {
+  it.each([
+    ['2027-01-31T10:15:30.000Z', 1, '2027-02-28T10:15:30.000Z'],
+    ['2028-01-31T10:15:30.000Z', 1, '2028-02-29T10:15:30.000Z'],
+    ['2027-03-31T10:15:30.000Z', 1, '2027-04-30T10:15:30.000Z'],
+    ['2027-12-31T10:15:30.000Z', 1, '2028-01-31T10:15:30.000Z'],
+    ['2027-02-28T10:15:30.000Z', 1, '2027-03-28T10:15:30.000Z'],
+    ['2027-08-31T10:15:30.000Z', 6, '2028-02-29T10:15:30.000Z'],
+    ['2027-01-31T10:15:30.000Z', 12, '2028-01-31T10:15:30.000Z'],
+  ])('clamps %s plus %i month(s) to %s', (input, months, expected) => {
+    expect(addMonthsClamped(new Date(input), months).toISOString()).toBe(
+      expected,
+    );
+  });
+});
 
 describe('nextMonthlyReset', () => {
   it('adds one month to the given date', () => {
@@ -24,6 +41,13 @@ describe('nextMonthlyReset', () => {
     const result = nextMonthlyReset(base);
     expect(result.getUTCFullYear()).toBe(2025);
     expect(result.getUTCMonth()).toBe(0); // January
+  });
+
+  it('clamps a month-end reset to the last valid UTC day', () => {
+    const base = new Date('2027-01-31T10:15:30.000Z');
+    expect(nextMonthlyReset(base).toISOString()).toBe(
+      '2027-02-28T10:15:30.000Z',
+    );
   });
 
   it('does not mutate the input date', () => {

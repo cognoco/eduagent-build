@@ -37,7 +37,6 @@ import {
   progressSnapshots,
 } from '@eduagent/database';
 import { eq } from 'drizzle-orm';
-import { ensureLegacyProfileAnchorForTest } from '../test-utils/legacy-identity-anchors';
 
 import { app } from '../index';
 import { clearJWKSCache } from '../middleware/jwt';
@@ -126,15 +125,6 @@ async function createChildProfile(owner: {
   await db.insert(guardianship).values({
     guardianPersonId: owner.id,
     chargePersonId: childId,
-  });
-  await ensureLegacyProfileAnchorForTest(db, {
-    profileId: childId,
-    accountId: owner.accountId,
-    displayName: 'Snapshot Progress Child',
-    birthYear,
-    isOwner: false,
-    clerkUserId: AUTH_USER_ID,
-    email: AUTH_EMAIL,
   });
   return { id: childId };
 }

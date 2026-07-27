@@ -1,0 +1,35 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The redacted 59-issue export was reviewed in full and retained as the source inventory for the classification.",
+      "pointer": "_wip/sentry-triage/runs/20260726-091034/sentry-unresolved-issues.md"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The source cluster summary was reviewed and its Resend counts were independently recomputed as 192 + 168 + 10 + 6 = 376.",
+      "pointer": "_wip/sentry-triage/runs/20260726-091034/sentry-clusters.md"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Every major cluster is classified as a product defect, staging/test noise, provider/config issue, duplicate, or needing deeper evidence, with the shared cause recorded.",
+      "pointer": "_wip/sentry-triage/runs/20260726-091034/triage-classification.md"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "The eleven follow-up records consolidate shared root causes rather than duplicating all 59 Sentry issues; WI-2756 Related Items was read back with exactly WI-2757 through WI-2767.",
+      "pointer": "_wip/sentry-triage/runs/20260726-091034/triage-classification.md"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "The follow-up evidence table cites each live record, its Sentry issue evidence from Found In, and its root-cause record, including WI-2766's verified acceptance-criteria refinement.",
+      "pointer": "_wip/sentry-triage/runs/20260726-091034/triage-classification.md"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "No Sentry issue was resolved or archived; the artifact records only a staged resolution plan gated on verified fixes or noise reclassification.",
+      "pointer": "_wip/sentry-triage/runs/20260726-091034/triage-classification.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13"
+}

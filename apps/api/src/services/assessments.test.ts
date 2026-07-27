@@ -1,15 +1,23 @@
 import {
   registerProvider,
+  setLlmRoutingV2Enabled,
+  _clearProviders,
+  _resetCircuits,
   type LLMProvider,
   type ChatMessage,
   type ModelConfig,
   type StopReason,
 } from './llm';
-import { createMockProvider } from './llm/test-utils';
+import { createMockProvider, getModelConfigForTest } from './llm/test-utils';
+// [WI-2433] GRADER_MODEL is the anthropic judge-grader occupant. It is a
+// production constant (not a barrel export); router.test.ts imports it the same
+// way to assert the resolved judge config.
+import { GRADER_MODEL } from './llm/router';
 import { makeChatStreamResult } from './llm/types';
 import {
   generateQuickCheck,
   evaluateAssessmentAnswer,
+  evaluateQuickCheckAnswer,
   getNextVerificationDepth,
   calculateMasteryScore,
   createAssessment,
@@ -57,7 +65,13 @@ function createQuickCheckMockProvider(questions: string[]): LLMProvider {
   };
 }
 
-/** Creates a mock provider that returns specific JSON for assessment evaluation */
+/**
+ * Creates a mock provider that returns specific JSON for assessment evaluation.
+ * [WI-2433] Registered under 'anthropic' because evaluateAssessmentAnswer /
+ * evaluateQuickCheckAnswer now route on capability:'judge', which resolves to
+ * the vendor-independent grader (anthropic + GRADER_MODEL) — never the tutor's
+ * text provider (gemini). See the judge-routing describe block below.
+ */
 function createAssessmentEvalMockProvider(evaluation: {
   feedback: string;
   passed: boolean;
@@ -66,7 +80,7 @@ function createAssessmentEvalMockProvider(evaluation: {
   qualityRating: number;
 }): LLMProvider {
   return {
-    id: 'gemini',
+    id: 'anthropic',
     async chat(_messages: ChatMessage[], _config: ModelConfig) {
       return {
         content: JSON.stringify(evaluation),
@@ -85,8 +99,9 @@ function createAssessmentEvalMockProvider(evaluation: {
 function createRawAssessmentEvalMockProvider(
   evaluation: Record<string, unknown>,
 ): LLMProvider {
+  // [WI-2433] 'anthropic' — the judge grader the eval calls now resolve to.
   return {
-    id: 'gemini',
+    id: 'anthropic',
     async chat(_messages: ChatMessage[], _config: ModelConfig) {
       return {
         content: JSON.stringify(evaluation),
@@ -483,7 +498,7 @@ describe('evaluateAssessmentAnswer', () => {
 
   it('falls back gracefully when LLM returns non-JSON', async () => {
     const rawProvider: LLMProvider = {
-      id: 'gemini',
+      id: 'anthropic', // [WI-2433] judge grader
       async chat() {
         return {
           content: 'The answer shows partial understanding.',
@@ -528,7 +543,7 @@ describe('evaluateAssessmentAnswer', () => {
     // learner as failed. The brace-depth walker stops at the first balanced
     // object, so trailing braces no longer break extraction.
     const messyProvider: LLMProvider = {
-      id: 'gemini',
+      id: 'anthropic', // [WI-2433] judge grader
       async chat() {
         return {
           content:
@@ -565,7 +580,7 @@ describe('evaluateAssessmentAnswer', () => {
 
   it('parses correctly when JSON is wrapped in markdown fence', async () => {
     const fencedProvider: LLMProvider = {
-      id: 'gemini',
+      id: 'anthropic', // [WI-2433] judge grader
       async chat() {
         return {
           content:
@@ -601,7 +616,7 @@ describe('evaluateAssessmentAnswer', () => {
 
   it('uses canned fallback when parsed JSON is missing feedback field', async () => {
     const missingFeedbackProvider: LLMProvider = {
-      id: 'gemini',
+      id: 'anthropic', // [WI-2433] judge grader
       async chat() {
         // Valid JSON, but no `feedback` field — caller used to default to
         // raw response under the old `?? response` pattern.
@@ -637,7 +652,7 @@ describe('evaluateAssessmentAnswer', () => {
 
   it('[WI-372] rejects session-envelope-shaped output for discrete assessment evaluation', async () => {
     const envelopeProvider: LLMProvider = {
-      id: 'gemini',
+      id: 'anthropic', // [WI-2433] judge grader
       async chat() {
         return {
           content: JSON.stringify({
@@ -1551,5 +1566,407 @@ describe('mapAssessmentRow — parseAssessmentExchangeHistory integration [BUG-3
     ]);
     expect(result).toHaveLength(1);
     expect(result[0]!.content).toBe('Hello');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2432] ageBracket threads to the router's under-18 vendor-exclusion gate.
+//
+// Before this fix, none of generateQuickCheck / evaluateAssessmentAnswer /
+// evaluateQuickCheckAnswer supplied ageBracket to routeAndCall, so the
+// router's under-18 Gemini/Vertex exclusion (isUnder18AgeBracket, router.ts)
+// could never fire for these calls on the legacy (routing V2 off) path — a
+// registered Gemini provider would silently serve a minor. These tests force
+// the legacy path and an under-18 ageBracket, then assert the Gemini
+// provider is never invoked (using the REAL router — registerProvider +
+// setLlmRoutingV2Enabled(false) — this file does not mock ./llm).
+// ---------------------------------------------------------------------------
+describe('[WI-2432] ageBracket threads to vendor-exclusion (legacy path)', () => {
+  let geminiSpy: jest.Mock;
+
+  function approvedQuickCheckProvider(
+    id: string,
+    questions: string[],
+  ): LLMProvider {
+    return {
+      id,
+      async chat(_messages: ChatMessage[], _config: ModelConfig) {
+        return {
+          content: JSON.stringify({ questions }),
+          stopReason: 'stop' as StopReason,
+        };
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield JSON.stringify({ questions });
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+  }
+
+  /**
+   * [WI-2432] Mock provider whose chat() fails `failCount` times then
+   * succeeds — same pattern as router.test.ts's local
+   * `createTransientFailProvider` (not exported from providers/mock, so
+   * re-declared per file). Used to force the primary provider past
+   * MAX_RETRIES(3) (4 attempts) so routeAndCall actually reaches
+   * getFallbackConfig (router.ts:1064), not just getModelConfig
+   * (router.ts:908) — the two sites have independent isUnder18AgeBracket
+   * gates, so a test that only exercises the primary path would not prove
+   * ageBracket also reaches the fallback call.
+   */
+  function createTransientFailProvider(
+    id: string,
+    failCount: number,
+    successContent: string,
+  ): LLMProvider & { callCount: number } {
+    let calls = 0;
+    return {
+      id,
+      async chat(): Promise<{ content: string; stopReason: StopReason }> {
+        calls++;
+        if (calls <= failCount) {
+          throw new Error(
+            `[WI-2432 test] simulated transient failure #${calls}`,
+          );
+        }
+        return { content: successContent, stopReason: 'stop' };
+      },
+      get callCount() {
+        return calls;
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield 'unused';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+  }
+
+  function approvedEvalProvider(
+    id: string,
+    evaluation: {
+      feedback: string;
+      passed: boolean;
+      shouldEscalateDepth: boolean;
+      rawScore: number;
+      qualityRating: number;
+    },
+  ): LLMProvider {
+    return {
+      id,
+      async chat(_messages: ChatMessage[], _config: ModelConfig) {
+        return {
+          content: JSON.stringify(evaluation),
+          stopReason: 'stop' as StopReason,
+        };
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield JSON.stringify(evaluation);
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+  }
+
+  beforeEach(() => {
+    _clearProviders();
+    _resetCircuits();
+    setLlmRoutingV2Enabled(false);
+    geminiSpy = jest.fn();
+    registerProvider({
+      id: 'gemini',
+      async chat(...args: Parameters<LLMProvider['chat']>) {
+        geminiSpy(...args);
+        return {
+          content: JSON.stringify({
+            questions: ['GEMINI SHOULD NEVER SERVE AN UNDER-18 SUBJECT', 'Q2?'],
+          }),
+          stopReason: 'stop' as StopReason,
+        };
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield 'unused';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    });
+  });
+
+  afterEach(() => {
+    _clearProviders();
+    setLlmRoutingV2Enabled(false);
+    registerProvider(createMockProvider('gemini'));
+  });
+
+  it.each(['child', 'adolescent'] as const)(
+    'generateQuickCheck never calls Gemini for an under-18 subject (%s)',
+    async (ageBracket) => {
+      registerProvider(
+        approvedQuickCheckProvider('cerebras', [
+          'Can you explain why we use let instead of var?',
+          'What happens if you try to reassign a const variable?',
+        ]),
+      );
+
+      const result = await generateQuickCheck(quickCheckContext, {
+        ageBracket,
+      });
+
+      expect(geminiSpy).not.toHaveBeenCalled();
+      expect(result.questions.length).toBeGreaterThanOrEqual(2);
+    },
+  );
+
+  // [WI-2433] evaluateAssessmentAnswer / evaluateQuickCheckAnswer now route on
+  // capability:'judge'. The judge branch (router.ts getModelConfig) is evaluated
+  // BEFORE the under-18 vendor gate and is age-blind + vendor-independent, so it
+  // resolves to the anthropic grader (never Gemini) regardless of ageBracket.
+  // The WI-2432 safety property — a minor is never served by Gemini for these
+  // calls — therefore still holds, now guaranteed more strongly by the judge
+  // routing rather than the under-18 text-fallback gate. The eval provider is
+  // registered under 'anthropic' (the grader vendor) accordingly. generateQuickCheck
+  // below is a generation call and still exercises the under-18 gate.
+  it.each(['child', 'adolescent'] as const)(
+    'evaluateAssessmentAnswer never calls Gemini for an under-18 subject (%s) — judge grader serves',
+    async (ageBracket) => {
+      registerProvider(
+        approvedEvalProvider('anthropic', {
+          feedback: 'Good progress.',
+          passed: true,
+          shouldEscalateDepth: false,
+          rawScore: 0.8,
+          qualityRating: 3,
+        }),
+      );
+
+      const result = await evaluateAssessmentAnswer(
+        assessmentContext,
+        'A variable stores data.',
+        { ageBracket },
+      );
+
+      expect(geminiSpy).not.toHaveBeenCalled();
+      expect(result.feedback).toContain('Good progress.');
+    },
+  );
+
+  it.each(['child', 'adolescent'] as const)(
+    'evaluateQuickCheckAnswer never calls Gemini for an under-18 subject (%s) — judge grader serves',
+    async (ageBracket) => {
+      registerProvider(
+        approvedEvalProvider('anthropic', {
+          feedback: 'Nicely done.',
+          passed: true,
+          shouldEscalateDepth: false,
+          rawScore: 0.8,
+          qualityRating: 3,
+        }),
+      );
+
+      const result = await evaluateQuickCheckAnswer(
+        assessmentContext,
+        'A variable stores data.',
+        { ageBracket },
+      );
+
+      expect(geminiSpy).not.toHaveBeenCalled();
+      expect(result.feedback).toBe('Nicely done.');
+    },
+  );
+
+  it('an unambiguously adult subject is unaffected (no regression) — Gemini remains eligible', async () => {
+    const result = await generateQuickCheck(quickCheckContext, {
+      ageBracket: 'adult',
+    });
+
+    expect(geminiSpy).toHaveBeenCalledTimes(1);
+    expect(result.questions.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('forces a primary-provider failure past MAX_RETRIES, driving generateQuickCheck through getFallbackConfig — still never selects Gemini for an under-18 subject', async () => {
+    const flakyCerebras = createTransientFailProvider(
+      'cerebras',
+      4, // 1 + MAX_RETRIES(3) — exhausts the primary's withRetry loop
+      JSON.stringify({
+        questions: [
+          'Can you explain why we use let instead of var?',
+          'What happens if you try to reassign a const variable?',
+        ],
+      }),
+    );
+    registerProvider(flakyCerebras);
+
+    const result = await generateQuickCheck(quickCheckContext, {
+      ageBracket: 'child',
+    });
+
+    expect(geminiSpy).not.toHaveBeenCalled();
+    expect(result.questions.length).toBeGreaterThanOrEqual(2);
+    // 4 failing primary attempts + 1 succeeding fallback attempt: proves
+    // execution actually reached getFallbackConfig's isUnder18AgeBracket
+    // gate (router.ts:1064), not just getModelConfig's (router.ts:908).
+    expect(flakyCerebras.callCount).toBe(5);
+  }, 15000);
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2433] Answer graders route on capability:'judge'.
+//
+// evaluateAssessmentAnswer and evaluateQuickCheckAnswer grade a learner's
+// answer — a judge task. They pass capability:'judge' to routeAndCall, which
+// resolves the vendor-independent, tier/age-blind grader (anthropic +
+// GRADER_MODEL, no reasoningEffort) per MMT-ADR-0016 §2 — the same routing
+// posture as the challenge-round / teach-back / suitability graders.
+//
+// These tests assert the RESOLVED ModelConfig is the judge path (NOT merely
+// that the capability param was threaded), and that the resolution is
+// age-invariant — i.e. exempt from the under-18 model restriction that makes
+// the default text path age-sensitive. Uses the REAL router (this file does
+// not mock ./llm).
+// ---------------------------------------------------------------------------
+describe("[WI-2433] answer graders resolve the capability:'judge' model config", () => {
+  /**
+   * Capturing anthropic grader — records the ModelConfig routeAndCall selected,
+   * so the end-to-end tests assert the RESOLVED config (not just the param
+   * passed in). Mirrors router.test.ts's `createCapturingProvider`.
+   */
+  function createCapturingAnthropicProvider(
+    evaluationJson: string,
+  ): LLMProvider & { lastConfig: ModelConfig | null } {
+    let captured: ModelConfig | null = null;
+    return {
+      id: 'anthropic',
+      get lastConfig() {
+        return captured;
+      },
+      async chat(_messages: ChatMessage[], config: ModelConfig) {
+        captured = config;
+        return { content: evaluationJson, stopReason: 'stop' as StopReason };
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield evaluationJson;
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+  }
+
+  const EVAL_JSON = JSON.stringify({
+    feedback: 'Good recall of the key idea.',
+    passed: true,
+    shouldEscalateDepth: false,
+    rawScore: 0.8,
+    qualityRating: 4,
+  });
+
+  beforeEach(() => {
+    _clearProviders();
+    _resetCircuits();
+    // Legacy routing (V2 off) is production today; the judge branch behaves
+    // identically under both, and resolveGraderConfig is flag-independent.
+    setLlmRoutingV2Enabled(false);
+  });
+
+  afterEach(() => {
+    _clearProviders();
+    setLlmRoutingV2Enabled(false);
+    registerProvider(createMockProvider('gemini'));
+  });
+
+  // --- AC-2 (literal acceptance criterion): the resolved judge config is
+  // age-blind and is NOT the default (gemini) text config. Asserts the two
+  // invariants — identical across brackets, and ≠ the default config — WITHOUT
+  // hardcoding a grader vendor: the judge resolves to the anthropic GRADER_MODEL
+  // normally but to openai when anthropic is the tutor vendor, so an
+  // `=== 'anthropic'` assertion would be brittle/wrong. Mirrors the
+  // getModelConfigForTest precedent in router.test.ts. ------------------------
+
+  it("[AC-2] capability:'judge' resolves an age-blind config that differs from the default (gemini) config", () => {
+    registerProvider(createMockProvider('gemini'));
+    // Approved non-Gemini text provider so the age-SENSITIVE default path
+    // resolves for a minor (Gemini-banned) instead of throwing.
+    registerProvider(createMockProvider('cerebras'));
+
+    // Rung 2 is the rung both grader call sites use.
+    const judgeAdult = getModelConfigForTest(2, {
+      capability: 'judge',
+      ageBracket: 'adult',
+    });
+    const judgeChild = getModelConfigForTest(2, {
+      capability: 'judge',
+      ageBracket: 'child',
+    });
+    const judgeAdolescent = getModelConfigForTest(2, {
+      capability: 'judge',
+      ageBracket: 'adolescent',
+    });
+
+    // Invariant 1 — AGE-BLIND: the judge branch is evaluated BEFORE the under-18
+    // gate, so a minor resolves to the IDENTICAL config as an adult.
+    expect(judgeChild).toEqual(judgeAdult);
+    expect(judgeAdolescent).toEqual(judgeAdult);
+
+    // Invariant 2 — NOT the default: the judge config is not Gemini and differs
+    // from the default text config a learner would otherwise get. No grader
+    // vendor is hardcoded; the grader vendor depends on the tutor vendor.
+    const defaultAdult = getModelConfigForTest(2, { ageBracket: 'adult' });
+    expect(defaultAdult.provider).toBe('gemini'); // baseline: default IS gemini
+    expect(judgeAdult.provider).not.toBe('gemini');
+    expect(judgeAdult).not.toEqual(defaultAdult);
+
+    // The default path IS age-sensitive — proving the age-blindness above is
+    // meaningful, not vacuous: a minor is redirected off the banned Gemini.
+    const defaultChild = getModelConfigForTest(2, { ageBracket: 'child' });
+    expect(defaultChild.provider).not.toBe('gemini');
+    expect(defaultChild).not.toEqual(defaultAdult);
+  });
+
+  // --- End-to-end: the actual call sites resolve to the judge grader ----------
+
+  it('evaluateAssessmentAnswer routes to the judge grader even for a minor (child)', async () => {
+    registerProvider(createMockProvider('gemini')); // tutor vendor to exclude
+    const grader = createCapturingAnthropicProvider(EVAL_JSON);
+    registerProvider(grader);
+
+    const result = await evaluateAssessmentAnswer(
+      assessmentContext,
+      'A variable stores data.',
+      { ageBracket: 'child' },
+    );
+
+    // The capturing anthropic provider served — proving the call site resolved
+    // to the judge grader, not the (age-gated) text path.
+    expect(grader.lastConfig).not.toBeNull();
+    expect(grader.lastConfig?.provider).toBe('anthropic');
+    expect(grader.lastConfig?.model).toBe(GRADER_MODEL);
+    expect(grader.lastConfig?.reasoningEffort).toBeUndefined();
+    // WI-2433 also sets responseFormat:'json' (matches the sibling judge
+    // callers; for the anthropic grader it prepends a JSON-only directive).
+    expect(grader.lastConfig?.responseFormat).toBe('json');
+    expect(result.feedback).toContain('Good recall of the key idea.');
+  });
+
+  it('evaluateQuickCheckAnswer routes to the judge grader even for a minor (adolescent)', async () => {
+    registerProvider(createMockProvider('gemini'));
+    const grader = createCapturingAnthropicProvider(EVAL_JSON);
+    registerProvider(grader);
+
+    const result = await evaluateQuickCheckAnswer(
+      assessmentContext,
+      'A variable stores data.',
+      { ageBracket: 'adolescent' },
+    );
+
+    expect(grader.lastConfig?.provider).toBe('anthropic');
+    expect(grader.lastConfig?.model).toBe(GRADER_MODEL);
+    expect(grader.lastConfig?.reasoningEffort).toBeUndefined();
+    expect(grader.lastConfig?.responseFormat).toBe('json');
+    expect(result.feedback).toContain('Good recall of the key idea.');
   });
 });

@@ -19,6 +19,7 @@ import {
   type AssessmentStatus,
   type ChatExchange,
   type ConversationLanguage,
+  type AgeBracket,
 } from '@eduagent/schemas';
 import { routeAndCall } from './llm';
 import type { ChatMessage } from './llm';
@@ -268,7 +269,10 @@ export function resolveAssessmentStatus(input: {
  */
 export async function generateQuickCheck(
   context: QuickCheckContext,
-  options?: { conversationLanguage?: ConversationLanguage },
+  options?: {
+    conversationLanguage?: ConversationLanguage;
+    ageBracket?: AgeBracket;
+  },
 ): Promise<QuickCheckResult> {
   // [PROMPT-INJECT-8] topic fields are stored content; exchange history is
   // raw learner+assistant text. Sanitize titles, entity-encode the joined
@@ -296,6 +300,7 @@ export async function generateQuickCheck(
   const result = await routeAndCall(messages, 2, {
     flow: 'assessment.evaluate',
     conversationLanguage: options?.conversationLanguage,
+    ageBracket: options?.ageBracket,
   });
   return parseQuickCheckResult(result.response);
 }
@@ -334,6 +339,7 @@ export async function evaluateAssessmentAnswer(
   options?: {
     assessmentStatus?: AssessmentStatus;
     conversationLanguage?: ConversationLanguage;
+    ageBracket?: AgeBracket;
   },
 ): Promise<AssessmentEvaluation> {
   if (
@@ -346,9 +352,22 @@ export async function evaluateAssessmentAnswer(
   }
 
   const messages = buildAssessmentEvaluationMessages(context, answer);
+  // [WI-2433] Answer grading is a judge task: route on capability:'judge' so it
+  // resolves to the vendor-independent, tier/age-blind grader (GRADER_MODEL),
+  // consistent with the other server-side graders (challenge-round,
+  // teach-back, suitability). This makes the call exempt from the under-18
+  // vendor gate WI-2432 threads (the judge branch is evaluated first and never
+  // returns Gemini by construction, MMT-ADR-0016 §2/§10.1); ageBracket is still
+  // threaded because it drives the safety preamble, not vendor selection.
+  // WI-2624: grades the LEARNER's answer, not any model's output —
+  // not-applicable (no producer vendor to exclude).
   const result = await routeAndCall(messages, 2, {
+    capability: 'judge',
+    judgeIndependence: { mode: 'not-applicable' },
     flow: 'assessment.evaluate',
+    responseFormat: 'json',
     conversationLanguage: options?.conversationLanguage,
+    ageBracket: options?.ageBracket,
   });
   const evaluation = parseAssessmentEvaluation(
     result.response,
@@ -481,6 +500,7 @@ export async function submitAssessmentAnswer(
   answer: string,
   options: {
     conversationLanguage?: ConversationLanguage;
+    ageBracket?: AgeBracket;
     deps?: SubmitAssessmentAnswerDependencies;
   } = {},
 ): Promise<SubmitAssessmentAnswerResult | null> {
@@ -533,6 +553,7 @@ export async function submitAssessmentAnswer(
             {
               assessmentStatus: snapshot.status,
               conversationLanguage: options.conversationLanguage,
+              ageBracket: options.ageBracket,
             },
           );
 
@@ -639,7 +660,10 @@ export async function submitAssessmentAnswer(
 export async function evaluateQuickCheckAnswer(
   context: AssessmentContext,
   answer: string,
-  options?: { conversationLanguage?: ConversationLanguage },
+  options?: {
+    conversationLanguage?: ConversationLanguage;
+    ageBracket?: AgeBracket;
+  },
 ): Promise<AssessmentEvaluation> {
   const safeTopicTitle = sanitizeXmlValue(context.topicTitle, 200);
   const safeTopicDescription = sanitizeXmlValue(context.topicDescription, 500);
@@ -657,9 +681,18 @@ export async function evaluateQuickCheckAnswer(
     },
   ];
 
+  // [WI-2433] Quick-check answer grading is a judge task — same routing posture
+  // as evaluateAssessmentAnswer above (capability:'judge' → vendor-independent,
+  // tier/age-blind GRADER_MODEL). See that call site for the rationale.
+  // WI-2624: grades the LEARNER's answer, not any model's output —
+  // not-applicable (no producer vendor to exclude).
   const result = await routeAndCall(messages, 2, {
+    capability: 'judge',
+    judgeIndependence: { mode: 'not-applicable' },
     flow: 'assessment.evaluate',
+    responseFormat: 'json',
     conversationLanguage: options?.conversationLanguage,
+    ageBracket: options?.ageBracket,
   });
   return parseAssessmentEvaluation(result.response, context.currentDepth);
 }
@@ -740,7 +773,9 @@ function parseQuickCheckResult(response: string): QuickCheckResult {
         extra: {
           surface: 'assessments-quick-check',
           reason: 'invalid_json',
-          jsonStrSample: jsonStr.slice(0, 200),
+          // [WI-1990] Length only — a slice of the LLM's quick-check JSON
+          // can echo learner-entered content. Never send raw content.
+          jsonStrLength: jsonStr.length,
         },
       });
       assessmentsLogger.warn(
@@ -803,7 +838,9 @@ function parseAssessmentEvaluation(
           extra: {
             surface: 'assessments-evaluation',
             reason: 'invalid_schema',
-            jsonStrSample: jsonStr.slice(0, 200),
+            // [WI-1990] Length only — a slice of the LLM's evaluation JSON
+            // can echo learner-entered content. Never send raw content.
+            jsonStrLength: jsonStr.length,
           },
         });
         assessmentsLogger.warn(
@@ -859,7 +896,9 @@ function parseAssessmentEvaluation(
         extra: {
           surface: 'assessments-evaluation',
           reason: 'invalid_json',
-          jsonStrSample: jsonStr.slice(0, 200),
+          // [WI-1990] Length only — a slice of the LLM's evaluation JSON
+          // can echo learner-entered content. Never send raw content.
+          jsonStrLength: jsonStr.length,
         },
       });
       assessmentsLogger.warn(

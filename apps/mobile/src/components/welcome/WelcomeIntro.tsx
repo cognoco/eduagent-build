@@ -15,7 +15,13 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../../lib/theme';
 
-export type WelcomeAudience = 'learner' | 'parent';
+// 'supporter' is a non-authorizing pre-auth intent (WI-2225): a signal that
+// this person is showing up to support someone else's learning, distinct
+// from 'parent' (which drives the family-context/add-a-child path at
+// first-profile setup — see create-profile.tsx). Chooser and card-deck
+// rendering fall through to the learner deck for 'supporter' below; no
+// dedicated deck exists yet.
+export type WelcomeAudience = 'learner' | 'parent' | 'supporter';
 
 type CardIndex = 0 | 1 | 2;
 

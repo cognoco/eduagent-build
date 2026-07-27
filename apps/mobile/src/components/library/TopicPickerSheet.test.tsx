@@ -115,9 +115,22 @@ describe('TopicPickerSheet', () => {
     expect(onSelect).toHaveBeenCalledWith('topic-3');
   });
 
-  it('calls onClose when backdrop is pressed', () => {
+  it('names the dialog, keeps topic actions independent, and closes once from the backdrop', () => {
     const onClose = jest.fn();
-    render(<TopicPickerSheet {...defaultProps} onClose={onClose} />);
+    const onSelect = jest.fn();
+    render(
+      <TopicPickerSheet
+        {...defaultProps}
+        onClose={onClose}
+        onSelect={onSelect}
+      />,
+    );
+
+    screen.getByRole('dialog', { name: 'Choose a topic' });
+
+    fireEvent.press(screen.getByTestId('topic-picker-topic-1'));
+    expect(onSelect).toHaveBeenCalledWith('topic-1');
+    expect(onClose).not.toHaveBeenCalled();
 
     fireEvent.press(screen.getByLabelText('Close topic picker'));
 

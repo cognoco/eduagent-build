@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -13,10 +13,70 @@ import type { HomeworkProblem } from '@eduagent/schemas';
 import type { Router, Href } from 'expo-router';
 import type { useCreateSubject } from '../../hooks/use-subjects';
 import {
+  type ChatMessage,
   type QuickChipId,
   type PendingSubjectResolution,
   type ConversationStage,
 } from './session-types';
+
+export interface HomeworkFirstResponseCompleteMarkerProps {
+  active: boolean;
+  problemText: string | undefined;
+  messages: ChatMessage[];
+  isStreaming: boolean;
+  hasFailure: boolean;
+}
+
+// E2E completion marker excludes partial streams and reconnect/fallback replies.
+export function HomeworkFirstResponseCompleteMarker({
+  active,
+  problemText,
+  messages,
+  isStreaming,
+  hasFailure,
+}: HomeworkFirstResponseCompleteMarkerProps): React.JSX.Element | null {
+  const complete = useMemo(() => {
+    if (!active) return false;
+
+    const normalizedProblem = problemText?.trim();
+    const problemIndex = normalizedProblem
+      ? messages.findIndex(
+          (message) =>
+            message.role === 'user' &&
+            message.isAutoSent === true &&
+            message.content.trim() === normalizedProblem,
+        )
+      : -1;
+    const messagesAfterProblem =
+      problemIndex >= 0 ? messages.slice(problemIndex + 1) : [];
+    const firstAssistantReply = messagesAfterProblem.find(
+      (message) => message.role === 'assistant',
+    );
+    const hasRecoveryOrFallback = messagesAfterProblem.some(
+      (message) =>
+        message.kind !== undefined || message.isSystemPrompt === true,
+    );
+
+    return (
+      active &&
+      !isStreaming &&
+      !hasFailure &&
+      !hasRecoveryOrFallback &&
+      firstAssistantReply !== undefined &&
+      firstAssistantReply.streaming !== true &&
+      typeof firstAssistantReply.eventId === 'string' &&
+      firstAssistantReply.eventId.trim().length > 0 &&
+      firstAssistantReply.content.trim().length > 0
+    );
+  }, [active, problemText, messages, isStreaming, hasFailure]);
+
+  return complete ? (
+    <View
+      testID="homework-first-response-complete"
+      style={{ width: 1, height: 1 }}
+    />
+  ) : null;
+}
 
 // ─── SessionToolAccessory ────────────────────────────────────────────────────
 
@@ -529,14 +589,16 @@ export function HomeworkModeChips({
 // ─── MentorHomeworkFirstResponse ─────────────────────────────────────────────
 // T23: V2 "mentor-is-the-app" homework round-trip. When the learner captures a
 // homework photo from the Mentor bar (entrySource=mentor + returnTo=mentor),
-// they land back in the same conversation thread with the captured image as
-// their own image bubble, followed by two deterministic first-response actions
-// — "help me solve this" / "check my answer" — and NO subject-picking preamble.
+// they land back in the same conversation thread with their captured image or
+// manually entered problem as their own bubble, followed by two deterministic
+// first-response actions — "help me solve this" / "check my answer" — and NO
+// subject-picking preamble.
 // The buttons are the FIRST actionable response; tapping one starts the
 // tutoring turn with the chosen homework mode.
 
 export interface MentorHomeworkFirstResponseProps {
   imageUri: string | undefined;
+  problemText: string | undefined;
   disabled: boolean;
   onHelpMeSolve: () => void;
   onCheckMyAnswer: () => void;
@@ -544,6 +606,7 @@ export interface MentorHomeworkFirstResponseProps {
 
 export function MentorHomeworkFirstResponse({
   imageUri,
+  problemText,
   disabled,
   onHelpMeSolve,
   onCheckMyAnswer,
@@ -563,13 +626,19 @@ export function MentorHomeworkFirstResponse({
           accessibilityLabel={t('mentorHome.homework.imageAlt')}
           testID="homework-image-bubble"
         />
-      ) : (
+      ) : problemText ? (
         <View
-          className="w-full aspect-[4/3] rounded-card bg-surface-elevated mb-3 items-center justify-center"
-          accessibilityLabel={t('mentorHome.homework.imageAlt')}
-          testID="homework-image-bubble"
-        />
-      )}
+          className="w-full rounded-card bg-surface-elevated mb-3 px-4 py-3"
+          testID="homework-problem-text-bubble-container"
+        >
+          <Text
+            className="text-body text-text-primary"
+            testID="homework-problem-text-bubble"
+          >
+            {problemText}
+          </Text>
+        </View>
+      ) : null}
       <View className="flex-row gap-2">
         <Pressable
           onPress={onHelpMeSolve}

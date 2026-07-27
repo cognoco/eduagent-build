@@ -2,7 +2,8 @@ import { useCallback, useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import {
-  completeMentorBornCeremony,
+  completeMentorBornCeremonyDurably,
+  restorePendingMentorBornCeremony,
   useMentorBornCeremonyRequest,
 } from '../../lib/mentor-born-ceremony';
 import { MentorBirthErrorBoundary } from './MentorBirthErrorBoundary';
@@ -14,8 +15,12 @@ export function MentorBornCeremonyOverlay() {
   const request = useMentorBornCeremonyRequest();
   const { t } = useTranslation();
   const onComplete = useCallback(() => {
-    if (request) completeMentorBornCeremony(request.id);
+    if (request) void completeMentorBornCeremonyDurably(request.id);
   }, [request]);
+
+  useEffect(() => {
+    void restorePendingMentorBornCeremony();
+  }, []);
 
   useEffect(() => {
     if (!request) return;

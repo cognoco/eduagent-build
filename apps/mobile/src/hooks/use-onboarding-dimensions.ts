@@ -22,10 +22,18 @@ import { useProfile } from '../lib/profile';
 import { assertOk } from '../lib/assert-ok';
 import { parseJson } from '../lib/parse-json';
 import { queryKeys } from '../lib/query-keys';
+import {
+  completeExplicitMentorLanguageUpdate,
+  failExplicitMentorLanguageUpdate,
+  finishMentorLanguageUpdate,
+  type MentorLanguageUpdateOperation,
+  waitForMentorLanguageUpdateTurn,
+} from '../lib/mentor-language-coordination';
 
 interface UpdateLanguageInput {
   childProfileId?: string;
   conversationLanguage: ConversationLanguage;
+  languageOperation?: MentorLanguageUpdateOperation;
 }
 
 interface UpdatePronounsInput {
@@ -58,16 +66,44 @@ export function useUpdateConversationLanguage(): UseMutationResult<
 
   return useMutation({
     mutationFn: async (input) => {
-      const res = input.childProfileId
-        ? await client.onboarding[':profileId'].language.$patch({
-            param: { profileId: input.childProfileId },
-            json: { conversationLanguage: input.conversationLanguage },
-          })
-        : await client.onboarding.language.$patch({
-            json: { conversationLanguage: input.conversationLanguage },
-          });
-      await assertOk(res);
-      return await parseJson(res, onboardingSuccessResponseSchema);
+      if (input.languageOperation) {
+        const canRun = await waitForMentorLanguageUpdateTurn(
+          input.languageOperation,
+        );
+        if (!canRun) {
+          if (input.languageOperation.kind === 'explicit') {
+            failExplicitMentorLanguageUpdate(input.languageOperation);
+          } else {
+            finishMentorLanguageUpdate(input.languageOperation);
+          }
+          throw new Error('Mentor-language update cancelled during sign-out');
+        }
+      }
+      try {
+        const res = input.childProfileId
+          ? await client.onboarding[':profileId'].language.$patch({
+              param: { profileId: input.childProfileId },
+              json: { conversationLanguage: input.conversationLanguage },
+            })
+          : await client.onboarding.language.$patch({
+              json: { conversationLanguage: input.conversationLanguage },
+            });
+        await assertOk(res);
+        const result = await parseJson(res, onboardingSuccessResponseSchema);
+        if (input.languageOperation?.kind === 'explicit') {
+          await completeExplicitMentorLanguageUpdate(input.languageOperation);
+        }
+        return result;
+      } catch (error) {
+        if (input.languageOperation?.kind === 'explicit') {
+          failExplicitMentorLanguageUpdate(input.languageOperation);
+        }
+        throw error;
+      } finally {
+        if (input.languageOperation) {
+          finishMentorLanguageUpdate(input.languageOperation);
+        }
+      }
     },
     onSuccess: async () => {
       // The tutor-language change takes effect at the next session (per spec

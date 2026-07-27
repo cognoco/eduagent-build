@@ -61,6 +61,7 @@ describe('now feed schemas', () => {
     expect(nowCardKindSchema.options).toEqual([
       'billing_alert',
       'unfinished_session',
+      'mentor_notice',
       'retention_due',
       'parked_item',
       'needs_deepening',
@@ -92,6 +93,7 @@ describe('now feed schemas', () => {
     expect(nowDeepLinkSchema.parse(deepLink)).toEqual(deepLink);
     expect(nowDeepLinkRouteSchema.options).toContain('journal');
     expect(nowDeepLinkRouteSchema.options).toContain('support.hub');
+    expect(nowDeepLinkRouteSchema.options).toContain('notice.recheck');
     expect(
       nowDeepLinkSchema.parse({
         route: 'journal',
@@ -142,6 +144,15 @@ describe('now feed schemas', () => {
 
     it('accepts empty params (cards with no deep-link routing IDs)', () => {
       expect(nowCardParamsSchema.safeParse({}).success).toBe(true);
+    });
+
+    it('validates the mentor notice action id', () => {
+      expect(
+        nowCardParamsSchema.safeParse({ noticeId: VALID_UUID }).success,
+      ).toBe(true);
+      expect(
+        nowCardParamsSchema.safeParse({ noticeId: 'not-uuid' }).success,
+      ).toBe(false);
     });
   });
 });

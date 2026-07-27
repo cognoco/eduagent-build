@@ -1,97 +1,7 @@
 import { Inngest, InngestMiddleware } from 'inngest';
-import type { Database } from '@eduagent/database';
 import { INNGEST_PII_STEP_KEYS, scrubPiiPayload } from '@eduagent/schemas';
 import { createLogger } from '../services/logger';
 import { captureException } from '../services/sentry';
-import {
-  enterWithEnvBindings,
-  beginStepDatabaseScope,
-  closeStepDatabases,
-  type EnvBindings,
-} from './helpers';
-
-function readStringBinding(
-  env: Record<string, unknown> | undefined,
-  key: string,
-): string | undefined {
-  const value = env?.[key];
-  return typeof value === 'string' ? value : undefined;
-}
-
-/**
- * Middleware that captures Cloudflare Workers env bindings and scopes them to
- * the invocation's async context for getStepDatabase(), getStepVoyageApiKey()
- * and friends.
- *
- * On CF Workers the bindings are only available through the request-scoped
- * env object. Inngest's middleware lifecycle runs before each function
- * invocation, giving us a hook to propagate the binding. The bindings are
- * carried through AsyncLocalStorage and (re-)entered in beforeMemoization /
- * beforeExecution — the hooks that fire on every invocation including step
- * re-entries — so overlapping runs in one isolate can never read each other's
- * values. (Previously these were module-level singletons, which a concurrent
- * invocation's middleware pass could overwrite mid-run.)
- */
-const envBindingMiddleware = new InngestMiddleware({
-  name: 'CF Env Binding Middleware',
-  init() {
-    return {
-      onFunctionRun({ reqArgs }) {
-        const stepDatabaseScope = new Set<Database>();
-        // reqArgs[0] is the Request, reqArgs[1] is the CF env bindings object
-        const env = reqArgs[1] as Record<string, unknown> | undefined;
-        const bindings: EnvBindings = {
-          databaseUrl: readStringBinding(env, 'DATABASE_URL'),
-          voyageApiKey: readStringBinding(env, 'VOYAGE_API_KEY'),
-          resendApiKey: readStringBinding(env, 'RESEND_API_KEY'),
-          emailFrom: readStringBinding(env, 'EMAIL_FROM'),
-          appUrl: readStringBinding(env, 'APP_URL'),
-          supportEmail: readStringBinding(env, 'SUPPORT_EMAIL'),
-          retentionPurgeEnabled: readStringBinding(
-            env,
-            'RETENTION_PURGE_ENABLED',
-          ),
-          clerkSecretKey: readStringBinding(env, 'CLERK_SECRET_KEY'),
-          stripeSecretKey: readStringBinding(env, 'STRIPE_SECRET_KEY'),
-          revenueCatRestApiKey: readStringBinding(
-            env,
-            'REVENUECAT_REST_API_KEY',
-          ),
-          memoryFactsDedupEnabled: readStringBinding(
-            env,
-            'MEMORY_FACTS_DEDUP_ENABLED',
-          ),
-          memoryFactsDedupThreshold: readStringBinding(
-            env,
-            'MEMORY_FACTS_DEDUP_THRESHOLD',
-          ),
-          maxDedupLlmCallsPerSession: readStringBinding(
-            env,
-            'MAX_DEDUP_LLM_CALLS_PER_SESSION',
-          ),
-          memoryFactsDedupRolloutPct: readStringBinding(
-            env,
-            'MEMORY_FACTS_DEDUP_ROLLOUT_PCT',
-          ),
-        };
-        enterWithEnvBindings(bindings);
-        return {
-          beforeMemoization() {
-            enterWithEnvBindings(bindings);
-            beginStepDatabaseScope(stepDatabaseScope);
-          },
-          beforeExecution() {
-            enterWithEnvBindings(bindings);
-            beginStepDatabaseScope(stepDatabaseScope);
-          },
-          beforeResponse() {
-            return closeStepDatabases(stepDatabaseScope);
-          },
-        };
-      },
-    };
-  },
-});
 
 const piiScrubLogger = createLogger();
 
@@ -201,5 +111,5 @@ const piiScrubMiddleware = new InngestMiddleware({
 
 export const inngest = new Inngest({
   id: 'eduagent',
-  middleware: [envBindingMiddleware, piiScrubMiddleware],
+  middleware: [piiScrubMiddleware],
 });

@@ -187,6 +187,7 @@ describe('RecallTestScreen', () => {
 
     expect(source).toContain("t('topic.recallTest.successMessage')");
     expect(source).toContain("t('topic.recallTest.partialResult')");
+    expect(source).toContain("t('topic.recallTest.reTeach')");
     expect(source).toContain("t('topic.recallTest.needsReview')");
     expect(source).not.toMatch(/animateResponse\(\s*['"`]/);
   });
@@ -201,8 +202,9 @@ describe('RecallTestScreen', () => {
       },
       {
         passed: false,
-        failureCount: 3,
+        failureCount: 4,
         failureAction: 'redirect_to_library',
+        offRampStage: 'topic_parked',
         remediation: {
           cooldownEndsAt: '2026-03-30T18:30:00.000Z',
           suggestionText: 'Review the topic again.',
@@ -243,12 +245,13 @@ describe('RecallTestScreen', () => {
     expect(screen.queryByTestId('recall-dont-remember-button')).toBeNull();
   });
 
-  it('shows remediation immediately when first result is redirect', async () => {
+  it('shows remediation immediately when first result is topic_parked', async () => {
     queuedRecallResults = [
       {
         passed: false,
-        failureCount: 3,
+        failureCount: 4,
         failureAction: 'redirect_to_library',
+        offRampStage: 'topic_parked',
         remediation: {
           cooldownEndsAt: '2026-03-30T18:30:00.000Z',
           retentionStatus: 'forgotten',
@@ -263,6 +266,63 @@ describe('RecallTestScreen', () => {
     await waitFor(() => {
       screen.getByTestId('remediation-card');
     });
+  });
+
+  // [WI-1462 / RR-4] The bounded re-teach off-ramp keeps the learner in the
+  // same flow — no remediation card, no navigation, input stays enabled.
+  it('shows the re-teach off-ramp on the 3rd failure without remediation or navigation', async () => {
+    queuedRecallResults = [
+      {
+        passed: false,
+        failureCount: 3,
+        failureAction: 'feedback_only',
+        offRampStage: 're_teach',
+        hint: 'Here is a hint framed differently.',
+      },
+    ];
+
+    render(<RecallTestScreen />);
+
+    fireEvent.press(screen.getByTestId('mock-send-button'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Here is a hint framed differently.'),
+      ).toBeTruthy();
+    });
+
+    expect(screen.queryByTestId('remediation-card')).toBeNull();
+    expect(mockPush).not.toHaveBeenCalled();
+    // Input stays enabled — the learner can retry in the same flow.
+    expect(screen.getByTestId('mock-send-button')).toBeTruthy();
+  });
+
+  // [WI-1462 / RR-4] The 2nd consecutive failure after re-teach parks the
+  // topic without ever auto-navigating — review/relearn stay explicit taps.
+  it('parks the topic on the 4th failure without auto-navigating to Library', async () => {
+    queuedRecallResults = [
+      {
+        passed: false,
+        failureCount: 4,
+        failureAction: 'redirect_to_library',
+        offRampStage: 'topic_parked',
+        remediation: {
+          cooldownEndsAt: '2026-03-30T18:30:00.000Z',
+          retentionStatus: 'forgotten',
+        },
+      },
+    ];
+
+    render(<RecallTestScreen />);
+
+    fireEvent.press(screen.getByTestId('mock-send-button'));
+
+    await waitFor(() => {
+      screen.getByTestId('remediation-card');
+    });
+
+    // The park is a warm exit, never an automatic redirect.
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('shows success message when text recall passes', async () => {
@@ -350,6 +410,172 @@ describe('RecallTestScreen', () => {
     fireEvent.press(screen.getByTestId('recall-dont-remember-button'));
 
     expect(mockRecallMutate).toHaveBeenCalledTimes(1);
+  });
+
+  // [WI-2114] Answer-specific Recall Check feedback. The exact preview-device
+  // incident: a learner recalling Sylvia Plath got the fixed "Good effort"
+  // prompt, and asking "What is wrong with what I said" repeated the same copy
+  // verbatim. The fix renders the grader's answer-specific feedback instead.
+  describe('[WI-2114] answer-specific feedback', () => {
+    beforeEach(() => {
+      mockSearchParams = { topicId: 'topic-plath', subjectId: 'subject-lit' };
+    });
+
+    it('[AC-1/AC-6 Sylvia Plath] renders grader feedback, not the generic prompt', async () => {
+      queuedRecallResults = [
+        {
+          passed: false,
+          failureCount: 1,
+          failureAction: 'feedback_only',
+          feedback: {
+            strengths:
+              'You correctly recalled that The Bell Jar is her only novel.',
+            gaps: 'You did not mention that Ariel was published after her death.',
+            nextStep:
+              'Next, note when Ariel appeared and why that timing matters.',
+          },
+        },
+      ];
+
+      render(<RecallTestScreen />);
+      fireEvent.press(screen.getByTestId('mock-send-button'));
+
+      await waitFor(() => {
+        screen.getByText(/The Bell Jar is her only novel/);
+      });
+      screen.getByText(/Ariel was published after her death/);
+      screen.getByText(/note when Ariel appeared/);
+      // The generic "Good effort" prompt must NOT appear when the grader
+      // supplied answer-specific feedback.
+      expect(screen.queryByText(/Good effort/)).toBeNull();
+    });
+
+    it('[AC-5] falls back to the honest generic prompt when the grader gave no feedback', async () => {
+      queuedRecallResults = [
+        {
+          passed: false,
+          failureCount: 1,
+          failureAction: 'feedback_only',
+        },
+      ];
+
+      render(<RecallTestScreen />);
+      fireEvent.press(screen.getByTestId('mock-send-button'));
+
+      // Cooldown / grader-omitted-feedback path: the generic prompt stays.
+      await waitFor(() => {
+        screen.getByText(/Good effort/);
+      });
+    });
+
+    it('[AC-3] consecutive submissions render distinct feedback', async () => {
+      queuedRecallResults = [
+        {
+          passed: false,
+          failureCount: 1,
+          failureAction: 'feedback_only',
+          feedback: {
+            strengths: 'First submission: you named the poet.',
+            gaps: 'First submission: the collection title is missing.',
+            nextStep: 'First submission: add the collection title.',
+          },
+        },
+        {
+          passed: false,
+          failureCount: 2,
+          failureAction: 'feedback_only',
+          feedback: {
+            strengths: 'Second submission: you added the collection title.',
+            gaps: 'Second submission: the publication year is still missing.',
+            nextStep: 'Second submission: add the publication year.',
+          },
+        },
+      ];
+
+      render(<RecallTestScreen />);
+      fireEvent.press(screen.getByTestId('mock-send-button'));
+      await waitFor(() => {
+        screen.getByText(/First submission: you named the poet/);
+      });
+      fireEvent.press(screen.getByTestId('mock-send-button'));
+      await waitFor(() => {
+        screen.getByText(/Second submission: you added the collection title/);
+      });
+      // Both distinct feedback bodies are on screen — the second did not repeat
+      // the first verbatim.
+      screen.getByText(/First submission: add the collection title/);
+      screen.getByText(/Second submission: add the publication year/);
+    });
+
+    it('[AC-2/AC-8] a cooldown-blocked follow-up reframes the prior feedback, never replaying it verbatim', async () => {
+      // Second half of the Sylvia Plath exchange: the learner asks "what is
+      // wrong with what I said?". That follow-up is cooldown-blocked, so the
+      // server returns no fresh `feedback` — only `priorFeedback` (the previous
+      // graded answer's stored feedback). The client must reframe it (lead with
+      // the correction + next step, drop the strengths celebration), NOT replay
+      // the fresh 3-part composition byte-for-byte (AC-8), and NOT fall back to
+      // the generic prompt (AC-2).
+      const priorFeedback = {
+        strengths:
+          'You correctly recalled that The Bell Jar is her only novel.',
+        gaps: 'You did not mention that Ariel was published after her death.',
+        nextStep: 'Next, note when Ariel appeared and why that timing matters.',
+      };
+      queuedRecallResults = [
+        {
+          passed: false,
+          failureCount: 1,
+          failureAction: 'feedback_only',
+          cooldownActive: true,
+          priorFeedback,
+        },
+      ];
+
+      render(<RecallTestScreen />);
+      fireEvent.press(screen.getByTestId('mock-send-button'));
+
+      // The correction + next step (a direct answer to "what was wrong") show.
+      await waitFor(() => {
+        screen.getByText(/Ariel was published after her death/);
+      });
+      screen.getByText(/note when Ariel appeared/);
+      // Reframed, not a verbatim replay of the fresh grade: the strengths
+      // celebration is dropped (AC-8).
+      expect(screen.queryByText(/The Bell Jar is her only novel/)).toBeNull();
+      // And never the generic "Good effort" prompt (AC-2).
+      expect(screen.queryByText(/Good effort/)).toBeNull();
+    });
+
+    it('[AC-4] renders mentor-language feedback prose while controls stay in the app language', async () => {
+      // Feedback arrives already written in the mentor language (here German —
+      // server-produced prose); the client renders it verbatim, never through
+      // t(). Navigation/controls (the dont-remember button) stay app-language.
+      queuedRecallResults = [
+        {
+          passed: false,
+          failureCount: 1,
+          failureAction: 'feedback_only',
+          feedback: {
+            strengths: 'Du hast das Hauptthema richtig erkannt.',
+            gaps: 'Dir fehlt noch das Erscheinungsjahr von Ariel.',
+            nextStep: 'Nenne als Nächstes das Erscheinungsjahr.',
+          },
+        },
+      ];
+
+      render(<RecallTestScreen />);
+      // App-language control label (English en.json) is present up front.
+      screen.getByText("I don't remember");
+
+      fireEvent.press(screen.getByTestId('mock-send-button'));
+
+      await waitFor(() => {
+        screen.getByText(/Du hast das Hauptthema richtig erkannt/);
+      });
+      // Mentor-prose rendered verbatim; app-language control unchanged.
+      screen.getByText(/Nenne als Nächstes das Erscheinungsjahr/);
+      screen.getByText("I don't remember");
+    });
   });
 
   it('[BUG-680] shows timeout fallback when submission hangs past 30s', () => {
@@ -463,8 +689,9 @@ describe('RecallTestScreen', () => {
     queuedRecallResults = [
       {
         passed: false,
-        failureCount: 3,
+        failureCount: 4,
         failureAction: 'redirect_to_library',
+        offRampStage: 'topic_parked',
         remediation: {
           cooldownEndsAt: '2026-03-30T18:30:00.000Z',
           retentionStatus: 'forgotten',

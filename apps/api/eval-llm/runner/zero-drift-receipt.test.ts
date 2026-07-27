@@ -200,3 +200,98 @@ describe('zero-drift eval receipt', () => {
     expect(existsSync(result.path)).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// WI-1810 regression guard: this file's git()/childGitEnv() ambient-environment
+// isolation (split off WI-1324; the fix landed via commit 96168d6c5 but had no
+// dedicated regression test). If childGitEnv()'s GIT_* stripping is reverted or
+// bypassed, an ambient GIT_DIR (as husky exports during pre-push -> nx -> jest)
+// makes git(repo, ...)'s writes resolve against the ambient GIT_DIR-pointed repo
+// instead of the `repo` cwd argument. This test uses only disposable mkdtemp
+// fixtures to stand in for "the ambient repo" — never the real worktree.
+// ---------------------------------------------------------------------------
+describe('git() ambient-environment isolation (WI-1810)', () => {
+  /**
+   * Raw git helper used ONLY to build/inspect the "ambient" fixture that
+   * stands in for the real checkout — deliberately independent of the
+   * git()/childGitEnv() functions under test, so the verification doesn't
+   * rely on the same (possibly buggy) env-construction logic it's checking.
+   */
+  function rawGit(repo: string, args: string[]): string {
+    const cleanEnv: NodeJS.ProcessEnv = { ...process.env };
+    for (const key of Object.keys(cleanEnv)) {
+      if (key.startsWith('GIT_')) {
+        delete cleanEnv[key];
+      }
+    }
+    const result = execFileSync('git', args, {
+      cwd: repo,
+      encoding: 'utf8',
+      env: {
+        ...cleanEnv,
+        GIT_AUTHOR_NAME: 'Ambient',
+        GIT_AUTHOR_EMAIL: 'ambient@example.com',
+        GIT_COMMITTER_NAME: 'Ambient',
+        GIT_COMMITTER_EMAIL: 'ambient@example.com',
+        HOME: process.env.HOME ?? '/tmp',
+      },
+    });
+    return result.trim();
+  }
+
+  function buildAmbientFixture(): string {
+    const ambientRepo = mkdtempSync(join(tmpdir(), 'wi1810-ambient-'));
+    rawGit(ambientRepo, ['init', '-q', '-b', 'main']);
+    rawGit(ambientRepo, ['config', 'user.email', 'ambient@example.com']);
+    rawGit(ambientRepo, ['config', 'user.name', 'Ambient']);
+    writeFileSync(join(ambientRepo, 'ambient.txt'), 'ambient content\n');
+    rawGit(ambientRepo, ['add', '.']);
+    rawGit(ambientRepo, ['commit', '-q', '-m', 'ambient initial commit']);
+    return ambientRepo;
+  }
+
+  /** Sets GIT_DIR to simulate husky's export; returns a restore function. */
+  function poisonGitDir(ambientRepo: string): () => void {
+    const saved = process.env.GIT_DIR;
+    process.env.GIT_DIR = join(ambientRepo, '.git');
+    return () => {
+      if (saved === undefined) {
+        delete process.env.GIT_DIR;
+      } else {
+        process.env.GIT_DIR = saved;
+      }
+    };
+  }
+
+  it('does not mutate an ambient repo when GIT_DIR leaks into the env', () => {
+    const ambientRepo = buildAmbientFixture();
+    const fixtureRepo = mkdtempSync(join(tmpdir(), 'wi1810-fixture-'));
+    try {
+      const ambientConfigPath = join(ambientRepo, '.git', 'config');
+      const headBefore = rawGit(ambientRepo, ['rev-parse', 'HEAD']);
+      const configBefore = readFileSync(ambientConfigPath, 'utf8');
+
+      const restoreGitDir = poisonGitDir(ambientRepo);
+      try {
+        // Exercises the file's own git()/childGitEnv() under test.
+        git(fixtureRepo, ['init', '-b', 'main']);
+        git(fixtureRepo, ['config', 'user.email', 'test@example.com']);
+        git(fixtureRepo, ['config', 'user.name', 'Test User']);
+        writeFileSync(join(fixtureRepo, 'fixture.txt'), 'fixture content\n');
+        git(fixtureRepo, ['add', '.']);
+        git(fixtureRepo, ['commit', '-m', 'fixture commit']);
+      } finally {
+        restoreGitDir();
+      }
+
+      const headAfter = rawGit(ambientRepo, ['rev-parse', 'HEAD']);
+      const configAfter = readFileSync(ambientConfigPath, 'utf8');
+
+      expect(headAfter).toBe(headBefore);
+      expect(configAfter).toBe(configBefore);
+    } finally {
+      rmSync(ambientRepo, { recursive: true, force: true });
+      rmSync(fixtureRepo, { recursive: true, force: true });
+    }
+  });
+});

@@ -1,0 +1,109 @@
+# WI-2596 — red-green-revert evidence
+
+Maestro E2E shards 2+3 are red on main and invisible to change-class routing.
+
+The guard landed for the invisibility defect (AC-3) is the Maestro-on-main health
+surfacer: `scripts/check-maestro-main-health.ts` + `scripts/check-maestro-main-health.test.ts`.
+Its job is to read the last-known Maestro-on-main status from workflow-run history
+and classify it green / red / stale, INDEPENDENT of change-class routing, so a
+scheduled workflow can go visibly red when main is unhealthy. RGR proves the guard's
+red-detection is load-bearing, not vacuous.
+
+## Scope confirmed at baseline
+
+- Baseline: `origin/main` at claim time (`3f2e421e`).
+- Both failing assertions confirmed red in real CI: run `29859762770` over
+  `ba6c01b28` (2026-07-21) — shard 2 `Assert id: more-row-subscription is visible
+  ... FAILED`; shard 3 `Assert id: progress-subject-back is visible ... FAILED`.
+  Shards 1 and 4 green. (Full, git-bisected attribution in the completion summary /
+  AC-1 and each flow header.)
+- The two testIDs still exist in source (`more/account.tsx:137`,
+  `progress/[subjectId]/index.tsx:381`) — the app is behaving correctly. Flow A
+  (more-row-subscription) is a flow/layout drift: `WI-2187` grew the Account security
+  section above the row, pushing it below the fold while the step asserts without a
+  scroll (bracket: green `e9a6b960` → red `ad5f9b96`, 2026-07-18). Flow B
+  (progress-subject-back) was false-green — masked by a shard-runner stdin-drain bug
+  fixed by `WI-2215` (`42554029a`) until its first genuine run on 2026-07-19 failed;
+  underlying cause needs device confirmation. Either way the assertions are left intact
+  (AC-5) and the flows are quarantined (AC-2), not weakened. This guard/RGR is
+  root-cause-independent.
+
+## Cycle executed
+
+The regression guard is the pure classifier `classifyMaestroHealth` in
+`scripts/check-maestro-main-health.ts`, exercised by
+`scripts/check-maestro-main-health.test.ts` (12 cases: green / red / red-behind-a
+change-class-skipped-run / stale-no-execution / stale-too-old / fresh / non-main
+filtered / ad-hoc-v2-dispatch ignored / dispatch-only-is-stale, plus the
+`isMaestroJob` / `runExecutedMaestro` / `isHealthSuiteRun` helpers).
+
+Command (Node 22 on PATH; see toolchain note):
+`pnpm exec jest --config scripts/jest.config.cjs scripts/check-maestro-main-health.test.ts --no-coverage --verbose`
+
+1. **GREEN (guard present)** — full suite green:
+
+   ```
+   Tests:       12 passed, 12 total
+   ```
+
+2. **RED (revert the fix)** — `failingMaestroShards()` neutralised to `return []`
+   (red detection disabled), guard test re-run. Exactly the three red-detection
+   cases fail; stale/green/filter/dispatch cases stay green:
+
+   ```
+     classifyMaestroHealth
+       ✓ GREEN when the most recent executed run passed every shard (1 ms)
+       ✕ RED when the most recent executed run has a failing shard (3 ms)
+       ✕ ignores change-class-skipped runs and reads the most recent EXECUTED run (1 ms)
+       ✓ STALE when no fetched run executed Maestro at all
+       ✓ STALE when the last executed run is older than the freshness window (1 ms)
+       ✓ does not go stale when the last executed run is within the window
+       ✓ filters out runs whose head branch is not main (1 ms)
+       ✕ ignores an ad-hoc workflow_dispatch (single-shard v2) so it cannot mask a red health suite (1 ms)
+       ✓ is STALE when only a non-health-suite dispatch has executed Maestro
+
+     ● classifyMaestroHealth › RED when the most recent executed run has a failing shard
+       Expected: "red"
+       Received: "green"
+       > 88 |     expect(result.verdict).toBe('red');
+
+     ● classifyMaestroHealth › ignores change-class-skipped runs and reads the most recent EXECUTED run
+       Expected: "red"
+       Received: "green"
+       > 112 |     expect(result.verdict).toBe('red');
+
+     ● classifyMaestroHealth › ignores an ad-hoc workflow_dispatch (single-shard v2) so it cannot mask a red health suite
+       Expected: "red"
+       Received: "green"
+       > 186 |     expect(result.verdict).toBe('red');
+
+   Test Suites: 1 failed, 1 total
+   Tests:       3 failed, 9 passed, 12 total
+   ```
+
+3. **RESTORE + GREEN** — `failingMaestroShards()` restored to its real body; full
+   suite green again:
+
+   ```
+   PASS scripts/check-maestro-main-health.test.ts
+   Test Suites: 1 passed, 1 total
+   Tests:       12 passed, 12 total
+   ```
+
+## Quarantine verification (AC-2)
+
+The quarantine (drop `pr-blocking` → `blocked` on the two flows and remove their
+`ci-maestro-manifest.json` `pr` entries) is a routing change, not a local-runnable
+guard, so it is verified rather than RGR'd: `apps/mobile/e2e/scripts/ci-maestro-plan.mjs
+--suite pr --all` still validates the manifest (bidirectional `pr-blocking`↔`manifest.pr`
+consistency stays green) and no longer emits either flow. Command + observed output are
+in the completion summary. The two assertions remain byte-for-byte intact in the flow
+files (AC-5); only the tag and the manifest membership changed.
+
+## Toolchain note
+
+Local system Node is v24 (breaks eduagent-build's pre-push `helpers.test.ts` per
+repo convention); every jest run above used a local Node 22 binary
+(`~/.local/node22/bin`) on `PATH`, matching the repo's declared `engines.node: 22.x`.
+Commit/push hooks run under Node 22 the same way. Verbatim captures were taken via
+redirected files (the terminal proxy compresses inline test output).

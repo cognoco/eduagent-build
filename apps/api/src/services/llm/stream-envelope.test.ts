@@ -538,6 +538,31 @@ describe('teeEnvelopeStream', () => {
     await expect(rawResponsePromise).rejects.toThrow('stream exploded');
   });
 
+  it('source error does not emit an unhandled rejection when only the clean stream is consumed', async () => {
+    const boom = new Error('stream exploded');
+    const unhandledRejections: unknown[] = [];
+    const captureUnhandledRejection = (reason: unknown) => {
+      unhandledRejections.push(reason);
+    };
+
+    async function* errorSource(): AsyncGenerator<string> {
+      yield '{"reply":"par';
+      throw boom;
+    }
+
+    process.on('unhandledRejection', captureUnhandledRejection);
+    try {
+      const { cleanReplyStream } = teeEnvelopeStream(errorSource());
+
+      await expect(drain(cleanReplyStream)).rejects.toBe(boom);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+
+      expect(unhandledRejections).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', captureUnhandledRejection);
+    }
+  });
+
   it('empty reply: cleanReplyStream yields nothing, rawResponsePromise resolves with full raw', async () => {
     const raw = '{"reply":"","signals":{}}';
     const { cleanReplyStream, rawResponsePromise } = teeEnvelopeStream(

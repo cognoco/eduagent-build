@@ -56,6 +56,8 @@ const noteRow = {
   subjectName: 'Chemistry',
   sessionId: SESSION_ID,
   content: 'Ionic bonds transfer electrons.',
+  artifactSource: 'learner_authored_note',
+  verificationState: 'unverified',
   createdAt: '2026-05-14T10:00:00.000Z',
   updatedAt: '2026-05-15T10:00:00.000Z',
 };
@@ -69,6 +71,8 @@ const bookmarkRow = {
   subjectName: 'Chemistry',
   topicTitle: 'Chemical Bonds',
   content: 'A covalent bond shares electrons.',
+  artifactSource: 'freeform_keep',
+  verificationState: 'unverified',
   createdAt: '2026-05-13T10:00:00.000Z',
 };
 

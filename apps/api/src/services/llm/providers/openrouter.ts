@@ -124,6 +124,7 @@ export function createOpenRouterProvider(
   async function chat(
     messages: ChatMessage[],
     config: ModelConfig,
+    signal?: AbortSignal,
   ): Promise<ChatResult> {
     // Both routing preferences are opt-in; the `provider` object is only
     // sent when at least one is set.
@@ -161,7 +162,9 @@ export function createOpenRouterProvider(
         'X-Title': 'EduAgent Eval Harness',
       },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(OPENROUTER_TIMEOUT_MS),
+      signal: signal
+        ? AbortSignal.any([signal, AbortSignal.timeout(OPENROUTER_TIMEOUT_MS)])
+        : AbortSignal.timeout(OPENROUTER_TIMEOUT_MS),
     });
 
     if (!res.ok) {

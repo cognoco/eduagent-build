@@ -21,6 +21,20 @@ jest.mock('../services/session', () => {
   };
 });
 
+// [WI-2398] assertNotProxyMode now also calls assertCanWriteProfile, which
+// calls verifyPersonOwnershipV2 — a raw db.select() membership query the
+// stub `db` ({}) in this file cannot satisfy. Every isOwner:true scenario in
+// this file is a caller-self write (createApp sets callerPersonId equal to
+// profileId below); the cross-account write attack this guard exists to
+// close is covered by the real-DB break test in
+// tests/integration/wi2398-write-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's stub-db environment.
+jest.mock('../services/identity-v2/ownership-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/ownership-v2'),
+  verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { Hono } from 'hono';
 import { parkingLotRoutes } from './parking-lot';
 import {
@@ -65,6 +79,10 @@ function createApp(
     c.set('db' as never, {});
     if (profileId !== NO_PROFILE) {
       c.set('profileId' as never, profileId);
+      // [WI-2398] Caller-self identity — assertNotProxyMode now also calls
+      // assertCanWriteProfile, which requires account + callerPersonId.
+      c.set('account' as never, { id: 'test-account-id' });
+      c.set('callerPersonId' as never, profileId);
     }
     c.set('user' as never, { id: 'test-user' });
     // [WI-161 / DS-072] Mirror profileScopeMiddleware: set profileMeta so the
@@ -264,7 +282,7 @@ describe('POST /sessions/:sessionId/parking-lot', () => {
     expect(mockGetSession).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when profileId is missing', async () => {
+  it('returns 403 when profileId is missing', async () => {
     const app = createApp(NO_PROFILE);
 
     const res = await app.request(`/sessions/${TEST_SESSION_ID}/parking-lot`, {
@@ -273,7 +291,13 @@ describe('POST /sessions/:sessionId/parking-lot', () => {
       body: JSON.stringify({ question: 'What is quantum entanglement?' }),
     });
 
-    expect(res.status).toBe(400);
+    // [WI-2398] assertNotProxyMode now fails closed (403) when profileId is
+    // absent, before requireProfileId's own 400 ever runs — the safer
+    // response when write authority cannot be established. Pre-WI-2398 this
+    // asserted 400 from requireProfileId; that later check is now
+    // unreachable for this synthetic (production-impossible) state (real
+    // profileScopeMiddleware always sets profileId and profileMeta together).
+    expect(res.status).toBe(403);
     expect(mockGetSession).not.toHaveBeenCalled();
   });
 

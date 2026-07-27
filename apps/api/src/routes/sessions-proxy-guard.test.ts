@@ -292,7 +292,6 @@ jest.mock('../services/session', () => {
     closeSession: jest.fn(),
     getSessionCompletionContext: jest.fn(),
     getSessionTranscript: jest.fn(),
-    evaluateSessionDepth: jest.fn(),
     recordSystemPrompt: jest.fn(),
     recordSessionEvent: jest.fn(),
     setSessionInputMode: jest.fn(),
@@ -430,7 +429,6 @@ describe('[WI-371 / DS-194] sessions proxy-mode guard — remaining write routes
       body: { message: 'Explain photosynthesis' },
     },
     { name: 'retry-filing', path: `/sessions/${SID}/retry-filing` },
-    { name: 'evaluate-depth', path: `/sessions/${SID}/evaluate-depth` },
     {
       name: 'system-prompt',
       // WI-373 replaced the free-text body with a typed intent union; send a
@@ -476,6 +474,10 @@ describe('[WI-371 / DS-194] sessions proxy-mode guard — remaining write routes
       body: { eventId: FLAG_EVENT_ID },
     },
     { name: 'summary/skip', path: `/sessions/${SID}/summary/skip` },
+    {
+      name: 'summary/retry-feedback',
+      path: `/sessions/${SID}/summary/retry-feedback`,
+    },
     {
       name: 'summary',
       path: `/sessions/${SID}/summary`,

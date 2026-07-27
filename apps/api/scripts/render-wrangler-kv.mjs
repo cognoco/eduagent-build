@@ -48,6 +48,10 @@ const PLACEHOLDERS = {
 // hex strings — same shape, same guard.
 const REAL_KV_ID_PATTERN = /^[0-9a-f]{32}$/;
 
+function describeIdentifierShape(value) {
+  return `actual length ${value.length}, lowercase hex ${/^[0-9a-f]+$/.test(value)}`;
+}
+
 function main() {
   const args = process.argv.slice(2);
   const checkOnly = args.includes('--check');
@@ -65,13 +69,15 @@ function main() {
     // Top-level `account_id = "<32-hex>"` (CF account ID).
     const accountIdMatch = original.match(/^account_id\s*=\s*"([^"]+)"/m);
     if (accountIdMatch && REAL_KV_ID_PATTERN.test(accountIdMatch[1])) {
-      failures.push(`account_id: real CF account ID committed (${accountIdMatch[1]})`);
+      failures.push(
+        `account_id: real CF account ID committed (${describeIdentifierShape(accountIdMatch[1])})`,
+      );
     }
 
     // KV namespace blocks: match `id = "..."` lines that follow a
     // `binding = "..."` line within the same block.
     const blockRegex =
-      /\[\[(?:env\.[a-z]+\.)?kv_namespaces\]\]([\s\S]*?)(?=^\[|$)/gm;
+      /\[\[(?:env\.[a-z]+\.)?kv_namespaces\]\]([\s\S]*?)(?=^\[|(?![\s\S]))/gm;
     let match;
     while ((match = blockRegex.exec(original)) !== null) {
       const body = match[1] ?? '';
@@ -80,7 +86,9 @@ function main() {
       if (idMatch && bindingMatch) {
         const id = idMatch[1];
         if (REAL_KV_ID_PATTERN.test(id)) {
-          failures.push(`${bindingMatch[1]}: real KV ID committed (${id})`);
+          failures.push(
+            `${bindingMatch[1]}: real KV ID committed (${describeIdentifierShape(id)})`,
+          );
         }
       }
     }
@@ -111,7 +119,7 @@ function main() {
       }
       if (!REAL_KV_ID_PATTERN.test(value)) {
         console.error(
-          `✗ ${envVar} value does not look like a Cloudflare identifier (expected 32-char hex): ${value}`,
+          `✗ ${envVar} value does not look like a Cloudflare identifier (expected 32-char lowercase hex; ${describeIdentifierShape(value)})`,
         );
         process.exit(1);
       }

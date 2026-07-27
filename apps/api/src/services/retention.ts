@@ -21,7 +21,7 @@ export interface RecallTestResult {
   passed: boolean;
   newState: RetentionState;
   xpChange: 'verified' | 'decayed' | 'none';
-  failureAction?: 'feedback_only' | 'redirect_to_library';
+  failureAction?: 'feedback_only' | 're_teach' | 'topic_parked';
 }
 
 // ---------------------------------------------------------------------------
@@ -69,12 +69,17 @@ export function createInitialRetentionState(topicId: string): RetentionState {
  * - failureCount incremented, consecutiveSuccesses reset
  * - XP decays proportionally
  * - Failure 1-2: feedback_only
- * - Failure 3+: redirect_to_library
+ * - Failure 3: re_teach — bounded, same-flow off-ramp offered once per
+ *   failure streak (RR-4), before any library/relearn navigation
+ * - Failure 4+: topic_parked — the second consecutive failure after
+ *   re-teach exits warmly by parking the topic; review-and-retest/relearn
+ *   stay available as explicit fallback choices. Stays parked (never
+ *   re-offers re-teach) so there is no infinite loop.
  */
 export function processRecallResult(
   state: RetentionState,
   quality: number,
-  reviewedAtIso = new Date().toISOString()
+  reviewedAtIso = new Date().toISOString(),
 ): RecallTestResult {
   const clampedQuality = Math.max(0, Math.min(5, Math.round(quality)));
   const now = reviewedAtIso;
@@ -136,7 +141,11 @@ export function processRecallResult(
   };
 
   const failureAction: RecallTestResult['failureAction'] =
-    newFailureCount >= 3 ? 'redirect_to_library' : 'feedback_only';
+    newFailureCount === 3
+      ? 're_teach'
+      : newFailureCount >= 4
+        ? 'topic_parked'
+        : 'feedback_only';
 
   return {
     passed: false,
@@ -166,7 +175,7 @@ export function isReviewDue(state: RetentionState, now?: Date): boolean {
  */
 export function canRetestTopic(
   state: RetentionState,
-  lastTestAt: string | null
+  lastTestAt: string | null,
 ): boolean {
   if (!lastTestAt) {
     return true;
@@ -185,7 +194,7 @@ export function canRetestTopic(
  * - forgotten: 4x+ past the interval or never reviewed
  */
 export function getRetentionStatus(
-  state: RetentionState
+  state: RetentionState,
 ): 'strong' | 'fading' | 'weak' | 'forgotten' {
   if (!state.lastReviewedAt) {
     return 'forgotten';

@@ -1,7 +1,7 @@
 // @inngest-admin: event-profile (profileId from event; consent check + hard delete scoped by that profileId)
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
-import { resolveLatestConsentStatusAnyBasis } from '../../services/identity-v2/consent-status-v2';
+import { resolveLatestConsentSetStatusAnyBasis } from '../../services/identity-v2/consent-status-v2';
 import { getPersonForConsentRevocationV2 } from '../../services/identity-v2/consent-v2';
 import { deleteArchivedPersonIfStillEligibleV2 } from '../../services/identity-v2/deletion-v2';
 import { resolveOrgIdForPerson } from '../../services/identity-v2/family-v2';
@@ -38,7 +38,7 @@ export const archiveCleanup = inngest.createFunction(
       // [CUT-B2] Dispatch to v2 consent model when flag is enabled.
       const orgId = await resolveOrgIdForPerson(db, profileId);
       if (orgId !== null) {
-        const consentStatus = await resolveLatestConsentStatusAnyBasis(
+        const consentStatus = await resolveLatestConsentSetStatusAnyBasis(
           db,
           profileId,
           orgId,

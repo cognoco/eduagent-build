@@ -20,6 +20,7 @@ export {
   UpstreamLlmError,
   VocabularyContextError,
   SubjectNotFoundError,
+  LearningSessionNotFoundError,
   VocabularyNotFoundError,
   TopicNotSkippedError,
   BadRequestError,

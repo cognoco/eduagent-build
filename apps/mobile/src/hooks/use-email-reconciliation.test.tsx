@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react-native';
+import { act, renderHook, waitFor } from '@testing-library/react-native';
 import * as Sentry from '@sentry/react-native';
 
 import { useEmailReconciliation } from './use-email-reconciliation';
@@ -131,15 +131,20 @@ describe('useEmailReconciliation [CRITICAL-1]', () => {
   });
 
   it('captures to Sentry when the sync throws, without disrupting the UI', async () => {
-    setClerkPrimary('new@example.com');
-    const failure = new Error('network down');
-    globalThis.fetch = jest.fn(async () => {
-      throw failure;
-    }) as unknown as typeof fetch;
+    jest.useFakeTimers();
+    try {
+      setClerkPrimary('new@example.com');
+      const failure = new Error('network down');
+      globalThis.fetch = jest.fn(async () => {
+        throw failure;
+      }) as unknown as typeof fetch;
 
-    renderHook(() => useEmailReconciliation(true));
+      renderHook(() => useEmailReconciliation(true));
 
-    await waitFor(() => {
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(7_500);
+      });
+      expect(globalThis.fetch).toHaveBeenCalledTimes(5);
       // The api-client middleware classifies the raw fetch failure into the
       // typed NetworkError before the hook's catch — assert the classified
       // error reaches Sentry with the queryable feature tag.
@@ -149,6 +154,8 @@ describe('useEmailReconciliation [CRITICAL-1]', () => {
           tags: expect.objectContaining({ feature: 'email_reconciliation' }),
         }),
       );
-    });
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

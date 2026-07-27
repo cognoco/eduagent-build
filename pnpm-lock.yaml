@@ -50,6 +50,9 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.92.0
         version: 0.92.0(zod@4.1.12)
+      '@babel/plugin-transform-react-jsx':
+        specifier: 7.27.1
+        version: 7.27.1(@babel/core@7.28.5)
       '@babel/runtime':
         specifier: ~7.27.6
         version: 7.27.6

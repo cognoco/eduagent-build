@@ -1,8 +1,11 @@
 import { resolve } from 'path';
+import { and, eq } from 'drizzle-orm';
+import type { ChallengeRoundSessionState } from '@eduagent/schemas';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   challengeRoundCooldowns,
   createDatabase,
+  createScopedRepository,
   curricula,
   curriculumBooks,
   curriculumTopics,
@@ -134,6 +137,27 @@ async function seedSession(
   return session!.id;
 }
 
+async function readSessionMetadata(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+): Promise<Record<string, unknown>> {
+  const repo = createScopedRepository(db, profileId);
+  const row = await repo.sessions.findFirst(eq(learningSessions.id, sessionId));
+
+  return (row?.metadata as Record<string, unknown> | null) ?? {};
+}
+
+function acceptedChallengeRound(topicId: string): ChallengeRoundSessionState {
+  return {
+    state: 'accepted',
+    offerCount: 1,
+    topicId,
+    declinedDontAskAgain: false,
+    evaluations: [],
+  };
+}
+
 async function seedChallengeEligibleSession(db: Database): Promise<{
   profileId: string;
   subjectId: string;
@@ -242,6 +266,101 @@ describeIfDb('prepareExchangeContext WI-80 ownership hardening', () => {
     );
 
     expect(result.context.challengeEligible).toBe(true);
+  });
+
+  it('[WI-1996] preserves the started Challenge Round when the mid continuation write lands', async () => {
+    const seeded = await seedProfileWithSubject(db, 'Continuation Biology');
+    const topicId = await seedTopic(db, {
+      subjectId: seeded.subjectId,
+      title: 'Cell Respiration',
+    });
+    const sessionId = await seedSession(db, {
+      profileId: seeded.profileId,
+      subjectId: seeded.subjectId,
+      topicId,
+      exchangeCount: 3,
+      metadata: {
+        challengeRound: acceptedChallengeRound(topicId),
+        continuationOpenerActive: true,
+        continuationOpenerStartedExchange: 0,
+        continuationDepth: 'low',
+      },
+    });
+
+    await prepareExchangeContext(
+      db,
+      seeded.profileId,
+      sessionId,
+      'Let us keep going.',
+      {
+        semanticMemoryRetrievalEnabled: false,
+        memoryFactsReadEnabled: false,
+        memoryFactsRelevanceEnabled: false,
+        challengeRoundRuntimeEnabled: true,
+      },
+    );
+
+    const metadata = await readSessionMetadata(db, seeded.profileId, sessionId);
+    expect(metadata['challengeRound']).toEqual(
+      expect.objectContaining({ state: 'active', topicId }),
+    );
+    expect(metadata['continuationDepth']).toBe('mid');
+    expect(metadata).not.toHaveProperty('continuationOpenerActive');
+    expect(metadata).not.toHaveProperty('continuationOpenerStartedExchange');
+  });
+
+  it('[WI-1996] preserves the started Challenge Round when the resume probe write lands', async () => {
+    const seeded = await seedProfileWithSubject(db, 'Resume Biology');
+    const topicId = await seedTopic(db, {
+      subjectId: seeded.subjectId,
+      title: 'Mitosis',
+    });
+    const priorSessionId = await seedSession(db, {
+      profileId: seeded.profileId,
+      subjectId: seeded.subjectId,
+      topicId,
+      exchangeCount: 1,
+    });
+    await db
+      .update(learningSessions)
+      .set({ status: 'completed', endedAt: new Date() })
+      .where(
+        and(
+          eq(learningSessions.id, priorSessionId),
+          eq(learningSessions.profileId, seeded.profileId),
+        ),
+      );
+    const sessionId = await seedSession(db, {
+      profileId: seeded.profileId,
+      subjectId: seeded.subjectId,
+      topicId,
+      exchangeCount: 0,
+      metadata: {
+        challengeRound: acceptedChallengeRound(topicId),
+        resumeFromSessionId: priorSessionId,
+      },
+    });
+
+    await prepareExchangeContext(
+      db,
+      seeded.profileId,
+      sessionId,
+      'Continue from last time.',
+      {
+        semanticMemoryRetrievalEnabled: false,
+        memoryFactsReadEnabled: false,
+        memoryFactsRelevanceEnabled: false,
+        challengeRoundRuntimeEnabled: true,
+      },
+    );
+
+    const metadata = await readSessionMetadata(db, seeded.profileId, sessionId);
+    expect(metadata['challengeRound']).toEqual(
+      expect.objectContaining({ state: 'active', topicId }),
+    );
+    expect(metadata['continuationOpenerActive']).toBe(true);
+    expect(metadata['continuationOpenerStartedExchange']).toBe(0);
+    expect(metadata['resumeFromSessionId']).toBe(priorSessionId);
   });
 
   it('suppresses Challenge Round eligibility inside the decline cooldown window', async () => {

@@ -349,9 +349,13 @@ describe('OpenAI Provider', () => {
     });
 
     it('skips malformed JSON chunks', async () => {
+      const sensitiveText = 'PRIVATE_RECITATION_SENTINEL';
+      const warnSpy = jest
+        .spyOn(console, 'warn')
+        .mockImplementation(() => undefined);
       const body = createSseStream(
         'data: {"choices":[{"delta":{"content":"ok"}}]}',
-        'data: {not valid json}',
+        `data: {${sensitiveText}}`,
         'data: {"choices":[{"delta":{"content":"!"}}]}',
         'data: [DONE]',
       );
@@ -366,6 +370,9 @@ describe('OpenAI Provider', () => {
       }
 
       expect(chunks).toEqual(['ok', '!']);
+      expect(warnSpy).toHaveBeenCalled();
+      expect(JSON.stringify(warnSpy.mock.calls)).not.toContain(sensitiveText);
+      warnSpy.mockRestore();
     });
 
     it('skips empty delta content', async () => {
@@ -539,5 +546,38 @@ describe('toOpenAIContent', () => {
       type: 'image_url',
       image_url: { url: 'data:image/png;base64,pngdata==' },
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Best-effort prompt-cache usage (WI-1827)
+// ---------------------------------------------------------------------------
+
+describe('OpenAI Provider — usage (WI-1827)', () => {
+  const provider = createOpenAIProvider(TEST_API_KEY);
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('surfaces prompt_tokens_details.cached_tokens as usage.cachedTokens', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: 'hi' } }],
+        usage: { prompt_tokens_details: { cached_tokens: 512 } },
+      }),
+      text: async () => '',
+    });
+
+    const result = await provider.chat(TEST_MESSAGES, TEST_CONFIG);
+    expect(result.usage).toEqual({ cachedTokens: 512 });
+  });
+
+  it('omits usage when cached_tokens is absent', async () => {
+    mockFetch.mockResolvedValueOnce(createOkResponse('hi'));
+    const result = await provider.chat(TEST_MESSAGES, TEST_CONFIG);
+    expect(result.usage).toBeUndefined();
   });
 });

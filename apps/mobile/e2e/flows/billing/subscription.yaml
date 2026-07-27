@@ -15,64 +15,60 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "trial-active"
+      SEED_SCENARIO: 'trial-active'
       API_URL: ${API_URL}
 
 # 2. Home screen
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 15000
 
 # 3. Navigate to More tab (BUG-15: use text, not testID)
 - tapOn:
-    text: "More"
+    text: 'More'
 
 # 4. Wait for More tab index — First settings row is always above the fold
 - extendedWaitUntil:
     visible:
-      id: "more-row-learning-preferences"
+      id: 'more-row-learning-preferences'
     timeout: 15000
 
 # 4a. Navigate into Account sub-screen (Subscription has moved from More index to Account)
 - tapOn:
-    id: "more-row-account"
+    id: 'more-row-account'
 
 - extendedWaitUntil:
     visible:
-      id: "more-account-scroll"
+      id: 'more-account-scroll'
     timeout: 10000
 
-# 5. Look for subscription/billing option on Account screen
-- extendedWaitUntil:
-    visible:
-      text: "Subscription"
-    timeout: 10000
+# 5. Scroll to the owner-only Subscription row below the small-phone fold.
+- scrollUntilVisible:
+    element:
+      id: 'more-row-subscription'
+    direction: DOWN
+    timeout: 15000
 
-# 6. Tap on subscription/billing
+# 6. Open subscription settings through the stable row contract.
 - tapOn:
-    text: "Subscription"
-
-# 7. Fallback: look for billing text
-- tapOn:
-    text: "Billing"
-    optional: true  # justified: "Billing" label is a fallback for when "Subscription" tap in step 6 did not navigate; text varies by platform
+    id: 'more-row-subscription'
 
 # 8. Wait for subscription detail screen
 - extendedWaitUntil:
     visible:
-      text: "Trial"
+      id: 'subscription-screen'
     timeout: 10000
 
 # 9. Verify trial-active banner is displayed (trial-active seed: tier=plus, status=trial)
 # subscription.tsx:751-776 renders testID="trial-banner" when status === 'trial'
 - assertVisible:
-    id: "trial-banner"
+    id: 'trial-banner'
 
 # 10. Verify current-plan card is present (trial-active is Plus tier, so no free-upgrade-button)
 # subscription.tsx:783-787 — current-plan renders for all logged-in owners
 - assertVisible:
-    id: "current-plan"
+    id: 'current-plan'
 
 # 11. Screenshot
 - takeScreenshot: subscription-flow-complete

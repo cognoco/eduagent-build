@@ -46,20 +46,20 @@ jest.mock(
   },
 );
 
-// Mock session service: processMessage / streamMessage / evaluateSessionDepth
-// transitively call routeAndCall (LLM external boundary); getSession /
+// Mock session service: processMessage / streamMessage transitively call
+// routeAndCall (LLM external boundary); getSession /
 // getSessionTranscript hit Neon directly. DB is mocked in this unit test, so
 // the real impls cannot run. Other exports (getSessionCompletionContext etc)
 // are stubbed with permissive defaults so the route module loads.
 jest.mock(
-  '../services/session' /* gc1-allow: routes through LLM (routeAndCall) for processMessage/streamMessage/evaluateSessionDepth and real Neon for session reads */,
+  '../services/session' /* gc1-allow: routes through LLM (routeAndCall) for processMessage/streamMessage and real Neon for session reads */,
   () => {
     const actual = jest.requireActual(
       '../services/session',
     ) as typeof import('../services/session');
     return {
       ...actual,
-      // processMessage/streamMessage/evaluateSessionDepth call LLM
+      // processMessage/streamMessage call LLM
       processMessage: jest
         .fn()
         .mockResolvedValue({ reply: 'test', exchangeCount: 1 }),
@@ -74,8 +74,6 @@ jest.mock(
       flagContent: jest.fn(),
       getSessionSummary: jest.fn(),
       submitSummary: jest.fn(),
-      // [BUG-653] evaluateSessionDepth + getSessionTranscript needed for the
-      // metering coverage on POST /sessions/:id/evaluate-depth.
       getSessionTranscript: jest.fn().mockResolvedValue({
         session: {
           sessionId: 'a0000000-0000-4000-a000-000000000001',
@@ -90,12 +88,6 @@ jest.mock(
           wallClockSeconds: null,
         },
         exchanges: [],
-      }),
-      evaluateSessionDepth: jest.fn().mockResolvedValue({
-        meaningful: false,
-        reason: 'mock',
-        method: 'heuristic_shallow',
-        topics: [],
       }),
       // Other session service exports referenced by the route module — return
       // permissive defaults so the route module loads without TypeError.
@@ -172,7 +164,6 @@ jest.mock(
           },
         ),
       getProfileDisplayName: jest.fn().mockResolvedValue('Test User'),
-      // [BUG-653] Used by the evaluate-depth route to age-tag the LLM call.
       getProfileAgeBracket: jest.fn().mockResolvedValue('teen'),
     };
   },
@@ -320,6 +311,12 @@ jest.mock(
 // The caller-vs-X-Profile-Id-spoof distinction this guard exists to enforce
 // is covered by the real-DB break test in
 // tests/integration/account-billing-owner-idor.integration.test.ts.
+// [WI-2398] assertNotProxyMode now also calls assertCanWriteProfile, which
+// calls this same verifyPersonOwnershipV2 — the same raw db.select()
+// membership query, same unmockable-DB reason. Every scenario in this file
+// that reaches assertNotProxyMode's allow path is a caller-self write; the
+// cross-account write attack this guard exists to close is covered by the
+// real-DB break test in tests/integration/wi2398-write-idor.integration.test.ts.
 jest.mock('../services/identity-v2/ownership-v2', () => {
   const actual = jest.requireActual(
     '../services/identity-v2/ownership-v2',
@@ -327,6 +324,7 @@ jest.mock('../services/identity-v2/ownership-v2', () => {
   return {
     ...actual,
     verifyPersonIsOrgAdminV2: jest.fn().mockResolvedValue(true),
+    verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
   };
 });
 
@@ -397,6 +395,7 @@ jest.mock(
 );
 
 import { app } from '../index';
+import { inngest } from '../inngest/client';
 import { MeteringError } from '../services/billing';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import {
@@ -770,12 +769,10 @@ describe('metering middleware', () => {
       expect(mockDecrementQuota).not.toHaveBeenCalled();
     });
 
-    // [CR-2026-05-21-047] Break test — KV failure in idempotency replay lookup
-    // must emit a safeSend dispatch for observability AND still return null
-    // (fall through to normal metering). Without the fix, safeSend is never
-    // called — the failure is silent and every client retry double-decrements
-    // the quota pool on KV outage.
-    it('[CR-2026-05-21-047] emits safeSend on idempotency KV read failure and still processes the request (no behavior change)', async () => {
+    // Idempotent session requests must fail closed when the metering replay
+    // lookup cannot distinguish a first request from a retry. The structured
+    // metric remains best-effort, but no quota or route work may begin.
+    it('fails closed before quota decrement when an idempotency KV read throws', async () => {
       mockSafeSendFn.mockClear();
       mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(mockQuota({ usedThisMonth: 100 }));
@@ -810,15 +807,23 @@ describe('metering middleware', () => {
         { ...TEST_ENV, IDEMPOTENCY_KV: throwingIdempotencyKV },
       );
 
-      // User-facing behavior unchanged: request falls through to normal metering
-      expect(res.status).toBe(200);
-      expect(mockDecrementQuota).toHaveBeenCalled();
+      expect(res.status).toBe(503);
+      expect(res.headers.get('Retry-After')).toBe('5');
+      await expect(res.json()).resolves.toEqual({
+        code: 'INTERNAL_ERROR',
+        message:
+          'Idempotency check temporarily unavailable. Please retry with the same Idempotency-Key.',
+      });
+      expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
+      expect(mockGetQuotaPool).not.toHaveBeenCalled();
+      expect(mockDecrementQuota).not.toHaveBeenCalled();
 
       // [BREAK] safeSend must have been called — proves the failure is observable.
       // Before the fix this assertion fails because safeSend is never invoked.
       expect(mockSafeSendFn).toHaveBeenCalledTimes(1);
 
-      // Verify the send thunk contains the expected event shape
+      // Execute the safeSend thunk against the real Inngest client seam so the
+      // structured event contract is asserted without network I/O.
       const [sendThunk, surface, context] = mockSafeSendFn.mock.calls[0] as [
         () => Promise<unknown>,
         string,
@@ -826,9 +831,24 @@ describe('metering middleware', () => {
       ];
       expect(surface).toBe('metering.idempotency_replay_lookup_failed');
       expect(context).toMatchObject({ route: expect.any(String) });
-
-      // The thunk itself is a function (we do not call it — safeSend is mocked)
-      expect(typeof sendThunk).toBe('function');
+      const sendSpy = jest
+        .spyOn(inngest, 'send')
+        .mockResolvedValue({ ids: [] } as never);
+      try {
+        await sendThunk();
+        expect(sendSpy).toHaveBeenCalledWith({
+          name: 'app/idempotency.preflight_lookup_failed',
+          data: {
+            accountId: 'test-account-id',
+            profileId: 'test-profile-id',
+            route: '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
+            error: 'KV outage',
+            timestamp: expect.any(String),
+          },
+        });
+      } finally {
+        sendSpy.mockRestore();
+      }
     });
 
     it('refunds quota when a metered route rejects before producing an answer', async () => {
@@ -1025,67 +1045,6 @@ describe('metering middleware', () => {
       expect(res.status).toBe(200);
     });
 
-    it('[BUG-653 / A-5] decrements quota for POST /sessions/:id/evaluate-depth', async () => {
-      // Break test: BEFORE the fix, evaluate-depth was missing from
-      // LLM_ROUTE_PATTERNS so decrementQuota was NEVER called for this
-      // endpoint. An attacker could spam the route in a tight loop and
-      // burn unlimited LLM capacity at zero cost. This test fails if the
-      // pattern is removed from the metered list.
-      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
-      mockGetQuotaPool.mockResolvedValue(mockQuota({ usedThisMonth: 100 }));
-      mockDecrementQuota.mockResolvedValue({
-        success: true,
-        source: 'monthly',
-        remainingMonthly: 399,
-        remainingTopUp: 0,
-        remainingDaily: null,
-      });
-
-      const res = await app.request(
-        '/v1/sessions/a0000000-0000-4000-a000-000000000001/evaluate-depth',
-        {
-          method: 'POST',
-          headers: AUTH_HEADERS,
-        },
-        TEST_ENV,
-      );
-
-      expect(mockDecrementQuota).toHaveBeenCalledWith(
-        expect.anything(),
-        'sub-1',
-        'test-profile-id',
-      );
-      expect(res.status).toBe(200);
-    });
-
-    it('[BUG-653 / A-5] returns 402 when quota exhausted on POST /sessions/:id/evaluate-depth', async () => {
-      // Companion break test: when quota is exhausted, the metering
-      // middleware MUST short-circuit BEFORE evaluateSessionDepth fires
-      // its LLM call. Otherwise the quota is meaningless on this route.
-      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
-      mockGetQuotaPool.mockResolvedValue(
-        mockQuota({ usedThisMonth: 500, monthlyLimit: 500 }),
-      );
-      mockDecrementQuota.mockResolvedValue({
-        success: false,
-        reason: 'monthly_exhausted',
-        remainingMonthly: 0,
-        remainingTopUp: 0,
-        remainingDaily: null,
-      });
-
-      const res = await app.request(
-        '/v1/sessions/a0000000-0000-4000-a000-000000000001/evaluate-depth',
-        {
-          method: 'POST',
-          headers: AUTH_HEADERS,
-        },
-        TEST_ENV,
-      );
-
-      expect(res.status).toBe(402);
-    });
-
     it('[BUG-623 / A-6] returns 402 when quota exhausted on POST /sessions/:id/recall-bridge', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(
@@ -1119,8 +1078,8 @@ describe('metering middleware', () => {
       // LLM_ROUTE_PATTERNS_POST_ONLY so decrementQuota was NEVER called for
       // this LLM-backed endpoint. Any authenticated user could spam the
       // resolver in a tight loop and burn unlimited LLM capacity at zero
-      // cost. Same class as BUG-623 (recall-bridge) and BUG-653
-      // (evaluate-depth). This test fails if the pattern is removed.
+      // cost. Same class as BUG-623 (recall-bridge). This test fails if the
+      // pattern is removed.
       mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(mockQuota({ usedThisMonth: 100 }));
       mockDecrementQuota.mockResolvedValue({

@@ -93,6 +93,15 @@ tags:
 # The overdue topic has xpStatus='verified' → topicStudiedIds contains it
 # → state = 'done' (book/[bookId].tsx:794-795).
 # testID: done-row-${TOPIC_ID}
+- scrollUntilVisible:
+    element:
+      id: "done-row-${TOPIC_ID}"
+    direction: DOWN
+    timeout: 10000
+    speed: 50
+    visibilityPercentage: 100
+    centerElement: true
+
 - tapOn:
     id: "done-row-${TOPIC_ID}"
 

@@ -129,29 +129,78 @@ describe('birthYearSchema minimum-age gate (v1 13+ launch floor, WI-570)', () =>
 });
 
 describe('isAdultOwner', () => {
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-01-15T12:00:00Z'));
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('returns false for null, missing, or unknown birth years', () => {
-    expect(isAdultOwner(null, 2026)).toBe(false);
-    expect(isAdultOwner(undefined, 2026)).toBe(false);
-    expect(isAdultOwner({ role: 'owner', birthYear: null }, 2026)).toBe(false);
-    expect(isAdultOwner({ role: 'owner' }, 2026)).toBe(false);
+    expect(isAdultOwner(null)).toBe(false);
+    expect(isAdultOwner(undefined)).toBe(false);
+    expect(isAdultOwner({ role: 'owner', birthYear: null })).toBe(false);
+    expect(isAdultOwner({ role: 'owner' })).toBe(false);
   });
 
   it('requires an owner role or owner profile flag', () => {
-    expect(isAdultOwner({ role: 'child', birthYear: 1990 }, 2026)).toBe(false);
-    expect(
-      isAdultOwner({ role: 'impersonated-child', birthYear: 1990 }, 2026),
-    ).toBe(false);
-    expect(isAdultOwner({ isOwner: false, birthYear: 1990 }, 2026)).toBe(false);
+    expect(isAdultOwner({ role: 'child', birthYear: 1990 })).toBe(false);
+    expect(isAdultOwner({ role: 'impersonated-child', birthYear: 1990 })).toBe(
+      false,
+    );
+    expect(isAdultOwner({ isOwner: false, birthYear: 1990 })).toBe(false);
   });
 
-  it('gates edge ages 17, 18, and 19 by current year minus birth year', () => {
-    expect(isAdultOwner({ role: 'owner', birthYear: 2009 }, 2026)).toBe(false);
-    expect(isAdultOwner({ role: 'owner', birthYear: 2008 }, 2026)).toBe(true);
-    expect(isAdultOwner({ role: 'owner', birthYear: 2007 }, 2026)).toBe(true);
+  it('[WI-1993] rejects a year-boundary 17-year-old before their birthday', () => {
+    expect(
+      isAdultOwner({
+        role: 'owner',
+        birthYear: 2008,
+        birthMonth: 12,
+        birthDay: 1,
+      }),
+    ).toBe(false);
+  });
+
+  it.each([
+    ['birthday already passed', 1, 1],
+    ['exact 18th birthday', 1, 15],
+  ])('[WI-1993] accepts an adult owner when %s', (_label, month, day) => {
+    expect(
+      isAdultOwner({
+        role: 'owner',
+        birthYear: 2008,
+        birthMonth: month,
+        birthDay: day,
+      }),
+    ).toBe(true);
+  });
+
+  it('[WI-1993] falls back to year-only gating when month/day are absent', () => {
+    expect(isAdultOwner({ role: 'owner', birthYear: 2008 })).toBe(true);
+  });
+
+  it('[WI-1993] preserves the current-year override for date-less profiles', () => {
+    expect(isAdultOwner({ role: 'owner', birthYear: 2011 }, 2030)).toBe(true);
+  });
+
+  it('[WI-1993] preserves the current-year override for full-date profiles', () => {
+    expect(
+      isAdultOwner(
+        {
+          role: 'owner',
+          birthYear: 2011,
+          birthMonth: 12,
+          birthDay: 1,
+        },
+        2030,
+      ),
+    ).toBe(true);
   });
 
   it('supports the existing isOwner profile shape', () => {
-    expect(isAdultOwner({ isOwner: true, birthYear: 2008 }, 2026)).toBe(true);
+    expect(isAdultOwner({ isOwner: true, birthYear: 2008 })).toBe(true);
   });
 });
 
@@ -199,7 +248,14 @@ describe('isUnambiguouslyAdult', () => {
   });
 
   it('is stricter than isAdultOwner at the boundary (the intended divergence)', () => {
-    expect(isAdultOwner({ role: 'owner', birthYear: 2008 }, 2026)).toBe(true);
+    jest.useFakeTimers().setSystemTime(new Date('2026-01-15T12:00:00Z'));
+
+    try {
+      expect(isAdultOwner({ role: 'owner', birthYear: 2008 })).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
+
     expect(isUnambiguouslyAdult(2008, 2026)).toBe(false);
   });
 });

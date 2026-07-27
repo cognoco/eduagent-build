@@ -7,6 +7,8 @@ import {
 } from '@tanstack/react-query';
 import type {
   CompleteRoundResponse,
+  ActiveRoundDetailResponse,
+  CompletedRoundDetailResponse,
   QuestionCheckResponse,
   QuestionCheckInput,
   QuestionResult,
@@ -17,6 +19,8 @@ import type {
 } from '@eduagent/schemas';
 import {
   completeRoundResponseSchema,
+  activeRoundDetailResponseSchema,
+  completedRoundDetailResponseSchema,
   questionCheckResponseSchema,
   quizRoundResponseSchema,
   quizStatsListResponseSchema,
@@ -121,6 +125,7 @@ export function useCompleteRound(): UseMutationResult<
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
+  const { activeProfile } = useProfile();
 
   return useMutation({
     mutationFn: async ({ roundId, results }) => {
@@ -135,9 +140,14 @@ export function useCompleteRound(): UseMutationResult<
         'POST /quiz/rounds/:id/complete',
       );
     },
-    onSuccess: () => {
+    onSuccess: (_response, { roundId }) => {
       void queryClient.invalidateQueries({ queryKey: ['quiz-recent'] });
       void queryClient.invalidateQueries({ queryKey: ['quiz-stats'] });
+      void queryClient.invalidateQueries({
+        queryKey: activeProfile?.id
+          ? ['quiz-round-detail', roundId, activeProfile.id]
+          : ['quiz-round-detail', roundId],
+      });
       // PR-10 deferred: broad ['progress'] — quiz completion affects topic progress
       // and subject progress for the round's topic, but the round may span multiple
       // topics and subjectId/topicId/activeProfileId are not available in this hook's
@@ -162,7 +172,7 @@ export function useRecentRounds(): UseQueryResult<RecentRound[]> {
 
 export function useRoundDetail(
   roundId: string | undefined,
-): UseQueryResult<QuizRoundResponse> {
+): UseQueryResult<ActiveRoundDetailResponse | CompletedRoundDetailResponse> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
@@ -183,7 +193,10 @@ export function useRoundDetail(
         await assertOk(res);
         return parseJson(
           res,
-          quizRoundResponseSchema,
+          z.union([
+            completedRoundDetailResponseSchema,
+            activeRoundDetailResponseSchema,
+          ]),
           'GET /quiz/rounds/:id (detail)',
         );
       } finally {

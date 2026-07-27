@@ -1,4 +1,58 @@
 {
+  "celebrationEarnedContext": {
+    "polar_star": {
+      "child": "北極星 — はじめて自分の力で答えられたね！",
+      "adult": "北極星 — 初めて自力で回答しました。"
+    },
+    "twin_stars": {
+      "child": "ふたご星 — しっかりした答えが3回続いたね！",
+      "adult": "ふたご星 — 的確な回答が3回続きました。"
+    },
+    "comet": {
+      "child": "彗星 — ひらめいたね！",
+      "adult": "彗星 — ひとつの考え方を理解しました。"
+    },
+    "orions_belt": {
+      "child": "オリオンの三つ星 — 助けなしで5回答えられたね！",
+      "adult": "オリオンの三つ星 — 自力での回答が5回続きました。"
+    },
+    "deep_diver": {
+      "child": "深掘り名人 — じっくり考えた答えがすてき！",
+      "adult": "深掘り名人 — よく考えた回答で達成しました。"
+    },
+    "persistent": {
+      "child": "ねばり強さ — 直したあとも続けられたね！",
+      "adult": "ねばり強さ — 修正後も学習を続けました。"
+    },
+    "topic_mastered": {
+      "child": "彗星 — このトピックをマスターしたね！",
+      "adult": "彗星 — トピックを習得しました。"
+    },
+    "evaluate_success": {
+      "child": "ふたご星 — まちがいに気づけたね！",
+      "adult": "ふたご星 — 回答を正しく評価しました。"
+    },
+    "teach_back_success": {
+      "child": "ふたご星 — わかりやすく説明できたね！",
+      "adult": "ふたご星 — 明確に説明し返せました。"
+    },
+    "streak_7": {
+      "child": "彗星 — 7日連続で学べたね！",
+      "adult": "彗星 — 7日間の学習継続を達成しました。"
+    },
+    "streak_30": {
+      "child": "オリオンの三つ星 — 30日連続で学べたね！",
+      "adult": "オリオンの三つ星 — 30日間の学習継続を達成しました。"
+    },
+    "curriculum_complete": {
+      "child": "彗星 — カリキュラムをやりきったね！",
+      "adult": "彗星 — カリキュラムを完了しました。"
+    },
+    "default": {
+      "child": "マイルストーン達成 — よくできたね！",
+      "adult": "マイルストーンを達成しました。"
+    }
+  },
   "common": {
     "cancel": "キャンセル",
     "ok": "OK",
@@ -38,7 +92,8 @@
     "tryAgainAction": "再試行",
     "dismiss": "閉じる",
     "pleaseTryAgain": "もう一度お試しください。",
-    "mentorImageAlt": "あなたのメンター"
+    "mentorImageAlt": "あなたのメンター",
+    "backTo": "{{destination}}に戻る"
   },
   "quota": {
     "parent": {
@@ -179,7 +234,8 @@
       "passwordPlaceholder": "パスワードを入力",
       "forgotPassword": "パスワードをお忘れですか？",
       "signInButton": "サインイン",
-      "sendVerificationCode": "認証コードを送信"
+      "sendVerificationCode": "認証コードを送信",
+      "verificationStartFailed": "認証を開始できませんでした。もう一度サインインしてください。"
     },
     "signUp": {
       "title": "アカウント作成",
@@ -212,7 +268,8 @@
       "emailPlaceholder": "mail@example.com",
       "passwordPlaceholder": "パスワードを作成",
       "signUpButton": "新規登録",
-      "signInButton": "ログイン"
+      "signInButton": "ログイン",
+      "captchaHint": "上に認証チェックが表示された場合は、完了してください。自動的に続行されます。"
     },
     "forgotPassword": {
       "title": "パスワードをお忘れですか？",
@@ -235,6 +292,27 @@
       "backToSignIn": "サインインに戻る",
       "emailPlaceholder": "mail@example.com",
       "sendResetCode": "リセットコードを送信"
+    },
+    "errors": {
+      "generic": "処理が完了しませんでした。もう一度お試しください。",
+      "form_identifier_not_found": "そのメールアドレスのアカウントが見つかりませんでした。",
+      "form_password_incorrect": "パスワードが正しくないようです。もう一度お試しください。",
+      "form_password_or_identifier_incorrect": "メールアドレスまたはパスワードが正しくないようです。もう一度お試しください。",
+      "form_password_pwned": "このパスワードはデータ漏洩で流出しています。別のパスワードを選択してください。",
+      "form_password_compromised": "このパスワードは安全ではありません。別のパスワードを選択してください。",
+      "form_password_not_strong_enough": "このパスワードは十分に強力ではありません。より複雑なものにしてください。",
+      "form_password_length_too_short": "パスワードが短すぎます。8文字以上で入力してください。",
+      "form_password_length_too_long": "パスワードが長すぎます。もっと短いものを入力してください。",
+      "form_password_no_uppercase": "パスワードには大文字が1文字以上必要です。",
+      "form_password_no_lowercase": "パスワードには小文字が1文字以上必要です。",
+      "form_password_no_number": "パスワードには数字が1文字以上必要です。",
+      "form_password_no_special_char": "パスワードには特殊文字が1文字以上必要です。",
+      "form_password_validation_failed": "そのパスワードは要件を満たしていません。",
+      "form_code_incorrect": "コードが一致しません。もう一度お試しください。",
+      "form_identifier_exists": "そのメールアドレスのアカウントはすでに存在します。",
+      "form_param_format_invalid": "有効なメールアドレスの形式ではないようです。",
+      "captcha_invalid": "人間であることを確認できませんでした。もう一度お試しください。",
+      "signup_rate_limit_exceeded": "サインアップの試行回数が多すぎます。後でもう一度お試しください。"
     }
   },
   "guards": {
@@ -264,8 +342,8 @@
       "emptySubjectsMessage": "今すぐ始めてもいいし、必要なときだけ宿題ヘルプを使っても大丈夫です。",
       "addSubject": "科目を追加",
       "momentum": {
-        "topicLearned": "{{n}} topic learned",
-        "topicsLearned": "{{n}} topics learned"
+        "topicLearned": "{{n}}個のトピックを学習済み",
+        "topicsLearned": "{{n}}個のトピックを学習済み"
       },
       "intentActions": {
         "homework": {
@@ -303,9 +381,9 @@
       "coachBandRevisitTopic": "{{topic}}をもう一度 — サクッと復習しよう。"
     },
     "notices": {
-      "consentArchivedTitle": "{{name}}'s account was archived",
+      "consentArchivedTitle": "{{name}}さんのアカウントはアーカイブされました",
       "consentArchivedBody": "データは30日間保持され、その後削除されます。",
-      "consentDeletedTitle": "{{name}}'s account was deleted",
+      "consentDeletedTitle": "{{name}}さんのアカウントは削除されました",
       "consentDeletedBody": "撤回猶予期間が終了しました。"
     },
     "parent": {
@@ -339,7 +417,7 @@
       "childCard": {
         "statusPending": "確認中",
         "reportsAction": "レポート",
-        "nudgeAction": "Nudge",
+        "nudgeAction": "促す",
         "learnTogetherAction": "一緒に学ぶ"
       },
       "card": {
@@ -448,15 +526,15 @@
   "family": {
     "orientationCueDismiss": "OK",
     "withdrawal": {
-      "bannerTitleSingle": "{{name}}'s account closes in {{days}} {{daysWord}}",
-      "bannerTitleMulti": "{{count}} accounts closing soon",
+      "bannerTitleSingle": "{{name}}さんのアカウントは{{days}}{{daysWord}}後に閉鎖されます",
+      "bannerTitleMulti": "{{count}}個のアカウントがまもなく閉鎖されます",
       "bannerCta": "取り消す",
-      "bannerCtaShort": "Undo",
-      "daysOne": "day",
-      "daysOther": "days",
+      "bannerCtaShort": "取り消し",
+      "daysOne": "日",
+      "daysOther": "日",
       "restoreErrorTitle": "閉鎖を取り消せませんでした",
       "restoreErrorBody": "しばらくしてからもう一度お試しください。",
-      "restoreSuccessToast": "Withdrawal reversed for {{name}}"
+      "restoreSuccessToast": "{{name}}さんの同意撤回を取り消しました"
     }
   },
   "more": {
@@ -587,7 +665,7 @@
       "notNow": "今はやめておく",
       "dontAskAgain": "もう聞かない",
       "banner": {
-        "question": "Question {{index}} of {{total}}"
+        "question": "{{total}}問中{{index}}問目"
       },
       "draft": {
         "title": "今わかっていること",
@@ -773,7 +851,9 @@
       "matched": "合っています",
       "retryWithMissingWords": "もう一度: {{words}}",
       "retry": "もう一度",
-      "retryLabel": "発話をやり直す"
+      "retryLabel": "発話をやり直す",
+      "extraWords": "追加: {{words}}",
+      "attemptError": "録音を保存できませんでした。もう一度録音してください。"
     },
     "chatShell": {
       "aiDisclosure": "AIメンターと話しています",
@@ -884,7 +964,8 @@
       "verificationBadge": {
         "evaluate": "思考力アップクリア",
         "teachBack": "ティーチバッククリア"
-      }
+      },
+      "mentorNotice": "学習中に気づいたこと：{{concept}}"
     },
     "noteInput": {
       "cancel": "キャンセル",
@@ -1479,7 +1560,6 @@
       "startTitle": "{{subject}}を始める"
     },
     "noteSignal": {
-      "verified": "確認済み",
       "verifiedAccessibilityLabel": "確認済み - あなたの回答は正解でした",
       "mentorAddition": "このトピックに関するメンターからの追加情報",
       "showMentorAdditionAccessibilityLabel": "メンターが追加した内容を表示",
@@ -1590,15 +1670,12 @@
     "inactiveFallbackBanner": {
       "message": "一時停止中・アーカイブ済みの科目を読み込めませんでした。タップして再試行 — データは消えていません。"
     },
-    "notStartedCount": "{{notStarted}} / {{total}} 未開始",
     "chooseTopic": "トピックを選択",
     "provenanceFrom": "{{name}}より",
     "recentlyAdded": "最近追加された項目",
     "sessionCount_one": "{{count}} セッション",
     "sessionCount_other": "{{count}} セッション",
     "a11yClearSearch": "検索をクリア",
-    "a11yEditNote": "ノートを編集",
-    "a11yDeleteNote": "ノートを削除",
     "a11yCloseTopicPicker": "トピック選択を閉じる",
     "myNotes": {
       "subtitleBookmarks_one": "保存済みの返信1件",
@@ -1625,9 +1702,6 @@
       "thisTopicFallback": "このトピック",
       "addedFromChildNamed": "{{name}}の学習から追加されました。",
       "addedFromChild": "お子さんの学習から追加されました。"
-    },
-    "collapsibleChapter": {
-      "a11yHeader": "{{title}}、{{total}}トピック中{{notStarted}}トピックが未開始"
     },
     "inlineNote": {
       "a11yCollapse": "{{topic}}のメモ。{{source}}。タップして折りたたむ。",
@@ -1698,7 +1772,8 @@
       "dontRememberFallbackHint": "大丈夫です — 覚えていることを一緒に探してみましょう。少しヒントです: このトピックの中心となる考えや最初のステップを思い出してみてください。何か浮かびますか？",
       "dontRememberReviewPrompt": "正直に教えてくれてありがとう。もう一度取り組みやすく感じられるように、復習に切り替えましょう。",
       "gradingUnavailableTitle": "回答を受け付けました。",
-      "gradingUnavailableMessage": "ただいま採点できませんでした。回答は安全に保存されています。もう一度試すか、後で確認してください。"
+      "gradingUnavailableMessage": "ただいま採点できませんでした。回答は安全に保存されています。もう一度試すか、後で確認してください。",
+      "reTeach": "別の方法でやってみましょう。もう一度よく見て、準備ができたら再挑戦してください。焦らなくて大丈夫です。"
     },
     "lastStudied": "最終学習：{{when}}",
     "neverStudied": "未学習",
@@ -1846,33 +1921,37 @@
   "legal": {
     "privacy": {
       "title": "プライバシーポリシー",
-      "lastUpdated": "最終更新日：2026年3月",
+      "lastUpdated": "最終更新日：2026年7月",
       "s1Title": "1. 当社について",
-      "s1Body": "MentoMateは、Zwizzly（以下「当社」）が運営するAI搭載のメンタープラットフォームです。当社は、すべてのユーザー、特に11歳から17歳のお子様のプライバシー保護に努めています。当社は、EU一般データ保護規則（GDPR）に従って個人データを処理します。",
+      "s1Body": "MentoMateは、ノルウェー法人番号811 696 072、所在地Fiskekroken 3B, 0139 Oslo, NorwayのZWIZZLY AS（以下「当社」）が運営するAI搭載の個別指導プラットフォームです。MentoMateは13歳以上の学習者を対象としています。ユーザーの一部が未成年者であるため、以下に説明するように、お子様のデータには追加の保護措置を適用します。",
       "s2Title": "2. 収集するデータ",
-      "s2Body1": "アカウントデータ：登録時に提供されるメールアドレス、表示名、プロフィール情報。",
-      "s2Body2": "学習データ：科目、インタビューの回答、カリキュラムの進捗、セッションのやり取り、評価結果、定着度スコア、XP。",
+      "s2Body1": "アカウントデータ：登録時に提供されるメールアドレス、表示名、生年月日、言語および代名詞の設定。",
+      "s2Body2": "学習データ：学習する科目、面接やオンボーディングでの回答、カリキュラムやトピックの進捗状況、学習セッション中に交換されたメッセージ、評価と習熟度の結果、復習スコア、XP。このデータの一部は、チューターがすでに学習した内容を記憶できるように、永続的な学習メモリを構築します（第8条参照）。",
       "s2Body3": "デバイスデータ：プッシュ通知トークン、デバイスタイプ、アプリのバージョン（通知の配信とサービス品質の維持のため）。",
-      "s2Body4": "当社は、位置情報、連絡先、写真（明示的に撮影した宿題の画像を除く）、閲覧履歴は収集しません。",
+      "s2Body4": "カメラとマイク：アプリは宿題の画像のためにカメラへのアクセスを、音声ベースの学習のためにマイクへのアクセスを要求します。マイク入力はデバイス上でテキストに変換され、MentoMateは音声録音を受信または保持しません。これらの入力は、ユーザーが明示的に有効にした場合にのみ使用します。",
       "s3Title": "3. データの使用方法",
-      "s3Body": "ソクラテス式対話と間隔反復を使用して、パーソナライズされたAIメンターを提供するため。カリキュラム、学習の洞察、進捗レポートを生成するため。オプトインした復習リマインダーや通知を送信するため。匿名化・集計された分析を通じてサービスを改善するため。",
-      "s4Title": "4. 保護者の同意",
-      "s4Body1": "16歳未満のユーザーについては、個人データを処理する前に検証可能な保護者の同意が必要です。保護者は、学習データが収集される前に、メールでお子様のアカウントを承認する必要があります。",
-      "s4Body2": "保護者は、保護者用ダッシュボードからいつでも同意を撤回できます。撤回後、お子様のデータは7日間の猶予期間を経て、完全に削除されます。",
+      "s3Body": "当社は、パーソナライズされたAI個別指導の提供、概念の説明、理解度の確認、間隔反復による復習のスケジュール設定、カリキュラムと進捗レポートの生成、およびあなたに合わせた指導のためにあなたのデータを使用します。このプロファイリングは、あなたの指導をパーソナライズするためにのみ使用され、あなたに関する法的または同様に重大な効果を生じさせるものではありません。また、オプトインした通知の送信や、エラーおよびパフォーマンス監視を通じてサービスを維持・改善するためにもデータを使用します。当社はあなたのデータを広告目的で使用せず、販売もしません。",
+      "s4Title": "4. 保護者の同意（GDPRおよびCOPPA）",
+      "s4Body1": "ユーザーがデジタル同意の適用年齢（EU/EEAでは国によって13歳から16歳、英国および米国のCOPPAでは13歳）未満の場合、お子様の個人データを処理する前に、検証可能な保護者の同意が必要です。学習データが収集される前に、親または保護者がお子様のアカウントを承認する必要があります。",
+      "s4Body2": "保護者はいつでも同意を撤回できます。同意は7日間の猶予期間中に回復できます。その期間の終了後、13歳以下のプロフィールは削除されます。それより年長のお子様のプロフィールは、アカウント所有者の保持設定に応じて30日間アーカイブされた後、削除される場合があります。",
       "s5Title": "5. AIによる処理",
-      "s5Body": "学習セッションは、教育的な応答を生成するために第三者のAIモデルプロバイダーによって処理されます。セッション内容は処理のためにAIプロバイダーに送信される場合がありますが、モデルのトレーニングには使用されません。当社は、個人を特定できる情報をAIプロバイダーと共有せず、学習コンテンツのみを共有します。",
+      "s5Body": "学習セッションの内容は、教育的な応答を生成するために、サードパーティのAIモデルプロバイダーによって処理されます。当社は応答の生成に必要なコンテンツとコンテキストのみを送信します。未成年者の場合、AIプロバイダーに送信されるコンテンツから名前とアカウント識別子を除外します。明確に成人と判断されるアカウント所有者の場合、パーソナライズのために表示名が含まれることがあります。当社はプロバイダーに対し、顧客のコンテンツを汎用モデルのトレーニングに使用しないよう要求します。この要件をサポートするプロバイダーとの契約および設定は、当社のローンチコンプライアンスプロセスの一環としてレビューされます。",
       "s6Title": "6. データ共有",
-      "s6Body1": "当社はデータを販売しません。データは、認証プロバイダー（Clerk）でのサインイン、AIプロバイダーでの学習セッション、メールプロバイダー（Resend）での通知、エラー追跡（Sentry）でのアプリの安定性、アプリ内購入管理（RevenueCat）でのサブスクリプション処理、支払い処理業者でのサブスクリプション管理のためにのみ共有します。",
-      "s6Body2": "13歳未満のユーザーについては、保護者の同意が得られるまでエラー追跡（Sentry）は無効化されます。同意が撤回された場合、再度無効化されます。",
-      "s7Title": "7. データ保持",
-      "s7Body": "当社は、アカウントが有効である限りデータを保持します。アカウントを削除すると、データは7日間の猶予期間（その間に削除をキャンセルできます）を経て、完全に削除されます。",
-      "s8Title": "8. あなたの権利",
-      "s8Body1": "あなたには、自分のデータにアクセスする権利（設定のエクスポート機能経由）、不正確なデータを訂正する権利、アカウントとすべての関連データを削除する権利、データ処理への同意を撤回する権利、処理に異議を唱える権利、データポータビリティの権利があります。",
-      "s8Body2": "これらの権利を行使するには、アプリ内設定を使用するか、privacy@mentomate.comまでご連絡ください。",
-      "s9Title": "9. セキュリティ",
-      "s9Body": "当社は、暗号化された接続（TLS）、安全な認証、各ユーザーが自分のデータにのみアクセスできるようにするプロファイルスコープのデータ分離など、業界標準のセキュリティ対策を使用しています。",
-      "s10Title": "10. お問い合わせ",
-      "s10Body": "プライバシーに関するご質問や懸念事項については、当社のデータ保護責任者（privacy@mentomate.com）までお問い合わせください。"
+      "s6Body1": "当社はあなたのデータを販売しません。MentoMateの運営に必要なサービスプロバイダーとのみデータを共有します。",
+      "s6Body2": "これらのプロバイダーには、サインイン用のClerk、学習応答と学習メモリ用のAIモデルおよび埋め込みプロバイダー、データベースとアプリケーションホスティング用のNeonとCloudflare、メール用のResend、エラーとパフォーマンス監視用のSentry、プッシュ通知用のExpo、Apple、Google、支払いとサブスクリプション用のApple、Google、RevenueCatが含まれます。",
+      "s7Title": "7. 国際的なデータ転送",
+      "s7Body": "一部の処理事業者は、米国を含め、EU/EEAおよび英国外に所在しています。データが国際的に転送される場合、当社はGDPRおよび英国GDPRの下で、EU標準契約条項、英国国際データ転送補遺、または適用される十分性認定メカニズムなどの適切な保護措置に依拠します。",
+      "s8Title": "8. データ保持",
+      "s8Body1": "チャットの記録：学習セッションのメッセージの全文は、学習概要が生成されてから30日間保持され、その後自動的に削除されます。概要の処理が遅延した場合、運用上の保護措置により、解決のためにその遅延がフラグ付けされます。",
+      "s8Body2": "学習メモリ：学習した内容の要約（科目、進捗、習熟度の結果、メモ、要約、メッセージからの短い引用など）は、チューターが長期にわたってあなたの学習を記憶できるよう、アカウントが有効な間保持されます。この学習メモリは、個別指導の継続性を提供するためにのみ使用され、広告、マーケティングプロファイル、またはサードパーティのAIモデルのトレーニングには使用されません。",
+      "s9Title": "9. あなたの権利",
+      "s9Body": "あなたには、ご自身のデータへのアクセス、不正確なデータの訂正、アカウントおよび関連する個人データと学習データの削除の要求（セクション8に記載の限定的な保持の例外が適用されます）、同意の撤回、処理への異議申し立て、データポータビリティを要求する権利があります。これらの権利を行使するには、アプリ内設定を使用するか、support@mentomate.comまでご連絡ください。",
+      "s10Title": "10. セキュリティ",
+      "s10Body": "当社は、暗号化された接続（TLS）、安全な認証、各ユーザーが自分のデータにのみアクセスできるように設計されたプロファイルスコープのデータ分離など、業界標準のセキュリティ対策を使用しています。",
+      "s2Body5": "当社は、位置情報、連絡先、明示的に選択した宿題の画像以外のフォトライブラリ、または閲覧履歴を収集しません。",
+      "s8Body3": "アカウントの削除：アカウントを削除すると、7日間の猶予期間に入り、その間にキャンセルできます。猶予期間終了後、あなたのアカウントおよび関連する個人データと学習データは、法的、セキュリティ、不正防止、または会計上の理由で保持される限定的な記録を除き、永久に削除されます。",
+      "s11Title": "11. お問い合わせ",
+      "s11Body": "ZWIZZLY ASは、あなたの個人データの管理者です。プライバシーに関するご質問やデータ保護の権利を行使するには、support@mentomate.comにメールするか、ZWIZZLY AS, Fiskekroken 3B, 0139 Oslo, Norwayまで書面でご連絡ください。"
     },
     "terms": {
       "title": "利用規約",
@@ -1880,7 +1959,7 @@
       "s1Title": "1. 規約への同意",
       "s1Body": "MentoMateのアカウントを作成または使用することにより、これらの利用規約に同意したものとみなされます。18歳未満の場合は、保護者があなたに代わって同意する必要があります。",
       "s2Title": "2. サービスの説明",
-      "s2Body": "MentoMateは、ソクラテス式対話、間隔反復、適応型カリキュラムを通じてパーソナライズされた学習を提供するAI搭載のメンタープラットフォームです。このサービスは、保護者の監督のもと、11歳から15歳の生徒向けに設計されています。",
+      "s2Body": "MentoMateは、ソクラテス式対話、間隔反復、適応型カリキュラムを通じてパーソナライズされた学習を提供するAI搭載のメンタリングプラットフォームです。このサービスは13歳以上の学習者を対象としており、未成年者については保護者の監督が必要です。",
       "s3Title": "3. アカウントの責任",
       "s3Body": "アカウントの認証情報の機密性を維持する責任はあなたにあります。登録時には正確な情報を提供する必要があります。アカウントを他人と共有したり、複数のアカウントを作成したりしてはなりません。",
       "s4Title": "4. 許容される使用",
@@ -2096,7 +2175,7 @@
     "register": {
       "child": {
         "growthSubtitle": "あなたの週ごとの成果",
-        "masteredTopicsHero": "You learned {{count}} topics. Steady wins.",
+        "masteredTopicsHero": "{{count}}個のトピックを学習しました。継続は力なり。",
         "retentionStrong": "今週思い出したこと。",
         "retentionFading": "軽く復習する価値あり。",
         "retentionWeak": "復習する価値あり。"
@@ -2250,7 +2329,24 @@
       "loadingTitle": "進捗を検索中...",
       "loadingMessage": "この科目のセッション、復習、保存された単語をまとめています。",
       "startedTopicsCount_one": "{{count}}個のトピックを開始",
-      "startedTopicsCount_other": "{{count}}個のトピックを開始"
+      "startedTopicsCount_other": "{{count}}個のトピックを開始",
+      "strandBalanceTitle": "最近の学習バランス",
+      "strandSessionsSampled": "最近のセッション{{count}}件",
+      "strandSessionsSampled_other": "最近のセッション{{count}}件",
+      "strandMeaningInput": "意味重視のインプット",
+      "strandMeaningOutput": "意味重視のアウトプット",
+      "strandLanguageFocus": "言語形式重視の学習",
+      "strandFluency": "流暢さの育成",
+      "skillProfileTitle": "スキルプロフィール",
+      "skillVocabulary": "語彙",
+      "skillGrammar": "文法",
+      "skillReading": "リーディング",
+      "skillListening": "リスニング",
+      "skillSpeaking": "スピーキング",
+      "skillFluency": "流暢さ",
+      "skillEvidenceCount": "アクティビティ{{count}}件",
+      "skillEvidenceCount_other": "アクティビティ{{count}}件",
+      "viewCefrVocabulary": "CEFRの語彙を閲覧"
     },
     "vocabulary": {
       "pageTitle": "あなたの語彙",
@@ -2293,14 +2389,14 @@
         "label": "もう一度取り組みましょう"
       },
       "elapsed": {
-        "remembered_one": "Remembered after {{count}} day",
-        "remembered_other": "Remembered after {{count}} days",
-        "fading_one": "Getting fuzzy after {{count}} day",
-        "fading_other": "Getting fuzzy after {{count}} days",
-        "weak_one": "Ready for a refresh after {{count}} day",
-        "weak_other": "Ready for a refresh after {{count}} days",
-        "forgotten_one": "Last seen {{count}} day ago",
-        "forgotten_other": "Last seen {{count}} days ago"
+        "remembered_one": "{{count}}日後も覚えていました",
+        "remembered_other": "{{count}}日後も覚えていました",
+        "fading_one": "{{count}}日後、記憶が薄れています",
+        "fading_other": "{{count}}日後、記憶が薄れています",
+        "weak_one": "{{count}}日経過、復習のタイミングです",
+        "weak_other": "{{count}}日経過、復習のタイミングです",
+        "forgotten_one": "最終学習日：{{count}}日前",
+        "forgotten_other": "最終学習日：{{count}}日前"
       }
     },
     "previousReports": {
@@ -2311,24 +2407,24 @@
     "latestReport": {
       "title": "最新レポート",
       "open": "レポートを開く",
-      "openWithDate": "Open report for {{date}}",
+      "openWithDate": "{{date}}のレポートを開く",
       "empty": "学習量がまとまるほどになると、次回の週次または月次レポートがここに表示されます。",
       "error": "現在、最新のレポートを読み込めませんでした。",
       "sessions": "セッション",
-      "time": "Time",
+      "time": "時間",
       "topics": "トピック",
-      "words": "Words",
-      "practiceLessons_one": "{{count}} practice lesson",
-      "practiceLessons_other": "{{count}} practice lessons",
-      "practicePoints_one": "{{count}} practice point",
-      "practicePoints_other": "{{count}} practice points"
+      "words": "単語",
+      "practiceLessons_one": "練習レッスン{{count}}回",
+      "practiceLessons_other": "練習レッスン{{count}}回",
+      "practicePoints_one": "練習ポイント{{count}}点",
+      "practicePoints_other": "練習ポイント{{count}}点"
     },
     "recentFocus": {
       "title": "最近のセッション",
       "showAll": "すべてのセッションを表示",
       "empty": "学習が始まると、最近のセッションがここに表示されます。",
       "error": "現在、最近のセッションを読み込めませんでした。",
-      "sessionFallback": "Studied {{date}}"
+      "sessionFallback": "{{date}}に学習"
     },
     "guardian": {
       "summaryFallback": "概要はまだありません。次のセッションの後に表示されます。",
@@ -2447,10 +2543,10 @@
     },
     "ready": {
       "title": "準備が整いました。",
-      "introWithLearner": "For {{learner}}:",
+      "introWithLearner": "{{learner}}さん向け：",
       "intro": "設定内容はこちら：",
       "rowTone": "メンターが適切な方法で話しかけます",
-      "rowSubject": "Starting with {{subject}}",
+      "rowSubject": "{{subject}}から始めましょう",
       "rowSubjectNoSubject": "最初のトピックの準備ができました",
       "rowPace": "ペースはあなたの速度に合わせます — 急かされることはありません",
       "reassurance": "ほとんどの学習者は最初のセッションで違いを感じます。",
@@ -2500,7 +2596,6 @@
       "profileRemovedOrNoAccess": "プロフィールが削除されたか、アクセス権がなくなった可能性があります",
       "backToDashboard": "ダッシュボードに戻る",
       "noAccessToProfile": "このプロフィールへのアクセス権がありません",
-      "firstReportSoon": "最初のレポートは月末に届きます",
       "progressNudgeFreshTitle": "{{focus}}が新しいうちに聞いてみる",
       "progressNudgeFreshSubtitle": "{{name}}は{{time}}に{{focus}}を学びました。あなたも少し試してから、何がわかったか聞いてみましょう。",
       "progressNudgeRecentTitle": "{{focus}}を忘れないうちに",
@@ -2511,7 +2606,7 @@
       "progressNudgeStartSubtitle": "{{subject}}を開いて次にできることを見て、あなたも短いレッスンを試してみましょう。",
       "openProgressNudgeAction": "{{subject}}を開く",
       "subjects": "科目",
-      "subjectsDescription": "{{name}}'s active subjects, with the most recent activity first.",
+      "subjectsDescription": "{{name}}さんが学習中の科目です。最近アクティビティがあった順に表示されます。",
       "subjectRawInputAudit": "お子さまは「{{rawInput}}」を検索しました",
       "openSubjectProgress": "{{subject}}の進捗を開く",
       "recentSessions": "最近のセッション",
@@ -2535,7 +2630,7 @@
       "cancelDeletion": "削除をキャンセル",
       "withdrawConsent": "同意を撤回",
       "withdrawConsentConfirmTitle": "同意を撤回しますか？",
-      "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
+      "withdrawConsentBody": "{{childName}}さんのアカウントと学習データは、7日間の猶予期間の後に削除されます。（13歳未満のアカウントの場合、プライバシー法に準拠するため、猶予期間が終了すると直ちに削除されます。）",
       "confirmWithdrawConsent": "確認 — 同意を撤回",
       "curriculumTitle": "カリキュラム",
       "curriculumSubtitle": "{{name}}さんの科目とトピックを閲覧",
@@ -2616,8 +2711,7 @@
       "checkConnectionRetry": "接続を確認して、もう一度お試しください",
       "weekOf": "の週",
       "retryReports": "レポートを再試行",
-      "firstReportArriveOn": "{{name}}さんの最初のレポートは{{date}}に届きます",
-      "firstReportTimeContext": "{{name}}さんの最初のレポートは{{timeContext}}"
+      "firstCombinedReportOn": "{{name}}さんの最初の週次または月次レポートは、まとめられるだけの学習量があれば、早ければ{{date}}に表示されます。"
     },
     "report": {
       "sessions": "セッション",
@@ -2681,9 +2775,9 @@
       "topicsNewLearnerBody": "これは初期のセッション後や自由な閲覧後に発生する可能性があります。以下の最近のセッションには何が起こったかが表示されます。",
       "noTopicsYetTitle": "まだレッスントピックはありません",
       "noTopicsYetBody": "メンターが十分なレッスンレベルの進捗状況を示す前に、ここにセッションが存在する場合があります。",
-      "description": "This is your child's progress in {{subject}}. Topics appear once sessions connect to a lesson step.",
-      "recentSubjectSessions": "Recent {{subject}} sessions",
-      "viewSessionFrom": "View session from {{date}}"
+      "description": "お子様の{{subject}}の進捗状況です。セッションがレッスンのステップに関連付けられると、トピックが表示されます。",
+      "recentSubjectSessions": "最近の{{subject}}セッション",
+      "viewSessionFrom": "{{date}}のセッションを見る"
     },
     "topic": {
       "topic": "トピック",
@@ -2910,7 +3004,24 @@
     "subjects": "科目",
     "subjectsLabel": "科目",
     "journal": "ジャーナル",
-    "journalLabel": "ジャーナル"
+    "journalLabel": "ジャーナル",
+    "adultSelfConsent": {
+      "title": "データの使用方法の確認",
+      "intro": "続行する前に、ご自身のアカウントに関する2つの事項について同意していただく必要があります。",
+      "platformUseHeading": "MentoMateの利用",
+      "platformUseBody": "アプリがあなたに合わせて機能するよう、アカウントと学習データ（科目、セッション、進捗状況）を処理します。",
+      "llmDisclosureHeading": "AIチュータリング",
+      "llmDisclosureBody": "AIメンターへのメッセージは、AIが返信して指導できるよう、AIモデルのプロバイダーに送信されます。あなたのデータを販売することは決してありません。",
+      "legalIntro": "同意する前に、詳細をすべてご確認ください：",
+      "termsLink": "利用規約",
+      "privacyLink": "プライバシーポリシー",
+      "accept": "同意する",
+      "submitting": "保存中…",
+      "errorTitle": "同意を保存できませんでした",
+      "errorBody": "エラーが発生しました。もう一度お試しください。",
+      "retry": "再試行",
+      "signOut": "代わりにサインアウト"
+    }
   },
   "subscription": {
     "trial": {
@@ -2942,15 +3053,15 @@
     "childPaywall": {
       "headline": "ここまでよく頑張りました！",
       "greatStart": "探求し、学習してきましたね — 素晴らしいスタートです！",
-      "xpStats_one": "You learned {{count}} topic and earned {{xp}} XP — great work!",
-      "xpStats_other": "You learned {{count}} topics and earned {{xp}} XP — great work!",
+      "xpStats_one": "トピックを{{count}}個学習し、{{xp}} XPを獲得しました。よくできました！",
+      "xpStats_other": "トピックを{{count}}個学習し、{{xp}} XPを獲得しました。よくできました！",
       "usedAllQuestions": "無料の質問をすべて使い切りました。学習を続けるには、保護者の方にアップグレードをお願いしてください。",
       "quotaUsedAllQuestions": "今使える質問は使い切りました。{{resetAt}}以降にもう一度試すか、もっと使いたいときは保護者に通知できます。",
       "notifyButton": "保護者に通知",
       "notifyButtonNotified": "保護者に通知済み",
       "notifyButtonAccessibilityNotified": "保護者にすでに通知済み",
       "notifyButtonAccessibilityNotify": "保護者に通知する",
-      "cooldownReminder": "You can remind them again in {{label}}.",
+      "cooldownReminder": "{{label}}後にもう一度リマインドできます。",
       "notifiedExploreText": "保護者の方に通知しました！お待ちの間、引き続き以下を探索できます:",
       "waitText": "お待ちの間、ライブラリを閲覧したり、進捗状況を確認したりできます。",
       "browseLibrary": "ライブラリを閲覧",
@@ -2959,10 +3070,10 @@
       "seeProgressAccessibilityLabel": "進捗状況を確認",
       "goHome": "ホームへ",
       "goHomeAccessibilityLabel": "ホームへ",
-      "back": "Back",
+      "back": "戻る",
       "backAccessibilityLabel": "戻る",
       "alerts": {
-        "sentTitle": "Sent!",
+        "sentTitle": "送信しました！",
         "sentBody": "保護者の方にお知らせしました！",
         "askParentTitle": "保護者の方にお願い",
         "askParentBody": "保護者の方にアプリを開いてサブスクライブするようお願いしてください。",
@@ -2995,7 +3106,7 @@
       "alerts": {
         "successTitle": "ウェイティングリスト",
         "successBody": "BYOKウェイティングリストに追加されました。",
-        "errorTitle": "Error",
+        "errorTitle": "エラー",
         "errorBody": "ウェイティングリストに参加できませんでした。もう一度お試しください。"
       }
     },
@@ -3032,6 +3143,7 @@
       "yourShare": "あなたの割り当て",
       "yourUsage": "あなたの使用状況",
       "questionsUsed": "{{count}}件の質問",
+      "formerMembers": "以前のメンバー",
       "familyAggregate": "家族の合計",
       "quotaResets": "割り当ては{{date}}にリセットされます",
       "renews": "サブスクリプションは{{date}}に更新されます",
@@ -3050,7 +3162,9 @@
       "title": "毎日のリマインダーを受け取りますか？",
       "message": "ストリークを途切れさせないよう、優しいリマインダーをお送りします。設定からいつでも無効にできます。",
       "allow": "許可する",
-      "notNow": "今はしない"
+      "notNow": "今はしない",
+      "noticeTitle": "簡単な復習をしませんか？",
+      "noticeMessage": "今日メンターが気づいたことを復習するよう、リマインダーを設定できます。この設定はいつでも「設定」からオフにできます。"
     },
     "masteredRow": {
       "title": "マスターしました："
@@ -3163,6 +3277,14 @@
         "language_focus": "次回は、文法パターンに取り組みましょう",
         "fluency": "次回: 流暢さの短期集中トレーニング"
       }
+    },
+    "feedbackUnavailableTitle": "フィードバックはまだ利用できません",
+    "feedbackUnavailableMessage": "概要は保存されました。再送信せずにフィードバックを再試行できます。",
+    "feedbackStillUnavailable": "フィードバックはまだ利用できませんが、概要は安全に保存されています。準備ができたら、再試行または続行できます。",
+    "retryFeedback": "フィードバックを再試行",
+    "retryingFeedback": "フィードバックを再試行中...",
+    "mentorNotice": {
+      "title": "学習中に気づいたこと"
     }
   },
   "sessionTranscript": {
@@ -3299,12 +3421,17 @@
     "detailLoadErrorMessage": "もう一度お試しいただくか、まとめリストに戻ってください。",
     "notFoundTitle": "まとめが見つかりません",
     "notFoundMessage": "このまとめは利用できません。",
-    "exchangesCount": "{{count}} exchanges",
+    "exchangesCount": "{{count}}回のやり取り",
     "whatHappened": "何が起こったか",
     "detailPending": "このまとめはまだ準備中です。",
     "tryAsking": "質問してみる",
     "openChildSession": "子どものセッションを開く",
-    "emptyCtaStartSession": "セッションを開始する"
+    "emptyCtaStartSession": "セッションを開始する",
+    "verifiedProof": {
+      "holdsStrong": "有効",
+      "lookupUnavailable": "確認済みの証明は一時的に利用できません",
+      "recheckDue": "{{date}}に再確認予定"
+    }
   },
   "addToMyLearning": {
     "tip": "お子様の学習内容を変更せずに、このトピックのコピーを自分のライブラリに保存します。",
@@ -3562,7 +3689,7 @@
         },
         "card2": {
           "subjects": {
-            "math": "Math",
+            "math": "数学",
             "history": "歴史",
             "spanish": "スペイン語"
           },
@@ -3614,15 +3741,17 @@
     "bridge": {
       "headline": "「分からない」を「分かった！」に変える。",
       "supporting": "メンターがあなたの科目、メモ、進捗を記憶できるよう、無料アカウントを作成してください。",
+      "parentHeadline": "学習者をサポートするには、あなたのアカウントで続行してください。",
+      "parentSupporting": "招待を承諾してサポートを設定するには、ログインまたは新規登録してください。学習者が許可しない限り、あなたのアカウントから学習活動にアクセスすることはできません。",
       "primaryCta": "無料アカウントを作成",
       "secondaryCta": "すでにアカウントをお持ちの方"
     },
-    "next": "Next",
+    "next": "次へ",
     "letsStart": "始めましょう",
     "a11y": {
       "previous": "前のカード",
       "next": "次のカード",
-      "dots": "Page {{current}} of {{total}}",
+      "dots": "{{total}}ページ中{{current}}ページ目",
       "bridgePrimary": "無料アカウントを作成",
       "bridgeSecondary": "既存のアカウントにサインイン"
     }
@@ -3691,12 +3820,6 @@
       "crossContextPromptMessage": "現在セッション中です。先にこちらを完了するか、アップデートを開いて現在のセッションを終了してください。",
       "stayHere": "このままにする",
       "openUpdate": "アップデートを開く"
-    },
-    "guardianPrimer": {
-      "title": "最新情報を受け取りますか？",
-      "message": "お子様があなたの助けを必要としているときに、そっとお知らせを送信できます。この設定はいつでも設定で変更できます。",
-      "allow": "許可する",
-      "notNow": "後で"
     }
   },
   "myNotes": {
@@ -3854,8 +3977,8 @@
     "methodPracticeDesc": "ガイド付きの演習を通して学習します",
     "methodPracticeLabelYoung": "やってみる",
     "methodPracticeDescYoung": "助けを借りながら問題を解いて学びます",
-    "copyTopicIntro": "今一番自信がないと感じるトピックを選んでください。",
-    "copyTopicIntroYoung": "もう一度挑戦したいトピックを選んでください。",
+    "copyTopicIntro": "復習が必要な順に並べました。別のトピックをタップして変更することもできます。",
+    "copyTopicIntroYoung": "始めるための順番を選びました。別のトピックを選ぶこともできます。",
     "copyMethodIntro": "次のステップに最適だと感じる教え方を選んでください。",
     "copyMethodIntroYoung": "今回はどのように学習したいですか？",
     "copySubjectIntro": "最初にどの科目を復習しますか？",
@@ -3983,6 +4106,14 @@
         "currentAccess": "有料プランは{{deadline}}まで有効です。",
         "freeFallback": "現在、無料プランをご利用中です。プランを復元するには、お支払い情報を更新してください。",
         "currentAccessNoDeadline": "有料アクセスはまだ有効です。"
+      },
+      "mentor_notice": {
+        "title": "確認しておきたいアイデア",
+        "cta": "今すぐ確認",
+        "notNow": "後で",
+        "arcDue": "いつでも始められます",
+        "arcAdvancing": "クイックチェックを開始中",
+        "arcMastered": "定着しました"
       }
     },
     "ledger": {
@@ -3995,6 +4126,9 @@
       },
       "quota": {
         "title": "学習の記録が保存されました。"
+      },
+      "notice_locked_in": {
+        "title": "{{concept}}が定着しました。"
       }
     },
     "overflow": {
@@ -4006,7 +4140,18 @@
       "placeholder": "学習したいことを質問、貼り付け、または入力してください。",
       "micLabel": "マイク",
       "homeworkChip": "宿題",
-      "title": "何でも質問"
+      "title": "何でも質問",
+      "micIdleLabel": "音声入力を開始",
+      "micRequestingLabel": "マイクへのアクセスをリクエスト中",
+      "micListeningLabel": "音声入力を停止",
+      "micProcessingLabel": "音声入力を終了中",
+      "micErrorLabel": "もう一度音声入力を試す",
+      "micDisabledLabel": "音声入力は利用できません",
+      "listening": "聞き取り中…",
+      "voiceError": "音声入力ができませんでした。キーボード入力は可能です。",
+      "voicePermissionError": "マイクへのアクセスがオフです。キーボード入力は可能です。",
+      "voiceAllow": "マイクを許可",
+      "voiceRetry": "もう一度音声入力"
     },
     "onTrack": {
       "label": "順調",
@@ -4201,7 +4346,8 @@
       "recap_ready": "要約の準備ができました。",
       "snapshot_ready": "学習スナップショットの準備ができました。",
       "reflection_bonus": "振り返りボーナスが保存されました。",
-      "quiz_personal_best": "自己ベストが保存されました。"
+      "quiz_personal_best": "自己ベストが保存されました。",
+      "notice_locked_in": "{{subjectName}}で{{concept}}を定着させました。"
     },
     "recaps": {
       "error": "概要を読み込めませんでした。",
@@ -4244,7 +4390,9 @@
   },
   "accountAdmin": {
     "title": "アカウント",
-    "openAccount": "アカウント設定を開く",
+    "openAccount": "{{name}}のアカウント設定を開く",
+    "openAccountNoName": "アカウント設定を開く",
+    "backTo": "{{destination}}に戻る",
     "security": "アカウントのセキュリティ",
     "familySettings": "ファミリー設定"
   },
@@ -4420,7 +4568,6 @@
       "activeMessage": "この同意書はいつでもここで確認できます。",
       "revoke": "共有を終了",
       "revoking": "共有を終了中...",
-      "revoked": "共有を終了します。サポーターに通知が表示されます。",
       "revokeErrorTitle": "共有を終了できませんでした",
       "missingActor": "アクティブなユーザーを特定できませんでした。",
       "relationLabel": "関係",
@@ -4428,7 +4575,16 @@
       "pickerManagedEmpty": "対象となるお子様はまだいません。",
       "pickerExistingTeenOption": "既存の家族メンバー（13歳以上）",
       "existingTeenUnavailableTitle": "まだ利用できません",
-      "existingTeenUnavailableMessage": "既存の家族メンバーの招待機能はまだ利用できません。後ほどもう一度ご確認ください。"
+      "existingTeenUnavailableMessage": "既存の家族メンバーの招待機能はまだ利用できません。後ほどもう一度ご確認ください。",
+      "existingTeenInviteTitle": "既存のメンバーを招待",
+      "existingTeenInviteMessage": "お子様がMentoMateで使用しているメールアドレスを入力してください。ファミリープランにアカウントを移行するための招待メールを送信します。学習履歴はそのまま引き継がれます。",
+      "existingTeenInviteEmailLabel": "お子様のMentoMateメールアドレス",
+      "existingTeenInviteEmailPlaceholder": "namae@example.jp",
+      "existingTeenInviteAction": "招待を送信",
+      "existingTeenInviteSending": "送信中…",
+      "existingTeenInviteSentTitle": "招待を送信しました",
+      "existingTeenInviteSentMessage": "そのメールアドレスがMentoMateアカウントに登録されている場合、招待を送信しました。お子様にMentoMateを開いて招待を承認するようお伝えください。",
+      "existingTeenInviteErrorTitle": "招待を送信できませんでした"
     }
   },
   "supporterColdStart": {

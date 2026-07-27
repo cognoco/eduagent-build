@@ -15,5 +15,11 @@
         ]
       }
     ]
+  },
+  "permissions": {
+    "deny": [
+      "Bash(git stash:*)",
+      "Bash(git stash)"
+    ]
   }
 }

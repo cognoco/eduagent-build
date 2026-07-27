@@ -1,0 +1,78 @@
+# [WI-2226 owner-gate retarget] V2 native supporter cold-start mount.
+#
+# Companion to v2-supporter-scope-journey.yaml (WI-2241), but scoped to
+# proving SupporterColdStart actually renders the OWNER-GATED managed card
+# from the mounted Support hub Mentor tab. The WI-2226 bounce-#1 fix
+# (supporter-coldstart.ts) renders a `state: 'managed'` card only for a
+# hasOwnAccount=false candidate whose membership resolves within the
+# SUPPORTER's OWN organization — the same predicate POST /profiles/switch
+# enforces, so the card's CTA (switchProfile) actually works. The prior
+# version of this flow targeted `v2-supporter-accepted`'s empty-record
+# supportee expecting a `granted-idle` card, but that supportee: (a) is an
+# independent v2 owner in a DIFFERENT organization (cross-org — the
+# owner-gate suppresses it even if it were a managed candidate), and (b)
+# hasOwnAccount has no writer anywhere in the codebase (WI-2538) — the
+# `granted-idle`/`active` branches are currently unreachable in production,
+# so a flow asserting one is unproducible. `v2-supporter-managed`
+# (test-seed-v2-supporter.ts) seeds the producible path instead: a
+# same-org managed child with a real supportership edge.
+#
+# [Disclosure, per WI-2226 bounce-#2 build report] Written and testID-
+# verified against source (SupporterColdStart.tsx, SupportHubMentorTab.tsx,
+# test-seed-v2-supporter.ts's seedV2SupporterManaged), and registered in
+# ci-maestro-manifest.json / scripts/e2e-ci-injection-and-smoke-gate.test.ts's
+# exhaustive v2-suite plan assertion (that consistency check IS runnable and
+# was run locally without an emulator — ci-maestro-plan.mjs fails closed on a
+# v2-tagged flow missing from the manifest, or a scenario mismatch against
+# this file's SEED_SCENARIO comment). The seed itself is also proven against
+# a real DB by test-seed-v2-supporter.integration.test.ts's
+# "v2-supporter-managed seed" suite (resolveSupporterColdStart renders the
+# exact managed card this flow asserts). What was NOT run is the flow itself:
+# no Android emulator or staging DB is reachable in this build environment,
+# so the actual Maestro walk (this file's tapOn/assertVisible steps against a
+# real app) has not been executed — do not read a passing CI run into this
+# file until the `v2` workflow-dispatch suite has actually run it. The
+# runtime fail-if-unreachable guard for this component already exists and IS
+# executed: SupportHubMentorTab.test.tsx's `[WI-2226 RGR]` case (RTL, real
+# mounted tree, red/green evidence in
+# apps/mobile/src/components/support/wi2226-rgr-evidence.md); a device-level
+# equivalent for this flow specifically is future work (WI-2216 device
+# session / a WI-2538 follow-up), not this change.
+#
+# SEED_SCENARIO: 'v2-supporter-managed'
+appId: com.mentomate.app
+tags:
+  - v2
+  - navigation
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: 'v2-supporter-managed'
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: 'support-hub-mentor-tab'
+    timeout: 30000
+
+# The same-org managed child's owner-gated cold-start card is visible on
+# landing (hasOwnAccount=false, on the supporter's own org — the exact
+# candidate the owner-gate renders a card for).
+- scrollUntilVisible:
+    element:
+      id: 'supporter-cold-start-managed-${MANAGED_CHILD_PERSON_ID}'
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: 'supporter-cold-start-handoff-${MANAGED_CHILD_PERSON_ID}'
+
+# Pressing the handoff CTA calls switchProfile (WI-2226 bounce-#1 fix,
+# SupporterColdStart.tsx) — the profile switch is real, so the app leaves
+# the Support hub for the managed child's own screen. Assert the switch
+# actually took (the Support hub tab is no longer showing), not merely that
+# the tap didn't crash.
+- tapOn:
+    id: 'supporter-cold-start-handoff-${MANAGED_CHILD_PERSON_ID}'
+- assertNotVisible:
+    id: 'support-hub-mentor-tab'

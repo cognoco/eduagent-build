@@ -14,8 +14,10 @@
  */
 import {
   maybeReplayResponseSchema,
+  mentorNoticeAcceptedSchema,
   type ChallengeRoundSessionState,
   type StreamLanguageMeaningOutput,
+  type StreamLanguageSpeakingPractice,
 } from '@eduagent/schemas';
 import {
   BadRequestError,
@@ -84,18 +86,25 @@ export interface LanguageGradedInputEvent {
 
 export type LanguageMeaningOutputEvent = StreamLanguageMeaningOutput;
 
+// WI-1777: derived (not hand-redeclared) — the WI-1756 rework this repo
+// already paid for once, applied from the start here.
+export type LanguageSpeakingPracticeEvent = StreamLanguageSpeakingPractice;
+
 export interface LanguageLearningActivityEvent {
   strand: 'meaning_input' | 'meaning_output' | 'language_focus' | 'fluency';
   activityType:
     | 'graded_input'
     | 'free_response'
     | 'correction_retry'
-    | 'timed_drill';
+    | 'timed_drill'
+    | 'repeat_after_me'
+    | 'shadowing';
   modality: 'text' | 'voice' | 'listening';
   targetWords: string[];
   targetGrammar: string[];
   gradedInput?: LanguageGradedInputEvent;
   meaningOutput?: LanguageMeaningOutputEvent;
+  speakingPractice?: LanguageSpeakingPracticeEvent;
 }
 
 export interface ChallengeRoundOfferEvent {
@@ -112,6 +121,8 @@ export interface DraftedChallengeNoteEvent {
 export interface StreamDoneEvent {
   type: 'done';
   exchangeCount: number;
+  /** Persisted assistant event id for idempotent client reconciliation. */
+  aiEventId?: string;
   /** Present on learning sessions; absent on interview done events. */
   escalationRung?: number;
   /** Present on interview done events; absent on learning sessions. */
@@ -134,6 +145,28 @@ export interface StreamDoneEvent {
   draftedNote?: DraftedChallengeNoteEvent;
   /** F6: LLM self-reported confidence. Absent or 'medium'/'high' = no indicator. Only 'low' shows a UI prompt. */
   confidence?: 'low' | 'medium' | 'high';
+  /** [WI-2107] LLM opened a topic without delivering content or a question this turn. */
+  topicOpenedPendingContent?: boolean;
+  /** Server-accepted homework observation; never present on token/fallback frames. */
+  mentorNotice?: import('@eduagent/schemas').MentorNoticeAccepted;
+  /**
+   * [WI-2627] The orderable rollout observation on the terminal frame.
+   *
+   * This parser never STRIPPED the field — but it never DECLARED it either, and
+   * an undeclared field is just as unreachable to a consumer: `use-stream-message.ts`
+   * cannot read `event.mentorNoticePolicy` off `StreamDoneEvent` without this
+   * line. Third variant of the same trap as the two consumer drops the item
+   * fixes: a field can die at a schema strip, at a validator, at a consumer's
+   * field-by-field reconstruction, OR at a client-side event type that was
+   * never widened — and only the first is visible from `packages/schemas`.
+   *
+   * Deliberately NOT runtime-validated in `isValidStreamEvent` below (unlike
+   * `mentorNotice`): `reduceMentorNoticePolicy` treats a malformed observation
+   * as a fail-closed disable at the held revision, which is strictly safer than
+   * dropping the field here — dropping it would read as "absent", i.e. no
+   * signal at all.
+   */
+  mentorNoticePolicy?: import('@eduagent/schemas').MentorNoticePolicyObservation;
 }
 
 export interface StreamErrorEvent {
@@ -163,7 +196,23 @@ function isValidStreamEvent(obj: Record<string, unknown>): boolean {
     );
   }
   if (obj.type === 'replay') return obj.replayed === true;
-  if (obj.type === 'done') return typeof obj.exchangeCount === 'number';
+  if (obj.type === 'done') {
+    if (typeof obj.exchangeCount !== 'number') return false;
+    // [WI-2500] Mobile trust boundary: the server validates a mentorNotice
+    // before emitting it, but this parser must not forward a malformed one to
+    // use-stream-message.ts / UI consumers as if it were a canonical accepted
+    // notice (invalid UUID, empty concept, non-string correctionHint). Runtime-
+    // parse the field with the shared schema and DROP an invalid notice rather
+    // than the whole done frame — the notice is a non-core adornment, and
+    // "only a committed server acceptance may enter UI output".
+    if (
+      obj.mentorNotice !== undefined &&
+      !mentorNoticeAcceptedSchema.safeParse(obj.mentorNotice).success
+    ) {
+      delete obj.mentorNotice;
+    }
+    return true;
+  }
   if (obj.type === 'error') return typeof obj.message === 'string';
   return false;
 }
@@ -339,7 +388,7 @@ export function streamSSEViaXHR(
   // sending data for IDLE_TIMEOUT_MS. The server may take 20s+ for LLM
   // streaming then another 10s for post-stream DB writes — the total easily
   // exceeds a fixed 30s timeout, but the stream is never truly idle.
-  const IDLE_TIMEOUT_MS = 45_000;
+  const IDLE_TIMEOUT_MS = 90_000;
   let idleTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
     if (done) return;
     const timeoutError = new Error(

@@ -3,7 +3,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import type { Profile } from '@eduagent/schemas';
 
-import { AppContextProvider, useAppContext } from './app-context';
+import {
+  AppContextProvider,
+  isServerFamilyCapableProfile,
+  useAppContext,
+} from './app-context';
 import { ProfileContext, type ProfileContextValue } from './profile';
 import { FEATURE_FLAGS } from './feature-flags';
 
@@ -330,5 +334,37 @@ describe('AppContextProvider', () => {
     expect(onError).not.toHaveBeenCalled();
     expect(onSuccess).toHaveBeenCalledTimes(1);
     expect(result.current.mode).toBe('study');
+  });
+});
+
+describe('isServerFamilyCapableProfile — exact-birth-date parity (WI-1259)', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('owner turning 18 later this year with family links is NOT family-capable', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-15T12:00:00Z'));
+    const boundaryOwner = {
+      ...adult,
+      birthYear: 2008,
+      birthMonth: 12,
+      birthDay: 31,
+      hasFamilyLinks: true,
+    } as Profile;
+    // Exact age on 2026-07-15 is 17 (birthday Dec 31); the year-only bracket
+    // says 18. The V1 gate must match the server decision (WI-367) and deny.
+    expect(isServerFamilyCapableProfile(boundaryOwner)).toBe(false);
+  });
+
+  it('owner past their 18th birthday this year with family links IS family-capable', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-15T12:00:00Z'));
+    const adultOwner = {
+      ...adult,
+      birthYear: 2008,
+      birthMonth: 1,
+      birthDay: 2,
+      hasFamilyLinks: true,
+    } as Profile;
+    expect(isServerFamilyCapableProfile(adultOwner)).toBe(true);
   });
 });

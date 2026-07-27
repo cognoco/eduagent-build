@@ -33,11 +33,6 @@ tags:
 - assertVisible:
     id: 'parent-home-screen'
 
-# Multi-child parent home renders the family summary panel instead of the
-# removed Conversation starters heading.
-- assertVisible:
-    id: 'parent-home-family-summary'
-
 - assertVisible:
     text: 'Children'
 
@@ -64,7 +59,18 @@ tags:
     direction: DOWN
     timeout: 10000
 
-- takeScreenshot: multi-child-02-all-children-visible
+# Multi-child parent home renders the family summary panel after all child
+# cards, so prove it only after scrolling through the full family list.
+- scrollUntilVisible:
+    element:
+      id: 'parent-home-family-summary'
+    direction: DOWN
+    timeout: 10000
+
+- assertVisible:
+    id: 'parent-home-family-summary'
+
+- takeScreenshot: multi-child-02-family-summary-visible
 
 # ── Drill into Child 1 (Emma) ─────────────────────────────────────────
 - scrollUntilVisible:
@@ -88,9 +94,9 @@ tags:
 
 - takeScreenshot: multi-child-03-emma-detail
 
-# Navigate back to parent home
-# Use pressKey:back only — tapOn back-button + pressKey = double-back exits home
-- pressKey: back
+# Navigate back to parent home through the screen-owned, history-independent route.
+- tapOn:
+    id: 'back-button'
 
 # Wait for parent home to reload
 - extendedWaitUntil:
@@ -119,9 +125,9 @@ tags:
 
 - takeScreenshot: multi-child-04-lucas-detail
 
-# Navigate back
-# Use pressKey:back only — tapOn back-button + pressKey = double-back exits home
-- pressKey: back
+# Navigate back through the screen-owned route.
+- tapOn:
+    id: 'back-button'
 
 - extendedWaitUntil:
     visible:
@@ -149,9 +155,9 @@ tags:
 
 - takeScreenshot: multi-child-05-sofia-detail
 
-# Navigate back
-# Use pressKey:back only — tapOn back-button + pressKey = double-back exits home
-- pressKey: back
+# Navigate back through the screen-owned route.
+- tapOn:
+    id: 'back-button'
 
 - extendedWaitUntil:
     visible:

@@ -10,6 +10,7 @@ import {
   createRoutedMockFetch,
   fetchCallsMatching,
 } from '../../../test-utils/mock-api-routes';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 // i18n mock — returns English values for quiz.index namespace so tests can
 // assert on the same English strings as before the migration.
@@ -119,14 +120,20 @@ jest.mock(
 const mockBack = jest.fn();
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+const mockNavigate = jest.fn();
 const mockCanGoBack = jest.fn();
 let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
+  useFocusEffect: (callback: () => void | (() => void)) => {
+    const ReactReq = jest.requireActual<typeof import('react')>('react');
+    ReactReq.useEffect(() => callback(), [callback]);
+  },
   useRouter: () => ({
     back: mockBack,
     push: mockPush,
     replace: mockReplace,
+    navigate: mockNavigate,
     canGoBack: mockCanGoBack,
   }),
   useLocalSearchParams: () => mockSearchParams,
@@ -244,8 +251,42 @@ describe('QuizIndexScreen', () => {
 
     fireEvent.press(screen.getByTestId('quiz-back'));
 
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
+    expect(mockNavigate).toHaveBeenCalledWith('/(app)/practice');
     expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('[WI-1864] restores the upstream Practice destination from Quiz Back', () => {
+    mockSearchParams = {
+      returnTo: 'practice',
+      practiceReturnTo: 'journal',
+    };
+
+    render(<QuizIndexScreen />, { wrapper: Wrapper });
+    fireEvent.press(screen.getByTestId('quiz-back'));
+
+    expect(mockNavigate).toHaveBeenCalledWith({
+      pathname: '/(app)/practice',
+      params: { returnTo: 'journal' },
+    });
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('[WI-1864] consumes Android hardware Back on the cross-tab Quiz root', () => {
+    const { BackHandler } = jest.requireActual(
+      'react-native',
+    ) as typeof import('react-native');
+    const listenerSpy = jest.spyOn(BackHandler, 'addEventListener');
+    mockSearchParams = { returnTo: 'practice' };
+
+    render(<QuizIndexScreen />, { wrapper: Wrapper });
+
+    const handler = listenerSpy.mock.calls.find(
+      ([event]) => event === 'hardwareBackPress',
+    )?.[1] as (() => boolean) | undefined;
+    expect(handler).toBeDefined();
+    expect(handler!()).toBe(true);
+    expect(mockNavigate).toHaveBeenCalledWith('/(app)/practice');
+    listenerSpy.mockRestore();
   });
 
   it('falls back to practice when opened without a return target and no history', () => {
@@ -280,6 +321,27 @@ describe('QuizIndexScreen', () => {
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/quiz/launch',
       params: { activityType: 'capitals', returnTo: 'learner-home' },
+    });
+  });
+
+  it('[WI-1864] forwards the upstream Practice destination when starting a quiz', async () => {
+    mockSearchParams = {
+      returnTo: 'practice',
+      practiceReturnTo: 'journal',
+    };
+
+    render(<QuizIndexScreen />, { wrapper: Wrapper });
+
+    await waitFor(() => screen.getByTestId('quiz-capitals'));
+    fireEvent.press(screen.getByTestId('quiz-capitals'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/quiz/launch',
+      params: {
+        activityType: 'capitals',
+        returnTo: 'practice',
+        practiceReturnTo: 'journal',
+      },
     });
   });
 
@@ -324,6 +386,38 @@ describe('QuizIndexScreen', () => {
     it('shows the locked Vocabulary card when there are no four_strands subjects', () => {
       render(<QuizIndexScreen />, { wrapper: Wrapper });
       screen.getByTestId('quiz-vocab-locked');
+    });
+
+    describe('locked Vocabulary card CTA destination [WI-2219]', () => {
+      let originalV2: boolean;
+
+      beforeEach(() => {
+        originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      });
+
+      afterEach(() => {
+        (
+          FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = originalV2;
+      });
+
+      it('navigates to library when V2 nav is off', () => {
+        (
+          FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = false;
+        render(<QuizIndexScreen />, { wrapper: Wrapper });
+        fireEvent.press(screen.getByTestId('quiz-vocab-locked'));
+        expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+      });
+
+      it('navigates to V2 Subjects when V2 nav is on', () => {
+        (
+          FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = true;
+        render(<QuizIndexScreen />, { wrapper: Wrapper });
+        fireEvent.press(screen.getByTestId('quiz-vocab-locked'));
+        expect(mockPush).toHaveBeenCalledWith('/(app)/subjects');
+      });
     });
 
     // [BUG-926] Per-language stats: stat rows now include languageCode so each

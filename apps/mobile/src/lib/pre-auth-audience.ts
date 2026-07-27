@@ -13,6 +13,11 @@
 // warm session) with a best-effort SecureStore write (covers a cold start
 // between signup and profile setup, e.g. an email-verification round-trip).
 //
+// WI-2225: 'supporter' is a third, non-authorizing value carried by this
+// same mechanism — first-profile setup treats it identically to 'learner'
+// (clean solo setup, no family context), so intent is preserved without
+// granting any extra scope.
+//
 // TTL: a generous 1 hour. If signup is abandoned and resumed much later the
 // record expires and the user falls back to the clean learner setup — never a
 // dead end (an adult can still add a child later from More → Add child).
@@ -45,7 +50,7 @@ function isFresh(savedAt: number): boolean {
 }
 
 function isAudience(value: unknown): value is WelcomeAudience {
-  return value === 'learner' || value === 'parent';
+  return value === 'learner' || value === 'parent' || value === 'supporter';
 }
 
 export function preAuthAudienceSecureStoreKey(): string {

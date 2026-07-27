@@ -73,7 +73,11 @@ export interface UsageBreakdown {
     usedToday: number;
     is_self: boolean;
   }>;
-  familyAggregate: { used: number; limit: number } | null;
+  familyAggregate: {
+    used: number;
+    limit: number;
+    formerMemberUsed?: number;
+  } | null;
   isOwnerBreakdownViewer: boolean;
   /**
    * Per-profile usage today for the active viewer's row. Used to scope

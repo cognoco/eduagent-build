@@ -10,10 +10,12 @@ import {
   chatExchangeSchema,
   declineAssessmentRefreshResponseSchema,
   getActiveAssessmentResponseSchema,
+  computeAgeBracketFromDate,
   type QuotaModel,
 } from '@eduagent/schemas';
 import { parseConversationLanguage } from '../services/llm';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { withProfile, type RouteEnv } from '../route-utils/route-context';
 import {
   createAssessmentIfNoneActive,
@@ -48,7 +50,7 @@ type AssessmentRouteEnv = RouteEnv & {
 export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
   // Start a topic completion assessment
   .post('/subjects/:subjectId/topics/:topicId/assessments', async (c) => {
-    assertNotProxyMode(c);
+    await assertNotProxyMode(c);
     const { db, profileId } = withProfile(c);
     const subjectId = c.req.param('subjectId');
     const topicId = c.req.param('topicId');
@@ -100,11 +102,22 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
     '/assessments/:assessmentId/answer',
     zValidator('json', assessmentAnswerSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const assessmentId = c.req.param('assessmentId');
       const { answer } = c.req.valid('json');
 
+      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+      // Gated unconditionally — the app_help/forceReview branches inside
+      // submitAssessmentAnswer are DB-only, but this endpoint's primary
+      // purpose (evaluateAssessmentAnswer) dispatches the LLM.
+      await assertLlmConsent(db, profileId);
+
+      // [WI-2432] Safety-adjacent age gate (mirrors exchanges.ts's
+      // ageBracket derivation) — the router consumes this to enforce the
+      // under-18 Gemini/Vertex vendor exclusion (MMT-ADR-0016 §1.5) on the
+      // legacy routing path.
+      const profileMeta = c.get('profileMeta');
       const result = await submitAssessmentAnswer(
         db,
         profileId,
@@ -112,8 +125,12 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
         answer,
         {
           conversationLanguage: parseConversationLanguage(
-            c.get('profileMeta')?.conversationLanguage,
+            profileMeta?.conversationLanguage,
           ),
+          ageBracket:
+            profileMeta?.birthYear != null
+              ? computeAgeBracketFromDate(profileMeta.birthYear)
+              : undefined,
         },
       );
       if (!result) return notFound(c, 'Assessment not found');
@@ -173,7 +190,7 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
   )
 
   .patch('/assessments/:assessmentId/decline-refresh', async (c) => {
-    assertNotProxyMode(c);
+    await assertNotProxyMode(c);
     const { db, profileId } = withProfile(c);
     const assessmentId = c.req.param('assessmentId');
 
@@ -249,6 +266,9 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
       const sessionId = c.req.param('sessionId');
       const { answer } = c.req.valid('json');
 
+      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+      await assertLlmConsent(db, profileId);
+
       const session = await getSession(db, profileId, sessionId);
       if (!session) return notFound(c, 'Session not found');
 
@@ -277,6 +297,12 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
           conversationLanguage: parseConversationLanguage(
             quickCheckProfileMeta?.conversationLanguage,
           ),
+          // [WI-2432] Safety-adjacent age gate — see submitAssessmentAnswer
+          // call above for rationale.
+          ageBracket:
+            quickCheckProfileMeta?.birthYear != null
+              ? computeAgeBracketFromDate(quickCheckProfileMeta.birthYear)
+              : undefined,
         },
       );
 

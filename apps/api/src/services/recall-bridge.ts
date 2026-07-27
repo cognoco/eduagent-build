@@ -18,6 +18,7 @@ import type {
 } from '@eduagent/schemas';
 import { routeAndCall, type ChatMessage, type EscalationRung } from './llm';
 import { sanitizeXmlValue } from './llm/sanitize';
+import { getPersonAgeBracket } from './identity-v2/helpers';
 
 // ---------------------------------------------------------------------------
 // Core function
@@ -88,10 +89,18 @@ export async function generateRecallBridge(
   ];
 
   const rung: EscalationRung = 1; // cheapest model — simple recall questions
+  // [WI-2432] This caller has no age data of its own (no options/context
+  // threading it in) — source it the same way other identity-v2 callers do:
+  // getPersonAgeBracket(db, profileId), the exact-date bracket helper built
+  // for exactly this purpose (WI-367). Both db and profileId are already in
+  // scope. Without this, the router's under-18 Gemini/Vertex vendor
+  // exclusion can't fire for this flow on the legacy routing path.
+  const ageBracket = await getPersonAgeBracket(db, profileId);
   const result = await routeAndCall(messages, rung, {
     flow: 'recall.bridge',
     sessionId,
     conversationLanguage: options?.conversationLanguage,
+    ageBracket,
   });
 
   const questions = result.response

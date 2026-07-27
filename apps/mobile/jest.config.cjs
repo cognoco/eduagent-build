@@ -14,7 +14,7 @@ const dropWorktreeGuards = (patterns) =>
 
 // CI-only readability defaults — silence captured console output from passing
 // tests + custom reporter for GitHub Actions annotations and end-of-log
-// summary. See docs/superpowers/specs/2026-05-14-ci-failure-readability-design.md.
+// summary.
 const ciDefaults = process.env.CI
   ? {
       silent: true,
@@ -33,7 +33,11 @@ module.exports = {
   moduleFileExtensions: ['ts', 'js', 'html', 'tsx', 'jsx'],
   setupFiles: ['<rootDir>/apps/mobile/jest.polyfills.js'],
   setupFilesAfterEnv: ['<rootDir>/apps/mobile/src/test-setup.ts'],
-  testMatch: ['**/apps/mobile/src/**/*.(spec|test).[jt]s?(x)', '**/apps/mobile/scripts/**/*.(spec|test).[jt]s?(x)'],
+  testMatch: [
+    '**/apps/mobile/src/**/*.(spec|test).[jt]s?(x)',
+    '**/apps/mobile/scripts/**/*.(spec|test).[jt]s?(x)',
+    '**/apps/mobile/e2e-web/helpers/**/*.(spec|test).[jt]s?(x)',
+  ],
   // The full Expo/RN mobile suite includes integration-style hook and screen
   // tests that legitimately run past Jest's 5s default on Windows workers.
   // Keep focused waits narrow in individual tests; this cap prevents the

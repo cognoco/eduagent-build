@@ -1,0 +1,46 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The V2 freeform Mentor route opener remains authoritative for session raw input and traverses subject resolution, session creation, deterministic outbox, streaming, and event persistence before later input.",
+      "pointer": "apps/mobile/src/components/session/use-session-streaming.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The deterministic mentor-opener session key and transcript-aware restoration continue to prevent remount, retry, drain, and replay duplication while preserving learner/Mentor ordering.",
+      "pointer": "apps/mobile/src/components/session/use-session-streaming.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The internally allocated session ID is backfilled without running the focused-screen reset, while genuine navigation and later focus resets retain their existing behavior.",
+      "pointer": "apps/mobile/src/app/(app)/session/index.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The real session screen regression drives opener classification and streaming through route backfill and a Yes follow-up, retaining streaming, subject/topic recovery context, and exact ordering.",
+      "pointer": "apps/mobile/src/app/(app)/session/index.test.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The persisted-session integration coverage retains question and declarative openers, delayed creation, retry/restart, already-created sessions, hydration, canonical raw input, and downstream transcript ordering.",
+      "pointer": "tests/integration/learning-session.integration.test.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Historical proof plus reviewer-rework RED, GREEN, production-only REVERT, RESTORE, validation counts, and caveats are preserved without deleting prior evidence.",
+      "pointer": "docs/evidence/WI-2099/report.md"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Fresh final latest-main integration reran the complete learning-session file and preserved all 22 scenarios after the history-preserving main merge.",
+      "pointer": "docs/evidence/WI-2099/final-integration-full-learning-session-main-6dce228a.json"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Fresh final mobile verification covers the session screen, streaming hook, subject classification, and message outbox with 149 passing tests.",
+      "pointer": "docs/evidence/WI-2099/final-integration-mobile-suites-main-6dce228a.json"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-18",
+  "redGreenPointer": "docs/evidence/WI-2099/report.md"
+}

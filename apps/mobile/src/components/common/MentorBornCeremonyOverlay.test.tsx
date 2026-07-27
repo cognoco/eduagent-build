@@ -2,7 +2,9 @@ import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Sentry } from '../../lib/sentry';
 import {
   __resetMentorBornCeremonyForTests,
+  completeMentorBornCeremonyDurably,
   getMentorBornCeremonySnapshot,
+  queueMentorBornCeremony,
   requestMentorBornCeremony,
 } from '../../lib/mentor-born-ceremony';
 
@@ -25,7 +27,7 @@ describe('MentorBornCeremonyOverlay', () => {
     jest.restoreAllMocks();
   });
 
-  it('clears the ceremony request on tap-to-skip', () => {
+  it('clears the ceremony request on tap-to-skip', async () => {
     requestMentorBornCeremony({
       profileId: 'learner-1',
       reason: 'first-profile-created',
@@ -38,14 +40,16 @@ describe('MentorBornCeremonyOverlay', () => {
     getByTestId('mentor-born-ceremony-overlay');
     fireEvent.press(getByTestId('mentor-birth-animation-skip'));
 
-    expect(queryByTestId('mentor-born-ceremony-overlay')).toBeNull();
+    await waitFor(() => {
+      expect(queryByTestId('mentor-born-ceremony-overlay')).toBeNull();
+    });
     expect(getMentorBornCeremonySnapshot()).toMatchObject({
       activeRequest: null,
       requestCount: 1,
     });
   });
 
-  it('caps the ceremony so navigation is never blocked by a dropped animation callback', () => {
+  it('caps the ceremony so navigation is never blocked by a dropped animation callback', async () => {
     jest.useFakeTimers();
     requestMentorBornCeremony({
       profileId: 'learner-1',
@@ -55,30 +59,42 @@ describe('MentorBornCeremonyOverlay', () => {
     const { queryByTestId } = render(<MentorBornCeremonyOverlay />);
     expect(queryByTestId('mentor-born-ceremony-overlay')).not.toBeNull();
 
-    act(() => {
+    await act(async () => {
       jest.advanceTimersByTime(MENTOR_BORN_CEREMONY_CAP_MS);
+      await Promise.resolve();
+      await Promise.resolve();
     });
 
     expect(queryByTestId('mentor-born-ceremony-overlay')).toBeNull();
     expect(getMentorBornCeremonySnapshot().activeRequest).toBeNull();
   });
 
-  it('completes instantly for reduced-motion users', async () => {
-    require('react-native-reanimated').useReducedMotion = () => true;
-    requestMentorBornCeremony({
+  it('[WI-2105 AC-2] restores the queued ceremony across an immediate root remount', async () => {
+    await queueMentorBornCeremony({
       profileId: 'learner-1',
       reason: 'first-profile-created',
     });
 
-    const { queryByTestId } = render(<MentorBornCeremonyOverlay />);
+    const first = render(<MentorBornCeremonyOverlay />);
+    first.getByTestId('mentor-born-ceremony-overlay');
+    first.unmount();
+
+    __resetMentorBornCeremonyForTests();
+    const remounted = render(<MentorBornCeremonyOverlay />);
 
     await waitFor(() => {
-      expect(queryByTestId('mentor-born-ceremony-overlay')).toBeNull();
+      remounted.getByTestId('mentor-born-ceremony-overlay');
     });
-    expect(getMentorBornCeremonySnapshot().activeRequest).toBeNull();
+    const restored = getMentorBornCeremonySnapshot().activeRequest;
+    if (!restored) throw new Error('expected restored ceremony request');
+    await act(async () => {
+      await completeMentorBornCeremonyDurably(restored.id);
+    });
+    expect(remounted.queryByTestId('mentor-born-ceremony-overlay')).toBeNull();
+    remounted.unmount();
   });
 
-  it('clears the ceremony and reports when the animation render crashes', () => {
+  it('clears the ceremony and reports when the animation render crashes', async () => {
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
     jest
       .spyOn(require('./MentorBirthAnimation'), 'MentorBirthAnimation')
@@ -92,7 +108,9 @@ describe('MentorBornCeremonyOverlay', () => {
 
     const { queryByTestId } = render(<MentorBornCeremonyOverlay />);
 
-    expect(queryByTestId('mentor-born-ceremony-overlay')).toBeNull();
+    await waitFor(() => {
+      expect(queryByTestId('mentor-born-ceremony-overlay')).toBeNull();
+    });
     expect(getMentorBornCeremonySnapshot().activeRequest).toBeNull();
     expect(Sentry.captureException).toHaveBeenCalledWith(
       expect.objectContaining({

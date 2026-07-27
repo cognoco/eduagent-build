@@ -25,7 +25,10 @@ const logger = createLogger();
  *
  * Consumers that depend on `birthYear`:
  *   - LLM context injection (system prompt age bracketing)
- *   - Sentry age-gating (under-13 PII scrubbing)
+ *   - Mobile Sentry age-gating (under-13 events disabled unless consented —
+ *     `apps/mobile/src/lib/sentry.ts`). API-side Sentry has no age gate; its
+ *     PII backstop is the field-denylist `beforeSend` scrubber
+ *     (`apps/api/src/services/sentry.ts`'s `scrubSentryEvent`) [WI-1990].
  *   - Consent checks (GDPR under-16 / COPPA under-13)
  */
 export interface ProfileMeta {

@@ -1,14 +1,14 @@
 // ---------------------------------------------------------------------------
 // RevenueCat Webhook Route — Tests
 //
-// [WI-1239 / 779-strip] This file now covers ONLY what the route itself owns
+// [WI-1239 / 779-strip / WI-2619] This file covers ONLY what the route itself owns
 // (see revenuecat-webhook.ts header): Bearer-token validation, Zod payload
 // parsing, account resolution, idempotency gate + ordering exemptions,
 // SANDBOX/non-production guards, late-event observability logging,
 // ensureFreeSubscription, event-type dispatch, and the sustained-auth-failure
-// escalator. It no longer forces dispatch to the legacy handler bundle —
-// `billing-v2/dispatch` is mocked to return plain jest.fn() handlers so
-// route-level behavior is verifiable without simulating v2 billing business
+// escalator. It exercises the real billing-v2 selector while replacing
+// downstream handler behavior so route-level behavior is verifiable without
+// simulating v2 billing business
 // logic. Handler business logic (INITIAL_PURCHASE/RENEWAL/CANCELLATION/
 // EXPIRATION/BILLING_ISSUE/SUBSCRIBER_ALIAS/PRODUCT_CHANGE/UNCANCELLATION/
 // NON_RENEWING_PURCHASE rules, product-ID mapping, family-share guard) now
@@ -16,16 +16,43 @@
 // and services/billing/revenuecat-shared.test.ts.
 // ---------------------------------------------------------------------------
 
-const mockGetRevenuecatWebhookHandlers = jest.fn();
+const mockRevenuecatHandlers = {
+  resolveAccountId: jest.fn().mockResolvedValue('acc-1'),
+  isRevenuecatEventProcessed: jest.fn().mockResolvedValue(false),
+  ensureFreeSubscription: jest.fn().mockResolvedValue(undefined),
+  handleInitialPurchase: jest.fn().mockResolvedValue(undefined),
+  handleRenewal: jest.fn().mockResolvedValue(undefined),
+  handleCancellation: jest.fn().mockResolvedValue(undefined),
+  handleExpiration: jest.fn().mockResolvedValue(undefined),
+  handleBillingIssue: jest.fn().mockResolvedValue(undefined),
+  handleSubscriberAlias: jest.fn().mockResolvedValue(undefined),
+  handleProductChange: jest.fn().mockResolvedValue(undefined),
+  handleNonRenewingPurchase: jest.fn().mockResolvedValue(null),
+  handleUncancellation: jest.fn().mockResolvedValue(undefined),
+};
 
-jest.mock(
-  // gc1-allow: intentional full replacement, not a passthrough gap — the whole point of this mock is to isolate route-level dispatch behavior (which handler gets called for which event type) from v2 handler business logic, which is covered separately in revenuecat-webhook-handler-v2.test.ts
-  '../services/billing/billing-v2/dispatch',
-  () => ({
-    getRevenuecatWebhookHandlers: (...args: unknown[]) =>
-      mockGetRevenuecatWebhookHandlers(...args),
-  }),
-);
+jest.mock('../services/billing/billing-v2', () => {
+  const actual = jest.requireActual(
+    '../services/billing/billing-v2',
+  ) as typeof import('../services/billing/billing-v2');
+  return {
+    ...actual,
+    resolveAccountIdV2: mockRevenuecatHandlers.resolveAccountId,
+    isRevenuecatEventProcessedV2:
+      mockRevenuecatHandlers.isRevenuecatEventProcessed,
+    ensureFreeSubscriptionV2: mockRevenuecatHandlers.ensureFreeSubscription,
+    handleInitialPurchaseV2: mockRevenuecatHandlers.handleInitialPurchase,
+    handleRenewalV2: mockRevenuecatHandlers.handleRenewal,
+    handleCancellationV2: mockRevenuecatHandlers.handleCancellation,
+    handleExpirationV2: mockRevenuecatHandlers.handleExpiration,
+    handleBillingIssueV2: mockRevenuecatHandlers.handleBillingIssue,
+    handleSubscriberAliasV2: mockRevenuecatHandlers.handleSubscriberAlias,
+    handleProductChangeV2: mockRevenuecatHandlers.handleProductChange,
+    handleNonRenewingPurchaseV2:
+      mockRevenuecatHandlers.handleNonRenewingPurchase,
+    handleUncancellationV2: mockRevenuecatHandlers.handleUncancellation,
+  };
+});
 
 const mockCaptureException = jest.fn();
 const mockCaptureMessage = jest.fn();
@@ -50,6 +77,7 @@ import {
   revenuecatAuthFailureEscalator,
   SIGNATURE_FAILURE_THRESHOLD,
 } from '../services/webhooks/signature-failure-escalator';
+import type { RevenuecatWebhook } from '@eduagent/schemas';
 import type { AppVariables } from '../types/hono';
 
 // ---------------------------------------------------------------------------
@@ -75,10 +103,14 @@ const TEST_ENV = {
 // Helpers
 // ---------------------------------------------------------------------------
 
+type TestWebhookPayload = Omit<RevenuecatWebhook, 'event'> & {
+  event: RevenuecatWebhook['event'] & Record<string, unknown>;
+};
+
 function makeWebhookPayload(
   eventType: string,
   overrides: Record<string, unknown> = {},
-) {
+): TestWebhookPayload {
   return {
     api_version: '1.0',
     event: {
@@ -119,29 +151,63 @@ function makeRequest(
   );
 }
 
-function makeHandlers() {
-  return {
-    resolveAccountId: jest.fn().mockResolvedValue('acc-1'),
-    isRevenuecatEventProcessed: jest.fn().mockResolvedValue(false),
-    ensureFreeSubscription: jest.fn().mockResolvedValue(undefined),
-    handleInitialPurchase: jest.fn().mockResolvedValue(undefined),
-    handleRenewal: jest.fn().mockResolvedValue(undefined),
-    handleCancellation: jest.fn().mockResolvedValue(undefined),
-    handleExpiration: jest.fn().mockResolvedValue(undefined),
-    handleBillingIssue: jest.fn().mockResolvedValue(undefined),
-    handleSubscriberAlias: jest.fn().mockResolvedValue(undefined),
-    handleProductChange: jest.fn().mockResolvedValue(undefined),
-    handleNonRenewingPurchase: jest.fn().mockResolvedValue(null),
-    handleUncancellation: jest.fn().mockResolvedValue(undefined),
-  };
+function makeSandboxAuthorization(
+  payload: ReturnType<typeof makeWebhookPayload>,
+  overrides: Record<string, unknown> = {},
+) {
+  const now = Date.now();
+  return JSON.stringify({
+    version: 1,
+    authorizationId: 'wi-2705-route-proof',
+    issuedAtMs: now - 60_000,
+    expiresAtMs: now + 60_000,
+    eventId: payload.event.id,
+    eventType: payload.event.type,
+    appId: payload.event.app_id,
+    appUserId: payload.event.app_user_id,
+    productId: payload.event.product_id,
+    periodType: payload.event.period_type,
+    store: payload.event.store,
+    transactionId: payload.event.transaction_id,
+    ...overrides,
+  });
 }
 
-let handlers: ReturnType<typeof makeHandlers>;
+function makeAuthorizedSandboxPayload() {
+  return makeWebhookPayload('INITIAL_PURCHASE', {
+    id: 'evt_wi_2705_route',
+    app_id: 'app_google_mentomate',
+    app_user_id: 'user_revenuecat_verification',
+    product_id: 'com.eduagent.plus.monthly.android:monthly',
+    store: 'PLAY_STORE',
+    environment: 'SANDBOX',
+    transaction_id: 'GPA.1234-5678-9012-34567',
+  });
+}
+
+function expectNoBillingLookupOrMutation() {
+  expect(handlers.resolveAccountId).not.toHaveBeenCalled();
+  expect(handlers.isRevenuecatEventProcessed).not.toHaveBeenCalled();
+  expect(handlers.ensureFreeSubscription).not.toHaveBeenCalled();
+  expect(handlers.handleInitialPurchase).not.toHaveBeenCalled();
+}
+
+const handlers = mockRevenuecatHandlers;
 
 beforeEach(() => {
   jest.clearAllMocks();
-  handlers = makeHandlers();
-  mockGetRevenuecatWebhookHandlers.mockReturnValue(handlers);
+  handlers.resolveAccountId.mockResolvedValue('acc-1');
+  handlers.isRevenuecatEventProcessed.mockResolvedValue(false);
+  handlers.ensureFreeSubscription.mockResolvedValue(undefined);
+  handlers.handleInitialPurchase.mockResolvedValue(undefined);
+  handlers.handleRenewal.mockResolvedValue(undefined);
+  handlers.handleCancellation.mockResolvedValue(undefined);
+  handlers.handleExpiration.mockResolvedValue(undefined);
+  handlers.handleBillingIssue.mockResolvedValue(undefined);
+  handlers.handleSubscriberAlias.mockResolvedValue(undefined);
+  handlers.handleProductChange.mockResolvedValue(undefined);
+  handlers.handleNonRenewingPurchase.mockResolvedValue(null);
+  handlers.handleUncancellation.mockResolvedValue(undefined);
 });
 
 // ---------------------------------------------------------------------------
@@ -682,16 +748,316 @@ describe('sandbox events [BUG-624 / A-8]', () => {
     expect(handlers.handleInitialPurchase).not.toHaveBeenCalled();
   });
 
-  it('accepts SANDBOX events in non-production (staging/dev) so QA can drive flows', async () => {
-    const payload = makeWebhookPayload('INITIAL_PURCHASE', {
-      environment: 'SANDBOX',
-    });
+  it('[WI-2705] lets one exactly authorized sandbox purchase enter the production-equivalent path', async () => {
+    const payload = makeAuthorizedSandboxPayload();
     const res = await makeRequest(payload, {
       ...TEST_ENV,
-      ENVIRONMENT: 'staging',
+      ENVIRONMENT: 'production',
+      REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION:
+        makeSandboxAuthorization(payload),
     });
+
     expect(res.status).toBe(200);
-    expect(handlers.handleInitialPurchase).toHaveBeenCalled();
+    expect(handlers.resolveAccountId).toHaveBeenCalledWith(
+      mockDb,
+      'user_revenuecat_verification',
+    );
+    expect(handlers.isRevenuecatEventProcessed).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      'evt_wi_2705_route',
+      payload.event.event_timestamp_ms,
+    );
+    expect(handlers.ensureFreeSubscription).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+    );
+    expect(handlers.handleInitialPurchase).toHaveBeenCalledWith(
+      mockDb,
+      mockKv,
+      expect.objectContaining({
+        id: 'evt_wi_2705_route',
+        environment: 'SANDBOX',
+      }),
+    );
+  });
+
+  it('[WI-2705] audits an accepted verification without logging user, transaction, or internal account identifiers', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation();
+    try {
+      const payload = makeAuthorizedSandboxPayload();
+      const res = await makeRequest(payload, {
+        ...TEST_ENV,
+        ENVIRONMENT: 'production',
+        REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION:
+          makeSandboxAuthorization(payload),
+      });
+
+      expect(res.status).toBe(200);
+      const acceptedLog = warn.mock.calls
+        .map(([entry]) => String(entry))
+        .find((entry) =>
+          entry.includes(
+            'Authorized bounded SANDBOX verification event in production',
+          ),
+        );
+      expect(acceptedLog).toBeDefined();
+
+      const auditEntry = JSON.parse(acceptedLog ?? '{}') as {
+        context?: Record<string, unknown>;
+      };
+      expect(auditEntry.context).toMatchObject({
+        authorizationId: 'wi-2705-route-proof',
+        eventId: 'evt_wi_2705_route',
+      });
+      expect(auditEntry.context).not.toHaveProperty('appUserId');
+      expect(auditEntry.context).not.toHaveProperty('transactionId');
+      expect(
+        warn.mock.calls.map(([entry]) => String(entry)).join('\n'),
+      ).not.toContain('"accountId":"acc-1"');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('[WI-2705] lets one exactly authorized expiration enter the production-equivalent cleanup path', async () => {
+    const payload = makeAuthorizedSandboxPayload();
+    payload.event.id = 'evt_wi_2705_expiration';
+    payload.event.type = 'EXPIRATION';
+    payload.event.period_type = 'NORMAL';
+    const res = await makeRequest(payload, {
+      ...TEST_ENV,
+      ENVIRONMENT: 'production',
+      REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION:
+        makeSandboxAuthorization(payload),
+    });
+
+    expect(res.status).toBe(200);
+    expect(handlers.resolveAccountId).toHaveBeenCalled();
+    expect(handlers.isRevenuecatEventProcessed).toHaveBeenCalled();
+    expect(handlers.ensureFreeSubscription).toHaveBeenCalled();
+    expect(handlers.handleExpiration).toHaveBeenCalledWith(
+      mockDb,
+      mockKv,
+      expect.objectContaining({
+        id: 'evt_wi_2705_expiration',
+        environment: 'SANDBOX',
+      }),
+    );
+    expect(handlers.handleInitialPurchase).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['trial', 'TRIAL'],
+  ])(
+    '[WI-2705] denies an authorized expiration with %s period type before billing lookup',
+    async (_label, periodType) => {
+      const payload = makeAuthorizedSandboxPayload();
+      payload.event.id = 'evt_wi_2705_expiration';
+      payload.event.type = 'EXPIRATION';
+      payload.event.period_type = 'NORMAL';
+      const authorization = makeSandboxAuthorization(payload);
+      payload.event.period_type = periodType;
+
+      const res = await makeRequest(payload, {
+        ...TEST_ENV,
+        ENVIRONMENT: 'production',
+        REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION: authorization,
+      });
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({
+        reason: 'sandbox_in_production',
+      });
+      expectNoBillingLookupOrMutation();
+      expect(handlers.handleExpiration).not.toHaveBeenCalled();
+    },
+  );
+
+  it('[WI-2705] keeps an exact replay idempotent and does not dispatch twice', async () => {
+    const payload = makeAuthorizedSandboxPayload();
+    const env = {
+      ...TEST_ENV,
+      ENVIRONMENT: 'production',
+      REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION:
+        makeSandboxAuthorization(payload),
+    };
+    handlers.isRevenuecatEventProcessed
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+
+    const first = await makeRequest(payload, env);
+    const replay = await makeRequest(payload, env);
+
+    expect(first.status).toBe(200);
+    expect(replay.status).toBe(200);
+    expect(await replay.json()).toEqual({ received: true, skipped: true });
+    expect(handlers.resolveAccountId).toHaveBeenCalledTimes(2);
+    expect(handlers.isRevenuecatEventProcessed).toHaveBeenCalledTimes(2);
+    expect(handlers.ensureFreeSubscription).toHaveBeenCalledTimes(1);
+    expect(handlers.handleInitialPurchase).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['wrong event', { id: 'evt_other' }, {}],
+    ['wrong user', { app_user_id: 'user_other' }, {}],
+    ['wrong app', { app_id: 'app_other' }, {}],
+    ['wrong store', { store: 'APP_STORE' }, {}],
+    [
+      'wrong product',
+      { product_id: 'com.eduagent.family.monthly.android:monthly' },
+      {},
+    ],
+    [
+      'wrong base plan',
+      { product_id: 'com.eduagent.plus.monthly.android:monthly-promo' },
+      {},
+    ],
+    ['wrong transaction', { transaction_id: 'GPA.other' }, {}],
+    [
+      'expired authorization',
+      {},
+      {
+        issuedAtMs: Date.now() - 120_000,
+        expiresAtMs: Date.now() - 60_000,
+      },
+    ],
+  ])(
+    '[WI-2705] denies %s before billing lookup or mutation',
+    async (_label, eventOverrides, authorizationOverrides) => {
+      const authorizedPayload = makeAuthorizedSandboxPayload();
+      const receivedPayload = makeAuthorizedSandboxPayload();
+      Object.assign(receivedPayload.event, eventOverrides);
+
+      const res = await makeRequest(receivedPayload, {
+        ...TEST_ENV,
+        ENVIRONMENT: 'production',
+        REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION: makeSandboxAuthorization(
+          authorizedPayload,
+          authorizationOverrides,
+        ),
+      });
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({
+        received: true,
+        skipped: true,
+        reason: 'sandbox_in_production',
+      });
+      expectNoBillingLookupOrMutation();
+    },
+  );
+
+  it.each([
+    ['absent', undefined],
+    ['malformed JSON', '{'],
+    ['malformed fields', JSON.stringify({ version: 1 })],
+  ])(
+    '[WI-2705] denies %s authorization before billing lookup or mutation',
+    async (_label, authorization) => {
+      const payload = makeAuthorizedSandboxPayload();
+      const res = await makeRequest(payload, {
+        ...TEST_ENV,
+        ENVIRONMENT: 'production',
+        REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION: authorization,
+      });
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({
+        received: true,
+        skipped: true,
+        reason: 'sandbox_in_production',
+      });
+      expectNoBillingLookupOrMutation();
+    },
+  );
+
+  it('[WI-2705] denies reuse of one authorization for a different event', async () => {
+    const authorizedPayload = makeAuthorizedSandboxPayload();
+    const reusedPayload = makeAuthorizedSandboxPayload();
+    reusedPayload.event.id = 'evt_reuse_attempt';
+
+    const res = await makeRequest(reusedPayload, {
+      ...TEST_ENV,
+      ENVIRONMENT: 'production',
+      REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION:
+        makeSandboxAuthorization(authorizedPayload),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      skipped: true,
+      reason: 'sandbox_in_production',
+    });
+    expectNoBillingLookupOrMutation();
+  });
+
+  it('[WI-2705] restores default rejection immediately after authorization removal', async () => {
+    const payload = makeAuthorizedSandboxPayload();
+    const authorized = await makeRequest(payload, {
+      ...TEST_ENV,
+      ENVIRONMENT: 'production',
+      REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION:
+        makeSandboxAuthorization(payload),
+    });
+    expect(authorized.status).toBe(200);
+    expect(handlers.handleInitialPurchase).toHaveBeenCalledTimes(1);
+
+    jest.clearAllMocks();
+    const afterRemoval = await makeRequest(payload, {
+      ...TEST_ENV,
+      ENVIRONMENT: 'production',
+    });
+
+    expect(afterRemoval.status).toBe(200);
+    expect(await afterRemoval.json()).toMatchObject({
+      skipped: true,
+      reason: 'sandbox_in_production',
+    });
+    expectNoBillingLookupOrMutation();
+  });
+
+  it('[WI-2705] propagates partial handler failure and permits an exact retry inside the window', async () => {
+    const payload = makeAuthorizedSandboxPayload();
+    const env = {
+      ...TEST_ENV,
+      ENVIRONMENT: 'production',
+      REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION:
+        makeSandboxAuthorization(payload),
+    };
+    handlers.handleInitialPurchase
+      .mockRejectedValueOnce(new Error('simulated atomic write failure'))
+      .mockResolvedValueOnce(undefined);
+
+    const failed = await makeRequest(payload, env);
+    const retry = await makeRequest(payload, env);
+
+    expect(failed.status).toBe(500);
+    expect(retry.status).toBe(200);
+    expect(handlers.handleInitialPurchase).toHaveBeenCalledTimes(2);
+  });
+
+  it('accepts SANDBOX events in non-production (staging/dev) so QA can drive flows', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation();
+    try {
+      const payload = makeWebhookPayload('INITIAL_PURCHASE', {
+        environment: 'SANDBOX',
+      });
+      const res = await makeRequest(payload, {
+        ...TEST_ENV,
+        ENVIRONMENT: 'staging',
+      });
+      expect(res.status).toBe(200);
+      expect(handlers.handleInitialPurchase).toHaveBeenCalled();
+      expect(
+        warn.mock.calls.map(([entry]) => String(entry)).join('\n'),
+      ).toContain(
+        'Received SANDBOX webhook event — verify this is intentional',
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('accepts PRODUCTION events in production (no regression)', async () => {

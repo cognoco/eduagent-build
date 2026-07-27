@@ -1,33 +1,84 @@
 import type { Href, Router } from 'expo-router';
 import {
   nowDeepLinkRouteSchema,
+  type NowCard,
   type NowDeepLink,
   type NowDeepLinkRoute,
+  type ScopeDescriptor,
 } from '@eduagent/schemas';
+import type { MENTOR_RETURN_TO } from './navigation';
 
 export type SubjectHubTarget = 'legacy-shelf' | 'v2-subject-hub';
 
-export interface PushNowDeepLinkOptions {
+interface NowPathOptions {
   subjectHubTarget?: SubjectHubTarget;
+  returnTo?: typeof MENTOR_RETURN_TO;
 }
+
+export interface PushNowDeepLinkOptions extends NowPathOptions {
+  // WI-2223: a support.hub pointer must select the Support-hub scope before
+  // the Mentor tab opens, or the learner Mentor surface renders instead
+  // (activeScope is otherwise unchanged by the push). Callers that hold
+  // useScopeContext pass their setActiveScope through here.
+  setActiveScope?: (scope: ScopeDescriptor) => void;
+}
+
+type ResolvedNowPathOptions = {
+  subjectHubTarget: SubjectHubTarget;
+  returnTo?: typeof MENTOR_RETURN_TO;
+};
 
 type PathBuilder = (
   params: Record<string, string>,
-  options: Required<PushNowDeepLinkOptions>,
+  options: ResolvedNowPathOptions,
 ) => string;
 
-const DEFAULT_OPTIONS: Required<PushNowDeepLinkOptions> = {
+const DEFAULT_OPTIONS: ResolvedNowPathOptions = {
   subjectHubTarget: 'legacy-shelf',
 };
 
-const PATH_BUILDERS: Record<NowDeepLinkRoute, PathBuilder> = {
+function ledgerKind(card: NowCard): string {
+  return typeof card.params['ledgerKind'] === 'string'
+    ? card.params['ledgerKind']
+    : card.templateKey.replace('now.ledger_moment.', '');
+}
+
+export function withJournalSectionIntent(card: NowCard): NowCard {
+  if (card.deepLink.route !== 'journal') return card;
+
+  if (ledgerKind(card) === 'quiz_personal_best') {
+    return {
+      ...card,
+      deepLink: {
+        ...card.deepLink,
+        params: { ...card.deepLink.params, section: 'practice' },
+      },
+    };
+  }
+
+  // TODO: Map a future Journal-routed ledger kind only after product assigns
+  // it to one of the existing Journal sections; unknown kinds stay at root.
+  if (!('section' in card.deepLink.params)) return card;
+  const rootParams = { ...card.deepLink.params };
+  delete rootParams['section'];
+  return {
+    ...card,
+    deepLink: { ...card.deepLink, params: rootParams },
+  };
+}
+
+const PATH_BUILDERS: Partial<Record<NowDeepLinkRoute, PathBuilder>> = {
   'settings.more': () => '/(app)/more',
   'settings.account': () => '/(app)/more/account',
   'billing.manage': () => '/(app)/subscription',
-  'session.resume': (params) =>
+  'session.resume': (params, options) =>
     `/(app)/session?sessionId=${encodeURIComponent(
       requiredParam(params, 'sessionId', 'session.resume'),
-    )}`,
+    )}${
+      options.returnTo
+        ? `&returnTo=${encodeURIComponent(options.returnTo)}`
+        : ''
+    }`,
   // [WI-1121 review fix] Matches the path buildSessionDetailHref() builds for
   // a completed session (session-detail-navigation.ts) — the recap/summary
   // screen, distinct from 'session.resume' (the live session chat).
@@ -56,7 +107,10 @@ const PATH_BUILDERS: Record<NowDeepLinkRoute, PathBuilder> = {
       requiredParam(params, 'topicId', 'challenge.start'),
     )}?mode=challenge`,
   'support.hub': () => '/(app)/mentor',
-  journal: () => '/(app)/journal',
+  journal: (params) =>
+    params['section']
+      ? `/(app)/journal?section=${encodeURIComponent(params['section'])}`
+      : '/(app)/journal',
 };
 
 function assertSupportedRoute(
@@ -84,9 +138,14 @@ function requiredParam(
 export function buildNowPath(
   route: NowDeepLinkRoute,
   params: Record<string, string>,
-  options: PushNowDeepLinkOptions = {},
+  options: NowPathOptions = {},
 ): string {
-  return PATH_BUILDERS[route](params, { ...DEFAULT_OPTIONS, ...options });
+  if (route === 'notice.recheck') {
+    throw new Error('notice.recheck is an action route, not a navigation path');
+  }
+  const builder = PATH_BUILDERS[route];
+  if (!builder) throw new Error(`Unsupported now path route: ${route}`);
+  return builder(params, { ...DEFAULT_OPTIONS, ...options });
 }
 
 export function pushNowDeepLink(
@@ -96,6 +155,9 @@ export function pushNowDeepLink(
 ): void {
   for (const route of [...deepLink.chain, deepLink.route]) {
     assertSupportedRoute(route);
+    if (route === 'support.hub') {
+      options.setActiveScope?.({ kind: 'supporter-hub' });
+    }
     router.push(buildNowPath(route, deepLink.params, options) as Href);
   }
 }

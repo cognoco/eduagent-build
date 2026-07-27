@@ -15,7 +15,7 @@ import {
 
 /** Creates a retention state with overrides for testing */
 function createTestState(
-  overrides: Partial<RetentionState> = {}
+  overrides: Partial<RetentionState> = {},
 ): RetentionState {
   return {
     ...createInitialRetentionState('topic-1'),
@@ -86,12 +86,36 @@ describe('processRecallResult', () => {
     expect(result.failureAction).toBe('feedback_only');
   });
 
-  it('returns redirect_to_library on third failure', () => {
+  // [WI-1462 / RR-4] Third failed recall gets a bounded, same-flow re-teach
+  // off-ramp instead of the forced library-redirect dead-end.
+  it('returns re_teach (bounded off-ramp) on third failure', () => {
     const state = createTestState({ failureCount: 2 });
 
     const result = processRecallResult(state, 1);
 
-    expect(result.failureAction).toBe('redirect_to_library');
+    expect(result.failureAction).toBe('re_teach');
+  });
+
+  it('returns topic_parked on the second consecutive failure after re-teach (4th failure)', () => {
+    const state = createTestState({ failureCount: 3 });
+
+    const result = processRecallResult(state, 1);
+
+    expect(result.failureAction).toBe('topic_parked');
+    // Honest SM-2 state: the park is a warm exit, not a synthetic override —
+    // failureCount/nextReviewAt keep advancing normally.
+    expect(result.newState.failureCount).toBe(4);
+    expect(result.newState.nextReviewAt).not.toBeNull();
+  });
+
+  it('stays topic_parked on further consecutive failures (no infinite re-teach loop)', () => {
+    const state = createTestState({ failureCount: 5 });
+
+    const result = processRecallResult(state, 1);
+
+    // re_teach is offered exactly once per failure streak (at failure 3) —
+    // it must never re-trigger once the topic is parked.
+    expect(result.failureAction).toBe('topic_parked');
   });
 
   it('transitions XP to verified on delayed recall success', () => {

@@ -266,4 +266,30 @@ describe('post-session-suggestions [WI-116] consent re-check', () => {
     expect(result).toEqual(expect.objectContaining({ status: 'completed' }));
     expect(mockRouteAndCall).toHaveBeenCalled();
   });
+
+  // [WI-2396] Basis-inclusive gate: switched from isGdprProcessingAllowedV2
+  // (parental basis only) to isLlmExchangeConsentAllowed, which ALSO honors
+  // an adult's independently-withdrawable self-consent (art6_1_a). Sequence
+  // is [gdpr_parental_consent, art6_1_a-platform_use] — CONSENTED then
+  // WITHDRAWN — proving the adult leg alone (parental leg passes) now blocks,
+  // which isGdprProcessingAllowedV2 alone would have missed.
+  it('[WI-2396] skips without calling the LLM when GDPR consent is granted but adult self-consent (art6_1_a) is withdrawn', async () => {
+    seedConsentState(mockDb as unknown as Record<string, unknown>, {
+      state: ['CONSENTED', 'WITHDRAWN'],
+    });
+    mockRouteAndCall.mockResolvedValue({
+      response: '{"suggestions": ["A", "B"]}',
+    });
+
+    const result = await runHandler(validEventData);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'skipped',
+        reason: 'consent_not_granted',
+      }),
+    );
+    expect(mockRouteAndCall).not.toHaveBeenCalled();
+    expect(mockDb.insert).not.toHaveBeenCalled();
+  });
 });

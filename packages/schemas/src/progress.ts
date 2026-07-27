@@ -13,7 +13,9 @@ import {
 } from './snapshots';
 import { consentStatusSchema } from './consent';
 import { struggleStatusSchema } from './struggle-status';
+import { retentionStatusSchema } from './retention-status.ts';
 import { isoDateField } from './common';
+import { verifiedEvidenceQuoteSchema } from './evidence-links';
 // [SC-04] Canonical session-type and engagement-signal enums — import instead of redefining inline.
 // Imported from the ./session-enums.ts leaf (not ./sessions) to avoid a circular
 // import: sessions.ts imports celebration schemas from this file.
@@ -388,6 +390,11 @@ export const dashboardChildSchema = z.object({
 });
 export type DashboardChild = z.infer<typeof dashboardChildSchema>;
 
+export const dashboardChildDetailSchema = dashboardChildSchema.extend({
+  organizationTimezone: z.string().nullable(),
+});
+export type DashboardChildDetail = z.infer<typeof dashboardChildDetailSchema>;
+
 export const pendingNoticeTypeSchema = z.enum([
   'consent_archived',
   'consent_deleted',
@@ -634,6 +641,14 @@ export const overdueTopicSchema = z.object({
   reason: z.enum(['overdue', 'flagged_weak', 'both']).optional(),
   // Concept label carried from a flagged needs-deepening row, when present.
   concept: z.string().optional(),
+  // [WI-1463] SM-2 retention band backing this topic's urgency (the same
+  // BAND_RANK classification services/overdue-topics.ts already sorts each
+  // subject's topics by). Exposed so the mobile relearn screen can present a
+  // single default order across ALL visible subjects — matching, not
+  // re-deriving, the server's per-subject worst-first ordering — instead of
+  // letting subject grouping demote an urgent topic in a small subject below
+  // a less-urgent one in a larger subject.
+  retentionStatus: retentionStatusSchema,
 });
 export type OverdueTopic = z.infer<typeof overdueTopicSchema>;
 
@@ -794,7 +809,7 @@ export type DashboardResponse = z.infer<typeof dashboardResponseSchema>;
 
 // GET /dashboard/children/:profileId
 export const childDetailResponseSchema = z.object({
-  child: dashboardChildSchema.nullable(),
+  child: dashboardChildDetailSchema.nullable(),
 });
 export type ChildDetailResponse = z.infer<typeof childDetailResponseSchema>;
 
@@ -937,17 +952,28 @@ export type ChildSessionDetailResponse = z.infer<
 >;
 
 // GET /dashboard/children/:profileId/verified-proof
-export const verifiedProofResponseSchema = z.object({
-  hasProof: z.boolean(),
-  topicId: z.string().uuid().optional(),
-  topicTitle: z.string().optional(),
-  subjectId: z.string().uuid().optional(),
-  sessionId: z.string().uuid().optional(),
-  verifiedAt: isoDateField.optional(),
-  quote: z.string().nullable(),
-  masteryVerificationState: z.enum(['unverified', 'fresh', 'stale']).optional(),
-  retentionStatus: z.enum(['strong', 'fading', 'weak', 'forgotten']).optional(),
-});
+export const verifiedProofResponseSchema = z.union([
+  z.object({
+    hasProof: z.literal(false),
+    quote: z.null(),
+  }),
+  z
+    .object({
+      hasProof: z.literal(true),
+      topicId: z.string().uuid().optional(),
+      topicTitle: z.string().optional(),
+      subjectId: z.string().uuid().optional(),
+      sessionId: z.string().uuid().optional(),
+      verifiedAt: isoDateField.optional(),
+      masteryVerificationState: z
+        .enum(['unverified', 'fresh', 'stale'])
+        .optional(),
+      retentionStatus: z
+        .enum(['strong', 'fading', 'weak', 'forgotten'])
+        .optional(),
+    })
+    .and(verifiedEvidenceQuoteSchema),
+]);
 export type VerifiedProofResponse = z.infer<typeof verifiedProofResponseSchema>;
 
 // Curated memory view schema — shared contract for API and mobile memory UI.

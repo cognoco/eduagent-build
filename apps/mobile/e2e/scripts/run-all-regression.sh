@@ -84,7 +84,7 @@ run_seeded "learning-active"       "flows/edge/streak-display.yaml"
 
 # ─── GROUP 11: Consent flows (updated per Sessions 15-18, 22) ───
 run_seeded "consent-withdrawn-solo" "flows/consent/consent-withdrawn-gate.yaml"
-run_seeded "onboarding-complete"    "flows/consent/post-approval-landing.yaml"
+run_seeded "post-approval-ready"    "flows/consent/post-approval-landing.yaml"
 run_seeded "consent-pending"        "flows/consent/consent-pending-gate.yaml"
 run_seeded "pre-profile"            "flows/consent/consent-coppa-under13.yaml"
 run_seeded "pre-profile"            "flows/consent/consent-gdpr-under16.yaml"

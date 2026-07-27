@@ -13,14 +13,22 @@
  * learningSessions.findMany chains used by getChildrenForParent /
  * getChildSessions / getChildSessionDetail — a multi-table relational-API stub
  * substantially larger than this test file. Tracked with the broader
- * services/dashboard burn-down (see docs/plans/2026-05-12-internal-mock-cleanup-
- * inventory.md).
+ * services/dashboard burn-down (see docs/_archive/plans/done/
+ * 2026-05-12-internal-mock-cleanup-inventory.md).
  */
 
 const mockGetChildrenForParent = jest.fn();
 const mockGetChildSessions = jest.fn();
 const mockGetChildSessionDetail = jest.fn();
 const mockListProfileSessions = jest.fn();
+const mockCaptureException = jest.fn();
+
+jest.mock(
+  './sentry' /* gc1-allow: Sentry is the external observation boundary for safe proof-lookup degradation */,
+  () => ({
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  }),
+);
 
 jest.mock('./dashboard', () => {
   const actual = jest.requireActual(
@@ -50,7 +58,16 @@ jest.mock(
   },
 );
 
-import type { Database } from '@eduagent/database';
+import {
+  assessments,
+  evidenceLinks,
+  needsDeepeningTopics,
+  retentionCards,
+  sessionEvents,
+  sessionSummaries,
+  topicNotes,
+  type Database,
+} from '@eduagent/database';
 
 import { ForbiddenError } from '../errors';
 import {
@@ -61,9 +78,12 @@ import {
 } from './recaps';
 
 const PARENT_ID = 'a0000000-0000-4000-8000-000000000001';
+const ORGANIZATION_ID = 'c0000000-0000-4000-8000-000000000001';
 const VISIBLE_CHILD = 'a0000000-0000-4000-8000-000000000010';
 const HIDDEN_CHILD = 'a0000000-0000-4000-8000-000000000020';
 const RECAP_ID = 'b0000000-0000-4000-8000-000000000100';
+const ARTIFACT_ID = 'e0000000-0000-4000-8000-000000000001';
+const EVENT_ID = 'f0000000-0000-4000-8000-000000000001';
 
 const db = {} as Database;
 
@@ -95,14 +115,54 @@ function sessionRow(sessionId: string) {
   >[number];
 }
 
+function topicSessionRow(sessionId: string) {
+  return {
+    ...sessionRow(sessionId),
+    topicId: 'd0000000-0000-4000-8000-000000000001',
+    topicTitle: 'Fractions',
+  } as Awaited<
+    ReturnType<typeof import('./dashboard').getChildSessions>
+  >[number];
+}
+
 beforeEach(() => {
   mockGetChildrenForParent.mockReset();
   mockGetChildSessions.mockReset();
   mockGetChildSessionDetail.mockReset();
   mockListProfileSessions.mockReset();
+  mockCaptureException.mockReset();
 });
 
 describe('listRecapsForParent — per-child ForbiddenError isolation', () => {
+  it('preserves unavailable when guardian-list proof enrichment fails', async () => {
+    mockGetChildrenForParent.mockResolvedValue([
+      childRow(VISIBLE_CHILD, 'Visible'),
+    ]);
+    mockGetChildSessions.mockResolvedValue([topicSessionRow(RECAP_ID)]);
+    const readFailure = new Error('database query detail');
+    const failingDb = {
+      select: jest.fn(() => {
+        throw readFailure;
+      }),
+    } as unknown as Database;
+
+    const recaps = await listRecapsForParent(
+      failingDb,
+      PARENT_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
+
+    expect(recaps[0]?.verifiedProof).toEqual({ status: 'unavailable' });
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Verified proof lookup failed' }),
+      { tags: { surface: 'recaps.verified-proof' } },
+    );
+    expect(JSON.stringify(mockCaptureException.mock.calls)).not.toContain(
+      readFailure.message,
+    );
+  });
+
   it('returns recaps from visible children when a sibling has hidden consent', async () => {
     mockGetChildrenForParent.mockResolvedValue([
       childRow(VISIBLE_CHILD, 'Visible'),
@@ -117,12 +177,18 @@ describe('listRecapsForParent — per-child ForbiddenError isolation', () => {
       },
     );
 
-    const recaps = await listRecapsForParent(db, PARENT_ID);
+    const recaps = await listRecapsForParent(
+      db,
+      PARENT_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
 
     expect(recaps).toHaveLength(1);
     expect(recaps[0]).toMatchObject({
       recapId: RECAP_ID,
       childProfileId: VISIBLE_CHILD,
+      verifiedProof: { status: 'absent' },
     });
   });
 
@@ -132,9 +198,9 @@ describe('listRecapsForParent — per-child ForbiddenError isolation', () => {
     ]);
     mockGetChildSessions.mockRejectedValueOnce(new Error('connection lost'));
 
-    await expect(listRecapsForParent(db, PARENT_ID)).rejects.toThrow(
-      'connection lost',
-    );
+    await expect(
+      listRecapsForParent(db, PARENT_ID, PARENT_ID, ORGANIZATION_ID),
+    ).rejects.toThrow('connection lost');
   });
 });
 
@@ -152,6 +218,47 @@ function fakeDbReturning(rows: unknown[]): Database {
   chain['leftJoin'] = jest.fn(() => chain);
   chain['where'] = jest.fn(async () => rows);
   return chain as unknown as Database;
+}
+
+function fakeProofDb(rowsByTable: Map<unknown, unknown[]>): Database {
+  return {
+    select: jest.fn(() => {
+      let rows: unknown[] = [];
+      const chain: Record<string, unknown> = {};
+      chain['from'] = jest.fn((table: unknown) => {
+        rows = rowsByTable.get(table) ?? [];
+        return chain;
+      });
+      chain['innerJoin'] = jest.fn(() => chain);
+      chain['leftJoin'] = jest.fn(() => chain);
+      chain['where'] = jest.fn(() => chain);
+      chain['orderBy'] = jest.fn(() => chain);
+      chain['limit'] = jest.fn(async () => rows);
+      chain['then'] = (
+        resolve: (value: unknown[]) => unknown,
+        reject: (reason: unknown) => unknown,
+      ) => Promise.resolve(rows).then(resolve, reject);
+      return chain;
+    }),
+    // Scoped-repository path used by getVerifiedProofForSessionTopic for the
+    // weak-spot and retention-card reads, and by getArtifactEvidenceAvailability
+    // for the evidence-links read; serve from the same seeded map.
+    query: {
+      needsDeepeningTopics: {
+        findMany: jest.fn(
+          async () => rowsByTable.get(needsDeepeningTopics) ?? [],
+        ),
+      },
+      retentionCards: {
+        findFirst: jest.fn(
+          async () => (rowsByTable.get(retentionCards) ?? [])[0],
+        ),
+      },
+      evidenceLinks: {
+        findMany: jest.fn(async () => rowsByTable.get(evidenceLinks) ?? []),
+      },
+    },
+  } as unknown as Database;
 }
 
 describe('listRecapsForParent — next-topic enrichment', () => {
@@ -173,7 +280,12 @@ describe('listRecapsForParent — next-topic enrichment', () => {
       },
     ]);
 
-    const recaps = await listRecapsForParent(enrichedDb, PARENT_ID);
+    const recaps = await listRecapsForParent(
+      enrichedDb,
+      PARENT_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
 
     expect(recaps).toHaveLength(1);
     expect(recaps[0]).toMatchObject({
@@ -201,7 +313,12 @@ describe('listRecapsForParent — next-topic enrichment', () => {
       },
     ]);
 
-    const recaps = await listRecapsForParent(enrichedDb, PARENT_ID);
+    const recaps = await listRecapsForParent(
+      enrichedDb,
+      PARENT_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
 
     expect(recaps).toHaveLength(1);
     expect(recaps[0]?.nextTopicTitle).toBeNull();
@@ -216,7 +333,12 @@ describe('listRecapsForParent — next-topic enrichment', () => {
     // DB returns no next-topic row for this session.
     const enrichedDb = fakeDbReturning([]);
 
-    const recaps = await listRecapsForParent(enrichedDb, PARENT_ID);
+    const recaps = await listRecapsForParent(
+      enrichedDb,
+      PARENT_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
 
     expect(recaps).toHaveLength(1);
     expect(recaps[0]?.nextTopicTitle).toBeNull();
@@ -248,7 +370,12 @@ describe('listRecapsForParent — next-topic enrichment', () => {
       },
     ]);
 
-    const recaps = await listRecapsForParent(enrichedDb, PARENT_ID);
+    const recaps = await listRecapsForParent(
+      enrichedDb,
+      PARENT_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
 
     expect(recaps).toHaveLength(1);
     expect(recaps[0]?.nextTopicTitle).toBe('Comparing fractions');
@@ -265,7 +392,12 @@ describe('listRecapsForParent — next-topic enrichment', () => {
 
     // db.select is undefined on this bare object → the lookup throws and the
     // try/catch defaults next-topic to null without failing the recap list.
-    const recaps = await listRecapsForParent({} as Database, PARENT_ID);
+    const recaps = await listRecapsForParent(
+      {} as Database,
+      PARENT_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
 
     expect(recaps).toHaveLength(1);
     expect(recaps[0]?.nextTopicTitle).toBeNull();
@@ -293,7 +425,13 @@ describe('getRecapForParent — per-child ForbiddenError isolation', () => {
       },
     );
 
-    const recap = await getRecapForParent(db, PARENT_ID, RECAP_ID);
+    const recap = await getRecapForParent(
+      db,
+      PARENT_ID,
+      RECAP_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
 
     expect(recap).toMatchObject({
       recapId: RECAP_ID,
@@ -321,7 +459,7 @@ describe('getRecapForParent — per-child ForbiddenError isolation', () => {
     );
 
     await expect(
-      getRecapForParent(db, PARENT_ID, RECAP_ID),
+      getRecapForParent(db, PARENT_ID, RECAP_ID, PARENT_ID, ORGANIZATION_ID),
     ).resolves.toBeNull();
   });
 
@@ -331,13 +469,266 @@ describe('getRecapForParent — per-child ForbiddenError isolation', () => {
     ]);
     mockGetChildSessionDetail.mockRejectedValueOnce(new Error('boom'));
 
-    await expect(getRecapForParent(db, PARENT_ID, RECAP_ID)).rejects.toThrow(
-      'boom',
+    await expect(
+      getRecapForParent(db, PARENT_ID, RECAP_ID, PARENT_ID, ORGANIZATION_ID),
+    ).rejects.toThrow('boom');
+  });
+});
+
+describe('getRecapForParent — verified-proof enrichment', () => {
+  const verifiedAt = new Date('2026-07-10T10:00:00.000Z');
+  const nextReviewAt = new Date('2026-07-17T10:00:00.000Z');
+
+  beforeEach(() => {
+    mockGetChildrenForParent.mockResolvedValue([
+      childRow(VISIBLE_CHILD, 'Visible'),
+    ]);
+    mockGetChildSessionDetail.mockResolvedValue(topicSessionRow(RECAP_ID));
+  });
+
+  function proofDb(
+    noteCreatedAt = new Date(),
+    targetAvailable = true,
+    artifactAvailable = true,
+  ): Database {
+    return fakeProofDb(
+      new Map<unknown, unknown[]>([
+        [sessionSummaries, []],
+        [
+          assessments,
+          [
+            {
+              topicId: topicSessionRow(RECAP_ID).topicId,
+              topicTitle: 'Fractions',
+              subjectId: topicSessionRow(RECAP_ID).subjectId,
+              sessionId: RECAP_ID,
+              verifiedAt,
+            },
+          ],
+        ],
+        [
+          topicNotes,
+          artifactAvailable
+            ? [
+                {
+                  id: ARTIFACT_ID,
+                  content: 'Equivalent fractions name the same amount.',
+                  createdAt: noteCreatedAt,
+                },
+              ]
+            : [],
+        ],
+        [
+          evidenceLinks,
+          [
+            {
+              id: '10000000-0000-4000-8000-000000000001',
+              profileId: VISIBLE_CHILD,
+              fromKind: 'artifact',
+              fromId: ARTIFACT_ID,
+              toKind: 'transcript_excerpt',
+              toId: EVENT_ID,
+              createdAt: new Date(),
+            },
+          ],
+        ],
+        [sessionEvents, targetAvailable ? [{ id: EVENT_ID }] : []],
+        [needsDeepeningTopics, []],
+        [
+          retentionCards,
+          [
+            {
+              topicId: topicSessionRow(RECAP_ID).topicId,
+              easeFactor: 2.5,
+              intervalDays: 30,
+              repetitions: 2,
+              failureCount: 0,
+              consecutiveSuccesses: 2,
+              xpStatus: 'verified',
+              lastReviewedAt: new Date(),
+              nextReviewAt,
+            },
+          ],
+        ],
+      ]),
     );
+  }
+
+  it('populates verified proof from the session topic marked artifact', async () => {
+    const recap = await getRecapForParent(
+      proofDb(),
+      PARENT_ID,
+      RECAP_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
+
+    expect(recap?.verifiedProof).toEqual({
+      status: 'present',
+      proof: {
+        topicId: topicSessionRow(RECAP_ID).topicId,
+        topicTitle: 'Fractions',
+        subjectId: topicSessionRow(RECAP_ID).subjectId,
+        verifiedAt: verifiedAt.toISOString(),
+        verificationState: 'fresh',
+        retentionStatus: 'strong',
+        nextReviewDate: nextReviewAt.toISOString(),
+        evidenceAvailability: 'available',
+        quote: 'Equivalent fractions name the same amount.',
+      },
+    });
+  });
+
+  it('returns absent and preserves the recap when no verified assessment exists', async () => {
+    const noProofDb = fakeProofDb(
+      new Map<unknown, unknown[]>([
+        [sessionSummaries, []],
+        [assessments, []],
+      ]),
+    );
+
+    const recap = await getRecapForParent(
+      noProofDb,
+      PARENT_ID,
+      RECAP_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
+
+    expect(recap).toMatchObject({
+      recapId: RECAP_ID,
+      childProfileId: VISIBLE_CHILD,
+      topicTitle: 'Fractions',
+      narrative: null,
+      verifiedProof: { status: 'absent' },
+    });
+  });
+
+  it('returns absent when no qualifying verified artifact exists', async () => {
+    const recap = await getRecapForParent(
+      proofDb(new Date(), true, false),
+      PARENT_ID,
+      RECAP_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
+
+    expect(recap?.verifiedProof).toEqual({ status: 'absent' });
+  });
+
+  it('returns only a typed unavailable result and observes a proof read failure', async () => {
+    const readFailure = new Error(
+      'column verified_artifact_secret does not exist in database query',
+    );
+    const failingDb = {
+      select: jest.fn(() => {
+        throw readFailure;
+      }),
+    } as unknown as Database;
+
+    const recap = await getRecapForParent(
+      failingDb,
+      PARENT_ID,
+      RECAP_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
+
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    const [observedError, observedContext] =
+      mockCaptureException.mock.calls[0] ?? [];
+    expect(observedError).toEqual(
+      new Error('Verified proof lookup failed', {
+        cause: { errorKind: 'error' },
+      }),
+    );
+    expect(observedContext).toEqual({
+      tags: { surface: 'recaps.verified-proof' },
+    });
+    expect(JSON.stringify(mockCaptureException.mock.calls)).not.toMatch(
+      /column|database|query|secret/i,
+    );
+    expect(recap?.verifiedProof).toEqual({ status: 'unavailable' });
+    expect(JSON.stringify(recap?.verifiedProof)).not.toMatch(
+      /column|database|query|secret/i,
+    );
+  });
+
+  it('keeps proof metadata but nulls an aged marked-note quote', async () => {
+    const agedCreatedAt = new Date();
+    agedCreatedAt.setUTCDate(agedCreatedAt.getUTCDate() - 31);
+
+    const recap = await getRecapForParent(
+      proofDb(agedCreatedAt),
+      PARENT_ID,
+      RECAP_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
+
+    expect(recap?.verifiedProof).toMatchObject({
+      status: 'present',
+      proof: {
+        topicId: topicSessionRow(RECAP_ID).topicId,
+        verifiedAt: verifiedAt.toISOString(),
+        verificationState: 'fresh',
+        nextReviewDate: nextReviewAt.toISOString(),
+        quote: null,
+      },
+    });
+  });
+
+  it('keeps recap proof metadata but nulls the quote when evidence was purged', async () => {
+    const recap = await getRecapForParent(
+      proofDb(new Date(), false),
+      PARENT_ID,
+      RECAP_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
+
+    expect(recap?.verifiedProof).toMatchObject({
+      status: 'present',
+      proof: {
+        topicId: topicSessionRow(RECAP_ID).topicId,
+        verifiedAt: verifiedAt.toISOString(),
+        evidenceAvailability: 'source_unavailable',
+        quote: null,
+      },
+    });
   });
 });
 
 describe('listRecapsForProfile — self-scope session mapping', () => {
+  it('preserves unavailable when self-recap proof enrichment fails', async () => {
+    mockListProfileSessions.mockResolvedValue({
+      sessions: [topicSessionRow(RECAP_ID)],
+      nextCursor: null,
+    });
+    const readFailure = new Error('database schema detail');
+    const profileDb = {
+      select: jest.fn(() => {
+        throw readFailure;
+      }),
+      query: {
+        person: {
+          findFirst: jest.fn(async () => ({ displayName: 'Self Learner' })),
+        },
+      },
+    } as unknown as Database;
+
+    const recaps = await listRecapsForProfile(profileDb, VISIBLE_CHILD);
+
+    expect(recaps[0]?.verifiedProof).toEqual({ status: 'unavailable' });
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Verified proof lookup failed' }),
+      { tags: { surface: 'recaps.verified-proof' } },
+    );
+    expect(JSON.stringify(mockCaptureException.mock.calls)).not.toContain(
+      readFailure.message,
+    );
+  });
+
   it('maps scoped profile sessions to recap items without parent or child-edge reads', async () => {
     mockListProfileSessions.mockResolvedValue({
       sessions: [sessionRow(RECAP_ID)],

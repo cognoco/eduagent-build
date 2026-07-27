@@ -311,6 +311,12 @@ const raw: readonly KeepPattern[] = [
       'apps/mobile/src/components/mentor/MentorCelebration.tsx:30',
   },
   {
+    pattern: 'mentorHome.bar.mic*Label',
+    reason:
+      'selected via MIC_LABEL_KEYS[micState] at ' +
+      'apps/mobile/src/components/mentor/MentorInputBar.tsx:271',
+  },
+  {
     pattern: 'subjectHub.nextUp.*',
     reason:
       'selected via NEXT_UP_ACTION_KEY[nextUp.kind] at ' +
@@ -345,19 +351,19 @@ const raw: readonly KeepPattern[] = [
     pattern: 'journal.practice.type.*',
     reason:
       'selected via practiceTypeLabel(type, t) → t(`journal.practice.type.${type}`) at ' +
-      'apps/mobile/src/components/journal/JournalTabView.tsx:883',
+      'apps/mobile/src/components/journal/JournalPracticeSection.tsx:28',
   },
   {
     pattern: 'home.parent.verifiedProof.state.*',
     reason:
       'selected via STATE_LABEL_KEYS[proof.masteryVerificationState] at ' +
-      'apps/mobile/src/components/home/VerifiedProofCard.tsx:73',
+      'apps/mobile/src/components/family/VerifiedProofBlock.tsx:14',
   },
   {
     pattern: 'home.parent.verifiedProof.retention.*',
     reason:
       'selected via RETENTION_LABEL_KEYS[proof.retentionStatus] at ' +
-      'apps/mobile/src/components/home/VerifiedProofCard.tsx:76',
+      'apps/mobile/src/components/family/VerifiedProofBlock.tsx:20',
   },
   {
     pattern: 'more.accommodation.sectionHeader',
@@ -380,6 +386,13 @@ const raw: readonly KeepPattern[] = [
     reason:
       'selected via STRAND_COPY_KEYS[strand] → strandCopyKey(strand) at ' +
       'apps/mobile/src/app/(app)/progress/[subjectId]/index.tsx:599',
+  },
+  {
+    // WI-2789/WI-2768: Clerk error-code → localized-message mapping.
+    pattern: 'auth.errors.*',
+    reason:
+      'selected via CLERK_ERROR_KEYS[code] then i18next.t(key) at ' +
+      'apps/mobile/src/lib/clerk-error.ts:19,50',
   },
 ];
 

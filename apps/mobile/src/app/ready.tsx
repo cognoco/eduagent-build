@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, Platform, Dimensions } from 'react-native';
+import { View, Text, Platform, Dimensions, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import { MentorBirthErrorBoundary } from '../components/common/MentorBirthErrorB
 import { MentorBirthAnimation } from '../components/common/MentorBirthAnimation';
 import { CheckmarkPopAnimation } from '../components/common/CheckmarkPopAnimation';
 import { Button } from '../components/common/Button';
+import { isSessionForwardableReturnTo } from '../lib/navigation';
 
 const SCREEN_HEIGHT =
   Platform.OS === 'web'
@@ -56,6 +57,7 @@ export default function ReadyScreen() {
     topicId?: string;
     topicName?: string;
     rawInput?: string;
+    returnTo?: string;
   }>();
 
   const subject = (params.subject ?? '').trim();
@@ -92,6 +94,8 @@ export default function ReadyScreen() {
     if (params.topicId) sessionParams.topicId = params.topicId;
     if (params.topicName) sessionParams.topicName = params.topicName;
     if (params.rawInput) sessionParams.rawInput = params.rawInput;
+    if (isSessionForwardableReturnTo(params.returnTo))
+      sessionParams.returnTo = params.returnTo;
 
     router.replace({
       pathname: '/(app)/session',
@@ -105,6 +109,7 @@ export default function ReadyScreen() {
     params.topicId,
     params.topicName,
     params.rawInput,
+    params.returnTo,
   ]);
 
   // /ready always runs as the learner whose profile is now active —
@@ -121,13 +126,21 @@ export default function ReadyScreen() {
       }}
       testID="ready-screen"
     >
-      <View
-        className="flex-1 items-center px-6"
+      <ScrollView
+        className="flex-1"
         style={
           Platform.OS === 'web'
             ? { maxWidth: 480, width: '100%', alignSelf: 'center' }
             : undefined
         }
+        contentContainerStyle={{
+          flexGrow: 1,
+          alignItems: 'center',
+          paddingHorizontal: 24,
+          paddingBottom: 24,
+        }}
+        showsVerticalScrollIndicator={false}
+        testID="ready-scroll"
       >
         <View className="items-center mt-8 mb-4">
           <MentorBirthErrorBoundary componentTag="ready-mentor-birth">
@@ -181,7 +194,7 @@ export default function ReadyScreen() {
             testID="ready-start"
           />
         </View>
-      </View>
+      </ScrollView>
     </View>
   );
 }

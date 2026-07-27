@@ -76,9 +76,9 @@ function formatFailure(
 }
 
 function listStagedFiles(cwd: string): string[] {
-  return splitGitLines(
-    git(cwd, ['diff', '--cached', '--name-only', '--diff-filter=d']),
-  ).map(normalizeGitPath);
+  return splitGitLines(git(cwd, ['diff', '--cached', '--name-only'])).map(
+    normalizeGitPath,
+  );
 }
 
 function normalizeGitPath(gitPath: string): string {

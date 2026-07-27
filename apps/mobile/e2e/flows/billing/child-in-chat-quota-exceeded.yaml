@@ -1,3 +1,7 @@
+# PARKED (WI-1864; owner WI-1655): The parent-authenticated release flow has no
+# supported way to activate the uncredentialed child after SecureStore clear.
+# UNBLOCK: add an EXPO_PUBLIC_E2E-guarded child-activation seam through the real
+# profile-switch contract, then validate this verify-at-e2e flow on Orion.
 # Flow: Child In-Chat Quota Exceeded - verify child-safe 402 actions
 # Validates: a non-owner child profile that exhausts its per-profile v2 quota
 # gets the structured in-chat quota card with notify-parent/home actions and no
@@ -11,6 +15,7 @@ tags:
   - nightly
   - billing
   - quota
+  - blocked
 ---
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml

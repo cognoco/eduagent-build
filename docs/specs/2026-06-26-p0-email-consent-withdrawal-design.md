@@ -10,6 +10,17 @@
 > `ANALYTICS_HASH_KEY` in production, Resend SPF/DKIM, live E2E) are tracked
 > under `WI-1340` and are operator-gated, not design-incomplete.
 
+> **Superseded in part (2026-07-19, `WI-2348` / `OPQ-114`): bearer-token
+> restore removed.** Everything below describing `POST /consent-page/restore`
+> as a mutating, bearer-token-authorized restore (§5.2, §5.3, §5.4, §7, §8) is
+> historical — that path was removed. `POST /consent-page/restore` now never
+> mutates; it always returns a "sign in to restore" informational page
+> regardless of token validity. `restoreConsentByToken` no longer exists.
+> Restore is authenticated-guardian-only, via `restoreConsentV2` /
+> `PUT /consent/:childProfileId/restore`. See
+> [`MMT-ADR-0029`](../adr/MMT-ADR-0029-bearer-token-consent-withdrawal-authority.md)
+> (amended) and Cosmo finding T-11.
+
 - **Date:** 2026-06-26
 - **Status:** Draft (design — awaiting review before plan). **Rev 2
   (2026-06-26):** durable withdrawal link relocated from the consent *request*

@@ -1,7 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useCallback, useEffect, useState } from 'react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { AccommodationMode } from '@eduagent/schemas';
@@ -24,12 +23,13 @@ import {
   LearningModeOption,
   SettingsRow,
 } from '../../../components/more/settings-rows';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function AccommodationScreen(): React.ReactElement {
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const { activeProfile, profiles } = useProfile();
   const navigationContract = useNavigationContract();
   const [showGuide, setShowGuide] = useState(false);
@@ -114,6 +114,15 @@ export default function AccommodationScreen(): React.ReactElement {
     );
   }, [canEditChildPreferences, childProfileId, router]);
 
+  if (isChildMode && !canEditChildPreferences) {
+    return (
+      <View
+        className="flex-1 bg-background"
+        testID="accommodation-access-pending"
+      />
+    );
+  }
+
   // [ACCOUNT-06] The hub row that opens this screen is labelled "Preferences";
   // title the self view to match ("Your learning preferences") instead of the
   // jargon-y "Your learning accommodation" so the destination reads as the same
@@ -123,7 +132,11 @@ export default function AccommodationScreen(): React.ReactElement {
     : t('more.learningPreferences.screenTitle');
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+    <View
+      className="flex-1 bg-background"
+      style={{ paddingTop: insets.top }}
+      testID="accommodation-screen"
+    >
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
           onPress={handleBack}

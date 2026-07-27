@@ -9,7 +9,7 @@
  * - Inngest event HTTP API — via fetch interceptor
  */
 
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import {
   generateUUIDv7,
   login,
@@ -48,10 +48,6 @@ jest.mock(
 );
 
 import { app } from '../../apps/api/src/index';
-import {
-  ensureLegacyProfileAnchorForTest,
-  legacyIdentityTableExistsForTest,
-} from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { getTierConfig } from '../../apps/api/src/services/subscription';
 
 const mockKvPut = jest.fn().mockResolvedValue(undefined);
@@ -147,15 +143,6 @@ async function seedAccount(prefix: string) {
     organizationId: accountId,
     roles: ['admin', 'learner'],
   });
-  await ensureLegacyProfileAnchorForTest(db, {
-    profileId: personId,
-    accountId,
-    displayName: 'Stripe Webhook Owner',
-    birthYear: 1985,
-    isOwner: true,
-    email: identity.email,
-    clerkUserId: identity.clerkUserId,
-  });
 
   return {
     db,
@@ -195,20 +182,6 @@ async function seedSubscriptionForAccount(input: {
       : input.lastStripeEventTimestamp
         ? new Date(input.lastStripeEventTimestamp)
         : null;
-
-  // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL insert,
-  // same conditional seed as before.
-  if (await legacyIdentityTableExistsForTest(input.db, 'subscriptions')) {
-    await input.db.execute(sql`
-      INSERT INTO subscriptions (
-        id, account_id, stripe_subscription_id, tier, status, last_stripe_event_timestamp
-      )
-      VALUES (
-        ${subscriptionId}, ${input.account.id}, ${stripeSubscriptionId ?? null},
-        ${tier}, ${status}, ${lastStripeEventTimestamp ? lastStripeEventTimestamp.toISOString() : null}
-      )
-    `);
-  }
 
   if (!input.ownerPersonId) {
     throw new Error('ownerPersonId is required for v2 Stripe seed');

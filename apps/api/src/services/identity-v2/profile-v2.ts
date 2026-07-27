@@ -30,9 +30,8 @@ import type {
 } from '@eduagent/schemas';
 import type { ProfileMeta } from '../../middleware/profile-scope';
 import {
-  resolveLatestConsentStatusAnyBasis,
-  resolveLatestConsentStatusesAnyBasis,
-  DEFAULT_CONSENT_PURPOSE,
+  resolveLatestConsentSetStatusAnyBasis,
+  resolveLatestConsentSetStatusesAnyBasis,
 } from './consent-status-v2';
 
 /**
@@ -159,11 +158,10 @@ export async function findOwnerPersonScope(
   const owner = ownerRow[0];
   if (!owner) return null;
 
-  const consentStatus = await resolveLatestConsentStatusAnyBasis(
+  const consentStatus = await resolveLatestConsentSetStatusAnyBasis(
     db,
     owner.personId,
     organizationId,
-    DEFAULT_CONSENT_PURPOSE,
   );
 
   return {
@@ -193,19 +191,7 @@ export async function findOwnerPersonScope(
 export async function getOwnerProfileV2(
   db: Database,
   organizationId: string,
-): Promise<
-  | (Profile & {
-      // [WI-367] Additive-only: exact birth-date parts for gating callers
-      // (e.g. child-profile-v2.ts's adult-owner gate) that need
-      // calculateAgeFromParts instead of year-only math. Not part of the
-      // Profile response schema — any route that serializes this through
-      // profileResponseSchema.parse() has these fields stripped (the schema
-      // is not .strict(), so z.object() drops unknown keys by default).
-      birthMonth?: number | null;
-      birthDay?: number | null;
-    })
-  | null
-> {
+): Promise<Profile | null> {
   const ownerRow = await db
     .select({
       personId: person.id,
@@ -234,11 +220,10 @@ export async function getOwnerProfileV2(
   const owner = ownerRow[0];
   if (!owner) return null;
 
-  const consentStatus = await resolveLatestConsentStatusAnyBasis(
+  const consentStatus = await resolveLatestConsentSetStatusAnyBasis(
     db,
     owner.personId,
     organizationId,
-    DEFAULT_CONSENT_PURPOSE,
   );
   const { birthMonth, birthDay } = birthMonthDayFromDate(owner.birthDate);
 
@@ -341,19 +326,21 @@ export async function getProfileV2(
     ? null
     : (chargeEdge?.grantedAt.toISOString() ?? null);
 
-  const consentStatus = await resolveLatestConsentStatusAnyBasis(
+  const consentStatus = await resolveLatestConsentSetStatusAnyBasis(
     db,
     profileId,
     organizationId,
-    DEFAULT_CONSENT_PURPOSE,
   );
+  const { birthMonth, birthDay } = birthMonthDayFromDate(row.birthDate);
 
   return {
     id: row.id,
     accountId: organizationId, // account.id = organization.id
     displayName: row.displayName,
     avatarUrl: row.avatarUrl ?? null,
-    birthYear: Number(row.birthDate.slice(0, 4)),
+    birthYear: birthYearFromDate(row.birthDate),
+    birthMonth,
+    birthDay,
     location: jurisdictionToLocation(row.residenceJurisdiction),
     isOwner,
     hasPremiumLlm: deriveHasPremiumLlm(),
@@ -403,11 +390,10 @@ export async function getPersonScope(
   const found = row[0];
   if (!found) return null;
 
-  const consentStatus = await resolveLatestConsentStatusAnyBasis(
+  const consentStatus = await resolveLatestConsentSetStatusAnyBasis(
     db,
     found.personId,
     organizationId,
-    DEFAULT_CONSENT_PURPOSE,
   );
 
   return {
@@ -534,11 +520,10 @@ export async function listProfilesV2(
 
   // Batched consent status (the L7-F1 batch replacement; behavior-preserving
   // latest-any-basis read). Persons with no consent rows are absent → null.
-  const consentByPersonId = await resolveLatestConsentStatusesAnyBasis(
+  const consentByPersonId = await resolveLatestConsentSetStatusesAnyBasis(
     db,
     personIds,
     organizationId,
-    DEFAULT_CONSENT_PURPOSE,
   );
 
   return rows.map((row) => {
@@ -549,12 +534,15 @@ export async function listProfilesV2(
     const hasFamilyLinks = isOwner
       ? guardianHasEdge.has(row.id)
       : chargeGrantedAt !== null;
+    const { birthMonth, birthDay } = birthMonthDayFromDate(row.birthDate);
     return {
       id: row.id,
       accountId: organizationId, // account.id = organization.id
       displayName: row.displayName,
       avatarUrl: row.avatarUrl ?? null,
       birthYear: birthYearFromDate(row.birthDate),
+      birthMonth,
+      birthDay,
       location: jurisdictionToLocation(row.residenceJurisdiction),
       isOwner,
       hasPremiumLlm: deriveHasPremiumLlm(),

@@ -18,4 +18,14 @@ describe('GET /v1/health', () => {
     expect(body).toHaveProperty('deploySha');
     expect(body.llm.providers).toEqual(expect.any(Array));
   });
+
+  it('echoes a valid phase-probe ID as Worker-boundary proof', async () => {
+    const probeId = 'd7685283-3f99-4acd-b84b-f5b62bf41648';
+
+    const res = await app.request('/v1/health', {
+      headers: { 'x-mentomate-probe-id': probeId },
+    });
+
+    expect(res.headers.get('x-mentomate-worker-probe-id')).toBe(probeId);
+  });
 });

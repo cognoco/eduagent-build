@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { InngestTestEngine } from '@inngest/test';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   createDatabase,
@@ -44,6 +45,8 @@ const emailApiCalls: Array<{
 }> = [];
 const originalFetch = globalThis.fetch;
 const originalResendApiKey = process.env['RESEND_API_KEY'];
+let expoPushResponseStatus = 200;
+let expoPushTicketId = 'ticket-integration';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -196,6 +199,12 @@ function buildProgressMetrics(
 async function seedProfile(input: {
   displayName: string;
   timezone?: string | null;
+  // [WI-1863] Managed charges have no login row; a login makes the person a
+  // credentialed charge, which the digest fan-out now suppresses. Child seeds
+  // pass credentialed:false so they model the managed-charge state the digest
+  // assertions are about; parents keep their login (email/push resolution
+  // reads db.query.login.findFirst for the recipient).
+  credentialed?: boolean;
 }): Promise<{ accountId: string; profileId: string }> {
   const idx = ++seedCounter;
   const clerkUserId = `clerk_weekly_push_${RUN_ID}_${idx}`;
@@ -216,13 +225,15 @@ async function seedProfile(input: {
       residenceJurisdiction: 'ROW',
     })
     .returning({ id: person.id });
-  const loginId = generateUUIDv7();
-  await db.insert(login).values({
-    id: loginId,
-    personId: p!.id,
-    clerkUserId,
-    email,
-  });
+  if (input.credentialed !== false) {
+    const loginId = generateUUIDv7();
+    await db.insert(login).values({
+      id: loginId,
+      personId: p!.id,
+      clerkUserId,
+      email,
+    });
+  }
   await db.insert(membership).values({
     personId: p!.id,
     organizationId: org!.id,
@@ -257,6 +268,17 @@ async function seedWeeklyEmailPrefs(profileId: string): Promise<void> {
     pushEnabled: false,
     maxDailyPush: 3,
     expoPushToken: null,
+  });
+}
+
+async function seedWeeklyPushAndEmailPrefs(profileId: string): Promise<void> {
+  await db.insert(notificationPreferences).values({
+    profileId,
+    weeklyProgressEmail: true,
+    weeklyProgressPush: true,
+    pushEnabled: true,
+    maxDailyPush: 3,
+    expoPushToken: 'ExponentPushToken[integration]',
   });
 }
 
@@ -301,6 +323,48 @@ async function seedSubject(input: {
   });
 }
 
+async function seedWeeklyDeliveryScenario(): Promise<{
+  guardianPersonId: string;
+  chargePersonId: string;
+}> {
+  const { profileId: guardianPersonId } = await seedProfile({
+    displayName: 'Delivery Guardian',
+    timezone: 'UTC',
+  });
+  const { profileId: chargePersonId } = await seedProfile({
+    displayName: 'Delivery Charge',
+    timezone: 'UTC',
+    credentialed: false,
+  });
+  await seedFamilyLink(guardianPersonId, chargePersonId);
+  await seedWeeklyPushAndEmailPrefs(guardianPersonId);
+
+  const latestSnapshotDate = isoDate(new Date());
+  const previousSnapshotDate = isoDate(
+    subtractDays(new Date(`${latestSnapshotDate}T00:00:00.000Z`), 7),
+  );
+  await seedSnapshot({
+    profileId: chargePersonId,
+    snapshotDate: previousSnapshotDate,
+    metrics: buildProgressMetrics({
+      totalSessions: 1,
+      topicsMastered: 1,
+      vocabularyTotal: 5,
+    }),
+  });
+  await seedSnapshot({
+    profileId: chargePersonId,
+    snapshotDate: latestSnapshotDate,
+    metrics: buildProgressMetrics({
+      totalSessions: 3,
+      topicsMastered: 4,
+      vocabularyTotal: 9,
+    }),
+  });
+
+  return { guardianPersonId, chargePersonId };
+}
+
 function migrationStatements(path: string): string[] {
   return readFileSync(path, 'utf8')
     .split('--> statement-breakpoint')
@@ -342,12 +406,26 @@ interface WeeklyPushCronResult {
   queuedParents: number;
 }
 
-async function executeCronSteps(): Promise<{
+interface ExecuteCronStepsOptions {
+  weekWindow?: {
+    nowUtcMs: number;
+    currentWeekStartMs: number;
+  };
+}
+
+async function executeCronSteps(
+  options: ExecuteCronStepsOptions = {},
+): Promise<{
   result: WeeklyPushCronResult;
   step: { run: jest.Mock; sendEvent: jest.Mock };
 }> {
   const step = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
+    run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
+      if (name === 'resolve-week-window' && options.weekWindow) {
+        return options.weekWindow;
+      }
+      return fn();
+    }),
     sendEvent: jest.fn().mockResolvedValue(undefined),
   };
 
@@ -405,8 +483,16 @@ beforeAll(async () => {
         body: body.body as string,
         data: body.data,
       });
+      if (expoPushResponseStatus !== 200) {
+        return new Response(JSON.stringify({ error: 'push unavailable' }), {
+          status: expoPushResponseStatus,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
       return new Response(
-        JSON.stringify({ data: { id: 'ticket-integration', status: 'ok' } }),
+        JSON.stringify({
+          data: { id: expoPushTicketId, status: 'ok' },
+        }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       );
     }
@@ -439,6 +525,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   pushApiCalls.length = 0;
   emailApiCalls.length = 0;
+  expoPushResponseStatus = 200;
+  expoPushTicketId = 'ticket-integration';
 });
 
 afterAll(async () => {
@@ -471,8 +559,161 @@ afterAll(async () => {
 }, 30_000);
 
 describe('weekly progress push integration', () => {
-  it('queues only parents whose real account timezone resolves to local 9am', async () => {
-    const now = new Date();
+  describe('[WI-1997] push delivery controls the email fallback', () => {
+    it('restores a delivered-but-unlogged push result across durable replay and suppresses email', async () => {
+      const { guardianPersonId } = await seedWeeklyDeliveryScenario();
+      // PostgreSQL text rejects NUL. The external Expo boundary still reports a
+      // successful ticket, then the real notificationLog insert throws and the
+      // real push service returns { sent: true, reason: 'log_write_failed' }.
+      expoPushTicketId = 'ticket-delivered-but-unlogged\u0000';
+
+      const event = {
+        name: 'app/weekly-progress-push.generate',
+        data: { parentId: guardianPersonId },
+      };
+      const pushEngine = new InngestTestEngine({
+        function: weeklyProgressPushGenerate,
+        events: [event],
+      });
+      const pushCheckpoint = await pushEngine.executeStep(
+        'send-weekly-progress-push',
+      );
+
+      // Persist every completed step output through JSON, then start a fresh
+      // engine from only that serialized durable state. The email gate cannot
+      // see an in-memory pushResult from the first engine.
+      const serializedCompletedSteps = JSON.parse(
+        JSON.stringify(
+          await Promise.all([
+            ...Object.entries(pushCheckpoint.state).map(
+              async ([id, dataPromise]) => ({ id, data: await dataPromise }),
+            ),
+            Promise.resolve({
+              id: pushCheckpoint.step.id,
+              data: pushCheckpoint.result,
+            }),
+          ]),
+        ),
+      ) as Array<{ id: string; data: unknown }>;
+      expect(serializedCompletedSteps).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            data: expect.objectContaining({
+              sent: true,
+              reason: 'log_write_failed',
+            }),
+          }),
+        ]),
+      );
+
+      const replayEngine = new InngestTestEngine({
+        function: weeklyProgressPushGenerate,
+        events: [event],
+        steps: serializedCompletedSteps.map(({ id, data }) => ({
+          id,
+          idIsHashed: true,
+          handler: () => data,
+        })),
+      });
+      const { result, state: replayState } = await replayEngine.execute();
+
+      expect(result).toEqual({
+        status: 'completed',
+        parentId: guardianPersonId,
+      });
+      expect(await Promise.all(Object.values(replayState))).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            sent: true,
+            reason: 'log_write_failed',
+          }),
+          { sent: false, reason: 'push_sent' },
+        ]),
+      );
+      expect(pushApiCalls).toHaveLength(1);
+      expect(emailApiCalls).toHaveLength(0);
+      const storedNotifications = await db.query.notificationLog.findMany({
+        where: and(
+          eq(notificationLog.profileId, guardianPersonId),
+          eq(notificationLog.type, 'weekly_progress'),
+        ),
+      });
+      expect(storedNotifications).toHaveLength(0);
+    });
+
+    it('sends fallback email when push genuinely fails', async () => {
+      const { guardianPersonId } = await seedWeeklyDeliveryScenario();
+      expoPushResponseStatus = 503;
+
+      const result = await executeGenerateHandler(guardianPersonId);
+
+      expect(result).toEqual({
+        status: 'completed',
+        parentId: guardianPersonId,
+      });
+      expect(pushApiCalls).toHaveLength(1);
+      expect(emailApiCalls).toHaveLength(1);
+    });
+
+    it('does not re-send a successful fallback email on retry', async () => {
+      const { guardianPersonId } = await seedWeeklyDeliveryScenario();
+      expoPushResponseStatus = 503;
+
+      await executeGenerateHandler(guardianPersonId);
+      await executeGenerateHandler(guardianPersonId);
+
+      expect(pushApiCalls).toHaveLength(1);
+      expect(emailApiCalls).toHaveLength(1);
+    });
+  });
+
+  it('queues a matching parent through the real same-hour week-window step', async () => {
+    const evaluationNow = new Date();
+    const matchingTimezone = findTimezoneForHour(9, evaluationNow);
+
+    const { profileId: queuedParentId } = await seedProfile({
+      displayName: 'Same-hour Parent',
+      timezone: matchingTimezone,
+    });
+    const { profileId: queuedChildId } = await seedProfile({
+      displayName: 'Same-hour Child',
+      timezone: matchingTimezone,
+      credentialed: false,
+    });
+
+    await seedWeeklyPushPrefs(queuedParentId);
+    await seedFamilyLink(queuedParentId, queuedChildId);
+
+    const dateNowSpy = jest
+      .spyOn(Date, 'now')
+      .mockReturnValue(evaluationNow.getTime());
+
+    try {
+      const { result, step } = await executeCronSteps();
+
+      expect(result.status).toBe('completed');
+      expect(result.queuedParents).toBeGreaterThanOrEqual(1);
+      expect(step.run).toHaveBeenCalledWith(
+        'resolve-week-window',
+        expect.any(Function),
+      );
+      expect(step.sendEvent).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: 'app/weekly-progress-push.generate',
+            data: expect.objectContaining({ parentId: queuedParentId }),
+          }),
+        ]),
+      );
+    } finally {
+      dateNowSpy.mockRestore();
+    }
+  });
+
+  it('uses the memoized evaluation instant when the wall clock is one hour later', async () => {
+    const wallClockNow = new Date();
+    const now = new Date(wallClockNow.getTime() - 60 * 60 * 1000);
     const matchingTimezone = findTimezoneForHour(9, now);
     const nonMatchingTimezone = findTimezoneNotHour(9, now, matchingTimezone);
 
@@ -483,6 +724,7 @@ describe('weekly progress push integration', () => {
     const { profileId: queuedChildId } = await seedProfile({
       displayName: 'Queued Child',
       timezone: matchingTimezone,
+      credentialed: false,
     });
     const { profileId: skippedParentId } = await seedProfile({
       displayName: 'Skipped Parent',
@@ -491,6 +733,7 @@ describe('weekly progress push integration', () => {
     const { profileId: skippedChildId } = await seedProfile({
       displayName: 'Skipped Child',
       timezone: nonMatchingTimezone,
+      credentialed: false,
     });
 
     await seedWeeklyPushPrefs(queuedParentId);
@@ -498,7 +741,12 @@ describe('weekly progress push integration', () => {
     await seedFamilyLink(queuedParentId, queuedChildId);
     await seedFamilyLink(skippedParentId, skippedChildId);
 
-    const { result, step } = await executeCronSteps();
+    const currentWeekStartMs = new Date(
+      `${weekStartIso(now)}T00:00:00.000Z`,
+    ).getTime();
+    const { result, step } = await executeCronSteps({
+      weekWindow: { nowUtcMs: now.getTime(), currentWeekStartMs },
+    });
 
     // The exact count may exceed 1 when other accounts in the shared DB
     // happen to match the 9am timezone window. Assert the test-created parent
@@ -523,7 +771,7 @@ describe('weekly progress push integration', () => {
       expect.any(String),
       expect.arrayContaining([
         expect.objectContaining({
-          data: { parentId: skippedParentId },
+          data: expect.objectContaining({ parentId: skippedParentId }),
         }),
       ]),
     );
@@ -537,6 +785,7 @@ describe('weekly progress push integration', () => {
     const { profileId: childProfileId } = await seedProfile({
       displayName: 'Emma',
       timezone: 'UTC',
+      credentialed: false,
     });
     await seedFamilyLink(parentProfileId, childProfileId);
     await seedWeeklyPushPrefs(parentProfileId);
@@ -669,6 +918,7 @@ describe('weekly progress push integration', () => {
     const { profileId: childProfileId } = await seedProfile({
       displayName: 'Emma',
       timezone: 'UTC',
+      credentialed: false,
     });
     await seedFamilyLink(parentProfileId, childProfileId);
     await seedWeeklyPushPrefs(parentProfileId);
@@ -736,6 +986,7 @@ describe('weekly progress push integration', () => {
     const { profileId: childProfileId } = await seedProfile({
       displayName: 'Emma',
       timezone: 'UTC',
+      credentialed: false,
     });
     await seedFamilyLink(parentProfileId, childProfileId);
     await seedWeeklyEmailPrefs(parentProfileId);
@@ -796,10 +1047,12 @@ describe('weekly progress push integration', () => {
     const { profileId: childWithDataId } = await seedProfile({
       displayName: 'Alice',
       timezone: 'UTC',
+      credentialed: false,
     });
     const { profileId: childWithoutDataId } = await seedProfile({
       displayName: 'Bob',
       timezone: 'UTC',
+      credentialed: false,
     });
 
     await seedFamilyLink(parentProfileId, childWithDataId);

@@ -26,8 +26,14 @@ import {
   type OverdueTopic,
 } from '../../../hooks/use-progress';
 import { useLinkedChildren, useProfile } from '../../../lib/profile';
-import { computeAgeBracket } from '@eduagent/schemas';
-import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
+import { computeAgeBracket, type RetentionStatus } from '@eduagent/schemas';
+import {
+  goBackOrReplace,
+  homeHrefForReturnTo,
+  resolvedV2TabForReturnTo,
+  V2_TAB_TITLE_KEYS,
+} from '../../../lib/navigation';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { formatApiError } from '../../../lib/format-api-error';
 import { useEntryGate } from '../../../hooks/use-entry-gate';
 import { firstParam } from '../../../lib/route-params';
@@ -121,6 +127,24 @@ function buildCopy(t: TFunction, isMinor: boolean) {
 
 type Phase = 'subjects' | 'topics' | 'method';
 
+// [WI-1463] Mirrors services/overdue-topics.ts's BAND_RANK. Used to flatten
+// the default topics view into a single SM-2-urgency-ranked list across ALL
+// visible subjects, so a more urgent topic in a smaller subject is never
+// demoted below a less urgent topic in a larger one. The API already sorts
+// each subject's topics by this same band + overdueDays; this only removes
+// the subject-grouping seam between subjects.
+const BAND_RANK: Record<RetentionStatus, number> = {
+  forgotten: 0,
+  weak: 1,
+  fading: 2,
+  strong: 3,
+};
+
+type RankedTopicEntry = {
+  subject: OverdueSubject;
+  topic: OverdueTopic;
+};
+
 type SelectedTopic = {
   topicId: string;
   topicTitle: string;
@@ -160,6 +184,26 @@ export default function RelearnScreen() {
   const routeSubjectName = firstParam(params.subjectName);
   const returnTo = firstParam(params.returnTo);
   const returnId = firstParam(params.returnId);
+  const v2Enabled = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+  // WI-2331 rework, F1b: the empty-state exit control always calls
+  // handleLeave() (never a phase step-back like the header chevron does), so
+  // it names the ACTUAL destination handleLeave resolves to — the returnTo
+  // token when present (via resolvedV2TabForReturnTo, which only claims a tab
+  // when the resolved destination genuinely is one), else Subjects (this
+  // screen's owning tab, per the AC-2 comment on handleLeave below) —
+  // instead of the generic `common.goBackAction` it showed before. When
+  // returnTo names a non-tab destination (practice, family-recaps,
+  // own-learning, …) the label falls back to the generic action rather than
+  // mislabeling as a tab it isn't going to.
+  const leaveBackTab = returnTo
+    ? resolvedV2TabForReturnTo(returnTo, returnId, v2Enabled)
+    : 'subjects';
+  const leaveLabel =
+    v2Enabled && leaveBackTab
+      ? t('common.backTo', {
+          destination: t(V2_TAB_TITLE_KEYS[leaveBackTab]),
+        })
+      : t('common.goBackAction');
   const source = firstParam(params.source);
   const sourceChildProfileId = firstParam(params.childProfileId);
   const isParentBridgeSource = source === 'parent_bridge';
@@ -253,12 +297,21 @@ export default function RelearnScreen() {
 
   const handleLeave = useCallback(() => {
     if (returnTo) {
-      router.replace(homeHrefForReturnTo(returnTo, returnId) as Href);
+      router.replace(
+        homeHrefForReturnTo(returnTo, returnId, v2Enabled) as Href,
+      );
       return;
     }
 
-    goBackOrReplace(router, '/(app)/library' as const);
-  }, [returnId, returnTo, router]);
+    // WI-2331 AC-2 (core): `/(app)/library` is dead in V2 (not one of the
+    // three tabs) — topic/relearn is a Subjects-owned nested leaf, so the
+    // no-returnTo fallback resolves through the same owning-tab contract
+    // AC-1's tab highlight uses instead of the retired Library tab.
+    goBackOrReplace(
+      router,
+      (v2Enabled ? '/(app)/subjects' : '/(app)/library') as Href,
+    );
+  }, [returnId, returnTo, router, v2Enabled]);
 
   const handleBack = useCallback(() => {
     setError(null);
@@ -406,6 +459,27 @@ export default function RelearnScreen() {
       return [selectedSubject];
     }
     return allSubjects;
+  }, [allSubjects, selectedSubject]);
+
+  // [WI-1463] Default recommended order for the topics phase when no subject
+  // has been picked yet (the >10-overdue subject picker, and the natural
+  // single-subject case, both already funnel through `selectedSubject` and
+  // keep the server's per-subject order — no cross-subject grouping issue
+  // there). Stable sort: ties on band+overdueDays keep the flattened array's
+  // original order, which is each subject's own already-correct ordering.
+  const rankedTopics = useMemo<RankedTopicEntry[]>(() => {
+    if (selectedSubject) {
+      return [];
+    }
+    const flattened = allSubjects.flatMap((subject) =>
+      subject.topics.map((topic) => ({ subject, topic })),
+    );
+    return [...flattened].sort((a, b) => {
+      const bandDelta =
+        BAND_RANK[a.topic.retentionStatus] - BAND_RANK[b.topic.retentionStatus];
+      if (bandDelta !== 0) return bandDelta;
+      return b.topic.overdueDays - a.topic.overdueDays;
+    });
   }, [allSubjects, selectedSubject]);
 
   const blocked = useEntryGate('topic/relearn', {
@@ -560,10 +634,10 @@ export default function RelearnScreen() {
             className="mt-4 min-h-[44px] rounded-button bg-primary px-6 py-3 items-center justify-center"
             testID="relearn-empty-back"
             accessibilityRole="button"
-            accessibilityLabel={t('common.goBackAction')}
+            accessibilityLabel={leaveLabel}
           >
             <Text className="text-body font-semibold text-text-inverse">
-              {t('common.goBackAction')}
+              {leaveLabel}
             </Text>
           </Pressable>
         </View>
@@ -652,14 +726,37 @@ export default function RelearnScreen() {
           <Text className="mb-4 text-body text-text-secondary">
             {copy.topicIntro}
           </Text>
-          {topicsToRender.map((subject) => (
-            <View key={subject.subjectId} className="mb-4">
-              {topicsToRender.length > 1 || !selectedSubject ? (
-                <Text className="mb-2 text-body-sm font-semibold text-text-secondary">
-                  {subject.subjectName}
-                </Text>
-              ) : null}
-              {subject.topics.map((topic) => (
+          {selectedSubject
+            ? // A single subject is in scope (picked via the >10-overdue
+              // subject picker, or the natural single-subject case) — the
+              // server's within-subject worst-first order already reflects
+              // true SM-2 urgency, so render it as-is with no header.
+              topicsToRender.map((subject) =>
+                subject.topics.map((topic) => (
+                  <Pressable
+                    key={topic.topicId}
+                    onPress={() => handleSelectTopic(subject, topic)}
+                    className="mb-3 rounded-card bg-surface p-4"
+                    testID={`relearn-topic-${topic.topicId}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('relearn.a11yOpenTopic', {
+                      title: topic.topicTitle,
+                    })}
+                  >
+                    <Text className="text-body font-semibold text-text-primary">
+                      {topic.topicTitle}
+                    </Text>
+                    <Text className="mt-1 text-body-sm text-text-secondary">
+                      {t('relearn.daysOverdue', { count: topic.overdueDays })}
+                    </Text>
+                  </Pressable>
+                )),
+              )
+            : // [WI-1463] Default recommended order, flattened across all
+              // visible subjects by SM-2 urgency band then most-overdue —
+              // tapping any topic below is a manual override, not the only
+              // path.
+              rankedTopics.map(({ subject, topic }) => (
                 <Pressable
                   key={topic.topicId}
                   onPress={() => handleSelectTopic(subject, topic)}
@@ -670,6 +767,9 @@ export default function RelearnScreen() {
                     title: topic.topicTitle,
                   })}
                 >
+                  <Text className="text-caption text-text-secondary">
+                    {subject.subjectName}
+                  </Text>
                   <Text className="text-body font-semibold text-text-primary">
                     {topic.topicTitle}
                   </Text>
@@ -678,8 +778,6 @@ export default function RelearnScreen() {
                   </Text>
                 </Pressable>
               ))}
-            </View>
-          ))}
         </ScrollView>
       ) : (
         <ScrollView

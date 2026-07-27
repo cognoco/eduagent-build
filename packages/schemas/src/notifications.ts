@@ -14,6 +14,7 @@ export const notificationTypeSchema = z.enum([
   'consent_archived',
   'subscribe_request',
   'recall_nudge',
+  'notice_recheck',
   'weekly_progress',
   'monthly_report',
   'progress_refresh',
@@ -23,6 +24,10 @@ export const notificationTypeSchema = z.enum([
   'dictation_review',
   'session_filing_failed',
   'nudge',
+  // [WI-1753] AC-6: teen self-cancel nudge after a family join — they keep an
+  // active store subscription while the parent now pays the family seat. No
+  // structured data payload (falls into noDataPayloadSchema).
+  'store_cancel_nudge',
   // [WI-179] Re-uses the rate-limit / notification-log table to track outbox
   // spillover requests per profile. NOT a user-visible notification — never
   // dispatched via push/email. The shared `notification_log` table provides
@@ -74,18 +79,31 @@ const paymentFailedPayloadSchema = notificationBaseSchema.extend({
   }),
 });
 
+const noticeRecheckPayloadSchema = notificationBaseSchema.extend({
+  type: z.literal('notice_recheck'),
+  data: z.object({
+    noticeId: z.string().uuid(),
+    subjectId: z.string().uuid(),
+  }),
+});
+
 /** All other types: no structured data payload at current call sites */
 const noDataPayloadSchema = notificationBaseSchema.extend({
   // [CR-178] Exclude 'nudge' so this branch can't accidentally match it —
   // new types added to notificationTypeSchema automatically fall here unless
   // a dedicated typed variant is added above.
-  type: notificationTypeSchema.exclude(['nudge', 'payment_failed']),
+  type: notificationTypeSchema.exclude([
+    'nudge',
+    'payment_failed',
+    'notice_recheck',
+  ]),
   data: z.undefined().optional(),
 });
 
 export const notificationPayloadSchema = z.union([
   nudgePayloadSchema,
   paymentFailedPayloadSchema,
+  noticeRecheckPayloadSchema,
   noDataPayloadSchema,
 ]);
 export type NotificationPayload = z.infer<typeof notificationPayloadSchema>;

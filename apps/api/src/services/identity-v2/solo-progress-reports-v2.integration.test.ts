@@ -20,6 +20,7 @@
 import { resolve } from 'path';
 import { eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import {
   consentGrant,
   createDatabase,
@@ -247,26 +248,32 @@ const UNDER_MINIMUM_AGE_BIRTH_DATE = `${new Date().getUTCFullYear() - 10}-01-01`
       const org = await seedOrg();
       const withdrawn = await seedPerson(org, { roles: ['admin'] });
       await seedSession(withdrawn);
-      await db.insert(consentGrant).values({
-        chargePersonId: withdrawn,
-        organizationId: org,
-        purpose: 'platform_use',
-        lawfulBasis: 'gdpr_parental_consent',
-        granted: true,
-        grantedAt: new Date(),
-        withdrawnAt: new Date(),
-      });
+      const withdrawnAt = new Date();
+      await db.insert(consentGrant).values(
+        CONSENT_PURPOSES.map((purpose) => ({
+          chargePersonId: withdrawn,
+          organizationId: org,
+          purpose,
+          lawfulBasis: 'gdpr_parental_consent' as const,
+          granted: true,
+          grantedAt: withdrawnAt,
+          withdrawnAt,
+        })),
+      );
 
       const consented = await seedPerson(org, { roles: ['admin'] });
       await seedSession(consented);
-      await db.insert(consentGrant).values({
-        chargePersonId: consented,
-        organizationId: org,
-        purpose: 'platform_use',
-        lawfulBasis: 'gdpr_parental_consent',
-        granted: true,
-        grantedAt: new Date(),
-      });
+      const grantedAt = new Date();
+      await db.insert(consentGrant).values(
+        CONSENT_PURPOSES.map((purpose) => ({
+          chargePersonId: consented,
+          organizationId: org,
+          purpose,
+          lawfulBasis: 'gdpr_parental_consent' as const,
+          granted: true,
+          grantedAt,
+        })),
+      );
 
       const result = await listEligibleSelfReportPersonIdsV2(db, WINDOW);
 

@@ -69,6 +69,13 @@ const SOLID_VERDICT_JSON = JSON.stringify({
       result: 'solid',
       evidence: 'links speed to collision frequency and energy',
       learnerQuote: 'particles move faster and collide more often',
+      questionIdentity: {
+        questionText: 'model-supplied text is overwritten',
+        minimalLearningClaim:
+          'higher temperature raises productive collision frequency',
+        cognitiveOperation: 'causal_explanation',
+        materialContext: 'most chemical reactions',
+      },
     },
   ],
 });
@@ -82,6 +89,7 @@ const BASE_INPUT: RunChallengeRoundGraderInput = {
   ageBracket: 'adolescent',
   conversationLanguage: 'en',
   sessionId: 'session-123',
+  producerVendor: 'anthropic',
 };
 
 // ---------------------------------------------------------------------------
@@ -118,6 +126,9 @@ describe('runChallengeRoundGrader', () => {
       expect(items[0]!.result).toBe('solid');
       // answerEventId is server-injected; the model never saw or supplied it.
       expect(items[0]!.answerEventId).toBe(BASE_INPUT.answerEventId);
+      expect(items[0]!.questionIdentity?.questionText).toBe(
+        BASE_INPUT.askedQuestion,
+      );
     });
 
     it('maps the concept and evidence fields from the verdict', async () => {
@@ -131,6 +142,28 @@ describe('runChallengeRoundGrader', () => {
       );
       expect(items[0]!.learnerQuote).toBe(
         'particles move faster and collide more often',
+      );
+    });
+
+    it('passes prior question identities to the grader for novelty classification', async () => {
+      mockRouteAndCall.mockResolvedValue(routeResult(SOLID_VERDICT_JSON));
+
+      await runChallengeRoundGrader({
+        ...BASE_INPUT,
+        priorQuestionIdentities: [
+          {
+            questionText: 'Why do particles collide more often when heated?',
+            minimalLearningClaim:
+              'temperature increases particle collision frequency',
+            cognitiveOperation: 'causal_explanation',
+            materialContext: 'most chemical reactions',
+          },
+        ],
+      });
+
+      const [messages] = mockRouteAndCall.mock.calls[0]!;
+      expect(messages.map((message) => message.content).join('\n')).toContain(
+        'temperature increases particle collision frequency',
       );
     });
   });
@@ -313,6 +346,40 @@ describe('runChallengeRoundGrader', () => {
     });
   });
 
+  // [WI-2670] The grader never fabricates a producerVendor. When the caller
+  // could not resolve one (e.g. a legacy ai_response row predating per-turn
+  // vendor tracking), it fails open exactly like every other degradation —
+  // structured Inngest event with its own reason code, no LLM call attempted.
+  describe('[WI-2670] producer vendor unresolved → fail-open + degraded event', () => {
+    it('returns [] and never calls routeAndCall when producerVendor is absent', async () => {
+      const { producerVendor: _producerVendor, ...inputWithoutVendor } =
+        BASE_INPUT;
+
+      const items = await runChallengeRoundGrader(inputWithoutVendor);
+
+      expect(items).toEqual([]);
+      expect(mockRouteAndCall).not.toHaveBeenCalled();
+    });
+
+    it('fires app/challenge-round.grader_degraded with reason:producer_vendor_unresolved', async () => {
+      const { producerVendor: _producerVendor, ...inputWithoutVendor } =
+        BASE_INPUT;
+
+      await runChallengeRoundGrader(inputWithoutVendor);
+
+      expect(mockInngestSend).toHaveBeenCalledTimes(1);
+      expect(mockInngestSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/challenge-round.grader_degraded',
+          data: expect.objectContaining({
+            reason: 'producer_vendor_unresolved',
+            profileId: BASE_INPUT.profileId,
+          }),
+        }),
+      );
+    });
+  });
+
   // Routing options are passed correctly.
   describe('routing options', () => {
     it('routes with capability:judge, flow:challenge.grader, and responseFormat:json', async () => {
@@ -375,6 +442,40 @@ describe('runChallengeRoundGrader', () => {
       const [, , options] = mockRouteAndCall.mock.calls[0]!;
       expect(options?.capability).toBe('judge');
       expect(options?.ageBracket).toBe('adolescent');
+    });
+  });
+
+  // [WI-2670] Thread per-turn producer vendor through to JudgeIndependence.
+  // The real vendor-exclusion behavior (does the router actually avoid the
+  // producer?) is proven end-to-end against the REAL router in
+  // grader.judge-independence.test.ts — routeAndCall is mocked at the
+  // external boundary in THIS file (GC1-compliant), so these tests can only
+  // assert what grader.ts passes INTO routeAndCall (same caveat as
+  // router.judge-independence.test.ts's note on judge-suitability.test.ts).
+  describe('[WI-2670] JudgeIndependence — model-output declaration', () => {
+    it('declares JudgeIndependence mode:model-output with the threaded producerVendor', async () => {
+      mockRouteAndCall.mockResolvedValue(routeResult(SOLID_VERDICT_JSON));
+
+      await runChallengeRoundGrader({
+        ...BASE_INPUT,
+        producerVendor: 'openai',
+      });
+
+      const [, , options] = mockRouteAndCall.mock.calls[0]!;
+      expect(options?.judgeIndependence).toEqual({
+        mode: 'model-output',
+        producerVendor: 'openai',
+      });
+    });
+
+    it('never declares mode:not-applicable (the WI-2624-deferred branch is removed)', async () => {
+      mockRouteAndCall.mockResolvedValue(routeResult(SOLID_VERDICT_JSON));
+
+      await runChallengeRoundGrader(BASE_INPUT);
+
+      const [, , options] = mockRouteAndCall.mock.calls[0]!;
+      expect(options?.judgeIndependence?.mode).not.toBe('not-applicable');
+      expect(options?.judgeIndependence?.mode).toBe('model-output');
     });
   });
 

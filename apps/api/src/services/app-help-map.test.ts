@@ -568,6 +568,15 @@ describe('applyAppHelpSignalGuard', () => {
     expect(guarded.readyToFinish).toBe(false);
   });
 
+  it('discards ordinary answer evaluation', () => {
+    const guarded = applyAppHelpSignalGuard({
+      ...baseParsed,
+      answerEvaluation: { correctness: 'correct' as const },
+    });
+
+    expect(guarded.answerEvaluation).toBeUndefined();
+  });
+
   it('preserves non-learning output fields unchanged', () => {
     const guarded = applyAppHelpSignalGuard({
       ...baseParsed,

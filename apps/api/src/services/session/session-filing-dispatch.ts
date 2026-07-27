@@ -3,9 +3,9 @@ import { sessionAutoFileRequestedEventSchema } from '@eduagent/schemas';
 
 import { inngest } from '../../inngest/client';
 import { createLogger } from '../logger';
-import { safeSend, safeWrite } from '../safe-non-core';
+import { safeSend } from '../safe-non-core';
 import { captureException } from '../sentry';
-import { recordActivationEvent } from '../activation-events';
+import { recordActivationEventSafely } from '../activation-events';
 import {
   getSession,
   getSessionCompletionContext,
@@ -147,14 +147,14 @@ export async function dispatchSessionCompletedEvent(
   // default profile-scoped dedupeKey (no occurrence suffix) lets
   // onConflictDoNothing keep only the earliest row. Non-core: must never
   // affect the pipeline-queued result computed above.
-  await safeWrite(
-    () =>
-      recordActivationEvent(db, {
-        eventType: 'first_session_completed',
-        profileId,
-        route: 'app/session.completed',
-        metadata: { sessionId: completion.sessionId },
-      }),
+  await recordActivationEventSafely(
+    db,
+    {
+      eventType: 'first_session_completed',
+      profileId,
+      route: 'app/session.completed',
+      metadata: { sessionId: completion.sessionId },
+    },
     'sessions.dispatch_completed.first_session_completed',
     { profileId, sessionId: completion.sessionId },
   );

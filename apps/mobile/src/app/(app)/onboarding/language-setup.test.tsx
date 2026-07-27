@@ -4,6 +4,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 // Translations table — mirrors what will be in en.json onboarding namespace once coordinator merges.
 // Keeps tests asserting on real English strings rather than i18n keys.
@@ -149,6 +150,7 @@ jest.mock(
 jest.mock(
   '../../../lib/navigation' /* gc1-allow: goBackOrReplace calls router.back which requires native navigation context */,
   () => ({
+    ...jest.requireActual('../../../lib/navigation'),
     goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
   }),
 );
@@ -205,6 +207,17 @@ describe('LanguageSetup', () => {
     );
   });
 
+  it('uses Subjects as the Back fallback for a V2 Subjects entry', () => {
+    mockReturnTo = 'subjects';
+    render(<LanguageSetup />);
+
+    fireEvent.press(screen.getByTestId('language-setup-back'));
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/subjects',
+    );
+  });
+
   it('shows validation error for "Other" language without custom input', async () => {
     render(<LanguageSetup />);
 
@@ -237,6 +250,46 @@ describe('LanguageSetup', () => {
       });
     });
   });
+
+  it.each(['subjects', 'learner-home', 'own-learning'])(
+    'forwards the supported %s return target to the first language session',
+    async (returnTo) => {
+      mockReturnTo = returnTo;
+      render(<LanguageSetup />);
+
+      fireEvent.press(screen.getByTestId('language-setup-continue'));
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith({
+          pathname: '/(app)/session',
+          params: expect.objectContaining({ returnTo }),
+        });
+      });
+    },
+  );
+
+  it.each(['library', 'malformed-return-target'])(
+    'does not forward the unsupported %s token to the first language session',
+    async (returnTo) => {
+      mockReturnTo = returnTo;
+      render(<LanguageSetup />);
+
+      fireEvent.press(screen.getByTestId('language-setup-continue'));
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith({
+          pathname: '/(app)/session',
+          params: {
+            mode: 'learning',
+            subjectId: 'test-id',
+            sessionId: 'session-1',
+            topicId: 'topic-1',
+            subjectName: 'Spanish',
+          },
+        });
+      });
+    },
+  );
 
   it('disables Continue button and hides the label when pending', () => {
     mockIsPending = true;
@@ -324,6 +377,71 @@ describe('LanguageSetup', () => {
       expect.anything(),
       '/(app)/home',
     );
+  });
+
+  it('routes error Cancel to Subjects for a V2 Subjects entry', async () => {
+    mockReturnTo = 'subjects';
+    mockMutateAsync.mockRejectedValue(new Error('save failed'));
+    render(<LanguageSetup />);
+
+    fireEvent.press(screen.getByTestId('language-setup-continue'));
+
+    await waitFor(() => {
+      screen.getByTestId('language-setup-error-cancel');
+    });
+    fireEvent.press(screen.getByTestId('language-setup-error-cancel'));
+
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/subjects',
+    );
+  });
+
+  it('routes a missing-subject guard back to Subjects for a V2 Subjects entry', () => {
+    mockSubjectId = undefined;
+    mockReturnTo = 'subjects';
+    render(<LanguageSetup />);
+
+    screen.getByText('Go Back');
+    fireEvent.press(screen.getByTestId('language-setup-guard-home'));
+
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/subjects',
+    );
+  });
+
+  // [WI-2331 rework] the header Back label must never claim a tab handleBack
+  // isn't actually routing to: a non-tab returnTo (e.g. the practice hub)
+  // resolves to its real, non-tab destination, so the label falls back to
+  // the generic "Go Back" instead of mislabeling as "Back to Mentor".
+  describe('Back label under V2 with a non-tab returnTo', () => {
+    let originalV2: boolean;
+
+    beforeEach(() => {
+      originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        true;
+    });
+
+    afterEach(() => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        originalV2;
+    });
+
+    it('uses the generic label and still routes to the real destination', () => {
+      mockReturnTo = 'practice';
+      render(<LanguageSetup />);
+
+      const backButton = screen.getByTestId('language-setup-back');
+      expect(backButton.props.accessibilityLabel).toBe('Go Back');
+
+      fireEvent.press(backButton);
+      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+        expect.anything(),
+        '/(app)/practice',
+      );
+    });
   });
 
   it('[BUG-692-FOLLOWUP] router.replace does not fire when user presses Back during configureLanguageSubject', async () => {

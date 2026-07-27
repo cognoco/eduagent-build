@@ -103,3 +103,71 @@ describe('[WI-1311] updateEasJson preserves managed vars Doppler does not curren
     expect(env.EXPO_PUBLIC_SENTRY_DSN).toBeUndefined();
   });
 });
+
+// [WI-1852] Blank-means-clear: a managed var Doppler returns as an explicit empty
+// string ('') must be CLEARED from the baked eas.json, while a managed var merely
+// ABSENT from the Doppler download stays preserved (the WI-1311 fix). The two must
+// not be conflated — that conflation (empty filtered out at the fetch boundary, then
+// preserved by default) is exactly the bug this guards. Durable red-green regression:
+// it fails on the pre-fix merge (the blanked var survives) and passes once
+// updateEasJson() distinguishes present-but-empty from absent.
+describe('[WI-1852] updateEasJson clears managed vars explicitly blanked in Doppler', () => {
+  let fixturePath: string;
+
+  beforeEach(() => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'setup-env-blank-test-'));
+    fixturePath = path.join(dir, 'eas.json');
+
+    const fixture = {
+      build: {
+        development: {
+          env: {
+            // Baked value Doppler will explicitly blank this run — must be CLEARED.
+            EXPO_PUBLIC_FEATURE_X: 'stale-on',
+            // Managed key ABSENT from Doppler this run — must be PRESERVED
+            // (WI-1311; absent != empty).
+            EXPO_PUBLIC_ENABLE_MODE_NAV_V2: 'true',
+            // Managed key Doppler returns with a real value — must be WRITTEN.
+            EXPO_PUBLIC_API_URL: 'https://old.example.com',
+            // Never managed by this script — must always survive.
+            SOME_UNMANAGED_VAR: 'keep-me',
+          },
+        },
+      },
+    };
+    fs.writeFileSync(fixturePath, JSON.stringify(fixture, null, 2));
+  });
+
+  afterEach(() => {
+    fs.rmSync(path.dirname(fixturePath), { recursive: true, force: true });
+  });
+
+  it('clears a blanked var, preserves an absent var, writes a real value', () => {
+    const fetchSecretsJson = (
+      config: string,
+    ): Record<string, string> | null => {
+      if (config === 'stg') {
+        return {
+          EXPO_PUBLIC_FEATURE_X: '', // explicit blank -> must clear
+          EXPO_PUBLIC_API_URL: 'https://new.example.com', // real value -> must write
+          // EXPO_PUBLIC_ENABLE_MODE_NAV_V2 intentionally absent -> must preserve
+        };
+      }
+      return null; // no prd access — production/other profiles untouched
+    };
+
+    updateEasJson(fixturePath, fetchSecretsJson);
+
+    const written = JSON.parse(fs.readFileSync(fixturePath, 'utf-8'));
+    const env = written.build.development.env;
+
+    // (a) blank-means-clear: the explicitly blanked var is gone
+    expect(env.EXPO_PUBLIC_FEATURE_X).toBeUndefined();
+    // (b) absent != empty: a managed var Doppler didn't return survives
+    expect(env.EXPO_PUBLIC_ENABLE_MODE_NAV_V2).toBe('true');
+    // (c) a returned value is written
+    expect(env.EXPO_PUBLIC_API_URL).toBe('https://new.example.com');
+    // unmanaged vars always survive
+    expect(env.SOME_UNMANAGED_VAR).toBe('keep-me');
+  });
+});

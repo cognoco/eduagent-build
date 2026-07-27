@@ -141,8 +141,7 @@ export function scrubPiiPayload<T>(
 // can carry a minor's transcript, name, or freeform input) via `logger.*` or
 // `captureException` extras. On a schema-drift path the payload is by
 // definition unknown, so the only safe diagnostic is its *shape* — type,
-// field count — never its keys or values. Pattern lifted from
-// ask-gate-observe.ts, which pioneered it. Forward-only guard:
+// field count — never its keys or values. Forward-only guard:
 // apps/api/src/services/pii-scrub.guard.test.ts bans `rawData: event.data`
 // (and the legacy content-slice keys) from non-test API source.
 // ---------------------------------------------------------------------------

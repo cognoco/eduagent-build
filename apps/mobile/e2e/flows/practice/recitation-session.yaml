@@ -18,27 +18,27 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "learning-active"
+      SEED_SCENARIO: 'learning-active'
       API_URL: ${API_URL}
 
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 15000
 
 # Navigate to Practice hub
 - scrollUntilVisible:
     element:
-      id: "home-action-practice"
+      id: 'home-action-practice'
     direction: DOWN
     timeout: 5000
 
 - tapOn:
-    id: "home-action-practice"
+    id: 'home-action-practice'
 
 - extendedWaitUntil:
     visible:
-      id: "practice-screen"
+      id: 'practice-screen'
     timeout: 10000
 
 - takeScreenshot: recitation-01-practice-hub
@@ -46,57 +46,95 @@ tags:
 # Tap Recitation card
 # practice-recitation is the SECOND card inside the "Other practice" horizontal
 # ScrollView (practice-other-practice-slider, practice/index.tsx:799).
-# Step 1: scroll the outer vertical container DOWN until the slider is in the
-# viewport (practice-dictation is the first card — confirmed working in
-# dictation-full-flow.yaml).
+# Step 1: best-effort outer positioning. Maestro can report the heading as
+# invisible after scrolling it into view, so the mandatory horizontal card
+# lookup in step 2 remains the actual reachability gate.
 # Step 2: scroll RIGHT inside the horizontal slider to reach practice-recitation.
 - scrollUntilVisible:
     element:
-      id: "practice-dictation"
+      id: 'practice-other-practice-heading'
     direction: DOWN
     timeout: 5000
+    visibilityPercentage: 50
+    centerElement: false
+    optional: true # justified: best-effort outer positioning; the mandatory horizontal card lookup below fails closed
 
 - scrollUntilVisible:
     element:
-      id: "practice-recitation"
+      id: 'practice-recitation'
     direction: RIGHT
-    timeout: 5000
+    timeout: 10000
+    visibilityPercentage: 100
+    centerElement: true
 
 - tapOn:
-    id: "practice-recitation"
+    id: 'practice-recitation'
 
 # Wait for session screen (ChatShell renders chat-input always)
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
+      id: 'chat-input'
     timeout: 20000
 
 - takeScreenshot: recitation-02-session-screen
 
-# Send one message to confirm the session is live
+# A title alone must advance directly to readiness.
 - tapOn:
-    id: "chat-input"
-- inputText: "The Road Not Taken by Robert Frost"
+    id: 'chat-input'
+- inputText: 'Ozymandias'
 - hideKeyboard
-- pressKey: Enter
-
-# Verify the message rendered in the chat list
-- scrollUntilVisible:
-    element:
-      text: "The Road Not Taken by Robert Frost"
-    direction: DOWN
-    timeout: 10000
-
-- takeScreenshot: recitation-03-message-sent
-
-# Exit session
 - tapOn:
-    id: "end-session-button"
+    id: 'send-button'
 
 - extendedWaitUntil:
     visible:
-      id: "practice-screen"
+      id: 'message-bubble-assistant-2'
+    timeout: 60000
+
+- assertVisible:
+    text: '(?i)^ready when you are.*begin your recitation from memory[.]?$'
+
+- assertNotVisible:
+    text: '(?i)^I don.t have reliable source material.*'
+
+- takeScreenshot: recitation-03-message-sent
+
+# Synthetic, non-copyrighted body exercises the feedback turn.
+- tapOn:
+    id: 'chat-input'
+- inputText: 'A remembered opening line for this test.'
+- hideKeyboard
+- tapOn:
+    id: 'send-button'
+
+- extendedWaitUntil:
+    visible:
+      id: 'message-bubble-assistant-4'
+    timeout: 60000
+
+- extendedWaitUntil:
+    visible:
+      id: 'message-feedback-helpful-.*'
+    timeout: 30000
+
+# Exit session
+- tapOn:
+    id: 'end-session-button'
+
+- tapOn:
+    text: '(?i)^end session$'
+
+- extendedWaitUntil:
+    visible:
+      id: 'summary-close-button'
+    timeout: 20000
+
+- tapOn:
+    id: 'summary-close-button'
+
+- extendedWaitUntil:
+    visible:
+      id: 'practice-screen'
     timeout: 10000
-    optional: true  # justified: end-session-button may show a confirmation dialog before navigating; practice-screen appears only after confirmation
 
 - takeScreenshot: recitation-04-exited

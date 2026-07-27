@@ -432,7 +432,7 @@ describe('[WI-803] updateProfileAppContext — loadProfileFamilyMeta v2 dispatch
   it('[WI-803][BREAK] flag-on non-owner: reads guardianship edge, NOT familyLinks (post-M-DROP safe)', async () => {
     const personData = mockPersonRow({
       id: 'child-1',
-      birthDate: '2012-05-15',
+      birthDate: '2010-04-09',
       isOwner: false,
       defaultAppContext: 'study',
     });
@@ -448,6 +448,8 @@ describe('[WI-803] updateProfileAppContext — loadProfileFamilyMeta v2 dispatch
 
     expect(result).not.toBeNull();
     expect(result!.hasFamilyLinks).toBe(true);
+    expect(result!.birthMonth).toBe(4);
+    expect(result!.birthDay).toBe(9);
     // legacy parity: linkCreatedAt comes from the edge's grantedAt
     expect(result!.linkCreatedAt).toBe(grantedAt.toISOString());
     expect(

@@ -39,10 +39,6 @@ import {
   validateGuardianChargeRelationshipV2,
   validateGuardianshipEdgeV2,
 } from './family-bridge-v2';
-import {
-  deleteLegacyAccountsForTest,
-  ensureLegacyProfileAnchorForTest,
-} from '../../test-utils/legacy-identity-anchors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
@@ -69,7 +65,6 @@ const RUN = !!process.env.DATABASE_URL;
           .delete(guardianship)
           .where(eq(guardianship.guardianPersonId, pid));
         await db.delete(subjects).where(eq(subjects.profileId, pid));
-        await deleteLegacyAccountsForTest(db, [pid]);
         await db.delete(person).where(eq(person.id, pid));
       }
       personIds.length = 0;
@@ -90,11 +85,6 @@ const RUN = !!process.env.DATABASE_URL;
         .returning();
       const personId = p!.id;
       personIds.push(personId);
-      await ensureLegacyProfileAnchorForTest(db, {
-        profileId: personId,
-        displayName: name,
-        birthYear: Number(birthDate.slice(0, 4)),
-      });
       return personId;
     }
 

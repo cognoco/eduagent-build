@@ -21,13 +21,16 @@ export const topicNotes = pgTable(
       onDelete: 'set null',
     }),
     content: text('content').notNull(),
-    // [WI-1658] Artifact-source marker. Nullable, additive, no DB-level enum —
-    // forward-compatible with the fuller artifactSource vocabulary WI-1704 owns
-    // (docs/specs/2026-07-06-verified-learning-loop.md, "Artifact Provenance
-    // Contract"). Today only 'challenge_drafted_note' is ever written, by the
-    // Challenge-Round finalize path (session-exchange.ts) on verified-outcome
-    // rounds only. Existing rows are NULL (ordinary learner/session-summary notes).
-    artifactSource: text('artifact_source'),
+    // Keep nullable during the compatible-writer rollout: the previously
+    // deployed Worker explicitly writes NULL. The default covers new writers;
+    // readers normalize legacy/null rows until a later contraction migration.
+    artifactSource: text('artifact_source').default('learner_authored_note'),
+    // Pointer-only solid-answer artifacts bind to this canonical concept key;
+    // their transcript text remains only in the retention-bound event row.
+    artifactConceptKey: text('artifact_concept_key'),
+    verificationState: text('verification_state')
+      .notNull()
+      .default('unverified'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

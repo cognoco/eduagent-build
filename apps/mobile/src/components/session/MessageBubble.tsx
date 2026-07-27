@@ -13,6 +13,7 @@ import Animated, {
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import type { TranslateKey } from '../../i18n/types';
+import type { MentorNoticeAccepted } from '@eduagent/schemas';
 import { formatMathContent } from '../../lib/math-format';
 import { stripEnvelopeJson } from '../../lib/strip-envelope';
 import { useThemeColors } from '../../lib/theme';
@@ -29,6 +30,8 @@ interface MessageBubbleProps {
   verificationBadge?: VerificationBadge;
   actions?: React.ReactNode;
   testID?: string;
+  mentorNotice?: MentorNoticeAccepted;
+  showInlineThinkingIndicator?: boolean;
 }
 
 function ThinkingDot({ delay }: { delay: number }): React.ReactElement {
@@ -122,7 +125,11 @@ function BlinkingCursor(): React.ReactElement {
   }));
 
   return (
-    <Animated.Text style={animatedStyle} className="text-accent">
+    <Animated.Text
+      style={animatedStyle}
+      className="text-accent"
+      testID="streaming-cursor"
+    >
       {' \u258C'}
     </Animated.Text>
   );
@@ -190,6 +197,8 @@ function areEqualMessageBubble(
     prev.escalationRung === next.escalationRung &&
     prev.verificationBadge === next.verificationBadge &&
     prev.actions === next.actions &&
+    prev.mentorNotice === next.mentorNotice &&
+    prev.showInlineThinkingIndicator === next.showInlineThinkingIndicator &&
     prev.testID === next.testID
   );
 }
@@ -203,6 +212,8 @@ export const MessageBubble = memo(function MessageBubble({
   verificationBadge,
   actions,
   testID,
+  mentorNotice,
+  showInlineThinkingIndicator = true,
 }: MessageBubbleProps): React.ReactElement {
   const { t } = useTranslation();
   const isAI = sender === 'assistant';
@@ -221,7 +232,7 @@ export const MessageBubble = memo(function MessageBubble({
     : projectedContent;
   const escalation =
     isAI && escalationRung ? ESCALATION_STYLES[escalationRung] : undefined;
-  const isThinking = streaming && !content;
+  const isThinking = streaming && !content && showInlineThinkingIndicator;
 
   const bubbleBg = escalation
     ? `${escalation.bg} ${escalation.border}`
@@ -259,7 +270,7 @@ export const MessageBubble = memo(function MessageBubble({
         ) : isAI ? (
           <View testID="message-ai-content">
             <ThemedMarkdown>{displayContent}</ThemedMarkdown>
-            {streaming && <BlinkingCursor />}
+            {streaming && content ? <BlinkingCursor /> : null}
           </View>
         ) : (
           <Text className="text-body leading-relaxed text-text-inverse">
@@ -268,6 +279,18 @@ export const MessageBubble = memo(function MessageBubble({
         )}
         {actions ? <View className="mt-3">{actions}</View> : null}
       </View>
+      {isAI && !streaming && mentorNotice && (
+        <View
+          testID="mentor-notice-chip"
+          className="mt-1 ml-1 self-start rounded-full bg-surface px-3 py-1"
+        >
+          <Text className="text-caption text-text-secondary">
+            {t('session.messageBubble.mentorNotice', {
+              concept: mentorNotice.concept,
+            })}
+          </Text>
+        </View>
+      )}
       {isAI &&
         verificationBadge &&
         VERIFICATION_BADGE_KEY[verificationBadge] && (

@@ -13,6 +13,31 @@ jest.mock(
 );
 
 describe('SupportPersonPickerSheet', () => {
+  it('names the dialog, keeps person actions independent, and dismisses once from the backdrop', () => {
+    const onSelectPerson = jest.fn();
+    const onClose = jest.fn();
+
+    render(
+      <SupportPersonPickerSheet
+        visible
+        eligiblePersons={[{ id: 'child-a', displayName: 'Emma' }]}
+        onSelectPerson={onSelectPerson}
+        onAddChild={jest.fn()}
+        onSelectExistingTeen={jest.fn()}
+        onClose={onClose}
+      />,
+    );
+
+    screen.getByRole('dialog', { name: 'Choose a learner' });
+
+    fireEvent.press(screen.getByTestId('support-person-picker-option-child-a'));
+    expect(onSelectPerson).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByLabelText('Close'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('lists eligible managed persons and selects one', () => {
     const onSelectPerson = jest.fn();
     const onAddChild = jest.fn();

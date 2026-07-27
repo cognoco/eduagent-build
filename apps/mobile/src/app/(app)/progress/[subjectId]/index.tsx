@@ -11,6 +11,8 @@ import {
   goBackOrReplace,
   homeHrefForReturnTo,
   pushLearningResumeTarget,
+  resolvedV2TabForReturnTo,
+  V2_TAB_TITLE_KEYS,
 } from '../../../../lib/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback, TimeoutLoader } from '../../../../components/common';
@@ -31,7 +33,7 @@ import {
   formatApiError,
 } from '../../../../lib/format-api-error';
 import { FEATURE_FLAGS } from '../../../../lib/feature-flags';
-import type { LanguageStrandName } from '@eduagent/schemas';
+import type { LanguageProgress, LanguageStrandName } from '@eduagent/schemas';
 
 // WI-1552: maps a persisted next-practice pointer's strand to its i18n key.
 // Deliberately does not surface the pointer's `reason` field verbatim — that
@@ -44,6 +46,17 @@ const STRAND_COPY_KEYS = {
   language_focus: 'progress.subject.continuePracticeStrandLanguageFocus',
   fluency: 'progress.subject.continuePracticeStrandFluency',
 } as const satisfies Record<LanguageStrandName, string>;
+
+const LANGUAGE_STRANDS: LanguageStrandName[] = [
+  'meaning_input',
+  'meaning_output',
+  'language_focus',
+  'fluency',
+];
+
+type LanguageSkill = NonNullable<
+  LanguageProgress['skillProfile']
+>[number]['skill'];
 
 function strandCopyKey(strand: LanguageStrandName) {
   return STRAND_COPY_KEYS[strand];
@@ -90,6 +103,34 @@ export default function ProgressSubjectScreen(): React.ReactElement {
     }
     return t('progress.subject.upNextNoDetails');
   };
+  const formatStrandLabel = (strand: LanguageStrandName): string => {
+    switch (strand) {
+      case 'meaning_input':
+        return t('progress.subject.strandMeaningInput');
+      case 'meaning_output':
+        return t('progress.subject.strandMeaningOutput');
+      case 'language_focus':
+        return t('progress.subject.strandLanguageFocus');
+      case 'fluency':
+        return t('progress.subject.strandFluency');
+    }
+  };
+  const formatSkillLabel = (skill: LanguageSkill): string => {
+    switch (skill) {
+      case 'vocabulary':
+        return t('progress.subject.skillVocabulary');
+      case 'grammar':
+        return t('progress.subject.skillGrammar');
+      case 'reading':
+        return t('progress.subject.skillReading');
+      case 'listening':
+        return t('progress.subject.skillListening');
+      case 'speaking':
+        return t('progress.subject.skillSpeaking');
+      case 'fluency':
+        return t('progress.subject.skillFluency');
+    }
+  };
   const role = useActiveProfileRole();
   const register = role === 'child' ? 'child' : 'adult';
   const router = useRouter();
@@ -98,9 +139,31 @@ export default function ProgressSubjectScreen(): React.ReactElement {
     subjectId: string;
     returnTo?: string;
   }>();
+  const v2Enabled = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
   const backFallback = returnTo
-    ? homeHrefForReturnTo(returnTo)
+    ? homeHrefForReturnTo(returnTo, undefined, v2Enabled)
     : ('/(app)/progress' as const);
+  // WI-2331 rework, F1b: every Back control below (loading, error, header)
+  // routes to this SAME backFallback, so all of them name the actual
+  // destination — the owning V2 tab named by returnTo (via
+  // resolvedV2TabForReturnTo, which only claims a tab when backFallback
+  // genuinely resolves to one), or Progress itself (this screen's real,
+  // unchanged parent when returnTo is absent) — instead of the generic
+  // `common.goBack` they showed before. When returnTo names a non-tab
+  // destination the label falls back to the generic action rather than
+  // mislabeling as a tab it isn't going to.
+  const returnToBackTab = returnTo
+    ? resolvedV2TabForReturnTo(returnTo, undefined, v2Enabled)
+    : null;
+  const backLabel = v2Enabled
+    ? returnTo
+      ? returnToBackTab
+        ? t('common.backTo', {
+            destination: t(V2_TAB_TITLE_KEYS[returnToBackTab]),
+          })
+        : t('common.goBack')
+      : t('progress.subject.backToProgress')
+    : t('common.goBack');
   const inventoryQuery = useProgressInventory();
   const subjectProgressQuery = useSubjectProgress(subjectId ?? '');
   const resumeTargetQuery = useLearningResumeTarget({
@@ -129,11 +192,24 @@ export default function ProgressSubjectScreen(): React.ReactElement {
       legacyProgress.lastSessionAt != null);
   const isLanguageSubject =
     subject?.pedagogyMode === 'four_strands' || !!languageProgress;
+  const maxStrandCount = Math.max(
+    1,
+    ...LANGUAGE_STRANDS.map(
+      (strand) => languageProgress?.strandBalance?.counts[strand] ?? 0,
+    ),
+  );
   const canResumeSubject = !!resumeTargetQuery.data;
 
   const openSubjectShelf = (targetSubjectId: string): void => {
     router.push({
       pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId: targetSubjectId },
+    } as Href);
+  };
+
+  const openCefrVocabulary = (targetSubjectId: string): void => {
+    router.push({
+      pathname: '/(app)/vocabulary/[subjectId]',
       params: { subjectId: targetSubjectId },
     } as Href);
   };
@@ -220,11 +296,11 @@ export default function ProgressSubjectScreen(): React.ReactElement {
           onPress={() => router.replace(backFallback as Href)}
           className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           accessibilityRole="button"
-          accessibilityLabel={t('progress.subject.backToProgress')}
+          accessibilityLabel={backLabel}
           testID="progress-subject-missing-back"
         >
           <Text className="text-body font-semibold text-text-inverse">
-            {t('progress.subject.backToProgress')}
+            {backLabel}
           </Text>
         </Pressable>
       </View>
@@ -248,7 +324,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
             testID: 'progress-subject-skeleton-timeout-retry',
           }}
           secondaryAction={{
-            label: t('common.goBack'),
+            label: backLabel,
             onPress: () => goBackOrReplace(router, backFallback),
             testID: 'progress-subject-skeleton-timeout-back',
           }}
@@ -269,11 +345,11 @@ export default function ProgressSubjectScreen(): React.ReactElement {
                 onPress={() => goBackOrReplace(router, backFallback)}
                 className="mt-6 rounded-button bg-surface-elevated px-6 py-3 min-h-[48px] items-center justify-center"
                 accessibilityRole="button"
-                accessibilityLabel={t('common.goBack')}
+                accessibilityLabel={backLabel}
                 testID="progress-subject-loading-back"
               >
                 <Text className="text-body font-semibold text-text-primary">
-                  {t('common.goBack')}
+                  {backLabel}
                 </Text>
               </Pressable>
             </View>
@@ -304,7 +380,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
             testID: 'progress-subject-error-retry',
           }}
           secondaryAction={{
-            label: t('common.goBack'),
+            label: backLabel,
             onPress: () => router.replace(backFallback as Href),
             testID: 'progress-subject-error-back',
           }}
@@ -325,7 +401,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
             onPress={() => goBackOrReplace(router, backFallback)}
             className="me-3 py-2 pe-2"
             accessibilityRole="button"
-            accessibilityLabel={t('common.goBack')}
+            accessibilityLabel={backLabel}
             testID="progress-subject-back"
           >
             <Text className="text-body font-semibold text-primary">
@@ -579,6 +655,111 @@ export default function ProgressSubjectScreen(): React.ReactElement {
                   </Text>
                 )}
 
+                {languageProgress?.strandBalance && (
+                  <View
+                    className="mt-4 pt-4 border-t border-border gap-3"
+                    testID="language-strand-balance"
+                  >
+                    <View className="flex-row flex-wrap items-start justify-between gap-2">
+                      <Text className="text-body-sm font-semibold text-text-primary flex-1 min-w-0">
+                        {t('progress.subject.strandBalanceTitle')}
+                      </Text>
+                      <Text className="text-caption text-text-muted">
+                        {t('progress.subject.strandSessionsSampled', {
+                          count: languageProgress.strandBalance.sessionsSampled,
+                        })}
+                      </Text>
+                    </View>
+                    {LANGUAGE_STRANDS.map((strand) => {
+                      const count =
+                        languageProgress.strandBalance!.counts[strand];
+                      return (
+                        <View key={strand} className="gap-1">
+                          <View className="flex-row flex-wrap items-center justify-between gap-2">
+                            <Text className="text-caption text-text-secondary flex-1 min-w-0">
+                              {formatStrandLabel(strand)}
+                            </Text>
+                            <Text
+                              className="text-caption text-text-muted"
+                              style={{ fontVariant: ['tabular-nums'] }}
+                            >
+                              {count}
+                            </Text>
+                          </View>
+                          <View className="bg-border rounded-full h-2 overflow-hidden">
+                            <View
+                              className="bg-secondary h-full rounded-full"
+                              style={{
+                                width: `${Math.round(
+                                  (count / maxStrandCount) * 100,
+                                )}%`,
+                              }}
+                            />
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+
+                {languageProgress?.skillProfile &&
+                  languageProgress.skillProfile.length > 0 && (
+                    <View
+                      className="mt-4 pt-4 border-t border-border gap-3"
+                      testID="language-skill-profile"
+                    >
+                      <Text className="text-body-sm font-semibold text-text-primary">
+                        {t('progress.subject.skillProfileTitle')}
+                      </Text>
+                      {languageProgress.skillProfile.map((entry) => (
+                        <View
+                          key={entry.skill}
+                          className="gap-1"
+                          testID={`language-skill-${entry.skill}`}
+                        >
+                          <View className="flex-row flex-wrap items-center justify-between gap-2">
+                            <Text className="text-caption text-text-secondary flex-1 min-w-0">
+                              {formatSkillLabel(entry.skill)}
+                            </Text>
+                            {entry.progress === null && (
+                              <Text className="text-caption text-text-muted">
+                                {t('progress.subject.skillEvidenceCount', {
+                                  count: entry.evidenceCount,
+                                })}
+                              </Text>
+                            )}
+                          </View>
+                          {entry.progress !== null && (
+                            <View className="bg-border rounded-full h-2 overflow-hidden">
+                              <View
+                                className="bg-primary h-full rounded-full"
+                                style={{
+                                  width: `${Math.round(entry.progress * 100)}%`,
+                                }}
+                              />
+                            </View>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                {languageProgress && subject && (
+                  <Pressable
+                    onPress={() => openCefrVocabulary(subject.subjectId)}
+                    className="mt-4 pt-4 border-t border-border self-start min-h-[44px] justify-center"
+                    accessibilityRole="button"
+                    accessibilityLabel={t(
+                      'progress.subject.viewCefrVocabulary',
+                    )}
+                    testID="cefr-vocabulary-browser-link"
+                  >
+                    <Text className="text-body-sm font-semibold text-primary">
+                      {t('progress.subject.viewCefrVocabulary')}
+                    </Text>
+                  </Pressable>
+                )}
+
                 {/* WI-1552: cross-session next-practice pointer, persisted at
                     the end of a prior four_strands session. `reason` is safe
                     debug metadata only — the label below is derived from
@@ -727,11 +908,11 @@ export default function ProgressSubjectScreen(): React.ReactElement {
               onPress={() => router.replace(backFallback as Href)}
               className="bg-primary rounded-button px-4 py-3 items-center mt-4 min-h-[48px] justify-center"
               accessibilityRole="button"
-              accessibilityLabel={t('progress.subject.backToProgress')}
+              accessibilityLabel={backLabel}
               testID="progress-subject-gone-back"
             >
               <Text className="text-body font-semibold text-text-inverse">
-                {t('progress.subject.backToProgress')}
+                {backLabel}
               </Text>
             </Pressable>
           </View>

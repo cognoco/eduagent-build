@@ -180,9 +180,13 @@ const RUN = !!process.env.DATABASE_URL;
         // THE CRITICAL ASSERTION: must return a non-null recap, not null.
         // With the WI-823 bug (opts not forwarded), this returns null because
         // assertParentAccess 403s on the flag-OFF path (no family_links row).
-        const recap = await getRecapForParent(db, guardianPersonId, recapId, {
-          identityV2Enabled: true,
-        });
+        const recap = await getRecapForParent(
+          db,
+          guardianPersonId,
+          recapId,
+          guardianPersonId,
+          orgId,
+        );
 
         expect(recap).not.toBeNull();
         expect(recap!.recapId).toBe(recapId);
@@ -215,9 +219,13 @@ const RUN = !!process.env.DATABASE_URL;
         // getRecapForParent returns null without reaching getChildSessionDetail.
         const recapId = generateUUIDv7();
 
-        const recap = await getRecapForParent(db, unrelatedParent, recapId, {
-          identityV2Enabled: true,
-        });
+        const recap = await getRecapForParent(
+          db,
+          unrelatedParent,
+          recapId,
+          unrelatedParent,
+          orgId,
+        );
 
         expect(recap).toBeNull();
       },

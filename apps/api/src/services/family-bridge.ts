@@ -20,12 +20,16 @@ import type {
 } from '@eduagent/schemas';
 
 import { NotFoundError } from '../errors';
-import { assertParentAccess } from './family-access';
+import {
+  assertChargeNotCredentialed,
+  assertParentAccess,
+} from './family-access';
 import { getChargeSubjectsForGuardianV2 } from './identity-v2/family-bridge-v2';
 import {
   findOwnedCurriculumTopic,
   type OwnedCurriculumTopic,
 } from './curriculum-topic-ownership';
+import { assertBookTopicWriteAvailable } from './curriculum-core';
 
 const REQUEST_CACHE_TTL_MS = 60_000;
 const cloneRequestCache = new Map<
@@ -377,6 +381,7 @@ export async function cloneTopicFromChild(
   if (cached) return cached;
 
   await assertParentAccess(db, adultProfileId, input.childProfileId);
+  await assertChargeNotCredentialed(db, input.childProfileId);
   const snapshot = await getChildTopicSnapshotForParent(
     db,
     adultProfileId,
@@ -396,16 +401,22 @@ export async function cloneTopicFromChild(
     if (resolvedSubject.created)
       createdIds.subjectId = resolvedSubject.subject.id;
 
-    const curriculum = await resolveCurriculum(
-      database,
-      resolvedSubject.subject.id,
-    );
     const resolvedBook = await resolveBook(
       database,
       resolvedSubject.subject.id,
       snapshot,
     );
     if (resolvedBook.created) createdIds.bookId = resolvedBook.book.id;
+    await assertBookTopicWriteAvailable(
+      database,
+      adultProfileId,
+      resolvedSubject.subject.id,
+      resolvedBook.book.id,
+    );
+    const curriculum = await resolveCurriculum(
+      database,
+      resolvedSubject.subject.id,
+    );
 
     if (!input.forceCopy) {
       const existingTopic = await findTopicByTitle(

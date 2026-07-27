@@ -97,7 +97,12 @@ export async function detectLanguageSubject(
     // [BUG-462] Silent recovery banned (AGENTS.md). Fallback is kept for
     // resilience but the error must be visible — log + capture before returning.
     captureException(err, {
-      extra: { context: 'language-detect.fallback', rawInput },
+      // [WI-1990] rawInput is freeform learner text and must not be
+      // forwarded to Sentry — length only, matching subject-resolve.ts.
+      extra: {
+        context: 'language-detect.fallback',
+        rawInputLength: rawInput.length,
+      },
     });
     logger.warn('[language-detect] LLM call failed — falling back to hint', {
       context: 'language-detect.fallback',

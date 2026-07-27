@@ -9,6 +9,12 @@
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ExpoSecureStore from 'expo-secure-store';
+import { deferred } from '@eduagent/test-utils';
+import {
+  beginExplicitMentorLanguageUpdate,
+  completeExplicitMentorLanguageUpdate,
+  shouldSuppressMentorLanguageAutoSync,
+} from './mentor-language-coordination';
 
 const mockDelete = jest.mocked(ExpoSecureStore.deleteItemAsync);
 
@@ -28,6 +34,18 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
     expect(calledWith).toContain('mentomate_preview_intent');
   });
 
+  // [WI-2225] The pre-auth audience carrier (preAuthAudience.v1) is wiped by
+  // key name, regardless of which value — 'learner', 'parent', or the new
+  // non-authorizing 'supporter' — was stored under it. This test does not
+  // stage a value (the wipe call takes no value, only the key), which is
+  // the point: the next signed-out user on a shared device must never
+  // inherit a prior supporter choice.
+  it('clears preAuthAudience.v1 on sign-out regardless of the stored audience value (incl. supporter)', async () => {
+    await clearProfileSecureStorageOnSignOut([]);
+    const calledWith = mockDelete.mock.calls.map((c) => c[0] as string);
+    expect(calledWith).toContain('preAuthAudience.v1');
+  });
+
   it('clears global keys even when no profileIds are passed', async () => {
     await clearProfileSecureStorageOnSignOut([]);
     const calledWith = mockDelete.mock.calls.map((c) => c[0] as string);
@@ -41,7 +59,7 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
     );
   });
 
-  it('clears every per-profile key for each profileId provided', async () => {
+  it('[WI-2098 AC-3] clears every per-profile key, including the explicit Mentor-language override, on sign-out', async () => {
     const ID_A = 'profile-a';
     const ID_B = 'profile-b';
     await clearProfileSecureStorageOnSignOut([ID_A, ID_B]);
@@ -65,9 +83,120 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
           `voice-input-mode-${id}`,
           `accentPreset_${id}`,
           `mentomate_parent_home_seen_${id}`,
+          `mentorLanguageExplicitOverride_${id}`,
         ]),
       );
     }
+  });
+
+  it('[WI-2098 coordination] clears only the signed-out profiles in memory as well as durable storage', async () => {
+    await completeExplicitMentorLanguageUpdate(
+      beginExplicitMentorLanguageUpdate('profile-a'),
+    );
+    await completeExplicitMentorLanguageUpdate(
+      beginExplicitMentorLanguageUpdate('profile-b'),
+    );
+
+    await clearProfileSecureStorageOnSignOut(['profile-a']);
+
+    await expect(
+      ExpoSecureStore.getItemAsync('mentorLanguageExplicitOverride_profile-a'),
+    ).resolves.toBeNull();
+    await expect(
+      shouldSuppressMentorLanguageAutoSync('profile-a'),
+    ).resolves.toBe(false);
+    await expect(
+      shouldSuppressMentorLanguageAutoSync('profile-b'),
+    ).resolves.toBe(true);
+  });
+
+  it('[WI-2098 R4 sign-out ordering] does not restore in-memory coordination when a pre-sign-out marker read resolves late', async () => {
+    const profileId = 'profile-late-read';
+    const markerKey = `mentorLanguageExplicitOverride_${profileId}`;
+    await ExpoSecureStore.setItemAsync(markerKey, 'true');
+    const markerRead = deferred<string | null>();
+    jest
+      .spyOn(ExpoSecureStore, 'getItemAsync')
+      .mockImplementationOnce(() => markerRead.promise);
+
+    const suppression = shouldSuppressMentorLanguageAutoSync(profileId);
+    await Promise.resolve();
+    await clearProfileSecureStorageOnSignOut([profileId]);
+    markerRead.resolve('true');
+    await suppression;
+
+    await expect(shouldSuppressMentorLanguageAutoSync(profileId)).resolves.toBe(
+      false,
+    );
+  });
+
+  it('[WI-2098 R4 sign-out ordering] clears coordination when a deferred marker read resolves before sign-out', async () => {
+    const profileId = 'profile-early-read';
+    const markerKey = `mentorLanguageExplicitOverride_${profileId}`;
+    await ExpoSecureStore.setItemAsync(markerKey, 'true');
+    const markerRead = deferred<string | null>();
+    jest
+      .spyOn(ExpoSecureStore, 'getItemAsync')
+      .mockImplementationOnce(() => markerRead.promise);
+
+    const suppression = shouldSuppressMentorLanguageAutoSync(profileId);
+    markerRead.resolve('true');
+    await expect(suppression).resolves.toBe(true);
+    await clearProfileSecureStorageOnSignOut([profileId]);
+
+    await expect(shouldSuppressMentorLanguageAutoSync(profileId)).resolves.toBe(
+      false,
+    );
+  });
+
+  it('[WI-2098 R4 sign-out ordering] deletes a marker after a pre-sign-out marker write resolves late', async () => {
+    const profileId = 'profile-late-write';
+    const markerKey = `mentorLanguageExplicitOverride_${profileId}`;
+    const markerWrite = deferred<void>();
+    const realSetItem = jest
+      .mocked(ExpoSecureStore.setItemAsync)
+      .getMockImplementation();
+    jest
+      .spyOn(ExpoSecureStore, 'setItemAsync')
+      .mockImplementationOnce(async (key, value) => {
+        await markerWrite.promise;
+        await realSetItem!(key, value);
+      });
+
+    const completion = completeExplicitMentorLanguageUpdate(
+      beginExplicitMentorLanguageUpdate(profileId),
+    );
+    await Promise.resolve();
+    const cleanup = clearProfileSecureStorageOnSignOut([profileId]);
+    await Promise.resolve();
+    markerWrite.resolve();
+    await Promise.all([completion, cleanup]);
+
+    await expect(ExpoSecureStore.getItemAsync(markerKey)).resolves.toBeNull();
+  });
+
+  it('[WI-2098 R4 sign-out ordering] deletes a marker when a deferred marker write resolves before sign-out', async () => {
+    const profileId = 'profile-early-write';
+    const markerKey = `mentorLanguageExplicitOverride_${profileId}`;
+    const markerWrite = deferred<void>();
+    const realSetItem = jest
+      .mocked(ExpoSecureStore.setItemAsync)
+      .getMockImplementation();
+    jest
+      .spyOn(ExpoSecureStore, 'setItemAsync')
+      .mockImplementationOnce(async (key, value) => {
+        await markerWrite.promise;
+        await realSetItem!(key, value);
+      });
+
+    const completion = completeExplicitMentorLanguageUpdate(
+      beginExplicitMentorLanguageUpdate(profileId),
+    );
+    markerWrite.resolve();
+    await completion;
+    await clearProfileSecureStorageOnSignOut([profileId]);
+
+    await expect(ExpoSecureStore.getItemAsync(markerKey)).resolves.toBeNull();
   });
 
   it('survives per-key delete failures (best-effort)', async () => {

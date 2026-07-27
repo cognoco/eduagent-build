@@ -7,6 +7,7 @@ import {
 } from '@eduagent/database';
 import {
   learnerRecapLlmOutputSchema,
+  computeAgeBracketFromDate,
   type ConversationLanguage,
 } from '@eduagent/schemas';
 import { extractFirstJsonObject, routeAndCall } from './llm';
@@ -474,6 +475,13 @@ export async function generateLearnerRecap(
       flow: 'session.recap',
       sessionId: input.sessionId,
       conversationLanguage: input.conversationLanguage,
+      // [WI-2432] input.birthYear was already in scope (used above only for
+      // the prose voice tier) but never converted to an ageBracket, so the
+      // router's under-18 Gemini/Vertex vendor exclusion couldn't fire for
+      // this flow on the legacy routing path. Year-only math is what
+      // RecapInput carries (no birthMonth/birthDay) — computeAgeBracketFromDate
+      // falls back to that automatically.
+      ageBracket: computeAgeBracketFromDate(input.birthYear),
     },
   );
 

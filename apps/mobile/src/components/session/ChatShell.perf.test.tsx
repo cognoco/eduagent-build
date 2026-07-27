@@ -11,7 +11,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react-native';
-import { ChatShell, animateResponse, type ChatMessage } from './ChatShell';
+import { ChatShell, animateResponse } from './ChatShell';
+import type { ChatMessage } from './session-types';
 
 // ---------------------------------------------------------------------------
 // Native-boundary mocks (same set ChatShell.test.tsx uses). These are platform
@@ -47,8 +48,17 @@ jest.mock('@expo/vector-icons', () => { // gc1-allow: native-boundary — vector
   };
 });
 
-// prettier-ignore
-jest.mock('../../hooks/use-speech-recognition', () => ({ // gc1-allow: voice hook touches native recording APIs outside component scope
+// Pattern A evaluates the real TTS hook module; keep its native dependency at
+// the external boundary so the component suite remains Jest-runnable.
+jest.mock('expo-speech', () => ({
+  speak: jest.fn(),
+  stop: jest.fn(),
+  pause: jest.fn(),
+  resume: jest.fn(),
+}));
+
+jest.mock('../../hooks/use-speech-recognition', () => ({
+  ...jest.requireActual('../../hooks/use-speech-recognition'),
   useSpeechRecognition: () => ({
     status: 'idle',
     transcript: '',
@@ -64,8 +74,8 @@ jest.mock('../../hooks/use-speech-recognition', () => ({ // gc1-allow: voice hoo
   }),
 }));
 
-// prettier-ignore
-jest.mock('../../hooks/use-text-to-speech', () => ({ // gc1-allow: voice output hook touches native speech APIs outside component scope
+jest.mock('../../hooks/use-text-to-speech', () => ({
+  ...jest.requireActual('../../hooks/use-text-to-speech'),
   useTextToSpeech: () => ({
     isSpeaking: false,
     rate: 1.0,
@@ -76,8 +86,8 @@ jest.mock('../../hooks/use-text-to-speech', () => ({ // gc1-allow: voice output 
   }),
 }));
 
-// prettier-ignore
-jest.mock('../common', () => ({ // gc1-allow: animations leak timers; ThemedMarkdown wraps native markdown renderer with focused coverage elsewhere
+jest.mock('../common', () => ({
+  ...jest.requireActual('../common'),
   DeskLampAnimation: () => null,
   MagicPenAnimation: () => null,
   ThemedMarkdown: ({ children }: { children: unknown }) => {

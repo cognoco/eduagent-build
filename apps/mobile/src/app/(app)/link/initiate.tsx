@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { Ionicons } from '@expo/vector-icons';
 import {
   supporterRelationSchema,
   visibilityContractSchema,
@@ -12,7 +13,10 @@ import {
 import { ErrorFallback } from '../../../components/common';
 import { assertOk } from '../../../lib/assert-ok';
 import { useApiClient } from '../../../lib/api-client';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { formatApiError } from '../../../lib/format-api-error';
+import { goBackOrReplace } from '../../../lib/navigation';
+import { useThemeColors } from '../../../lib/theme';
 import {
   useEligibleManagedPersons,
   type EligibleManagedPerson,
@@ -70,6 +74,16 @@ export default function InitiateLinkScreen(): React.ReactElement {
     parseRelation(firstParam(params.relation)),
   );
 
+  // [WI-2188 rework] `createMutation.reset()` (in the confirmation Back
+  // handler below) only clears TanStack Query's *observer* state — it does
+  // not cancel an already in-flight request. Without this guard, a create
+  // request that resolves successfully AFTER the user has backed out still
+  // ran its unconditional `onSuccess`, pulling them forward into the
+  // contract screen they had just exited. Set on Back, checked in
+  // `onSuccess`, and cleared before every new submit so a later, deliberate
+  // create still navigates normally.
+  const hasExitedRef = useRef(false);
+
   const createMutation = useMutation({
     mutationFn: async () => {
       const supporterPersonId = activeProfile?.id;
@@ -88,6 +102,7 @@ export default function InitiateLinkScreen(): React.ReactElement {
       return visibilityContractSchema.parse(await okRes.json());
     },
     onSuccess: (contract) => {
+      if (hasExitedRef.current) return;
       router.replace({
         pathname: '/(app)/link/[contractId]',
         params: {
@@ -109,6 +124,17 @@ export default function InitiateLinkScreen(): React.ReactElement {
         contentInsetAdjustmentBehavior="automatic"
         testID="visibility-link-initiate-screen"
       >
+        {/* [WI-2188] `_layout.tsx` hides the native Stack header for this
+            whole route group, so this is the ceremony's only exit affordance
+            here — canGoBack() is true for support-hub entry (mentor.tsx /
+            subjects.tsx push this screen as a single push), false for a
+            historyless direct/deep-link entry, which falls back to the same
+            V2 Mentor root used by the sibling `[contractId].tsx` back
+            button. */}
+        <LinkCeremonyBackButton
+          onPress={() => goBackOrReplace(router, '/(app)/mentor')}
+          testID="visibility-link-initiate-picker-back"
+        />
         <SupporteePicker
           eligibleManagedPersons={eligibleManagedPersons}
           onSelectManagedPerson={(person) =>
@@ -132,7 +158,14 @@ export default function InitiateLinkScreen(): React.ReactElement {
         contentInsetAdjustmentBehavior="automatic"
         testID="visibility-link-initiate-screen"
       >
-        <ExistingTeenUnavailable onBack={() => setTarget(null)} />
+        {/* [WI-1753] The real cross-account invite flow is gated behind
+            MODE_NAV_V2_ENABLED; other environments keep the "not yet available"
+            placeholder so the shipped production behavior does not change. */}
+        {FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? (
+          <ExistingTeenInvite onBack={() => setTarget(null)} />
+        ) : (
+          <ExistingTeenUnavailable onBack={() => setTarget(null)} />
+        )}
       </ScrollView>
     );
   }
@@ -144,6 +177,38 @@ export default function InitiateLinkScreen(): React.ReactElement {
       contentInsetAdjustmentBehavior="automatic"
       testID="visibility-link-initiate-screen"
     >
+      {/* [WI-2188] Discriminated by entry shape, reusing the two exit
+          handlers this screen already has rather than inventing a third:
+          reached via the inline picker (no supporteePersonId param) → back
+          to the picker (same `setTarget(null)` shape the existingTeen
+          branches already use above); reached via a pre-filled param (the
+          `pushLinkInitiateForManagedPerson` direct-entry path, which skips
+          the picker entirely) → there is no picker to return to, so this
+          falls straight back to support-hub/fallback like the picker's own
+          back button — AC-3 requires support-hub entry to return there in
+          one step, not two. */}
+      <LinkCeremonyBackButton
+        onPress={() => {
+          // Mark the exit before either branch below runs: reset() does not
+          // cancel a request already in flight, so a late-resolving success
+          // (see `hasExitedRef` above) must not navigate the user forward —
+          // regardless of which exit path (pre-filled vs. inline-picker
+          // entry) they take out of this step.
+          hasExitedRef.current = true;
+          if (paramSupporteePersonId) {
+            goBackOrReplace(router, '/(app)/mentor');
+            return;
+          }
+          // Reset the mutation alongside the state change: without this, a
+          // prior failed submit's `isError` state survives the trip back to
+          // the picker and re-selecting a person re-renders the confirmation
+          // step with the stale error already showing, before this attempt
+          // has submitted anything.
+          createMutation.reset();
+          setTarget(null);
+        }}
+        testID="visibility-link-initiate-confirm-back"
+      />
       <View>
         <Text className="text-display-sm font-semibold text-text-primary">
           {t('visibility.link.createTitle')}
@@ -174,7 +239,11 @@ export default function InitiateLinkScreen(): React.ReactElement {
         accessibilityRole="button"
         accessibilityLabel={t('visibility.link.createAction')}
         className="min-h-[48px] items-center justify-center rounded-button bg-primary px-4 py-3"
-        onPress={() => createMutation.mutate()}
+        disabled={createMutation.isPending}
+        onPress={() => {
+          hasExitedRef.current = false;
+          createMutation.mutate();
+        }}
         testID="visibility-link-create"
       >
         <Text className="text-body font-semibold text-text-inverse">
@@ -189,13 +258,48 @@ export default function InitiateLinkScreen(): React.ReactElement {
           message={formatApiError(createMutation.error)}
           primaryAction={{
             label: t('common.tryAgain'),
-            onPress: () => createMutation.mutate(),
+            onPress: () => {
+              hasExitedRef.current = false;
+              createMutation.mutate();
+            },
             testID: 'visibility-link-create-retry',
           }}
           testID="visibility-link-create-error"
         />
       ) : null}
     </ScrollView>
+  );
+}
+
+// [WI-2188] Shared in-app exit for the two ceremony steps that previously had
+// none (the initial picker and the managed-person confirmation step). Styled
+// to match the sibling `link/[contractId].tsx` back button (same chevron +
+// "common.goBack" label + tap-target sizing) so the `link/*` route family's
+// back affordance stays visually consistent. Never submits or mutates — the
+// caller supplies pure navigation/state-reset `onPress` handlers.
+function LinkCeremonyBackButton({
+  onPress,
+  testID,
+}: {
+  onPress: () => void;
+  testID: string;
+}): React.ReactElement {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t('common.goBack')}
+      className="min-h-[44px] flex-row items-center gap-2 self-start rounded-button border border-border px-4 py-2"
+      onPress={onPress}
+      testID={testID}
+    >
+      <Ionicons name="chevron-back" size={18} color={colors.textSecondary} />
+      <Text className="text-body-sm font-semibold text-text-secondary">
+        {t('common.goBack')}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -249,6 +353,129 @@ function SupporteePicker({
       >
         <Text className="text-body font-semibold text-text-primary">
           {t('visibility.link.pickerExistingTeenOption')}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// [WI-1753] Cross-account existing-teen invite (join-my-family v1). ANTI-ENUM
+// (AC-1): the endpoint returns a byte-identical neutral ack regardless of
+// whether the email matches an account, so the confirmation copy is deliberately
+// neutral ("if that email belongs to a MentoMate account…") — it never confirms
+// or denies that an account exists. The invite disclosure copy is subject to the
+// AC-1 operator disclosure review.
+function ExistingTeenInvite({
+  onBack,
+}: {
+  onBack: () => void;
+}): React.ReactElement {
+  const { t } = useTranslation();
+  const client = useApiClient();
+  const colors = useThemeColors();
+  const [email, setEmail] = useState('');
+
+  const inviteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await client['family-join'].invite.$post({
+        json: { invitedEmail: email.trim() },
+      });
+      await assertOk(res);
+    },
+  });
+
+  if (inviteMutation.isSuccess) {
+    return (
+      <View
+        className="rounded-card border border-border bg-surface p-4"
+        testID="visibility-link-initiate-existing-teen-sent"
+      >
+        <Text className="text-h3 font-semibold text-text-primary">
+          {t('visibility.link.existingTeenInviteSentTitle')}
+        </Text>
+        <Text className="mt-2 text-body text-text-secondary">
+          {t('visibility.link.existingTeenInviteSentMessage')}
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('common.goBack')}
+          className="mt-4 min-h-[44px] items-center justify-center rounded-button border border-border px-4 py-2"
+          onPress={onBack}
+          testID="visibility-link-initiate-existing-teen-done"
+        >
+          <Text className="text-body-sm font-semibold text-text-secondary">
+            {t('common.goBack')}
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const canSubmit = email.trim().length > 0 && !inviteMutation.isPending;
+
+  return (
+    <View
+      className="rounded-card border border-border bg-surface p-4"
+      testID="visibility-link-initiate-existing-teen-invite"
+    >
+      <Text className="text-h3 font-semibold text-text-primary">
+        {t('visibility.link.existingTeenInviteTitle')}
+      </Text>
+      <Text className="mt-2 text-body text-text-secondary">
+        {t('visibility.link.existingTeenInviteMessage')}
+      </Text>
+      <Text className="mt-4 mb-1 text-body-sm font-semibold text-text-secondary">
+        {t('visibility.link.existingTeenInviteEmailLabel')}
+      </Text>
+      <TextInput
+        className="rounded-input bg-background px-4 py-3 text-body text-text-primary"
+        placeholder={t('visibility.link.existingTeenInviteEmailPlaceholder')}
+        placeholderTextColor={colors.muted}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoCorrect={false}
+        value={email}
+        onChangeText={setEmail}
+        editable={!inviteMutation.isPending}
+        testID="visibility-link-initiate-existing-teen-email"
+      />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('visibility.link.existingTeenInviteAction')}
+        disabled={!canSubmit}
+        className={`mt-4 min-h-[48px] items-center justify-center rounded-button px-4 py-3 ${
+          canSubmit ? 'bg-primary' : 'bg-primary/50'
+        }`}
+        onPress={() => inviteMutation.mutate()}
+        testID="visibility-link-initiate-existing-teen-submit"
+      >
+        <Text className="text-body font-semibold text-text-inverse">
+          {inviteMutation.isPending
+            ? t('visibility.link.existingTeenInviteSending')
+            : t('visibility.link.existingTeenInviteAction')}
+        </Text>
+      </Pressable>
+      {inviteMutation.isError ? (
+        <ErrorFallback
+          title={t('visibility.link.existingTeenInviteErrorTitle')}
+          message={formatApiError(inviteMutation.error)}
+          primaryAction={{
+            label: t('common.tryAgain'),
+            onPress: () => inviteMutation.mutate(),
+            testID: 'visibility-link-initiate-existing-teen-retry',
+          }}
+          testID="visibility-link-initiate-existing-teen-error"
+        />
+      ) : null}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('common.goBack')}
+        className="mt-4 min-h-[44px] items-center justify-center rounded-button border border-border px-4 py-2"
+        onPress={onBack}
+        testID="visibility-link-initiate-existing-teen-back"
+      >
+        <Text className="text-body-sm font-semibold text-text-secondary">
+          {t('common.goBack')}
         </Text>
       </Pressable>
     </View>

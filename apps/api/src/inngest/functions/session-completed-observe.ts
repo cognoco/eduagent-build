@@ -13,7 +13,7 @@
 // Inngest dashboard. This module provides the observable terminus so a future
 // alerting rule can page on rate spikes without instrumenting Sentry first.
 //
-// Pattern mirrors ask-classification-observe.ts and ask-gate-observe.ts.
+// Pattern mirrors ask-classification-observe.ts.
 // ---------------------------------------------------------------------------
 
 import {

@@ -20,6 +20,7 @@ import {
 } from '@eduagent/database';
 import { getTierConfig } from '../../subscription';
 import { findOwnerPersonId } from '../../identity-v2/helpers';
+import { addMonthsClamped } from '../billing-shared';
 import type { TopUpCreditRow } from '../top-up';
 import { parseSubscriptionV2PlanTier } from './types-v2';
 
@@ -78,8 +79,7 @@ export async function purchaseTopUpCreditsV2(
     buyerProfileId = ownerPersonId;
   }
 
-  const expiresAt = new Date(now);
-  expiresAt.setMonth(expiresAt.getMonth() + TOP_UP_EXPIRY_MONTHS);
+  const expiresAt = addMonthsClamped(now, TOP_UP_EXPIRY_MONTHS);
 
   if (transactionId) {
     const rows = await db

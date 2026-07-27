@@ -19,11 +19,17 @@ import type { Database } from '@eduagent/database';
 import {
   hasParentAccess,
   assertParentAccess,
+  assertChargeNotCredentialed,
   assertCanManageOwnConsent,
   assertOwnerAndParentAccess,
   assertOwnerProfile,
+  filterUncredentialedCharges,
 } from './family-access';
 import { ForbiddenError } from '../errors';
+import {
+  createDatabaseModuleMock,
+  seedCredentialedLogins,
+} from '../test-utils/database-module';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -65,6 +71,16 @@ function dbWithLink(_parentId: string, _childId: string): Database {
 /** Mock DB where NO guardianship edge exists (findFirst returns undefined). */
 function dbWithoutLink(): Database {
   return makeDb(undefined);
+}
+
+function dbWithCredential(credentialed: boolean): Database {
+  const limit = jest
+    .fn()
+    .mockResolvedValue(credentialed ? [{ personId: CHILD_ID }] : []);
+  const where = jest.fn().mockReturnValue({ limit });
+  const from = jest.fn().mockReturnValue({ where });
+  const select = jest.fn().mockReturnValue({ from });
+  return { select } as unknown as Database;
 }
 
 // ---------------------------------------------------------------------------
@@ -141,6 +157,60 @@ describe('assertParentAccess', () => {
     await expect(
       assertParentAccess(db, PARENT_ID, CHILD_ID),
     ).resolves.not.toThrow();
+  });
+});
+
+describe('assertChargeNotCredentialed', () => {
+  it('resolves when the charge has no Login row', async () => {
+    await expect(
+      assertChargeNotCredentialed(dbWithCredential(false), CHILD_ID),
+    ).resolves.toBeUndefined();
+  });
+
+  it('[BREAK / WI-787] throws ForbiddenError when the charge has a Login row', async () => {
+    await expect(
+      assertChargeNotCredentialed(dbWithCredential(true), CHILD_ID),
+    ).rejects.toThrow(ForbiddenError);
+  });
+
+  it('supports explicit credentialed-login seeds on the shared mock database', async () => {
+    const { db } = createDatabaseModuleMock();
+    seedCredentialedLogins(db, [CHILD_ID]);
+
+    await expect(
+      assertChargeNotCredentialed(db as unknown as Database, CHILD_ID),
+    ).rejects.toThrow(ForbiddenError);
+    await expect(
+      assertChargeNotCredentialed(db as unknown as Database, UNRELATED_ID),
+    ).resolves.toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// filterUncredentialedCharges — WI-1863 batch presence filter for the
+// aggregate parent surfaces (dashboard root, weekly digest, monthly report).
+// ---------------------------------------------------------------------------
+
+describe('filterUncredentialedCharges', () => {
+  it('[WI-1863] drops credentialed charges, keeps managed charges, preserves order', async () => {
+    const { db } = createDatabaseModuleMock();
+    seedCredentialedLogins(db, [CHILD_ID]);
+
+    await expect(
+      filterUncredentialedCharges(db as unknown as Database, [
+        UNRELATED_ID,
+        CHILD_ID,
+        PARENT_ID,
+      ]),
+    ).resolves.toEqual([UNRELATED_ID, PARENT_ID]);
+  });
+
+  it('[WI-1863] returns [] for empty input without touching the database', async () => {
+    const select = jest.fn();
+    await expect(
+      filterUncredentialedCharges({ select } as unknown as Database, []),
+    ).resolves.toEqual([]);
+    expect(select).not.toHaveBeenCalled();
   });
 });
 

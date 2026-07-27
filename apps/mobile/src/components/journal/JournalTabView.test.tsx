@@ -4,11 +4,20 @@ import {
   screen,
   within,
 } from '@testing-library/react-native';
-import type { NowResponse } from '@eduagent/schemas';
+import { Platform } from 'react-native';
+import type { NowResponse, RecapListItem } from '@eduagent/schemas';
 
 import { JournalTabView } from './JournalTabView';
 
 const mockPush = jest.fn();
+const mockSetParams = jest.fn(
+  (params: { section?: string | undefined }): void => {
+    mockJournalSection = params.section;
+  },
+);
+const mockSetActiveScope = jest.fn();
+const originalPlatformOs = Object.getOwnPropertyDescriptor(Platform, 'OS');
+let mockJournalSection: string | undefined;
 let mockNowFeed: {
   data: NowResponse | undefined;
   isLoading: boolean;
@@ -24,9 +33,27 @@ let mockBookmarks: ReturnType<typeof infiniteQuery>;
 let mockPracticeHistory!: ReturnType<typeof infiniteQuery>;
 let lastPracticeOpts: { limit?: number; type?: string } | undefined;
 
+function setPlatformOs(os: 'android' | 'ios' | 'web'): void {
+  Object.defineProperty(Platform, 'OS', {
+    configurable: true,
+    value: os,
+  });
+}
+
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({
+    push: mockPush,
+    setParams: mockSetParams,
+  }),
+  useLocalSearchParams: () => ({ section: mockJournalSection }),
 }));
+
+jest.mock(
+  '../../lib/scope-context' /* gc1-allow: real hook throws without its provider and resolves persisted scope asynchronously; this composition test only needs a stable setActiveScope spy */,
+  () => ({
+    useScopeContext: () => ({ setActiveScope: mockSetActiveScope }),
+  }),
+);
 
 jest.mock(
   '../../hooks/use-now-feed' /* gc1-allow: Journal moments consume the already-tested feed hook; component test pins feed states */,
@@ -65,8 +92,7 @@ jest.mock(
 );
 
 jest.mock(
-  // gc1-allow: Journal composes the practice-history hook; endpoint and hook have dedicated coverage
-  '../../hooks/use-practice-activity-history',
+  '../../hooks/use-practice-activity-history' /* gc1-allow: Journal composes the practice-history hook; endpoint and hook have dedicated coverage */,
   () => ({
     usePracticeActivityHistory: (opts?: { limit?: number; type?: string }) => {
       lastPracticeOpts = opts;
@@ -86,6 +112,14 @@ jest.mock(
     }),
   }),
 );
+
+function firstCallOrder(mockFn: jest.Mock): number {
+  const order = mockFn.mock.invocationCallOrder[0];
+  if (order === undefined) {
+    throw new Error('expected mock to have been called');
+  }
+  return order;
+}
 
 function query<T>(data: T) {
   return {
@@ -126,7 +160,8 @@ const recap = {
   engagementSignal: null,
   nextTopicTitle: null,
   nextTopicReason: null,
-};
+  verifiedProof: { status: 'absent' },
+} satisfies RecapListItem;
 
 const weeklyReport = {
   id: 'weekly-1',
@@ -155,6 +190,7 @@ const monthlyReport = {
 describe('JournalTabView', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockJournalSection = undefined;
     mockNowFeed = {
       data: {
         scope: 'self',
@@ -266,6 +302,12 @@ describe('JournalTabView', () => {
     });
   });
 
+  afterEach(() => {
+    if (originalPlatformOs) {
+      Object.defineProperty(Platform, 'OS', originalPlatformOs);
+    }
+  });
+
   it('renders ledger moments and defaults to the sessions section', () => {
     render(<JournalTabView />);
 
@@ -278,6 +320,50 @@ describe('JournalTabView', () => {
     // The Sessions tab renders the recap list (recap = the session's row).
     screen.getByTestId('journal-recaps-section');
     screen.getByTestId(`journal-recap-row-${recap.recapId}`);
+  });
+
+  it('[WI-2234] opens the Journal session_filed case without a Mentor return destination', () => {
+    render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-moment-session_filed'));
+
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith('/(app)/session?sessionId=session-1');
+    expect(mockSetActiveScope).not.toHaveBeenCalled();
+  });
+
+  // [WI-2223 AC-1] activating a support.hub-linked ledger moment must select
+  // the Support-hub scope BEFORE the Mentor tab opens — the second
+  // pushNowDeepLink caller (the first is mentor.tsx, covered in
+  // mentor.test.tsx), or the learner Mentor surface renders instead.
+  it('[WI-2223] AC-1: selects the Support-hub scope before pushing a support.hub-linked moment', () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: {
+        scope: 'self',
+        generatedAt: '2026-06-14T00:00:00.000Z',
+        overflowCount: 0,
+        cards: [
+          {
+            kind: 'ledger_moment',
+            templateKey: 'now.ledger_moment.session_filed',
+            params: { ledgerKind: 'session_filed', topicTitle: 'Emma' },
+            deepLink: { route: 'support.hub', params: {}, chain: [] },
+            scope: 'self',
+          },
+        ],
+      },
+    };
+
+    render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-moment-session_filed'));
+
+    expect(mockSetActiveScope).toHaveBeenCalledWith({ kind: 'supporter-hub' });
+    expect(mockPush).toHaveBeenCalledWith('/(app)/mentor');
+    expect(firstCallOrder(mockSetActiveScope)).toBeLessThan(
+      firstCallOrder(mockPush),
+    );
   });
 
   it('renders all five section buttons in the two-row control', () => {
@@ -293,6 +379,62 @@ describe('JournalTabView', () => {
     screen.getByText('Practice');
   });
 
+  it('[WI-2110 AC-1/4] temporarily overrides a warm organic section and restores it', () => {
+    const { rerender } = render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-tab-notes'));
+    screen.getByTestId('journal-notes-section');
+
+    mockJournalSection = 'practice';
+    rerender(<JournalTabView />);
+    screen.getByTestId('journal-practice-section');
+    screen.getByTestId('journal-moments-strip');
+
+    mockJournalSection = undefined;
+    rerender(<JournalTabView />);
+    screen.getByTestId('journal-notes-section');
+  });
+
+  it('[WI-2110 AC-3] selects Practice for a cold-start section override', () => {
+    mockJournalSection = 'practice';
+
+    render(<JournalTabView />);
+
+    screen.getByTestId('journal-practice-section');
+  });
+
+  it.each([
+    ['sessions', 'recaps'],
+    ['notes', 'notes'],
+    ['practice', 'practice'],
+    ['memory', 'memory'],
+  ] as const)(
+    '[WI-2239] treats the Reports route section as an initial selection and permits switching to %s',
+    (tab, section) => {
+      mockJournalSection = 'reports';
+      const { rerender } = render(<JournalTabView />);
+
+      screen.getByTestId('journal-reports-section');
+      fireEvent.press(screen.getByTestId(`journal-tab-${tab}`));
+      // The router mock does not schedule the route update that a real
+      // setParams call does, so explicitly render the updated route params.
+      rerender(<JournalTabView />);
+      screen.getByTestId(`journal-${section}-section`);
+      expect(screen.queryByTestId('journal-reports-section')).toBeNull();
+    },
+  );
+
+  it('[WI-2110 AC-2] ignores an unknown section and preserves organic selection', () => {
+    const { rerender } = render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-tab-notes'));
+    mockJournalSection = 'future-section';
+    rerender(<JournalTabView />);
+
+    screen.getByTestId('journal-notes-section');
+    screen.getByTestId('journal-moments-strip');
+  });
+
   it('opens the practice hub from the Practice section', () => {
     render(<JournalTabView />);
 
@@ -301,7 +443,10 @@ describe('JournalTabView', () => {
     screen.getByTestId('journal-practice-past-activity');
 
     fireEvent.press(screen.getByTestId('journal-practice-open-hub'));
-    expect(mockPush).toHaveBeenCalledWith('/(app)/practice');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/practice',
+      params: { returnTo: 'journal' },
+    });
   });
 
   it('lists past practice activity of every type with topic as the headline', () => {
@@ -311,12 +456,18 @@ describe('JournalTabView', () => {
 
     expect(screen.getByTestId('journal-activity-activity-1')).toBeTruthy();
     expect(screen.getByTestId('journal-activity-activity-2')).toBeTruthy();
-    within(screen.getByTestId('journal-activity-activity-1')).getByText(
-      'Photosynthesis',
-    );
-    within(screen.getByTestId('journal-activity-activity-2')).getByText(
-      'Dictation',
-    );
+    expect(
+      screen.getByTestId('journal-activity-headline-activity-1'),
+    ).toHaveTextContent('Photosynthesis');
+    expect(
+      screen.getByTestId('journal-activity-meta-activity-1'),
+    ).toHaveTextContent(/^Assessment · Biology · .+$/);
+    expect(
+      screen.getByTestId('journal-activity-headline-activity-2'),
+    ).toHaveTextContent('Dictation');
+    expect(
+      screen.getByTestId('journal-activity-meta-activity-2'),
+    ).toHaveTextContent(/^Spanish · .+$/);
   });
 
   it('filters past activity by type chips, driving the server query', () => {
@@ -332,14 +483,58 @@ describe('JournalTabView', () => {
     expect(lastPracticeOpts?.type).toBeUndefined();
   });
 
-  it('auto-surfaces the latest report inline in the Reports section', () => {
+  it('auto-surfaces the latest report with native Progress ancestry', () => {
+    setPlatformOs('android');
     render(<JournalTabView />);
 
     fireEvent.press(screen.getByTestId('journal-tab-reports'));
     // The most-recent report is opened inline (not just listed) — the V1
     // Progress "latest report" card, reused here.
-    screen.getByTestId('progress-latest-report-card');
+    fireEvent.press(screen.getByTestId('progress-latest-report-card'));
+    expect(mockPush).toHaveBeenCalledTimes(3);
+    expect(mockPush).toHaveBeenNthCalledWith(1, '/(app)/progress');
+    expect(mockPush).toHaveBeenNthCalledWith(2, '/(app)/progress/reports');
+    expect(mockPush).toHaveBeenNthCalledWith(3, {
+      pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
+      params: { weeklyReportId: 'weekly-1', returnTo: 'journal' },
+    });
   });
+
+  it.each([
+    [
+      'weekly',
+      'weekly-report-card-weekly-1',
+      {
+        pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
+        params: { weeklyReportId: 'weekly-1', returnTo: 'journal' },
+      },
+    ],
+    [
+      'monthly',
+      'report-card-monthly-1',
+      {
+        pathname: '/(app)/progress/reports/[reportId]',
+        params: { reportId: 'monthly-1', returnTo: 'journal' },
+      },
+    ],
+  ])(
+    'commits the web Reports owner before routing a %s report to its exact leaf',
+    (_kind, reportTestId, expectedHref) => {
+      setPlatformOs('web');
+      render(<JournalTabView />);
+
+      fireEvent.press(screen.getByTestId('journal-tab-reports'));
+      fireEvent.press(screen.getByTestId(reportTestId));
+
+      expect(mockSetParams).toHaveBeenCalledTimes(1);
+      expect(mockSetParams).toHaveBeenCalledWith({ section: 'reports' });
+      expect(firstCallOrder(mockSetParams)).toBeLessThan(
+        firstCallOrder(mockPush),
+      );
+      expect(mockPush).toHaveBeenCalledTimes(1);
+      expect(mockPush).toHaveBeenCalledWith(expectedHref);
+    },
+  );
 
   it('filters the notes archive by authorship with one-click chips', () => {
     render(<JournalTabView />);
@@ -377,20 +572,33 @@ describe('JournalTabView', () => {
         sessionId: recap.sessionId,
         subjectId: recap.subjectId,
         topicId: recap.topicId,
+        returnTo: 'journal',
       },
     });
   });
 
-  it('switches to reports and routes report rows to existing report details', () => {
+  it('routes native report rows through complete Progress ancestry', () => {
+    setPlatformOs('android');
     render(<JournalTabView />);
 
     fireEvent.press(screen.getByTestId('journal-tab-reports'));
     screen.getByTestId('journal-reports-section');
 
     fireEvent.press(screen.getByTestId('weekly-report-card-weekly-1'));
-    expect(mockPush).toHaveBeenCalledWith({
+    expect(mockPush).toHaveBeenNthCalledWith(1, '/(app)/progress');
+    expect(mockPush).toHaveBeenNthCalledWith(2, '/(app)/progress/reports');
+    expect(mockPush).toHaveBeenNthCalledWith(3, {
       pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
-      params: { weeklyReportId: 'weekly-1' },
+      params: { weeklyReportId: 'weekly-1', returnTo: 'journal' },
+    });
+
+    fireEvent.press(screen.getByTestId('report-card-monthly-1'));
+    expect(mockPush).toHaveBeenCalledTimes(6);
+    expect(mockPush).toHaveBeenNthCalledWith(4, '/(app)/progress');
+    expect(mockPush).toHaveBeenNthCalledWith(5, '/(app)/progress/reports');
+    expect(mockPush).toHaveBeenNthCalledWith(6, {
+      pathname: '/(app)/progress/reports/[reportId]',
+      params: { reportId: 'monthly-1', returnTo: 'journal' },
     });
   });
 
@@ -452,7 +660,7 @@ describe('JournalTabView', () => {
     screen.getByTestId('journal-notes-empty');
   });
 
-  it('uses the ruled animated motif for each Journal empty state', () => {
+  it('keeps the magic pen as the sole animated focal point in practice and reports empty states', () => {
     mockNowFeed = {
       data: {
         scope: 'self',
@@ -488,26 +696,50 @@ describe('JournalTabView', () => {
     });
 
     fireEvent.press(screen.getByTestId('journal-tab-practice'));
-    screen.getByTestId('journal-practice-empty-motif-lamp', {
+    const practiceMotif = screen.getByTestId('journal-practice-empty-motif', {
       includeHiddenElements: true,
     });
+    expect(
+      within(practiceMotif).getAllByTestId(/^journal-practice-empty-motif-.+/, {
+        includeHiddenElements: true,
+      }),
+    ).toHaveLength(1);
     screen.getByTestId('journal-practice-empty-motif-pen', {
       includeHiddenElements: true,
     });
-    screen.getByTestId('journal-practice-empty-motif-book', {
-      includeHiddenElements: true,
-    });
+    expect(
+      screen.queryByTestId('journal-practice-empty-motif-lamp', {
+        includeHiddenElements: true,
+      }),
+    ).toBeNull();
+    expect(
+      screen.queryByTestId('journal-practice-empty-motif-book', {
+        includeHiddenElements: true,
+      }),
+    ).toBeNull();
 
     fireEvent.press(screen.getByTestId('journal-tab-reports'));
-    screen.getByTestId('journal-reports-empty-motif-lamp', {
+    const reportsMotif = screen.getByTestId('journal-reports-empty-motif', {
       includeHiddenElements: true,
     });
+    expect(
+      within(reportsMotif).getAllByTestId(/^journal-reports-empty-motif-.+/, {
+        includeHiddenElements: true,
+      }),
+    ).toHaveLength(1);
     screen.getByTestId('journal-reports-empty-motif-pen', {
       includeHiddenElements: true,
     });
-    screen.getByTestId('journal-reports-empty-motif-book', {
-      includeHiddenElements: true,
-    });
+    expect(
+      screen.queryByTestId('journal-reports-empty-motif-lamp', {
+        includeHiddenElements: true,
+      }),
+    ).toBeNull();
+    expect(
+      screen.queryByTestId('journal-reports-empty-motif-book', {
+        includeHiddenElements: true,
+      }),
+    ).toBeNull();
   });
 
   it('[WI-1678] keeps the Reports empty motif hidden while report queries are still loading', () => {
@@ -537,6 +769,58 @@ describe('JournalTabView', () => {
       }),
     ).toBeNull();
   });
+
+  it('[WI-2186] shows one combined empty expectation only after both report queries settle', () => {
+    mockMonthlyReports = query([]);
+    mockWeeklyReports = query([]);
+
+    render(<JournalTabView />);
+    fireEvent.press(screen.getByTestId('journal-tab-reports'));
+
+    expect(
+      screen.getAllByText(
+        'Your next weekly or monthly report will appear here once there is enough learning to summarize.',
+      ),
+    ).toHaveLength(1);
+    expect(
+      screen.queryByText(
+        'The first report will arrive at the end of the month',
+      ),
+    ).toBeNull();
+  });
+
+  it('[WI-2186] keeps a settled endpoint error distinct from no report activity', () => {
+    mockMonthlyReports = {
+      ...query([]),
+      isError: true,
+    };
+    mockWeeklyReports = query([]);
+
+    render(<JournalTabView />);
+    fireEvent.press(screen.getByTestId('journal-tab-reports'));
+
+    screen.getByTestId('journal-reports-error');
+    expect(screen.queryByTestId('progress-latest-report-empty')).toBeNull();
+    expect(screen.queryByTestId('reports-list-empty')).toBeNull();
+  });
+
+  it.each([
+    ['weekly-only', [], [weeklyReport], 'weekly-report-card-weekly-1'],
+    ['monthly-only', [monthlyReport], [], 'report-card-monthly-1'],
+  ])(
+    '[WI-2186] preserves the %s report state',
+    (_case, monthly, weekly, rowTestID) => {
+      mockMonthlyReports = query(monthly);
+      mockWeeklyReports = query(weekly);
+
+      render(<JournalTabView />);
+      fireEvent.press(screen.getByTestId('journal-tab-reports'));
+
+      screen.getByTestId(rowTestID);
+      expect(screen.queryByTestId('reports-list-empty')).toBeNull();
+      expect(screen.queryByTestId('journal-reports-error')).toBeNull();
+    },
+  );
 
   it('exposes a transcription-only mic on the archive search line', () => {
     render(<JournalTabView />);
@@ -569,9 +853,10 @@ describe('JournalTabView', () => {
     screen.getByTestId('journal-memory-section');
     fireEvent.press(screen.getByTestId('journal-memory-open'));
 
-    expect(mockPush).toHaveBeenCalledWith(
-      '/(app)/mentor-memory?returnTo=journal',
-    );
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/mentor-memory',
+      params: { returnTo: 'journal' },
+    });
   });
 
   it('keeps feed failures retryable without blanking the paper trail', () => {

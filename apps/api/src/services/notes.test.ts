@@ -1,3 +1,11 @@
+jest.mock(
+  './llm' /* gc1-allow: mocks the routeAndCall LLM boundary. The [WI-2628] gate now refers user-authored ambiguous text to an independent judge, so asserting the educational-allowance path reaches the write requires a judge verdict; routeAndCall cannot be exercised without a provider registration. Same escape and reasoning as learning-text-safety/judge.test.ts and gate.test.ts. */,
+  () => {
+    const actual = jest.requireActual('./llm') as typeof import('./llm');
+    return { ...actual, routeAndCall: jest.fn() };
+  },
+);
+
 /**
  * notes.ts unit tests
  *
@@ -24,11 +32,15 @@
 
 import {
   listAllNotes,
+  createNoteForSession,
   updateNote,
   deleteNoteById,
   getNotesForTopic,
   getTopicIdsWithNotes,
 } from './notes';
+import { PgDialect } from 'drizzle-orm/pg-core';
+import { BadRequestError } from '../errors';
+import { routeAndCall } from './llm';
 
 // ---------------------------------------------------------------------------
 // Shared stub factory
@@ -64,6 +76,10 @@ interface StubConfig {
   queryFindMany?: StubRow[][];
   /** Whether tx.execute() (advisory lock) should resolve (default true) */
   txExecuteOk?: boolean;
+  /** Observe an UPDATE predicate for ownership/authorization assertions. */
+  onUpdateWhere?: (condition: unknown) => void;
+  /** Observe a DELETE predicate for ownership/authorization assertions. */
+  onDeleteWhere?: (condition: unknown) => void;
 }
 
 type ChainCall = { [k: string]: (...args: unknown[]) => any };
@@ -77,18 +93,30 @@ function makeInsertChain(rows: StubRow[]): ChainCall {
   return chain;
 }
 
-function makeUpdateChain(rows: StubRow[]): ChainCall {
+function makeUpdateChain(
+  rows: StubRow[],
+  onWhere?: (condition: unknown) => void,
+): ChainCall {
   const chain: ChainCall = {
     set: () => chain,
-    where: () => chain,
+    where: (condition: unknown) => {
+      onWhere?.(condition);
+      return chain;
+    },
     returning: async () => rows,
   };
   return chain;
 }
 
-function makeDeleteChain(rows: StubRow[]): ChainCall {
+function makeDeleteChain(
+  rows: StubRow[],
+  onWhere?: (condition: unknown) => void,
+): ChainCall {
   const chain: ChainCall = {
-    where: () => chain,
+    where: (condition: unknown) => {
+      onWhere?.(condition);
+      return chain;
+    },
     returning: async () => rows,
   };
   return chain;
@@ -173,11 +201,11 @@ function makeDbStub(config: StubConfig): Parameters<typeof listAllNotes>[0] {
     },
     update: () => {
       const rows = updateBatches.shift() ?? [];
-      return makeUpdateChain(rows);
+      return makeUpdateChain(rows, config.onUpdateWhere);
     },
     delete: () => {
       const rows = deleteBatches.shift() ?? [];
-      return makeDeleteChain(rows);
+      return makeDeleteChain(rows, config.onDeleteWhere);
     },
     query: queryProxy,
     transaction: async (cb: (tx: unknown) => Promise<unknown>) => {
@@ -372,6 +400,38 @@ describe('listAllNotes — ISO date formatting', () => {
     expect(typeof result.notes[0]!.updatedAt).toBe('string');
     expect(result.notes[0]!.createdAt).toBe(testDate.toISOString());
   });
+
+  it('normalizes rollout-era null metadata as learner-authored/unverified', async () => {
+    const testDate = new Date('2026-03-15T10:30:00.000Z');
+    const db = makeDbStub({
+      selectMany: [
+        [
+          {
+            id: 'note-rollout',
+            topicId: 'topic-1',
+            topicTitle: 'Topic',
+            bookId: 'book-1',
+            bookTitle: 'Book',
+            subjectId: 'subject-1',
+            subjectName: 'Subject',
+            sessionId: null,
+            content: 'Compatible writer note',
+            artifactSource: null,
+            verificationState: 'unverified',
+            createdAt: testDate,
+            updatedAt: testDate,
+          },
+        ],
+      ],
+    });
+
+    const result = await listAllNotes(db, 'profile-1');
+
+    expect(result.notes[0]).toMatchObject({
+      artifactSource: 'learner_authored_note',
+      verificationState: 'unverified',
+    });
+  });
 });
 
 describe('listAllNotes — session_id schema drift fallback', () => {
@@ -518,6 +578,28 @@ describe('updateNote — profile isolation', () => {
     expect(result.content).toBe('updated content');
   });
 
+  it('allows rollout-era null learner notes while refusing server-owned or verified artifacts', async () => {
+    let capturedWhere: unknown;
+    const db = makeDbStub({
+      updateReturning: [[]],
+      onUpdateWhere: (condition) => {
+        capturedWhere = condition;
+      },
+    });
+
+    await expect(
+      updateNote(db, 'profile-1', 'note-123', 'new content'),
+    ).rejects.toThrow('Note not found');
+
+    const rendered = new PgDialect().sqlToQuery(capturedWhere as never);
+    expect(rendered.sql).toMatch(/"artifact_source"\s+is\s+null/);
+    expect(rendered.sql).toMatch(/"artifact_source"\s*=\s*\$\d+/);
+    expect(rendered.sql).toMatch(/"verification_state"\s*=\s*\$\d+/);
+    expect(rendered.params).toEqual(
+      expect.arrayContaining(['learner_authored_note', 'unverified']),
+    );
+  });
+
   // [BUG-391] NoteRow mapper — neon-serverless returns Date objects for
   // timestamp columns; the mapper must normalise them to ISO 8601 strings
   // so callers always receive the API-contract shape regardless of whether
@@ -563,5 +645,259 @@ describe('deleteNoteById — profile isolation', () => {
     const db = makeDbStub({ deleteReturning: [[{ id: 'note-123' }]] });
     const deleted = await deleteNoteById(db, 'profile-1', 'note-123');
     expect(deleted).toBe(true);
+  });
+
+  it('allows rollout-era null learner notes while refusing server-owned or verified artifacts', async () => {
+    let capturedWhere: unknown;
+    const db = makeDbStub({
+      deleteReturning: [[]],
+      onDeleteWhere: (condition) => {
+        capturedWhere = condition;
+      },
+    });
+
+    await expect(deleteNoteById(db, 'profile-1', 'note-123')).resolves.toBe(
+      false,
+    );
+
+    const rendered = new PgDialect().sqlToQuery(capturedWhere as never);
+    expect(rendered.sql).toMatch(/"artifact_source"\s+is\s+null/);
+    expect(rendered.sql).toMatch(/"artifact_source"\s*=\s*\$\d+/);
+    expect(rendered.sql).toMatch(/"verification_state"\s*=\s*\$\d+/);
+    expect(rendered.params).toEqual(
+      expect.arrayContaining(['learner_authored_note', 'unverified']),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2628 AC-5] The gate stops unsafe text AT the write boundary.
+//
+// The criterion is "unsafe text does not reach a write", so the assertion has to
+// sit at the write, not one layer above it. Asserting that the gate returns
+// `block` would pass even if `updateNote` ignored the verdict and issued the
+// UPDATE anyway — the defect and success would look identical. So these tests
+// inject a recording `db` and assert on STATEMENTS ISSUED.
+//
+// `db` is a constructor parameter of every function here, so this needs no
+// internal jest.mock (GC1/GC6): the real `updateNote`, the real gate, the real
+// scanner and the real judge fail-closed matrix all run.
+// ---------------------------------------------------------------------------
+describe('[WI-2628 AC-5] unsafe learning text never reaches the notes write', () => {
+  /** A db whose only capability is to record that it was asked to write. */
+  function makeRecordingDb(): {
+    db: Parameters<typeof updateNote>[0];
+    update: jest.Mock;
+  } {
+    const update = jest.fn(() => {
+      throw new Error(
+        'db.update was called — unsafe text reached the write boundary',
+      );
+    });
+    return {
+      db: { update } as unknown as Parameters<typeof updateNote>[0],
+      update,
+    };
+  }
+
+  /**
+   * Non-English person attributions. Every one of these was returned UNCHANGED by
+   * the shipped English-only guard — i.e. persisted — which is this Work Item's
+   * root cause. The English row is the control that already worked.
+   */
+  const UNSAFE_BY_LANGUAGE: ReadonlyArray<readonly [string, string]> = [
+    ['Czech', 'Petr má dyslexii a potřebuje pomoc.'],
+    ['Spanish', 'El alumno tiene TEA.'],
+    ['German', 'Der Schüler hat ADS.'],
+    ['Norwegian', 'Eleven har ADD.'],
+    ['Japanese', '田中さんは自閉症です。'],
+    [
+      'English genitive of an attributed-only acronym',
+      "Emma's TEA is documented in the file.",
+    ],
+    [
+      'English (control — the shipped guard already blocked this)',
+      'Petr has dyslexia.',
+    ],
+  ];
+
+  it.each(UNSAFE_BY_LANGUAGE)(
+    'updateNote refuses %s and issues NO statement',
+    async (_name, content) => {
+      const { db, update } = makeRecordingDb();
+      await expect(
+        updateNote(db, 'profile-1', 'note-123', content),
+      ).rejects.toThrow(BadRequestError);
+      // THE PROPERTY. Not "the gate said block" — "nothing was written".
+      expect(update).not.toHaveBeenCalled();
+    },
+  );
+
+  it('createNoteForSession refuses unsafe content and issues NO statement', async () => {
+    // The other write path into insertNoteWithCap. A stub with no `transaction`
+    // and no `insert` at all: if the gate did not stop this, the call would fail
+    // with a TypeError rather than BadRequestError, so the assertion cannot pass
+    // by accident.
+    const insert = jest.fn();
+    const transaction = jest.fn();
+    await expect(
+      createNoteForSession({ insert, transaction } as never, {
+        profileId: 'profile-1',
+        topicId: 'topic-1',
+        sessionId: 'session-1',
+        content: 'Žák má dyslexii.',
+      }),
+    ).rejects.toThrow(BadRequestError);
+    expect(insert).not.toHaveBeenCalled();
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('lets safe content through to the UPDATE statement', async () => {
+    // Weak-but-necessary control: proves the write path works at all. It is NOT
+    // sufficient on its own — 'volcanoes' contains no protected lexeme, so this
+    // row passes whether or not the educational allowance survives. That gap is
+    // exactly why the closed educational path shipped unnoticed; the
+    // protected-lexeme controls below are the real ones.
+    const updatedRow = {
+      id: 'note-123',
+      topicId: 'topic-1',
+      sessionId: null,
+      content: 'We read two chapters about volcanoes today.',
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+      updatedAt: new Date('2026-01-02T00:00:00Z'),
+    };
+    const db = makeDbStub({ updateReturning: [[updatedRow]] });
+    const result = await updateNote(
+      db,
+      'profile-1',
+      'note-123',
+      'We read two chapters about volcanoes today.',
+    );
+    expect(result.content).toBe('We read two chapters about volcanoes today.');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2628, operator ruling 2026-07-26] The EDUCATIONAL ALLOWANCE must survive.
+//
+// A non-triviality control has to CONTAIN THE THING UNDER TEST. The control
+// above ('…volcanoes…') has no protected lexeme, so nothing in this file
+// asserted that educational use of a protected term still reaches the write —
+// which is how `notes.ts` came to return 400 on text the shipped English-only
+// guard allowed, unnoticed.
+//
+// Under the ruling this text is REFERRED to the independent judge rather than
+// blocked outright, so these rows stub the judge verdict. Both directions are
+// asserted: an allowing judge lets the write proceed, a blocking or unavailable
+// judge still refuses it. "Goes to the judge" is not "passes".
+// ---------------------------------------------------------------------------
+describe('[WI-2628] educational use of a protected term still reaches the write', () => {
+  const mockRouteAndCall = routeAndCall as jest.MockedFunction<
+    typeof routeAndCall
+  >;
+
+  /** Allowed by the shipped English-only guard; must not regress to a 400. */
+  const EDUCATIONAL = [
+    'This chapter explains what dyslexia is.',
+    'Dyslexia is a reading difference that affects decoding.',
+    'dyslexia',
+    'We practised strategies used for ADHD support.',
+    'Autism spectrum conditions vary widely.',
+  ] as const;
+
+  const judgeVerdict = (verdict: string, reason: string): void => {
+    mockRouteAndCall.mockResolvedValue({
+      response: JSON.stringify({ verdict, reason }),
+      provider: 'anthropic',
+      model: 'notes-gate-test-model',
+      latencyMs: 5,
+      stopReason: 'stop',
+    } as Awaited<ReturnType<typeof routeAndCall>>);
+  };
+
+  beforeEach(() => {
+    mockRouteAndCall.mockReset();
+  });
+
+  it.each(EDUCATIONAL)(
+    'writes %s when the judge allows it as an educational reference',
+    async (content) => {
+      judgeVerdict('allow', 'educational_reference');
+      const updatedRow = {
+        id: 'note-123',
+        topicId: 'topic-1',
+        sessionId: null,
+        content,
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+        updatedAt: new Date('2026-01-02T00:00:00Z'),
+      };
+      const db = makeDbStub({ updateReturning: [[updatedRow]] });
+
+      const result = await updateNote(db, 'profile-1', 'note-123', content);
+
+      expect(result.content).toBe(content);
+      // The judge was actually consulted — without this the row could pass by
+      // the scanner clearing the text, which would not exercise the allowance.
+      expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(EDUCATIONAL)(
+    'still refuses %s when the judge blocks it',
+    async (content) => {
+      judgeVerdict('block', 'diagnostic_inference');
+      const update = jest.fn(() => {
+        throw new Error('db.update was called — the judge blocked this text');
+      });
+      await expect(
+        updateNote(
+          { update } as unknown as Parameters<typeof updateNote>[0],
+          'profile-1',
+          'note-123',
+          content,
+        ),
+      ).rejects.toThrow(BadRequestError);
+      expect(update).not.toHaveBeenCalled();
+    },
+  );
+
+  it('still refuses educational text when the judge is unavailable', async () => {
+    // Fail-closed floor on a user-facing write. The ruling moved the case to the
+    // judge; it did not make a judge outage into an allowance.
+    mockRouteAndCall.mockRejectedValue(new Error('circuit open'));
+    const update = jest.fn();
+    await expect(
+      updateNote(
+        { update } as unknown as Parameters<typeof updateNote>[0],
+        'profile-1',
+        'note-123',
+        'This chapter explains what dyslexia is.',
+      ),
+    ).rejects.toThrow(BadRequestError);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('never consults the judge for a person attribution, in any language', async () => {
+    // Attribution is deterministic and decided before provenance is consulted,
+    // so an allowing judge cannot rescue it. This is the row that proves the
+    // ruling did not widen the gate.
+    judgeVerdict('allow', 'educational_reference');
+    for (const content of [
+      'The learner has ADHD.',
+      'Petr má dyslexii a potřebuje pomoc.',
+      'El alumno tiene TEA.',
+    ]) {
+      const update = jest.fn();
+      await expect(
+        updateNote(
+          { update } as unknown as Parameters<typeof updateNote>[0],
+          'profile-1',
+          'note-123',
+          content,
+        ),
+      ).rejects.toThrow(BadRequestError);
+      expect(update).not.toHaveBeenCalled();
+    }
+    expect(mockRouteAndCall).not.toHaveBeenCalled();
   });
 });

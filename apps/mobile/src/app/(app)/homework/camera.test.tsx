@@ -602,6 +602,26 @@ describe('CameraScreen', () => {
     getByText(/center your homework/i);
   });
 
+  it('[WI-1864] anchors manual entry to the full camera viewport', () => {
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
+    const layoutAncestors: Array<{ className?: string; testID?: string }> = [];
+    let ancestor = getByTestId('manual-entry-button').parent;
+    while (ancestor) {
+      layoutAncestors.push(ancestor.props);
+      if (ancestor.props.testID === 'camera-view') break;
+      ancestor = ancestor.parent;
+    }
+
+    expect(layoutAncestors.at(-1)?.testID).toBe('camera-view');
+    expect(
+      layoutAncestors.some(({ className }) =>
+        className?.includes('flex-row items-center justify-center px-8 pb-4'),
+      ),
+    ).toBe(false);
+  });
+
   it('opens a type-or-record editor from the viewfinder without taking a picture', async () => {
     const { getByTestId, getByText } = render(<CameraScreen />, {
       wrapper: createWrapper(),

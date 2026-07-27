@@ -1245,11 +1245,23 @@ describe('runTopicIntentMatcher — malformed LLM response logging (errors-api F
  * test fails loudly instead of silently passing.
  */
 function makeNullSessionDb() {
-  return {
+  const db = {
     query: {
       learningSessions: { findFirst: jest.fn().mockResolvedValue(null) },
     },
-  } as never;
+    update: jest.fn(() => ({
+      set: jest.fn(() => ({
+        where: jest.fn(() => ({
+          returning: jest.fn().mockResolvedValue([]),
+        })),
+      })),
+    })),
+    transaction: jest.fn(),
+  };
+  db.transaction.mockImplementation(
+    async (callback: (tx: typeof db) => Promise<unknown>) => callback(db),
+  );
+  return db as never;
 }
 
 describe('[F-015] recordSystemPrompt — typed NotFoundError for missing session', () => {

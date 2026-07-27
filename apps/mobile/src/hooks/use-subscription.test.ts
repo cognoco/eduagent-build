@@ -250,6 +250,7 @@ describe('useFamilySubscription', () => {
             monthlyLimit: 1500,
             usedThisMonth: 300,
             remainingQuestions: 1200,
+            cycleResetAt: '2026-03-01T00:00:00.000Z',
             profileCount: 3,
             maxProfiles: 4,
             members: [
@@ -275,6 +276,7 @@ describe('useFamilySubscription', () => {
 
     expect(result.current.data?.profileCount).toBe(3);
     expect(result.current.data?.maxProfiles).toBe(4);
+    expect(result.current.data?.cycleResetAt).toBe('2026-03-01T00:00:00.000Z');
   });
 
   it('returns null when the family endpoint responds 404 (non-throwing mock)', async () => {

@@ -112,6 +112,10 @@ jest.mock('react-i18next', () => ({
           'Turn "I don\'t get it" into "I\'ve got this."',
         'welcomeIntro.bridge.supporting':
           'Create a free account so your mentor can remember your subjects, notes, and progress.',
+        'welcomeIntro.bridge.parentHeadline':
+          'Continue with your account to support your learner.',
+        'welcomeIntro.bridge.parentSupporting':
+          'Sign in or sign up to accept the invitation and set up support. Your account does not grant access to learning activity unless the learner authorizes it.',
         'welcomeIntro.bridge.primaryCta': 'Create free account',
         'welcomeIntro.bridge.secondaryCta': 'I already have an account',
         'welcomeIntro.a11y.bridgePrimary': 'Create a free account',
@@ -133,6 +137,14 @@ function chooseLearner() {
 function chooseParent() {
   fireEvent.press(screen.getByTestId('welcome-chooser-parent'));
 }
+
+const LEARNER_BRIDGE_HEADLINE = 'Turn "I don\'t get it" into "I\'ve got this."';
+const LEARNER_BRIDGE_SUPPORTING =
+  'Create a free account so your mentor can remember your subjects, notes, and progress.';
+const PARENT_BRIDGE_HEADLINE =
+  'Continue with your account to support your learner.';
+const PARENT_BRIDGE_SUPPORTING =
+  'Sign in or sign up to accept the invitation and set up support. Your account does not grant access to learning activity unless the learner authorizes it.';
 
 describe('<PreAuthWelcomeRoute /> - audience chooser', () => {
   beforeEach(() => {
@@ -259,21 +271,84 @@ describe('<PreAuthWelcomeRoute /> - cards -> bridge -> auth', () => {
     expect(mockTrack).toHaveBeenCalledWith('intro_completed', {});
   });
 
-  it('bridge renders the tagline, supporting copy, and both CTAs', () => {
-    render(<PreAuthWelcomeRoute />);
-    chooseParent();
-    fireEvent.press(screen.getByTestId('welcome-intro-stub-complete'));
-    expect(screen.getByTestId('pre-auth-bridge').props.style).toEqual(
-      expect.objectContaining({
-        backgroundColor: WELCOME_DARK_STAGE_COLORS.background,
-      }),
-    );
-    expect(
-      screen.getByText(/Turn "I don't get it" into "I've got this."/),
-    ).toBeTruthy();
-    expect(screen.getByTestId('pre-auth-bridge-primary')).toBeTruthy();
-    expect(screen.getByTestId('pre-auth-bridge-secondary')).toBeTruthy();
-  });
+  it.each([
+    {
+      audience: 'learner' as const,
+      choose: chooseLearner,
+      ctaTestId: 'pre-auth-bridge-primary',
+      destination: '/(auth)/sign-up',
+      headline: LEARNER_BRIDGE_HEADLINE,
+      supporting: LEARNER_BRIDGE_SUPPORTING,
+      excludedHeadline: PARENT_BRIDGE_HEADLINE,
+      excludedSupporting: PARENT_BRIDGE_SUPPORTING,
+    },
+    {
+      audience: 'learner' as const,
+      choose: chooseLearner,
+      ctaTestId: 'pre-auth-bridge-secondary',
+      destination: '/(auth)/sign-in',
+      headline: LEARNER_BRIDGE_HEADLINE,
+      supporting: LEARNER_BRIDGE_SUPPORTING,
+      excludedHeadline: PARENT_BRIDGE_HEADLINE,
+      excludedSupporting: PARENT_BRIDGE_SUPPORTING,
+    },
+    {
+      audience: 'parent' as const,
+      choose: chooseParent,
+      ctaTestId: 'pre-auth-bridge-primary',
+      destination: '/(auth)/sign-up',
+      headline: PARENT_BRIDGE_HEADLINE,
+      supporting: PARENT_BRIDGE_SUPPORTING,
+      excludedHeadline: LEARNER_BRIDGE_HEADLINE,
+      excludedSupporting: LEARNER_BRIDGE_SUPPORTING,
+    },
+    {
+      audience: 'parent' as const,
+      choose: chooseParent,
+      ctaTestId: 'pre-auth-bridge-secondary',
+      destination: '/(auth)/sign-in',
+      headline: PARENT_BRIDGE_HEADLINE,
+      supporting: PARENT_BRIDGE_SUPPORTING,
+      excludedHeadline: LEARNER_BRIDGE_HEADLINE,
+      excludedSupporting: LEARNER_BRIDGE_SUPPORTING,
+    },
+  ])(
+    'renders audience-specific bridge copy and preserves the audience through each auth CTA: $audience → $destination',
+    ({
+      audience,
+      choose,
+      ctaTestId,
+      destination,
+      headline,
+      supporting,
+      excludedHeadline,
+      excludedSupporting,
+    }) => {
+      render(<PreAuthWelcomeRoute />);
+      choose();
+      fireEvent.press(screen.getByTestId('welcome-intro-stub-complete'));
+
+      expect(screen.getByTestId('pre-auth-bridge').props.style).toEqual(
+        expect.objectContaining({
+          backgroundColor: WELCOME_DARK_STAGE_COLORS.background,
+        }),
+      );
+      expect(screen.getByText(headline)).toBeTruthy();
+      expect(screen.getByText(supporting)).toBeTruthy();
+      expect(screen.queryByText(excludedHeadline)).toBeNull();
+      expect(screen.queryByText(excludedSupporting)).toBeNull();
+      expect(screen.getByTestId('pre-auth-bridge-primary')).toBeTruthy();
+      expect(screen.getByTestId('pre-auth-bridge-secondary')).toBeTruthy();
+      expect(mockMarkAudience).toHaveBeenCalledTimes(1);
+      expect(mockMarkAudience).toHaveBeenCalledWith(audience);
+
+      fireEvent.press(screen.getByTestId(ctaTestId));
+
+      expect(mockMarkAudience).toHaveBeenCalledTimes(1);
+      expect(mockMarkPreAuthIntroSeen).toHaveBeenCalledTimes(1);
+      expect(mockReplace).toHaveBeenCalledWith(destination);
+    },
+  );
 
   it('"Create free account" marks intro seen and replaces to /(auth)/sign-up', () => {
     render(<PreAuthWelcomeRoute />);

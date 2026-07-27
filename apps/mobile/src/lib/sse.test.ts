@@ -198,6 +198,86 @@ describe('parseSSEStream', () => {
     });
   });
 
+  // [WI-2500] Mobile SSE trust boundary: a mentorNotice on a done frame must be
+  // runtime-parsed with the shared schema, not trusted from the server's type
+  // declaration. A malformed notice is dropped so it never reaches UI consumers
+  // as a canonical accepted notice; the rest of the done frame is preserved.
+  describe('done-frame mentorNotice validation (WI-2500)', () => {
+    const VALID_UUID = '11111111-1111-4111-8111-111111111111';
+
+    it('surfaces a valid accepted mentorNotice unchanged', async () => {
+      const notice = {
+        id: VALID_UUID,
+        concept: 'long division carrying',
+        correctionHint: 'carry the remainder to the next column',
+      };
+      const stream = createMockStream([
+        `data: {"type":"done","exchangeCount":2,"mentorNotice":${JSON.stringify(notice)}}\n\n`,
+      ]);
+
+      const events: StreamEvent[] = [];
+      for await (const event of parseSSEStream(mockResponse(stream))) {
+        events.push(event);
+      }
+
+      expect(events).toHaveLength(1);
+      expect(events[0]).toEqual({
+        type: 'done',
+        exchangeCount: 2,
+        mentorNotice: notice,
+      });
+    });
+
+    it('surfaces a valid notice with null correctionHint', async () => {
+      const notice = { id: VALID_UUID, concept: 'topic', correctionHint: null };
+      const stream = createMockStream([
+        `data: {"type":"done","exchangeCount":1,"mentorNotice":${JSON.stringify(notice)}}\n\n`,
+      ]);
+
+      const events: StreamEvent[] = [];
+      for await (const event of parseSSEStream(mockResponse(stream))) {
+        events.push(event);
+      }
+
+      expect(events[0]).toEqual({
+        type: 'done',
+        exchangeCount: 1,
+        mentorNotice: notice,
+      });
+    });
+
+    it.each([
+      [
+        'invalid UUID',
+        { id: 'not-a-uuid', concept: 'x', correctionHint: null },
+      ],
+      ['empty concept', { id: VALID_UUID, concept: '', correctionHint: null }],
+      [
+        'non-string correctionHint',
+        { id: VALID_UUID, concept: 'x', correctionHint: 42 },
+      ],
+      ['missing id', { concept: 'x', correctionHint: null }],
+    ])(
+      'drops a malformed mentorNotice (%s) but keeps the done frame',
+      async (_label, notice) => {
+        const stream = createMockStream([
+          `data: {"type":"done","exchangeCount":4,"mentorNotice":${JSON.stringify(notice)}}\n\n`,
+        ]);
+
+        const events: StreamEvent[] = [];
+        for await (const event of parseSSEStream(mockResponse(stream))) {
+          events.push(event);
+        }
+
+        expect(events).toHaveLength(1);
+        expect(events[0]).toEqual({ type: 'done', exchangeCount: 4 });
+        expect(
+          (events[0] as { mentorNotice?: unknown }).mentorNotice,
+        ).toBeUndefined();
+      },
+    );
+  });
+
   it('parses typed challenge round fields from done events', async () => {
     const challengeRound = {
       state: 'active',
@@ -465,6 +545,30 @@ describe('streamSSEViaXHR', () => {
   afterEach(() => {
     (global as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest =
       originalXhr;
+  });
+
+  it('[WI-2102] gives the transport sole ownership of a 90-second idle budget', async () => {
+    jest.useFakeTimers();
+    const xhr = installFakeXhr();
+    const { events } = streamSSEViaXHR('https://example.test/stream', {
+      method: 'POST',
+    });
+    const nextEvent = events.next();
+    const timeoutResult = expect(nextEvent).rejects.toMatchObject({
+      message: 'The connection timed out while waiting for a reply',
+      isTimeout: true,
+    });
+
+    try {
+      await jest.advanceTimersByTimeAsync(89_999);
+      expect(xhr.abort).not.toHaveBeenCalled();
+
+      await jest.advanceTimersByTimeAsync(1);
+      expect(xhr.abort).toHaveBeenCalledTimes(1);
+      await timeoutResult;
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   // [BUG-632 / I-21] When the server flushes a few SSE frames before returning

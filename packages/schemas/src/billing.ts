@@ -29,6 +29,17 @@ export const subscriptionStatusSchema = z.enum([
 ]);
 export type SubscriptionStatus = z.infer<typeof subscriptionStatusSchema>;
 
+export type CoherentBillingAccessResultV2<TAccess, TSharedPoolStatus> =
+  | {
+      kind: 'available';
+      access: TAccess | null;
+      sharedPoolStatus: TSharedPoolStatus | null;
+    }
+  | {
+      kind: 'shared-pool-unavailable';
+      access: TAccess | null;
+    };
+
 export const subscriptionSchema = z
   .object({
     tier: subscriptionTierSchema,
@@ -84,6 +95,8 @@ export type UsageProfileBreakdownRow = z.infer<
 export const usageFamilyAggregateSchema = z.object({
   used: z.number().int(),
   limit: z.number().int(),
+  /** Current-cycle usage retained from profiles removed from the family. */
+  formerMemberUsed: z.number().int().nonnegative().optional(),
 });
 export type UsageFamilyAggregate = z.infer<typeof usageFamilyAggregateSchema>;
 
@@ -162,6 +175,7 @@ export const familySubscriptionSchema = z.object({
   monthlyLimit: z.number().int(),
   usedThisMonth: z.number().int(),
   remainingQuestions: z.number().int(),
+  cycleResetAt: isoDateField,
   profileCount: z.number().int(),
   maxProfiles: z.number().int(),
   members: z.array(familyMemberSchema),

@@ -1,9 +1,22 @@
 # Epic 17: Voice-First Learning — Talk to Your Mentor
 
 **Date:** 2026-04-07
-**Status:** Draft
+**Status:** Obsolete umbrella; wholesale conversational voice-first is OUT of MVP · last verified 2026-07-22
 **FRs:** FR243-FR261 (19 FRs)
 **Dependencies:** Epic 8 (voice infrastructure — complete), Epic 6 (language learning), Epic 13 (session lifecycle), Epic 12 (persona removal / birth year)
+
+> **Implementation disposition.** The ratified
+> `docs/plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md` §6 keeps Epic 17 wholesale
+> OUT while preserving the independently defined MVP voice floor: transcription
+> input everywhere, current TTS, and the narrow speaking-practice slice. Current code and tests
+> include `apps/mobile/src/hooks/use-speech-recognition.ts` and its test,
+> `apps/mobile/src/components/session/ChatShell.tsx` and its test,
+> `apps/mobile/src/components/mentor/MentorInputBar.tsx` and its test,
+> `apps/mobile/src/app/(app)/homework/camera.tsx` and its test,
+> `apps/mobile/src/hooks/use-text-to-speech.ts` and its test, and
+> `apps/mobile/src/components/session/SpeakingPracticeActivity.tsx` and its test. The successor
+> **WI-1459 (Re-scope and refresh the Epic 17 voice-first spec before any execution
+> (umbrella))** is Ready/Parked. This historical spec authorizes no new voice work.
 
 ---
 

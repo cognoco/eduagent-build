@@ -20,6 +20,8 @@ function note(overrides: Partial<AllNote> = {}): AllNote {
     sessionId: null,
     content: 'My note',
     origin: 'self',
+    artifactSource: 'learner_authored_note',
+    verificationState: 'unverified',
     createdAt: '2026-06-10T10:00:00.000Z',
     updatedAt: '2026-06-11T10:00:00.000Z',
     ...overrides,
@@ -36,6 +38,8 @@ function bookmark(overrides: Partial<Bookmark> = {}): Bookmark {
     subjectName: 'Spanish',
     topicTitle: null,
     content: 'Saved mentor reply',
+    artifactSource: 'freeform_keep',
+    verificationState: 'unverified',
     createdAt: '2026-06-12T10:00:00.000Z',
     ...overrides,
   };

@@ -5,10 +5,11 @@
 import { createMiddleware } from 'hono/factory';
 import {
   registerProvider,
+  getRegisteredProviders,
   _clearProviders,
+  runWithLlmRequestContext,
   setLlmRoutingV2Enabled,
   setLlmKillSwitchActive,
-  setLlmEnvironment,
 } from '../services/llm';
 import { createGeminiProvider } from '../services/llm/providers/gemini';
 import { createOpenAIProvider } from '../services/llm/providers/openai';
@@ -70,28 +71,6 @@ function envHash(env: {
 }
 
 export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
-  // Inject the V2 routing cutover flag into the pure router module every
-  // request. Idempotent and decoupled from the API-key env-hash below (the
-  // flag is not a provider key, so a flag flip must take effect even when the
-  // key set is unchanged). Default-off until LLM_ROUTING_V2_ENABLED=true in
-  // Doppler (MMT-ADR-0016 §1.5 cutover).
-  setLlmRoutingV2Enabled(isLlmRoutingV2Enabled(c.env?.LLM_ROUTING_V2_ENABLED));
-
-  // WI-1505 — environment tag for the aggregate volume metric (observability
-  // only; does not affect routing).
-  setLlmEnvironment(c.env?.ENVIRONMENT ?? 'development');
-
-  // WI-1505 — aggregate LLM traffic kill switch: a genuine per-request KV
-  // read (not a Doppler/env var), so an operator's KV write takes effect on
-  // the very next request with no redeploy. No SUBSCRIPTION_KV binding (some
-  // test/dev environments) fails OPEN — traffic continues rather than being
-  // silently blocked by an infra gap.
-  if (c.env?.SUBSCRIPTION_KV) {
-    setLlmKillSwitchActive(await readLlmKillSwitch(c.env.SUBSCRIPTION_KV));
-  } else {
-    setLlmKillSwitchActive(false);
-  }
-
   const currentHash = envHash({
     GEMINI_API_KEY: c.env?.GEMINI_API_KEY,
     OPENAI_API_KEY: c.env?.OPENAI_API_KEY,
@@ -146,8 +125,17 @@ export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
     // the legacy primaries. A Gemini-free deployment whose text primary is
     // Cerebras and vision is Mistral is a valid boot — gating only on
     // Gemini/OpenAI/Anthropic would reject it despite working providers.
+    // A dedicated Worker entrypoint may install an external-boundary provider
+    // before the first request (hosted Maestro does this). Cold production
+    // index.ts installs none, and an env-hash change clears the registry above,
+    // so accepting an existing provider does not weaken the no-key boot gate.
     const hasAnyProvider =
-      cerebrasKey || mistralKey || openaiKey || anthropicKey || geminiKey;
+      cerebrasKey ||
+      mistralKey ||
+      openaiKey ||
+      anthropicKey ||
+      geminiKey ||
+      getRegisteredProviders().length > 0;
 
     if (!hasAnyProvider) {
       if (
@@ -172,7 +160,20 @@ export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
     // Hash update is deferred to here — only reached when registration succeeded.
     _registeredEnvHash = currentHash;
   }
-  await next();
+  // Request-scoped routing values must not live in isolate globals: Workers
+  // can overlap requests in one isolate. The kill switch binding is carried
+  // without I/O here and read lazily at the LLM router choke points.
+  const subscriptionKv = c.env?.SUBSCRIPTION_KV;
+  await runWithLlmRequestContext(
+    {
+      routingV2Enabled: isLlmRoutingV2Enabled(c.env?.LLM_ROUTING_V2_ENABLED),
+      environment: c.env?.ENVIRONMENT ?? 'development',
+      readKillSwitch: subscriptionKv
+        ? () => readLlmKillSwitch(subscriptionKv)
+        : undefined,
+    },
+    next,
+  );
 });
 
 /**

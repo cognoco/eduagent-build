@@ -38,7 +38,7 @@ import { extractFirstJsonObject } from './llm/extract-json';
 import { projectAiResponseContent } from './llm/project-response';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
-import { isGdprProcessingAllowedV2 } from './identity-v2/consent-status-v2';
+import { isLlmExchangeConsentAllowed } from './identity-v2/consent-status-v2';
 import { verifyPersonOwnershipV2 } from './identity-v2/ownership-v2';
 import {
   requireCallerPersonId,
@@ -1399,11 +1399,17 @@ export async function applyAnalysis(
     return { fieldsUpdated: [], notifications: [] };
   }
 
-  // [WI-221] GDPR regulatory consent gate — checked on the outer db BEFORE
+  // [WI-221] Regulatory consent gate — checked on the outer db BEFORE
   // opening a transaction. revokeConsent sets GDPR status to WITHDRAWN without
   // clearing memoryConsentStatus, so the existing memory gate alone is
   // insufficient.
-  const gdprAllowed = await isGdprProcessingAllowedV2(db, profileId);
+  // [WI-2396] isLlmExchangeConsentAllowed also honors adult self-consent
+  // (art6_1_a) withdrawal, not only the parental basis. Note: for the
+  // learner-input.ts caller, the LLM call (parseLearnerInputToAnalysis) runs
+  // BEFORE this function — this gate protects the derived-memory WRITE, not
+  // the dispatch itself, for that path (pre-existing; out of this WI's
+  // six-route AC-1 scope, flagged separately).
+  const gdprAllowed = await isLlmExchangeConsentAllowed(db, profileId);
   if (!gdprAllowed) {
     return { fieldsUpdated: [], notifications: [] };
   }
@@ -1415,10 +1421,10 @@ export async function applyAnalysis(
         profileId,
       );
 
-      // [WI-221] Re-check GDPR consent INSIDE the transaction to close the
+      // [WI-221] Re-check consent INSIDE the transaction to close the
       // TOCTOU window between the outer gate (above) and this write — consent
       // could be withdrawn in the interval.
-      const gdprAllowedTx = await isGdprProcessingAllowedV2(
+      const gdprAllowedTx = await isLlmExchangeConsentAllowed(
         tx as unknown as Database,
         profileId,
       );
@@ -1646,22 +1652,27 @@ export async function toggleMemoryCollection(
   opts?: IdentityV2Opts,
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, accountId, opts);
-  const profile = await getOrCreateLearningProfile(db, profileId);
-  const memoryConsentStatus: MemoryConsentStatus = enabled
-    ? 'granted'
-    : profile.memoryConsentStatus;
+  await db.transaction(async (tx) => {
+    const profile = await getOrCreateLearningProfileTx(
+      tx as unknown as Database,
+      profileId,
+    );
+    const memoryConsentStatus: MemoryConsentStatus = enabled
+      ? 'granted'
+      : profile.memoryConsentStatus;
 
-  await db
-    .update(learningProfiles)
-    .set({
-      memoryCollectionEnabled: enabled,
-      memoryEnabled: enabled || profile.memoryInjectionEnabled,
-      memoryConsentStatus,
-      consentPromptDismissedAt: new Date(),
-      version: sql`${learningProfiles.version} + 1`,
-      updatedAt: new Date(),
-    })
-    .where(eq(learningProfiles.profileId, profileId));
+    await tx
+      .update(learningProfiles)
+      .set({
+        memoryCollectionEnabled: enabled,
+        memoryEnabled: enabled || profile.memoryInjectionEnabled,
+        memoryConsentStatus,
+        consentPromptDismissedAt: new Date(),
+        version: sql`${learningProfiles.version} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(learningProfiles.profileId, profileId));
+  });
 }
 
 export async function toggleMemoryInjection(
@@ -1672,22 +1683,27 @@ export async function toggleMemoryInjection(
   opts?: IdentityV2Opts,
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, accountId, opts);
-  const profile = await getOrCreateLearningProfile(db, profileId);
+  await db.transaction(async (tx) => {
+    const profile = await getOrCreateLearningProfileTx(
+      tx as unknown as Database,
+      profileId,
+    );
 
-  // [F-PV-09] Refuse to enable injection when consent is not granted.
-  if (enabled && profile.memoryConsentStatus !== 'granted') {
-    return;
-  }
+    // [F-PV-09] Refuse to enable injection when consent is not granted.
+    if (enabled && profile.memoryConsentStatus !== 'granted') {
+      return;
+    }
 
-  await db
-    .update(learningProfiles)
-    .set({
-      memoryInjectionEnabled: enabled,
-      memoryEnabled: enabled || profile.memoryCollectionEnabled,
-      version: sql`${learningProfiles.version} + 1`,
-      updatedAt: new Date(),
-    })
-    .where(eq(learningProfiles.profileId, profileId));
+    await tx
+      .update(learningProfiles)
+      .set({
+        memoryInjectionEnabled: enabled,
+        memoryEnabled: enabled || profile.memoryCollectionEnabled,
+        version: sql`${learningProfiles.version} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(learningProfiles.profileId, profileId));
+  });
 }
 
 export async function grantMemoryConsent(

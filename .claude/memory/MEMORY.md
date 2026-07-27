@@ -20,6 +20,7 @@
 ## Identity Foundation & V2 Shell
 
 - [project_identity_foundation_decisions.md](project_identity_foundation_decisions.md) — Pointer to ratified identity/policy/router/safety ADRs + `docs/registers/llm-models/`; runway in `_wip/identity-foundation/`.
+- [project_v2_wayfinding_orientation.md](project_v2_wayfinding_orientation.md) — Operator-ruled V2 orientation cues: owning tab, named return, and explicit active-person context; operational source WI-2331.
 - [feedback_s6_deferred_irreversible.md](feedback_s6_deferred_irreversible.md) — S6 (V2 cutover & deletions) DEFERRED + IRREVERSIBLE; never autonomous; state that S6 removes the flag-flip rollback before any destructive step.
 
 ## Known Issues
@@ -53,7 +54,7 @@
 - [feedback_verify_claims_against_source_before_canon.md](feedback_verify_claims_against_source_before_canon.md) — Read SOURCE before writing implementation claims into canon; surface corrections, never quietly patch.
 - [project_zdx_bundle_guard_family.md](project_zdx_bundle_guard_family.md) — /cosmo:bundle defect family (absorb destroys unchecked fields; 4th: formation leaves Description/AC properties empty). Enumerate what a child carries before deciding what a bundle copies.
 - Commit early + push after every commit. Never batch large changes.
-- [feedback_never_switch_branch.md](feedback_never_switch_branch.md) — NEVER switch branches unless user explicitly asks.
+- [feedback_never_switch_branch.md](feedback_never_switch_branch.md) — Never switch branches without authority; docs-only publication uses a normal branch in the main checkout, not a worktree.
 - [feedback_fast_iteration.md](feedback_fast_iteration.md) — 60-min feedback loops unacceptable. CI gates, but optimize speed.
 - [feedback_just_do_it.md](feedback_just_do_it.md) — Clear action commands = execute immediately, don't gate on confirmations.
 - [feedback_autonomous_speccing.md](feedback_autonomous_speccing.md) — Decide small stuff yourself; ask only on genuinely big trade-offs.
@@ -83,11 +84,13 @@
 ## Brand & UX Decisions
 
 - [project_brand_dark_first.md](project_brand_dark_first.md) — Teal primary + lavender secondary. No accent picker. Dark default.
+- [feedback_semantic_localization.md](feedback_semantic_localization.md) — Localize meaning and mentor tone in screen context; grammatically valid literal translations are drafts, not accepted copy.
 - [project_product_roles_students_any_age.md](project_product_roles_students_any_age.md) — Pointer: role/persona/login model → `docs/canon/identity/`; not a kids-only app.
 - Coaching cards are LIVE: `BaseCoachingCard` in `ParentHomeScreen.tsx`; `coaching_card_cache` backs home.
 
 ## Core Learning Philosophy
 
+- [project_challenge_deeper_learning.md](project_challenge_deeper_learning.md) — Challenge deepens the active session topic; recall/quiz/mastery remain separate surfaces. Canon: OPQ-118 + WI-2112.
 - [project_language_pedagogy.md](project_language_pedagogy.md) — four_strands mode (alongside socratic); vocabulary CRUD, CEFR, language-progress routes.
 - [project_freeform_library_filing_decision.md](project_freeform_library_filing_decision.md) — Pointer to `MMT-ADR-0021`: freeform Library filing at 5 exchanges.
 - [project_language_assessments_production_first.md](project_language_assessments_production_first.md) — Language reviews test production/translation, not abstract summaries.

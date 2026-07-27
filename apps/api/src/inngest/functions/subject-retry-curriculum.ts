@@ -12,7 +12,7 @@ import {
 import { parseConversationLanguage } from '../../services/llm';
 import { generateBookTopics } from '../../services/book-generation';
 import { markBookFailed, persistBookTopics } from '../../services/curriculum';
-import { isGdprProcessingAllowedV2 } from '../../services/identity-v2/consent-status-v2';
+import { isLlmExchangeConsentAllowed } from '../../services/identity-v2/consent-status-v2';
 import {
   getPersonAge,
   getPersonLlmContext,
@@ -126,12 +126,14 @@ export const subjectRetryCurriculum = inngest.createFunction(
         return { status: 'already-generated' as const };
       }
 
-      // [WI-82] Re-check current GDPR consent at execution time. This job runs
+      // [WI-82] Re-check current consent at execution time. This job runs
       // outside the HTTP consent middleware; a queued event must not load learner
       // age data, call the LLM, or persist derived topics for a profile whose
       // consent is no longer granted.
-      // [CUT-B1 §2.5(i)] v2 seam: GDPR gate via resolver; legacy via consent_states.
-      const gdprAllowed = await isGdprProcessingAllowedV2(db, profileId);
+      // [CUT-B1 §2.5(i)] v2 seam: consent gate via resolver; legacy via consent_states.
+      // [WI-2396] isLlmExchangeConsentAllowed also honors adult self-consent
+      // (art6_1_a) withdrawal, not only the parental basis.
+      const gdprAllowed = await isLlmExchangeConsentAllowed(db, profileId);
       if (!gdprAllowed) {
         // Consent-blocked is NOT a curriculum failure — it is owned by the
         // consent gate (a retry cannot grant consent). Leave failed_at unset so
@@ -238,7 +240,10 @@ export const subjectRetryCurriculum = inngest.createFunction(
         // consent withdrawal that occurred after the first run would otherwise be
         // missed and stale-allowed learner data would still reach the LLM.
         // [CUT-B1 §2.5(i)] v2 seam.
-        const stepGdprAllowed = await isGdprProcessingAllowedV2(db, profileId);
+        const stepGdprAllowed = await isLlmExchangeConsentAllowed(
+          db,
+          profileId,
+        );
         if (!stepGdprAllowed) {
           // Consent-blocked: not a curriculum failure (see load-context gate).
           return;

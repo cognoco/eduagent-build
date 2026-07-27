@@ -18,7 +18,7 @@
  * 4. POST /account/security-event rejects an unknown / server-only event type.
  */
 
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { membership } from '@eduagent/database';
 
 import {
@@ -27,7 +27,6 @@ import {
   createIntegrationDb,
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
-import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
 import { clearFetchCalls } from './fetch-interceptor';
 
@@ -70,23 +69,11 @@ async function createOwnerProfile(): Promise<string> {
     columns: { personId: true },
   });
   if (!membershipRow) {
-    // [WI-1139] Legacy `profiles` Drizzle def removed — raw SQL select.
-    const row = (await legacyIdentityTableExistsForTest(db, 'profiles'))
-      ? await (async () => {
-          const raw = (await db.execute(sql`
-            SELECT account_id AS "accountId" FROM profiles WHERE id = ${profileId}
-          `)) as unknown;
-          const rows = Array.isArray(raw)
-            ? (raw as Array<{ accountId: string }>)
-            : ((raw as { rows?: Array<{ accountId: string }> }).rows ?? []);
-          return rows[0];
-        })()
-      : undefined;
-    if (!row) {
-      throw new Error(
-        `Profile not found in v2 (membership) or legacy (profiles) after create: ${profileId}`,
-      );
-    }
+    // [WI-1128] Legacy `profiles` fallback is dropped (post-M-DROP); no
+    // fallback remains once v2 membership resolution fails.
+    throw new Error(
+      `Profile not found in v2 (membership) or legacy (profiles) after create: ${profileId}`,
+    );
   }
   return profileId;
 }

@@ -19,6 +19,7 @@ import {
   seedSubject,
 } from './route-fixtures';
 import { registerProvider } from '../../apps/api/src/services/llm';
+import { createMockProvider } from '../../apps/api/src/services/llm/test-utils';
 import { app } from '../../apps/api/src/index';
 
 // Controllable mock provider — overrides the default mock registered in setup.ts.
@@ -36,10 +37,27 @@ const ASSESSMENTS_USER = {
 // Tests control responses via mockChat.mockResolvedValue / mockResolvedValueOnce.
 beforeAll(() => {
   registerProvider({
-    id: 'gemini',
-    chat: mockChat,
-    async *chatStream() {
-      yield* []; // no-op: streaming not used in these tests
+    ...createMockProvider('gemini'),
+    async chat(messages, config) {
+      return {
+        content: await mockChat(messages, config),
+        stopReason: 'stop',
+      };
+    },
+  });
+  // [WI-2433] The answer-graders (evaluateAssessmentAnswer /
+  // evaluateQuickCheckAnswer) route on capability:'judge', which resolves to the
+  // vendor-independent anthropic grader (tutor=gemini ⇒ grader=anthropic). Register
+  // the SAME mockChat under 'anthropic' so a POST /answer's grader call resolves to
+  // the mocked evaluation JSON instead of throwing "No provider registered for:
+  // anthropic". One shared mock ⇒ installAssessmentLlmMock() drives both providers.
+  registerProvider({
+    ...createMockProvider('anthropic'),
+    async chat(messages, config) {
+      return {
+        content: await mockChat(messages, config),
+        stopReason: 'stop',
+      };
     },
   });
 });

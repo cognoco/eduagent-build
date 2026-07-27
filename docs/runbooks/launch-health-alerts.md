@@ -28,6 +28,53 @@ The LLM fallback signal added by WI-1500 deliberately omits prompt content,
 provider error bodies, and `sessionId`. Its searchable dimensions are limited
 to provider, fallback provider, capability, reason, circuit key, and flow.
 
+## Sentry project routing invariant
+
+The Cloudflare API Worker must send errors to the `mentomate-api` Sentry
+project. Mobile clients and mobile preview builds send errors to
+`mentomate-mobile`; the two DSNs are not interchangeable even though both are
+valid Sentry credentials.
+
+`pnpm secrets:sync` validates the project ID embedded in `SENTRY_DSN` before it
+uploads any Doppler values to a Worker. A mismatch or malformed DSN is a hard
+failure before deployment. The diagnostic may contain the public project IDs,
+but must never print the DSN or its public key.
+
+If the guard fails:
+
+1. stop the deployment rather than bypassing the sync;
+2. correct the affected Doppler configuration to use the `mentomate-api` DSN;
+3. rerun the normal secret-sync and deployment workflow;
+4. emit a safe staging API synthetic and confirm it appears in
+   `mentomate-api`, not `mentomate-mobile`;
+5. verify that no new staging-API errors reach `mentomate-mobile` during the
+   agreed observation window.
+
+## Sentry ingestion-capacity invariant
+
+Every Sentry-backed alert in this runbook is blind when the organization has
+exhausted its error-event quota. Transaction ingestion uses a separate quota,
+so continuing traces do not prove that errors or alert events are accepted.
+
+Before relying on Sentry during a launch window, the accountable operator must
+verify all of the following without copying credentials or payment details into
+the evidence record:
+
+1. the organization has either an active paid plan with remaining error quota
+   or a non-zero on-demand error budget;
+2. the organization is not suspended or past due;
+3. a controlled error probe reports accepted events rather than only
+   `rate_limited` outcomes;
+4. one safe synthetic creates an issue and exercises an `[LH]` alert rule to
+   its configured destination.
+
+If the error quota is exhausted, treat every Sentry rule as unavailable even
+when its configuration still appears active. Restore capacity through the
+Operator Queue financial-action gate, confirm ingestion with the controlled
+probe, and only then use Sentry delivery as launch-health evidence. Record the
+chosen plan or budget and the before/after probe on the governing Work Item;
+never record API tokens, DSNs, card details, or invoices in this runbook.
+
 ## Alert summary
 
 Thresholds use rolling windows. A threshold is evaluated only in production;
@@ -38,10 +85,21 @@ channel. `Page` routes to the accountable launch operator.
 | --- | --- | --- | --- |
 | 1. Payment recovery | `app/payment.failed`; `app/billing.alert_delivery_failed`; aged `subscriptions.status=past_due` | Any payment failure, failed notification channel, or past-due row older than 24 hours | Three payment failures in 15 minutes, one billing-alert delivery failure, or any past-due row beyond its grace deadline |
 | 2. LLM routing | Structured fallback logs plus `llm.stop_reason`; Sentry `surface=llm-router`, `signal=provider-fallback` | Fallback rate greater than 2% over 15 minutes with at least 20 calls | Fallback rate greater than 10% over 15 minutes with at least 20 calls, or any `primary-circuit-open` signal |
-| 3. Challenge grader | `app/challenge-round.finalize.failed` | One failure in 24 hours | Three failures in 1 hour |
-| 4. Notification delivery | `app/notification.suppressed`; `app/email.bounced`; `app/feedback.delivery_failed` | Three suppressions/bounces/retries in 1 hour | One complaint or terminal feedback-retry failure, or ten combined failures in 1 hour |
-| 5. Deletion and retention | Sentry `surface=transcript-purge-on-failure`; `app/session.purge.delayed`; `app/consent.revocation.failed` | Any delayed purge or retrying revocation failure | Any terminal purge or consent-revocation failure; delayed purge count at least 10 |
-| 6. Privacy gate and filing | `app/ask.gate_decision`; `app/ask.gate_timeout`; `app/session.filing_timed_out` | Any timeout, or denial rate greater than 20% over 1 hour with at least 10 decisions | Five timeouts or three stranded filings in 1 hour |
+| 3. Challenge grader | Sentry `surface:challenge-round signal:finalize-failed` | One failure in 24 hours | Three failures in 1 hour |
+| 4. Notification delivery | Sentry `surface:notification signal:suppressed`; `surface:email`; `surface:feedback signal:delivery-failed` | Three suppressions/bounces/retries in 1 hour | One `surface:email signal:complained` or terminal feedback-retry failure, or ten combined failures in 1 hour |
+| 5. Deletion and retention | Sentry `surface:transcript-purge signal:delayed`; `surface:transcript-purge signal:function-failed`; `app/consent.revocation.failed` | Any delayed purge or retrying revocation failure | Any terminal purge or consent-revocation failure; delayed purge count at least 10 |
+| 6. Stranded filing | Sentry `surface:filing` | Any filing auto-retry | Three unrecoverable filings in 1 hour |
+
+Every bucket also has the fleet-wide terminal-failure backstop:
+
+```text
+surface:inngest-fleet signal:function-failed
+```
+
+Group that query by `functionId`. It catches terminal failures even when a
+function has no bucket-specific observer; the bucket-specific tags above carry
+the more useful operational meaning when both events exist. The fleet observer
+copies no failed-event payload and no provider error message into Sentry.
 
 The retention thresholds inherit the more detailed definitions in
 [`retention-slo-alerts.md`](retention-slo-alerts.md). If the two runbooks appear
@@ -62,6 +120,19 @@ for `status = 'past_due'`, their provider-updated timestamp, and grace deadline.
 The warning catches a recovery that has remained unresolved for 24 hours; the
 page catches any row that crosses its grace deadline without returning to an
 active/free terminal state.
+
+Sentry filters:
+
+```text
+surface:billing signal:payment-failed
+surface:billing signal:alert-delivery-failed
+surface:billing signal:missing-current-period-end
+surface:billing signal:trial-expiry-failed
+```
+
+Use the first two filters for the payment-recovery warn/page rules above. The
+period-end and trial-expiry filters are separate billing-integrity signals and
+must not be collapsed into payment-decline volume.
 
 ### First response
 
@@ -132,6 +203,12 @@ claim for retry after the mastery/deepening write failed. One isolated failure
 is recoverable; repeated failures mean Challenge outcomes are not being
 persisted reliably.
 
+Sentry filter:
+
+```text
+surface:challenge-round signal:finalize-failed
+```
+
 ### First response
 
 1. Inspect `challenge-round-finalize-failed` runs and group by coarse error
@@ -160,6 +237,15 @@ This bucket joins failures that otherwise appear in separate providers:
 One complaint pages immediately. A bounce or suppression spike usually means a
 provider, address-quality, or notification-log problem.
 
+Sentry filters:
+
+```text
+surface:notification signal:suppressed
+surface:email signal:bounced
+surface:email signal:complained
+surface:feedback signal:delivery-failed
+```
+
 ### First response
 
 1. Split complaints, bounces, suppressions, and retry failures.
@@ -180,10 +266,16 @@ provider, address-quality, or notification-log problem.
 ### Meaning
 
 Retention is successful only when purges and consent-driven deletion complete.
-Retrying errors warn; terminal errors page. `app/session.purge.delayed` uses its
-payload count, while terminal transcript failures use the Sentry surface
-`transcript-purge-on-failure`. Consent revocation terminal failures emit
-`app/consent.revocation.failed`.
+Retrying errors warn; terminal errors page. Delayed and terminal transcript
+purges are filterable by real Sentry tags. Consent revocation terminal failures
+emit `app/consent.revocation.failed`.
+
+Sentry filters:
+
+```text
+surface:transcript-purge signal:delayed
+surface:transcript-purge signal:function-failed
+```
 
 ### First response
 
@@ -201,30 +293,35 @@ payload count, while terminal transcript failures use the Sentry surface
 - `apps/api/src/inngest/functions/transcript-purge-observe.test.ts`
 - `apps/api/src/inngest/functions/consent-revocation.test.ts`
 
-## 6. Privacy gate and stranded filing
+## 6. Stranded filing
 
 ### Meaning
 
-`app/ask.gate_decision` exposes the aggregate allow/deny outcome of the Ask
-gate; `app/ask.gate_timeout` identifies evaluation timeouts. A high denial rate
-can indicate an overly strict or broken privacy/meaningfulness gate. A filing
-timeout means an ended learning session did not reach its expected Library
-destination within the recovery window.
+The old `app/ask.gate_decision` and `app/ask.gate_timeout` surfaces were removed
+with the superseded session-depth gate and must not be used in alert rules. A
+filing auto-retry or unrecoverable resolution means an ended learning session
+did not reach its expected Library destination on the primary path.
+
+Sentry filters:
+
+```text
+surface:filing signal:auto-retry-attempted
+surface:filing signal:resolved resolution:unrecoverable
+surface:filing signal:unrecoverable
+```
 
 ### First response
 
-1. Compare denial rate with the previous 24-hour baseline and group only by
-   method/coarse outcome.
-2. For timeouts, inspect the gate evaluator and its upstream LLM/database
-   dependencies.
-3. For `app/session.filing_timed_out`, inspect the recovery attempt and the
+1. Compare filing retry/unrecoverable volume with the previous 24-hour baseline
+   and group only by the tagged coarse outcome.
+2. For `app/session.filing_timed_out`, inspect the recovery attempt and the
    eventual `app/session.filing_resolved` event before replaying.
-4. Do not inspect or post learner reasoning text; the observer intentionally
+3. Do not inspect or post learner reasoning text; the observer intentionally
    records only reason presence/length.
 
 ### Evidence
 
-- `apps/api/src/inngest/functions/ask-gate-observe.test.ts`
+- `apps/api/src/inngest/functions/filing-observe.test.ts`
 - `apps/api/src/inngest/functions/filing-timed-out-observe.test.ts`
 - `apps/api/src/inngest/functions/filing-stranded-backfill.test.ts`
 

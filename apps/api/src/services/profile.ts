@@ -11,10 +11,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import { getChargePersonIds } from './identity-v2/guardianship';
-import {
-  resolveLatestConsentStatusAnyBasis,
-  DEFAULT_CONSENT_PURPOSE,
-} from './identity-v2/consent-status-v2';
+import { resolveLatestConsentSetStatusAnyBasis } from './identity-v2/consent-status-v2';
 import {
   jurisdictionToLocation,
   birthYearFromDate,
@@ -106,12 +103,7 @@ export async function updateProfileAppContext(
   // owner/guardian → hasFamilyLinks if any active charge; linkCreatedAt null
   // non-owner/charge → hasFamilyLinks if active guardian edge; linkCreatedAt = edge.grantedAt
   const [consentStatus, chargeIds, guardianEdge] = await Promise.all([
-    resolveLatestConsentStatusAnyBasis(
-      db,
-      profileId,
-      organizationId,
-      DEFAULT_CONSENT_PURPOSE,
-    ),
+    resolveLatestConsentSetStatusAnyBasis(db, profileId, organizationId),
     isOwner
       ? getChargePersonIds(db, profileId)
       : Promise.resolve([] as string[]),
@@ -136,7 +128,9 @@ export async function updateProfileAppContext(
     accountId: organizationId,
     displayName: p.displayName,
     avatarUrl: p.avatarUrl ?? null,
-    birthYear: Number(p.birthDate.slice(0, 4)),
+    birthYear,
+    birthMonth,
+    birthDay,
     location: jurisdictionToLocation(p.residenceJurisdiction),
     isOwner,
     hasPremiumLlm: false,

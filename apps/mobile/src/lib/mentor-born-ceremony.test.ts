@@ -1,9 +1,17 @@
 import {
   __resetMentorBornCeremonyForTests,
+  completeMentorBornCeremonyDurably,
   completeMentorBornCeremony,
   getMentorBornCeremonySnapshot,
+  queueMentorBornCeremony,
   requestMentorBornCeremony,
+  restorePendingMentorBornCeremony,
 } from './mentor-born-ceremony';
+import { mentorBirthSeenKey } from './secure-store-keys';
+
+const expoSecureStoreMock = jest.requireMock('expo-secure-store') as {
+  __store: Map<string, string>;
+};
 
 describe('mentor-born ceremony requests', () => {
   beforeEach(() => {
@@ -59,6 +67,27 @@ describe('mentor-born ceremony requests', () => {
       },
       requestCount: 2,
       requestedProfileIds: ['learner-1', 'learner-2'],
+    });
+  });
+
+  it('[WI-2105 AC-3] does not restore a ceremony after its durable completion survives relaunch', async () => {
+    const request = await queueMentorBornCeremony({
+      profileId: 'learner-1',
+      reason: 'first-profile-created',
+    });
+    if (!request) throw new Error('expected durable ceremony request');
+
+    await completeMentorBornCeremonyDurably(request.id);
+    expect(
+      expoSecureStoreMock.__store.get(mentorBirthSeenKey('learner-1')),
+    ).toBe('true');
+
+    __resetMentorBornCeremonyForTests();
+    await restorePendingMentorBornCeremony();
+
+    expect(getMentorBornCeremonySnapshot()).toMatchObject({
+      activeRequest: null,
+      requestCount: 0,
     });
   });
 });

@@ -58,7 +58,7 @@ import {
   getSessionEffectiveMode,
   MAX_EXCHANGES_PER_SESSION,
 } from '@eduagent/schemas';
-import { NotFoundError } from '../../errors';
+import { ConflictError, NotFoundError } from '../../errors';
 import { insertSessionEvent } from './session-events';
 import { resolveSystemPromptIntent } from './system-prompt-intents';
 import { getSubject } from '../subject';
@@ -146,6 +146,18 @@ export class SessionExchangeLimitError extends Error {
       `Session has reached the maximum of ${MAX_EXCHANGES_PER_SESSION} exchanges`,
     );
     this.name = 'SessionExchangeLimitError';
+  }
+}
+
+/**
+ * [WI-2372] Thrown by `assertExchangeConsent` when the profile's consent has
+ * been withdrawn (parental or adult self-consent) — refuses the exchange
+ * before any LLM dispatch. Mapped to 403 CONSENT_WITHDRAWN in routes/sessions.ts.
+ */
+export class ConsentWithdrawnError extends Error {
+  constructor() {
+    super('Consent has been withdrawn — processing is refused');
+    this.name = 'ConsentWithdrawnError';
   }
 }
 
@@ -274,42 +286,61 @@ export async function startSession(
   // [L10-001] Session row + session_start audit event must be atomic — if the
   // audit insert fails after the session is created, the session would exist
   // with no session_start event in its audit trail.
-  const row = await db.transaction(async (tx) => {
-    const [inserted] = await tx
-      .insert(learningSessions)
-      .values({
-        profileId,
-        subjectId,
-        topicId: input.topicId ?? null,
-        sessionType: input.sessionType ?? 'learning',
-        verificationType: input.verificationType ?? null,
-        inputMode: input.inputMode ?? 'text',
-        status: 'active',
-        escalationRung: 1,
-        exchangeCount: 0,
-        metadata: {
-          ...(input.metadata ?? {}),
-          inputMode: input.inputMode ?? input.metadata?.inputMode ?? 'text',
-        },
-        rawInput: input.rawInput ?? null,
-      })
-      .returning();
-
-    if (!inserted)
-      throw new Error('Insert learning session did not return a row');
-
-    await tx.insert(sessionEvents).values({
-      sessionId: inserted.id,
+  const row = await db.transaction((tx) =>
+    createSessionWithStartEvent(
+      tx as unknown as Database,
       profileId,
       subjectId,
-      eventType: 'session_start' as const,
-      content: '',
-    });
-
-    return inserted;
-  });
+      input,
+    ),
+  );
 
   return mapSessionRow(row);
+}
+
+/**
+ * Transaction-aware insert primitive. Callers must prove subject/topic
+ * ownership before entering; this function owns only the atomic row + audit
+ * event write.
+ */
+export async function createSessionWithStartEvent(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  input: SessionStartInput,
+) {
+  const [inserted] = await db
+    .insert(learningSessions)
+    .values({
+      profileId,
+      subjectId,
+      topicId: input.topicId ?? null,
+      sessionType: input.sessionType ?? 'learning',
+      verificationType: input.verificationType ?? null,
+      inputMode: input.inputMode ?? 'text',
+      status: 'active',
+      escalationRung: 1,
+      exchangeCount: 0,
+      metadata: {
+        ...(input.metadata ?? {}),
+        inputMode: input.inputMode ?? input.metadata?.inputMode ?? 'text',
+      },
+      rawInput: input.rawInput ?? null,
+    })
+    .returning();
+
+  if (!inserted)
+    throw new Error('Insert learning session did not return a row');
+
+  await db.insert(sessionEvents).values({
+    sessionId: inserted.id,
+    profileId,
+    subjectId,
+    eventType: 'session_start' as const,
+    content: '',
+  });
+
+  return inserted;
 }
 
 const FIRST_CURRICULUM_SESSION_WAIT_MS = 25_000;
@@ -808,6 +839,48 @@ export async function closeSession(
 
     if (!row) return null;
 
+    // WI-2103: A silence-prompt transaction may have acquired this session
+    // row first and committed its event while close was waiting. Re-read after
+    // winning the row lock, then remove only server-authored silence nudges
+    // that the learner never answered. Earlier nudges followed by a learner
+    // message remain part of the session history.
+    const trailingEvents = await createScopedRepository(
+      txDb,
+      profileId,
+    ).sessionEvents.findMany(
+      and(
+        eq(sessionEvents.sessionId, sessionId),
+        inArray(sessionEvents.eventType, ['user_message', 'system_prompt']),
+      ),
+      [desc(sessionEvents.createdAt), desc(sessionEvents.id)],
+    );
+    const unansweredSilencePromptIds: string[] = [];
+    for (const event of trailingEvents) {
+      if (event.eventType === 'user_message') break;
+      const metadata = event.metadata as {
+        source?: unknown;
+        intent?: { kind?: unknown };
+      } | null;
+      if (
+        event.eventType === 'system_prompt' &&
+        metadata?.source === 'server' &&
+        metadata.intent?.kind === 'silence_nudge'
+      ) {
+        unansweredSilencePromptIds.push(event.id);
+      }
+    }
+    if (unansweredSilencePromptIds.length > 0) {
+      await txDb
+        .delete(sessionEvents)
+        .where(
+          and(
+            eq(sessionEvents.sessionId, sessionId),
+            eq(sessionEvents.profileId, profileId),
+            inArray(sessionEvents.id, unansweredSilencePromptIds),
+          ),
+        );
+    }
+
     await createPendingSessionSummary(
       txDb,
       sessionId,
@@ -1010,7 +1083,8 @@ export async function closeStaleSessions(
     // Advance cursor to last row. If the page was smaller than the limit,
     // we have exhausted all stale sessions.
     if (page.length < pageSize) break;
-    const last: typeof learningSessions.$inferSelect = page[page.length - 1]!;
+    const last: typeof learningSessions.$inferSelect | undefined = page.at(-1);
+    if (!last) break;
     cursor = { lastActivityAt: last.lastActivityAt, lastId: last.id };
   }
 
@@ -1252,17 +1326,39 @@ export async function recordSystemPrompt(
   sessionId: string,
   intent: SystemPromptIntent,
 ): Promise<void> {
-  const session = await getSession(db, profileId, sessionId);
-  if (!session) {
-    throw new NotFoundError('Session');
-  }
+  await db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+    const now = new Date();
+    const [activeSession] = await txDb
+      .update(learningSessions)
+      .set({ lastActivityAt: now, updatedAt: now })
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+          eq(learningSessions.status, 'active'),
+          isNull(learningSessions.endedAt),
+        ),
+      )
+      .returning();
 
-  await insertSessionEvent(db, session, profileId, {
-    sessionId,
-    eventType: 'system_prompt',
-    content: resolveSystemPromptIntent(intent),
-    metadata: { source: 'server', intent },
-    touchSession: true,
+    if (!activeSession) {
+      const existing = await getSession(txDb, profileId, sessionId);
+      if (!existing) {
+        throw new NotFoundError('Session');
+      }
+      throw new ConflictError(
+        'Session is closed and cannot accept system prompts',
+      );
+    }
+
+    await insertSessionEvent(txDb, mapSessionRow(activeSession), profileId, {
+      sessionId,
+      eventType: 'system_prompt',
+      content: resolveSystemPromptIntent(intent),
+      metadata: { source: 'server', intent },
+      touchSession: false,
+    });
   });
 }
 

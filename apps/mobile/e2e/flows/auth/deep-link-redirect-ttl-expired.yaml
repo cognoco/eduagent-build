@@ -5,26 +5,24 @@
 # deep-link target (library-screen).
 #
 # Mechanism:
-#   1. seed-and-run.sh seeds an onboarding-complete user; app lands on sign-in.
-#   2. Maestro fires openLink to the dev-only seed route, which calls
-#      seedPendingAuthRedirectForTesting('/(app)/library', 360000). The
-#      savedAt is backdated by 360000ms (6 min), exceeding the 5-min TTL.
-#      The seed route then router.replace to bare /(auth)/sign-in (NO
-#      redirectTo param — that would overwrite the stale record).
-#   3. Maestro signs in via _setup/sign-in-only.yaml.
-#   4. (auth)/_layout.tsx calls peekPendingAuthRedirect, which finds the
-#      record stale and returns null. The fallback /(app)/home is used.
+#   1. Sign in, then seed a FRESH library redirect through the authenticated
+#      E2E route. Its explicit action performs normal sign-out cleanup, re-seeds
+#      afterward, and opens sign-in. Signing in must land on Library. This is the
+#      positive control proving the seam and replay path actually work.
+#   2. Repeat with savedAt backdated by 360000ms (6 min), exceeding the 5-min
+#      TTL. The same sign-in must now land on Home, not Library.
 #
 # Pre-req:
 #   The APK MUST be built with EXPO_PUBLIC_E2E=true. Without it the seed route
 #   renders null and the seedPendingAuthRedirectForTesting call is never made.
-#   The flow will fail at the pending-redirect-seeded step if the flag is absent.
+#   The receipt plus fresh-control Library landing fail if the seam is absent.
 #
 # testIDs verified against source:
-#   sign-in-screen          apps/mobile/src/app/(auth)/sign-in.tsx
-#   pending-redirect-seeded apps/mobile/src/app/dev-only/seed-pending-redirect.tsx
-#   home-screen             apps/mobile/src/app/(app)/home.tsx:132
-#   library-screen          apps/mobile/src/app/(app)/library.tsx (root View)
+#   pending-redirect-seeded   apps/mobile/src/app/dev-only/seed-pending-redirect.tsx
+#   pending-redirect-sign-out apps/mobile/src/app/dev-only/seed-pending-redirect.tsx
+#   sign-in-screen            apps/mobile/src/app/(auth)/sign-in.tsx
+#   home-screen               apps/mobile/src/app/(app)/home.tsx:132
+#   library-screen            apps/mobile/src/app/(app)/library.tsx (root View)
 #
 # Run command:
 #   ./e2e/scripts/seed-and-run.sh onboarding-complete e2e/flows/auth/deep-link-redirect-ttl-expired.yaml
@@ -35,47 +33,82 @@ tags:
   - nightly
   - auth
 ---
-# ── Step 1: Confirm we are on the sign-in screen ──
+# ── Step 1: Establish the authenticated session required by the seed route ──
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+
 - extendedWaitUntil:
     visible:
-      id: "sign-in-screen"
-    timeout: 120000
+      id: 'home-screen'
+    timeout: 30000
 
-- takeScreenshot: deep-link-ttl-01-sign-in-screen
+# ── Step 2: Positive control — a fresh redirect must replay to Library ──
+- openLink: 'mentomate:///dev-only/seed-pending-redirect?path=%2F(app)%2Flibrary&staleMs=0'
 
-# ── Step 2: Fire the dev-only seed route ──
-# staleMs=360000 (6 min) > PENDING_AUTH_REDIRECT_TTL_MS (5 min = 300000).
-- openLink: "mentomate:///dev-only/seed-pending-redirect?path=%2F(app)%2Flibrary&staleMs=360000"
-
-# ── Step 3: Confirm the seed ran ──
 - extendedWaitUntil:
     visible:
-      id: "pending-redirect-seeded"
-    timeout: 8000
-
-- takeScreenshot: deep-link-ttl-02-seed-screen-visible
-
-# ── Step 4: Wait for sign-in screen (seed route auto-redirects) ──
-- extendedWaitUntil:
-    visible:
-      id: "sign-in-screen"
+      id: 'pending-redirect-seeded'
     timeout: 10000
 
-- takeScreenshot: deep-link-ttl-03-back-on-sign-in
+- tapOn:
+    id: 'pending-redirect-sign-out'
 
-# ── Step 5: Sign in via canonical sign-in flow ──
-- runFlow:
-    file: ../_setup/sign-in-only.yaml
-
-- takeScreenshot: deep-link-ttl-04-after-sign-in
-
-# ── Step 6: Assert TTL fallback landed on home, not library ──
 - extendedWaitUntil:
     visible:
-      id: "home-screen"
+      id: 'sign-in-screen'
     timeout: 15000
 
-- assertNotVisible:
-    id: "library-screen"
+- tapOn:
+    id: 'sign-in-email'
+- inputText: ${EMAIL}
+- hideKeyboard
+- tapOn:
+    id: 'sign-in-password'
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: 'sign-in-button'
 
-- takeScreenshot: deep-link-ttl-05-fallback-to-home
+- extendedWaitUntil:
+    visible:
+      id: 'library-screen'
+    timeout: 30000
+
+- takeScreenshot: deep-link-ttl-01-fresh-control-library
+
+# ── Step 3: Expired record — identical replay must fall back to Home ──
+- openLink: 'mentomate:///dev-only/seed-pending-redirect?path=%2F(app)%2Flibrary&staleMs=360000'
+
+- extendedWaitUntil:
+    visible:
+      id: 'pending-redirect-seeded'
+    timeout: 10000
+
+- tapOn:
+    id: 'pending-redirect-sign-out'
+
+- extendedWaitUntil:
+    visible:
+      id: 'sign-in-screen'
+    timeout: 15000
+
+- tapOn:
+    id: 'sign-in-email'
+- inputText: ${EMAIL}
+- hideKeyboard
+- tapOn:
+    id: 'sign-in-password'
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: 'sign-in-button'
+
+- extendedWaitUntil:
+    visible:
+      id: 'home-screen'
+    timeout: 30000
+
+- assertNotVisible:
+    id: 'library-screen'
+
+- takeScreenshot: deep-link-ttl-02-expired-fallback-home

@@ -19,6 +19,8 @@ const repoRoot = join(__dirname, '..');
 
 type Step = { name?: string };
 
+type RunStep = Step & { run?: string };
+
 function apiDeploySteps(): Step[] {
   const doc = parse(
     readFileSync(join(repoRoot, '.github/workflows/deploy.yml'), 'utf8'),
@@ -34,6 +36,12 @@ function indexOfStep(steps: Step[], name: string): number {
   return i;
 }
 
+function stepByName(steps: RunStep[], name: string): RunStep {
+  const step = steps.find((candidate) => candidate.name === name);
+  if (!step) throw new Error(`step not found: ${name}`);
+  return step;
+}
+
 describe('deploy.yml api-deploy step ordering', () => {
   const steps = apiDeploySteps();
   const migrate = indexOfStep(steps, 'Run database migrations');
@@ -46,5 +54,23 @@ describe('deploy.yml api-deploy step ordering', () => {
 
   test('secret sync runs before the worker deploy (no stale-secret traffic switch)', () => {
     expect(sync).toBeLessThan(deploy);
+  });
+
+  test('[WI-1194] production requires the transcript purge flag before secret sync', () => {
+    const syncStep = stepByName(
+      steps as RunStep[],
+      'Sync secrets from Doppler to Worker',
+    );
+    const run = syncStep.run ?? '';
+    const retentionCheck = run.indexOf(
+      'doppler secrets get RETENTION_PURGE_ENABLED',
+    );
+    const workerSync = run.indexOf('pnpm secrets:sync "$SYNC_TARGET"');
+
+    expect(run).toContain('if [ "$SYNC_TARGET" = "prd" ]');
+    expect(run).toContain('RETENTION_PURGE_ENABLED must be true');
+    expect(run).toContain('SKIP_DOPPLER_SYNC cannot be used for production');
+    expect(retentionCheck).toBeGreaterThanOrEqual(0);
+    expect(workerSync).toBeGreaterThan(retentionCheck);
   });
 });

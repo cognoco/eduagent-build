@@ -28,7 +28,11 @@ import { useSubjects } from '../../../hooks/use-subjects';
 import {
   goBackOrReplace,
   homeHrefForReturnTo,
+  JOURNAL_HREF,
+  JOURNAL_RETURN_TO,
   PRACTICE_RETURN_TO,
+  resolvedV2TabForReturnTo,
+  V2_TAB_TITLE_KEYS,
 } from '../../../lib/navigation';
 import { useReviewSummary } from '../../../hooks/use-progress';
 import { useEntryGate } from '../../../hooks/use-entry-gate';
@@ -36,6 +40,7 @@ import { useAssessmentEligibleTopics } from '../../../hooks/use-assessments';
 import { useTheme, useThemeColors } from '../../../lib/theme';
 import { getSubjectTint } from '../../../lib/subject-tints';
 import { withOpacity } from '../../../lib/color-opacity';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 const PRACTICE_WEB_MAX_WIDTH = 560;
 
@@ -161,11 +166,18 @@ function getLanguageDisplayName(
   }
 }
 
-function SectionLabel({ children }: { children: string }): React.ReactElement {
+function SectionLabel({
+  children,
+  testID,
+}: {
+  children: string;
+  testID?: string;
+}): React.ReactElement {
   return (
     <Text
       className="text-caption font-bold text-text-secondary"
       style={styles.sectionLabel}
+      testID={testID}
     >
       {children}
     </Text>
@@ -239,6 +251,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 18,
     paddingVertical: 18,
+  },
+  quizBrowseAction: {
+    minHeight: 44,
   },
   quizOption: {
     minHeight: 128,
@@ -387,10 +402,45 @@ export default function PracticeScreen(): React.ReactElement {
       ? t('practiceHub.history.roundsPlayed', { count: totalRoundsPlayed })
       : t('practiceHub.history.noRoundsYet');
   const practiceReturnParams = { returnTo: PRACTICE_RETURN_TO } as const;
+  const practiceChildReturnParams = returnTo
+    ? { ...practiceReturnParams, practiceReturnTo: returnTo }
+    : practiceReturnParams;
 
   const handleBack = () => {
-    goBackOrReplace(router, homeHrefForReturnTo(returnTo));
+    if (returnTo === JOURNAL_RETURN_TO) {
+      router.replace(JOURNAL_HREF);
+      return;
+    }
+
+    goBackOrReplace(
+      router,
+      homeHrefForReturnTo(
+        returnTo,
+        undefined,
+        FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+      ),
+    );
   };
+
+  // WI-2331 rework, F1b: handleBack always exits this screen (Journal
+  // directly, or the owning V2 tab named by returnTo/the Mentor default via
+  // homeHrefForReturnTo), so the header Back control names that destination
+  // instead of the generic `common.goBack` it showed before. When returnTo
+  // names a non-tab destination (practice/family-recaps/own-learning/…) —
+  // reachable here via a forwarded `practiceReturnTo` — resolvedV2TabForReturnTo
+  // returns null and the label falls back to the generic action rather than
+  // mislabeling as a tab it isn't going to.
+  const practiceBackTab = resolvedV2TabForReturnTo(
+    returnTo,
+    undefined,
+    FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+  );
+  const backLabel =
+    FEATURE_FLAGS.MODE_NAV_V2_ENABLED && practiceBackTab
+      ? t('common.backTo', {
+          destination: t(V2_TAB_TITLE_KEYS[practiceBackTab]),
+        })
+      : t('common.goBack');
 
   const openQuiz = () =>
     router.push({
@@ -452,7 +502,7 @@ export default function PracticeScreen(): React.ReactElement {
               pointerStyle(),
             ]}
             accessibilityRole="button"
-            accessibilityLabel={t('common.goBack')}
+            accessibilityLabel={backLabel}
             testID="practice-back"
           >
             <Ionicons name="arrow-back" size={24} color={colors.ink} />
@@ -588,7 +638,13 @@ export default function PracticeScreen(): React.ReactElement {
                 <Pressable
                   testID="review-empty-browse"
                   className="mt-3"
-                  onPress={() => router.push('/(app)/library' as Href)}
+                  onPress={() =>
+                    router.push(
+                      (FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+                        ? '/(app)/subjects'
+                        : '/(app)/library') as Href,
+                    )
+                  }
                 >
                   <Text className="text-body-sm text-primary font-semibold">
                     {t('practiceHub.review.browseTopics')}
@@ -682,37 +738,43 @@ export default function PracticeScreen(): React.ReactElement {
 
           <View className="gap-3">
             <SectionLabel>{t('practiceHub.sections.quiz')}</SectionLabel>
-            <Pressable
-              className="active:opacity-80"
+            <View
               style={[
                 styles.quizCard,
                 {
                   borderColor: colors.quizBorder,
                   backgroundColor: colors.quizBg,
                 },
-                pointerStyle(),
               ]}
-              onPress={openQuiz}
-              accessibilityRole="button"
+              role="group"
               accessibilityLabel={t('practiceHub.quiz.title')}
-              accessibilityHint={t('practiceHub.quiz.hintOpenQuiz')}
-              testID="practice-quiz"
+              testID="practice-quiz-group"
             >
-              <View className="flex-row items-start justify-between">
-                <View className="flex-1 pr-3">
-                  <Text className="text-h2 font-bold text-text-primary">
-                    {t('practiceHub.quiz.title')}
-                  </Text>
-                  <Text className="mt-2 text-body-sm text-text-secondary">
-                    {quizSubtitle}
-                  </Text>
+              <Pressable
+                className="active:opacity-80"
+                style={[styles.quizBrowseAction, pointerStyle()]}
+                onPress={openQuiz}
+                accessibilityRole="button"
+                accessibilityLabel={t('practiceHub.quiz.title')}
+                accessibilityHint={t('practiceHub.quiz.hintOpenQuiz')}
+                testID="practice-quiz"
+              >
+                <View className="flex-row items-start justify-between">
+                  <View className="flex-1 pr-3">
+                    <Text className="text-h2 font-bold text-text-primary">
+                      {t('practiceHub.quiz.title')}
+                    </Text>
+                    <Text className="mt-2 text-body-sm text-text-secondary">
+                      {quizSubtitle}
+                    </Text>
+                  </View>
+                  {!statsError ? (
+                    <CueChip strong testID="practice-quiz-xp" colors={colors}>
+                      {t('practiceHub.xpLabel', { xp: totalXp })}
+                    </CueChip>
+                  ) : null}
                 </View>
-                {!statsError ? (
-                  <CueChip strong testID="practice-quiz-xp" colors={colors}>
-                    {t('practiceHub.xpLabel', { xp: totalXp })}
-                  </CueChip>
-                ) : null}
-              </View>
+              </Pressable>
               <View className="mt-4 flex-row gap-3">
                 <Pressable
                   className="flex-1 active:opacity-80"
@@ -724,10 +786,7 @@ export default function PracticeScreen(): React.ReactElement {
                     },
                     pointerStyle(),
                   ]}
-                  onPress={(event) => {
-                    event?.stopPropagation?.();
-                    openQuizActivity('capitals');
-                  }}
+                  onPress={() => openQuizActivity('capitals')}
                   accessibilityRole="button"
                   accessibilityLabel={t('practiceHub.quiz.capitals')}
                   testID="practice-quiz-capitals"
@@ -766,10 +825,7 @@ export default function PracticeScreen(): React.ReactElement {
                     },
                     pointerStyle(),
                   ]}
-                  onPress={(event) => {
-                    event?.stopPropagation?.();
-                    openQuizActivity('guess_who');
-                  }}
+                  onPress={() => openQuizActivity('guess_who')}
                   accessibilityRole="button"
                   accessibilityLabel={t('practiceHub.quiz.guessWho')}
                   testID="practice-quiz-guess-who"
@@ -799,11 +855,11 @@ export default function PracticeScreen(): React.ReactElement {
                   </View>
                 </Pressable>
               </View>
-            </Pressable>
+            </View>
           </View>
 
           <View className="gap-3">
-            <SectionLabel>
+            <SectionLabel testID="practice-other-practice-heading">
               {t('practiceHub.sections.otherPractice')}
             </SectionLabel>
             <ScrollView
@@ -889,7 +945,7 @@ export default function PracticeScreen(): React.ReactElement {
                 onPress={() =>
                   router.push({
                     pathname: '/(app)/dictation',
-                    params: practiceReturnParams,
+                    params: practiceChildReturnParams,
                   } as Href)
                 }
                 accessibilityRole="button"
@@ -981,7 +1037,7 @@ export default function PracticeScreen(): React.ReactElement {
               onPress={() =>
                 router.push({
                   pathname: '/(app)/quiz/history',
-                  params: practiceReturnParams,
+                  params: practiceChildReturnParams,
                 } as Href)
               }
               accessibilityRole="button"

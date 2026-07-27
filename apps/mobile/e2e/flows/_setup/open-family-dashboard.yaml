@@ -17,13 +17,13 @@ appId: com.mentomate.app
 # profiles API response — typically 3-8 seconds after sign-in on the emulator).
 - extendedWaitUntil:
     visible:
-      id: "parent-home-screen"
+      id: 'parent-home-screen'
     timeout: 20000
 
 - tapOn:
-    id: "parent-home-check-child-${CHILD_PROFILE_ID}"
+    id: 'parent-home-check-child-${CHILD_PROFILE_ID}'
 
 - extendedWaitUntil:
     visible:
-      text: "Recent sessions"
+      id: 'child-detail-scroll'
     timeout: 15000

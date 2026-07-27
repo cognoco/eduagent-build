@@ -14,19 +14,13 @@
  * Real:   JWT verification, Database, consent service, notification service plumbing
  */
 
-import { sql } from 'drizzle-orm';
-import {
-  buildIntegrationEnv,
-  cleanupAccounts,
-  createIntegrationDb,
-} from './helpers';
+import { buildIntegrationEnv, cleanupAccounts } from './helpers';
 import { buildAuthHeaders } from './test-keys';
 import { mockResendEmail } from './external-mocks';
 import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
 import { getFetchCalls, clearFetchCalls } from './fetch-interceptor';
 
 import { app } from '../../apps/api/src/index';
-import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 
 // --- Constants ---
 const CONSENT_USER_ID = 'integration-consent-email';
@@ -110,11 +104,13 @@ describe('Integration: Consent email delivery', () => {
     // Verify Resend API was called with the correct key
     const calls = getFetchCalls('resend.com');
     expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe('https://api.resend.com/emails');
-    expect(calls[0].headers['Authorization']).toBe(`Bearer ${FAKE_RESEND_KEY}`);
+    const call = calls[0];
+    if (!call) throw new Error('Expected one captured Resend call');
+    expect(call.url).toBe('https://api.resend.com/emails');
+    expect(call.headers['Authorization']).toBe(`Bearer ${FAKE_RESEND_KEY}`);
 
     // Verify email payload
-    const emailBody = JSON.parse(calls[0].body!);
+    const emailBody = JSON.parse(call.body!);
     expect(emailBody.to).toContain(PARENT_EMAIL);
     expect(emailBody.from).toBe('test@mentomate.test');
     expect(emailBody.subject).toContain('consent');
@@ -130,22 +126,14 @@ describe('Integration: Consent email delivery', () => {
         }),
       }),
     ]);
-    expect(inngestEvents[0].data).not.toHaveProperty('parentEmail');
+    const event = inngestEvents[0];
+    if (!event) throw new Error('Expected one captured Inngest event');
+    expect(event.data).not.toHaveProperty('parentEmail');
   });
 
   it('returns emailStatus "failed" when RESEND_API_KEY is missing from env', async () => {
     // No RESEND_API_KEY — reproduces the stale-secret bug
     const env = buildIntegrationEnv();
-
-    // Clean up consent state from previous test so the insert isn't a resend
-    const db = createIntegrationDb();
-    // [WI-1139] Legacy `consent_states` Drizzle def removed — raw SQL
-    // delete, same conditional cleanup as before.
-    if (await legacyIdentityTableExistsForTest(db, 'consent_states')) {
-      await db.execute(
-        sql`DELETE FROM consent_states WHERE profile_id = ${childProfileId}`,
-      );
-    }
 
     const res = await app.request(
       '/v1/consent/request',

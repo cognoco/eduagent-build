@@ -11,6 +11,11 @@
 //   (iv)  isPersonLive(profileId) — person.archived_at IS NULL liveness check
 //   (v)   getPersonOrgTimezone(profileId) — the person → membership →
 //         organization timezone join (scan joins profiles × accounts)
+//   (vi)  getPersonOrganizationId(personId) — a person's own org id, via the
+//         one-membership-per-person invariant (WI-1303)
+//   (vii) isPersonInOrg(personId, organizationId) — the same person ↔
+//         membership predicate getPersonScope (profile-v2.ts) and
+//         POST /profiles/switch enforce, exposed standalone
 //
 // All keyed on person.id = profiles.id, so profileId values are unchanged.
 // ---------------------------------------------------------------------------
@@ -170,4 +175,49 @@ export async function getPersonOrgTimezone(
     .where(eq(person.id, profileId))
     .limit(1);
   return row[0]?.timezone ?? null;
+}
+
+/**
+ * (vi) A person's own organization id, resolved from their membership row.
+ * The membership_person_id_unique index (WI-1303, audit R8) guarantees at
+ * most one membership per person, so this is a single-row lookup. Returns
+ * null when the person has no membership.
+ */
+export async function getPersonOrganizationId(
+  db: Database,
+  personId: string,
+): Promise<string | null> {
+  const row = await db
+    .select({ organizationId: membership.organizationId })
+    .from(membership)
+    .where(eq(membership.personId, personId))
+    .limit(1);
+  return row[0]?.organizationId ?? null;
+}
+
+/**
+ * (vii) Whether a person belongs to a given organization — the same
+ * person ↔ membership predicate getPersonScope (profile-v2.ts) applies, and
+ * the one POST /profiles/switch enforces before accepting a profile switch.
+ * Exposed standalone for callers that only need the boolean, not the full
+ * profile-scope read. person not archived.
+ */
+export async function isPersonInOrg(
+  db: Database,
+  personId: string,
+  organizationId: string,
+): Promise<boolean> {
+  const row = await db
+    .select({ id: person.id })
+    .from(person)
+    .innerJoin(membership, eq(membership.personId, person.id))
+    .where(
+      and(
+        eq(person.id, personId),
+        eq(membership.organizationId, organizationId),
+        isNull(person.archivedAt),
+      ),
+    )
+    .limit(1);
+  return row.length > 0;
 }

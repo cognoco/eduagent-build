@@ -49,7 +49,7 @@ import {
   sessionSummaries,
   type Database,
 } from '@eduagent/database';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 
 import * as config from '../../config';
 import * as sentry from '../../services/sentry';
@@ -57,12 +57,6 @@ import * as sentry from '../../services/sentry';
 import * as llm from '../../services/llm';
 import { getSubjectNeedsDeepening } from '../../services/retention-data';
 import { loadTopicTitle, sessionCompleted } from './session-completed';
-import {
-  deleteLegacyAccountsForTest,
-  ensureLegacyProfileAnchorForTest,
-  ensureLegacySubscriptionAnchorForTest,
-  legacyIdentityTableExistsForTest,
-} from '../../test-utils/legacy-identity-anchors';
 
 // ── Database env bootstrap ────────────────────────────────────────────────────
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
@@ -142,13 +136,6 @@ async function seedAccount(): Promise<{ accountId: string }> {
     })
     .returning({ id: person.id });
   seededPersonIds.push(owner!.id);
-  await ensureLegacyProfileAnchorForTest(db, {
-    profileId: owner!.id,
-    accountId: org!.id,
-    displayName: 'Test Owner',
-    birthYear: 1985,
-    isOwner: true,
-  });
   await db.insert(membership).values({
     personId: owner!.id,
     organizationId: org!.id,
@@ -164,13 +151,6 @@ async function seedAccount(): Promise<{ accountId: string }> {
     periodStartAt: new Date(),
     periodEndAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
   });
-  await ensureLegacySubscriptionAnchorForTest(db, {
-    subscriptionId,
-    accountId: org!.id,
-    tier: 'free',
-    status: 'active',
-  });
-
   return { accountId: org!.id };
 }
 
@@ -186,12 +166,6 @@ async function seedProfile(orgId: string): Promise<{ profileId: string }> {
     })
     .returning({ id: person.id });
   seededPersonIds.push(p!.id);
-  await ensureLegacyProfileAnchorForTest(db, {
-    profileId: p!.id,
-    accountId: orgId,
-    displayName: 'Test Learner',
-    birthYear: 2005,
-  });
   await db.insert(membership).values({
     personId: p!.id,
     organizationId: orgId,
@@ -392,7 +366,6 @@ afterAll(async () => {
     await db
       .delete(guardianship)
       .where(inArray(guardianship.guardianPersonId, seededPersonIds));
-    await deleteLegacyAccountsForTest(db, seededOrgIds);
     if (seededOrgIds.length > 0) {
       await db
         .delete(subscription)
@@ -1198,22 +1171,9 @@ describe('session-completed integration', () => {
       memoryEnabled: true,
     });
 
-    // Seed the parent → child edge in BOTH shapes so sendStruggleNotification
-    // resolves the parent regardless of IDENTITY_V2_ENABLED: guardianship is the
-    // v2 edge (flag-on), familyLinks is the legacy edge (flag-off, which the
-    // required api:integration-api gate runs). This test seeds legacy consent
-    // (learningProfiles.memoryConsentStatus), so it exercises the flag-off path
-    // — without the familyLinks edge the legacy lookup returns no_parent_link
-    // and no push fires. Mirrors the dual-seed in weekly-progress-push's
-    // seedFamilyLink helper.
-    // [WI-1139] Legacy `family_links` Drizzle def removed — raw SQL insert,
-    // same conditional seed as before.
-    if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
-      await db.execute(sql`
-        INSERT INTO family_links (id, parent_profile_id, child_profile_id)
-        VALUES (${generateUUIDv7()}, ${parentProfileId}, ${profileId})
-      `);
-    }
+    // Seed the parent → child edge: sendStruggleNotification resolves the
+    // parent via guardianship (v2) unconditionally — no legacy fallback
+    // remains in notifications.ts.
     await db.insert(guardianship).values({
       guardianPersonId: parentProfileId,
       chargePersonId: profileId,

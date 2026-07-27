@@ -455,4 +455,247 @@ describe('checkFile — integration', () => {
     ].join('\n');
     expect(checkFile('a.test.ts', diff, staged)).toEqual([]);
   });
+
+  // WI-1355 variant (a): gc1-allow trails the specifier on the SAME line,
+  // inside a genuinely multi-line jest.mock( call. Found diagnosing PR 1842
+  // (3 false violations) — the captured `content` slice ended at the
+  // specifier literal's own end, so a comment after it on that line fell
+  // outside the slice GC1_ALLOW.test() inspects.
+  it('allows a multiline internal mock with gc1-allow trailing the specifier on the same line', () => {
+    const diff = [
+      '@@ -0,0 +1,4 @@',
+      '+jest.mock(',
+      "+  './services/foo', // gc1-allow: unit-test boundary",
+      '+  () => ({ bar: jest.fn() })',
+      '+);',
+    ].join('\n');
+    const staged = [
+      'jest.mock(',
+      "  './services/foo', // gc1-allow: unit-test boundary",
+      '  () => ({ bar: jest.fn() })',
+      ');',
+    ].join('\n');
+    expect(checkFile('a.test.ts', diff, staged)).toEqual([]);
+  });
+
+  // WI-1355 variant (b): gc1-allow sits on its OWN line, immediately after
+  // the specifier line, before the factory function begins.
+  it('allows a multiline internal mock with gc1-allow on its own line immediately after the specifier', () => {
+    const diff = [
+      '@@ -0,0 +1,5 @@',
+      '+jest.mock(',
+      "+  './services/foo',",
+      '+  // gc1-allow: unit-test boundary',
+      '+  () => ({ bar: jest.fn() })',
+      '+);',
+    ].join('\n');
+    const staged = [
+      'jest.mock(',
+      "  './services/foo',",
+      '  // gc1-allow: unit-test boundary',
+      '  () => ({ bar: jest.fn() })',
+      ');',
+    ].join('\n');
+    expect(checkFile('a.test.ts', diff, staged)).toEqual([]);
+  });
+
+  // WI-1355 rework (adversarial review, round 1): the widened window must not
+  // turn into a bare substring search. A comment that merely MENTIONS
+  // "gc1-allow" in passing prose — not a genuine `gc1-allow: <reason>`
+  // directive — must not bypass the ratchet for a real violation.
+  it('blocks a NEW multiline non-Pattern-A mock with an incidental gc1-allow mention on the following line', () => {
+    const diff = [
+      '@@ -0,0 +1,4 @@',
+      '+jest.mock(',
+      "+  './services/foo',",
+      '+  // note: this codebase used to require gc1-allow tags everywhere, ugh',
+      '+  () => ({ bar: jest.fn() })',
+      '+);',
+    ].join('\n');
+    const staged = [
+      'jest.mock(',
+      "  './services/foo',",
+      '  // note: this codebase used to require gc1-allow tags everywhere, ugh',
+      '  () => ({ bar: jest.fn() })',
+      ');',
+    ].join('\n');
+    const v = checkFile('a.test.ts', diff, staged);
+    expect(v).toHaveLength(1);
+    expect(v[0].reason).toBe('missing-pattern-a');
+  });
+
+  // WI-1809: the WI-1355 window only reached the specifier's line plus at
+  // most one following comment-only line, so a gc1-allow comment placed
+  // deeper in a multi-line factory body was invisible to the checker even
+  // though it is a genuine, well-formed annotation. Real-world shape: three
+  // executor rework cycles in one day (2026-07-11, PRs #2052/#2070/#2055)
+  // hit this before the mock factory even got past its opening lines. The
+  // scan must now cover the whole jest.mock CallExpression span.
+  it('allows a multiline internal mock with gc1-allow inside the factory body', () => {
+    const diff = [
+      '@@ -0,0 +1,6 @@',
+      "+jest.mock('./services/foo', () => ({",
+      '+  // gc1-allow: unit-test boundary',
+      '+  bar: jest.fn(),',
+      '+}));',
+    ].join('\n');
+    const staged = [
+      "jest.mock('./services/foo', () => ({",
+      '  // gc1-allow: unit-test boundary',
+      '  bar: jest.fn(),',
+      '}));',
+    ].join('\n');
+    expect(checkFile('a.test.ts', diff, staged)).toEqual([]);
+  });
+
+  // WI-1809: same footgun, but the escape hatch trails the closing `);` of a
+  // genuinely multi-line call (jest.mock( and the specifier on separate
+  // lines) rather than the specifier itself.
+  it('allows a multiline internal mock with gc1-allow trailing the closing paren', () => {
+    const diff = [
+      '@@ -0,0 +1,6 @@',
+      '+jest.mock(',
+      "+  './services/foo',",
+      '+  () => ({',
+      '+    bar: jest.fn(),',
+      '+  }),',
+      '+); // gc1-allow: unit-test boundary',
+    ].join('\n');
+    const staged = [
+      'jest.mock(',
+      "  './services/foo',",
+      '  () => ({',
+      '    bar: jest.fn(),',
+      '  }),',
+      '); // gc1-allow: unit-test boundary',
+    ].join('\n');
+    expect(checkFile('a.test.ts', diff, staged)).toEqual([]);
+  });
+
+  // WI-1355 rework: reproduces the reviewer's exact repro shape — a long
+  // filler comment block (10 lines) with an incidental "gc1-allow" mention
+  // buried in the last line. Must still flag: the widened window (WI-1809:
+  // now the whole CallExpression span) only helps a GENUINE directive — the
+  // match stays anchored to "// gc1-allow:" as the first token of its own
+  // comment, so a wider reach cannot smuggle an incidental mention past the
+  // ratchet.
+  it('blocks a NEW multiline non-Pattern-A mock with gc1-allow buried in a long filler comment block', () => {
+    const fillerLines = [
+      '  // filler line 1',
+      '  // filler line 2',
+      '  // filler line 3',
+      '  // filler line 4',
+      '  // filler line 5',
+      '  // filler line 6',
+      '  // filler line 7',
+      '  // filler line 8',
+      '  // filler line 9',
+      '  // filler line 10 mentions gc1-allow only in passing prose',
+    ];
+    const diff = [
+      `@@ -0,0 +1,${3 + fillerLines.length} @@`,
+      '+jest.mock(',
+      "+  './services/foo',",
+      ...fillerLines.map((l) => '+' + l),
+      '+  () => ({ bar: jest.fn() })',
+      '+);',
+    ].join('\n');
+    const staged = [
+      'jest.mock(',
+      "  './services/foo',",
+      ...fillerLines,
+      '  () => ({ bar: jest.fn() })',
+      ');',
+    ].join('\n');
+    const v = checkFile('a.test.ts', diff, staged);
+    expect(v).toHaveLength(1);
+    expect(v[0].reason).toBe('missing-pattern-a');
+  });
+
+  // WI-1809 reviewer finding: the widened CallExpression-span scan is a TEXT
+  // regex, so it cannot distinguish a real comment from comment-shaped text
+  // inside a string literal. A factory property whose STRING VALUE happens to
+  // read `'// gc1-allow: ...'` must not satisfy the escape hatch — only a
+  // genuine `//` or `/*` comment counts.
+  it('blocks a NEW non-Pattern-A mock whose factory contains a gc1-allow-shaped STRING LITERAL (not a real comment)', () => {
+    const diff = [
+      '@@ -0,0 +1,4 @@',
+      "+jest.mock('./services/foo', () => ({",
+      '+  bar: jest.fn(),',
+      "+  note: '// gc1-allow: documentation example only',",
+      '+}));',
+    ].join('\n');
+    const staged = [
+      "jest.mock('./services/foo', () => ({",
+      '  bar: jest.fn(),',
+      "  note: '// gc1-allow: documentation example only',",
+      '}));',
+    ].join('\n');
+    const v = checkFile('a.test.ts', diff, staged);
+    expect(v).toHaveLength(1);
+    expect(v[0].reason).toBe('missing-pattern-a');
+  });
+
+  // Same STRING-not-COMMENT scenario as above, but via a template literal
+  // instead of a single-quoted string — the reviewer's mandate names both
+  // literal kinds. The parser folds a template literal with no
+  // interpolation into one NoSubstitutionTemplateLiteral token, so it's
+  // opaque to the structural comment scan exactly like a string literal.
+  it('blocks a NEW non-Pattern-A mock whose factory contains a gc1-allow-shaped TEMPLATE LITERAL (not a real comment)', () => {
+    const diff = [
+      '@@ -0,0 +1,4 @@',
+      "+jest.mock('./services/foo', () => ({",
+      '+  bar: jest.fn(),',
+      '+  note: `// gc1-allow: documentation example only`,',
+      '+}));',
+    ].join('\n');
+    const staged = [
+      "jest.mock('./services/foo', () => ({",
+      '  bar: jest.fn(),',
+      '  note: `// gc1-allow: documentation example only`,',
+      '}));',
+    ].join('\n');
+    const v = checkFile('a.test.ts', diff, staged);
+    expect(v).toHaveLength(1);
+    expect(v[0].reason).toBe('missing-pattern-a');
+  });
+
+  // Adversarial self-review finding: the AST walk that replaced the text
+  // regex must not widen the escape hatch's REACH in the process of fixing
+  // its BLINDNESS to string literals. A gc1-allow comment sitting on the
+  // line immediately ABOVE `jest.mock(` — outside the call's own span and
+  // outside the pre-WI-1809 text-slice window — must not satisfy the escape
+  // hatch for an unrelated, non-Pattern-A mock below it.
+  it('blocks a NEW non-Pattern-A mock when gc1-allow sits on the line ABOVE jest.mock(', () => {
+    const diff = [
+      '@@ -0,0 +1,2 @@',
+      '+// gc1-allow: intended for something else entirely',
+      "+jest.mock('./services/foo', () => ({ bar: jest.fn() }));",
+    ].join('\n');
+    const staged = [
+      '// gc1-allow: intended for something else entirely',
+      "jest.mock('./services/foo', () => ({ bar: jest.fn() }));",
+    ].join('\n');
+    const v = checkFile('a.test.ts', diff, staged);
+    expect(v).toHaveLength(1);
+    expect(v[0].reason).toBe('missing-pattern-a');
+  });
+
+  // Same reach concern, trailing side: a gc1-allow comment on the line AFTER
+  // the closing `);` — its own statement, not a trailing comment on the
+  // mock's line — must not satisfy the escape hatch either.
+  it('blocks a NEW non-Pattern-A mock when gc1-allow sits on the line AFTER the closing );', () => {
+    const diff = [
+      '@@ -0,0 +1,2 @@',
+      "+jest.mock('./services/foo', () => ({ bar: jest.fn() }));",
+      '+// gc1-allow: intended for something else entirely',
+    ].join('\n');
+    const staged = [
+      "jest.mock('./services/foo', () => ({ bar: jest.fn() }));",
+      '// gc1-allow: intended for something else entirely',
+    ].join('\n');
+    const v = checkFile('a.test.ts', diff, staged);
+    expect(v).toHaveLength(1);
+    expect(v[0].reason).toBe('missing-pattern-a');
+  });
 });

@@ -1,6 +1,32 @@
 import { formatMathContent } from './math-format';
 
 describe('formatMathContent', () => {
+  describe('WI-2124 escaped Unicode formulas', () => {
+    it('[WI-2124 AC-1] renders the exact Rayleigh-scattering escape as lambda', () => {
+      expect(formatMathContent('1/\\u03bb^4')).toBe('1/λ^4');
+    });
+
+    it('[WI-2124 AC-2a] decodes both lambda escapes in one response', () => {
+      expect(
+        formatMathContent(
+          'Rayleigh scattering follows 1/\\u03bb^4, so 1/\\u03bb^4 rises for shorter wavelengths.',
+        ),
+      ).toBe(
+        'Rayleigh scattering follows 1/λ^4, so 1/λ^4 rises for shorter wavelengths.',
+      );
+    });
+
+    it('[WI-2124 AC-3] preserves an already-decoded lambda', () => {
+      expect(formatMathContent('1/λ^4')).toBe('1/λ^4');
+    });
+
+    it('[WI-2124 AC-4] leaves malformed and truncated escapes readable', () => {
+      const malformed = 'Compare 1/\\u03GZ^4 with 1/\\u03^4.';
+      expect(() => formatMathContent(malformed)).not.toThrow();
+      expect(formatMathContent(malformed)).toBe(malformed);
+    });
+  });
+
   describe('passthrough', () => {
     it('returns plain text unchanged', () => {
       expect(formatMathContent('Hello world')).toBe('Hello world');

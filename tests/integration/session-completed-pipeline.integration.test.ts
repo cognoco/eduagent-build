@@ -28,7 +28,7 @@
  *        but is a harmless no-op here
  */
 
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import {
   guardianship,
   generateUUIDv7,
@@ -42,17 +42,15 @@ import {
   sessionSummaries,
   needsDeepeningTopics,
 } from '@eduagent/database';
-import {
-  ensureV2IdentityForLegacyProfileTest,
-  legacyIdentityTableExistsForTest,
-} from '../../apps/api/src/test-utils/legacy-identity-anchors';
+import { ensureV2IdentityForLegacyProfileTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { registerProvider } from '../../apps/api/src/services/llm';
 import { createMockProvider } from '../../apps/api/src/services/llm/test-utils';
 import { getChildSessionDetail } from '../../apps/api/src/services/dashboard';
+import { ForbiddenError } from '@eduagent/schemas';
 
 import { cleanupAccounts, createIntegrationDb } from './helpers';
 import { clearFetchCalls, getFetchCalls } from './fetch-interceptor';
-import { mockVoyageAI, type MockHandle } from './external-mocks';
+import { mockVoyageAI } from './external-mocks';
 
 // ---------------------------------------------------------------------------
 // External boundary mocks — must be declared before importing the handler
@@ -62,13 +60,18 @@ const mockCaptureException = jest.fn();
 
 jest.mock('@sentry/cloudflare', () => ({
   // gc1-allow: @sentry/cloudflare is an external observability SDK — no real Sentry transport is available in the test environment; the Cloudflare-specific withSentry/withScope wrappers require a live DSN and worker context to initialise
-  withScope: (fn: (scope) => void) =>
-    fn({ setUser: jest.fn(), setTag: jest.fn(), setExtra: jest.fn() }),
-  captureException: (...args) => mockCaptureException(...args),
+  withScope: (
+    fn: (scope: {
+      setUser: (...args: unknown[]) => unknown;
+      setTag: (...args: unknown[]) => unknown;
+      setExtra: (...args: unknown[]) => unknown;
+    }) => void,
+  ) => fn({ setUser: jest.fn(), setTag: jest.fn(), setExtra: jest.fn() }),
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
   captureMessage: jest.fn(),
   addBreadcrumb: jest.fn(),
   // withSentry is called at module-level in apps/api/src/index.ts
-  withSentry: (_config, handler) => handler,
+  withSentry: <T>(_config: unknown, handler: T): T => handler,
 }));
 
 import { sessionCompleted } from '../../apps/api/src/inngest/functions/session-completed';
@@ -76,8 +79,6 @@ import { sessionCompleted } from '../../apps/api/src/inngest/functions/session-c
 // ---------------------------------------------------------------------------
 // Voyage AI fetch interceptor handle
 // ---------------------------------------------------------------------------
-
-let voyageHandle: MockHandle;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -255,7 +256,7 @@ async function seedScenario(options?: {
     await db.insert(retentionCards).values({
       profileId: profileId,
       topicId: topic!.id,
-      easeFactor: '2.50',
+      easeFactor: 2.5,
       intervalDays: 3,
       repetitions: 3,
       lastReviewedAt: new Date('2026-02-21T10:00:00.000Z'),
@@ -283,9 +284,6 @@ async function seedParentLink(childProfileId: string) {
   // [WI-1145] Seed the parent's v2 identity + guardianship edge to the child
   // unconditionally — the pipeline's parent/guardian reads resolve via v2 on the
   // post-collapse flag-off main lane (child person seeded by seedScenario).
-  // Dual-writes the gated legacy accounts/profiles anchor internally — the
-  // familyLinks insert below depends on that legacy profiles row existing, so
-  // it must run AFTER this call.
   await ensureV2IdentityForLegacyProfileTest(db, {
     accountId,
     profileId,
@@ -296,21 +294,12 @@ async function seedParentLink(childProfileId: string) {
     isOwner: true,
   });
 
-  // [WI-1139] Legacy `family_links` Drizzle def removed — raw SQL insert,
-  // same conditional seed as before.
-  if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
-    await db.execute(sql`
-      INSERT INTO family_links (id, parent_profile_id, child_profile_id)
-      VALUES (${generateUUIDv7()}, ${profileId}, ${childProfileId})
-    `);
-  }
-
   await db.insert(guardianship).values({
     guardianPersonId: profileId,
     chargePersonId: childProfileId,
   });
 
-  return profileId;
+  return { accountId, profileId };
 }
 
 // ---------------------------------------------------------------------------
@@ -353,7 +342,7 @@ async function loadSessionSummary(sessionId: string) {
 beforeAll(() => {
   // Register Voyage AI fetch interceptor — the real embeddings service
   // calls fetch('https://api.voyageai.com/...') which we intercept
-  voyageHandle = mockVoyageAI();
+  mockVoyageAI();
 });
 
 beforeEach(async () => {
@@ -489,13 +478,15 @@ describe('session-completed Inngest pipeline (integration)', () => {
     // Embedding was attempted for the session content via the real Voyage AI fetch
     const voyageCalls = getFetchCalls('voyageai');
     expect(voyageCalls).toHaveLength(1);
-    expect(voyageCalls[0].method).toBe('POST');
+    const voyageCall = voyageCalls[0];
+    if (!voyageCall) throw new Error('Expected one captured Voyage AI call');
+    expect(voyageCall.method).toBe('POST');
 
-    const voyageBody = JSON.parse(voyageCalls[0].body!);
+    const voyageBody = JSON.parse(voyageCall.body!);
     expect(voyageBody.input[0]).toContain('What is photosynthesis?');
 
     // Verify the Authorization header used the right API key
-    expect(voyageCalls[0].headers['Authorization']).toBe(
+    expect(voyageCall.headers['Authorization']).toBe(
       'Bearer voyage-stab-pipeline-test-key',
     );
   });
@@ -561,26 +552,19 @@ describe('session-completed Inngest pipeline (integration)', () => {
 
   it('stores narrative recap fields and exposes them through dashboard session detail', async () => {
     registerProvider({
-      id: 'gemini',
+      ...createMockProvider('gemini'),
       async chat() {
-        return JSON.stringify({
-          highlight: 'Practiced equivalent fractions',
-          narrative:
-            'They compared fraction sizes and fixed one shaky step after a hint.',
-          conversationPrompt: 'Which fraction felt easiest to compare today?',
-          engagementSignal: 'curious',
-          confidence: 'high',
-        });
-      },
-      async *chatStream() {
-        yield JSON.stringify({
-          highlight: 'Practiced equivalent fractions',
-          narrative:
-            'They compared fraction sizes and fixed one shaky step after a hint.',
-          conversationPrompt: 'Which fraction felt easiest to compare today?',
-          engagementSignal: 'curious',
-          confidence: 'high',
-        });
+        return {
+          content: JSON.stringify({
+            highlight: 'Practiced equivalent fractions',
+            narrative:
+              'They compared fraction sizes and fixed one shaky step after a hint.',
+            conversationPrompt: 'Which fraction felt easiest to compare today?',
+            engagementSignal: 'curious',
+            confidence: 'high',
+          }),
+          stopReason: 'stop',
+        };
       },
     });
 
@@ -606,7 +590,8 @@ describe('session-completed Inngest pipeline (integration)', () => {
         },
       ],
     });
-    const parentProfileId = await seedParentLink(scenario.profileId);
+    const { accountId: parentAccountId, profileId: parentProfileId } =
+      await seedParentLink(scenario.profileId);
 
     await executeChain({
       profileId: scenario.profileId,
@@ -630,22 +615,21 @@ describe('session-completed Inngest pipeline (integration)', () => {
     );
     expect(summary!.engagementSignal).toBe('curious');
 
-    const sessionDetail = await getChildSessionDetail(
-      createIntegrationDb(),
-      parentProfileId,
-      scenario.profileId,
-      scenario.sessionId,
-    );
-
-    expect(sessionDetail).toEqual(
-      expect.objectContaining({
-        highlight: 'Practiced equivalent fractions',
-        narrative:
-          'They compared fraction sizes and fixed one shaky step after a hint.',
-        conversationPrompt: 'Which fraction felt easiest to compare today?',
-        engagementSignal: 'curious',
-      }),
-    );
+    // [WI-787] scenario.profileId is a credentialed charge — it owns its login
+    // (seeded with clerkUserId) and also carries a guardian edge — so the
+    // guardian's dashboard read of it is now suppressed. The recap fields'
+    // storage and exposure are already verified by the loadSessionSummary
+    // assertions above; this call asserts the credentialed-charge boundary.
+    await expect(
+      getChildSessionDetail(
+        createIntegrationDb(),
+        parentProfileId,
+        scenario.profileId,
+        scenario.sessionId,
+        parentProfileId,
+        parentAccountId,
+      ),
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('falls back to the short-session highlight without narrative fields', async () => {

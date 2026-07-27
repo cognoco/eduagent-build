@@ -160,7 +160,9 @@ jest.mock('../services/curriculum', () => {
     getBookWithTopics: jest.fn().mockResolvedValue(null),
     persistBookTopics: jest.fn().mockResolvedValue(mockBookWithTopics),
     claimBookForGeneration: jest.fn().mockResolvedValue(null),
+    claimBookForTopicExpansion: jest.fn().mockResolvedValue(null),
     releaseBookGenerationClaimIfEmpty: jest.fn().mockResolvedValue(undefined),
+    releaseBookTopicExpansionClaim: jest.fn().mockResolvedValue(undefined),
     repairIncompleteBookGenerationClaim: jest
       .fn()
       .mockResolvedValue({ status: 'not_incomplete' }),
@@ -415,6 +417,36 @@ jest.mock(
 // ---------------------------------------------------------------------------
 
 import { Hono, type ExecutionContext } from 'hono';
+// [WI-2398] assertNotProxyMode now also calls assertCanWriteProfile, which
+// calls verifyPersonOwnershipV2 — a raw db.select() membership query the
+// fully-mocked DB module cannot satisfy. Every scenario in this file that
+// reaches assertNotProxyMode's allow path is a caller-self write (the header
+// profile equals the authenticated caller's own person id, both
+// 'test-profile-id', via the seeded v2 identity graph); the cross-account
+// write attack this guard exists to close is covered by the real-DB break
+// test in tests/integration/wi2398-write-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's mock DB environment.
+jest.mock('../services/identity-v2/ownership-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/ownership-v2'),
+  verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+}));
+
+// [WI-2396] assertLlmConsent (called by POST generate-topics) runs
+// isLlmExchangeConsentAllowed, which reads db.query.membership /
+// consentGrant — real queries with no controllable behavior on this file's
+// mock DB. Defaults to allowed (resolves undefined = no throw); the
+// consent-withdrawal test suite below overrides with
+// mockRejectedValueOnce(new ConsentWithdrawnError()) to exercise the
+// refusal path. Mirrors the subjects.test.ts pattern.
+// gc1-allow: isLlmExchangeConsentAllowed runs real db.query.membership /
+// consentGrant reads with no real implementation available in this file's
+// mock-DB environment (same class as verifyPersonOwnershipV2 above).
+jest.mock('../services/identity-v2/consent-status-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/consent-status-v2'),
+  assertLlmConsent: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { app } from '../index';
 import { bookRoutes } from './books';
 import {
@@ -422,13 +454,17 @@ import {
   getAllProfileBooks,
   getBookWithTopics,
   claimBookForGeneration,
+  claimBookForTopicExpansion,
   releaseBookGenerationClaimIfEmpty,
+  releaseBookTopicExpansionClaim,
   repairIncompleteBookGenerationClaim,
   deleteBook,
 } from '../services/curriculum';
 import { inngest } from '../inngest/client';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { ERROR_CODES, type BookWithTopics } from '@eduagent/schemas';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
+import { ConsentWithdrawnError } from '../services/session';
 
 const mockGetBooks = getBooks as jest.MockedFunction<typeof getBooks>;
 const mockGetAllProfileBooks = getAllProfileBooks as jest.MockedFunction<
@@ -439,9 +475,17 @@ const mockGetBookWithTopics = getBookWithTopics as jest.MockedFunction<
 >;
 const mockClaimBookForGeneration =
   claimBookForGeneration as jest.MockedFunction<typeof claimBookForGeneration>;
+const mockClaimBookForTopicExpansion =
+  claimBookForTopicExpansion as jest.MockedFunction<
+    typeof claimBookForTopicExpansion
+  >;
 const mockReleaseBookGenerationClaimIfEmpty =
   releaseBookGenerationClaimIfEmpty as jest.MockedFunction<
     typeof releaseBookGenerationClaimIfEmpty
+  >;
+const mockReleaseBookTopicExpansionClaim =
+  releaseBookTopicExpansionClaim as jest.MockedFunction<
+    typeof releaseBookTopicExpansionClaim
   >;
 const mockRepairIncompleteBookGenerationClaim =
   repairIncompleteBookGenerationClaim as jest.MockedFunction<
@@ -458,6 +502,7 @@ const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 const BOOK_ID = '550e8400-e29b-41d4-a716-446655440001';
+const EXPANSION_CLAIM_STARTED_AT = new Date('2026-07-22T08:00:00.000Z');
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -843,6 +888,148 @@ describe('book routes', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.book.topicsGenerated).toBe(true);
+    });
+
+    it.each([{}, { expandExisting: true }])(
+      '[WI-1864] returns 409 after losing generation CAS to a current-order in-flight claim (%j)',
+      async (body) => {
+        mockClaimBookForGeneration.mockResolvedValueOnce(null);
+        mockGetBookWithTopics.mockResolvedValueOnce({
+          ...mockBookWithTopics,
+          book: { ...mockBook, topicsGenerated: false },
+          topics: [],
+        } as never);
+        mockRepairIncompleteBookGenerationClaim.mockResolvedValueOnce({
+          status: 'not_incomplete',
+        });
+        const { expandExistingBookTopics } = jest.requireMock(
+          '../services/curriculum',
+        );
+
+        const res = await app.request(
+          `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+          {
+            method: 'POST',
+            headers: AUTH_HEADERS,
+            body: JSON.stringify(body),
+          },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(409);
+        expect(mockClaimBookForTopicExpansion).not.toHaveBeenCalled();
+        expect(expandExistingBookTopics).not.toHaveBeenCalled();
+        expect(mockReleaseBookTopicExpansionClaim).not.toHaveBeenCalled();
+      },
+    );
+
+    it('[WI-1864] claims a fresh filed thin book before explicit expansion', async () => {
+      const filedBook = {
+        ...mockBookWithTopics,
+        book: { ...mockBookWithTopics.book, topicsGenerated: true },
+        topics: [mockBookWithTopics.topics[0]],
+      };
+      mockClaimBookForGeneration.mockResolvedValueOnce(null);
+      mockGetBookWithTopics.mockResolvedValueOnce(filedBook as never);
+      mockRepairIncompleteBookGenerationClaim.mockResolvedValueOnce({
+        status: 'not_incomplete',
+      });
+      mockClaimBookForTopicExpansion.mockResolvedValueOnce(
+        EXPANSION_CLAIM_STARTED_AT,
+      );
+      const { expandExistingBookTopics } = jest.requireMock(
+        '../services/curriculum',
+      );
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ expandExisting: true }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockClaimBookForTopicExpansion).toHaveBeenCalledWith(
+        undefined,
+        'test-profile-id',
+        SUBJECT_ID,
+        BOOK_ID,
+      );
+      expect(expandExistingBookTopics).toHaveBeenCalledTimes(1);
+      expect(mockReleaseBookTopicExpansionClaim).not.toHaveBeenCalled();
+    });
+
+    it('[WI-1864] returns 409 when another request owns the thin-book expansion claim', async () => {
+      mockClaimBookForGeneration.mockResolvedValueOnce(null);
+      mockGetBookWithTopics.mockResolvedValueOnce({
+        ...mockBookWithTopics,
+        book: { ...mockBookWithTopics.book, topicsGenerated: true },
+        topics: [mockBookWithTopics.topics[0]],
+      } as never);
+      mockRepairIncompleteBookGenerationClaim.mockResolvedValueOnce({
+        status: 'not_incomplete',
+      });
+      mockClaimBookForTopicExpansion.mockResolvedValueOnce(null);
+      const { expandExistingBookTopics } = jest.requireMock(
+        '../services/curriculum',
+      );
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ expandExisting: true }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(409);
+      expect(expandExistingBookTopics).not.toHaveBeenCalled();
+      expect(mockReleaseBookTopicExpansionClaim).not.toHaveBeenCalled();
+    });
+
+    it('[WI-1864] releases the thin-book expansion claim when expansion fails', async () => {
+      mockClaimBookForGeneration.mockResolvedValueOnce(null);
+      mockGetBookWithTopics.mockResolvedValueOnce({
+        ...mockBookWithTopics,
+        book: { ...mockBookWithTopics.book, topicsGenerated: true },
+        topics: [mockBookWithTopics.topics[0]],
+      } as never);
+      mockRepairIncompleteBookGenerationClaim.mockResolvedValueOnce({
+        status: 'not_incomplete',
+      });
+      mockClaimBookForTopicExpansion.mockResolvedValueOnce(
+        EXPANSION_CLAIM_STARTED_AT,
+      );
+      const { expandExistingBookTopics } = jest.requireMock(
+        '../services/curriculum',
+      );
+      expandExistingBookTopics.mockRejectedValueOnce(
+        new Error('expansion failed'),
+      );
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ expandExisting: true }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(500);
+      expect(mockReleaseBookTopicExpansionClaim).toHaveBeenCalledWith(
+        undefined,
+        'test-profile-id',
+        SUBJECT_ID,
+        BOOK_ID,
+        EXPANSION_CLAIM_STARTED_AT,
+      );
     });
 
     it('[WI-78 review] rejects an empty generated claim without releasing an active generator', async () => {
@@ -1249,6 +1436,9 @@ describe('book routes', () => {
 
       it('stale-thin expand uses v2 age 36', async () => {
         mockClaimBookForGeneration.mockResolvedValueOnce(null);
+        mockClaimBookForTopicExpansion.mockResolvedValueOnce(
+          EXPANSION_CLAIM_STARTED_AT,
+        );
         mockRepairIncompleteBookGenerationClaim.mockResolvedValueOnce({
           status: 'not_incomplete',
         });
@@ -1272,6 +1462,63 @@ describe('book routes', () => {
         const deps = (expandExistingBookTopics as jest.Mock).mock.calls[0]?.[6];
         expect(deps.learnerAge).toBe(36);
       });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5)
+  // -------------------------------------------------------------------------
+  describe('[WI-2396] generate-topics consent-withdrawal gate', () => {
+    const assertLlmConsentMock = jest.mocked(assertLlmConsent);
+
+    it('refuses with 403 CONSENT_WITHDRAWN and never calls generateBookTopics when consent is withdrawn', async () => {
+      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+      mockClaimBookForGeneration.mockResolvedValueOnce({
+        id: BOOK_ID,
+        title: 'Ancient Egypt',
+        description: 'Explore pyramids and pharaohs',
+      });
+      const { generateBookTopics } = jest.requireMock(
+        '../services/book-generation',
+      );
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
+      expect(generateBookTopics).not.toHaveBeenCalled();
+      expect(mockClaimBookForGeneration).not.toHaveBeenCalled();
+    });
+
+    it('proceeds (LLM dispatched) when consent is active', async () => {
+      mockClaimBookForGeneration.mockResolvedValueOnce({
+        id: BOOK_ID,
+        title: 'Ancient Egypt',
+        description: 'Explore pyramids and pharaohs',
+      });
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(assertLlmConsentMock.mock.calls[0]?.[1]).toBe('test-profile-id');
+      expect(mockClaimBookForGeneration).toHaveBeenCalled();
     });
   });
 });
@@ -1367,6 +1614,13 @@ describe('POST generate-topics — pre-generation dispatch lifetime', () => {
         isOwner: true,
         resolvedVia: 'explicit-header',
       });
+      // [WI-2398] Caller-self identity — assertNotProxyMode now also calls
+      // assertCanWriteProfile, which requires account + callerPersonId.
+      // profileId equal to callerPersonId mirrors the legitimate
+      // owner-acting-as-self flow (verifyPersonOwnershipV2 is mocked to
+      // succeed at file scope regardless of the stub `db`).
+      c.set('account' as never, { id: 'test-account-id' });
+      c.set('callerPersonId' as never, 'test-profile-id');
       await next();
     });
     ownerApp.route('/', bookRoutes);

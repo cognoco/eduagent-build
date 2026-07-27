@@ -1,6 +1,7 @@
 # Flow A-MFA-3: Sign-in MFA — Phone code branch
 #
-# BLOCKED: Same infrastructure gap as sign-in-mfa-email-code.yaml.
+# BLOCKED (OPQ-26): Same operator-owned fixture gap as
+# sign-in-mfa-email-code.yaml; this placeholder is deliberately non-executable.
 # Phone-code MFA requires a Clerk test user with a verified phone number and
 # phone-code 2FA enrolled. The E2E environment uses real Clerk accounts;
 # without CLERK_TESTING_TOKEN wired, Clerk may rate-limit or block SMS delivery
@@ -29,8 +30,10 @@ appId: com.mentomate.app
 tags:
   - weekly
   - auth
+  - blocked
+  - manual
 ---
 # Placeholder: flow body will be written once infrastructure is unblocked.
 - launchApp:
-    appId: "com.mentomate.app"
+    appId: 'com.mentomate.app'
     stopApp: false

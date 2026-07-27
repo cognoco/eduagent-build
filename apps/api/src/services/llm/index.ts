@@ -17,6 +17,14 @@ export {
   setLlmKillSwitchActive,
   setLlmEnvironment,
 } from './router';
+export { CONVERSATION_LANGUAGE_NAMES } from './router';
+// [WI-2628] The judge-independence exclusion pool + resolver. Exported so a guard
+// test can assert the SAFETY PROPERTY directly — that a declared producer vendor is
+// absent from the resolved pool — rather than only that some string was passed. A
+// model string ('claude-sonnet-4-6') passes a "vendor was supplied" check while
+// excluding nothing.
+export { JUDGE_VENDOR_ORDER, resolveJudgeEligibleVendors } from './router';
+export { runWithLlmRequestContext } from './request-context';
 export { parseConversationLanguage } from './conversation-language';
 // Test-only helpers (createMockProvider, mockProvider, getFallbackConfigForTest,
 // getModelConfigForTest, _setOpenAIAdvancedModelForTesting, _getLlmRoutingV2Enabled)
@@ -36,6 +44,7 @@ export type {
   LlmProviderPolicy,
   OpenAIAdvancedModel,
   PreferredLlmProvider,
+  JudgeIndependence,
 } from './router';
 export {
   parseEnvelope,
@@ -62,3 +71,4 @@ export type {
   TextPart,
   InlineDataPart,
 } from './types';
+export { escapeXml } from './sanitize';

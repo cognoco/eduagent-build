@@ -127,6 +127,10 @@ stores **consent-authority + the consent record only**; the operational capabili
 not a stored flag). The check lives in **one named resolver** (the clean successor to the buggy
 `getFamilyOwnerProfileId`), never re-derived at call sites.
 
+**Guardian writes to credentialed charges are BLOCKED BY DEFAULT.** Exceptions arrive only as future
+named capabilities with provenance via `WI-1765`; implemented in `verifyPersonOwnershipV2` (`WI-787`).
+*(Ruled 2026-07-11, OPQ-32.)*
+
 **Multi-org governance — split by axis:**
 - **Consent / visibility axis → ruled** by the `MMT-ADR-0008` derivation: consent over the *set* of
   guardian edges; visibility = guardian-link ∧ shared org. This is what keeps the **separated-parents /

@@ -35,6 +35,7 @@ import { platformAlert } from '../../../lib/platform-alert';
 // styled in-app Modal — same pattern as parent withdraw-consent (BUG-553).
 import { formatApiError } from '../../../lib/format-api-error';
 import { homeHrefForReturnTo } from '../../../lib/navigation';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { useThemeColors } from '../../../lib/theme';
 import { formatTimer } from '../../../lib/format-relative-date';
 import { Sentry } from '../../../lib/sentry';
@@ -86,7 +87,11 @@ export default function QuizPlayScreen(): React.ReactElement {
   const { round, activityType, returnTo, setRound, setCompletionResult } =
     useQuizFlow();
   const exitHref = returnTo
-    ? homeHrefForReturnTo(returnTo)
+    ? homeHrefForReturnTo(
+        returnTo,
+        undefined,
+        FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+      )
     : ('/(app)/quiz' as Href);
   const completeRound = useCompleteRound();
   const completeRoundMutate = completeRound.mutate;
@@ -863,7 +868,10 @@ export default function QuizPlayScreen(): React.ReactElement {
           continues with the result assumed wrong; this banner lets the user
           know so they don't think their connection is fine. */}
         {answerCheckFailed ? (
-          <Text className="text-caption text-warning text-center mb-2 px-5">
+          <Text
+            className="text-caption text-warning text-center mb-2 px-5"
+            testID="quiz-answer-check-failed"
+          >
             {t('quiz.play.answerCheckFailed')}
           </Text>
         ) : null}

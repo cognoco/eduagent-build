@@ -18,6 +18,7 @@ import {
   login,
   membership,
   guardianship,
+  supportership,
   consentGrant,
   consentRequest,
   subscription,
@@ -36,6 +37,7 @@ import {
   assessments,
   quotaPools,
   profileQuotaUsage,
+  usageEvents,
   streaks,
   needsDeepeningTopics,
   vocabulary,
@@ -47,9 +49,19 @@ import {
   generateUUIDv7,
   type Database,
 } from '@eduagent/database';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import { listSubjects } from './subject';
 import { getTierConfig } from './subscription';
+import { addMonthsClamped } from './billing/billing-shared';
 import { sleep } from './sleep';
+import { recordPracticeActivityEvent } from './practice-activity-events';
+import {
+  seedV2SupporterAccepted,
+  seedV2SupporterManaged,
+  seedV2SupporterPendingLink,
+  seedV2SupporterSelfLearning,
+  seedV2SupporterSelfLearningActive,
+} from './test-seed-v2-supporter';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -77,7 +89,9 @@ const CLERK_FETCH_BASE_DELAY_MS = 500;
 export type SeedScenario =
   | 'onboarding-complete'
   | 'onboarding-no-subject'
+  | 'post-approval-ready'
   | 'learning-active'
+  | 'v2-returning-learner'
   | 'retention-due'
   | 'failed-recall-3x'
   | 'parent-with-children'
@@ -118,6 +132,7 @@ export type SeedScenario =
   | 'quiz-malformed-round'
   | 'quiz-deterministic-wrong-answer'
   | 'quiz-answer-check-fails'
+  | 'quiz-completed-history-detail'
   | 'dictation-with-mistakes'
   | 'dictation-perfect-score'
   | 'review-empty'
@@ -155,7 +170,25 @@ export type SeedScenario =
   // Third wave (BILLING-07/08 + BRIDGE-03/04).
   | 'mentor-audit-family-pool-members'
   | 'mentor-audit-family-owner-daily-quota-with-child'
-  | 'mentor-audit-bridge-backstack';
+  | 'mentor-audit-bridge-backstack'
+  // WI-2194 — stale Plus denominator repaired into one Family cycle.
+  | 'wi-2194-stale-family-cycle'
+  | 'v2-journal-paper-trail'
+  // [WI-2241] Supportership-aware v2 identity + accepted-visibility fixture —
+  // apps/api/src/services/test-seed-v2-supporter.ts.
+  | 'v2-supporter-accepted'
+  // [WI-2226 owner-gate corroboration] Same-org managed cold-start candidate
+  // — apps/api/src/services/test-seed-v2-supporter.ts.
+  | 'v2-supporter-managed'
+  // [WI-2554] Credentialed learner-only identity for Account row gating.
+  | 'v2-account-non-owner-child'
+  // [WI-2243] Self-learning doorway + Me-scope persistence fixtures —
+  // apps/api/src/services/test-seed-v2-supporter.ts.
+  | 'v2-supporter-self-learning'
+  | 'v2-supporter-self-learning-active'
+  // [WI-2242] Pending (pre-acceptance) visibility contract — the link-
+  // ceremony fixture — apps/api/src/services/test-seed-v2-supporter.ts.
+  | 'v2-supporter-pending-link';
 
 /** Environment bindings needed by the seed service */
 export interface SeedEnv {
@@ -249,7 +282,7 @@ async function fetchClerkWithRetry(
  *
  * If CLERK_SECRET_KEY is not set, generates a fake `clerk_seed_*` ID instead.
  */
-async function createClerkTestUser(
+export async function createClerkTestUser(
   email: string,
   env: SeedEnv,
 ): Promise<{ clerkUserId: string; password: string }> {
@@ -732,7 +765,7 @@ async function createBaseProfile(
   return profileId;
 }
 
-async function createSubjectWithCurriculum(
+export async function createSubjectWithCurriculum(
   db: Database,
   profileId: string,
   name: string,
@@ -807,7 +840,7 @@ async function createSubjectWithCurriculum(
 // (see VALID_SCENARIOS it.each + the Stage-0 ids whitelist in test-seed.test.ts).
 // ---------------------------------------------------------------------------
 
-async function insertWeeklyReport(
+export async function insertWeeklyReport(
   db: Database,
   opts: {
     profileId: string; // parent
@@ -913,7 +946,7 @@ async function insertMonthlyReport(
   return { reportId, reportMonth };
 }
 
-async function insertRetentionCards(
+export async function insertRetentionCards(
   db: Database,
   opts: {
     profileId: string;
@@ -938,13 +971,14 @@ async function insertRetentionCards(
   return { retentionCardIds: rows.map((row) => row.id) };
 }
 
-async function insertSessionWithRecap(
+export async function insertSessionWithRecap(
   db: Database,
   opts: {
     profileId: string;
     subjectId: string;
     topicId: string;
     recapContent?: string;
+    learnerRecap?: string;
     recapHighlight?: string;
     engagementSignal?: 'curious' | 'focused' | 'restless' | 'frustrated';
     endedDaysAgo?: number;
@@ -953,6 +987,8 @@ async function insertSessionWithRecap(
   },
 ): Promise<{ sessionId: string; summaryId: string }> {
   const sessionId = generateUUIDv7();
+  const wallClockSeconds = opts.wallClockSeconds ?? 1080;
+  const endedAt = pastDate(opts.endedDaysAgo ?? 1);
   await db.insert(learningSessions).values({
     id: sessionId,
     profileId: opts.profileId,
@@ -961,8 +997,10 @@ async function insertSessionWithRecap(
     sessionType: 'learning',
     status: 'completed',
     exchangeCount: opts.exchangeCount ?? 10,
-    endedAt: pastDate(opts.endedDaysAgo ?? 1),
-    wallClockSeconds: opts.wallClockSeconds ?? 1080,
+    startedAt: new Date(endedAt.getTime() - wallClockSeconds * 1000),
+    lastActivityAt: endedAt,
+    endedAt,
+    wallClockSeconds,
   });
 
   const summaryId = generateUUIDv7();
@@ -974,6 +1012,9 @@ async function insertSessionWithRecap(
     content:
       opts.recapContent ??
       'We worked through the topic with growing confidence and self-corrected mid-way.',
+    ...(opts.learnerRecap === undefined
+      ? {}
+      : { learnerRecap: opts.learnerRecap }),
     aiFeedback: 'Great perseverance and clear reasoning throughout.',
     highlight:
       opts.recapHighlight ??
@@ -1062,6 +1103,66 @@ async function insertBookmarks(
   return { bookmarkIds: rows.map((row) => row.id) };
 }
 
+async function insertLearnerNote(
+  db: Database,
+  opts: {
+    profileId: string;
+    sessionId: string;
+    topicId: string;
+    content: string;
+  },
+): Promise<{ noteId: string }> {
+  const noteId = generateUUIDv7();
+  await db.insert(topicNotes).values({
+    id: noteId,
+    profileId: opts.profileId,
+    sessionId: opts.sessionId,
+    topicId: opts.topicId,
+    content: opts.content,
+  });
+  return { noteId };
+}
+
+async function insertMentorMemory(
+  db: Database,
+  opts: { profileId: string },
+): Promise<{ mentorMemoryId: string }> {
+  const mentorMemoryId = generateUUIDv7();
+  await db.insert(learningProfiles).values({
+    id: mentorMemoryId,
+    profileId: opts.profileId,
+    learningStyle: {
+      preferredExplanations: ['diagrams', 'examples'],
+      pacePreference: 'thorough',
+      responseToChallenge: 'motivated',
+      confidence: 'medium',
+      corroboratingSessions: 4,
+      source: 'inferred',
+    },
+    interests: ['Plant biology', 'Nature photography'],
+    strengths: [
+      {
+        subject: 'Biology',
+        topics: ['Explaining cause and effect'],
+        confidence: 'high',
+        source: 'inferred',
+      },
+    ],
+    struggles: [],
+    communicationNotes: ['Connects new ideas to real-world examples'],
+    suppressedInferences: [],
+    interestTimestamps: {
+      'Plant biology': pastDate(3).toISOString(),
+      'Nature photography': pastDate(5).toISOString(),
+    },
+    memoryEnabled: true,
+    memoryConsentStatus: 'granted',
+    memoryCollectionEnabled: true,
+    memoryInjectionEnabled: true,
+  });
+  return { mentorMemoryId };
+}
+
 // ---------------------------------------------------------------------------
 // Scenario Seeders
 // ---------------------------------------------------------------------------
@@ -1090,17 +1191,76 @@ async function seedOnboardingNoSubject(
     clerkUserId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   return {
     scenario: 'onboarding-no-subject',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: {},
+  };
+}
+
+/** Teen owner immediately after parental approval. The profile deliberately
+ * has zero subjects and an approved request with a guardian recipient, which
+ * is the exact contract usePostApprovalLanding requires. */
+async function seedPostApprovalReady(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Approved Learner',
+    birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
+  });
+  const now = new Date();
+  const purposeGrants = CONSENT_PURPOSES.map((purpose) => ({
+    purpose,
+    grantId: generateUUIDv7(),
+  }));
+
+  await db.insert(consentGrant).values(
+    purposeGrants.map(({ purpose, grantId }) => ({
+      id: grantId,
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
+  await db.insert(consentRequest).values(
+    purposeGrants.map(({ purpose, grantId }) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      requestedBasis: 'gdpr_parental_consent',
+      guardianEmail: 'parent-e2e-test@example.com',
+      status: 'approved' as const,
+      requestedAt: now,
+      respondedAt: now,
+      consentGrantId: grantId,
+    })),
+  );
+
+  return {
+    scenario: 'post-approval-ready',
     accountId,
     profileId,
     email,
@@ -1123,14 +1283,16 @@ async function seedOnboardingComplete(
     clerkUserId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   // BUG-34 fix: Add a subject so the home screen stays visible after sign-in.
   // Without a subject, home.tsx auto-redirects to /create-subject, breaking
@@ -1178,6 +1340,50 @@ async function seedOnboardingComplete(
     email,
     password,
     ids: { subjectId, topicId: firstTopicId },
+  };
+}
+
+/**
+ * A credentialed learner who is not an organization admin. Unlike the
+ * managed-child fixtures, this person owns a Clerk login and can enter the
+ * V2 shell directly; unlike owner fixtures, membership carries only the
+ * learner role. That distinction is the property Account E2E must exercise.
+ */
+async function seedV2AccountNonOwnerChild(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Test Child',
+    birthYear: LEARNER_BIRTH_YEAR,
+    isOwner: false,
+  });
+
+  const loginId = generateUUIDv7();
+  await db.insert(login).values({
+    id: loginId,
+    personId: profileId,
+    clerkUserId,
+    email,
+  });
+  await db.update(person).set({ loginId }).where(eq(person.id, profileId));
+
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Child Learning Data',
+  );
+
+  return {
+    scenario: 'v2-account-non-owner-child',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subjectId },
   };
 }
 
@@ -1249,6 +1455,98 @@ async function seedLearningActive(
   };
 }
 
+/**
+ * V2 returning-learner release fixture.
+ *
+ * Intentionally contains one live session and one overdue retention card on
+ * different topics. Keeping the graph this small makes each Mentor card an
+ * independently guaranteed consequence of the seed rather than an incidental
+ * by-product of a broader learning-history fixture.
+ */
+async function seedV2ReturningLearner(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Returning Learner',
+    birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
+  });
+  const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'World History',
+  );
+  const sessionTopicId = topicIds[0];
+  const dueReviewTopicId = topicIds[1];
+  if (!sessionTopicId || !dueReviewTopicId) {
+    throw new Error('Returning-learner seed requires two curriculum topics');
+  }
+
+  const sessionId = generateUUIDv7();
+  await db.insert(learningSessions).values({
+    id: sessionId,
+    profileId,
+    subjectId,
+    topicId: sessionTopicId,
+    sessionType: 'learning',
+    status: 'active',
+    exchangeCount: 1,
+  });
+  await db.insert(sessionEvents).values([
+    {
+      id: generateUUIDv7(),
+      sessionId,
+      profileId,
+      subjectId,
+      topicId: sessionTopicId,
+      eventType: 'user_message',
+      content: 'Why did the Romans build so many roads?',
+    },
+    {
+      id: generateUUIDv7(),
+      sessionId,
+      profileId,
+      subjectId,
+      topicId: sessionTopicId,
+      eventType: 'ai_response',
+      content: 'They connected cities, trade, armies, and new ideas.',
+    },
+  ]);
+
+  const retentionCardId = generateUUIDv7();
+  await db.insert(retentionCards).values({
+    id: retentionCardId,
+    profileId,
+    topicId: dueReviewTopicId,
+    easeFactor: 2.5,
+    intervalDays: 7,
+    repetitions: 2,
+    nextReviewAt: pastDate(1),
+    lastReviewedAt: pastDate(8),
+  });
+
+  return {
+    scenario: 'v2-returning-learner',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: {
+      subjectId,
+      bookId,
+      sessionId,
+      sessionTopicId,
+      dueReviewTopicId,
+      retentionCardId,
+    },
+  };
+}
+
 async function seedRetentionDue(
   db: Database,
   email: string,
@@ -1284,14 +1582,22 @@ async function seedRetentionDue(
   await db.insert(retentionCards).values(cardValues);
 
   const firstCard = cardValues[0];
-  if (!firstCard) throw new Error('No retention cards created');
+  const firstTopicId = topicIds[0];
+  if (!firstCard || !firstTopicId) {
+    throw new Error('No retention cards created');
+  }
   return {
     scenario: 'retention-due',
     accountId,
     profileId,
     email,
     password,
-    ids: { subjectId, bookId, retentionCardId: firstCard.id },
+    ids: {
+      subjectId,
+      bookId,
+      topicId: firstTopicId,
+      retentionCardId: firstCard.id,
+    },
   };
 }
 
@@ -1615,14 +1921,16 @@ async function seedParentWithChildren(
   });
 
   // Consent for child
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: childProfileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: childProfileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   // Give child a subject with some progress
   const { subjectId } = await createSubjectWithCurriculum(
@@ -1694,8 +2002,14 @@ async function seedParentMultiChild(
     defaultAppContext: 'family',
   });
 
-  // Parent also gets a subject so the inline "Learn something" view works
-  await createSubjectWithCurriculum(db, parentProfileId, 'General Knowledge');
+  // Parent also gets a subject so the inline "Learn something" view works.
+  // Expose its ID separately from the child subjects so owner-learner E2E
+  // evidence can bind content to the exact owner's row.
+  const { subjectId: ownerSubjectId } = await createSubjectWithCurriculum(
+    db,
+    parentProfileId,
+    'General Knowledge',
+  );
 
   // Child 1 — teen with active learning
   const child1ProfileId = await createBaseProfile(db, accountId, {
@@ -1710,14 +2024,16 @@ async function seedParentMultiChild(
     chargePersonId: child1ProfileId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: child1ProfileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: child1ProfileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const { subjectId: subject1Id, topicIds: child1TopicIds } =
     await createSubjectWithCurriculum(
@@ -1775,14 +2091,16 @@ async function seedParentMultiChild(
     chargePersonId: child2ProfileId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: child2ProfileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: child2ProfileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const { subjectId: subject2Id, topicIds: child2TopicIds } =
     await createSubjectWithCurriculum(db, child2ProfileId, 'Science');
@@ -1833,14 +2151,16 @@ async function seedParentMultiChild(
     chargePersonId: child3ProfileId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: child3ProfileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: child3ProfileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const { subjectId: subject3Id, topicIds: child3TopicIds } =
     await createSubjectWithCurriculum(db, child3ProfileId, 'History');
@@ -1857,6 +2177,7 @@ async function seedParentMultiChild(
     password,
     ids: {
       parentProfileId,
+      ownerSubjectId,
       child1ProfileId,
       child2ProfileId,
       child3ProfileId,
@@ -2191,14 +2512,16 @@ async function seedTrialExpiredChild(
   });
 
   // Consent for child
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: childProfileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: childProfileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   // Give child a subject with topics so "Browse Library" has content
   const { subjectId } = await createSubjectWithCurriculum(
@@ -2251,23 +2574,27 @@ async function seedConsentWithdrawn(
   });
 
   // Consent state: WITHDRAWN
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: childProfileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: childProfileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: false,
-    withdrawnAt: new Date(),
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: childProfileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: childProfileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: false,
+      withdrawnAt: new Date(),
+    })),
+  );
 
   return {
     scenario: 'consent-withdrawn',
@@ -2296,23 +2623,27 @@ async function seedConsentWithdrawnSolo(
   });
 
   // Consent state: WITHDRAWN
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: false,
-    withdrawnAt: new Date(),
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: false,
+      withdrawnAt: new Date(),
+    })),
+  );
 
   return {
     scenario: 'consent-withdrawn-solo',
@@ -2341,14 +2672,16 @@ async function seedParentSolo(
     clerkUserId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: parentProfileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: parentProfileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const subscriptionId = generateUUIDv7();
   await insertSubscriptionWithLegacy(db, {
@@ -2434,18 +2767,20 @@ async function seedConsentPending(
   const consentToken = `seed-consent-${generateUUIDv7()}`;
   const consentStateId = generateUUIDv7();
 
-  await db.insert(consentRequest).values({
-    id: consentStateId,
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    requestedBasis: 'gdpr_parental_consent',
-    guardianEmail: 'parent-e2e-test@example.com',
-    status: 'requested',
-    token: consentToken,
-    tokenExpiresAt: futureDate(7),
-    requestedAt: new Date(),
-  });
+  await db.insert(consentRequest).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: purpose === CONSENT_PURPOSES[0] ? consentStateId : generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      requestedBasis: 'gdpr_parental_consent',
+      guardianEmail: 'parent-e2e-test@example.com',
+      status: 'requested',
+      token: consentToken,
+      tokenExpiresAt: futureDate(7),
+      requestedAt: new Date(),
+    })),
+  );
 
   return {
     scenario: 'consent-pending',
@@ -2471,14 +2806,16 @@ async function seedLanguageLearner(
     clerkUserId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const subjectId = generateUUIDv7();
   await db.insert(subjects).values({
@@ -2804,14 +3141,16 @@ async function seedAccountDeletionScheduled(
     clerkUserId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const subscriptionId = generateUUIDv7();
   await insertSubscriptionWithLegacy(db, {
@@ -2868,14 +3207,16 @@ async function seedSessionWithTranscript(
     clerkUserId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
     db,
@@ -3035,14 +3376,16 @@ async function seedParentProxy(
     chargePersonId: childProfileId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: childProfileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: childProfileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
     db,
@@ -3166,14 +3509,16 @@ async function seedWithBookmarks(
     clerkUserId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
     db,
@@ -3391,14 +3736,16 @@ async function seedParentWithChildrenNoSessions(
     chargePersonId: childProfileId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: childProfileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: childProfileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   // Subject + curriculum WITHOUT any learningSessions row. Keeps the child
   // dashboard renderable (subject card visible) but produces zero recaps.
@@ -3515,24 +3862,28 @@ async function seedSubscriptionFamilyActive(
     clerkUserId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const subscriptionId = generateUUIDv7();
+  const periodStartAt = new Date();
+  const cycleResetAt = addMonthsClamped(periodStartAt, 1);
   await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: profileId,
     planTier: 'family',
     status: 'active',
-    periodStartAt: new Date(),
-    periodEndAt: futureDate(30),
+    periodStartAt,
+    periodEndAt: cycleResetAt,
   });
 
   await db.insert(quotaPools).values({
@@ -3540,7 +3891,7 @@ async function seedSubscriptionFamilyActive(
     subscriptionId,
     monthlyLimit: familyTier.monthlyQuota,
     usedThisMonth: 120,
-    cycleResetAt: futureDate(30),
+    cycleResetAt,
   });
 
   const { subjectId } = await createSubjectWithCurriculum(
@@ -3580,24 +3931,28 @@ async function seedSubscriptionProActive(
     clerkUserId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const subscriptionId = generateUUIDv7();
+  const periodStartAt = new Date();
+  const cycleResetAt = addMonthsClamped(periodStartAt, 1);
   await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: profileId,
     planTier: 'pro',
     status: 'active',
-    periodStartAt: new Date(),
-    periodEndAt: futureDate(30),
+    periodStartAt,
+    periodEndAt: cycleResetAt,
   });
 
   await db.insert(quotaPools).values({
@@ -3605,7 +3960,7 @@ async function seedSubscriptionProActive(
     subscriptionId,
     monthlyLimit: proTier.monthlyQuota,
     usedThisMonth: 250,
-    cycleResetAt: futureDate(30),
+    cycleResetAt,
   });
 
   const { subjectId } = await createSubjectWithCurriculum(
@@ -3649,14 +4004,16 @@ async function seedPurchasePending(
     clerkUserId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const subscriptionId = generateUUIDv7();
   await insertSubscriptionWithLegacy(db, {
@@ -3719,14 +4076,16 @@ async function seedPurchaseConfirmed(
     clerkUserId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const subscriptionId = generateUUIDv7();
   await insertSubscriptionWithLegacy(db, {
@@ -3785,14 +4144,16 @@ async function seedQuotaExceeded(
     clerkUserId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const subscriptionId = generateUUIDv7();
   await insertSubscriptionWithLegacy(db, {
@@ -3805,6 +4166,7 @@ async function seedQuotaExceeded(
     periodEndAt: futureDate(30),
   });
 
+  const cycleResetAt = futureDate(30);
   await db.insert(quotaPools).values({
     id: generateUUIDv7(),
     subscriptionId,
@@ -3813,7 +4175,23 @@ async function seedQuotaExceeded(
     usedThisMonth: freeTier.monthlyQuota,
     dailyLimit: freeTier.dailyLimit,
     usedToday: 2, // Daily still has headroom; server caps on monthly
-    cycleResetAt: futureDate(30),
+    cycleResetAt,
+  });
+
+  // Free-tier enforcement reads the owner's per-profile meter. Keep the
+  // shared pool above for legacy readers, but exhaust the authoritative row so
+  // this scenario cannot be lazily provisioned back to zero usage.
+  const ownerMonthlyLimit = freeTier.ownerMonthlyQuota ?? freeTier.monthlyQuota;
+  await db.insert(profileQuotaUsage).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    profileId,
+    role: 'owner',
+    monthlyLimit: ownerMonthlyLimit,
+    usedThisMonth: ownerMonthlyLimit,
+    dailyLimit: freeTier.dailyLimit,
+    usedToday: 2,
+    cycleResetAt,
   });
 
   const { subjectId, topicIds } = await createSubjectWithCurriculum(
@@ -3858,14 +4236,16 @@ async function seedForbidden(
     clerkUserId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   // Deliberately no subscription row — metering middleware returns FORBIDDEN
   const { subjectId } = await createSubjectWithCurriculum(
@@ -3908,14 +4288,16 @@ async function seedQuizMalformedRound(
     clerkUserId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const freeTier = getTierConfig('free');
   const subscriptionId = generateUUIDv7();
@@ -3983,12 +4365,12 @@ async function seedQuizMalformedRound(
 
 // ---------------------------------------------------------------------------
 // Scenario: quiz-deterministic-wrong-answer
-// A pre-inserted quiz round with a known-wrong option at a deterministic index.
-// The E2E dispute test taps option index 1 which is always wrong (correctAnswer
-// is at index 0 after the server side shuffle; we arrange distractors so the
-// round's stored question places the correct answer first in the options
-// presented to the client).
-// Returns ROUND_ID.
+// A pre-inserted three-question vocabulary round. The E2E dispute test selects
+// answer text rather than an option index because the client-safe API projection
+// deliberately shuffles options on every fetch. Three questions keep both the
+// wrong-answer dispute and correct-answer suppression checks away from the final
+// question's automatic round submission.
+// Returns ROUND_ID, WRONG_ANSWER, and CORRECT_ANSWER.
 // ---------------------------------------------------------------------------
 
 async function seedQuizDeterministicWrongAnswer(
@@ -4005,14 +4387,16 @@ async function seedQuizDeterministicWrongAnswer(
     clerkUserId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const freeTier = getTierConfig('free');
   const subscriptionId = generateUUIDv7();
@@ -4040,29 +4424,53 @@ async function seedQuizDeterministicWrongAnswer(
     'Geography',
   );
 
-  // Question with correctAnswer='Paris', distractors are clearly wrong.
-  // Index 0 = correct, index 1-3 = wrong — E2E flow taps index 1 to submit
-  // a known-wrong answer for the dispute test.
-  const deterministicQuestion = {
-    type: 'capitals',
-    country: 'France',
-    correctAnswer: 'Paris',
-    acceptedAliases: ['Paris'],
-    distractors: ['London', 'Berlin', 'Madrid'],
-    funFact: 'Paris has been the capital of France since the 10th century.',
-    isLibraryItem: false,
-    topicId: null,
-    freeTextEligible: false,
-  };
+  const deterministicQuestions = [
+    {
+      type: 'vocabulary',
+      term: 'bonjour',
+      correctAnswer: 'hello',
+      acceptedAnswers: ['hello'],
+      distractors: ['goodbye', 'please', 'thanks'],
+      funFact: '',
+      cefrLevel: 'A1',
+      isLibraryItem: false,
+      vocabularyId: null,
+      freeTextEligible: false,
+    },
+    {
+      type: 'vocabulary',
+      term: 'merci',
+      correctAnswer: 'thanks',
+      acceptedAnswers: ['thanks'],
+      distractors: ['hello', 'please', 'goodbye'],
+      funFact: '',
+      cefrLevel: 'A1',
+      isLibraryItem: false,
+      vocabularyId: null,
+      freeTextEligible: false,
+    },
+    {
+      type: 'vocabulary',
+      term: 'au revoir',
+      correctAnswer: 'goodbye',
+      acceptedAnswers: ['goodbye'],
+      distractors: ['hello', 'please', 'thanks'],
+      funFact: '',
+      cefrLevel: 'A1',
+      isLibraryItem: false,
+      vocabularyId: null,
+      freeTextEligible: false,
+    },
+  ];
 
   const roundId = generateUUIDv7();
   await db.insert(quizRounds).values({
     id: roundId,
     profileId,
-    activityType: 'capitals',
-    theme: 'European Capitals',
-    questions: [deterministicQuestion],
-    total: 1,
+    activityType: 'vocabulary',
+    theme: 'Deterministic vocabulary',
+    questions: deterministicQuestions,
+    total: 3,
     libraryQuestionIndices: [],
     status: 'active',
   });
@@ -4073,7 +4481,12 @@ async function seedQuizDeterministicWrongAnswer(
     profileId,
     email,
     password,
-    ids: { subjectId, roundId, wrongOptionIndex: '1' },
+    ids: {
+      subjectId,
+      roundId,
+      wrongAnswer: 'goodbye',
+      correctAnswer: 'thanks',
+    },
   };
 }
 
@@ -4100,14 +4513,16 @@ async function seedQuizAnswerCheckFails(
     clerkUserId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const freeTier = getTierConfig('free');
   const subscriptionId = generateUUIDv7();
@@ -4149,6 +4564,17 @@ async function seedQuizAnswerCheckFails(
     topicId: null,
     freeTextEligible: false,
   };
+  const secondQuestion = {
+    type: 'capitals',
+    country: 'France',
+    correctAnswer: 'Paris',
+    acceptedAliases: ['Paris'],
+    distractors: ['Lyon', 'Marseille', 'Toulouse'],
+    funFact: 'Paris has been the capital of France for more than a millennium.',
+    isLibraryItem: false,
+    topicId: null,
+    freeTextEligible: false,
+  };
 
   const roundId = generateUUIDv7();
   await db.insert(quizRounds).values({
@@ -4156,10 +4582,10 @@ async function seedQuizAnswerCheckFails(
     profileId,
     activityType: 'capitals',
     theme: 'European Capitals',
-    questions: [question],
+    questions: [question, secondQuestion],
     results: [],
     score: 1,
-    total: 1,
+    total: 2,
     status: 'completed',
     completedAt: new Date(),
     libraryQuestionIndices: [],
@@ -4172,6 +4598,62 @@ async function seedQuizAnswerCheckFails(
     email,
     password,
     ids: { subjectId, roundId },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Scenario: quiz-completed-history-detail
+// A completed round in the production-persisted shape consumed by detail reads.
+// The full Playwright history-open specification uses this seed so it never
+// depends on a prior quiz run or mutates state during the browser assertion.
+// ---------------------------------------------------------------------------
+
+async function seedQuizCompletedHistoryDetail(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const base = await seedOnboardingComplete(db, email, env);
+  const roundId = generateUUIDv7();
+
+  await db.insert(quizRounds).values({
+    id: roundId,
+    profileId: base.profileId,
+    subjectId: base.ids.subjectId,
+    activityType: 'capitals',
+    theme: 'European Capitals',
+    questions: [
+      {
+        type: 'capitals',
+        country: 'France',
+        correctAnswer: 'Paris',
+        acceptedAliases: ['Paris'],
+        distractors: ['Berlin', 'Madrid', 'Rome'],
+        funFact: 'Paris is known as the City of Light.',
+        isLibraryItem: false,
+      },
+    ],
+    results: [
+      {
+        questionIndex: 0,
+        correct: false,
+        correctAnswer: 'Paris',
+        answerGiven: 'Berlin',
+        timeMs: 1250,
+      },
+    ],
+    score: 0,
+    total: 1,
+    xpEarned: 0,
+    libraryQuestionIndices: [],
+    status: 'completed',
+    completedAt: new Date(),
+  });
+
+  return {
+    ...base,
+    scenario: 'quiz-completed-history-detail',
+    ids: { ...base.ids, roundId },
   };
 }
 
@@ -4310,14 +4792,16 @@ async function seedChildQuotaExceeded(
     guardianPersonId: ownerProfileId,
     chargePersonId: childProfileId,
   });
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: childProfileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: childProfileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const subscriptionId = generateUUIDv7();
   await insertSubscriptionWithLegacy(db, {
@@ -4476,14 +4960,16 @@ async function seedDictationWithMistakes(
     clerkUserId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const { subjectId } = await createSubjectWithCurriculum(
     db,
@@ -4523,14 +5009,16 @@ async function seedDictationPerfectScore(
     clerkUserId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const { subjectId } = await createSubjectWithCurriculum(
     db,
@@ -4590,14 +5078,16 @@ async function seedMentorAuditFamilyAtProfileLimit(
     defaultAppContext: 'family',
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: parentProfileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: parentProfileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const subscriptionId = generateUUIDv7();
   await insertSubscriptionWithLegacy(db, {
@@ -4636,14 +5126,16 @@ async function seedMentorAuditFamilyAtProfileLimit(
       chargePersonId: childProfileId,
     });
 
-    await db.insert(consentGrant).values({
-      id: generateUUIDv7(),
-      chargePersonId: childProfileId,
-      organizationId: accountId,
-      purpose: 'platform_use',
-      lawfulBasis: 'gdpr_parental_consent',
-      granted: true,
-    });
+    await db.insert(consentGrant).values(
+      CONSENT_PURPOSES.map((purpose) => ({
+        id: generateUUIDv7(),
+        chargePersonId: childProfileId,
+        organizationId: accountId,
+        purpose,
+        lawfulBasis: 'gdpr_parental_consent',
+        granted: true,
+      })),
+    );
   }
 
   return {
@@ -4681,14 +5173,16 @@ async function seedMentorAuditPostApprovalRedirect(
     clerkUserId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: parentProfileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: parentProfileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const childProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Awaiting-Approval Child',
@@ -4704,18 +5198,20 @@ async function seedMentorAuditPostApprovalRedirect(
 
   const consentToken = `seed-consent-${generateUUIDv7()}`;
   const consentStateId = generateUUIDv7();
-  await db.insert(consentRequest).values({
-    id: consentStateId,
-    chargePersonId: childProfileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    requestedBasis: 'gdpr_parental_consent',
-    guardianEmail: 'parent-e2e-test@example.com',
-    status: 'requested',
-    token: consentToken,
-    tokenExpiresAt: futureDate(7),
-    requestedAt: new Date(),
-  });
+  await db.insert(consentRequest).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: purpose === CONSENT_PURPOSES[0] ? consentStateId : generateUUIDv7(),
+      chargePersonId: childProfileId,
+      organizationId: accountId,
+      purpose,
+      requestedBasis: 'gdpr_parental_consent',
+      guardianEmail: 'parent-e2e-test@example.com',
+      status: 'requested',
+      token: consentToken,
+      tokenExpiresAt: futureDate(7),
+      requestedAt: new Date(),
+    })),
+  );
 
   return {
     scenario: 'mentor-audit-post-approval-redirect',
@@ -4794,14 +5290,16 @@ async function seedMentorAuditQuotaOwnerDaily(
     clerkUserId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const subscriptionId = generateUUIDv7();
   await insertSubscriptionWithLegacy(db, {
@@ -4858,14 +5356,16 @@ async function seedMentorAuditQuotaFamilyMonthly(
     clerkUserId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const subscriptionId = generateUUIDv7();
   await insertSubscriptionWithLegacy(db, {
@@ -4919,14 +5419,16 @@ async function seedMentorAuditResumableSession(
     clerkUserId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const { subjectId, topicIds } = await createSubjectWithCurriculum(
     db,
@@ -4978,6 +5480,140 @@ async function seedMentorAuditResumableSession(
   };
 }
 
+/** One self-owned learner graph spanning every persisted V2 Journal section.
+ *  This is deliberately separate from mentor-audit-rich-child-history: that
+ *  fixture is a Family owner reviewing a linked child, while Journal's Me
+ *  surface reads artifacts belonging to the active credentialed learner. */
+async function seedV2JournalPaperTrail(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Journal Learner',
+    birthYear: 1985,
+    isOwner: true,
+    email,
+    clerkUserId,
+  });
+
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: profileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'art6_1_a' as const,
+      granted: true,
+    })),
+  );
+
+  const { subjectId, topicIds } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Biology',
+  );
+  const topicId = topicIds[0];
+  if (!topicId) {
+    throw new Error('v2-journal-paper-trail: subject created no topics');
+  }
+
+  const { sessionId, summaryId: sessionSummaryId } =
+    await insertSessionWithRecap(db, {
+      profileId,
+      subjectId,
+      topicId,
+      recapContent:
+        'The learner connected sunlight, chlorophyll, and glucose while explaining how photosynthesis stores energy.',
+      learnerRecap:
+        'We traced how photosynthesis stores sunlight as chemical energy in glucose.',
+      recapHighlight:
+        'Connected chlorophyll, carbon dioxide, and glucose without prompting.',
+      engagementSignal: 'focused',
+      endedDaysAgo: 1,
+      exchangeCount: 8,
+      wallClockSeconds: 960,
+    });
+
+  const { noteId: learnerNoteId } = await insertLearnerNote(db, {
+    profileId,
+    sessionId,
+    topicId,
+    content:
+      'Photosynthesis stores sunlight as chemical energy in glucose for the plant.',
+  });
+  const { bookmarkIds } = await insertBookmarks(db, {
+    profileId,
+    sessionId,
+    subjectId,
+    topicId,
+    contents: ['Chlorophyll captures light energy that powers photosynthesis.'],
+  });
+  const bookmarkId = bookmarkIds[0];
+  if (!bookmarkId) {
+    throw new Error('v2-journal-paper-trail: bookmark helper returned no id');
+  }
+
+  const practiceActivity = await recordPracticeActivityEvent(db, {
+    profileId,
+    subjectId,
+    activityType: 'review',
+    activitySubtype: 'spaced_repetition',
+    completedAt: pastDate(1),
+    pointsEarned: 8,
+    score: 3,
+    total: 3,
+    sourceType: 'topic',
+    sourceId: topicId,
+    metadata: { topicId },
+  });
+  if (!practiceActivity) {
+    throw new Error('v2-journal-paper-trail: practice event was not inserted');
+  }
+
+  // Journal self-view reads reports by childProfileId. Setting both columns
+  // to this credentialed learner makes the subject and owner the same Me scope.
+  const { reportId: weeklyReportId } = await insertWeeklyReport(db, {
+    profileId,
+    childProfileId: profileId,
+    childName: 'Journal Learner',
+    reportWeek: '2026-07-13',
+  });
+  const { reportId: monthlyReportId } = await insertMonthlyReport(db, {
+    profileId,
+    childProfileId: profileId,
+    childName: 'Journal Learner',
+    reportMonth: '2026-07-01',
+    monthLabel: 'July 2026',
+  });
+  const { mentorMemoryId } = await insertMentorMemory(db, { profileId });
+
+  return {
+    scenario: 'v2-journal-paper-trail',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: {
+      learnerProfileId: profileId,
+      subjectId,
+      topicId,
+      sessionId,
+      // The recaps API identifies a recap by its learning-session id.
+      recapId: sessionId,
+      sessionSummaryId,
+      learnerNoteId,
+      bookmarkId,
+      practiceActivityEventId: practiceActivity.id,
+      weeklyReportId,
+      monthlyReportId,
+      mentorMemoryId,
+    },
+  };
+}
+
 /** Rich-history child — composes the Task 0 helpers so the audit can exercise
  *  the parent-native review surfaces (weekly report, recap, retention,
  *  vocabulary, bookmarks) against a single linked child. Deterministic — no
@@ -5000,14 +5636,16 @@ async function seedMentorAuditRichChildHistory(
     defaultAppContext: 'family',
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: parentProfileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: parentProfileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const childProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Rich-History Child',
@@ -5021,14 +5659,16 @@ async function seedMentorAuditRichChildHistory(
     chargePersonId: childProfileId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: childProfileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: childProfileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   // 2 subjects, ≥3 topics — one Math (retention surface), one English (recap +
   // bookmarks + vocabulary).
@@ -5363,24 +6003,28 @@ async function seedMentorAuditFamilyPoolMembers(
     defaultAppContext: 'family',
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: parentProfileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: parentProfileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const subscriptionId = generateUUIDv7();
+  const periodStartAt = new Date();
+  const cycleResetAt = addMonthsClamped(periodStartAt, 1);
   await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: parentProfileId,
     planTier: 'family',
     status: 'active',
-    periodStartAt: new Date(),
-    periodEndAt: futureDate(30),
+    periodStartAt,
+    periodEndAt: cycleResetAt,
   });
 
   const usedThisMonth = Math.floor(familyTier.monthlyQuota / 2);
@@ -5389,7 +6033,7 @@ async function seedMentorAuditFamilyPoolMembers(
     subscriptionId,
     monthlyLimit: familyTier.monthlyQuota,
     usedThisMonth,
-    cycleResetAt: futureDate(30),
+    cycleResetAt,
   });
 
   // Pinned at 2 consented children — see docstring.
@@ -5408,15 +6052,27 @@ async function seedMentorAuditFamilyPoolMembers(
       chargePersonId: childProfileId,
     });
 
-    await db.insert(consentGrant).values({
-      id: generateUUIDv7(),
-      chargePersonId: childProfileId,
-      organizationId: accountId,
-      purpose: 'platform_use',
-      lawfulBasis: 'gdpr_parental_consent',
-      granted: true,
-    });
+    await db.insert(consentGrant).values(
+      CONSENT_PURPOSES.map((purpose) => ({
+        id: generateUUIDv7(),
+        chargePersonId: childProfileId,
+        organizationId: accountId,
+        purpose,
+        lawfulBasis: 'gdpr_parental_consent',
+        granted: true,
+      })),
+    );
   }
+
+  // Family status is reconstructed from current-cycle events, so the
+  // maintained mid-month seed records its 50% usage in the event ledger too.
+  await db.insert(usageEvents).values(
+    Array.from({ length: usedThisMonth }, () => ({
+      subscriptionId,
+      profileId: parentProfileId,
+      delta: 1,
+    })),
+  );
 
   return {
     scenario: 'mentor-audit-family-pool-members',
@@ -5433,6 +6089,58 @@ async function seedMentorAuditFamilyPoolMembers(
       // audit row reads it as a numeric percentage of the monthly cap.
       quotaUsedThisMonth: String(usedThisMonth),
       quotaMonthlyLimit: String(familyTier.monthlyQuota),
+    },
+  };
+}
+
+/** WI-2194 — stale Plus-era pool repaired into one current Family cycle.
+ *  Kept separate from the maintained normal-mid-month audit seed so the
+ *  generic BILLING-08 contract remains at 40–60% usage. */
+async function seedWi2194StaleFamilyCycle(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const base = await seedMentorAuditFamilyPoolMembers(db, email, env);
+  const {
+    subscriptionId,
+    parentProfileId,
+    childProfileId1: childProfileId,
+  } = base.ids;
+  if (!subscriptionId || !parentProfileId || !childProfileId) {
+    throw new Error('WI-2194 Family seed did not return its required IDs');
+  }
+
+  await db
+    .update(quotaPools)
+    .set({
+      monthlyLimit: getTierConfig('plus').monthlyQuota,
+      usedThisMonth: 7,
+    })
+    .where(eq(quotaPools.subscriptionId, subscriptionId));
+  await db
+    .delete(usageEvents)
+    .where(eq(usageEvents.subscriptionId, subscriptionId));
+  await db.insert(usageEvents).values([
+    ...Array.from({ length: 9 }, () => ({
+      subscriptionId,
+      profileId: parentProfileId,
+      delta: 1,
+    })),
+    ...Array.from({ length: 5 }, () => ({
+      subscriptionId,
+      profileId: childProfileId,
+      delta: 1,
+    })),
+  ]);
+
+  return {
+    ...base,
+    scenario: 'wi-2194-stale-family-cycle',
+    ids: {
+      ...base.ids,
+      quotaUsedThisMonth: '14',
+      quotaMonthlyLimit: String(getTierConfig('family').monthlyQuota),
     },
   };
 }
@@ -5462,14 +6170,16 @@ async function seedMentorAuditFamilyOwnerDailyQuotaWithChild(
     defaultAppContext: 'family',
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: ownerProfileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: ownerProfileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const subscriptionId = generateUUIDv7();
   await insertSubscriptionWithLegacy(db, {
@@ -5532,14 +6242,16 @@ async function seedMentorAuditFamilyOwnerDailyQuotaWithChild(
     chargePersonId: childProfileId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: childProfileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: childProfileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const { subjectId: childSubjectId, topicIds: childTopicIds } =
     await createSubjectWithCurriculum(
@@ -5624,14 +6336,16 @@ async function seedMentorAuditBridgeBackstack(
     defaultAppContext: 'family',
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: ownerProfileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: ownerProfileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   // Adult library deliberately gets a *different* subject name from the
   // child's, so the bridge flow exercises the "not yet in adult library"
@@ -5652,14 +6366,16 @@ async function seedMentorAuditBridgeBackstack(
     chargePersonId: childProfileId,
   });
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: childProfileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      id: generateUUIDv7(),
+      chargePersonId: childProfileId,
+      organizationId: accountId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+    })),
+  );
 
   const childSubjectName = 'Mathematics';
   const { subjectId: childSubjectId, topicIds: childTopicIds } =
@@ -5839,7 +6555,9 @@ export async function attachClerkTotpFactor(
 const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'onboarding-complete': seedOnboardingComplete,
   'onboarding-no-subject': seedOnboardingNoSubject,
+  'post-approval-ready': seedPostApprovalReady,
   'learning-active': seedLearningActive,
+  'v2-returning-learner': seedV2ReturningLearner,
   'retention-due': seedRetentionDue,
   'failed-recall-3x': seedFailedRecall3x,
   'parent-with-children': seedParentWithChildren,
@@ -5880,6 +6598,7 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'quiz-malformed-round': seedQuizMalformedRound,
   'quiz-deterministic-wrong-answer': seedQuizDeterministicWrongAnswer,
   'quiz-answer-check-fails': seedQuizAnswerCheckFails,
+  'quiz-completed-history-detail': seedQuizCompletedHistoryDetail,
   'review-empty': seedReviewEmpty,
   'dictation-with-mistakes': seedDictationWithMistakes,
   'dictation-perfect-score': seedDictationPerfectScore,
@@ -5948,6 +6667,17 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'mentor-audit-family-owner-daily-quota-with-child':
     seedMentorAuditFamilyOwnerDailyQuotaWithChild,
   'mentor-audit-bridge-backstack': seedMentorAuditBridgeBackstack,
+  'wi-2194-stale-family-cycle': seedWi2194StaleFamilyCycle,
+  'v2-journal-paper-trail': seedV2JournalPaperTrail,
+  // [WI-2241] test-seed-v2-supporter.ts — composes test-seed-v2 owner
+  // identities with the accepted-visibility fixture logic (linking-ceremony)
+  // and the rich learning/report insert helpers above.
+  'v2-supporter-accepted': seedV2SupporterAccepted,
+  'v2-supporter-managed': seedV2SupporterManaged,
+  'v2-account-non-owner-child': seedV2AccountNonOwnerChild,
+  'v2-supporter-self-learning': seedV2SupporterSelfLearning,
+  'v2-supporter-self-learning-active': seedV2SupporterSelfLearningActive,
+  'v2-supporter-pending-link': seedV2SupporterPendingLink,
 };
 
 export const VALID_SCENARIOS = Object.keys(SCENARIO_MAP) as SeedScenario[];
@@ -6024,7 +6754,7 @@ export async function seedScenario(
 //   6. Delete person rows (cascades login, membership, any remaining consent_request, subjects, sessions…)
 //   7. Delete organization rows (membership already gone; safe)
 // ---------------------------------------------------------------------------
-async function deleteOrganizationGraph(
+export async function deleteOrganizationGraph(
   db: Database,
   orgIds: string[],
 ): Promise<number> {
@@ -6109,6 +6839,25 @@ async function deleteOrganizationGraph(
         or(
           inArray(guardianship.guardianPersonId, deletablePersonIds),
           inArray(guardianship.chargePersonId, deletablePersonIds),
+        ),
+      );
+  }
+
+  // 5b. [WI-2241] Delete supportership rows (RESTRICT on both person FK
+  // columns, mirroring guardianship above). support_visibility_contracts /
+  // support_visibility_audit_events / support_visibility_notices all CASCADE
+  // from supportership.id, so deleting the edge here reclaims the whole
+  // visibility-contract subtree — no separate delete needed for those tables.
+  // Required for any reseed of a v2-supporter-accepted-style identity: without
+  // this, the person delete below hits the RESTRICT FK and the whole
+  // idempotent-reseed cleanup throws.
+  if (deletablePersonIds.length > 0) {
+    await db
+      .delete(supportership)
+      .where(
+        or(
+          inArray(supportership.supporterPersonId, deletablePersonIds),
+          inArray(supportership.supporteePersonId, deletablePersonIds),
         ),
       );
   }

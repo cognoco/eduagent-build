@@ -659,7 +659,10 @@ export function LearnerScreen({
         <View className={showLearningActions ? 'mt-5' : 'mt-4'}>
           {subjectCards.length > 0 ? (
             <>
-              <Text className="text-caption font-bold uppercase text-text-secondary px-5 mb-2.5">
+              <Text
+                testID="home-subjects-heading"
+                className="text-caption font-bold uppercase text-text-secondary px-5 mb-2.5"
+              >
                 {t('home.learner.yourSubjects')}
               </Text>
               <ScrollView

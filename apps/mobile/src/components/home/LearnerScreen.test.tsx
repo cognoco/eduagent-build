@@ -651,6 +651,7 @@ describe('LearnerScreen', () => {
     renderLearner();
 
     await waitFor(() => {
+      screen.getByTestId('home-subjects-heading');
       screen.getByTestId(`home-subject-card-${MATH_SUBJECT_ID}`);
       screen.getByTestId(`home-subject-card-${PHYSICS_SUBJECT_ID}`);
       screen.getByText('Math');

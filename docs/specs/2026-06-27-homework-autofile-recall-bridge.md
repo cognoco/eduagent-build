@@ -6,7 +6,15 @@
 > candidates **C1** + **C4**). No prior spec/plan existed (verified against
 > `docs/specs/`, `docs/plans/`, `docs/plans/v2-plan/`).
 
-Date: 2026-06-27 · Status: draft (revised after two adversarial challenges — UX + architecture)
+> **STATUS (last verified 2026-07-22): SHIPPED.** Homework auto-file, the quiet
+> remove/restore control for short homework sessions, and Recall Bridge coverage on
+> both reflection-submit and skip paths are implemented and tested in
+> `apps/mobile/src/components/session/use-session-actions.ts`,
+> `apps/mobile/src/components/session-summary/SessionSummaryLibraryFilingControls.tsx`,
+> `apps/mobile/src/app/session-summary/[sessionId].tsx`, and their co-located tests.
+> Landed in `01dd53af2` (PR #1551). This spec has no remaining implementation scope.
+
+Date: 2026-06-27 · Status: shipped · Last verified: 2026-07-22
 
 ## Problem
 

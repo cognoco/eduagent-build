@@ -10,6 +10,7 @@ import {
 } from './language-curriculum';
 import type { Database } from '@eduagent/database';
 import type { GeneratedTopic } from '@eduagent/schemas';
+import { ConflictError } from '../errors';
 
 const PROFILE_ID = 'profile-001';
 const SUBJECT_ID = 'subject-001';
@@ -24,12 +25,28 @@ function createMockDb({
   curriculumFindFirst = undefined as Record<string, unknown> | undefined,
   topicsFindMany = [] as Record<string, unknown>[],
   vocabularySelect = [] as Record<string, unknown>[],
+  recentSessionsSelect = [] as Record<string, unknown>[],
+  sessionSummariesSelect = [] as Record<string, unknown>[],
+  sessionEventsSelect = [] as Record<string, unknown>[],
   insertReturning = [] as unknown[],
+  updateReturning = [{ id: 'book-1' }] as unknown[],
 } = {}): Database {
-  const selectFromChain = {
-    from: jest.fn().mockReturnValue({
-      where: jest.fn().mockResolvedValue(vocabularySelect),
-    }),
+  const makeSelectChain = (rows: Record<string, unknown>[]) => {
+    const chain: Record<string, unknown> = {
+      from: jest.fn(),
+      innerJoin: jest.fn(),
+      where: jest.fn(),
+      orderBy: jest.fn(),
+      limit: jest.fn(),
+      then: (
+        resolve: (value: Record<string, unknown>[]) => unknown,
+        reject: (reason: unknown) => unknown,
+      ) => Promise.resolve(rows).then(resolve, reject),
+    };
+    for (const method of ['from', 'innerJoin', 'where', 'orderBy', 'limit']) {
+      (chain[method] as jest.Mock).mockReturnValue(chain);
+    }
+    return chain;
   };
 
   const db = {
@@ -47,7 +64,14 @@ function createMockDb({
         findFirst: jest.fn().mockResolvedValue({ id: 'book-1' }),
       },
     },
-    select: jest.fn().mockReturnValue(selectFromChain),
+    select: jest.fn((selection: Record<string, unknown>) => {
+      if ('milestoneId' in selection) return makeSelectChain(vocabularySelect);
+      if ('languageLearningSummary' in selection) {
+        return makeSelectChain(sessionSummariesSelect);
+      }
+      if ('eventType' in selection) return makeSelectChain(sessionEventsSelect);
+      return makeSelectChain(recentSessionsSelect);
+    }),
     insert: jest.fn().mockReturnValue({
       values: jest.fn().mockReturnValue({
         returning: jest.fn().mockResolvedValue(insertReturning),
@@ -55,6 +79,13 @@ function createMockDb({
     }),
     delete: jest.fn().mockReturnValue({
       where: jest.fn().mockResolvedValue(undefined),
+    }),
+    update: jest.fn().mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue(updateReturning),
+        }),
+      }),
     }),
     // regenerateLanguageCurriculum runs its delete→insert swap inside a
     // transaction; the mock runs the callback against the same chainable db so
@@ -270,6 +301,25 @@ describe('regenerateLanguageCurriculum', () => {
     expect(insertCallCount).toBeGreaterThanOrEqual(1);
   });
 
+  it('[WI-1864] returns a conflict before deleting when topic expansion owns the book', async () => {
+    const db = createMockDb({
+      subjectFindFirst: { id: SUBJECT_ID, profileId: PROFILE_ID },
+      updateReturning: [],
+    });
+
+    await expect(
+      regenerateLanguageCurriculum(db, PROFILE_ID, SUBJECT_ID, 'es', 'A1'),
+    ).rejects.toMatchObject<Partial<ConflictError>>({
+      name: 'ConflictError',
+      errorCode: 'CONFLICT',
+      status: 409,
+      message: 'Book topic expansion is in progress. Please retry shortly.',
+    });
+
+    expect(db.delete).not.toHaveBeenCalled();
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
   // [BUG-655 / L3.M3.1] BREAK TEST — cross-profile delete attempt
   // Pre-fix: the function deleted curricula by subjectId alone, so a caller
   // passing a victim profile's subjectId would wipe their curriculum,
@@ -366,6 +416,163 @@ describe('getCurrentLanguageProgress', () => {
     expect(result!.currentMilestone).toBeNull();
     expect(result!.nextMilestone).toBeNull();
     expect(result!.nextPractice).toBeNull();
+    expect(result!.strandBalance).toBeNull();
+    expect(result!.skillProfile).toBeNull();
+  });
+
+  it('returns recent strand balance and evidence-backed skill progress', async () => {
+    const db = createMockDb({
+      subjectFindFirst: {
+        id: SUBJECT_ID,
+        profileId: PROFILE_ID,
+        name: 'Spanish',
+        pedagogyMode: 'four_strands',
+        languageCode: 'es',
+      },
+      curriculumFindFirst: {
+        id: CURRICULUM_ID,
+        subjectId: SUBJECT_ID,
+        version: 1,
+      },
+      topicsFindMany: [
+        {
+          id: 'milestone-1',
+          curriculumId: CURRICULUM_ID,
+          title: 'Greetings',
+          description: 'Basic greetings',
+          sortOrder: 0,
+          relevance: 'core',
+          estimatedMinutes: 30,
+          skipped: false,
+          cefrLevel: 'A1',
+          cefrSublevel: '1',
+          targetWordCount: 4,
+          targetChunkCount: 0,
+        },
+      ],
+      vocabularySelect: [
+        { milestoneId: 'milestone-1', type: 'word', mastered: true },
+        { milestoneId: 'milestone-1', type: 'word', mastered: true },
+      ],
+      recentSessionsSelect: [
+        { sessionId: 'session-1' },
+        { sessionId: 'session-2' },
+      ],
+      sessionSummariesSelect: [
+        {
+          sessionId: 'session-1',
+          languageLearningSummary: {
+            practicedScenario: 'order food',
+            newWords: [],
+            strengthenedWords: [],
+            grammarPatterns: ['polite requests', 'present tense'],
+            comprehension: { correct: 2, total: 3 },
+            speakingAttempts: 2,
+            fluency: { correct: 3, total: 5 },
+            nextRecommendationStrand: 'meaning_output',
+          },
+        },
+        {
+          sessionId: 'session-2',
+          languageLearningSummary: {
+            practicedScenario: null,
+            newWords: [],
+            strengthenedWords: [],
+            grammarPatterns: ['polite requests'],
+            comprehension: { correct: 1, total: 1 },
+            speakingAttempts: 1,
+            fluency: { correct: 2, total: 3 },
+            nextRecommendationStrand: null,
+          },
+        },
+      ],
+      sessionEventsSelect: [
+        {
+          sessionId: 'session-1',
+          eventType: 'ai_response',
+          metadata: { languageLearning: { strand: 'meaning_input' } },
+        },
+        {
+          sessionId: 'session-1',
+          eventType: 'ai_response',
+          metadata: { languageLearning: { strand: 'meaning_output' } },
+        },
+        {
+          sessionId: 'session-2',
+          eventType: 'ai_response',
+          metadata: { languageLearning: { strand: 'language_focus' } },
+        },
+        {
+          sessionId: 'session-2',
+          eventType: 'ai_response',
+          metadata: { languageLearning: { strand: 'fluency' } },
+        },
+      ],
+    });
+
+    const result = await getCurrentLanguageProgress(db, PROFILE_ID, SUBJECT_ID);
+
+    expect(result?.strandBalance).toEqual({
+      counts: {
+        meaning_input: 1,
+        meaning_output: 1,
+        language_focus: 1,
+        fluency: 1,
+      },
+      sessionsSampled: 2,
+    });
+    expect(result?.skillProfile).toEqual([
+      { skill: 'vocabulary', progress: 0.5, evidenceCount: 2 },
+      { skill: 'grammar', progress: null, evidenceCount: 2 },
+      { skill: 'listening', progress: 0.75, evidenceCount: 4 },
+      { skill: 'speaking', progress: null, evidenceCount: 3 },
+      { skill: 'fluency', progress: 0.625, evidenceCount: 8 },
+    ]);
+    expect(result?.skillProfile?.some((row) => row.skill === 'reading')).toBe(
+      false,
+    );
+  });
+
+  it('returns null evidence fields when there are no recent sessions', async () => {
+    const db = createMockDb({
+      subjectFindFirst: {
+        id: SUBJECT_ID,
+        profileId: PROFILE_ID,
+        name: 'Spanish',
+        pedagogyMode: 'four_strands',
+        languageCode: 'es',
+      },
+      curriculumFindFirst: {
+        id: CURRICULUM_ID,
+        subjectId: SUBJECT_ID,
+        version: 1,
+      },
+      topicsFindMany: [
+        {
+          id: 'milestone-1',
+          curriculumId: CURRICULUM_ID,
+          title: 'Greetings',
+          description: 'Basic greetings',
+          sortOrder: 0,
+          relevance: 'core',
+          estimatedMinutes: 30,
+          skipped: false,
+          cefrLevel: 'A1',
+          cefrSublevel: '1',
+          targetWordCount: 4,
+          targetChunkCount: 0,
+        },
+      ],
+      vocabularySelect: [
+        { milestoneId: 'milestone-1', type: 'word', mastered: true },
+      ],
+      recentSessionsSelect: [],
+    });
+
+    const result = await getCurrentLanguageProgress(db, PROFILE_ID, SUBJECT_ID);
+
+    expect(result?.strandBalance).toBeNull();
+    expect(result?.skillProfile).toBeNull();
   });
 
   // WI-1552 (AC1/AC4a): the cross-session pointer read back from
@@ -468,6 +675,8 @@ describe('getCurrentLanguageProgress', () => {
 
     expect(result).not.toBeNull();
     expect(result!.currentMilestone).toBeNull();
+    expect(result!.strandBalance).toBeNull();
+    expect(result!.skillProfile).toBeNull();
   });
 
   it('returns correct current milestone when milestones are incomplete', async () => {

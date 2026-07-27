@@ -226,5 +226,66 @@ describe('Cerebras Provider', () => {
         }
       }).rejects.toThrow(SafetyFilterError);
     });
+
+    it('logs malformed stream metadata without response content', async () => {
+      const sensitiveText = 'PRIVATE_RECITATION_SENTINEL';
+      const warnSpy = jest
+        .spyOn(console, 'warn')
+        .mockImplementation(() => undefined);
+      const body = sse(
+        `data: {${sensitiveText}}`,
+        'data: {"choices":[{"delta":{"content":"ok"}}]}',
+        'data: [DONE]',
+      );
+      mockFetch.mockResolvedValueOnce({ ok: true, status: 200, body });
+
+      const chunks: string[] = [];
+      for await (const chunk of provider.chatStream(MESSAGES, CFG)) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toEqual(['ok']);
+      expect(warnSpy).toHaveBeenCalled();
+      expect(JSON.stringify(warnSpy.mock.calls)).not.toContain(sensitiveText);
+      warnSpy.mockRestore();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Best-effort prompt-cache usage (WI-1827)
+// ---------------------------------------------------------------------------
+
+describe('Cerebras Provider — usage (WI-1827)', () => {
+  const provider = createCerebrasProvider('test-key');
+
+  beforeEach(() => mockFetch.mockReset());
+
+  it('surfaces prompt_tokens_details.cached_tokens as usage.cachedTokens', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [
+          {
+            message: { content: '{"reply":"hi","signals":{}}' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: { prompt_tokens_details: { cached_tokens: 256 } },
+      }),
+      text: async () => '',
+    });
+
+    const result = await provider.chat(MESSAGES, CFG);
+    expect(result.usage).toEqual({ cachedTokens: 256 });
+  });
+
+  it('omits usage when cached_tokens is absent', async () => {
+    mockFetch.mockResolvedValueOnce(
+      okResponse('{"reply":"hi","signals":{}}', 'stop'),
+    );
+    const result = await provider.chat(MESSAGES, CFG);
+    expect(result.usage).toBeUndefined();
   });
 });

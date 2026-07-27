@@ -112,18 +112,10 @@ tags:
           optional: true  # justified: dispute button timing varies — may not appear between rapid answer transitions
       - tapOn:
           id: "quiz-next-question"
-          optional: true  # justified: only present for non-final questions; final question shows quiz-final-see-results instead
+          optional: true  # justified: only present for non-final questions; the final answer auto-navigates to results
 
-# After the 8-question round the play screen shows quiz-final-see-results.
-# Tap it to navigate to the results screen (router.replace → quiz/results).
-- extendedWaitUntil:
-    visible:
-      id: "quiz-final-see-results"
-    timeout: 10000
-
-- tapOn:
-    id: "quiz-final-see-results"
-
+# Submitting the final answer completes the round and replaces this route with
+# quiz/results, so the results screen is the hard completion receipt.
 - extendedWaitUntil:
     visible:
       id: "quiz-results-screen"
@@ -131,8 +123,20 @@ tags:
 
 - takeScreenshot: quiz-04-results
 
+- scrollUntilVisible:
+    element:
+      id: "quiz-results-done"
+    direction: DOWN
+    timeout: 10000
+
 - assertVisible:
     id: "quiz-results-done"
+
+- scrollUntilVisible:
+    element:
+      id: "quiz-results-history"
+    direction: DOWN
+    timeout: 10000
 
 - assertVisible:
     id: "quiz-results-history"

@@ -1,11 +1,18 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@clerk/expo';
+import {
+  usePreventRemove,
+  type NavigationAction,
+} from '@react-navigation/native';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { platformAlert } from '../../../lib/platform-alert';
-import { goBackOrReplace } from '../../../lib/navigation';
+import { goBackOrReplace, MENTOR_RETURN_TO } from '../../../lib/navigation';
 import { shouldShowBookLink } from '../../../lib/show-book-link';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import {
   useRouter,
+  useNavigation,
   useLocalSearchParams,
   useFocusEffect,
   type Href,
@@ -15,6 +22,7 @@ import type {
   HomeworkCaptureSource,
   HomeworkProblem,
   InputMode,
+  LearningSession,
   PendingCelebration,
   ChallengeRoundSessionState,
 } from '@eduagent/schemas';
@@ -26,6 +34,7 @@ import {
   FluencyDrillStrip,
   GradedInputCard,
   MeaningOutputCard,
+  SpeakingPracticeActivity,
   type ChatMessage,
 } from '../../../components/session';
 import { FirstSessionGreeting } from '../../../components/session/FirstSessionGreeting';
@@ -57,6 +66,7 @@ import {
   useIsFirstSession,
 } from '../../../hooks/use-session-context';
 import { useNetworkStatus } from '../../../hooks/use-network-status';
+import { useObservedPolicyEpoch } from '../../../hooks/use-now-feed';
 import { useApiReachability } from '../../../hooks/use-api-reachability';
 import { useCelebrationLevel } from '../../../hooks/use-settings';
 import { useLearnerProfile } from '../../../hooks/use-learner-profile';
@@ -69,6 +79,7 @@ import {
   useApiClient,
   type QuotaExceededDetails,
 } from '../../../lib/api-client';
+import { queryKeys } from '../../../lib/query-keys';
 import { classifyApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
 import { useCreateNote } from '../../../hooks/use-notes';
@@ -81,9 +92,11 @@ import {
   type PendingSubjectResolution,
 } from '../../../components/session/session-types';
 import {
+  mentorOpenerIdempotencyKey,
   useSessionStreaming,
   type ContinueMessageOptions,
 } from '../../../components/session/use-session-streaming';
+import { getOutboxEntry } from '../../../lib/message-outbox';
 import { ChallengeOfferCard } from '../../../components/session/ChallengeOfferCard';
 import { ChallengeRoundBanner } from '../../../components/session/ChallengeRoundBanner';
 import { DraftedNoteReview } from '../../../components/session/DraftedNoteReview';
@@ -93,6 +106,7 @@ import { BookmarkNudgeTooltip } from '../../../components/session/BookmarkNudgeT
 import {
   SessionToolAccessory,
   SessionAccessory,
+  HomeworkFirstResponseCompleteMarker,
   MentorHomeworkFirstResponse,
 } from '../../../components/session/SessionAccessories';
 import {
@@ -147,7 +161,47 @@ function isChallengeRoundInFlight(
   );
 }
 
+function isExactManualHomeworkSessionAssociated({
+  isE2EBuild,
+  isMentorHomeworkFrame,
+  allocatedSessionIds,
+  activeSessionId,
+  activeSession,
+  effectiveSubjectId,
+  initialProblemText,
+}: {
+  isE2EBuild: boolean;
+  isMentorHomeworkFrame: boolean;
+  allocatedSessionIds: readonly string[];
+  activeSessionId: string | null;
+  activeSession: LearningSession | null | undefined;
+  effectiveSubjectId: string | undefined;
+  initialProblemText: string | undefined;
+}): boolean {
+  const persistedHomework = activeSession?.metadata?.homework;
+  const persistedProblem = persistedHomework?.problems[0];
+
+  return (
+    isE2EBuild &&
+    isMentorHomeworkFrame &&
+    allocatedSessionIds.length === 1 &&
+    allocatedSessionIds[0] === activeSessionId &&
+    activeSession?.id === activeSessionId &&
+    activeSession?.subjectId === effectiveSubjectId &&
+    activeSession?.sessionType === 'homework' &&
+    persistedHomework?.problemCount === 1 &&
+    persistedHomework?.currentProblemIndex === 0 &&
+    persistedHomework?.problems.length === 1 &&
+    persistedProblem?.source === 'manual' &&
+    persistedProblem?.text.trim() === initialProblemText?.trim()
+  );
+}
+
 const MENTOR_BIRTH_SESSION_TIME_SCALE = 0.35;
+// Bound a failed policy-epoch hydration without claiming a refreshed projection.
+const MENTOR_RETURN_EPOCH_WAIT_MS = 2_000;
+// Give the exact projection one bounded opportunity without trapping Back.
+const MENTOR_RETURN_REFRESH_WAIT_MS = 2_000;
 
 interface FirstSessionWrapUpCardProps {
   value: string;
@@ -173,7 +227,8 @@ function FirstSessionWrapUpCard({
   onMarkCelebrationSeen,
 }: FirstSessionWrapUpCardProps) {
   const { t } = useTranslation();
-  const canSubmit = value.trim().length >= 10 && !isSubmitting;
+  const hasSubmitted = reflectionTotalXp != null;
+  const canSubmit = value.trim().length >= 10 && !isSubmitting && !hasSubmitted;
 
   return (
     <View
@@ -192,7 +247,7 @@ function FirstSessionWrapUpCard({
         multiline
         value={value}
         onChangeText={onChangeText}
-        editable={!isSubmitting}
+        editable={!isSubmitting && !hasSubmitted}
         className="mt-3 min-h-20 rounded-xl border border-border px-3 py-2 text-text-primary"
       />
       {hasError ? (
@@ -254,6 +309,7 @@ export default function SessionScreen() {
 }
 
 function SessionScreenInner() {
+  const isE2EBuild = process.env.EXPO_PUBLIC_E2E === 'true';
   const {
     mode,
     subjectId,
@@ -298,6 +354,7 @@ function SessionScreenInner() {
     imageMimeType?: string;
   }>();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
   const navigationContract = useNavigationContract();
@@ -353,8 +410,123 @@ function SessionScreenInner() {
   // don't always resolve on web — the chevron looked clickable but the URL
   // never changed. Supplying an explicit handler that uses Expo Router's
   // typed object form makes the navigation reliable across web + native.
+  const { userId } = useAuth();
+  const { epoch: observedNowFeedEpoch, hydrated: nowFeedEpochHydrated } =
+    useObservedPolicyEpoch(userId, activeProfile?.id);
+  const [pendingMentorReturn, setPendingMentorReturn] = useState(false);
+  const [mentorReturnReady, setMentorReturnReady] = useState(false);
+  const [deferredRemovalAction, setDeferredRemovalAction] =
+    useState<NavigationAction | null>(null);
+  const navigation = useNavigation();
+  const canRefreshMentorFeed =
+    returnTo === MENTOR_RETURN_TO &&
+    !!userId &&
+    !!activeProfile?.id &&
+    nowFeedEpochHydrated;
+  const refreshMentorFeedBeforeReturn = useCallback(async () => {
+    if (!userId || !activeProfile?.id) return;
+
+    // The Mentor feed was warm before this session opened. Refetch its exact
+    // actor/profile/epoch projection (including an inactive cache entry) and
+    // wait for that projection before remounting Mentor.
+    await queryClient.invalidateQueries(
+      {
+        queryKey: queryKeys.now.feed(
+          userId,
+          activeProfile.id,
+          observedNowFeedEpoch,
+        ),
+        exact: true,
+        refetchType: 'all',
+      },
+      { throwOnError: true },
+    );
+  }, [activeProfile?.id, observedNowFeedEpoch, queryClient, userId]);
+  const startMentorReturn = useCallback(() => {
+    setMentorReturnReady(false);
+    setPendingMentorReturn(true);
+  }, []);
+  usePreventRemove(
+    returnTo === MENTOR_RETURN_TO &&
+      !mentorReturnReady &&
+      deferredRemovalAction === null,
+    ({ data: { action } }) => {
+      if (action.type !== 'GO_BACK' && action.type !== 'POP') {
+        setDeferredRemovalAction(action);
+        return;
+      }
+      startMentorReturn();
+    },
+  );
+  useEffect(() => {
+    if (!deferredRemovalAction) return;
+    navigation.dispatch(deferredRemovalAction);
+    setDeferredRemovalAction(null);
+  }, [deferredRemovalAction, navigation]);
+  useEffect(() => {
+    if (!pendingMentorReturn) return;
+
+    // An epoch read can fail to settle (for example, a storage failure during
+    // cold start). We must not call that an exact refreshed projection, but a
+    // back action also must not strand the learner in the session forever.
+    if (!nowFeedEpochHydrated) {
+      const timer = setTimeout(() => {
+        setPendingMentorReturn(false);
+        setMentorReturnReady(true);
+      }, MENTOR_RETURN_EPOCH_WAIT_MS);
+      return () => clearTimeout(timer);
+    }
+    // An absent actor/profile cannot identify a scoped Mentor projection.
+    // Leave without invalidating rather than claiming evidence or stranding
+    // the learner behind a binding that may never appear on this screen.
+    if (!userId || !activeProfile?.id) {
+      setPendingMentorReturn(false);
+      setMentorReturnReady(true);
+      return;
+    }
+    if (!canRefreshMentorFeed) return;
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      if (cancelled) return;
+      setPendingMentorReturn(false);
+      setMentorReturnReady(true);
+    }, MENTOR_RETURN_REFRESH_WAIT_MS);
+    async function returnAfterMentorRefresh(): Promise<void> {
+      try {
+        await refreshMentorFeedBeforeReturn();
+      } catch {
+        // A failed exact refresh is not evidence of freshness, but Back still exits.
+      }
+      if (cancelled) return;
+      clearTimeout(timer);
+      setPendingMentorReturn(false);
+      setMentorReturnReady(true);
+    }
+    void returnAfterMentorRefresh();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [
+    activeProfile?.id,
+    canRefreshMentorFeed,
+    nowFeedEpochHydrated,
+    pendingMentorReturn,
+    refreshMentorFeedBeforeReturn,
+    userId,
+  ]);
+  useEffect(() => {
+    if (!mentorReturnReady) return;
+    router.replace(homeBackHref as Href);
+    setMentorReturnReady(false);
+  }, [homeBackHref, mentorReturnReady, router]);
   const handleChatBackPress = useCallback(() => {
     if (returnTo) {
+      if (returnTo === MENTOR_RETURN_TO) {
+        startMentorReturn();
+        return;
+      }
       router.replace(homeBackHref as Href);
       return;
     }
@@ -365,16 +537,28 @@ function SessionScreenInner() {
       } as Href);
       return;
     }
-    router.replace('/(app)/home' as Href);
-  }, [returnTo, subjectId, homeBackHref, router]);
+    // WI-2331 AC-3: `/(app)/home` is dead in V2 (not one of the three tabs)
+    // — this last-resort branch (no returnTo, no subjectId) routes through
+    // the same owning-tab contract AC-1's tab highlight uses instead of the
+    // retired Home tab.
+    router.replace(
+      (FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+        ? '/(app)/mentor'
+        : '/(app)/home') as Href,
+    );
+  }, [returnTo, subjectId, homeBackHref, router, startMentorReturn]);
   const handleHomeBack = useCallback(() => {
     if (returnTo) {
+      if (returnTo === MENTOR_RETURN_TO) {
+        startMentorReturn();
+        return;
+      }
       router.replace(homeBackHref as Href);
       return;
     }
 
     goBackOrReplace(router, homeBackHref);
-  }, [homeBackHref, returnTo, router]);
+  }, [homeBackHref, returnTo, router, startMentorReturn]);
   const handleStartNewSession = useCallback(() => {
     router.replace({
       pathname: '/(app)/session',
@@ -443,6 +627,12 @@ function SessionScreenInner() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(
     routeSessionId ?? null,
   );
+  const [e2eAllocatedSessionIds, setE2EAllocatedSessionIds] = useState<
+    string[]
+  >([]);
+  const handleE2ESessionCreated = useCallback((createdSessionId: string) => {
+    setE2EAllocatedSessionIds((current) => [...current, createdSessionId]);
+  }, []);
   const [showMentorBirthMoment, setShowMentorBirthMoment] = useState(false);
   const [pendingClassification, setPendingClassification] = useState(false);
   const [classifyError, setClassifyError] = useState<string | null>(null);
@@ -486,10 +676,11 @@ function SessionScreenInner() {
   const [homeworkMode, setHomeworkMode] = useState<
     'help_me' | 'check_answer' | undefined
   >(undefined);
-  // T23: V2 mentor-homework round-trip. The captured photo lands back in the
-  // session thread as the learner's image bubble with two deterministic
-  // first-response actions (help me solve / check my answer). Once the learner
-  // picks one, the deterministic block is consumed and the tutoring turn begins.
+  // T23: V2 mentor-homework round-trip. The captured photo or manually entered
+  // problem lands back in the session thread as the learner's own bubble with
+  // two deterministic first-response actions (help me solve / check my answer).
+  // Once the learner picks one, the deterministic block is consumed and the
+  // tutoring turn begins.
   const isMentorHomeworkFrame = mentorHomeworkWrapUpFrame === 'mentor-homework';
   const [mentorHomeworkChoice, setMentorHomeworkChoice] = useState<
     'help_me' | 'check_answer' | null
@@ -556,9 +747,15 @@ function SessionScreenInner() {
   } | null>(null);
   const animationCleanupRef = useRef<(() => void) | null>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sessionEndedRef = useRef(false);
   const lastAiAtRef = useRef<number | null>(null);
   const lastExpectedMinutesRef = useRef(10);
   const hasAutoSentRef = useRef(false);
+  const mentorOpenerLaunchKeyRef = useRef<string | null>(null);
+  const firstSessionReflectionInFlightRef = useRef(false);
+  const firstSessionReflectionAbortRef = useRef<AbortController | null>(null);
+  const firstSessionReflectionMountedRef = useRef(true);
+  const internallyBackfilledSessionIdRef = useRef<string | null>(null);
   const hasHydratedRecoveryRef = useRef(false);
   const queuedProblemTextRef = useRef<string | null>(null);
   const localMessageIdRef = useRef(0);
@@ -573,11 +770,39 @@ function SessionScreenInner() {
 
   const transcript = useSessionTranscript(routeSessionId ?? '');
   const activeSession = useSession(activeSessionId ?? '');
+  const cancelSilencePrompt = useCallback(() => {
+    if (!silenceTimerRef.current) return;
+    clearTimeout(silenceTimerRef.current);
+    silenceTimerRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    sessionEndedRef.current = Boolean(activeSession.data?.endedAt);
+    if (sessionEndedRef.current) {
+      cancelSilencePrompt();
+    }
+  }, [activeSession.data?.endedAt, activeSessionId, cancelSilencePrompt]);
   const clearContinuationDepth = useClearContinuationDepth(
     activeSessionId ?? '',
   );
   const liveTranscript =
     transcript.data?.archived === false ? transcript.data : null;
+  const isV2MentorEntry =
+    FEATURE_FLAGS.MODE_NAV_V2_ENABLED && entrySource === 'mentor';
+  const mentorOpenerText =
+    isV2MentorEntry && effectiveMode === 'freeform' && rawInput?.trim().length
+      ? rawInput
+      : undefined;
+  const mentorOpenerAlreadyPersisted = !!(
+    mentorOpenerText &&
+    liveTranscript?.exchanges.some(
+      (exchange, index, exchanges) =>
+        exchange.role === 'user' &&
+        exchange.content === mentorOpenerText &&
+        exchanges[index + 1]?.role === 'assistant' &&
+        !exchanges[index + 1]?.isSystemPrompt,
+    )
+  );
 
   // Auto-resume the latest active/paused session when the user re-enters a
   // learning topic (e.g. tapping "Continue learning" on the topic screen,
@@ -610,6 +835,21 @@ function SessionScreenInner() {
     hasResolvedActiveSessionRef.current = true;
     router.setParams({ sessionId: resumedSessionId });
   }, [activeSessionLookup.data?.sessionId, shouldLookupActiveSession, router]);
+
+  // New sessions allocate their ID inside the streaming hook. Put that ID
+  // back into the route immediately so transcript hydration and restoration
+  // use the same canonical session after remount/retry.
+  useEffect(() => {
+    if (
+      !mentorOpenerText ||
+      !activeSessionId ||
+      routeSessionId === activeSessionId
+    ) {
+      return;
+    }
+    internallyBackfilledSessionIdRef.current = activeSessionId;
+    router.setParams({ sessionId: activeSessionId });
+  }, [activeSessionId, mentorOpenerText, routeSessionId, router]);
 
   useEffect(() => {
     const profileId = activeProfile?.id;
@@ -684,6 +924,14 @@ function SessionScreenInner() {
   // Reset state when screen regains focus (prevents stale state loop)
   useFocusEffect(
     useCallback(() => {
+      const isInternalSessionIdBackfill =
+        !!routeSessionId &&
+        internallyBackfilledSessionIdRef.current === routeSessionId;
+      internallyBackfilledSessionIdRef.current = null;
+      if (isInternalSessionIdBackfill) {
+        return;
+      }
+
       animationCleanupRef.current?.();
       // When resuming a session (routeSessionId set), leave messages,
       // exchangeCount, and escalationRung alone — the transcript hydration
@@ -831,6 +1079,15 @@ function SessionScreenInner() {
     classifyApiError(transcript.error).category === 'not-found';
 
   useEffect(() => {
+    firstSessionReflectionMountedRef.current = true;
+    return () => {
+      firstSessionReflectionMountedRef.current = false;
+      firstSessionReflectionAbortRef.current?.abort();
+      firstSessionReflectionAbortRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
     const round = activeSession.data?.metadata?.challengeRound;
     if (round) {
       setChallengeRound(round);
@@ -887,6 +1144,7 @@ function SessionScreenInner() {
     liveTranscriptMilestones: liveTranscript?.session.milestonesReached,
     hydrate,
     hasHydratedRecoveryRef,
+    cancelSilencePrompt,
   });
 
   const {
@@ -904,6 +1162,8 @@ function SessionScreenInner() {
     topicName: topicName ?? undefined,
     inputMode,
     rawInput: rawInput ?? undefined,
+    hasInitialMentorOpener: !!mentorOpenerText,
+    mentorOpenerAlreadyPersisted,
     resumeFromSessionId: resumeFromSessionId ?? undefined,
     gaps,
     verificationType: routeVerificationType ?? undefined,
@@ -938,6 +1198,7 @@ function SessionScreenInner() {
     notePromptOffered,
     animationCleanupRef,
     silenceTimerRef,
+    sessionEndedRef,
     lastAiAtRef,
     lastExpectedMinutesRef,
     lastRetryPayloadRef,
@@ -953,6 +1214,7 @@ function SessionScreenInner() {
     trigger,
     createLocalMessageId,
     responseHistory,
+    onSessionCreated: isE2EBuild ? handleE2ESessionCreated : undefined,
   });
 
   // BUG-373: Exclude auto-sent messages (homework OCR, queued multi-problem)
@@ -970,7 +1232,7 @@ function SessionScreenInner() {
     exchangeCount,
   });
 
-  const hasSubject = !!(classifiedSubject?.subjectId || subjectId);
+  const hasSubject = !!(classifiedSubject?.subjectId || effectiveSubjectId);
   const conversationStage = getConversationStage(
     learnerTurnCount,
     hasSubject,
@@ -981,9 +1243,6 @@ function SessionScreenInner() {
   // scoped to the mentor entry (both freeform questions and homework/camera
   // launched from the mentor bar). Drives non-blocking, no-grid subject
   // resolution in useSubjectClassification and relaxes the composer gate below.
-  const isV2MentorEntry =
-    FEATURE_FLAGS.MODE_NAV_V2_ENABLED && entrySource === 'mentor';
-
   const {
     handleResolveSubject,
     handleCreateResolveSuggestion,
@@ -1005,7 +1264,7 @@ function SessionScreenInner() {
     messages,
     setMessages,
     setResumedBanner,
-    subjectId: subjectId ?? undefined,
+    subjectId: effectiveSubjectId || undefined,
     effectiveMode,
     isV2MentorEntry,
     availableSubjects,
@@ -1021,6 +1280,77 @@ function SessionScreenInner() {
     animationCleanupRef,
     setIsStreaming,
   });
+
+  useEffect(() => {
+    const profileId = activeProfile?.id;
+    if (!profileId || !mentorOpenerText || sessionExpired) return;
+    if (mentorOpenerAlreadyPersisted) {
+      mentorOpenerLaunchKeyRef.current = `${profileId}:${mentorOpenerText}`;
+      return;
+    }
+    if (routeSessionId && transcript.isFetching && !transcript.data) return;
+    if (
+      isStreaming ||
+      pendingClassification ||
+      pendingSubjectResolution ||
+      quotaError
+    ) {
+      return;
+    }
+
+    const launchKey = `${profileId}:${mentorOpenerText}`;
+    if (mentorOpenerLaunchKeyRef.current === launchKey) return;
+    mentorOpenerLaunchKeyRef.current = launchKey;
+
+    void (async () => {
+      const sessionId = routeSessionId ?? activeSessionId;
+      if (sessionId) {
+        const existingEntry = await getOutboxEntry(
+          profileId,
+          'session',
+          mentorOpenerIdempotencyKey(sessionId),
+        );
+        await handleSend(mentorOpenerText, {
+          isAutoSent: true,
+          initialMentorOpener: true,
+          ...(effectiveSubjectId
+            ? { sessionSubjectId: effectiveSubjectId }
+            : {}),
+          ...(effectiveSubjectName
+            ? { sessionSubjectName: effectiveSubjectName }
+            : {}),
+          ...(existingEntry ? { existingEntry } : {}),
+        });
+        return;
+      }
+
+      await handleSend(mentorOpenerText, {
+        isAutoSent: true,
+        initialMentorOpener: true,
+      });
+    })().catch((error) => {
+      mentorOpenerLaunchKeyRef.current = null;
+      Sentry.captureException(error, {
+        tags: { screen: 'session', action: 'persist_mentor_opener' },
+      });
+    });
+  }, [
+    activeProfile?.id,
+    activeSessionId,
+    effectiveSubjectId,
+    effectiveSubjectName,
+    handleSend,
+    isStreaming,
+    mentorOpenerAlreadyPersisted,
+    mentorOpenerText,
+    pendingClassification,
+    pendingSubjectResolution,
+    quotaError,
+    routeSessionId,
+    sessionExpired,
+    transcript.data,
+    transcript.isFetching,
+  ]);
 
   useEffect(() => {
     if (!queuedProblemTextRef.current) {
@@ -1042,7 +1372,7 @@ function SessionScreenInner() {
     // T23: For the V2 mentor-homework frame the deterministic help/check
     // buttons are the first actionable response — defer the OCR auto-send
     // until the learner picks one (mentorHomeworkChoice set). This keeps the
-    // image bubble + buttons as the genuine first turn with no LLM/subject
+    // learner problem bubble + buttons as the genuine first turn with no LLM/subject
     // preamble. For every other entry the auto-send fires as before.
     if (isMentorHomeworkFrame && !mentorHomeworkChoice) {
       return undefined;
@@ -1184,10 +1514,24 @@ function SessionScreenInner() {
     if (!firstSessionWrapUp || firstSessionReflectionTotalXp != null) return;
     const content = firstSessionReflectionText.trim();
     if (content.length < 10) return;
+    if (firstSessionReflectionInFlightRef.current) return;
+
+    firstSessionReflectionInFlightRef.current = true;
+    const controller = new AbortController();
+    firstSessionReflectionAbortRef.current = controller;
 
     try {
       setFirstSessionReflectionError(false);
-      const result = await submitFirstSessionSummary.mutateAsync({ content });
+      const result = await submitFirstSessionSummary.mutateAsync({
+        content,
+        signal: controller.signal,
+      });
+      if (
+        !firstSessionReflectionMountedRef.current ||
+        controller.signal.aborted
+      ) {
+        return;
+      }
       setMessages((prev) => [
         ...prev,
         {
@@ -1198,12 +1542,23 @@ function SessionScreenInner() {
       ]);
       const totalXp =
         (result.summary.baseXp ?? 0) + (result.summary.reflectionBonusXp ?? 0);
-      setFirstSessionReflectionTotalXp(totalXp > 0 ? totalXp : null);
+      setFirstSessionReflectionTotalXp(totalXp);
     } catch (err) {
+      if (
+        !firstSessionReflectionMountedRef.current ||
+        controller.signal.aborted
+      ) {
+        return;
+      }
       setFirstSessionReflectionError(true);
       Sentry.captureException(err, {
         tags: { screen: 'session', action: 'first_session_reflection' },
       });
+    } finally {
+      if (firstSessionReflectionAbortRef.current === controller) {
+        firstSessionReflectionAbortRef.current = null;
+      }
+      firstSessionReflectionInFlightRef.current = false;
     }
   }, [
     firstSessionReflectionText,
@@ -1237,6 +1592,7 @@ function SessionScreenInner() {
     setShowWrongSubjectChip,
     setShowTopicSwitcher,
     setShowParkingLot,
+    setMessages,
     filing,
     setConsumedQuickChipMessageId,
     setMessageFeedback,
@@ -1250,6 +1606,8 @@ function SessionScreenInner() {
     parkingLotDraft,
     setParkingLotDraft,
     closedSessionRef,
+    silenceTimerRef,
+    sessionEndedRef,
     queuedProblemTextRef,
     activeProfileId: activeProfile?.id,
     closeSession,
@@ -1494,6 +1852,22 @@ function SessionScreenInner() {
       onDismiss={() => setLanguageLearning(null)}
     />
   ) : null;
+  // WI-1777: `key` on the target sentence forces a remount (fresh transcript
+  // + feedback state) whenever the server rotates to a new target — retry
+  // (same target) never remounts, only a genuinely new turn does.
+  const speakingPracticeSessionId = activeSessionId ?? routeSessionId;
+  const speakingPracticeCard =
+    languageLearning?.speakingPractice &&
+    speakingPracticeSessionId &&
+    subjectId ? (
+      <SpeakingPracticeActivity
+        key={languageLearning.speakingPractice.targetText}
+        activity={languageLearning}
+        sessionId={speakingPracticeSessionId}
+        subjectId={subjectId}
+        textToSpeechLanguage={languageVoiceLocale}
+      />
+    ) : null;
   const firstSessionWrapUpCard = firstSessionWrapUp ? (
     <FirstSessionWrapUpCard
       value={firstSessionReflectionText}
@@ -1514,12 +1888,13 @@ function SessionScreenInner() {
 
   // T23: Render the deterministic homework first-response only for the V2
   // mentor-homework frame and only until the learner picks help/check. It is
-  // the FIRST actionable response in-thread — image bubble + two buttons, with
-  // no subject-picking preamble.
+  // the FIRST actionable response in-thread — learner problem bubble + two
+  // buttons, with no subject-picking preamble.
   const mentorHomeworkFirstResponse =
     isMentorHomeworkFrame && !mentorHomeworkChoice ? (
       <MentorHomeworkFirstResponse
         imageUri={imageUri}
+        problemText={initialProblemText}
         disabled={isStreaming || isClosing || !!quotaError}
         onHelpMeSolve={handleMentorHomeworkHelpMeSolve}
         onCheckMyAnswer={handleMentorHomeworkCheckMyAnswer}
@@ -1577,6 +1952,19 @@ function SessionScreenInner() {
         handleReconnect,
       },
     });
+
+  const exactManualHomeworkSessionAssociated =
+    isExactManualHomeworkSessionAssociated({
+      isE2EBuild,
+      isMentorHomeworkFrame,
+      allocatedSessionIds: e2eAllocatedSessionIds,
+      activeSessionId,
+      activeSession: activeSession.data,
+      effectiveSubjectId,
+      initialProblemText,
+    });
+  const multipleHomeworkSessionsCreated =
+    isE2EBuild && isMentorHomeworkFrame && e2eAllocatedSessionIds.length > 1;
 
   return (
     <View className="flex-1" testID="session-screen">
@@ -1637,6 +2025,27 @@ function SessionScreenInner() {
         rightAction={headerRight}
         inputAccessory={
           <>
+            {exactManualHomeworkSessionAssociated ? (
+              <View
+                testID="homework-session-associated-once"
+                style={{ width: 1, height: 1 }}
+              />
+            ) : null}
+            {multipleHomeworkSessionsCreated ? (
+              <View
+                testID="homework-session-created-more-than-once"
+                style={{ width: 1, height: 1 }}
+              />
+            ) : null}
+            <HomeworkFirstResponseCompleteMarker
+              active={
+                isE2EBuild && isMentorHomeworkFrame && !!mentorHomeworkChoice
+              }
+              problemText={initialProblemText}
+              messages={messages}
+              isStreaming={isStreaming}
+              hasFailure={sessionExpired || !!quotaError}
+            />
             {challengeBanner}
             {drillStrip}
             {mentorHomeworkFirstResponse}
@@ -1653,6 +2062,7 @@ function SessionScreenInner() {
           <>
             {gradedInputCard}
             {meaningOutputCard}
+            {speakingPracticeCard}
             {challengeOfferCard}
             {draftedNoteReview}
             <BookmarkNudgeTooltip

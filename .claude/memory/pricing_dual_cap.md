@@ -4,7 +4,9 @@ description: Free tier: 10/day + 100/month. Plus tier: 700/month, no daily limit
 type: project
 ---
 
-Free tier uses a **dual-cap model: 10 questions/day AND 100 questions/month** (changed from 50/month on 2026-03-25).
+Free tier uses a **dual-cap model: 10 communicated questions/day AND 100 questions/month** (changed from 50/month on 2026-03-25).
+
+**Cap-hit product ruling (2026-07-15, OPQ-117; not yet implementation canon):** warn quietly after question 8 so the learner can wrap up; continue communicating 10 free questions/day; permit an unadvertised 11th goodwill question before pausing new mentor exchanges. Ship only this graceful cap floor in MVP. The parent value-handoff card and conversion funnel are Post-MVP. Future bounded grace for returning learners in unusually heavy active sessions is a direction to design separately, not a promised entitlement; eligibility, maximum grace, cost/abuse controls, and analytics remain unresolved.
 
 **Plus tier: 700 questions/month, no daily limit, one serious-study profile.** Quota confirmed 2026-04-09 when integration test expected 500 but account had 700. User explicitly stated "699 for plus program" (meaning X-Quota-Remaining shows 699 after 1 message consumed from 700). Premium profile clarified 2026-05-18: Plus is for one person who wants serious studying.
 
@@ -18,7 +20,7 @@ Model/provider routing is not canonical in this memory. The old Gemini-only / GP
 - Daily limit users (~day 10) become the best conversion candidates
 
 **Tier config:**
-- Free tier: `monthlyQuota: 100, dailyLimit: 10`
+- Current implementation: `monthlyQuota: 100, dailyLimit: 10`; OPQ-117 requires the cap mechanism to preserve the advertised 10 while permitting one unadvertised goodwill question.
 - Plus: `monthlyQuota: 700, dailyLimit: null, llmTier: 'standard'`
 - Family: `monthlyQuota: 1500, dailyLimit: null, llmTier: 'standard'`
 - Pro: `monthlyQuota: 3000, dailyLimit: null, llmTier: 'standard'`

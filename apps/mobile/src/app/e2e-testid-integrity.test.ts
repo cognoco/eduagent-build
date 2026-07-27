@@ -10,13 +10,20 @@
 // ---------------------------------------------------------------------------
 
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
+
+import { extractValueProducingTestIds } from '../../scripts/test-id-expression';
 
 const E2E_FLOWS_DIR = path.resolve(__dirname, '../../e2e/flows');
 const SOURCE_DIR = path.resolve(__dirname, '..');
 
 // Platform / third-party IDs that are not React Native testIDs
 const EXTERNAL_ID_PREFIXES = ['android:id/', 'com.android.', 'com.google.'];
+const EXTERNAL_ID_SELECTORS = new Set([
+  // Android Photo Picker: AOSP and Google API package variants.
+  'com(?:\\.google)?\\.android\\.providers\\.media\\.module:id/icon_thumbnail',
+]);
 
 // Pre-existing testID drift from earlier refactors. Each entry is a Maestro id
 // selector that no longer has a matching testID in source. These E2E flows are
@@ -138,10 +145,12 @@ function extractMaestroIds(yamlFiles: string[]): Map<string, string[]> {
 function extractSourceTestIds(tsxFiles: string[]): {
   staticIds: Set<string>;
   dynamicPrefixes: string[];
+  dynamicWitnesses: string[];
   derivedSuffixes: string[];
 } {
   const staticIds = new Set<string>();
   const dynamicPrefixes: string[] = [];
+  const dynamicWitnesses: string[] = [];
   const derivedSuffixes: string[] = [];
 
   // Static: testID="value", testID='value', testID: 'value', testID: "value"
@@ -155,16 +164,11 @@ function extractSourceTestIds(tsxFiles: string[]): {
     /tabBarButtonTestID:\s*"([^"]+)"/g,
   ];
 
-  // Dynamic template: testID={`prefix-${...}`} — extract the prefix before ${
-  const dynamicPattern = /testID=\{`([^$`]+)\$\{/g;
+  // Dynamic template: retain both its static prefix and a representative full ID.
+  const dynamicTemplatePattern = /testID=\{\s*`(([^$`]+)\$\{[^`]+)`\s*\}/g;
   // Derived suffix: testID={testID ? `${testID}-primary` : undefined}
   const derivedSuffixPattern =
     /testID=\{[^`]*`\$\{[^}]+\}([^`$]+)`\s*:\s*undefined\s*\}/g;
-
-  // String literals inside JSX expression bodies. Skips template literals
-  // (handled separately by dynamicPattern).
-  const stringLiteralPattern =
-    /'([^'\\]*(?:\\.[^'\\]*)*)'|"([^"\\]*(?:\\.[^"\\]*)*)"/g;
 
   for (const file of tsxFiles) {
     const source = fs.readFileSync(file, 'utf-8');
@@ -177,10 +181,12 @@ function extractSourceTestIds(tsxFiles: string[]): {
       }
     }
 
-    dynamicPattern.lastIndex = 0;
+    dynamicTemplatePattern.lastIndex = 0;
     let match;
-    while ((match = dynamicPattern.exec(source)) !== null) {
-      dynamicPrefixes.push(match[1]!);
+    while ((match = dynamicTemplatePattern.exec(source)) !== null) {
+      const template = match[1]!;
+      dynamicPrefixes.push(match[2]!);
+      dynamicWitnesses.push(template.replace(/\$\{[^}]+\}/g, 'DYNAMIC'));
     }
 
     derivedSuffixPattern.lastIndex = 0;
@@ -220,25 +226,126 @@ function extractSourceTestIds(tsxFiles: string[]): {
       }
       if (depth === 0) {
         const body = source.slice(start, i);
-        stringLiteralPattern.lastIndex = 0;
-        let litMatch;
-        while ((litMatch = stringLiteralPattern.exec(body)) !== null) {
-          staticIds.add(litMatch[1] ?? litMatch[2]!);
-        }
+        const extracted = extractValueProducingTestIds(body);
+        for (const id of extracted.staticIds) staticIds.add(id);
+        dynamicPrefixes.push(...extracted.dynamicPrefixes);
+        dynamicWitnesses.push(...extracted.dynamicWitnesses);
       }
     }
   }
 
-  return { staticIds, dynamicPrefixes, derivedSuffixes };
+  return { staticIds, dynamicPrefixes, dynamicWitnesses, derivedSuffixes };
 }
 
 function isExternalId(id: string): boolean {
-  return EXTERNAL_ID_PREFIXES.some((prefix) => id.startsWith(prefix));
+  return (
+    EXTERNAL_ID_SELECTORS.has(id) ||
+    EXTERNAL_ID_PREFIXES.some((prefix) => id.startsWith(prefix))
+  );
 }
 
 /** IDs containing Maestro env vars (e.g. ${SUBJECT_ID}) — dynamic at runtime. */
 function isMaestroEnvVar(id: string): boolean {
   return id.includes('${');
+}
+
+function stripWholeOuterGroup(body: string): string {
+  const prefix = body.startsWith('(?:')
+    ? '(?:'
+    : body.startsWith('(')
+      ? '('
+      : null;
+  if (!prefix) return body;
+
+  let depth = 0;
+  let escaped = false;
+  let inClass = false;
+
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i]!;
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (ch === '[') inClass = true;
+    else if (ch === ']') inClass = false;
+    else if (!inClass && ch === '(') depth++;
+    else if (!inClass && ch === ')') {
+      depth--;
+      if (depth === 0) {
+        return i === body.length - 1 ? body.slice(prefix.length, -1) : body;
+      }
+    }
+  }
+
+  return body;
+}
+
+function splitTopLevelAlternatives(body: string): string[] | null {
+  const alternatives: string[] = [];
+  let start = 0;
+  let depth = 0;
+  let escaped = false;
+  let inClass = false;
+  let nestedAlternative = false;
+
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i]!;
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (ch === '[') inClass = true;
+    else if (ch === ']') inClass = false;
+    else if (!inClass && ch === '(') depth++;
+    else if (!inClass && ch === ')') depth--;
+    else if (!inClass && ch === '|') {
+      if (depth > 0) nestedAlternative = true;
+      else {
+        alternatives.push(body.slice(start, i));
+        start = i + 1;
+      }
+    }
+
+    if (depth < 0) return null;
+  }
+
+  alternatives.push(body.slice(start));
+  if (
+    escaped ||
+    inClass ||
+    depth !== 0 ||
+    nestedAlternative ||
+    alternatives.some((part) => part.length === 0)
+  ) {
+    return null;
+  }
+
+  return alternatives;
+}
+
+function anchoredRegexBranches(selector: string): RegExp[] | null {
+  if (!selector.startsWith('^') || !selector.endsWith('$')) return null;
+
+  const body = stripWholeOuterGroup(selector.slice(1, -1));
+  const alternatives = splitTopLevelAlternatives(body);
+  if (!alternatives) return null;
+
+  try {
+    return alternatives.map(
+      (alternative) => new RegExp(`^(?:${alternative})$`),
+    );
+  } catch {
+    return null;
+  }
 }
 
 describe('E2E testID integrity', () => {
@@ -249,15 +356,39 @@ describe('E2E testID integrity', () => {
   const sourceFiles = [
     ...collectFiles(SOURCE_DIR, '.tsx'),
     ...collectFiles(SOURCE_DIR, '.ts'),
-  ];
+  ].filter((file) => !/\.(?:test|spec)\.[^.]+$/.test(file));
   const maestroIds = extractMaestroIds(yamlFiles);
-  const { staticIds, dynamicPrefixes, derivedSuffixes } =
+  const { staticIds, dynamicPrefixes, dynamicWitnesses, derivedSuffixes } =
     extractSourceTestIds(sourceFiles);
 
   function hasMatchingDerivedSuffix(id: string): boolean {
     return derivedSuffixes.some(
       (suffix) =>
         id.endsWith(suffix) && staticIds.has(id.slice(0, -suffix.length)),
+    );
+  }
+
+  const regexCandidates = new Set([...staticIds, ...dynamicWitnesses]);
+  for (const suffix of derivedSuffixes) {
+    for (const id of staticIds) regexCandidates.add(`${id}${suffix}`);
+  }
+
+  function matchesSourceTestId(selector: string): boolean {
+    if (selector.startsWith('^') && selector.endsWith('$')) {
+      const branches = anchoredRegexBranches(selector);
+      return (
+        branches !== null &&
+        branches.length > 0 &&
+        branches.every((branch) =>
+          [...regexCandidates].some((candidate) => branch.test(candidate)),
+        )
+      );
+    }
+
+    return (
+      staticIds.has(selector) ||
+      dynamicPrefixes.some((prefix) => selector.startsWith(prefix)) ||
+      hasMatchingDerivedSuffix(selector)
     );
   }
 
@@ -269,6 +400,38 @@ describe('E2E testID integrity', () => {
     expect(staticIds.size).toBeGreaterThan(0);
   });
 
+  it('collects only value-producing testID branches, not predicate or helper-call decoys', () => {
+    const fixtureDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'e2e-testid-integrity-'),
+    );
+    const fixturePath = path.join(fixtureDir, 'fixture.tsx');
+    fs.writeFileSync(
+      fixturePath,
+      [
+        'export const fixture = (',
+        '  <View',
+        '    testID={',
+        `      shouldRender('predicate-decoy', \`predicate-\${id}\`)`,
+        `        ? \`actual-\${id}\``,
+        `        : formatTestId('helper-decoy', \`helper-\${id}\`)`,
+        '    }',
+        '  />',
+        ');',
+      ].join('\n'),
+    );
+
+    try {
+      expect(extractSourceTestIds([fixturePath])).toEqual({
+        staticIds: new Set(),
+        dynamicPrefixes: ['actual-'],
+        dynamicWitnesses: ['actual-DYNAMIC'],
+        derivedSuffixes: [],
+      });
+    } finally {
+      fs.rmSync(fixtureDir, { recursive: true, force: true });
+    }
+  });
+
   // Build the list of Maestro IDs that are NOT in source (excluding known drift)
   const missingIds: Array<{ id: string; files: string[] }> = [];
 
@@ -276,11 +439,41 @@ describe('E2E testID integrity', () => {
     if (isExternalId(id)) continue;
     if (isMaestroEnvVar(id)) continue;
     if (KNOWN_DRIFT.has(id)) continue;
-    if (staticIds.has(id)) continue;
-    if (dynamicPrefixes.some((prefix) => id.startsWith(prefix))) continue;
-    if (hasMatchingDerivedSuffix(id)) continue;
+    if (matchesSourceTestId(id)) continue;
     missingIds.push({ id, files });
   }
+
+  it('validates every anchored regex branch against source testIDs', () => {
+    const alternatives = [
+      'ready-screen',
+      'subject-confident-card',
+      'subject-single-suggestion-card',
+      'subject-no-match-card',
+      'subject-suggestion-card',
+    ];
+    const stable = `^(${alternatives.join('|')})$`;
+
+    expect(matchesSourceTestId(stable)).toBe(true);
+    expect(matchesSourceTestId('^subjects-browse-row-.*$')).toBe(true);
+
+    for (const alternative of alternatives) {
+      expect(
+        matchesSourceTestId(
+          stable.replace(alternative, `${alternative}-missing`),
+        ),
+      ).toBe(false);
+    }
+
+    expect(matchesSourceTestId('^subjects-detail-row-.*$')).toBe(false);
+    expect(matchesSourceTestId('^subjects-browse-row-$')).toBe(false);
+    expect(matchesSourceTestId('^mock-redirect-.*$')).toBe(false);
+    expect(matchesSourceTestId('^subject-(confident|missing)-card$')).toBe(
+      false,
+    );
+    expect(matchesSourceTestId('^([$')).toBe(false);
+    expect(matchesSourceTestId('ready-screen')).toBe(true);
+    expect(matchesSourceTestId('ready')).toBe(false);
+  });
 
   it('every Maestro id: selector must match a testID in source', () => {
     if (missingIds.length > 0) {

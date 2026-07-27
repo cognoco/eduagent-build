@@ -1,42 +1,66 @@
-# Compliance Artifacts — Launch (13+)
+# MentoMate compliance workspace
 
-**Status:** DRAFTS for DPO / privacy-counsel sign-off. **Not legal advice.**
-**Scope:** EU/EEA (company seat: Norway) + UK + USA. AI tutoring app, sold to consumers, used by minors 13+.
-**Launch decision (2026-06-08):** launch at **13+**; build for **10+ but outside COPPA** (block US-resident under-13; serve any future non-US 10–12 cohort under the lighter GDPR parental-authorization route, never COPPA-grade VPC).
-**Master checklist:** [`docs/meetings/minors-compliance-requirements.md`](../meetings/minors-compliance-requirements.md) — LIST A (live) / LIST B (dormant at 13+).
-**Verified data map:** [`docs/audit/2026-06-07-data-retention-and-erasure-audit.md`](../audit/2026-06-07-data-retention-and-erasure-audit.md).
+**Status:** Working controller records for the EEA consumer launch. Draft legal
+positions require independent DPO/privacy advice before final approval.
 
-> **How to read these.** They are written so a non-lawyer can see what each one says and why. Every legal claim carries a `Law:` tag so your DPO/lawyer can verify fast. The DPIA (A1) and the Art 9 decision (A23) are the two that a qualified privacy professional must sign before launch — budget a few hours of their time to review the drafts here, not to write them from scratch.
+**Launch scope:** Direct-to-consumer, credentialled users aged 13+. Perimeter =
+screen-based allowlist (ruled 2026-07-26): EEA countries whose launch-day
+verified GDPR Article 8 threshold is 13 (Route 1, per the 07-23 register), plus
+non-EEA jurisdictions individually cleared by a documented admission screen
+(Route 2 — US is the first pass, conditional). UK, Poland/higher-threshold EEA,
+Switzerland, and all unscreened jurisdictions remain unavailable at launch. See
+[`2026-07-26-launch-perimeter-ruling-screen-based-allowlist.md`](2026-07-26-launch-perimeter-ruling-screen-based-allowlist.md).
 
-## What's here
+## Start here
 
-| File | Checklist item | What it is | Sign-off owner | Blocks launch? |
-|---|---|---|---|---|
-| [`dpia.md`](dpia.md) | A1 | Data Protection Impact Assessment — the master risk assessment. | DPO + counsel | **Yes** |
-| [`ropa.md`](ropa.md) | A3 | Record of Processing Activities (GDPR Art 30 register). | DPO | Yes |
-| [`breach-response-plan.md`](breach-response-plan.md) | A4 | 72-hour data-breach procedure (Datatilsynet). | DPO | Yes |
-| [`art9-special-category-decision.md`](art9-special-category-decision.md) | A23 | Decision: we do **not** process health/disability (Art 9) data. | DPO + counsel | Yes (gates DPIA weight) |
+| Record | Purpose |
+|---|---|
+| [`dpia.md`](dpia.md) | Master Data Protection Impact Assessment. |
+| [`edpb_dpia_filled_2026_v1.md`](edpb_dpia_filled_2026_v1.md) | EDPB-format technical DPIA companion. |
+| [`ropa.md`](ropa.md) | GDPR Article 30 Record of Processing Activities. |
+| [`2026-07-26-launch-perimeter-ruling-screen-based-allowlist.md`](2026-07-26-launch-perimeter-ruling-screen-based-allowlist.md) | **Active launch-perimeter ruling** — screen-based allowlist (EEA-13 + screened non-EEA). |
+| [`2026-07-26-us-launch-screen-record.md`](2026-07-26-us-launch-screen-record.md) | First Route-2 admission screen: United States (conditional pass). |
+| [`2026-07-23-13-plus-eea-launch-country-ruling.md`](2026-07-23-13-plus-eea-launch-country-ruling.md) | EEA country register + Article 8 analysis (incorporated as Route 1 of the 07-26 ruling). |
+| [`art9-special-category-position.md`](art9-special-category-position.md) | Current proposed treatment of incidental special-category data. |
+| [`breach-response-plan.md`](breach-response-plan.md) | Personal-data breach procedure. |
+| [`DPO exchanges/`](DPO%20exchanges/) | Stephan’s findings, ZWIZZLY AS’s response, decision annex, and separate AI Act request. |
+| [`assessments/providers/2026-07-25-processor-transfer-evidence-ledger.md`](assessments/providers/2026-07-25-processor-transfer-evidence-ledger.md) | Current-main processor and international-transfer evidence ledger for counsel/DPO handoff. |
 
-## Not yet drafted here (tracked, owners elsewhere)
+## Supporting records
 
-| Item | What | Owner | Where it lives |
-|---|---|---|---|
-| A2 | Appoint outsourced DPO | You (procure) | retainer + privacy policy contact |
-| A5 | Privacy policy | Done (rewritten 2026-06-08) | [`docs/privacy-policy.html`](../privacy-policy.html) — pre-publish TODO open (DPO name, address, Art 27 rep) |
-| A6 | UK GDPR representative | You (procure, if serving UK) | privacy policy |
-| A10 | "You're talking to an AI" notice (EU AI Act Art 50, deadline 2 Aug 2026) | Eng | chat/tutor screen |
-| A11/A12 | Provider DPAs (business tier) + US-transfer checks | DPO + you | per-provider contract files |
-| A14 | Voice = transcription only (AI Act Art 5(1)(f)) | Eng | product rule + voice-lib check |
+| Record | Purpose |
+|---|---|
+| [`identity-compliance-register.md`](identity-compliance-register.md) | Identity and consent compliance requirements. |
+| [`audience-matrix.md`](audience-matrix.md) | Reconstructed audience and access-control inventory; verify against current code before relying on line-level claims. |
+| [`2026-07-17-consent-withdrawal-bearer-token-threat-posture.md`](2026-07-17-consent-withdrawal-bearer-token-threat-posture.md) | Consent-withdrawal token security posture. |
+| [`rls-risk-acceptance-memo.md`](rls-risk-acceptance-memo.md) | Row-level-security risk decision. |
+| [`privacy-policy.html`](privacy-policy.html) | Adult-facing privacy notice draft. |
+| [`child-readable-privacy-summary-draft.md`](child-readable-privacy-summary-draft.md) | Child-readable transparency draft. |
+| [`2026-07-04-launch-compliance-closure-check-early-pass.md`](2026-07-04-launch-compliance-closure-check-early-pass.md) | Historical engineering evidence still cited by the DPIA; re-verify at the final launch gate. |
+| [`2026-07-06-school-institutional-ai-act-tripwire.md`](2026-07-06-school-institutional-ai-act-tripwire.md) | Product/legal gate for school, LMS/SIS, formal-assessment, proctoring, and institutional use, plus the blocked-copy list. Decides no classification. |
+| [`2026-07-06-eu-ai-act-technical-file-qms-skeleton.md`](2026-07-06-eu-ai-act-technical-file-qms-skeleton.md) | High-risk-readiness technical-file and QMS index. A gap map, not evidence of compliance. |
 
-## Launch substrate — the new identity-foundation architecture
+## Directory structure
 
-**Decision (user, 2026-06-08): everything launches on the new architecture**, not the legacy `accounts`/`profiles` schema. Consequences baked into the data-layer docs:
+| Directory | Contents | Authority |
+|---|---|---|
+| [`DPO exchanges/`](DPO%20exchanges/) | Dated correspondence and review requests. | External-review working material, not controller approval. |
+| [`assessments/providers/`](assessments/providers/) | Controller processor due-diligence and international-transfer assessments. | Management evidence; final legal/DPO conclusions remain independently reviewed. |
+| [`evidence/providers/`](evidence/providers/) | Provider DPAs and configuration evidence with SHA-256 integrity hashes. | Evidence only; legal adequacy remains for review. |
+| [`research/providers/`](research/providers/) | Vendor-owned source research supporting procurement and transfer review. | Research, not legal advice or executed approval. |
+| [`templates/`](templates/) | Blank source templates. | No product or legal authority. |
+| [`history/`](history/) | Superseded decisions, obsolete snapshots, and completed audits retained for provenance. | Never use as current launch authority. |
 
-- The **DPIA** and **ROPA** are written against the ratified target ([`_wip/identity-foundation/data-model.md`](../../_wip/identity-foundation/data-model.md)), citing it as the schema source. They assess the *design*; a re-confirmation pass against the *built* schema (live `file:line` citations) is owed before final DPIA sign-off.
-- The target model **closes several risks by construction**: consent-receipt survives deletion (`person_retain`, the `I-C1` fix), consent is an append-only event log with recorded `lawful_basis` (`consent_grant`), age/jurisdiction gating is regime-banded (the policy engine), and vendor routing enforces the Gemini-under-18 exclusion (`allowed_models` / `MMT-ADR-0014`).
-- **Timeline reality:** the target is **ratified but not yet built** — execution is post-Phase-P and gated on external `WI-530`. So **launch is downstream of building the identity foundation.** The compliance drafting here does not unblock that; the build does.
+## Evidence rules
 
-### Carried into the new build (not legacy fixes)
-- New delete flow must erase the external **Clerk identity** (R1) and the out-of-model **`byok_waitlist`** email (R3a) — neither is handled by the identity cascade. The legacy `executeDeletion` byok fix is break-tested and interim; its *requirement* carries forward.
-- `person_retain.*.retention_period` values must be counsel-set, not placeholder (Phase-F launch-readiness guard).
-- The legacy `organizations`-row PII gap (R3b) is **moot** — the target schema drops that table.
+- Build launch evidence from the exact release and configuration proposed for
+  launch.
+- Keep signed or incorporated provider terms with their source date and
+  integrity hash.
+- Do not treat feature flags, Work Item status, a historical deployment, or a
+  design document as proof that a launch control operates.
+- Keep obsolete material under `history/` with a clear supersession notice;
+  delete only verified duplicates or records with no continuing evidential
+  value.
+- The final DPIA requires Stephan’s independent advice followed by Zuzana
+  Kopečná’s recorded decision for ZWIZZLY AS.

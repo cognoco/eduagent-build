@@ -15,6 +15,7 @@ import { topupExpiryReminderSend } from './functions/topup-expiry-reminder-send'
 import { billingSubscriptionStoreTeardown } from './functions/billing-subscription-store-teardown';
 import { trialExpiryFailureObserve } from './functions/trial-expiry-failure-observe';
 import { paymentFailedObserve } from './functions/payment-failed-observe';
+import { familyJoinStoreCancelNudge } from './functions/family-join-store-cancel-nudge';
 import { billingAlertDeliveryFailedObserve } from './functions/billing-alert-delivery-failed-observe';
 import { billingMissingCurrentPeriodEndObserve } from './functions/billing-missing-current-period-end-observe';
 import { billingAliasMerge } from './functions/billing-alias-merge';
@@ -24,10 +25,6 @@ import {
   askClassificationSkippedObserve,
   askClassificationFailedObserve,
 } from './functions/ask-classification-observe';
-import {
-  askGateDecisionObserve,
-  askGateTimeoutObserve,
-} from './functions/ask-gate-observe';
 import { emailBouncedObserve } from './functions/email-bounced-observe';
 import { subjectAutoArchive } from './functions/subject-auto-archive';
 import { bookPreGeneration } from './functions/book-pre-generation';
@@ -40,6 +37,9 @@ import { filingCompletedObserve } from './functions/filing-completed-observe';
 import { filingTimedOutObserve } from './functions/filing-timed-out-observe';
 import { filingStrandedBackfill } from './functions/filing-stranded-backfill';
 import { reviewDueScan } from './functions/review-due-scan';
+import { mentorNoticeNudgeScan } from './functions/mentor-notice-nudge-scan';
+import { mentorNoticeNudgeSend } from './functions/mentor-notice-nudge-send';
+import { mentorNoticeFade } from './functions/mentor-notice-fade';
 import { reviewDueSend } from './functions/review-due-send';
 import { dailyReminderScan } from './functions/daily-reminder-scan';
 import { dailyReminderSend } from './functions/daily-reminder-send';
@@ -76,6 +76,7 @@ import { orphanPersistFailed } from './functions/orphan-persist-failed';
 import { subjectPrewarmCurriculum } from './functions/subject-prewarm-curriculum';
 import { subjectRetryCurriculum } from './functions/subject-retry-curriculum';
 import { notificationSuppressedObserve } from './functions/notification-suppressed-observe';
+import { inngestFunctionFailedObserve } from './functions/inngest-function-failed-observe';
 import {
   learnerRecapRegenerate,
   sessionSummaryCreate,
@@ -87,6 +88,10 @@ import {
   transcriptPurgeHandler,
   transcriptPurgeHandlerOnFailure,
 } from './functions/transcript-purge-cron';
+import {
+  activationEventsRetentionCron,
+  activationEventsRetentionOnFailure,
+} from './functions/activation-events-retention-cron';
 import { retrievalEventsRetentionCron } from './functions/retrieval-events-retention-cron';
 import { memoryFactsBackfill } from './functions/memory-facts-backfill';
 import { memoryFactsEmbedBackfill } from './functions/memory-facts-embed-backfill';
@@ -124,6 +129,7 @@ import {
   blockedSafetyDigestDelivery,
   blockedSafetyDigestIngest,
 } from './functions/blocked-safety-digest';
+import { pastDueLaunchHealth } from './functions/past-due-launch-health';
 
 export {
   inngest,
@@ -144,6 +150,7 @@ export {
   billingSubscriptionStoreTeardown,
   trialExpiryFailureObserve,
   paymentFailedObserve,
+  familyJoinStoreCancelNudge,
   billingAlertDeliveryFailedObserve,
   billingMissingCurrentPeriodEndObserve,
   billingAliasMerge,
@@ -151,8 +158,6 @@ export {
   askClassificationCompletedObserve,
   askClassificationSkippedObserve,
   askClassificationFailedObserve,
-  askGateDecisionObserve,
-  askGateTimeoutObserve,
   emailBouncedObserve,
   subjectAutoArchive,
   bookPreGeneration,
@@ -174,6 +179,9 @@ export {
   filingTimedOutObserve,
   filingStrandedBackfill,
   reviewDueScan,
+  mentorNoticeNudgeScan,
+  mentorNoticeNudgeSend,
+  mentorNoticeFade,
   reviewDueSend,
   dailyReminderScan,
   dailyReminderSend,
@@ -184,6 +192,7 @@ export {
   subjectPrewarmCurriculum,
   subjectRetryCurriculum,
   notificationSuppressedObserve,
+  inngestFunctionFailedObserve,
   sessionSummaryCreate,
   sessionSummaryRegenerate,
   learnerRecapRegenerate,
@@ -192,6 +201,8 @@ export {
   transcriptPurgeHandler,
   transcriptPurgeHandlerOnFailure,
   retrievalEventsRetentionCron,
+  activationEventsRetentionCron,
+  activationEventsRetentionOnFailure,
   memoryFactsBackfill,
   memoryFactsEmbedBackfill,
   reviewCalibrationGrade,
@@ -218,6 +229,7 @@ export {
   graduationNarration,
   blockedSafetyDigestIngest,
   blockedSafetyDigestDelivery,
+  pastDueLaunchHealth,
 };
 
 // All Inngest functions to register with the serve handler
@@ -239,6 +251,7 @@ export const functions = [
   billingSubscriptionStoreTeardown,
   trialExpiryFailureObserve,
   paymentFailedObserve,
+  familyJoinStoreCancelNudge,
   billingAlertDeliveryFailedObserve,
   billingMissingCurrentPeriodEndObserve,
   billingAliasMerge,
@@ -246,8 +259,6 @@ export const functions = [
   askClassificationCompletedObserve,
   askClassificationSkippedObserve,
   askClassificationFailedObserve,
-  askGateDecisionObserve,
-  askGateTimeoutObserve,
   emailBouncedObserve,
   subjectAutoArchive,
   bookPreGeneration,
@@ -270,6 +281,9 @@ export const functions = [
   filingTimedOutObserve,
   filingStrandedBackfill,
   reviewDueScan,
+  mentorNoticeNudgeScan,
+  mentorNoticeNudgeSend,
+  mentorNoticeFade,
   reviewDueSend,
   dailyReminderScan,
   dailyReminderSend,
@@ -280,6 +294,7 @@ export const functions = [
   subjectPrewarmCurriculum,
   subjectRetryCurriculum,
   notificationSuppressedObserve,
+  inngestFunctionFailedObserve,
   sessionSummaryCreate,
   sessionSummaryRegenerate,
   learnerRecapRegenerate,
@@ -288,6 +303,8 @@ export const functions = [
   transcriptPurgeHandler,
   transcriptPurgeHandlerOnFailure,
   retrievalEventsRetentionCron,
+  activationEventsRetentionCron,
+  activationEventsRetentionOnFailure,
   memoryFactsBackfill,
   memoryFactsEmbedBackfill,
   reviewCalibrationGrade,
@@ -314,4 +331,5 @@ export const functions = [
   graduationNarration,
   blockedSafetyDigestIngest,
   blockedSafetyDigestDelivery,
+  pastDueLaunchHealth,
 ];

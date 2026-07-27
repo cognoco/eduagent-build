@@ -1,13 +1,29 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
 import i18next from 'i18next';
+import * as ExpoSecureStore from 'expo-secure-store';
 
+import {
+  finishMentorLanguageUpdate,
+  type MentorLanguageUpdateOperation,
+} from '../lib/mentor-language-coordination';
+import { clearProfileSecureStorageOnSignOut } from '../lib/sign-out-cleanup';
 import { useMentorLanguageSync } from './use-mentor-language-sync';
+
+type MockLanguageInput = {
+  languageOperation?: MentorLanguageUpdateOperation;
+};
+
+function finishMockMutation(vars: unknown): void {
+  const operation = (vars as MockLanguageInput).languageOperation;
+  if (operation) finishMentorLanguageUpdate(operation);
+}
 
 // Default implementation: simulates a successful mutation by calling onSuccess.
 // Tests that need to simulate failure should use mockMutate.mockImplementationOnce
 // and intentionally NOT call onSuccess.
 const mockMutate = jest.fn(
-  (_vars: unknown, opts?: { onSuccess?: () => void }) => {
+  (vars: unknown, opts?: { onSuccess?: () => void }) => {
+    finishMockMutation(vars);
     opts?.onSuccess?.();
   },
 );
@@ -43,13 +59,23 @@ describe('useMentorLanguageSync', () => {
     // mockReset clears call history AND restores the default success implementation.
     mockMutate.mockReset();
     mockMutate.mockImplementation(
-      (_vars: unknown, opts?: { onSuccess?: () => void }) => {
+      (vars: unknown, opts?: { onSuccess?: () => void }) => {
+        finishMockMutation(vars);
         opts?.onSuccess?.();
       },
     );
     mockIsPending = false;
     mockActiveProfile = { id: 'p1', conversationLanguage: 'en' };
     await i18next.changeLanguage('en');
+  });
+
+  afterEach(async () => {
+    await clearProfileSecureStorageOnSignOut([
+      'p1',
+      'p2',
+      'profile-1',
+      'profile-2',
+    ]);
   });
 
   it('patches profile when i18next language differs from stored value', async () => {
@@ -59,22 +85,125 @@ describe('useMentorLanguageSync', () => {
 
     await waitFor(() =>
       expect(mockMutate).toHaveBeenCalledWith(
-        { conversationLanguage: 'nb' },
+        expect.objectContaining({ conversationLanguage: 'nb' }),
         expect.any(Object),
       ),
     );
   });
 
-  it('patches profile after a languageChanged event', async () => {
+  it('[WI-2098 AC-2] auto-syncs app-language changes when no explicit override exists', async () => {
     renderHook(() => useMentorLanguageSync());
 
     await i18next.changeLanguage('ja');
 
     await waitFor(() =>
       expect(mockMutate).toHaveBeenCalledWith(
-        { conversationLanguage: 'ja' },
+        expect.objectContaining({ conversationLanguage: 'ja' }),
         expect.any(Object),
       ),
+    );
+  });
+
+  it('[WI-2098 recovery] retries automatic sync after one marker-read failure for an unmarked profile', async () => {
+    jest
+      .mocked(ExpoSecureStore.getItemAsync)
+      .mockRejectedValueOnce(new Error('storage unavailable'));
+    renderHook(() => useMentorLanguageSync());
+
+    await i18next.changeLanguage('ja');
+    await waitFor(() => expect(mockMutate).not.toHaveBeenCalled());
+    await i18next.changeLanguage('de');
+
+    await waitFor(() =>
+      expect(mockMutate).toHaveBeenCalledWith(
+        expect.objectContaining({ conversationLanguage: 'de' }),
+        expect.any(Object),
+      ),
+    );
+  });
+
+  it('[WI-2098 AC-1] preserves an explicitly selected mentor language when app language changes', async () => {
+    await ExpoSecureStore.setItemAsync(
+      'mentorLanguageExplicitOverride_profile-1',
+      'true',
+    );
+    mockActiveProfile = {
+      id: 'profile-1',
+      conversationLanguage: 'en',
+    };
+
+    renderHook(() => useMentorLanguageSync());
+
+    await i18next.changeLanguage('de');
+
+    await waitFor(() => expect(mockMutate).not.toHaveBeenCalled());
+  });
+
+  it('[WI-2098 AC-3] restores a profile-scoped override after remount without suppressing another profile', async () => {
+    await ExpoSecureStore.setItemAsync(
+      'mentorLanguageExplicitOverride_profile-1',
+      'true',
+    );
+    mockActiveProfile = {
+      id: 'profile-1',
+      conversationLanguage: 'en',
+    };
+
+    const firstMount = renderHook(() => useMentorLanguageSync());
+    await i18next.changeLanguage('de');
+    await waitFor(() => expect(mockMutate).not.toHaveBeenCalled());
+    firstMount.unmount();
+
+    mockActiveProfile = {
+      id: 'profile-2',
+      conversationLanguage: 'en',
+    };
+    const secondMount = renderHook(() => useMentorLanguageSync());
+
+    await waitFor(() =>
+      expect(mockMutate).toHaveBeenCalledWith(
+        expect.objectContaining({ conversationLanguage: 'de' }),
+        expect.any(Object),
+      ),
+    );
+    secondMount.unmount();
+
+    await clearProfileSecureStorageOnSignOut(['profile-1']);
+    mockMutate.mockClear();
+    mockActiveProfile = {
+      id: 'profile-1',
+      conversationLanguage: 'en',
+    };
+    renderHook(() => useMentorLanguageSync());
+
+    await waitFor(() =>
+      expect(mockMutate).toHaveBeenCalledWith(
+        expect.objectContaining({ conversationLanguage: 'de' }),
+        expect.any(Object),
+      ),
+    );
+  });
+
+  it('[WI-2098 AC-4] keeps the explicit override latched across app-language changes and an explicit change back', async () => {
+    const overrideKey = 'mentorLanguageExplicitOverride_profile-1';
+    await ExpoSecureStore.setItemAsync(overrideKey, 'true');
+    mockActiveProfile = {
+      id: 'profile-1',
+      conversationLanguage: 'en',
+    };
+
+    renderHook(() => useMentorLanguageSync());
+    await i18next.changeLanguage('de');
+    await waitFor(() => expect(mockMutate).not.toHaveBeenCalled());
+
+    // A later explicit selection writes the same durable marker; it must not
+    // be consumed by, or toggle with, automatic app-language synchronization.
+    await ExpoSecureStore.setItemAsync(overrideKey, 'true');
+    await i18next.changeLanguage('ja');
+
+    await waitFor(() => expect(mockMutate).not.toHaveBeenCalled());
+    await expect(ExpoSecureStore.getItemAsync(overrideKey)).resolves.toBe(
+      'true',
     );
   });
 
@@ -134,8 +263,9 @@ describe('useMentorLanguageSync', () => {
     // callback but never calls it (the real useMutation omits onSuccess on
     // error). This means lastSyncedRef must NOT be set after the first call.
     let firstCallDone = false;
-    mockMutate.mockImplementationOnce((_vars: unknown, _opts: unknown) => {
+    mockMutate.mockImplementationOnce((vars: unknown, _opts: unknown) => {
       // Intentionally do NOT call opts.onSuccess — simulates a failed patch.
+      finishMockMutation(vars);
       firstCallDone = true;
     });
 
@@ -157,7 +287,7 @@ describe('useMentorLanguageSync', () => {
     await waitFor(() => expect(mockMutate).toHaveBeenCalledTimes(2));
     expect(mockMutate).toHaveBeenNthCalledWith(
       2,
-      { conversationLanguage: 'nb' },
+      expect.objectContaining({ conversationLanguage: 'nb' }),
       expect.any(Object),
     );
   });

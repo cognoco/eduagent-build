@@ -5,7 +5,7 @@
  * This suite targets the mock-heavy quota, top-up, and RevenueCat paths.
  */
 
-import { asc, eq, inArray, sql } from 'drizzle-orm';
+import { asc, eq, inArray } from 'drizzle-orm';
 import {
   generateUUIDv7,
   membership,
@@ -33,58 +33,31 @@ import {
   activateSubscriptionFromRevenuecatV2,
   isRevenuecatEventProcessedV2,
   purchaseTopUpCreditsV2,
+  reattributeTopUpCreditsOnModelChangeV2,
   updateSubscriptionFromRevenuecatWebhookV2,
 } from '../../apps/api/src/services/billing/billing-v2';
 import { getTierConfig } from '../../apps/api/src/services/subscription';
-import { cleanupAccounts, createIntegrationDb } from './helpers';
-import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
+import { createIntegrationDb } from './helpers';
 
-const TEST_ACCOUNTS = [
-  {
-    clerkUserId: 'integration-billing-service-01',
-    email: 'integration-billing-service-01@integration.test',
-  },
-  {
-    clerkUserId: 'integration-billing-service-02',
-    email: 'integration-billing-service-02@integration.test',
-  },
-  {
-    clerkUserId: 'integration-billing-service-03',
-    email: 'integration-billing-service-03@integration.test',
-  },
-  {
-    clerkUserId: 'integration-billing-service-04',
-    email: 'integration-billing-service-04@integration.test',
-  },
-  {
-    clerkUserId: 'integration-billing-service-05',
-    email: 'integration-billing-service-05@integration.test',
-  },
-  {
-    clerkUserId: 'integration-billing-service-06',
-    email: 'integration-billing-service-06@integration.test',
-  },
-  {
-    clerkUserId: 'integration-billing-service-07',
-    email: 'integration-billing-service-07@integration.test',
-  },
-];
-
-const ALL_EMAILS = TEST_ACCOUNTS.map((account) => account.email);
-const ALL_CLERK_USER_IDS = TEST_ACCOUNTS.map((account) => account.clerkUserId);
-
-// [WI-1128] `accounts` is on the drop list — seedAccount's real anchor is now
-// the v2 `organization`, keyed by name so cleanupOrgAccounts (below) can sweep
-// it (helpers.ts's cleanupAccounts only finds v2 rows via a `login` row, and
-// seedAccount never creates one).
-const ORG_NAMES = TEST_ACCOUNTS.map(
+// This suite seeds only v2 organizations. Keep cleanup scoped to those names;
+// `cleanupAccounts` reads the retired `login` table and cannot clean this data.
+const ORG_NAMES = Array.from(
+  { length: 7 },
   (_, i) => `integration-billing-service-org-${i}`,
 );
+
+const REATTRIBUTION_ORG_NAMES = [
+  'integration-billing-service-reattribution-target',
+  'integration-billing-service-reattribution-other',
+] as const;
 
 async function cleanupOrgAccounts() {
   const db = createIntegrationDb();
   const orgs = await db.query.organization.findMany({
-    where: inArray(organization.name, ORG_NAMES),
+    where: inArray(organization.name, [
+      ...ORG_NAMES,
+      ...REATTRIBUTION_ORG_NAMES,
+    ]),
   });
   const orgIds = orgs.map((o) => o.id);
   if (orgIds.length === 0) return;
@@ -105,23 +78,9 @@ async function cleanupOrgAccounts() {
     await db.delete(person).where(inArray(person.id, personIds));
   }
   await db.delete(organization).where(inArray(organization.id, orgIds));
-  // [WI-1128] Legacy `accounts` may already be dropped (post-M-DROP); its
-  // `subscriptions` row (same id as the org) cascades away via the
-  // M-REPOINT'd account_id->organization FK when the org itself is deleted
-  // above.
-  // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL delete, same
-  // conditional cleanup as before.
-  if (
-    (await legacyIdentityTableExistsForTest(db, 'accounts')) &&
-    orgIds.length > 0
-  ) {
-    await db.execute(
-      sql`DELETE FROM accounts WHERE id IN (${sql.join(
-        orgIds.map((id) => sql`${id}::uuid`),
-        sql`, `,
-      )})`,
-    );
-  }
+  // [WI-1128] Legacy `accounts` is dropped (post-M-DROP); its `subscriptions`
+  // row (same id as the org) cascades away via the M-REPOINT'd
+  // account_id->organization FK when the org itself is deleted above.
 }
 
 // [WI-1239 / 779-strip] v2 dual-store seeding. decrementQuota /
@@ -208,41 +167,19 @@ async function cleanupV2() {
 
 async function seedAccount(index: number) {
   const db = createIntegrationDb();
-  const account = TEST_ACCOUNTS[index]!;
   const [org] = await db
     .insert(organization)
     .values({ name: ORG_NAMES[index]! })
     .returning();
-  // [WI-1128] Legacy `accounts` may already be dropped (post-M-DROP); after
-  // M-REPOINT, `subscriptions.accountId` targets `organization` directly, so
-  // this mirror (same id as the org, the "reseed identity contract") is a
-  // no-op there instead of hard-failing.
-  // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL insert, same
-  // conditional seed as before.
-  if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-    await db.execute(sql`
-      INSERT INTO accounts (id, clerk_user_id, email)
-      VALUES (${org!.id}, ${account.clerkUserId}, ${account.email})
-    `);
-  }
   return org!;
 }
 
-async function seedOwnerProfile(accountId: string, displayName: string) {
-  const db = createIntegrationDb();
+async function seedOwnerProfile(_accountId: string, _displayName: string) {
   // [WI-1128] Generated here (not via the legacy `profiles` insert's
   // defaultFn) so the id is available even when `profiles` is gated off
   // (post-M-DROP) — callers always follow up with seedV2Counterpart, which
   // creates the v2 `person` row under this SAME id.
   const id = generateUUIDv7();
-  // [WI-1139] Legacy `profiles` Drizzle def removed — raw SQL insert, same
-  // conditional seed as before.
-  if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
-    await db.execute(sql`
-      INSERT INTO profiles (id, account_id, display_name, birth_year, is_owner)
-      VALUES (${id}, ${accountId}, ${displayName}, 1990, true)
-    `);
-  }
   return { id };
 }
 
@@ -302,30 +239,6 @@ async function seedSubscriptionWithQuota(input: {
         input.lastRevenuecatEventTimestampMs ?? null,
     })
     .returning();
-
-  // [WI-1347] Mirror into legacy `subscriptions` under the SAME id, gated —
-  // `subscriptions` IS on the WI-1306/0130 drop list despite the prior
-  // comment here; createSubscription/ensureFreeSubscription (tested below)
-  // are transitively dead (see docs/_archive/retired-code.md), so this
-  // anchor self-inerts once the table is dropped.
-  // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL insert,
-  // same conditional seed as before.
-  if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
-    await db.execute(sql`
-      INSERT INTO subscriptions (
-        id, account_id, tier, status, current_period_start, current_period_end,
-        trial_ends_at, last_revenuecat_event_id, last_revenuecat_event_timestamp_ms
-      )
-      VALUES (
-        ${subscriptionV2Row!.id}, ${input.accountId}, ${input.tier}, ${input.status ?? 'active'},
-        ${(input.currentPeriodStart ?? new Date('2026-04-01T00:00:00.000Z')).toISOString()}::timestamptz,
-        ${(input.currentPeriodEnd ?? new Date('2026-05-01T00:00:00.000Z')).toISOString()}::timestamptz,
-        ${input.trialEndsAt ? input.trialEndsAt.toISOString() : null},
-        ${input.lastRevenuecatEventId ?? null},
-        ${input.lastRevenuecatEventTimestampMs ?? null}
-      )
-    `);
-  }
 
   const [quotaPool] = await db
     .insert(quotaPools)
@@ -433,20 +346,132 @@ async function loadTopUps(subscriptionId: string) {
   });
 }
 
+const REATTRIBUTION_TIERS = ['free', 'plus', 'family', 'pro'] as const;
+
+function reattributionTierPairs(
+  predicate: (
+    from: (typeof REATTRIBUTION_TIERS)[number],
+    to: (typeof REATTRIBUTION_TIERS)[number],
+  ) => boolean,
+) {
+  return REATTRIBUTION_TIERS.flatMap((previousTier) =>
+    REATTRIBUTION_TIERS.flatMap((newTier) =>
+      predicate(previousTier, newTier)
+        ? [[previousTier, newTier] as const]
+        : [],
+    ),
+  );
+}
+
+function snapshotTopUpRows(rows: Awaited<ReturnType<typeof loadTopUps>>) {
+  return rows.map((row) => ({
+    id: row.id,
+    subscriptionId: row.subscriptionId,
+    profileId: row.profileId,
+    amount: row.amount,
+    remaining: row.remaining,
+    purchasedAt: row.purchasedAt.toISOString(),
+    expiresAt: row.expiresAt.toISOString(),
+    revenuecatTransactionId: row.revenuecatTransactionId,
+    createdAt: row.createdAt.toISOString(),
+  }));
+}
+
+async function seedReattributionFixture(withOwner = true) {
+  const db = createIntegrationDb();
+  const [targetOrganization] = await db
+    .insert(organization)
+    .values({ name: REATTRIBUTION_ORG_NAMES[0] })
+    .returning();
+  const [otherOrganization] = await db
+    .insert(organization)
+    .values({ name: REATTRIBUTION_ORG_NAMES[1] })
+    .returning();
+
+  const [targetPayer] = await db
+    .insert(person)
+    .values({
+      displayName: 'Reattribution target payer',
+      birthDate: '1990-01-01',
+      residenceJurisdiction: 'EU',
+    })
+    .returning();
+  const [otherPayer] = await db
+    .insert(person)
+    .values({
+      displayName: 'Reattribution other payer',
+      birthDate: '1990-01-01',
+      residenceJurisdiction: 'EU',
+    })
+    .returning();
+  await db.insert(membership).values([
+    {
+      personId: targetPayer!.id,
+      organizationId: targetOrganization!.id,
+      roles: withOwner ? ['admin'] : ['learner'],
+    },
+    {
+      personId: otherPayer!.id,
+      organizationId: otherOrganization!.id,
+      roles: ['admin'],
+    },
+  ]);
+
+  const [targetSubscription] = await db
+    .insert(subscriptionV2Table)
+    .values({
+      organizationId: targetOrganization!.id,
+      planTier: 'family',
+      status: 'active',
+      payerPersonId: targetPayer!.id,
+    })
+    .returning();
+  const [otherSubscription] = await db
+    .insert(subscriptionV2Table)
+    .values({
+      organizationId: otherOrganization!.id,
+      planTier: 'family',
+      status: 'active',
+      payerPersonId: otherPayer!.id,
+    })
+    .returning();
+
+  const rowInputs = [
+    { profileId: null, remaining: 11 },
+    { profileId: targetPayer!.id, remaining: 13 },
+    { profileId: null, remaining: 0 },
+    { profileId: targetPayer!.id, remaining: 0 },
+  ] as const;
+  for (const [subscriptionId, profileId] of [
+    [targetSubscription!.id, targetPayer!.id],
+    [otherSubscription!.id, otherPayer!.id],
+  ] as const) {
+    for (const [index, row] of rowInputs.entries()) {
+      await seedTopUpCredit({
+        subscriptionId,
+        profileId: row.profileId === null ? null : profileId,
+        amount: 20 + index,
+        remaining: row.remaining,
+        purchasedAt: new Date(`2026-01-0${index + 1}T00:00:00.000Z`),
+        expiresAt: new Date('2027-01-01T00:00:00.000Z'),
+      });
+    }
+  }
+
+  return {
+    targetOrganization: targetOrganization!,
+    targetSubscription: targetSubscription!,
+    otherSubscription: otherSubscription!,
+    targetPayer: targetPayer!,
+  };
+}
+
 beforeEach(async () => {
-  await cleanupAccounts({
-    emails: ALL_EMAILS,
-    clerkUserIds: ALL_CLERK_USER_IDS,
-  });
   await cleanupOrgAccounts();
   await cleanupV2();
 });
 
 afterAll(async () => {
-  await cleanupAccounts({
-    emails: ALL_EMAILS,
-    clerkUserIds: ALL_CLERK_USER_IDS,
-  });
   await cleanupOrgAccounts();
   await cleanupV2();
 });
@@ -459,6 +484,181 @@ describe('Integration: billing service', () => {
   // and the legacy `subscriptions` table def is now removed too. Deleted per
   // the WI-1128 quarantine comment's own "deletion + un-skip = WI-1139
   // dead-sweep" disposition. See docs/_archive/retired-code.md.
+
+  const sharedToPerProfilePairs = reattributionTierPairs(
+    (previousTier, newTier) =>
+      getTierConfig(previousTier).quotaModel === 'shared-pool' &&
+      getTierConfig(newTier).quotaModel === 'per-profile',
+  );
+  const perProfileToSharedPairs = reattributionTierPairs(
+    (previousTier, newTier) =>
+      getTierConfig(previousTier).quotaModel === 'per-profile' &&
+      getTierConfig(newTier).quotaModel === 'shared-pool',
+  );
+  const unchangedModelPairs = reattributionTierPairs(
+    (previousTier, newTier) =>
+      getTierConfig(previousTier).quotaModel ===
+      getTierConfig(newTier).quotaModel,
+  );
+
+  it.each(sharedToPerProfilePairs)(
+    'reattributes every eligible target credit from shared-pool %s to per-profile %s and preserves every other row',
+    async (previousTier, newTier) => {
+      const fixture = await seedReattributionFixture();
+      const beforeTarget = await loadTopUps(fixture.targetSubscription.id);
+      const beforeOther = await loadTopUps(fixture.otherSubscription.id);
+      const beforeSnapshot = snapshotTopUpRows([
+        ...beforeTarget,
+        ...beforeOther,
+      ]);
+      const totalRemaining = beforeSnapshot.reduce(
+        (total, row) => total + row.remaining,
+        0,
+      );
+
+      const updated = await reattributeTopUpCreditsOnModelChangeV2(
+        createIntegrationDb(),
+        fixture.targetSubscription.id,
+        fixture.targetOrganization.id,
+        previousTier,
+        newTier,
+      );
+      const afterTarget = await loadTopUps(fixture.targetSubscription.id);
+      const afterOther = await loadTopUps(fixture.otherSubscription.id);
+      const afterSnapshot = snapshotTopUpRows([...afterTarget, ...afterOther]);
+      const eligibleIds = beforeTarget
+        .filter((row) => row.profileId === null && row.remaining > 0)
+        .map((row) => row.id);
+
+      expect(updated).toBe(eligibleIds.length);
+      expect(afterSnapshot).toHaveLength(beforeSnapshot.length);
+      expect(
+        afterSnapshot.reduce((total, row) => total + row.remaining, 0),
+      ).toBe(totalRemaining);
+      expect(afterSnapshot).toEqual(
+        beforeSnapshot.map((row) =>
+          eligibleIds.includes(row.id)
+            ? { ...row, profileId: fixture.targetPayer.id }
+            : row,
+        ),
+      );
+
+      const replay = await reattributeTopUpCreditsOnModelChangeV2(
+        createIntegrationDb(),
+        fixture.targetSubscription.id,
+        fixture.targetOrganization.id,
+        previousTier,
+        newTier,
+      );
+      expect(replay).toBe(0);
+      expect(
+        snapshotTopUpRows(await loadTopUps(fixture.targetSubscription.id)),
+      ).toEqual(snapshotTopUpRows(afterTarget));
+    },
+  );
+
+  it('leaves target credits unchanged when a shared-pool to per-profile transition has no owner', async () => {
+    const fixture = await seedReattributionFixture(false);
+    const beforeTarget = snapshotTopUpRows(
+      await loadTopUps(fixture.targetSubscription.id),
+    );
+
+    const updated = await reattributeTopUpCreditsOnModelChangeV2(
+      createIntegrationDb(),
+      fixture.targetSubscription.id,
+      fixture.targetOrganization.id,
+      'family',
+      'plus',
+    );
+
+    expect(updated).toBe(0);
+    expect(
+      snapshotTopUpRows(await loadTopUps(fixture.targetSubscription.id)),
+    ).toEqual(beforeTarget);
+  });
+
+  it.each(perProfileToSharedPairs)(
+    'reattributes every eligible target credit from per-profile %s to shared-pool %s and preserves every other row',
+    async (previousTier, newTier) => {
+      const fixture = await seedReattributionFixture();
+      const beforeTarget = await loadTopUps(fixture.targetSubscription.id);
+      const beforeOther = await loadTopUps(fixture.otherSubscription.id);
+      const beforeSnapshot = snapshotTopUpRows([
+        ...beforeTarget,
+        ...beforeOther,
+      ]);
+      const totalRemaining = beforeSnapshot.reduce(
+        (total, row) => total + row.remaining,
+        0,
+      );
+
+      const updated = await reattributeTopUpCreditsOnModelChangeV2(
+        createIntegrationDb(),
+        fixture.targetSubscription.id,
+        fixture.targetOrganization.id,
+        previousTier,
+        newTier,
+      );
+      const afterTarget = await loadTopUps(fixture.targetSubscription.id);
+      const afterOther = await loadTopUps(fixture.otherSubscription.id);
+      const afterSnapshot = snapshotTopUpRows([...afterTarget, ...afterOther]);
+      const eligibleIds = beforeTarget
+        .filter((row) => row.profileId !== null && row.remaining > 0)
+        .map((row) => row.id);
+
+      expect(updated).toBe(eligibleIds.length);
+      expect(afterSnapshot).toHaveLength(beforeSnapshot.length);
+      expect(
+        afterSnapshot.reduce((total, row) => total + row.remaining, 0),
+      ).toBe(totalRemaining);
+      expect(afterSnapshot).toEqual(
+        beforeSnapshot.map((row) =>
+          eligibleIds.includes(row.id) ? { ...row, profileId: null } : row,
+        ),
+      );
+
+      const replay = await reattributeTopUpCreditsOnModelChangeV2(
+        createIntegrationDb(),
+        fixture.targetSubscription.id,
+        fixture.targetOrganization.id,
+        previousTier,
+        newTier,
+      );
+      expect(replay).toBe(0);
+      expect(
+        snapshotTopUpRows(await loadTopUps(fixture.targetSubscription.id)),
+      ).toEqual(snapshotTopUpRows(afterTarget));
+    },
+  );
+
+  it.each(unchangedModelPairs)(
+    'is a no-op for unchanged quota-model pair %s to %s',
+    async (previousTier, newTier) => {
+      const fixture = await seedReattributionFixture();
+      const beforeTarget = snapshotTopUpRows(
+        await loadTopUps(fixture.targetSubscription.id),
+      );
+      const beforeOther = snapshotTopUpRows(
+        await loadTopUps(fixture.otherSubscription.id),
+      );
+
+      const updated = await reattributeTopUpCreditsOnModelChangeV2(
+        createIntegrationDb(),
+        fixture.targetSubscription.id,
+        fixture.targetOrganization.id,
+        previousTier,
+        newTier,
+      );
+
+      expect(updated).toBe(0);
+      expect(
+        snapshotTopUpRows(await loadTopUps(fixture.targetSubscription.id)),
+      ).toEqual(beforeTarget);
+      expect(
+        snapshotTopUpRows(await loadTopUps(fixture.otherSubscription.id)),
+      ).toEqual(beforeOther);
+    },
+  );
 
   it('decrements monthly quota against the real quota pool row', async () => {
     const account = await seedAccount(2);

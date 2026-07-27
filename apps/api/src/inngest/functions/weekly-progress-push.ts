@@ -27,6 +27,7 @@ import {
   person,
   weeklyReports,
 } from '@eduagent/database';
+import { isWeeklyProgressPushLocalHour9 } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { INNGEST_PLAN_CONCURRENCY_CAP } from '../plan-limits';
 import { getStepDatabase, getStepResendApiKey } from '../helpers';
@@ -34,6 +35,7 @@ import {
   getAllActiveGuardianPersonIds,
   getChargePersonIds,
 } from '../../services/identity-v2/guardianship';
+import { filterUncredentialedCharges } from '../../services/family-access';
 import {
   listEligibleSelfReportPersonIdsV2,
   listEligibleSelfReportPersonIdsAtLocalHour9V2,
@@ -118,19 +120,7 @@ type PreparedWeeklyProgressDigest =
 // cron to `0 9 * * 1` would constrain delivery to UTC parents only and break
 // timezone-aware morning delivery for everyone else. See test:
 // "fires for each parent exactly once across the 24 Monday-UTC hours".
-export function isLocalHour9(timezone: string | null, nowUtc: Date): boolean {
-  if (!timezone) return nowUtc.getUTCHours() === 9;
-  try {
-    const localTimeStr = nowUtc.toLocaleString('en-US', {
-      timeZone: timezone,
-      hour: 'numeric',
-      hour12: false,
-    });
-    return parseInt(localTimeStr, 10) === 9;
-  } catch {
-    return nowUtc.getUTCHours() === 9;
-  }
-}
+export const isLocalHour9 = isWeeklyProgressPushLocalHour9;
 
 function startOfCurrentWeek(date: Date): Date {
   const day = date.getUTCDay();
@@ -277,9 +267,23 @@ export const weeklyProgressPushCron = inngest.createFunction(
   },
   { cron: '0 * * * 1' },
   async ({ step }) => {
+    // [CR-2026-05-21-189 / WI-2839] Compute the evaluation window in the first
+    // dedicated step so every timezone-sensitive query uses the same memoized
+    // instant, including after an Inngest replay or an hour-boundary crossing.
+    // Date objects don't survive step-result serialization cleanly, so the step
+    // returns millisecond timestamps and reconstructs Dates afterward.
+    const weekWindow = await step.run('resolve-week-window', async () => {
+      const nowUtcMs = Date.now();
+      const currentWeekStartMs = startOfCurrentWeek(
+        new Date(nowUtcMs),
+      ).getTime();
+      return { nowUtcMs, currentWeekStartMs };
+    });
+    const nowUtc = new Date(weekWindow.nowUtcMs);
+    const currentWeekStart = new Date(weekWindow.currentWeekStartMs);
+
     const parentIds = await step.run('find-weekly-parents', async () => {
       const db = getStepDatabase();
-      const nowUtc = new Date();
 
       // 1. Find all parents who can receive a weekly progress digest.
       // Push still requires pushEnabled + weeklyProgressPush; email is its own
@@ -343,24 +347,6 @@ export const weeklyProgressPushCron = inngest.createFunction(
         );
     });
 
-    // [CR-2026-05-21-189] nowUtc/currentWeekStart computed INSIDE a dedicated
-    // step.run so the value is memoized as part of the step's cached result.
-    // Computing them at function entry caused the closure to recompute
-    // new Date() to a later value on Inngest replay while the upstream step
-    // result (find-weekly-self-report-profiles) reflected the original window.
-    // Pattern mirrors session-stale-cleanup.ts and summary-reconciliation-cron.ts
-    // (BUG-189 / CR-029 / CR-031). Date objects don't survive Inngest step
-    // result serialization cleanly — timestamps are returned as ms numbers and
-    // Dates are reconstructed from them after the step.
-    const weekWindow = await step.run('resolve-week-window', async () => {
-      const nowUtcMs = Date.now();
-      const currentWeekStartMs = startOfCurrentWeek(
-        new Date(nowUtcMs),
-      ).getTime();
-      return { nowUtcMs, currentWeekStartMs };
-    });
-    const nowUtc = new Date(weekWindow.nowUtcMs);
-    const currentWeekStart = new Date(weekWindow.currentWeekStartMs);
     const selfReportProfileIds = await step.run(
       'find-weekly-self-report-profiles',
       async () => {
@@ -583,11 +569,13 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             : null;
 
           // Parent's children: active guardianship charges (v2 always-on).
-          const links = (await getChargePersonIds(db, parentId)).map(
-            (childProfileId) => ({
-              childProfileId,
-            }),
+          const chargePersonIds = await filterUncredentialedCharges(
+            db,
+            await getChargePersonIds(db, parentId),
           );
+          const links = chargePersonIds.map((childProfileId) => ({
+            childProfileId,
+          }));
           if (links.length === 0) {
             if (selfReportResult?.status === 'completed') {
               return {
@@ -809,21 +797,26 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             // the send-weekly-progress-push step above). The notificationLog
             // `weekly_progress` slot is shared across channels — a parent
             // receives at most one weekly-progress notification per 24h
-            // regardless of push/email. The push step runs first; if it sent,
-            // its log makes this count > 0 and the email is suppressed (push
-            // preferred). If push was skipped/failed (no log written), the email
-            // still goes out as the fallback channel. Reading inside this step
-            // (not the prepare step) keeps the gate retry-safe: an email-step
-            // retry re-reads the log written by its own first attempt and skips
-            // the re-send, matching the [WI-998] rationale on the push side.
+            // regardless of push/email. The push step runs first; its `sent`
+            // result suppresses email even if its own log write failed. If push
+            // was skipped/failed, email remains the fallback channel. Reading
+            // the ledger inside this step (not prepare) also keeps the gate
+            // retry-safe: an email-step retry re-reads the row written by its
+            // own first attempt and skips the re-send.
             const recentEmailCount = await getRecentNotificationCount(
               db,
               parentId,
               'weekly_progress',
               24,
             );
-            if (recentEmailCount > 0) {
-              return { sent: false, reason: 'dedup_24h' as const };
+            if (pushResult?.sent === true || recentEmailCount > 0) {
+              return {
+                sent: false,
+                reason:
+                  pushResult?.sent === true
+                    ? ('push_sent' as const)
+                    : ('dedup_24h' as const),
+              };
             }
             const emailPayload = formatWeeklyProgressEmail(
               parentEmail,

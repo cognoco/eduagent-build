@@ -1,4 +1,5 @@
 import {
+  challengeRoundEvaluationItemSchema,
   challengeRoundGraderDegradedEventSchema,
   challengeRoundGraderVerdictSchema,
   llmAssessmentEvaluationSchema,
@@ -114,6 +115,60 @@ describe('llmResponseEnvelopeSchema', () => {
     // null values get preprocessed to undefined by optionalBooleanSchema
     expect(parsed.signals?.ready_to_finish).toBeUndefined();
     expect(parsed.signals?.partial_progress).toBeUndefined();
+  });
+
+  describe('signals.answer_evaluation', () => {
+    it.each(['correct', 'partial', 'incorrect', 'na'] as const)(
+      'accepts %s with an optional bounded concept',
+      (correctness) => {
+        const parsed = llmResponseEnvelopeSchema.parse({
+          reply: 'Keep going.',
+          signals: {
+            answer_evaluation: { correctness, concept: 'linear equations' },
+          },
+        });
+
+        expect(parsed.signals?.answer_evaluation).toEqual({
+          correctness,
+          concept: 'linear equations',
+        });
+      },
+    );
+
+    it('accepts an evaluation without a concept', () => {
+      const parsed = llmResponseEnvelopeSchema.parse({
+        reply: 'Keep going.',
+        signals: { answer_evaluation: { correctness: 'na' } },
+      });
+
+      expect(parsed.signals?.answer_evaluation).toEqual({ correctness: 'na' });
+    });
+
+    it.each([1, 200])(
+      'accepts a concept at the %i-character boundary',
+      (size) => {
+        const concept = 'x'.repeat(size);
+        const parsed = llmResponseEnvelopeSchema.parse({
+          reply: 'Keep going.',
+          signals: { answer_evaluation: { correctness: 'correct', concept } },
+        });
+
+        expect(parsed.signals?.answer_evaluation?.concept).toBe(concept);
+      },
+    );
+
+    it.each([
+      { correctness: 'mostly_correct' },
+      { correctness: 'correct', concept: '' },
+      { correctness: 'correct', concept: 'x'.repeat(201) },
+    ])('rejects malformed evaluation %#', (answer_evaluation) => {
+      expect(
+        llmResponseEnvelopeSchema.safeParse({
+          reply: 'Keep going.',
+          signals: { answer_evaluation },
+        }).success,
+      ).toBe(false);
+    });
   });
 
   it('coerces signals when null/non-object is passed (optionalObjectInput)', () => {
@@ -280,6 +335,29 @@ describe('llmResponseEnvelopeSchema', () => {
         },
       },
     });
+    expect(parsed.ui_hints?.fluency_drill?.score).toBeUndefined();
+  });
+
+  it('[WI-1823] accepts fluency_drill active=true with degenerate 0/0 score (strips it)', () => {
+    // Captured four-strands t5 drill-start payload: a template-following model
+    // (gpt-oss-120b) emits the `score` field the response-format template shows
+    // even when STARTING a drill, producing score:{correct:0,total:0}. total:0
+    // violates score.total >= 1. Before the fix the all-zero score was only
+    // stripped when active=false, so an active=true drill-start failed
+    // llmResponseEnvelopeSchema.safeParse → schema_violation. The 0/0 score is
+    // meaningless at drill start; strip it regardless of active.
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: 'Ready — 30 second drill with porque, pero, entonces. Go!',
+      ui_hints: {
+        fluency_drill: {
+          active: true,
+          duration_s: 30,
+          score: { correct: 0, total: 0 },
+        },
+      },
+    });
+    expect(parsed.ui_hints?.fluency_drill?.active).toBe(true);
+    expect(parsed.ui_hints?.fluency_drill?.duration_s).toBe(30);
     expect(parsed.ui_hints?.fluency_drill?.score).toBeUndefined();
   });
 
@@ -615,16 +693,77 @@ describe('signals.evaluate_assessment', () => {
     expect(parsed.signals?.evaluate_assessment).toBeUndefined();
   });
 
-  it('rejects evaluate_assessment without challenge_passed (required field)', () => {
+  it('[WI-1995] keeps the reply and sibling signals when challenge_passed is missing', () => {
     const result = llmResponseEnvelopeSchema.safeParse({
-      reply: 'ok',
+      reply: 'Nice work — tell me more about why that step follows.',
       signals: {
+        ready_to_finish: true,
         evaluate_assessment: {
+          flaw_identified: 'inverted cause-effect',
           quality: 4,
         },
       },
     });
-    expect(result.success).toBe(false);
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.reply).toBe(
+      'Nice work — tell me more about why that step follows.',
+    );
+    expect(result.data.signals?.ready_to_finish).toBe(true);
+    expect(result.data.signals?.evaluate_assessment).toEqual({
+      challenge_passed: undefined,
+      flaw_identified: 'inverted cause-effect',
+      quality: 4,
+    });
+  });
+
+  it('[WI-1995] keeps the reply and sibling signals when challenge_passed has the wrong type', () => {
+    const result = llmResponseEnvelopeSchema.safeParse({
+      reply: 'Your explanation still matters.',
+      signals: {
+        partial_progress: true,
+        evaluate_assessment: {
+          challenge_passed: 'yes',
+          flaw_identified: 'missed the boundary case',
+          quality: 3,
+        },
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.reply).toBe('Your explanation still matters.');
+    expect(result.data.signals?.partial_progress).toBe(true);
+    expect(result.data.signals?.evaluate_assessment).toEqual({
+      challenge_passed: undefined,
+      flaw_identified: 'missed the boundary case',
+      quality: 3,
+    });
+  });
+
+  it('[WI-1995] preserves a valid challenge_passed verdict', () => {
+    const result = llmResponseEnvelopeSchema.safeParse({
+      reply: 'You found the flaw.',
+      signals: {
+        understanding_check: true,
+        evaluate_assessment: {
+          challenge_passed: true,
+          flaw_identified: 'unsupported premise',
+          quality: 5,
+        },
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.reply).toBe('You found the flaw.');
+    expect(result.data.signals?.understanding_check).toBe(true);
+    expect(result.data.signals?.evaluate_assessment).toEqual({
+      challenge_passed: true,
+      flaw_identified: 'unsupported premise',
+      quality: 5,
+    });
   });
 });
 
@@ -705,6 +844,7 @@ describe('normaliseSignals', () => {
     const result: NormalisedEnvelopeSignals = normaliseSignals({});
     expect(result.ready_to_finish).toBe(false);
     expect(result.partial_progress).toBe(false);
+    expect(result.answer_evaluation).toBeNull();
     expect(result.needs_deepening).toBe(false);
     expect(result.understanding_check).toBe(false);
     expect(result.retrieval_score).toBeNull();
@@ -721,6 +861,7 @@ describe('normaliseSignals', () => {
     const result = normaliseSignals(undefined);
     expect(result.challenge_round_offer).toBe(false);
     expect(result.challenge_round_evaluation).toEqual([]);
+    expect(result.noticed_gap).toBeNull();
   });
 
   // [H2 — 2026-06-05 safety audit] crisis_redirect signal
@@ -733,6 +874,71 @@ describe('normaliseSignals', () => {
     expect(normaliseSignals({ crisis_redirect: true }).crisis_redirect).toBe(
       true,
     );
+  });
+});
+
+describe('mentor notice envelope fields', () => {
+  const answerEventId = '00000000-0000-4000-8000-000000000001';
+
+  it('accepts a grounded noticed_gap proposal', () => {
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: 'Those minus signs are sneaky.',
+      signals: {
+        noticed_gap: {
+          concept: 'Sign changes when moving terms',
+          correctionHint: 'Reverse the operation across the equals sign.',
+          answerEventId,
+          learnerQuote: 'I moved -3 over and kept it negative',
+        },
+      },
+    });
+
+    expect(parsed.signals?.noticed_gap?.answerEventId).toBe(answerEventId);
+  });
+
+  // [WI-2500] clause 1 — the MVP proposal carries no topicId (interleaved
+  // notice targeting is out of MVP scope per clause 6). A stray topicId from
+  // an un-upgraded prompt must not surface anywhere downstream, so this
+  // asserts it is silently stripped rather than merely absent from the type.
+  it('strips a stray topicId from a noticed_gap proposal', () => {
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: 'Let us straighten out that distinction.',
+      signals: {
+        noticed_gap: {
+          concept: 'Mitosis versus meiosis',
+          correctionHint: 'Mitosis keeps the chromosome count unchanged.',
+          answerEventId,
+          learnerQuote: 'meiosis makes identical cells',
+          topicId: '00000000-0000-4000-8000-000000000003',
+        },
+      },
+    });
+
+    expect(parsed.signals?.noticed_gap).not.toHaveProperty('topicId');
+  });
+
+  it('accepts an explicit null noticed_gap when no gap was observed', () => {
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: 'That answer is correct.',
+      signals: { noticed_gap: null },
+    });
+
+    expect(parsed.signals?.noticed_gap).toBeNull();
+    expect(normaliseSignals(parsed.signals).noticed_gap).toBeNull();
+  });
+
+  it('rejects a noticed_gap proposal without learner evidence', () => {
+    expect(
+      llmResponseEnvelopeSchema.safeParse({
+        reply: 'Keep going.',
+        signals: {
+          noticed_gap: {
+            concept: 'Sign changes',
+            answerEventId,
+          },
+        },
+      }).success,
+    ).toBe(false);
   });
 });
 
@@ -788,6 +994,15 @@ describe('challenge round envelope fields', () => {
             answerEventId: '00000000-0000-4000-8000-000000000001',
             learnerQuote:
               'photosynthesis stores energy in glucose and respiration releases it',
+            questionIdentity: {
+              questionText:
+                'Why does photosynthesis store energy while respiration releases it?',
+              minimalLearningClaim:
+                'photosynthesis stores energy while respiration releases it',
+              cognitiveOperation: 'causal_explanation',
+              materialContext: '',
+              noveltyBasis: 'new_reasoning',
+            },
           },
           {
             concept: 'role of ATP',
@@ -809,45 +1024,131 @@ describe('challenge round envelope fields', () => {
       confidence: 'high',
     });
     expect(parsed.signals?.challenge_round_evaluation).toHaveLength(3);
+    expect(
+      parsed.signals?.challenge_round_evaluation?.[0]?.questionIdentity
+        ?.cognitiveOperation,
+    ).toBe('causal_explanation');
+    expect(
+      parsed.signals?.challenge_round_evaluation?.[0]?.questionIdentity
+        ?.noveltyBasis,
+    ).toBe('new_reasoning');
     expect(parsed.signals?.challenge_round_evaluation?.[2]?.correction).toBe(
       'occurs in chloroplasts',
     );
   });
 
-  it('rejects evaluation item missing answerEventId (HIGH-6 grounding requirement)', () => {
-    const result = llmResponseEnvelopeSchema.safeParse({
-      reply: 'OK.',
-      signals: {
-        challenge_round_evaluation: [
-          {
-            concept: 'x',
-            result: 'solid',
-            evidence: 'ok',
-            // missing answerEventId
-            learnerQuote: 'something',
-          },
-        ],
+  it('accepts a legacy question identity without noveltyBasis', () => {
+    const result = challengeRoundEvaluationItemSchema.safeParse({
+      concept: 'photosynthesis',
+      result: 'solid',
+      evidence: 'learner explains stored chemical energy',
+      answerEventId: '00000000-0000-4000-8000-000000000001',
+      learnerQuote: 'sunlight becomes energy stored in glucose',
+      questionIdentity: {
+        questionText: 'How does photosynthesis store energy?',
+        minimalLearningClaim:
+          'photosynthesis stores light energy as chemical energy',
+        cognitiveOperation: 'causal_explanation',
+        materialContext: '',
       },
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.questionIdentity?.noveltyBasis).toBeUndefined();
+  });
+
+  it('rejects an unsupported question identity noveltyBasis', () => {
+    const result = challengeRoundEvaluationItemSchema.safeParse({
+      concept: 'photosynthesis',
+      result: 'solid',
+      evidence: 'learner explains stored chemical energy',
+      answerEventId: '00000000-0000-4000-8000-000000000001',
+      learnerQuote: 'sunlight becomes energy stored in glucose',
+      questionIdentity: {
+        questionText: 'How does photosynthesis store energy?',
+        minimalLearningClaim:
+          'photosynthesis stores light energy as chemical energy',
+        cognitiveOperation: 'causal_explanation',
+        materialContext: '',
+        noveltyBasis: 'cosmetic_paraphrase',
+      },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an item missing answerEventId (HIGH-6 grounding requirement)', () => {
+    const result = challengeRoundEvaluationItemSchema.safeParse({
+      concept: 'x',
+      result: 'solid',
+      evidence: 'ok',
+      // missing answerEventId
+      learnerQuote: 'something',
     });
     expect(result.success).toBe(false);
   });
 
-  it('rejects evaluation item missing learnerQuote (HIGH-6 grounding requirement)', () => {
+  it('rejects an item missing learnerQuote (HIGH-6 grounding requirement)', () => {
+    const result = challengeRoundEvaluationItemSchema.safeParse({
+      concept: 'x',
+      result: 'solid',
+      evidence: 'ok',
+      answerEventId: '00000000-0000-4000-8000-000000000001',
+      // missing learnerQuote
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('[WI-1995] drops the whole challenge evaluation when any item is malformed', () => {
+    const validItem = {
+      concept: 'photosynthesis vs respiration',
+      result: 'solid' as const,
+      evidence: 'learner described both directions of energy flow',
+      answerEventId: '00000000-0000-4000-8000-000000000001',
+      learnerQuote:
+        'photosynthesis stores energy in glucose and respiration releases it',
+    };
     const result = llmResponseEnvelopeSchema.safeParse({
-      reply: 'OK.',
+      reply: 'Strong work — your valid explanation is preserved.',
       signals: {
+        ready_to_finish: true,
         challenge_round_evaluation: [
+          validItem,
           {
-            concept: 'x',
-            result: 'solid',
-            evidence: 'ok',
-            answerEventId: '00000000-0000-4000-8000-000000000001',
-            // missing learnerQuote
+            concept: 'role of ATP',
+            result: 'partial',
+            evidence: 'mentioned energy currency, missed structure',
+            answerEventId: '00000000-0000-4000-8000-000000000002',
+            // missing learnerQuote: the whole Challenge signal must be discarded
           },
         ],
       },
     });
-    expect(result.success).toBe(false);
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.reply).toBe(
+      'Strong work — your valid explanation is preserved.',
+    );
+    expect(result.data.signals?.ready_to_finish).toBe(true);
+    expect(result.data.signals?.challenge_round_evaluation).toBeUndefined();
+  });
+
+  it('[WI-1995] keeps the envelope when challenge evaluation has the wrong type', () => {
+    const result = llmResponseEnvelopeSchema.safeParse({
+      reply: 'The learner-visible reply still matters.',
+      signals: {
+        ready_to_finish: true,
+        challenge_round_evaluation: 'not an array',
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.reply).toBe('The learner-visible reply still matters.');
+    expect(result.data.signals?.ready_to_finish).toBe(true);
+    expect(result.data.signals?.challenge_round_evaluation).toBeUndefined();
   });
 
   it('caps challenge_round_evaluation array at 10 items', () => {
@@ -864,6 +1165,32 @@ describe('challenge round envelope fields', () => {
         challenge_round_evaluation: Array.from({ length: 11 }, () => item),
       },
     });
+    expect(result.success).toBe(false);
+  });
+
+  it('[WI-1995] rejects an over-cap evaluation even when one item is malformed', () => {
+    const validItem = {
+      concept: 'x',
+      result: 'solid' as const,
+      evidence: 'ok',
+      answerEventId: '00000000-0000-4000-8000-000000000001',
+      learnerQuote: 'q',
+    };
+    const result = llmResponseEnvelopeSchema.safeParse({
+      reply: 'OK.',
+      signals: {
+        challenge_round_evaluation: [
+          ...Array.from({ length: 10 }, () => validItem),
+          {
+            concept: 'malformed overflow item',
+            result: 'partial',
+            evidence: 'missing provenance quote',
+            answerEventId: '00000000-0000-4000-8000-000000000002',
+          },
+        ],
+      },
+    });
+
     expect(result.success).toBe(false);
   });
 
@@ -939,6 +1266,12 @@ describe('challengeRoundGraderVerdictSchema (T1 — grader verdict)', () => {
     result: 'solid' as const,
     evidence: 'links speed to collision frequency and energy',
     learnerQuote: 'particles move faster and collide more often',
+    questionIdentity: {
+      questionText: 'Why does increasing temperature speed up reactions?',
+      minimalLearningClaim: 'temperature raises productive collision frequency',
+      cognitiveOperation: 'causal_explanation' as const,
+      materialContext: 'most chemical reactions',
+    },
   };
 
   // (a) a one-item verdict without answerEventId parses successfully
@@ -1063,12 +1396,14 @@ describe('challengeRoundGraderDegradedEventSchema (T1 — degraded event payload
     expect(result.success).toBe(true);
   });
 
-  it('accepts all four reason enum values', () => {
+  it('accepts all five reason enum values', () => {
     for (const reason of [
       'route_error',
       'no_json',
       'parse_error',
       'schema_invalid',
+      // [WI-2670] producer vendor unresolved — fail-open degraded reason.
+      'producer_vendor_unresolved',
     ] as const) {
       const r = challengeRoundGraderDegradedEventSchema.safeParse({
         ...REQUIRED,

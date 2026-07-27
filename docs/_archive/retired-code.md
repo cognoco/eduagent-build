@@ -5,6 +5,24 @@ and how to recover it. Append newest-first.
 
 ---
 
+## WI-1576 — Retired the 4 no-op legacy-identity-anchors.ts test shims (2026-07-12)
+
+`apps/api/src/test-utils/legacy-identity-anchors.ts`'s four back-compat shims
+(`legacyIdentityTableExistsForTest`, `ensureLegacyProfileAnchorForTest`,
+`ensureLegacySubscriptionAnchorForTest`, `deleteLegacyAccountsForTest`) —
+self-inerting no-ops since WI-1306's physical DROP of the legacy
+accounts/profiles/family_links/consent_states/subscriptions tables — are now
+deleted outright, along with their ~105 call sites across 30+ integration-test
+files. Each call site either dropped a line whose only purpose was invoking a
+no-op, or (where the removed helper gated a legacy-fallback read/write) had its
+conditional collapsed to the always-true branch the gate already forced once
+the tables were gone (e.g. `route-fixtures.ts`'s `createProfileViaRoute` /
+`resolveAccountId`, which always took the "legacy unavailable" branch). The two
+other exports in the same file, `ensureV2IdentityForLegacyProfileTest` and
+`deleteV2IdentitiesForTest`, write real v2 tables and are unchanged. The
+"Test-seed / test-util raw-SQL conversion" entry under WI-1306 below, describing
+these four as still-live no-ops, is now superseded by this entry.
+
 ## WI-1306 — M2a physical DROP of the 5 legacy identity/billing tables (2026-07-05)
 
 Journal-promoted the two terminal freeze-only drafts

@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, exists, sql } from 'drizzle-orm';
 
 import {
   curriculumBooks,
@@ -6,6 +6,7 @@ import {
   person,
   retentionCards,
   subjects,
+  supportVisibilityContracts,
   supportership,
   type Database,
 } from '@eduagent/database';
@@ -18,6 +19,7 @@ import {
 } from '@eduagent/schemas';
 
 import { ForbiddenError } from '../errors';
+import { acceptedVisibilityCondition } from './linking-ceremony';
 
 type StructuralRow = {
   subjectId: string;
@@ -141,12 +143,15 @@ export async function readSupporteeStructuralSubjects(
     .select({ edgeId: supportership.id })
     .from(supportership)
     .innerJoin(person, eq(person.id, supportership.supporteePersonId))
+    .innerJoin(
+      supportVisibilityContracts,
+      eq(supportVisibilityContracts.supportershipId, supportership.id),
+    )
     .where(
       and(
         eq(supportership.supporterPersonId, supporterPersonId),
         eq(supportership.supporteePersonId, supporteePersonId),
-        isNull(supportership.revokedAt),
-        isNull(person.archivedAt),
+        acceptedVisibilityCondition(),
       ),
     )
     .limit(1);
@@ -186,7 +191,35 @@ export async function readSupporteeStructuralSubjects(
         eq(retentionCards.profileId, subjects.profileId),
       ),
     )
-    .where(eq(subjects.profileId, supporteePersonId))
+    .where(
+      and(
+        eq(subjects.profileId, supporteePersonId),
+        // [WI-2237] Self-authorizing re-check, not a trust of the edgeId
+        // fetched above: closes the intra-call TOCTOU window the AC calls
+        // out ("separate pre-check/read sequences are also TOCTOU-prone") —
+        // a revoke/lapse landing between the edge lookup above and this
+        // query cannot leak structural data, because this query
+        // independently re-evaluates the same accepted-visibility predicate
+        // at read time, correlated on subjects.profileId.
+        exists(
+          db
+            .select({ _: sql`1` })
+            .from(supportership)
+            .innerJoin(
+              supportVisibilityContracts,
+              eq(supportVisibilityContracts.supportershipId, supportership.id),
+            )
+            .innerJoin(person, eq(person.id, supportership.supporteePersonId))
+            .where(
+              and(
+                eq(supportership.supporterPersonId, supporterPersonId),
+                eq(supportership.supporteePersonId, subjects.profileId),
+                acceptedVisibilityCondition(),
+              ),
+            ),
+        ),
+      ),
+    )
     .orderBy(
       asc(subjects.name),
       asc(subjects.id),

@@ -333,7 +333,7 @@ describe('[BUG-699-FOLLOWUP] recall-nudge-send 24h push dedup', () => {
       {
         hours: 24,
         maxCount: 1,
-        dedupTypes: ['recall_nudge', 'review_reminder'],
+        dedupTypes: ['review_reminder', 'recall_nudge', 'notice_recheck'],
       },
     );
     expect(mockSendPushNotification).not.toHaveBeenCalled();

@@ -12,6 +12,8 @@ import type { ScopeDescriptor, SharedRecord } from '@eduagent/schemas';
 import type { EligibleManagedPerson } from '../../hooks/use-eligible-supportees';
 import { StructuralFactCard } from '../learning-surface';
 import { SupportPersonPickerSheet } from './SupportPersonPickerSheet';
+import { SupporterColdStart } from './SupporterColdStart';
+import { SupporterSelfLearningDoorway } from './SupporterSelfLearningDoorway';
 import { useSharedRecord } from './use-shared-record';
 
 type PersonScope = Extract<ScopeDescriptor, { kind: 'person' }>;
@@ -213,10 +215,16 @@ export function SupportHubMentorTab({
     >
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1">
-          <Text className="text-h2 font-semibold text-text-primary">
+          <Text
+            className="text-h2 font-semibold text-text-primary"
+            testID="support-hub-mentor-heading"
+          >
             {title}
           </Text>
-          <Text className="mt-1 text-body-sm text-text-secondary">
+          <Text
+            className="mt-1 text-body-sm text-text-secondary"
+            testID="support-hub-mentor-subtitle"
+          >
             {activePersonScope
               ? t('supportHub.mentor.personSubtitle')
               : t('supportHub.mentor.subtitle')}
@@ -240,6 +248,31 @@ export function SupportHubMentorTab({
           </Pressable>
         ) : null}
       </View>
+
+      {/* [WI-2226] The cold-start doorway (managed-family handoff / granted-
+          idle kickstart nudges) only applies to the unfiltered Support hub
+          view, not a single person's scope — the component self-guards on
+          `activeScope.kind`, but that guard fires after its query hook, so
+          gate the mount itself to avoid an unnecessary fetch while a person
+          scope is active.
+
+          [WI-2243] SupporterSelfLearningDoorway is mounted alongside it,
+          not in place of it. V2 shell spec §2.3/§4.2 makes the "learn
+          something yourself" doorway persistent and first-class, distinct
+          from these child-focused cold-start cards — the two answer
+          different questions ("what about my kids" vs. "learn something
+          yourself") and are meant to coexist, not compete. Each self-guards
+          independently (SupporterColdStart on having something to show;
+          the doorway on the supporter having no own learning state yet),
+          so any combination of "both", "doorway alone", or "neither" is a
+          valid render — this gate only keeps both out of a single person's
+          scope. */}
+      {!activePersonScope ? (
+        <>
+          <SupporterColdStart />
+          <SupporterSelfLearningDoorway />
+        </>
+      ) : null}
 
       <View className="mt-4 gap-3">
         {personScopes.length === 0 ? (

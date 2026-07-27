@@ -1,0 +1,4 @@
+DROP INDEX IF EXISTS "support_visibility_audit_events_contract_idx";--> statement-breakpoint
+DROP INDEX IF EXISTS "support_visibility_notices_contract_idx";--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "support_visibility_audit_events_contract_idx" ON "support_visibility_audit_events" USING btree ("contract_id") WHERE "support_visibility_audit_events"."contract_id" IS NOT NULL;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "support_visibility_notices_contract_idx" ON "support_visibility_notices" USING btree ("contract_id") WHERE "support_visibility_notices"."contract_id" IS NOT NULL;

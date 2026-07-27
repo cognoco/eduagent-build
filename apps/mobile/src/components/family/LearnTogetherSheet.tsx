@@ -70,7 +70,12 @@ export function LearnTogetherSheet({
   };
 
   return (
-    <BottomSheet visible onClose={onClose} animationType="fade">
+    <BottomSheet
+      visible
+      onClose={onClose}
+      accessibilityLabel={t('home.parent.learnTogether.title')}
+      animationType="fade"
+    >
       <View className="bg-surface px-5 pt-5 pb-8" testID="learn-together-sheet">
         <View className="flex-row items-center justify-between mb-3">
           <View className="flex-1 pr-3">

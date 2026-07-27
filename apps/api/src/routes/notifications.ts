@@ -18,7 +18,10 @@ import {
 } from '../middleware/profile-scope';
 import type { Account } from '../services/account';
 import { notFound } from '../errors';
-import { assertOwnerProfile } from '../services/family-access';
+import {
+  assertOwnerProfile,
+  assertCallerIsAccountOwner,
+} from '../services/family-access';
 import { dismissChildCapNotification } from '../services/child-cap-notifications';
 import {
   listActiveChildCapNotificationsV2,
@@ -34,6 +37,9 @@ type NotificationsRouteEnv = {
     user: AuthUser;
     db: Database;
     account: Account;
+    // [WI-1989] The authenticated caller's own person id, resolved server-side
+    // by accountMiddleware — required by assertCallerIsAccountOwner.
+    callerPersonId: string | undefined;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
   };
@@ -46,6 +52,8 @@ const notificationParamsSchema = z.object({
 export const notificationsRoutes = new Hono<NotificationsRouteEnv>()
   .get('/notifications/child-cap', async (c) => {
     assertOwnerProfile(c);
+    // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(c);
 
     const ownerProfileId = requireProfileId(c.get('profileId'));
     const notifications = await listActiveChildCapNotificationsV2(
@@ -59,6 +67,8 @@ export const notificationsRoutes = new Hono<NotificationsRouteEnv>()
     zValidator('param', notificationParamsSchema),
     async (c) => {
       assertOwnerProfile(c);
+      // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+      await assertCallerIsAccountOwner(c);
 
       const dismissed = await dismissChildCapNotification(
         c.get('db'),

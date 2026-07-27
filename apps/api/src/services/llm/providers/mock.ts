@@ -92,12 +92,24 @@ function maybeRecallGradeJson(messages: ChatMessage[]): string | null {
         verdict: 'solid',
         rationale: 'Mock grade: substantive recall.',
         misconception: null,
+        // [WI-2114] Mock the answer-specific feedback block so paths that
+        // surface it (feedback_only rendering) are exercised end-to-end.
+        feedback: {
+          strengths: 'Mock feedback: you covered the core idea.',
+          gaps: 'Mock feedback: a supporting detail is missing.',
+          nextStep: 'Mock feedback: name that detail and try again.',
+        },
       }
     : {
         quality: 2,
         verdict: 'partial',
         rationale: 'Mock grade: incomplete recall.',
         misconception: null,
+        feedback: {
+          strengths: 'Mock feedback: you recalled part of it.',
+          gaps: 'Mock feedback: key points are still missing.',
+          nextStep: 'Mock feedback: review the main idea and retry.',
+        },
       };
   return JSON.stringify(grade);
 }

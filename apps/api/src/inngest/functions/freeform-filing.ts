@@ -19,7 +19,7 @@ import {
 } from '../../services/filing';
 import { getSessionTranscript } from '../../services/session';
 import { routeAndCall } from '../../services/llm';
-import { isGdprProcessingAllowedV2 } from '../../services/identity-v2/consent-status-v2';
+import { isLlmExchangeConsentAllowed } from '../../services/identity-v2/consent-status-v2';
 
 interface FilingStep {
   run<T>(id: string, fn: () => Promise<T>): Promise<T>;
@@ -77,10 +77,11 @@ async function runFreeformFiling({
   const consentAllowed = await step.run('check-gdpr-consent', async () => {
     const db = getStepDatabase();
     // [WI-809] v2: consent_states is dropped at the cutover (migration
-    // 0118). Route through the GDPR-pinned v2 gate. isGdprProcessingAllowedV2
-    // returns true iff there is no GDPR consent row OR the latest GDPR grant
-    // is CONSENTED — byte-identical to the legacy allow rule, pinned to GDPR.
-    return isGdprProcessingAllowedV2(db, profileId);
+    // 0118). [WI-2396] Switched from the GDPR-pinned-only
+    // isGdprProcessingAllowedV2 to isLlmExchangeConsentAllowed, which also
+    // honors an adult's independently-withdrawable self-consent (art6_1_a) —
+    // this step gates the LLM-backed filing call below.
+    return isLlmExchangeConsentAllowed(db, profileId);
   });
   if (!consentAllowed) {
     return { status: 'skipped', reason: 'consent_not_granted' };
@@ -171,7 +172,7 @@ async function runFreeformFiling({
     // Re-check inside the consuming step. The earlier consent step is memoized
     // by Inngest, so a withdrawal between steps must still block transcript
     // use, LLM filing, and derived library writes.
-    const reCheckAllowed = await isGdprProcessingAllowedV2(db, profileId);
+    const reCheckAllowed = await isLlmExchangeConsentAllowed(db, profileId);
     if (!reCheckAllowed) {
       return { status: 'skipped' as const, reason: 'consent_not_granted' };
     }

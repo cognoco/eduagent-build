@@ -191,6 +191,16 @@ export class VocabularyNotFoundError extends Error {
   }
 }
 
+// WI-1777: write-side ownership guard for speaking-practice attempts —
+// mirrors SubjectNotFoundError's shape for the sessionId ownership check.
+export class LearningSessionNotFoundError extends Error {
+  constructor() {
+    super('Learning session not found');
+    this.name = 'LearningSessionNotFoundError';
+    Object.setPrototypeOf(this, LearningSessionNotFoundError.prototype);
+  }
+}
+
 export class TopicNotSkippedError extends Error {
   constructor() {
     super('Topic is not skipped');
@@ -471,6 +481,7 @@ export const ERROR_CODES = {
   NETWORK_ERROR: 'NETWORK_ERROR',
   // [WI-1059] Client boundary: API response body did not match expected schema.
   API_RESPONSE_SHAPE_ERROR: 'API_RESPONSE_SHAPE_ERROR',
+  RECALL_BRIDGE_SUPPRESSED: 'RECALL_BRIDGE_SUPPRESSED',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

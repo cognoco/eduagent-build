@@ -7,6 +7,8 @@ import {
   streamFallbackFrameSchema,
   UpstreamLlmError,
   type QuotaModel,
+  type AnswerEvaluation,
+  type MentorNoticePolicyObservation,
   type SubscriptionTier,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -35,6 +37,8 @@ interface DoneFrameSource {
   aiEventId?: string;
   notePrompt?: boolean;
   notePromptPostSession?: boolean;
+  /** [WI-2107] LLM opened a topic without delivering content or a question this turn. */
+  topicOpenedPendingContent?: boolean;
   fluencyDrill?: unknown;
   languageLearning?: unknown;
   confidence?: 'low' | 'medium' | 'high';
@@ -42,6 +46,8 @@ interface DoneFrameSource {
   challengeRound?: unknown;
   challengeOffer?: { pitch: string };
   draftedNote?: unknown;
+  mentorNotice?: unknown;
+  answerEvaluation?: AnswerEvaluation;
 }
 
 type SessionMessageInput = Parameters<typeof processMessage>[3];
@@ -77,6 +83,16 @@ export interface StreamSessionResponseParams {
   };
   idempotencyKv?: KVNamespace;
   streamOptions: StreamMessageOptions;
+  /**
+   * [WI-2627] Mentor-notice policy observation for this request, resolved by the
+   * route through the one visibility predicate. Attached to EVERY terminal
+   * `done` frame — including the fallback ones — because it describes the
+   * POLICY, not the outcome of the exchange: a client whose turn fell back to
+   * the non-streaming path still needs to order its policy state, and a
+   * fallback frame that silently dropped the observation would look to the
+   * client exactly like a legacy worker that never sends one.
+   */
+  noticePolicyObservation?: MentorNoticePolicyObservation;
   createSseResponse: CreateSseResponse;
   deps?: StreamSessionResponseDependencies;
 }
@@ -94,15 +110,20 @@ const defaultDeps: StreamSessionResponseDependencies = {
   addBreadcrumb,
 };
 
-export function buildDoneFramePayload(source: DoneFrameSource) {
+export function buildDoneFramePayload(
+  source: DoneFrameSource,
+  noticePolicyObservation?: MentorNoticePolicyObservation,
+) {
   return streamDoneFrameSchema.parse({
     type: 'done' as const,
+    mentorNoticePolicy: noticePolicyObservation,
     exchangeCount: source.exchangeCount,
     escalationRung: source.escalationRung,
     expectedResponseMinutes: source.expectedResponseMinutes ?? 0,
     aiEventId: source.aiEventId,
     notePrompt: source.notePrompt || undefined,
     notePromptPostSession: source.notePromptPostSession || undefined,
+    topicOpenedPendingContent: source.topicOpenedPendingContent || undefined,
     fluencyDrill: source.fluencyDrill || undefined,
     languageLearning: source.languageLearning || undefined,
     confidence: source.confidence || undefined,
@@ -110,6 +131,8 @@ export function buildDoneFramePayload(source: DoneFrameSource) {
     challengeRound: source.challengeRound,
     challengeOffer: source.challengeOffer,
     draftedNote: source.draftedNote,
+    mentorNotice: source.mentorNotice,
+    answerEvaluation: source.answerEvaluation,
   });
 }
 
@@ -166,6 +189,8 @@ function buildProcessOptions(
     memoryFactsReadEnabled: options.memoryFactsReadEnabled,
     memoryFactsRelevanceEnabled: options.memoryFactsRelevanceEnabled,
     challengeRoundRuntimeEnabled: options.challengeRoundRuntimeEnabled,
+    answerEvaluationEnabled: options.answerEvaluationEnabled,
+    mentorNoticeEnabled: options.mentorNoticeEnabled,
     reviewCallbackOpenerEnabled: options.reviewCallbackOpenerEnabled,
     judgeFrameworkEnabled: options.judgeFrameworkEnabled,
     judgeEnforcementEnabled: options.judgeEnforcementEnabled,
@@ -265,7 +290,9 @@ export async function streamSessionResponse(
               }),
             });
             await sseStream.writeSSE({
-              data: JSON.stringify(buildDoneFramePayload(fallback)),
+              data: JSON.stringify(
+                buildDoneFramePayload(fallback, params.noticePolicyObservation),
+              ),
             });
             await deps.markPersisted({
               kv: params.idempotencyKv,
@@ -380,6 +407,10 @@ export async function streamSessionResponse(
               exchangeCount: params.session.exchangeCount,
               escalationRung: result.escalationRung,
               expectedResponseMinutes: 0,
+              // [WI-2627] This frame is hand-built rather than routed through
+              // buildDoneFramePayload; the observation is attached here too so
+              // no terminal frame is silently observation-free.
+              mentorNoticePolicy: params.noticePolicyObservation,
             }),
           });
           await deps.sendEmptyReplyFallbackEvent({
@@ -407,7 +438,9 @@ export async function streamSessionResponse(
         }
 
         await sseStream.writeSSE({
-          data: JSON.stringify(buildDoneFramePayload(result)),
+          data: JSON.stringify(
+            buildDoneFramePayload(result, params.noticePolicyObservation),
+          ),
         });
         await deps.markPersisted({
           kv: params.idempotencyKv,
@@ -489,7 +522,9 @@ export async function streamSessionResponse(
             }),
           });
           await sseStream.writeSSE({
-            data: JSON.stringify(buildDoneFramePayload(fallback)),
+            data: JSON.stringify(
+              buildDoneFramePayload(fallback, params.noticePolicyObservation),
+            ),
           });
           await deps.markPersisted({
             kv: params.idempotencyKv,

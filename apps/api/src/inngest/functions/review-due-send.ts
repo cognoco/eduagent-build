@@ -17,6 +17,7 @@ import { isPersonLive } from '../../services/identity-v2/helpers';
 import {
   formatReviewReminderBody,
   sendPushNotification,
+  REVIEW_FAMILY_DEDUP_TYPES,
 } from '../../services/notifications';
 import { checkAndLogRateLimitInternal } from '../../services/settings';
 import { captureException } from '../../services/sentry';
@@ -82,7 +83,7 @@ export const reviewDueSend = inngest.createFunction(
           {
             hours: 24,
             maxCount: 1,
-            dedupTypes: ['recall_nudge', 'review_reminder'],
+            dedupTypes: [...REVIEW_FAMILY_DEDUP_TYPES],
           },
         );
       } catch (err) {

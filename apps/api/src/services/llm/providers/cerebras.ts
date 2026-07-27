@@ -11,7 +11,7 @@ import { normalizeStopReason, type StopReason } from '../stop-reason';
 import { createLogger } from '../../logger';
 import { SafetyFilterError } from '../../../errors';
 import { createProviderApiError, createProviderHttpError } from './errors';
-import { toOpenAIContent } from './openai';
+import { toOpenAIContent, toOpenAICompatLlmUsage } from './openai';
 import { normalizeModelRefusal } from './refusal-envelope';
 import {
   cerebrasResponseSchema,
@@ -205,6 +205,7 @@ export function createCerebrasProvider(apiKey: string): LLMProvider {
     async chat(
       messages: ChatMessage[],
       config: ModelConfig,
+      signal?: AbortSignal,
     ): Promise<ChatResult> {
       const res = await fetch(CEREBRAS_BASE_URL, {
         method: 'POST',
@@ -213,7 +214,9 @@ export function createCerebrasProvider(apiKey: string): LLMProvider {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify(buildBody(messages, config, false)),
-        signal: AbortSignal.timeout(CEREBRAS_TIMEOUT_MS),
+        signal: signal
+          ? AbortSignal.any([signal, AbortSignal.timeout(CEREBRAS_TIMEOUT_MS)])
+          : AbortSignal.timeout(CEREBRAS_TIMEOUT_MS),
       });
 
       if (!res.ok) {
@@ -261,6 +264,7 @@ export function createCerebrasProvider(apiKey: string): LLMProvider {
       return {
         content: normalized ?? text,
         stopReason: normalizeStopReason('openai', choice?.finish_reason),
+        usage: toOpenAICompatLlmUsage(data.usage),
       };
     },
 
@@ -345,8 +349,8 @@ export function createCerebrasProvider(apiKey: string): LLMProvider {
                       {
                         event: 'cerebras.sse.malformed',
                         site: 'stream_loop',
-                        chunk: jsonStr.slice(0, 200),
-                        error: chunkParsed.error.message,
+                        chunkLength: jsonStr.length,
+                        errorKind: 'schema_validation',
                       },
                     );
                     continue;
@@ -365,8 +369,8 @@ export function createCerebrasProvider(apiKey: string): LLMProvider {
                   logger.warn('[llm:cerebras] malformed SSE chunk discarded', {
                     event: 'cerebras.sse.malformed',
                     site: 'stream_loop',
-                    chunk: jsonStr.slice(0, 200),
-                    error: err instanceof Error ? err.message : String(err),
+                    chunkLength: jsonStr.length,
+                    errorKind: 'json_parse',
                   });
                 }
               }
@@ -388,8 +392,8 @@ export function createCerebrasProvider(apiKey: string): LLMProvider {
                         {
                           event: 'cerebras.sse.malformed',
                           site: 'flush_buffer',
-                          chunk: jsonStr.slice(0, 200),
-                          error: chunkParsed.error.message,
+                          chunkLength: jsonStr.length,
+                          errorKind: 'schema_validation',
                         },
                       );
                     } else {
@@ -408,8 +412,8 @@ export function createCerebrasProvider(apiKey: string): LLMProvider {
                       {
                         event: 'cerebras.sse.malformed',
                         site: 'flush_buffer',
-                        chunk: jsonStr.slice(0, 200),
-                        error: err instanceof Error ? err.message : String(err),
+                        chunkLength: jsonStr.length,
+                        errorKind: 'json_parse',
                       },
                     );
                   }

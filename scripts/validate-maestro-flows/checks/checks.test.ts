@@ -371,7 +371,462 @@ describe('C6 — unjustified optional: true', () => {
     expect(result.passed).toBe(false);
   });
 
-  it('exempts flows not tagged pr-blocking or smoke', () => {
+  it('fails on unjustified optional: true in a v2-only flow', () => {
+    const yaml = [
+      'tags:',
+      '  - v2',
+      '---',
+      '- assertVisible:',
+      '    id: "v2-shell"',
+      '    optional: true',
+    ].join('\n');
+    const flow = mkFlow('flows/v2/shell.yaml', yaml);
+    const result = runC6(baseInputs({ flows: [flow] }));
+    expect(result.passed).toBe(false);
+    expect(result.violations[0]?.reason).toMatch(/v2.*hard assertion/i);
+  });
+
+  it('fails on a justified optional assertion in a v2 flow', () => {
+    const yaml = [
+      'tags: [v2]',
+      '---',
+      '- assertNotVisible:',
+      '    id: "legacy-shell"',
+      '    optional: true # justified: transitional UI',
+    ].join('\n');
+    const flow = mkFlow('flows/v2/no-legacy.yaml', yaml);
+    const result = runC6(baseInputs({ flows: [flow] }));
+    expect(result.passed).toBe(false);
+    expect(result.violations[0]?.reason).toMatch(/hard assertion/i);
+  });
+
+  it('fails on an allowlisted optional assertion in a v2 flow', () => {
+    const repoPath = 'apps/mobile/e2e/flows/v2/allowlisted.yaml';
+    const yaml = [
+      'tags: [v2]',
+      '---',
+      '- assertVisible:',
+      '    id: "v2-shell"',
+      '    optional: true',
+    ].join('\n');
+    const flow = mkFlow(repoPath, yaml);
+    const result = runC6(
+      baseInputs({
+        flows: [flow],
+        optionalAllowlist: ['flows/v2/allowlisted.yaml'],
+      }),
+    );
+    expect(result.passed).toBe(false);
+    expect(result.violations[0]?.reason).toMatch(/hard assertion/i);
+  });
+
+  it('fails on a bare optional inline-map assertion in a v2 flow', () => {
+    const flow = mkFlow(
+      'flows/v2/inline.yaml',
+      [
+        'tags: [v2]',
+        '---',
+        '- assertVisible: { id: "v2-shell", optional: true }',
+      ].join('\n'),
+    );
+    const result = runC6(baseInputs({ flows: [flow] }));
+    expect(result.passed).toBe(false);
+    expect(result.checkedCount).toBe(1);
+    expect(result.violations[0]?.reason).toMatch(/hard assertion/i);
+  });
+
+  it('fails on a justified optional inline-map assertion in a v2 flow', () => {
+    const flow = mkFlow(
+      'flows/v2/inline-justified.yaml',
+      [
+        'tags: [v2]',
+        '---',
+        '- assertNotVisible: { id: "legacy-shell", optional: true } # justified: transitional UI',
+      ].join('\n'),
+    );
+    const result = runC6(baseInputs({ flows: [flow] }));
+    expect(result.passed).toBe(false);
+    expect(result.violations[0]?.reason).toMatch(/hard assertion/i);
+  });
+
+  it('fails on an allowlisted optional inline-map assertion in a v2 flow', () => {
+    const repoPath = 'apps/mobile/e2e/flows/v2/inline-allowlisted.yaml';
+    const flow = mkFlow(
+      repoPath,
+      [
+        'tags: [v2]',
+        '---',
+        '- assertVisible: { text: "V2 home", optional: true }',
+      ].join('\n'),
+    );
+    const result = runC6(
+      baseInputs({
+        flows: [flow],
+        optionalAllowlist: ['flows/v2/inline-allowlisted.yaml'],
+      }),
+    );
+    expect(result.passed).toBe(false);
+    expect(result.violations[0]?.reason).toMatch(/hard assertion/i);
+  });
+
+  it('fails on a split sequence-map optional assertion in a v2 flow', () => {
+    const flow = mkFlow(
+      'flows/v2/split-map.yaml',
+      [
+        'tags: [v2]',
+        '---',
+        '-',
+        '  assertVisible:',
+        '    id: "v2-shell"',
+        '    optional: true',
+      ].join('\n'),
+    );
+    const result = runC6(baseInputs({ flows: [flow] }));
+    expect(result.passed).toBe(false);
+    expect(result.checkedCount).toBe(1);
+    expect(result.violations[0]?.reason).toMatch(/hard assertion/i);
+  });
+
+  it('fails on a quoted block optional key in a v2 assertion', () => {
+    const flow = mkFlow(
+      'flows/v2/quoted-block.yaml',
+      [
+        'tags: [v2]',
+        '---',
+        '- assertVisible:',
+        '    id: "v2-shell"',
+        '    "optional": true',
+      ].join('\n'),
+    );
+    const result = runC6(baseInputs({ flows: [flow] }));
+    expect(result.passed).toBe(false);
+    expect(result.checkedCount).toBe(1);
+    expect(result.violations[0]?.reason).toMatch(/hard assertion/i);
+  });
+
+  it('fails on a quoted inline optional key in a v2 assertion', () => {
+    const flow = mkFlow(
+      'flows/v2/quoted-inline.yaml',
+      [
+        'tags: [v2]',
+        '---',
+        '- assertNotVisible: { id: "legacy-shell", "optional": true }',
+      ].join('\n'),
+    );
+    const result = runC6(baseInputs({ flows: [flow] }));
+    expect(result.passed).toBe(false);
+    expect(result.checkedCount).toBe(1);
+    expect(result.violations[0]?.reason).toMatch(/hard assertion/i);
+  });
+
+  it.each([
+    ['YAML 1.1 yes', 'yes'],
+    ['YAML 1.1 title-case yes', 'Yes'],
+    ['YAML 1.1 uppercase yes', 'YES'],
+    ['YAML 1.1 on', 'on'],
+    ['YAML 1.1 title-case on', 'On'],
+    ['YAML 1.1 uppercase on', 'ON'],
+    ['explicit bool shorthand', '!!bool y'],
+    ['explicit bool mixed-case yes', '!!bool yEs'],
+    ['explicit bool mixed-case on', '!!bool oN'],
+    ['explicit bool mixed-case true', '!!bool tRuE'],
+    ['explicit bool quoted yes', '!!bool "yes"'],
+    ['quoted true', '"true"'],
+    ['quoted title-case true', '"True"'],
+    ['quoted uppercase true', '"TRUE"'],
+    ['quoted padded true', '" true "'],
+    ['non-zero integer', '1'],
+    ['negative integer', '-1'],
+    ['hexadecimal non-zero integer', '0x1'],
+  ])('fails on a V2 assertion using Maestro truthy %s', (_name, value) => {
+    const flow = mkFlow(
+      'flows/v2/maestro-truthy.yaml',
+      [
+        'tags: [v2]',
+        '---',
+        '- assertVisible:',
+        '    id: "v2-shell"',
+        `    optional: ${value}`,
+      ].join('\n'),
+    );
+    const result = runC6(baseInputs({ flows: [flow] }));
+    expect(result.passed).toBe(false);
+    expect(result.checkedCount).toBe(1);
+    expect(result.violations[0]?.line).toBe(5);
+    expect(result.violations[0]?.reason).toMatch(/hard assertion/i);
+  });
+
+  it('treats quoted true padded by ASCII control characters as optional true', () => {
+    const flow = mkFlow(
+      'flows/v2/maestro-ascii-control-padded-true.yaml',
+      [
+        'tags: [v2]',
+        '---',
+        '- assertVisible:',
+        '    id: "v2-shell"',
+        '    optional: "\\u0009true\\u001f"',
+      ].join('\n'),
+    );
+    const result = runC6(baseInputs({ flows: [flow] }));
+    expect(result.passed).toBe(false);
+    expect(result.checkedCount).toBe(1);
+    expect(result.violations[0]?.line).toBe(5);
+    expect(result.violations[0]?.reason).toMatch(/hard assertion/i);
+  });
+
+  it('does not treat quoted true padded by Unicode non-breaking spaces as optional true', () => {
+    const flow = mkFlow(
+      'flows/v2/maestro-unicode-space-padded-true.yaml',
+      [
+        'tags: [v2]',
+        '---',
+        '- assertVisible:',
+        '    id: "v2-shell"',
+        '    optional: "\\u00a0true\\u00a0"',
+      ].join('\n'),
+    );
+    const result = runC6(baseInputs({ flows: [flow] }));
+    expect(result.passed).toBe(true);
+    expect(result.checkedCount).toBe(0);
+  });
+
+  it('does not coerce untagged YAML sexagesimal 1:20 to optional true', () => {
+    const flow = mkFlow(
+      'flows/v2/maestro-sexagesimal.yaml',
+      [
+        'tags: [v2]',
+        '---',
+        '- assertVisible:',
+        '    id: "v2-shell"',
+        '    optional: 1:20',
+      ].join('\n'),
+    );
+    const result = runC6(baseInputs({ flows: [flow] }));
+    expect(result.passed).toBe(true);
+    expect(result.checkedCount).toBe(0);
+  });
+
+  it.each(['y', 'Y', '0', '0x0', '0:00', '1.0', '"false"'])(
+    'does not treat Maestro non-truth value %s as optional true',
+    (value) => {
+      const flow = mkFlow(
+        'flows/v2/maestro-non-truth.yaml',
+        [
+          'tags: [v2]',
+          '---',
+          '- assertVisible:',
+          '    id: "v2-shell"',
+          `    optional: ${value}`,
+        ].join('\n'),
+      );
+      const result = runC6(baseInputs({ flows: [flow] }));
+      expect(result.passed).toBe(true);
+      expect(result.checkedCount).toBe(0);
+    },
+  );
+
+  it('fails closed when a v2 flow is malformed YAML', () => {
+    const flow = mkFlow(
+      'flows/v2/malformed.yaml',
+      [
+        'tags: [v2]',
+        '---',
+        '- assertVisible: { id: "v2-shell", optional: true',
+      ].join('\n'),
+    );
+    const result = runC6(baseInputs({ flows: [flow] }));
+    expect(result.passed).toBe(false);
+    expect(result.violations[0]?.reason).toMatch(/malformed YAML/i);
+  });
+
+  it.each([
+    [
+      'quoted inline optional key',
+      '- tapOn: { id: "dismiss-dialog", "optional": true }',
+    ],
+    [
+      'uppercase block boolean',
+      ['- tapOn:', '    id: "dismiss-dialog"', '    optional: TRUE'].join('\n'),
+    ],
+    [
+      'YAML 1.1 block boolean',
+      ['- tapOn:', '    id: "dismiss-dialog"', '    optional: yes'].join('\n'),
+    ],
+  ])(
+    'fails on an unjustified V2 non-assert action with %s',
+    (_name, command) => {
+      const flow = mkFlow(
+        'flows/v2/unjustified-action.yaml',
+        ['tags: [v2]', '---', command].join('\n'),
+      );
+      const result = runC6(baseInputs({ flows: [flow] }));
+      expect(result.passed).toBe(false);
+      expect(result.checkedCount).toBe(1);
+      expect(result.violations[0]?.reason).toMatch(/without # justified/i);
+    },
+  );
+
+  it.each([
+    [
+      'quoted inline optional key',
+      '- tapOn: { id: "dismiss-dialog", "optional": true } # justified: dialog is conditional',
+    ],
+    [
+      'uppercase block boolean',
+      [
+        '- tapOn:',
+        '    id: "dismiss-dialog"',
+        '    optional: TRUE # justified: dialog is conditional',
+      ].join('\n'),
+    ],
+    [
+      'YAML 1.1 block boolean',
+      [
+        '- tapOn:',
+        '    id: "dismiss-dialog"',
+        '    optional: yes # justified: dialog is conditional',
+      ].join('\n'),
+    ],
+  ])('permits a justified V2 non-assert action with %s', (_name, command) => {
+    const flow = mkFlow(
+      'flows/v2/justified-action.yaml',
+      ['tags: [v2]', '---', command].join('\n'),
+    );
+    const result = runC6(baseInputs({ flows: [flow] }));
+    expect(result.passed).toBe(true);
+    expect(result.checkedCount).toBe(1);
+  });
+
+  it('permits a preceding justification on a quoted V2 optional key', () => {
+    const flow = mkFlow(
+      'flows/v2/preceding-justification.yaml',
+      [
+        'tags: [v2]',
+        '---',
+        '- tapOn:',
+        '    id: "dismiss-dialog"',
+        '    # justified: dialog is conditional',
+        '    "optional": TRUE',
+      ].join('\n'),
+    );
+    const result = runC6(baseInputs({ flows: [flow] }));
+    expect(result.passed).toBe(true);
+    expect(result.checkedCount).toBe(1);
+  });
+
+  it.each([
+    [
+      'quoted inline optional key',
+      '- tapOn: { id: "dismiss-dialog", "optional": true }',
+    ],
+    [
+      'uppercase block boolean',
+      ['- tapOn:', '    id: "dismiss-dialog"', '    optional: TRUE'].join('\n'),
+    ],
+    [
+      'YAML 1.1 block boolean',
+      ['- tapOn:', '    id: "dismiss-dialog"', '    optional: yes'].join('\n'),
+    ],
+  ])(
+    'permits an allowlisted V2 non-assert action with %s',
+    (_name, command) => {
+      const repoPath = 'apps/mobile/e2e/flows/v2/allowlisted-action.yaml';
+      const flow = mkFlow(repoPath, ['tags: [v2]', '---', command].join('\n'));
+      const result = runC6(
+        baseInputs({
+          flows: [flow],
+          optionalAllowlist: ['flows/v2/allowlisted-action.yaml'],
+        }),
+      );
+      expect(result.passed).toBe(true);
+      expect(result.checkedCount).toBe(1);
+    },
+  );
+
+  it('treats a V2 assertion mapping alias as selector text with optional false', () => {
+    const flow = mkFlow(
+      'flows/v2/aliased-assertion.yaml',
+      [
+        'tags: [v2]',
+        '---',
+        '- tapOn: &soft-options',
+        '    id: "dismiss-dialog"',
+        '    optional: yes # justified: dialog is conditional',
+        '- assertVisible: *soft-options',
+      ].join('\n'),
+    );
+    const result = runC6(baseInputs({ flows: [flow] }));
+    expect(result.passed).toBe(true);
+    expect(result.checkedCount).toBe(1);
+    expect(result.violations).toHaveLength(0);
+  });
+
+  it('treats a V2 action mapping alias as selector text with optional false', () => {
+    const flow = mkFlow(
+      'flows/v2/aliased-action.yaml',
+      [
+        'tags: [v2]',
+        '---',
+        '- tapOn: &soft-options',
+        '    id: "dismiss-dialog"',
+        '    optional: yes # justified: dialog is conditional',
+        '- tapOn: *soft-options',
+      ].join('\n'),
+    );
+    const result = runC6(baseInputs({ flows: [flow] }));
+    expect(result.passed).toBe(true);
+    expect(result.checkedCount).toBe(1);
+    expect(result.violations).toHaveLength(0);
+  });
+
+  it('reports the anchor definition but not its selector-text alias usage', () => {
+    const flow = mkFlow(
+      'flows/v2/aliased-anchor-definition.yaml',
+      [
+        'tags: [v2]',
+        '---',
+        '- tapOn: &soft-options',
+        '    id: "dismiss-dialog"',
+        '    optional: yes',
+        '- assertVisible: *soft-options',
+      ].join('\n'),
+    );
+    const result = runC6(baseInputs({ flows: [flow] }));
+    expect(result.passed).toBe(false);
+    expect(result.checkedCount).toBe(1);
+    expect(result.violations).toHaveLength(1);
+    expect(result.violations[0]?.line).toBe(5);
+    expect(result.violations[0]?.reason).toMatch(/without # justified/i);
+  });
+
+  it('permits a justified optional inline-map non-assert action in a v2 flow', () => {
+    const flow = mkFlow(
+      'flows/v2/inline-action.yaml',
+      [
+        'tags: [v2]',
+        '---',
+        '- tapOn: { id: "dismiss-dialog", optional: true } # justified: dialog is conditional',
+      ].join('\n'),
+    );
+    const result = runC6(baseInputs({ flows: [flow] }));
+    expect(result.passed).toBe(true);
+    expect(result.checkedCount).toBe(1);
+  });
+
+  it('permits a justified optional non-assert action in a v2 flow', () => {
+    const yaml = [
+      'tags: [v2]',
+      '---',
+      '- tapOn:',
+      '    id: "dismiss-transient-dialog"',
+      '    optional: true # justified: dialog is conditional',
+    ].join('\n');
+    const flow = mkFlow('flows/v2/conditional-dialog.yaml', yaml);
+    const result = runC6(baseInputs({ flows: [flow] }));
+    expect(result.passed).toBe(true);
+  });
+
+  it('exempts flows not tagged pr-blocking, smoke, or v2', () => {
     const yaml = [
       'tags:',
       '  - nightly',

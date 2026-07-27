@@ -7,6 +7,7 @@ import {
 } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { computeAgeBracketFromDate } from '@eduagent/schemas';
 import { ProfileBasicsStep } from './ProfileBasicsStep';
 import type { PreviewOnboardingStateV0 } from '../../../../lib/preview-onboarding-state';
 
@@ -137,6 +138,44 @@ describe('ProfileBasicsStep', () => {
 
     expect(mockFetch).not.toHaveBeenCalled();
     expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  it('matches the year-only exact-date oracle at the adult boundary', () => {
+    const boundaryYear = new Date().getFullYear() - 18;
+    const oracleAllowsParent =
+      computeAgeBracketFromDate(boundaryYear) === 'adult';
+
+    render(
+      <ProfileBasicsStep
+        target="child"
+        previewState={basePreviewState}
+        onComplete={jest.fn()}
+        onExitWizard={jest.fn()}
+      />,
+      { wrapper: Wrapper },
+    );
+
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-parent-name'),
+      'Boundary Parent',
+    );
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-parent-birth-year'),
+      String(boundaryYear),
+    );
+    fireEvent.changeText(screen.getByTestId('save-basics-child-name'), 'Kid');
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-child-birth-year'),
+      String(new Date().getFullYear() - 10),
+    );
+
+    expect(Boolean(screen.queryByTestId('save-basics-adult-required'))).toBe(
+      !oracleAllowsParent,
+    );
+    expect(
+      screen.getByTestId('save-basics-continue').props.accessibilityState
+        ?.disabled,
+    ).toBe(!oracleAllowsParent);
   });
 
   // [WI-824] ACCOUNT-05/35: a 402 PROFILE_LIMIT_EXCEEDED during child profile

@@ -440,6 +440,30 @@ export const queryKeys = {
   },
 
   // ------------------------------------------------------------------
+  // Now projections
+  // ------------------------------------------------------------------
+  now: {
+    feed: (
+      actorId: QueryScopeId,
+      profileId: QueryScopeId,
+      policyEpoch: string,
+    ) =>
+      ['now-feed', scopeId(actorId), scopeId(profileId), policyEpoch] as const,
+
+    overflow: (
+      actorId: QueryScopeId,
+      profileId: QueryScopeId,
+      policyEpoch: string,
+    ) =>
+      [
+        'now-overflow',
+        scopeId(actorId),
+        scopeId(profileId),
+        policyEpoch,
+      ] as const,
+  },
+
+  // ------------------------------------------------------------------
   // subscription / usage domains
   // ------------------------------------------------------------------
   subscription: (profileId: QueryScopeId) =>
@@ -552,4 +576,13 @@ export const queryKeys = {
     subjectId: string | undefined,
     profileId: string | undefined,
   ) => ['subject-sessions', subjectId, profileId] as const,
+
+  historySessionsMatch:
+    (profileId: string | undefined) => (queryKey: readonly unknown[]) =>
+      ((queryKey[0] === 'topic-sessions' || queryKey[0] === 'book-sessions') &&
+        queryKey.length === 4 &&
+        queryKey[3] === profileId) ||
+      (queryKey[0] === 'subject-sessions' &&
+        queryKey.length === 3 &&
+        queryKey[2] === profileId),
 } as const;

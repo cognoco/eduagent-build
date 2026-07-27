@@ -6,6 +6,7 @@ import {
   buildFallbackFilingResponse,
 } from './filing';
 import type { FilingLlmOutput, LibraryIndex } from '@eduagent/schemas';
+import { curriculumBooks } from '@eduagent/database';
 import { TEST_SUBJECT_ID } from '@eduagent/test-utils';
 
 // ---------------------------------------------------------------------------
@@ -403,7 +404,9 @@ describe('resolveFilingResult', () => {
       },
       update: jest.fn().mockReturnValue({
         set: jest.fn().mockReturnValue({
-          where: jest.fn().mockResolvedValue(undefined),
+          where: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue([{ id: 'book-1' }]),
+          }),
         }),
       }),
     };
@@ -429,7 +432,8 @@ describe('resolveFilingResult', () => {
     });
 
     expect(result.topicId).toBe('topic-1');
-    expect(txDb.update).not.toHaveBeenCalled();
+    expect(txDb.update).toHaveBeenCalledTimes(1);
+    expect(txDb.update).toHaveBeenCalledWith(curriculumBooks);
   });
 
   // Integration coverage lives in services/filing.integration.test.ts.

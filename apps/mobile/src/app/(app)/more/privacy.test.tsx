@@ -1,6 +1,7 @@
 import React from 'react';
 import { fireEvent, act, waitFor } from '@testing-library/react-native';
 import { Platform, Share } from 'react-native';
+import { DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS } from '@eduagent/schemas';
 import {
   renderScreen,
   cleanupScreen,
@@ -146,6 +147,7 @@ const dataExportFixture = {
   },
   profiles: [],
   consentStates: [],
+  subscriptionFieldDescriptions: DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
   exportedAt: '2026-07-10T00:00:00.000Z',
 };
 

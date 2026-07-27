@@ -154,7 +154,9 @@ const evaluateAssessmentSignalSchema = z.preprocess(
   optionalObjectInput,
   z
     .object({
-      challenge_passed: z.preprocess(nullToUndefined, z.boolean()),
+      challenge_passed: z
+        .preprocess(nullToUndefined, z.boolean().optional())
+        .catch(undefined),
       flaw_identified: z.preprocess((value) => {
         if (typeof value !== 'string') return undefined;
         const trimmed = value.trim();
@@ -269,6 +271,37 @@ export type TeachBackGraderDegradedEvent = z.infer<
  * plan). The drafter MUST refuse to use any item where these are missing or
  * where the result is not `solid`.
  */
+export const challengeRoundQuestionIdentitySchema = z.object({
+  questionText: z.string().min(1).max(500),
+  minimalLearningClaim: z.string().min(1).max(300),
+  cognitiveOperation: z.enum([
+    'explanation',
+    'application',
+    'comparison',
+    'causal_explanation',
+    'synthesis',
+    'evaluation',
+    'teach_back',
+    'other',
+  ]),
+  materialContext: z.string().max(300),
+  /**
+   * Structured evidence that this probe is genuinely distinct from every
+   * earlier probe in the current Challenge Round. Omit for the first probe,
+   * repeats, paraphrases, and cosmetic context changes.
+   */
+  noveltyBasis: z
+    .enum([
+      'new_minimal_learning_claim',
+      'new_material_evidence_or_context',
+      'new_reasoning',
+    ])
+    .optional(),
+});
+export type ChallengeRoundQuestionIdentity = z.infer<
+  typeof challengeRoundQuestionIdentitySchema
+>;
+
 export const challengeRoundEvaluationItemSchema = z.object({
   concept: z.string().min(1).max(200),
   result: z.enum(['solid', 'partial', 'missing', 'misconception']),
@@ -276,6 +309,12 @@ export const challengeRoundEvaluationItemSchema = z.object({
   answerEventId: z.string().uuid(),
   learnerQuote: z.string().min(1).max(500),
   correction: z.string().min(1).max(500).optional(),
+  /**
+   * Deterministic semantic identity of the question this answer addresses.
+   * Optional for backwards-compatible deserialization of in-flight rounds;
+   * mastery fails closed when fewer than two distinct identities are present.
+   */
+  questionIdentity: challengeRoundQuestionIdentitySchema.optional(),
 });
 export type ChallengeRoundEvaluationItem = z.infer<
   typeof challengeRoundEvaluationItemSchema
@@ -324,11 +363,49 @@ export const challengeRoundGraderDegradedEventSchema = z.object({
   sessionId: z.string().optional(),
   answerEventId: z.string().optional(),
   timestamp: z.string(),
-  reason: z.enum(['route_error', 'no_json', 'parse_error', 'schema_invalid']),
+  // [WI-2670] 'producer_vendor_unresolved': the caller could not provably
+  // identify the vendor that produced the graded question (e.g. a legacy
+  // ai_response row predating per-turn vendor tracking) — the grader never
+  // fabricates a producerVendor, so this is a distinct, structurally loud
+  // degradation reason rather than being silently folded into another one.
+  reason: z.enum([
+    'route_error',
+    'no_json',
+    'parse_error',
+    'schema_invalid',
+    'producer_vendor_unresolved',
+  ]),
 });
 export type ChallengeRoundGraderDegradedEvent = z.infer<
   typeof challengeRoundGraderDegradedEventSchema
 >;
+
+export const noticedGapSignalSchema = z.object({
+  concept: z.string().min(1).max(200),
+  correctionHint: z.string().min(1).max(500).optional(),
+  answerEventId: z.string().uuid(),
+  learnerQuote: z.string().min(1).max(500),
+});
+export type NoticedGapSignal = z.infer<typeof noticedGapSignalSchema>;
+
+function normalizeNoticedGapDecision(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return value;
+  }
+
+  const input = value as Record<string, unknown>;
+  if (input['observed'] === false) return null;
+  if (input['observed'] !== true) return value;
+
+  const { observed: _observed, ...evidence } = input;
+  return evidence;
+}
+
+export const answerEvaluationSchema = z.object({
+  correctness: z.enum(['correct', 'partial', 'incorrect', 'na']),
+  concept: z.string().min(1).max(200).optional(),
+});
+export type AnswerEvaluation = z.infer<typeof answerEvaluationSchema>;
 
 const signalsSchema = z.preprocess(
   optionalObjectInput,
@@ -336,8 +413,18 @@ const signalsSchema = z.preprocess(
     .object({
       /** Interview flow: model believes it has enough to conclude. Ignored by server if exchange < cap. */
       ready_to_finish: optionalBooleanSchema,
+      /**
+       * [WI-2107] Model opened a new topic (e.g. "Let's talk about X") but did
+       * not deliver content or ask a question this turn. The app immediately
+       * requests another turn rather than leaving the learner with a bare
+       * promise. Client-side hard cap: at most one auto-requested follow-up
+       * per learner turn (see use-session-streaming.ts).
+       */
+      topic_opened_pending_content: optionalBooleanSchema,
       /** Main loop: learner response showed partial understanding — hold escalation. */
       partial_progress: optionalBooleanSchema,
+      /** Ordinary learning loop: evaluation of the current learner answer. */
+      answer_evaluation: answerEvaluationSchema.optional(),
       /** Main loop: rung-5 exit protocol fired — queue topic for remediation. */
       needs_deepening: optionalBooleanSchema,
       /** Main loop: the AI message contains an understanding check. Observational. */
@@ -372,9 +459,21 @@ const signalsSchema = z.preprocess(
       challenge_round_offer: optionalBooleanSchema,
       /** Challenge Round: per-concept evaluation of the learner's explanations. Drives mastery + note + weak-spot persistence. */
       challenge_round_evaluation: z
-        .array(challengeRoundEvaluationItemSchema)
-        .max(10)
-        .optional(),
+        .preprocess(
+          (value) => (Array.isArray(value) ? value : undefined),
+          z.array(z.unknown()).max(10).optional(),
+        )
+        .pipe(
+          z
+            .array(challengeRoundEvaluationItemSchema)
+            .optional()
+            .catch(undefined),
+        ),
+      /** Personal-mentor felt moment: proposed learner-safe notice, accepted only after DB-backed evidence checks. */
+      noticed_gap: z.preprocess(
+        normalizeNoticedGapDecision,
+        noticedGapSignalSchema.nullable().optional(),
+      ),
     })
     .optional(),
 );
@@ -416,8 +515,13 @@ const fluencyDrillSchema = z.preprocess(
       delete normalized['score'];
     }
 
+    // A 0/0 score is meaningless — no drill has been graded yet. Template-
+    // following models (e.g. gpt-oss-120b) emit the response-format template's
+    // `score` field even when STARTING a drill (active:true), producing
+    // score:{correct:0,total:0}; total:0 then violates score.total >= 1 and
+    // fails the whole envelope. Strip an all-zero score regardless of `active`
+    // (was previously stripped only when active===false — WI-1823).
     if (
-      normalized['active'] === false &&
       normalized['score'] &&
       typeof normalized['score'] === 'object' &&
       !Array.isArray(normalized['score']) &&
@@ -514,6 +618,8 @@ export interface NormalisedEnvelopeSignals {
   ready_to_finish: boolean;
   /** Main loop: learner response showed partial understanding — hold escalation. */
   partial_progress: boolean;
+  /** Ordinary learning loop: canonical answer evaluation. Null when absent. */
+  answer_evaluation: AnswerEvaluation | null;
   /** Main loop: rung-5 exit protocol fired — queue topic for remediation. */
   needs_deepening: boolean;
   /** Main loop: the AI message contains an understanding check. Observational. */
@@ -528,6 +634,10 @@ export interface NormalisedEnvelopeSignals {
   challenge_round_offer: boolean;
   /** Challenge Round: per-concept evaluations. Empty array when not in a round. */
   challenge_round_evaluation: ChallengeRoundEvaluationItem[];
+  /** [WI-2107] Model opened a topic without delivering content or a question this turn. */
+  topic_opened_pending_content: boolean;
+  /** Personal-mentor felt moment proposal. Null when absent. */
+  noticed_gap: NoticedGapSignal | null;
 }
 
 export function normaliseSignals(
@@ -539,12 +649,16 @@ export function normaliseSignals(
   return {
     ready_to_finish: signals?.ready_to_finish ?? false,
     partial_progress: signals?.partial_progress ?? false,
+    answer_evaluation: signals?.answer_evaluation ?? null,
     needs_deepening: signals?.needs_deepening ?? false,
     understanding_check: signals?.understanding_check ?? false,
     retrieval_score: signals?.retrieval_score ?? null,
     crisis_redirect: signals?.crisis_redirect ?? false,
     challenge_round_offer: signals?.challenge_round_offer ?? false,
     challenge_round_evaluation: signals?.challenge_round_evaluation ?? [],
+    topic_opened_pending_content:
+      signals?.topic_opened_pending_content ?? false,
+    noticed_gap: signals?.noticed_gap ?? null,
   };
 }
 

@@ -5,13 +5,15 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { ReactNode } from 'react';
-import type {
-  ScopeDescriptor,
-  SupporterColdStart as SupporterColdStartData,
-} from '@eduagent/schemas';
+import { useState, type ReactNode } from 'react';
+import { Alert, Text } from 'react-native';
+import type { SupporterColdStart as SupporterColdStartData } from '@eduagent/schemas';
 
-import { ProfileContext } from '../../lib/profile';
+import {
+  ProfileContext,
+  useProfile,
+  type ProfileContextValue,
+} from '../../lib/profile';
 import { ScopeContextProvider } from '../../lib/scope-context';
 import { createTestProfile } from '../../test-utils/app-hook-test-utils';
 import type { RoutedMockFetch } from '../../test-utils/mock-api-routes';
@@ -42,22 +44,47 @@ jest.mock(/* gc1-allow: Clerk useAuth() external boundary; component test exerci
 const PERSON_ID = '550e8400-e29b-41d4-a716-446655440101';
 const EDGE_ID = '550e8400-e29b-41d4-a716-446655440201';
 
+// Renders the CURRENT activeProfile id so tests can assert the real effect
+// of a switchProfile call, not merely that it was invoked.
+function ActiveProfileProbe(): React.ReactElement {
+  const { activeProfile } = useProfile();
+  return (
+    <Text testID="active-profile-probe">{activeProfile?.id ?? 'none'}</Text>
+  );
+}
+
 function wrapper(
   shape: 'supporter' | 'learner' = 'supporter',
-  extraScopes: Extract<ScopeDescriptor, { kind: 'person' }>[] = [],
+  switchProfileMock?: ProfileContextValue['switchProfile'],
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
   return function Wrapper({ children }: { children: ReactNode }) {
+    const [activeProfile, setActiveProfile] = useState(createTestProfile());
+    // Wires the caller's switchProfile spy (for call assertions) through to
+    // real ProfileContext state (for effect assertions via
+    // ActiveProfileProbe) — a successful switch actually flips activeProfile.
+    const switchProfile: ProfileContextValue['switchProfile'] = async (
+      profileId,
+      options,
+    ) => {
+      const result = switchProfileMock
+        ? await switchProfileMock(profileId, options)
+        : { success: true };
+      if (result.success) {
+        setActiveProfile(createTestProfile({ id: profileId }));
+      }
+      return result;
+    };
     return (
       <QueryClientProvider client={queryClient}>
         <ProfileContext.Provider
           value={{
-            profiles: [createTestProfile()],
-            activeProfile: createTestProfile(),
+            profiles: [activeProfile],
+            activeProfile,
             isExplicitProxyMode: false,
-            switchProfile: async () => ({ success: true }),
+            switchProfile,
             isLoading: false,
             profileLoadError: null,
             profileWasRemoved: false,
@@ -70,12 +97,13 @@ function wrapper(
                 ? { shape: 'learner' }
                 : {
                     shape: 'supporter',
-                    scopes: [{ kind: 'supporter-hub' }, ...extraScopes],
+                    scopes: [{ kind: 'supporter-hub' }],
                     defaultScopeIndex: 0,
                   }
             }
           >
             {children}
+            <ActiveProfileProbe />
           </ScopeContextProvider>
         </ProfileContext.Provider>
       </QueryClientProvider>
@@ -142,7 +170,16 @@ describe('SupporterColdStart', () => {
     });
   });
 
-  it('renders a per-child managed card with a handoff CTA that switches into the child scope', async () => {
+  it('renders a per-child managed card whose CTA switches the active profile to the child', async () => {
+    // [WI-2226 bounce-recovery] The prior version of this test manually
+    // added the managed child as an available person scope in
+    // ScopeContext's initialScopeList — that masked the real no-op bug,
+    // because setActiveScope only worked because the test fabricated a
+    // scope list membership production never guarantees for a managed
+    // cold-start card (resolveScopesForPerson requires an accepted
+    // visibility contract; the coldstart resolver does not). The CTA no
+    // longer touches scope context — it calls switchProfile directly — so
+    // there is nothing left to fabricate here.
     const data: SupporterColdStartData = {
       variant: 'per-child',
       cards: [
@@ -158,15 +195,9 @@ describe('SupporterColdStart', () => {
     };
     mockFetch.setRoute('/scopes/coldstart', data);
 
+    const switchProfileSpy = jest.fn(async () => ({ success: true }));
     render(<SupporterColdStart />, {
-      wrapper: wrapper('supporter', [
-        {
-          kind: 'person',
-          personId: PERSON_ID,
-          edgeId: EDGE_ID,
-          displayName: 'Emma',
-        },
-      ]),
+      wrapper: wrapper('supporter', switchProfileSpy),
     });
 
     await waitFor(() => {
@@ -177,15 +208,72 @@ describe('SupporterColdStart', () => {
       "Emma is all set. Whenever they're ready, hand them the phone.",
     );
     screen.getByText('Switch to Emma');
+    expect(screen.getByTestId('active-profile-probe')).toHaveTextContent(
+      'test-profile-id',
+    );
 
-    // Handoff switches the active scope; the card should disappear once the
-    // Support hub scope is no longer active (this component self-guards).
     fireEvent.press(
       screen.getByTestId(`supporter-cold-start-handoff-${PERSON_ID}`),
     );
+
+    // The real effect: switchProfile is invoked with the child's profileId,
+    // and the active profile actually flips — not merely "was called".
     await waitFor(() => {
-      expect(screen.queryByTestId('supporter-cold-start')).toBeNull();
+      expect(switchProfileSpy).toHaveBeenCalledWith(PERSON_ID, undefined);
     });
+    await waitFor(() => {
+      expect(screen.getByTestId('active-profile-probe')).toHaveTextContent(
+        PERSON_ID,
+      );
+    });
+  });
+
+  it('surfaces an error and does not flip the active profile when the switch fails', async () => {
+    jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const data: SupporterColdStartData = {
+      variant: 'per-child',
+      cards: [
+        {
+          personId: PERSON_ID,
+          edgeId: EDGE_ID,
+          displayName: 'Emma',
+          state: 'managed',
+          anchor: 'handoff',
+        },
+      ],
+      selfLearningDoorway: true,
+    };
+    mockFetch.setRoute('/scopes/coldstart', data);
+
+    const switchProfileSpy = jest.fn(async () => ({
+      success: false,
+      error: 'Profile does not belong to this account',
+    }));
+    render(<SupporterColdStart />, {
+      wrapper: wrapper('supporter', switchProfileSpy),
+    });
+
+    await waitFor(() => {
+      screen.getByTestId(`supporter-cold-start-managed-${PERSON_ID}`);
+    });
+
+    fireEvent.press(
+      screen.getByTestId(`supporter-cold-start-handoff-${PERSON_ID}`),
+    );
+
+    await waitFor(() => {
+      expect(switchProfileSpy).toHaveBeenCalledWith(PERSON_ID, undefined);
+    });
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Could not switch profile',
+      'Profile does not belong to this account',
+      undefined,
+      undefined,
+    );
+    // No silent recovery: the active profile must NOT flip on failure.
+    expect(screen.getByTestId('active-profile-probe')).toHaveTextContent(
+      'test-profile-id',
+    );
   });
 
   it('renders a per-child granted-idle card without a stale-idle nudge', async () => {
@@ -300,16 +388,7 @@ describe('SupporterColdStart', () => {
     };
     mockFetch.setRoute('/scopes/coldstart', data);
 
-    render(<SupporterColdStart />, {
-      wrapper: wrapper('supporter', [
-        {
-          kind: 'person',
-          personId: MANAGED_PERSON_ID,
-          edgeId: MANAGED_EDGE_ID,
-          displayName: 'Emma',
-        },
-      ]),
-    });
+    render(<SupporterColdStart />, { wrapper: wrapper() });
 
     await waitFor(() => {
       screen.getByTestId(`supporter-cold-start-managed-${MANAGED_PERSON_ID}`);

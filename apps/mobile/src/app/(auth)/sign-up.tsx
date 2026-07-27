@@ -41,6 +41,16 @@ const SCREEN_HEIGHT =
     ? Math.min(Dimensions.get('screen').height, 812)
     : Dimensions.get('screen').height;
 
+// [WI-2119] signUp.create() can trigger Clerk's Smart CAPTCHA as a real,
+// user-clickable Cloudflare Turnstile challenge rendered into the
+// clerk-captcha mount point below — not just an invisible auto-pass. The
+// shared CLERK_REQUEST_TIMEOUT_MS (20s) assumes a pure network round-trip and
+// budgets no time for a human to notice and complete that challenge, so this
+// call gets its own longer ceiling. CAPTCHA_HINT_DELAY_MS surfaces a cue
+// telling the user to look for the check well before that ceiling hits.
+export const SIGN_UP_CAPTCHA_TIMEOUT_MS = 45_000;
+const CAPTCHA_HINT_DELAY_MS = 5_000;
+
 export default function SignUpScreen() {
   const { t } = useTranslation();
   const { isLoaded, signUp, setActive } = useSignUp();
@@ -60,17 +70,26 @@ export default function SignUpScreen() {
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
+  const [showCaptchaHint, setShowCaptchaHint] = useState(false);
   const [pendingSessionActivationId, setPendingSessionActivationId] = useState<
     string | null
   >(null);
   const [activationFailureContext, setActivationFailureContext] = useState<
     'oauth' | 'verification' | null
   >(null);
-  const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
+  const {
+    scrollRef,
+    onFieldLayout,
+    onFieldFocus,
+    onScrollViewLayout,
+    onSubmitButtonLayout,
+  } = useKeyboardScroll();
   const {
     scrollRef: verifyScrollRef,
     onFieldLayout: onVerifyFieldLayout,
     onFieldFocus: onVerifyFieldFocus,
+    onScrollViewLayout: onVerifyScrollViewLayout,
+    onSubmitButtonLayout: onVerifySubmitButtonLayout,
   } = useKeyboardScroll();
   const reportActivationEvent = useReportActivationEvent();
 
@@ -288,6 +307,16 @@ export default function SignUpScreen() {
     setError('');
     setLoading(true);
 
+    // [WI-2119] signUp.create() may surface an interactive CAPTCHA challenge
+    // (see the clerk-captcha mount point below). Nothing else in this flow
+    // tells the user that happened, so give them a nudge partway through the
+    // longer SIGN_UP_CAPTCHA_TIMEOUT_MS window rather than leaving them
+    // staring at a plain spinner. Web-only — native never renders a captcha.
+    const captchaHintTimer =
+      Platform.OS === 'web'
+        ? setTimeout(() => setShowCaptchaHint(true), CAPTCHA_HINT_DELAY_MS)
+        : undefined;
+
     try {
       if (__DEV__)
         console.log(
@@ -296,6 +325,12 @@ export default function SignUpScreen() {
       await withClerkTimeout(
         signUp.create({ emailAddress, password }),
         'signUp.create',
+        // [WI-2119] The longer CAPTCHA ceiling only applies on web — native
+        // never renders Clerk's Smart CAPTCHA, so it keeps the standard
+        // CLERK_REQUEST_TIMEOUT_MS rather than silently waiting 45s.
+        Platform.OS === 'web'
+          ? SIGN_UP_CAPTCHA_TIMEOUT_MS
+          : CLERK_REQUEST_TIMEOUT_MS,
       );
       if (__DEV__)
         console.log(
@@ -313,6 +348,8 @@ export default function SignUpScreen() {
       if (__DEV__) console.warn('[AUTH-DEBUG] signUp flow threw:', err);
       setError(formatSignUpError(err));
     } finally {
+      if (captchaHintTimer) clearTimeout(captchaHintTimer);
+      setShowCaptchaHint(false);
       setLoading(false);
     }
   }, [
@@ -349,9 +386,7 @@ export default function SignUpScreen() {
         setError(t('auth.signUp.verificationNotCompleted'));
       }
     } catch (err: unknown) {
-      setError(
-        extractClerkError(err, 'Invalid verification code. Please try again.'),
-      );
+      setError(extractClerkError(err));
     } finally {
       setLoading(false);
     }
@@ -400,6 +435,7 @@ export default function SignUpScreen() {
           }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
+          onLayout={onVerifyScrollViewLayout}
         >
           <View className="flex-1" style={{ minHeight: 40 }} />
           <Text className="text-h2 font-bold text-text-primary mb-1">
@@ -447,14 +483,16 @@ export default function SignUpScreen() {
             />
           </View>
 
-          <Button
-            variant="primary"
-            label={t('auth.signUp.verifyButton')}
-            onPress={onVerifyPress}
-            disabled={!canSubmitCode}
-            loading={loading}
-            testID="sign-up-verify-button"
-          />
+          <View onLayout={onVerifySubmitButtonLayout}>
+            <Button
+              variant="primary"
+              label={t('auth.signUp.verifyButton')}
+              onPress={onVerifyPress}
+              disabled={!canSubmitCode}
+              loading={loading}
+              testID="sign-up-verify-button"
+            />
+          </View>
 
           {activationFailureContext === 'verification' &&
           pendingSessionActivationId ? (
@@ -527,6 +565,7 @@ export default function SignUpScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
         testID="sign-up-scroll"
+        onLayout={onScrollViewLayout}
       >
         <View testID="sign-up-content">
           {/* Brand logo at top of screen — keep margins tight so the primary CTA
@@ -682,14 +721,29 @@ export default function SignUpScreen() {
            * view to attach the widget. On iOS/Android this is a no-op View. */}
           <View nativeID="clerk-captcha" testID="clerk-captcha" />
 
-          <Button
-            variant="primary"
-            label={t('auth.signUp.signUpButton')}
-            onPress={onSignUpPress}
-            disabled={!canSubmitSignUp}
-            loading={loading}
-            testID="sign-up-button"
-          />
+          {/* [WI-2119] The captcha above can silently turn into a real,
+           * clickable challenge once signUp.create() fires — the button's
+           * spinner alone gives no sign of that. Nudge the user to look for
+           * it well before SIGN_UP_CAPTCHA_TIMEOUT_MS runs out. */}
+          {showCaptchaHint && (
+            <Text
+              className="text-body-sm text-text-secondary text-center mb-3"
+              testID="sign-up-captcha-hint"
+            >
+              {t('auth.signUp.captchaHint')}
+            </Text>
+          )}
+
+          <View onLayout={onSubmitButtonLayout}>
+            <Button
+              variant="primary"
+              label={t('auth.signUp.signUpButton')}
+              onPress={onSignUpPress}
+              disabled={!canSubmitSignUp}
+              loading={loading}
+              testID="sign-up-button"
+            />
+          </View>
 
           <View
             className="flex-row justify-center items-center mt-3 mb-3"

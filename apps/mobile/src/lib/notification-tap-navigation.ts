@@ -32,6 +32,7 @@ function notificationTargetForData(
     case 'review_reminder':
     case 'daily_reminder':
     case 'recall_nudge':
+    case 'notice_recheck':
     case 'dictation_review':
     case 'session_filing_failed':
       return { context: 'study', href: '/(app)/home' as Href };

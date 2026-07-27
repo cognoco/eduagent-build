@@ -6,10 +6,14 @@ import {
   isProfileInChallengeRoundCohort,
   isChallengeRoundEnabledForProfile,
   isChallengeRoundGraderEnabled,
+  isAnswerEvaluationRuntimeEnabled,
   isReviewContinuityOpenerEnabled,
   isManagedTierActive,
   isMaintenanceProductionEnabled,
   isTopicIntentMatcherEnabled,
+  isMentorNoticeEnabled,
+  isMentorNoticePushPostMvpEnabled,
+  resolveMentorNoticePolicyRevision,
   validateEnv,
   validateProductionBindings,
   validateProductionKeys,
@@ -37,6 +41,7 @@ describe('validateProductionKeys', () => {
     CONSENT_POLICY_VERSION: '2026-05-31',
     EMPTY_REPLY_GUARD_ENABLED: 'true',
     RETENTION_PURGE_ENABLED: 'false',
+    FAMILY_JOIN_ENABLED: 'false',
     MEMORY_FACTS_READ_ENABLED: 'false',
     MEMORY_FACTS_RELEVANCE_RETRIEVAL: 'false',
     MEMORY_FACTS_DEDUP_ENABLED: 'false',
@@ -45,6 +50,7 @@ describe('validateProductionKeys', () => {
     MEMORY_FACTS_DEDUP_ROLLOUT_PCT: '0',
     MATCHER_ENABLED: 'false',
     CHALLENGE_ROUND_RUNTIME_ENABLED: 'false',
+    ANSWER_EVALUATION_RUNTIME_ENABLED: 'false',
     REVIEW_CALLBACK_OPENER_ENABLED: 'false',
     ALLOW_MISSING_IDEMPOTENCY_KV: 'false',
     ADULT_OWNER_GATE_ENABLED: 'true',
@@ -276,6 +282,32 @@ describe('validateEnv', () => {
 
     expect(env.ENVIRONMENT).toBe('development');
     expect(env.DATABASE_URL).toBe('postgresql://localhost/test');
+  });
+
+  it('[WI-2705] preserves a non-empty sandbox verification authorization binding', () => {
+    const authorization = JSON.stringify({
+      version: 1,
+      authorizationId: 'wi-2705-config-proof',
+    });
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+      REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION: authorization,
+    });
+
+    expect(env.REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION).toBe(
+      authorization,
+    );
+  });
+
+  it('[WI-2705] rejects an empty sandbox verification authorization binding', () => {
+    expect(() =>
+      validateEnv({
+        ENVIRONMENT: 'development',
+        DATABASE_URL: 'postgresql://localhost/test',
+        REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION: '',
+      }),
+    ).toThrow('Invalid environment');
   });
 
   it('throws on missing DATABASE_URL', () => {
@@ -673,6 +705,89 @@ describe('validateEnv', () => {
     expect(isChallengeRoundRuntimeEnabled('yes')).toBe(false);
   });
 
+  it('ANSWER_EVALUATION_RUNTIME_ENABLED defaults to "false" when unset', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(env.ANSWER_EVALUATION_RUNTIME_ENABLED).toBe('false');
+    expect(
+      isAnswerEvaluationRuntimeEnabled(env.ANSWER_EVALUATION_RUNTIME_ENABLED),
+    ).toBe(false);
+  });
+
+  it('isAnswerEvaluationRuntimeEnabled returns true only for "true"', () => {
+    expect(isAnswerEvaluationRuntimeEnabled('true')).toBe(true);
+    expect(isAnswerEvaluationRuntimeEnabled('false')).toBe(false);
+    expect(isAnswerEvaluationRuntimeEnabled(undefined)).toBe(false);
+    expect(isAnswerEvaluationRuntimeEnabled('yes')).toBe(false);
+  });
+
+  it('MENTOR_NOTICE_ENABLED defaults off and enables only for "true"', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(env.MENTOR_NOTICE_ENABLED).toBe('false');
+    expect(isMentorNoticeEnabled(env.MENTOR_NOTICE_ENABLED)).toBe(false);
+    expect(isMentorNoticeEnabled('true')).toBe(true);
+    expect(isMentorNoticeEnabled('yes')).toBe(false);
+  });
+
+  // [WI-2627] The revision is what makes rollout observations ORDERABLE. The
+  // guaranteed property under test is not "it parses integers" but "no
+  // admissible input can RAISE the ordering above a real deployment value":
+  // every rejected form resolves to 0, the lowest revision, and a client only
+  // re-enables on a strictly HIGHER revision. So a typo'd or absent binding is
+  // structurally incapable of re-enabling a client that has observed a rollback.
+  it('[WI-2627] resolves the policy revision, clamping every malformed form to the lowest admissible value', () => {
+    expect(resolveMentorNoticePolicyRevision('7')).toBe(7);
+    expect(resolveMentorNoticePolicyRevision(' 12 ')).toBe(12);
+    expect(resolveMentorNoticePolicyRevision('0')).toBe(0);
+
+    for (const malformed of [
+      undefined,
+      '',
+      '   ',
+      'latest',
+      '2.5',
+      '-3',
+      'NaN',
+      'Infinity',
+      '1e999',
+    ]) {
+      expect(resolveMentorNoticePolicyRevision(malformed)).toBe(0);
+    }
+  });
+
+  it('[WI-2627] MENTOR_NOTICE_POLICY_REVISION is optional in the env schema, so no deployment needs the binding to boot', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(env.MENTOR_NOTICE_POLICY_REVISION).toBeUndefined();
+    expect(
+      resolveMentorNoticePolicyRevision(env.MENTOR_NOTICE_POLICY_REVISION),
+    ).toBe(0);
+  });
+
+  it('[WI-2573] MENTOR_NOTICE_PUSH_POST_MVP_ENABLED defaults off and is independent of the in-app flag', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+      // In-app mentor notices fully ON — the push boundary must stay closed.
+      MENTOR_NOTICE_ENABLED: 'true',
+    });
+    expect(env.MENTOR_NOTICE_ENABLED).toBe('true');
+    expect(env.MENTOR_NOTICE_PUSH_POST_MVP_ENABLED).toBe('false');
+    expect(
+      isMentorNoticePushPostMvpEnabled(env.MENTOR_NOTICE_PUSH_POST_MVP_ENABLED),
+    ).toBe(false);
+    expect(isMentorNoticePushPostMvpEnabled(undefined)).toBe(false);
+    expect(isMentorNoticePushPostMvpEnabled('yes')).toBe(false);
+    expect(isMentorNoticePushPostMvpEnabled('true')).toBe(true);
+  });
+
   it('CHALLENGE_ROUND_COHORT_PROFILE_IDS defaults to "" when unset', () => {
     const env = validateEnv({
       ENVIRONMENT: 'development',
@@ -778,6 +893,7 @@ describe('validateProductionBindings', () => {
     CONSENT_POLICY_VERSION: '2026-05-31',
     EMPTY_REPLY_GUARD_ENABLED: 'true',
     RETENTION_PURGE_ENABLED: 'false',
+    FAMILY_JOIN_ENABLED: 'false',
     MEMORY_FACTS_READ_ENABLED: 'false',
     MEMORY_FACTS_RELEVANCE_RETRIEVAL: 'false',
     MEMORY_FACTS_DEDUP_ENABLED: 'false',
@@ -786,6 +902,9 @@ describe('validateProductionBindings', () => {
     MEMORY_FACTS_DEDUP_ROLLOUT_PCT: 0,
     MATCHER_ENABLED: 'false',
     CHALLENGE_ROUND_RUNTIME_ENABLED: 'false',
+    ANSWER_EVALUATION_RUNTIME_ENABLED: 'false',
+    MENTOR_NOTICE_ENABLED: 'false',
+    MENTOR_NOTICE_PUSH_POST_MVP_ENABLED: 'false',
     CHALLENGE_ROUND_COHORT_PROFILE_IDS: '',
     REVIEW_CALLBACK_OPENER_ENABLED: 'false',
     JUDGE_FRAMEWORK_ENABLED: 'false',

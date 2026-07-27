@@ -51,6 +51,8 @@ export function createTestProfile(overrides: Partial<Profile> = {}): Profile {
     displayName: 'Test Learner',
     avatarUrl: null,
     birthYear: 2010,
+    birthMonth: null,
+    birthDay: null,
     location: null,
     isOwner: true,
     hasPremiumLlm: false,

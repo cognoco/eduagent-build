@@ -24,7 +24,7 @@
 // ---------------------------------------------------------------------------
 
 import { resolve } from 'path';
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import {
   createDatabase,
   generateUUIDv7,
@@ -33,7 +33,6 @@ import {
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { generateExport } from './export';
-import { legacyIdentityTableExistsForTest } from '../test-utils/legacy-identity-anchors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -57,27 +56,9 @@ describeIfDb('generateExport learning-only billing skip (integration)', () => {
       .values({ name: `wi805-export-org-${RUN_ID}` })
       .returning({ id: organization.id });
     accountId = org!.id;
-
-    // A legacy subscription the export WOULD surface on the normal path.
-    // Gated: post-drop there is no legacy row to leak, so the assertion below
-    // holds trivially instead of hard-failing on a dropped table.
-    // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL insert,
-    // same conditional seed as before.
-    if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
-      await db.execute(
-        sql`INSERT INTO subscriptions (id, account_id) VALUES (${generateUUIDv7()}, ${accountId})`,
-      );
-    }
   });
 
   afterAll(async () => {
-    // subscriptions cascades on organization delete, but be explicit + FK-safe.
-    // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL delete.
-    if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
-      await db.execute(
-        sql`DELETE FROM subscriptions WHERE account_id = ${accountId}`,
-      );
-    }
     await db.delete(organization).where(eq(organization.id, accountId));
   });
 

@@ -208,6 +208,13 @@ const profileSchemaShape = {
   displayName: z.string(),
   avatarUrl: z.string().url().nullable(),
   birthYear: birthYearSchema,
+  // WI-1259 — exact-birth-date client mirroring. Month/day ride the client
+  // profile so the mobile family-capable pre-checks can match the server's
+  // computeAgeBracketFromDate decision (WI-367). null = year-only birth date
+  // (the YYYY-01-01 sentinel; see birthMonthDayFromDate). Default null so
+  // cached pre-WI-1259 responses parse cleanly.
+  birthMonth: z.number().int().min(1).max(12).nullable().default(null),
+  birthDay: z.number().int().min(1).max(31).nullable().default(null),
   location: locationSchema.nullable(),
   isOwner: z.boolean(),
   hasPremiumLlm: z.boolean().default(false),
@@ -259,6 +266,14 @@ export type ProfileResponse = z.infer<typeof profileResponseSchema>;
 
 export const profileListResponseSchema = z.object({
   profiles: z.array(publicProfileSchema),
+  // [WI-1193 AC1 — first-use repair signal] True when the authenticated caller
+  // is an adult account-owner who holds no adult self-consent (`art6_1_a`)
+  // record AND none could be lawfully repaired from a genuinely captured
+  // versioned terms-acceptance fact — the client must drive a (re-)consent
+  // write. False for everyone else (children, non-owners, adults already
+  // holding or repaired into a record). Default false so pre-WI-1193 cached
+  // responses parse cleanly.
+  needsAdultConsent: z.boolean().default(false),
 });
 export type ProfileListResponse = z.infer<typeof profileListResponseSchema>;
 

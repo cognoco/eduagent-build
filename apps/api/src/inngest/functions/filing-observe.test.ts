@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 const mockCaptureException = jest.fn();
+const mockCaptureMessage = jest.fn();
 jest.mock(
   '../../services/sentry' /* gc1-allow: observer test asserts captureException escalation on schema drift */,
   () => {
@@ -12,6 +13,7 @@ jest.mock(
     return {
       ...actual,
       captureException: (...args: unknown[]) => mockCaptureException(...args),
+      captureMessage: (...args: unknown[]) => mockCaptureMessage(...args),
     };
   },
 );
@@ -106,6 +108,7 @@ describe('sessionFilingResolvedObserve [BUG-369]', () => {
       resolution: 'late_completion',
     });
     expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
   });
 
   it('[BREAK] emits info-level log for non-unrecoverable resolution', async () => {
@@ -133,6 +136,17 @@ describe('sessionFilingResolvedObserve [BUG-369]', () => {
     expect(entry?.level).toBe('error');
     expect(entry?.context).toMatchObject({ resolution: 'unrecoverable' });
     expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      'session.filing_resolved',
+      expect.objectContaining({
+        level: 'error',
+        tags: {
+          surface: 'filing',
+          signal: 'resolved',
+          resolution: 'unrecoverable',
+        },
+      }),
+    );
   });
 
   it('[BREAK] returns schema_error on invalid payload', async () => {
@@ -185,6 +199,13 @@ describe('filingAutoRetryAttemptedObserve [BUG-369]', () => {
     });
     expect(result).toMatchObject({ status: 'logged', attemptNumber: 1 });
     expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      'filing.auto_retry_attempted',
+      expect.objectContaining({
+        level: 'warning',
+        tags: { surface: 'filing', signal: 'auto-retry-attempted' },
+      }),
+    );
   });
 
   it('[BREAK] emits a structured warn log for auto-retry', async () => {

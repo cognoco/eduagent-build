@@ -276,6 +276,20 @@ describe('parseEvaluateAssessment', () => {
 
     expect(parseEvaluateAssessment(event)).toBeNull();
   });
+
+  it('[WI-1995] partial EVALUATE signal yields no evaluation, so no mastery is granted', () => {
+    const event = eventWithRawEnvelopeContent({
+      reply: 'The learner-visible reply survives the partial signal.',
+      signals: {
+        evaluate_assessment: {
+          flaw_identified: 'missing verdict',
+          quality: 4,
+        },
+      },
+    });
+
+    expect(parseEvaluateAssessment(event)).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

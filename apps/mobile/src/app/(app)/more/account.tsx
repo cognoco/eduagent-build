@@ -81,11 +81,13 @@ export default function AccountScreen(): React.ReactElement {
         />
         <AccountSecurity
           visible={navigationContract.gates.showAccountSecurity}
+          targetName={displayName}
         />
         {FEATURE_FLAGS.I18N_ENABLED ? (
           <SettingsRow
             label={t('settings.appLanguage')}
             value={LANGUAGE_LABELS[currentLanguage]?.native}
+            targetName={displayName}
             onPress={() => setShowLanguagePicker(true)}
             testID="settings-app-language"
           />
@@ -106,6 +108,7 @@ export default function AccountScreen(): React.ReactElement {
               ? undefined
               : t('more.account.mentorLanguageDisabledHint')
           }
+          targetName={displayName}
           onPress={
             navigationContract.gates.sessionIsOwner
               ? () => router.push('/(app)/more/mentor-language' as Href)
@@ -122,6 +125,7 @@ export default function AccountScreen(): React.ReactElement {
         {navigationContract.gates.showBilling ? (
           <SettingsRow
             label={t('more.account.subscription')}
+            targetName={displayName}
             value={
               subscription
                 ? `${subscription.tier

@@ -11,7 +11,7 @@
 #                consent granted, but 0 subjects)
 #
 # testIDs verified against:
-#   - apps/mobile/src/components/home/LearnerScreen.tsx (intent-learn card,
+#   - apps/mobile/src/components/home/LearnerScreen.tsx (zero-subject CTA,
 #     pushes to /create-subject)
 #   - apps/mobile/src/app/(app)/_layout.tsx (PostApprovalLanding, shown only
 #     when subjects empty AND SecureStore postApprovalSeen flag missing)
@@ -20,8 +20,8 @@
 #   - apps/mobile/src/components/session/ChatShell.tsx (chat-input)
 #
 # NOTE: There is NO auto-redirect from home → create-subject when subjects=0.
-# The home screen renders LearnerScreen with intent-learn (the "Learn" card),
-# which pushes to /create-subject when tapped. This flow taps that card.
+# The home screen renders LearnerScreen with home-add-first-subject below the
+# intent cards. This flow scrolls to and taps that zero-subject CTA.
 #
 # BUG-34: onboarding-complete now includes a subject (to keep learner-screen
 # visible for other flows). Use onboarding-no-subject for the empty-state test.
@@ -36,7 +36,7 @@ tags:
 - runFlow:
     file: ../_setup/sign-in-only.yaml
     env:
-      SEED_SCENARIO: "onboarding-no-subject"
+      SEED_SCENARIO: 'onboarding-no-subject'
       API_URL: ${API_URL}
 
 # 1b. BUG-38: PostApprovalLanding appears after pm clear wipes SecureStore.
@@ -49,7 +49,7 @@ tags:
       text: "You're approved!"
     timeout: 15000
     # PostApprovalLanding only appears after SecureStore wipe — genuinely optional
-    optional: true  # justified: PostApprovalLanding only appears when SecureStore was wiped (pm clear) and profile has CONSENTED status; not shown on every run
+    optional: true # justified: PostApprovalLanding only appears when SecureStore was wiped (pm clear) and profile has CONSENTED status; not shown on every run
 
 # Dismiss PostApprovalLanding if it appeared.
 # Tap by testID (not text) — the button label is t('tabs.postApproval.letsGo')
@@ -57,78 +57,125 @@ tags:
 # Source: apps/mobile/src/app/(app)/_components/PostApprovalLanding.tsx:42
 #         apps/mobile/src/i18n/locales/en.json:2022 ("letsGo": "Let's go!")
 - tapOn:
-    id: "post-approval-continue"
+    id: 'post-approval-continue'
     # Only present if PostApprovalLanding appeared (see step above)
-    optional: true  # justified: post-approval-continue only present when PostApprovalLanding screen appeared above
+    optional: true # justified: post-approval-continue only present when PostApprovalLanding screen appeared above
 
 # 2. Wait for the LearnerScreen to render after PostApproval dismiss.
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 30000
 
-# 2b. Tap the add-subject tile to navigate to /create-subject.
-#     LearnerScreen.tsx pushes to /create-subject on add-subject tile press.
+# 2b. Scroll to the zero-subject CTA and navigate to /create-subject.
+- scrollUntilVisible:
+    element:
+      id: 'home-add-first-subject'
+    direction: DOWN
+    timeout: 10000
+
 - tapOn:
-    id: "home-add-subject-tile"
+    id: 'home-add-first-subject'
 
 # 2c. Wait for create-subject screen.
 - extendedWaitUntil:
     visible:
-      id: "create-subject-name"
+      id: 'create-subject-name'
     timeout: 15000
 
 # 3. Verify "New subject" heading is visible
 # Keyboard autoFocus may push heading above fold on small screens (BUG-60)
 - assertVisible:
-    text: "New subject"
+    text: 'New subject'
     # autoFocus keyboard pushes heading off-screen on small emulator viewports
-    optional: true  # justified: autoFocus keyboard pushes heading off-screen on small emulator viewports (BUG-60)
+    optional: true # justified: autoFocus keyboard pushes heading off-screen on small emulator viewports (BUG-60)
 
 # 4. Dismiss keyboard so cancel/submit buttons are visible
 - hideKeyboard
 
 # 5. Verify cancel button is present (mandatory — core UI element)
+- scrollUntilVisible:
+    element:
+      id: 'create-subject-cancel'
+    direction: UP
+    timeout: 10000
 - assertVisible:
-    id: "create-subject-cancel"
+    id: 'create-subject-cancel'
 
 # 6. Verify submit button is present (mandatory — core UI element)
+- scrollUntilVisible:
+    element:
+      id: 'create-subject-submit'
+    direction: DOWN
+    timeout: 10000
 - assertVisible:
-    id: "create-subject-submit"
+    id: 'create-subject-submit'
 
 # 6b. Screenshot: create-subject screen (empty state)
 - takeScreenshot: empty-first-user-01-create-subject
 
 # 7. Type a subject name
+- scrollUntilVisible:
+    element:
+      id: 'create-subject-name'
+    direction: UP
+    timeout: 10000
 - tapOn:
-    id: "create-subject-name"
-- inputText: "Biology"
+    id: 'create-subject-name'
+- inputText: 'Biology'
 - hideKeyboard
 
 # 8. Tap "Start Learning" submit button
+- scrollUntilVisible:
+    element:
+      id: 'create-subject-submit'
+    direction: DOWN
+    timeout: 10000
 - tapOn:
-    id: "create-subject-submit"
+    id: 'create-subject-submit'
 
-# 9. Wait for interview screen — the create-subject mutation navigates to
-#    /(learner)/onboarding/interview after creating the subject.
-#    The interview ChatShell always has a chat-input.
+# 9. A user's first subject intentionally hands off through the Ready screen.
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
-    timeout: 20000
+      id: 'ready-screen'
+    timeout: 30000
+
+- scrollUntilVisible:
+    element:
+      id: 'ready-start'
+    direction: DOWN
+    timeout: 10000
+    visibilityPercentage: 100
+    centerElement: true
+
+- assertVisible:
+    id: 'ready-start'
+
+- tapOn:
+    id: 'ready-start'
+
+- extendedWaitUntil:
+    visible:
+      id: 'session-screen'
+    timeout: 30000
+
+- extendedWaitUntil:
+    visible:
+      id: 'chat-input'
+    timeout: 30000
 
 # 10. Verify the interview title contains the subject name
 - assertVisible:
-    text: "Biology"
+    text: 'Biology'
     # Header title may show generic "Onboarding" before subject name loads via query
-    optional: true  # justified: header title may show generic "Onboarding" before subject name loads via React Query
+    optional: true # justified: header title may show generic "Onboarding" before subject name loads via React Query
 
-# 11. Verify interview screen is showing coach context.
-#     NOTE: "learning coach" text is inside a chat bubble FlatList — Maestro
-#     can't find text inside React Native chat bubbles on Android.
-#     Use the header subtitle "Your mate is here" instead.
-- assertVisible:
-    text: "Your mate is here"
+# 11. Require the rendered assistant greeting. Header subtitle copy is not the
+#     journey receipt and changes independently of the session contract.
+- extendedWaitUntil:
+    visible:
+      id: 'message-bubble-assistant-0'
+    timeout: 30000
 
 # 12. Screenshot: interview screen with AI greeting
 - takeScreenshot: empty-first-user-02-interview

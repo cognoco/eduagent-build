@@ -144,6 +144,7 @@ jest.mock(
 );
 
 import { emptyPracticeActivitySummary } from '../../test-utils/practice-activity-summary-fixture';
+import { createMockDb } from '@eduagent/test-utils';
 // WI-867: seeds v2 GDPR consent chain (membership+consentGrant+consentRequest) on db.query Proxy
 import { seedConsentState } from '../../test-utils/consent-seed';
 
@@ -201,7 +202,7 @@ function buildMockDb(
     .mockReturnValue({ onConflictDoNothing: mockOnConflictDoNothing });
   const mockInsert = jest.fn().mockReturnValue({ values: mockInsertValues });
 
-  const db = {
+  const db = Object.assign(createMockDb() as Record<string, unknown>, {
     query: {
       familyLinks: {
         findMany: jest.fn().mockResolvedValue(childLinks),
@@ -283,7 +284,7 @@ function buildMockDb(
     _mockInsert: mockInsert,
     _mockInsertValues: mockInsertValues,
     _mockOnConflictDoNothing: mockOnConflictDoNothing,
-  };
+  });
 
   return db;
 }
@@ -407,8 +408,15 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('Email digest channel — weekly', () => {
+  const failNextPush = () =>
+    mockSendPushNotification.mockResolvedValueOnce({
+      sent: false,
+      reason: 'network_error',
+    });
+
   // Break test 1: Email sent when both preference + parent email present
   it('(T1) sends email when weekly_progress_email=true and parent email present', async () => {
+    failNextPush();
     const db = buildMockDb();
     db.query.consentStates.findFirst = jest.fn().mockResolvedValue({
       status: 'CONSENTED',
@@ -512,6 +520,7 @@ describe('Email digest channel — weekly', () => {
 
   // Break test 4: Struggle watch-line rendered with topic name when struggles non-empty
   it('(T4) renders struggle watch-line with topic names when learning_profiles.struggles non-empty', async () => {
+    failNextPush();
     dbState.struggles = [{ topic: 'fractions' }, { topic: 'decimals' }];
     const db = buildMockDb();
     db.query.consentStates.findFirst = jest.fn().mockResolvedValue({
@@ -538,6 +547,7 @@ describe('Email digest channel — weekly', () => {
 
   // Break test 5: Watch-line omitted when struggles empty
   it('(T5) omits watch-line topics when struggles is empty', async () => {
+    failNextPush();
     dbState.struggles = [];
     const db = buildMockDb();
     db.query.consentStates.findFirst = jest.fn().mockResolvedValue({
@@ -560,6 +570,7 @@ describe('Email digest channel — weekly', () => {
 
   // Break test 6: Resend Idempotency-Key set per parentId + reportWeek
   it('(T6) sets Resend Idempotency-Key from weekly + parentId + reportWeek', async () => {
+    failNextPush();
     const db = buildMockDb();
     db.query.consentStates.findFirst = jest.fn().mockResolvedValue({
       status: 'CONSENTED',
@@ -579,6 +590,8 @@ describe('Email digest channel — weekly', () => {
 
   // Break test 7: Retry after transient Resend failure does not double-send
   it('(T7) Resend Idempotency-Key is deterministic — same key on retry prevents double-send', async () => {
+    failNextPush();
+    failNextPush();
     // The idempotency key is derived from parentId + reportWeek (not a random uuid),
     // so two calls with the same parentId on the same week produce identical keys.
     // Resend deduplicates on this key within 24h.
@@ -669,6 +682,7 @@ describe('Email digest channel — weekly', () => {
 
   // Break test 10: Mixed consent — CONSENTED child included, WITHDRAWN child excluded
   it('(T10) weekly — includes only CONSENTED child row; WITHDRAWN child redacted', async () => {
+    failNextPush();
     const db = buildMockDb([
       { childProfileId: CHILD_ID_A },
       { childProfileId: CHILD_ID_B },
@@ -680,6 +694,7 @@ describe('Email digest channel — weekly', () => {
     //             send-push(A=CONSENTED), send-email(A=CONSENTED).
     seedConsentState(db as unknown as Record<string, unknown>, {
       state: ['CONSENTED', 'WITHDRAWN', 'CONSENTED', 'CONSENTED'],
+      purposesPerState: 2,
     });
 
     const result = (await executeWeeklyGenerate(PARENT_ID, db)) as {
@@ -758,9 +773,18 @@ function buildMonthlyMockDb(
     .mockResolvedValue([{ conversationLanguage: null }]);
   const mockSelectWhere = jest.fn().mockReturnValue({ limit: mockSelectLimit });
   const mockSelectFrom = jest.fn().mockReturnValue({ where: mockSelectWhere });
-  const mockSelect = jest.fn().mockReturnValue({ from: mockSelectFrom });
+  const mockSelect = jest
+    .fn()
+    .mockImplementation((fields: Record<string, unknown>) => ({
+      from:
+        'personId' in fields
+          ? jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue([]),
+            })
+          : mockSelectFrom,
+    }));
 
-  return {
+  return Object.assign(createMockDb() as Record<string, unknown>, {
     query: {
       familyLinks: {
         findFirst: jest.fn().mockResolvedValue({ id: 'link-001' }),
@@ -826,7 +850,7 @@ function buildMonthlyMockDb(
     },
     insert: mockInsert,
     select: mockSelect,
-  };
+  });
 }
 
 beforeEach(() => {

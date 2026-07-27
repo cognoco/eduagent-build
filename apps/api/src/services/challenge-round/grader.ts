@@ -20,6 +20,7 @@ import {
   challengeRoundGraderVerdictSchema,
   type AgeBracket,
   type ChallengeRoundEvaluationItem,
+  type ChallengeRoundQuestionIdentity,
   type ConversationLanguage,
 } from '@eduagent/schemas';
 import { inngest } from '../../inngest/client';
@@ -49,6 +50,8 @@ export interface RunChallengeRoundGraderInput {
   askedQuestion: string;
   /** The learner's verbatim answer. */
   learnerAnswer: string;
+  /** Earlier Challenge identities, in round order, for novelty classification. */
+  priorQuestionIdentities?: ChallengeRoundQuestionIdentity[];
   /** Server-owned event id — injected into every returned item; never sent to the model. */
   answerEventId: string;
   /** Language for learner-facing fields in the verdict. */
@@ -57,13 +60,29 @@ export interface RunChallengeRoundGraderInput {
   ageBracket: AgeBracket;
   /** Optional session id for correlation / per-flow metrics. */
   sessionId?: string;
+  /**
+   * [WI-2670] The REAL vendor that produced `askedQuestion` — the caller
+   * (session-exchange.ts's `resolveAskedQuestion`) reads it back from that
+   * turn's persisted `llmProvider`, never from the current turn's own
+   * routing decision (the two can diverge after a mid-session provider
+   * fallback). Declared to the router as `JudgeIndependence`
+   * mode:'model-output' so the grader is never selected from the same
+   * vendor that produced the question it grades.
+   *
+   * Optional because the caller cannot always resolve it (e.g. a legacy
+   * `ai_response` row persisted before per-turn vendor tracking existed) —
+   * see the `producer_vendor_unresolved` fail-open branch below. The grader
+   * never fabricates a vendor to fill this in.
+   */
+  producerVendor?: string;
 }
 
 type DegradedReason =
   | 'route_error'
   | 'no_json'
   | 'parse_error'
-  | 'schema_invalid';
+  | 'schema_invalid'
+  | 'producer_vendor_unresolved';
 
 async function emitDegradedEvent(
   reason: DegradedReason,
@@ -105,19 +124,56 @@ async function emitDegradedEvent(
 export async function runChallengeRoundGrader(
   input: RunChallengeRoundGraderInput,
 ): Promise<ChallengeRoundEvaluationItem[]> {
+  // 0. [WI-2670] Never fabricate a producerVendor. If the caller could not
+  //    provably identify who produced the graded question (e.g. a legacy
+  //    ai_response row predating per-turn vendor tracking — should not
+  //    happen for any row written after this WI), fail open the same way
+  //    every other degradation does: structured Inngest event with a
+  //    distinct reason code (feeds the degraded-rate dashboard — AGENTS.md
+  //    "silent recovery without escalation is banned"), never a bare
+  //    console warn standing in for real observability. No routeAndCall is
+  //    attempted — there is no safe way to declare JudgeIndependence
+  //    without a real vendor to exclude.
+  if (!input.producerVendor) {
+    logger.warn(
+      '[challenge-round.grader] degraded — producer vendor unresolved',
+      {
+        reason: 'producer_vendor_unresolved',
+        flow: GRADER_FLOW,
+      },
+    );
+    await emitDegradedEvent('producer_vendor_unresolved', input);
+    return [];
+  }
+
   const messages = buildChallengeRoundGraderPrompt({
     askedQuestion: input.askedQuestion,
     learnerAnswer: input.learnerAnswer,
+    priorQuestionIdentities: input.priorQuestionIdentities,
     conversationLanguage: input.conversationLanguage,
     ageBracket: input.ageBracket,
   });
 
   // 1. Route to the judge (capability:'judge' selects the tier/age-blind
   //    grader path — exempt from the under-18 Gemini-ban gate, WI-1800).
+  //
+  // [WI-2670] This grades the LEARNER's answer, but is judged against
+  // `askedQuestion` — the mentor's own prior turn, i.e. tutor output. The
+  // caller (session-exchange.ts's `resolveAskedQuestion`) threads the REAL
+  // vendor that produced that prior turn, read back from its persisted
+  // `llmProvider` — never the current turn's own routing decision, which can
+  // diverge after a mid-session provider fallback. Declaring `model-output`
+  // excludes that vendor from judge selection (MMT-ADR-0016 §2), closing the
+  // one reachable producer-judges-own-output site on the production-default
+  // config (LLM_ROUTING_V2_ENABLED off) that WI-2624 deferred.
   let response: string;
   try {
     const result = await routeAndCall(messages, GRADER_RUNG, {
       capability: 'judge',
+      judgeIndependence: {
+        mode: 'model-output',
+        producerVendor: input.producerVendor,
+      },
       flow: GRADER_FLOW,
       responseFormat: 'json',
       conversationLanguage: input.conversationLanguage,
@@ -176,10 +232,19 @@ export async function runChallengeRoundGrader(
     return [];
   }
 
-  // 5. Inject the server-owned answerEventId into every item. The model never
-  //    sees or supplies this field — server ownership is the invariant.
+  // 5. Inject the server-owned answerEventId and bind the exact asked-question
+  //    text into the semantic identity. The model supplies the structured
+  //    claim/operation/context, but cannot rewrite which question was asked.
   return verdict.data.items.map((item) => ({
     ...item,
     answerEventId: input.answerEventId,
+    ...(item.questionIdentity
+      ? {
+          questionIdentity: {
+            ...item.questionIdentity,
+            questionText: input.askedQuestion,
+          },
+        }
+      : {}),
   }));
 }

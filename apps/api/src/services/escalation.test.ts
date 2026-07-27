@@ -33,6 +33,130 @@ describe('evaluateEscalation', () => {
     totalExchanges: 0,
   };
 
+  describe('answer-evaluation downscaffolding [WI-1443]', () => {
+    it('lowers exactly one rung after four completed correct answers', () => {
+      const decision = evaluateEscalation(
+        {
+          ...baseState,
+          currentRung: 5,
+          answerEvaluationEnabled: true,
+          correctStreak: 4,
+        },
+        '42',
+      );
+
+      expect(decision).toMatchObject({
+        shouldEscalate: false,
+        action: 'deescalate',
+        direction: 'down',
+        newRung: 4,
+      });
+    });
+
+    it('lowers explicitly from rung 2 to rung 1', () => {
+      const decision = evaluateEscalation(
+        {
+          ...baseState,
+          currentRung: 2,
+          answerEvaluationEnabled: true,
+          correctStreak: 4,
+        },
+        '42',
+      );
+
+      expect(decision).toMatchObject({
+        action: 'deescalate',
+        direction: 'down',
+        newRung: 1,
+      });
+    });
+
+    it.each([
+      [3, 'none', 3],
+      [4, 'down', 2],
+    ] as const)(
+      'requires four completed correct answers (streak %i)',
+      (correctStreak, direction, newRung) => {
+        const decision = evaluateEscalation(
+          {
+            ...baseState,
+            currentRung: 3,
+            answerEvaluationEnabled: true,
+            correctStreak,
+          },
+          '42',
+        );
+
+        expect(decision.direction).toBe(direction);
+        expect(decision.newRung).toBe(newRung);
+      },
+    );
+
+    it('holds at the rung-1 floor', () => {
+      const decision = evaluateEscalation(
+        {
+          ...baseState,
+          answerEvaluationEnabled: true,
+          correctStreak: 5,
+        },
+        '42',
+      );
+
+      expect(decision).toMatchObject({
+        action: 'hold',
+        direction: 'none',
+        newRung: 1,
+      });
+    });
+
+    it('keeps legacy behavior when the runtime flag is disabled', () => {
+      const decision = evaluateEscalation(
+        { ...baseState, currentRung: 4, correctStreak: 5 },
+        '42',
+      );
+
+      expect(decision.newRung).toBe(4);
+      expect(decision.direction).not.toBe('down');
+    });
+
+    it('gives the current stuck response precedence over a prior correct streak', () => {
+      const decision = evaluateEscalation(
+        {
+          ...baseState,
+          currentRung: 3,
+          answerEvaluationEnabled: true,
+          correctStreak: 4,
+        },
+        "I don't know",
+      );
+
+      expect(decision).toMatchObject({
+        action: 'escalate',
+        direction: 'up',
+        newRung: 4,
+      });
+    });
+
+    it('freezes rung movement for excluded turns', () => {
+      const decision = evaluateEscalation(
+        {
+          ...baseState,
+          currentRung: 3,
+          answerEvaluationEnabled: true,
+          correctStreak: 4,
+          freezeRung: true,
+        },
+        "I don't know",
+      );
+
+      expect(decision).toMatchObject({
+        action: 'hold',
+        direction: 'none',
+        newRung: 3,
+      });
+    });
+  });
+
   it('does not escalate on a normal response with few exchanges', () => {
     const decision = evaluateEscalation(baseState, 'I think the answer is 42');
 

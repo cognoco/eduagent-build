@@ -2,7 +2,7 @@
  * Surface-ownership forward-only guard.
  *
  * Enforces the import-boundary rules from the design at
- *   docs/superpowers/specs/2026-05-13-surface-ownership-boundaries-design.md
+ *   docs/_archive/specs/Done/2026-05-13-surface-ownership-boundaries-design.md
  * (PR 7 in the implementation sequence).
  *
  * Each rule binds a file-path glob ("surface") to a set of forbidden named
@@ -275,7 +275,7 @@ describe('SURFACE-OWNERSHIP guard — forward-only import boundaries', () => {
         .join('\n');
       throw new Error(
         `Found ${fresh.length} new surface-ownership violation(s):\n${lines}\n\n` +
-          `See docs/superpowers/specs/2026-05-13-surface-ownership-boundaries-design.md.`,
+          `See docs/_archive/specs/Done/2026-05-13-surface-ownership-boundaries-design.md.`,
       );
     }
     expect(fresh).toEqual([]);

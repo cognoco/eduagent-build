@@ -2919,6 +2919,47 @@ describe('sessionCompleted', () => {
       expect(mockApplyAnalysis).not.toHaveBeenCalled();
     });
 
+    // [WI-2396] Basis-inclusive gate: switched from isGdprProcessingAllowedV2
+    // (parental basis only) to isLlmExchangeConsentAllowed, which ALSO honors
+    // an adult's independently-withdrawable self-consent (art6_1_a). Sequence
+    // is [gdpr_parental_consent, art6_1_a-platform_use] — CONSENTED then
+    // WITHDRAWN — proving the adult leg alone (parental leg passes) blocks
+    // the transcript from reaching the LLM, which isGdprProcessingAllowedV2
+    // alone would have missed.
+    it('[WI-2396] does not transmit the transcript to the LLM when adult self-consent (art6_1_a) is withdrawn even though GDPR consent is granted', async () => {
+      mockGetLearningProfile.mockResolvedValue({
+        memoryConsentStatus: 'granted',
+        memoryCollectionEnabled: true,
+      });
+      mockSessionCompletedDb.query.consentGrant.findFirst
+        .mockResolvedValueOnce({
+          granted: true,
+          withdrawnAt: null,
+          grantedAt: new Date('2026-05-01T00:00:00.000Z'),
+        })
+        .mockResolvedValueOnce({
+          granted: true,
+          withdrawnAt: new Date('2026-05-02T00:00:00.000Z'),
+          grantedAt: new Date('2026-05-01T00:00:00.000Z'),
+        });
+      mockSessionCompletedDb.query.consentRequest.findFirst
+        .mockResolvedValueOnce({
+          status: 'approved',
+          requestedAt: new Date('2026-05-01T00:00:00.000Z'),
+          createdAt: new Date('2026-05-01T00:00:00.000Z'),
+        })
+        .mockResolvedValueOnce({
+          status: 'approved',
+          requestedAt: new Date('2026-05-01T00:00:00.000Z'),
+          createdAt: new Date('2026-05-01T00:00:00.000Z'),
+        });
+
+      await executeSteps(createEventData({ qualityRating: 4 }));
+
+      expect(mockAnalyzeSessionTranscript).not.toHaveBeenCalled();
+      expect(mockApplyAnalysis).not.toHaveBeenCalled();
+    });
+
     it('does not call applyAnalysis when analyzeSessionTranscript returns null', async () => {
       mockGetLearningProfile.mockResolvedValue({
         memoryConsentStatus: 'granted',

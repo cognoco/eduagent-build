@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import {
   createDatabase,
   generateUUIDv7,
@@ -12,7 +12,6 @@ import {
 } from '@eduagent/database';
 
 import { buildBackfillRowsForProfile } from '../../../apps/api/src/services/memory/backfill-mapping';
-import { legacyIdentityTableExistsForTest } from '../../../apps/api/src/test-utils/legacy-identity-anchors';
 
 const seededAccountIds = new Set<string>();
 
@@ -38,11 +37,6 @@ export async function setupTestDb(): Promise<{
           await db.delete(person).where(eq(person.id, row.personId));
         }
         await db.delete(organization).where(eq(organization.id, accountId));
-        // Also clean up the dual-write legacy rows (accounts + profiles cascade).
-        // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL delete.
-        if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-          await db.execute(sql`DELETE FROM accounts WHERE id = ${accountId}`);
-        }
         seededAccountIds.delete(accountId);
       }
     },
@@ -89,20 +83,6 @@ export async function seedLearningProfile(
     organizationId: accountId,
     roles: ['learner'],
   });
-  // [WI-1139] Legacy `accounts`/`profiles` Drizzle defs removed — raw SQL
-  // inserts, same conditional seed as before.
-  if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-    await db.execute(sql`
-      INSERT INTO accounts (id, clerk_user_id, email)
-      VALUES (${accountId}, ${`integration-memory-${accountId}`}, ${`memory-${accountId}@integration.test`})
-    `);
-  }
-  if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
-    await db.execute(sql`
-      INSERT INTO profiles (id, account_id, display_name, birth_year, is_owner)
-      VALUES (${profileId}, ${accountId}, 'Memory Fixture', 2012, false)
-    `);
-  }
   seededAccountIds.add(accountId);
 
   await db.insert(learningProfiles).values({
@@ -139,10 +119,6 @@ export async function cleanupSeededAccount(
     await db.delete(person).where(eq(person.id, row.personId));
   }
   await db.delete(organization).where(eq(organization.id, accountId));
-  // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL delete.
-  if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-    await db.execute(sql`DELETE FROM accounts WHERE id = ${accountId}`);
-  }
 }
 
 export async function runBackfillForOneProfile(

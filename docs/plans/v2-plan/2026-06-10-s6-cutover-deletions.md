@@ -8,9 +8,19 @@ status: deferred
 
 # S6 — Cutover & Deletions — Implementation Plan
 
-> **STATUS (2026-06-27):** TODO — not started. All deletion targets still present (`more/`, `library.tsx`, `ModeSwitcher`, `legacy-navigation-contract.ts`, `child/` proxy routes). Gate (a) P3 park-and-return evals — MET via S3. Gate (b) §13.1 V0-retirement product ruling — NOT made (owner decision pending). Gate (c) S1–S4 heir completeness — BLOCKED on S4 missing cold-start/co-learning surfaces and S5 missing linking-ceremony screens. Requires explicit human confirmation before any destructive step.
-
-> **ADR governance correction (2026-06-30, WI-752):** S6 remains deferred and contradiction-checked against corrected canon. `MMT-ADR-0024` is still Proposed, so any deletion that depends on the scope-chip model requires that ADR to be accepted and promoted first; the existing destructive gates and explicit human irreversibility confirmation still apply. S5 visibility/tier ADRs (`MMT-ADR-0027`/`0028`) stand as amended Architecture decisions, but their missing mobile screens and break-tests still block heir parity.
+> **STATUS (last verified 2026-07-22): DEFERRED — NOT STARTED.** Supporter
+> cold-start (`e00baa7be`) and the linking ceremony (`eccae5a9f`) are landed;
+> supporter self-learning / Me-scope coexistence (`a394d68ae`) is also landed, but
+> it is not contextual co-learning. **WI-1136 (S4: build supporter-co-learning
+> service + CoLearningDoorway (T19))** remains Ready/Parked and OUT/fast-follow in
+> the MVP definition. Whether that product deferral clears the relevant S6
+> heir-completeness gate is unresolved and is not decided here. The destructive
+> targets remain present (`ModeSwitcher.tsx`, `legacy-navigation-contract.ts`,
+> V0/V1 flag plumbing, and legacy routes). Gate (a) remains met. Gate (b), the
+> product ruling authorizing V0/V1 retirement, is not evidenced; `MMT-ADR-0024`
+> remains Proposed. The MVP definition keeps S6 OUT/deferred. The mandatory
+> explicit human irreversibility confirmation below and every remaining
+> per-deletion heir check remain in force; this update authorizes no deletion.
 
 > ## ⛔ DEFERRED — DO NOT EXECUTE WITHOUT EXPLICIT HUMAN CONFIRMATION
 >
@@ -218,6 +228,8 @@ T12 Delete V0/V1 e2e regression flows; final orphan-grep sweep (incl. apps/api a
 ### Group B — V0 constraint retirement (GATE (c) §13.1 ruling)
 
 > **Group B does not start until gate (c) is green.** Until the §13.1 product ruling, all protected legacy flag states must not regress: flags-off legacy, current production V0-on/V1-off, and V1 dev/preview. T9–T12 are the *execution* of that ruling, removing the flag scaffolding and the legacy contract entirely.
+
+> **Pre-execution checklist (one-way-door drain T4 rider, added 2026-07-15, ruled sitting-1):** before starting T10/T11 deletion work: (1) refresh this plan's file/line anchors against current `main` (captured 2026-06-13); (2) confirm `MMT-ADR-0024` (scope-chip) resolved status — owned by WI-2062 (Resolve MMT-ADR-0024 status before S5/S6 reliance) — if any deletion depends on scope-chip semantics; (3) keep the T9 flag flip a separate change-set from T10/T11 deletions (already this plan's order — do not collapse them); (4) restate at execution time that once T10/T11 land, rollback is `git revert` only — no longer a flag flip or OTA.
 
 - [ ] **T9: Flip `MODE_NAV_V2_ENABLED` to the production default.**
   In `apps/mobile/eas.json`, set `build.production.env.EXPO_PUBLIC_ENABLE_MODE_NAV_V2: 'true'` (the prod build now ships V2) and **remove** `EXPO_PUBLIC_ENABLE_MODE_NAV` / `..._V1` from prod (`:13`), dev (`:23-24`), preview (`:39-40`). In `.github/workflows/ci.yml` OTA env (currently around `:397-398`), remove the V0/V1 lines and keep only the V2 line. In `apps/api/src/config.ts`, the `MODE_NAV_V2_ENABLED` env entry stays (it is now the canonical "on" state) — add a comment that V0/V1 are retired. Do this as a **flag-flip commit separate from code deletion** so a regression is reverted by flipping one env value, not by restoring deleted files.

@@ -11,13 +11,18 @@
  * out-of-allowlist path must be rejected; the safe default `/(app)/home` must
  * be seeded instead.
  *
- * `IS_E2E_BUILD` (NODE_ENV !== 'production' && EXPO_PUBLIC_E2E === 'true')
- * is evaluated at module load time, so we set `EXPO_PUBLIC_E2E=true` before
- * requiring the screen. Jest already pins NODE_ENV to 'test'.
+ * `IS_E2E_BUILD` (EXPO_PUBLIC_E2E === 'true') is evaluated at module load
+ * time, so we set the flag before requiring the screen.
  */
 
-import { render } from '@testing-library/react-native';
-import { useAuth } from '@clerk/expo';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
+import { useAuth, useClerk } from '@clerk/expo';
+import { useQueryClient } from '@tanstack/react-query';
 
 import {
   clearPendingAuthRedirect,
@@ -32,6 +37,11 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace }),
 }));
 
+jest.mock('@tanstack/react-query', () => ({
+  ...jest.requireActual('@tanstack/react-query'),
+  useQueryClient: jest.fn(),
+}));
+
 // Ensure IS_E2E_BUILD === true when the screen module is required below.
 process.env.EXPO_PUBLIC_E2E = 'true';
 
@@ -40,6 +50,9 @@ const SeedPendingRedirectScreen = require('./seed-pending-redirect')
   .default as () => React.ReactElement | null;
 
 describe('SeedPendingRedirectScreen — auth guard [CR-2026-05-19-H25]', () => {
+  const mockClerkSignOut = jest.fn().mockResolvedValue(undefined);
+  const mockQueryClient = { clear: jest.fn() };
+
   beforeEach(() => {
     jest.clearAllMocks();
     clearPendingAuthRedirect();
@@ -47,6 +60,8 @@ describe('SeedPendingRedirectScreen — auth guard [CR-2026-05-19-H25]', () => {
       path: '/(app)/library',
       staleMs: '0',
     });
+    (useClerk as jest.Mock).mockReturnValue({ signOut: mockClerkSignOut });
+    (useQueryClient as jest.Mock).mockReturnValue(mockQueryClient);
   });
 
   afterEach(() => {
@@ -79,7 +94,7 @@ describe('SeedPendingRedirectScreen — auth guard [CR-2026-05-19-H25]', () => {
     expect(mockReplace).not.toHaveBeenCalled();
   });
 
-  it('seeds the pending redirect and replaces to sign-in when authenticated', () => {
+  it('exposes a deterministic receipt without seeding until the explicit sign-out action', () => {
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: true,
       isSignedIn: true,
@@ -87,10 +102,31 @@ describe('SeedPendingRedirectScreen — auth guard [CR-2026-05-19-H25]', () => {
 
     render(<SeedPendingRedirectScreen />);
 
-    // Authenticated E2E flow: the path is written and the screen redirects
-    // to sign-in so the next sign-in replays the seeded path.
-    expect(peekPendingAuthRedirect()).toBe('/(app)/library');
-    expect(mockReplace).toHaveBeenCalledWith('/(auth)/sign-in');
+    // The authenticated app shell is still mounted here. Seeding before the
+    // explicit action lets that shell consume the redirect and race this
+    // receipt away before Maestro can press it.
+    expect(peekPendingAuthRedirect()).toBeNull();
+    expect(screen.getByTestId('pending-redirect-seeded')).toBeTruthy();
+    expect(screen.getByTestId('pending-redirect-sign-out')).toBeTruthy();
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('cleans up the active session, then re-seeds the redirect for the next sign-in', async () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+      userId: 'user-1',
+    });
+    render(<SeedPendingRedirectScreen />);
+    expect(peekPendingAuthRedirect()).toBeNull();
+    fireEvent.press(screen.getByTestId('pending-redirect-sign-out'));
+
+    await waitFor(() => {
+      expect(mockQueryClient.clear).toHaveBeenCalledTimes(1);
+      expect(mockClerkSignOut).toHaveBeenCalledTimes(1);
+      expect(peekPendingAuthRedirect()).toBe('/(app)/library');
+      expect(mockReplace).toHaveBeenCalledWith('/(auth)/sign-in');
+    });
   });
 });
 
@@ -102,36 +138,45 @@ describe('SeedPendingRedirectScreen — path allowlist [CR-2026-05-21-113]', () 
       isLoaded: true,
       isSignedIn: true,
     });
+    (useClerk as jest.Mock).mockReturnValue({ signOut: jest.fn() });
+    (useQueryClient as jest.Mock).mockReturnValue({ clear: jest.fn() });
   });
 
   afterEach(() => {
     clearPendingAuthRedirect();
   });
 
-  it('accepts an allowlisted path (/(app)/library) and seeds it as-is', () => {
+  it('accepts an allowlisted path (/(app)/library) and seeds it as-is after sign-out', async () => {
     mockUseLocalSearchParams.mockReturnValue({
       path: '/(app)/library',
       staleMs: '0',
     });
 
     render(<SeedPendingRedirectScreen />);
+    expect(peekPendingAuthRedirect()).toBeNull();
+    fireEvent.press(screen.getByTestId('pending-redirect-sign-out'));
 
-    // The allowlisted path must be seeded exactly as provided.
-    expect(peekPendingAuthRedirect()).toBe('/(app)/library');
+    await waitFor(() => {
+      expect(peekPendingAuthRedirect()).toBe('/(app)/library');
+    });
   });
 
-  it('accepts the safe default (/(app)/home) and seeds it as-is', () => {
+  it('accepts the safe default (/(app)/home) and seeds it as-is after sign-out', async () => {
     mockUseLocalSearchParams.mockReturnValue({
       path: '/(app)/home',
       staleMs: '0',
     });
 
     render(<SeedPendingRedirectScreen />);
+    expect(peekPendingAuthRedirect()).toBeNull();
+    fireEvent.press(screen.getByTestId('pending-redirect-sign-out'));
 
-    expect(peekPendingAuthRedirect()).toBe('/(app)/home');
+    await waitFor(() => {
+      expect(peekPendingAuthRedirect()).toBe('/(app)/home');
+    });
   });
 
-  it('rejects a non-allowlisted path and seeds the safe default instead — break test [CR-2026-05-21-113]', () => {
+  it('rejects a non-allowlisted path and seeds the safe default after sign-out — break test [CR-2026-05-21-113]', async () => {
     // Simulate a malicious deep link targeting a sensitive route.
     mockUseLocalSearchParams.mockReturnValue({
       path: '/(app)/account/billing',
@@ -139,21 +184,29 @@ describe('SeedPendingRedirectScreen — path allowlist [CR-2026-05-21-113]', () 
     });
 
     render(<SeedPendingRedirectScreen />);
+    expect(peekPendingAuthRedirect()).toBeNull();
+    fireEvent.press(screen.getByTestId('pending-redirect-sign-out'));
 
-    // The attacker-controlled path must NOT be seeded; the safe default must
-    // be used instead.
-    expect(peekPendingAuthRedirect()).toBe('/(app)/home');
-    expect(peekPendingAuthRedirect()).not.toBe('/(app)/account/billing');
+    await waitFor(() => {
+      // The attacker-controlled path must NOT be seeded; the safe default must
+      // be used instead.
+      expect(peekPendingAuthRedirect()).toBe('/(app)/home');
+      expect(peekPendingAuthRedirect()).not.toBe('/(app)/account/billing');
+    });
   });
 
-  it('rejects an external-looking value and seeds the safe default instead — break test [CR-2026-05-21-113]', () => {
+  it('rejects an external-looking value and seeds the safe default after sign-out — break test [CR-2026-05-21-113]', async () => {
     mockUseLocalSearchParams.mockReturnValue({
       path: 'https://evil.example.com/steal',
       staleMs: '0',
     });
 
     render(<SeedPendingRedirectScreen />);
+    expect(peekPendingAuthRedirect()).toBeNull();
+    fireEvent.press(screen.getByTestId('pending-redirect-sign-out'));
 
-    expect(peekPendingAuthRedirect()).toBe('/(app)/home');
+    await waitFor(() => {
+      expect(peekPendingAuthRedirect()).toBe('/(app)/home');
+    });
   });
 });

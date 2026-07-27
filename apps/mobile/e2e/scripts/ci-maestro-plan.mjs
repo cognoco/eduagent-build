@@ -34,6 +34,12 @@ function flowMetadata(path) {
     flow: relative(e2eRoot, path).replaceAll('\\', '/'),
     source,
     tags: Array.isArray(header.tags) ? header.tags.map(String) : [],
+    // Optional per-flow system UI mode ('light' | 'dark'), applied by
+    // run-ci-maestro.sh before this flow's app launch (WI-2548 AC-2). Absent
+    // for the vast majority of flows, which don't care about system theme.
+    uiMode: header.uiMode === 'light' || header.uiMode === 'dark'
+      ? header.uiMode
+      : null,
   };
 }
 
@@ -112,6 +118,7 @@ function validateManifest(allFlows, validScenarios) {
       .map(({ flow }) => flow),
   );
   const manifestPr = new Set(manifest.pr.map(({ flow }) => flow));
+  const manifestV2 = new Set(manifest.v2.map(({ flow }) => flow));
 
   for (const [flow, scenario] of Object.entries(manifest.scenarioOverrides)) {
     if (!byPath.has(flow))
@@ -125,9 +132,18 @@ function validateManifest(allFlows, validScenarios) {
 
   if (manifestPr.size !== manifest.pr.length)
     fail('PR manifest contains duplicate flows');
+  if (manifestV2.size !== manifest.v2.length)
+    fail('V2 manifest contains duplicate flows');
   for (const flow of taggedPr) {
     if (!manifestPr.has(flow))
       fail(`pr-blocking flow missing from PR manifest: ${flow}`);
+  }
+  const taggedV2 = new Set(
+    allFlows.filter(({ tags }) => tags.includes('v2')).map(({ flow }) => flow),
+  );
+  for (const flow of taggedV2) {
+    if (!manifestV2.has(flow))
+      fail(`V2-tagged flow missing from V2 manifest: ${flow}`);
   }
   for (const { flow, scenario } of manifest.pr) {
     const metadata = byPath.get(flow);
@@ -144,29 +160,57 @@ function validateManifest(allFlows, validScenarios) {
       );
     }
   }
+  for (const { flow, scenario } of manifest.v2) {
+    const metadata = byPath.get(flow);
+    if (!metadata) fail(`V2 manifest flow does not exist: ${flow}`);
+    if (!metadata.tags.includes('v2'))
+      fail(`V2 manifest flow lacks v2 tag: ${flow}`);
+    if (scenario !== null && !validScenarios.has(scenario)) {
+      fail(`V2 manifest flow ${flow} names unknown seed scenario ${scenario}`);
+    }
+    const resolved = resolveScenario(metadata, validScenarios);
+    if (resolved !== scenario) {
+      fail(
+        `V2 manifest scenario mismatch for ${flow}: ${scenario} != ${resolved}`,
+      );
+    }
+  }
 }
 
 function buildPlan(suite) {
   const validScenarios = validSeedScenarios();
   const allFlows = walkYaml(join(e2eRoot, 'flows')).map(flowMetadata);
   validateManifest(allFlows, validScenarios);
+  const byPath = new Map(allFlows.map((flow) => [flow.flow, flow]));
 
   const selected =
     suite === 'pr'
       ? manifest.pr
-      : allFlows
-          .filter(
-            ({ tags }) =>
-              tags.some((tag) => scheduledTags.has(tag)) &&
-              !tags.some((tag) => nonExecutableTags.has(tag)),
-          )
-          .map((metadata) => ({
-            flow: metadata.flow,
-            scenario: resolveScenario(metadata, validScenarios),
-          }));
-  const shardCount = suite === 'pr' ? 4 : 8;
+      : suite === 'v2'
+        ? manifest.v2
+        : allFlows
+            .filter(
+              ({ tags }) =>
+                tags.some((tag) => scheduledTags.has(tag)) &&
+                !tags.some((tag) => nonExecutableTags.has(tag)),
+            )
+            .map((metadata) => ({
+              flow: metadata.flow,
+              scenario: resolveScenario(metadata, validScenarios),
+            }));
+  // Attach uiMode uniformly regardless of which of the three paths above
+  // produced the entry — manifest-declared (pr/v2) entries don't carry
+  // uiMode themselves, so look it up from the flow's own frontmatter. Only
+  // add the key when a flow actually declares one, so the vast majority of
+  // entries (which don't care about system theme) keep their existing
+  // {flow, scenario, shard} shape.
+  const withUiMode = selected.map((entry) => {
+    const uiMode = byPath.get(entry.flow)?.uiMode ?? null;
+    return uiMode ? { ...entry, uiMode } : entry;
+  });
+  const shardCount = suite === 'pr' ? 4 : suite === 'v2' ? 1 : 8;
 
-  return assignScenarioShards(selected, shardCount).sort((left, right) =>
+  return assignScenarioShards(withUiMode, shardCount).sort((left, right) =>
     left.flow.localeCompare(right.flow),
   );
 }
@@ -177,8 +221,8 @@ function option(name) {
 }
 
 const suite = option('--suite');
-if (suite !== 'pr' && suite !== 'nightly')
-  fail('--suite must be pr or nightly');
+if (suite !== 'pr' && suite !== 'nightly' && suite !== 'v2')
+  fail('--suite must be pr, nightly, or v2');
 const format = option('--format') ?? 'tsv';
 const all = process.argv.includes('--all');
 const shardOption = option('--shard');
@@ -195,8 +239,8 @@ if (!all) {
 if (format === 'json') {
   process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);
 } else if (format === 'tsv') {
-  for (const { flow, scenario } of plan) {
-    process.stdout.write(`${scenario ?? '-'}\t${flow}\n`);
+  for (const { flow, scenario, uiMode } of plan) {
+    process.stdout.write(`${scenario ?? '-'}\t${flow}\t${uiMode ?? '-'}\n`);
   }
 } else {
   fail('--format must be json or tsv');

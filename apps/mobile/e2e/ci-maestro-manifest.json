@@ -38,6 +38,60 @@
       "scenario": "multi-subject"
     }
   ],
+  "v2": [
+    {
+      "flow": "flows/v2/v2-mentor-single-composer.yaml",
+      "scenario": "onboarding-no-subject"
+    },
+    {
+      "flow": "flows/v2/v2-returning-learner-resume.yaml",
+      "scenario": "v2-returning-learner"
+    },
+    {
+      "flow": "flows/v2/v2-homework-manual-entry.yaml",
+      "scenario": "trial-active"
+    },
+    {
+      "flow": "flows/v2/v2-journal-paper-trail.yaml",
+      "scenario": "v2-journal-paper-trail"
+    },
+    {
+      "flow": "flows/v2/v2-shell-navigation.yaml",
+      "scenario": "learning-active"
+    },
+    {
+      "flow": "flows/v2/v2-subject-create-round-trip.yaml",
+      "scenario": "onboarding-no-subject"
+    },
+    {
+      "flow": "flows/v2/v2-supporter-scope-journey.yaml",
+      "scenario": "v2-supporter-accepted"
+    },
+    {
+      "flow": "flows/v2/v2-supporter-coldstart-mount.yaml",
+      "scenario": "v2-supporter-managed"
+    },
+    {
+      "flow": "flows/v2/v2-supporter-link-ceremony.yaml",
+      "scenario": "v2-supporter-pending-link"
+    },
+    {
+      "flow": "flows/v2/v2-account-owner.yaml",
+      "scenario": "parent-multi-child"
+    },
+    {
+      "flow": "flows/v2/v2-account-non-owner-child.yaml",
+      "scenario": "v2-account-non-owner-child"
+    },
+    {
+      "flow": "flows/v2/v2-supporter-self-learning-doorway.yaml",
+      "scenario": "v2-supporter-self-learning-active"
+    },
+    {
+      "flow": "flows/v2/v2-supporter-scope-geometry.yaml",
+      "scenario": "v2-supporter-self-learning-active"
+    }
+  ],
   "scenarioOverrides": {
     "flows/account/learner-mentor-memory-populated.yaml": "mentor-memory-populated",
     "flows/account/learner-mentor-memory.yaml": "language-subject-active",
@@ -60,7 +114,7 @@
     "flows/consent/consent-pending-gate.yaml": "consent-pending",
     "flows/consent/consent-withdrawn-gate.yaml": "consent-withdrawn-solo",
     "flows/consent/hand-to-parent-consent.yaml": "pre-profile",
-    "flows/consent/post-approval-landing.yaml": "onboarding-complete",
+    "flows/consent/post-approval-landing.yaml": "post-approval-ready",
     "flows/edge/animated-splash.yaml": null,
     "flows/onboarding/create-subject.yaml": "onboarding-complete",
     "flows/onboarding/preview-self.yaml": null,

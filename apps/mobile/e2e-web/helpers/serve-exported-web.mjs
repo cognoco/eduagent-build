@@ -144,6 +144,7 @@ const apiUrl =
   process.env.EXPO_PUBLIC_API_URL ??
   defaultApiUrl;
 process.env.EXPO_PUBLIC_API_URL = apiUrl;
+process.env.EXPO_PUBLIC_E2E ??= 'true';
 const generatedEnvFiles = new Set();
 
 async function overrideEnvFiles() {

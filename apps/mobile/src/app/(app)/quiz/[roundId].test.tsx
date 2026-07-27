@@ -1,6 +1,14 @@
-import { render, screen, fireEvent, within } from '@testing-library/react-native';
+import {
+  render,
+  screen,
+  fireEvent,
+  within,
+} from '@testing-library/react-native';
 import QuizRoundDetailScreen from './[roundId]';
 import type { CompletedRoundDetailResponse } from '@eduagent/schemas';
+
+const mockReplace = jest.fn();
+let mockSearchParams: Record<string, string> = { roundId: 'round-1' };
 
 // i18n mock — returns English values for quiz.round namespace so tests can
 // assert on the same English strings as before the migration.
@@ -36,10 +44,10 @@ jest.mock('react-i18next', () => {
 });
 
 jest.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({ roundId: 'round-1' }),
+  useLocalSearchParams: () => mockSearchParams,
   useRouter: () => ({
     push: jest.fn(),
-    replace: jest.fn(),
+    replace: mockReplace,
     back: jest.fn(),
     canGoBack: () => false,
   }),
@@ -131,6 +139,39 @@ function buildActiveRoundWithoutResults() {
     total: 1,
   };
 }
+
+beforeEach(() => {
+  mockReplace.mockReset();
+  mockSearchParams = { roundId: 'round-1' };
+});
+
+describe('QuizRoundDetailScreen — route-aware Back', () => {
+  beforeEach(() => {
+    mockUseRoundDetail.mockReset();
+  });
+
+  it('[WI-1864] restores Quiz History with its upstream Practice contract', () => {
+    mockSearchParams = {
+      roundId: 'round-1',
+      historyReturnTo: 'practice',
+      historyPracticeReturnTo: 'journal',
+    };
+    mockUseRoundDetail.mockReturnValue({
+      data: buildGuessWhoRound(),
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<QuizRoundDetailScreen />);
+    fireEvent.press(screen.getByTestId('round-detail-back-btn'));
+
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/quiz/history',
+      params: { returnTo: 'practice', practiceReturnTo: 'journal' },
+    });
+  });
+});
 
 describe('QuizRoundDetailScreen — hint reveal', () => {
   beforeEach(() => {
@@ -326,9 +367,24 @@ describe('QuizRoundDetailScreen — result lookup with non-index-aligned results
       ],
       // Results arrive in REVERSE order — index 2 first, then 1, then 0.
       results: [
-        { questionIndex: 2, correct: false, correctAnswer: 'Tokyo', answerGiven: 'Osaka' },
-        { questionIndex: 1, correct: true, correctAnswer: 'Berlin', answerGiven: 'Berlin' },
-        { questionIndex: 0, correct: true, correctAnswer: 'Paris', answerGiven: 'Paris' },
+        {
+          questionIndex: 2,
+          correct: false,
+          correctAnswer: 'Tokyo',
+          answerGiven: 'Osaka',
+        },
+        {
+          questionIndex: 1,
+          correct: true,
+          correctAnswer: 'Berlin',
+          answerGiven: 'Berlin',
+        },
+        {
+          questionIndex: 0,
+          correct: true,
+          correctAnswer: 'Paris',
+          answerGiven: 'Paris',
+        },
       ],
     };
 
@@ -344,8 +400,8 @@ describe('QuizRoundDetailScreen — result lookup with non-index-aligned results
     // Q0 card: France (array position 0) → result for questionIndex 0 → correct=true,
     // answerGiven='Paris'. A naive results[i] would give questionIndex 2 (Osaka, wrong).
     const q0Card = screen.getByTestId('round-detail-question-0');
-    within(q0Card).getByText('Your answer: Paris');   // proves result matched qi=0
-    within(q0Card).getByText('Correct');              // proves correct=true
+    within(q0Card).getByText('Your answer: Paris'); // proves result matched qi=0
+    within(q0Card).getByText('Correct'); // proves correct=true
 
     // Q1 card: Germany → questionIndex 1 → correct=true, answerGiven='Berlin'.
     const q1Card = screen.getByTestId('round-detail-question-1');

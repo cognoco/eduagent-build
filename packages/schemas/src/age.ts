@@ -31,6 +31,8 @@ export interface AgeGateProfile {
   role?: AgeGateRole | null;
   isOwner?: boolean | null;
   birthYear?: number | null;
+  birthMonth?: number | null;
+  birthDay?: number | null;
 }
 
 /**
@@ -102,8 +104,17 @@ export function isAdultOwner(
   if (profile.role === undefined && profile.isOwner !== true) return false;
   if (profile.birthYear == null) return false;
 
-  const year = currentYear ?? new Date().getFullYear();
-  return year - profile.birthYear >= PARENT_ACCOUNT_MINIMUM_AGE;
+  if (currentYear !== undefined) {
+    return computeAgeBracket(profile.birthYear, currentYear) === 'adult';
+  }
+
+  return (
+    computeAgeBracketFromDate(
+      profile.birthYear,
+      profile.birthMonth ?? undefined,
+      profile.birthDay ?? undefined,
+    ) === 'adult'
+  );
 }
 
 /**

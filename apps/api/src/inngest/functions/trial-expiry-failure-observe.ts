@@ -53,6 +53,7 @@ export const trialExpiryFailureObserve = inngest.createFunction(
       level: 'error',
       tags: {
         surface: 'billing',
+        signal: 'trial-expiry-failed',
         event: 'trial_expiry_failed',
         step: data.step ?? 'unknown',
       },

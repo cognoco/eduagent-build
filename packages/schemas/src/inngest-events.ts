@@ -4,6 +4,51 @@ import { childCapNotificationKindSchema } from './notifications.ts';
 import { subscriptionStatusSchema, subscriptionTierSchema } from './billing.ts';
 import { conversationLanguageSchema } from './profiles.ts';
 
+const mentorNoticeEventBaseSchema = z.object({
+  eventId: z.string().uuid(),
+  profileId: z.string().uuid(),
+  noticeId: z.string().uuid(),
+  timestamp: isoDateField,
+});
+
+export const mentorNoticeNudgeEventSchema = mentorNoticeEventBaseSchema;
+export type MentorNoticeNudgeEvent = z.infer<
+  typeof mentorNoticeNudgeEventSchema
+>;
+
+export const mentorNoticeCreatedEventSchema =
+  mentorNoticeEventBaseSchema.extend({
+    sourceSessionId: z.string().uuid(),
+  });
+export type MentorNoticeCreatedEvent = z.infer<
+  typeof mentorNoticeCreatedEventSchema
+>;
+
+export const mentorNoticeNudgeSentEventSchema =
+  mentorNoticeEventBaseSchema.extend({
+    status: z.enum(['sent', 'skipped', 'suppressed']),
+  });
+export type MentorNoticeNudgeSentEvent = z.infer<
+  typeof mentorNoticeNudgeSentEventSchema
+>;
+
+export const mentorNoticeRecheckStartedEventSchema =
+  mentorNoticeEventBaseSchema.extend({
+    sessionId: z.string().uuid(),
+  });
+export type MentorNoticeRecheckStartedEvent = z.infer<
+  typeof mentorNoticeRecheckStartedEventSchema
+>;
+
+export const mentorNoticeRecheckOutcomeEventSchema =
+  mentorNoticeEventBaseSchema.extend({
+    sessionId: z.string().uuid().optional(),
+    outcome: z.enum(['locked_in', 'not_yet', 'dismissed', 'deferred']),
+  });
+export type MentorNoticeRecheckOutcomeEvent = z.infer<
+  typeof mentorNoticeRecheckOutcomeEventSchema
+>;
+
 export const paymentFailedEventSchema = z.object({
   subscriptionId: z.string().uuid(),
   stripeSubscriptionId: z.string().min(1).optional(),
@@ -39,6 +84,23 @@ export const billingAlertDeliveryFailedEventSchema = z.object({
 });
 export type BillingAlertDeliveryFailedEvent = z.infer<
   typeof billingAlertDeliveryFailedEventSchema
+>;
+
+// [WI-1753] AC-6: dispatched post-commit by the family-join accept path when an
+// existing teen who joins a parent's family still holds an ACTIVE store
+// subscription — their own store sub keeps billing while the parent now pays the
+// family seat. The consumer nudges the teen to self-cancel; no server refund is
+// possible (store-delegated billing). The store ref is captured BEFORE the
+// org-of-one subscription teardown; only the RevenueCat original-app-user id is
+// carried (store product/platform columns are unpopulated — see billing explore).
+export const familyJoinStoreCancelNudgeRequestedEventSchema = z.object({
+  teenPersonId: z.string().uuid(),
+  familyOrgId: z.string().uuid(),
+  revenuecatOriginalAppUserId: z.string().min(1),
+  timestamp: isoDateField.optional(),
+});
+export type FamilyJoinStoreCancelNudgeRequestedEvent = z.infer<
+  typeof familyJoinStoreCancelNudgeRequestedEventSchema
 >;
 
 export const filingTimedOutEventSchema = z.object({

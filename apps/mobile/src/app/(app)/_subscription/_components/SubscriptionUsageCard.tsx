@@ -79,6 +79,21 @@ export function SubscriptionUsageCard({
                   </Text>
                 </View>
               ))}
+              {(usage.familyAggregate?.formerMemberUsed ?? 0) > 0 ? (
+                <View
+                  className="flex-row items-center justify-between py-1"
+                  testID="usage-former-members"
+                >
+                  <Text className="text-caption text-text-secondary">
+                    {t('subscription.usageCard.formerMembers')}
+                  </Text>
+                  <Text className="text-caption font-semibold text-text-primary">
+                    {t('subscription.usageCard.questionsUsed', {
+                      count: usage.familyAggregate?.formerMemberUsed,
+                    })}
+                  </Text>
+                </View>
+              ) : null}
               {usage.familyAggregate ? (
                 <View
                   className="flex-row items-center justify-between py-1"

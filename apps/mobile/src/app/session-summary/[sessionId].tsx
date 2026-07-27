@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator,
   InteractionManager,
+  Platform,
 } from 'react-native';
 import {
   useRouter,
@@ -26,12 +27,14 @@ import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { useParentProxy } from '../../hooks/use-parent-proxy';
 import { useRatingPrompt } from '../../hooks/use-rating-prompt';
+import { useAnnounce } from '../../hooks/use-announce';
 import {
   useSession,
   useSessionTranscript,
   useSessionSummary,
   useSkipSummary,
   useSubmitSummary,
+  useRetrySummaryFeedback,
   useRecallBridge,
 } from '../../hooks/use-sessions';
 import { useSessionBookmarks } from '../../hooks/use-bookmarks';
@@ -39,7 +42,13 @@ import { useTotalSessionCount } from '../../hooks/use-session-context';
 import { useLearnerProfile } from '../../hooks/use-learner-profile';
 import { useTopicSuggestions } from '../../hooks/use-topic-suggestions';
 import { usePostSessionNotificationAsk } from '../../hooks/use-post-session-notification-ask';
-import { goBackOrReplace, homeHrefForReturnTo } from '../../lib/navigation';
+import {
+  goBackOrReplace,
+  homeHrefForReturnTo,
+  JOURNAL_HREF,
+  JOURNAL_RETURN_TO,
+} from '../../lib/navigation';
+import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { platformAlert } from '../../lib/platform-alert';
 import { formatApiError, classifyApiError } from '../../lib/format-api-error';
 import { Sentry } from '../../lib/sentry';
@@ -98,13 +107,19 @@ export default function SessionSummaryScreen() {
     sessionType?: string;
     filedSubjectId?: string;
     filedBookId?: string;
-    returnTo?: string;
+    returnTo?: string | string[];
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const summaryHomeHref = homeHrefForReturnTo(returnTo);
+  const resolvedReturnTo = Array.isArray(returnTo) ? returnTo[0] : returnTo;
+  const summaryHomeHref = homeHrefForReturnTo(
+    resolvedReturnTo,
+    undefined,
+    FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+  );
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const announce = useAnnounce();
   // [BUG-134] Auth gate — this route is at the root, not under (app)/, so
   // the (app)/_layout.tsx auth guard does NOT fire on deep-link entry.
   // Without this check, an unauthenticated user opening a /session-summary
@@ -138,8 +153,11 @@ export default function SessionSummaryScreen() {
   // allowing double-submission if user taps rapidly.
   const submitInFlight = useRef(false);
   const skipInFlight = useRef(false);
+  const feedbackRetryInFlight = useRef(false);
+  const [feedbackRetryAttempted, setFeedbackRetryAttempted] = useState(false);
 
   const submitSummary = useSubmitSummary(sessionId ?? '');
+  const retrySummaryFeedback = useRetrySummaryFeedback(sessionId ?? '');
   const skipSummary = useSkipSummary(sessionId ?? '');
   const session = useSession(sessionId ?? '');
   const transcript = useSessionTranscript(sessionId ?? '');
@@ -171,11 +189,6 @@ export default function SessionSummaryScreen() {
   // completed at least one session (the post-value moment). Skipped in
   // parent-proxy mode and dedup'd via SecureStore inside the hook.
   // Must be called before any early returns to satisfy Rules of Hooks.
-  usePostSessionNotificationAsk(
-    activeProfile?.id,
-    totalSessionCount >= 1,
-    isProxyMode,
-  );
   const [recallQuestions, setRecallQuestions] = useState<string[] | null>(null);
 
   // BUG-449: when the user re-enters this screen from Library → Shelf → Book →
@@ -198,6 +211,17 @@ export default function SessionSummaryScreen() {
   });
   const sessionBookmarks = useSessionBookmarks(sessionId ?? undefined);
   const persisted = persistedSummary.data ?? null;
+  usePostSessionNotificationAsk(
+    activeProfile?.id,
+    totalSessionCount >= 1,
+    isProxyMode,
+    // [WI-2573] MMT-ADR-0036 §3.1: the mentor-notice MVP is in-app only and
+    // shows no mentor-notice-specific notification primer. The generic
+    // post-session ask is unchanged and unrelated to mentor notices; only the
+    // notice-flavoured copy variant is contained. The hook still supports the
+    // variant, so reopening it post-MVP is a one-argument change.
+    false,
+  );
   // Destructure `refetch` once: TanStack Query produces a new top-level
   // result object reference on every state slice change (isFetching, isStale,
   // dataUpdatedAt, background polling tick). If we depended on the whole
@@ -211,9 +235,12 @@ export default function SessionSummaryScreen() {
     persisted?.status === 'submitted' || persisted?.status === 'accepted';
   const isPersistedSkipped = persisted?.status === 'skipped';
   const isAlreadyPersisted = isPersistedSubmitted || isPersistedSkipped;
+  const isRevisitedPersistedSummary = isAlreadyPersisted && !submitted;
 
   useEffect(() => {
     setRecapTimedOut(false);
+    setAiFeedback(null);
+    setFeedbackRetryAttempted(false);
     // A new session id resets the loading-escape anchor — otherwise an
     // in-flight 10s timer from a previous session would continue ticking
     // against the new session's load.
@@ -350,9 +377,12 @@ export default function SessionSummaryScreen() {
 
   const showSubmittedView = submitted || isPersistedSubmitted;
   const displayContent = submitted ? summaryText : (persisted?.content ?? '');
-  const displayAiFeedback = submitted
-    ? aiFeedback
-    : (persisted?.aiFeedback ?? null);
+  const displayAiFeedback = aiFeedback ?? persisted?.aiFeedback ?? null;
+  const displayFeedbackStatus = displayAiFeedback
+    ? 'available'
+    : submitted
+      ? 'unavailable'
+      : persisted?.feedbackStatus;
   const transcriptSessionType = liveTranscript?.session.sessionType;
   const sessionType = deriveSessionSummaryMode({
     sessionTypeParam,
@@ -424,7 +454,29 @@ export default function SessionSummaryScreen() {
     }
   };
 
+  const navigateToSummaryHome = (preferBack: boolean): void => {
+    if (resolvedReturnTo === JOURNAL_RETURN_TO) {
+      // Pop to the already-mounted Journal tab route. Replacing this root
+      // summary route leaves the retained tab underneath and mounts a second
+      // Journal screen; dismissTo also replaces safely for a direct deep link.
+      router.dismissTo(JOURNAL_HREF);
+      return;
+    }
+
+    if (preferBack) {
+      goBackOrReplace(router, summaryHomeHref);
+      return;
+    }
+
+    router.replace(summaryHomeHref as Href);
+  };
+
   const finishSummaryNavigation = (): void => {
+    if (resolvedReturnTo === JOURNAL_RETURN_TO) {
+      navigateToSummaryHome(false);
+      return;
+    }
+
     if (filedSubjectId && filedBookId) {
       router.replace('/(app)/library' as Href);
       InteractionManager.runAfterInteractions(() => {
@@ -445,7 +497,7 @@ export default function SessionSummaryScreen() {
 
     const effectiveTopicId = topicId ?? fallbackSession?.topicId;
     const effectiveSubjectId = subjectId ?? fallbackSession?.subjectId;
-    if (isAlreadyPersisted && effectiveTopicId && effectiveSubjectId) {
+    if (isRevisitedPersistedSummary && effectiveTopicId && effectiveSubjectId) {
       router.replace({
         pathname: '/(app)/topic/[topicId]',
         params: { topicId: effectiveTopicId, subjectId: effectiveSubjectId },
@@ -453,12 +505,12 @@ export default function SessionSummaryScreen() {
       return;
     }
 
-    if (isAlreadyPersisted) {
-      goBackOrReplace(router, summaryHomeHref);
+    if (isRevisitedPersistedSummary) {
+      navigateToSummaryHome(true);
       return;
     }
 
-    router.replace(summaryHomeHref as Href);
+    navigateToSummaryHome(false);
   };
 
   // [BUG-134] Auth gate (see comment at top of component).
@@ -490,7 +542,7 @@ export default function SessionSummaryScreen() {
         message={t('sessionSummary.notFoundHeadHomeMessage')}
         primaryAction={{
           label: t('common.goHome'),
-          onPress: () => goBackOrReplace(router, summaryHomeHref),
+          onPress: () => navigateToSummaryHome(true),
           testID: 'session-summary-missing-param',
         }}
       />
@@ -521,7 +573,7 @@ export default function SessionSummaryScreen() {
         <Button
           variant="primary"
           label={t('common.goHome')}
-          onPress={() => goBackOrReplace(router, summaryHomeHref)}
+          onPress={() => navigateToSummaryHome(true)}
           testID="expired-session-go-home"
         />
       </View>
@@ -542,7 +594,7 @@ export default function SessionSummaryScreen() {
         <Button
           variant="primary"
           label={t('common.goHome')}
-          onPress={() => goBackOrReplace(router, summaryHomeHref)}
+          onPress={() => navigateToSummaryHome(true)}
           testID="session-not-found-go-home"
         />
       </View>
@@ -571,7 +623,7 @@ export default function SessionSummaryScreen() {
           }}
           secondaryAction={{
             label: t('common.goHome'),
-            onPress: () => goBackOrReplace(router, summaryHomeHref),
+            onPress: () => navigateToSummaryHome(true),
           }}
         />
       );
@@ -606,7 +658,7 @@ export default function SessionSummaryScreen() {
         <Button
           variant="primary"
           label={t('common.goHome')}
-          onPress={() => router.replace(summaryHomeHref as Href)}
+          onPress={() => navigateToSummaryHome(false)}
           testID="session-not-found-go-home"
         />
       </View>
@@ -679,6 +731,40 @@ export default function SessionSummaryScreen() {
       return false;
     } finally {
       submitInFlight.current = false;
+    }
+  };
+
+  const handleRetryFeedback = async (): Promise<void> => {
+    if (
+      retrySummaryFeedback.isPending ||
+      feedbackRetryInFlight.current ||
+      !sessionId
+    ) {
+      return;
+    }
+    feedbackRetryInFlight.current = true;
+    try {
+      const result = await retrySummaryFeedback.mutateAsync();
+      setAiFeedback(result.summary.aiFeedback);
+      setFeedbackRetryAttempted(true);
+      announce(
+        result.summary.aiFeedback
+          ? `${t('sessionSummary.mateFeedback')}: ${result.summary.aiFeedback}`
+          : t('sessionSummary.feedbackStillUnavailable'),
+      );
+      if (!isPersistedSubmitted) {
+        setSubmitted(true);
+      }
+      await refetchPersistedSummary();
+    } catch (error) {
+      setFeedbackRetryAttempted(true);
+      announce(t('sessionSummary.feedbackStillUnavailable'));
+      Sentry.captureException(error, {
+        tags: { surface: 'session-summary.feedback-retry' },
+        extra: { sessionId },
+      });
+    } finally {
+      feedbackRetryInFlight.current = false;
     }
   };
 
@@ -935,6 +1021,25 @@ export default function SessionSummaryScreen() {
           </Text>
         ) : null}
 
+        {persisted?.mentorNotice ? (
+          <View
+            className="bg-surface rounded-card p-4 mb-4"
+            testID="session-summary-mentor-notice"
+          >
+            <Text className="text-body font-semibold text-text-primary mb-1">
+              {t('sessionSummary.mentorNotice.title')}
+            </Text>
+            <Text className="text-body text-text-primary">
+              {persisted.mentorNotice.concept}
+            </Text>
+            {persisted.mentorNotice.correctionHint ? (
+              <Text className="text-caption text-text-secondary mt-2">
+                {persisted.mentorNotice.correctionHint}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+
         {/* Session takeaways (learner-friendly, no internal metrics) */}
         <View
           className="bg-surface rounded-card p-4 mb-4"
@@ -1079,7 +1184,10 @@ export default function SessionSummaryScreen() {
                   <Text className="text-body text-text-secondary me-2">
                     {'\u2022'}
                   </Text>
-                  <Text className="text-body text-text-primary flex-1">
+                  <Text
+                    className="text-body text-text-primary flex-1"
+                    testID={`session-recap-learning-point-${index}`}
+                  >
                     {bullet.replace(/^- /, '')}
                   </Text>
                 </View>
@@ -1453,6 +1561,24 @@ export default function SessionSummaryScreen() {
               <Text className="text-body text-text-primary mb-2">
                 {displayContent}
               </Text>
+              {Platform.OS === 'web' ? (
+                <View
+                  className="sr-only"
+                  testID="feedback-retry-status"
+                  role="status"
+                  accessibilityLiveRegion="polite"
+                >
+                  <Text testID="feedback-retry-status-message">
+                    {feedbackRetryAttempted
+                      ? displayAiFeedback
+                        ? `${t('sessionSummary.mateFeedback')}: ${displayAiFeedback}`
+                        : displayFeedbackStatus === 'unavailable'
+                          ? t('sessionSummary.feedbackStillUnavailable')
+                          : ''
+                      : ''}
+                  </Text>
+                </View>
+              ) : null}
               {displayAiFeedback ? (
                 <>
                   <View className="h-px bg-surface-elevated my-3" />
@@ -1466,6 +1592,33 @@ export default function SessionSummaryScreen() {
                     {displayAiFeedback}
                   </Text>
                 </>
+              ) : displayFeedbackStatus === 'unavailable' ? (
+                <View
+                  className="mt-3 border-t border-surface-elevated pt-3"
+                  testID="feedback-unavailable"
+                >
+                  <Text className="text-body-sm font-semibold text-text-primary mb-1">
+                    {t('sessionSummary.feedbackUnavailableTitle')}
+                  </Text>
+                  <Text className="text-body-sm text-text-secondary mb-3">
+                    {feedbackRetryAttempted || retrySummaryFeedback.isError
+                      ? t('sessionSummary.feedbackStillUnavailable')
+                      : t('sessionSummary.feedbackUnavailableMessage')}
+                  </Text>
+                  <Button
+                    variant="secondary"
+                    label={
+                      retrySummaryFeedback.isPending
+                        ? t('sessionSummary.retryingFeedback')
+                        : t('sessionSummary.retryFeedback')
+                    }
+                    onPress={() => {
+                      void handleRetryFeedback();
+                    }}
+                    loading={retrySummaryFeedback.isPending}
+                    testID="retry-feedback-button"
+                  />
+                </View>
               ) : null}
             </View>
           </View>
@@ -1586,7 +1739,7 @@ export default function SessionSummaryScreen() {
             className="bg-primary rounded-button py-3 items-center mt-2"
             testID="continue-button"
             accessibilityLabel={
-              isAlreadyPersisted
+              isRevisitedPersistedSummary
                 ? t('sessionSummary.a11yContinueLearning')
                 : t('sessionSummary.a11yContinueToHome')
             }

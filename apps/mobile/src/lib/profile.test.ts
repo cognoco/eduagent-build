@@ -44,3 +44,53 @@ describe('isFamilyCapableProfile', () => {
     expect(isFamilyCapableProfile(minorOwner, [minorOwner, child])).toBe(false);
   });
 });
+
+describe('isFamilyCapableProfile — exact-birth-date parity (WI-1259)', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  const child = makeProfile({ id: 'p2', isOwner: false, birthYear: 2015 });
+
+  it('uses month/day when present: owner turning 18 later this year is NOT family-capable', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-15T12:00:00Z'));
+    const boundaryOwner = makeProfile({
+      id: 'p1',
+      isOwner: true,
+      birthYear: 2008,
+      birthMonth: 12,
+      birthDay: 31,
+    });
+    // Exact age on 2026-07-15 is 17 (birthday Dec 31). The year-only bracket
+    // says 18 — the client gate must match the server (WI-367) and deny.
+    expect(isFamilyCapableProfile(boundaryOwner, [boundaryOwner, child])).toBe(
+      false,
+    );
+  });
+
+  it('owner whose birthday already passed this year IS family-capable', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-15T12:00:00Z'));
+    const adultOwner = makeProfile({
+      id: 'p1',
+      isOwner: true,
+      birthYear: 2008,
+      birthMonth: 1,
+      birthDay: 2,
+    });
+    expect(isFamilyCapableProfile(adultOwner, [adultOwner, child])).toBe(true);
+  });
+
+  it('falls back to year-only when month/day are null', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-15T12:00:00Z'));
+    const yearOnlyOwner = makeProfile({
+      id: 'p1',
+      isOwner: true,
+      birthYear: 2008,
+      birthMonth: null,
+      birthDay: null,
+    });
+    expect(isFamilyCapableProfile(yearOnlyOwner, [yearOnlyOwner, child])).toBe(
+      true,
+    );
+  });
+});

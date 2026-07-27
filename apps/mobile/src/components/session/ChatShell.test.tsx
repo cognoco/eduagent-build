@@ -6,7 +6,8 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import { AccessibilityInfo, Alert, AppState, Linking } from 'react-native';
-import { ChatShell, type ChatMessage } from './ChatShell';
+import { ChatShell } from './ChatShell';
+import type { ChatMessage } from './session-types';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -49,6 +50,15 @@ jest.mock('@expo/vector-icons', () => {
   };
 });
 
+// Pattern A evaluates the real TTS hook module; keep its native dependency at
+// the external boundary so the component suite remains Jest-runnable.
+jest.mock('expo-speech', () => ({
+  speak: jest.fn(),
+  stop: jest.fn(),
+  pause: jest.fn(),
+  resume: jest.fn(),
+}));
+
 // STT mock
 const mockStartListening = jest.fn().mockResolvedValue(undefined);
 const mockStopListening = jest.fn().mockResolvedValue(undefined);
@@ -64,8 +74,8 @@ let mockSttState = {
   isListening: false,
 };
 
-// prettier-ignore
-jest.mock('../../hooks/use-speech-recognition', () => ({ // gc1-allow: voice hook touches native recording APIs outside component scope
+jest.mock('../../hooks/use-speech-recognition', () => ({
+  ...jest.requireActual('../../hooks/use-speech-recognition'),
   useSpeechRecognition: () => ({
     ...mockSttState,
     startListening: mockStartListening,
@@ -82,8 +92,8 @@ const mockStopSpeaking = jest.fn();
 const mockReplay = jest.fn();
 const mockSetRate = jest.fn();
 
-// prettier-ignore
-jest.mock('../../hooks/use-text-to-speech', () => ({ // gc1-allow: voice output hook touches native speech APIs outside component scope
+jest.mock('../../hooks/use-text-to-speech', () => ({
+  ...jest.requireActual('../../hooks/use-text-to-speech'),
   useTextToSpeech: () => ({
     isSpeaking: false,
     rate: 1.0,
@@ -96,8 +106,8 @@ jest.mock('../../hooks/use-text-to-speech', () => ({ // gc1-allow: voice output 
 
 // Stub shared components that add native renderer/timer dependencies the shell
 // suite does not exercise directly.
-// prettier-ignore
-jest.mock('../common', () => ({ // gc1-allow: animations leak timers; ThemedMarkdown wraps react-native-markdown-display + theme context and has focused coverage
+jest.mock('../common', () => ({
+  ...jest.requireActual('../common'),
   DeskLampAnimation: () => null,
   MagicPenAnimation: () => null,
   ThemedMarkdown: ({ children }: { children: unknown }) => {
@@ -156,6 +166,12 @@ describe('ChatShell', () => {
   // Basic rendering (regression — existing behaviour)
   // -----------------------------------------------------------------------
 
+  it('does not request microphone permission when mounted in text mode', () => {
+    renderChatShell();
+
+    expect(mockRequestMicrophonePermission).not.toHaveBeenCalled();
+  });
+
   // [BUG-887] On small phones (Galaxy S10e ~5.8") the Text/Voice mode
   // toggle eats vertical space the composer needs when the soft keyboard
   // opens. Onboarding interview opts in to hide the toggle.
@@ -177,6 +193,75 @@ describe('ChatShell', () => {
 
     screen.getByTestId('message-bubble-assistant-0');
     screen.getByTestId('message-bubble-user-1');
+  });
+
+  it('[WI-2234] marks only non-empty completed assistant responses', () => {
+    renderChatShell({
+      isStreaming: true,
+      messages: [
+        {
+          id: 'completed',
+          role: 'assistant',
+          content: 'Roman roads connected communities and ideas.',
+          isResponseComplete: true,
+        },
+        {
+          id: 'opening',
+          role: 'assistant',
+          content: 'What would you like to explore?',
+        },
+        {
+          id: 'empty',
+          role: 'assistant',
+          content: '   ',
+          isResponseComplete: true,
+        },
+        {
+          id: 'streaming',
+          role: 'assistant',
+          content: 'Roman roads connected',
+          streaming: true,
+          isResponseComplete: true,
+        },
+        {
+          id: 'reconnect',
+          role: 'assistant',
+          content: 'Connection lost — Try again',
+          kind: 'reconnect_prompt',
+          isResponseComplete: true,
+        },
+        {
+          id: 'fallback',
+          role: 'assistant',
+          content: "I didn't have a reply — tap to try again.",
+          kind: 'reconnect_prompt',
+          isResponseComplete: true,
+        },
+        {
+          id: 'system',
+          role: 'assistant',
+          content: 'Previous send restored.',
+          isSystemPrompt: true,
+          kind: 'session_expired',
+          isResponseComplete: true,
+        },
+        {
+          id: 'learner',
+          role: 'user',
+          content: 'How did Roman roads help people exchange ideas?',
+          isResponseComplete: true,
+        },
+      ],
+    });
+
+    screen.getByTestId('assistant-response-complete-0');
+    expect(screen.queryByTestId('assistant-response-complete-1')).toBeNull();
+    expect(screen.queryByTestId('assistant-response-complete-2')).toBeNull();
+    expect(screen.queryByTestId('assistant-response-complete-3')).toBeNull();
+    expect(screen.queryByTestId('assistant-response-complete-4')).toBeNull();
+    expect(screen.queryByTestId('assistant-response-complete-5')).toBeNull();
+    expect(screen.queryByTestId('assistant-response-complete-6')).toBeNull();
+    expect(screen.queryByTestId('assistant-response-complete-7')).toBeNull();
   });
 
   it('shows the input mode toggle when hideInputModeToggle is false [BUG-887]', () => {
@@ -408,14 +493,15 @@ describe('ChatShell', () => {
   // -----------------------------------------------------------------------
 
   describe('voice recording', () => {
-    it('calls startListening when mic button is pressed', async () => {
+    it('starts listening once without a duplicate permission request on mic press', async () => {
       renderChatShell({ verificationType: 'teach_back' });
 
       await act(async () => {
         fireEvent.press(screen.getByTestId('voice-record-button'));
       });
 
-      expect(mockStartListening).toHaveBeenCalled();
+      expect(mockStartListening).toHaveBeenCalledTimes(1);
+      expect(mockRequestMicrophonePermission).not.toHaveBeenCalled();
     });
 
     it('enables voice mode and starts listening from the compact mic button', async () => {
@@ -1261,10 +1347,6 @@ describe('ChatShell', () => {
       const actionButton = buttons?.find((b) => b.style !== 'cancel');
       expect(actionButton).toBeDefined();
 
-      // ChatShell pre-warms requestMicrophonePermission on mount — clear that
-      // call so we measure only the button tap.
-      mockRequestMicrophonePermission.mockClear();
-
       await act(async () => {
         actionButton?.onPress?.();
         await Promise.resolve();
@@ -1456,6 +1538,118 @@ describe('ChatShell', () => {
     it('does not show animations during normal conversation', () => {
       renderChatShell({ isStreaming: false });
       expect(screen.queryByTestId('thinking-bulb-animation')).toBeNull();
+      expect(screen.queryByTestId('idle-pen-animation')).toBeNull();
+    });
+
+    it('[WI-2108 AC-1] mounts only the shell waiting indicator while the mentor is writing', () => {
+      renderChatShell({
+        isStreaming: true,
+        messages: [
+          { id: 'ai-writing', role: 'assistant', content: '', streaming: true },
+        ],
+      });
+
+      screen.getByTestId('thinking-bulb-animation');
+      expect(screen.queryByTestId('thinking-indicator')).toBeNull();
+      expect(screen.queryByTestId('streaming-cursor')).toBeNull();
+      expect(screen.queryByTestId('idle-pen-animation')).toBeNull();
+    });
+
+    it('[WI-2108 AC-2] keeps one indicator owner across idle, thinking, streaming, and done boundaries', () => {
+      jest.useFakeTimers();
+      try {
+        const { rerender, props } = renderChatShell({
+          messages: [
+            { id: 'ai-done', role: 'assistant', content: 'Your turn.' },
+          ],
+        });
+
+        act(() => {
+          jest.advanceTimersByTime(20_000);
+        });
+        screen.getByTestId('idle-pen-animation');
+        expect(screen.queryByTestId('thinking-bulb-animation')).toBeNull();
+        expect(screen.queryByTestId('thinking-indicator')).toBeNull();
+        expect(screen.queryByTestId('streaming-cursor')).toBeNull();
+
+        rerender(
+          <ChatShell
+            {...props}
+            isStreaming
+            messages={[
+              {
+                id: 'ai-stream',
+                role: 'assistant',
+                content: '',
+                streaming: true,
+              },
+            ]}
+          />,
+        );
+        screen.getByTestId('thinking-bulb-animation');
+        expect(screen.queryByTestId('idle-pen-animation')).toBeNull();
+        expect(screen.queryByTestId('thinking-indicator')).toBeNull();
+        expect(screen.queryByTestId('streaming-cursor')).toBeNull();
+
+        rerender(
+          <ChatShell
+            {...props}
+            isStreaming
+            messages={[
+              {
+                id: 'ai-stream',
+                role: 'assistant',
+                content: 'A partial reply',
+                streaming: true,
+              },
+            ]}
+          />,
+        );
+        expect(screen.queryByTestId('thinking-bulb-animation')).toBeNull();
+        screen.getByTestId('streaming-cursor');
+        expect(screen.queryByTestId('idle-pen-animation')).toBeNull();
+        expect(screen.queryByTestId('thinking-indicator')).toBeNull();
+
+        rerender(
+          <ChatShell
+            {...props}
+            isStreaming={false}
+            messages={[
+              {
+                id: 'ai-stream',
+                role: 'assistant',
+                content: 'A complete reply',
+                streaming: false,
+              },
+            ]}
+          />,
+        );
+        expect(screen.queryByTestId('thinking-bulb-animation')).toBeNull();
+        expect(screen.queryByTestId('idle-pen-animation')).toBeNull();
+        expect(screen.queryByTestId('thinking-indicator')).toBeNull();
+        expect(screen.queryByTestId('streaming-cursor')).toBeNull();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('[WI-2108 AC-3] clears the sole waiting indicator when writing is aborted', () => {
+      const messages: ChatMessage[] = [
+        { id: 'ai-abort', role: 'assistant', content: '', streaming: true },
+      ];
+      const { rerender, props } = renderChatShell({
+        isStreaming: true,
+        messages,
+      });
+      screen.getByTestId('thinking-bulb-animation');
+
+      rerender(
+        <ChatShell {...props} isStreaming={false} messages={messages} />,
+      );
+
+      expect(screen.queryByTestId('thinking-bulb-animation')).toBeNull();
+      expect(screen.queryByTestId('thinking-indicator')).toBeNull();
+      expect(screen.queryByTestId('streaming-cursor')).toBeNull();
       expect(screen.queryByTestId('idle-pen-animation')).toBeNull();
     });
   });

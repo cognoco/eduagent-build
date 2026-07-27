@@ -347,9 +347,10 @@ recorded per `MMT-ADR-0020`, not a silent overwrite.
    ─────────────────────────────────           ────────────────────────────────────
    person              ─────────drop────►       consent_receipt   (← from consent_grant)
    membership          ─────────drop────►       deletion_audit    (← write at delete-time)
-   subscription        ───────survives────►     financial_record  (← per-person refs)
-   guardianship        ───────survives────►     (the org's subscription row continues
-   supportership       ───────survives────►      to live on the organization)
+   subscription        ───────survives────►     financial_record  (← per-person refs;
+                                                  the org's subscription row lives on)
+   guardianship        ──────torn down─────►     (severed before the person drops,
+   supportership       ──────torn down─────►      both directions — WI-1985)
    consent_grant       ─────migrate on drop─►   (only `consent_receipt` survives;
    all learning data    ─────────drop────►       the live `consent_grant` row is gone)
 ```
@@ -358,13 +359,15 @@ The key asymmetry: **the live consent record moves, the receipt stays.** `consen
 row; `consent_receipt` is the durable artifact. The `charge_person_id ON DELETE RESTRICT` on
 `consent_grant` enforces "you can't hard-delete a person with active grants — re-home them first."
 
-**The "survives" column above is the *person-granularity* delete** — dropping one `person` while their
-org and the other humans on their edges live on. There is a second granularity: a **whole-org /
-whole-account erasure** (the GDPR Art-17 path, `executeDeletionV2`), which removes the `organization`
-**and every person in it**. On that path the otherwise-surviving relationship edges cannot survive — the
-person on (at least) one end is gone — so the erasure **tears down every `guardianship` and
-`supportership` edge incident to the org's persons** (both directions) in the same transaction, before the
-persons drop. A **cross-org** edge (a guardian/supporter who lives in another org) has only its **edge
+**The retain/drop split above is the *person-granularity* delete** — dropping one `person` while their
+org and the *counterpart* humans on their edges live on. The person-scoped delete paths (`deletePersonV2`
+and the consent-gated erasure sweeps) **tear down every `guardianship` and `supportership` edge incident
+to that person** (both directions) in the same transaction, before the person row drops (WI-1985): the
+edge to an erased person cannot survive, though the counterpart human does. (`subscription` still survives
+a person-scoped delete — it is org-anchored.) The same teardown scales up at the second granularity: a
+**whole-org / whole-account erasure** (the GDPR Art-17 path, `executeDeletionV2`), which removes the
+`organization` **and every person in it**, **tears down every `guardianship` and `supportership` edge
+incident to the org's persons** (both directions) in the same transaction, before the persons drop. A **cross-org** edge (a guardian/supporter who lives in another org) has only its **edge
 row** removed; the out-of-org counterpart person and their org are untouched. `subscription` DB rows are **torn down** in the same erasure transaction (Step G1, WI-849 Gap 1), so a
 *subscribed* org's erasure now succeeds. The Stripe/RC store-cancellation is deferred to WI-885. See
 **MMT-ADR-0026** (and §6.1).
@@ -501,9 +504,11 @@ The forward-only ratchet installs against the new baseline: it cannot regress to
 
 > **Two deletion granularities (MMT-ADR-0026).** The "consent_grant blocked by RESTRICT" row above is the
 > *person-granularity* contract — the RESTRICT FKs on `guardianship`/`supportership`/`subscription` are
-> load-bearing and a single-person delete leaves those edges intact. The *whole-org erasure* row is the
-> second granularity: it removes the org and all its persons, so the incident relationship edges are torn
-> down rather than preserved. The legacy `accounts`-row erasure that an earlier audit posited (WI-849
+> load-bearing: they force the caller to sever/re-home first. A single-person delete now **tears down the
+> erased person's incident `guardianship`/`supportership` edges** in-transaction before the person drops
+> (WI-1985; the counterpart human is untouched); only `subscription` survives a person-scoped delete
+> (org-anchored). The *whole-org erasure* row is the second granularity: it removes the org and all its
+> persons, so the incident relationship edges are torn down rather than preserved. The legacy `accounts`-row erasure that an earlier audit posited (WI-849
 > Gap 2) does **not** apply on the v2-live environments — the legacy `accounts`/`profiles` tables were
 > dropped by the MMT-ADR-0012 baseline reset, so there is no legacy row to leave behind on the v2 path.
 
@@ -557,3 +562,68 @@ decisions ledger and the counsel-finding trail live in `_wip/identity-foundation
 | Org-scoped consent (v1) | `consent_grant.organization_id` is `NOT NULL`; `controller_role` is the clean-add future |
 | Moved-country grace | `person.residence_jurisdiction` + the sweep's grace-window consumer |
 | Three-layer authority separation (`inv 22`) | consent on `guardianship`; billing on `subscription.payer_person_id`; visibility on `supportership` |
+
+---
+
+## §8 — `person_id` mistake recovery (forward-repair doctrine)
+
+> **Amended 2026-07-18** per the operator canon-pass ruling on `WI-2055`
+> (one-way-door risk drain, T2). Read against `MMT-ADR-0007`, `0008`, `0011`,
+> `0015`, and `0020` — none of the five states or implies a rollback-based
+> recovery path, so this section amends canon directly rather than opening a
+> new ADR.
+>
+> **Scope.** This section governs recovery from a **`person_id` mistake** —
+> data attached to the wrong `person`, a bad merge, a mis-keyed write.
+> **It does not govern deletion recovery** (undoing a legitimate,
+> consent-driven or lifecycle-driven person/account deletion) — that is
+> `WI-2390`, tracked separately, out of scope here.
+
+### 8.1 Legacy rollback is retired, absolutely
+
+Rolling back to the legacy (pre-`MMT-ADR-0012` baseline-reset) schema is
+**not a recovery path for `person_id` mistakes** — not conditionally, not as
+a break-glass option. The legacy tables no longer exist post-reset (§1); a
+"rollback" would mean resurrecting a dropped schema, which is not a smaller
+or safer action than fixing forward. This retirement is absolute.
+
+### 8.2 Recovery today: Neon PITR — staged, not final
+
+Recovery from a `person_id` mistake is, today, **Neon point-in-time restore
+(PITR) / snapshot recovery** — see
+`docs/runbooks/neon-pitr-identity-recovery.md` (`WI-2056`) for the mechanics,
+the restore procedure, what it does and does not recover, and the mandatory
+deletion-replay step (§8.4).
+
+This is a **staged** position, not a permanent one. Purpose-built
+forward-repair primitives — merge, reparent, and alias operations scoped to
+`person_id` — are tracked as `WI-2057` (Backlog). This canon **names and
+links** `WI-2057`; it does not define merge/reparent/alias behavior, because
+those primitives do not exist yet. Behavior for those primitives belongs in
+`WI-2057`'s own design, not here.
+
+### 8.3 Ad hoc manual `person_id` data-surgery is prohibited
+
+Directly editing `person_id` values, or other identity-graph rows, by hand
+(one-off SQL against production, a console query, a manual patch script) is
+**prohibited** as a way to fix a `person_id` mistake. The sanctioned paths
+are: the Neon PITR runbook (§8.2, today) and, once shipped, the `WI-2057`
+primitives. Any deviation from these sanctioned paths requires an explicit
+**operator escalation** before it happens — it is never a call an agent or
+on-call engineer makes unilaterally.
+
+### 8.4 Deletion-supremacy invariant
+
+**Deletion always wins.** Any operation that recovers `person_id` mistakes —
+a PITR restore today, or a `WI-2057` primitive once it ships — **must
+re-apply every deletion recorded since the recovery's restore point** before
+the recovery is considered complete. A recovery step is never allowed to
+resurrect a person who was validly deleted after that point.
+
+This canon states the invariant only; the mechanics that satisfy it —
+the deletion-record source of truth and the replay procedure — live in the
+Neon PITR runbook (`WI-2056`, §5 of
+`docs/runbooks/neon-pitr-identity-recovery.md`), the `WI-2057` primitives
+(when they ship), and the deletion mechanics documented for `WI-2058`
+(`docs/runbooks/deletion-irreversible-boundary.md`). Canon does not carry a
+second copy of that mechanism.

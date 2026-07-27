@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -13,48 +12,20 @@ export interface SpeakingPracticeCardProps {
   onPlayTarget: () => void;
   onRecordPress: () => void;
   onRetry?: () => void;
-}
-
-interface SpeakingPracticeComparison {
-  isComplete: boolean;
-  missingWords: string[];
-}
-
-function normalizeWords(text: string): string[] {
-  return text
-    .toLocaleLowerCase()
-    .replace(/[^\p{L}\p{N}'\s]+/gu, ' ')
-    .split(/\s+/)
-    .filter(Boolean);
-}
-
-export function compareSpeakingPracticeTranscript(
-  targetText: string,
-  transcript: string,
-): SpeakingPracticeComparison {
-  const targetWords = normalizeWords(targetText);
-  const heardWordCounts = new Map<string, number>();
-
-  for (const word of normalizeWords(transcript)) {
-    heardWordCounts.set(word, (heardWordCounts.get(word) ?? 0) + 1);
-  }
-
-  const missingWords: string[] = [];
-  for (const word of targetWords) {
-    const heardCount = heardWordCounts.get(word) ?? 0;
-    if (heardCount > 0) {
-      heardWordCounts.set(word, heardCount - 1);
-      continue;
-    }
-    if (!missingWords.includes(word)) {
-      missingWords.push(word);
-    }
-  }
-
-  return {
-    isComplete: targetWords.length > 0 && missingWords.length === 0,
-    missingWords,
-  };
+  // WI-1777: the server's deterministic score is the ONLY source of
+  // match/missing/extra feedback rendered by this card (from the persisted
+  // attempt's score — see apps/api's speaking-practice/scoring.ts). There is
+  // no client-side comparison: a divergent client scorer previously
+  // co-rendered a live "Matched!/missing: X" verdict from the raw transcript
+  // that could disagree with the server's persisted verdict (Phase-4 finding
+  // M1) — e.g. "Está" vs. STT "esta" showed the learner "missing: está"
+  // while the server, which strips diacritics, scored it complete. Until
+  // `missingWords` is supplied (i.e. an attempt has actually been scored),
+  // the card shows only the raw transcript text — no verdict, no missing/
+  // extra words — including while listening and after a failed submission.
+  missingWords?: string[];
+  extraWords?: string[];
+  isComplete?: boolean;
 }
 
 export function SpeakingPracticeCard({
@@ -65,16 +36,18 @@ export function SpeakingPracticeCard({
   onPlayTarget,
   onRecordPress,
   onRetry,
+  missingWords,
+  extraWords,
+  isComplete,
 }: SpeakingPracticeCardProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const trimmedTranscript = transcript.trim();
-  const comparison = useMemo(
-    () => compareSpeakingPracticeTranscript(targetText, trimmedTranscript),
-    [targetText, trimmedTranscript],
-  );
+  const hasServerFeedback = missingWords !== undefined;
   const hasTranscript = trimmedTranscript.length > 0;
-  const showMissingWords = hasTranscript && comparison.missingWords.length > 0;
+  const effectiveIsComplete = hasServerFeedback && (isComplete ?? false);
+  const showMissingWords = hasServerFeedback && (missingWords?.length ?? 0) > 0;
+  const showExtraWords = hasServerFeedback && (extraWords?.length ?? 0) > 0;
 
   return (
     <View
@@ -157,12 +130,23 @@ export function SpeakingPracticeCard({
           >
             {trimmedTranscript}
           </Text>
-          {comparison.isComplete ? (
+          {effectiveIsComplete ? (
             <Text className="mt-2 text-caption font-semibold text-success">
               {t('session.speakingPractice.matched')}
             </Text>
           ) : null}
         </View>
+      ) : null}
+
+      {showExtraWords ? (
+        <Text
+          className="mt-3 text-body-sm text-text-secondary"
+          testID="speaking-practice-extra"
+        >
+          {t('session.speakingPractice.extraWords', {
+            words: (extraWords ?? []).join(', '),
+          })}
+        </Text>
       ) : null}
 
       {showMissingWords ? (
@@ -172,7 +156,7 @@ export function SpeakingPracticeCard({
             testID="speaking-practice-missing"
           >
             {t('session.speakingPractice.retryWithMissingWords', {
-              words: comparison.missingWords.join(', '),
+              words: (missingWords ?? []).join(', '),
             })}
           </Text>
           {onRetry ? (

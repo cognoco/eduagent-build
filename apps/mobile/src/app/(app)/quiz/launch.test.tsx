@@ -5,6 +5,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 // i18n mock — returns English values for the quiz.launch namespace so tests
 // can assert on the same English strings as before the migration.
@@ -32,6 +33,12 @@ jest.mock('react-i18next', () => {
     'quiz.launch.cancelLabel': 'Cancel',
     'common.retry': 'Retry',
     'common.goBack': 'Go Back',
+    'common.backTo': 'Back to {{destination}}',
+    'practiceHub.title': 'Test yourself',
+    'quiz.index.title': 'Quiz',
+    'tabs.mentor': 'Mentor',
+    'tabs.subjects': 'Subjects',
+    'tabs.journal': 'Journal',
   };
   const t = (key: string, opts?: Record<string, unknown>) => {
     const template = TRANSLATIONS[key] ?? key;
@@ -70,13 +77,14 @@ jest.mock(
 );
 
 const mockReplace = jest.fn();
-const mockGoBackOrReplace = jest.fn();
+const mockNavigate = jest.fn();
 const mockSetRound = jest.fn();
 const mockSetActivityType = jest.fn();
 const mockSetSubjectId = jest.fn();
 const mockSetLanguageName = jest.fn();
 const mockSetReturnTo = jest.fn();
 const mockMutate = jest.fn();
+const mockUseFetchRound = jest.fn();
 let mockSearchParams: Record<string, string> = {};
 let mockFlowActivityType: 'capitals' | 'guess_who' | 'vocabulary' | null =
   'capitals';
@@ -107,8 +115,39 @@ const challengeRound = {
   ],
 };
 
+const seededE2ERound = {
+  id: 'c0000000-0000-4000-a000-000000000186',
+  activityType: 'vocabulary' as const,
+  theme: 'Deterministic vocabulary',
+  total: 2,
+  questions: [
+    {
+      type: 'vocabulary' as const,
+      term: 'bonjour',
+      options: ['hello', 'goodbye', 'please', 'thanks'],
+      funFact: '',
+      cefrLevel: 'A1',
+      isLibraryItem: false,
+      freeTextEligible: false,
+    },
+    {
+      type: 'vocabulary' as const,
+      term: 'merci',
+      options: ['thanks', 'hello', 'please', 'goodbye'],
+      funFact: '',
+      cefrLevel: 'A1',
+      isLibraryItem: false,
+      freeTextEligible: false,
+    },
+  ],
+};
+
+let mockFetchRound = {
+  data: undefined as typeof seededE2ERound | undefined,
+};
+
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ replace: mockReplace }),
+  useRouter: () => ({ replace: mockReplace, navigate: mockNavigate }),
   useLocalSearchParams: () => mockSearchParams,
 }));
 
@@ -130,19 +169,6 @@ jest.mock(
 );
 
 jest.mock(
-  '../../../lib/navigation' /* gc1-allow: navigation helper mock keeps screen unit-scoped */,
-  () => ({
-    goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-    homeHrefForReturnTo: (returnTo: string) =>
-      returnTo === 'practice'
-        ? '/(app)/practice'
-        : returnTo === 'own-learning'
-          ? '/(app)/own-learning'
-          : '/(app)/home',
-  }),
-);
-
-jest.mock(
   '../../../components/common/DeskLampAnimation' /* gc1-allow: DeskLampAnimation is native-animated SVG; stub prevents native module crash */,
   () => ({
     DeskLampAnimation: ({ testID }: { testID?: string }) => {
@@ -157,6 +183,10 @@ jest.mock(
   () => ({
     ...jest.requireActual('../../../hooks/use-quiz'),
     useGenerateRound: () => mockGenerateRound,
+    useFetchRound: (roundId: string | null) => {
+      mockUseFetchRound(roundId);
+      return mockFetchRound;
+    },
   }),
 );
 
@@ -177,6 +207,7 @@ jest.mock(
 );
 
 const { default: QuizLaunchScreen, friendlyErrorMessage } = require('./launch');
+const previousE2E = process.env.EXPO_PUBLIC_E2E;
 
 describe('friendlyErrorMessage', () => {
   it('returns friendly message for UPSTREAM_ERROR code', () => {
@@ -200,6 +231,7 @@ describe('friendlyErrorMessage', () => {
 describe('QuizLaunchScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env.EXPO_PUBLIC_E2E = 'false';
     mockSearchParams = {};
     mockFlowActivityType = 'capitals';
     mockFlowReturnTo = null;
@@ -209,6 +241,7 @@ describe('QuizLaunchScreen', () => {
       isError: false,
       error: null,
     };
+    mockFetchRound = { data: undefined };
     mockMutate.mockImplementation(
       (
         _input: unknown,
@@ -217,6 +250,47 @@ describe('QuizLaunchScreen', () => {
         options?.onSuccess?.(challengeRound);
       },
     );
+  });
+
+  afterAll(() => {
+    if (previousE2E === undefined) {
+      delete process.env.EXPO_PUBLIC_E2E;
+      return;
+    }
+    process.env.EXPO_PUBLIC_E2E = previousE2E;
+  });
+
+  it('[WI-1864] loads a seeded active round by ID only in an E2E build', async () => {
+    process.env.EXPO_PUBLIC_E2E = 'true';
+    mockSearchParams = {
+      activityType: 'vocabulary',
+      subjectId: 'subject-id',
+      roundId: seededE2ERound.id,
+    };
+    mockFetchRound = { data: seededE2ERound };
+
+    render(<QuizLaunchScreen />);
+
+    await waitFor(() => {
+      expect(mockSetRound).toHaveBeenCalledWith(seededE2ERound);
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz/play');
+    });
+    expect(mockUseFetchRound).toHaveBeenCalledWith(seededE2ERound.id);
+    expect(mockMutate).not.toHaveBeenCalled();
+  });
+
+  it('[WI-1864] ignores a roundId route param outside E2E builds', async () => {
+    mockSearchParams = {
+      activityType: 'capitals',
+      roundId: seededE2ERound.id,
+    };
+
+    render(<QuizLaunchScreen />);
+
+    await waitFor(() => {
+      expect(mockMutate).toHaveBeenCalled();
+    });
+    expect(mockUseFetchRound).toHaveBeenCalledWith(null);
   });
 
   it('shows the challenge banner before entering a difficulty bump round', async () => {
@@ -300,7 +374,111 @@ describe('QuizLaunchScreen', () => {
     render(<QuizLaunchScreen />);
 
     fireEvent.press(screen.getByTestId('quiz-launch-cancel'));
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
+    expect(mockNavigate).toHaveBeenCalledWith('/(app)/practice');
+  });
+
+  it('[WI-1864] restores the upstream Practice destination on launch cancel', () => {
+    mockGenerateRound = {
+      mutate: mockMutate,
+      isPending: true,
+      isError: false,
+      error: null,
+    };
+    mockSearchParams = {
+      activityType: 'capitals',
+      returnTo: 'practice',
+      practiceReturnTo: 'journal',
+    };
+    mockMutate.mockImplementation(() => {
+      // Keep launch on the loading screen.
+    });
+
+    render(<QuizLaunchScreen />);
+
+    fireEvent.press(screen.getByTestId('quiz-launch-cancel'));
+    expect(mockNavigate).toHaveBeenCalledWith({
+      pathname: '/(app)/practice',
+      params: { returnTo: 'journal' },
+    });
+    expect(mockReplace).not.toHaveBeenCalledWith('/(app)/practice');
+  });
+
+  it('[WI-1864] restores the upstream Practice destination from a launch error', () => {
+    mockGenerateRound = {
+      mutate: mockMutate,
+      isPending: false,
+      isError: true,
+      error: new Error('network unavailable'),
+    };
+    mockSearchParams = {
+      activityType: 'capitals',
+      returnTo: 'practice',
+      practiceReturnTo: 'journal',
+    };
+    mockMutate.mockImplementation(() => undefined);
+
+    render(<QuizLaunchScreen />);
+
+    fireEvent.press(screen.getByTestId('quiz-launch-back'));
+    expect(mockNavigate).toHaveBeenCalledWith({
+      pathname: '/(app)/practice',
+      params: { returnTo: 'journal' },
+    });
+    expect(mockReplace).not.toHaveBeenCalledWith('/(app)/practice');
+  });
+
+  // [WI-2331 rework] exitLabel (the error-state secondary action, shared by
+  // both error panels) must never claim a tab handleExit isn't actually
+  // routing to. Covers the three destination classes it can resolve under
+  // V2: the Practice hub special case, a real V2 tab returnTo, and a
+  // non-tab returnTo that falls back to this quiz flow's own root.
+  describe('[WI-2331 rework] exitLabel under V2', () => {
+    let originalV2: boolean;
+
+    beforeEach(() => {
+      originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        true;
+      mockGenerateRound = {
+        mutate: mockMutate,
+        isPending: false,
+        isError: true,
+        error: new Error('network unavailable'),
+      };
+      mockMutate.mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        originalV2;
+    });
+
+    it('names Practice when returnTo is the practice hub', () => {
+      mockSearchParams = { activityType: 'capitals', returnTo: 'practice' };
+
+      render(<QuizLaunchScreen />);
+
+      screen.getByText('Back to Test yourself');
+    });
+
+    it('names the owning V2 tab for a real tab returnTo', () => {
+      mockSearchParams = { activityType: 'capitals', returnTo: 'subjects' };
+
+      render(<QuizLaunchScreen />);
+
+      screen.getByText('Back to Subjects');
+    });
+
+    it("falls back to this quiz flow's own root for a non-tab returnTo", () => {
+      mockSearchParams = {
+        activityType: 'capitals',
+        returnTo: 'family-recaps',
+      };
+
+      render(<QuizLaunchScreen />);
+
+      screen.getByText('Back to Quiz');
+    });
   });
 
   // [BUG-UX-QUIZ-TIMEOUT] 30s hard UI-level timeout on round generation.

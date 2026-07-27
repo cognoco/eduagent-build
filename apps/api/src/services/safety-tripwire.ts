@@ -1,3 +1,5 @@
+import type { ConversationLanguage } from '@eduagent/schemas';
+
 // ---------------------------------------------------------------------------
 // Deterministic safety tripwire [2026-06-06]
 //
@@ -199,17 +201,35 @@ export function detectCatastrophicSafetyTrigger(
  * teacher / counsellor / a relative the learner feels safe with / a helpline
  * instead. It does NOT repeat the disclosure, interrogate, or moralise.
  *
- * Intentionally NOT localized in this first pass — a safe English fallback is
- * better than a mistranslated safety message, and the structured event still
- * fires regardless of language. Localization is a tracked follow-up.
+ * The safety prose remains the reviewed English fallback. The maintained help
+ * directory is locale-keyed so the learner can reach verified local resources
+ * without this service embedding phone numbers that can go stale.
  */
-export function tripwireResponse(category: CatastrophicCategory): string {
+const HELPLINE_RESOURCE_URLS: Record<ConversationLanguage, string> = {
+  en: 'https://findahelpline.com/',
+  cs: 'https://findahelpline.com/cs-CZ',
+  es: 'https://findahelpline.com/es-ES',
+  fr: 'https://findahelpline.com/fr-FR',
+  de: 'https://findahelpline.com/de-DE',
+  it: 'https://findahelpline.com/it-IT',
+  pt: 'https://findahelpline.com/pt-PT',
+  pl: 'https://findahelpline.com/pl-PL',
+  ja: 'https://findahelpline.com/ja-JP',
+  nb: 'https://findahelpline.com/countries/no',
+};
+
+export function tripwireResponse(
+  category: CatastrophicCategory,
+  conversationLanguage: ConversationLanguage = 'en',
+): string {
+  const helplineResourceUrl = HELPLINE_RESOURCE_URLS[conversationLanguage];
   switch (category) {
     case 'self_harm_method':
       return (
         "I'm really sorry you're feeling like this, and I'm glad you said something. " +
         'This is something to talk about with a parent, guardian, or trusted adult. ' +
-        'If you need help right now, please reach out to a helpline in your country — ' +
+        'If you need help right now, please use ' +
+        `[Find A Helpline](${helplineResourceUrl}) to find verified support in your country — ` +
         'you deserve support from someone who can be there with you.'
       );
     case 'sexual_content_minor':
@@ -223,7 +243,9 @@ export function tripwireResponse(category: CatastrophicCategory): string {
         "I'm really glad you told me, and I'm sorry this is happening to you. " +
         'This is not your fault, and you deserve to be safe. Please talk to an ' +
         'adult you trust — a teacher, a school counsellor, a relative you feel ' +
-        'safe with, or a helpline in your country — so someone can help you. ' +
+        'safe with, or use ' +
+        `[Find A Helpline](${helplineResourceUrl}) to find verified support in your country — ` +
+        'so someone can help you. ' +
         "You don't have to handle this on your own."
       );
   }
@@ -237,18 +259,24 @@ export function tripwireResponse(category: CatastrophicCategory): string {
 // model ever sees the picture (exchanges.ts). If OCR itself fails we must NOT
 // fall through and hand an unscreened image to the model — the floor would be
 // silently defeated. Instead we fail SAFE: refuse this turn's image with a
-// neutral, non-accusatory message and let the learner continue with text.
-// This is a generic "couldn't screen it" response, NOT a catastrophic-category
-// hit, so it intentionally lives outside CatastrophicCategory.
+// non-accusatory uncertainty message, local support resources, and a text retry.
+// This is a generic "couldn't screen it" response rather than a claimed
+// catastrophic-category hit, so it intentionally lives outside
+// CatastrophicCategory while still activating the conservative resource path.
 // ---------------------------------------------------------------------------
 
 /** Marker recorded in the ExchangeResult.model field for the fail-safe path. */
 export const IMAGE_UNSCREENED_MODEL = 'deterministic:image_unscreened';
 
-/** Neutral safe reply when an attached image could not be screened (OCR error). */
-export function imageUnscreenedResponse(): string {
+/** Safe reply with local resources when an attached image cannot be screened. */
+export function imageUnscreenedResponse(
+  conversationLanguage: ConversationLanguage = 'en',
+): string {
+  const helplineResourceUrl = HELPLINE_RESOURCE_URLS[conversationLanguage];
   return (
     "I couldn't check that image just now, so I can't open it. " +
+    'If it is about you or someone else being unsafe, use ' +
+    `[Find A Helpline](${helplineResourceUrl}) to find verified support in your country. ` +
     'Please type your question instead, or try the photo again in a moment.'
   );
 }

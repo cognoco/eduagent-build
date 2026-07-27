@@ -13,10 +13,6 @@ describe('policy-engine barrel exports', () => {
     expect(typeof policyEngine.resolveExchangeRouter).toBe('function');
   });
 
-  it('exports resolveJudgeConfig', () => {
-    expect(typeof policyEngine.resolveJudgeConfig).toBe('function');
-  });
-
   it('exports NoEligibleModelError', () => {
     expect(typeof policyEngine.NoEligibleModelError).toBe('function');
   });

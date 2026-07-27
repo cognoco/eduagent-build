@@ -33,7 +33,7 @@ type NudgeRouteEnv = {
 export const nudgeRoutes = new Hono<NudgeRouteEnv>()
   .post('/nudges', zValidator('json', nudgeCreateSchema), async (c) => {
     // [WI-159 / DS-070] Server-derived proxy-mode write guard.
-    assertNotProxyMode(c);
+    await assertNotProxyMode(c);
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
     const input = c.req.valid('json');
@@ -51,7 +51,7 @@ export const nudgeRoutes = new Hono<NudgeRouteEnv>()
   })
   .patch('/nudges/:id/read', async (c) => {
     // [WI-159 / DS-070] Server-derived proxy-mode write guard.
-    assertNotProxyMode(c);
+    await assertNotProxyMode(c);
     const count = await markNudgeRead(
       c.get('db'),
       requireProfileId(c.get('profileId')),
@@ -62,7 +62,7 @@ export const nudgeRoutes = new Hono<NudgeRouteEnv>()
   })
   .post('/nudges/mark-read', async (c) => {
     // [WI-159 / DS-070] Server-derived proxy-mode write guard.
-    assertNotProxyMode(c);
+    await assertNotProxyMode(c);
     const count = await markAllNudgesRead(
       c.get('db'),
       requireProfileId(c.get('profileId')),

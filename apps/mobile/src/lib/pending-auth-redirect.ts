@@ -110,22 +110,21 @@ export function clearPendingAuthRedirect(): void {
  * artificially backdated by `staleMs` milliseconds, so callers can
  * simulate a TTL-expired record without waiting.
  *
- * Throws in production builds or when `EXPO_PUBLIC_E2E !== 'true'`.
+ * Throws unless the dedicated E2E bundle flag is enabled. Native CI uses a
+ * release-mode bundle, so NODE_ENV alone cannot distinguish it from a store
+ * build; production/store bundles keep EXPO_PUBLIC_E2E unset.
  */
 export function seedPendingAuthRedirectForTesting(
   path: string,
   staleMs: number,
 ): void {
-  if (
-    process.env.NODE_ENV === 'production' ||
-    process.env.EXPO_PUBLIC_E2E !== 'true'
-  ) {
+  if (process.env.EXPO_PUBLIC_E2E !== 'true') {
     // [BUG-324] Spell out the required flag so the developer/CI operator
     // hitting this guard knows exactly what's missing — the original
-    // 'dev-only' message left them guessing whether to flip NODE_ENV,
-    // an Expo public flag, or something else entirely.
+    // A vague test-only message left operators guessing which build flag was
+    // missing, so name the sole release-E2E authorization explicitly.
     throw new Error(
-      'seedPendingAuthRedirectForTesting is dev-only — requires NODE_ENV !== "production" AND EXPO_PUBLIC_E2E=true',
+      'seedPendingAuthRedirectForTesting is E2E-only — requires EXPO_PUBLIC_E2E=true',
     );
   }
 

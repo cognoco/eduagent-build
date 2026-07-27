@@ -246,6 +246,44 @@ describe('buildFourStrandsPrompt', () => {
     expect(joined).toContain('Ask for a quick retry after correcting.');
   });
 
+  it('includes the server-selected speaking-practice target when present [WI-1777]', () => {
+    const result = buildFourStrandsPrompt(
+      makeContext({
+        languageCode: 'es',
+        languageSessionState: {
+          activeStrand: 'fluency',
+          sessionStrandCounts: {
+            meaning_input: 1,
+            meaning_output: 1,
+            language_focus: 1,
+            fluency: 0,
+          },
+          nextActivity: {
+            strand: 'fluency',
+            activityType: 'repeat_after_me',
+            modality: 'voice',
+            targetWords: [],
+            targetGrammar: [],
+            speakingPractice: {
+              type: 'repeat_after_me',
+              targetText: 'Hola, como estas.',
+              locale: 'es-ES',
+              modality: 'voice',
+              retryGuidance: 'retry_same_target',
+            },
+          },
+        },
+      }),
+    );
+    const joined = result.join('\n');
+
+    expect(joined).toContain('Speaking practice artifact:');
+    expect(joined).toContain('Mode: repeat_after_me');
+    expect(joined).toContain('Hola, como estas.');
+    expect(joined).toContain('Locale: es-ES');
+    expect(joined).toContain('you do not need to grade it');
+  });
+
   it('gates the correction+retry brief to the answer turn via previousMeaningOutputTask [WI-1756]', () => {
     // AC5 answer-turn coverage: on the turn where the learner replies to a
     // meaning-output task, the strand has already rotated away and

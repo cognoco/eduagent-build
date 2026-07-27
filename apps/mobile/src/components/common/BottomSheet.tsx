@@ -1,7 +1,7 @@
 import type React from 'react';
-import { Modal, Pressable, View } from 'react-native';
+import { Modal, Platform, Pressable, View } from 'react-native';
 
-interface BottomSheetProps {
+interface BottomSheetBaseProps {
   /** Controls Modal visibility. */
   visible: boolean;
   /** Called when the user presses the hardware back button (Android) or the
@@ -13,25 +13,29 @@ interface BottomSheetProps {
   children: React.ReactNode;
   /** testID forwarded to the surface container (the white rounded card). */
   testID?: string;
-  /**
-   * Whether tapping the semi-transparent backdrop dismisses the sheet.
-   * Defaults to false (matches the NudgeActionSheet / LearnTogetherSheet
-   * pattern). Set to true for sheets where backdrop dismiss is expected
-   * (TopicPickerSheet, TopicDetailSheet pattern).
-   */
-  backdropDismissible?: boolean;
-  /**
-   * Accessibility label for the backdrop Pressable when backdropDismissible is
-   * true. Defaults to "Close". Provide a localised string when the sheet uses
-   * a translatable label (e.g. `t('library.a11yCloseTopicPicker')`).
-   */
-  backdropAccessibilityLabel?: string;
+  /** Accessible name for the dialog surface. */
+  accessibilityLabel: string;
   /**
    * Modal animation type. Defaults to 'slide'.
    * Use 'fade' to match legacy NudgeActionSheet / LearnTogetherSheet behaviour.
    */
   animationType?: 'slide' | 'fade' | 'none';
 }
+
+type BottomSheetProps = BottomSheetBaseProps &
+  (
+    | {
+        /** Enables dismissal by the semi-transparent backdrop. */
+        backdropDismissible: true;
+        /** Localized accessible name for the backdrop close action. */
+        backdropAccessibilityLabel: string;
+      }
+    | {
+        /** Defaults to false for sheets that require an explicit close action. */
+        backdropDismissible?: false;
+        backdropAccessibilityLabel?: never;
+      }
+  );
 
 /**
  * Shared bottom-sheet primitive — WI-1080.
@@ -54,32 +58,20 @@ export function BottomSheet({
   onClose,
   children,
   testID,
+  accessibilityLabel,
   backdropDismissible = false,
-  backdropAccessibilityLabel = 'Close',
+  backdropAccessibilityLabel,
   animationType = 'slide',
 }: BottomSheetProps): React.ReactElement {
-  const surface = (
-    <View testID={testID} className="rounded-t-3xl overflow-hidden">
-      {children}
-    </View>
-  );
-
   const backdrop = backdropDismissible ? (
     <Pressable
-      className="flex-1 justify-end bg-black/40"
+      className="absolute inset-0 bg-black/40"
       onPress={onClose}
       accessibilityRole="button"
       accessibilityLabel={backdropAccessibilityLabel}
-    >
-      <Pressable
-        onPress={(e) => e?.stopPropagation?.()}
-        accessibilityRole="none"
-      >
-        {surface}
-      </Pressable>
-    </Pressable>
+    />
   ) : (
-    <View className="flex-1 justify-end bg-black/40">{surface}</View>
+    <View className="absolute inset-0 bg-black/40" />
   );
 
   return (
@@ -88,9 +80,32 @@ export function BottomSheet({
       transparent
       animationType={animationType}
       onRequestClose={onClose}
-      accessibilityViewIsModal
+      accessibilityViewIsModal={Platform.OS !== 'web' ? true : undefined}
+      accessibilityLabel={
+        Platform.OS === 'web' ? accessibilityLabel : undefined
+      }
     >
-      {backdrop}
+      <View
+        className="flex-1 justify-end"
+        accessibilityViewIsModal={Platform.OS === 'ios' ? true : undefined}
+        importantForAccessibility={
+          Platform.OS === 'android' ? 'yes' : undefined
+        }
+      >
+        {backdrop}
+        <View testID={testID} className="rounded-t-3xl overflow-hidden">
+          {Platform.OS !== 'web' && accessibilityLabel ? (
+            <View
+              accessible
+              role="dialog"
+              accessibilityLabel={accessibilityLabel}
+              pointerEvents="none"
+              className="absolute inset-0"
+            />
+          ) : null}
+          {children}
+        </View>
+      </View>
     </Modal>
   );
 }

@@ -23,7 +23,6 @@
  */
 
 import { resolve } from 'path';
-import { sql } from 'drizzle-orm';
 import {
   createDatabase,
   generateUUIDv7,
@@ -40,11 +39,8 @@ import {
 import { clearJWKSCache } from '../middleware/jwt';
 import { app } from '../index';
 import {
-  deleteLegacyAccountsForTest,
   deleteV2IdentitiesForTest,
-  ensureLegacyProfileAnchorForTest,
   ensureV2IdentityForLegacyProfileTest,
-  legacyIdentityTableExistsForTest,
 } from '../test-utils/legacy-identity-anchors';
 
 // ---------------------------------------------------------------------------
@@ -123,16 +119,6 @@ async function seedAccountAndProfile(
 
   seededAccountIds.push(accountId);
   seededProfileIds.push(profileId);
-
-  await ensureLegacyProfileAnchorForTest(db, {
-    accountId,
-    profileId,
-    clerkUserId,
-    email,
-    displayName,
-    birthYear,
-    isOwner: true,
-  });
 
   await ensureV2IdentityForLegacyProfileTest(db, {
     accountId,
@@ -237,7 +223,6 @@ async function cleanupTestAccounts(): Promise<void> {
     profileIds: seededProfileIds,
     accountIds: seededAccountIds,
   });
-  await deleteLegacyAccountsForTest(db, seededAccountIds);
   seededProfileIds.length = 0;
   seededAccountIds.length = 0;
 }
@@ -287,13 +272,6 @@ describeIfDb(
       // by family_links pre-repoint and guardianship under identity v2.
       childProfileCId = generateUUIDv7();
       seededProfileIds.push(childProfileCId);
-      await ensureLegacyProfileAnchorForTest(db, {
-        accountId: accountAId,
-        profileId: childProfileCId,
-        displayName: `Test Child ${RUN_ID}`,
-        birthYear: new Date().getFullYear() - 12,
-        isOwner: false,
-      });
       await ensureV2IdentityForLegacyProfileTest(db, {
         accountId: accountAId,
         profileId: childProfileCId,
@@ -303,15 +281,6 @@ describeIfDb(
         birthYear: new Date().getFullYear() - 12,
         isOwner: false,
       });
-
-      // [WI-1139] Legacy `family_links` Drizzle def removed — raw SQL
-      // insert, same conditional seed as before.
-      if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
-        await db.execute(sql`
-          INSERT INTO family_links (id, parent_profile_id, child_profile_id)
-          VALUES (${generateUUIDv7()}, ${profileAId}, ${childProfileCId})
-        `);
-      }
 
       await db
         .insert(guardianship)

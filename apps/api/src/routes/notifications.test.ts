@@ -37,6 +37,24 @@ jest.mock(
   },
 );
 
+// [WI-1989] assertCallerIsAccountOwner calls verifyPersonIsOrgAdminV2, which
+// runs a raw membership query this file's mini mock DB (`{}`) cannot satisfy.
+// Every scenario here that reaches assertCallerIsAccountOwner is a
+// caller-owner scenario (the non-owner break tests are rejected earlier by
+// assertOwnerProfile's isOwner check, before this guard runs) — the
+// caller-vs-X-Profile-Id-spoof distinction this guard exists to enforce is
+// covered by the real-DB break test in
+// tests/integration/wi1989-owner-idor.integration.test.ts.
+jest.mock('../services/identity-v2/ownership-v2', () => {
+  const actual = jest.requireActual(
+    '../services/identity-v2/ownership-v2',
+  ) as typeof import('../services/identity-v2/ownership-v2');
+  return {
+    ...actual,
+    verifyPersonIsOrgAdminV2: jest.fn().mockResolvedValue(true),
+  };
+});
+
 import { Hono } from 'hono';
 
 import type { Database } from '@eduagent/database';
@@ -63,6 +81,8 @@ type TestEnv = {
     user: AuthUser;
     db: Database;
     account: { id: string };
+    // [WI-1989] Required by assertCallerIsAccountOwner.
+    callerPersonId: string | undefined;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
   };
@@ -77,6 +97,7 @@ function makeApp(overrides?: {
   app.use('*', async (c, next) => {
     c.set('db', {} as Database);
     c.set('account', { id: ACCOUNT_ID });
+    c.set('callerPersonId', overrides?.profileId ?? OWNER_PROFILE_ID);
     c.set('profileId', overrides?.profileId ?? OWNER_PROFILE_ID);
     const profileMeta =
       overrides?.profileMeta === null

@@ -1,0 +1,245 @@
+# [WI-2242] V2 native supporter <-> supportee link ceremony.
+#
+# Companion to v2-supporter-scope-journey.yaml (WI-2241), but proves the
+# CEREMONY itself: reachability of the initiate screen via deep link, the
+# supporter's own acceptance, a cross-login as the supportee to accept the
+# other side, and a return to the supporter confirming both sides now see
+# the accepted contract — then chains into the SAME Support hub -> person
+# scope -> Journal shape v2-supporter-scope-journey.yaml asserts.
+#
+# Seeded with `v2-supporter-pending-link` (test-seed-v2-supporter.ts) — a
+# supporter + ONE independent supportee identity with a contract already
+# initiated via the real `initiateLink` write path (status='pending', both
+# supporter/supporteeAcceptedAt null). Pre-acceptance, the supporter has
+# shape:'learner' (resolveScopesForPerson — zero ACCEPTED contracts), so
+# seed-and-sign-in.yaml lands on the ordinary Mentor screen (mentor-screen),
+# not the Support hub.
+#
+# [REACHABILITY GAP, WI-2242 map §E] No in-app affordance pushes a CROSS-ORG
+# *existing* supportee into `/link/initiate` — the picker's "existing teen"
+# option routes to family-join (WI-1753, gated MODE_NAV_V2_ENABLED), whose
+# accept surface does not exist yet. `initiate.tsx` places no org
+# restriction on a pre-filled supporteePersonId route param, so a deep link
+# is the only route reaching this screen for an existing supportee today.
+# This is a real product gap (PM's topology domain), scoped OUT of WI-2242
+# (test-only, no new navigation) — this flow proves the CEREMONY mechanism
+# itself (initiateLink/acceptLink) is reachable and correct via that deep
+# link, which is what this AC's happy path names.
+#
+# [Disclosure] This explicit-lane flow covers Android Back, process relaunch,
+# offline retry, invalid-link recovery, and both login handoffs in
+# addition to the happy path. Completion evidence must cite an executed green
+# run; source presence alone is not a receipt. DB-backed scenario-state
+# assertions live in test-seed-v2-supporter.integration.test.ts; concurrent
+# acceptance and audit side-effect invariants live in
+# linking-ceremony.integration.test.ts.
+#
+# SEED_SCENARIO: 'v2-supporter-pending-link'
+appId: com.mentomate.app
+tags:
+  - v2
+  - navigation
+---
+- setAirplaneMode: disabled
+
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: 'v2-supporter-pending-link'
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 30000
+
+# REACHABILITY: deep-link into the initiate screen with the existing
+# supportee pre-filled. Screen-render only — the pending fixture already
+# exercised the real initiateLink write path and supplies the deterministic
+# contract ID used across both login handoffs below.
+- openLink: 'mentomate:///link/initiate?supporteePersonId=${SUPPORTEE_PERSON_ID}&relation=other'
+- extendedWaitUntil:
+    visible:
+      id: 'visibility-link-initiate-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'visibility-link-create'
+
+# NAVIGATION — Android hardware Back from the deep-linked initiate route must
+# return to the V2 Mentor root, never legacy Home/Recaps. Reopen to prove the
+# pending ceremony remains reachable after the round trip.
+- pressKey: back
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 15000
+- assertNotVisible:
+    id: 'home-screen'
+- assertNotVisible:
+    id: 'recaps-screen'
+- openLink: 'mentomate:///link/initiate?supporteePersonId=${SUPPORTEE_PERSON_ID}&relation=other'
+- extendedWaitUntil:
+    visible:
+      id: 'visibility-link-initiate-screen'
+    timeout: 15000
+
+# CEREMONY: open the seeded pending contract and accept as supporter. Status
+# stays 'pending' until the supportee also accepts (linking-ceremony.ts's
+# acceptLink flips status only once BOTH supporterAcceptedAt/
+# supporteeAcceptedAt are set).
+- openLink: 'mentomate:///link/${CONTRACT_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'visibility-link-screen'
+    timeout: 15000
+- tapOn:
+    id: 'visibility-contract-accept'
+# The review card is absent before either side accepts, so its absence cannot
+# prove this mutation completed. The current side's Accept control disappears
+# only after the accepted contract is written back into the owned query state.
+- extendedWaitUntil:
+    notVisible:
+      id: 'visibility-contract-accept'
+    timeout: 15000
+- assertNotVisible:
+    id: 'visibility-link-review'
+
+# Cross-login: sign out and sign back in as the supportee (env override,
+# same EMAIL/PASSWORD variables sign-in-only-returning.yaml reads) to accept
+# the other side. Uses the RETURNING-USER sign-in (no welcome-chooser walk) —
+# sign-out-v2.yaml leaves the app directly on the sign-in screen, never on
+# welcome-chooser, so sign-in-only.yaml's unconditional
+# nav-welcome-to-sign-in.yaml call would hang its full 120s waiting for a
+# screen that never appears.
+- runFlow:
+    file: ../_setup/sign-out-v2.yaml
+- runFlow:
+    file: ../_setup/sign-in-only-returning.yaml
+    env:
+      EMAIL: ${SUPPORTEE_EMAIL}
+      PASSWORD: ${SUPPORTEE_PASSWORD}
+
+# NAVIGATION + RECOVERY — a cold process relaunch clears the in-memory query
+# cache while preserving the one-sided/pending contract in the API. Force that
+# valid contract's first read offline, then use the real retry control after
+# restoring connectivity. This proves both cold persistence and recovery on
+# the same real agreement the two participants are accepting.
+- stopApp
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible:
+      id: 'account-avatar-button'
+    timeout: 30000
+- setAirplaneMode: enabled
+- openLink: 'mentomate:///link/${CONTRACT_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'visibility-link-error'
+    timeout: 30000
+- setAirplaneMode: disabled
+- extendedWaitUntil:
+    visible:
+      id: 'visibility-link-error-retry'
+    timeout: 15000
+- tapOn:
+    id: 'visibility-link-error-retry'
+- extendedWaitUntil:
+    visible:
+      id: 'visibility-contract-card'
+    timeout: 30000
+- assertVisible:
+    id: 'visibility-contract-accept'
+- assertNotVisible:
+    id: 'visibility-link-review'
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: 'visibility-contract-accept'
+- extendedWaitUntil:
+    visible:
+      id: 'visibility-link-review'
+    timeout: 15000
+- assertVisible:
+    id: 'visibility-contract-revoke'
+
+# Back to the supporter: sign out and sign back in with the original
+# EMAIL/PASSWORD, confirming both sides now see the accepted contract, then
+# chain into the WI-2241 post-acceptance shape (v2-supporter-scope-journey.
+# yaml) — the newly-accepted supportee is now reachable from the Support hub
+# (resolveScopesForPerson flips 'learner' -> 'supporter' once >=1 accepted
+# contract exists). This supportee has no learning data (identity spine
+# only), so the Journal renders the SAME honest empty state that flow
+# asserts for its own empty-record supportee.
+- runFlow:
+    file: ../_setup/sign-out-v2.yaml
+- runFlow:
+    file: ../_setup/sign-in-only-returning.yaml
+
+# NAVIGATION — completed stage also survives a cold process relaunch.
+- stopApp
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible:
+      id: 'account-avatar-button'
+    timeout: 30000
+- openLink: 'mentomate:///link/${CONTRACT_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'visibility-link-review'
+    timeout: 30000
+
+# RECOVERY — a nonexistent contract fails closed and its explicit Back action
+# returns to the post-acceptance V2 Support hub Mentor root.
+- pressKey: back
+- extendedWaitUntil:
+    visible:
+      id: 'support-hub-mentor-tab'
+    timeout: 15000
+- openLink: 'mentomate:///link/00000000-0000-7000-8000-000000000099'
+- extendedWaitUntil:
+    visible:
+      id: 'visibility-link-error'
+    timeout: 30000
+- tapOn:
+    id: 'visibility-link-error-back'
+- extendedWaitUntil:
+    visible:
+      id: 'support-hub-mentor-tab'
+    timeout: 15000
+- assertNotVisible:
+    id: 'home-screen'
+- assertNotVisible:
+    id: 'recaps-screen'
+
+- openLink: 'mentomate:///mentor'
+- extendedWaitUntil:
+    visible:
+      id: 'support-hub-mentor-tab'
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: 'support-hub-mentor-open-${SUPPORTEE_PERSON_ID}'
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: 'support-hub-mentor-person-${SUPPORTEE_PERSON_ID}'
+- tapOn:
+    id: 'support-hub-mentor-open-${SUPPORTEE_PERSON_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-mentor-tab'
+    timeout: 15000
+
+- tapOn:
+    id: 'tab-journal'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-journal-placeholder'
+    timeout: 15000
+- assertNotVisible:
+    id: 'visibility-shared-record'
+- assertVisible:
+    id: 'person-scope-journal-empty-lamp'

@@ -19,7 +19,7 @@
 // ---------------------------------------------------------------------------
 
 import { resolve } from 'path';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   childCapNotifications,
@@ -36,58 +36,6 @@ import {
   recordChildCapNotificationForAccountV2,
   recordChildCapNotificationForSubscriptionV2,
 } from './child-cap-notifications-v2';
-import { legacyIdentityTableExistsForTest } from '../../../test-utils/legacy-identity-anchors';
-
-// [WI-1139] Legacy `accounts`/`profiles` Drizzle defs removed — raw SQL
-// helpers, same table-guarded seed/cleanup as before.
-async function insertLegacyAccount(
-  db: Database,
-  input: { id: string; clerkUserId: string; email: string },
-): Promise<void> {
-  await db.execute(sql`
-    INSERT INTO accounts (id, clerk_user_id, email)
-    VALUES (${input.id}, ${input.clerkUserId}, ${input.email})
-  `);
-}
-
-async function insertLegacyProfilePair(
-  db: Database,
-  input: {
-    owner: {
-      id: string;
-      accountId: string;
-      displayName: string;
-      birthYear: number;
-    };
-    child: {
-      id: string;
-      accountId: string;
-      displayName: string;
-      birthYear: number;
-    };
-  },
-): Promise<void> {
-  await db.execute(sql`
-    INSERT INTO profiles (id, account_id, display_name, birth_year, is_owner)
-    VALUES
-      (${input.owner.id}, ${input.owner.accountId}, ${input.owner.displayName}, ${input.owner.birthYear}, true),
-      (${input.child.id}, ${input.child.accountId}, ${input.child.displayName}, ${input.child.birthYear}, false)
-  `);
-}
-
-async function deleteLegacyProfilesByAccountId(
-  db: Database,
-  accountId: string,
-): Promise<void> {
-  await db.execute(sql`DELETE FROM profiles WHERE account_id = ${accountId}`);
-}
-
-async function deleteLegacyAccountById(
-  db: Database,
-  accountId: string,
-): Promise<void> {
-  await db.execute(sql`DELETE FROM accounts WHERE id = ${accountId}`);
-}
 
 loadDatabaseEnv(resolve(__dirname, '../../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
@@ -109,34 +57,6 @@ const RUN = !!process.env.DATABASE_URL;
     });
 
     async function seedGraph(): Promise<void> {
-      // [WI-1128] Legacy `accounts`/`profiles` may already be dropped
-      // (post-M-DROP); after M-REPOINT, child_cap_notifications FKs `person`
-      // directly, so this legacy twin mirror is a no-op there instead of
-      // hard-failing.
-      if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-        await insertLegacyAccount(db, {
-          id: ORG_ID,
-          clerkUserId: `clerk_${ORG_ID}`,
-          email: `owner_${ORG_ID}@test.local`,
-        });
-      }
-      if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
-        await insertLegacyProfilePair(db, {
-          owner: {
-            id: OWNER_ID,
-            accountId: ORG_ID,
-            displayName: 'Owner',
-            birthYear: 1985,
-          },
-          child: {
-            id: CHILD_ID,
-            accountId: ORG_ID,
-            displayName: 'Child',
-            birthYear: 2014,
-          },
-        });
-      }
-
       // v2 graph.
       await db.insert(organization).values({ id: ORG_ID, name: 'WI-905 Fam' });
       await db.insert(person).values([
@@ -170,14 +90,6 @@ const RUN = !!process.env.DATABASE_URL;
       await db.delete(person).where(eq(person.id, OWNER_ID));
       await db.delete(person).where(eq(person.id, CHILD_ID));
       await db.delete(organization).where(eq(organization.id, ORG_ID));
-      // [WI-1128] Legacy `accounts`/`profiles` may already be dropped
-      // (post-M-DROP); skip cleanup there instead of hard-failing.
-      if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
-        await deleteLegacyProfilesByAccountId(db, ORG_ID);
-      }
-      if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-        await deleteLegacyAccountById(db, ORG_ID);
-      }
     });
 
     // -------------------------------------------------------------------------
@@ -355,29 +267,6 @@ const RUN = !!process.env.DATABASE_URL;
       const orgB = generateUUIDv7();
       const ownerB = generateUUIDv7();
       const childB = generateUUIDv7();
-      if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-        await insertLegacyAccount(db, {
-          id: orgB,
-          clerkUserId: `clerk_${orgB}`,
-          email: `owner_${orgB}@test.local`,
-        });
-      }
-      if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
-        await insertLegacyProfilePair(db, {
-          owner: {
-            id: ownerB,
-            accountId: orgB,
-            displayName: 'Owner B',
-            birthYear: 1980,
-          },
-          child: {
-            id: childB,
-            accountId: orgB,
-            displayName: 'Child B',
-            birthYear: 2015,
-          },
-        });
-      }
       await db.insert(organization).values({ id: orgB, name: 'WI-905 Fam B' });
       await db.insert(person).values([
         {
@@ -438,12 +327,6 @@ const RUN = !!process.env.DATABASE_URL;
         await db.delete(person).where(eq(person.id, ownerB));
         await db.delete(person).where(eq(person.id, childB));
         await db.delete(organization).where(eq(organization.id, orgB));
-        if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
-          await deleteLegacyProfilesByAccountId(db, orgB);
-        }
-        if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-          await deleteLegacyAccountById(db, orgB);
-        }
       }
     });
   },

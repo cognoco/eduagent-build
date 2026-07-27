@@ -398,6 +398,35 @@ describe('progressSummaryGeneration', () => {
       expect(mockUpsertProgressSummary).toHaveBeenCalled();
     });
 
+    // [WI-2396] Basis-inclusive gate: switched from isGdprProcessingAllowedV2
+    // (parental basis only) to isLlmExchangeConsentAllowed, which ALSO honors
+    // an adult's independently-withdrawable self-consent (art6_1_a). Sequence
+    // is [gdpr_parental_consent, art6_1_a-platform_use] — CONSENTED then
+    // WITHDRAWN, within the FIRST (gather-context) gate call — proving the
+    // adult leg alone (parental leg passes) now blocks, which
+    // isGdprProcessingAllowedV2 alone would have missed.
+    it('[WI-2396] skips LLM when GDPR consent is granted but adult self-consent (art6_1_a) is withdrawn', async () => {
+      mockFindLatestCompletedLearningSession.mockResolvedValue({
+        id: 'session-1',
+        startedAt: new Date('2026-05-13T10:00:00Z'),
+      });
+      seedConsentState(sharedDb as unknown as Record<string, unknown>, {
+        state: ['CONSENTED', 'WITHDRAWN'],
+      });
+
+      const { result } = await invokeProgressSummary({
+        profileId: 'child-1',
+        sessionId: 'session-1',
+      });
+
+      expect(result).toEqual({
+        status: 'skipped',
+        reason: 'consent_not_granted',
+      });
+      expect(mockGenerateProgressSummary).not.toHaveBeenCalled();
+      expect(mockUpsertProgressSummary).not.toHaveBeenCalled();
+    });
+
     // [WI-82] Cross-step memoization regression: consent granted when
     // gather-context ran, then withdrawn before generate-summary.
     // The re-check INSIDE generate-summary must catch the withdrawal and
@@ -408,9 +437,15 @@ describe('progressSummaryGeneration', () => {
         startedAt: new Date('2026-05-13T10:00:00Z'),
       });
       // WI-867: source reads isGdprProcessingAllowedV2 (v2, IDENTITY_V2_ENABLED=true).
-      // Sequence: gather-context = CONSENTED, generate-summary = WITHDRAWN.
+      // [WI-2396] Now reads isLlmExchangeConsentAllowed, which fires up to 3
+      // resolveConsentStatus calls per gate invocation (1 gdpr_parental_consent +
+      // up to 2 art6_1_a purposes, short-circuiting on the first WITHDRAWN).
+      // gather-context's gate must fully pass (3 CONSENTED) before
+      // generate-summary's gate sees WITHDRAWN on its first (gdpr) check —
+      // otherwise the sequence is consumed within gather-context's gate and
+      // this test stops exercising the cross-step re-check it documents.
       seedConsentState(sharedDb as unknown as Record<string, unknown>, {
-        state: ['CONSENTED', 'WITHDRAWN'],
+        state: ['CONSENTED', 'CONSENTED', 'CONSENTED', 'WITHDRAWN'],
       });
 
       const { result } = await invokeProgressSummary({

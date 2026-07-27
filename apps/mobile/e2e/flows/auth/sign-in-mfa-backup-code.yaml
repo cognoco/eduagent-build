@@ -1,6 +1,7 @@
 # Flow A-MFA-4: Sign-in MFA — Backup code branch
 #
-# BLOCKED: Same infrastructure gap as sign-in-mfa-email-code.yaml.
+# BLOCKED (OPQ-26): Same operator-owned fixture gap as
+# sign-in-mfa-email-code.yaml; this placeholder is deliberately non-executable.
 # Backup codes are generated at TOTP enrollment time. The test harness would
 # need to: (a) seed a TOTP-enrolled user, (b) capture the backup codes at
 # enrollment, and (c) export one as ${BACKUP_CODE} for use in this flow.
@@ -33,8 +34,10 @@ appId: com.mentomate.app
 tags:
   - weekly
   - auth
+  - blocked
+  - manual
 ---
 # Placeholder: flow body will be written once infrastructure is unblocked.
 - launchApp:
-    appId: "com.mentomate.app"
+    appId: 'com.mentomate.app'
     stopApp: false

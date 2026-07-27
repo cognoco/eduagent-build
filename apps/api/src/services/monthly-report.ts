@@ -14,7 +14,10 @@ import {
   monthlyReportSummarySchema,
   SchemaDriftError,
 } from '@eduagent/schemas';
-import { assertParentAccess } from './family-access';
+import {
+  assertChargeNotCredentialed,
+  assertParentAccess,
+} from './family-access';
 import { routeAndCall, type ChatMessage } from './llm';
 import { extractFirstJsonObject } from './llm/extract-json';
 import { createLogger } from './logger';
@@ -362,6 +365,7 @@ export async function listMonthlyReportsForParentChild(
   childProfileId: string,
 ): Promise<MonthlyReportSummary[]> {
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChargeNotCredentialed(db, childProfileId);
   const rows = await db.query.monthlyReports.findMany({
     where: and(
       eq(monthlyReports.profileId, parentProfileId),
@@ -407,6 +411,7 @@ export async function getMonthlyReportForParentChild(
   reportId: string,
 ): Promise<MonthlyReportRecord | null> {
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChargeNotCredentialed(db, childProfileId);
   const row = await db.query.monthlyReports.findFirst({
     where: and(
       eq(monthlyReports.id, reportId),
@@ -425,6 +430,7 @@ export async function markMonthlyReportViewed(
   reportId: string,
 ): Promise<void> {
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChargeNotCredentialed(db, childProfileId);
   await db
     .update(monthlyReports)
     .set({ viewedAt: new Date() })

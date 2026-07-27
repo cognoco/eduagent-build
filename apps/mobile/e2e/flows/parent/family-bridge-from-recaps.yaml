@@ -127,12 +127,15 @@ tags:
 
 - takeScreenshot: family-bridge-recaps-04-session
 
-# Critical assertion: device back from the session must return the parent to
-# the Recaps detail they started from, NOT to Home and NOT to the Recaps list.
-# This validates that the bridge passes returnTo=family-recaps + returnId
-# through the relearn screen on Open.
-- back
-- back
+# Critical assertion: the route-aware session back control must return the
+# parent to the Recaps detail they started from, NOT to Home and NOT to the
+# Recaps list. Raw Android back presses bypass the session's returnTo mapping
+# and can exhaust the release APK's native activity history.
+- assertVisible:
+    id: 'chat-shell-back'
+
+- tapOn:
+    id: 'chat-shell-back'
 
 - extendedWaitUntil:
     visible:
@@ -140,8 +143,8 @@ tags:
     timeout: 10000
 
 # Negative assertions: confirm we did NOT land on Home or the Recaps list.
-# The spec says "device back returns to Recaps detail (not Home, not Recaps
-# list)" — without these, a regression that lands on home-screen but where
+# The journey must return to Recaps detail (not Home, not Recaps list) —
+# without these, a regression that lands on home-screen but where
 # recap-detail-screen is still mounted under it would pass silently.
 - assertNotVisible:
     id: 'home-screen'

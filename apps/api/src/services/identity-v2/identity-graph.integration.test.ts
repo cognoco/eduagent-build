@@ -25,6 +25,8 @@ import { resolve } from 'path';
 import { eq, sql } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
+  consentGrant,
+  consentRequest,
   createDatabase,
   generateUUIDv7,
   login,
@@ -37,12 +39,14 @@ import {
   quotaPools,
   type Database,
 } from '@eduagent/database';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import { ConflictError } from '../../errors';
 import {
   createIdentityGraph,
   buildValidatedBirthDate,
   locationToJurisdiction,
 } from './identity-graph';
+import { resolveLatestConsentSetStatusAnyBasis } from './consent-status-v2';
 
 // Populate process.env.DATABASE_URL from the test env (no-op if already set).
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
@@ -99,6 +103,15 @@ async function cleanupByClerk(
       await db.execute(sql`DELETE FROM accounts WHERE id = ${orgId}`);
     }
   }
+  // [WI-1193] consent_grant.charge_person_id/organization_id are ON DELETE
+  // RESTRICT — an adult bootstrap now writes rows here, so they must go before
+  // the person/organization deletes below.
+  await db
+    .delete(consentGrant)
+    .where(eq(consentGrant.chargePersonId, personId));
+  await db
+    .delete(consentRequest)
+    .where(eq(consentRequest.chargePersonId, personId));
   await db.delete(membership).where(eq(membership.personId, personId));
   await db.delete(login).where(eq(login.clerkUserId, clerkUserId));
   await db.delete(person).where(eq(person.id, personId));
@@ -231,6 +244,88 @@ async function cleanupByClerk(
     expect(ownerUsage?.role).toBe('owner');
     expect(ownerUsage?.usedThisMonth).toBe(0);
     expect(ownerUsage?.usedToday).toBe(0);
+
+    // [WI-1193 AC1/AC2] A self-registered adult owner (birthYear 1990 → age
+    // ~35-36) gets a persisted lawful-basis + terms-accepted fact per purpose:
+    // one CONSENTED consent_grant row for EACH of platform_use/llm_disclosure,
+    // basis='art6_1_a' — the "adult who never needed consent" gap
+    // this WI closes.
+    const grants = await db.query.consentGrant.findMany({
+      where: eq(consentGrant.chargePersonId, graph.personId),
+    });
+    expect(grants).toHaveLength(2);
+    const purposes = grants.map((g) => g.purpose).sort();
+    expect(purposes).toEqual(['llm_disclosure', 'platform_use']);
+    for (const g of grants) {
+      expect(g.lawfulBasis).toBe('art6_1_a');
+      expect(g.granted).toBe(true);
+      expect(g.withdrawnAt).toBeNull();
+      expect(g.organizationId).toBe(graph.organizationId);
+    }
+  });
+
+  it('[WI-1193][WI-1864] records pending GDPR, not adult self-consent, for a self-registered owner age 15', async () => {
+    const clerkUserId = uniqueClerk();
+    const email = `teen_owner_${generateUUIDv7()}@test.local`;
+    const currentYear = new Date().getUTCFullYear();
+
+    const graph = await createIdentityGraph(db, {
+      clerkUserId,
+      verifiedEmail: email,
+      displayName: 'Teen Owner',
+      birthYear: currentYear - 15,
+      birthMonth: 1,
+      birthDay: 1,
+      location: 'US',
+    });
+
+    const grants = await db.query.consentGrant.findMany({
+      where: eq(consentGrant.chargePersonId, graph.personId),
+    });
+    expect(grants).toHaveLength(0);
+
+    const requests = await db.query.consentRequest.findMany({
+      where: eq(consentRequest.chargePersonId, graph.personId),
+    });
+    expect(requests).toHaveLength(CONSENT_PURPOSES.length);
+    expect(requests.map((request) => request.purpose).sort()).toEqual(
+      [...CONSENT_PURPOSES].sort(),
+    );
+    for (const request of requests) {
+      expect(request).toMatchObject({
+        organizationId: graph.organizationId,
+        requestedBasis: 'gdpr_parental_consent',
+        status: 'pending',
+      });
+    }
+    await expect(
+      resolveLatestConsentSetStatusAnyBasis(
+        db,
+        graph.personId,
+        graph.organizationId,
+      ),
+    ).resolves.toBe('PENDING');
+  });
+
+  it('[WI-1864] does not create a parental request for a self-registered owner age 17', async () => {
+    const clerkUserId = uniqueClerk();
+    const email = `seventeen_owner_${generateUUIDv7()}@test.local`;
+    const currentYear = new Date().getUTCFullYear();
+
+    const graph = await createIdentityGraph(db, {
+      clerkUserId,
+      verifiedEmail: email,
+      displayName: 'Seventeen Owner',
+      birthYear: currentYear - 17,
+      birthMonth: 1,
+      birthDay: 1,
+      location: 'EU',
+    });
+
+    const requests = await db.query.consentRequest.findMany({
+      where: eq(consentRequest.chargePersonId, graph.personId),
+    });
+    expect(requests).toHaveLength(0);
   });
 
   it('is idempotent on a repeated clerk id (login_clerk_user_id_unique replay)', async () => {

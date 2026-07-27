@@ -28,16 +28,25 @@ export function createCurriculumRepository(db: Database, profileId: string) {
   return {
     bookSuggestions: {
       async findBySubject(subjectId: string) {
-        const subject = await db.query.subjects.findFirst({
-          where: and(
-            eq(subjects.id, subjectId),
-            eq(subjects.profileId, profileId),
-          ),
-        });
-        if (!subject) return [];
-        return db.query.bookSuggestions.findMany({
-          where: eq(bookSuggestions.subjectId, subjectId),
-        });
+        return db
+          .select({
+            id: bookSuggestions.id,
+            subjectId: bookSuggestions.subjectId,
+            title: bookSuggestions.title,
+            emoji: bookSuggestions.emoji,
+            description: bookSuggestions.description,
+            category: bookSuggestions.category,
+            createdAt: bookSuggestions.createdAt,
+            pickedAt: bookSuggestions.pickedAt,
+          })
+          .from(bookSuggestions)
+          .innerJoin(subjects, eq(subjects.id, bookSuggestions.subjectId))
+          .where(
+            and(
+              eq(bookSuggestions.subjectId, subjectId),
+              eq(subjects.profileId, profileId),
+            ),
+          );
       },
     },
     topicSuggestions: {

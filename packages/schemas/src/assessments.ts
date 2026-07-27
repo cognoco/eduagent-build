@@ -379,6 +379,8 @@ export type TopicRetentionResponse = z.infer<
 
 // Recall test result — RemediationSchema is embedded here to avoid circular imports
 const recallRemediationSchema = z.object({
+  // Wire value stays 'redirect_to_library' for backward compat with clients
+  // built against the pre-WI-1462 contract — see offRampStage below.
   action: z.literal('redirect_to_library'),
   topicId: z.string().uuid(),
   topicTitle: z.string(),
@@ -389,6 +391,22 @@ const recallRemediationSchema = z.object({
   options: z.array(z.enum(['review_and_retest', 'relearn_topic'])),
 });
 
+// [WI-2114] Answer-specific recall feedback. The grader emits three short
+// learner-facing sentences — what the answer got right, what is missing or
+// inaccurate, and a concrete next step — so Recall Check can respond to the
+// actual answer instead of one fixed "Good effort" prompt. All three are
+// mentor-prose (written in the learner's conversation_language); the client
+// renders them as the assistant reply while its own controls stay in the app
+// language. Optional end-to-end: absent when the grader is unavailable or on
+// the deterministic dont_remember / cooldown paths, where the client keeps its
+// honest generic copy.
+export const recallFeedbackSchema = z.object({
+  strengths: z.string(),
+  gaps: z.string(),
+  nextStep: z.string(),
+});
+export type RecallFeedback = z.infer<typeof recallFeedbackSchema>;
+
 export const recallTestResultSchema = z.object({
   passed: z.boolean(),
   masteryScore: z.number(),
@@ -396,7 +414,31 @@ export const recallTestResultSchema = z.object({
   nextReviewAt: isoDateField,
   failureCount: z.number().int(),
   hint: z.string().optional(),
+  // [WI-2114] Answer-specific feedback for the sub-3-failure retry path — see
+  // recallFeedbackSchema. Additive + optional so a client on the pre-WI-2114
+  // schema ignores it and keeps its generic copy.
+  feedback: recallFeedbackSchema.optional(),
+  // [WI-2114] The PRIOR graded answer's stored feedback, surfaced when the
+  // current submission is cooldown-blocked (never re-graded) — e.g. the learner
+  // immediately asks "what was wrong with what I said?". Distinct field from
+  // `feedback` so the client renders it as a REFRAMED recap of the previous
+  // answer, never a byte-for-byte replay of a fresh grade (AC-8): a
+  // cooldown-blocked submission has no evaluated content of its own, so AC-3's
+  // identical-content exception does not apply to it. Absent when no prior
+  // feedback is stored — the client then keeps its honest generic copy (AC-5).
+  priorFeedback: recallFeedbackSchema.optional(),
+  // [WI-1462] Wire-compatible values only — unchanged from the pre-WI-1462
+  // contract so a client built against the old schema still parses this
+  // response. A client on the old schema that reaches the 3rd/4th failure
+  // sees exactly its old behavior (feedback_only retry, then a
+  // redirect_to_library remediation card) rather than a schema-parse error.
   failureAction: z.enum(['feedback_only', 'redirect_to_library']).optional(),
+  // [WI-1462] Additive discriminator, new key — an old client's non-strict
+  // z.object simply ignores an unrecognized extra key, so this never breaks
+  // an old parse. Present alongside failureAction='redirect_to_library' to
+  // tell a client on the NEW schema whether this is the bounded 3rd-failure
+  // re-teach off-ramp or the 4th+-failure park.
+  offRampStage: z.enum(['re_teach', 'topic_parked']).optional(),
   remediation: recallRemediationSchema.optional(),
   cooldownActive: z.boolean().optional(),
   cooldownEndsAt: isoDateField.optional(),

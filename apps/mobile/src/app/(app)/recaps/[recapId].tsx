@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ErrorFallback, TimeoutLoader } from '../../../components/common';
 import { AddToMyLearningButton } from '../../../components/family/AddToMyLearningButton';
+import { VerifiedProofBlock } from '../../../components/family/VerifiedProofBlock';
 import { RequireFamilyContext } from '../../../components/guards/RequireFamilyContext';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import { useRecap } from '../../../hooks/use-recaps';
@@ -162,6 +163,41 @@ export default function RecapDetailScreen(): React.ReactElement {
                   t('recaps.detailPending')}
               </Text>
             </View>
+
+            {recapQuery.data.verifiedProof.status === 'present' ? (
+              <View
+                className="mt-3 rounded-card border border-border bg-surface px-4 py-4"
+                testID="recap-detail-verified-proof"
+              >
+                <VerifiedProofBlock
+                  topicTitle={recapQuery.data.verifiedProof.proof.topicTitle}
+                  verifiedAt={recapQuery.data.verifiedProof.proof.verifiedAt}
+                  quote={recapQuery.data.verifiedProof.proof.quote}
+                  evidenceAvailability={
+                    recapQuery.data.verifiedProof.proof.evidenceAvailability
+                  }
+                  verificationState={
+                    recapQuery.data.verifiedProof.proof.verificationState
+                  }
+                  retentionStatus={
+                    recapQuery.data.verifiedProof.proof.retentionStatus
+                  }
+                  nextReviewDate={
+                    recapQuery.data.verifiedProof.proof.nextReviewDate
+                  }
+                  showRetentionAffordances
+                />
+              </View>
+            ) : recapQuery.data.verifiedProof.status === 'unavailable' ? (
+              <View
+                className="mt-3 rounded-card border border-border bg-surface px-4 py-4"
+                testID="recap-detail-verified-proof-unavailable"
+              >
+                <Text className="text-body-sm text-text-secondary">
+                  {t('recaps.verifiedProof.lookupUnavailable')}
+                </Text>
+              </View>
+            ) : null}
 
             {recapQuery.data.conversationPrompt ? (
               <View className="mt-3 rounded-card border border-border bg-surface px-4 py-4">

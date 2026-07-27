@@ -88,7 +88,7 @@ run_s "onboarding-no-subject" "flows/edge/empty-first-user.yaml"
 
 # Consent
 run_s "consent-withdrawn-solo" "flows/consent/consent-withdrawn-gate.yaml"
-run_s "onboarding-complete" "flows/consent/post-approval-landing.yaml"
+run_s "post-approval-ready" "flows/consent/post-approval-landing.yaml"
 
 # Standalone
 log "SKIP" "flows/onboarding/sign-up-flow.yaml" "(manual-only: requires Clerk email verification)"

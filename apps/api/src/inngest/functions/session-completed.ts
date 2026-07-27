@@ -6,7 +6,7 @@ import {
   getStepMemoryFactsDedupConfig,
   getStepVoyageApiKey,
 } from '../helpers';
-import { isGdprProcessingAllowedV2 } from '../../services/identity-v2/consent-status-v2';
+import { isLlmExchangeConsentAllowed } from '../../services/identity-v2/consent-status-v2';
 import { getPersonLlmContext } from '../../services/identity-v2/helpers';
 import {
   updateRetentionFromSession,
@@ -1712,15 +1712,20 @@ export const sessionCompleted = inngest.createFunction(
               return;
             }
 
-            // [WI-221] GDPR regulatory-consent gate at the processing site,
+            // [WI-221] Regulatory-consent gate at the processing site,
             // BEFORE the transcript is sent to the LLM. revokeConsent sets GDPR
             // status to WITHDRAWN without clearing memoryConsentStatus, so the
             // memory gate above is insufficient: without this a withdrawn-but-
             // memory-granted profile's transcript would still be transmitted to
             // the external LLM provider (the regulated processing act under GDPR
             // Art. 7(3)) before applyAnalysis later blocks only the write.
-            // [CUT-B1 §2.5(i)] v2 seam: GDPR gate via resolver.
-            const gdprAllowed = await isGdprProcessingAllowedV2(db, profileId);
+            // [CUT-B1 §2.5(i)] v2 seam: consent gate via resolver.
+            // [WI-2396] isLlmExchangeConsentAllowed also honors adult
+            // self-consent (art6_1_a) withdrawal, not only the parental basis.
+            const gdprAllowed = await isLlmExchangeConsentAllowed(
+              db,
+              profileId,
+            );
             if (!gdprAllowed) {
               return;
             }
@@ -2037,15 +2042,19 @@ export const sessionCompleted = inngest.createFunction(
         runIsolated('generate-embeddings', profileId, async () => {
           const db = getStepDatabase();
 
-          // [C6] GDPR processing gate — close the consent asymmetry with
+          // [C6] Processing gate — close the consent asymmetry with
           // analyze-learner-profile (step 3). storeSessionEmbedding transmits
           // transcript content to Voyage (an external processor / regulated
           // processing act under GDPR Art. 7(3)). revokeConsent sets GDPR
           // status to WITHDRAWN without touching the memory gate, so this step
           // must re-check the regulatory consent itself — exactly as the
           // profile step does — and skip before any transcript leaves Neon.
-          // [WI-867] v2 always: GDPR gate via v2 resolver.
-          const gdprAllowed = await isGdprProcessingAllowedV2(db, profileId);
+          // [WI-867] v2 always: consent gate via v2 resolver.
+          // [WI-2396] isLlmExchangeConsentAllowed also honors adult
+          // self-consent (art6_1_a) withdrawal — kept symmetric with the
+          // analyze-learner-profile gate above (both send transcript content
+          // to an external AI processor under the same llm_disclosure purpose).
+          const gdprAllowed = await isLlmExchangeConsentAllowed(db, profileId);
           if (!gdprAllowed) {
             return;
           }

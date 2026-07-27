@@ -30,6 +30,7 @@ export {
   formatSecurityNotificationEmail,
   formatAccountReclaimAttemptEmail,
   formatPaymentFailedEmail,
+  formatFamilyJoinStoreCancelEmail,
   type EmailPayload,
   type EmailOptions,
   type EmailResult,
@@ -49,6 +50,11 @@ export interface NotificationResult {
 
 /** Maximum push notifications per day per profile */
 export const MAX_DAILY_PUSH = 3;
+export const REVIEW_FAMILY_DEDUP_TYPES = [
+  'review_reminder',
+  'recall_nudge',
+  'notice_recheck',
+] as const;
 
 const EXPO_PUSH_API_URL = 'https://exp.host/--/api/v2/push/send';
 
@@ -201,7 +207,12 @@ export async function sendPushNotification(
   // itself succeeded — we still report `sent: true` because the user got it —
   // but escalate the log-write failure so on-call can see the divergence
   // between Expo tickets and our notification_log rows.
-  if (!options?.skipRateLimitLog) {
+  // `store_cancel_nudge` (WI-1753 AC-6) is push-only: cap-exempt and
+  // Inngest-idempotent, it is deliberately NOT written to notification_log (the
+  // DB notification_type enum omits it). The `!== 'store_cancel_nudge'` guard
+  // both enforces that at runtime and narrows `payload.type` to the loggable
+  // subset that logNotification accepts.
+  if (!options?.skipRateLimitLog && payload.type !== 'store_cancel_nudge') {
     try {
       await logNotification(db, payload.profileId, payload.type, ticketId);
     } catch (err) {

@@ -2,10 +2,10 @@
 // WI-1505 — Aggregate LLM traffic kill switch — integration test.
 //
 // Exercises the REAL llmMiddleware + REAL router.ts routeAndCall together,
-// backed by a real in-memory KV, proving the per-request KV read
-// (services/kv.ts readLlmKillSwitch) takes effect on the very NEXT
-// "request" (a fresh llmMiddleware invocation) with no mobile release and no
-// Worker redeploy. The only faked boundary is the LLM provider network call
+// backed by a real in-memory KV, proving the request-local lazy KV read
+// (services/kv.ts readLlmKillSwitch) takes effect on the very NEXT request
+// with no mobile release and no Worker redeploy. The only faked boundary is
+// the LLM provider network call
 // itself, via the sanctioned createMockProvider test fixture
 // (services/llm/providers/mock.ts) registered through the real
 // registerProvider() — no internal module is jest.mock'd (GC1).
@@ -44,13 +44,18 @@ type KVNamespace = {
 };
 
 /** Real in-memory KV — not a jest.fn mock — so writes/reads actually round-trip. */
-function createInMemoryKV(): KVNamespace {
+function createInMemoryKV(
+  onGet: (key: string) => void = () => undefined,
+): KVNamespace {
   const store = new Map<string, string>();
   return {
     put: async (key, value) => {
       store.set(key, String(value));
     },
-    get: async (key) => store.get(key) ?? null,
+    get: async (key) => {
+      onGet(key);
+      return store.get(key) ?? null;
+    },
     delete: async (key) => {
       store.delete(key);
     },
@@ -59,6 +64,7 @@ function createInMemoryKV(): KVNamespace {
   };
 }
 
+import { Hono } from 'hono';
 import { llmMiddleware, resetLlmMiddleware } from './llm';
 import {
   routeAndCall,
@@ -71,6 +77,7 @@ import {
 } from '../services/llm';
 import {
   createMockProvider,
+  _getLlmRoutingV2Enabled,
   _resetVolumeCounters,
 } from '../services/llm/test-utils';
 // Real production constant — assert against the actual threshold, never a
@@ -78,19 +85,49 @@ import {
 import { LLM_DAILY_VOLUME_ALERT_THRESHOLD } from '../services/llm/router';
 import { writeLlmKillSwitch, LLM_KILL_SWITCH_KEY } from '../services/kv';
 
+type LlmTestEnv = {
+  Bindings: {
+    OPENAI_API_KEY?: string;
+    ANTHROPIC_API_KEY?: string;
+    CEREBRAS_API_KEY?: string;
+    MISTRAL_API_KEY?: string;
+    LLM_ROUTING_V2_ENABLED?: string;
+    ENVIRONMENT?: string;
+    SUBSCRIPTION_KV?: KVNamespace;
+  };
+};
+
+function createDeferred(): {
+  promise: Promise<void>;
+  resolve: () => void;
+} {
+  let resolve!: () => void;
+  const promise = new Promise<void>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 function createMockContext(env: Record<string, unknown>) {
   return { env } as unknown as Parameters<typeof llmMiddleware>[0];
 }
 
 /**
- * Simulates one HTTP request reaching llmMiddleware — the same per-request
- * KV read a real Worker request performs. Calling this again after a KV
- * write is what proves "next request, no redeploy".
+ * Simulates one HTTP request reaching llmMiddleware and executes the LLM
+ * operation inside its request context. Calling this again after a KV write
+ * proves "next request, no redeploy".
  */
-async function simulateRequest(kv: KVNamespace): Promise<void> {
+async function simulateRequest<T>(
+  kv: KVNamespace,
+  operation: () => Promise<T>,
+): Promise<T> {
   const c = createMockContext({ ENVIRONMENT: 'test', SUBSCRIPTION_KV: kv });
-  const next = jest.fn().mockResolvedValue(undefined);
+  let result!: T;
+  const next = async () => {
+    result = await operation();
+  };
   await llmMiddleware(c, next);
+  return result;
 }
 
 describe('LLM kill switch (WI-1505)', () => {
@@ -109,29 +146,220 @@ describe('LLM kill switch (WI-1505)', () => {
     registerProvider(createMockProvider('openai'));
   });
 
-  it('(a) switch OFF (no key in KV) — routeAndCall behaves unchanged', async () => {
-    await simulateRequest(kv);
+  it('[WI-1566] does not read kill-switch KV for a non-LLM Hono request', async () => {
+    let getCalls = 0;
+    kv = createInMemoryKV(() => {
+      getCalls += 1;
+    });
+    const app = new Hono<LlmTestEnv>();
+    app.use('*', llmMiddleware);
+    app.get('/health', (c) => c.json({ status: 'ok' }));
 
-    const result = await routeAndCall([{ role: 'user', content: 'hello' }]);
+    const response = await app.request(
+      '/health',
+      {},
+      { ENVIRONMENT: 'test', SUBSCRIPTION_KV: kv },
+    );
+
+    expect(response.status).toBe(200);
+    expect(getCalls).toBe(0);
+  });
+
+  it('[WI-1566] shares one in-flight lazy KV read across concurrent LLM calls in one request', async () => {
+    let getCalls = 0;
+    let callsBeforeFirstLlm = -1;
+    let callsWhileReadInFlight = -1;
+    const releaseKvRead = createDeferred();
+    const backingKv = createInMemoryKV();
+    kv = {
+      ...backingKv,
+      get: async (key) => {
+        getCalls += 1;
+        await releaseKvRead.promise;
+        return backingKv.get(key);
+      },
+    };
+    const app = new Hono<LlmTestEnv>();
+    app.use('*', llmMiddleware);
+    app.post('/llm', async (c) => {
+      callsBeforeFirstLlm = getCalls;
+      const firstCall = routeAndCall([{ role: 'user', content: 'first' }]);
+      const secondCall = routeAndCall([{ role: 'user', content: 'second' }]);
+      await Promise.resolve();
+      callsWhileReadInFlight = getCalls;
+      releaseKvRead.resolve();
+      await Promise.all([firstCall, secondCall]);
+      return c.json({ ok: true });
+    });
+
+    const response = await app.request(
+      '/llm',
+      { method: 'POST' },
+      { ENVIRONMENT: 'test', SUBSCRIPTION_KV: kv },
+    );
+
+    expect(response.status).toBe(200);
+    expect(callsBeforeFirstLlm).toBe(0);
+    expect(callsWhileReadInFlight).toBe(1);
+    expect(getCalls).toBe(1);
+  });
+
+  it('[WI-1566] isolates overlapping kill-switch decisions without a fail-open race', async () => {
+    const activeKv = createInMemoryKV();
+    const inactiveKv = createInMemoryKV();
+    await writeLlmKillSwitch(activeKv, true);
+
+    const activeEnteredHandler = createDeferred();
+    const releaseActiveHandler = createDeferred();
+    const app = new Hono<LlmTestEnv>();
+    app.use('*', llmMiddleware);
+    app.post('/llm', async (c) => {
+      if (c.req.header('x-request-id') === 'active') {
+        activeEnteredHandler.resolve();
+        await releaseActiveHandler.promise;
+      }
+      try {
+        const result = await routeAndCall([{ role: 'user', content: 'hello' }]);
+        return c.json({ blocked: false, provider: result.provider });
+      } catch (error) {
+        if (error instanceof CircuitOpenError) {
+          return c.json({ blocked: true }, 503);
+        }
+        throw error;
+      }
+    });
+
+    const activeRequest = app.request(
+      '/llm',
+      { method: 'POST', headers: { 'x-request-id': 'active' } },
+      { ENVIRONMENT: 'test', SUBSCRIPTION_KV: activeKv },
+    );
+    await activeEnteredHandler.promise;
+
+    const inactiveResponse = await app.request(
+      '/llm',
+      { method: 'POST', headers: { 'x-request-id': 'inactive' } },
+      { ENVIRONMENT: 'test', SUBSCRIPTION_KV: inactiveKv },
+    );
+    releaseActiveHandler.resolve();
+    const activeResponse = await activeRequest;
+
+    expect(inactiveResponse.status).toBe(200);
+    expect(await inactiveResponse.json()).toMatchObject({ blocked: false });
+    expect(activeResponse.status).toBe(503);
+    expect(await activeResponse.json()).toEqual({ blocked: true });
+  });
+
+  it('[WI-1566] isolates routing-V2 values across overlapping requests', async () => {
+    const enabledEnteredHandler = createDeferred();
+    const releaseEnabledHandler = createDeferred();
+    const app = new Hono<LlmTestEnv>();
+    app.use('*', llmMiddleware);
+    app.get('/routing', async (c) => {
+      if (c.req.header('x-request-id') === 'enabled') {
+        enabledEnteredHandler.resolve();
+        await releaseEnabledHandler.promise;
+      }
+      return c.json({ routingV2: _getLlmRoutingV2Enabled() });
+    });
+
+    const enabledRequest = app.request(
+      '/routing',
+      { headers: { 'x-request-id': 'enabled' } },
+      { ENVIRONMENT: 'test', LLM_ROUTING_V2_ENABLED: 'true' },
+    );
+    await enabledEnteredHandler.promise;
+
+    const disabledResponse = await app.request(
+      '/routing',
+      { headers: { 'x-request-id': 'disabled' } },
+      { ENVIRONMENT: 'test', LLM_ROUTING_V2_ENABLED: 'false' },
+    );
+    releaseEnabledHandler.resolve();
+    const enabledResponse = await enabledRequest;
+
+    expect(await disabledResponse.json()).toEqual({ routingV2: false });
+    expect(await enabledResponse.json()).toEqual({ routingV2: true });
+  });
+
+  it('[WI-1566] isolates volume-metric environment tags across overlapping requests', async () => {
+    const firstEnteredHandler = createDeferred();
+    const releaseFirstHandler = createDeferred();
+    const app = new Hono<LlmTestEnv>();
+    app.use('*', llmMiddleware);
+    app.post('/environment', async (c) => {
+      if (c.req.header('x-request-id') === 'first') {
+        firstEnteredHandler.resolve();
+        await releaseFirstHandler.promise;
+      }
+      await routeAndCall([{ role: 'user', content: 'hello' }]);
+      return c.json({ ok: true });
+    });
+    const logSpy = jest
+      .spyOn(console, 'log')
+      .mockImplementation(() => undefined);
+
+    let environments: string[] = [];
+    try {
+      const firstRequest = app.request(
+        '/environment',
+        { method: 'POST', headers: { 'x-request-id': 'first' } },
+        { ENVIRONMENT: 'environment-a' },
+      );
+      await firstEnteredHandler.promise;
+
+      const secondResponse = await app.request(
+        '/environment',
+        { method: 'POST', headers: { 'x-request-id': 'second' } },
+        { ENVIRONMENT: 'environment-b' },
+      );
+      releaseFirstHandler.resolve();
+      const firstResponse = await firstRequest;
+      expect(firstResponse.status).toBe(200);
+      expect(secondResponse.status).toBe(200);
+
+      environments = logSpy.mock.calls
+        .map(
+          ([line]) =>
+            JSON.parse(String(line)) as {
+              message?: string;
+              context?: { environment?: string };
+            },
+        )
+        .filter((entry) => entry.message === 'llm.stop_reason')
+        .map((entry) => entry.context?.environment)
+        .filter((value): value is string => value !== undefined)
+        .sort();
+    } finally {
+      logSpy.mockRestore();
+    }
+
+    expect(environments).toEqual(['environment-a', 'environment-b']);
+  });
+
+  it('(a) switch OFF (no key in KV) — routeAndCall behaves unchanged', async () => {
+    const result = await simulateRequest(kv, () =>
+      routeAndCall([{ role: 'user', content: 'hello' }]),
+    );
 
     expect(result.response).toContain('Mock response to');
     expect(result.provider).toBe('openai');
   });
 
   it('(b) switch ON — the NEXT request blocks before any provider is touched, no redeploy', async () => {
-    await simulateRequest(kv); // request #1 — switch off
-    const before = await routeAndCall([{ role: 'user', content: 'hello' }]);
+    const before = await simulateRequest(kv, () =>
+      routeAndCall([{ role: 'user', content: 'hello' }]),
+    ); // request #1 — switch off
     expect(before.provider).toBe('openai');
 
     // Operator flips the switch — a real KV write via the real kv.ts helper.
     await writeLlmKillSwitch(kv, true);
     expect(await kv.get(LLM_KILL_SWITCH_KEY)).toBe('1');
 
-    // Request #2 re-reads KV via llmMiddleware (no code change, no restart).
-    await simulateRequest(kv);
-
     await expect(
-      routeAndCall([{ role: 'user', content: 'hello' }]),
+      simulateRequest(kv, () =>
+        routeAndCall([{ role: 'user', content: 'hello' }]),
+      ),
     ).rejects.toThrow(CircuitOpenError);
   });
 
@@ -139,16 +367,18 @@ describe('LLM kill switch (WI-1505)', () => {
     // routeAndStream is the highest-traffic path (learner chat SSE) and a
     // SEPARATE entry point from routeAndCall, so the switch must be proven on
     // it independently.
-    await simulateRequest(kv); // switch off — streaming works
-    const ok = await routeAndStream([{ role: 'user', content: 'hello' }]);
+    const ok = await simulateRequest(kv, () =>
+      routeAndStream([{ role: 'user', content: 'hello' }]),
+    ); // switch off — streaming works
     expect(ok.provider).toBe('openai');
 
     await writeLlmKillSwitch(kv, true);
-    await simulateRequest(kv); // next request re-reads KV, no redeploy
 
     let caught: unknown;
     try {
-      await routeAndStream([{ role: 'user', content: 'hello' }]);
+      await simulateRequest(kv, () =>
+        routeAndStream([{ role: 'user', content: 'hello' }]),
+      ); // next request re-reads KV, no redeploy
     } catch (err) {
       caught = err;
     }
@@ -159,30 +389,32 @@ describe('LLM kill switch (WI-1505)', () => {
   });
 
   it('(c) switch OFF again — traffic resumes on the next request', async () => {
-    await simulateRequest(kv);
     await writeLlmKillSwitch(kv, true);
-    await simulateRequest(kv);
     await expect(
-      routeAndCall([{ role: 'user', content: 'hello' }]),
+      simulateRequest(kv, () =>
+        routeAndCall([{ role: 'user', content: 'hello' }]),
+      ),
     ).rejects.toThrow(CircuitOpenError);
 
     // Operator flips the switch back off.
     await writeLlmKillSwitch(kv, false);
     expect(await kv.get(LLM_KILL_SWITCH_KEY)).toBeNull();
 
-    await simulateRequest(kv); // request #3
-    const result = await routeAndCall([{ role: 'user', content: 'hello' }]);
+    const result = await simulateRequest(kv, () =>
+      routeAndCall([{ role: 'user', content: 'hello' }]),
+    ); // next request
     expect(result.response).toContain('Mock response to');
     expect(result.provider).toBe('openai');
   });
 
   it('degraded mode is a user-safe, already-handled 503 error — no raw provider error, no hang', async () => {
     await writeLlmKillSwitch(kv, true);
-    await simulateRequest(kv);
 
     let caught: unknown;
     try {
-      await routeAndCall([{ role: 'user', content: 'hello' }]);
+      await simulateRequest(kv, () =>
+        routeAndCall([{ role: 'user', content: 'hello' }]),
+      );
     } catch (err) {
       caught = err;
     }

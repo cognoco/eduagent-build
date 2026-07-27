@@ -9,7 +9,7 @@ import type {
   CelebrationReason,
 } from '@eduagent/schemas';
 import type { Router, Href } from 'expo-router';
-import type { ChatMessage } from './ChatShell';
+import type { ChatMessage } from './session-types';
 import type {
   useCloseSession,
   useRecordSystemPrompt,
@@ -23,6 +23,7 @@ import { clearSessionRecoveryMarker } from '../../lib/session-recovery';
 import * as SecureStore from '../../lib/secure-storage';
 import { classifyApiError, recoveryActions } from '../../lib/format-api-error';
 import { homeHrefForReturnTo } from '../../lib/navigation';
+import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { withProblemMode } from '../homework/problem-cards';
 import { reportHomeworkMetadataSyncFailure } from './homework-metadata-telemetry';
 import {
@@ -53,6 +54,7 @@ export interface UseSessionActionsOptions {
   setShowWrongSubjectChip: React.Dispatch<React.SetStateAction<boolean>>;
   setShowTopicSwitcher: React.Dispatch<React.SetStateAction<boolean>>;
   setShowParkingLot: React.Dispatch<React.SetStateAction<boolean>>;
+  setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   setConsumedQuickChipMessageId: React.Dispatch<
     React.SetStateAction<string | null>
   >;
@@ -76,6 +78,8 @@ export interface UseSessionActionsOptions {
     wallClockSeconds: number;
     fastCelebrations: PendingCelebration[];
   } | null>;
+  silenceTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
+  sessionEndedRef: React.MutableRefObject<boolean>;
   queuedProblemTextRef: React.MutableRefObject<string | null>;
 
   // Profile
@@ -131,6 +135,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     setShowWrongSubjectChip,
     setShowTopicSwitcher,
     setShowParkingLot,
+    setMessages,
     filing,
     setConsumedQuickChipMessageId,
     setMessageFeedback,
@@ -144,6 +149,8 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     parkingLotDraft,
     setParkingLotDraft,
     closedSessionRef,
+    silenceTimerRef,
+    sessionEndedRef,
     queuedProblemTextRef,
     activeProfileId,
     closeSession,
@@ -353,6 +360,14 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
         {
           text: i18next.t('session.endPrompt.confirm'),
           onPress: async () => {
+            sessionEndedRef.current = true;
+            setMessages((prev) =>
+              prev.filter((message) => message.id !== 'silence-prompt'),
+            );
+            if (silenceTimerRef.current) {
+              clearTimeout(silenceTimerRef.current);
+              silenceTimerRef.current = null;
+            }
             let timeoutId: ReturnType<typeof setTimeout> | undefined;
             try {
               const timeoutPromise = new Promise<never>((_, reject) => {
@@ -415,6 +430,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
                 fastCelebrations,
               );
             } catch (err: unknown) {
+              sessionEndedRef.current = false;
               if (timeoutId) {
                 clearTimeout(timeoutId);
               }
@@ -426,8 +442,14 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
                 goHome: () =>
                   router.replace(
                     (returnTo
-                      ? homeHrefForReturnTo(returnTo)
-                      : '/(app)/home') as never,
+                      ? homeHrefForReturnTo(
+                          returnTo,
+                          undefined,
+                          FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+                        )
+                      : FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+                        ? '/(app)/mentor'
+                        : '/(app)/home') as never,
                   ),
               });
               const buttons: Array<{
@@ -473,7 +495,10 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     returnTo,
     router,
     setIsClosing,
+    setMessages,
     closedSessionRef,
+    sessionEndedRef,
+    silenceTimerRef,
   ]);
 
   const handleQuickChip = useCallback(

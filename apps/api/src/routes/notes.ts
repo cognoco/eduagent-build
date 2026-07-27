@@ -16,6 +16,7 @@ import {
   conceptMasterySignalsResponseSchema,
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
+import type { Account } from '../services/account';
 import {
   requireProfileId,
   type ProfileMeta,
@@ -35,12 +36,17 @@ import {
 import { getConceptMasterySignalsForTopics } from '../services/concept-mastery';
 import { getTopicSessions } from '../services/session';
 import { withProfile } from '../route-utils/route-context';
+import { assertCanReadProfile } from '../services/family-access';
 
 type NotesRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
   Variables: {
     user: AuthUser;
     db: Database;
+    account: Account;
+    // [WI-2416] The authenticated caller's own person id, resolved
+    // server-side by accountMiddleware — required by assertCanReadProfile.
+    callerPersonId: string | undefined;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
   };
@@ -108,6 +114,9 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      // [WI-2416] Header-resolved profileId is only org-checked; verify
+      // caller authority (self or guardian of an uncredentialed charge).
+      await assertCanReadProfile(c, profileId);
       const { subjectId, bookId } = c.req.valid('param');
 
       try {
@@ -128,6 +137,9 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      // [WI-2416] Header-resolved profileId is only org-checked; verify
+      // caller authority (self or guardian of an uncredentialed charge).
+      await assertCanReadProfile(c, profileId);
       const { subjectId, topicId } = c.req.valid('param');
 
       try {
@@ -145,6 +157,9 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
   .get('/notes', zValidator('query', allNotesQuerySchema), async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
+    // [WI-2416] Header-resolved profileId is only org-checked; verify caller
+    // authority (self or guardian of an uncredentialed charge).
+    await assertCanReadProfile(c, profileId);
     const { cursor, limit, subjectId } = c.req.valid('query');
 
     const result = await listAllNotes(db, profileId, {
@@ -158,6 +173,9 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
   .get('/notes/topic-ids', async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
+    // [WI-2416] Header-resolved profileId is only org-checked; verify caller
+    // authority (self or guardian of an uncredentialed charge).
+    await assertCanReadProfile(c, profileId);
 
     const topicIds = await getTopicIdsWithNotes(db, profileId);
     return c.json(topicIdsResponseSchema.parse({ topicIds }));
@@ -168,6 +186,9 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     zValidator('query', conceptMasteryQuerySchema),
     async (c) => {
       const { db, profileId } = withProfile(c);
+      // [WI-2416] Header-resolved profileId is only org-checked; verify
+      // caller authority (self or guardian of an uncredentialed charge).
+      await assertCanReadProfile(c, profileId);
       const { topicIds } = c.req.valid('query');
 
       const signals = await getConceptMasterySignalsForTopics(
@@ -189,6 +210,9 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      // [WI-2416] Header-resolved profileId is only org-checked; verify
+      // caller authority (self or guardian of an uncredentialed charge).
+      await assertCanReadProfile(c, profileId);
       const { subjectId, topicId } = c.req.valid('param');
 
       try {
@@ -208,7 +232,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     async (c) => {
       // [BUG-973 / CCR-PR145-C-1] Block writes from proxy sessions.
       // A parent operating in proxy mode must not create notes on their child's profile.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { subjectId, topicId } = c.req.valid('param');
@@ -237,7 +261,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     zValidator('json', updateNoteInputSchema),
     async (c) => {
       // [BUG-973 / CCR-PR145-C-1] Block writes from proxy sessions.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { noteId } = c.req.valid('param');
@@ -260,7 +284,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     zValidator('param', topicParamSchema),
     async (c) => {
       // [BUG-973 / CCR-PR145-C-1] Block writes from proxy sessions.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { subjectId, topicId } = c.req.valid('param');
@@ -286,7 +310,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     zValidator('param', noteIdParamSchema),
     async (c) => {
       // [BUG-973 / CCR-PR145-C-1] Block writes from proxy sessions.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { noteId } = c.req.valid('param');
@@ -303,6 +327,9 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      // [WI-2416] Header-resolved profileId is only org-checked; verify
+      // caller authority (self or guardian of an uncredentialed charge).
+      await assertCanReadProfile(c, profileId);
       // subjectId is validated for URL consistency; topic ownership is
       // enforced via the subjects join inside getTopicSessions.
       const { topicId } = c.req.valid('param');

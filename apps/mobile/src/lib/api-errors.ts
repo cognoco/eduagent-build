@@ -127,7 +127,7 @@ export async function fetchOrThrowNetworkError(
   try {
     return await globalThis.fetch(input, init);
   } catch (err) {
-    throw classifyFetchRejection(err, init?.signal);
+    throw classifyFetchRejection(err, init?.signal ?? undefined);
   }
 }
 
@@ -183,6 +183,7 @@ export function shouldRetryApiError(
   failureCount: number,
   error: Error,
 ): boolean {
+  if (error instanceof NetworkError) return false;
   const status = (error as { status?: number }).status;
   if (status !== undefined && status >= 400 && status < 500) return false;
   return failureCount < MAX_API_ERROR_RETRIES;

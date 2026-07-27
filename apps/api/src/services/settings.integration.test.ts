@@ -16,7 +16,7 @@
  * No mocks of internal services or database.
  */
 
-import { eq, inArray, and, count, gte, sql } from 'drizzle-orm';
+import { eq, inArray, and, count, gte } from 'drizzle-orm';
 import {
   guardianship,
   organization,
@@ -29,10 +29,7 @@ import {
 } from '@eduagent/database';
 import {
   ensureV2IdentityForLegacyProfileTest,
-  ensureLegacyProfileAnchorForTest,
-  deleteLegacyAccountsForTest,
   deleteV2IdentitiesForTest,
-  legacyIdentityTableExistsForTest,
 } from '../test-utils/legacy-identity-anchors';
 
 // Discovers the account/profile ids a prior run of seedFixture-shaped helpers
@@ -101,18 +98,6 @@ async function seedFixture() {
   const accountId = generateUUIDv7();
   const profileId = generateUUIDv7();
   // [WI-867] v2 identity rows — always seeded (flag collapsed to v2-only).
-  // Gated internally: dual-writes the legacy accounts/profiles anchor when
-  // the legacy tables exist (seedBaselineSubscription:false skips the v2
-  // helper's own anchor call, so this explicit one is load-bearing).
-  await ensureLegacyProfileAnchorForTest(db, {
-    profileId,
-    accountId,
-    displayName: 'Settings Test User',
-    birthYear: 2000,
-    isOwner: true,
-    clerkUserId: ACCOUNT.clerkUserId,
-    email: ACCOUNT.email,
-  });
   await ensureV2IdentityForLegacyProfileTest(db, {
     accountId,
     profileId,
@@ -134,7 +119,6 @@ async function cleanup() {
   const { accountIds, profileIds } = await findSeededIdsByEmail(db, [
     ACCOUNT.email,
   ]);
-  await deleteLegacyAccountsForTest(db, accountIds);
   await deleteV2IdentitiesForTest(db, { accountIds, profileIds });
 }
 
@@ -308,43 +292,6 @@ async function seedCelebrationFixture() {
   const profileBId = generateUUIDv7();
   const childProfileId = generateUUIDv7();
 
-  await ensureLegacyProfileAnchorForTest(db, {
-    profileId: profileAId,
-    accountId: accountAId,
-    displayName: 'Parent A',
-    birthYear: 1985,
-    isOwner: true,
-    clerkUserId: CELEB_PARENT_A.clerkUserId,
-    email: CELEB_PARENT_A.email,
-  });
-  await ensureLegacyProfileAnchorForTest(db, {
-    profileId: profileBId,
-    accountId: accountBId,
-    displayName: 'Parent B',
-    birthYear: 1986,
-    isOwner: true,
-    clerkUserId: CELEB_PARENT_B.clerkUserId,
-    email: CELEB_PARENT_B.email,
-  });
-  // Child profile belongs to parent A's account.
-  await ensureLegacyProfileAnchorForTest(db, {
-    profileId: childProfileId,
-    accountId: accountAId,
-    displayName: 'Child',
-    birthYear: 2014,
-    isOwner: false,
-  });
-
-  // Link child only to parent A (legacy table — kept for legacy-path callers).
-  // [WI-1139] Legacy `family_links` Drizzle def removed — raw SQL insert,
-  // same conditional seed as before.
-  if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
-    await db.execute(sql`
-      INSERT INTO family_links (id, parent_profile_id, child_profile_id)
-      VALUES (${generateUUIDv7()}, ${profileAId}, ${childProfileId})
-    `);
-  }
-
   // [WI-867] v2 identity rows — assertParentAccess now reads guardianship.
   await db.insert(person).values([
     {
@@ -413,7 +360,6 @@ async function cleanupCelebration() {
     CELEB_PARENT_A.email,
     CELEB_PARENT_B.email,
   ]);
-  await deleteLegacyAccountsForTest(db, accountIds);
   await deleteV2IdentitiesForTest(db, { accountIds, profileIds });
 }
 

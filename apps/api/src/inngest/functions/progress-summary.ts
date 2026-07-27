@@ -11,7 +11,7 @@ import {
   generateProgressSummary,
   upsertProgressSummary,
 } from '../../services/progress-summary';
-import { isGdprProcessingAllowedV2 } from '../../services/identity-v2/consent-status-v2';
+import { isLlmExchangeConsentAllowed } from '../../services/identity-v2/consent-status-v2';
 import { getGuardianPersonIds } from '../../services/identity-v2/guardianship';
 import { captureException } from '../../services/sentry';
 import { NonRetriableError } from 'inngest';
@@ -56,8 +56,11 @@ export const progressSummaryGeneration = inngest.createFunction(
     }
 
     // [CUT-B2] GDPR gate + parent-link + person reads dispatch by the flag.
+    // [WI-2396] isLlmExchangeConsentAllowed also honors adult self-consent
+    // (art6_1_a) withdrawal, not only the parental basis — both call sites
+    // below gate the LLM-generated progress summary (generateProgressSummary).
     const gdprAllowed = (db: ReturnType<typeof getStepDatabase>) =>
-      isGdprProcessingAllowedV2(db, profileId);
+      isLlmExchangeConsentAllowed(db, profileId);
 
     const context = await step.run('gather-context', async () => {
       const db = getStepDatabase();

@@ -50,6 +50,10 @@ export const challengeRoundFinalizeFailed = inngest.createFunction(
 
     captureException(new Error('challenge round finalize failed'), {
       profileId: data.profileId,
+      tags: {
+        surface: 'challenge-round',
+        signal: 'finalize-failed',
+      },
       extra: {
         surface: 'challenge-round.finalize.failed.observer',
         sessionId: data.sessionId,

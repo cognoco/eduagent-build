@@ -2080,6 +2080,56 @@ describe('applyAnalysis — GDPR consent gate (WI-221)', () => {
     expect(result.notifications).toEqual([]);
     expect(txMock).not.toHaveBeenCalled();
   });
+
+  // [WI-2396] Basis-inclusive gate: switched from isGdprProcessingAllowedV2
+  // (parental basis only) to isLlmExchangeConsentAllowed, which ALSO honors
+  // an adult's independently-withdrawable self-consent (art6_1_a). Sequence
+  // is [gdpr_parental_consent, art6_1_a-platform_use] — CONSENTED then
+  // WITHDRAWN — proving the adult leg alone (parental leg passes) blocks the
+  // transaction, which isGdprProcessingAllowedV2 alone would have missed.
+  // makeDb() above only supports a single uniform consentState across all
+  // basis checks, so this test builds its own sequenced db directly.
+  it('[WI-2396] skips analysis when GDPR consent is granted but adult self-consent (art6_1_a) is withdrawn', async () => {
+    const txMock = jest.fn().mockResolvedValue({
+      finalFieldsUpdated: ['interests'],
+      finalNotifications: [],
+    });
+    const db = {
+      transaction: txMock,
+      query: {
+        membership: {
+          findFirst: jest.fn().mockResolvedValue({ organizationId: 'org-1' }),
+        },
+        consentGrant: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValueOnce({
+              granted: true,
+              withdrawnAt: null,
+              grantedAt: new Date('2026-05-01'),
+            })
+            .mockResolvedValueOnce({
+              granted: true,
+              withdrawnAt: new Date('2026-05-02'),
+              grantedAt: new Date('2026-05-01'),
+            }),
+        },
+        consentRequest: {
+          findFirst: jest.fn().mockResolvedValue({
+            status: 'approved',
+            requestedAt: new Date('2026-05-01'),
+            createdAt: new Date('2026-05-01'),
+          }),
+        },
+      },
+    } as unknown as Database;
+
+    const result = await applyAnalysis(db, profileId, validAnalysis, null);
+
+    expect(result.fieldsUpdated).toEqual([]);
+    expect(result.notifications).toEqual([]);
+    expect(txMock).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------

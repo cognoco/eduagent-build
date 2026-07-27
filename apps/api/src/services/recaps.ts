@@ -9,7 +9,7 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
-import type { RecapListItem } from '@eduagent/schemas';
+import type { RecapListItem, VerifiedProofReceipt } from '@eduagent/schemas';
 import { recapListItemSchema } from '@eduagent/schemas';
 import { ForbiddenError } from '../errors';
 
@@ -21,6 +21,7 @@ import {
 import { listProfileSessions } from './session/session-crud';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
+import { getVerifiedProofForSessionTopic } from './parent-proof';
 
 const logger = createLogger();
 
@@ -33,15 +34,32 @@ interface NextTopic {
   nextTopicReason: string | null;
 }
 
+type RecapVerifiedProofResult = RecapListItem['verifiedProof'];
+type RecapVerifiedProof = Extract<
+  RecapVerifiedProofResult,
+  { status: 'present' }
+>['proof'];
+
+interface ProofLookup {
+  childProfileId: string;
+  sessionId: string;
+  topicId: string | null;
+}
+
 const NO_NEXT_TOPIC: NextTopic = {
   nextTopicTitle: null,
   nextTopicReason: null,
+};
+const NO_VERIFIED_PROOF: RecapVerifiedProofResult = { status: 'absent' };
+const VERIFIED_PROOF_UNAVAILABLE: RecapVerifiedProofResult = {
+  status: 'unavailable',
 };
 
 function toRecapItem(
   child: DashboardChildSummary,
   session: Awaited<ReturnType<typeof getChildSessions>>[number],
   nextTopic: NextTopic = NO_NEXT_TOPIC,
+  verifiedProof: RecapVerifiedProofResult = NO_VERIFIED_PROOF,
 ): RecapListItem {
   return {
     recapId: session.sessionId,
@@ -64,6 +82,7 @@ function toRecapItem(
     engagementSignal: session.engagementSignal,
     nextTopicTitle: nextTopic.nextTopicTitle,
     nextTopicReason: nextTopic.nextTopicReason,
+    verifiedProof,
   };
 }
 
@@ -72,6 +91,7 @@ function profileSessionToRecapItem(
   displayName: string,
   session: Awaited<ReturnType<typeof listProfileSessions>>['sessions'][number],
   nextTopic: NextTopic = NO_NEXT_TOPIC,
+  verifiedProof: RecapVerifiedProofResult = NO_VERIFIED_PROOF,
 ): RecapListItem {
   return {
     recapId: session.sessionId,
@@ -94,7 +114,83 @@ function profileSessionToRecapItem(
     engagementSignal: session.engagementSignal,
     nextTopicTitle: nextTopic.nextTopicTitle,
     nextTopicReason: nextTopic.nextTopicReason,
+    verifiedProof,
   };
+}
+
+function toRecapVerifiedProof(
+  receipt: VerifiedProofReceipt,
+): RecapVerifiedProofResult {
+  if (
+    !receipt.hasProof ||
+    !receipt.topicId ||
+    !receipt.topicTitle ||
+    !receipt.verifiedAt ||
+    !receipt.masteryVerificationState
+  ) {
+    return NO_VERIFIED_PROOF;
+  }
+
+  const metadata = {
+    topicId: receipt.topicId,
+    topicTitle: receipt.topicTitle,
+    subjectId: receipt.subjectId ?? null,
+    verifiedAt: receipt.verifiedAt,
+    verificationState: receipt.masteryVerificationState,
+    retentionStatus: receipt.retentionStatus ?? null,
+    nextReviewDate: receipt.nextReviewDate ?? null,
+  };
+  const proof: RecapVerifiedProof =
+    receipt.evidenceAvailability === 'available'
+      ? {
+          ...metadata,
+          evidenceAvailability: receipt.evidenceAvailability,
+          quote: receipt.quote,
+        }
+      : {
+          ...metadata,
+          evidenceAvailability: receipt.evidenceAvailability,
+          quote: null,
+        };
+  return { status: 'present', proof };
+}
+
+/**
+ * Session-keyed additive enrichment. Each lookup remains pinned to the exact
+ * child/session/topic tuple. Completed lookups distinguish proof from absence;
+ * read failures are observed and represented only by a safe unavailable state.
+ */
+async function loadVerifiedProofMap(
+  db: Database,
+  lookups: ProofLookup[],
+): Promise<Map<string, RecapVerifiedProofResult>> {
+  const entries = await Promise.all(
+    lookups.map(async ({ childProfileId, sessionId, topicId }) => {
+      if (!topicId) return [sessionId, NO_VERIFIED_PROOF] as const;
+
+      try {
+        const receipt = await getVerifiedProofForSessionTopic(
+          db,
+          childProfileId,
+          sessionId,
+          topicId,
+        );
+        return [sessionId, toRecapVerifiedProof(receipt)] as const;
+      } catch (error) {
+        captureException(
+          new Error('Verified proof lookup failed', {
+            cause: {
+              errorKind: error instanceof Error ? 'error' : 'non_error',
+            },
+          }),
+          { tags: { surface: 'recaps.verified-proof' } },
+        );
+        return [sessionId, VERIFIED_PROOF_UNAVAILABLE] as const;
+      }
+    }),
+  );
+
+  return new Map(entries);
 }
 
 /**
@@ -176,12 +272,19 @@ async function loadNextTopicMap(
 export async function listRecapsForParent(
   db: Database,
   parentProfileId: string,
+  callerPersonId: string | undefined,
+  organizationId: string | undefined,
   options: {
     childProfileId?: string;
     limit?: number;
   } = {},
 ): Promise<RecapListItem[]> {
-  const children = await getChildrenForParent(db, parentProfileId);
+  const children = await getChildrenForParent(
+    db,
+    parentProfileId,
+    callerPersonId,
+    organizationId,
+  );
   const selectedChildren = options.childProfileId
     ? children.filter((child) => child.profileId === options.childProfileId)
     : children;
@@ -200,6 +303,10 @@ export async function listRecapsForParent(
   // individual child and must not poison sibling lookups — Promise.all would
   // reject the whole parent dashboard when any one child has hidden data.
   // Other errors (DB, etc.) still propagate via the outer await.
+  // Each exported leaf deliberately repeats the admin assertion so it remains
+  // safe when called independently. The extra lookups are bounded by this
+  // household's family-linked child count; that defense-in-depth cost is
+  // accepted at the current household-scale cardinality.
   const sessionsByChild = await Promise.all(
     selectedChildren.map(async (child) => {
       try {
@@ -207,6 +314,8 @@ export async function listRecapsForParent(
           db,
           parentProfileId,
           child.profileId,
+          callerPersonId,
+          organizationId,
         );
         return { child, sessions };
       } catch (err) {
@@ -235,10 +344,26 @@ export async function listRecapsForParent(
     nextTopicBySession = new Map();
   }
 
+  const verifiedProofBySession = await loadVerifiedProofMap(
+    db,
+    sessionsByChild.flatMap(({ child, sessions }) =>
+      sessions.map((session) => ({
+        childProfileId: child.profileId,
+        sessionId: session.sessionId,
+        topicId: session.topicId,
+      })),
+    ),
+  );
+
   return sessionsByChild
     .flatMap(({ child, sessions }) =>
       sessions.map((session) =>
-        toRecapItem(child, session, nextTopicBySession.get(session.sessionId)),
+        toRecapItem(
+          child,
+          session,
+          nextTopicBySession.get(session.sessionId),
+          verifiedProofBySession.get(session.sessionId),
+        ),
       ),
     )
     .sort((left, right) => right.startedAt.localeCompare(left.startedAt))
@@ -322,12 +447,22 @@ export async function listRecapsForProfile(
     nextTopicBySession = new Map();
   }
 
+  const verifiedProofBySession = await loadVerifiedProofMap(
+    db,
+    page.sessions.map((session) => ({
+      childProfileId: profileId,
+      sessionId: session.sessionId,
+      topicId: session.topicId,
+    })),
+  );
+
   const items = page.sessions.map((session) =>
     profileSessionToRecapItem(
       profileId,
       profile?.displayName ?? 'Learner',
       session,
       nextTopicBySession.get(session.sessionId),
+      verifiedProofBySession.get(session.sessionId),
     ),
   );
 
@@ -342,8 +477,15 @@ export async function getRecapForParent(
   db: Database,
   parentProfileId: string,
   recapId: string,
+  callerPersonId: string | undefined,
+  organizationId: string | undefined,
 ): Promise<RecapListItem | null> {
-  const children = await getChildrenForParent(db, parentProfileId);
+  const children = await getChildrenForParent(
+    db,
+    parentProfileId,
+    callerPersonId,
+    organizationId,
+  );
 
   // [L7-F2] Parallelize per-child lookups instead of awaiting in series. A
   // single-query refactor (fetch session by recapId, then assert membership
@@ -355,6 +497,10 @@ export async function getRecapForParent(
   // individual child and must not block the lookup against siblings — the
   // recap may belong to a visible child even if a sibling is hidden. Other
   // errors still propagate via the outer await.
+  // Each exported leaf deliberately repeats the admin assertion so it remains
+  // safe when called independently. The extra lookups are bounded by this
+  // household's family-linked child count; that defense-in-depth cost is
+  // accepted at the current household-scale cardinality.
   const sessions = await Promise.all(
     children.map(async (child) => {
       try {
@@ -363,6 +509,8 @@ export async function getRecapForParent(
           parentProfileId,
           child.profileId,
           recapId,
+          callerPersonId,
+          organizationId,
         );
       } catch (err) {
         if (err instanceof ForbiddenError) return null;
@@ -374,7 +522,21 @@ export async function getRecapForParent(
   for (let i = 0; i < children.length; i += 1) {
     const session = sessions[i];
     const child = children[i];
-    if (session && child) return toRecapItem(child, session);
+    if (session && child) {
+      const verifiedProofBySession = await loadVerifiedProofMap(db, [
+        {
+          childProfileId: child.profileId,
+          sessionId: session.sessionId,
+          topicId: session.topicId,
+        },
+      ]);
+      return toRecapItem(
+        child,
+        session,
+        undefined,
+        verifiedProofBySession.get(session.sessionId),
+      );
+    }
   }
 
   return null;

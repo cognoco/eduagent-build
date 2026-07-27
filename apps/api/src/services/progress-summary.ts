@@ -12,7 +12,11 @@ import type {
 
 import { routeAndCall, type ChatMessage } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
-import { assertParentAccess } from './family-access';
+import {
+  assertCallerIsOrganizationAdminForPerson,
+  assertChargeNotCredentialed,
+  assertParentAccess,
+} from './family-access';
 import { createLogger } from './logger';
 
 export const INACTIVITY_THRESHOLDS = {
@@ -260,8 +264,18 @@ export async function getProgressSummary(
   db: Database,
   requesterProfileId: string,
   childProfileId: string,
+  callerPersonId: string | undefined,
+  organizationId: string | undefined,
 ): Promise<ProgressSummary> {
+  await assertCallerIsOrganizationAdminForPerson(
+    db,
+    callerPersonId,
+    organizationId,
+    requesterProfileId,
+    'You are not authorized to access this dashboard.',
+  );
   await assertParentAccess(db, requesterProfileId, childProfileId);
+  await assertChargeNotCredentialed(db, childProfileId);
 
   const stored = await db.query.progressSummaries.findFirst({
     where: eq(progressSummaries.profileId, childProfileId),

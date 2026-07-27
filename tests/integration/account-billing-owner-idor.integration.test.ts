@@ -28,7 +28,6 @@ import {
 import {
   buildIntegrationEnv,
   cleanupAccounts,
-  createIntegrationDb,
   requireDatabaseUrl,
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';

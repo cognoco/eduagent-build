@@ -112,4 +112,23 @@ git worktree remove .worktrees/<branch-name>
 git worktree prune
 ```
 
-If `git worktree remove` complains about untracked files or uncommitted changes, the worktree has unfinished state — stash, commit, or discard first.
+If `git worktree remove` complains about untracked files or uncommitted changes, the worktree has unfinished state — commit or discard first (never `git stash`; see above).
+
+## Never `git stash` in a worktree
+
+All worktrees of this repo share ONE stash stack — git stores stashes in the
+shared common dir, not per-worktree. A `git stash pop` in your worktree can pull
+ANOTHER session's stashed changes into your tree, or hand yours to them
+(real incident: BID-4, 2026-07-17 — WI-2338).
+
+Park work-in-progress on your own branch instead:
+
+```bash
+git add -A && git commit -m "wip: park before <reason>"
+# ...do the thing...
+git reset --soft HEAD~1   # restore — changes back in the index
+```
+
+Claude Code sessions have `git stash` deny-listed in `.claude/settings.json` —
+the block is intentional; use the commit-park pattern above. (Estate-wide
+host-level enforcement is WI-2338's deliverable, ZDX program.)

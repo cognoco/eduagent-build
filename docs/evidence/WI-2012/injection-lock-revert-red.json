@@ -1,0 +1,33 @@
+{
+  "workItem": "WI-2012",
+  "phase": "production-only injection-lock revert",
+  "command": "pnpm exec jest --config apps/api/jest.integration.config.cjs apps/api/src/services/learner-profile.integration.test.ts --runInBand --no-coverage -t \"serializes collection=true before injection=false\"",
+  "exitCode": 1,
+  "testSuites": {
+    "failed": 1,
+    "total": 1
+  },
+  "tests": {
+    "failed": 1,
+    "skipped": 12,
+    "total": 13
+  },
+  "productionState": {
+    "revertedFunction": "toggleMemoryInjection",
+    "retainedFunction": "toggleMemoryCollection",
+    "testsChangedForRun": false
+  },
+  "assertion": {
+    "pointer": "apps/api/src/services/learner-profile.integration.test.ts:402",
+    "expected": {
+      "memoryCollectionEnabled": true,
+      "memoryInjectionEnabled": false,
+      "memoryEnabled": true
+    },
+    "received": {
+      "memoryCollectionEnabled": true,
+      "memoryInjectionEnabled": false,
+      "memoryEnabled": false
+    }
+  }
+}

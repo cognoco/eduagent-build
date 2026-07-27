@@ -146,13 +146,21 @@ export default function PreAuthWelcomeRoute(): React.ReactElement {
             style={{ color: WELCOME_DARK_STAGE_COLORS.textPrimary }}
             testID="pre-auth-bridge-headline"
           >
-            {t('welcomeIntro.bridge.headline')}
+            {t(
+              audience === 'learner'
+                ? 'welcomeIntro.bridge.headline'
+                : 'welcomeIntro.bridge.parentHeadline',
+            )}
           </Text>
           <Text
             className="text-body text-center mb-10"
             style={{ color: WELCOME_DARK_STAGE_COLORS.textSecondary }}
           >
-            {t('welcomeIntro.bridge.supporting')}
+            {t(
+              audience === 'learner'
+                ? 'welcomeIntro.bridge.supporting'
+                : 'welcomeIntro.bridge.parentSupporting',
+            )}
           </Text>
           <Pressable
             onPress={handleCreateAccount}

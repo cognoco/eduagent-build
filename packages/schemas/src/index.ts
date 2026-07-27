@@ -8,13 +8,18 @@ export * from './health';
 // Profiles
 export * from './profiles';
 export * from './consent';
+// Habitual-residence country matrix + jurisdiction decision (WI-2690)
+export * from './country-policy';
+export * from './family-join';
 export * from './account';
 
 // Onboarding & Curriculum (Epic 1)
 export * from './subjects';
 export * from './sessions';
+export * from './mentor-notices';
 export * from './language';
 export * from './bookmarks';
+export * from './evidence-links';
 
 // Assessment & Retention (Epic 3)
 export * from './assessments';
@@ -25,10 +30,12 @@ export * from './visibility-contract';
 
 // Progress, Motivation & Dashboard (Epic 4)
 export * from './progress';
+export * from './report-schedule';
 export * from './retention-status';
 export * from './struggle-status';
 export * from './snapshots';
 export * from './recaps';
+export * from './parent-proof';
 
 // Observer event payload schemas — shared contract between Inngest senders and observer terminus functions
 export * from './observers';
@@ -85,3 +92,9 @@ export * from './notifications';
 
 // Launch activation instrumentation (WI-1504)
 export * from './activation-events';
+
+// Speaking-practice attempt persistence (WI-1777)
+export * from './speaking-practice';
+
+// Recitation setup state (server-owned deterministic transition contract)
+export * from './recitation-setup';

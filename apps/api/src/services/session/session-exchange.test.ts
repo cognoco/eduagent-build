@@ -1,4 +1,7 @@
 import {
+  buildDeescalationTelemetry,
+  buildCorrectStreakOfferTelemetry,
+  buildDownwardRungMovementAudit,
   buildExchangeHistory,
   mergeMemoryContexts,
   computeCorrectStreak,
@@ -11,6 +14,7 @@ import {
   persistChallengeRoundState,
   resolveReadyToFinish,
   resolvePromptLearnerName,
+  resolveAskedQuestion,
   type ExchangeHistoryEvent,
 } from './session-exchange';
 import type { processMessage, streamMessage } from './session-exchange';
@@ -23,11 +27,53 @@ import {
 } from '@eduagent/schemas';
 import { MAX_CHALLENGE_QUESTIONS } from '../challenge-round/caps';
 import { MAX_INTERVIEW_EXCHANGES } from '../exchanges';
+import { buildSystemPrompt } from '../exchange-prompts';
 import { SessionExchangeLimitError } from './session-crud';
 import { computeNextPracticePointer } from '../language-session-engine';
 import { resetSessionStaticContextCache } from './session-cache';
+import { recitationSetupClaimMetadataKey } from './session-recitation-setup';
 
 type ExchangeHistoryEntry = ReturnType<typeof buildExchangeHistory>[number];
+
+describe('downward rung audit', () => {
+  it('builds the exact non-escalation persistence and telemetry payloads', () => {
+    const movement = buildDownwardRungMovementAudit(5, 4, {
+      rungMovementStreak: 4,
+      rungDirection: 'down',
+      rungReason: 'Four correct answers at the current rung — reducing support',
+    });
+
+    expect(movement).toEqual({
+      fromRung: 5,
+      toRung: 4,
+      action: 'deescalate',
+      direction: 'down',
+      streak: 4,
+      reason: 'Four correct answers at the current rung — reducing support',
+    });
+    expect(buildDeescalationTelemetry('session-1', movement!)).toEqual({
+      event: 'llm.deescalation_applied',
+      sessionId: 'session-1',
+      fromRung: 5,
+      toRung: 4,
+      action: 'deescalate',
+      direction: 'down',
+      streak: 4,
+      reason: 'Four correct answers at the current rung — reducing support',
+    });
+  });
+});
+
+describe('correct-streak offer telemetry', () => {
+  it('does not label a stuck-driven upward movement as a correct-streak offer', () => {
+    expect(
+      buildCorrectStreakOfferTelemetry('session-1', {
+        correctStreak: 4,
+        rungDirection: 'up',
+      }),
+    ).toBeUndefined();
+  });
+});
 
 describe('buildExchangeHistory', () => {
   it('filters out non-conversational event types', () => {
@@ -170,6 +216,120 @@ describe('buildExchangeHistory', () => {
     expect(rewrapped.reply).toBe('hi');
     expect(rewrapped.reply).not.toContain('"signals"');
     expect(rewrapped.reply).not.toContain('"ui_hints"');
+  });
+
+  // [WI-2670] producerVendor is read back from the persisted `llmProvider`
+  // field on an ai_response event's metadata (see `persistExchangeResult`'s
+  // `aiMetadata.llmProvider`) — never fabricated, never sourced elsewhere.
+  describe('[WI-2670] producerVendor extraction', () => {
+    it('attaches producerVendor to an assistant entry from metadata.llmProvider', () => {
+      const events: ExchangeHistoryEvent[] = [
+        { eventType: 'user_message', content: 'why does X happen?' },
+        {
+          eventType: 'ai_response',
+          content: 'because Y',
+          metadata: { llmProvider: 'openai', llmModel: 'gpt-test' },
+        },
+      ];
+
+      const history = buildExchangeHistory(events);
+      const assistantTurn = history.find(
+        (h: ExchangeHistoryEntry) => h.role === 'assistant',
+      );
+      expect(assistantTurn?.producerVendor).toBe('openai');
+    });
+
+    it('omits producerVendor when metadata carries no llmProvider (legacy row)', () => {
+      const events: ExchangeHistoryEvent[] = [
+        { eventType: 'ai_response', content: 'legacy reply', metadata: {} },
+      ];
+
+      const history = buildExchangeHistory(events);
+      expect(history[0]!.producerVendor).toBeUndefined();
+    });
+
+    it('omits producerVendor when metadata is absent entirely', () => {
+      const events: ExchangeHistoryEvent[] = [
+        { eventType: 'ai_response', content: 'no metadata at all' },
+      ];
+
+      const history = buildExchangeHistory(events);
+      expect(history[0]!.producerVendor).toBeUndefined();
+    });
+
+    it('never attaches producerVendor to a user_message or system_prompt entry', () => {
+      const events: ExchangeHistoryEvent[] = [
+        {
+          eventType: 'user_message',
+          content: 'hi',
+          metadata: { llmProvider: 'openai' },
+        },
+        {
+          eventType: 'system_prompt',
+          content: 'sys',
+          metadata: { llmProvider: 'openai' },
+        },
+      ];
+
+      const history = buildExchangeHistory(events);
+      expect(history[0]).toEqual({ role: 'user', content: 'hi' });
+      expect(history[1]).toEqual({ role: 'system', content: 'sys' });
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2670] resolveAskedQuestion — sources the Challenge Round grader's
+// asked-question AND its real producing vendor from the LAST assistant turn
+// in exchangeHistory.
+// ---------------------------------------------------------------------------
+describe('[WI-2670] resolveAskedQuestion', () => {
+  it('returns empty askedQuestion and no producerVendor when history has no assistant turn', () => {
+    expect(resolveAskedQuestion([])).toEqual({ askedQuestion: '' });
+  });
+
+  it('sources producerVendor from the last assistant turn, not an earlier one (fallback-divergence case)', () => {
+    // Turn 1: mentor's question was produced by anthropic. Mid-session
+    // provider fallback occurs; turn 2 (the ACTUAL graded question) is
+    // produced by openai. The grader must exclude openai (the real
+    // producer of the graded question) — never anthropic, which produced
+    // an earlier, different turn. This is exactly the substitution
+    // root-cause note WI-2624 flagged: "the current turn's own
+    // result.provider... can differ from [the asked question's producer]
+    // e.g. a mid-session provider fallback."
+    const history = buildExchangeHistory([
+      { eventType: 'user_message', content: 'first question' },
+      {
+        eventType: 'ai_response',
+        content: 'first reply',
+        metadata: { llmProvider: 'anthropic' },
+      },
+      { eventType: 'user_message', content: 'second question' },
+      {
+        eventType: 'ai_response',
+        content: 'second reply — the actual asked question',
+        metadata: { llmProvider: 'openai' },
+      },
+    ]);
+
+    const result = resolveAskedQuestion(history);
+
+    expect(result.producerVendor).toBe('openai');
+    expect(result.producerVendor).not.toBe('anthropic');
+  });
+
+  it('extracts plain prose from the re-wrapped JSON envelope for askedQuestion', () => {
+    const history = buildExchangeHistory([
+      {
+        eventType: 'ai_response',
+        content: 'the mentor question',
+        metadata: { llmProvider: 'anthropic' },
+      },
+    ]);
+
+    const result = resolveAskedQuestion(history);
+    expect(result.askedQuestion).toBe('the mentor question');
+    expect(result.producerVendor).toBe('anthropic');
   });
 });
 
@@ -335,6 +495,96 @@ describe('computeCorrectStreak', () => {
     ];
     // Scanning backwards: first event (index 2) = correct → streak 1;
     // second event (index 1) = false → break. Result: 1.
+    expect(computeCorrectStreak(events, 2)).toBe(1);
+  });
+
+  it('prefers canonical correct over a conflicting legacy false', () => {
+    const events = [
+      {
+        eventType: 'ai_response',
+        metadata: {
+          escalationRung: 2,
+          answerEvaluation: { correctness: 'correct' },
+          correctAnswer: false,
+        },
+      },
+    ];
+
+    expect(computeCorrectStreak(events, 2)).toBe(1);
+  });
+
+  it.each(['partial', 'incorrect'] as const)(
+    'canonical %s resets even when legacy boolean conflicts',
+    (correctness) => {
+      const events = [
+        {
+          eventType: 'ai_response',
+          metadata: {
+            escalationRung: 2,
+            answerEvaluation: { correctness: 'correct' },
+          },
+        },
+        {
+          eventType: 'ai_response',
+          metadata: {
+            escalationRung: 2,
+            answerEvaluation: { correctness },
+            correctAnswer: true,
+          },
+        },
+      ];
+
+      expect(computeCorrectStreak(events, 2)).toBe(0);
+    },
+  );
+
+  it('resets at canonical partial within correct → partial → correct', () => {
+    const events = [
+      {
+        eventType: 'ai_response',
+        metadata: {
+          escalationRung: 2,
+          answerEvaluation: { correctness: 'correct' },
+        },
+      },
+      {
+        eventType: 'ai_response',
+        metadata: {
+          escalationRung: 2,
+          answerEvaluation: { correctness: 'partial' },
+        },
+      },
+      {
+        eventType: 'ai_response',
+        metadata: {
+          escalationRung: 2,
+          answerEvaluation: { correctness: 'correct' },
+        },
+      },
+    ];
+
+    expect(computeCorrectStreak(events, 2)).toBe(1);
+  });
+
+  it('skips canonical na and unevaluated turns', () => {
+    const events = [
+      {
+        eventType: 'ai_response',
+        metadata: {
+          escalationRung: 2,
+          answerEvaluation: { correctness: 'correct' },
+        },
+      },
+      {
+        eventType: 'ai_response',
+        metadata: {
+          escalationRung: 2,
+          answerEvaluation: { correctness: 'na' },
+        },
+      },
+      { eventType: 'ai_response', metadata: { escalationRung: 2 } },
+    ];
+
     expect(computeCorrectStreak(events, 2)).toBe(1);
   });
 });
@@ -1298,7 +1548,7 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
   const SESSION_ID = 'sess-wi1552';
   const SUBJECT_ID = 'subj-wi1552';
 
-  function buildSessionRow() {
+  function buildSessionRow(overrides: Record<string, unknown> = {}) {
     return {
       id: SESSION_ID,
       profileId: PROFILE_ID,
@@ -1322,6 +1572,7 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
       metadata: null,
       updatedAt: new Date('2026-01-02T10:00:00Z'),
       createdAt: new Date('2026-01-02T10:00:00Z'),
+      ...overrides,
     };
   }
 
@@ -1343,8 +1594,8 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
       name: 'Spanish',
       rawInput: null,
       status: 'active',
-      pedagogyMode: 'four_strands',
-      languageCode: 'es',
+      pedagogyMode: 'four_strands' as string | null,
+      languageCode: 'es' as string | null,
       createdAt: new Date('2026-01-01T09:00:00Z'),
       updatedAt: new Date('2026-01-01T09:00:00Z'),
       urgencyBoostUntil: null,
@@ -1381,6 +1632,7 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
       innerJoin: () => typeof node;
       leftJoin: () => typeof node;
       limit: () => typeof node;
+      for: () => typeof node;
       then: (resolve: (v: unknown[]) => void) => void;
     } = {
       where: () => node,
@@ -1388,6 +1640,7 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
       innerJoin: () => node,
       leftJoin: () => node,
       limit: () => node,
+      for: () => node,
       then: (resolve) => resolve(rows),
     };
     return node;
@@ -1398,15 +1651,44 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
   // that as the dispatch key to hand back the seeded person row; every other
   // .select() call site (vocabulary reads, urgency read, last-session-summary
   // read, fetchPriorTopics, fetchCrossSubjectHighlights) gets an empty result.
-  function makeDb(subjectRow: ReturnType<typeof buildSubjectRow>) {
+  function makeDb(
+    subjectRow: ReturnType<typeof buildSubjectRow>,
+    options?: {
+      sessionRow?: ReturnType<typeof buildSessionRow>;
+      events?: Array<{
+        eventType: string;
+        content: string;
+        metadata?: unknown;
+      }>;
+    },
+  ) {
+    const sessionRow = options?.sessionRow ?? buildSessionRow();
     const subjectsFindFirst = jest.fn().mockResolvedValue(subjectRow);
+    const transactionDb = {
+      select: jest.fn(() => ({
+        from: () =>
+          makeChainNode([
+            {
+              metadata: sessionRow.metadata,
+              exchangeCount: sessionRow.exchangeCount,
+            },
+          ]),
+      })),
+      update: jest.fn(() => ({
+        set: jest.fn(() => ({
+          where: jest.fn().mockResolvedValue(undefined),
+        })),
+      })),
+    };
     return {
       query: {
         learningSessions: {
-          findFirst: jest.fn().mockResolvedValue(buildSessionRow()),
+          findFirst: jest.fn().mockResolvedValue(sessionRow),
         },
         subjects: { findFirst: subjectsFindFirst },
-        sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
+        sessionEvents: {
+          findMany: jest.fn().mockResolvedValue(options?.events ?? []),
+        },
         teachingPreferences: {
           findFirst: jest.fn().mockResolvedValue(undefined),
         },
@@ -1421,6 +1703,10 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
             ? makeChainNode([personRow])
             : makeChainNode([]),
       })),
+      transaction: jest.fn(
+        async (callback: (tx: typeof transactionDb) => unknown) =>
+          callback(transactionDb),
+      ),
     } as never;
   }
 
@@ -1459,5 +1745,268 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
     expect(result.context.languageSessionState?.activeStrand).toBe(
       'meaning_input',
     );
+  });
+
+  it('restores recitation setup state and resolves the current turn in shared context preparation', async () => {
+    const db = makeDb(
+      { ...buildSubjectRow(null), pedagogyMode: null, languageCode: null },
+      {
+        sessionRow: buildSessionRow({
+          exchangeCount: 1,
+          metadata: {
+            effectiveMode: 'recitation',
+            [recitationSetupClaimMetadataKey]: {
+              phase: 'awaiting_selection',
+              clarificationCount: 1,
+              lastAction: 'clarify_selection',
+              recentClaims: [],
+            },
+          },
+        }),
+        events: [
+          { eventType: 'user_message', content: 'unclear' },
+          {
+            eventType: 'ai_response',
+            content: 'clarification',
+            metadata: {
+              recitationSetup: {
+                phase: 'awaiting_selection',
+                clarificationCount: 1,
+              },
+            },
+          },
+        ],
+      },
+    );
+
+    const result = await prepareExchangeContext(
+      db,
+      PROFILE_ID,
+      SESSION_ID,
+      'Ozymandias',
+      { semanticMemoryRetrievalEnabled: false },
+    );
+
+    expect(
+      (db as unknown as { transaction: jest.Mock }).transaction,
+    ).toHaveBeenCalledTimes(1);
+    expect(result.context.recitationSetup).toEqual({
+      action: 'invite_to_begin',
+      state: { phase: 'ready', clarificationCount: 1 },
+    });
+  });
+
+  it('applies 5→4 from a source-rung streak without prompting upward escalation', async () => {
+    const events = Array.from({ length: 4 }, (_, index) => ({
+      id: `ai-${index}`,
+      eventType: 'ai_response',
+      content: 'Keep going.',
+      metadata: {
+        escalationRung: 5,
+        answerEvaluation: { correctness: 'correct' },
+        correctAnswer: true,
+      },
+      createdAt: new Date(`2026-01-02T10:0${index}:00Z`),
+    }));
+    const db = makeDb(buildSubjectRow(null), {
+      sessionRow: buildSessionRow({ escalationRung: 5, exchangeCount: 4 }),
+      events,
+    });
+
+    const result = await prepareExchangeContext(
+      db,
+      PROFILE_ID,
+      SESSION_ID,
+      '42',
+      {
+        semanticMemoryRetrievalEnabled: false,
+        answerEvaluationEnabled: true,
+      },
+    );
+
+    expect(result.sourceCorrectStreak).toBe(4);
+    expect(result.escalationDecision).toMatchObject({
+      action: 'deescalate',
+      direction: 'down',
+      newRung: 4,
+    });
+    expect(result.context.correctStreak).toBeUndefined();
+    expect(buildSystemPrompt(result.context)).not.toContain(
+      'ADAPTIVE ESCALATION',
+    );
+    expect(result.effectiveRung).toBe(4);
+  });
+
+  it('keeps a source streak for audit but removes it from the prompt on stuck 3→4 movement', async () => {
+    const events = Array.from({ length: 4 }, (_, index) => ({
+      id: `ai-up-${index}`,
+      eventType: 'ai_response',
+      content: 'Keep going.',
+      metadata: {
+        escalationRung: 3,
+        answerEvaluation: { correctness: 'correct' },
+      },
+      createdAt: new Date(`2026-01-02T10:0${index}:00Z`),
+    }));
+    const db = makeDb(buildSubjectRow(null), {
+      sessionRow: buildSessionRow({ escalationRung: 3, exchangeCount: 4 }),
+      events,
+    });
+
+    const result = await prepareExchangeContext(
+      db,
+      PROFILE_ID,
+      SESSION_ID,
+      "I don't know",
+      {
+        semanticMemoryRetrievalEnabled: false,
+        answerEvaluationEnabled: true,
+      },
+    );
+
+    expect(result.sourceCorrectStreak).toBe(4);
+    expect(result.escalationDecision).toMatchObject({
+      action: 'escalate',
+      direction: 'up',
+      newRung: 4,
+    });
+    expect(result.context.correctStreak).toBeUndefined();
+    expect(buildSystemPrompt(result.context)).not.toContain(
+      'ADAPTIVE ESCALATION',
+    );
+  });
+
+  it.each([
+    {
+      label: 'app-help',
+      message: 'Where do I find my notes?',
+      metadata: null,
+    },
+    {
+      label: 'recitation',
+      message: "I don't know",
+      metadata: { effectiveMode: 'recitation' },
+    },
+    {
+      label: 'Challenge accepted',
+      message: "I don't know",
+      metadata: {
+        challengeRound: {
+          state: 'accepted',
+          offerCount: 1,
+          declinedDontAskAgain: false,
+          evaluations: [],
+        },
+      },
+    },
+    {
+      label: 'Challenge active',
+      message: "I don't know",
+      metadata: {
+        challengeRound: {
+          state: 'active',
+          offerCount: 1,
+          questionIndex: 1,
+          totalQuestions: 4,
+          declinedDontAskAgain: false,
+          evaluations: [],
+        },
+      },
+    },
+  ])(
+    'prepareExchangeContext freezes $label turns without prompt or telemetry streak leakage',
+    async ({ message, metadata }) => {
+      const events = Array.from({ length: 4 }, (_, index) => ({
+        id: `ai-freeze-${index}`,
+        eventType: 'ai_response',
+        content: 'Keep going.',
+        metadata: {
+          escalationRung: 3,
+          answerEvaluation: { correctness: 'correct' },
+        },
+        createdAt: new Date(`2026-01-02T10:0${index}:00Z`),
+      }));
+      const db = makeDb(buildSubjectRow(null), {
+        sessionRow: buildSessionRow({
+          escalationRung: 3,
+          exchangeCount: 4,
+          metadata,
+        }),
+        events,
+      });
+
+      const result = await prepareExchangeContext(
+        db,
+        PROFILE_ID,
+        SESSION_ID,
+        message,
+        {
+          semanticMemoryRetrievalEnabled: false,
+          answerEvaluationEnabled: true,
+        },
+      );
+
+      expect(result.sourceCorrectStreak).toBe(4);
+      expect(result.escalationDecision).toMatchObject({
+        action: 'hold',
+        direction: 'none',
+        newRung: 3,
+      });
+      expect(result.effectiveRung).toBe(3);
+      expect({
+        promptCorrectStreak: result.context.correctStreak,
+        promptIncludesAdaptiveEscalation: buildSystemPrompt(
+          result.context,
+        ).includes('ADAPTIVE ESCALATION'),
+        offerTelemetry: buildCorrectStreakOfferTelemetry(SESSION_ID, {
+          correctStreak: result.context.correctStreak,
+          rungDirection: result.escalationDecision.direction,
+        }),
+      }).toEqual({
+        promptCorrectStreak: undefined,
+        promptIncludesAdaptiveEscalation: false,
+        offerTelemetry: undefined,
+      });
+    },
+  );
+
+  it('scopes question and streak counts to the latest contiguous rung visit', async () => {
+    const makeEvent = (id: string, escalationRung: number) => ({
+      id,
+      eventType: 'ai_response',
+      content: 'Keep going.',
+      metadata: {
+        escalationRung,
+        answerEvaluation: { correctness: 'correct' },
+      },
+      createdAt: new Date('2026-01-02T10:00:00Z'),
+    });
+    // findMany returns DESC and prepareExchangeContext reverses to chronological.
+    const events = [
+      makeEvent('new-r3', 3),
+      makeEvent('visit-r4', 4),
+      makeEvent('old-r3-3', 3),
+      makeEvent('old-r3-2', 3),
+      makeEvent('old-r3-1', 3),
+    ];
+    const db = makeDb(buildSubjectRow(null), {
+      sessionRow: buildSessionRow({ escalationRung: 3, exchangeCount: 5 }),
+      events,
+    });
+
+    const result = await prepareExchangeContext(
+      db,
+      PROFILE_ID,
+      SESSION_ID,
+      'maybe',
+      {
+        semanticMemoryRetrievalEnabled: false,
+        answerEvaluationEnabled: true,
+      },
+    );
+
+    expect(result.sourceCorrectStreak).toBe(1);
+    expect(result.escalationDecision.direction).toBe('none');
+    expect(result.effectiveRung).toBe(3);
   });
 });

@@ -1,0 +1,35 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Verify-first: all 4 sites (book-generation.ts, assessments.ts, session-recap.ts, recall-bridge.ts) confirmed to omit ageBracket at origin/main, citing router.ts:908/:1064 (isUnder18AgeBracket gate returns false for undefined). Fixed by threading; the header docblock documents the confirmed premise and the hand-verified red-green receipt.",
+      "pointer": "apps/api/src/services/llm/router.age-bracket-coverage.test.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "book-generation.ts (detectSubjectType, generateBookTopics): under-18 subject on the forced legacy path never receives a Gemini/Vertex provider config, on BOTH the primary (getModelConfig) and — via a forced primary-provider failure past MAX_RETRIES — the fallback (getFallbackConfig) selection.",
+      "pointer": "apps/api/src/services/book-generation.age-bracket.test.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "assessments.ts (generateQuickCheck, evaluateAssessmentAnswer, evaluateQuickCheckAnswer, submitAssessmentAnswer) + routes/assessments.ts threading: under-18 subject on the forced legacy path never receives a Gemini/Vertex provider config, on both the primary and (forced primary-provider failure) fallback selection.",
+      "pointer": "apps/api/src/services/assessments.test.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "session-recap.ts (generateLearnerRecap): under-18 subject (birthYear converted via computeAgeBracketFromDate) on the forced legacy path never receives a Gemini/Vertex provider config, on both the primary and (forced primary-provider failure) fallback selection.",
+      "pointer": "apps/api/src/services/session-recap.age-bracket.test.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "recall-bridge.ts (generateRecallBridge): under-18 subject (ageBracket sourced via getPersonAgeBracket, identity-v2's canonical helper) on the forced legacy path never receives a Gemini/Vertex provider config, on both the primary and (forced primary-provider failure) fallback selection.",
+      "pointer": "apps/api/src/services/recall-bridge.age-bracket.test.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Forward ratchet: every LEARNER_FACING_FLOWS routeAndCall/routeAndCallForQuiz/routeAndStream site whose flow: is a string-literal member threads ageBracket, else the test fails naming file:line. Denylist covers 2 open-scope guardian-consumed flow tags (BID-26 entry-gate ratification) and 11 sites deferred to WI-2520 (tracked, not fixed here). Demonstrated red by hand against a scratch non-threading site and against a temporarily-reverted real site; both restored to green.",
+      "pointer": "apps/api/src/services/llm/router.age-bracket-coverage.test.ts"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13"
+}

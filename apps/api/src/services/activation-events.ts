@@ -8,6 +8,8 @@ import type {
   ActivationProfileShape,
 } from '@eduagent/schemas';
 
+import { safeWrite } from './safe-non-core';
+
 export interface RecordActivationEventInput {
   eventType: ActivationEventType;
   profileId?: string | null;
@@ -33,6 +35,14 @@ export interface RecordActivationEventInput {
   dedupeKey?: string;
   occurrenceKey?: string | null;
   metadata?: Record<string, unknown>;
+}
+
+export interface RecordActivationEventSafelyInput extends Omit<
+  RecordActivationEventInput,
+  'profileShape'
+> {
+  profileMeta?: { isOwner: boolean } | null;
+  profileShape?: ActivationProfileShape | null;
 }
 
 /**
@@ -68,6 +78,13 @@ export function buildActivationEventDedupeKey(
     `actor=${encodeSegment(input.actorKey)}`,
     `occurrence=${encodeOptionalSegment(input.occurrenceKey)}`,
   ].join('|');
+}
+
+export function buildActivationEventOccurrenceKey(input: {
+  occurrenceId?: string | null;
+  occurredAt: Date;
+}): string {
+  return input.occurrenceId ?? input.occurredAt.toISOString().slice(0, 10);
 }
 
 /**
@@ -114,4 +131,34 @@ export async function recordActivationEvent(
     .returning();
 
   return row ?? null;
+}
+
+export async function recordActivationEventSafely(
+  db: Database,
+  input: RecordActivationEventSafelyInput,
+  surface: string,
+  context?: Record<string, unknown>,
+): Promise<ActivationEvent | null> {
+  const { profileMeta, ...eventInput } = input;
+  const profileShape =
+    eventInput.profileShape !== undefined
+      ? eventInput.profileShape
+      : profileMeta
+        ? deriveActivationProfileShape(profileMeta)
+        : null;
+  let recorded: ActivationEvent | null = null;
+
+  await safeWrite(
+    async () => {
+      recorded = await recordActivationEvent(db, {
+        ...eventInput,
+        profileShape,
+      });
+      return recorded;
+    },
+    surface,
+    context,
+  );
+
+  return recorded;
 }

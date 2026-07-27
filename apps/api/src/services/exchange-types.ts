@@ -11,6 +11,7 @@
  */
 
 import type {
+  AppShell,
   HomeworkMode,
   InputMode,
   SessionType,
@@ -18,6 +19,7 @@ import type {
   VerificationType,
   ExtractedInterviewSignals,
   ChallengeRoundSessionState,
+  RecitationSetupTransition,
 } from '@eduagent/schemas';
 import type {
   EscalationRung,
@@ -141,6 +143,8 @@ export interface ExchangeContext {
   /** Multiple topics for interleaved retrieval sessions (FR92) */
   interleavedTopics?: Array<{
     topicId: string;
+    /** Server-resolved owner of this topic; never supplied by the model. */
+    subjectId?: string;
     title: string;
     description?: string;
   }>;
@@ -198,8 +202,19 @@ export interface ExchangeContext {
    * in session-exchange.ts from session_events. Undefined means no streak data.
    */
   correctStreak?: number;
+  /** Default-closed gate for ordinary per-turn answer evaluation. */
+  answerEvaluationEnabled?: boolean;
   /** Client-side effective mode — drives mode-specific prompt sections (e.g. recitation) */
   effectiveMode?: string;
+  /** Server-owned recitation setup transition for this exchange. */
+  recitationSetup?: RecitationSetupTransition;
+  /**
+   * [WI-2220] Active app nav shell, threaded from the client per exchange
+   * (mirrors effectiveMode above). Selects which app-help destination map
+   * buildAppHelpPromptBlock answers app-navigation questions from. Absent or
+   * anything other than 'v2' resolves to the 'v0' map — see app-help-map.ts.
+   */
+  shell?: AppShell;
   /** Gap labels carried from a borderline assessment into a focused refresh session. */
   gapAreas?: string[];
   /** Continuation opener phase for same-topic resume sessions. */
@@ -233,6 +248,15 @@ export interface ExchangeContext {
   challengeRound?: ChallengeRoundSessionState;
   /** Server-generated id to use when evaluating the current learner answer. */
   currentUserMessageEventId?: string;
+  /** Runtime gate for evidence-bound homework mentor-notice detection. */
+  mentorNoticeEnabled?: boolean;
+  /** Active bounded mentor-notice re-check offered in this session. */
+  mentorNoticeRecheck?: {
+    id: string;
+    concept: string;
+    correctionHint: string | null;
+    exchangeNumber: number;
+  };
   /**
    * Runtime kill switch for Challenge Round prompt injection and offer
    * consumption. Sourced from the typed `CHALLENGE_ROUND_RUNTIME_ENABLED`

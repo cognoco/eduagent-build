@@ -42,6 +42,7 @@ export const billingMissingCurrentPeriodEndObserve = inngest.createFunction(
       level: 'error',
       tags: {
         surface: 'billing',
+        signal: 'missing-current-period-end',
         event: 'missing_current_period_end',
       },
       extra: {

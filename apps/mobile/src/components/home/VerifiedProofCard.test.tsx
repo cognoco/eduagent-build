@@ -75,6 +75,36 @@ describe('VerifiedProofCard', () => {
     ).toBeNull();
   });
 
+  it('renders lookup unavailable when the verified-proof request fails', async () => {
+    active = renderScreen(
+      <VerifiedProofCard
+        childProfileId={CHILD_PROFILE_ID}
+        accentColor="#123456"
+      />,
+      {
+        profile: PARENT,
+        profiles: [PARENT, CHILD],
+        routes: {
+          '/verified-proof': () =>
+            new Response(JSON.stringify({ message: 'database query detail' }), {
+              status: 500,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+        },
+      },
+    );
+
+    await active.result.findByTestId(
+      `parent-home-child-verified-proof-unavailable-${CHILD_PROFILE_ID}`,
+    );
+    expect(
+      active.result.queryByTestId(
+        `parent-home-child-verified-proof-${CHILD_PROFILE_ID}`,
+      ),
+    ).toBeNull();
+    expect(active.result.queryByText(/database|query|detail/i)).toBeNull();
+  });
+
   it('renders topic/date/quote when a verified proof exists', async () => {
     active = renderScreen(
       <VerifiedProofCard
@@ -93,6 +123,7 @@ describe('VerifiedProofCard', () => {
             sessionId: SESSION_ID,
             verifiedAt: '2026-07-01T12:00:00.000Z',
             quote: 'Plants convert light into chemical energy.',
+            evidenceAvailability: 'available',
             masteryVerificationState: 'fresh',
             retentionStatus: 'strong',
           },
@@ -130,6 +161,7 @@ describe('VerifiedProofCard', () => {
             sessionId: SESSION_ID,
             verifiedAt: '2026-07-01T12:00:00.000Z',
             quote: 'Plants convert light into chemical energy.',
+            evidenceAvailability: 'available',
             masteryVerificationState: 'stale',
             // retentionStatus intentionally omitted.
           },
@@ -161,6 +193,7 @@ describe('VerifiedProofCard', () => {
             sessionId: SESSION_ID,
             verifiedAt: '2026-07-01T12:00:00.000Z',
             quote: null,
+            evidenceAvailability: 'source_unavailable',
             masteryVerificationState: 'fresh',
             retentionStatus: 'strong',
           },
@@ -217,6 +250,7 @@ describe('VerifiedProofCard', () => {
             sessionId: SESSION_ID,
             verifiedAt: '2026-07-01T12:00:00.000Z',
             quote: 'Plants convert light into chemical energy.',
+            evidenceAvailability: 'available',
             masteryVerificationState: 'fresh',
             retentionStatus: 'strong',
           },

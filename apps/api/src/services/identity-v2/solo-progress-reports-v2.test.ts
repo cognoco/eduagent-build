@@ -79,7 +79,7 @@ describe('[WI-961] listEligibleSelfReportPersonIdsV2', () => {
     jest.spyOn(guardianship, 'getGuardianPersonIds').mockResolvedValue([]);
     // A: no consent row (null → allowed). B: explicitly CONSENTED.
     jest
-      .spyOn(consentStatusV2, 'resolveConsentStatus')
+      .spyOn(consentStatusV2, 'resolveConsentSetStatus')
       .mockImplementation(async (_db, personId) =>
         personId === PERSON_A ? null : 'CONSENTED',
       );
@@ -99,7 +99,7 @@ describe('[WI-961] listEligibleSelfReportPersonIdsV2', () => {
       );
     // B reaches consent and is WITHDRAWN → excluded.
     jest
-      .spyOn(consentStatusV2, 'resolveConsentStatus')
+      .spyOn(consentStatusV2, 'resolveConsentSetStatus')
       .mockResolvedValue('WITHDRAWN');
 
     const result = await listEligibleSelfReportPersonIdsV2(db, WINDOW);
@@ -123,7 +123,7 @@ describe('[WI-961] listEligibleSelfReportPersonIdsV2', () => {
         return [];
       });
     jest
-      .spyOn(consentStatusV2, 'resolveConsentStatus')
+      .spyOn(consentStatusV2, 'resolveConsentSetStatus')
       .mockResolvedValue('CONSENTED');
 
     await listEligibleSelfReportPersonIdsV2(db, WINDOW);
@@ -143,7 +143,7 @@ describe('[WI-961] listEligibleSelfReportPersonIdsV2', () => {
 
     jest.spyOn(guardianship, 'getGuardianPersonIds').mockResolvedValue([]);
     jest
-      .spyOn(consentStatusV2, 'resolveConsentStatus')
+      .spyOn(consentStatusV2, 'resolveConsentSetStatus')
       .mockImplementation(async (_db, personId) => {
         callOrder.push(`consent-start-${personId}`);
         if (personId === PERSON_A) {

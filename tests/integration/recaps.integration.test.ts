@@ -14,14 +14,6 @@
 //   organization → person×2 → login (guardian) → membership×2 (admin+learner,learner)
 //   → guardianship → learning tree + session for child
 //
-// NOTE: on a pre-repoint CI lane (committed-migration DB running 0117/0118
-// de-journaled, legacy accounts/profiles tables STILL PRESENT), subjects.profileId
-// / learningSessions.profileId FK -> profiles, so this suite dual-writes a legacy
-// account + child profile (WI-808 pattern) gated on legacyIdentityTableExistsForTest
-// so the seed INSERTs satisfy those FKs; the route reads only the v2 person graph
-// under flag-on, so the legacy rows never affect behavior. [WI-1128] Post-M-DROP
-// (0129/0130 applied) the legacy tables are gone and subjects/learningSessions FK
-// directly to person, so this block is a no-op there.
 // NOTE: isChildLearningDataVisible(null) === true so no consent_grant needed.
 //
 // NO internal jest.mock (GC1/GC6 compliant). JWKS is mocked by setup.ts via
@@ -43,12 +35,11 @@ import {
   subjects,
   subscription as subscriptionV2,
 } from '@eduagent/database';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 
 import { app } from '../../apps/api/src/index';
 import { buildAuthHeaders } from './test-keys';
 import { buildIntegrationEnv } from './helpers';
-import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 
 const RUN = !!process.env.DATABASE_URL;
 
@@ -180,28 +171,6 @@ async function seedV2Family(db: Db): Promise<{
     .insert(guardianship)
     .values({ guardianPersonId: guardianId, chargePersonId: childId });
 
-  // 1b. Legacy dual-write (WI-808 pattern), gated on table existence. On a
-  // pre-repoint CI lane the legacy accounts/profiles tables still exist and
-  // subjects.profileId / learningSessions.profileId FK -> profiles(id). Seed a
-  // legacy account + child profile (profiles.id = childId, the only id used as
-  // a profileId below) so those INSERTs satisfy the FK. Random clerk/email keep
-  // it collision-free in the shared CI DB. The route reads only the v2 person
-  // graph under flag-on, so these rows never change behavior. [WI-1128]
-  // No-op post-M-DROP (legacy tables gone; subjects/learningSessions FK directly
-  // to person).
-  // [WI-1139] Legacy `accounts`/`profiles` Drizzle defs removed — raw SQL
-  // inserts, same conditional seed as before.
-  if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-    await db.execute(sql`
-      INSERT INTO accounts (id, clerk_user_id, email)
-      VALUES (${accountId}, ${`wi821-acct-${accountId.slice(0, 8)}`}, ${`wi821-acct-${accountId.slice(0, 8)}@integration.test`})
-    `);
-    await db.execute(sql`
-      INSERT INTO profiles (id, account_id, display_name, birth_year, is_owner)
-      VALUES (${childId}, ${accountId}, 'WI821-Child', 2013, false)
-    `);
-  }
-
   // 2. Learning tree for child (needed for listRecapsForParent to return data)
   const [subject] = await db
     .insert(subjects)
@@ -275,22 +244,13 @@ async function teardownV2Family(
   orgId: string,
   guardianId: string,
   childId: string,
-  accountId: string,
 ): Promise<void> {
   // FK-safe teardown. deleteLearningTree removes subjects/learning_sessions
-  // (which FK -> profiles on the pre-repoint CI DB) BEFORE the legacy account
-  // delete cascades the child profile. Then the v2 graph: subscription (RESTRICT
+  // first. Then the v2 graph: subscription (RESTRICT
   // on person, may have been auto-provisioned by ensureFreeSubscriptionV2 during
   // the GET /v1/recaps request) -> guardianship -> person (cascades login,
   // membership) -> organization.
   await deleteLearningTree(db, [childId]);
-  // [WI-1128] Legacy `accounts` may already be dropped (post-M-DROP); gate on
-  // table existence — the v2 person/organization deletes below are the real teardown.
-  // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL delete, same
-  // conditional cleanup as before.
-  if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-    await db.execute(sql`DELETE FROM accounts WHERE id = ${accountId}`); // cascades child profile
-  }
   await db
     .delete(subscriptionV2)
     .where(eq(subscriptionV2.organizationId, orgId));
@@ -332,7 +292,6 @@ async function teardownV2Family(
           fixture.orgId,
           fixture.guardianId,
           fixture.childId,
-          fixture.accountId,
         );
       }
       delete process.env['IDENTITY_V2_ENABLED'];

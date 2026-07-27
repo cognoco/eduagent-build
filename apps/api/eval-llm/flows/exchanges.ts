@@ -6,10 +6,12 @@ import {
 import { isAppHelpQuery } from '../../src/services/app-help-map';
 import { resolveAgeBracket } from '../../src/services/exchange-prompts';
 import { buildMemoryBlock } from '../../src/services/learner-profile';
+import { recitationSetupLeaksSourceContent } from '../../src/services/session/session-recitation-setup';
 import type { ChatMessage } from '../../src/services/llm/types';
 import { llmResponseEnvelopeSchema } from '@eduagent/schemas';
 import type { EvalProfile } from '../fixtures/profiles';
 import { runHarnessLlm } from '../runner/llm-client';
+import { parseFirstJsonObject } from '../runner/quality';
 import {
   HISTORY_S1_RUNG1,
   HISTORY_S2_RUNG2,
@@ -29,7 +31,12 @@ import {
   HISTORY_APP_HELP_NOTES,
   HISTORY_APP_HELP_PREFERENCES,
 } from '../fixtures/exchange-histories-app-help';
-import type { FlowDefinition, PromptMessages, Scenario } from '../runner/types';
+import type {
+  FlowDefinition,
+  PromptMessages,
+  QualityIssue,
+  Scenario,
+} from '../runner/types';
 
 // ---------------------------------------------------------------------------
 // Flow adapter — Main tutoring loop (exchanges.buildSystemPrompt)
@@ -299,6 +306,106 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
     appliesTo: () => true,
   },
   {
+    id: 'AE1-answer-correct',
+    purpose:
+      'Answer-evaluation enabled — a substantive correct answer to the immediately preceding ordinary question must emit correctness=correct',
+    history: [
+      {
+        role: 'assistant',
+        content: 'What are the three periods of the Mesozoic Era?',
+      },
+      { role: 'user', content: 'Triassic, Jurassic, and Cretaceous.' },
+    ],
+    contextOverrides: {
+      escalationRung: 2,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 2,
+      answerEvaluationEnabled: true,
+    },
+    appliesTo: (p) => p.id === '12yo-dinosaurs',
+  },
+  {
+    id: 'AE2-answer-partial',
+    purpose:
+      'Answer-evaluation enabled — an incomplete substantive answer to the immediately preceding ordinary question must emit correctness=partial',
+    history: [
+      {
+        role: 'assistant',
+        content: 'What are the three periods of the Mesozoic Era?',
+      },
+      { role: 'user', content: 'Triassic and Jurassic.' },
+    ],
+    contextOverrides: {
+      escalationRung: 2,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 2,
+      answerEvaluationEnabled: true,
+    },
+    appliesTo: (p) => p.id === '12yo-dinosaurs',
+  },
+  {
+    id: 'AE3-answer-incorrect',
+    purpose:
+      'Answer-evaluation enabled — a substantive wrong answer to the immediately preceding ordinary question must emit correctness=incorrect',
+    history: [
+      {
+        role: 'assistant',
+        content: 'Which period came first in the Mesozoic Era?',
+      },
+      { role: 'user', content: 'The Cretaceous period.' },
+    ],
+    contextOverrides: {
+      escalationRung: 2,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 2,
+      answerEvaluationEnabled: true,
+    },
+    appliesTo: (p) => p.id === '12yo-dinosaurs',
+  },
+  {
+    id: 'AE4-answer-na',
+    purpose:
+      'Answer-evaluation enabled — a request for explanation rather than an answer must emit correctness=na',
+    history: [
+      {
+        role: 'assistant',
+        content: 'Which period came first in the Mesozoic Era?',
+      },
+      { role: 'user', content: 'Can you explain how the periods are ordered?' },
+    ],
+    contextOverrides: {
+      escalationRung: 2,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 2,
+      answerEvaluationEnabled: true,
+    },
+    appliesTo: (p) => p.id === '12yo-dinosaurs',
+  },
+  {
+    id: 'AE5-answer-disabled',
+    purpose:
+      'Answer-evaluation disabled — the legacy prompt and response must omit signals.answer_evaluation',
+    history: [
+      {
+        role: 'assistant',
+        content: 'What are the three periods of the Mesozoic Era?',
+      },
+      { role: 'user', content: 'Triassic, Jurassic, and Cretaceous.' },
+    ],
+    contextOverrides: {
+      escalationRung: 2,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 2,
+      answerEvaluationEnabled: false,
+    },
+    appliesTo: (p) => p.id === '12yo-dinosaurs',
+  },
+  {
     id: 'S15-review-mode-opener',
     purpose:
       'Review mode turn-0 — calibration opener prompt fires for effectiveMode=review',
@@ -521,7 +628,59 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
     },
     appliesTo: () => true,
   },
+  {
+    id: 'S23-recitation-title-only-ready',
+    purpose:
+      'Title-only text recitation advances directly to a content-free invitation to begin',
+    history: [],
+    contextOverrides: {
+      rawInput: 'Ozymandias',
+      effectiveMode: 'recitation',
+      inputMode: 'text',
+      exchangeCount: 0,
+      recitationSetup: {
+        action: 'invite_to_begin',
+        state: { phase: 'ready', clarificationCount: 0 },
+      },
+    },
+    appliesTo: () => true,
+  },
+  {
+    id: 'S24-recitation-voice-title-only-ready',
+    purpose:
+      'Title-only voice recitation uses the same ready transition without supplying content',
+    history: [],
+    contextOverrides: {
+      rawInput: 'Ozymandias',
+      effectiveMode: 'recitation',
+      inputMode: 'voice',
+      exchangeCount: 0,
+      recitationSetup: {
+        action: 'invite_to_begin',
+        state: { phase: 'ready', clarificationCount: 0 },
+      },
+    },
+    appliesTo: (profile) => profile.id === '12yo-dinosaurs',
+  },
 ];
+
+function recitationIssue(code: string, message: string): QualityIssue {
+  return { severity: 'error', code, message };
+}
+
+function isRecitationReadyScenario(input: ExchangeScenarioInput): boolean {
+  return (
+    input.scenarioId === 'S23-recitation-title-only-ready' ||
+    input.scenarioId === 'S24-recitation-voice-title-only-ready'
+  );
+}
+
+const RECITATION_READY_SOURCE_ANCHORS = [
+  'I met a traveller from an antique land',
+  'Two vast and trunkless legs of stone',
+  'Look on my works ye Mighty and despair',
+  'The lone and level sands stretch far away',
+] as const;
 
 // ---------------------------------------------------------------------------
 // Context synthesis — deterministic, derived from the profile.
@@ -675,6 +834,74 @@ function buildScenarioContext(
   };
 }
 
+const EXPECTED_ANSWER_EVALUATION_BY_SCENARIO = {
+  'AE1-answer-correct': 'correct',
+  'AE2-answer-partial': 'partial',
+  'AE3-answer-incorrect': 'incorrect',
+  'AE4-answer-na': 'na',
+  'AE5-answer-disabled': 'omitted',
+} as const;
+
+export function evaluateAnswerEvaluationScenarioQuality(
+  scenarioId: string,
+  liveResponse: string,
+): QualityIssue[] {
+  const expected =
+    EXPECTED_ANSWER_EVALUATION_BY_SCENARIO[
+      scenarioId as keyof typeof EXPECTED_ANSWER_EVALUATION_BY_SCENARIO
+    ];
+  if (!expected) return [];
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(liveResponse);
+  } catch {
+    return [
+      {
+        severity: 'error',
+        code: 'answer_evaluation_unparseable',
+        message: `${scenarioId} returned non-JSON output, so answer_evaluation could not be checked`,
+      },
+    ];
+  }
+
+  const signals =
+    parsed && typeof parsed === 'object' && 'signals' in parsed
+      ? (parsed.signals as Record<string, unknown> | null | undefined)
+      : undefined;
+  const answerEvaluation =
+    signals && typeof signals === 'object'
+      ? (signals.answer_evaluation as
+          | { correctness?: unknown }
+          | null
+          | undefined)
+      : undefined;
+
+  if (expected === 'omitted') {
+    return answerEvaluation == null
+      ? []
+      : [
+          {
+            severity: 'error',
+            code: 'answer_evaluation_emitted_while_disabled',
+            message: `${scenarioId} emitted signals.answer_evaluation while the runtime flag was disabled`,
+          },
+        ];
+  }
+
+  return answerEvaluation?.correctness === expected
+    ? []
+    : [
+        {
+          severity: 'error',
+          code: 'answer_evaluation_wrong_or_missing',
+          message: `${scenarioId} expected correctness=${expected}, received ${String(
+            answerEvaluation?.correctness ?? 'missing',
+          )}`,
+        },
+      ];
+}
+
 export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
   id: 'exchanges',
   name: 'Exchanges (main tutoring loop)',
@@ -736,6 +963,91 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
         `expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs`,
       ],
     };
+  },
+
+  evaluateDeterministic({ input, messages }): QualityIssue[] {
+    if (!isRecitationReadyScenario(input)) return [];
+    const issues: QualityIssue[] = [];
+    if (messages.user !== input.context.rawInput) {
+      issues.push(
+        recitationIssue(
+          'recitation-ready.user-input',
+          'Prompt did not preserve the title-only learner input.',
+        ),
+      );
+    }
+    for (const required of [
+      'SERVER-OWNED SETUP ACTION: INVITE TO BEGIN',
+      'Do NOT provide any of the recitation',
+    ]) {
+      if (!messages.system.includes(required)) {
+        issues.push(
+          recitationIssue(
+            'recitation-ready.prompt-contract',
+            `Prompt omitted required setup contract: ${required}`,
+          ),
+        );
+      }
+    }
+    if (
+      messages.system.includes(
+        '1. Ask what they would like to recite (title, author, or description).',
+      )
+    ) {
+      issues.push(
+        recitationIssue(
+          'recitation-ready.prompt-reask',
+          'Prompt retained the legacy selection question after accepting a title.',
+        ),
+      );
+    }
+    return issues;
+  },
+
+  evaluateQuality({ input, liveResponse }): QualityIssue[] {
+    const issues = evaluateAnswerEvaluationScenarioQuality(
+      input.scenarioId,
+      liveResponse,
+    );
+    if (!isRecitationReadyScenario(input)) return issues;
+    const parsed = parseFirstJsonObject<{ reply?: unknown }>(liveResponse);
+    const reply = typeof parsed?.reply === 'string' ? parsed.reply : '';
+    if (!/\b(?:ready|begin|start|go ahead|recite)\b/i.test(reply)) {
+      issues.push(
+        recitationIssue(
+          'recitation-ready.no-invitation',
+          'Reply did not invite the learner to begin reciting.',
+        ),
+      );
+    }
+    if (
+      /\b(?:what|which).*(?:recite|recitation|poem)|\b(?:tell(?:ing)?|giv(?:e|ing)) me (?:which |the )?(?:poem|recitation|title|author)|\b(?:title|author)\b/i.test(
+        reply,
+      )
+    ) {
+      issues.push(
+        recitationIssue(
+          'recitation-ready.reasked-selection',
+          'Reply asked for the selection again after accepting the title.',
+        ),
+      );
+    }
+    if (
+      /\b(?:model answer|polished version|you could say|start with\s*:|begin with\s*:)/i.test(
+        reply,
+      ) ||
+      RECITATION_READY_SOURCE_ANCHORS.some((sourceText) =>
+        recitationSetupLeaksSourceContent(reply, sourceText),
+      )
+    ) {
+      issues.push(
+        recitationIssue(
+          'recitation-ready.premature-content',
+          'Reply supplied recitation content before the learner recited.',
+        ),
+      );
+    }
+    return issues;
   },
 
   // Uses messages.system as-is — production adds buildOrphanSystemAddendum but the harness omits it so the live run validates the same prompt the Tier-1 snapshot displays.

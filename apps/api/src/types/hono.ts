@@ -9,6 +9,9 @@ export type AppVariables = {
   user: AuthUser;
   db: Database;
   account: Account;
+  // [WI-2416] The authenticated caller's own person id, resolved server-side
+  // by accountMiddleware — required by assertCanReadProfile.
+  callerPersonId: string | undefined;
   profileId: string | undefined;
   profileMeta: ProfileMeta | undefined;
   /**

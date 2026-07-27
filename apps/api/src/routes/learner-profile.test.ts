@@ -167,6 +167,35 @@ jest.mock(
   }),
 );
 
+// [WI-2416] assertCanReadProfile (GET /learner-profile, /export-text) calls
+// verifyPersonOwnershipV2, which — like getPersonScope above — runs a raw
+// db.select() membership query unrunnable on this unit mock DB. Every
+// self-scoped read scenario in this file is a caller-self read (the header
+// profile equals the authenticated caller's own person id); the
+// cross-account read attack this guard exists to close is covered by the
+// real-DB break test in tests/integration/wi2416-read-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's mock DB environment.
+jest.mock('../services/identity-v2/ownership-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/ownership-v2'),
+  verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+}));
+
+// [WI-2396] assertLlmConsent (called by both /learner-profile/tell routes)
+// runs isLlmExchangeConsentAllowed, which reads db.query.membership /
+// consentGrant — real queries with no controllable behavior on this file's
+// mock DB. Defaults to allowed (resolves undefined = no throw); the
+// consent-withdrawal test suite below overrides with
+// mockRejectedValueOnce(new ConsentWithdrawnError()) to exercise the
+// refusal path. Mirrors the subjects.test.ts pattern.
+// gc1-allow: isLlmExchangeConsentAllowed runs real db.query.membership /
+// consentGrant reads with no real implementation available in this file's
+// mock-DB environment (same class as verifyPersonOwnershipV2 above).
+jest.mock('../services/identity-v2/consent-status-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/consent-status-v2'),
+  assertLlmConsent: jest.fn().mockResolvedValue(undefined),
+}));
+
 // Learner-profile service mocks — record calls so assertions can verify
 // the route reached the service with the right (parent/child) profileId.
 const mockGetOrCreateLearningProfile = jest.fn();
@@ -223,6 +252,8 @@ import { learnerProfileRoutes } from './learner-profile';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { extractDrizzleParamValues } from '../test-utils/drizzle-introspection';
 import { ERROR_CODES } from '@eduagent/schemas';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
+import { ConsentWithdrawnError } from '../services/session';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -1206,6 +1237,152 @@ describe('learner-profile routes', () => {
       const body = await res.json();
       expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
       expect(mockGrantMemoryConsent).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-2396] Tell-Mentor consent-withdrawal gate — refuses BEFORE LLM
+  // dispatch (canon R5). parseLearnerInput unconditionally dispatches the
+  // LLM (parseLearnerInputToAnalysis -> routeAndCall) on both routes.
+  // -------------------------------------------------------------------------
+  describe('[WI-2396] Tell-Mentor consent-withdrawal gate', () => {
+    const assertLlmConsentMock = jest.mocked(assertLlmConsent);
+    const parseLearnerInputMock = (
+      jest.requireMock('../services/learner-input') as {
+        parseLearnerInput: jest.Mock;
+      }
+    ).parseLearnerInput;
+
+    // [WI-371 pattern] /learner-profile/tell is an LLM-metered route — routing
+    // through the full `app` hits the metering middleware's billing-v2
+    // fixtures, which this file's stub account does not provide. Mount
+    // learnerProfileRoutes directly (isOwner:true so assertNotProxyMode
+    // passes) the same way makeProxyApp() below does for the proxy-guard
+    // suite.
+    function makeSelfApp() {
+      const selfApp = new Hono();
+      selfApp.use('*', async (c, next) => {
+        c.set('db' as never, {});
+        c.set('profileId' as never, PARENT_PROFILE_ID);
+        c.set('account' as never, { id: 'test-account-id' });
+        c.set('callerPersonId' as never, PARENT_PROFILE_ID);
+        c.set('profileMeta' as never, {
+          isOwner: true,
+          resolvedVia: 'explicit-header',
+        });
+        await next();
+      });
+      selfApp.onError((err, c) => {
+        // [WI-2396] Mirrors index.ts's global ConsentWithdrawnError -> 403 mapping.
+        if (err instanceof ConsentWithdrawnError) {
+          return c.json(
+            { code: ERROR_CODES.CONSENT_WITHDRAWN, message: err.message },
+            403,
+          );
+        }
+        return c.json({ code: 'INTERNAL_ERROR', message: err.message }, 500);
+      });
+      selfApp.route('/', learnerProfileRoutes);
+      return selfApp;
+    }
+
+    // The parent route additionally needs assertOwnerAndParentAccess /
+    // assertChargeNotCredentialed / assertChildDashboardDataVisible to
+    // resolve, which need the real mock-DB module (not a bare stub) —
+    // the same mockFindGuardianship / query stubs the full-app "parent with
+    // valid family link" suite above exercises — while still bypassing the
+    // full app's metering middleware.
+    function makeFamilyApp() {
+      const familyApp = new Hono();
+      familyApp.use('*', async (c, next) => {
+        c.set('db' as never, mockDatabaseModule.db);
+        c.set('profileId' as never, PARENT_PROFILE_ID);
+        c.set('account' as never, { id: 'test-account-id' });
+        c.set('callerPersonId' as never, PARENT_PROFILE_ID);
+        c.set('profileMeta' as never, {
+          isOwner: true,
+          resolvedVia: 'explicit-header',
+        });
+        await next();
+      });
+      familyApp.onError((err, c) => {
+        // [WI-2396] Mirrors index.ts's global ConsentWithdrawnError -> 403 mapping.
+        if (err instanceof ConsentWithdrawnError) {
+          return c.json(
+            { code: ERROR_CODES.CONSENT_WITHDRAWN, message: err.message },
+            403,
+          );
+        }
+        return c.json({ code: 'INTERNAL_ERROR', message: err.message }, 500);
+      });
+      familyApp.route('/', learnerProfileRoutes);
+      return familyApp;
+    }
+
+    it('POST /learner-profile/tell refuses with 403 CONSENT_WITHDRAWN and never calls parseLearnerInput when consent is withdrawn', async () => {
+      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+
+      const res = await makeSelfApp().request('/learner-profile/tell', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: 'Remember that I love dinosaurs' }),
+      });
+
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
+      expect(parseLearnerInputMock).not.toHaveBeenCalled();
+    });
+
+    it('POST /learner-profile/tell proceeds (LLM dispatched) when consent is active', async () => {
+      const res = await makeSelfApp().request('/learner-profile/tell', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: 'Remember that I love dinosaurs' }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(assertLlmConsentMock).toHaveBeenCalledWith(
+        expect.anything(),
+        PARENT_PROFILE_ID,
+      );
+      expect(parseLearnerInputMock).toHaveBeenCalled();
+    });
+
+    it('POST /learner-profile/:profileId/tell refuses with 403 CONSENT_WITHDRAWN and never calls parseLearnerInput when the CHILD consent is withdrawn', async () => {
+      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+
+      const res = await makeFamilyApp().request(
+        `/learner-profile/${OWN_CHILD_PROFILE_ID}/tell`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: 'They love dinosaurs' }),
+        },
+      );
+
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
+      expect(parseLearnerInputMock).not.toHaveBeenCalled();
+    });
+
+    it('POST /learner-profile/:profileId/tell proceeds (LLM dispatched) when the CHILD consent is active', async () => {
+      const res = await makeFamilyApp().request(
+        `/learner-profile/${OWN_CHILD_PROFILE_ID}/tell`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: 'They love dinosaurs' }),
+        },
+      );
+
+      expect(res.status).toBe(200);
+      expect(assertLlmConsentMock).toHaveBeenCalledWith(
+        expect.anything(),
+        OWN_CHILD_PROFILE_ID,
+      );
+      expect(parseLearnerInputMock).toHaveBeenCalled();
     });
   });
 

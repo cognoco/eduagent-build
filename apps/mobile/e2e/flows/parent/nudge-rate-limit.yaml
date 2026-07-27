@@ -25,109 +25,117 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "parent-with-children"
+      SEED_SCENARIO: 'parent-with-children'
       API_URL: ${API_URL}
 
 # 2. Wait for parent Home
 - extendedWaitUntil:
     visible:
-      id: "parent-home-screen"
+      id: 'parent-home-screen'
     timeout: 15000
+
+- scrollUntilVisible:
+    element:
+      id: 'parent-home-send-nudge-${CHILD_PROFILE_ID}'
+    direction: DOWN
+    timeout: 30000
+    visibilityPercentage: 100
+    centerElement: true
 
 # ── Nudge 1 of 4 ─────────────────────────────────────────────────────
 - tapOn:
-    id: "parent-home-send-nudge-${CHILD_PROFILE_ID}"
+    id: 'parent-home-send-nudge-${CHILD_PROFILE_ID}'
 - extendedWaitUntil:
     visible:
-      id: "nudge-template-you_got_this"
+      id: 'nudge-template-you_got_this'
     timeout: 5000
 - tapOn:
-    id: "nudge-template-you_got_this"
+    id: 'nudge-template-you_got_this'
 - extendedWaitUntil:
     visible:
-      text: "Nudge sent"
+      text: 'Nudge sent'
     timeout: 5000
-    optional: true  # justified: native alert dialog timing varies; "Nudge sent" may auto-dismiss before Maestro polls
+    optional: true # justified: native alert dialog timing varies; "Nudge sent" may auto-dismiss before Maestro polls
 - tapOn:
-    text: "OK"
-    optional: true  # justified: dismiss alert only if it appeared (paired with optional alert wait above)
+    text: 'OK'
+    optional: true # justified: dismiss alert only if it appeared (paired with optional alert wait above)
 - extendedWaitUntil:
     visible:
-      id: "parent-home-screen"
+      id: 'parent-home-screen'
     timeout: 5000
 
 # ── Nudge 2 of 4 ─────────────────────────────────────────────────────
 - tapOn:
-    id: "parent-home-send-nudge-${CHILD_PROFILE_ID}"
+    id: 'parent-home-send-nudge-${CHILD_PROFILE_ID}'
 - extendedWaitUntil:
     visible:
-      id: "nudge-template-proud_of_you"
+      id: 'nudge-template-proud_of_you'
     timeout: 5000
 - tapOn:
-    id: "nudge-template-proud_of_you"
+    id: 'nudge-template-proud_of_you'
 - extendedWaitUntil:
     visible:
-      text: "Nudge sent"
+      text: 'Nudge sent'
     timeout: 5000
-    optional: true  # justified: native alert dialog timing varies; "Nudge sent" may auto-dismiss before Maestro polls
+    optional: true # justified: native alert dialog timing varies; "Nudge sent" may auto-dismiss before Maestro polls
 - tapOn:
-    text: "OK"
-    optional: true  # justified: dismiss alert only if it appeared (paired with optional alert wait above)
+    text: 'OK'
+    optional: true # justified: dismiss alert only if it appeared (paired with optional alert wait above)
 - extendedWaitUntil:
     visible:
-      id: "parent-home-screen"
+      id: 'parent-home-screen'
     timeout: 5000
 
 # ── Nudge 3 of 4 ─────────────────────────────────────────────────────
 - tapOn:
-    id: "parent-home-send-nudge-${CHILD_PROFILE_ID}"
+    id: 'parent-home-send-nudge-${CHILD_PROFILE_ID}'
 - extendedWaitUntil:
     visible:
-      id: "nudge-template-quick_session"
+      id: 'nudge-template-quick_session'
     timeout: 5000
 - tapOn:
-    id: "nudge-template-quick_session"
+    id: 'nudge-template-quick_session'
 - extendedWaitUntil:
     visible:
-      text: "Nudge sent"
+      text: 'Nudge sent'
     timeout: 5000
-    optional: true  # justified: native alert dialog timing varies; "Nudge sent" may auto-dismiss before Maestro polls
+    optional: true # justified: native alert dialog timing varies; "Nudge sent" may auto-dismiss before Maestro polls
 - tapOn:
-    text: "OK"
-    optional: true  # justified: dismiss alert only if it appeared (paired with optional alert wait above)
+    text: 'OK'
+    optional: true # justified: dismiss alert only if it appeared (paired with optional alert wait above)
 - extendedWaitUntil:
     visible:
-      id: "parent-home-screen"
+      id: 'parent-home-screen'
     timeout: 5000
 
 # ── Nudge 4 of 4 (last successful one) ───────────────────────────────
 - tapOn:
-    id: "parent-home-send-nudge-${CHILD_PROFILE_ID}"
+    id: 'parent-home-send-nudge-${CHILD_PROFILE_ID}'
 - extendedWaitUntil:
     visible:
-      id: "nudge-template-thinking_of_you"
+      id: 'nudge-template-thinking_of_you'
     timeout: 5000
 - tapOn:
-    id: "nudge-template-thinking_of_you"
+    id: 'nudge-template-thinking_of_you'
 - extendedWaitUntil:
     visible:
-      text: "Nudge sent"
+      text: 'Nudge sent'
     timeout: 5000
-    optional: true  # justified: native alert dialog timing varies; "Nudge sent" may auto-dismiss before Maestro polls
+    optional: true # justified: native alert dialog timing varies; "Nudge sent" may auto-dismiss before Maestro polls
 - tapOn:
-    text: "OK"
-    optional: true  # justified: dismiss alert only if it appeared (paired with optional alert wait above)
+    text: 'OK'
+    optional: true # justified: dismiss alert only if it appeared (paired with optional alert wait above)
 - extendedWaitUntil:
     visible:
-      id: "parent-home-screen"
+      id: 'parent-home-screen'
     timeout: 5000
 
 # ── Nudge 5: should be rate-limited (count is now 4, limit is 4) ─────
 - tapOn:
-    id: "parent-home-send-nudge-${CHILD_PROFILE_ID}"
+    id: 'parent-home-send-nudge-${CHILD_PROFILE_ID}'
 - extendedWaitUntil:
     visible:
-      id: "nudge-template-you_got_this"
+      id: 'nudge-template-you_got_this'
     timeout: 5000
 
 # 3. Screenshot: sheet open before 5th attempt
@@ -135,15 +143,12 @@ tags:
 
 # 4. Tap template — should trigger inline error, not success
 - tapOn:
-    id: "nudge-template-you_got_this"
+    id: 'nudge-template-you_got_this'
 
-# 5. Wait for the inline rate-limit error copy inside the sheet
-#    en.json nudge.error.rateLimit: "You've sent enough encouragement for now -
-#    {{childName}} will see it next time they open the app."
-#    (apps/mobile/src/i18n/locales/en.json:2253)
+# 5. Wait for the stable inline rate-limit receipt inside the sheet.
 - extendedWaitUntil:
     visible:
-      text: "enough encouragement for now"
+      id: 'nudge-inline-error-rate'
     timeout: 5000
 
 # 6. Screenshot: inline rate-limit error visible in sheet
@@ -154,16 +159,16 @@ tags:
 #    sheet should still be open (not auto-closed), which proves the send
 #    did not succeed. Assert the sheet subtitle is still showing.
 - assertVisible:
-    text: "Pick one short encouragement."
+    text: 'Pick one short encouragement.'
 
 # 8. Dismiss sheet via Cancel
 - tapOn:
-    id: "nudge-action-sheet-cancel"
+    id: 'nudge-action-sheet-cancel'
 
 # 9. Confirm we're back on Home
 - extendedWaitUntil:
     visible:
-      id: "parent-home-screen"
+      id: 'parent-home-screen'
     timeout: 5000
 
 # 10. Final screenshot

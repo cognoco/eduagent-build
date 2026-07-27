@@ -1,0 +1,18 @@
+{
+  "pageId": "39f8bce9-1f7c-8112-a075-d6a0a6f1cb1a",
+  "id": "WI-2223",
+  "name": "Make support.hub deep links select Support-hub scope before navigation",
+  "description": "The support.hub deep link only pushes the Mentor route; from a supporter's Me scope that route still renders the learner Mentor surface because active scope is unchanged.",
+  "acceptanceCriteria": "- Activating a support.hub pointer first selects the Support-hub scope and then opens its Mentor tab.\n- The transition works from Me and every person scope and remains safe if the edge list changed.\n- Back navigation has a defined scope behavior and does not duplicate support content into Me.\n- Route-contract and seeded multi-scope tests cover the pointer.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "Ramtop",
+  "bodyText": "Acceptance Criteria (PM-ratified 2026-07-19, Opus-drafted, grounded at main 85629757c)\nRisk/Impact: P2 wrong-surface bug — the support.hub pointer only pushes /(app)/mentor; from Me/person scope the active scope is unchanged, so the learner Mentor surface renders instead of the supporter hub.\nAC-1 (scope-before-nav — the guaranteed property): Activating a support.hub pointer first calls setActiveScope({kind:'supporter-hub'}) (scope-context.tsx:125-145) and only then opens the Mentor tab (/(app)/mentor, now-deep-link.ts:58), so the supporter-hub Mentor surface renders. Evidence: co-located jest with a spy ordering assertion at each caller — apps/mobile/src/app/(app)/mentor.tsx and apps/mobile/src/components/journal/JournalMomentsStrip.tsx (the two pushNowDeepLink sites).\nAC-2 (every source scope + stale-edge safety): The transition produces the supporter-hub surface from Me scope and from every person scope, and is safe (no throw, defined fallback) if the supportership edge list changed since the pointer was minted (setActiveScope no-ops for unknown non-me scopes — scope-context.tsx:136). Evidence: seeded multi-scope cases in the caller/now-deep-link co-located test.\nAC-3 (Back scope behavior): Back navigation from the support-hub Mentor surface has defined scope behavior and does not duplicate support content into the Me scope. Evidence: co-located jest on the return path; any visible layout claim via a named full nav-shell.spec.ts case.\nAC-4 (flag/shape isolation): A learner-shape / me-only account is unaffected (setActiveScope early-returns) and legacy/V0 non-supporter flows are unchanged. Evidence: named case in the co-located suite.\nRefinement notes: Effort=M. Core issue: pushNowDeepLink takes only Pick<Router,'push'> (now-deep-link.ts:92) — no scope access; thread setActiveScope via a new option or via the two callers which already hold useScopeContext. Target is a tab root: the property is scope-selected-before-navigation, NOT ancestor-chain depth — no reflex chain AC."
+}

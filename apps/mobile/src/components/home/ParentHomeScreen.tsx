@@ -748,6 +748,8 @@ export function ParentHomeScreen({
   const showAddChild = isAdultOwner({
     role,
     birthYear: activeProfile?.birthYear,
+    birthMonth: activeProfile?.birthMonth,
+    birthDay: activeProfile?.birthDay,
   });
   const familyActivitySummary = formatFamilyActivitySummary(
     linkedChildren,

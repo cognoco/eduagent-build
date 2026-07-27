@@ -23,9 +23,11 @@ import {
   reportViewedResponseSchema,
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
+import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { withProfile } from '../route-utils/route-context';
 import { notFound } from '../errors';
+import { assertCanReadProfile } from '../services/family-access';
 import { listProfileSessions } from '../services/session/session-crud';
 import {
   getMonthlyReportForProfile,
@@ -55,6 +57,10 @@ type ProgressRouteEnv = {
   Variables: {
     user: AuthUser;
     db: Database;
+    account: Account;
+    // [WI-2416] The authenticated caller's own person id, resolved
+    // server-side by accountMiddleware — required by assertCanReadProfile.
+    callerPersonId: string | undefined;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
   };
@@ -64,6 +70,9 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
   // Get subject progress with topic breakdown
   .get('/subjects/:subjectId/progress', async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2416] Header-resolved profileId is only org-checked; verify
+    // caller authority (self or guardian of an uncredentialed charge).
+    await assertCanReadProfile(c, profileId);
     const subjectId = c.req.param('subjectId');
 
     const progress = await getSubjectProgress(db, profileId, subjectId);
@@ -74,6 +83,9 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
   // Get detailed topic progress
   .get('/subjects/:subjectId/topics/:topicId/progress', async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2416] Header-resolved profileId is only org-checked; verify
+    // caller authority (self or guardian of an uncredentialed charge).
+    await assertCanReadProfile(c, profileId);
     const subjectId = c.req.param('subjectId');
     const topicId = c.req.param('topicId');
 
@@ -85,6 +97,9 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
   // Get overall progress across all subjects
   .get('/progress/overview', async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2416] Header-resolved profileId is only org-checked; verify
+    // caller authority (self or guardian of an uncredentialed charge).
+    await assertCanReadProfile(c, profileId);
 
     const overview = await getOverallProgress(db, profileId);
     return c.json(progressOverviewResponseSchema.parse(overview));
@@ -93,6 +108,9 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
   // Get total overdue review count across the active profile
   .get('/progress/review-summary', async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2416] Header-resolved profileId is only org-checked; verify
+    // caller authority (self or guardian of an uncredentialed charge).
+    await assertCanReadProfile(c, profileId);
 
     const { overdueCount, nextReviewTopic, nextUpcomingReviewAt } =
       await getProfileOverdueCount(db, profileId);
@@ -107,6 +125,9 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
 
   .get('/progress/overdue-topics', async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2416] Header-resolved profileId is only org-checked; verify
+    // caller authority (self or guardian of an uncredentialed charge).
+    await assertCanReadProfile(c, profileId);
 
     const result = await getOverdueTopicsGrouped(db, profileId);
     return c.json(overdueTopicsResponseSchema.parse(result));
@@ -118,6 +139,9 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
     zValidator('query', childSessionsQuerySchema),
     async (c) => {
       const { db, profileId } = withProfile(c);
+      // [WI-2416] Header-resolved profileId is only org-checked; verify
+      // caller authority (self or guardian of an uncredentialed charge).
+      await assertCanReadProfile(c, profileId);
       const { cursor, limit } = c.req.valid('query');
 
       const result = await listProfileSessions(db, profileId, {
@@ -136,6 +160,9 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
     zValidator('query', practiceActivityHistoryQuerySchema),
     async (c) => {
       const { db, profileId } = withProfile(c);
+      // [WI-2416] Header-resolved profileId is only org-checked; verify
+      // caller authority (self or guardian of an uncredentialed charge).
+      await assertCanReadProfile(c, profileId);
       const { cursor, limit, type } = c.req.valid('query');
 
       const result = await listPracticeActivityHistory(db, profileId, {
@@ -151,6 +178,9 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
   // routes still enforce parent-child access separately.
   .get('/progress/reports', async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2416] Header-resolved profileId is only org-checked; verify
+    // caller authority (self or guardian of an uncredentialed charge).
+    await assertCanReadProfile(c, profileId);
 
     const reports = await listMonthlyReportsForProfile(db, profileId);
     return c.json(childReportsResponseSchema.parse({ reports }));
@@ -161,6 +191,9 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
   // profile's report by guessing an ID.
   .get('/progress/reports/:reportId', async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2416] Header-resolved profileId is only org-checked; verify
+    // caller authority (self or guardian of an uncredentialed charge).
+    await assertCanReadProfile(c, profileId);
     const reportId = c.req.param('reportId');
 
     const report = await getMonthlyReportForProfile(db, profileId, reportId);
@@ -187,6 +220,9 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
   // List weekly reports for the active profile.
   .get('/progress/weekly-reports', async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2416] Header-resolved profileId is only org-checked; verify
+    // caller authority (self or guardian of an uncredentialed charge).
+    await assertCanReadProfile(c, profileId);
 
     const reports = await listWeeklyReportsForProfile(db, profileId);
     return c.json(weeklyReportsResponseSchema.parse({ reports }));
@@ -195,6 +231,9 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
   // Get a weekly report for the active profile.
   .get('/progress/weekly-reports/:weeklyReportId', async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2416] Header-resolved profileId is only org-checked; verify
+    // caller authority (self or guardian of an uncredentialed charge).
+    await assertCanReadProfile(c, profileId);
     const reportId = c.req.param('weeklyReportId');
 
     const report = await getWeeklyReportForProfile(db, profileId, reportId);
@@ -220,6 +259,9 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
   // Get active/paused session for a specific topic [F-4]
   .get('/progress/topic/:topicId/active-session', async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2416] Header-resolved profileId is only org-checked; verify
+    // caller authority (self or guardian of an uncredentialed charge).
+    await assertCanReadProfile(c, profileId);
     const topicId = c.req.param('topicId');
 
     const result = await getActiveSessionForTopic(db, profileId, topicId);
@@ -229,6 +271,9 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
   // [F-009] Resolve a topic's parent subject — enables deep-links with topicId only
   .get('/topics/:topicId/resolve', async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2416] Header-resolved profileId is only org-checked; verify
+    // caller authority (self or guardian of an uncredentialed charge).
+    await assertCanReadProfile(c, profileId);
     const topicId = c.req.param('topicId');
 
     const result = await resolveTopicSubject(db, profileId, topicId);
@@ -242,6 +287,9 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
     zValidator('query', learningResumeScopeSchema),
     async (c) => {
       const { db, profileId } = withProfile(c);
+      // [WI-2416] Header-resolved profileId is only org-checked; verify
+      // caller authority (self or guardian of an uncredentialed charge).
+      await assertCanReadProfile(c, profileId);
       const { subjectId, bookId, topicId } = c.req.valid('query');
 
       const target = await getLearningResumeTarget(db, profileId, {
@@ -256,6 +304,9 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
   // Get "continue where I left off" suggestion
   .get('/progress/continue', async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2416] Header-resolved profileId is only org-checked; verify
+    // caller authority (self or guardian of an uncredentialed charge).
+    await assertCanReadProfile(c, profileId);
 
     const suggestion = await getContinueSuggestion(db, profileId);
     return c.json(continueSuggestionResponseSchema.parse({ suggestion }));

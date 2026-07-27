@@ -177,6 +177,7 @@ export async function getSubjectProgress(
   // Find curriculum for this subject
   const curriculum = await db.query.curricula.findFirst({
     where: eq(curricula.subjectId, subjectId),
+    orderBy: desc(curricula.version),
   });
 
   if (!curriculum) {

@@ -34,6 +34,20 @@ describe('session-route-params', () => {
     });
   });
 
+  it('preserves recitation mode when a deep-link route is rehydrated with repeated params', () => {
+    const params = getSessionRouteParams({
+      mode: ['recitation', 'freeform'],
+      subjectId: ['subject-1', 'ignored-subject'],
+      returnTo: ['learner-home', 'own-learning'],
+    });
+
+    expect(params).toMatchObject({
+      effectiveMode: 'recitation',
+      homeBackHref: '/(app)/home',
+      chatBackFallback: '/(app)/home',
+    });
+  });
+
   it('parses gaps JSON, trims blank values, and caps at eight entries', () => {
     const gaps = [
       'one',

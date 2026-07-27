@@ -593,3 +593,256 @@ describe('useApiClient stale-token recovery', () => {
     expect((err as UnauthorizedError).reason).toBe('session-expired');
   });
 });
+
+// ---------------------------------------------------------------------------
+// [WI-2451] A staging edge gap can reject every api-stg route before the
+// Worker sees a request for 5-6.5 seconds. The client may bridge that window,
+// but only for requests whose replay cannot duplicate an unsafe mutation.
+// ---------------------------------------------------------------------------
+
+describe('useApiClient bounded transport replay [WI-2451]', () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    jest.useFakeTimers({ now: 0 });
+    originalFetch = globalThis.fetch;
+    mockGetToken.mockResolvedValue('test-token');
+    setActiveProfileId('profile-A');
+    setProxyMode(true);
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    setActiveProfileId(undefined);
+    setProxyMode(false);
+    mockGetToken.mockReset();
+    jest.useRealTimers();
+  });
+
+  function makeClient() {
+    const { result } = renderHook(() => useApiClient());
+    return result.current as unknown as {
+      v1: {
+        health: {
+          $get: (
+            args?: Record<string, never>,
+            options?: { init?: RequestInit },
+          ) => Promise<Response>;
+          $head: () => Promise<Response>;
+        };
+        transport: {
+          $post: (args: {
+            json: Record<string, unknown>;
+            header?: Record<string, string>;
+          }) => Promise<Response>;
+        };
+      };
+    };
+  }
+
+  it('[MUTATION: NETWORK_RETRY_DELAYS_MS] spans the measured 6.5-second transport gap and then recovers', async () => {
+    const attemptTimes: number[] = [];
+    const fetchMock = jest.fn(async () => {
+      attemptTimes.push(Date.now());
+      if (Date.now() < 6_500) {
+        throw new TypeError('Failed to fetch');
+      }
+      return new Response('{}', { status: 200 });
+    });
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+
+    const request = makeClient().v1.health.$get();
+    await jest.advanceTimersByTimeAsync(10_000);
+
+    await expect(request).resolves.toMatchObject({ status: 200 });
+    expect(attemptTimes).toEqual([0, 500, 1_500, 3_500, 7_500]);
+  });
+
+  it('[MUTATION: safe replay predicate] preserves auth/profile/proxy headers and body on an idempotency-keyed mutation', async () => {
+    const attempts: Array<{ headers: Headers; body: BodyInit | null }> = [];
+    const fetchMock = jest.fn(async (_input, init) => {
+      attempts.push({
+        headers: new Headers(init?.headers),
+        body: init?.body ?? null,
+      });
+      if (attempts.length < 3) {
+        throw new TypeError('Failed to fetch');
+      }
+      return new Response('{}', { status: 200 });
+    });
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+
+    const request = makeClient().v1.transport.$post({
+      json: { answer: 42 },
+      header: {
+        'Idempotency-Key': 'retry-safe-operation',
+        'X-Caller': 'preserve-me',
+      },
+    });
+    await jest.advanceTimersByTimeAsync(1_500);
+
+    await expect(request).resolves.toMatchObject({ status: 200 });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    for (const attempt of attempts) {
+      expect(attempt.headers.get('Authorization')).toBe('Bearer test-token');
+      expect(attempt.headers.get('X-Profile-Id')).toBe('profile-A');
+      expect(attempt.headers.get('X-Proxy-Mode')).toBe('true');
+      expect(attempt.headers.get('Idempotency-Key')).toBe(
+        'retry-safe-operation',
+      );
+      expect(attempt.headers.get('X-Caller')).toBe('preserve-me');
+      expect(attempt.body).toBe(JSON.stringify({ answer: 42 }));
+    }
+  });
+
+  it('[MUTATION: safe replay predicate] never replays an unkeyed mutation', async () => {
+    const fetchMock = jest.fn(async () => {
+      throw new TypeError('Failed to fetch');
+    });
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+
+    const request = makeClient()
+      .v1.transport.$post({ json: { unsafe: true } })
+      .catch((error: unknown) => error);
+    await jest.advanceTimersByTimeAsync(10_000);
+    const err = await request;
+
+    expect(err).toBeInstanceOf(NetworkError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('replays a HEAD request after a pre-response transport failure', async () => {
+    const fetchMock = jest
+      .fn(async () => new Response(null, { status: 200 }))
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+
+    const request = makeClient().v1.health.$head();
+    await jest.advanceTimersByTimeAsync(500);
+
+    await expect(request).resolves.toMatchObject({ status: 200 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('[MUTATION: abort exclusion] never replays an AbortError', async () => {
+    const fetchMock = jest.fn(async () => {
+      throw abortError();
+    });
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+
+    const request = makeClient()
+      .v1.health.$get()
+      .catch((error: unknown) => error);
+    await jest.advanceTimersByTimeAsync(10_000);
+    const err = await request;
+
+    expect(err).toBeInstanceOf(NetworkError);
+    expect((err as NetworkError).cause).toMatchObject({ name: 'AbortError' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('never replays a TanStack query cancellation', async () => {
+    const queryController = new AbortController();
+    const { signal, cleanup } = combinedSignal(queryController.signal);
+    const fetchMock = jest.fn(
+      async () =>
+        new Promise<Response>((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(abortError()));
+        }),
+    );
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+
+    const request = makeClient()
+      .v1.health.$get({}, { init: { signal } })
+      .catch((error: unknown) => error);
+    await jest.advanceTimersByTimeAsync(0);
+    queryController.abort();
+    const err = await request;
+
+    expect(err).toBeInstanceOf(CancelledError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    cleanup();
+  });
+
+  it('never replays a client timeout', async () => {
+    const { signal, cleanup } = combinedSignal(undefined, 25);
+    const fetchMock = jest.fn(
+      async () =>
+        new Promise<Response>((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(abortError()));
+        }),
+    );
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+
+    const request = makeClient()
+      .v1.health.$get({}, { init: { signal } })
+      .catch((error: unknown) => error);
+    await jest.advanceTimersByTimeAsync(25);
+    const err = await request;
+
+    expect(err).toBeInstanceOf(TimeoutError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    cleanup();
+  });
+
+  it('never replays an HTTP response, including a 503', async () => {
+    const fetchMock = jest.fn(
+      async () => new Response('unavailable', { status: 503 }),
+    );
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+
+    const err = await makeClient()
+      .v1.health.$get()
+      .catch((error: unknown) => error);
+
+    expect(err).toBeInstanceOf(UpstreamError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws one terminal NetworkError after the fixed transport retry cap', async () => {
+    const terminalFailure = new TypeError('Failed to fetch');
+    const fetchMock = jest.fn(async () => {
+      throw terminalFailure;
+    });
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+
+    const request = makeClient()
+      .v1.health.$get()
+      .catch((error: unknown) => error);
+    await jest.advanceTimersByTimeAsync(10_000);
+    const err = await request;
+
+    expect(err).toBeInstanceOf(NetworkError);
+    expect((err as NetworkError).cause).toBe(terminalFailure);
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+  });
+
+  it('shares the fixed transport cap across the one-time fresh-token 401 path', async () => {
+    mockGetToken.mockReset();
+    mockGetToken.mockResolvedValueOnce('stale-token');
+    mockGetToken.mockResolvedValueOnce('fresh-token');
+
+    const fetchMock = jest.fn(async () => {
+      if (fetchMock.mock.calls.length === 3) {
+        return new Response(
+          JSON.stringify({ code: 'UNAUTHORIZED', message: 'token expired' }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      throw new TypeError('Failed to fetch');
+    });
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+
+    const request = makeClient()
+      .v1.health.$get()
+      .catch((error: unknown) => error);
+    await jest.advanceTimersByTimeAsync(10_000);
+    const err = await request;
+
+    expect(err).toBeInstanceOf(NetworkError);
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+    expect(mockGetToken).toHaveBeenCalledTimes(2);
+    expect(mockGetToken).toHaveBeenNthCalledWith(2, { skipCache: true });
+  });
+});

@@ -6,6 +6,8 @@ import type { SupporterColdStartCard } from '@eduagent/schemas';
 import { QueryStateView } from '../common';
 import { useSupporterColdStart } from '../../hooks/use-supporter-coldstart';
 import { useScopeContext } from '../../lib/scope-context';
+import { useProfile } from '../../lib/profile';
+import { platformAlert } from '../../lib/platform-alert';
 import { pushAddChildForSupport } from '../../lib/navigation';
 import type { TranslateKey } from '../../i18n';
 
@@ -22,7 +24,29 @@ function ManagedCard({
   card: Extract<SupporterColdStartCard, { state: 'managed' }>;
 }): React.ReactElement {
   const { t } = useTranslation();
-  const { setActiveScope } = useScopeContext();
+  const { switchProfile } = useProfile();
+
+  const handleHandoff = async (): Promise<void> => {
+    // [WI-2226 owner-gate] A managed card only renders for a supportee on
+    // the supporter's own account (resolveSupporterColdStart), so this
+    // switch should always succeed — but switchProfile is async and may
+    // resolve {success:false} or throw (network/Clerk failure), so surface
+    // failure rather than silently no-op (AGENTS.md "UX Resilience Rules").
+    try {
+      const result = await switchProfile(card.personId);
+      if (!result.success) {
+        platformAlert(
+          t('tabs.switchProfile.errorTitle'),
+          result.error ?? t('tabs.switchProfile.errorMessage'),
+        );
+      }
+    } catch {
+      platformAlert(
+        t('tabs.switchProfile.errorTitle'),
+        t('tabs.switchProfile.errorMessage'),
+      );
+    }
+  };
 
   return (
     <View
@@ -40,14 +64,7 @@ function ManagedCard({
         accessibilityLabel={t('supporterColdStart.managed.cta', {
           name: card.displayName,
         })}
-        onPress={() =>
-          setActiveScope({
-            kind: 'person',
-            personId: card.personId,
-            edgeId: card.edgeId,
-            displayName: card.displayName,
-          })
-        }
+        onPress={() => void handleHandoff()}
         className="mt-3 min-h-[44px] items-center justify-center rounded-button bg-primary px-4 py-3"
         testID={`supporter-cold-start-handoff-${card.personId}`}
       >

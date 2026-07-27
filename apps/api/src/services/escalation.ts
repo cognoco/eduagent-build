@@ -22,11 +22,19 @@ export interface EscalationState {
   previousResponseHadPartialProgress?: boolean;
   /** Consecutive exchanges held by partial progress (Gap 3 cap) */
   consecutiveHolds?: number;
+  /** Completed correct-answer streak for the latest contiguous rung visit. */
+  correctStreak?: number;
+  /** Default-closed gate for bounded answer-evaluation downscaffolding. */
+  answerEvaluationEnabled?: boolean;
+  /** App-help, recitation, and active Challenge turns freeze rung movement. */
+  freezeRung?: boolean;
 }
 
 /** Result of evaluating whether to escalate */
 export interface EscalationDecision {
   shouldEscalate: boolean;
+  action: 'escalate' | 'hold' | 'deescalate';
+  direction: 'up' | 'none' | 'down';
   newRung: EscalationRung;
   reason?: string;
 }
@@ -161,22 +169,67 @@ export function evaluateEscalation(
     (normalised.length < ENGAGED_RESPONSE_MIN_LENGTH &&
       WEAK_STUCK_INDICATORS.some((phrase) => normalised.includes(phrase)));
 
-  // Never escalate beyond rung 5
-  if (state.currentRung >= 5) {
+  if (state.freezeRung === true) {
     return {
       shouldEscalate: false,
-      newRung: 5 as EscalationRung,
-      reason: 'Already at maximum escalation rung',
+      action: 'hold',
+      direction: 'none',
+      newRung: state.currentRung,
+      reason: 'Rung movement frozen for excluded exchange mode',
     };
   }
 
   // "I don't know" (UX-16) — escalate faster, after 1 exchange at current rung
   if (isStuck) {
+    if (state.currentRung >= 5) {
+      return {
+        shouldEscalate: false,
+        action: 'hold',
+        direction: 'none',
+        newRung: 5 as EscalationRung,
+        reason: 'Already at maximum escalation rung',
+      };
+    }
     const nextRung = Math.min(state.currentRung + 1, 5) as EscalationRung;
     return {
       shouldEscalate: true,
+      action: 'escalate',
+      direction: 'up',
       newRung: nextRung,
       reason: 'Learner indicated they are stuck — adjusting approach',
+    };
+  }
+
+  if (
+    state.answerEvaluationEnabled === true &&
+    (state.correctStreak ?? 0) >= 4
+  ) {
+    if (state.currentRung <= 1) {
+      return {
+        shouldEscalate: false,
+        action: 'hold',
+        direction: 'none',
+        newRung: 1 as EscalationRung,
+        reason: 'Correct-answer streak reached the rung-1 floor',
+      };
+    }
+    return {
+      shouldEscalate: false,
+      action: 'deescalate',
+      direction: 'down',
+      newRung: (state.currentRung - 1) as EscalationRung,
+      reason: 'Four correct answers at the current rung — reducing support',
+    };
+  }
+
+  // Never escalate beyond rung 5.
+  if (state.currentRung >= 5) {
+    return {
+      shouldEscalate: false,
+      action: 'hold',
+      direction: 'none',
+      newRung: 5 as EscalationRung,
+      reason: 'Already at maximum escalation rung',
     };
   }
 
@@ -200,6 +253,8 @@ export function evaluateEscalation(
   if (hasPartialProgress && withinHoldBudget) {
     return {
       shouldEscalate: false,
+      action: 'hold',
+      direction: 'none',
       newRung: state.currentRung,
       reason: 'Partial progress detected — holding at current rung',
     };
@@ -217,6 +272,8 @@ export function evaluateEscalation(
     const nextRung = Math.min(state.currentRung + 1, 5) as EscalationRung;
     return {
       shouldEscalate: true,
+      action: 'escalate',
+      direction: 'up',
       newRung: nextRung,
       reason: `No progress after ${updatedExchanges} exchanges at rung ${state.currentRung}`,
     };
@@ -224,6 +281,8 @@ export function evaluateEscalation(
 
   return {
     shouldEscalate: false,
+    action: 'hold',
+    direction: 'none',
     newRung: state.currentRung,
   };
 }

@@ -101,6 +101,7 @@ export const transcriptPurgeCron = inngest.createFunction(
               `transcript-purge-cron: ${delayed.length} session(s) past day-37 with missing llmSummary/learnerRecap`,
             ),
             {
+              tags: { surface: 'transcript-purge', signal: 'delayed' },
               extra: {
                 surface: 'transcript-purge-delayed',
                 delayedCount: delayed.length,
@@ -141,6 +142,7 @@ export const transcriptPurgeCron = inngest.createFunction(
             `transcript-purge-cron: ${delayed.length} session(s) past day-37 with missing llmSummary/learnerRecap`,
           ),
           {
+            tags: { surface: 'transcript-purge', signal: 'delayed' },
             extra: {
               surface: 'transcript-purge-delayed',
               delayedCount: delayed.length,
@@ -207,6 +209,7 @@ export const transcriptPurgeHandlerOnFailure = inngest.createFunction(
         `transcript-purge: all retries exhausted — ${failedEvent.error?.message ?? 'unknown error'}`,
       ),
       {
+        tags: { surface: 'transcript-purge', signal: 'function-failed' },
         extra: {
           surface: 'transcript-purge-on-failure',
           profileId: originalData.profileId ?? null,

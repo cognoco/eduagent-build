@@ -11,47 +11,73 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
 
-- runFlow:
-    file: ../_setup/open-family-dashboard.yaml
+# Wait for family navigation to settle before opening child detail. Do not use
+# open-family-dashboard here: it already taps this child card, so the explicit
+# tap below would navigate twice.
+- extendedWaitUntil:
+    visible:
+      id: 'parent-home-screen'
+    timeout: 20000
 
 - tapOn:
-    id: "parent-home-check-child-${CHILD_PROFILE_ID}"
+    id: 'parent-home-child-profile-${CHILD_PROFILE_ID}'
 
 - extendedWaitUntil:
     visible:
-      id: "child-detail-scroll"
+      id: 'child-detail-scroll'
     timeout: 10000
 
 - scrollUntilVisible:
     element:
-      id: "mentor-memory-link"
+      id: 'mentor-memory-link'
     direction: DOWN
     timeout: 10000
 
 - tapOn:
-    id: "mentor-memory-link"
+    id: 'mentor-memory-link'
 
 - extendedWaitUntil:
     visible:
-      text: "What the mentor knows"
+      id: 'child-mentor-memory-screen'
     timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      id: 'child-mentor-memory-populated-category'
+    direction: DOWN
+    timeout: 10000
+    visibilityPercentage: 100
+    centerElement: true
+
+- assertVisible:
+    id: 'child-mentor-memory-populated-category'
 
 - assertNotVisible:
-    text: "No learning observations yet."
+    id: 'child-mentor-memory-empty-state'
 
 - scrollUntilVisible:
     element:
-      text: "Interested in Soccer"
-    direction: DOWN
+      id: 'interest-context-Soccer-both'
+    direction: UP
     timeout: 10000
+    visibilityPercentage: 100
+    centerElement: true
 
 - takeScreenshot: 01-parent-memory-populated
 
 - scrollUntilVisible:
     element:
-      id: "something-wrong-button"
+      id: 'something-wrong-button'
     direction: DOWN
     timeout: 10000
+    visibilityPercentage: 50
+    centerElement: false
+    # Maestro can report 0% after landing this fully above the fixed tab bar.
+    # The mandatory assertion below remains the reachability gate.
+    optional: true
+
+- assertVisible:
+    id: 'something-wrong-button'
 
 - takeScreenshot: 02-parent-memory-controls
 
@@ -59,5 +85,5 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "child-detail-scroll"
+      id: 'child-detail-scroll'
     timeout: 10000

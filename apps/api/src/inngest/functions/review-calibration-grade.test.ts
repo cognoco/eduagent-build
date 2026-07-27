@@ -20,10 +20,26 @@ import type {
   StopReason,
 } from '../../services/llm/types';
 
+jest.mock(
+  '../client', // gc1-allow: Inngest transport boundary
+  () => {
+    const actual = jest.requireActual(
+      '../client',
+    ) as typeof import('../client');
+    const { createInngestTransportCapture } = jest.requireActual(
+      '../../test-utils/inngest-transport-capture',
+    ) as typeof import('../../test-utils/inngest-transport-capture');
+    return {
+      ...actual,
+      inngest: createInngestTransportCapture().inngest,
+    };
+  },
+);
+
 // Register a grader provider that returns a fixed body. The LLM is the only
-// external boundary the in-step closure touches; everything else (topic join,
-// session-event read, recordRetrievalEvent, EU-7 cap read) runs against the
-// mock db below. No internal module is mocked.
+// variable external boundary the in-step closure touches; Inngest transport is
+// captured above, and everything else (topic join, session-event read,
+// recordRetrievalEvent, EU-7 cap read) runs against the mock db below.
 function registerGrader(body: string): void {
   const provider: LLMProvider = {
     id: 'gemini',
@@ -508,11 +524,25 @@ describe('reviewCalibrationGrade', () => {
             content: LEARNER_ANSWER,
           }),
         },
+        retrievalEvents: {
+          findFirst: jest.fn().mockResolvedValue(null),
+        },
+        // [WI-1454] getOpenTopicWeakConcepts reads open needs_deepening rows
+        // for the topic before grading. Default: none → whole-topic recall.
+        needsDeepeningTopics: {
+          findMany: jest.fn().mockResolvedValue([]),
+        },
       },
       insert: jest.fn((table: unknown) => ({
         values: jest.fn((v: unknown) => {
           insertSink.push({ table, v });
-          return Promise.resolve(undefined);
+          return {
+            onConflictDoNothing: jest.fn(() => ({
+              returning: jest
+                .fn()
+                .mockResolvedValue([{ id: LEARNER_MESSAGE_EVENT_ID }]),
+            })),
+          };
         }),
       })),
       update: jest.fn().mockReturnValue({
@@ -534,6 +564,58 @@ describe('reviewCalibrationGrade', () => {
     subjectId: SUBJECT_ID,
     topicDescription: 'How plants convert light to energy',
   };
+
+  it('[WI-1454] focuses the calibration grader on the topic’s open weak concepts (live due-review path)', async () => {
+    // The live "due topic → Review" flow grades through this Inngest closure.
+    // Capture the grader messages to prove an open weak concept is folded into
+    // the recall scope (AC-1 lookup before grading; AC-2 focus). SM-2 finalize
+    // stays memoized/topic-grained (AC-4).
+    let capturedMessages: ChatMessage[] | null = null;
+    const gradeBody =
+      '{"quality": 4, "verdict": "solid", "rationale": "ok", "misconception": null}';
+    registerProvider({
+      id: 'gemini',
+      async chat(messages: ChatMessage[]): Promise<ChatResult> {
+        capturedMessages = messages;
+        return { content: gradeBody, stopReason: 'stop' };
+      },
+      chatStream(messages: ChatMessage[]): ChatStreamResult {
+        capturedMessages = messages;
+        return makeChatStreamResult(
+          (async function* () {
+            yield gradeBody;
+          })(),
+          Promise.resolve<StopReason>('stop'),
+        );
+      },
+    });
+
+    const inserts: Array<{ table: unknown; v: unknown }> = [];
+    const base = makeInlineDbBase(inserts);
+    (base.query.needsDeepeningTopics.findMany as jest.Mock).mockResolvedValue([
+      { concept: 'Light-dependent reactions' },
+    ]);
+    const db = {
+      ...base,
+      select: jest.fn().mockReturnValueOnce(makeTopicSelectChain(TOPIC_ROW)),
+    };
+
+    await runWithInlineClosure({
+      db,
+      memoized: {
+        'load-retention-card': makeFreshCard(),
+        'claim-cooldown-slot': [{ id: CARD_ID }],
+        'finalize-retention-update': undefined,
+        'stamp-mastery-on-verify': undefined,
+      },
+    });
+
+    const user = (capturedMessages as ChatMessage[] | null)?.find(
+      (m) => m.role === 'user',
+    );
+    expect(user?.content).toContain('<focus_concepts>');
+    expect(user?.content).toContain('Light-dependent reactions');
+  });
 
   it('[C-3] records inside the step and crosses the boundary with NO PII (graded)', async () => {
     registerGrader(

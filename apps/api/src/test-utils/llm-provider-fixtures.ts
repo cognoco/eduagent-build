@@ -28,10 +28,18 @@ export interface LlmProviderFixtureOptions {
   id?: string;
   chatResponse?: LlmFixtureContent;
   chatResponses?: LlmFixtureContent[];
+  chatResponseResolver?: (
+    messages: ChatMessage[],
+    config: ModelConfig,
+  ) => LlmFixtureContent | undefined;
   chatError?: unknown;
   chatErrors?: unknown[];
   streamResponse?: LlmFixtureContent;
   streamResponses?: LlmFixtureContent[];
+  streamResponseResolver?: (
+    messages: ChatMessage[],
+    config: ModelConfig,
+  ) => LlmFixtureContent | undefined;
   streamError?: unknown;
   stopReason?: StopReason;
   chunkSize?: number;
@@ -132,6 +140,13 @@ export function createLlmProviderFixture(
       if (chatError !== undefined) {
         throwFixtureError(chatError);
       }
+      const resolvedResponse = options.chatResponseResolver?.(messages, config);
+      if (resolvedResponse !== undefined) {
+        return {
+          content: contentToString(resolvedResponse),
+          stopReason,
+        };
+      }
       return {
         content: queuedChatResponses.shift() ?? chatResponse,
         stopReason,
@@ -139,8 +154,14 @@ export function createLlmProviderFixture(
     },
     chatStream(messages: ChatMessage[], config: ModelConfig) {
       streamCalls.push({ messages, config });
+      const resolvedResponse = options.streamResponseResolver?.(
+        messages,
+        config,
+      );
       const response =
-        queuedStreamResponses.shift() ?? streamResponse ?? chatResponse;
+        resolvedResponse === undefined
+          ? (queuedStreamResponses.shift() ?? streamResponse ?? chatResponse)
+          : contentToString(resolvedResponse);
 
       let resolveStopReason!: (reason: StopReason) => void;
       const stopReasonPromise = new Promise<StopReason>((resolve) => {

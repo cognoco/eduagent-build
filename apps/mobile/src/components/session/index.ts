@@ -1,4 +1,5 @@
-export { ChatShell, animateResponse, type ChatMessage } from './ChatShell';
+export { ChatShell, animateResponse } from './ChatShell';
+export type { ChatMessage } from './session-types';
 export { MessageBubble, type VerificationBadge } from './MessageBubble';
 export {
   type SessionModeConfig,
@@ -22,6 +23,7 @@ export type { QuotaExceededCardProps } from './QuotaExceededCard';
 export { FluencyDrillStrip } from './FluencyDrillStrip';
 export { GradedInputCard } from './GradedInputCard';
 export { MeaningOutputCard } from './MeaningOutputCard';
+export { SpeakingPracticeActivity } from './SpeakingPracticeActivity';
 export {
   MilestoneDots,
   MILESTONE_DOTS_NARROW_BREAKPOINT_PT,

@@ -9,13 +9,27 @@
 // DB / grant work and escalates via the Sentry boundary.
 //
 // Sentry is a true external boundary (the @sentry SDK wrapper) — the only mock.
-// The handler receives a Proxy `db` that throws on ANY access: if the guard
+// The handler receives a Proxy `db` that throws on any access OUTSIDE the
+// identity-resolve query chain (see `createIdentityDb` below): if the guard
 // regressed and the handler proceeded to resolveAccountIdV2 / the grant path,
-// the call would throw. Asserting it resolves without throwing proves the guard
-// short-circuited before touching the DB.
+// an unmodeled DB access (e.g. the subscription table) would throw. Asserting
+// it resolves without throwing proves the guard short-circuited before
+// touching the DB.
 //
 // [WI-1010] Additional mocks for handleBillingIssueV2 inngest.send escalation
 // test. These modules are external boundaries or pattern-a conversions.
+//
+// [WI-1252] resolveIdentityV2 (identity-v2/identity-resolve) and
+// safeRefreshKvCacheV2 (safe-refresh-kv-cache-v2) are no longer mocked — the
+// real implementations run against `createIdentityDb`'s seeded fake below.
+// safeRefreshKvCacheV2 never actually reaches the DB in this file: every test
+// passes `kv=undefined`, and its first line is `if (!kv) { captureMessage(...);
+// return; }` — see its own module header. `./revenuecat-v2`
+// (updateSubscriptionFromRevenuecatWebhookV2 et al.) stays mocked: unmocking it
+// would require faithfully modeling quota reconciliation's person×membership×
+// subscription joins and provisionProfileQuotaUsageV2 — real coverage of that
+// write path already lives in revenuecat-v2.integration.test.ts against actual
+// Postgres. Deferred (GC6 backlog, not indefinite — see AGENTS.md).
 // ---------------------------------------------------------------------------
 
 const mockCaptureMessage = jest.fn();
@@ -42,23 +56,6 @@ jest.mock(
     inngest: { send: (...args: unknown[]) => mockInngestSend(...args) },
   }),
 );
-
-// [WI-1010] identity-v2 resolve — DB-backed; pattern-a conversion.
-// Note: resolveAccountIdV2 is defined inline in revenuecat-webhook-handler-v2.ts
-// and calls resolveIdentityV2 from this module. Mocking resolveIdentityV2 is
-// the correct seam.
-const mockResolveIdentityV2 = jest.fn().mockResolvedValue({
-  organizationId: 'account-v2-test',
-});
-jest.mock('../../identity-v2/identity-resolve', () => {
-  const actual = jest.requireActual(
-    '../../identity-v2/identity-resolve',
-  ) as typeof import('../../identity-v2/identity-resolve');
-  return {
-    ...actual,
-    resolveIdentityV2: (...args: unknown[]) => mockResolveIdentityV2(...args),
-  };
-});
 
 // [WI-1010] revenuecat-v2 — DB-backed; pattern-a conversion.
 const mockUpdateSubscriptionFromRevenuecatWebhookV2 = jest
@@ -147,17 +144,6 @@ jest.mock('../top-up', () => {
   };
 });
 
-// [WI-1010] safe-refresh-kv-cache-v2 — KV+DB-backed; pattern-a conversion.
-jest.mock('./safe-refresh-kv-cache-v2', () => {
-  const actual = jest.requireActual(
-    './safe-refresh-kv-cache-v2',
-  ) as typeof import('./safe-refresh-kv-cache-v2');
-  return {
-    ...actual,
-    safeRefreshKvCacheV2: jest.fn().mockResolvedValue(undefined),
-  };
-});
-
 import {
   handleInitialPurchaseV2,
   handleRenewalV2,
@@ -169,21 +155,135 @@ import {
   handleSubscriberAliasV2,
   handleUncancellationV2,
 } from './revenuecat-webhook-handler-v2';
-import { safeRefreshKvCacheV2 } from './safe-refresh-kv-cache-v2';
+// [WI-1252] Real module — spied (call-through) rather than jest.mock'd, so the
+// handler's `if (!kv) { captureMessage(...); return; }` short-circuit (kv is
+// always undefined in this file) runs for real while `toHaveBeenCalled()`
+// assertions on the actual invocation still work.
+import * as safeRefreshKvCacheV2Module from './safe-refresh-kv-cache-v2';
+import type { Database } from '@eduagent/database';
 import type { RevenueCatEvent } from '../revenuecat-shared';
 
-// A db that throws on ANY property access — any attempt to reach the DB or grant
-// path after the guard would fail loudly.
-const throwingDb = new Proxy(
-  {},
-  {
-    get() {
-      throw new Error(
-        'DB accessed — family-share guard did not short-circuit before the grant path',
-      );
+const safeRefreshKvCacheV2Spy = jest.spyOn(
+  safeRefreshKvCacheV2Module,
+  'safeRefreshKvCacheV2',
+);
+
+// ---------------------------------------------------------------------------
+// [WI-1252] Identity-resolve fake DB — models the login → membership →
+// organization query chain the real (unmocked) resolveIdentityV2 reads.
+// Ignores the `where` predicate and always serves the currently-seeded
+// identity: no test in this file resolves more than one distinct clerkUserId
+// within a single call chain (the family-share tests short-circuit before
+// resolving at all; the alias test reseeds to a second identity between
+// tests, not within one). Mirrors the ignore-the-where fake pattern already
+// used in subscription-core-v2.test.ts / access-v2.test.ts.
+//
+// Any property access outside the query chain throws — this preserves the
+// "nothing else reaches the DB" proof the family-share tests and the
+// activation control test depend on (the revenuecat-v2 core functions stay
+// mocked in this file; see the header comment above).
+// ---------------------------------------------------------------------------
+
+interface FakeIdentity {
+  personId: string;
+  organizationId: string;
+  roles: string[];
+}
+
+function createIdentityDb(defaultIdentity: FakeIdentity) {
+  let current: FakeIdentity | null = defaultIdentity;
+
+  const query = {
+    login: {
+      findFirst: jest.fn(async () =>
+        current
+          ? {
+              id: `login-${current.personId}`,
+              personId: current.personId,
+              clerkUserId: 'unused-in-fake', // where-clause is ignored
+              email: 'unused@test.example',
+            }
+          : undefined,
+      ),
     },
-  },
-) as never;
+    membership: {
+      findMany: jest.fn(async () =>
+        current
+          ? [
+              {
+                id: `membership-${current.personId}`,
+                personId: current.personId,
+                organizationId: current.organizationId,
+                roles: current.roles,
+              },
+            ]
+          : [],
+      ),
+    },
+    organization: {
+      findFirst: jest.fn(async () =>
+        current
+          ? {
+              id: current.organizationId,
+              timezone: null,
+              createdAt: new Date('2026-01-01T00:00:00.000Z'),
+              updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+            }
+          : undefined,
+      ),
+    },
+  };
+
+  // Only these entry points indicate the real revenuecat-v2 write path was
+  // reached (it stays mocked in this file — see the header comment). Jest's
+  // own equality/asymmetric-matcher machinery probes plain-object-looking
+  // properties (asymmetricMatch, then, toJSON, symbols, …) on any arg passed
+  // to `toHaveBeenCalledWith(mockDb, ...)`; those must fall through to
+  // `undefined`, not throw, or every such assertion in this file breaks.
+  const GUARDED_DB_METHODS = new Set([
+    'transaction',
+    'select',
+    'update',
+    'insert',
+    'delete',
+  ]);
+
+  const db = new Proxy(
+    { query },
+    {
+      get(target, prop) {
+        if (prop === 'query') return target.query;
+        if (typeof prop === 'symbol' || !GUARDED_DB_METHODS.has(prop)) {
+          return undefined;
+        }
+        throw new Error(
+          `identity fake db: unexpected db.${String(prop)} access — this fake ` +
+            'only models the login/membership/organization chain resolveIdentityV2 ' +
+            "reads; the revenuecat-v2 core functions stay mocked in this file (WI-1252 deferral — see this file's header comment).",
+        );
+      },
+    },
+  );
+
+  return {
+    db: db as unknown as Database,
+    setIdentity(identity: FakeIdentity | null) {
+      current = identity;
+    },
+  };
+}
+
+const DEFAULT_IDENTITY: FakeIdentity = {
+  personId: 'person-v2-test',
+  organizationId: 'account-v2-test',
+  roles: ['admin'],
+};
+
+// [WI-1252] A db that throws on any access OUTSIDE the identity-resolve query
+// chain — any attempt to reach the (mocked-out) grant path after the guard
+// would still fail loudly, but the real resolveIdentityV2 call the "control"
+// test below exercises can now resolve identity for real.
+const throwingDb = createIdentityDb(DEFAULT_IDENTITY).db;
 
 const mockKv = undefined;
 
@@ -313,13 +413,21 @@ describe('[Issue 836] v2 family-share entitlement block', () => {
     );
 
     // Referential (not structural) checks — throwingDb's Proxy throws on any
-    // property access, including what Jest's deep-equal matchers would do.
+    // property access outside the identity-resolve query chain, including
+    // what Jest's deep-equal matchers would do.
     expect(mockActivateSubscriptionFromRevenuecatV2).toHaveBeenCalledTimes(1);
     const call = mockActivateSubscriptionFromRevenuecatV2.mock.calls[0];
     expect(call[0]).toBe(throwingDb);
     expect(call[1]).toBe('account-v2-test');
     expect(call[2]).toBe('plus');
-    expect(mockCaptureMessage).not.toHaveBeenCalled();
+    // [WI-1252] safeRefreshKvCacheV2 is real now and its `kv=undefined`
+    // short-circuit calls captureMessage('missing-kv') — so "not called at
+    // all" is no longer the right assertion. Assert no FAMILY-SHARE escalation
+    // happened instead, which is what this control test actually guards.
+    expect(mockCaptureMessage).not.toHaveBeenCalledWith(
+      expect.stringContaining('family_share'),
+      expect.anything(),
+    );
   });
 });
 
@@ -357,15 +465,14 @@ describe('[WI-1010] handleBillingIssueV2 inngest.send failure escalation', () =>
     event_timestamp_ms: 1700000000000,
   };
 
-  // A no-op db — handleBillingIssueV2 DB operations are all mocked.
-  const noopDb = {} as never;
+  // [WI-1252] handleBillingIssueV2's other DB-backed calls are mocked; only
+  // resolveIdentityV2 (via resolveAccountIdV2) is real, so noopDb only needs
+  // to serve the identity-resolve chain.
+  const noopDb = createIdentityDb(DEFAULT_IDENTITY).db;
 
   beforeEach(() => {
     // Ensure inngest.send succeeds by default; tests override as needed.
     mockInngestSend.mockResolvedValue(undefined);
-    mockResolveIdentityV2.mockResolvedValue({
-      organizationId: 'account-v2-test',
-    });
     mockUpdateSubscriptionFromRevenuecatWebhookV2.mockResolvedValue({
       id: 'sub-v2-test',
       accountId: 'account-v2-test',
@@ -427,7 +534,11 @@ describe('[WI-1010] handleBillingIssueV2 inngest.send failure escalation', () =>
 // each handler calls (same pattern as the family-share tests above).
 // ---------------------------------------------------------------------------
 
-const mockDb = {} as any;
+// [WI-1252] resolveAccountIdV2 (real) resolves identity through this db; every
+// other DB-backed call the handlers make is still mocked (see the jest.mock
+// calls above), so mockDb only needs to serve the identity-resolve chain.
+const mockIdentityDb = createIdentityDb(DEFAULT_IDENTITY);
+const mockDb = mockIdentityDb.db;
 
 function mockSub(overrides: Record<string, unknown> = {}) {
   return {
@@ -441,6 +552,7 @@ function mockSub(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   mockGetSubscriptionByAccountIdV2.mockResolvedValue(mockSub());
+  mockIdentityDb.setIdentity(DEFAULT_IDENTITY);
 });
 
 describe('handleInitialPurchaseV2', () => {
@@ -460,7 +572,7 @@ describe('handleInitialPurchaseV2', () => {
       'evt_rc_v2_1',
       expect.objectContaining({ isTrial: false }),
     );
-    expect(safeRefreshKvCacheV2).toHaveBeenCalled();
+    expect(safeRefreshKvCacheV2Spy).toHaveBeenCalled();
   });
 
   it('escalates an unmapped product_id to Sentry without activating', async () => {
@@ -729,12 +841,14 @@ describe('handleSubscriberAliasV2', () => {
   // a pre-downgrade snapshot (including its top-up balance) so the merge
   // worker can reconcile the survivor.
   it('[BUG-783 / WI-1057] downgrades the from-side subscription and dispatches app/billing.alias_received with a snapshot', async () => {
-    mockResolveIdentityV2.mockImplementation(
-      async (_db: unknown, appUserId: string) =>
-        appUserId === 'clerk_user_from'
-          ? { organizationId: 'account-from' }
-          : { organizationId: 'account-v2-test' },
-    );
+    // [WI-1252] The only identity resolveIdentityV2 resolves in this test is
+    // the from-side ('clerk_user_from') — handleSubscriberAliasV2 never
+    // resolves the event's own app_user_id.
+    mockIdentityDb.setIdentity({
+      personId: 'person-from',
+      organizationId: 'account-from',
+      roles: ['admin'],
+    });
     mockGetSubscriptionByAccountIdV2.mockResolvedValue(
       mockSub({ id: 'sub-from-1', accountId: 'account-from', tier: 'plus' }),
     );
@@ -954,7 +1068,7 @@ describe('handleNonRenewingPurchaseV2 [BS-02]', () => {
       'txn_duplicate_123',
     );
     expect(result).toBeNull();
-    expect(safeRefreshKvCacheV2).not.toHaveBeenCalled();
+    expect(safeRefreshKvCacheV2Spy).not.toHaveBeenCalled();
   });
 });
 

@@ -10,6 +10,7 @@ export function SettingsRow({
   onPress,
   testID,
   labelClassName,
+  targetName,
 }: {
   label: string;
   description?: string;
@@ -17,8 +18,12 @@ export function SettingsRow({
   onPress?: () => void;
   testID?: string;
   labelClassName?: string;
+  targetName?: string;
 }): React.ReactElement {
   const themeColors = useThemeColors();
+  const accessibilityLabel = [label, targetName, value, description]
+    .filter(Boolean)
+    .join('. ');
   return (
     <Pressable
       onPress={onPress}
@@ -28,7 +33,7 @@ export function SettingsRow({
         ...(pressed ? { opacity: 0.6 } : {}),
         ...(Platform.OS === 'web' && onPress ? { cursor: 'pointer' } : {}),
       })}
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel}
       accessibilityRole={onPress ? 'button' : undefined}
       testID={testID}
     >
@@ -36,6 +41,11 @@ export function SettingsRow({
         <Text className={labelClassName ?? 'text-body text-text-primary'}>
           {label}
         </Text>
+        {targetName ? (
+          <Text className="text-body-sm text-text-secondary mt-0.5">
+            {targetName}
+          </Text>
+        ) : null}
         {description ? (
           <Text className="text-body-sm text-text-secondary mt-0.5">
             {description}
@@ -70,6 +80,7 @@ export function ToggleRow({
   disabled,
   testID,
   description,
+  targetName,
 }: {
   label: string;
   value: boolean;
@@ -77,7 +88,11 @@ export function ToggleRow({
   disabled?: boolean;
   testID?: string;
   description?: string;
+  targetName?: string;
 }): React.ReactElement {
+  const accessibilityLabel = [label, targetName, description]
+    .filter(Boolean)
+    .join('. ');
   return (
     <View
       className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2"
@@ -85,6 +100,11 @@ export function ToggleRow({
     >
       <View className="flex-1 pr-3">
         <Text className="text-body text-text-primary">{label}</Text>
+        {targetName ? (
+          <Text className="text-body-sm text-text-secondary mt-1">
+            {targetName}
+          </Text>
+        ) : null}
         {description ? (
           <Text className="text-body-sm text-text-secondary mt-1">
             {description}
@@ -95,7 +115,7 @@ export function ToggleRow({
         value={value}
         onValueChange={onToggle}
         disabled={disabled}
-        accessibilityLabel={label}
+        accessibilityLabel={accessibilityLabel}
         testID={testID ? `${testID}-switch` : undefined}
       />
     </View>

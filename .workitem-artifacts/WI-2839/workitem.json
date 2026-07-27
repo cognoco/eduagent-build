@@ -1,0 +1,23 @@
+{
+  "pageId": "3a98bce9-1f7c-81c7-a85e-e0c3cbeafd19",
+  "id": "WI-2839",
+  "name": "Stabilize weekly-progress-push timezone test across hour boundaries",
+  "description": "Root cause: the weekly-progress-push integration test selects a supposedly local-09:00 organization timezone from one new Date() before seeding, while the real cron independently constructs a later new Date() inside find-weekly-parents. If execution crosses a UTC-hour boundary between those reads, the seeded timezone no longer resolves to 09:00, so the real eligibility query excludes the intended parent and returns queuedParents=0. This time-dependent test race blocks unrelated strict-green PRs.",
+  "acceptanceCriteria": "Root cause: the test chooses the matching timezone from one wall-clock instant, but the real cron evaluates eligibility using a later independent instant; crossing a UTC-hour boundary invalidates the fixture. Variants searched: (a) same-hour control queues the matching parent, (b) deterministic rollover between fixture selection and cron evaluation still queues the intended parent, (c) the deliberately non-matching parent remains excluded, and (d) unrelated shared-database parents do not weaken the created-parent identity assertion. 1. A named regression test fails on the landed implementation when the two reads straddle an hour boundary and passes with the fix. 2. Test and handler use one authoritative evaluation instant or an equivalent deterministic boundary without changing production scheduling semantics. 3. Existing queued-parent and excluded-parent identity assertions remain strict; no retry, timeout, or count loosening. 4. Focused weekly-progress-push integration passes with IDENTITY_V2_ENABLED=true. 5. The full Flag-ON integration gate passes at the exact PR head. 6. Evidence cites originating run 30224090384/job 89851383157 (151 other API suites and 1160 tests green). Non-goals: production cadence changes, timezone-policy redesign, or unrelated shared-DB cleanup.",
+  "riskImpact": "P1 delivery-gate blocker: the race can fail the Flag-ON integration check on any unrelated PR near an hour boundary, preventing governed landing and obscuring real regressions.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "executor:codex:bid19:WI-2839",
+  "claimWorkspace": "cognoco/eduagent-build@WI-2839",
+  "claimMachine": "lancre",
+  "claimedAt": "2026-07-27T00:00:00.000+00:00",
+  "claimExpires": "July 27, 2026 03:00",
+  "lastEditedTime": "2026-07-27T00:00:00.000Z",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "",
+  "bodyText": ""
+}

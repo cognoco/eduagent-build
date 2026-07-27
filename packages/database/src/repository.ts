@@ -7,6 +7,7 @@ import { createCurriculumRepository } from './repository.curriculum';
 import { createMemoryRepository } from './repository.memory';
 import { createReportsRepository } from './repository.reports';
 import { createQuizRepository } from './repository.quiz';
+import { createSpeakingPracticeRepository } from './repository.speaking-practice';
 
 // [BUG-704 / P-8] Single source of truth for the runtime DB enum
 // (quizActivityTypeEnum at quiz.ts:4-8 = ['capitals', 'vocabulary', 'guess_who']).
@@ -43,6 +44,7 @@ export function createScopedRepository(db: Database, profileId: string) {
     ...createMemoryRepository(db, profileId, scopedWhere),
     ...createReportsRepository(db, profileId, scopedWhere),
     ...createQuizRepository(db, profileId, scopedWhere),
+    ...createSpeakingPracticeRepository(db, profileId, scopedWhere),
   };
 }
 

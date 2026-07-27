@@ -1,0 +1,177 @@
+# WI-2215: V2 Subjects create-subject round trip
+#
+# Covers the bounded zero-subject journey owned by this item: Subjects Add,
+# Cancel, Android Back, first subject creation, ready handoff, and semantic
+# return from the first session to the V2 Subjects tab. Every case-specific
+# assertion is hard; this flow intentionally contains no optional assertions.
+appId: com.mentomate.app
+tags:
+  - v2
+  - subjects
+  - subject-creation
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: 'onboarding-no-subject'
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 30000
+
+- tapOn:
+    id: 'tab-subjects'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'subjects-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'subjects-browse-create'
+
+# Cancel returns semantically to Subjects rather than account onboarding.
+- tapOn:
+    id: 'subjects-browse-create'
+- extendedWaitUntil:
+    visible:
+      id: 'create-subject-name'
+    timeout: 15000
+- tapOn:
+    id: 'create-subject-name'
+- inputText: 'Cancel path subject'
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: 'create-subject-cancel'
+    direction: UP
+    timeout: 10000
+- assertVisible:
+    id: 'create-subject-cancel'
+- tapOn:
+    id: 'create-subject-cancel'
+- extendedWaitUntil:
+    visible:
+      id: 'subjects-screen'
+    timeout: 15000
+
+# Android hardware Back preserves the pushed Subjects ancestor.
+- tapOn:
+    id: 'subjects-browse-create'
+- extendedWaitUntil:
+    visible:
+      id: 'create-subject-name'
+    timeout: 15000
+- tapOn:
+    id: 'create-subject-name'
+- inputText: 'Temporary subject'
+- hideKeyboard
+- pressKey: back
+- extendedWaitUntil:
+    visible:
+      id: 'subjects-screen'
+    timeout: 15000
+
+# Create a specific topic and carry the Subjects return token through the
+# first-subject ready handoff. Each resolver result is handled explicitly:
+# direct matches reach Ready without another action; corrected/resolved
+# matches require confirmation; no-match uses the learner's exact words;
+# ambiguous matches fail closed instead of selecting an arbitrary option.
+- tapOn:
+    id: 'subjects-browse-create'
+- extendedWaitUntil:
+    visible:
+      id: 'create-subject-name'
+    timeout: 15000
+- tapOn:
+    id: 'create-subject-name'
+- inputText: 'Photosynthesis'
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: 'create-subject-submit'
+    timeout: 5000
+- tapOn:
+    id: 'create-subject-submit'
+# Wait for a durable resolver outcome before evaluating one-shot branches.
+# The generic suggestion card is the ambiguous result and fails closed below.
+- extendedWaitUntil:
+    visible:
+      id: '^(ready-screen|subject-confident-card|subject-single-suggestion-card|subject-no-match-card|subject-suggestion-card)$'
+    timeout: 60000
+- extendedWaitUntil:
+    notVisible:
+      id: 'subject-resolve-loading'
+    timeout: 60000
+- assertNotVisible:
+    id: 'subject-suggestion-card'
+# Each owned branch proves the action is a descendant before tapping its ID.
+# Do not require childOf: action buttons can sit below layout wrappers.
+- runFlow:
+    when:
+      visible:
+        id: 'subject-confident-card'
+    commands:
+      - assertVisible:
+          id: 'subject-confident-card'
+          containsDescendants:
+            - id: 'subject-suggestion-accept'
+      - tapOn:
+          id: 'subject-suggestion-accept'
+- runFlow:
+    when:
+      visible:
+        id: 'subject-single-suggestion-card'
+    commands:
+      - assertVisible:
+          id: 'subject-single-suggestion-card'
+          containsDescendants:
+            - id: 'subject-suggestion-accept'
+      - tapOn:
+          id: 'subject-suggestion-accept'
+- runFlow:
+    when:
+      visible:
+        id: 'subject-no-match-card'
+    commands:
+      - assertVisible:
+          id: 'subject-no-match-card'
+          containsDescendants:
+            - id: 'subject-use-my-words'
+      - tapOn:
+          id: 'subject-use-my-words'
+- extendedWaitUntil:
+    visible:
+      id: 'ready-screen'
+    timeout: 60000
+- extendedWaitUntil:
+    visible:
+      text: 'Starting with Photosynthesis'
+    timeout: 10000
+- assertVisible:
+    text: 'Starting with Photosynthesis'
+- assertVisible:
+    id: 'ready-start'
+- tapOn:
+    id: 'ready-start'
+- extendedWaitUntil:
+    visible:
+      id: 'session-screen'
+    timeout: 45000
+- assertVisible:
+    id: 'chat-shell-back'
+- tapOn:
+    id: 'chat-shell-back'
+- extendedWaitUntil:
+    visible:
+      id: 'subjects-screen'
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: '^subjects-browse-row-.*$'
+      text: 'Open Photosynthesis'
+    timeout: 15000
+- assertVisible:
+    id: '^subjects-browse-row-.*$'
+    text: 'Open Photosynthesis'

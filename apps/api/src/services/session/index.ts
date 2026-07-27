@@ -43,6 +43,7 @@ export type { RecordableSessionEventType } from './session-events';
 export {
   SubjectInactiveError,
   SessionExchangeLimitError,
+  ConsentWithdrawnError,
   CurriculumSessionNotReadyError,
   MAX_EXCHANGES_PER_SESSION,
   startSession,
@@ -104,6 +105,7 @@ export {
   getSessionSummary,
   skipSummary,
   submitSummary,
+  retrySummaryFeedback,
 } from './session-summary';
 
 export { generateLearnerRecap } from '../session-recap';
@@ -121,9 +123,6 @@ export {
   backfillSessionTopicId,
 } from './session-book';
 export type { BookSession } from '@eduagent/schemas';
-
-// Depth evaluation
-export { evaluateSessionDepth } from './session-depth';
 
 // Topic sessions (Library v3)
 export { getTopicSessions } from './session-topic';

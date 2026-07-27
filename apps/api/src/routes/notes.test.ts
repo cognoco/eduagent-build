@@ -4,6 +4,22 @@ import { noteRoutes } from './notes';
 import type { AppVariables } from '../types/hono';
 import { TEST_PROFILE_ID, TEST_SESSION_ID } from '@eduagent/test-utils';
 
+// [WI-2416] assertCanReadProfile (all GET /notes* routes) calls
+// verifyPersonOwnershipV2, which runs a raw db.select() membership query.
+// This file's fake db is a call-order shift-queue keyed to the ROUTE's own
+// selects (see makeFakeDb) — an extra, unaccounted-for select from the guard
+// would desync the queue and return the wrong pre-programmed rows to
+// unrelated assertions. Every scenario in this file is a caller-self read
+// (makeApp sets callerPersonId === profileId); the cross-account read attack
+// this guard exists to close is covered by the real-DB break test in
+// tests/integration/wi2416-read-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's shift-queue mock DB.
+jest.mock('../services/identity-v2/ownership-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/ownership-v2'),
+  verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+}));
+
 const PROFILE_ID = TEST_PROFILE_ID;
 const SUBJECT_ID = 'a0000000-0000-4000-a000-000000000010';
 const TOPIC_ID = 'a0000000-0000-4000-a000-000000000020';
@@ -91,6 +107,10 @@ function makeApp(db: FakeDb) {
 
   app.use('*', async (c, next) => {
     c.set('db', db as AppVariables['db']);
+    // [WI-2416] assertCanReadProfile requires both; self-scoped throughout
+    // this file (callerPersonId === profileId).
+    c.set('account', { id: 'test-account-id' } as AppVariables['account']);
+    c.set('callerPersonId', PROFILE_ID);
     c.set('profileId', PROFILE_ID);
     c.set('profileMeta', {
       isOwner: true,
@@ -151,6 +171,8 @@ describe('note routes', () => {
             subjectName: 'Chemistry',
             sessionId: SESSION_ID,
             content: 'Remember that atoms are mostly empty space.',
+            artifactSource: 'learner_authored_note',
+            verificationState: 'unverified',
             createdAt: new Date('2026-05-15T10:00:00.000Z'),
             updatedAt: new Date('2026-05-15T10:05:00.000Z'),
           },
@@ -174,6 +196,8 @@ describe('note routes', () => {
             sessionId: SESSION_ID,
             content: 'Remember that atoms are mostly empty space.',
             origin: 'self',
+            artifactSource: 'learner_authored_note',
+            verificationState: 'unverified',
             createdAt: '2026-05-15T10:00:00.000Z',
             updatedAt: '2026-05-15T10:05:00.000Z',
           },
@@ -197,6 +221,8 @@ describe('note routes', () => {
             subjectName: 'Chemistry',
             sessionId: null,
             content: 'First visible note.',
+            artifactSource: 'learner_authored_note',
+            verificationState: 'unverified',
             createdAt: new Date('2026-05-15T10:00:00.000Z'),
             updatedAt: new Date('2026-05-15T10:05:00.000Z'),
           },
@@ -210,6 +236,8 @@ describe('note routes', () => {
             subjectName: 'Chemistry',
             sessionId: null,
             content: 'Second row is the lookahead row.',
+            artifactSource: 'learner_authored_note',
+            verificationState: 'unverified',
             createdAt: new Date('2026-05-15T09:00:00.000Z'),
             updatedAt: new Date('2026-05-15T09:05:00.000Z'),
           },

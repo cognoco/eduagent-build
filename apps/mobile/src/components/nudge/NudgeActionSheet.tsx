@@ -91,7 +91,12 @@ export function NudgeActionSheet({
               : null;
 
   return (
-    <BottomSheet visible onClose={onClose} animationType="fade">
+    <BottomSheet
+      visible
+      onClose={onClose}
+      accessibilityLabel={t('nudge.sheet.title', { childName })}
+      animationType="fade"
+    >
       <View
         className="bg-surface px-5 pt-5"
         style={{ paddingBottom: insets.bottom + 8 }}
@@ -153,7 +158,10 @@ export function NudgeActionSheet({
         </View>
 
         {errorCopy ? (
-          <View className="rounded-card bg-danger-soft px-4 py-3 mt-3">
+          <View
+            className="rounded-card bg-danger-soft px-4 py-3 mt-3"
+            testID={`nudge-inline-error-${inlineError}`}
+          >
             <Text className="text-body-sm font-semibold text-danger">
               {errorCopy}
             </Text>

@@ -45,6 +45,7 @@ export function SupportPersonPickerSheet({
       onClose={onClose}
       backdropDismissible
       backdropAccessibilityLabel={t('supportHub.picker.closeLabel')}
+      accessibilityLabel={t('supportHub.picker.title')}
       testID="support-person-picker-sheet"
     >
       <View className="bg-background px-5 pt-5 pb-8">

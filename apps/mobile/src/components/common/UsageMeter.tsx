@@ -46,6 +46,9 @@ export function UsageMeter({ used, limit, warningLevel }: UsageMeterProps) {
         accessibilityRole="progressbar"
         accessibilityLabel={t('usageMeter.a11yProgressBar', { used, limit })}
         accessibilityValue={{ min: 0, max: limit, now: clampedUsed }}
+        aria-valuemin={0}
+        aria-valuemax={limit}
+        aria-valuenow={clampedUsed}
         className="h-2.5 bg-border rounded-full overflow-hidden"
       >
         <View

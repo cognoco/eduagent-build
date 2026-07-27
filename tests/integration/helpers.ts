@@ -95,6 +95,7 @@ type IntegrationEnvOverrides = Partial<{
   CLERK_AUDIENCE: string;
   APP_URL: string;
   API_ORIGIN: string;
+  CONSENT_POLICY_VERSION: string;
 }>;
 
 export const INTEGRATION_TEST_AUDIENCE = 'integration-test-audience';

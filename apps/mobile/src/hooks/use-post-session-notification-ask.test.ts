@@ -45,7 +45,7 @@ const mockAlert = platformAlert as jest.Mock;
 // useUpdateNotificationSettings (via ./use-settings) so the mutation payload
 // (preserved fields + pushEnabled) is exercised end to end. GC1-clean: the
 // only mocked boundary is global fetch, mirroring
-// use-guardian-notification-ask.test.ts and use-child-cap-notifications.test.ts.
+// use-child-cap-notifications.test.ts.
 const mockFetch = jest.fn();
 const originalFetch = globalThis.fetch;
 
@@ -118,6 +118,7 @@ function renderPostSessionAsk(
   profileId: string | undefined,
   hasCompletedSession: boolean,
   isParentProxy: boolean,
+  hasMentorNotice = false,
 ) {
   return renderHook(
     () =>
@@ -125,6 +126,7 @@ function renderPostSessionAsk(
         profileId,
         hasCompletedSession,
         isParentProxy,
+        hasMentorNotice,
       ),
     { wrapper: setupWrapper() },
   );
@@ -278,6 +280,21 @@ describe('usePostSessionNotificationAsk', () => {
         'true',
       );
     });
+  });
+
+  it('uses notice-specific primer copy after a felt moment', async () => {
+    renderPostSessionAsk('p1', true, false, true);
+    await waitFor(() => expect(mockGetPerm).toHaveBeenCalled());
+
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+
+    expect(mockAlert).toHaveBeenCalledWith(
+      'Want a gentle follow-up?',
+      'We can remind you to revisit what your mentor noticed today. You can turn this off anytime in Settings.',
+      expect.any(Array),
+    );
   });
 
   it('resets firedRef when profileId changes — second profile can prime', async () => {

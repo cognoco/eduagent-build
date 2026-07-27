@@ -31,7 +31,7 @@
  */
 
 import { resolve } from 'path';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { loadDatabaseEnv } from '../../packages/test-utils/src';
 import {
   assessments,
@@ -53,11 +53,8 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
-import {
-  deleteV2IdentitiesForTest,
-  ensureLegacyProfileAnchorForTest,
-  legacyIdentityTableExistsForTest,
-} from '../../apps/api/src/test-utils/legacy-identity-anchors';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
+import { deleteV2IdentitiesForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { finalizeChallengeRoundIfReady } from '../../apps/api/src/services/session/session-exchange';
 import { mapSessionRow } from '../../apps/api/src/services/session/session-events';
 import { getLatestVerifiedProofForChild } from '../../apps/api/src/services/parent-proof';
@@ -85,8 +82,6 @@ loadDatabaseEnv(resolve(__dirname, '../..'));
 const hasDatabaseUrl = !!process.env.DATABASE_URL;
 const describeIfDb = hasDatabaseUrl ? describe : describe.skip;
 
-const RUN_ID = generateUUIDv7();
-
 // ---------------------------------------------------------------------------
 // Seed helpers — modeled on
 // apps/api/src/services/session/session-exchange.integration.test.ts:236-416
@@ -102,18 +97,6 @@ async function seedProfileAndSubject(
   const idx = ++seedCounter;
   const accountId = generateUUIDv7();
   const profileId = generateUUIDv7();
-  const clerkUserId = `clerk_wi1666_${RUN_ID}_${idx}`;
-  const email = `wi1666-${RUN_ID}-${idx}@test.invalid`;
-
-  await ensureLegacyProfileAnchorForTest(db, {
-    profileId,
-    accountId,
-    displayName: `Loop Tester ${idx}`,
-    birthYear: 2006,
-    isOwner: true,
-    clerkUserId,
-    email,
-  });
 
   await db
     .insert(organization)
@@ -151,18 +134,6 @@ async function seedParentProfile(
 ): Promise<string> {
   const idx = ++seedCounter;
   const parentProfileId = generateUUIDv7();
-  const clerkUserId = `clerk_wi1666_${RUN_ID}_${idx}_parent`;
-  const email = `wi1666-${RUN_ID}-${idx}-parent@test.invalid`;
-
-  await ensureLegacyProfileAnchorForTest(db, {
-    profileId: parentProfileId,
-    accountId,
-    displayName: `Loop Parent ${idx}`,
-    birthYear: 1980,
-    isOwner: true,
-    clerkUserId,
-    email,
-  });
 
   await db.insert(person).values({
     id: parentProfileId,
@@ -198,26 +169,31 @@ async function seedConsented(
   profileId: string,
   orgId: string,
 ): Promise<void> {
-  await db.insert(consentGrant).values({
-    chargePersonId: profileId,
-    organizationId: orgId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-    grantedAt: new Date(),
-  });
+  await db.insert(consentGrant).values(
+    CONSENT_PURPOSES.map((purpose) => ({
+      chargePersonId: profileId,
+      organizationId: orgId,
+      purpose,
+      lawfulBasis: 'gdpr_parental_consent' as const,
+      granted: true,
+      grantedAt: new Date(),
+    })),
+  );
 }
 
 async function seedCurriculumTopic(
   db: Database,
   subjectId: string,
 ): Promise<string> {
-  const [{ id: curriculumId }] = await db
+  const [curriculum] = await db
     .insert(curricula)
     .values({ subjectId })
     .returning({ id: curricula.id });
+  if (!curriculum) {
+    throw new Error('Expected curriculum seed insert to return an id');
+  }
 
-  const [{ id: bookId }] = await db
+  const [book] = await db
     .insert(curriculumBooks)
     .values({
       subjectId,
@@ -225,20 +201,26 @@ async function seedCurriculumTopic(
       sortOrder: 1,
     })
     .returning({ id: curriculumBooks.id });
+  if (!book) {
+    throw new Error('Expected curriculum book seed insert to return an id');
+  }
 
-  const [{ id: topicId }] = await db
+  const [topic] = await db
     .insert(curriculumTopics)
     .values({
-      bookId,
-      curriculumId,
+      bookId: book.id,
+      curriculumId: curriculum.id,
       title: 'Photosynthesis',
       description: 'Light reactions and Calvin cycle.',
       sortOrder: 1,
       estimatedMinutes: 20,
     })
     .returning({ id: curriculumTopics.id });
+  if (!topic) {
+    throw new Error('Expected curriculum topic seed insert to return an id');
+  }
 
-  return topicId;
+  return topic.id;
 }
 
 /** Learner text shared deliberately with the note draft so the lexical-overlap
@@ -355,6 +337,7 @@ async function driveVerifiedChallengeRound(
   topicId: string,
 ): Promise<{ sessionId: string; result: ChallengeRoundRuntimeOutcome }> {
   const answerEventId = nextAnswerEventId();
+  const applicationAnswerEventId = nextAnswerEventId();
   const session = await seedDraftingSession(db, profileId, subjectId, topicId, [
     {
       concept: 'photosynthesis inputs',
@@ -362,6 +345,29 @@ async function driveVerifiedChallengeRound(
       evidence: 'Learner correctly named all three inputs.',
       answerEventId,
       learnerQuote: LEARNER_ANSWER,
+      questionIdentity: {
+        questionText: 'What inputs does a plant use for photosynthesis?',
+        minimalLearningClaim:
+          'photosynthesis uses sunlight water and carbon dioxide to make food',
+        cognitiveOperation: 'explanation',
+        materialContext: '',
+      },
+    },
+    {
+      concept: 'photosynthesis inputs in a greenhouse',
+      result: 'solid',
+      evidence:
+        'Learner correctly applied the same inputs to a carbon-dioxide-limited greenhouse.',
+      answerEventId: applicationAnswerEventId,
+      learnerQuote: LEARNER_ANSWER,
+      questionIdentity: {
+        questionText:
+          'How would limited carbon dioxide affect a greenhouse plant making food?',
+        minimalLearningClaim:
+          'photosynthesis uses sunlight water and carbon dioxide to make food',
+        cognitiveOperation: 'application',
+        materialContext: 'a greenhouse plant with limited carbon dioxide',
+      },
     },
   ]);
   const meta = await readSessionChallengeRound(db, profileId, session.id);
@@ -371,6 +377,7 @@ async function driveVerifiedChallengeRound(
     session,
     meta,
     {
+      source_concepts: ['photosynthesis'],
       source_answer_event_ids: [answerEventId],
       content: NOTE_DRAFT_CONTENT,
     },
@@ -404,11 +411,6 @@ describeIfDb('Verified-learning loop (WI-1666, S8)', () => {
         profileIds: seededV2ProfileIds,
       });
     }
-    if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-      await db.execute(
-        sql`DELETE FROM accounts WHERE clerk_user_id LIKE ${`clerk_wi1666_${RUN_ID}%`}`,
-      );
-    }
   });
 
   // -------------------------------------------------------------------------
@@ -427,7 +429,8 @@ describeIfDb('Verified-learning loop (WI-1666, S8)', () => {
     );
 
     expect(result.challengeRoundVerdict).toEqual({
-      solidCount: 1,
+      outcome: 'verified',
+      solidCount: 2,
       partialCount: 0,
       missingCount: 0,
       misconceptionCount: 0,
@@ -502,6 +505,7 @@ describeIfDb('Verified-learning loop (WI-1666, S8)', () => {
     expect(result).not.toBeNull();
 
     expect(result!.challengeRoundVerdict).toEqual({
+      outcome: 'partial',
       solidCount: 0,
       partialCount: 1,
       missingCount: 0,
@@ -571,6 +575,7 @@ describeIfDb('Verified-learning loop (WI-1666, S8)', () => {
     expect(result).not.toBeNull();
 
     expect(result!.challengeRoundVerdict).toEqual({
+      outcome: 'partial',
       solidCount: 0,
       partialCount: 0,
       missingCount: 0,
@@ -776,6 +781,9 @@ describeIfDb('Verified-learning loop (WI-1666, S8)', () => {
     );
 
     expect(proof.hasProof).toBe(true);
+    if (!proof.hasProof) {
+      throw new Error('Expected a verified proof receipt');
+    }
     expect(proof.topicId).toBe(topicId);
     expect(proof.topicTitle).toBe('Photosynthesis');
     expect(proof.masteryVerificationState).toBe('fresh');

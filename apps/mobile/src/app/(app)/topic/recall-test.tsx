@@ -6,7 +6,7 @@ import {
   ChatShell,
   animateResponse,
   type ChatMessage,
-} from '../../../components/session/ChatShell';
+} from '../../../components/session';
 import {
   RemediationCard,
   type RetentionStatus,
@@ -28,6 +28,42 @@ function createOpeningMessage(content: string): ChatMessage {
     role: 'assistant',
     content,
   };
+}
+
+// [WI-2114] Compose the grader's answer-specific feedback into the assistant
+// reply. The three fields are mentor-prose (already in the learner's
+// conversation language — AC-4); we only join them, adding no English
+// connective text. Returns null when feedback is absent so the caller falls
+// back to the generic translated prompt (grader-unavailable / cooldown /
+// dont_remember — AC-5).
+function composeRecallFeedback(
+  feedback: { strengths: string; gaps: string; nextStep: string } | undefined,
+): string | null {
+  if (!feedback) return null;
+  const parts = [feedback.strengths, feedback.gaps, feedback.nextStep]
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  return parts.length > 0 ? parts.join('\n\n') : null;
+}
+
+// [WI-2114] Reframe of a PRIOR graded answer's stored feedback, shown when the
+// current submission is cooldown-blocked (never re-graded) — e.g. the learner
+// immediately asks "what was wrong with what I said?". It must NOT replay the
+// fresh-grade composition byte-for-byte (AC-8): a cooldown-blocked submission
+// has no evaluated content of its own, so AC-3's identical-content exception
+// does not apply. We reframe by answering the follow-up directly — lead with
+// the correction (gaps) + next step and drop the strengths celebration — so the
+// recap reads as "here's what was off last time", distinct from the fresh
+// grade. Mentor-prose only (already in the learner's language — AC-4); no
+// English connective text is added.
+function composePriorRecallFeedback(
+  feedback: { strengths: string; gaps: string; nextStep: string } | undefined,
+): string | null {
+  if (!feedback) return null;
+  const parts = [feedback.gaps, feedback.nextStep]
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  return parts.length > 0 ? parts.join('\n\n') : null;
 }
 
 function deriveStatus(retentionStatus?: string): RetentionStatus {
@@ -154,16 +190,40 @@ export default function RecallTestScreen() {
                   releaseSubmissionBlock();
                 },
               );
-            } else if (result.failureAction === 'feedback_only') {
-              // Under 3 failures — encourage retry
+            } else if (result.offRampStage === 're_teach') {
+              // [WI-1462 / RR-4] 3rd failure — bounded, same-flow re-teach
+              // off-ramp in a different style (warm copy, no punishment
+              // framing). Input stays enabled — no navigation yet.
+              // offRampStage is checked before failureAction: on the wire,
+              // failureAction still reports 'feedback_only' for this case
+              // (backward compat for a client without offRampStage).
               cleanupRef.current = animateResponse(
-                t('topic.recallTest.partialResult'),
+                result.hint ?? t('topic.recallTest.reTeach'),
+                setMessages,
+                setIsStreaming,
+                releaseSubmissionBlock,
+              );
+            } else if (result.failureAction === 'feedback_only') {
+              // [WI-2114] Under 3 failures — render the grader's answer-specific
+              // feedback (what was right, what's missing, a next step) when the
+              // server produced it. When this submission was cooldown-blocked and
+              // never re-graded, fall back to a REFRAMED recap of the prior
+              // graded answer (AC-2: a direct "what was wrong" answer, not the
+              // generic prompt; AC-8: reframed, never a verbatim replay). Only
+              // when neither exists do we show the honest generic copy (AC-5).
+              cleanupRef.current = animateResponse(
+                composeRecallFeedback(result.feedback) ??
+                  composePriorRecallFeedback(result.priorFeedback) ??
+                  t('topic.recallTest.partialResult'),
                 setMessages,
                 setIsStreaming,
                 releaseSubmissionBlock,
               );
             } else if (result.failureAction === 'redirect_to_library') {
-              // 3+ failures — show remediation card
+              // [WI-1462 / RR-4] 2nd consecutive failure after re-teach —
+              // exit warmly by parking the topic; show remediation card.
+              // (offRampStage is 'topic_parked' here; failureAction alone —
+              // its pre-WI-1462 wire value — is enough to route this branch.)
               cleanupRef.current = animateResponse(
                 t('topic.recallTest.needsReview'),
                 setMessages,
@@ -292,10 +352,11 @@ export default function RecallTestScreen() {
         onSuccess: (result) => {
           if (token !== submissionTokenRef.current) return;
           setDontRememberPending(false);
-          if (
-            result.failureAction === 'redirect_to_library' ||
-            nextCount >= 2
-          ) {
+          // [WI-1462 / RR-4] Trust the server-authoritative failureAction —
+          // it already reaches the parked state at the 2nd consecutive
+          // failure after re-teach (bounded exactly at the 3rd/4th real
+          // failure), so no local dontRememberCount>=2 shortcut is needed.
+          if (result.failureAction === 'redirect_to_library') {
             cleanupRef.current = animateResponse(
               t('topic.recallTest.dontRememberReviewPrompt'),
               setMessages,
@@ -314,6 +375,8 @@ export default function RecallTestScreen() {
             return;
           }
 
+          // feedback_only or re_teach — same-flow hint (re_teach's hint is
+          // the bounded, different-style off-ramp; input stays enabled).
           cleanupRef.current = animateResponse(
             result.hint ?? t('topic.recallTest.dontRememberFallbackHint'),
             setMessages,

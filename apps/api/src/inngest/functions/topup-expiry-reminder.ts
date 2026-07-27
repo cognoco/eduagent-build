@@ -8,13 +8,17 @@
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { findExpiringTopUpCredits } from '../../services/billing';
+import { addMonthsClamped } from '../../services/billing/billing-shared';
 
 /** Reminder milestones: months before expiry at which to remind. */
 const REMINDER_MONTHS_BEFORE_EXPIRY = [6, 4, 2, 0] as const;
 
 /**
  * For each milestone, compute the date range for credits expiring
- * at that milestone month from now. We check a 1-day window.
+ * at that milestone month from now. The window partitions clamped dates so a
+ * target day is owned by exactly one source day: skip when the source day does
+ * not exist in the target month, widen a source month-end into a longer target
+ * month, and otherwise query exactly the corresponding target day.
  *
  * [BUG-838 / F-SVC-004] Returns null if `now` is an invalid Date so the
  * milestone is skipped instead of throwing RangeError out of toISOString and
@@ -28,15 +32,44 @@ function getExpiryWindowForMilestone(
 ): { rangeStart: Date; rangeEnd: Date } | null {
   if (!Number.isFinite(now.getTime())) return null;
 
-  const target = new Date(now);
-  target.setMonth(target.getMonth() + monthsBeforeExpiry);
+  const target = addMonthsClamped(now, monthsBeforeExpiry);
 
   if (!Number.isFinite(target.getTime())) return null;
 
-  const dateStr = target.toISOString().slice(0, 10);
+  const sourceMonthLastDay = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  const targetMonthLastDay = new Date(
+    Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+
+  const sourceDay = now.getUTCDate();
+  if (sourceDay > targetMonthLastDay) return null;
+
+  const rangeEndDay =
+    sourceDay === sourceMonthLastDay && targetMonthLastDay > sourceMonthLastDay
+      ? targetMonthLastDay
+      : target.getUTCDate();
+
   return {
-    rangeStart: new Date(dateStr + 'T00:00:00.000Z'),
-    rangeEnd: new Date(dateStr + 'T23:59:59.999Z'),
+    rangeStart: new Date(
+      Date.UTC(
+        target.getUTCFullYear(),
+        target.getUTCMonth(),
+        target.getUTCDate(),
+      ),
+    ),
+    rangeEnd: new Date(
+      Date.UTC(
+        target.getUTCFullYear(),
+        target.getUTCMonth(),
+        rangeEndDay,
+        23,
+        59,
+        59,
+        999,
+      ),
+    ),
   };
 }
 

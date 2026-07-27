@@ -181,6 +181,65 @@ describe('queryKeys mode-scoped factories', () => {
 });
 
 describe('queryKeys non-mode-scoped factories', () => {
+  it('keeps Now projections bound to exact actor/profile/epoch keys', () => {
+    const actorId = 'actor-abc';
+    const profileId = 'prof-abc';
+    const policyEpoch = 'epoch-enabled';
+
+    expect(queryKeys.now.feed(actorId, profileId, policyEpoch)).toEqual([
+      'now-feed',
+      actorId,
+      profileId,
+      policyEpoch,
+    ]);
+    expect(queryKeys.now.overflow(actorId, profileId, policyEpoch)).toEqual([
+      'now-overflow',
+      actorId,
+      profileId,
+      policyEpoch,
+    ]);
+  });
+
+  it.each(['feed', 'overflow'] as const)(
+    'normalizes unloaded Now %s scope IDs',
+    (projection) => {
+      expect(
+        queryKeys.now[projection](null, undefined, 'epoch-enabled'),
+      ).toEqual([
+        projection === 'feed' ? 'now-feed' : 'now-overflow',
+        undefined,
+        undefined,
+        'epoch-enabled',
+      ]);
+    },
+  );
+
+  it('[WI-2184] matches only completed-session history keys for one profile', () => {
+    const matchProfileHistory = queryKeys.historySessionsMatch('prof-abc');
+
+    expect(
+      matchProfileHistory(
+        queryKeys.topicSessions('subject-1', 'topic-1', 'prof-abc'),
+      ),
+    ).toBe(true);
+    expect(
+      matchProfileHistory(
+        queryKeys.bookSessions('subject-1', 'book-1', 'prof-abc'),
+      ),
+    ).toBe(true);
+    expect(
+      matchProfileHistory(queryKeys.subjectSessions('subject-1', 'prof-abc')),
+    ).toBe(true);
+    expect(
+      matchProfileHistory(
+        queryKeys.topicSessions('subject-1', 'topic-1', 'prof-other'),
+      ),
+    ).toBe(false);
+    expect(
+      matchProfileHistory(['session', 'study', 'session-1', 'prof-abc']),
+    ).toBe(false);
+  });
+
   it('leaves retention and library keys unchanged', () => {
     expect(queryKeys.retention.subject('sub-1', 'prof-abc')).toEqual([
       'retention',

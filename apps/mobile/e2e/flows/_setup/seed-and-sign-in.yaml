@@ -51,7 +51,7 @@ appId: com.mentomate.app
 # the user is always first-time. testID is stable across both states.
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: 'sign-in-button'
     timeout: 120000
 
 # Visual audit: sign-in screen baseline (layout, SSO buttons, form fields)
@@ -59,38 +59,42 @@ appId: com.mentomate.app
 
 # ── Step 2: Sign in with seeded credentials ──
 - tapOn:
-    id: "sign-in-email"
+    id: 'sign-in-email'
 - inputText: ${EMAIL}
 
 # Visual audit: email field with keyboard open (BUG-24 regression guard)
 - takeScreenshot: signin-02-email-keyboard-open
 
-# Dismiss keyboard so password field is visible. On E2E_Device_2 the keyboard
-# covers the form including the heading. `hideKeyboard` is a Maestro built-in
-# that is a no-op when the keyboard is closed, so it never falls through to
-# the Android Back action — replaces the prior `pressKey: back` pattern which
-# was fragile when inputText completed before the keyboard rendered (the case
-# that blocked the consent/pre-profile flows on 2026-05-14).
-- hideKeyboard
+# Keep this independent of the emulator's soft-keyboard policy. On devices
+# exposing a hardware keyboard, Maestro's hideKeyboard can inject Android Back
+# even though no IME is open and close the app. The sign-in form is scrollable,
+# so reveal the next control directly whether or not an IME occupies the screen.
+- scrollUntilVisible:
+    element:
+      id: 'sign-in-password'
+    direction: DOWN
+    timeout: 10000
+    speed: 60
+    visibilityPercentage: 50
 
 - tapOn:
-    id: "sign-in-password"
+    id: 'sign-in-password'
 - inputText: ${PASSWORD}
 
 # Visual audit: password field with keyboard open (BUG-24 regression guard)
 - takeScreenshot: signin-03-password-keyboard-open
 
-# Dismiss keyboard before tapping sign-in button (same pattern as above)
-- hideKeyboard
-
-# Wait for keyboard to fully dismiss and sign-in button to be visible
-- extendedWaitUntil:
-    visible:
-      id: "sign-in-button"
+# Reveal the submit control without relying on Android Back to dismiss an IME.
+- scrollUntilVisible:
+    element:
+      id: 'sign-in-button'
     timeout: 10000
+    direction: DOWN
+    speed: 60
+    visibilityPercentage: 50
 
 - tapOn:
-    id: "sign-in-button"
+    id: 'sign-in-button'
 
 # ── Step 3: Wait for post-auth screen ──
 # After sign-in, the app may land on one of three screens depending on persona/state:
@@ -101,7 +105,7 @@ appId: com.mentomate.app
 # If it's not found, the flow continues — individual flows handle their landing screen.
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 30000
     optional: true
 
@@ -109,7 +113,7 @@ appId: com.mentomate.app
 # Accept dashboard-scroll as a valid post-auth landing.
 - extendedWaitUntil:
     visible:
-      id: "dashboard-scroll"
+      id: 'dashboard-scroll'
     timeout: 5000
     optional: true
 
@@ -117,7 +121,7 @@ appId: com.mentomate.app
 # not learner-screen or dashboard-scroll. Recognize it as a valid home screen.
 - extendedWaitUntil:
     visible:
-      id: "parent-home-screen"
+      id: 'parent-home-screen'
     timeout: 5000
     optional: true
 
@@ -133,8 +137,14 @@ appId: com.mentomate.app
 # A permission or setup gate can appear immediately after sign-in on fresh data.
 # Dismiss it before Back-key recovery, otherwise return-to-home can exit the app.
 - tapOn:
-    text: "Skip for now"
+    text: 'Skip for now'
     optional: true
+
+# An authenticated profile bootstrap error is terminal for setup. Assert the
+# guaranteed property after the legitimate landing probes have allowed
+# bootstrap to settle, immediately before Back recovery could hide the failure.
+- assertNotVisible:
+    id: 'profile-load-error'
 
 # BUG-43: After PostApproval dismiss, the coaching card may auto-navigate to
 # a Practice Session (for scenarios with active sessions like retention-due,
@@ -148,21 +158,38 @@ appId: com.mentomate.app
 - runFlow:
     when:
       notVisible:
-        id: "learner-screen"
+        id: 'learner-screen'
     file: return-to-home-safe.yaml
 
 # After all dismiss/return logic, wait for home screen (optional — parent
 # scenarios route to dashboard-scroll or parent-home-screen, already handled above).
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 10000
     optional: true
 
 # Accept parent-home-screen as a valid post-auth landing for parent-with-children users.
 - extendedWaitUntil:
     visible:
-      id: "parent-home-screen"
+      id: 'parent-home-screen'
+    timeout: 5000
+    optional: true
+
+# V2-on release builds land on the Mentor tab instead of a legacy home screen.
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 5000
+    optional: true
+
+# [WI-2241] A supporter persona lands on the Support hub Mentor tab instead
+# of the learner's mentor-screen — mentor.tsx branches on activeScope.kind,
+# rendering SupportHubMentorTab (testID support-hub-mentor-tab) rather than
+# LearnerMentorScreen (testID mentor-screen) for a scope-having supporter.
+- extendedWaitUntil:
+    visible:
+      id: 'support-hub-mentor-tab'
     timeout: 5000
     optional: true
 
@@ -174,5 +201,5 @@ appId: com.mentomate.app
 # seed-and-run.sh pre-grants via ADB, but this is a safety net.
 - runFlow:
     when:
-      visible: "send you notifications"
+      visible: 'send you notifications'
     file: dismiss-notifications.yaml

@@ -1,7 +1,7 @@
 import { fireEvent, waitFor } from '@testing-library/react-native';
 import type {
   ChildSession,
-  DashboardChild,
+  DashboardChildDetail,
   LearningProfile,
 } from '@eduagent/schemas';
 import {
@@ -272,11 +272,12 @@ function makeSession(overrides: Partial<ChildSession> = {}): ChildSession {
 }
 
 function makeChildDetail(
-  overrides: Partial<DashboardChild> = {},
-): DashboardChild {
+  overrides: Partial<DashboardChildDetail> = {},
+): DashboardChildDetail {
   return {
     profileId: CHILD_PROFILE_ID,
     displayName: 'Emma',
+    organizationTimezone: null,
     consentStatus: null,
     respondedAt: null,
     summary: 'Year 6',
@@ -381,7 +382,9 @@ function setRoutes(config: RouteConfig = {}): void {
       ? config.childDetail === null
         ? null
         : makeChildDetail(
-            definedOverrides(config.childDetail as Partial<DashboardChild>),
+            definedOverrides(
+              config.childDetail as Partial<DashboardChildDetail>,
+            ),
           )
       : defaultChildDetail;
   const sessions = config.sessions ?? [makeSession()];

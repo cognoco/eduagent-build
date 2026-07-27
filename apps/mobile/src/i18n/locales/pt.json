@@ -1,4 +1,58 @@
 {
+  "celebrationEarnedContext": {
+    "polar_star": {
+      "child": "Estrela Polar — a tua primeira resposta independente!",
+      "adult": "Estrela Polar — primeira resposta independente."
+    },
+    "twin_stars": {
+      "child": "Estrelas Gémeas — três respostas fortes seguidas!",
+      "adult": "Estrelas Gémeas — três respostas fortes seguidas."
+    },
+    "comet": {
+      "child": "Cometa — agora fez sentido!",
+      "adult": "Cometa — um conceito ficou claro."
+    },
+    "orions_belt": {
+      "child": "Cinturão de Órion — cinco seguidas sem ajuda!",
+      "adult": "Cinturão de Órion — cinco respostas independentes seguidas."
+    },
+    "deep_diver": {
+      "child": "Mergulho Profundo — respostas muito bem pensadas!",
+      "adult": "Mergulho Profundo — marco alcançado com respostas ponderadas."
+    },
+    "persistent": {
+      "child": "Persistência — continuaste depois de uma correção!",
+      "adult": "Persistência — continuou depois de uma correção."
+    },
+    "topic_mastered": {
+      "child": "Cometa — dominaste este tema!",
+      "adult": "Cometa — tema dominado."
+    },
+    "evaluate_success": {
+      "child": "Estrelas Gémeas — encontraste a falha!",
+      "adult": "Estrelas Gémeas — resposta avaliada corretamente."
+    },
+    "teach_back_success": {
+      "child": "Estrelas Gémeas — explicaste com clareza!",
+      "adult": "Estrelas Gémeas — explicação clara concluída."
+    },
+    "streak_7": {
+      "child": "Cometa — sete dias de aprendizagem seguidos!",
+      "adult": "Cometa — sequência de aprendizagem de sete dias."
+    },
+    "streak_30": {
+      "child": "Cinturão de Órion — 30 dias de aprendizagem seguidos!",
+      "adult": "Cinturão de Órion — sequência de aprendizagem de trinta dias."
+    },
+    "curriculum_complete": {
+      "child": "Cometa — concluíste o currículo!",
+      "adult": "Cometa — currículo concluído."
+    },
+    "default": {
+      "child": "Marco alcançado — muito bem!",
+      "adult": "Marco alcançado."
+    }
+  },
   "common": {
     "cancel": "Cancelar",
     "ok": "OK",
@@ -38,7 +92,8 @@
     "tryAgainAction": "Tentar novamente",
     "dismiss": "Dispensar",
     "pleaseTryAgain": "Tente novamente.",
-    "mentorImageAlt": "Seu mentor"
+    "mentorImageAlt": "Seu mentor",
+    "backTo": "Voltar para {{destination}}"
   },
   "quota": {
     "parent": {
@@ -179,7 +234,8 @@
       "passwordPlaceholder": "Introduza a sua palavra-passe",
       "forgotPassword": "Esqueceu-se da palavra-passe?",
       "signInButton": "Iniciar sessão",
-      "sendVerificationCode": "Enviar código de verificação"
+      "sendVerificationCode": "Enviar código de verificação",
+      "verificationStartFailed": "Não foi possível iniciar a verificação. Tente iniciar a sessão novamente."
     },
     "signUp": {
       "title": "Criar conta",
@@ -212,7 +268,8 @@
       "emailPlaceholder": "voce@exemplo.com",
       "passwordPlaceholder": "Crie uma senha",
       "signUpButton": "Cadastrar-se",
-      "signInButton": "Entrar"
+      "signInButton": "Entrar",
+      "captchaHint": "Se aparecer uma verificação acima, conclua-a e continuaremos automaticamente."
     },
     "forgotPassword": {
       "title": "Esqueceu a senha?",
@@ -235,6 +292,27 @@
       "backToSignIn": "Voltar ao início de sessão",
       "emailPlaceholder": "voce@exemplo.com",
       "sendResetCode": "Enviar código de reposição"
+    },
+    "errors": {
+      "generic": "Algo não correu bem. Tente novamente.",
+      "form_identifier_not_found": "Não encontrámos uma conta com esse e-mail.",
+      "form_password_incorrect": "Essa palavra-passe não parece correta. Tente novamente.",
+      "form_password_or_identifier_incorrect": "Esse e-mail ou palavra-passe não parece correto. Tente novamente.",
+      "form_password_pwned": "Esta palavra-passe apareceu numa fuga de dados. Escolha uma palavra-passe diferente.",
+      "form_password_compromised": "Esta palavra-passe não é segura. Escolha uma palavra-passe diferente.",
+      "form_password_not_strong_enough": "Esta palavra-passe não é suficientemente forte. Adicione mais variedade.",
+      "form_password_length_too_short": "A palavra-passe é demasiado curta. Use pelo menos 8 caracteres.",
+      "form_password_length_too_long": "A palavra-passe é demasiado longa. Use uma mais curta.",
+      "form_password_no_uppercase": "A palavra-passe precisa de ter pelo menos uma letra maiúscula.",
+      "form_password_no_lowercase": "A palavra-passe precisa de ter pelo menos uma letra minúscula.",
+      "form_password_no_number": "A palavra-passe precisa de ter pelo menos um número.",
+      "form_password_no_special_char": "A palavra-passe precisa de ter pelo menos um caráter especial.",
+      "form_password_validation_failed": "Essa palavra-passe não cumpre os requisitos.",
+      "form_code_incorrect": "O código não corresponde. Tente novamente.",
+      "form_identifier_exists": "Já existe uma conta com esse e-mail.",
+      "form_param_format_invalid": "Isso não parece ser um endereço de e-mail válido.",
+      "captcha_invalid": "Não foi possível verificar que é humano. Tente novamente.",
+      "signup_rate_limit_exceeded": "Demasiadas tentativas de registo. Tente novamente mais tarde."
     }
   },
   "guards": {
@@ -264,8 +342,8 @@
       "emptySubjectsMessage": "Comece uma agora, ou use ajuda com lição de casa quando precisar.",
       "addSubject": "Adicionar matéria",
       "momentum": {
-        "topicLearned": "{{n}} topic learned",
-        "topicsLearned": "{{n}} topics learned"
+        "topicLearned": "{{n}} tópico aprendido",
+        "topicsLearned": "{{n}} tópicos aprendidos"
       },
       "intentActions": {
         "homework": {
@@ -303,9 +381,9 @@
       "coachBandRevisitTopic": "Revisite {{topic}} — pronto para uma revisão rápida."
     },
     "notices": {
-      "consentArchivedTitle": "{{name}}'s account was archived",
+      "consentArchivedTitle": "A conta de {{name}} foi arquivada",
       "consentArchivedBody": "Os dados são retidos por 30 dias e depois excluídos.",
-      "consentDeletedTitle": "{{name}}'s account was deleted",
+      "consentDeletedTitle": "A conta de {{name}} foi eliminada",
       "consentDeletedBody": "O período de carência para retirada terminou."
     },
     "parent": {
@@ -339,7 +417,7 @@
       "childCard": {
         "statusPending": "Verificando",
         "reportsAction": "Relatórios",
-        "nudgeAction": "Nudge",
+        "nudgeAction": "Incentivar",
         "learnTogetherAction": "Aprender juntos"
       },
       "card": {
@@ -475,15 +553,15 @@
   "family": {
     "orientationCueDismiss": "Entendido",
     "withdrawal": {
-      "bannerTitleSingle": "{{name}}'s account closes in {{days}} {{daysWord}}",
-      "bannerTitleMulti": "{{count}} accounts closing soon",
+      "bannerTitleSingle": "A conta de {{name}} fecha em {{days}} {{daysWord}}",
+      "bannerTitleMulti": "{{count}} contas a fechar em breve",
       "bannerCta": "Reverter",
-      "bannerCtaShort": "Undo",
-      "daysOne": "day",
-      "daysOther": "days",
+      "bannerCtaShort": "Desfazer",
+      "daysOne": "dia",
+      "daysOther": "dias",
       "restoreErrorTitle": "Não foi possível reverter o cancelamento",
       "restoreErrorBody": "Tente novamente em um momento.",
-      "restoreSuccessToast": "Withdrawal reversed for {{name}}"
+      "restoreSuccessToast": "A retirada do consentimento de {{name}} foi anulada"
     }
   },
   "more": {
@@ -614,7 +692,7 @@
       "notNow": "Agora não",
       "dontAskAgain": "Não perguntar mais",
       "banner": {
-        "question": "Question {{index}} of {{total}}"
+        "question": "Pergunta {{index}} de {{total}}"
       },
       "draft": {
         "title": "Isso é o que você sabe agora",
@@ -800,7 +878,9 @@
       "matched": "Corresponde",
       "retryWithMissingWords": "Tente novamente: {{words}}",
       "retry": "Tentar novamente",
-      "retryLabel": "Tentar a fala novamente"
+      "retryLabel": "Tentar a fala novamente",
+      "extraWords": "Extras: {{words}}",
+      "attemptError": "Não foi possível salvar a tentativa. Tente gravar novamente."
     },
     "chatShell": {
       "aiDisclosure": "Você está falando com um mentor de IA",
@@ -911,7 +991,8 @@
       "verificationBadge": {
         "evaluate": "PENSAMENTO APROFUNDADO CONCLUÍDO",
         "teachBack": "RECAPITULAÇÃO CONCLUÍDA"
-      }
+      },
+      "mentorNotice": "Nota do mentor: {{concept}}"
     },
     "noteInput": {
       "cancel": "Cancelar",
@@ -1506,7 +1587,6 @@
       "startTitle": "Começar {{subject}}"
     },
     "noteSignal": {
-      "verified": "Verificado",
       "verifiedAccessibilityLabel": "Verificado - as suas palavras foram confirmadas",
       "mentorAddition": "O mentor tem mais sobre este tópico.",
       "showMentorAdditionAccessibilityLabel": "Mostrar o que o mentor adicionou.",
@@ -1617,15 +1697,12 @@
     "inactiveFallbackBanner": {
       "message": "Não foi possível carregar as tuas matérias pausadas e arquivadas. Toca para tentar de novo — elas não desapareceram."
     },
-    "notStartedCount": "{{notStarted}} / {{total}} por começar",
     "chooseTopic": "Escolha um tópico",
     "provenanceFrom": "De {{name}}",
     "recentlyAdded": "Adicionado recentemente",
     "sessionCount_one": "{{count}} sessão",
     "sessionCount_other": "{{count}} sessões",
     "a11yClearSearch": "Limpar busca",
-    "a11yEditNote": "Editar anotação",
-    "a11yDeleteNote": "Excluir anotação",
     "a11yCloseTopicPicker": "Fechar seletor de tópicos",
     "myNotes": {
       "subtitleBookmarks_one": "1 resposta guardada",
@@ -1652,9 +1729,6 @@
       "thisTopicFallback": "este tópico",
       "addedFromChildNamed": "Adicionado da aprendizagem de {{name}}.",
       "addedFromChild": "Adicionado da aprendizagem de uma criança."
-    },
-    "collapsibleChapter": {
-      "a11yHeader": "{{title}}, {{notStarted}} de {{total}} tópicos não iniciados"
     },
     "inlineNote": {
       "a11yCollapse": "Nota para {{topic}}. {{source}}. Toque para recolher.",
@@ -1725,7 +1799,8 @@
       "dontRememberFallbackHint": "Tudo bem — vamos ver do que você se lembra. Aqui vai uma pequena dica: pense na ideia principal ou no primeiro passo ligado a este tema. Algo voltou?",
       "dontRememberReviewPrompt": "Obrigado por dizer isso com sinceridade. Vamos passar para a revisão para que isso volte a parecer viável.",
       "gradingUnavailableTitle": "Resposta recebida.",
-      "gradingUnavailableMessage": "Não consegui verificar agora, mas sua resposta está segura. Tente novamente ou volte mais tarde."
+      "gradingUnavailableMessage": "Não consegui verificar agora, mas sua resposta está segura. Tente novamente ou volte mais tarde.",
+      "reTeach": "Vamos tentar de uma forma diferente. Dê outra olhada e tente de novo quando estiver pronto. Sem pressa."
     },
     "lastStudied": "Estudado pela última vez {{when}}",
     "neverStudied": "Nunca estudado",
@@ -1873,33 +1948,37 @@
   "legal": {
     "privacy": {
       "title": "Política de Privacidade",
-      "lastUpdated": "Última atualização: Março de 2026",
+      "lastUpdated": "Última atualização: julho de 2026",
       "s1Title": "1. Quem Somos",
-      "s1Body": "MentoMate é uma plataforma de mentoria com IA operada por Zwizzly (\"nós\", \"nosso(a)\"). Estamos comprometidos em proteger a privacidade de todos os nossos usuários, especialmente crianças de 11 a 17 anos. Processamos dados pessoais de acordo com o Regulamento Geral de Proteção de Dados (GDPR) da UE.",
-      "s2Title": "2. Dados que Coletamos",
-      "s2Body1": "Dados da conta: endereço de e-mail, nome de exibição e informações de perfil que você fornece durante o registro.",
-      "s2Body2": "Dados de aprendizado: matérias, respostas da entrevista, progresso do currículo, interações da sessão, resultados de avaliações, pontuações de retenção e XP.",
-      "s2Body3": "Dados do dispositivo: tokens de notificação push, tipo de dispositivo e versão do aplicativo para enviar notificações e manter a qualidade do serviço.",
-      "s2Body4": "NÃO coletamos dados de localização, contatos, fotos (exceto imagens de dever de casa que você captura explicitamente) ou histórico de navegação.",
-      "s3Title": "3. Como Usamos Seus Dados",
-      "s3Body": "Para fornecer mentoria de IA personalizada usando diálogo socrático e repetição espaçada. Para gerar currículos, insights de aprendizado e relatórios de progresso. Para enviar lembretes de revisão e notificações que você optou por receber. Para melhorar nosso serviço através de análises anônimas e agregadas.",
-      "s4Title": "4. Consentimento dos Pais",
-      "s4Body1": "Para usuários menores de 16 anos, exigimos consentimento parental verificável antes de processar dados pessoais. Um pai ou responsável deve aprovar a conta da criança por e-mail antes que quaisquer dados de aprendizado sejam coletados.",
-      "s4Body2": "Os pais podem retirar o consentimento a qualquer momento no painel dos pais. Após a retirada, os dados da criança entram em um período de carência de 7 dias e são então excluídos permanentemente.",
+      "s1Body": "O MentoMate é uma plataforma de tutoria com IA operada pela ZWIZZLY AS, número de organização norueguesa 811 696 072, registada em Fiskekroken 3B, 0139 Oslo, Noruega (\"nós\", \"nos\", \"nosso\"). O MentoMate destina-se a estudantes com 13 anos ou mais. Como alguns dos nossos utilizadores são menores, aplicamos proteções adicionais aos dados das crianças, conforme descrito abaixo.",
+      "s2Title": "2. Dados que Recolhemos",
+      "s2Body1": "Dados da conta: endereço de correio eletrónico, nome de apresentação, data de nascimento e preferências de idioma e pronome que fornece durante o registo.",
+      "s2Body2": "Dados de aprendizagem: as disciplinas que estuda, as suas respostas na entrevista e na integração, o progresso no currículo e nos tópicos, as mensagens trocadas durante as sessões de aprendizagem, os resultados de avaliação e domínio, as pontuações de revisão e os XP. Alguns destes dados constroem uma memória de aprendizagem persistente para que o tutor se possa lembrar do que já estudou (ver Secção 8).",
+      "s2Body3": "Dados do dispositivo: tokens de notificação push, tipo de dispositivo e versão da aplicação para enviar notificações e manter a qualidade do serviço.",
+      "s2Body4": "Câmara e microfone: a aplicação solicita acesso à câmara para imagens de trabalhos de casa e acesso ao microfone para aprendizagem por voz. A entrada do microfone é convertida em texto no seu dispositivo; o MentoMate não recebe nem retém a gravação de áudio. Usamos estas entradas apenas quando as ativa explicitamente.",
+      "s3Title": "3. Como Utilizamos os Seus Dados",
+      "s3Body": "Usamos os seus dados para fornecer tutoria personalizada com IA, explicar conceitos, verificar a sua compreensão, agendar revisões usando repetição espaçada, gerar currículos e relatórios de progresso e adaptar o ensino a si. Esta definição de perfis é usada apenas para personalizar o seu ensino; não produz efeitos legais ou igualmente significativos sobre si. Também usamos os dados para enviar notificações que tenha aceite receber e para manter e melhorar o serviço através da monitorização de erros e desempenho. Não usamos os seus dados para publicidade e não os vendemos.",
+      "s4Title": "4. Consentimento Parental (RGPD e COPPA)",
+      "s4Body1": "Quando um utilizador está abaixo da idade aplicável para o consentimento digital — que é entre 13 e 16 anos na UE/EEE, dependendo do país, e 13 anos no Reino Unido e sob a COPPA nos Estados Unidos — exigimos o consentimento parental verificável antes de processar os dados pessoais da criança. Um pai ou tutor deve aprovar a conta da criança antes de quaisquer dados de aprendizagem serem recolhidos.",
+      "s4Body2": "Os pais podem retirar o consentimento a qualquer momento. O consentimento pode ser restaurado durante um período de carência de 7 dias. No final desse período, os perfis com 13 anos ou menos são eliminados; os perfis de crianças mais velhas podem, em vez disso, ser arquivados por 30 dias, de acordo com a preferência de retenção do titular da conta, e são depois eliminados.",
       "s5Title": "5. Processamento por IA",
-      "s5Body": "As sessões de aprendizado são processadas por provedores de modelos de IA de terceiros para gerar respostas educacionais. O conteúdo da sessão pode ser enviado aos provedores de IA para processamento, mas não é usado para treinar seus modelos. Não compartilhamos informações de identificação pessoal com provedores de IA — apenas o conteúdo de aprendizado.",
-      "s6Title": "6. Compartilhamento de Dados",
-      "s6Body1": "Não vendemos seus dados. Compartilhamos dados apenas com: provedor de autenticação (Clerk) para login; provedores de IA para sessões de aprendizado; provedor de e-mail (Resend) para notificações; rastreamento de erros (Sentry) para estabilidade do aplicativo; gerenciamento de compras no aplicativo (RevenueCat) para processamento de assinaturas; processadores de pagamento para gerenciamento de assinaturas.",
-      "s6Body2": "Para usuários menores de 13 anos, o rastreamento de erros (Sentry) é desativado até que o consentimento dos pais seja concedido. Ele é reativado se o consentimento for retirado.",
-      "s7Title": "7. Retenção de Dados",
-      "s7Body": "Retemos seus dados enquanto sua conta estiver ativa. Quando você exclui sua conta, seus dados entram em um período de carência de 7 dias (durante o qual você pode cancelar a exclusão), após o qual são removidos permanentemente.",
-      "s8Title": "8. Seus Direitos",
-      "s8Body1": "Você tem o direito de: acessar seus dados (através do recurso Exportar nas Configurações); corrigir dados imprecisos; excluir sua conta e todos os dados associados; retirar o consentimento para o processamento de dados; opor-se ao processamento; portabilidade de dados.",
-      "s8Body2": "Para exercer esses direitos, use as configurações no aplicativo ou entre em contato conosco em privacy@mentomate.com.",
-      "s9Title": "9. Segurança",
-      "s9Body": "Usamos medidas de segurança padrão da indústria, incluindo conexões criptografadas (TLS), autenticação segura e isolamento de dados por perfil, garantindo que cada usuário só possa acessar seus próprios dados.",
-      "s10Title": "10. Contate-nos",
-      "s10Body": "Para perguntas ou preocupações sobre privacidade, entre em contato com nosso Encarregado de Proteção de Dados em privacy@mentomate.com."
+      "s5Body": "O conteúdo da sessão de aprendizagem é processado por fornecedores de modelos de IA de terceiros para gerar respostas educativas. Enviamos apenas o conteúdo e o contexto necessários para gerar uma resposta. Para menores, excluímos nomes e identificadores de conta do conteúdo enviado aos fornecedores de IA. Para titulares de conta inequivocamente adultos, um nome de exibição pode ser incluído para personalização. Exigimos que os fornecedores não usem o conteúdo do cliente para treinar os seus modelos de uso geral; os contratos e as configurações do fornecedor que apoiam este requisito são revistos como parte do nosso processo de conformidade de lançamento.",
+      "s6Title": "6. Partilha de Dados",
+      "s6Body1": "Não vendemos os seus dados. Partilhamos dados apenas com os fornecedores de serviços necessários para operar o MentoMate.",
+      "s6Body2": "Estes fornecedores incluem Clerk para o início de sessão; fornecedores de modelos de IA e de incorporação para respostas de aprendizagem e memória de aprendizagem; Neon e Cloudflare para alojamento de bases de dados e aplicações; Resend para e-mail; Sentry para monitorização de erros e desempenho; Expo, Apple e Google para notificações push; e Apple, Google e RevenueCat para pagamentos e subscrições.",
+      "s7Title": "7. Transferências Internacionais de Dados",
+      "s7Body": "Alguns processadores estão localizados fora da UE/EEE e do Reino Unido, incluindo nos Estados Unidos. Quando os dados são transferidos internacionalmente, baseamo-nos em salvaguardas apropriadas ao abrigo do RGPD e do RGPD do Reino Unido, como as Cláusulas Contratuais-Tipo da UE, o Adendo de Transferência Internacional de Dados do Reino Unido ou um mecanismo de adequação aplicável.",
+      "s8Title": "8. Retenção de Dados",
+      "s8Body1": "Transcrições de chat: o texto completo das suas mensagens da sessão de aprendizagem é retido por 30 dias após a geração do resumo da aprendizagem e depois eliminado automaticamente. Se o processamento do resumo for atrasado, as salvaguardas operacionais sinalizam o atraso para resolução.",
+      "s8Body2": "Memória de aprendizagem: resumos do que estudou — incluindo disciplinas, progresso, resultados de domínio, notas, recapitulações e, por vezes, pequenas citações das suas mensagens — são mantidos enquanto a sua conta estiver ativa para que o tutor se possa lembrar da sua aprendizagem ao longo do tempo. Esta memória de aprendizagem é usada apenas para fornecer continuidade à tutoria; não é usada para publicidade, perfis de marketing ou treino de modelos de IA de terceiros.",
+      "s9Title": "9. Os Seus Direitos",
+      "s9Body": "Tem o direito de aceder aos seus dados; corrigir dados incorretos; solicitar a eliminação da sua conta e dos dados pessoais e de aprendizagem associados, sujeito às exceções de retenção limitadas descritas na Secção 8; retirar o consentimento; opor-se ao processamento; e solicitar a portabilidade dos dados. Para exercer estes direitos, utilize as definições na aplicação ou contacte support@mentomate.com.",
+      "s10Title": "10. Segurança",
+      "s10Body": "Usamos medidas de segurança padrão da indústria, incluindo ligações encriptadas (TLS), autenticação segura e isolamento de dados por perfil, concebidas para garantir que cada utilizador só pode aceder aos seus próprios dados.",
+      "s2Body5": "Não recolhemos dados de localização, contactos, a sua biblioteca de fotos (exceto as imagens de trabalhos de casa que seleciona explicitamente) nem o histórico de navegação.",
+      "s8Body3": "Eliminação da conta: quando elimina a sua conta, a eliminação entra num período de carência de 7 dias durante o qual pode cancelar. Após o período de carência, a sua conta e os dados pessoais e de aprendizagem associados são removidos permanentemente, exceto por registos limitados retidos por razões legais, de segurança, prevenção de fraudes ou contabilidade.",
+      "s11Title": "11. Contacto",
+      "s11Body": "A ZWIZZLY AS é responsável pelo tratamento dos seus dados pessoais. Para questões de privacidade ou para exercer os seus direitos de proteção de dados, envie um e-mail para support@mentomate.com ou escreva para ZWIZZLY AS, Fiskekroken 3B, 0139 Oslo, Noruega."
     },
     "terms": {
       "title": "Termos de Serviço",
@@ -1907,7 +1986,7 @@
       "s1Title": "1. Aceitação dos Termos",
       "s1Body": "Ao criar uma conta ou usar o MentoMate, você concorda com estes Termos de Serviço. Se você for menor de 18 anos, seu pai ou responsável deve concordar em seu nome.",
       "s2Title": "2. Descrição do Serviço",
-      "s2Body": "MentoMate é uma plataforma de mentoria com IA que oferece aprendizado personalizado através de diálogo socrático, repetição espaçada e currículos adaptativos. O serviço é projetado para estudantes de 11 a 15 anos com supervisão dos pais.",
+      "s2Body": "O MentoMate é uma plataforma de mentoria com IA que oferece aprendizagem personalizada através de diálogo socrático, repetição espaçada e currículos adaptativos. O serviço destina-se a estudantes com 13 anos ou mais, com supervisão parental para menores.",
       "s3Title": "3. Responsabilidades da Conta",
       "s3Body": "Você é responsável por manter a confidencialidade das suas credenciais de conta. Você deve fornecer informações precisas durante o registro. Você não deve compartilhar sua conta com outros ou criar várias contas.",
       "s4Title": "4. Uso Aceitável",
@@ -2123,7 +2202,7 @@
     "register": {
       "child": {
         "growthSubtitle": "Suas vitórias semanais",
-        "masteredTopicsHero": "You learned {{count}} topics. Steady wins.",
+        "masteredTopicsHero": "Tópicos aprendidos: {{count}}. A persistência compensa.",
         "retentionStrong": "O que você lembrou esta semana.",
         "retentionFading": "Vale uma revisão rápida.",
         "retentionWeak": "Vale a pena rever."
@@ -2277,7 +2356,24 @@
       "loadingTitle": "Encontrando seu progresso...",
       "loadingMessage": "Estamos reunindo sessões, revisões e palavras salvas para este assunto.",
       "startedTopicsCount_one": "{{count}} tópico iniciado",
-      "startedTopicsCount_other": "{{count}} tópicos iniciados"
+      "startedTopicsCount_other": "{{count}} tópicos iniciados",
+      "strandBalanceTitle": "Equilíbrio da prática recente",
+      "strandSessionsSampled": "{{count}} sessão recente",
+      "strandSessionsSampled_other": "{{count}} sessões recentes",
+      "strandMeaningInput": "Input focado no significado",
+      "strandMeaningOutput": "Output focado no significado",
+      "strandLanguageFocus": "Aprendizagem focada na língua",
+      "strandFluency": "Desenvolvimento da fluência",
+      "skillProfileTitle": "Perfil de competências",
+      "skillVocabulary": "Vocabulário",
+      "skillGrammar": "Gramática",
+      "skillReading": "Leitura",
+      "skillListening": "Audição",
+      "skillSpeaking": "Expressão oral",
+      "skillFluency": "Fluência",
+      "skillEvidenceCount": "{{count}} atividade",
+      "skillEvidenceCount_other": "{{count}} atividades",
+      "viewCefrVocabulary": "Explorar vocabulário do QECR"
     },
     "vocabulary": {
       "pageTitle": "Seu Vocabulário",
@@ -2320,14 +2416,14 @@
         "label": "Precisa de uma nova passagem"
       },
       "elapsed": {
-        "remembered_one": "Remembered after {{count}} day",
-        "remembered_other": "Remembered after {{count}} days",
-        "fading_one": "Getting fuzzy after {{count}} day",
-        "fading_other": "Getting fuzzy after {{count}} days",
-        "weak_one": "Ready for a refresh after {{count}} day",
-        "weak_other": "Ready for a refresh after {{count}} days",
-        "forgotten_one": "Last seen {{count}} day ago",
-        "forgotten_other": "Last seen {{count}} days ago"
+        "remembered_one": "Lembrado após {{count}} dia",
+        "remembered_other": "Lembrado após {{count}} dias",
+        "fading_one": "A ficar vago após {{count}} dia",
+        "fading_other": "A ficar vago após {{count}} dias",
+        "weak_one": "Pronto para uma revisão após {{count}} dia",
+        "weak_other": "Pronto para uma revisão após {{count}} dias",
+        "forgotten_one": "Visto pela última vez há {{count}} dia",
+        "forgotten_other": "Visto pela última vez há {{count}} dias"
       }
     },
     "previousReports": {
@@ -2338,24 +2434,24 @@
     "latestReport": {
       "title": "Último relatório",
       "open": "Abrir relatório",
-      "openWithDate": "Open report for {{date}}",
+      "openWithDate": "Abrir relatório de {{date}}",
       "empty": "Seu próximo relatório semanal ou mensal aparecerá aqui quando houver aprendizado suficiente para resumir.",
       "error": "Não foi possível carregar o relatório mais recente agora.",
       "sessions": "Sessões",
-      "time": "Time",
+      "time": "Tempo",
       "topics": "Tópicos",
-      "words": "Words",
-      "practiceLessons_one": "{{count}} practice lesson",
-      "practiceLessons_other": "{{count}} practice lessons",
-      "practicePoints_one": "{{count}} practice point",
-      "practicePoints_other": "{{count}} practice points"
+      "words": "Palavras",
+      "practiceLessons_one": "{{count}} lição de prática",
+      "practiceLessons_other": "{{count}} lições de prática",
+      "practicePoints_one": "{{count}} ponto de prática",
+      "practicePoints_other": "{{count}} pontos de prática"
     },
     "recentFocus": {
       "title": "Sessões recentes",
       "showAll": "Mostrar todas as sessões",
       "empty": "Sessões recentes aparecerão aqui quando o aprendizado começar.",
       "error": "Não foi possível carregar as sessões recentes agora.",
-      "sessionFallback": "Studied {{date}}"
+      "sessionFallback": "Estudou em {{date}}"
     },
     "guardian": {
       "summaryFallback": "Nenhum resumo disponível ainda. Um aparecerá após a próxima sessão.",
@@ -2371,8 +2467,8 @@
     "remediation": {
       "heading": "Tente uma abordagem diferente",
       "body": "É completamente normal precisar de outra passagem nisso.",
-      "cooldownMinutes": "You can retry in {{minutes}} min — take a short break and come back.",
-      "cooldownHours": "You can retry in about {{hours}} h — step away and let it settle.",
+      "cooldownMinutes": "Você pode tentar novamente em {{minutes}} min — faça uma pequena pausa e volte.",
+      "cooldownHours": "Você pode tentar novamente em cerca de {{hours}} h — afaste-se e deixe a ideia assentar.",
       "cooldownTomorrow": "Faça uma pausa mais longa e tente novamente amanhã.",
       "primaryCta": "Tente de outra forma",
       "primaryCtaA11y": "Tente uma forma diferente de aprender este tópico",
@@ -2474,10 +2570,10 @@
     },
     "ready": {
       "title": "Está tudo pronto.",
-      "introWithLearner": "For {{learner}}:",
+      "introWithLearner": "Para {{learner}}:",
       "intro": "Isto é o que está configurado:",
       "rowTone": "O seu mentor falará consigo da forma certa",
-      "rowSubject": "Starting with {{subject}}",
+      "rowSubject": "A começar com {{subject}}",
       "rowSubjectNoSubject": "Seu primeiro tópico está pronto",
       "rowPace": "O ritmo mantém-se à sua velocidade — nunca apressado",
       "reassurance": "A maioria dos alunos sente a diferença na primeira sessão.",
@@ -2527,7 +2623,6 @@
       "profileRemovedOrNoAccess": "O perfil pode ter sido removido ou você não tem mais acesso",
       "backToDashboard": "Voltar para o painel",
       "noAccessToProfile": "Você não tem acesso a este perfil",
-      "firstReportSoon": "O primeiro relatório chegará no final do mês",
       "progressNudgeFreshTitle": "Pergunta sobre {{focus}} enquanto está fresco",
       "progressNudgeFreshSubtitle": "{{name}} estudou {{focus}} {{time}}. Experimenta uma ronda rápida também e depois pergunta o que fez sentido.",
       "progressNudgeRecentTitle": "Mantém {{focus}} ativo",
@@ -2538,7 +2633,7 @@
       "progressNudgeStartSubtitle": "Abre {{subject}} para ver o que está pronto e experimenta uma lição curta para poderes ajudar.",
       "openProgressNudgeAction": "Abrir {{subject}}",
       "subjects": "Matérias",
-      "subjectsDescription": "{{name}}'s active subjects, with the most recent activity first.",
+      "subjectsDescription": "Disciplinas ativas de {{name}}, com a atividade mais recente primeiro.",
       "subjectRawInputAudit": "Seu filho pesquisou por \"{{rawInput}}\"",
       "openSubjectProgress": "Abrir progresso em {{subject}}",
       "recentSessions": "Sessões recentes",
@@ -2562,7 +2657,7 @@
       "cancelDeletion": "Cancelar exclusão",
       "withdrawConsent": "Retirar consentimento",
       "withdrawConsentConfirmTitle": "Retirar consentimento?",
-      "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
+      "withdrawConsentBody": "A conta e os dados de aprendizagem de {{childName}} serão eliminados após um período de tolerância de 7 dias. (Para contas de menores de 13 anos, a eliminação é imediata no final do período de tolerância para cumprir a lei de privacidade.)",
       "confirmWithdrawConsent": "Confirmar — retirar consentimento",
       "curriculumTitle": "Currículo",
       "curriculumSubtitle": "Explore as disciplinas e os tópicos de {{name}}",
@@ -2643,8 +2738,7 @@
       "checkConnectionRetry": "Verifique sua conexão e tente novamente",
       "weekOf": "Semana de",
       "retryReports": "Repetir relatórios",
-      "firstReportArriveOn": "O primeiro relatório de {{name}} chegará em {{date}}",
-      "firstReportTimeContext": "O primeiro relatório de {{name}} {{timeContext}}"
+      "firstCombinedReportOn": "O primeiro relatório semanal ou mensal de {{name}} pode chegar já em {{date}}, quando houver aprendizado suficiente para resumir."
     },
     "report": {
       "sessions": "Sessões",
@@ -2708,9 +2802,9 @@
       "topicsNewLearnerBody": "Isso pode acontecer após as primeiras sessões ou navegação livre. As sessões recentes abaixo ainda mostram o que aconteceu.",
       "noTopicsYetTitle": "Nenhum tópico de lição ainda",
       "noTopicsYetBody": "As sessões ainda podem existir aqui antes que o mentor tenha progresso suficiente no nível da lição para mostrar.",
-      "description": "This is your child's progress in {{subject}}. Topics appear once sessions connect to a lesson step.",
-      "recentSubjectSessions": "Recent {{subject}} sessions",
-      "viewSessionFrom": "View session from {{date}}"
+      "description": "Este é o progresso do seu filho em {{subject}}. Os tópicos aparecem assim que as sessões se ligam a uma etapa da lição.",
+      "recentSubjectSessions": "Sessões recentes de {{subject}}",
+      "viewSessionFrom": "Ver sessão de {{date}}"
     },
     "topic": {
       "topic": "Tópico",
@@ -2937,7 +3031,24 @@
     "subjects": "Matérias",
     "subjectsLabel": "Matérias",
     "journal": "Diário",
-    "journalLabel": "Diário"
+    "journalLabel": "Diário",
+    "adultSelfConsent": {
+      "title": "Confirme como usamos os seus dados",
+      "intro": "Antes de continuar, precisamos do seu consentimento para duas coisas sobre a sua conta.",
+      "platformUseHeading": "Usar o MentoMate",
+      "platformUseBody": "Processamos os dados da sua conta e aprendizagem para que a app funcione para si — as suas disciplinas, sessões e progresso.",
+      "llmDisclosureHeading": "Mentoria de IA",
+      "llmDisclosureBody": "As suas mensagens para o seu mentor de IA são enviadas a um fornecedor de modelos de IA para que ele possa responder e ensinar. Nunca vendemos os seus dados.",
+      "legalIntro": "Reveja todos os detalhes antes de concordar:",
+      "termsLink": "Termos de Serviço",
+      "privacyLink": "Política de Privacidade",
+      "accept": "Concordo",
+      "submitting": "A guardar…",
+      "errorTitle": "Não foi possível guardar o seu acordo",
+      "errorBody": "Ocorreu um erro da nossa parte. Tente novamente.",
+      "retry": "Tentar novamente",
+      "signOut": "Sair da conta"
+    }
   },
   "subscription": {
     "trial": {
@@ -2969,15 +3080,15 @@
     "childPaywall": {
       "headline": "Bom trabalho até agora!",
       "greatStart": "Você tem explorado e aprendido — ótimo começo!",
-      "xpStats_one": "You learned {{count}} topic and earned {{xp}} XP — great work!",
-      "xpStats_other": "You learned {{count}} topics and earned {{xp}} XP — great work!",
+      "xpStats_one": "Você aprendeu {{count}} tópico e ganhou {{xp}} XP — ótimo trabalho!",
+      "xpStats_other": "Você aprendeu {{count}} tópicos e ganhou {{xp}} XP — ótimo trabalho!",
       "usedAllQuestions": "Você usou todas as suas perguntas gratuitas. Peça aos seus pais para fazerem um upgrade para você continuar aprendendo.",
       "quotaUsedAllQuestions": "Você usou suas perguntas por enquanto. Pode tentar novamente depois de {{resetAt}} ou avisar um responsável se precisar de mais espaço.",
       "notifyButton": "Notificar Meus Pais",
       "notifyButtonNotified": "Pais notificados",
       "notifyButtonAccessibilityNotified": "Pais já notificados",
       "notifyButtonAccessibilityNotify": "Notificar meus pais",
-      "cooldownReminder": "You can remind them again in {{label}}.",
+      "cooldownReminder": "Você pode lembrá-los novamente em {{label}}.",
       "notifiedExploreText": "Seus pais foram notificados! Enquanto espera, você ainda pode explorar:",
       "waitText": "Enquanto espera, você ainda pode navegar pela sua Biblioteca e ver seu progresso.",
       "browseLibrary": "Navegar na Biblioteca",
@@ -2986,10 +3097,10 @@
       "seeProgressAccessibilityLabel": "Ver seu progresso",
       "goHome": "Ir para Início",
       "goHomeAccessibilityLabel": "Ir para Início",
-      "back": "Back",
+      "back": "Voltar",
       "backAccessibilityLabel": "Voltar",
       "alerts": {
-        "sentTitle": "Sent!",
+        "sentTitle": "Enviado!",
         "sentBody": "Avisamos seus pais!",
         "askParentTitle": "Pergunte aos seus pais",
         "askParentBody": "Peça aos seus pais para abrirem o aplicativo e assinarem.",
@@ -3022,7 +3133,7 @@
       "alerts": {
         "successTitle": "Lista de Espera",
         "successBody": "Você foi adicionado à lista de espera BYOK.",
-        "errorTitle": "Error",
+        "errorTitle": "Erro",
         "errorBody": "Não foi possível entrar na lista. Tente novamente."
       }
     },
@@ -3059,6 +3170,7 @@
       "yourShare": "A tua parte",
       "yourUsage": "A tua utilização",
       "questionsUsed": "{{count}} perguntas",
+      "formerMembers": "Membros anteriores",
       "familyAggregate": "Total da família",
       "quotaResets": "A quota é reposta a {{date}}",
       "renews": "A subscrição renova a {{date}}",
@@ -3077,7 +3189,9 @@
       "title": "Quer um lembrete diário?",
       "message": "Podemos enviar um lembrete gentil para você não perder sua sequência. Você pode desativar a qualquer momento nas Configurações.",
       "allow": "Permitir",
-      "notNow": "Agora não"
+      "notNow": "Agora não",
+      "noticeTitle": "Quer um lembrete amigável?",
+      "noticeMessage": "Podemos lembrar você de rever o que seu mentor notou hoje. Você pode desativar isso a qualquer momento nas Configurações."
     },
     "masteredRow": {
       "title": "Você dominou:"
@@ -3190,6 +3304,14 @@
         "language_focus": "Próxima vez: vamos trabalhar nos padrões gramaticais",
         "fluency": "Próxima vez: um sprint rápido de fluência"
       }
+    },
+    "feedbackUnavailableTitle": "O feedback ainda não está disponível",
+    "feedbackUnavailableMessage": "O seu resumo está guardado. Pode tentar obter o feedback novamente sem o submeter outra vez.",
+    "feedbackStillUnavailable": "O feedback ainda não está disponível, mas o seu resumo está seguro. Pode tentar novamente ou continuar quando quiser.",
+    "retryFeedback": "Tentar novamente",
+    "retryingFeedback": "A tentar novamente...",
+    "mentorNotice": {
+      "title": "Observações do mentor"
     }
   },
   "sessionTranscript": {
@@ -3299,12 +3421,17 @@
     "detailLoadErrorMessage": "Tente novamente ou volte para a lista de resumos.",
     "notFoundTitle": "Resumo não encontrado",
     "notFoundMessage": "Este resumo não está mais disponível.",
-    "exchangesCount": "{{count}} exchanges",
+    "exchangesCount": "Trocas: {{count}}",
     "whatHappened": "O que aconteceu",
     "detailPending": "Este resumo ainda está sendo preparado.",
     "tryAsking": "Tente perguntar",
     "openChildSession": "Abrir sessão da criança",
-    "emptyCtaStartSession": "Iniciar uma sessão"
+    "emptyCtaStartSession": "Iniciar uma sessão",
+    "verifiedProof": {
+      "holdsStrong": "continua válido",
+      "lookupUnavailable": "A prova verificada está temporariamente indisponível",
+      "recheckDue": "revisão agendada para {{date}}"
+    }
   },
   "addToMyLearning": {
     "tip": "Salve uma cópia deste tópico em sua própria Biblioteca sem alterar o aprendizado do seu filho.",
@@ -3562,7 +3689,7 @@
         },
         "card2": {
           "subjects": {
-            "math": "Math",
+            "math": "Matemática",
             "history": "História",
             "spanish": "Espanhol"
           },
@@ -3614,15 +3741,17 @@
     "bridge": {
       "headline": "Transforme \"Não entendi\" em \"Eu consegui.\"",
       "supporting": "Crie uma conta gratuita para que seu mentor possa lembrar seus assuntos, anotações e progresso.",
+      "parentHeadline": "Continue com sua conta para apoiar o aluno.",
+      "parentSupporting": "Entre ou crie uma conta para aceitar o convite e configurar o suporte. Sua conta não dá acesso às atividades de aprendizagem, a menos que o aluno autorize.",
       "primaryCta": "Criar conta gratuita",
       "secondaryCta": "Já tenho uma conta"
     },
-    "next": "Next",
+    "next": "Seguinte",
     "letsStart": "Vamos começar",
     "a11y": {
       "previous": "Cartão anterior",
       "next": "Próximo cartão",
-      "dots": "Page {{current}} of {{total}}",
+      "dots": "Página {{current}} de {{total}}",
       "bridgePrimary": "Criar uma conta gratuita",
       "bridgeSecondary": "Entrar em uma conta existente"
     }
@@ -3691,12 +3820,6 @@
       "crossContextPromptMessage": "Você está em uma sessão. Termine-a primeiro ou abra a atualização e saia do fluxo atual.",
       "stayHere": "Ficar aqui",
       "openUpdate": "Abrir atualização"
-    },
-    "guardianPrimer": {
-      "title": "Quer ficar a par?",
-      "message": "Podemos enviar um lembrete quando uma criança precisar da sua atenção. Pode alterar isto a qualquer momento nas Definições.",
-      "allow": "Permitir",
-      "notNow": "Agora não"
     }
   },
   "myNotes": {
@@ -3854,8 +3977,8 @@
     "methodPracticeDesc": "Aprenda resolvendo exercícios guiados",
     "methodPracticeLabelYoung": "Deixe-me Tentar",
     "methodPracticeDescYoung": "Aprenda resolvendo problemas com ajuda",
-    "copyTopicIntro": "Escolha o tópico em que você tem mais dificuldade agora.",
-    "copyTopicIntroYoung": "Escolha o tópico que você quer tentar de novo.",
+    "copyTopicIntro": "Organizamos esses tópicos pelo que mais precisa de revisão — toque em outro tópico para trocar.",
+    "copyTopicIntroYoung": "Sugerimos uma ordem para começar — você também pode escolher outro tópico.",
     "copyMethodIntro": "Escolha um estilo de ensino que pareça ser o melhor próximo passo para você.",
     "copyMethodIntroYoung": "Como você gostaria de aprender desta vez?",
     "copySubjectIntro": "Qual matéria você gostaria de revisar primeiro?",
@@ -3983,6 +4106,14 @@
         "currentAccess": "Seu acesso pago permanece ativo até {{deadline}}.",
         "freeFallback": "Sua conta está usando o acesso gratuito agora. Atualize o pagamento para restaurar seu plano.",
         "currentAccessNoDeadline": "O seu acesso pago ainda está ativo."
+      },
+      "mentor_notice": {
+        "title": "Uma pequena ideia para rever",
+        "cta": "Conferir agora",
+        "notNow": "Agora não",
+        "arcDue": "Pronto quando quiser",
+        "arcAdvancing": "Abrindo uma revisão rápida",
+        "arcMastered": "Dominado"
       }
     },
     "ledger": {
@@ -3995,6 +4126,9 @@
       },
       "quota": {
         "title": "Um momento de aprendizado foi salvo."
+      },
+      "notice_locked_in": {
+        "title": "Você dominou {{concept}}."
       }
     },
     "overflow": {
@@ -4006,7 +4140,18 @@
       "placeholder": "Pergunte, cole ou descreva o que você quer aprender.",
       "micLabel": "Microfone",
       "homeworkChip": "Dever de casa",
-      "title": "Pergunte qualquer coisa"
+      "title": "Pergunte qualquer coisa",
+      "micIdleLabel": "Iniciar entrada de voz",
+      "micRequestingLabel": "A pedir acesso ao microfone",
+      "micListeningLabel": "Parar entrada de voz",
+      "micProcessingLabel": "A finalizar a entrada de voz",
+      "micErrorLabel": "Tente a entrada de voz novamente",
+      "micDisabledLabel": "Entrada de voz indisponível",
+      "listening": "A ouvir…",
+      "voiceError": "A entrada de voz não funcionou. Podes escrever.",
+      "voicePermissionError": "O acesso ao microfone está desligado. Podes escrever.",
+      "voiceAllow": "Permitir microfone",
+      "voiceRetry": "Tentar voz novamente"
     },
     "onTrack": {
       "label": "Em dia",
@@ -4201,7 +4346,8 @@
       "recap_ready": "Um resumo está pronto.",
       "snapshot_ready": "Um resumo do seu aprendizado está pronto.",
       "reflection_bonus": "Bônus de reflexão salvo.",
-      "quiz_personal_best": "Recorde pessoal salvo."
+      "quiz_personal_best": "Recorde pessoal salvo.",
+      "notice_locked_in": "Dominou {{concept}} em {{subjectName}}."
     },
     "recaps": {
       "error": "Não foi possível carregar seus resumos.",
@@ -4244,7 +4390,9 @@
   },
   "accountAdmin": {
     "title": "Conta",
-    "openAccount": "Abrir configurações da conta",
+    "openAccount": "Abrir as configurações da conta de {{name}}",
+    "openAccountNoName": "Abrir as configurações da conta",
+    "backTo": "Voltar para {{destination}}",
     "security": "Segurança da conta",
     "familySettings": "Configurações da família"
   },
@@ -4420,7 +4568,6 @@
       "activeMessage": "Podes rever este acordo aqui a qualquer momento.",
       "revoke": "Terminar partilha",
       "revoking": "A terminar a partilha...",
-      "revoked": "A partilha está a terminar. O apoiante verá um aviso.",
       "revokeErrorTitle": "Não foi possível terminar a partilha",
       "missingActor": "Não conseguimos identificar a pessoa ativa.",
       "relationLabel": "Relação",
@@ -4428,7 +4575,16 @@
       "pickerManagedEmpty": "Ainda não há crianças elegíveis.",
       "pickerExistingTeenOption": "Membro da família existente (13+)",
       "existingTeenUnavailableTitle": "Ainda não disponível",
-      "existingTeenUnavailableMessage": "Convidar um membro da família existente ainda não está disponível. Volta em breve."
+      "existingTeenUnavailableMessage": "Convidar um membro da família existente ainda não está disponível. Volta em breve.",
+      "existingTeenInviteTitle": "Convidar um membro da família existente",
+      "existingTeenInviteMessage": "Insira o e-mail que o seu adolescente usa no MentoMate. Enviaremos um convite para mover a conta dele para o seu plano familiar — o histórico de aprendizagem dele será mantido.",
+      "existingTeenInviteEmailLabel": "E-mail do MentoMate",
+      "existingTeenInviteEmailPlaceholder": "nome@exemplo.com",
+      "existingTeenInviteAction": "Enviar convite",
+      "existingTeenInviteSending": "A enviar…",
+      "existingTeenInviteSentTitle": "Convite a caminho",
+      "existingTeenInviteSentMessage": "Se esse e-mail pertencer a uma conta MentoMate, enviámos um convite. Peça-lhe para abrir o MentoMate e aceitá-lo.",
+      "existingTeenInviteErrorTitle": "Não foi possível enviar o convite"
     }
   },
   "supporterColdStart": {

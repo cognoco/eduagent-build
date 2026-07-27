@@ -333,7 +333,9 @@ export function useTopicProgress(
   });
 }
 
-export function useProgressInventory(): UseQueryResult<KnowledgeInventory> {
+export function useProgressInventory(options?: {
+  enabled?: boolean;
+}): UseQueryResult<KnowledgeInventory> {
   const client = useApiClient();
   const { activeProfile, mode, profileId } = useSelfProgressNavigationScope();
 
@@ -356,7 +358,7 @@ export function useProgressInventory(): UseQueryResult<KnowledgeInventory> {
         cleanup();
       }
     },
-    enabled: !!activeProfile,
+    enabled: !!activeProfile && (options?.enabled ?? true),
     // [BUG-503] Prevent refetch storm: inventory doesn't change within a visit.
     staleTime: 2 * 60 * 1000,
   });

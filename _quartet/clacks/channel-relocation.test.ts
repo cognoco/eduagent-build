@@ -58,11 +58,29 @@ afterEach(() => {
   }
 });
 
+// WI-1345 sweep: strip ambient GIT_* (a husky-exported GIT_DIR would redirect
+// fixture-repo git calls at the real checkout) and re-layer explicit identity.
+function childGitEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('GIT_')) {
+      delete env[key];
+    }
+  }
+  return { ...env, ...overrides };
+}
+
 function git(cwd: string, args: string[]) {
   return execFileSync('git', args, {
     cwd,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
+    env: childGitEnv({
+      GIT_AUTHOR_NAME: 'test',
+      GIT_AUTHOR_EMAIL: 'test@example.invalid',
+      GIT_COMMITTER_NAME: 'test',
+      GIT_COMMITTER_EMAIL: 'test@example.invalid',
+    }),
   });
 }
 

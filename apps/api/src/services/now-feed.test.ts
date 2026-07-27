@@ -7,12 +7,27 @@ import {
   orderSupporterHubCandidates,
   buildNowFeedFromCandidates,
   buildNowOverflowFromCandidates,
+  isRetentionDueAt,
   rankCandidates,
   resolveDeepLink,
   type NowFeedCandidate,
 } from './now-feed';
 
 const now = new Date('2026-06-11T12:00:00.000Z');
+
+describe('WI-2113 retention transition', () => {
+  it('[WI-2113 AC-2] exposes retention only at or after its due timestamp', () => {
+    expect(isRetentionDueAt(new Date('2026-06-11T12:00:01.000Z'), now)).toBe(
+      false,
+    );
+    expect(isRetentionDueAt(new Date('2026-06-11T12:00:00.000Z'), now)).toBe(
+      true,
+    );
+    expect(isRetentionDueAt(new Date('2026-06-11T11:59:59.000Z'), now)).toBe(
+      true,
+    );
+  });
+});
 
 function candidate(
   overrides: Partial<NowFeedCandidate> & Pick<NowFeedCandidate, 'id' | 'kind'>,
@@ -69,6 +84,23 @@ describe('now feed ranking', () => {
       '04-challenge',
       '05-parked',
       '06-ledger',
+    ]);
+  });
+
+  it('ranks mentor notices after unfinished sessions and before retention work', () => {
+    const ranked = rankCandidates(
+      [
+        candidate({ id: 'retention', kind: 'retention_due' }),
+        candidate({ id: 'notice', kind: 'mentor_notice' }),
+        candidate({ id: 'session', kind: 'unfinished_session' }),
+      ],
+      now,
+    );
+
+    expect(ranked.map((item) => item.id)).toEqual([
+      'session',
+      'notice',
+      'retention',
     ]);
   });
 
@@ -289,6 +321,19 @@ describe('now feed route catalog', () => {
     expect(resolveDeepLink('journal', {})).toEqual({
       route: 'journal',
       params: {},
+      chain: [],
+    });
+  });
+
+  it('builds the notice re-check action route with its required identifiers', () => {
+    expect(
+      resolveDeepLink('notice.recheck', {
+        noticeId: 'notice-1',
+        subjectId: 'subject-1',
+      }),
+    ).toEqual({
+      route: 'notice.recheck',
+      params: { noticeId: 'notice-1', subjectId: 'subject-1' },
       chain: [],
     });
   });

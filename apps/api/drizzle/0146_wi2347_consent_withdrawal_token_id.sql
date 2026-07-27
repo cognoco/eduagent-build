@@ -1,0 +1,1 @@
+ALTER TABLE "consent_grant" ADD COLUMN "withdrawal_token_id" uuid;

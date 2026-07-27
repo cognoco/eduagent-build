@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { eq, and, desc, inArray, lt, sql, gte, ne } from 'drizzle-orm';
+import { z } from 'zod';
 import {
   assessments,
   learningSessions,
@@ -19,6 +20,7 @@ import {
 } from '@eduagent/database';
 import type {
   AgeBracket,
+  AppShell,
   ChallengeRoundEvaluationItem,
   ChallengeRoundNoteDraftHint,
   ConversationLanguage,
@@ -36,6 +38,10 @@ import type {
   LanguageActivityTelemetry,
   LanguageComprehensionEvaluation,
   LanguageNextPracticePointer,
+  MentorNoticeAccepted,
+  RecitationSetupState,
+  RecitationSetupTransition,
+  AnswerEvaluation,
 } from '@eduagent/schemas';
 import {
   computeAgeBracket,
@@ -51,6 +57,8 @@ import {
   extractedInterviewSignalsSchema,
   isUnambiguouslyAdult,
   languageNextPracticePointerSchema,
+  recitationSetupActionSchema,
+  recitationSetupStateSchema,
 } from '@eduagent/schemas';
 import { persistUserMessageOnly } from './persist-user-message-only';
 import {
@@ -66,6 +74,7 @@ import {
   emitSuitabilityBlockedEvent,
   emitSuitabilityJudgeUnavailableEvent,
   inferObviousReliableSourceForAudit,
+  shouldAcceptAnswerEvaluation,
   type ExchangeFallback,
   type ExchangeSourceAudit,
   type FluencyDrillAnnotation,
@@ -76,9 +85,11 @@ import { applyMinorPiiEchoGate } from '../minor-pii-echo-gate';
 import { runSuitabilityEnforcement } from '../suitability-gate';
 import type { ExchangeContext, ReviewCallback } from '../exchange-types';
 import { getReviewCallbackContext } from '../review-callback';
+import { isLlmExchangeConsentAllowed } from '../identity-v2/consent-status-v2';
 import {
   evaluateEscalation,
   getRetentionAwareStartingRung,
+  type EscalationDecision,
 } from '../escalation';
 import {
   buildPriorLearningContext,
@@ -86,6 +97,16 @@ import {
 } from '../prior-learning';
 import { buildMemoryBlock, buildAccommodationBlock } from '../learner-profile';
 import { applyAppHelpSignalGuard, isAppHelpQuery } from '../app-help-map';
+import {
+  applyMentorNoticeOutcome,
+  createMentorNoticeFromExchange,
+  detachMentorNoticeRecheckAttempt,
+  evaluateMentorNoticeRecheck,
+  getLearningDayStart,
+  getProfileTimeZone,
+  MENTOR_NOTICE_RECHECK_MAX_EXCHANGES,
+  resolveMentorNoticeRecheckContext,
+} from '../mentor-notices';
 import { generateEmbedding } from '../embeddings';
 import { retrieveRelevantMemory } from '../memory';
 import { makeEmbedderFromEnv } from '../memory/embed-fact';
@@ -104,7 +125,10 @@ import { shouldTriggerEvaluate } from '../evaluate';
 import { shouldTriggerTeachBack } from '../teach-back';
 import { getRetentionStatus, type RetentionState } from '../retention';
 import { extractInterestLabels } from '../graded-input-generation';
-import { createNoteForSession } from '../notes';
+import {
+  persistVerifiedChallengeArtifact,
+  persistVerifiedChallengeArtifacts,
+} from '../evidence-links';
 import type {
   EscalationRung,
   LlmProviderPolicy,
@@ -122,13 +146,14 @@ import {
 import {
   getSession,
   MAX_EXCHANGES_PER_SESSION,
+  ConsentWithdrawnError,
   persistSessionMetadata,
   SessionExchangeLimitError,
 } from './session-crud';
 import { createLogger } from '../logger';
 import { captureException } from '../sentry';
 import { safeSend, safeWrite } from '../safe-non-core';
-import * as learningTextGuard from '../persisted-learning-text-guard';
+import { evaluateLearningTextFields } from '../learning-text-safety/gate';
 import {
   buildResumeContext,
   loadPriorSessionMeta,
@@ -136,6 +161,13 @@ import {
 import { projectAiResponseContent } from '../llm/project-response';
 import { resolveSuitabilityJudgeDispatch } from '../policy-engine/judge-dispatch';
 import { isSubstantiveCalibrationAnswer } from './review-calibration';
+import {
+  recitationSetupClaimMetadataKey,
+  recitationOpeningForLog,
+  readPersistedRecitationSetupState,
+  resolveRecitationSetupTransition,
+  sanitizeRecitationSourceAudit,
+} from './session-recitation-setup';
 import {
   recordPracticeActivityEvent,
   type RecordPracticeActivityEventInput,
@@ -151,6 +183,7 @@ import {
 import {
   CONCEPT_CAPTURE_ENABLED,
   captureConceptMastery,
+  conceptKeyForLabel,
 } from '../concept-capture';
 import { MAX_CHALLENGE_QUESTIONS } from '../challenge-round/caps';
 import {
@@ -220,6 +253,91 @@ async function recordSessionPracticeActivityEvent(
 const logger = createLogger();
 
 // ---------------------------------------------------------------------------
+// [WI-2625 rework #4] Mentor-notice re-check CAP — the attempt lifecycle is
+// SEPARATE bookkeeping from notice status (operator ruling, 2026-07-26).
+//
+// A valid `continue` makes NO mentor-notice transition at any exchange number,
+// including the third (AC-3, as written). The three-response cap therefore ends
+// the ATTEMPT, not the notice: `endMentorNoticeRecheckAttemptAtCap` detaches the
+// session's attempt bookkeeping and leaves the notice `open` and unresolved, so
+// it stays eligible for a later re-offer under the ordinary eligibility/cooldown
+// rules — a fresh attempt, counted from exchange 1, in a fresh session.
+//
+// Detaching is what makes that re-offer genuinely reachable rather than a
+// zombie: while the attempt keys survive on a session already past the cap,
+// `resolveMentorNoticeRecheckContext` returns null there forever AND
+// `startMentorNoticeRecheck` keeps handing that same dead session back. See
+// `detachMentorNoticeRecheckAttempt` (offer.ts) for the full argument.
+//
+// What still terminalizes `not_yet` at the cap (AC-4) is an UNRESOLVED
+// evaluation — `evaluation.kind === 'unresolved'`, the discriminant the switch
+// below actually branches on. The rationale is the discriminant's meaning, not a
+// list of causes: unresolved means no valid verdict was ever obtained, so there
+// is nothing to preserve for a later attempt.
+//
+// Deliberately NOT enumerated. This comment previously said "malformed or
+// unavailable judgment … is the ONE case", which was untrue of the code beneath
+// it: `recheck-judge.ts` reaches `UNRESOLVED` from SEVEN sites, and two of them
+// are neither malformed nor unavailable — an answer event the server cannot find
+// (`answer_event_missing`), and a verdict whose reason does not match its
+// outcome (`mismatched_pair`). Merged canon (WI-2623, 23441a032) states the
+// unresolved set is explicitly not closed by any illustrative list, so naming
+// members here would drift from canon the moment a site is added. Branch on the
+// discriminant; read `recheck-judge.ts` for the current causes.
+// ---------------------------------------------------------------------------
+
+/**
+ * [AC-3] The cap fired over a VALID `continue`: end the attempt, transition
+ * nothing. The notice stays open and re-offerable.
+ */
+async function endMentorNoticeRecheckAttemptAtCap(
+  db: Database,
+  input: { profileId: string; sessionId: string; exchangeNumber: number },
+): Promise<void> {
+  if (input.exchangeNumber < MENTOR_NOTICE_RECHECK_MAX_EXCHANGES) return;
+  logger.info(
+    '[mentor-notice-recheck] response cap reached after a valid continue — attempt ended, notice preserved',
+    {
+      cause: 'valid_continue',
+      exchangeNumber: input.exchangeNumber,
+      maxExchanges: MENTOR_NOTICE_RECHECK_MAX_EXCHANGES,
+    },
+  );
+  await detachMentorNoticeRecheckAttempt(db, {
+    profileId: input.profileId,
+    sessionId: input.sessionId,
+  });
+}
+
+/**
+ * [AC-4] The cap fired over an UNRESOLVED evaluation (malformed output, judge
+ * unavailable, routing failure): deterministically terminalize `not_yet`.
+ */
+async function terminalizeUnresolvedMentorNoticeRecheckAtCap(
+  db: Database,
+  input: {
+    profileId: string;
+    noticeId: string;
+    exchangeNumber: number;
+  },
+): Promise<void> {
+  if (input.exchangeNumber < MENTOR_NOTICE_RECHECK_MAX_EXCHANGES) return;
+  logger.info(
+    '[mentor-notice-recheck] response cap reached — terminalizing not_yet',
+    {
+      cause: 'evaluator_unresolved',
+      exchangeNumber: input.exchangeNumber,
+      maxExchanges: MENTOR_NOTICE_RECHECK_MAX_EXCHANGES,
+    },
+  );
+  await applyMentorNoticeOutcome(db, {
+    profileId: input.profileId,
+    noticeId: input.noticeId,
+    outcome: 'not_yet',
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Correct-answer streak computation (pure — testable in isolation)
 // ---------------------------------------------------------------------------
 
@@ -251,9 +369,25 @@ export function computeCorrectStreak(
     if (!meta || typeof meta !== 'object') break;
     const m = meta as Record<string, unknown>;
     if (m.escalationRung !== currentRung) break;
-    // Explicit wrong answer resets the streak; unevaluated turns are skipped.
-    if (m.correctAnswer === false) break;
-    if (m.correctAnswer !== true) continue;
+    const answerEvaluation = m.answerEvaluation;
+    const canonicalCorrectness =
+      answerEvaluation &&
+      typeof answerEvaluation === 'object' &&
+      !Array.isArray(answerEvaluation)
+        ? (answerEvaluation as Record<string, unknown>).correctness
+        : undefined;
+    if (
+      canonicalCorrectness === 'partial' ||
+      canonicalCorrectness === 'incorrect'
+    ) {
+      break;
+    }
+    if (canonicalCorrectness === 'na') continue;
+    if (canonicalCorrectness !== 'correct') {
+      // Legacy rows remain readable when no valid canonical signal exists.
+      if (m.correctAnswer === false) break;
+      if (m.correctAnswer !== true) continue;
+    }
     streak++;
     if (streak >= MAX_CORRECT_STREAK) break;
   }
@@ -275,6 +409,8 @@ export interface ExchangeBehavioralMetrics {
   homeworkMode?: 'help_me' | 'check_answer';
   /** Envelope signal — read back next turn to hold escalation (F1.2) */
   partialProgress?: boolean;
+  /** Canonical ordinary-loop answer evaluation for this learner turn. */
+  answerEvaluation?: AnswerEvaluation;
   /** Envelope signal — used to queue topic for remediation (F1.3) */
   needsDeepening?: boolean;
   /** F6: LLM self-reported confidence — persisted so the next turn and analytics can read it. */
@@ -289,6 +425,12 @@ export interface ExchangeBehavioralMetrics {
   sourceAudit?: ExchangeSourceAudit;
   /** B.3 monitoring: consecutive correct-answer streak at the current escalation rung */
   correctStreak?: number;
+  /** Source-rung streak retained only for rung-movement audit evidence. */
+  rungMovementStreak?: number;
+  /** Explicit rung movement chosen before this exchange. */
+  rungAction?: EscalationDecision['action'];
+  rungDirection?: EscalationDecision['direction'];
+  rungReason?: string;
   /** Fluency-drill score correct count, when the envelope's ui_hints.fluency_drill.score was set. */
   drillCorrect?: number;
   /** Fluency-drill score total count, when the envelope's ui_hints.fluency_drill.score was set. */
@@ -313,6 +455,8 @@ export interface ExchangeBehavioralMetrics {
   llmModel?: string;
   /** True when streaming fell back from the initial provider before first byte. */
   llmFallbackUsed?: boolean;
+  /** Server-owned recitation setup phase persisted on the assistant event. */
+  recitationSetup?: RecitationSetupState;
   /**
    * Bug #348: EVALUATE assessment signal (snake_case wire shape) emitted by the
    * LLM in `envelope.signals.evaluate_assessment`. Persisted under
@@ -339,7 +483,74 @@ export interface ExchangeBehavioralMetrics {
   draftedNote?: DraftedChallengeNote;
 }
 
+export interface DownwardRungMovementAudit {
+  fromRung: number;
+  toRung: number;
+  action: 'deescalate';
+  direction: 'down';
+  streak?: number;
+  reason?: string;
+}
+
+export function buildDownwardRungMovementAudit(
+  previousRung: number,
+  effectiveRung: number,
+  behavioral?: Pick<
+    ExchangeBehavioralMetrics,
+    'rungDirection' | 'rungMovementStreak' | 'rungReason'
+  >,
+): DownwardRungMovementAudit | undefined {
+  if (previousRung === effectiveRung || behavioral?.rungDirection !== 'down') {
+    return undefined;
+  }
+
+  return {
+    fromRung: previousRung,
+    toRung: effectiveRung,
+    action: 'deescalate',
+    direction: 'down',
+    ...(behavioral.rungMovementStreak !== undefined && {
+      streak: behavioral.rungMovementStreak,
+    }),
+    ...(behavioral.rungReason && { reason: behavioral.rungReason }),
+  };
+}
+
+export function buildDeescalationTelemetry(
+  sessionId: string,
+  movement: DownwardRungMovementAudit,
+) {
+  return {
+    event: 'llm.deescalation_applied' as const,
+    sessionId,
+    ...movement,
+  };
+}
+
+export function buildCorrectStreakOfferTelemetry(
+  sessionId: string,
+  behavioral?: Pick<
+    ExchangeBehavioralMetrics,
+    'correctStreak' | 'rungDirection'
+  >,
+) {
+  if (
+    behavioral?.rungDirection !== 'none' ||
+    behavioral.correctStreak == null ||
+    behavioral.correctStreak < 4
+  ) {
+    return undefined;
+  }
+
+  return {
+    event: 'llm.escalation_offered' as const,
+    sessionId,
+    correctStreak: behavioral.correctStreak,
+  };
+}
+
 export interface ChallengeRoundVerdict {
+  outcome: MasteryOutcome;
   solidCount: number;
   partialCount: number;
   missingCount: number;
@@ -451,23 +662,6 @@ function mapRetrievalScoreToDepth(score: number): 'low' | 'mid' | 'high' {
   return 'low';
 }
 
-async function updateSessionMetadata(
-  db: Database,
-  profileId: string,
-  sessionId: string,
-  nextMetadata: Record<string, unknown>,
-): Promise<void> {
-  await db
-    .update(learningSessions)
-    .set({ metadata: nextMetadata, updatedAt: new Date() })
-    .where(
-      and(
-        eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId),
-      ),
-    );
-}
-
 async function applyContinuationScore(
   db: Database,
   profileId: string,
@@ -478,7 +672,7 @@ async function applyContinuationScore(
   // [CR-2026-05-19-M3]: Wrap SELECT + UPDATE in a transaction with FOR UPDATE
   // so concurrent exchanges cannot clobber each other's continuationDepth write.
   // The previously-passed `session.metadata` snapshot was captured at request
-  // start, before `updateSessionMetadata` set `continuationOpenerActive: true`,
+  // start, before `persistSessionMetadata` set `continuationOpenerActive: true`,
   // so spreading that snapshot here clobbered the freshly-written flag.
   await db.transaction(async (tx) => {
     const [fresh] = await tx
@@ -682,9 +876,11 @@ export async function persistActiveChallengeRoundTransition(
 
 function verdictFromEvaluations(
   evaluations: ChallengeRoundEvaluationItem[],
+  outcome: MasteryOutcome,
 ): ChallengeRoundVerdict {
   const summary = summarizeEvaluation(evaluations);
   return {
+    outcome,
     solidCount: summary.solid,
     partialCount: summary.partial,
     missingCount: summary.missing,
@@ -730,14 +926,30 @@ function buildFallbackDraft(
  * here should only happen if an answer row becomes unreadable between that
  * claim and the note-draft guard.
  */
+function wholeEventVerifiedSolidItems(
+  evaluations: ChallengeRoundEvaluationItem[],
+): ChallengeRoundEvaluationItem[] {
+  const nonSolidEventIds = new Set(
+    evaluations
+      .filter((item) => item.result !== 'solid')
+      .map((item) => item.answerEventId),
+  );
+  return evaluations.filter(
+    (item) =>
+      item.result === 'solid' && !nonSolidEventIds.has(item.answerEventId),
+  );
+}
+
 async function fetchVerifiedSolidContents(
   db: Database,
   profileId: string,
   sessionId: string,
   evaluations: ChallengeRoundEvaluationItem[],
 ): Promise<string[] | null> {
-  const solidItems = evaluations.filter((item) => item.result === 'solid');
-  if (solidItems.length === 0) return [];
+  const allSolidItems = evaluations.filter((item) => item.result === 'solid');
+  const solidItems = wholeEventVerifiedSolidItems(evaluations);
+  if (allSolidItems.length === 0) return [];
+  if (solidItems.length === 0) return null;
   try {
     const verified = await validateEvaluationEventIds(
       db,
@@ -761,9 +973,7 @@ function buildValidatedDraft(
   verifiedSolidContents: string[] | null,
 ): DraftedChallengeNote | undefined {
   const solidEventIds = new Set(
-    evaluations
-      .filter((item) => item.result === 'solid')
-      .map((item) => item.answerEventId),
+    wholeEventVerifiedSolidItems(evaluations).map((item) => item.answerEventId),
   );
   const solidAnswerEventIds = Array.from(solidEventIds);
   if (!noteDraft) {
@@ -894,6 +1104,44 @@ async function persistChallengeRoundReviewTargets(
     decision.reviewTargets.map((target) => [target.concept, target]),
   );
 
+  // [WI-2628] Gate every review target's `misconception` HERE, above the
+  // transaction. The gate can make an LLM round-trip (the independent judge), and
+  // an LLM call inside an open transaction pins a pooled connection for its whole
+  // duration — a connection-exhaustion hazard under load. The text is already
+  // known from `decision.reviewTargets`, so nothing forces the evaluation inside.
+  // One batch, so N targets cost at most one judge call per distinct text.
+  //
+  // DERIVED WRITE — unsafe data is DROPPED (the field is written null), never
+  // raised, which is the AC-5 asymmetry and matches exactly what the English-only
+  // guard did at these two sites.
+  const misconceptionGate = await evaluateLearningTextFields({
+    // Not loaded on this path; the gate then scans all ten attribution grammars
+    // and keeps the strictest verdict. Never `'en'` — that is the bug being fixed.
+    conversationLanguage: undefined,
+    provenance: 'llm',
+    // Not reachable here. AC-4: a missing producer fails closed to block/unclear
+    // rather than referring the text to the judge.
+    producerVendor: null,
+    sessionId: session.id,
+    fields: [...targetsByConcept.values()].map((target) => ({
+      key: target.concept,
+      fieldKind: 'needs_deepening' as const,
+      text: target.misconception,
+    })),
+  });
+  /**
+   * Null when the gate refused the value. `isSafe` fails closed on a concept the
+   * batch never evaluated, so a target added to the loop without being added to
+   * the batch above drops its misconception rather than persisting it ungated.
+   */
+  const safeMisconception = (target: {
+    concept: string;
+    misconception?: string | null;
+  }): string | null =>
+    misconceptionGate.isSafe(target.concept)
+      ? (target.misconception ?? null)
+      : null;
+
   // [WI-1060] Read existing rows + the per-target update/insert loop run in one
   // transaction. Each review target is a separate update-or-insert; a crash
   // mid-loop would persist some weak concepts as deepening targets and drop
@@ -928,10 +1176,7 @@ async function persistChallengeRoundReviewTargets(
         await txDb
           .update(needsDeepeningTopics)
           .set({
-            misconception:
-              learningTextGuard.scrubClinicalInferenceFromLearningRecord(
-                target.misconception,
-              ),
+            misconception: safeMisconception(target),
             correction: target.correction,
             ...(existing.status === 'pending_review'
               ? { pendingExpiresAt }
@@ -955,10 +1200,7 @@ async function persistChallengeRoundReviewTargets(
         status: 'pending_review',
         source: 'challenge_round',
         concept: target.concept,
-        misconception:
-          learningTextGuard.scrubClinicalInferenceFromLearningRecord(
-            target.misconception,
-          ),
+        misconception: safeMisconception(target),
         correction: target.correction,
         pendingExpiresAt,
         updatedAt: now,
@@ -1099,6 +1341,7 @@ const COMPLETION_COOLDOWN_OUTCOME_CODE: Record<
   verified: 2,
   partial: 1,
   reteach: 3,
+  insufficient_breadth: 4,
 };
 
 export async function finalizeChallengeRoundIfReady(
@@ -1269,6 +1512,36 @@ export async function finalizeChallengeRoundIfReady(
     verifiedSolidContents,
   );
 
+  // Persist only DB-confirmed solid answers whose whole source event is solid.
+  // If the same event also carries partial/misconception/missing content, the
+  // unsliced event cannot safely become verified evidence.
+  if (verifiedSolidContents !== null) {
+    const solidItems = wholeEventVerifiedSolidItems(evaluations);
+    await safeWrite(
+      async () => {
+        await persistVerifiedChallengeArtifacts(db, {
+          profileId,
+          topicId,
+          sessionId: session.id,
+          artifacts: solidItems.flatMap((item, index) => {
+            const eventContent = verifiedSolidContents[index];
+            return eventContent
+              ? [
+                  {
+                    artifactSource: 'challenge_solid_quote' as const,
+                    conceptKey: conceptKeyForLabel(item.concept),
+                    sourceEventIds: [item.answerEventId],
+                  },
+                ]
+              : [];
+          }),
+        });
+      },
+      'challenge-round.finalize.solid-quote-persist',
+      { profileId, sessionId: session.id, topicId },
+    );
+  }
+
   // [WI-1658] Persist the validated draft as the durable verified-proof artifact,
   // ONLY on a fully-verified round (every evaluation item solid). This sidesteps
   // the event-grain gap the Artifact Provenance Contract flags for mixed rounds:
@@ -1279,14 +1552,16 @@ export async function finalizeChallengeRoundIfReady(
   // persistChallengeRoundMasteryEvidence above.
   if (decision.outcome === 'verified' && draftedNote?.body) {
     await safeWrite(
-      () =>
-        createNoteForSession(db, {
+      async () => {
+        await persistVerifiedChallengeArtifact(db, {
           profileId,
           topicId,
           sessionId: session.id,
           content: draftedNote.body as string,
           artifactSource: 'challenge_drafted_note',
-        }),
+          sourceEventIds: draftedNote.sourceAnswerEventIds,
+        });
+      },
       'challenge-round.finalize.note-persist',
       { profileId, sessionId: session.id, topicId },
     );
@@ -1301,7 +1576,10 @@ export async function finalizeChallengeRoundIfReady(
 
   return {
     challengeRound: complete,
-    challengeRoundVerdict: verdictFromEvaluations(evaluations),
+    challengeRoundVerdict: verdictFromEvaluations(
+      evaluations,
+      decision.outcome,
+    ),
     ...(draftedNote ? { draftedNote } : {}),
   };
 }
@@ -1374,6 +1652,49 @@ async function validateChallengeRoundEvaluationItems(
   });
 }
 
+function bindAskedQuestionToEvaluationIdentities(
+  evaluations: ChallengeRoundEvaluationItem[],
+  askedQuestion: string | undefined,
+): ChallengeRoundEvaluationItem[] {
+  if (!askedQuestion?.trim()) return evaluations;
+  return evaluations.map((evaluation) =>
+    evaluation.questionIdentity
+      ? {
+          ...evaluation,
+          questionIdentity: {
+            ...evaluation.questionIdentity,
+            questionText: askedQuestion,
+          },
+        }
+      : evaluation,
+  );
+}
+
+/**
+ * [WI-2670] T6 extension: source the most recent mentor question AND its REAL
+ * producing vendor from the last assistant turn in `exchangeHistory` — no DB
+ * read. `producerVendor` comes from that turn's persisted `llmProvider` (see
+ * `extractProducerVendor`/`buildExchangeHistory`), never the CURRENT turn's
+ * own routing decision: the two can diverge after a mid-session provider
+ * fallback, which is exactly the substitution the Challenge Round grader's
+ * `JudgeIndependence` declaration must not make (root-cause note removed from
+ * grader.ts — see WI-2670).
+ */
+export function resolveAskedQuestion(
+  exchangeHistory: ReturnType<typeof buildExchangeHistory>,
+): { askedQuestion: string; producerVendor?: string } {
+  const lastAssistant = exchangeHistory
+    .filter((e) => e.role === 'assistant')
+    .at(-1);
+  if (!lastAssistant) return { askedQuestion: '' };
+  return {
+    askedQuestion: projectAiResponseContent(lastAssistant.content, {
+      silent: true,
+    }),
+    producerVendor: lastAssistant.producerVendor,
+  };
+}
+
 async function applyChallengeRoundRuntimeSignals(
   db: Database,
   profileId: string,
@@ -1389,6 +1710,12 @@ async function applyChallengeRoundRuntimeSignals(
     // assistant message in exchangeHistory. Passed to the grader judge so it
     // has the question context without a DB round-trip.
     askedQuestion?: string;
+    // [WI-2670] The REAL vendor that produced `askedQuestion` — sourced by the
+    // caller from that same last assistant turn's persisted `llmProvider`
+    // (see `resolveAskedQuestion`). Required for the grader to declare
+    // `JudgeIndependence` mode:'model-output'; undefined only when the
+    // producer genuinely cannot be resolved.
+    askedQuestionProducerVendor?: string;
     // T8: true when CHALLENGE_ROUND_GRADER_ENABLED env binding is 'true'.
     // Threaded from processMessage/streamMessage options.
     challengeRoundGraderEnabled?: boolean;
@@ -1441,11 +1768,23 @@ async function applyChallengeRoundRuntimeSignals(
 
     // Call the judge (fail-open: emits a structured degraded event and returns
     // [] on any error — never throws into this path).
+    //
+    // [WI-2670] `producerVendor` is threaded from the asked question's
+    // persisted `llmProvider` (see `resolveAskedQuestion`) — every
+    // ai_response event written by `persistExchangeResult` carries it, so
+    // this should always resolve in practice. grader.ts owns the
+    // "producer unresolved" fail-open branch (never fabricates a vendor,
+    // emits its own structured `producer_vendor_unresolved` degraded event)
+    // rather than this call site special-casing it.
     const graderEvaluation = await runChallengeRoundGrader({
       profileId,
       askedQuestion: payload.askedQuestion ?? '',
       learnerAnswer: payload.currentUserMessage.content,
       answerEventId: payload.currentUserMessage.id,
+      producerVendor: payload.askedQuestionProducerVendor,
+      priorQuestionIdentities: current.evaluations.flatMap((evaluation) =>
+        evaluation.questionIdentity ? [evaluation.questionIdentity] : [],
+      ),
       conversationLanguage: context.conversationLanguage,
       ageBracket,
       sessionId: context.sessionId,
@@ -1483,7 +1822,10 @@ async function applyChallengeRoundRuntimeSignals(
         db,
         profileId,
         session.id,
-        graderEvaluation,
+        bindAskedQuestionToEvaluationIdentities(
+          graderEvaluation,
+          payload.askedQuestion,
+        ),
         payload.currentUserMessage,
       );
     } catch (err) {
@@ -1551,7 +1893,10 @@ async function applyChallengeRoundRuntimeSignals(
         db,
         profileId,
         session.id,
-        payload.challengeRoundEvaluation,
+        bindAskedQuestionToEvaluationIdentities(
+          payload.challengeRoundEvaluation,
+          payload.askedQuestion,
+        ),
         payload.currentUserMessage,
       );
     } catch (err) {
@@ -1965,6 +2310,22 @@ interface ExchangePrep {
   effectiveRung: EscalationRung;
   hintCount: number;
   lastAiResponseAt: Date | null;
+  escalationDecision: EscalationDecision;
+  sourceCorrectStreak: number;
+}
+
+/**
+ * [WI-2372] Consent-withdrawal guard for the live LLM/exchange pipeline
+ * (canon R5). Runs BEFORE checkExchangeLimit / prepareExchangeContext so a
+ * withdrawn-consent profile's request never reaches LLM dispatch.
+ */
+async function assertExchangeConsent(
+  db: Database,
+  profileId: string,
+): Promise<void> {
+  if (!(await isLlmExchangeConsentAllowed(db, profileId))) {
+    throw new ConsentWithdrawnError();
+  }
 }
 
 /**
@@ -2058,10 +2419,32 @@ function isReplayableSystemPrompt(event: ExchangeHistoryEvent): boolean {
   return source === undefined || source === 'server';
 }
 
+/**
+ * [WI-2670] The REAL vendor that produced an `ai_response` event, read back
+ * from the `llmProvider` field persisted on `session_events.metadata` at
+ * write time (see `persistExchangeResult`'s `aiMetadata.llmProvider`). Every
+ * `ai_response` row written by this file's persistence path carries it
+ * unconditionally; a missing/malformed value (e.g. a pre-tracking legacy row)
+ * resolves to `undefined` rather than throwing — callers must treat that as
+ * "producer unresolved," never guess.
+ */
+function extractProducerVendor(metadata: unknown): string | undefined {
+  if (
+    !metadata ||
+    typeof metadata !== 'object' ||
+    !('llmProvider' in metadata)
+  ) {
+    return undefined;
+  }
+  const value = (metadata as { llmProvider?: unknown }).llmProvider;
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
 export function buildExchangeHistory(events: ExchangeHistoryEvent[]): Array<{
   role: 'user' | 'system' | 'assistant';
   content: string;
   orphan_reason?: string;
+  producerVendor?: string;
 }> {
   return events
     .filter(
@@ -2078,6 +2461,12 @@ export function buildExchangeHistory(events: ExchangeHistoryEvent[]): Array<{
             ? ('system' as const)
             : ('assistant' as const),
       ...(e.orphanReason ? { orphan_reason: e.orphanReason } : {}),
+      ...(e.eventType === 'ai_response'
+        ? (() => {
+            const producerVendor = extractProducerVendor(e.metadata);
+            return producerVendor ? { producerVendor } : {};
+          })()
+        : {}),
       content:
         e.eventType === 'ai_response'
           ? (() => {
@@ -2131,6 +2520,147 @@ export function resolvePromptLearnerName(profile: {
   return profile.displayName ?? undefined;
 }
 
+const MAX_RECITATION_SETUP_REPLAY_CLAIMS = MAX_EXCHANGES_PER_SESSION;
+
+const recitationSetupReplayClaimSchema = recitationSetupStateSchema.extend({
+  clientId: z.string().min(1),
+  action: recitationSetupActionSchema,
+});
+const persistedRecitationSetupClaimSchema = recitationSetupStateSchema.extend({
+  lastAction: recitationSetupActionSchema,
+  lastClientId: z.string().min(1).optional(),
+  recentClaims: z.array(recitationSetupReplayClaimSchema),
+});
+type PersistedRecitationSetupClaim = z.infer<
+  typeof persistedRecitationSetupClaimSchema
+>;
+
+function parsePersistedRecitationSetupClaim(
+  value: unknown,
+): PersistedRecitationSetupClaim | undefined {
+  const parsed = persistedRecitationSetupClaimSchema.safeParse(value);
+  if (!parsed.success) return undefined;
+  return {
+    ...parsed.data,
+    recentClaims: parsed.data.recentClaims.slice(
+      -MAX_RECITATION_SETUP_REPLAY_CLAIMS,
+    ),
+  };
+}
+
+/**
+ * Atomically reserves the recitation setup transition before model dispatch.
+ *
+ * Private setup state lives in the mutable learning-session metadata summary,
+ * while the immutable event log remains append-only. The public session schema
+ * strips this server-only key. The transaction commits before any LLM work,
+ * avoiding a connection held across provider latency.
+ */
+export async function claimRecitationSetupTransition(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  message: string,
+  clientId?: string,
+): Promise<RecitationSetupTransition | undefined> {
+  return db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({
+        metadata: learningSessions.metadata,
+        exchangeCount: learningSessions.exchangeCount,
+      })
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+        ),
+      )
+      .for('update')
+      .limit(1);
+    if (!current) return undefined;
+
+    const sessionMetadata =
+      (current.metadata as Record<string, unknown> | null) ?? {};
+    if (sessionMetadata['effectiveMode'] !== 'recitation') return undefined;
+
+    const persisted = parsePersistedRecitationSetupClaim(
+      sessionMetadata[recitationSetupClaimMetadataKey],
+    );
+    const replayClaim = clientId
+      ? [...(persisted?.recentClaims ?? [])]
+          .reverse()
+          .find((claim) => claim.clientId === clientId)
+      : undefined;
+    if (replayClaim) {
+      return {
+        action: replayClaim.action,
+        state: {
+          phase: replayClaim.phase,
+          clarificationCount: replayClaim.clarificationCount,
+        },
+      };
+    }
+    if (clientId && persisted?.lastClientId === clientId) {
+      return {
+        action: persisted.lastAction,
+        state: {
+          phase: persisted.phase,
+          clarificationCount: persisted.clarificationCount,
+        },
+      };
+    }
+
+    const transition = resolveRecitationSetupTransition({
+      effectiveMode: 'recitation',
+      exchangeCount: current.exchangeCount,
+      message,
+      previousState: persisted
+        ? {
+            phase: persisted.phase,
+            clarificationCount: persisted.clarificationCount,
+          }
+        : undefined,
+    });
+    if (!transition) return undefined;
+
+    const recentClaims = clientId
+      ? [
+          ...(persisted?.recentClaims ?? []).filter(
+            (claim) => claim.clientId !== clientId,
+          ),
+          {
+            clientId,
+            action: transition.action,
+            ...transition.state,
+          },
+        ].slice(-MAX_RECITATION_SETUP_REPLAY_CLAIMS)
+      : (persisted?.recentClaims ?? []);
+
+    await tx
+      .update(learningSessions)
+      .set({
+        metadata: {
+          ...sessionMetadata,
+          [recitationSetupClaimMetadataKey]: {
+            ...transition.state,
+            lastAction: transition.action,
+            ...(clientId ? { lastClientId: clientId } : {}),
+            recentClaims,
+          },
+        },
+      })
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+        ),
+      );
+
+    return transition;
+  });
+}
+
 export async function prepareExchangeContext(
   db: Database,
   profileId: string,
@@ -2139,6 +2669,8 @@ export async function prepareExchangeContext(
   options?: {
     voyageApiKey?: string;
     homeworkMode?: 'help_me' | 'check_answer';
+    /** [WI-2220] Client-supplied active app shell, passed through per exchange. */
+    shell?: AppShell;
     llmTier?: LLMTier;
     subscriptionTier?: SubscriptionTier;
     quotaRemainingTurns?: number;
@@ -2148,8 +2680,11 @@ export async function prepareExchangeContext(
     semanticMemoryRetrievalEnabled?: boolean;
     challengeRoundRuntimeEnabled?: boolean;
     challengeRoundGraderEnabled?: boolean;
+    answerEvaluationEnabled?: boolean;
+    mentorNoticeEnabled?: boolean;
     reviewCallbackOpenerEnabled?: boolean;
     currentUserMessageEventId?: string;
+    clientId?: string;
   },
 ): Promise<ExchangePrep> {
   // 1. Load session
@@ -2161,6 +2696,16 @@ export async function prepareExchangeContext(
   const sessionMeta = ((session.metadata as
     | Record<string, unknown>
     | undefined) ?? {}) as Record<string, unknown>;
+  const claimedRecitationSetup =
+    sessionMeta['effectiveMode'] === 'recitation'
+      ? await claimRecitationSetupTransition(
+          db,
+          profileId,
+          sessionId,
+          userMessage,
+          options?.clientId,
+        )
+      : undefined;
   const isFreeform =
     session.sessionType === 'learning' &&
     !session.topicId &&
@@ -2462,6 +3007,7 @@ export async function prepareExchangeContext(
         }
         resolvedTopics.push({
           topicId: owned.topicId,
+          subjectId: owned.subjectId,
           title: owned.topicTitle,
           description: owned.topicDescription ?? undefined,
         });
@@ -2478,6 +3024,14 @@ export async function prepareExchangeContext(
         : 'problem_first'
     : 'full'; // default for new topics
   const exchangeHistory = buildExchangeHistory(events);
+  const recitationSetup =
+    claimedRecitationSetup ??
+    resolveRecitationSetupTransition({
+      effectiveMode: sessionMeta['effectiveMode'] as string | undefined,
+      exchangeCount: session.exchangeCount,
+      message: userMessage,
+      previousState: readPersistedRecitationSetupState(events),
+    });
 
   const rawSilentClassification = sessionMeta['silentClassification'];
   const silentClassification =
@@ -2705,13 +3259,23 @@ export async function prepareExchangeContext(
       computeDaysSinceLastReview(retentionCard.lastReviewedAt) ?? undefined;
   }
 
-  // 3c. Count questions at the current escalation rung + compute hint count
+  const currentRung =
+    session.exchangeCount === 0 && retentionStatusValue
+      ? getRetentionAwareStartingRung(retentionStatusValue)
+      : session.escalationRung;
+
+  // 3c. Count only the latest contiguous visit to the current rung. Older
+  // visits must not bounce the learner immediately after returning here.
   const aiResponseEvents = events.filter((e) => e.eventType === 'ai_response');
-  const questionsAtCurrentRung = aiResponseEvents.filter(
-    (e) =>
-      (e.metadata as Record<string, unknown> | null)?.escalationRung ===
-      session.escalationRung,
-  ).length;
+  const currentRungVisit = [] as typeof aiResponseEvents;
+  for (let i = aiResponseEvents.length - 1; i >= 0; i--) {
+    const event = aiResponseEvents[i];
+    const rung = (event?.metadata as Record<string, unknown> | null)
+      ?.escalationRung;
+    if (rung !== currentRung) break;
+    if (event) currentRungVisit.unshift(event);
+  }
+  const questionsAtCurrentRung = currentRungVisit.length;
   // Hint = AI response at escalation rung >= 2 (beyond basic Socratic)
   const hintCount = aiResponseEvents.filter((e) => {
     const rung = (e.metadata as Record<string, unknown> | null)?.escalationRung;
@@ -2725,7 +3289,7 @@ export async function prepareExchangeContext(
   // [PARTIAL_PROGRESS] marker; after the envelope migration the signal
   // lives in structured metadata persisted alongside the ai_response event.
   const previousResponseHadPartialProgress =
-    (lastAiResponseEvent?.metadata as Record<string, unknown> | null)
+    (currentRungVisit.at(-1)?.metadata as Record<string, unknown> | null)
       ?.partialProgress === true;
 
   // 3e. Count consecutive trailing ai_response events with partialProgress
@@ -2733,8 +3297,8 @@ export async function prepareExchangeContext(
   // walk backwards from the most recent ai_response; the streak breaks on
   // the first event without the flag.
   let consecutiveHolds = 0;
-  for (let i = aiResponseEvents.length - 1; i >= 0; i--) {
-    const meta = aiResponseEvents[i]?.metadata as Record<
+  for (let i = currentRungVisit.length - 1; i >= 0; i--) {
+    const meta = currentRungVisit[i]?.metadata as Record<
       string,
       unknown
     > | null;
@@ -2745,28 +3309,6 @@ export async function prepareExchangeContext(
     }
   }
 
-  // 4. Evaluate escalation (retention-aware + partial-progress-aware)
-  // On first exchange: use retention-aware starting rung (Gap 4)
-  const currentRung =
-    session.exchangeCount === 0 && retentionStatusValue
-      ? getRetentionAwareStartingRung(retentionStatusValue)
-      : session.escalationRung;
-
-  const escalationDecision = evaluateEscalation(
-    {
-      currentRung,
-      hintCount,
-      questionsAtCurrentRung,
-      totalExchanges: session.exchangeCount,
-      retentionStatus: retentionStatusValue,
-      previousResponseHadPartialProgress,
-      consecutiveHolds,
-    },
-    userMessage,
-  );
-  const effectiveRung = escalationDecision.shouldEscalate
-    ? escalationDecision.newRung
-    : currentRung;
   const parsedChallengeRound = challengeRoundSessionStateSchema.safeParse(
     sessionMeta['challengeRound'],
   );
@@ -2788,8 +3330,38 @@ export async function prepareExchangeContext(
     );
     challengeRound = challengeRoundStart.challengeRound;
   }
-  const correctStreak = computeCorrectStreak(events, effectiveRung);
-  const challengeCorrectStreak = computeCorrectStreak(events, currentRung);
+
+  const sourceCorrectStreak = computeCorrectStreak(events, currentRung);
+  const effectiveMode = (session.metadata as Record<string, unknown> | null)
+    ?.effectiveMode as string | undefined;
+  const freezeRung =
+    isAppHelpQuery(userMessage) ||
+    effectiveMode === 'recitation' ||
+    challengeRound?.state === 'accepted' ||
+    challengeRound?.state === 'active';
+
+  const escalationDecision = evaluateEscalation(
+    {
+      currentRung,
+      hintCount,
+      questionsAtCurrentRung,
+      totalExchanges: session.exchangeCount,
+      retentionStatus: retentionStatusValue,
+      previousResponseHadPartialProgress,
+      consecutiveHolds,
+      correctStreak: sourceCorrectStreak,
+      answerEvaluationEnabled: options?.answerEvaluationEnabled === true,
+      freezeRung,
+    },
+    userMessage,
+  );
+  const effectiveRung = escalationDecision.newRung;
+  // B.3 is a stationary-turn offer: frozen modes or any rung movement suppress it.
+  const correctStreak =
+    !freezeRung && escalationDecision.direction === 'none'
+      ? sourceCorrectStreak
+      : undefined;
+  const challengeCorrectStreak = sourceCorrectStreak;
   const challengeQuotaRemainingTurns = options?.quotaRemainingTurns;
   const challengeQuotaFractionRemaining = options?.quotaFractionRemaining;
   const hasChallengeQuotaInputs =
@@ -2909,11 +3481,11 @@ export async function prepareExchangeContext(
 
   if (continuationOpenerActive && session.exchangeCount >= 3) {
     continuationDepth = 'mid';
-    const nextMetadata = { ...(sessionMetadata ?? {}) };
-    delete nextMetadata['continuationOpenerActive'];
-    delete nextMetadata['continuationOpenerStartedExchange'];
-    nextMetadata['continuationDepth'] = continuationDepth;
-    await updateSessionMetadata(db, profileId, sessionId, nextMetadata);
+    await persistSessionMetadata(db, profileId, sessionId, {
+      continuationOpenerActive: undefined,
+      continuationOpenerStartedExchange: undefined,
+      continuationDepth,
+    });
   } else if (continuationOpenerActive) {
     continuationOpenerPhase = session.exchangeCount >= 1 ? 'score' : 'probe';
   } else if (
@@ -2925,8 +3497,7 @@ export async function prepareExchangeContext(
     priorSessionMeta.endedAt >= continuationCutoff
   ) {
     continuationOpenerPhase = 'probe';
-    await updateSessionMetadata(db, profileId, sessionId, {
-      ...(sessionMetadata ?? {}),
+    await persistSessionMetadata(db, profileId, sessionId, {
       continuationOpenerActive: true,
       continuationOpenerStartedExchange: 0,
     });
@@ -3134,6 +3705,10 @@ export async function prepareExchangeContext(
 
   // 6. Build ExchangeContext
   // For interleaved sessions: use the topic list, clear single-topic fields
+  const mentorNoticeRecheck = options?.mentorNoticeEnabled
+    ? await resolveMentorNoticeRecheckContext(db, profileId, session)
+    : null;
+
   const context: ExchangeContext = {
     sessionId,
     profileId,
@@ -3201,8 +3776,10 @@ export async function prepareExchangeContext(
     // Teach-first: expose exchange count so buildSystemPrompt can gate first-exchange behaviour
     exchangeCount: session.exchangeCount,
     // Client-side effective mode — drives mode-specific prompt sections (e.g. recitation)
-    effectiveMode: (session.metadata as Record<string, unknown> | null)
-      ?.effectiveMode as string | undefined,
+    effectiveMode,
+    recitationSetup,
+    // [WI-2220] Active app shell, passed from client per exchange
+    shell: options?.shell,
     gapAreas: Array.isArray(sessionMetadata?.gaps)
       ? sessionMetadata.gaps
           .map((gap) => String(gap).trim())
@@ -3223,15 +3800,26 @@ export async function prepareExchangeContext(
     // B.3: Consecutive correct-answer streak at the current escalation rung.
     // Used by the prompt to trigger adaptive escalation when streak >= 4.
     correctStreak,
+    answerEvaluationEnabled: options?.answerEvaluationEnabled === true,
     challengeEligible: challengeReadiness.eligible,
     challengeRuntimeEnabled: challengeRoundRuntimeEnabled,
+    mentorNoticeEnabled: options?.mentorNoticeEnabled === true,
+    mentorNoticeRecheck: mentorNoticeRecheck ?? undefined,
     graderEnabled: options?.challengeRoundGraderEnabled === true,
     challengeRound,
     currentUserMessageEventId: options?.currentUserMessageEventId,
     reviewCallback,
   };
 
-  return { session, context, effectiveRung, hintCount, lastAiResponseAt };
+  return {
+    session,
+    context,
+    effectiveRung,
+    hintCount,
+    lastAiResponseAt,
+    escalationDecision,
+    sourceCorrectStreak,
+  };
 }
 
 export async function persistExchangeResult(
@@ -3258,6 +3846,30 @@ export async function persistExchangeResult(
   userMessageEventId?: string;
 }> {
   const previousRung = session.escalationRung;
+  const persistenceEffectiveMode = (
+    session.metadata as Record<string, unknown> | null
+  )?.['effectiveMode'];
+  const persistedSourceAudit = sanitizeRecitationSourceAudit(
+    persistenceEffectiveMode,
+    behavioral?.sourceAudit,
+  );
+  const answerEvaluation = behavioral?.answerEvaluation;
+  const persistedPartialProgress =
+    answerEvaluation?.correctness === 'partial'
+      ? true
+      : behavioral?.partialProgress;
+  const compatibilityCorrectAnswer =
+    answerEvaluation?.correctness === 'correct'
+      ? true
+      : answerEvaluation?.correctness === 'partial' ||
+          answerEvaluation?.correctness === 'incorrect'
+        ? false
+        : undefined;
+  const downwardRungMovement = buildDownwardRungMovementAudit(
+    previousRung,
+    effectiveRung,
+    behavioral,
+  );
 
   // Build ai_response metadata — always includes escalationRung,
   // enriched with behavioral metrics when available (UX-18)
@@ -3273,8 +3885,15 @@ export async function persistExchangeResult(
       expectedResponseMinutes: behavioral.expectedResponseMinutes,
       // Envelope signals persisted so the next turn can read them back for
       // escalation-hold (F1.2) and remediation-queue (F1.3) decisions.
-      ...(behavioral.partialProgress !== undefined && {
-        partialProgress: behavioral.partialProgress,
+      ...(persistedPartialProgress !== undefined && {
+        partialProgress: persistedPartialProgress,
+      }),
+      ...(answerEvaluation !== undefined && { answerEvaluation }),
+      ...(compatibilityCorrectAnswer !== undefined && {
+        correctAnswer: compatibilityCorrectAnswer,
+      }),
+      ...(downwardRungMovement !== undefined && {
+        rungMovement: downwardRungMovement,
       }),
       ...(behavioral.needsDeepening !== undefined && {
         needsDeepening: behavioral.needsDeepening,
@@ -3291,8 +3910,8 @@ export async function persistExchangeResult(
       ...(behavioral.envelopeParseFailureReason !== undefined && {
         envelopeParseFailureReason: behavioral.envelopeParseFailureReason,
       }),
-      ...(behavioral.sourceAudit !== undefined && {
-        sourceAudit: behavioral.sourceAudit,
+      ...(persistedSourceAudit !== undefined && {
+        sourceAudit: persistedSourceAudit,
       }),
       ...(behavioral.llmTier !== undefined && {
         llmTier: behavioral.llmTier,
@@ -3323,6 +3942,9 @@ export async function persistExchangeResult(
       }),
       ...(behavioral.llmFallbackUsed !== undefined && {
         llmFallbackUsed: behavioral.llmFallbackUsed,
+      }),
+      ...(behavioral.recitationSetup !== undefined && {
+        recitationSetup: behavioral.recitationSetup,
       }),
       ...(behavioral.challengeRound !== undefined && {
         challengeRound: behavioral.challengeRound,
@@ -3552,7 +4174,7 @@ export async function persistExchangeResult(
     });
   }
 
-  if (previousRung !== effectiveRung) {
+  if (previousRung !== effectiveRung && behavioral?.rungDirection !== 'down') {
     await safeWrite(
       () =>
         db.insert(sessionEvents).values({
@@ -3578,7 +4200,7 @@ export async function persistExchangeResult(
     logger.info('[session-exchange] tone check', {
       event: 'llm.tone_check',
       sessionId,
-      firstSixWords,
+      firstSixWords: recitationOpeningForLog(effectiveMode, firstSixWords),
       wordCount: words.length,
       startsWithFiller,
     });
@@ -3595,12 +4217,19 @@ export async function persistExchangeResult(
   }
 
   // B.3 monitoring: escalation offered on correct streak
-  if (behavioral?.correctStreak != null && behavioral.correctStreak >= 4) {
-    logger.info('[session-exchange] escalation offered', {
-      event: 'llm.escalation_offered',
+  if (downwardRungMovement) {
+    logger.info(
+      '[session-exchange] de-escalation applied',
+      buildDeescalationTelemetry(sessionId, downwardRungMovement),
+    );
+  } else {
+    const correctStreakOffer = buildCorrectStreakOfferTelemetry(
       sessionId,
-      correctStreak: behavioral.correctStreak,
-    });
+      behavioral,
+    );
+    if (correctStreakOffer) {
+      logger.info('[session-exchange] escalation offered', correctStreakOffer);
+    }
   }
 
   return {
@@ -3635,9 +4264,11 @@ export async function processMessage(
     // Call sites read `c.env.CHALLENGE_ROUND_GRADER_ENABLED` and pass the
     // result of `isChallengeRoundGraderEnabled(value)` here.
     challengeRoundGraderEnabled?: boolean;
+    mentorNoticeEnabled?: boolean;
     reviewCallbackOpenerEnabled?: boolean;
     judgeFrameworkEnabled?: boolean;
     judgeEnforcementEnabled?: boolean;
+    answerEvaluationEnabled?: boolean;
   },
 ): Promise<{
   response: string;
@@ -3667,25 +4298,41 @@ export async function processMessage(
    */
   notePrompt?: boolean;
   notePromptPostSession?: boolean;
+  /** [WI-2107] LLM opened a topic without delivering content or a question this turn. */
+  topicOpenedPendingContent?: boolean;
   confidence?: 'low' | 'medium' | 'high';
   challengeRound?: ChallengeRoundSessionState;
   challengeOffer?: { pitch: string };
   draftedNote?: DraftedChallengeNote;
+  mentorNotice?: MentorNoticeAccepted;
+  answerEvaluation?: AnswerEvaluation;
 }> {
+  // [WI-2372] Consent-withdrawal gate — first op, before any dispatch.
+  await assertExchangeConsent(db, profileId);
+
   // Early exchange limit check — runs before expensive prepareExchangeContext
   // which performs 9+ parallel DB queries and a quota check (issue #15, review item #4)
   await checkExchangeLimit(db, profileId, sessionId);
 
   const currentUserMessageEventId =
-    options?.challengeRoundRuntimeEnabled === true
+    options?.challengeRoundRuntimeEnabled === true ||
+    options?.mentorNoticeEnabled === true
       ? generateUUIDv7()
       : undefined;
-  const { session, context, effectiveRung, hintCount, lastAiResponseAt } =
-    await prepareExchangeContext(db, profileId, sessionId, input.message, {
-      ...options,
-      homeworkMode: input.homeworkMode,
-      currentUserMessageEventId,
-    });
+  const {
+    session,
+    context,
+    effectiveRung,
+    hintCount,
+    lastAiResponseAt,
+    escalationDecision,
+    sourceCorrectStreak,
+  } = await prepareExchangeContext(db, profileId, sessionId, input.message, {
+    ...options,
+    homeworkMode: input.homeworkMode,
+    shell: input.shell,
+    currentUserMessageEventId,
+  });
 
   const imageData: ImageData | undefined =
     input.imageBase64 && input.imageMimeType
@@ -3736,13 +4383,10 @@ export async function processMessage(
   // (the mentor's most recent question, assembled before this LLM call — no DB
   // read). `content` is a re-wrapped JSON envelope; projectAiResponseContent
   // extracts clean prose. Falls back to '' if history is empty (first turn).
-  const askedQuestion = (() => {
-    const lastAssistant = context.exchangeHistory
-      .filter((e) => e.role === 'assistant')
-      .at(-1);
-    if (!lastAssistant) return '';
-    return projectAiResponseContent(lastAssistant.content, { silent: true });
-  })();
+  // [WI-2670] Also sources that turn's real producer vendor — see
+  // `resolveAskedQuestion`.
+  const { askedQuestion, producerVendor: askedQuestionProducerVendor } =
+    resolveAskedQuestion(context.exchangeHistory);
 
   let challengeRoundRuntime = await applyChallengeRoundRuntimeSignals(
     db,
@@ -3758,6 +4402,7 @@ export async function processMessage(
         ? { id: currentUserMessageEventId, content: input.message }
         : undefined,
       // T6 + T7 + T8
+      askedQuestionProducerVendor,
       askedQuestion,
       challengeRoundGraderEnabled: options?.challengeRoundGraderEnabled,
     },
@@ -3820,6 +4465,7 @@ export async function processMessage(
       expectedResponseMinutes: result.expectedResponseMinutes,
       homeworkMode: input.homeworkMode,
       partialProgress: result.partialProgress,
+      answerEvaluation: result.answerEvaluation,
       needsDeepening: result.needsDeepening,
       confidence: result.confidence,
       retrievalScore: result.retrievalScore,
@@ -3838,6 +4484,12 @@ export async function processMessage(
         context.languageSessionState?.previousComprehension,
       llmProvider: result.provider,
       llmModel: result.model,
+      recitationSetup: context.recitationSetup?.state,
+      correctStreak: context.correctStreak,
+      rungMovementStreak: sourceCorrectStreak,
+      rungAction: escalationDecision.action,
+      rungDirection: escalationDecision.direction,
+      rungReason: escalationDecision.reason,
       // Bug #348: forward EVALUATE / TEACH_BACK assessment signals onto
       // aiMetadata.signals so parseEvaluate/TeachBackAssessment can read them.
       evaluateAssessment: result.evaluateAssessment,
@@ -3858,6 +4510,86 @@ export async function processMessage(
       challengeRoundRuntime,
       result.noteDraft,
     );
+  }
+
+  let mentorNotice: MentorNoticeAccepted | undefined;
+  if (
+    options?.mentorNoticeEnabled === true &&
+    persisted.persistedUserMessage &&
+    result.noticedGap
+  ) {
+    mentorNotice =
+      (await createMentorNoticeFromExchange(db, {
+        profileId,
+        session,
+        signal: result.noticedGap,
+        isMentorNoticeRecheck: Boolean(context.mentorNoticeRecheck),
+        // [WI-2628] The SAME `result` produced `noticedGap`, so `result.provider`
+        // is genuinely the producer of this copy — the same value passed as
+        // `tutorVendor` to the re-check judge below. Threading it lets the gate
+        // refer ambiguous copy to an independent judge instead of failing closed.
+        producerVendor: result.provider,
+      })) ?? undefined;
+  }
+
+  if (
+    options?.mentorNoticeEnabled === true &&
+    context.mentorNoticeRecheck &&
+    persisted.persistedUserMessage &&
+    persisted.userMessageEventId
+  ) {
+    // [WI-2625] Independent server-side judge decides the re-check outcome —
+    // the tutor is never asked for a verdict. `persisted.persistedUserMessage`
+    // is also the retry/replay idempotency gate: a duplicate client send
+    // that hits the exchange's clientId dedup path never re-enters this
+    // block, so the judge is called at most once per genuinely new turn.
+    const evaluation = await evaluateMentorNoticeRecheck(db, {
+      profileId,
+      sessionId,
+      notice: context.mentorNoticeRecheck,
+      answerEventId: persisted.userMessageEventId,
+      conversationLanguage: context.conversationLanguage,
+      tutorVendor: result.provider,
+    });
+    // [WI-2625 rework #4] Exhaustive switch on the evaluation variant. The
+    // judge's verdict and the response cap are separate mechanisms, and the cap
+    // acts on the ATTEMPT, not the notice: a valid `continue` transitions
+    // nothing at ANY exchange number (AC-3) — at the cap the attempt is merely
+    // detached, leaving the notice open and re-offerable. Only an unresolved
+    // evaluation at the cap terminalizes `not_yet` (AC-4). The `never` default
+    // makes any future re-merging of these facts a compile error.
+    switch (evaluation.kind) {
+      case 'outcome': {
+        const now = new Date();
+        const timezone = await getProfileTimeZone(db, profileId);
+        await applyMentorNoticeOutcome(db, {
+          profileId,
+          noticeId: context.mentorNoticeRecheck.id,
+          outcome: evaluation.outcome,
+          occurredAt: now,
+          learningDayStart: getLearningDayStart(now, timezone),
+        });
+        break;
+      }
+      case 'continue':
+        await endMentorNoticeRecheckAttemptAtCap(db, {
+          profileId,
+          sessionId,
+          exchangeNumber: context.mentorNoticeRecheck.exchangeNumber,
+        });
+        break;
+      case 'unresolved':
+        await terminalizeUnresolvedMentorNoticeRecheckAtCap(db, {
+          profileId,
+          noticeId: context.mentorNoticeRecheck.id,
+          exchangeNumber: context.mentorNoticeRecheck.exchangeNumber,
+        });
+        break;
+      default: {
+        const exhaustive: never = evaluation;
+        void exhaustive;
+      }
+    }
   }
 
   if (persisted.persistedUserMessage) {
@@ -3931,10 +4663,13 @@ export async function processMessage(
     // the same client-facing shape. Consumers MUST NOT assume these are absent.
     notePrompt: result.notePrompt || undefined,
     notePromptPostSession: result.notePromptPostSession || undefined,
+    topicOpenedPendingContent: result.topicOpenedPendingContent || undefined,
     confidence: result.confidence,
     challengeRound: challengeRoundRuntime.challengeRound,
     challengeOffer: challengeRoundRuntime.challengeOffer,
     draftedNote: challengeRoundRuntime.draftedNote,
+    mentorNotice,
+    answerEvaluation: result.answerEvaluation,
   };
 }
 
@@ -3960,9 +4695,11 @@ export async function streamMessage(
     challengeRoundRuntimeEnabled?: boolean;
     // T8: true when CHALLENGE_ROUND_GRADER_ENABLED env binding is 'true'.
     challengeRoundGraderEnabled?: boolean;
+    mentorNoticeEnabled?: boolean;
     reviewCallbackOpenerEnabled?: boolean;
     judgeFrameworkEnabled?: boolean;
     judgeEnforcementEnabled?: boolean;
+    answerEvaluationEnabled?: boolean;
   },
 ): Promise<{
   stream: AsyncIterable<string>;
@@ -3977,6 +4714,8 @@ export async function streamMessage(
     aiEventId?: string;
     notePrompt?: boolean;
     notePromptPostSession?: boolean;
+    /** [WI-2107] LLM opened a topic without delivering content or a question this turn. */
+    topicOpenedPendingContent?: boolean;
     fluencyDrill?: FluencyDrillAnnotation;
     confidence?: 'low' | 'medium' | 'high';
     sourceAudit?: ExchangeSourceAudit;
@@ -3998,22 +4737,36 @@ export async function streamMessage(
     challengeRound?: ChallengeRoundSessionState;
     challengeOffer?: { pitch: string };
     draftedNote?: DraftedChallengeNote;
+    mentorNotice?: MentorNoticeAccepted;
+    answerEvaluation?: AnswerEvaluation;
   }>;
 }> {
+  // [WI-2372] Consent-withdrawal gate — first op, before any dispatch.
+  await assertExchangeConsent(db, profileId);
+
   // Early exchange limit check — runs before expensive prepareExchangeContext
   // which performs 9+ parallel DB queries and a quota check (issue #15, review item #4)
   await checkExchangeLimit(db, profileId, sessionId);
 
   const currentUserMessageEventId =
-    options?.challengeRoundRuntimeEnabled === true
+    options?.challengeRoundRuntimeEnabled === true ||
+    options?.mentorNoticeEnabled === true
       ? generateUUIDv7()
       : undefined;
-  const { session, context, effectiveRung, hintCount, lastAiResponseAt } =
-    await prepareExchangeContext(db, profileId, sessionId, input.message, {
-      ...options,
-      homeworkMode: input.homeworkMode,
-      currentUserMessageEventId,
-    });
+  const {
+    session,
+    context,
+    effectiveRung,
+    hintCount,
+    lastAiResponseAt,
+    escalationDecision,
+    sourceCorrectStreak,
+  } = await prepareExchangeContext(db, profileId, sessionId, input.message, {
+    ...options,
+    homeworkMode: input.homeworkMode,
+    shell: input.shell,
+    currentUserMessageEventId,
+  });
 
   // Compute time-to-answer before streaming begins.
   // [BUG-391] Same defensive cast as the non-streaming path above — ensure a
@@ -4090,10 +4843,16 @@ export async function streamMessage(
       // instead of falling back to `response.trim()` — the raw envelope JSON —
       // which would be written verbatim to ai_response.content and re-rendered
       // by the client as a raw JSON blob.
+      const appHelpTurn = isAppHelpQuery(input.message);
+      const acceptAnswerEvaluation = shouldAcceptAnswerEvaluation(
+        context,
+        appHelpTurn,
+      );
       const outcome = classifyExchangeOutcome(rawResponse, {
         sessionId,
         profileId,
         flow: 'streamMessage',
+        acceptAnswerEvaluation,
       });
 
       // [BUG-941] When the LLM emitted an unparseable / empty response, return
@@ -4143,9 +4902,17 @@ export async function streamMessage(
         };
       }
 
-      const parsed = isAppHelpQuery(input.message)
+      const modeGuarded = appHelpTurn
         ? applyAppHelpSignalGuard(outcome.parsed)
         : outcome.parsed;
+      const parsed = acceptAnswerEvaluation
+        ? {
+            ...modeGuarded,
+            partialProgress:
+              modeGuarded.answerEvaluation?.correctness === 'partial' ||
+              modeGuarded.partialProgress,
+          }
+        : { ...modeGuarded, answerEvaluation: undefined };
       const privateSourcesForAudit = inferObviousReliableSourceForAudit(
         parsed.privateSources,
         result.sourceEvidence,
@@ -4267,15 +5034,10 @@ export async function streamMessage(
       // T6: source the asked-question from the last assistant turn in history.
       // Same pattern as processMessage — no DB read; projectAiResponseContent
       // extracts clean prose from the re-wrapped JSON envelope.
-      const askedQuestion = (() => {
-        const lastAssistant = context.exchangeHistory
-          .filter((e) => e.role === 'assistant')
-          .at(-1);
-        if (!lastAssistant) return '';
-        return projectAiResponseContent(lastAssistant.content, {
-          silent: true,
-        });
-      })();
+      // [WI-2670] Also sources that turn's real producer vendor — see
+      // `resolveAskedQuestion`.
+      const { askedQuestion, producerVendor: askedQuestionProducerVendor } =
+        resolveAskedQuestion(context.exchangeHistory);
 
       let challengeRoundRuntime = await applyChallengeRoundRuntimeSignals(
         db,
@@ -4291,6 +5053,7 @@ export async function streamMessage(
             ? { id: currentUserMessageEventId, content: input.message }
             : undefined,
           // T6 + T7 + T8
+          askedQuestionProducerVendor,
           askedQuestion,
           challengeRoundGraderEnabled: options?.challengeRoundGraderEnabled,
         },
@@ -4310,6 +5073,7 @@ export async function streamMessage(
           expectedResponseMinutes,
           homeworkMode: input.homeworkMode,
           partialProgress: parsed.partialProgress,
+          answerEvaluation: parsed.answerEvaluation,
           needsDeepening: parsed.needsDeepening,
           confidence: parsed.confidence,
           retrievalScore: parsed.retrievalScore,
@@ -4327,6 +5091,12 @@ export async function streamMessage(
           llmProvider: result.provider,
           llmModel: result.model,
           llmFallbackUsed: result.fallbackUsed === true,
+          recitationSetup: context.recitationSetup?.state,
+          correctStreak: context.correctStreak,
+          rungMovementStreak: sourceCorrectStreak,
+          rungAction: escalationDecision.action,
+          rungDirection: escalationDecision.direction,
+          rungReason: escalationDecision.reason,
           // Bug #348: forward EVALUATE / TEACH_BACK assessment signals from
           // the parsed envelope onto aiMetadata.signals.
           evaluateAssessment: parsed.evaluateAssessment,
@@ -4395,6 +5165,81 @@ export async function streamMessage(
         });
       }
 
+      let mentorNotice: MentorNoticeAccepted | undefined;
+      if (
+        options?.mentorNoticeEnabled === true &&
+        persisted.persistedUserMessage &&
+        parsed.noticedGap
+      ) {
+        mentorNotice =
+          (await createMentorNoticeFromExchange(db, {
+            profileId,
+            session,
+            signal: parsed.noticedGap,
+            isMentorNoticeRecheck: Boolean(context.mentorNoticeRecheck),
+            // [WI-2628] `parsed` is the parsed envelope of the SAME `result`
+            // whose `.provider` is recorded throughout this block (and passed as
+            // `tutorVendor` to the re-check judge below), so this is genuinely
+            // the vendor that produced `noticedGap` — not a guess.
+            producerVendor: result.provider,
+          })) ?? undefined;
+      }
+
+      if (
+        options?.mentorNoticeEnabled === true &&
+        context.mentorNoticeRecheck &&
+        persisted.persistedUserMessage &&
+        persisted.userMessageEventId
+      ) {
+        // [WI-2625] Independent server-side judge decides the re-check
+        // outcome — mirrors the processMessage call site above.
+        const evaluation = await evaluateMentorNoticeRecheck(db, {
+          profileId,
+          sessionId,
+          notice: context.mentorNoticeRecheck,
+          answerEventId: persisted.userMessageEventId,
+          conversationLanguage: context.conversationLanguage,
+          tutorVendor: result.provider,
+        });
+        // [WI-2625 rework #4] Same exhaustive variant switch and same cap
+        // handling as the processMessage call site above — a valid `continue`
+        // transitions nothing at any exchange number; at the cap the ATTEMPT is
+        // detached and the notice stays open and re-offerable. Only an
+        // unresolved evaluation at the cap terminalizes `not_yet`.
+        switch (evaluation.kind) {
+          case 'outcome': {
+            const now = new Date();
+            const timezone = await getProfileTimeZone(db, profileId);
+            await applyMentorNoticeOutcome(db, {
+              profileId,
+              noticeId: context.mentorNoticeRecheck.id,
+              outcome: evaluation.outcome,
+              occurredAt: now,
+              learningDayStart: getLearningDayStart(now, timezone),
+            });
+            break;
+          }
+          case 'continue':
+            await endMentorNoticeRecheckAttemptAtCap(db, {
+              profileId,
+              sessionId,
+              exchangeNumber: context.mentorNoticeRecheck.exchangeNumber,
+            });
+            break;
+          case 'unresolved':
+            await terminalizeUnresolvedMentorNoticeRecheckAtCap(db, {
+              profileId,
+              noticeId: context.mentorNoticeRecheck.id,
+              exchangeNumber: context.mentorNoticeRecheck.exchangeNumber,
+            });
+            break;
+          default: {
+            const exhaustive: never = evaluation;
+            void exhaustive;
+          }
+        }
+      }
+
       // [#419] Apply the server-side hard cap for interview / onboarding flows,
       // mirroring the non-streaming processMessage path. Without this, a
       // streaming interview session could run all the way to
@@ -4412,6 +5257,8 @@ export async function streamMessage(
         aiEventId: persisted.aiEventId,
         notePrompt: parsed.notePrompt || undefined,
         notePromptPostSession: parsed.notePromptPostSession || undefined,
+        topicOpenedPendingContent:
+          parsed.topicOpenedPendingContent || undefined,
         fluencyDrill: parsed.fluencyDrill ?? undefined,
         confidence: parsed.confidence,
         sourceAudit: sourceSafe.sourceAudit,
@@ -4420,6 +5267,8 @@ export async function streamMessage(
         challengeRound: challengeRoundRuntime.challengeRound,
         challengeOffer: challengeRoundRuntime.challengeOffer,
         draftedNote: challengeRoundRuntime.draftedNote,
+        mentorNotice,
+        answerEvaluation: parsed.answerEvaluation,
       };
     },
   };

@@ -1,9 +1,20 @@
 import type { Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
+import type { Database } from '@eduagent/database';
 import type { ProfileMeta, ProfileScopeEnv } from './profile-scope';
+import { assertCanWriteProfile } from '../services/family-access';
 
 const PROXY_MODE_MESSAGE = 'Not available in proxy mode';
 const PROXY_MODE_CODE = 'PROXY_MODE';
+
+// Narrow shape assertCanWriteProfile needs — mirrors family-access.ts's own
+// CanWriteProfileSource so this file does not have to import Hono's Env
+// types for every route (they vary per route file).
+type CallerIdentitySource = {
+  get(key: 'db'): Database;
+  get(key: 'account'): { id: string } | undefined;
+  get(key: 'callerPersonId'): string | undefined;
+};
 
 // Body shape: include a stable `code` so the mobile classifier can distinguish
 // proxy-mode rejection from a generic 403 and avoid mapping it to "sign out".
@@ -30,10 +41,27 @@ const proxyModeBody = {
  * The X-Proxy-Mode header is still honored as a belt-and-suspenders signal
  * (e.g., a parent explicitly sending it from the owner profile during a
  * switch race) but it can no longer downgrade a true proxy request.
+ *
+ * [WI-2398 — write-side IDOR] The checks above only prove the client-supplied
+ * X-Profile-Id resolves to SOME owner-role profile in the caller's org (via
+ * profileMeta.isOwner / resolvedVia) — never that it is the CALLER's own
+ * identity. A non-owner org member (own login, own callerPersonId) can send
+ * X-Profile-Id = a DIFFERENT owner/admin profile's id, pass every check
+ * above, and mutate that profile's self-service data (curriculum
+ * skip/unskip/challenge/topics/adapt, onboarding pronouns/interests, and
+ * every other write gated solely by this function). The final check below
+ * closes that gap: it derives allow/deny from the server-resolved caller
+ * (`callerPersonId`, set app-wide by accountMiddleware from the
+ * authenticated login->person binding, never request-supplied) via
+ * assertCanWriteProfile — the write-authority twin of assertCanReadProfile
+ * (WI-2416) — requiring the caller to be self-or-guardian of the
+ * header-resolved profile, not merely an org member. Because every call
+ * site shares this one function, fixing it here closes the gap at every
+ * assertNotProxyMode call site without touching each route individually.
  */
-export function assertNotProxyMode(
+export async function assertNotProxyMode(
   c: Context<ProfileScopeEnv> | Context,
-): void {
+): Promise<void> {
   const profileMeta = (c as Context<ProfileScopeEnv>).get('profileMeta') as
     | ProfileMeta
     | undefined;
@@ -78,6 +106,33 @@ export function assertNotProxyMode(
   // can only tighten — useful for owner-profile sessions that the client
   // wants treated as read-only for a switch transition).
   if (c.req.header('X-Proxy-Mode') === 'true') {
+    throw new HTTPException(403, {
+      message: PROXY_MODE_MESSAGE,
+      res: c.json(proxyModeBody, 403),
+    });
+  }
+
+  // [WI-2398] Caller-identity gate — see the function doc above. profileId
+  // here is the HEADER-resolved profile (already proven owner-shaped and
+  // explicitly selected by the checks above); assertCanWriteProfile proves
+  // the server-resolved caller actually has write authority over it (self or
+  // active guardian of an uncredentialed charge), not merely org membership.
+  const profileId = (c as Context<ProfileScopeEnv>).get('profileId');
+  if (!profileId) {
+    throw new HTTPException(403, {
+      message: PROXY_MODE_MESSAGE,
+      res: c.json(proxyModeBody, 403),
+    });
+  }
+  try {
+    await assertCanWriteProfile(
+      c as unknown as CallerIdentitySource,
+      profileId,
+    );
+  } catch {
+    // assertCanWriteProfile always throws ForbiddenError (fail-closed) — the
+    // outward-facing rejection stays the stable PROXY_MODE shape so the
+    // mobile classifier's existing handling applies unchanged.
     throw new HTTPException(403, {
       message: PROXY_MODE_MESSAGE,
       res: c.json(proxyModeBody, 403),
