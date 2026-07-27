@@ -151,6 +151,55 @@ const SCENARIOS: readonly ScenarioSpec[] = [
       'admit. A block here means the seam admits nothing and every ambiguous ' +
       'educational note is silently dropped from learner records.',
   },
+  // The FOUR remaining strings from the operator's 2026-07-26 ruling. LTS04 alone
+  // covered one of the five, which is not enough to carry the claim the whole
+  // loosening rests on: that the seam actually ADMITS educational text in
+  // practice. If these do not reliably return the strict
+  // allow/educational_reference pair, the `refer` extension to user provenance
+  // delivers no learner benefit despite being correctly implemented — every
+  // ambiguous educational note is still dropped, just one layer later. That is a
+  // finding for the operator, which is why each is asserted, not recorded.
+  {
+    id: 'LTS06-definitional-clause-allowed',
+    text: 'This chapter explains what dyslexia is.',
+    conversationLanguage: 'en',
+    fieldKind: 'note_text',
+    expectation: 'must-allow',
+    description:
+      'A learner note describing what a chapter covers. Ruling string 1 of 5.',
+  },
+  {
+    id: 'LTS07-bare-term-allowed',
+    text: 'dyslexia',
+    conversationLanguage: 'en',
+    fieldKind: 'note_text',
+    expectation: 'must-allow',
+    description:
+      'The protected term ALONE, with no sentence around it — the weakest ' +
+      'possible context, and the hardest case for a judge asked to decide ' +
+      'whether a person is characterized. Ruling string 2 of 5.',
+  },
+  {
+    id: 'LTS08-strategy-reference-allowed',
+    text: 'We practised strategies used for ADHD support.',
+    conversationLanguage: 'en',
+    fieldKind: 'note_text',
+    expectation: 'must-allow',
+    description:
+      'First-person plural about a practice, not a diagnosis. Note "we" is a ' +
+      'person reference, so this is the ruling string closest to the ' +
+      'attribution boundary. Ruling string 3 of 5.',
+  },
+  {
+    id: 'LTS09-category-statement-allowed',
+    text: 'Autism spectrum conditions vary widely.',
+    conversationLanguage: 'en',
+    fieldKind: 'note_text',
+    expectation: 'must-allow',
+    description:
+      'A general statement about a category of conditions, no person in ' +
+      'scope. Ruling string 4 of 5 (LTS04 is the fifth).',
+  },
   {
     id: 'LTS05-person-implied-blocked',
     text: 'Autism was noted in the file for the pupil in question.',
