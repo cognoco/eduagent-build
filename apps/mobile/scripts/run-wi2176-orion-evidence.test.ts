@@ -817,23 +817,67 @@ function availablePowerShellExecutables(
 
 const powershellCandidates =
   process.platform === 'win32' ? ['pwsh.exe', 'powershell.exe'] : ['pwsh'];
-const powershellExecutables =
-  process.platform === 'win32'
-    ? powershellCandidates
-    : availablePowerShellExecutables(powershellCandidates);
 const windowsContractJob = 'WI-2176 Windows/Orion PowerShell contract';
 const platformOwnedDisposition = `WI-2176 cleanup contract: NOT_RUN_PLATFORM_OWNED; required CI job: ${windowsContractJob}`;
 
+interface PowerShellContractPlan {
+  executables: string[];
+  disposition?: string;
+}
+
+function createPowerShellContractPlan(
+  candidates: readonly string[],
+  executableExists: (executable: string) => boolean = executableExistsOnPath,
+  requireEveryCandidate = false,
+): PowerShellContractPlan {
+  const executables = requireEveryCandidate
+    ? [...candidates]
+    : availablePowerShellExecutables(candidates, executableExists);
+  return {
+    executables,
+    disposition:
+      executables.length === 0 ? platformOwnedDisposition : undefined,
+  };
+}
+
+function dispatchPowerShellContract(
+  plan: PowerShellContractPlan,
+  runHarness: (executable: string) => void,
+  reportDisposition: (disposition: string) => void,
+): void {
+  if (plan.disposition) {
+    reportDisposition(plan.disposition);
+    return;
+  }
+
+  plan.executables.forEach(runHarness);
+}
+
+const powershellContractPlan = createPowerShellContractPlan(
+  powershellCandidates,
+  executableExistsOnPath,
+  process.platform === 'win32',
+);
+
 test('does not attempt the harness or report cleanup PASS when PowerShell is unavailable', () => {
-  const runHarness = jest.fn(() => 'WI-2176 cleanup contract: PASS');
-  const unavailableExecutables = availablePowerShellExecutables(
+  const runHarness = jest.fn();
+  const reportDisposition = jest.fn();
+  const unavailableContractPlan = createPowerShellContractPlan(
     powershellCandidates,
     () => false,
   );
-  const output = unavailableExecutables.map(runHarness).join('\n');
+
+  dispatchPowerShellContract(
+    unavailableContractPlan,
+    runHarness,
+    reportDisposition,
+  );
 
   expect(runHarness).not.toHaveBeenCalled();
-  expect(output).not.toContain('WI-2176 cleanup contract: PASS');
+  expect(reportDisposition).toHaveBeenCalledWith(platformOwnedDisposition);
+  expect(reportDisposition.mock.calls.flat().join('\n')).not.toContain(
+    'WI-2176 cleanup contract: PASS',
+  );
 });
 
 function verifyPowerShellContract(powershellExecutable: string): void {
@@ -871,17 +915,18 @@ function verifyPowerShellContract(powershellExecutable: string): void {
   }
 }
 
-if (powershellExecutables.length === 0) {
-  test('reports the platform-owned contract without claiming cleanup PASS', () => {
-    expect(platformOwnedDisposition).toContain(windowsContractJob);
-    expect(platformOwnedDisposition).not.toContain(
-      'WI-2176 cleanup contract: PASS',
-    );
-    console.info(platformOwnedDisposition);
-  });
-} else {
-  test.each(powershellExecutables)(
-    'attempts every cleanup action and preserves primary failure precedence under %s',
-    verifyPowerShellContract,
-  );
-}
+dispatchPowerShellContract(
+  powershellContractPlan,
+  (powershellExecutable) => {
+    test(`attempts every cleanup action and preserves primary failure precedence under ${powershellExecutable}`, () => {
+      verifyPowerShellContract(powershellExecutable);
+    });
+  },
+  (disposition) => {
+    test('reports the platform-owned contract without claiming cleanup PASS', () => {
+      expect(disposition).toContain(windowsContractJob);
+      expect(disposition).not.toContain('WI-2176 cleanup contract: PASS');
+      console.info(disposition);
+    });
+  },
+);

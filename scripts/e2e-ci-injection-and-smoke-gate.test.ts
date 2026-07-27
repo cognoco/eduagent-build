@@ -210,6 +210,7 @@ describe('[WI-2836] CI preserves the Windows-owned WI-2176 PowerShell contract',
     expect(dependencyGate?.run).toContain(
       'WI2176_CONTRACT_RESULT" != "success"',
     );
+    expect(dependencyGate?.run).toContain('exit 1');
   });
 
   it('executes the full WI-2176 PowerShell harness in the Windows job', () => {
