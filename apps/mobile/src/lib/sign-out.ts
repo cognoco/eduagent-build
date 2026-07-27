@@ -43,6 +43,7 @@ import {
   setProxyMode,
   resetAuthExpiredGuard,
 } from './api-client';
+import { clearNavigationTransitionProvenance } from './navigation-transition-provenance';
 
 // [BUG-771] Hard timeout on Clerk's signOut so a stuck network call (web
 // socket close, slow Clerk backend, hanging fetch) cannot trap the user in
@@ -92,6 +93,8 @@ export async function signOutWithCleanup(
   params: SignOutWithCleanupParams,
 ): Promise<void> {
   const { clerkSignOut, queryClient, profileIds, clerkUserId } = params;
+
+  clearNavigationTransitionProvenance();
 
   // Reset in-memory api-client identity FIRST so any request that fires
   // between here and the Clerk signOut resolution cannot ship a stale
