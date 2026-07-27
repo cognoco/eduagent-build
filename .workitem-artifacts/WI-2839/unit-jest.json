@@ -26,7 +26,7 @@
     "unmatched": 0,
     "updated": 0
   },
-  "startTime": 1785108226885,
+  "startTime": 1785110692624,
   "success": true,
   "testResults": [
     {
@@ -44,7 +44,7 @@
           "location": null,
           "numPassingAsserts": 1,
           "retryReasons": [],
-          "startAt": 1785108229660,
+          "startAt": 1785110693741,
           "status": "passed",
           "title": "declares a concurrency limit on the receiver"
         },
@@ -61,7 +61,7 @@
           "location": null,
           "numPassingAsserts": 1,
           "retryReasons": [],
-          "startAt": 1785108229663,
+          "startAt": 1785110693744,
           "status": "passed",
           "title": "has idempotency keyed on event.data.parentId + \"-\" + event.data.reportWeekStart"
         },
@@ -69,7 +69,7 @@
           "ancestorTitles": [
             "[WI-368] weekly progress push GDPR consent helper consolidation"
           ],
-          "duration": 1,
+          "duration": 2,
           "failing": false,
           "failureDetails": [],
           "failureMessages": [],
@@ -78,7 +78,7 @@
           "location": null,
           "numPassingAsserts": 8,
           "retryReasons": [],
-          "startAt": 1785108229664,
+          "startAt": 1785110693745,
           "status": "passed",
           "title": "uses isGdprProcessingAllowedV2 instead of an inline GDPR consent query"
         },
@@ -95,7 +95,7 @@
           "location": null,
           "numPassingAsserts": 5,
           "retryReasons": [],
-          "startAt": 1785108229665,
+          "startAt": 1785110693747,
           "status": "passed",
           "title": "skips child digest generation when latest GDPR consent is PENDING"
         },
@@ -112,7 +112,7 @@
           "location": null,
           "numPassingAsserts": 5,
           "retryReasons": [],
-          "startAt": 1785108229670,
+          "startAt": 1785110693752,
           "status": "passed",
           "title": "skips child digest generation when latest GDPR consent is PARENTAL_CONSENT_REQUESTED"
         },
@@ -120,7 +120,7 @@
           "ancestorTitles": [
             "[WI-368] weekly progress push GDPR consent helper consolidation"
           ],
-          "duration": 1,
+          "duration": 2,
           "failing": false,
           "failureDetails": [],
           "failureMessages": [],
@@ -129,7 +129,7 @@
           "location": null,
           "numPassingAsserts": 5,
           "retryReasons": [],
-          "startAt": 1785108229672,
+          "startAt": 1785110693754,
           "status": "passed",
           "title": "skips child digest generation when latest GDPR consent is WITHDRAWN"
         },
@@ -137,7 +137,7 @@
           "ancestorTitles": [
             "[WI-368] weekly progress push GDPR consent helper consolidation"
           ],
-          "duration": 4,
+          "duration": 3,
           "failing": false,
           "failureDetails": [],
           "failureMessages": [],
@@ -146,7 +146,7 @@
           "location": null,
           "numPassingAsserts": 3,
           "retryReasons": [],
-          "startAt": 1785108229673,
+          "startAt": 1785110693756,
           "status": "passed",
           "title": "includes child digest generation when latest GDPR consent is CONSENTED"
         },
@@ -163,7 +163,7 @@
           "location": null,
           "numPassingAsserts": 3,
           "retryReasons": [],
-          "startAt": 1785108229677,
+          "startAt": 1785110693760,
           "status": "passed",
           "title": "includes child digest generation when latest GDPR consent is absent"
         },
@@ -171,7 +171,7 @@
           "ancestorTitles": [
             "weekly-progress-push isLocalHour9 (BUG-640 / J-4)"
           ],
-          "duration": 40,
+          "duration": 37,
           "failing": false,
           "failureDetails": [],
           "failureMessages": [],
@@ -180,7 +180,7 @@
           "location": null,
           "numPassingAsserts": 10,
           "retryReasons": [],
-          "startAt": 1785108229678,
+          "startAt": 1785110693761,
           "status": "passed",
           "title": "fires for each parent exactly once across the 24 Monday-UTC hours"
         },
@@ -197,7 +197,7 @@
           "location": null,
           "numPassingAsserts": 2,
           "retryReasons": [],
-          "startAt": 1785108229718,
+          "startAt": 1785110693798,
           "status": "passed",
           "title": "null timezone falls back to UTC 09:00"
         },
@@ -205,7 +205,7 @@
           "ancestorTitles": [
             "weekly-progress-push isLocalHour9 (BUG-640 / J-4)"
           ],
-          "duration": 0,
+          "duration": 1,
           "failing": false,
           "failureDetails": [],
           "failureMessages": [],
@@ -214,7 +214,7 @@
           "location": null,
           "numPassingAsserts": 1,
           "retryReasons": [],
-          "startAt": 1785108229719,
+          "startAt": 1785110693799,
           "status": "passed",
           "title": "invalid timezone string falls back to UTC 09:00 (no crash)"
         },
@@ -222,7 +222,7 @@
           "ancestorTitles": [
             "weekly-progress-push isLocalHour9 (BUG-640 / J-4)"
           ],
-          "duration": 0,
+          "duration": 1,
           "failing": false,
           "failureDetails": [],
           "failureMessages": [],
@@ -231,7 +231,7 @@
           "location": null,
           "numPassingAsserts": 2,
           "retryReasons": [],
-          "startAt": 1785108229720,
+          "startAt": 1785110693800,
           "status": "passed",
           "title": "Europe/Prague (UTC+2 DST) matches at 07:00 UTC on a DST Monday"
         },
@@ -248,7 +248,7 @@
           "location": null,
           "numPassingAsserts": 10,
           "retryReasons": [],
-          "startAt": 1785108229720,
+          "startAt": 1785110693801,
           "status": "passed",
           "title": "continues batching after a sendEvent failure and reports partial"
         },
@@ -263,7 +263,7 @@
           "location": null,
           "numPassingAsserts": 2,
           "retryReasons": [],
-          "startAt": 1785108229722,
+          "startAt": 1785110693803,
           "status": "passed",
           "title": "queues an email-only parent even when push is disabled"
         },
@@ -278,7 +278,7 @@
           "location": null,
           "numPassingAsserts": 2,
           "retryReasons": [],
-          "startAt": 1785108229725,
+          "startAt": 1785110693806,
           "status": "passed",
           "title": "[WI-86] does not queue parents missing from the active-profile timezone query"
         },
@@ -293,13 +293,13 @@
           "location": null,
           "numPassingAsserts": 3,
           "retryReasons": [],
-          "startAt": 1785108229726,
+          "startAt": 1785110693807,
           "status": "passed",
           "title": "queues eligible self-report profiles through the proven weekly fan-out"
         },
         {
           "ancestorTitles": ["weekly progress generate practice summary"],
-          "duration": 1,
+          "duration": 2,
           "failing": false,
           "failureDetails": [],
           "failureMessages": [],
@@ -308,13 +308,13 @@
           "location": null,
           "numPassingAsserts": 4,
           "retryReasons": [],
-          "startAt": 1785108229727,
+          "startAt": 1785110693808,
           "status": "passed",
           "title": "loads practice activity summary for the report week before generating the digest"
         },
         {
           "ancestorTitles": ["weekly progress generate practice summary"],
-          "duration": 1,
+          "duration": 2,
           "failing": false,
           "failureDetails": [],
           "failureMessages": [],
@@ -323,13 +323,13 @@
           "location": null,
           "numPassingAsserts": 4,
           "retryReasons": [],
-          "startAt": 1785108229729,
+          "startAt": 1785110693810,
           "status": "passed",
           "title": "[WI-86] generates weekly child reports from active-subject-filtered cached metrics"
         },
         {
           "ancestorTitles": ["weekly progress generate practice summary"],
-          "duration": 31,
+          "duration": 23,
           "failing": false,
           "failureDetails": [],
           "failureMessages": [],
@@ -338,13 +338,13 @@
           "location": null,
           "numPassingAsserts": 5,
           "retryReasons": [],
-          "startAt": 1785108229730,
+          "startAt": 1785110693812,
           "status": "passed",
           "title": "[WI-86] records only digest-contributing child ids for delivery rechecks"
         },
         {
           "ancestorTitles": ["weekly progress generate practice summary"],
-          "duration": 2,
+          "duration": 1,
           "failing": false,
           "failureDetails": [],
           "failureMessages": [],
@@ -353,13 +353,13 @@
           "location": null,
           "numPassingAsserts": 2,
           "retryReasons": [],
-          "startAt": 1785108229761,
+          "startAt": 1785110693836,
           "status": "passed",
           "title": "[WI-1863] skips credentialed charges while retaining managed charges"
         },
         {
           "ancestorTitles": ["weekly progress generate practice summary"],
-          "duration": 0,
+          "duration": 1,
           "failing": false,
           "failureDetails": [],
           "failureMessages": [],
@@ -368,13 +368,13 @@
           "location": null,
           "numPassingAsserts": 3,
           "retryReasons": [],
-          "startAt": 1785108229763,
+          "startAt": 1785110693837,
           "status": "passed",
           "title": "[WI-86] skips weekly push and email when parent is archived after preparation"
         },
         {
           "ancestorTitles": ["weekly progress generate practice summary"],
-          "duration": 0,
+          "duration": 1,
           "failing": false,
           "failureDetails": [],
           "failureMessages": [],
@@ -383,13 +383,13 @@
           "location": null,
           "numPassingAsserts": 3,
           "retryReasons": [],
-          "startAt": 1785108229764,
+          "startAt": 1785110693838,
           "status": "passed",
           "title": "[WI-86] skips weekly push and email when a child is archived after preparation"
         },
         {
           "ancestorTitles": ["weekly progress generate practice summary"],
-          "duration": 1,
+          "duration": 16,
           "failing": false,
           "failureDetails": [],
           "failureMessages": [],
@@ -398,7 +398,7 @@
           "location": null,
           "numPassingAsserts": 3,
           "retryReasons": [],
-          "startAt": 1785108229764,
+          "startAt": 1785110693839,
           "status": "passed",
           "title": "[WI-86] ignores archived children that did not render into the prepared digest"
         },
@@ -413,7 +413,7 @@
           "location": null,
           "numPassingAsserts": 4,
           "retryReasons": [],
-          "startAt": 1785108229765,
+          "startAt": 1785110693855,
           "status": "passed",
           "title": "persists a self report without child links when includeSelfReport is set"
         },
@@ -428,7 +428,7 @@
           "location": null,
           "numPassingAsserts": 7,
           "retryReasons": [],
-          "startAt": 1785108229767,
+          "startAt": 1785110693857,
           "status": "passed",
           "title": "never memoizes child names, struggle topics, or the parent email; sends still carry the content"
         },
@@ -445,7 +445,7 @@
           "location": null,
           "numPassingAsserts": 4,
           "retryReasons": [],
-          "startAt": 1785108229768,
+          "startAt": 1785110693858,
           "status": "passed",
           "title": "re-pins a delayed retry to the memoized snapshotDate when a newer snapshot exists"
         },
@@ -462,7 +462,7 @@
           "location": null,
           "numPassingAsserts": 5,
           "retryReasons": [],
-          "startAt": 1785108229769,
+          "startAt": 1785110693859,
           "status": "passed",
           "title": "[BUG-842] notificationLog is written inside the send step — log survives a step-boundary failure"
         },
@@ -479,7 +479,7 @@
           "location": null,
           "numPassingAsserts": 2,
           "retryReasons": [],
-          "startAt": 1785108229770,
+          "startAt": 1785110693860,
           "status": "passed",
           "title": "[BUG-842] notificationLog is not written when email send returns sent:false"
         },
@@ -487,7 +487,7 @@
           "ancestorTitles": [
             "[WI-998] push dedup read is inside the send step (retry-safe atomicity)"
           ],
-          "duration": 1,
+          "duration": 0,
           "failing": false,
           "failureDetails": [],
           "failureMessages": [],
@@ -496,15 +496,15 @@
           "location": null,
           "numPassingAsserts": 2,
           "retryReasons": [],
-          "startAt": 1785108229770,
+          "startAt": 1785110693861,
           "status": "passed",
           "title": "[BREAK] does not re-send the push when the step retries after logNotification commits"
         }
       ],
-      "endTime": 1785108229772,
+      "endTime": 1785110693863,
       "message": "",
       "name": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2839/apps/api/src/inngest/functions/weekly-progress-push.test.ts",
-      "startTime": 1785108227087,
+      "startTime": 1785110692822,
       "status": "passed",
       "summary": ""
     }

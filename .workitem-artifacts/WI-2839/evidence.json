@@ -2,33 +2,33 @@
   "claims": [
     {
       "acRef": "AC-1",
-      "description": "A named real-database regression fixes the evaluation instant one hour behind the process wall clock and fails on the pre-fix handler with queuedParents=0.",
-      "pointer": "apps/api/src/inngest/functions/weekly-progress-push.integration.test.ts:667"
+      "description": "The separate real-step same-hour control starts at line 670; the named rollover regression starts here, fixes the evaluation instant one hour behind the process wall clock, and fails under the old independent wall-clock read while the control stays green.",
+      "pointer": "apps/api/src/inngest/functions/weekly-progress-push.integration.test.ts:714"
     },
     {
       "acRef": "AC-2",
       "description": "The cron resolves its replay-stable week window first and reuses the same nowUtc for parent and self-report timezone eligibility.",
-      "pointer": "apps/api/src/inngest/functions/weekly-progress-push.ts:269"
+      "pointer": "apps/api/src/inngest/functions/weekly-progress-push.ts:275"
     },
     {
       "acRef": "AC-3",
-      "description": "The regression retains exact created-parent inclusion and non-matching-parent exclusion assertions without retry, timeout, or count widening.",
-      "pointer": "apps/api/src/inngest/functions/weekly-progress-push.integration.test.ts:707"
+      "description": "The rollover regression retains exact created-parent inclusion at line 766 and non-matching-parent exclusion at line 774 without retry, timeout, or count widening.",
+      "pointer": "apps/api/src/inngest/functions/weekly-progress-push.integration.test.ts:766"
     },
     {
       "acRef": "AC-4",
-      "description": "The full weekly-progress-push co-located integration file passed 9/9 with IDENTITY_V2_ENABLED=true.",
-      "pointer": ".workitem-artifacts/WI-2839/full-integration-jest.json"
+      "description": "Focused, full co-located integration, and companion unit receipts are bound to exact commands, IDENTITY_V2_ENABLED=true, and implementation head 80e9aaa4987525cbd2a58eec896d09e76b6fe947.",
+      "pointer": ".workitem-artifacts/WI-2839/verification.json"
     },
     {
       "acRef": "AC-5",
       "description": "Exact-head Flag-ON CI evidence is required before governed landing.",
-      "pointer": "pending exact-head PR check"
+      "pointer": ".workitem-artifacts/WI-2839/verification.json"
     },
     {
       "acRef": "AC-6",
       "description": "The originating unrelated-head failure is GitHub Actions run 30224090384/job 89851383157; its other 151 API suites and 1160 tests passed.",
-      "pointer": "https://github.com/cognoco/eduagent-build/actions/runs/30224090384/job/89851383157"
+      "pointer": ".workitem-artifacts/WI-2839/verification.json"
     }
   ],
   "noiseBaselineVersion": "2026-07-13",

@@ -2,13 +2,13 @@
   "numFailedTestSuites": 0,
   "numFailedTests": 0,
   "numPassedTestSuites": 1,
-  "numPassedTests": 9,
+  "numPassedTests": 10,
   "numPendingTestSuites": 0,
   "numPendingTests": 0,
   "numRuntimeErrorTestSuites": 0,
   "numTodoTests": 0,
   "numTotalTestSuites": 1,
-  "numTotalTests": 9,
+  "numTotalTests": 10,
   "openHandles": [],
   "snapshot": {
     "added": 0,
@@ -26,7 +26,7 @@
     "unmatched": 0,
     "updated": 0
   },
-  "startTime": 1785108410612,
+  "startTime": 1785110664175,
   "success": true,
   "testResults": [
     {
@@ -36,7 +36,7 @@
             "weekly progress push integration",
             "[WI-1997] push delivery controls the email fallback"
           ],
-          "duration": 3234,
+          "duration": 3222,
           "failing": false,
           "failureDetails": [],
           "failureMessages": [],
@@ -45,7 +45,7 @@
           "location": null,
           "numPassingAsserts": 6,
           "retryReasons": [],
-          "startAt": 1785108411903,
+          "startAt": 1785110665435,
           "status": "passed",
           "title": "restores a delivered-but-unlogged push result across durable replay and suppresses email"
         },
@@ -54,7 +54,7 @@
             "weekly progress push integration",
             "[WI-1997] push delivery controls the email fallback"
           ],
-          "duration": 2312,
+          "duration": 2366,
           "failing": false,
           "failureDetails": [],
           "failureMessages": [],
@@ -63,7 +63,7 @@
           "location": null,
           "numPassingAsserts": 3,
           "retryReasons": [],
-          "startAt": 1785108415139,
+          "startAt": 1785110668659,
           "status": "passed",
           "title": "sends fallback email when push genuinely fails"
         },
@@ -72,7 +72,7 @@
             "weekly progress push integration",
             "[WI-1997] push delivery controls the email fallback"
           ],
-          "duration": 4199,
+          "duration": 4206,
           "failing": false,
           "failureDetails": [],
           "failureMessages": [],
@@ -81,13 +81,28 @@
           "location": null,
           "numPassingAsserts": 2,
           "retryReasons": [],
-          "startAt": 1785108417452,
+          "startAt": 1785110671026,
           "status": "passed",
           "title": "does not re-send a successful fallback email on retry"
         },
         {
           "ancestorTitles": ["weekly progress push integration"],
-          "duration": 1229,
+          "duration": 1430,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly progress push integration queues a matching parent through the real same-hour week-window step",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 4,
+          "retryReasons": [],
+          "startAt": 1785110675232,
+          "status": "passed",
+          "title": "queues a matching parent through the real same-hour week-window step"
+        },
+        {
+          "ancestorTitles": ["weekly progress push integration"],
+          "duration": 1218,
           "failing": false,
           "failureDetails": [],
           "failureMessages": [],
@@ -96,13 +111,13 @@
           "location": null,
           "numPassingAsserts": 5,
           "retryReasons": [],
-          "startAt": 1785108421651,
+          "startAt": 1785110676663,
           "status": "passed",
           "title": "uses the memoized evaluation instant when the wall clock is one hour later"
         },
         {
           "ancestorTitles": ["weekly progress push integration"],
-          "duration": 1771,
+          "duration": 1798,
           "failing": false,
           "failureDetails": [],
           "failureMessages": [],
@@ -111,13 +126,13 @@
           "location": null,
           "numPassingAsserts": 6,
           "retryReasons": [],
-          "startAt": 1785108422880,
+          "startAt": 1785110677881,
           "status": "passed",
           "title": "persists a weekly report and sends a real delta summary from stored snapshots"
         },
         {
           "ancestorTitles": ["weekly progress push integration"],
-          "duration": 267,
+          "duration": 275,
           "failing": false,
           "failureDetails": [],
           "failureMessages": [],
@@ -126,13 +141,13 @@
           "location": null,
           "numPassingAsserts": 2,
           "retryReasons": [],
-          "startAt": 1785108424652,
+          "startAt": 1785110679679,
           "status": "passed",
           "title": "returns skipped when the parent has no linked children"
         },
         {
           "ancestorTitles": ["weekly progress push integration"],
-          "duration": 1642,
+          "duration": 1699,
           "failing": false,
           "failureDetails": [],
           "failureMessages": [],
@@ -141,13 +156,13 @@
           "location": null,
           "numPassingAsserts": 3,
           "retryReasons": [],
-          "startAt": 1785108424919,
+          "startAt": 1785110679954,
           "status": "passed",
           "title": "[BUG-699-FOLLOWUP] does not re-push when a weekly_progress notification was logged in the last 24h"
         },
         {
           "ancestorTitles": ["weekly progress push integration"],
-          "duration": 1712,
+          "duration": 1753,
           "failing": false,
           "failureDetails": [],
           "failureMessages": [],
@@ -156,13 +171,13 @@
           "location": null,
           "numPassingAsserts": 6,
           "retryReasons": [],
-          "startAt": 1785108426562,
+          "startAt": 1785110681653,
           "status": "passed",
           "title": "[BUG-699-FOLLOWUP] logs email-only weekly sends so the 24h dedup gate can see them"
         },
         {
           "ancestorTitles": ["weekly progress push integration"],
-          "duration": 2041,
+          "duration": 2023,
           "failing": false,
           "failureDetails": [],
           "failureMessages": [],
@@ -171,15 +186,15 @@
           "location": null,
           "numPassingAsserts": 6,
           "retryReasons": [],
-          "startAt": 1785108428274,
+          "startAt": 1785110683407,
           "status": "passed",
           "title": "skips children with no snapshots but still pushes for children that have activity"
         }
       ],
-      "endTime": 1785108430480,
+      "endTime": 1785110685581,
       "message": "",
       "name": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2839/apps/api/src/inngest/functions/weekly-progress-push.integration.test.ts",
-      "startTime": 1785108410815,
+      "startTime": 1785110664373,
       "status": "passed",
       "summary": ""
     }
