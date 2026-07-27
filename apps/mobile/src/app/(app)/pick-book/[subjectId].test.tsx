@@ -9,9 +9,9 @@ import PickBookScreen from './[subjectId]';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 // ---------------------------------------------------------------------------
-// Fetch-boundary mock — mockFetch assigned inside factory to bypass hoisting.
-// lib/api-client is mocked at the transport boundary so the real Hono RPC
-// client routes through our routed mock fetch, keeping React Query, assertOk,
+// Fetch-boundary seam — mockFetch is assigned inside the factory to bypass
+// hoisting. The real api-client exports stay intact; only useApiClient routes
+// the Hono RPC client through our mock fetch, keeping React Query, assertOk,
 // and all hooks real.
 // ---------------------------------------------------------------------------
 
