@@ -53,6 +53,11 @@ tags:
 - assertVisible:
     id: 'cold-start-chip-homework'
 
+# inputText above deliberately proves the Android keyboard path. Dismiss that
+# known-open IME before selecting the starter below it; otherwise Maestro taps
+# the keyboard overlay while reporting the obscured accessibility node tapped.
+- hideKeyboard
+
 # The homework starter preserves the learner's existing draft while the
 # composer's canonical Camera action remains available and no second Camera
 # accessibility target appears. Component and web E2E coverage additionally

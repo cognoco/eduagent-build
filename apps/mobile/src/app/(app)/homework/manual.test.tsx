@@ -10,6 +10,7 @@ import ManualHomeworkScreen from './manual';
 
 const ORIGINAL_E2E_FLAG = process.env.EXPO_PUBLIC_E2E;
 const mockReplace = jest.fn();
+const mockPush = jest.fn();
 const mockRedirect = jest.fn();
 let mockSearchParams: Record<string, string | string[] | undefined> = {};
 
@@ -25,7 +26,7 @@ jest.mock('expo-router', () => ({
     return <View testID="manual-route-redirect" />;
   },
   useLocalSearchParams: () => mockSearchParams,
-  useRouter: () => ({ replace: mockReplace }),
+  useRouter: () => ({ replace: mockReplace, push: mockPush }),
 }));
 
 const SUBJECT_ID = '00000000-0000-7000-a000-000000000301';
@@ -159,5 +160,84 @@ describe('ManualHomeworkScreen', () => {
         problemText: PROBLEM,
       }),
     });
+  });
+
+  it('names the zero-active-Subject condition and offers a Subject-creation escape, keeping confirmation disabled (real production loaded-empty response)', async () => {
+    mockSearchParams = { entrySource: 'mentor', returnTo: 'mentor' };
+    // AC-required case: production useSubjects() calls the API with the
+    // default includeInactive:false, so the server itself excludes
+    // archived/paused Subjects — the real "finished loading, zero active"
+    // response IS an empty array. This must be the fixture that proves the
+    // Acceptance Criterion, not a client-side-filtered inactive-Subject list
+    // (see the follow-up defense-in-depth test below for that case).
+    const rendered = renderScreen(<ManualHomeworkScreen />, {
+      routes: {
+        subjects: {
+          subjects: [],
+        },
+      },
+    });
+    cleanups.push(rendered.cleanup);
+
+    // The Subject list finished loading (server returned subjects: []) —
+    // distinct from the loading case (subject-picker-loading) and from
+    // having an active Subject (homework-subject-resolution-ready).
+    await waitFor(() => {
+      expect(screen.getByTestId('subject-picker-empty')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('subject-picker-loading')).toBeNull();
+    expect(
+      screen.queryByTestId('homework-subject-resolution-ready'),
+    ).toBeNull();
+    expect(screen.getByText("You don't have any subjects yet.")).toBeTruthy();
+
+    fireEvent.changeText(screen.getByTestId('result-text-input'), PROBLEM);
+
+    expect(
+      screen.getByTestId('confirm-button').props.accessibilityState,
+    ).toEqual({ disabled: true });
+
+    fireEvent.press(screen.getByTestId('subject-picker-create'));
+
+    expect(mockPush).toHaveBeenCalledWith('/create-subject');
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('defense-in-depth: also shows the escape when the client-side active filter zeroes out a loaded, non-empty Subject list', async () => {
+    mockSearchParams = { entrySource: 'mentor', returnTo: 'mentor' };
+    // Additional coverage, NOT a substitute for the AC-required subjects:[]
+    // case above: proves the screen's own `status === 'active'` filter (not
+    // just an empty server response) also reaches the same empty state, in
+    // case a caller ever requests includeInactive:true here.
+    const rendered = renderScreen(<ManualHomeworkScreen />, {
+      routes: {
+        subjects: {
+          subjects: [
+            {
+              id: '00000000-0000-7000-a000-000000000401',
+              profileId: '00000000-0000-7000-a000-000000000201',
+              name: 'Retired History',
+              status: 'archived',
+              pedagogyMode: 'socratic',
+              createdAt: '2026-07-20T00:00:00.000Z',
+              updatedAt: '2026-07-20T00:00:00.000Z',
+            },
+          ],
+        },
+      },
+    });
+    cleanups.push(rendered.cleanup);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('subject-picker-empty')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('subject-picker-loading')).toBeNull();
+    expect(
+      screen.queryByTestId('homework-subject-resolution-ready'),
+    ).toBeNull();
+
+    fireEvent.press(screen.getByTestId('subject-picker-create'));
+
+    expect(mockPush).toHaveBeenCalledWith('/create-subject');
   });
 });

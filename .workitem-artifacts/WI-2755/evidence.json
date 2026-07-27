@@ -1,0 +1,31 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Source-artifact QA reproduced the real failure after all four migration replay assertions passed: pg_stat_activity still reported one backend at the original ten-second deadline, so teardown threw before DROP and preserved the scratch database. The focused non-DB regression models that exact ten-second linger and was observed red against the original timeout before turning green with the extended bounded drain window.",
+      "pointer": "apps/api/src/db/profiles-dropped-migrate-replay-teardown.test.ts:58"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "closePoolAndDropScratchDatabase ends the scratch pool, polls pg_stat_activity by the exact scratch database name until the backend count reaches zero, and only then issues a normal DROP DATABASE. A bounded timeout throws instead of escalating to FORCE.",
+      "pointer": "apps/api/src/db/scratch-database-teardown.ts:12"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "The profiles-dropped migration replay suite's afterAll now delegates teardown to the drain-aware helper; admin-pool shutdown and temporary migration-directory removal remain protected by finally blocks.",
+      "pointer": "apps/api/src/db/profiles-dropped-migrate-replay.integration.test.ts:198"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Scratch isolation remains database-name scoped: the helper queries pg_stat_activity with the generated scratch database name as a parameter and drops that same quoted identifier. The default bounded drain window is thirty seconds, allowing the observed ten-second socket linger to resolve safely. An explicit short timeout test proves a genuinely persistent connection still throws and leaves the database intact rather than force-killing it.",
+      "pointer": "apps/api/src/db/profiles-dropped-migrate-replay-teardown.test.ts:17"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "The existing CI workflow runs the co-located integration glob containing the profiles-dropped suite against two disposable pgvector Postgres services (the required main lane and the flag-on diagnostic lane), providing two isolated real-database executions for the PR without using the shared staging endpoint.",
+      "pointer": ".github/workflows/ci.yml:435"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": "apps/api/src/db/profiles-dropped-migrate-replay-teardown.test.ts:58"
+}

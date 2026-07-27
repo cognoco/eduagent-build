@@ -981,7 +981,7 @@ Ask Anything starts without a required topic. It can resolve or ask for a subjec
 - FR5: Users can switch between learner profiles
 - FR6: Parents can switch into child's profile for full access to learning history
 - FR7: Users aged 13–17 below the Article 8 threshold for their EEA country of habitual residence can request guardian authorization during registration
-- FR8: US registration and COPPA flows are dormant because the United States and all under-13 users are outside the launch perimeter
+- FR8: Under-13 users are outside the launch perimeter, keeping COPPA parental-consent flows dormant. The United States is inside the launch perimeter via the non-EEA admission screen (`docs/compliance/2026-07-26-launch-perimeter-ruling-screen-based-allowlist.md`, Route 2; screen record `2026-07-26-us-launch-screen-record.md`), with the 13+ floor keeping COPPA dormant; US admission remains conditional on the screen's open items (DPO concurrence, WI-1116 App Store Accountability Acts resolution, risk-acceptance signature)
 - FR9: Parents can approve or decline consent via email link
 - FR10: If parent declines consent, child account is deleted immediately with no data retained
 - FR11: Users can delete their accounts and all associated data (GDPR)
@@ -1123,13 +1123,13 @@ Mentor notices are the learner-only, low-stakes loop defined by [`MMT-ADR-0036`]
 
 - The capability applies to learners of every age under the same age-neutral rules. Interleaved sessions are excluded from the MVP.
 - The learner sees at most one actionable notice at a time and never a queue of shortcomings. Guardians, supporters, payers, and proxy views receive no notice details or projections.
-- `Continue` starts or resumes a re-check capped at three learner responses. The tutor guides but never grades its own re-check; an independent server-side judge produces the only transition the client may render. Only validated learner evidence may produce a `locked_in` result; `not_yet` ends the current offer without claiming mastery, and explicit dismissal is terminal.
-- `Not now` defers for the current learning day, which begins at local 04:00 in the learner's IANA time zone. An inactive open notice fades after 21 days, including while the feature is off.
+- `Continue` starts or resumes a re-check capped at three learner responses. The tutor guides but never grades its own re-check. The server commits the only transition the client may render: re-check verdicts use an independent server-side judge, while explicit `Not now` is a deterministic server action. A valid `continue` makes no notice transition at any response, including the third; when the cap is reached after a valid `continue` the server ends that re-check attempt and the notice stays unresolved and eligible for a later re-offer. Only an unresolved evaluation at the third response — for example an unavailable or malformed judgment — terminalizes as `not_yet`. Only validated learner evidence may produce a `locked_in` result; `not_yet` ends the current offer without claiming mastery, and explicit dismissal is terminal.
+- `Not now` defers for the current learning day, which begins at local 04:00 in the learner's IANA time zone. If the zone is invalid or unavailable, the server applies the 04:00 boundary and derives the civil date in UTC. An inactive open notice fades after 21 days, including while the feature is off.
 - MVP delivery is in-app only: no notice push, primer, scheduled nudge, or notification-family budget. Rollout is internal QA followed by all friendly-user MVP testers.
 - Rollout observations carry a monotonic server revision: lower revisions are ignored, disabled wins at the same revision, and re-enable requires a higher revision. Missing or malformed policy is fail-closed.
 - Flag-off removes all observed in-app and cached behavior without deleting notice rows; ordinary retention and deletion rules still apply. This work does not authorize production activation, percentage rollout, OTA, release, deployment, or push delivery.
 - The durable notice keeps an immutable `answerEventId` scalar after transcript purge, without a foreign key to the purged event. The server validates the event at creation; optional `learnerQuote` is transient validation input and is never stored.
-- All persisted learning text passes one shared multilingual clinical-safety gate. Person-attributed clinical inference is blocked, and ambiguity fails closed unless an independent judge strictly identifies LLM-authored text as an educational reference.
+- All persisted learning text passes one shared multilingual clinical-safety gate. Person-attributed clinical inference is blocked. Ambiguous text is referred to an independent judge whoever authored it — learner, user, or model — and proceeds only when that judge strictly identifies it as an educational reference; ambiguity without a judgment fails closed.
 
 ### Learning Verification
 

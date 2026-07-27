@@ -12,6 +12,10 @@ export const PRACTICE_RETURN_TO = 'practice';
 export const PRACTICE_HREF = '/(app)/practice';
 export const JOURNAL_RETURN_TO = 'journal';
 export const JOURNAL_HREF = '/(app)/journal';
+export const JOURNAL_REPORTS_HREF = {
+  pathname: JOURNAL_HREF,
+  params: { section: 'reports' },
+} as const;
 export const MENTOR_RETURN_TO = 'mentor';
 export const MENTOR_HREF = '/(app)/mentor';
 export const SUBJECTS_RETURN_TO = 'subjects';
@@ -33,6 +37,16 @@ const V2_ACCOUNT_RETURN_HREFS = {
   subjects: '/(app)/subjects',
   journal: '/(app)/journal',
 } as const satisfies Record<V2AccountReturnToken, Href>;
+
+// WI-2331 AC-2/AC-5: i18n title keys for the "Back to {tab}" label contract,
+// shared by every V2 root-level pushed screen that names its owning tab as
+// its Back destination (not just the Account screen — each such screen maps
+// its own pathname to the owning tab via accountReturnTokenForPathname).
+export const V2_TAB_TITLE_KEYS = {
+  mentor: 'tabs.mentor',
+  subjects: 'tabs.subjects',
+  journal: 'tabs.journal',
+} as const satisfies Record<V2AccountReturnToken, string>;
 
 export function isSessionForwardableReturnTo(
   returnTo: string | undefined,
@@ -115,9 +129,23 @@ export function childProfileHref(
   return `/(app)/child/${encodedProfileId}?mode=${encodedMode}` as Href;
 }
 
+/**
+ * WI-2331 AC-2 (core) / AC-3: the trailing catch-all below used to be an
+ * unconditional `/(app)/home` — dead in V2 (not one of the three tabs) and
+ * reachable whenever a caller's `returnTo` is absent or an unrecognized
+ * token (a plausible deep-link / stale-param path for session, quiz,
+ * practice, homework, topic/relearn, child/session, and my-notes, every one
+ * of which resolves its own exit target through this function). The
+ * `v2Enabled` param routes that catch-all through the same owning-tab
+ * contract AC-1 uses (`accountReturnTokenForPathname`'s "unknown -> Mentor"
+ * default) instead — every OTHER named token below is an intentional V0/V1
+ * destination (own-learning, family-home, family-recaps, …) and is left
+ * untouched so V0/V1 behavior does not change.
+ */
 export function homeHrefForReturnTo(
   returnTo: string | string[] | undefined,
   returnId?: string | string[] | undefined,
+  v2Enabled = false,
 ): Href {
   const token = firstParam(returnTo);
   const id = firstParam(returnId);
@@ -139,7 +167,33 @@ export function homeHrefForReturnTo(
   if (token === FAMILY_PROGRESS_RETURN_TO) return FAMILY_PROGRESS_HREF as Href;
   if (token === STUDY_PROGRESS_RETURN_TO) return STUDY_PROGRESS_HREF as Href;
   if (token === FAMILY_CHILDREN_RETURN_TO) return FAMILY_CHILDREN_HREF as Href;
-  return '/(app)/home' as Href;
+  return v2Enabled
+    ? (V2_ACCOUNT_RETURN_HREFS.mentor as Href)
+    : ('/(app)/home' as Href);
+}
+
+/**
+ * WI-2331 rework: `accountReturnToken` collapses every non-tab `returnTo`
+ * token (practice, family-recaps, own-learning, home, …) to `'mentor'`, but
+ * `homeHrefForReturnTo` routes those same tokens to their real, non-tab
+ * destinations. A "Back to {tab}" label built from `accountReturnToken`
+ * therefore lies whenever the actual Back destination isn't a tab root. This
+ * helper resolves the Back destination the same way `homeHrefForReturnTo`
+ * does and returns the owning tab ONLY when that destination genuinely is
+ * one of the three V2 tab roots — null otherwise, so callers fall back to a
+ * generic label instead of mislabeling.
+ */
+export function resolvedV2TabForReturnTo(
+  returnTo: string | string[] | undefined,
+  returnId: string | string[] | undefined,
+  v2Enabled: boolean,
+): V2AccountReturnToken | null {
+  if (!v2Enabled) return null;
+  const href = homeHrefForReturnTo(returnTo, returnId, v2Enabled);
+  if (href === MENTOR_HREF) return 'mentor';
+  if (href === SUBJECTS_HREF) return 'subjects';
+  if (href === JOURNAL_HREF) return 'journal';
+  return null;
 }
 
 /**
@@ -185,19 +239,22 @@ export function goBackOrReplace(
  * Return a Journal-origin report to Journal without leaving Reports behind.
  *
  * Web replaces the report with Journal because Expo Router's stack can point
- * at the hidden Progress ancestor instead of the visible Journal caller.
- * Native dismisses the complete cross-tab Progress ancestry to Journal.
+ * at the hidden Progress ancestor instead of the visible Journal caller. Native
+ * first replaces the report leaf with Progress root so the report cannot
+ * resurrect when Progress is revisited, then uses the tab-supported NAVIGATE
+ * action to restore Journal Reports. POP_TO is unhandled across sibling tabs.
  */
 export function returnJournalReportToCaller(
-  router: Pick<Router, 'dismissTo' | 'replace'>,
+  router: Pick<Router, 'navigate' | 'replace'>,
   platform: 'web' | 'native',
 ): void {
   if (platform === 'web') {
-    router.replace(JOURNAL_HREF);
+    router.replace(JOURNAL_REPORTS_HREF);
     return;
   }
 
-  router.dismissTo(JOURNAL_HREF);
+  router.replace(STUDY_PROGRESS_HREF);
+  router.navigate(JOURNAL_REPORTS_HREF);
 }
 
 export function pushLearningResumeTarget(

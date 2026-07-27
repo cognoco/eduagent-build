@@ -1,7 +1,16 @@
-import { expect, test, type Request } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
+import { expect, test, type APIResponse } from '@playwright/test';
+import {
+  createHeldNowRequestDiscriminator,
+  fetchAndFulfillHeldNowResponse,
+  isHeldNowCaptureCandidate,
+  type HeldNowRequestDiscriminator,
+  waitForHeldNowResponse,
+} from '../../helpers/held-now-request';
 import { pressableClick } from '../../helpers/pressable';
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 import { fillTextInput } from '../../helpers/text-input';
+import { observeSeededTranscript } from '../../helpers/transcript-observation';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -38,18 +47,33 @@ test('WI-2234 returning learner: unfinished session resumes, exchanges, and retu
   await expect(unfinishedCard).toBeVisible();
   await expect(dueReviewCard).toBeVisible();
 
+  const transcriptObservationPromise = observeSeededTranscript(page, {
+    sessionId: seeded.ids.sessionId,
+    exchanges: [
+      {
+        role: 'user',
+        content: 'Why did the Romans build so many roads?',
+      },
+      {
+        role: 'assistant',
+        content: 'They connected cities, trade, armies, and new ideas.',
+      },
+    ],
+  });
   await pressableClick(unfinishedCard.getByTestId('now-card-continue'));
   const chatInput = page.getByTestId('chat-input');
   await expect(chatInput).toBeVisible({ timeout: 30_000 });
   await expect
     .poll(() => new URL(page.url()).searchParams.get('sessionId'))
     .toBe(seeded.ids.sessionId);
+  await transcriptObservationPromise;
   await expect(
     page
       .getByTestId('chat-messages')
       .getByText('They connected cities, trade, armies, and new ideas.', {
         exact: true,
       }),
+    '[transcript:hydration] API returned the exact persisted exchange, but the assistant message was not rendered',
   ).toBeVisible();
 
   await fillTextInput(
@@ -74,29 +98,50 @@ test('WI-2234 returning learner: unfinished session resumes, exchanges, and retu
   // navigator keeps Mentor mounted underneath the pushed Session route.
   let capturePostBackNowRequest = false;
   let releasePostBackNowResponse!: () => void;
-  let observePostBackNowRequest!: (request: Request) => void;
-  const postBackNowRequest = new Promise<Request>((resolve) => {
-    observePostBackNowRequest = resolve;
-  });
+  let observePostBackNowRequest!: (
+    discriminator: HeldNowRequestDiscriminator,
+  ) => void;
+  const postBackNowRequest = new Promise<HeldNowRequestDiscriminator>(
+    (resolve) => {
+      observePostBackNowRequest = resolve;
+    },
+  );
   const allowPostBackNowResponse = new Promise<void>((resolve) => {
     releasePostBackNowResponse = resolve;
   });
+  let observePostBackNowResponse!: (response: APIResponse) => void;
+  let rejectPostBackNowResponse!: (error: unknown) => void;
+  const postBackNowResponsePromise = new Promise<APIResponse>(
+    (resolve, reject) => {
+      observePostBackNowResponse = resolve;
+      rejectPostBackNowResponse = reject;
+    },
+  );
+  const postBackNowCorrelation = `wi-2234-${randomUUID()}`;
   await page.route('**/v1/now?*', async (route) => {
     const request = route.request();
-    const url = new URL(request.url());
-    if (
-      request.method() !== 'GET' ||
-      url.searchParams.get('scope') !== 'self' ||
-      !capturePostBackNowRequest
-    ) {
+    if (!isHeldNowCaptureCandidate(request, capturePostBackNowRequest)) {
       await route.continue();
       return;
     }
 
     capturePostBackNowRequest = false;
-    observePostBackNowRequest(request);
+    const discriminator = createHeldNowRequestDiscriminator(
+      request,
+      postBackNowCorrelation,
+    );
+    observePostBackNowRequest(discriminator);
     await allowPostBackNowResponse;
-    await route.continue();
+    try {
+      const response = await fetchAndFulfillHeldNowResponse(
+        route,
+        discriminator,
+      );
+      observePostBackNowResponse(response);
+    } catch (error) {
+      rejectPostBackNowResponse(error);
+      throw error;
+    }
   });
 
   await pressableClick(page.getByTestId('chat-shell-back'), {
@@ -110,11 +155,12 @@ test('WI-2234 returning learner: unfinished session resumes, exchanges, and retu
   const heldPostBackNowRequest = await postBackNowRequest;
   await expect(page).toHaveURL(/\/session(?:\?|$)/);
   await expect(page.getByTestId('session-screen')).toBeVisible();
-  const postBackNowResponsePromise = page.waitForResponse(
-    (response) => response.request() === heldPostBackNowRequest,
+  const boundedPostBackNowResponsePromise = waitForHeldNowResponse(
+    postBackNowResponsePromise,
   );
   releasePostBackNowResponse();
-  const postBackNowResponse = await postBackNowResponsePromise;
+  const postBackNowResponse = await boundedPostBackNowResponsePromise;
+  expect(postBackNowResponse.url()).toBe(heldPostBackNowRequest.url);
   expect(postBackNowResponse.ok()).toBe(true);
   const postBackNowFeed = (await postBackNowResponse.json()) as {
     generatedAt?: unknown;

@@ -1,5 +1,6 @@
 import {
   registerProvider,
+  _resetCircuits,
   type LLMProvider,
   type ChatMessage,
   type MessagePart,
@@ -7,7 +8,7 @@ import {
   type StopReason,
 } from './llm';
 import { createMockProvider } from './llm/test-utils';
-import { makeChatStreamResult } from './llm/types';
+import { makeChatStreamResult, type ChatStreamResult } from './llm/types';
 import {
   buildSystemPrompt,
   auditExchangeSources,
@@ -49,6 +50,30 @@ afterEach(() => {
 });
 
 const currentYear = new Date().getFullYear();
+
+// [WI-2670] Mirrors router.test.ts's helper of the same name — a mock
+// provider whose chatStream throws on its first `next()` (pre-first-byte
+// failure), used to force a real transparent mid-stream fallback through
+// streamExchange rather than mocking the fallback outcome directly.
+function createFailingStreamProvider(id: string): LLMProvider {
+  return {
+    ...createMockProvider(id),
+    chatStream(): ChatStreamResult {
+      return makeChatStreamResult(
+        {
+          [Symbol.asyncIterator]() {
+            return {
+              async next(): Promise<IteratorResult<string>> {
+                throw new Error('Stream connection lost');
+              },
+            };
+          },
+        },
+        Promise.resolve<StopReason>('unknown'),
+      );
+    },
+  };
+}
 
 /** Base context reused across tests */
 const baseContext: ExchangeContext = {
@@ -1981,6 +2006,54 @@ describe('streamExchange', () => {
 
     expect(chunks.length).toBeGreaterThan(0);
     expect(typeof chunks[0]).toBe('string');
+  });
+
+  // [WI-2670] AC-1's persisted-record path is `streamExchange` →
+  // `streamMessage.onComplete` → `persistExchangeResult` → `metadata.llmProvider`
+  // — but no prior test exercised `streamExchange` itself under a transparent
+  // mid-stream fallback. `result.provider`/`result.model` on the returned
+  // `ExchangeStreamResult` are lazy getters (mirroring the router's own
+  // `fallbackUsed` getter) precisely so a post-drain read reports the
+  // EFFECTIVE producer, not the originally-selected provider that failed
+  // pre-first-byte. This test fails if EITHER getter layer — this file's
+  // `streamExchange` return object (see the `get provider()`/`get model()`
+  // above) or the router's own `routeAndStream` return object — is reverted
+  // to a plain property assigned before the stream is drained.
+  it('[WI-2670] provider/model name the fallback vendor after drain, not the failed primary', async () => {
+    // Adult context so routing honours preferredLlmProvider (the under-18
+    // gate ignores it and always resolves to the approved-text fallback
+    // provider, which would make primary and fallback the same vendor).
+    const adultContext: ExchangeContext = {
+      ...baseContext,
+      birthYear: currentYear - 25,
+      preferredLlmProvider: 'openai',
+    };
+    const failingOpenAi = createFailingStreamProvider('openai');
+    registerProvider(failingOpenAi);
+    // gemini is already registered (real, working mock) from the top-level
+    // beforeAll — it is the router's fallback for a failed openai primary
+    // (see `getFallbackConfig`'s `primary.provider === 'openai'` branch).
+
+    try {
+      const result = await streamExchange(adultContext, 'Explain quadratics');
+
+      // Draining the stream is what triggers the fallback: the primary
+      // stream throws on its first `next()`, and `wrapStreamWithCircuitBreaker`
+      // only fires `onFallback` (setting `fallbackFired`) during iteration —
+      // asserting before drain would read the pre-fallback (stale) value.
+      const chunks: string[] = [];
+      for await (const chunk of result.stream) chunks.push(chunk);
+      expect(chunks.length).toBeGreaterThan(0);
+
+      expect(result.fallbackUsed).toBe(true);
+      expect(result.provider).toBe('gemini');
+      expect(result.provider).not.toBe('openai');
+      expect(result.model).not.toBe('');
+    } finally {
+      registerProvider(createMockProvider('gemini'));
+      registerProvider(createMockProvider('cerebras'));
+      _resetCircuits();
+    }
   });
 
   it('preserves escalation rung', async () => {

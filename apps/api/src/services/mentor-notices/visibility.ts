@@ -86,8 +86,12 @@
 // ---------------------------------------------------------------------------
 
 import type { Database } from '@eduagent/database';
+import type { MentorNoticePolicyObservation } from '@eduagent/schemas';
 
-import { isMentorNoticeEnabled } from '../../config';
+import {
+  isMentorNoticeEnabled,
+  resolveMentorNoticePolicyRevision,
+} from '../../config';
 import { isLlmExchangeConsentAllowed } from '../identity-v2/consent-status-v2';
 
 /**
@@ -131,9 +135,27 @@ export const MENTOR_NOTICE_EPOCH_OTHER_SUBJECT =
 /** Rollout on, caller IS the subject, but the subject withdrew LLM consent. */
 export const MENTOR_NOTICE_EPOCH_CONSENT_WITHDRAWN =
   `${EPOCH_PREFIX}:on:self:withdrawn` as const;
-/** The ONLY epoch under which notice data may be projected. */
+/** The ONLY epoch SUFFIX under which notice data may be projected. */
 export const MENTOR_NOTICE_EPOCH_VISIBLE =
   `${EPOCH_PREFIX}:on:self:consented` as const;
+
+/**
+ * [WI-2627] Fold the policy revision INTO the opaque epoch.
+ *
+ * The revision is not decoration on the side of the epoch — it is part of the
+ * cache-binding token, so a revision bump alone re-keys every persisted
+ * projection even on a client too old to read the observation object. That
+ * makes a revision bump a usable invalidation lever by itself, which is what
+ * lets the server PR land ahead of the client store without being inert for
+ * already-shipped builds.
+ *
+ * Placed as a SEGMENT of the same opaque string rather than a second key
+ * component because the client contract is "store the string you were given
+ * and key on it"; a second component would be a second thing to get wrong.
+ */
+export function withPolicyRevision(epoch: string, revision: number): string {
+  return `${EPOCH_PREFIX}:r${revision}${epoch.slice(EPOCH_PREFIX.length)}`;
+}
 
 /**
  * [WI-2504] The server's answer for one request: whether notice data may be
@@ -143,7 +165,39 @@ export const MENTOR_NOTICE_EPOCH_VISIBLE =
 export type MentorNoticePolicy = {
   visible: boolean;
   policyEpoch: string;
+  /**
+   * [WI-2627] The observation to put on the wire. `projectionEpoch` is the same
+   * string as `policyEpoch` — one derivation, two names, so no caller can emit
+   * an observation whose epoch disagrees with the epoch it gated on.
+   */
+  observation: MentorNoticePolicyObservation;
 };
+
+/**
+ * [WI-2627] Assemble the policy result from the ONE derivation.
+ *
+ * `visible` is `epochSuffix === MENTOR_NOTICE_EPOCH_VISIBLE`, and
+ * `projectionEpoch` is the revision-folded form of that same suffix, so the
+ * three can never disagree — there is no path that returns a visible policy
+ * under a hidden epoch, or an observation for a different epoch than the one
+ * this request was gated on.
+ */
+function policy(
+  epochSuffix: string,
+  revision: number,
+  rolloutEnabled: boolean,
+): MentorNoticePolicy {
+  const projectionEpoch = withPolicyRevision(epochSuffix, revision);
+  return {
+    visible: epochSuffix === MENTOR_NOTICE_EPOCH_VISIBLE,
+    policyEpoch: projectionEpoch,
+    observation: {
+      rolloutRevision: revision,
+      rolloutEnabled,
+      projectionEpoch,
+    },
+  };
+}
 
 /**
  * Resolve V (and its epoch) for `subjectProfileId` on the current request.
@@ -157,23 +211,34 @@ export async function resolveMentorNoticeVisibility(
   subjectProfileId: string,
   rolloutValue: string | undefined,
   signals: MentorNoticeVisibilityRequestSignals = {},
+  policyRevisionValue?: string | undefined,
 ): Promise<MentorNoticePolicy> {
+  // [WI-2627] The revision is resolved ONCE, before any branch, so every branch
+  // below reports the same revision. A branch-local resolve would let two
+  // conjuncts of the same request disagree about what deployment they are.
+  const revision = resolveMentorNoticePolicyRevision(policyRevisionValue);
+
   // 1. Rollout. Cheapest conjunct and the one that short-circuits the DB read
   //    when the feature is off entirely.
-  if (!isMentorNoticeEnabled(rolloutValue)) {
-    return { visible: false, policyEpoch: MENTOR_NOTICE_EPOCH_ROLLOUT_OFF };
+  const rolloutEnabled = isMentorNoticeEnabled(rolloutValue);
+  if (!rolloutEnabled) {
+    return policy(MENTOR_NOTICE_EPOCH_ROLLOUT_OFF, revision, false);
   }
 
   // Client tightening. Checked before the DB read purely as an optimisation —
   // it can only ever produce `false`, so its position carries no authority.
+  // [WI-2627] Note `rolloutEnabled: true` on this and the two branches below:
+  // the ROLLOUT is on, this REQUEST is merely tightened. Reporting these as
+  // rollout-disabled would let one proxy read latch the client's monotonic
+  // store off for the same learner's own legitimate read at the same revision.
   if (signals.proxyModeHeader === 'true') {
-    return { visible: false, policyEpoch: MENTOR_NOTICE_EPOCH_PROXY };
+    return policy(MENTOR_NOTICE_EPOCH_PROXY, revision, true);
   }
 
   // 2. Selfhood — server-derived on both sides (see the file header).
   const callerPersonId = source.get('callerPersonId');
   if (!callerPersonId || callerPersonId !== subjectProfileId) {
-    return { visible: false, policyEpoch: MENTOR_NOTICE_EPOCH_OTHER_SUBJECT };
+    return policy(MENTOR_NOTICE_EPOCH_OTHER_SUBJECT, revision, true);
   }
 
   // 3. Subject consent. Applied to the SUBJECT, not the caller — the data
@@ -185,6 +250,6 @@ export async function resolveMentorNoticeVisibility(
     subjectProfileId,
   );
   return consented
-    ? { visible: true, policyEpoch: MENTOR_NOTICE_EPOCH_VISIBLE }
-    : { visible: false, policyEpoch: MENTOR_NOTICE_EPOCH_CONSENT_WITHDRAWN };
+    ? policy(MENTOR_NOTICE_EPOCH_VISIBLE, revision, true)
+    : policy(MENTOR_NOTICE_EPOCH_CONSENT_WITHDRAWN, revision, true);
 }

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   useQuery,
   useMutation,
@@ -14,12 +15,14 @@ import type {
   HomeworkSessionMetadata,
   InputMode,
   LearningSession,
+  MentorNoticePolicyObservation,
   MessageResult,
   ParkingLotItem,
   SessionMetadata,
   SessionAnalyticsEventInput,
   SessionStartResult,
   SessionSummary,
+  SessionSummaryGetResponse,
   SkipSummaryResponse,
   SubmitSummaryResult,
   TranscriptResponse,
@@ -56,6 +59,7 @@ import { useAuth } from '@clerk/expo';
 
 import { useNavigationDataScopeContract } from './use-navigation-contract';
 import { useObservedPolicyEpoch } from './use-now-feed';
+import { useMentorNoticePolicy } from '../lib/mentor-notice-policy';
 
 export { useStreamMessage } from './use-stream-message';
 
@@ -319,6 +323,14 @@ export function useSendMessage(
   sessionId: string,
 ): UseMutationResult<MessageResult, Error, { message: string }> {
   const client = useApiClient();
+  const { profileId } = useSessionNavigationScope();
+  const { userId } = useAuth();
+  // [WI-2627] The non-stream turn is a notice-bearing MUTATION surface. WI-2504
+  // left the epoch off mutations because a flag-off answers with nothing to
+  // invalidate; ordering is a different requirement — a successful mutation is a
+  // fresh authenticated observation the client must be able to order against
+  // whatever the Now feed last told it.
+  const policy = useMentorNoticePolicy(userId, profileId);
 
   return useMutation({
     mutationFn: async (input: { message: string }) => {
@@ -327,11 +339,13 @@ export function useSendMessage(
         json: input,
       });
       await assertOk(res);
-      return parseJson(
+      const result = await parseJson(
         res,
         messageResultSchema,
         'POST /sessions/:sessionId/messages',
       );
+      policy.observe(result.mentorNoticePolicy);
+      return result;
     },
   });
 }
@@ -580,6 +594,22 @@ export function useAddParkingLotItem(
   });
 }
 
+export type SessionSummaryQueryResult =
+  UseQueryResult<SessionSummary | null> & {
+    /**
+     * [WI-2627] The rollout observation this summary response arrived with, or
+     * `undefined` when the response carried none (pre-field worker).
+     *
+     * Surfaced because the fix is not "the field survives the schema parse" — the
+     * pre-fix query fn returned `data.summary`, discarding the sibling
+     * `data.mentorNoticePolicy` AFTER a correct parse, so the observation died at
+     * the CONSUMER and this surface silently could not feed the monotonic store
+     * while appearing to. Exposing it makes "reaches the caller" directly
+     * assertable rather than inferable.
+     */
+    mentorNoticePolicy: MentorNoticePolicyObservation | undefined;
+  };
+
 export function useSessionSummary(
   sessionId: string,
   options?: {
@@ -587,7 +617,7 @@ export function useSessionSummary(
       data: SessionSummary | null | undefined,
     ) => number | false;
   },
-): UseQueryResult<SessionSummary | null> {
+): SessionSummaryQueryResult {
   const client = useApiClient();
   const { activeProfile, mode, profileId } = useSessionNavigationScope();
   // [WI-2504] The summary carries the mentor-notice RECEIPT, and the app's
@@ -601,8 +631,11 @@ export function useSessionSummary(
   const { userId } = useAuth();
   const { epoch: policyEpoch, hydrated: epochHydrated } =
     useObservedPolicyEpoch(userId, profileId);
+  // [WI-2627] Ordering, alongside the epoch's invalidation above. Two seams
+  // because they answer two questions — see lib/mentor-notice-policy.ts.
+  const policy = useMentorNoticePolicy(userId, profileId);
 
-  return useQuery({
+  const query = useQuery({
     queryKey: [
       ...queryKeys.sessions.summary(mode, sessionId, profileId),
       policyEpoch,
@@ -615,21 +648,62 @@ export function useSessionSummary(
           { init: { signal } },
         );
         await assertOk(res);
-        const data = await parseJson(
-          res,
-          sessionSummaryGetResponseSchema,
-          'GET /sessions/:sessionId/summary',
-        );
-        return data.summary;
+        let data: SessionSummaryGetResponse;
+        try {
+          data = await parseJson(
+            res,
+            sessionSummaryGetResponseSchema,
+            'GET /sessions/:sessionId/summary',
+          );
+        } catch (err) {
+          // [WI-2627 rework] A malformed `mentorNoticePolicy` fails the WHOLE
+          // response schema, so the fold below is never REACHED — and TanStack
+          // Query then RETAINS the prior receipt-bearing summary and keeps
+          // rendering it with policy still enabled. Folding fail-closed here
+          // both records the untrustworthy observation and blanks the retained
+          // payload, because the suppression memo below re-evaluates against
+          // the now-disabled store. Deliberately over-broad, as on the two Now
+          // surfaces: a body we cannot parse is one whose policy we cannot
+          // confirm, and notices are the private feature.
+          policy.observeMalformed();
+          throw err;
+        }
+        // [WI-2627] The whole response, not `data.summary`. Returning the
+        // summary alone discarded the sibling observation here, downstream of a
+        // correct parse — see `SessionSummaryQueryResult` above.
+        policy.observe(data.mentorNoticePolicy);
+        return data;
       } finally {
         cleanup();
       }
     },
     enabled: !!activeProfile && !!sessionId && epochHydrated,
     refetchInterval: options?.refetchInterval
-      ? (query) => options.refetchInterval?.(query.state.data ?? null) ?? false
+      ? (query) =>
+          options.refetchInterval?.(query.state.data?.summary ?? null) ?? false
       : undefined,
   });
+
+  const observation = query.data?.mentorNoticePolicy;
+  // [WI-2627] Bind the payload to the observation it arrived with. A summary
+  // fetched at revision 6 and still warm after the client learned revision 7
+  // must not keep painting its receipt, even though the store's own state is by
+  // then correct.
+  const summary = useMemo(() => {
+    const value = query.data?.summary ?? null;
+    if (!value?.mentorNotice) return value;
+    if (!policy.suppressed(observation)) return value;
+    const { mentorNotice: _suppressed, ...rest } = value;
+    return rest;
+  }, [query.data, observation, policy]);
+
+  // As in `useNowFeed`: the cast reconciles the `UseQueryResult` discriminated
+  // union after `data` is narrowed from the full response to the summary. The
+  // runtime shape is the query result plus one added field.
+  return useMemo(
+    () => ({ ...query, data: summary, mentorNoticePolicy: observation }),
+    [query, summary, observation],
+  ) as unknown as SessionSummaryQueryResult;
 }
 
 export function useSubmitSummary(

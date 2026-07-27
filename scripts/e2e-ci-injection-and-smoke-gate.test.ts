@@ -114,6 +114,7 @@ type Job = {
   if?: unknown;
   env?: Record<string, unknown>;
   needs?: unknown;
+  'runs-on'?: unknown;
   strategy?: Record<string, unknown>;
   steps?: Array<Record<string, unknown>>;
   'continue-on-error'?: unknown;
@@ -180,6 +181,50 @@ function allRunScripts(workflow: Record<string, unknown>): string[] {
   }
   return scripts;
 }
+
+describe('[WI-2836] CI preserves the Windows-owned WI-2176 PowerShell contract', () => {
+  const workflow = loadWorkflow('ci.yml');
+  const jobs = workflow.jobs as Record<string, Job>;
+  const contractJobId = 'wi2176-windows-orion-contract';
+
+  it('makes the Windows/Orion contract a dependency of the required main check', () => {
+    const contractJob = jobs[contractJobId];
+    const mainJob = jobs['main'];
+    const mainNeeds = Array.isArray(mainJob?.needs)
+      ? mainJob.needs
+      : [mainJob?.needs];
+
+    expect(contractJob).toBeDefined();
+    expect(contractJob?.['runs-on']).toBe('windows-latest');
+    expect(mainNeeds).toContain(contractJobId);
+    expect(mainJob?.if).toBe('${{ always() }}');
+
+    const dependencyGate = mainJob?.steps?.find(
+      (step) =>
+        step.name === 'Require the WI-2176 Windows/Orion PowerShell contract',
+    );
+    expect(dependencyGate?.env).toEqual({
+      WI2176_CONTRACT_RESULT:
+        '${{ needs.wi2176-windows-orion-contract.result }}',
+    });
+    expect(dependencyGate?.run).toContain(
+      'WI2176_CONTRACT_RESULT" != "success"',
+    );
+    expect(dependencyGate?.run).toContain('exit 1');
+  });
+
+  it('executes the full WI-2176 PowerShell harness in the Windows job', () => {
+    const contractJob = jobs[contractJobId];
+    const contractCommand = contractJob?.steps?.find(
+      (step) => step.name === 'Run WI-2176 Windows/Orion PowerShell contract',
+    )?.run;
+
+    expect(contractCommand).toContain(
+      'apps/mobile/scripts/run-wi2176-orion-evidence.test.ts',
+    );
+    expect(contractCommand).toContain('--runInBand');
+  });
+});
 
 describe('[F-151] e2e-ci.yml has no workflow_run.pull_requests injection sink', () => {
   const raw = loadWorkflowRaw('e2e-ci.yml');
@@ -1683,6 +1728,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(plan.every(({ shard }) => shard >= 1 && shard <= 8)).toBe(true);
   });
 
+  // Executed red/green/revert/restore receipt: docs/evidence/WI-1864/report.md
   it('[WI-1864] keeps every prose-parked flow machine-excluded from scheduled suites', () => {
     const e2eRoot = join(repoRoot, 'apps/mobile/e2e');
     const flowsRoot = join(e2eRoot, 'flows');

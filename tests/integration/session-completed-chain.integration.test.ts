@@ -31,11 +31,7 @@ import {
 } from '@eduagent/database';
 
 import { cleanupAccounts, createIntegrationDb } from './helpers';
-import {
-  clearFetchCalls,
-  getFetchCalls,
-  jsonResponse,
-} from './fetch-interceptor';
+import { clearFetchCalls, getFetchCalls } from './fetch-interceptor';
 import { mockVoyageAI, type MockHandle } from './external-mocks';
 import { registerProvider } from '../../apps/api/src/services/llm';
 import { createMockProvider } from '../../apps/api/src/services/llm/test-utils';
@@ -47,22 +43,22 @@ jest.mock('@sentry/cloudflare', () => ({
   // gc1-allow: @sentry/cloudflare is an external observability SDK — no real Sentry transport is available in the test environment; the Cloudflare-specific withSentry/withScope wrappers require a live DSN and worker context to initialise
   withScope: (
     fn: (scope: {
-      setUser: jest.Mock;
-      setTag: jest.Mock;
-      setExtra: jest.Mock;
+      setUser: (...args: unknown[]) => unknown;
+      setTag: (...args: unknown[]) => unknown;
+      setExtra: (...args: unknown[]) => unknown;
       [key: string]: unknown;
     }) => void,
   ) =>
     fn({
       setUser: jest.fn(),
-      setTag: (...args) => mockSetTag(...args),
+      setTag: (...args: unknown[]) => mockSetTag(...args),
       setExtra: jest.fn(),
     }),
-  captureException: (...args) => mockCaptureException(...args),
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
   captureMessage: jest.fn(),
   addBreadcrumb: jest.fn(),
   // withSentry is called at module-level in apps/api/src/index.ts
-  withSentry: (_config, handler) => handler,
+  withSentry: <T>(_config: unknown, handler: T): T => handler,
 }));
 
 import { sessionCompleted } from '../../apps/api/src/inngest/functions/session-completed';
@@ -236,7 +232,7 @@ async function seedScenario(options?: {
     await db.insert(retentionCards).values({
       profileId: profileId,
       topicId,
-      easeFactor: '2.50',
+      easeFactor: 2.5,
       intervalDays: 3,
       repetitions: 3,
       lastReviewedAt: new Date('2026-02-20T10:00:00.000Z'),
@@ -254,7 +250,7 @@ async function seedScenario(options?: {
       sessionId: session!.id,
       verificationDepth: 'recall',
       status: 'passed',
-      masteryScore: '0.80',
+      masteryScore: 0.8,
       qualityRating: 4,
     });
   }
@@ -449,16 +445,16 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
     // Verify the REAL embeddings service called Voyage AI via fetch
     const voyageCalls = getFetchCalls('voyageai');
     expect(voyageCalls).toHaveLength(1);
-    expect(voyageCalls[0].method).toBe('POST');
+    const voyageCall = voyageCalls[0];
+    if (!voyageCall) throw new Error('Expected one captured Voyage AI call');
+    expect(voyageCall.method).toBe('POST');
 
-    const voyageBody = JSON.parse(voyageCalls[0].body!);
+    const voyageBody = JSON.parse(voyageCall.body!);
     expect(voyageBody.model).toBe('voyage-3.5');
     expect(voyageBody.input[0]).toContain('What is photosynthesis?');
 
     // Verify the Authorization header used the right API key
-    expect(voyageCalls[0].headers['Authorization']).toBe(
-      'Bearer voyage-test-key',
-    );
+    expect(voyageCall.headers['Authorization']).toBe('Bearer voyage-test-key');
   });
 
   it('skips topic-bound retention work when the event has no topicId', async () => {

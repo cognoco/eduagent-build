@@ -82,6 +82,8 @@ ENVIRONMENT = "development"
 # --- Payments (RevenueCat) ---
 #   REVENUECAT_WEBHOOK_SECRET RevenueCat webhook authentication secret
 #   REVENUECAT_REST_API_KEY   RevenueCat REST API key for GDPR store teardown
+#   REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION
+#                               Short-lived exact-event JSON; absent by default
 #
 # --- Email (Resend) ---
 #   RESEND_API_KEY            Resend transactional email API key

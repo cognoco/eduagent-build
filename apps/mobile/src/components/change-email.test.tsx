@@ -188,9 +188,16 @@ describe('ChangeEmail', () => {
     });
   });
 
+  // [WI-2768] extractClerkError now maps Clerk's locale-independent `code` to
+  // localized copy rather than surfacing the raw English longMessage.
   it('surfaces duplicate email errors from Clerk', async () => {
     mockCreateEmailAddress.mockRejectedValue({
-      errors: [{ longMessage: 'Email address is already taken.' }],
+      errors: [
+        {
+          code: 'form_identifier_exists',
+          longMessage: 'Email address is already taken.',
+        },
+      ],
     });
     active = renderScreen(<ChangeEmail />);
 
@@ -201,21 +208,26 @@ describe('ChangeEmail', () => {
     fireEvent.press(screen.getByTestId('change-email-send-code'));
 
     await waitFor(() => {
-      screen.getByText('Email address is already taken.');
+      screen.getByText('An account with that email already exists.');
       expect(mockPrepareVerification).not.toHaveBeenCalled();
     });
   });
 
   it('surfaces invalid or expired verification codes', async () => {
     mockAttemptVerification.mockRejectedValue({
-      errors: [{ longMessage: 'Verification code is invalid.' }],
+      errors: [
+        {
+          code: 'form_code_incorrect',
+          longMessage: 'Verification code is invalid.',
+        },
+      ],
     });
     active = renderScreen(<ChangeEmail />);
 
     await submitEmailAndCode();
 
     await waitFor(() => {
-      screen.getByText('Verification code is invalid.');
+      screen.getByText("That code doesn't match. Please try again.");
       expect(mockUpdate).not.toHaveBeenCalled();
       expect(mockSyncEmail).not.toHaveBeenCalled();
     });

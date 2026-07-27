@@ -789,6 +789,91 @@ describe('session routes', () => {
   });
 
   // -------------------------------------------------------------------------
+  // [WI-2627] Policy observation on the notice-bearing session surfaces.
+  //
+  // The summary carries the mentor-notice RECEIPT and the message response can
+  // carry an accepted `mentorNotice`, so both are notice-bearing and must let a
+  // client ORDER what they paint against a rollback observed on another surface.
+  // Each case asserts the guaranteed property — the emitted revision and the
+  // flag reading — not merely that a field is present.
+  // -------------------------------------------------------------------------
+  describe('[WI-2627] mentor-notice policy observation', () => {
+    it('emits the observation on GET /summary, carrying the configured revision', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/summary`,
+        { headers: AUTH_HEADERS },
+        {
+          ...TEST_ENV,
+          MENTOR_NOTICE_ENABLED: 'true',
+          MENTOR_NOTICE_POLICY_REVISION: '9',
+        },
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.mentorNoticePolicy).toEqual({
+        rolloutRevision: 9,
+        rolloutEnabled: true,
+        projectionEpoch: 'notice-policy-v1:r9:on:self:consented',
+      });
+    });
+
+    it('emits the observation on GET /summary with rolloutEnabled=false while the kill switch is thrown', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/summary`,
+        { headers: AUTH_HEADERS },
+        {
+          ...TEST_ENV,
+          MENTOR_NOTICE_ENABLED: 'false',
+          MENTOR_NOTICE_POLICY_REVISION: '9',
+        },
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.mentorNoticePolicy).toEqual({
+        rolloutRevision: 9,
+        rolloutEnabled: false,
+        projectionEpoch: 'notice-policy-v1:r9:off',
+      });
+    });
+
+    it('emits the observation on the non-streaming message response', async () => {
+      (processMessage as jest.Mock).mockResolvedValueOnce({
+        response: 'Here is the next step.',
+        escalationRung: 1,
+        isUnderstandingCheck: false,
+        exchangeCount: 2,
+        expectedResponseMinutes: 3,
+        aiEventId: EVENT_ID,
+        readyToFinish: false,
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/messages`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'go on' }),
+        },
+        {
+          ...TEST_ENV,
+          MENTOR_NOTICE_ENABLED: 'true',
+          MENTOR_NOTICE_POLICY_REVISION: '5',
+        },
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.mentorNoticePolicy).toEqual({
+        rolloutRevision: 5,
+        rolloutEnabled: true,
+        projectionEpoch: 'notice-policy-v1:r5:on:self:consented',
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon
   // R5). generateRecallBridge unconditionally dispatches the LLM.
   // -------------------------------------------------------------------------

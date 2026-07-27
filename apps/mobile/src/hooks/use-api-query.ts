@@ -6,7 +6,7 @@ import {
 import type { ZodType } from 'zod';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
-import { assertOk } from '../lib/assert-ok';
+import { assertOk, type ApiResponse } from '../lib/assert-ok';
 import { parseJson } from '../lib/parse-json';
 
 type RetryOption =
@@ -34,9 +34,28 @@ export function useApiQuery<TResponse, TData = TResponse>(opts: {
   timeoutMs?: number;
   schema: ZodType<TResponse>;
   context?: string;
-  fetch: (signal: AbortSignal) => Promise<Response>;
+  fetch: (signal: AbortSignal) => Promise<ApiResponse>;
   select: (json: TResponse) => TData;
   notFoundFallback?: TData | (() => TData);
+  /**
+   * [WI-2627] Called when the body fails `schema` validation, BEFORE the error
+   * propagates.
+   *
+   * This wrapper parses strictly before running `select`, which is a latent
+   * fail-open for any consumer whose `select` carries a security-relevant
+   * observation: a payload malformed in the very field that governs visibility
+   * never reaches the observer, and TanStack Query goes on retaining and
+   * rendering the last successful — permissive — data. The hook that hit this
+   * first was `useNowOverflow`, whose `select` folds the mentor-notice rollout
+   * observation; the exposure was the RETAINED notice-bearing page, not the
+   * dropped one.
+   *
+   * The seam is deliberately narrow: the error is rethrown UNCHANGED, so the
+   * query lands in exactly the error state it does today, and every caller that
+   * omits this option is unaffected. Use it to record a fail-closed signal, not
+   * to recover — it cannot supply a value.
+   */
+  onParseError?: (error: unknown) => void;
 }): UseQueryResult<TData> {
   const { activeProfile } = useProfile();
 
@@ -50,7 +69,13 @@ export function useApiQuery<TResponse, TData = TResponse>(opts: {
           return resolveFallback(opts.notFoundFallback);
         }
         await assertOk(res);
-        const json = await parseJson(res, opts.schema, opts.context);
+        let json: TResponse;
+        try {
+          json = await parseJson(res, opts.schema, opts.context);
+        } catch (err) {
+          opts.onParseError?.(err);
+          throw err;
+        }
         return opts.select(json);
       } finally {
         cleanup();

@@ -9,7 +9,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useSignIn } from '@clerk/expo/legacy';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Trans, useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
@@ -72,10 +72,14 @@ export default function ForgotPasswordScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
   const timeoutMessage = t('auth.forgotPassword.timeoutMessage');
   const router = useRouter();
+  // [WI-2771] Seeded from sign-in's "Forgot password?" link so the user
+  // doesn't have to retype an email they already entered — mirrors the
+  // sign-up screen's existing email-param pattern.
+  const { email: emailParam } = useLocalSearchParams<{ email?: string }>();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
 
-  const [emailAddress, setEmailAddress] = useState('');
+  const [emailAddress, setEmailAddress] = useState(emailParam ?? '');
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [pendingReset, setPendingReset] = useState(false);
@@ -89,11 +93,19 @@ export default function ForgotPasswordScreen() {
   const [pendingActivationSessionId, setPendingActivationSessionId] = useState<
     string | null
   >(null);
-  const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
+  const {
+    scrollRef,
+    onFieldLayout,
+    onFieldFocus,
+    onScrollViewLayout,
+    onSubmitButtonLayout,
+  } = useKeyboardScroll();
   const {
     scrollRef: resetScrollRef,
     onFieldLayout: onResetFieldLayout,
     onFieldFocus: onResetFieldFocus,
+    onScrollViewLayout: onResetScrollViewLayout,
+    onSubmitButtonLayout: onResetSubmitButtonLayout,
   } = useKeyboardScroll();
 
   const canSubmitEmail = emailAddress.trim() !== '' && !loading;
@@ -283,6 +295,7 @@ export default function ForgotPasswordScreen() {
           }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
+          onLayout={onResetScrollViewLayout}
         >
           {/* Top spacer: see sign-in.tsx BUG-24 comment */}
           <View className="flex-1" style={{ minHeight: 40 }} />
@@ -382,14 +395,16 @@ export default function ForgotPasswordScreen() {
                 </View>
               </View>
 
-              <Button
-                variant="primary"
-                label={t('auth.forgotPassword.resetPasswordButton')}
-                onPress={onResetPress}
-                disabled={!canSubmitReset}
-                loading={loading}
-                testID="reset-password-button"
-              />
+              <View onLayout={onResetSubmitButtonLayout}>
+                <Button
+                  variant="primary"
+                  label={t('auth.forgotPassword.resetPasswordButton')}
+                  onPress={onResetPress}
+                  disabled={!canSubmitReset}
+                  loading={loading}
+                  testID="reset-password-button"
+                />
+              </View>
 
               <View className="flex-row justify-center mt-4">
                 <Button
@@ -448,6 +463,7 @@ export default function ForgotPasswordScreen() {
         }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
+        onLayout={onScrollViewLayout}
       >
         {/* BUG-19: Reduced top spacer — forgot-password has fewer fields than
             sign-in, so flex-1 pushed content excessively to the bottom. */}
@@ -490,14 +506,16 @@ export default function ForgotPasswordScreen() {
           />
         </View>
 
-        <Button
-          variant="primary"
-          label={t('auth.forgotPassword.sendResetCode')}
-          onPress={onSendCodePress}
-          disabled={!canSubmitEmail}
-          loading={loading}
-          testID="send-reset-code-button"
-        />
+        <View onLayout={onSubmitButtonLayout}>
+          <Button
+            variant="primary"
+            label={t('auth.forgotPassword.sendResetCode')}
+            onPress={onSendCodePress}
+            disabled={!canSubmitEmail}
+            loading={loading}
+            testID="send-reset-code-button"
+          />
+        </View>
 
         <View className="flex-row justify-center mt-6">
           <Button

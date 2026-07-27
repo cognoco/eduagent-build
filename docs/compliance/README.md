@@ -3,10 +3,13 @@
 **Status:** Working controller records for the EEA consumer launch. Draft legal
 positions require independent DPO/privacy advice before final approval.
 
-**Launch scope:** Direct-to-consumer, credentialled users aged 13+, limited at
-initial launch to specifically enabled EEA countries whose launch-day verified
-GDPR Article 8 threshold is 13. The UK and all other uncleared jurisdictions
-remain unavailable.
+**Launch scope:** Direct-to-consumer, credentialled users aged 13+. Perimeter =
+screen-based allowlist (ruled 2026-07-26): EEA countries whose launch-day
+verified GDPR Article 8 threshold is 13 (Route 1, per the 07-23 register), plus
+non-EEA jurisdictions individually cleared by a documented admission screen
+(Route 2 — US is the first pass, conditional). UK, Poland/higher-threshold EEA,
+Switzerland, and all unscreened jurisdictions remain unavailable at launch. See
+[`2026-07-26-launch-perimeter-ruling-screen-based-allowlist.md`](2026-07-26-launch-perimeter-ruling-screen-based-allowlist.md).
 
 ## Start here
 
@@ -15,7 +18,9 @@ remain unavailable.
 | [`dpia.md`](dpia.md) | Master Data Protection Impact Assessment. |
 | [`edpb_dpia_filled_2026_v1.md`](edpb_dpia_filled_2026_v1.md) | EDPB-format technical DPIA companion. |
 | [`ropa.md`](ropa.md) | GDPR Article 30 Record of Processing Activities. |
-| [`2026-07-23-13-plus-eea-launch-country-ruling.md`](2026-07-23-13-plus-eea-launch-country-ruling.md) | Launch-country and Article 8 policy ruling. |
+| [`2026-07-26-launch-perimeter-ruling-screen-based-allowlist.md`](2026-07-26-launch-perimeter-ruling-screen-based-allowlist.md) | **Active launch-perimeter ruling** — screen-based allowlist (EEA-13 + screened non-EEA). |
+| [`2026-07-26-us-launch-screen-record.md`](2026-07-26-us-launch-screen-record.md) | First Route-2 admission screen: United States (conditional pass). |
+| [`2026-07-23-13-plus-eea-launch-country-ruling.md`](2026-07-23-13-plus-eea-launch-country-ruling.md) | EEA country register + Article 8 analysis (incorporated as Route 1 of the 07-26 ruling). |
 | [`art9-special-category-position.md`](art9-special-category-position.md) | Current proposed treatment of incidental special-category data. |
 | [`breach-response-plan.md`](breach-response-plan.md) | Personal-data breach procedure. |
 | [`DPO exchanges/`](DPO%20exchanges/) | Stephan’s findings, ZWIZZLY AS’s response, decision annex, and separate AI Act request. |
@@ -32,6 +37,8 @@ remain unavailable.
 | [`privacy-policy.html`](privacy-policy.html) | Adult-facing privacy notice draft. |
 | [`child-readable-privacy-summary-draft.md`](child-readable-privacy-summary-draft.md) | Child-readable transparency draft. |
 | [`2026-07-04-launch-compliance-closure-check-early-pass.md`](2026-07-04-launch-compliance-closure-check-early-pass.md) | Historical engineering evidence still cited by the DPIA; re-verify at the final launch gate. |
+| [`2026-07-06-school-institutional-ai-act-tripwire.md`](2026-07-06-school-institutional-ai-act-tripwire.md) | Product/legal gate for school, LMS/SIS, formal-assessment, proctoring, and institutional use, plus the blocked-copy list. Decides no classification. |
+| [`2026-07-06-eu-ai-act-technical-file-qms-skeleton.md`](2026-07-06-eu-ai-act-technical-file-qms-skeleton.md) | High-risk-readiness technical-file and QMS index. A gap map, not evidence of compliance. |
 
 ## Directory structure
 

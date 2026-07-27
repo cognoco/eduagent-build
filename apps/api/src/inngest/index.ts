@@ -77,7 +77,6 @@ import { subjectPrewarmCurriculum } from './functions/subject-prewarm-curriculum
 import { subjectRetryCurriculum } from './functions/subject-retry-curriculum';
 import { notificationSuppressedObserve } from './functions/notification-suppressed-observe';
 import { inngestFunctionFailedObserve } from './functions/inngest-function-failed-observe';
-import { syntheticFleetFailureProbe } from './functions/synthetic-fleet-failure-probe';
 import {
   learnerRecapRegenerate,
   sessionSummaryCreate,
@@ -130,6 +129,7 @@ import {
   blockedSafetyDigestDelivery,
   blockedSafetyDigestIngest,
 } from './functions/blocked-safety-digest';
+import { pastDueLaunchHealth } from './functions/past-due-launch-health';
 
 export {
   inngest,
@@ -193,7 +193,6 @@ export {
   subjectRetryCurriculum,
   notificationSuppressedObserve,
   inngestFunctionFailedObserve,
-  syntheticFleetFailureProbe,
   sessionSummaryCreate,
   sessionSummaryRegenerate,
   learnerRecapRegenerate,
@@ -230,6 +229,7 @@ export {
   graduationNarration,
   blockedSafetyDigestIngest,
   blockedSafetyDigestDelivery,
+  pastDueLaunchHealth,
 };
 
 // All Inngest functions to register with the serve handler
@@ -295,7 +295,6 @@ export const functions = [
   subjectRetryCurriculum,
   notificationSuppressedObserve,
   inngestFunctionFailedObserve,
-  syntheticFleetFailureProbe,
   sessionSummaryCreate,
   sessionSummaryRegenerate,
   learnerRecapRegenerate,
@@ -332,4 +331,5 @@ export const functions = [
   graduationNarration,
   blockedSafetyDigestIngest,
   blockedSafetyDigestDelivery,
+  pastDueLaunchHealth,
 ];

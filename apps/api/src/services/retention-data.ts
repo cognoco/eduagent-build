@@ -1973,9 +1973,20 @@ export async function updateRetentionFromSession(
     : await ensureRetentionCard(db, profileId, topicId);
   const card = ensured.card;
 
-  // D-01: skip double-counting guard for newly created cards
+  // A relearn reset also clears lastReviewedAt, but preserves the timestamp
+  // written by the card's real review history. Only a DB-seeded virgin row
+  // has both defaultNow() columns still equal.
+  const isVirginExistingCard =
+    !ensured.isNew &&
+    card.lastReviewedAt === null &&
+    card.createdAt.getTime() === card.updatedAt.getTime();
+
+  // D-01: skip double-counting guard for newly created or virgin cards.
+  // A virgin existing row gets its updatedAt from PostgreSQL defaultNow(), so
+  // database/app clock skew must not prevent the repetitionsZero CAS below.
   if (
     !ensured.isNew &&
+    !isVirginExistingCard &&
     sessionTimestamp &&
     card.updatedAt &&
     card.updatedAt.getTime() >= new Date(sessionTimestamp).getTime()
@@ -2020,30 +2031,16 @@ export async function updateRetentionFromSession(
     // each other to overwrite stale reads. If a non-JS writer (raw SQL,
     // background job in another language, etc.) is ever introduced, revisit
     // this comparison rather than re-widening it blindly.
-    // [WI-1445] A never-reviewed EXISTING card is the one exception —
-    // discriminated by `lastReviewedAt === null`, NOT `repetitions === 0`.
+    // [WI-1445/WI-2531] A virgin EXISTING card is the one exception.
     // `repetitions` alone is ambiguous: SM-2 resets it to 0 on every FAILED
-    // review too, so a card with real prior history (failureCount > 0,
-    // xpStatus: 'decayed') can also read repetitions === 0 while its
-    // `updatedAt` was set by a JS writer on that very reset (every SM-2
-    // write sets `lastReviewedAt` alongside `updatedAt`) — for that card the
-    // strict updatedAt-equality CAS above is exactly correct and must not be
-    // downgraded, or two concurrent writers racing on it could both match
-    // and the loser's stale write would silently clobber ease/interval.
-    // `lastReviewedAt === null` means the row has NEVER been touched by any
-    // JS writer (only `insertRetentionCardIfAbsent`'s SQL defaultNow()) — for
-    // that case ONLY, the timestamp can carry sub-millisecond precision a JS
-    // Date read-back truncates, so the strict equality would silently match
-    // 0 rows. Guard on `repetitionsZero` instead (integer equality, immune to
-    // timestamp precision) — same established primitive
-    // topic-probe-extract.ts's seedRetentionCard uses for this exact
-    // never-reviewed-card scenario. Both branches still detect a genuine
-    // concurrent writer: if another session already advanced repetitions (or
-    // updatedAt) between our read and this write, the WHERE clause fails to
-    // match and `updateResult.updated` is false.
+    // review, while a relearn reset also clears `lastReviewedAt`. A virgin row
+    // is therefore identified by null lastReviewedAt plus unchanged, equal DB
+    // defaults for createdAt/updatedAt. Its strict timestamp parameter CAS can
+    // lose PostgreSQL sub-millisecond precision, so use the repetitionsZero
+    // guard; historical cards retain the exact updatedAt lock.
     guard: ensured.isNew
       ? { kind: 'none' }
-      : card.lastReviewedAt === null
+      : isVirginExistingCard
         ? { kind: 'repetitionsZero' }
         : { kind: 'optimisticLock', updatedAt: card.updatedAt },
     updatedAt: new Date(),

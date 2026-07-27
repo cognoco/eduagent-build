@@ -92,7 +92,8 @@
     "tryAgainAction": "Intentar de nuevo",
     "dismiss": "Descartar",
     "pleaseTryAgain": "Inténtalo de nuevo.",
-    "mentorImageAlt": "Tu mentor"
+    "mentorImageAlt": "Tu mentor",
+    "backTo": "Volver a {{destination}}"
   },
   "quota": {
     "parent": {
@@ -233,7 +234,8 @@
       "passwordPlaceholder": "Ingresa tu contraseña",
       "forgotPassword": "¿Olvidaste tu contraseña?",
       "signInButton": "Iniciar sesión",
-      "sendVerificationCode": "Enviar código de verificación"
+      "sendVerificationCode": "Enviar código de verificación",
+      "verificationStartFailed": "No pudimos iniciar la verificación. Intenta iniciar sesión de nuevo."
     },
     "signUp": {
       "title": "Crear cuenta",
@@ -290,6 +292,27 @@
       "backToSignIn": "Volver a inicio de sesión",
       "emailPlaceholder": "tu@ejemplo.com",
       "sendResetCode": "Enviar código"
+    },
+    "errors": {
+      "generic": "Algo no funcionó. Inténtalo de nuevo.",
+      "form_identifier_not_found": "No encontramos una cuenta con ese correo electrónico.",
+      "form_password_incorrect": "Esa contraseña no parece correcta. Inténtalo de nuevo.",
+      "form_password_or_identifier_incorrect": "Ese correo o contraseña no parece correcto. Inténtalo de nuevo.",
+      "form_password_pwned": "Esta contraseña ha aparecido en una filtración de datos. Elige una contraseña diferente.",
+      "form_password_compromised": "No es seguro usar esta contraseña. Elige una contraseña diferente.",
+      "form_password_not_strong_enough": "Esta contraseña no es lo suficientemente segura. Añade más variedad.",
+      "form_password_length_too_short": "La contraseña es muy corta. Usa al menos 8 caracteres.",
+      "form_password_length_too_long": "La contraseña es muy larga. Usa una más corta.",
+      "form_password_no_uppercase": "La contraseña necesita al menos una letra mayúscula.",
+      "form_password_no_lowercase": "La contraseña necesita al menos una letra minúscula.",
+      "form_password_no_number": "La contraseña necesita al menos un número.",
+      "form_password_no_special_char": "La contraseña necesita al menos un carácter especial.",
+      "form_password_validation_failed": "Esa contraseña no cumple los requisitos.",
+      "form_code_incorrect": "Ese código no coincide. Inténtalo de nuevo.",
+      "form_identifier_exists": "Ya existe una cuenta con ese correo electrónico.",
+      "form_param_format_invalid": "No parece una dirección de correo electrónico válida.",
+      "captcha_invalid": "No pudimos verificar que eres humano. Inténtalo de nuevo.",
+      "signup_rate_limit_exceeded": "Demasiados intentos de registro. Inténtalo de nuevo más tarde."
     }
   },
   "guards": {
@@ -4545,7 +4568,6 @@
       "activeMessage": "Puedes revisar este acuerdo aquí en cualquier momento.",
       "revoke": "Dejar de compartir",
       "revoking": "Finalizando uso compartido...",
-      "revoked": "El uso compartido está finalizando. El mentor verá un aviso.",
       "revokeErrorTitle": "No se pudo dejar de compartir",
       "missingActor": "No pudimos identificar a la persona activa.",
       "relationLabel": "Relación",

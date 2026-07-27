@@ -38,7 +38,6 @@ const EMBEDDING_A = axis(0);
 const EMBEDDING_B = axis(0); // identical → cosine distance 0 (best case)
 
 // A far vector so we can control which neighbour is within threshold
-const EMBEDDING_FAR = axis(1);
 
 function llmDecision(
   decision: DedupLlmResult & { ok: true },
