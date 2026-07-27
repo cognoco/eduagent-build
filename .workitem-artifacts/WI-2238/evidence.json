@@ -1,0 +1,40 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Six named browser cases cover exact Subjects status/search/no-results, Subject Hub ownership, World History resume, Biology due review, recovery, preparation, and ancestor return. Native browse/resume and due-review flows bind the corresponding seeded owners and Android Back path.",
+      "pointer": "apps/mobile/e2e-web/flows/v2/v2-subjects.spec.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "The browser and native zero-subject journeys reuse the existing creation path, create exact Photosynthesis, exit its first session, restore its V2 Subjects row, and exclude Home or legacy Library fallback.",
+      "pointer": "apps/mobile/e2e/flows/v2/v2-subject-create-round-trip.yaml"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Browser cases bind exact learner, subject, topic, and session owners. The native helper binds active profile name and ID, and the provenance contracts preserve Topic, Session, Subject Hub, and Subjects ancestry while rejecting crafted or mismatched tokens.",
+      "pointer": "apps/mobile/e2e/flows/_setup/assert-v2-active-profile-and-return.yaml"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "The browser suite covers empty Subjects, search miss and clear, API error and Retry, and exact World History curriculum-preparing ownership with stable selectors. Inactive hub variants remain management/back-only.",
+      "pointer": "apps/mobile/e2e-web/flows/v2/v2-subjects.spec.ts"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "The fixtures compose the established multi-subject, learning-active, retention-due, and onboarding-no-subject seed scenarios; product subject creation remains owned by WI-2215.",
+      "pointer": "apps/mobile/e2e-web/flows/v2/v2-subjects-fixtures.ts"
+    },
+    {
+      "acRef": "AC-6",
+      "description": "The explicit V2 manifest registers all three Maestro flow/scenario pairs. The structural guard rejects optional assertions, wrong-owner substitutions, and removed path properties; the final validator passed all seven contracts and the Playwright catalog listed 22 V2 tests.",
+      "pointer": "scripts/e2e-ci-injection-and-smoke-gate.test.ts"
+    },
+    {
+      "acRef": "AC-7",
+      "description": "Final current-main local evidence is 15/15 affected suites and 394/394 tests; WI-2238 guard 5/5; Maestro 7/7; TypeScript green; V2 catalog 22 tests; canonical mobile 515/515 suites and 6806/6806 tests in 331.19 seconds. Exact-head hosted browser, release-APK, CI, and review receipts are required before landing.",
+      "pointer": ".workitem-artifacts/WI-2238/verification.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13"
+}
