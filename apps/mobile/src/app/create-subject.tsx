@@ -36,6 +36,7 @@ import {
   SUBJECTS_HREF,
   SUBJECTS_RETURN_TO,
 } from '../lib/navigation';
+import { FEATURE_FLAGS } from '../lib/feature-flags';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
 import type { LearningSession, SubjectResolveResult } from '@eduagent/schemas';
@@ -633,7 +634,13 @@ function CreateSubjectScreenAuthenticated() {
       return;
     }
 
-    router.replace(homeHrefForReturnTo(returnTo) as Href);
+    router.replace(
+      homeHrefForReturnTo(
+        returnTo,
+        undefined,
+        FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+      ) as Href,
+    );
   }, [returnTo, router]);
 
   const handleSubjectLimitPress = useCallback(() => {

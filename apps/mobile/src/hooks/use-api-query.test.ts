@@ -216,4 +216,69 @@ describe('useApiQuery', () => {
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error).toBeInstanceOf(ApiResponseShapeError);
   });
+
+  // [WI-2627] The parse runs BEFORE `select`, so a consumer whose `select`
+  // carries a security-relevant observation never sees a payload malformed in
+  // the very field that governs visibility. `onParseError` is the seam that
+  // lets such a consumer record a fail-closed signal — without changing the
+  // error the query lands in.
+  describe('onParseError', () => {
+    it('fires on a schema mismatch and still propagates the error unchanged', async () => {
+      const fetchFn = jest.fn().mockResolvedValue(
+        new Response(JSON.stringify({ items: ['not-a-number'] }), {
+          status: 200,
+        }),
+      );
+      const onParseError = jest.fn();
+      const select = jest.fn((json: { items: number[] }) => json.items);
+
+      const { result } = renderHook(
+        () =>
+          useApiQuery<{ items: number[] }, number[]>({
+            queryKey: ['probe', 'on-parse-error'],
+            schema: itemsResponseSchema,
+            fetch: (signal) => fetchFn(signal),
+            select,
+            onParseError,
+          }),
+        { wrapper: createWrapper() },
+      );
+
+      await waitFor(() => expect(result.current.isError).toBe(true));
+      expect(onParseError).toHaveBeenCalledTimes(1);
+      expect(onParseError.mock.calls[0]?.[0]).toBeInstanceOf(
+        ApiResponseShapeError,
+      );
+      // The hook is NOT a recovery seam: the error still reaches the query
+      // untouched, and `select` never runs on an unvalidated body.
+      expect(result.current.error).toBeInstanceOf(ApiResponseShapeError);
+      expect(result.current.error).toBe(onParseError.mock.calls[0]?.[0]);
+      expect(select).not.toHaveBeenCalled();
+    });
+
+    it('is not called on a successful parse', async () => {
+      const fetchFn = jest
+        .fn()
+        .mockResolvedValue(
+          new Response(JSON.stringify({ items: [1, 2] }), { status: 200 }),
+        );
+      const onParseError = jest.fn();
+
+      const { result } = renderHook(
+        () =>
+          useApiQuery<{ items: number[] }, number>({
+            queryKey: ['probe', 'on-parse-error-clean'],
+            schema: itemsResponseSchema,
+            fetch: (signal) => fetchFn(signal),
+            select: (json) => json.items.length,
+            onParseError,
+          }),
+        { wrapper: createWrapper() },
+      );
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data).toBe(2);
+      expect(onParseError).not.toHaveBeenCalled();
+    });
+  });
 });

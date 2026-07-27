@@ -355,6 +355,39 @@ describe('probes quality heuristics — HW02 (too-little-text, solved-from-memor
     );
   });
 
+  it('accepts a reply that says question 4 is cut off or unclear', async () => {
+    const issues = await evaluate('12yo-dinosaurs', 'HW02', {
+      reply:
+        'Question 4 is cut off and unclear in this photo. Please send the missing part before we continue.',
+      private_sources: { relied_on: [], insufficient: true },
+    });
+    expect(issues.filter((i) => i.code === 'HW02.solved-from-memory')).toEqual(
+      [],
+    );
+  });
+
+  it('accepts a clarifying reply about blank worksheet cells', async () => {
+    const issues = await evaluate('12yo-dinosaurs', 'HW02', {
+      reply:
+        'Some cells are blank or missing on the worksheet, so I need the rest of question 4 before I can help.',
+      private_sources: { relied_on: [], insufficient: true },
+    });
+    expect(issues.filter((i) => i.code === 'HW02.solved-from-memory')).toEqual(
+      [],
+    );
+  });
+
+  it('accepts a clarification that describes worksheet cells as layout blocks', async () => {
+    const issues = await evaluate('12yo-dinosaurs', 'HW02', {
+      reply:
+        'The worksheet cells are the basic blocks of its layout, but their labels are missing, so I need a clearer photo.',
+      private_sources: { relied_on: [], insufficient: true },
+    });
+    expect(issues.filter((i) => i.code === 'HW02.solved-from-memory')).toEqual(
+      [],
+    );
+  });
+
   it('still flags a reply that answers the cut-off question from memory', async () => {
     const issues = await evaluate('12yo-dinosaurs', 'HW02', {
       reply:
@@ -362,6 +395,30 @@ describe('probes quality heuristics — HW02 (too-little-text, solved-from-memor
       private_sources: { relied_on: [], insufficient: true },
     });
     expect(issues.some((i) => i.code === 'HW02.solved-from-memory')).toBe(true);
+  });
+
+  it('still flags a declarative cell-biology answer without other anchor terms', async () => {
+    const issues = await evaluate('12yo-dinosaurs', 'HW02', {
+      reply: 'Cells are the building blocks of every living organism.',
+      private_sources: { relied_on: [], insufficient: true },
+    });
+    expect(issues.some((i) => i.code === 'HW02.solved-from-memory')).toBe(true);
+  });
+
+  it('still flags an unquantified living-organisms answer', async () => {
+    const issues = await evaluate('12yo-dinosaurs', 'HW02', {
+      reply: 'Cells are the building blocks of living organisms.',
+      private_sources: { relied_on: [], insufficient: true },
+    });
+    expect(issues.some((i) => i.code === 'HW02.solved-from-memory')).toBe(true);
+  });
+
+  it('still requires an insufficient-source signal when the model answers', async () => {
+    const issues = await evaluate('12yo-dinosaurs', 'HW02', {
+      reply: 'Cells are the building blocks of every living organism.',
+      private_sources: { relied_on: [], insufficient: false },
+    });
+    expect(issues.some((i) => i.code === 'HW02.too-little-text')).toBe(true);
   });
 });
 

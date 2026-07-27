@@ -9,6 +9,7 @@ import {
 import { createHookWrapper } from '../test-utils/app-hook-test-utils';
 import { NetworkError, setActiveProfileId } from '../lib/api-client';
 import { buildNowFeedCacheKey, readCachedNowFeed } from '../lib/now-feed-cache';
+import { resetMentorNoticePolicyStoreForTests } from '../lib/mentor-notice-policy';
 
 import {
   useMentorNoticeActions,
@@ -931,5 +932,612 @@ describe('useMentorNoticeActions', () => {
     expect(rendered.result.current.defer.isSuccess).toBe(false);
 
     queryClient.clear();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2627] The ORDERED rollout observation on the Now-feed surfaces.
+//
+// Distinct from the WI-2504 epoch coverage above and deliberately not a
+// replacement for it: the epoch is the opaque cache key (equality only), this is
+// the order. The cases that only the order can express are the ones here — a
+// payload arriving out of order, and a re-enable that must require a strictly
+// higher revision.
+// ---------------------------------------------------------------------------
+describe('[WI-2627] orderable mentor-notice rollout observation', () => {
+  const ACTOR = 'wi2498-test-actor';
+  const PROFILE = 'test-profile-id';
+  const POLICY_KEY = `mentor-notice-policy-state::${ACTOR}::${PROFILE}`;
+
+  let mockFetch: jest.Mock;
+  let originalFetch: typeof globalThis.fetch;
+
+  function policy(revision: number, enabled: boolean) {
+    return {
+      rolloutRevision: revision,
+      rolloutEnabled: enabled,
+      projectionEpoch: `notice-policy-v1:r${revision}:${
+        enabled ? 'on' : 'off'
+      }:self:consented`,
+    };
+  }
+
+  function jsonResponse(body: unknown): Response {
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const NOTICE_CARD = {
+    kind: 'mentor_notice',
+    templateKey: 'now.mentor_notice.default',
+    params: {
+      noticeId: '11111111-1111-4111-8111-111111111111',
+      concept: 'sign flip',
+    },
+    deepLink: { route: 'notice.recheck', params: {}, chain: [] },
+    scope: 'self',
+  };
+
+  beforeEach(async () => {
+    originalFetch = globalThis.fetch;
+    mockFetch = jest.fn();
+    globalThis.fetch = mockFetch as unknown as typeof globalThis.fetch;
+    setActiveProfileId(PROFILE);
+    resetMentorNoticePolicyStoreForTests();
+    await AsyncStorage.clear();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    setActiveProfileId(undefined);
+  });
+
+  describe('GET /now', () => {
+    it('folds the observation it arrives with and paints the cards at that revision', async () => {
+      mockFetch.mockResolvedValue(
+        jsonResponse({
+          scope: 'self',
+          cards: [NOTICE_CARD],
+          overflowCount: 0,
+          generatedAt: FRESH_CACHE_TIMESTAMP,
+          mentorNoticePolicy: policy(7, true),
+        }),
+      );
+
+      const { result } = renderHook(() => useNowFeed(), {
+        wrapper: createHookWrapper().wrapper,
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      // Positive control for the suppression tests below.
+      expect(result.current.data?.cards.map((c) => c.kind)).toEqual([
+        'mentor_notice',
+      ]);
+      await waitFor(async () =>
+        expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
+          '{"revision":7,"enabled":true}',
+        ),
+      );
+    });
+
+    // The case the epoch cannot express. The epoch is comparable for equality
+    // only, so this response's cards would render on the strength of arriving
+    // last.
+    it('does not paint the cards of a response that PREDATES the rollback we know about', async () => {
+      await AsyncStorage.setItem(POLICY_KEY, '{"revision":7,"enabled":false}');
+      mockFetch.mockResolvedValue(
+        jsonResponse({
+          scope: 'self',
+          cards: [NOTICE_CARD],
+          overflowCount: 0,
+          generatedAt: FRESH_CACHE_TIMESTAMP,
+          mentorNoticePolicy: policy(6, true),
+        }),
+      );
+
+      const { result } = renderHook(() => useNowFeed(), {
+        wrapper: createHookWrapper().wrapper,
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data?.cards).toEqual([]);
+      // The fold refused it too: the stored revision did not regress to 6.
+      await waitFor(async () =>
+        expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
+          '{"revision":7,"enabled":false}',
+        ),
+      );
+    });
+
+    it('does not persist the cards of a suppressed response, so the next cold start cannot read them back', async () => {
+      await AsyncStorage.setItem(POLICY_KEY, '{"revision":7,"enabled":false}');
+      // `mockImplementation`, not `mockResolvedValue`: this response carries an
+      // epoch, which re-keys the query and fires a second fetch — and a Response
+      // body is single-use, so a shared instance would fail the refetch.
+      mockFetch.mockImplementation(() =>
+        Promise.resolve(
+          jsonResponse({
+            scope: 'self',
+            cards: [NOTICE_CARD],
+            overflowCount: 0,
+            generatedAt: FRESH_CACHE_TIMESTAMP,
+            mentorNoticePolicyEpoch: 'notice-policy-v1:r7:off',
+            mentorNoticePolicy: policy(7, false),
+          }),
+        ),
+      );
+
+      const { result } = renderHook(() => useNowFeed(), {
+        wrapper: createHookWrapper().wrapper,
+      });
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+      await waitFor(async () => {
+        const persisted = await readCachedNowFeed(
+          {
+            actorId: ACTOR,
+            profileId: PROFILE,
+            policyEpoch: 'notice-policy-v1:r7:off',
+          },
+          Date.parse('2999-06-14T08:00:00.000Z'),
+        );
+        expect(persisted?.cards ?? []).toEqual([]);
+      });
+    });
+
+    it('re-enables only on a STRICTLY HIGHER revision', async () => {
+      await AsyncStorage.setItem(POLICY_KEY, '{"revision":7,"enabled":false}');
+      // Same revision, enabled — refused, so the cards stay suppressed.
+      mockFetch.mockResolvedValue(
+        jsonResponse({
+          scope: 'self',
+          cards: [NOTICE_CARD],
+          overflowCount: 0,
+          generatedAt: FRESH_CACHE_TIMESTAMP,
+          mentorNoticePolicy: policy(7, true),
+        }),
+      );
+
+      const sameRevision = renderHook(() => useNowFeed(), {
+        wrapper: createHookWrapper().wrapper,
+      });
+      await waitFor(() =>
+        expect(sameRevision.result.current.isSuccess).toBe(true),
+      );
+      expect(sameRevision.result.current.data?.cards).toEqual([]);
+      sameRevision.unmount();
+
+      // A deploy bumps the revision. That, and only that, brings them back.
+      resetMentorNoticePolicyStoreForTests();
+      mockFetch.mockResolvedValue(
+        jsonResponse({
+          scope: 'self',
+          cards: [NOTICE_CARD],
+          overflowCount: 0,
+          generatedAt: FRESH_CACHE_TIMESTAMP,
+          mentorNoticePolicy: policy(8, true),
+        }),
+      );
+
+      const higher = renderHook(() => useNowFeed(), {
+        wrapper: createHookWrapper().wrapper,
+      });
+      await waitFor(() => expect(higher.result.current.isSuccess).toBe(true));
+      await waitFor(() =>
+        expect(higher.result.current.data?.cards.map((c) => c.kind)).toEqual([
+          'mentor_notice',
+        ]),
+      );
+    });
+  });
+
+  describe('GET /now/overflow — the deep-link surface', () => {
+    const OVERFLOW_ITEM = {
+      kind: 'mentor_notice',
+      templateKey: 'now.mentor_notice.default',
+      params: {
+        noticeId: '11111111-1111-4111-8111-111111111111',
+        concept: 'sign flip',
+      },
+      deepLink: { route: 'notice.recheck', params: {}, chain: [] },
+      scope: 'self',
+    };
+
+    it('serves its notice-bearing items at the observed revision', async () => {
+      mockFetch.mockResolvedValue(
+        jsonResponse({
+          scope: 'self',
+          items: [OVERFLOW_ITEM],
+          mentorNoticePolicy: policy(7, true),
+        }),
+      );
+
+      const { result } = renderHook(() => useNowOverflow(true), {
+        wrapper: createHookWrapper().wrapper,
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      await waitFor(() =>
+        expect(result.current.data?.items.map((i) => i.kind)).toEqual([
+          'mentor_notice',
+        ]),
+      );
+    });
+
+    it('drops its notice-bearing items — and their notice deep links — once the rollout is off', async () => {
+      await AsyncStorage.setItem(POLICY_KEY, '{"revision":7,"enabled":false}');
+      mockFetch.mockResolvedValue(
+        jsonResponse({
+          scope: 'self',
+          items: [OVERFLOW_ITEM],
+          mentorNoticePolicy: policy(7, false),
+        }),
+      );
+
+      const { result } = renderHook(() => useNowOverflow(true), {
+        wrapper: createHookWrapper().wrapper,
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      await waitFor(() => expect(result.current.data?.items).toEqual([]));
+    });
+  });
+
+  describe('recheck / defer mutations', () => {
+    it('folds the observation a successful recheck echoes', async () => {
+      mockFetch.mockResolvedValue(
+        jsonResponse({
+          sessionId: '660e8400-e29b-41d4-a716-446655440000',
+          mentorNoticePolicy: policy(9, false),
+        }),
+      );
+
+      const { result } = renderHook(() => useMentorNoticeActions(), {
+        wrapper: createHookWrapper().wrapper,
+      });
+
+      await act(async () => {
+        await result.current.recheck.mutateAsync(
+          '11111111-1111-4111-8111-111111111111',
+        );
+      });
+
+      await waitFor(async () =>
+        expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
+          '{"revision":9,"enabled":false}',
+        ),
+      );
+    });
+
+    it('folds the observation a successful defer echoes', async () => {
+      mockFetch.mockResolvedValue(
+        jsonResponse({
+          noticeId: '11111111-1111-4111-8111-111111111111',
+          deferredAt: '2026-07-26T08:00:00.000Z',
+          mentorNoticePolicy: policy(4, true),
+        }),
+      );
+
+      const { result } = renderHook(() => useMentorNoticeActions(), {
+        wrapper: createHookWrapper().wrapper,
+      });
+
+      await act(async () => {
+        await result.current.defer.mutateAsync(
+          '11111111-1111-4111-8111-111111111111',
+        );
+      });
+
+      await waitFor(async () =>
+        expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
+          '{"revision":4,"enabled":true}',
+        ),
+      );
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2627 rework] Two routes that never reached the reducer at all.
+//
+// Both defects live ABOVE the reducer, so a reducer-level test proves nothing
+// about either: one is a response that fails schema validation before the fold
+// runs, the other is a fold that runs a render too late.
+// ---------------------------------------------------------------------------
+describe('[WI-2627] the fold must be reachable, and must precede publication', () => {
+  const ACTOR = 'wi2498-test-actor';
+  const PROFILE = 'test-profile-id';
+  const POLICY_KEY = `mentor-notice-policy-state::${ACTOR}::${PROFILE}`;
+
+  let mockFetch: jest.Mock;
+  let originalFetch: typeof globalThis.fetch;
+
+  function policy(revision: number, enabled: boolean) {
+    return {
+      rolloutRevision: revision,
+      rolloutEnabled: enabled,
+      projectionEpoch: `notice-policy-v1:r${revision}:${
+        enabled ? 'on' : 'off'
+      }:self:consented`,
+    };
+  }
+
+  function jsonResponse(body: unknown): Response {
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const NOTICE_CARD = {
+    kind: 'mentor_notice',
+    templateKey: 'now.mentor_notice.default',
+    params: {
+      noticeId: '11111111-1111-4111-8111-111111111111',
+      concept: 'sign flip',
+    },
+    deepLink: { route: 'notice.recheck', params: {}, chain: [] },
+    scope: 'self',
+  };
+
+  beforeEach(async () => {
+    originalFetch = globalThis.fetch;
+    mockFetch = jest.fn();
+    globalThis.fetch = mockFetch as unknown as typeof globalThis.fetch;
+    setActiveProfileId(PROFILE);
+    resetMentorNoticePolicyStoreForTests();
+    await AsyncStorage.clear();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    setActiveProfileId(undefined);
+  });
+
+  // The defect is NOT that the reducer mishandles a malformed observation — it
+  // handles it correctly. The defect is that the reducer is never REACHED: a
+  // malformed policy field fails the whole `nowResponseSchema`, `parseJson`
+  // throws, and TanStack Query retains the prior notice-bearing data with policy
+  // still enabled. So this test drives a real parse FAILURE and asserts on the
+  // retained payload.
+  it('goes fail-closed when the response fails to parse, and suppresses the RETAINED cards', async () => {
+    // First fetch: a good notice-bearing feed at revision 7, rollout on.
+    mockFetch.mockImplementationOnce(() =>
+      Promise.resolve(
+        jsonResponse({
+          scope: 'self',
+          cards: [NOTICE_CARD],
+          overflowCount: 0,
+          generatedAt: FRESH_CACHE_TIMESTAMP,
+          mentorNoticePolicy: policy(7, true),
+        }),
+      ),
+    );
+
+    const { result } = renderHook(() => useNowFeed(), {
+      wrapper: createHookWrapper().wrapper,
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    // Precondition: the cards really are rendering before the bad response.
+    expect(result.current.data?.cards.map((c) => c.kind)).toEqual([
+      'mentor_notice',
+    ]);
+    await waitFor(async () =>
+      expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
+        '{"revision":7,"enabled":true}',
+      ),
+    );
+
+    // Refetch returns a MALFORMED observation — negative revision. The whole
+    // response schema rejects it, so no observation value ever reaches `observe`.
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(
+        jsonResponse({
+          scope: 'self',
+          cards: [NOTICE_CARD],
+          overflowCount: 0,
+          generatedAt: FRESH_CACHE_TIMESTAMP,
+          mentorNoticePolicy: {
+            rolloutRevision: -1,
+            rolloutEnabled: true,
+            projectionEpoch: 'notice-policy-v1:bad',
+          },
+        }),
+      ),
+    );
+
+    await act(async () => {
+      await result.current.refetch();
+    });
+
+    // The store took the fail-closed signal even though the reducer got no
+    // observation value: disabled AT the held revision, never dropped to 0.
+    await waitFor(async () =>
+      expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
+        '{"revision":7,"enabled":false}',
+      ),
+    );
+    // And the retained (still notice-bearing) payload is suppressed rather than
+    // rendering indefinitely.
+    await waitFor(() => expect(result.current.data?.cards).toEqual([]));
+  });
+
+  // [WI-2627 rework, finding 1] The same defect on the OVERFLOW surface, which
+  // the first pass left fail-OPEN.
+  //
+  // `useApiQuery` parsed inside its own query fn, BEFORE running the `select`
+  // callback that held the fold — so a malformed policy threw at the wrapper and
+  // the fold was unreachable. TanStack Query then retained the prior
+  // notice-bearing page and kept handing it to the surface with policy still
+  // enabled.
+  //
+  // The assertion is deliberately about what the surface EXPOSES while the query
+  // sits in an error state holding retained data — not about the schema, and not
+  // about whether `observeMalformed` was called. Both of those pass on code that
+  // still renders the retained notice.
+  it('goes fail-closed when the OVERFLOW response fails to parse, and suppresses the RETAINED notice item', async () => {
+    const PLAIN_ITEM = {
+      kind: 'retention_due',
+      templateKey: 'now.retention_due.default',
+      params: { subjectName: 'Physics' },
+      deepLink: { route: 'retention.review', params: {}, chain: [] },
+      scope: 'self',
+    };
+    const OVERFLOW_NOTICE_ITEM = {
+      kind: 'mentor_notice',
+      templateKey: 'now.mentor_notice.default',
+      params: {
+        noticeId: '11111111-1111-4111-8111-111111111111',
+        concept: 'sign flip',
+      },
+      deepLink: { route: 'notice.recheck', params: {}, chain: [] },
+      scope: 'self',
+    };
+
+    // First fetch: a good notice-bearing overflow page at revision 7, rollout on.
+    mockFetch.mockImplementationOnce(() =>
+      Promise.resolve(
+        jsonResponse({
+          scope: 'self',
+          items: [OVERFLOW_NOTICE_ITEM, PLAIN_ITEM],
+          mentorNoticePolicy: policy(7, true),
+        }),
+      ),
+    );
+
+    const { result } = renderHook(() => useNowOverflow(true), {
+      wrapper: createHookWrapper().wrapper,
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    // NON-TRIVIALITY CONTROL: at a revision the store accepts with rollout ON,
+    // the notice item really does render. An implementation that suppressed
+    // unconditionally would fail here, so the suppression assertion below is not
+    // vacuously satisfiable.
+    expect(result.current.data?.items.map((item) => item.kind)).toEqual([
+      'mentor_notice',
+      'retention_due',
+    ]);
+    await waitFor(async () =>
+      expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
+        '{"revision":7,"enabled":true}',
+      ),
+    );
+
+    // Refetch returns a MALFORMED observation — negative revision, which the
+    // whole `nowOverflowResponseSchema` rejects, so no observation value ever
+    // reaches `observe`.
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(
+        jsonResponse({
+          scope: 'self',
+          items: [OVERFLOW_NOTICE_ITEM, PLAIN_ITEM],
+          mentorNoticePolicy: {
+            rolloutRevision: -1,
+            rolloutEnabled: true,
+            projectionEpoch: 'notice-policy-v1:bad',
+          },
+        }),
+      ),
+    );
+
+    await act(async () => {
+      await result.current.refetch();
+    });
+
+    // The query IS in an error state and IS still holding the prior successful
+    // page — that retention is the exposure, so it has to be established rather
+    // than assumed.
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.data).toBeDefined();
+    // THE CRITERION'S LAYER: what the surface exposes off that retained page.
+    // The plain item survives (proving the page really was retained and is not
+    // merely gone); the notice item and its notice.recheck deep link do not.
+    await waitFor(() =>
+      expect(result.current.data?.items.map((item) => item.kind)).toEqual([
+        'retention_due',
+      ]),
+    );
+    // And the mechanism behind it: fail-closed at the held revision, never
+    // dropped to 0.
+    expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
+      '{"revision":7,"enabled":false}',
+    );
+
+    // RECOVERY: fail-closed must be sticky, not permanent. Holding the revision
+    // rather than dropping it to 0 is precisely what leaves a strictly higher
+    // revision able to lift the disable — without this, one corrupt response
+    // would blacken this surface on the device forever, which is what extending
+    // the sticky-disable class to three surfaces would otherwise risk.
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(
+        jsonResponse({
+          scope: 'self',
+          items: [OVERFLOW_NOTICE_ITEM, PLAIN_ITEM],
+          mentorNoticePolicy: policy(8, true),
+        }),
+      ),
+    );
+    await act(async () => {
+      await result.current.refetch();
+    });
+    await waitFor(() =>
+      expect(result.current.data?.items.map((item) => item.kind)).toEqual([
+        'mentor_notice',
+        'retention_due',
+      ]),
+    );
+  });
+
+  // "It is correct after the effect" IS the bug, so this asserts on every
+  // COMMITTED render rather than on eventual state.
+  it('never publishes a rollback-bearing overflow payload — not even for one frame', async () => {
+    await AsyncStorage.setItem(POLICY_KEY, '{"revision":7,"enabled":true}');
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(
+        jsonResponse({
+          scope: 'self',
+          items: [
+            {
+              kind: 'mentor_notice',
+              templateKey: 'now.mentor_notice.default',
+              params: {
+                noticeId: '11111111-1111-4111-8111-111111111111',
+                concept: 'sign flip',
+              },
+              deepLink: { route: 'notice.recheck', params: {}, chain: [] },
+              scope: 'self',
+            },
+          ],
+          // The response that carries the rollback.
+          mentorNoticePolicy: policy(8, false),
+        }),
+      ),
+    );
+
+    // Record what each committed render exposed. The pre-fix code published one
+    // render with the notice items intact — judged non-stale against the
+    // still-enabled store — before the effect's fold forced a second render.
+    const committed: (string[] | undefined)[] = [];
+    const { result } = renderHook(
+      () => {
+        const query = useNowOverflow(true);
+        committed.push(query.data?.items.map((item) => item.kind));
+        return query;
+      },
+      { wrapper: createHookWrapper().wrapper },
+    );
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    await waitFor(() => expect(result.current.data?.items).toEqual([]));
+
+    // No committed render may ever have carried the notice item or its deep link.
+    expect(
+      committed.filter((items) => items?.includes('mentor_notice')),
+    ).toEqual([]);
+    // Positive control: renders with data really did occur, so the assertion
+    // above is not passing because nothing was ever published.
+    expect(committed.some((items) => Array.isArray(items))).toBe(true);
   });
 });

@@ -185,3 +185,36 @@ export const NOW_FEED_CACHE_KEY_PREFIX = 'now-feed-cache';
  * Full key: `now-feed-policy-epoch::<actorId>::<profileId>`
  */
 export const NOW_FEED_POLICY_EPOCH_KEY_PREFIX = 'now-feed-policy-epoch';
+
+/**
+ * [WI-2627] The ORDERABLE mentor-notice rollout state this device last folded
+ * in, per actor+profile: `{ revision, enabled }` as JSON. AsyncStorage, same
+ * double-colon construction in the consumer.
+ *
+ * Stored separately from the epoch above because it answers a different
+ * question — the epoch is the opaque cache key (equality only), this is the
+ * ordered rollback state. See `lib/mentor-notice-policy.ts`.
+ * Full key: `mentor-notice-policy-state::<actorId>::<profileId>`
+ */
+export const MENTOR_NOTICE_POLICY_STATE_KEY_PREFIX =
+  'mentor-notice-policy-state';
+
+/**
+ * [WI-2627] Key SEGMENT introducing the suppress-only "disable floor" — a SET of
+ * markers hanging off the state key above, ONE KEY PER REVISION:
+ *
+ *   `mentor-notice-policy-state::<actorId>::<profileId>::disable-floor::<revision>`
+ *
+ * Each marker records that the server told this device the mentor-notice rollout
+ * is OFF at that revision. The revision lives in the KEY, and the key's presence
+ * IS the fact — the stored value is a placeholder and is never read.
+ *
+ * One key per revision, rather than one slot holding the highest, because the
+ * device must be able to record a disable while it cannot READ storage. Writing
+ * a single slot blind can LOWER it (overwriting a higher revision it never saw),
+ * and lowering the floor is what lets a stale intermediate enabled reply
+ * re-enable notices. A set only ever gains members, so the floor — the maximum
+ * over the set — cannot decrease no matter what a blind write adds. See the
+ * "THE DISABLE FLOOR" section of `lib/mentor-notice-policy.ts`.
+ */
+export const MENTOR_NOTICE_POLICY_DISABLE_FLOOR_KEY_SUFFIX = 'disable-floor';

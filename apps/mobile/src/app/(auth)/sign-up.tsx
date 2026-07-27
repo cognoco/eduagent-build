@@ -77,11 +77,19 @@ export default function SignUpScreen() {
   const [activationFailureContext, setActivationFailureContext] = useState<
     'oauth' | 'verification' | null
   >(null);
-  const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
+  const {
+    scrollRef,
+    onFieldLayout,
+    onFieldFocus,
+    onScrollViewLayout,
+    onSubmitButtonLayout,
+  } = useKeyboardScroll();
   const {
     scrollRef: verifyScrollRef,
     onFieldLayout: onVerifyFieldLayout,
     onFieldFocus: onVerifyFieldFocus,
+    onScrollViewLayout: onVerifyScrollViewLayout,
+    onSubmitButtonLayout: onVerifySubmitButtonLayout,
   } = useKeyboardScroll();
   const reportActivationEvent = useReportActivationEvent();
 
@@ -378,9 +386,7 @@ export default function SignUpScreen() {
         setError(t('auth.signUp.verificationNotCompleted'));
       }
     } catch (err: unknown) {
-      setError(
-        extractClerkError(err, 'Invalid verification code. Please try again.'),
-      );
+      setError(extractClerkError(err));
     } finally {
       setLoading(false);
     }
@@ -429,6 +435,7 @@ export default function SignUpScreen() {
           }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
+          onLayout={onVerifyScrollViewLayout}
         >
           <View className="flex-1" style={{ minHeight: 40 }} />
           <Text className="text-h2 font-bold text-text-primary mb-1">
@@ -476,14 +483,16 @@ export default function SignUpScreen() {
             />
           </View>
 
-          <Button
-            variant="primary"
-            label={t('auth.signUp.verifyButton')}
-            onPress={onVerifyPress}
-            disabled={!canSubmitCode}
-            loading={loading}
-            testID="sign-up-verify-button"
-          />
+          <View onLayout={onVerifySubmitButtonLayout}>
+            <Button
+              variant="primary"
+              label={t('auth.signUp.verifyButton')}
+              onPress={onVerifyPress}
+              disabled={!canSubmitCode}
+              loading={loading}
+              testID="sign-up-verify-button"
+            />
+          </View>
 
           {activationFailureContext === 'verification' &&
           pendingSessionActivationId ? (
@@ -556,6 +565,7 @@ export default function SignUpScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
         testID="sign-up-scroll"
+        onLayout={onScrollViewLayout}
       >
         <View testID="sign-up-content">
           {/* Brand logo at top of screen — keep margins tight so the primary CTA
@@ -724,14 +734,16 @@ export default function SignUpScreen() {
             </Text>
           )}
 
-          <Button
-            variant="primary"
-            label={t('auth.signUp.signUpButton')}
-            onPress={onSignUpPress}
-            disabled={!canSubmitSignUp}
-            loading={loading}
-            testID="sign-up-button"
-          />
+          <View onLayout={onSubmitButtonLayout}>
+            <Button
+              variant="primary"
+              label={t('auth.signUp.signUpButton')}
+              onPress={onSignUpPress}
+              disabled={!canSubmitSignUp}
+              loading={loading}
+              testID="sign-up-button"
+            />
+          </View>
 
           <View
             className="flex-row justify-center items-center mt-3 mb-3"

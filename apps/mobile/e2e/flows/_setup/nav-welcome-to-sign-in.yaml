@@ -38,24 +38,23 @@ appId: com.mentomate.app
       id: "welcome-card-1"
     timeout: 10000
 
-# 3. Advance through the card deck to the bridge. The deck is a paged
-#    carousel; on this emulator a single next-button tap occasionally
-#    "completes" without advancing the card. So tap next up to 5x (optional —
-#    on the final card the button becomes welcome-start-button, so the
-#    next-button tap is simply skipped) until the "Let's start" CTA appears.
-#    This absorbs missed taps without weakening the end state: we still
-#    require welcome-start-button before proceeding.
-- repeat:
-    times: 5
-    commands:
-      - tapOn:
-          id: "welcome-next-button"
-          optional: true
-      - extendedWaitUntil:
-          visible:
-            id: "welcome-start-button"
-          timeout: 2500
-          optional: true
+# 3. Advance through the deck with exactly one tap per card. Retrying the
+#    shared Next control can over-advance two cards; each positive card marker
+#    and the animation wait keep the second tap on the settled card-2 state.
+- tapOn:
+    id: "welcome-next-button"
+- extendedWaitUntil:
+    visible:
+      id: "welcome-card-2"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: "welcome-next-button"
+- extendedWaitUntil:
+    visible:
+      id: "welcome-card-3"
+    timeout: 10000
 
 # 4. Final card's "Let's start" → LightBulb bridge.
 - extendedWaitUntil:

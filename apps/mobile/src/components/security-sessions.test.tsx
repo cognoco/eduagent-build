@@ -127,6 +127,8 @@ describe('SecuritySessions', () => {
     });
   });
 
+  // [WI-2768] Same as above — no form-validation code, so the localized
+  // generic message is shown rather than Clerk's raw English longMessage.
   it('[WI-1849] surfaces a rejected single-session revoke without refreshing', async () => {
     mockRevokeOther.mockRejectedValue({
       errors: [{ longMessage: 'Could not revoke this device' }],
@@ -139,7 +141,7 @@ describe('SecuritySessions', () => {
     fireEvent.press(screen.getByTestId('revoke-session-session-other'));
 
     await waitFor(() => {
-      screen.getByText('Could not revoke this device');
+      screen.getByText("Something didn't go through. Please try again.");
     });
     expect(mockGetSessions).toHaveBeenCalledTimes(1);
   });
@@ -163,6 +165,10 @@ describe('SecuritySessions', () => {
     expect(mockRevokeCurrent).not.toHaveBeenCalled();
   });
 
+  // [WI-2768] extractClerkError now maps Clerk's locale-independent `code` to
+  // localized copy; a session-revoke failure carries no form-validation code,
+  // so it falls through to the localized generic message, never Clerk's raw
+  // English longMessage.
   it('[WI-1849] surfaces a rejected bulk revoke and stops before later sessions', async () => {
     mockRevokeOther.mockRejectedValue({
       errors: [{ longMessage: 'Could not sign out all devices' }],
@@ -175,7 +181,7 @@ describe('SecuritySessions', () => {
     fireEvent.press(screen.getByTestId('security-sessions-revoke-all'));
 
     await waitFor(() => {
-      screen.getByText('Could not sign out all devices');
+      screen.getByText("Something didn't go through. Please try again.");
     });
     expect(mockRevokeOther).toHaveBeenCalledTimes(1);
     expect(mockRevokeOther2).not.toHaveBeenCalled();

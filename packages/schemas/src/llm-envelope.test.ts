@@ -862,7 +862,6 @@ describe('normaliseSignals', () => {
     expect(result.challenge_round_offer).toBe(false);
     expect(result.challenge_round_evaluation).toEqual([]);
     expect(result.noticed_gap).toBeNull();
-    expect(result.notice_recheck).toBeNull();
   });
 
   // [H2 — 2026-06-05 safety audit] crisis_redirect signal
@@ -880,7 +879,6 @@ describe('normaliseSignals', () => {
 
 describe('mentor notice envelope fields', () => {
   const answerEventId = '00000000-0000-4000-8000-000000000001';
-  const noticeId = '00000000-0000-4000-8000-000000000002';
 
   it('accepts a grounded noticed_gap proposal', () => {
     const parsed = llmResponseEnvelopeSchema.parse({
@@ -941,22 +939,6 @@ describe('mentor notice envelope fields', () => {
         },
       }).success,
     ).toBe(false);
-  });
-
-  it('accepts deferred as a non-terminal re-check verdict', () => {
-    const parsed = llmResponseEnvelopeSchema.parse({
-      reply: 'No problem — we can leave it there.',
-      signals: {
-        notice_recheck: {
-          noticeId,
-          verdict: 'deferred',
-          answerEventId,
-          learnerQuote: 'not now please',
-        },
-      },
-    });
-
-    expect(parsed.signals?.notice_recheck?.verdict).toBe('deferred');
   });
 });
 
@@ -1414,12 +1396,14 @@ describe('challengeRoundGraderDegradedEventSchema (T1 — degraded event payload
     expect(result.success).toBe(true);
   });
 
-  it('accepts all four reason enum values', () => {
+  it('accepts all five reason enum values', () => {
     for (const reason of [
       'route_error',
       'no_json',
       'parse_error',
       'schema_invalid',
+      // [WI-2670] producer vendor unresolved — fail-open degraded reason.
+      'producer_vendor_unresolved',
     ] as const) {
       const r = challengeRoundGraderDegradedEventSchema.safeParse({
         ...REQUIRED,

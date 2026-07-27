@@ -632,6 +632,7 @@ function createIntegrationDb(): Database {
       expect(seeded.ids.supporteePersonId).toBeTruthy();
       expect(seeded.ids.edgeId).toBeTruthy();
       expect(seeded.ids.contractId).toBeTruthy();
+      expect(seeded.ids.lapsedContractId).toBeTruthy();
       expect(seeded.ids.visibilityStatus).toBe('pending');
       expect(seeded.ids.contractVersion).toBe('1');
       expect(seeded.ids.relation).toBe('other');
@@ -665,12 +666,14 @@ function createIntegrationDb(): Database {
       const afterSupportee = await acceptLink(db, seeded.ids.contractId, {
         actorPersonId: seeded.ids.supporteePersonId,
         audience: 'supportee',
+        contractVersion: Number(seeded.ids.contractVersion),
       });
       expect(afterSupportee.status).toBe('pending'); // one-sided — not yet both.
 
       const afterSupporter = await acceptLink(db, seeded.ids.contractId, {
         actorPersonId: seeded.ids.supporterPersonId,
         audience: 'supporter',
+        contractVersion: Number(seeded.ids.contractVersion),
       });
       expect(afterSupporter.status).toBe('accepted');
 
@@ -702,30 +705,36 @@ function createIntegrationDb(): Database {
         acceptLink(db, seeded.ids.contractId, {
           actorPersonId: unrelatedPersonId,
           audience: 'supporter',
+          contractVersion: Number(seeded.ids.contractVersion),
         }),
       ).rejects.toBeInstanceOf(ForbiddenError);
       await expect(
         acceptLink(db, seeded.ids.contractId, {
           actorPersonId: unrelatedPersonId,
           audience: 'supportee',
+          contractVersion: Number(seeded.ids.contractVersion),
         }),
       ).rejects.toBeInstanceOf(ForbiddenError);
     });
 
-    it('[AC recovery — duplicate accept] re-accepting the same side twice is idempotent — recomputes the same accepted state rather than erroring or double-writing', async () => {
+    it('[AC recovery — duplicate accept] re-accepting the same side returns the original accepted state without error', async () => {
       // Also runs after the shared `seeded` contract is already 'accepted';
       // re-accepting the supporter side is idempotent either way, so
       // correctness holds regardless of the contract's pending/accepted state.
       const first = await acceptLink(db, seeded.ids.contractId, {
         actorPersonId: seeded.ids.supporterPersonId,
         audience: 'supporter',
+        contractVersion: Number(seeded.ids.contractVersion),
       });
       const second = await acceptLink(db, seeded.ids.contractId, {
         actorPersonId: seeded.ids.supporterPersonId,
         audience: 'supporter',
+        contractVersion: Number(seeded.ids.contractVersion),
       });
       expect(second.status).toBe(first.status);
       expect(second.supporterAcceptedAt).toBeTruthy();
+      // The concurrent same-side race and one-audit invariant are exercised
+      // against Neon in linking-ceremony.integration.test.ts.
     });
 
     it('[AC recovery — expired/lapsed invite fails closed] a lapsed contract denies scope and structural read identically to pending/revoked — proving the fail-closed PROPERTY the AC requires, even though the expiry TRANSITION itself is unimplemented in production', async () => {

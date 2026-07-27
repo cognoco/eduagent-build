@@ -418,20 +418,13 @@ describe('Integration: billing lifecycle routes', () => {
     expect(subscription!.tier).toBe('plus');
     expect(subscription!.status).toBe('trial');
     expect(subscription!.trialEndsAt).not.toBeNull();
-    // [WI-1145] The collapsed checkout writes stripeCustomerId to the store it
-    // targets — v2 `subscription` post-WI-867, legacy `subscriptions` pre-collapse
-    // (the legacy parent ensureLegacySubscriptionParent writes carries tier/status
-    // but NOT the stripe customer). Flag is off in both, so assert it landed in
-    // EITHER store rather than reading one fixed store.
+    // [WI-1145] The collapsed checkout writes stripeCustomerId to the v2
+    // `subscription` store post-WI-867.
     const checkoutDb = createIntegrationDb();
     const v2Checkout = await checkoutDb.query.subscription.findFirst({
       where: eq(subscriptionV2.organizationId, account.id),
     });
-    const legacyCheckout = undefined;
-    expect(
-      v2Checkout?.stripeCustomerId === 'cus_checkout' ||
-        legacyCheckout?.stripeCustomerId === 'cus_checkout',
-    ).toBe(true);
+    expect(v2Checkout?.stripeCustomerId).toBe('cus_checkout');
 
     const quotaPool = await loadQuotaPool(subscription!.id);
     expect(quotaPool).not.toBeUndefined();
@@ -466,23 +459,14 @@ describe('Integration: billing lifecycle routes', () => {
       new Date(STRIPE_CURRENT_PERIOD_END * 1000).toISOString(),
     );
 
-    // [WI-1145] The collapsed cancel writes cancelledAt + stripeSubscriptionId to
-    // the store it targets — v2 `subscription` post-WI-867, legacy `subscriptions`
-    // pre-collapse. Flag is off in both, so assert the cancel mutation landed in
-    // EITHER store rather than reading one fixed store (loadSubscription's
-    // flag-off legacy read would miss the v2-side mutation post-collapse).
+    // [WI-1145] The collapsed cancel writes cancelledAt + stripeSubscriptionId
+    // to the v2 `subscription` store post-WI-867.
     const cancelDb = createIntegrationDb();
     const v2Cancel = await cancelDb.query.subscription.findFirst({
       where: eq(subscriptionV2.organizationId, account.id),
     });
-    const legacyCancel = undefined;
-    expect((v2Cancel?.cancelledAt ?? legacyCancel?.cancelledAt) != null).toBe(
-      true,
-    );
-    expect(
-      v2Cancel?.stripeSubscriptionId === 'sub_cancel' ||
-        legacyCancel?.stripeSubscriptionId === 'sub_cancel',
-    ).toBe(true);
+    expect(v2Cancel?.cancelledAt).not.toBeNull();
+    expect(v2Cancel?.stripeSubscriptionId).toBe('sub_cancel');
 
     const quotaPool = await loadQuotaPool(seeded.subscription.id);
     expect(quotaPool).not.toBeUndefined();

@@ -5,10 +5,17 @@
 ```bash
 scripts/check-change-class.sh              # what do I need to validate?
 scripts/check-change-class.sh --run        # run all validation
-scripts/check-change-class.sh --run --fast # run only fast commands
+scripts/check-change-class.sh --run --fast # run only database-/Doppler-free fast commands
 scripts/check-change-class.sh --staged     # check staged files only
 scripts/check-change-class.sh --branch     # check all changes vs main
 ```
+
+`--run --fast` is database- and Doppler-free by contract: those commands are
+reported under **Skipped (slow)** and are never executed. Fast commands may
+still update workspace artifacts; for example, `eval:llm` can rewrite prompt
+snapshots or its zero-drift receipt. The explicit full-run path, `--run`
+without `--fast`, executes database validation steps and therefore requires
+separate authorization for the target environment.
 
 Naming note: `test:api:integration` is the local wrapper for the
 `apps/api/src/**/*.integration.test.ts` co-located API suite
@@ -17,10 +24,10 @@ is the cross-package suite under `tests/integration/`.
 
 ## Quick Reference
 
-| Class | File Pattern | Fast | Slow | Notes |
+| Class | File Pattern | Fast | Full run only / slow | Notes |
 |---|---|---|---|---|
-| **db-schema** | `packages/database/src/schema/**` | `db:push:dev`, `db:generate:dev` | `test:api:integration` | Never push to staging/prod |
-| **db-migrations** | `apps/api/drizzle/**` | `db:push:dev`, `nx run @eduagent/database:test` | `test:api:integration` | Migrate before deploy; rollback section if dropping. Emits `--github-output database=true`; the `Database package tests (db-migrations — WI-1164)` ci.yml step runs the suite on PRs |
+| **db-schema** | `packages/database/src/schema/**` | — | `db:push:dev`, `db:generate:dev`, `test:api:integration` | Database/Doppler actions require explicit authorization; never push to staging/prod |
+| **db-migrations** | `apps/api/drizzle/**` | `nx run @eduagent/database:test` | `db:push:dev`, `test:api:integration` | Database/Doppler actions require explicit authorization. Migrate before deploy; rollback section if dropping. Emits `--github-output database=true`; the `Database package tests (db-migrations — WI-1164)` ci.yml step runs the suite on PRs |
 | **llm-prompts** | `services/**/*-prompts.ts`, `services/llm/*.ts` | `eval:llm` | `eval:llm --live`, `test:llm:enduser` | Pre-commit enforces snapshot staging |
 | **llm-routing** | `services/llm/router.ts`, `services/session/session-exchange.ts`, `services/subscription.ts`, `scripts/premium-routing-pass.ts` | — | `test:llm:premium-routing` | Live Plus/Family advanced-model routing gate |
 | **llm-book-generation** | `packages/schemas/src/subjects.ts`, `services/book-generation.ts`, `services/book-suggestion-generation.ts`, `services/curriculum.ts`, `services/session/session-context-builders.ts`, `scripts/book-generation-pass.ts` | — | `test:llm:book-generation` | Live book/topic-map generation quality gate |

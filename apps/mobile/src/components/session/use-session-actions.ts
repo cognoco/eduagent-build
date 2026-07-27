@@ -23,6 +23,7 @@ import { clearSessionRecoveryMarker } from '../../lib/session-recovery';
 import * as SecureStore from '../../lib/secure-storage';
 import { classifyApiError, recoveryActions } from '../../lib/format-api-error';
 import { homeHrefForReturnTo } from '../../lib/navigation';
+import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { withProblemMode } from '../homework/problem-cards';
 import { reportHomeworkMetadataSyncFailure } from './homework-metadata-telemetry';
 import {
@@ -441,8 +442,14 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
                 goHome: () =>
                   router.replace(
                     (returnTo
-                      ? homeHrefForReturnTo(returnTo)
-                      : '/(app)/home') as never,
+                      ? homeHrefForReturnTo(
+                          returnTo,
+                          undefined,
+                          FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+                        )
+                      : FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+                        ? '/(app)/mentor'
+                        : '/(app)/home') as never,
                   ),
               });
               const buttons: Array<{

@@ -26,16 +26,13 @@ import {
   byokWaitlist,
   challengeRoundCooldowns,
   consentGrant,
-  consentReceipt,
   consentRequest,
   curricula,
   curriculumAdaptations,
   curriculumBooks,
   curriculumTopics,
-  deletionAudit,
   dictationResults,
   familyPreferences,
-  financialRecord,
   learningSessions,
   login,
   memoryDedupDecisions,
@@ -112,14 +109,19 @@ async function loadDeletionState(accountId: string): Promise<{
   });
   // [WI-1128] Legacy `accounts` is dropped (post-M-DROP) — the v2
   // `organization` row above is the real anchor.
-  const acctRow = undefined;
-  if (!orgRow && !acctRow) return null;
+  if (!orgRow) return null;
   return {
-    deletionScheduledAt:
-      orgRow?.deletionScheduledAt ?? acctRow?.deletionScheduledAt ?? null,
-    deletionCancelledAt:
-      orgRow?.deletionCancelledAt ?? acctRow?.deletionCancelledAt ?? null,
+    deletionScheduledAt: orgRow.deletionScheduledAt ?? null,
+    deletionCancelledAt: orgRow.deletionCancelledAt ?? null,
   };
+}
+
+function firstCount(result: unknown): number {
+  const row = (result as { rows?: Array<{ c: number }> }).rows?.[0];
+  if (!row) {
+    throw new Error('Expected a count row from the integration database');
+  }
+  return row.c;
 }
 
 beforeAll(() => {
@@ -513,17 +515,17 @@ legacyAccountDeletionCascadeDescribe(
       const summaries = await db.execute(
         sql`SELECT count(*)::int AS c FROM session_summaries WHERE profile_id = ${profileId}`,
       );
-      expect((summaries.rows as Array<{ c: number }>)[0].c).toBe(0);
+      expect(firstCount(summaries)).toBe(0);
 
       const embeddings = await db.execute(
         sql`SELECT count(*)::int AS c FROM session_embeddings WHERE profile_id = ${profileId}`,
       );
-      expect((embeddings.rows as Array<{ c: number }>)[0].c).toBe(0);
+      expect(firstCount(embeddings)).toBe(0);
 
       const events = await db.execute(
         sql`SELECT count(*)::int AS c FROM session_events WHERE profile_id = ${profileId}`,
       );
-      expect((events.rows as Array<{ c: number }>)[0].c).toBe(0);
+      expect(firstCount(events)).toBe(0);
     });
 
     // ---------------------------------------------------------------------------
@@ -671,7 +673,7 @@ legacyAccountDeletionCascadeDescribe(
         await db.insert(retentionCards).values({
           profileId,
           topicId: topic!.id,
-          easeFactor: '2.50',
+          easeFactor: 2.5,
           intervalDays: 1,
           nextReviewAt: new Date(),
         });
@@ -749,7 +751,7 @@ legacyAccountDeletionCascadeDescribe(
         await db.insert(vocabularyRetentionCards).values({
           profileId,
           vocabularyId: vocab!.id,
-          easeFactor: '2.50',
+          easeFactor: 2.5,
           intervalDays: 1,
         });
 
@@ -981,9 +983,7 @@ legacyAccountDeletionCascadeDescribe(
         const beforeProfile = await db.execute(
           sql`SELECT count(*)::int AS c FROM organization WHERE id = ${accountId}`,
         );
-        expect(
-          (beforeProfile.rows as Array<{ c: number }>)[0].c,
-        ).toBeGreaterThan(0);
+        expect(firstCount(beforeProfile)).toBeGreaterThan(0);
 
         // -----------------------------------------------------------------------
         // Act: delete via executeDeletionV2 (deletes person → cascades every
@@ -1011,7 +1011,7 @@ legacyAccountDeletionCascadeDescribe(
           const row = await db.execute(
             sql`SELECT count(*)::int AS c FROM ${sql.identifier(table)} WHERE ${sql.identifier(col)} = ${profileId}`,
           );
-          const count = (row.rows as Array<{ c: number }>)[0].c;
+          const count = firstCount(row);
           expect({ table, count }).toEqual({ table, count: 0 });
         }
 
@@ -1020,11 +1020,11 @@ legacyAccountDeletionCascadeDescribe(
         const nudgesFrom = await db.execute(
           sql`SELECT count(*)::int AS c FROM nudges WHERE from_profile_id = ${profileId}`,
         );
-        expect((nudgesFrom.rows as Array<{ c: number }>)[0].c).toBe(0);
+        expect(firstCount(nudgesFrom)).toBe(0);
         const nudgesTo = await db.execute(
           sql`SELECT count(*)::int AS c FROM nudges WHERE to_profile_id = ${profileId}`,
         );
-        expect((nudgesTo.rows as Array<{ c: number }>)[0].c).toBe(0);
+        expect(firstCount(nudgesTo)).toBe(0);
 
         // [WI-1128] family_links assertions removed: family_links is a 0129
         // drop-list table (FK stays on profiles, not repointed to person), so
@@ -1351,21 +1351,19 @@ if (isIdentityV2Enabled()) {
           const receiptRow = await db.execute(
             sql`SELECT count(*)::int AS c FROM consent_receipt WHERE person_id = ${personId}`,
           );
-          expect(
-            (receiptRow.rows as Array<{ c: number }>)[0].c,
-          ).toBeGreaterThanOrEqual(1);
+          expect(firstCount(receiptRow)).toBeGreaterThanOrEqual(1);
 
           // deletion_audit — 1 row per person (§6.1)
           const auditRow = await db.execute(
             sql`SELECT count(*)::int AS c FROM deletion_audit WHERE person_id = ${personId}`,
           );
-          expect((auditRow.rows as Array<{ c: number }>)[0].c).toBe(1);
+          expect(firstCount(auditRow)).toBe(1);
 
           // financial_record — 2 rows per person (§6.1: tax + chargeback retain)
           const financialRow = await db.execute(
             sql`SELECT count(*)::int AS c FROM financial_record WHERE person_id = ${personId}`,
           );
-          expect((financialRow.rows as Array<{ c: number }>)[0].c).toBe(2);
+          expect(firstCount(financialRow)).toBe(2);
 
           // -------------------------------------------------------------------
           // Cross-account break test: the OTHER org's identity graph is untouched.
@@ -1491,17 +1489,17 @@ if (isIdentityV2Enabled()) {
         const summaries = await db.execute(
           sql`SELECT count(*)::int AS c FROM session_summaries WHERE profile_id = ${personId}`,
         );
-        expect((summaries.rows as Array<{ c: number }>)[0].c).toBe(0);
+        expect(firstCount(summaries)).toBe(0);
 
         const embeddings = await db.execute(
           sql`SELECT count(*)::int AS c FROM session_embeddings WHERE profile_id = ${personId}`,
         );
-        expect((embeddings.rows as Array<{ c: number }>)[0].c).toBe(0);
+        expect(firstCount(embeddings)).toBe(0);
 
         const events = await db.execute(
           sql`SELECT count(*)::int AS c FROM session_events WHERE profile_id = ${personId}`,
         );
-        expect((events.rows as Array<{ c: number }>)[0].c).toBe(0);
+        expect(firstCount(events)).toBe(0);
       } finally {
         await teardownV2Graph(db, personId, organizationId).catch(
           () => undefined,

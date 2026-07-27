@@ -292,10 +292,6 @@
     "token": "gemini_only"
   },
   {
-    "file": "scripts/premium-routing-pass.ts",
-    "token": "gemini-2.5"
-  },
-  {
     "file": "scripts/provider-degradation-pass.ts",
     "token": "gemini_only"
   },

@@ -214,6 +214,8 @@ function isExactManualHomeworkSessionAssociated({
 const MENTOR_BIRTH_SESSION_TIME_SCALE = 0.35;
 // Bound a failed policy-epoch hydration without claiming a refreshed projection.
 const MENTOR_RETURN_EPOCH_WAIT_MS = 2_000;
+// Give the exact projection one bounded opportunity without trapping Back.
+const MENTOR_RETURN_REFRESH_WAIT_MS = 2_000;
 
 interface FirstSessionWrapUpCardProps {
   value: string;
@@ -569,20 +571,26 @@ function SessionScreenInner() {
     if (!canRefreshMentorFeed) return;
 
     let cancelled = false;
+    const timer = setTimeout(() => {
+      if (cancelled) return;
+      setPendingMentorReturn(false);
+      setMentorReturnReady(true);
+    }, MENTOR_RETURN_REFRESH_WAIT_MS);
     async function returnAfterMentorRefresh(): Promise<void> {
       try {
         await refreshMentorFeedBeforeReturn();
-        if (cancelled) return;
-        setPendingMentorReturn(false);
-        setMentorReturnReady(true);
       } catch {
-        if (cancelled) return;
-        setPendingMentorReturn(false);
+        // A failed exact refresh is not evidence of freshness, but Back still exits.
       }
+      if (cancelled) return;
+      clearTimeout(timer);
+      setPendingMentorReturn(false);
+      setMentorReturnReady(true);
     }
     void returnAfterMentorRefresh();
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [
     activeProfile?.id,
@@ -615,7 +623,15 @@ function SessionScreenInner() {
       } as Href);
       return;
     }
-    router.replace('/(app)/home' as Href);
+    // WI-2331 AC-3: `/(app)/home` is dead in V2 (not one of the three tabs)
+    // — this last-resort branch (no returnTo, no subjectId) routes through
+    // the same owning-tab contract AC-1's tab highlight uses instead of the
+    // retired Home tab.
+    router.replace(
+      (FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+        ? '/(app)/mentor'
+        : '/(app)/home') as Href,
+    );
   }, [returnTo, subjectId, homeBackHref, router, startMentorReturn]);
   const handleHomeBack = useCallback(() => {
     if (returnTo) {

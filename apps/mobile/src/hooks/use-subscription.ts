@@ -26,7 +26,7 @@ import { useApiClient } from '../lib/api-client';
 import { NotFoundError } from '../lib/api-errors';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
-import { assertOk } from '../lib/assert-ok';
+import { assertOk, type ApiResponse } from '../lib/assert-ok';
 import { queryKeys } from '../lib/query-keys';
 import { parseJson } from '../lib/parse-json';
 import { useApiQuery } from './use-api-query';
@@ -115,7 +115,9 @@ export function useFamilySubscription(
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
         const familyClient = client.subscription.family as {
-          $get: (input: { init: { signal: AbortSignal } }) => Promise<Response>;
+          $get: (input: {
+            init: { signal: AbortSignal };
+          }) => Promise<ApiResponse>;
         };
         const res = await familyClient.$get({
           init: { signal },
@@ -214,7 +216,9 @@ export function useRemoveFamilyProfile(): UseMutationResult<
     mutationFn: async (profileId: string) => {
       const familyClient = client.subscription.family as {
         remove: {
-          $post: (input: { json: { profileId: string } }) => Promise<Response>;
+          $post: (input: {
+            json: { profileId: string };
+          }) => Promise<ApiResponse>;
         };
       };
       const res = await familyClient.remove.$post({ json: { profileId } });

@@ -14,6 +14,7 @@ import {
   persistChallengeRoundState,
   resolveReadyToFinish,
   resolvePromptLearnerName,
+  resolveAskedQuestion,
   type ExchangeHistoryEvent,
 } from './session-exchange';
 import type { processMessage, streamMessage } from './session-exchange';
@@ -215,6 +216,120 @@ describe('buildExchangeHistory', () => {
     expect(rewrapped.reply).toBe('hi');
     expect(rewrapped.reply).not.toContain('"signals"');
     expect(rewrapped.reply).not.toContain('"ui_hints"');
+  });
+
+  // [WI-2670] producerVendor is read back from the persisted `llmProvider`
+  // field on an ai_response event's metadata (see `persistExchangeResult`'s
+  // `aiMetadata.llmProvider`) — never fabricated, never sourced elsewhere.
+  describe('[WI-2670] producerVendor extraction', () => {
+    it('attaches producerVendor to an assistant entry from metadata.llmProvider', () => {
+      const events: ExchangeHistoryEvent[] = [
+        { eventType: 'user_message', content: 'why does X happen?' },
+        {
+          eventType: 'ai_response',
+          content: 'because Y',
+          metadata: { llmProvider: 'openai', llmModel: 'gpt-test' },
+        },
+      ];
+
+      const history = buildExchangeHistory(events);
+      const assistantTurn = history.find(
+        (h: ExchangeHistoryEntry) => h.role === 'assistant',
+      );
+      expect(assistantTurn?.producerVendor).toBe('openai');
+    });
+
+    it('omits producerVendor when metadata carries no llmProvider (legacy row)', () => {
+      const events: ExchangeHistoryEvent[] = [
+        { eventType: 'ai_response', content: 'legacy reply', metadata: {} },
+      ];
+
+      const history = buildExchangeHistory(events);
+      expect(history[0]!.producerVendor).toBeUndefined();
+    });
+
+    it('omits producerVendor when metadata is absent entirely', () => {
+      const events: ExchangeHistoryEvent[] = [
+        { eventType: 'ai_response', content: 'no metadata at all' },
+      ];
+
+      const history = buildExchangeHistory(events);
+      expect(history[0]!.producerVendor).toBeUndefined();
+    });
+
+    it('never attaches producerVendor to a user_message or system_prompt entry', () => {
+      const events: ExchangeHistoryEvent[] = [
+        {
+          eventType: 'user_message',
+          content: 'hi',
+          metadata: { llmProvider: 'openai' },
+        },
+        {
+          eventType: 'system_prompt',
+          content: 'sys',
+          metadata: { llmProvider: 'openai' },
+        },
+      ];
+
+      const history = buildExchangeHistory(events);
+      expect(history[0]).toEqual({ role: 'user', content: 'hi' });
+      expect(history[1]).toEqual({ role: 'system', content: 'sys' });
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2670] resolveAskedQuestion — sources the Challenge Round grader's
+// asked-question AND its real producing vendor from the LAST assistant turn
+// in exchangeHistory.
+// ---------------------------------------------------------------------------
+describe('[WI-2670] resolveAskedQuestion', () => {
+  it('returns empty askedQuestion and no producerVendor when history has no assistant turn', () => {
+    expect(resolveAskedQuestion([])).toEqual({ askedQuestion: '' });
+  });
+
+  it('sources producerVendor from the last assistant turn, not an earlier one (fallback-divergence case)', () => {
+    // Turn 1: mentor's question was produced by anthropic. Mid-session
+    // provider fallback occurs; turn 2 (the ACTUAL graded question) is
+    // produced by openai. The grader must exclude openai (the real
+    // producer of the graded question) — never anthropic, which produced
+    // an earlier, different turn. This is exactly the substitution
+    // root-cause note WI-2624 flagged: "the current turn's own
+    // result.provider... can differ from [the asked question's producer]
+    // e.g. a mid-session provider fallback."
+    const history = buildExchangeHistory([
+      { eventType: 'user_message', content: 'first question' },
+      {
+        eventType: 'ai_response',
+        content: 'first reply',
+        metadata: { llmProvider: 'anthropic' },
+      },
+      { eventType: 'user_message', content: 'second question' },
+      {
+        eventType: 'ai_response',
+        content: 'second reply — the actual asked question',
+        metadata: { llmProvider: 'openai' },
+      },
+    ]);
+
+    const result = resolveAskedQuestion(history);
+
+    expect(result.producerVendor).toBe('openai');
+    expect(result.producerVendor).not.toBe('anthropic');
+  });
+
+  it('extracts plain prose from the re-wrapped JSON envelope for askedQuestion', () => {
+    const history = buildExchangeHistory([
+      {
+        eventType: 'ai_response',
+        content: 'the mentor question',
+        metadata: { llmProvider: 'anthropic' },
+      },
+    ]);
+
+    const result = resolveAskedQuestion(history);
+    expect(result.askedQuestion).toBe('the mentor question');
+    expect(result.producerVendor).toBe('anthropic');
   });
 });
 

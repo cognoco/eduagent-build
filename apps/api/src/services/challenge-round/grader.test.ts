@@ -89,6 +89,7 @@ const BASE_INPUT: RunChallengeRoundGraderInput = {
   ageBracket: 'adolescent',
   conversationLanguage: 'en',
   sessionId: 'session-123',
+  producerVendor: 'anthropic',
 };
 
 // ---------------------------------------------------------------------------
@@ -345,6 +346,40 @@ describe('runChallengeRoundGrader', () => {
     });
   });
 
+  // [WI-2670] The grader never fabricates a producerVendor. When the caller
+  // could not resolve one (e.g. a legacy ai_response row predating per-turn
+  // vendor tracking), it fails open exactly like every other degradation —
+  // structured Inngest event with its own reason code, no LLM call attempted.
+  describe('[WI-2670] producer vendor unresolved → fail-open + degraded event', () => {
+    it('returns [] and never calls routeAndCall when producerVendor is absent', async () => {
+      const { producerVendor: _producerVendor, ...inputWithoutVendor } =
+        BASE_INPUT;
+
+      const items = await runChallengeRoundGrader(inputWithoutVendor);
+
+      expect(items).toEqual([]);
+      expect(mockRouteAndCall).not.toHaveBeenCalled();
+    });
+
+    it('fires app/challenge-round.grader_degraded with reason:producer_vendor_unresolved', async () => {
+      const { producerVendor: _producerVendor, ...inputWithoutVendor } =
+        BASE_INPUT;
+
+      await runChallengeRoundGrader(inputWithoutVendor);
+
+      expect(mockInngestSend).toHaveBeenCalledTimes(1);
+      expect(mockInngestSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/challenge-round.grader_degraded',
+          data: expect.objectContaining({
+            reason: 'producer_vendor_unresolved',
+            profileId: BASE_INPUT.profileId,
+          }),
+        }),
+      );
+    });
+  });
+
   // Routing options are passed correctly.
   describe('routing options', () => {
     it('routes with capability:judge, flow:challenge.grader, and responseFormat:json', async () => {
@@ -407,6 +442,40 @@ describe('runChallengeRoundGrader', () => {
       const [, , options] = mockRouteAndCall.mock.calls[0]!;
       expect(options?.capability).toBe('judge');
       expect(options?.ageBracket).toBe('adolescent');
+    });
+  });
+
+  // [WI-2670] Thread per-turn producer vendor through to JudgeIndependence.
+  // The real vendor-exclusion behavior (does the router actually avoid the
+  // producer?) is proven end-to-end against the REAL router in
+  // grader.judge-independence.test.ts — routeAndCall is mocked at the
+  // external boundary in THIS file (GC1-compliant), so these tests can only
+  // assert what grader.ts passes INTO routeAndCall (same caveat as
+  // router.judge-independence.test.ts's note on judge-suitability.test.ts).
+  describe('[WI-2670] JudgeIndependence — model-output declaration', () => {
+    it('declares JudgeIndependence mode:model-output with the threaded producerVendor', async () => {
+      mockRouteAndCall.mockResolvedValue(routeResult(SOLID_VERDICT_JSON));
+
+      await runChallengeRoundGrader({
+        ...BASE_INPUT,
+        producerVendor: 'openai',
+      });
+
+      const [, , options] = mockRouteAndCall.mock.calls[0]!;
+      expect(options?.judgeIndependence).toEqual({
+        mode: 'model-output',
+        producerVendor: 'openai',
+      });
+    });
+
+    it('never declares mode:not-applicable (the WI-2624-deferred branch is removed)', async () => {
+      mockRouteAndCall.mockResolvedValue(routeResult(SOLID_VERDICT_JSON));
+
+      await runChallengeRoundGrader(BASE_INPUT);
+
+      const [, , options] = mockRouteAndCall.mock.calls[0]!;
+      expect(options?.judgeIndependence?.mode).not.toBe('not-applicable');
+      expect(options?.judgeIndependence?.mode).toBe('model-output');
     });
   });
 

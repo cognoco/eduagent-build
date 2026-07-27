@@ -121,12 +121,8 @@ export function useSubjectsIndex(options: UseSubjectsIndexOptions = {}): {
 
   return {
     subjects,
-    isLoading:
-      subjectsQuery.isLoading ||
-      libraryBooks.isLoading ||
-      progressQuery.isLoading,
-    isError:
-      subjectsQuery.isError || libraryBooks.isError || progressQuery.isError,
+    isLoading: subjectsQuery.isLoading,
+    isError: subjectsQuery.isError,
     refetch: () => {
       void subjectsQuery.refetch();
       libraryBooks.refetch();

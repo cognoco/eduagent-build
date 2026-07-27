@@ -96,9 +96,16 @@ describe('AddPassword', () => {
     });
   });
 
+  // [WI-2768] extractClerkError now maps Clerk's locale-independent `code` to
+  // localized copy rather than surfacing the raw English longMessage.
   it('shows Clerk rejection without marking success', async () => {
     mockUpdatePassword.mockRejectedValue({
-      errors: [{ longMessage: 'Password is too weak.' }],
+      errors: [
+        {
+          code: 'form_password_not_strong_enough',
+          longMessage: 'Password is too weak.',
+        },
+      ],
     });
     active = renderScreen(
       <AddPassword onPasswordAdded={mockOnPasswordAdded} />,
@@ -112,7 +119,9 @@ describe('AddPassword', () => {
     fireEvent.press(screen.getByTestId('add-password-submit'));
 
     await waitFor(() => {
-      screen.getByText('Password is too weak.');
+      screen.getByText(
+        "This password isn't strong enough. Please add more variety.",
+      );
       expect(mockOnPasswordAdded).not.toHaveBeenCalled();
     });
   });

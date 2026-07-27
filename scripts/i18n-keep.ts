@@ -387,6 +387,13 @@ const raw: readonly KeepPattern[] = [
       'selected via STRAND_COPY_KEYS[strand] → strandCopyKey(strand) at ' +
       'apps/mobile/src/app/(app)/progress/[subjectId]/index.tsx:599',
   },
+  {
+    // WI-2789/WI-2768: Clerk error-code → localized-message mapping.
+    pattern: 'auth.errors.*',
+    reason:
+      'selected via CLERK_ERROR_KEYS[code] then i18next.t(key) at ' +
+      'apps/mobile/src/lib/clerk-error.ts:19,50',
+  },
 ];
 
 export const KEEP_PATTERNS: readonly KeepPattern[] = raw.map((p) =>
