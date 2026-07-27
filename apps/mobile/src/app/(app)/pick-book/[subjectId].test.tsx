@@ -32,7 +32,7 @@ jest.mock(
     mockFetch = createRoutedMockFetch();
     return {
       ...actual,
-      useApiClient: () => hc('http://localhost', { fetch: mockFetch }),
+      useApiClient: () => hc('http://localhost/v1', { fetch: mockFetch }),
     };
   },
 );

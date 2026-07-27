@@ -15,14 +15,16 @@ confirmed this was a file-wide boundary rather than a filing-path defect.
 
 ## Verification
 
-- Five repair processes, three post-main-integration processes, and three
-  exact-final-head processes passed the complete 30-test PickBookScreen suite.
+- Five repair processes, three post-main-integration processes, three
+  pre-review final-head processes, and one review-amendment process passed the
+  complete 30-test PickBookScreen suite.
 - After normal integration of landed WI-2845 and WI-2846 plus the preserved
-  remote seam clarification, the exact-final-head canonical mobile command
-  passed 514/514 suites and 6,726/6,726 tests in 338.192 seconds;
+  remote seam clarification, the review-amended final canonical mobile command
+  passed 514/514 suites and 6,726/6,726 tests in 335.119 seconds;
   PickBookScreen and useNowFeed both passed in-suite.
 - Targeted Prettier and diff integrity passed.
 
-No production file or global timeout changed.
+No production file or global timeout changed. The targeted Hono mock mirrors
+production's `/v1` base path.
 
 Refs: WI-2844

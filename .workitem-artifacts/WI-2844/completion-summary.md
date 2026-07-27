@@ -15,11 +15,12 @@ are unchanged.
 Both full-suite loader-boundary failures and their isolated passes are preserved
 in the red-green artifact. The complete focused suite passed in five repair
 processes, three post-main-integration processes, and three exact-final-head
-processes. After normally integrating
-landed WI-2845 and WI-2846, the canonical mobile command on the exact final
-head passed 514/514 suites and 6,726/6,726 tests in 338.192 seconds;
-PickBookScreen and useNowFeed both
-passed under full load. Hosted exact-head CI and governed landing remain pending.
+processes. A review-amendment process also passed 30/30 after the targeted Hono
+client was aligned with production's version-one API base. After normally integrating
+landed WI-2845 and WI-2846, the canonical mobile command on the review-amended
+final head passed 514/514 suites and 6,726/6,726 tests in 335.119 seconds;
+PickBookScreen and useNowFeed both passed under full load. Hosted exact-head CI
+and governed landing remain pending.
 
 ## Caveats / Follow-ups
 

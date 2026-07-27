@@ -47,12 +47,17 @@ Each run used:
 pnpm exec jest --config apps/mobile/jest.config.cjs --runInBand --forceExit --silent --runTestsByPath "apps/mobile/src/app/(app)/pick-book/[subjectId].test.tsx"
 ```
 
+After exact-head review, the targeted real-module mock was aligned with
+production's `/v1` Hono base and the lifecycle pointers were corrected. That
+review-amended head passed another focused process 30/30 in 20.542 seconds.
+
 The final canonical `pnpm test:mobile:unit --silent` run inherited WI-2845's
 portable 6,144 MB heap contract and WI-2846's bounded useNowFeed success wait.
 The post-main control passed 514/514 suites and 6,726/6,726 tests in 329.527
-seconds. After preserving remote commit `500da0b97`, the exact-final-head run
-again passed 514/514 suites and 6,726/6,726 tests in 338.192 seconds.
-PickBookScreen ran first and passed 30/30 in 20.015 seconds; useNowFeed also
-passed under full load. `/usr/bin/time -v` reported 6,026,368 KB maximum RSS,
-zero swaps, and exit status 0. This is the exact integrated proof required
-before publication.
+seconds. After preserving remote commit `500da0b97`, the pre-review final run
+again passed 514/514 suites and 6,726/6,726 tests in 338.192 seconds. The
+review-amended final run passed 514/514 suites and 6,726/6,726 tests in 335.119
+seconds; PickBookScreen ran first and passed 30/30 in 19.988 seconds, and
+useNowFeed also passed under full load. `/usr/bin/time -v` reported 5,616,268 KB
+maximum RSS, zero swaps, and exit status 0. This is the exact integrated proof
+required before publication.

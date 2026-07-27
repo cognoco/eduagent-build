@@ -3,21 +3,21 @@
     {
       "acRef": "AC-1",
       "description": "A file-local waitFor wrapper gives PickBookScreen async assertions a 3000 ms default above the 800 ms sticky-loading boundary; caller overrides remain authoritative and the repository-wide timeout is unchanged.",
-      "pointer": "apps/mobile/src/app/(app)/pick-book/[subjectId].test.tsx:179"
+      "pointer": "apps/mobile/src/app/(app)/pick-book/[subjectId].test.tsx:186"
     },
     {
       "acRef": "AC-2",
       "description": "The exact filing-failure alert and no-navigation assertions remain unchanged.",
-      "pointer": "apps/mobile/src/app/(app)/pick-book/[subjectId].test.tsx:336"
+      "pointer": "apps/mobile/src/app/(app)/pick-book/[subjectId].test.tsx:350"
     },
     {
       "acRef": "AC-3",
-      "description": "Five repair processes, three post-main-integration processes, and three exact-final-head processes passed the complete PickBookScreen suite 30/30; the exact-final-head runs completed in 20.603 s, 20.097 s, and 20.123 s.",
-      "pointer": "apps/mobile/src/app/(app)/pick-book/[subjectId].test.tsx:179"
+      "description": "Five repair processes, three post-main-integration processes, three pre-review final-head processes, and one review-amendment process passed the complete PickBookScreen suite 30/30; the review-amendment run completed in 20.542 s.",
+      "pointer": ".workitem-artifacts/WI-2844/verification.md"
     },
     {
       "acRef": "AC-4",
-      "description": "After normal integration of landed WI-2845 and WI-2846 plus the preserved remote seam clarification, the exact-final-head canonical mobile Jest command passed 514/514 suites and 6726/6726 tests in 338.192 seconds; PickBookScreen and useNowFeed both passed within the run, max RSS was 6026368 KB, and swaps were zero.",
+      "description": "After normal integration of landed WI-2845 and WI-2846 plus the preserved remote seam clarification, the review-amended final canonical mobile Jest command passed 514/514 suites and 6726/6726 tests in 335.119 seconds; PickBookScreen and useNowFeed both passed within the run, max RSS was 5616268 KB, and swaps were zero.",
       "pointer": "pnpm test:mobile:unit --silent"
     },
     {
