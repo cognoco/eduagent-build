@@ -406,12 +406,26 @@ interface WeeklyPushCronResult {
   queuedParents: number;
 }
 
-async function executeCronSteps(): Promise<{
+interface ExecuteCronStepsOptions {
+  weekWindow?: {
+    nowUtcMs: number;
+    currentWeekStartMs: number;
+  };
+}
+
+async function executeCronSteps(
+  options: ExecuteCronStepsOptions = {},
+): Promise<{
   result: WeeklyPushCronResult;
   step: { run: jest.Mock; sendEvent: jest.Mock };
 }> {
   const step = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
+    run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
+      if (name === 'resolve-week-window' && options.weekWindow) {
+        return options.weekWindow;
+      }
+      return fn();
+    }),
     sendEvent: jest.fn().mockResolvedValue(undefined),
   };
 
@@ -653,8 +667,53 @@ describe('weekly progress push integration', () => {
     });
   });
 
-  it('queues only parents whose real account timezone resolves to local 9am', async () => {
-    const now = new Date();
+  it('queues a matching parent through the real same-hour week-window step', async () => {
+    const evaluationNow = new Date();
+    const matchingTimezone = findTimezoneForHour(9, evaluationNow);
+
+    const { profileId: queuedParentId } = await seedProfile({
+      displayName: 'Same-hour Parent',
+      timezone: matchingTimezone,
+    });
+    const { profileId: queuedChildId } = await seedProfile({
+      displayName: 'Same-hour Child',
+      timezone: matchingTimezone,
+      credentialed: false,
+    });
+
+    await seedWeeklyPushPrefs(queuedParentId);
+    await seedFamilyLink(queuedParentId, queuedChildId);
+
+    const dateNowSpy = jest
+      .spyOn(Date, 'now')
+      .mockReturnValue(evaluationNow.getTime());
+
+    try {
+      const { result, step } = await executeCronSteps();
+
+      expect(result.status).toBe('completed');
+      expect(result.queuedParents).toBeGreaterThanOrEqual(1);
+      expect(step.run).toHaveBeenCalledWith(
+        'resolve-week-window',
+        expect.any(Function),
+      );
+      expect(step.sendEvent).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: 'app/weekly-progress-push.generate',
+            data: expect.objectContaining({ parentId: queuedParentId }),
+          }),
+        ]),
+      );
+    } finally {
+      dateNowSpy.mockRestore();
+    }
+  });
+
+  it('uses the memoized evaluation instant when the wall clock is one hour later', async () => {
+    const wallClockNow = new Date();
+    const now = new Date(wallClockNow.getTime() - 60 * 60 * 1000);
     const matchingTimezone = findTimezoneForHour(9, now);
     const nonMatchingTimezone = findTimezoneNotHour(9, now, matchingTimezone);
 
@@ -682,7 +741,12 @@ describe('weekly progress push integration', () => {
     await seedFamilyLink(queuedParentId, queuedChildId);
     await seedFamilyLink(skippedParentId, skippedChildId);
 
-    const { result, step } = await executeCronSteps();
+    const currentWeekStartMs = new Date(
+      `${weekStartIso(now)}T00:00:00.000Z`,
+    ).getTime();
+    const { result, step } = await executeCronSteps({
+      weekWindow: { nowUtcMs: now.getTime(), currentWeekStartMs },
+    });
 
     // The exact count may exceed 1 when other accounts in the shared DB
     // happen to match the 9am timezone window. Assert the test-created parent
@@ -707,7 +771,7 @@ describe('weekly progress push integration', () => {
       expect.any(String),
       expect.arrayContaining([
         expect.objectContaining({
-          data: { parentId: skippedParentId },
+          data: expect.objectContaining({ parentId: skippedParentId }),
         }),
       ]),
     );
