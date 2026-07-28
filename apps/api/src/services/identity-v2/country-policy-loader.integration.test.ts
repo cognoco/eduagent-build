@@ -26,7 +26,10 @@ import {
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
 
-const AS_OF = new Date('2026-07-25T12:00:00Z');
+// Must postdate every seeded row's effective_at, including the US row seeded
+// at 2026-07-28T00:00:00Z (WI-2850) — otherwise it reads as not-yet-effective
+// instead of exercising the blocked/unverified/gates-open decision path.
+const AS_OF = new Date('2026-07-28T12:00:00Z');
 const ADULT_BIRTH_DATE = '1990-01-01';
 const OPEN_GATE_ROW_ID = 'c2000000-0000-4000-8000-000000000001';
 const MISSING_GATE_ROW_ID = 'c2000000-0000-4000-8000-000000000002';
@@ -75,10 +78,11 @@ const GOOD_ASSURANCE = {
         );
     });
 
-    it('seeds the full EEA perimeter plus the United Kingdom', () => {
+    it('seeds the full EEA perimeter plus the United Kingdom and the United States', () => {
       const codes = new Set(rows.map((row) => row.countryCode));
-      expect(codes.size).toBe(31);
+      expect(codes.size).toBe(32);
       expect(codes.has('GB')).toBe(true);
+      expect(codes.has('US')).toBe(true);
     });
 
     it('carries the ruling’s Article 8 threshold distribution', () => {
@@ -87,8 +91,9 @@ const GOOD_ASSURANCE = {
         return acc;
       }, {});
       // 9/6/5/10 across the 30 EEA states, plus the United Kingdom seeded at the
-      // most restrictive value because the launch ruling does not clear one.
-      expect(histogram).toEqual({ 13: 9, 14: 6, 15: 5, 16: 11 });
+      // most restrictive value because the launch ruling does not clear one,
+      // plus the United States at the COPPA threshold of 13 (WI-2850).
+      expect(histogram).toEqual({ 13: 10, 14: 6, 15: 5, 16: 11 });
     });
 
     it('enables no country — the launch allowlist is empty', () => {
@@ -203,12 +208,14 @@ const GOOD_ASSURANCE = {
       expect(errorChainText(error)).toContain(CLOSED_GATES_CHECK);
     });
 
-    it('flags exactly the two countries with live-law rechecks', () => {
+    it('flags exactly the three countries with live-law rechecks', () => {
       const flagged = rows
         .filter((row) => row.launchDayReviewRequired)
         .map((row) => row.countryCode)
         .sort();
-      expect(flagged).toEqual(['NO', 'PT']);
+      // NO and PT per the 13+ EEA ruling; US per the launch-day KOSA recheck
+      // mandated by the 2026-07-26 US launch screen record (WI-2850).
+      expect(flagged).toEqual(['NO', 'PT', 'US']);
     });
 
     it('records France as the only joint child-plus-guardian authorization', () => {
@@ -227,7 +234,9 @@ const GOOD_ASSURANCE = {
         expect(loaded.length).toBeGreaterThan(0);
         expect(loaded[0].countryCode).toBe(code);
         expect(loaded[0].sourceProvenance.length).toBeGreaterThan(0);
-        expect(loaded[0].regimeKey).toMatch(/^(EU_GDPR_1[3-6]|UK_AADC)$/);
+        expect(loaded[0].regimeKey).toMatch(
+          /^(EU_GDPR_1[3-6]|UK_AADC|US_COPPA)$/,
+        );
       }
     });
 
