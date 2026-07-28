@@ -1,0 +1,18 @@
+{
+  "pageId": "3a58bce9-1f7c-816f-9aa3-def621c436a2",
+  "id": "WI-2600",
+  "name": "Restore + device-verify the two Maestro flows quarantined by WI-2596 (more-row-subscription, progress-subject-back)",
+  "description": "WI-2596 quarantined flows/account/more-tab-navigation.yaml and flows/subjects/multi-subject.yaml (pr-blocking -> blocked, removed from the manifest) because their assertions are red on main; restore both and re-verify green on a real emulator (cannot run on the headless Lancre host). Attribution (git-bisected): Flow A is a LAYOUT-FOLD regression from WI-2187 (Account security section grew above more-row-subscription; flow asserts without a scroll) — NOT the WI-2241 seed drift an earlier writeup claimed. Flow B was false-green (masked by a stdin-drain bug fixed by WI-2215) and needs device reproduction to confirm its cause.",
+  "acceptanceCriteria": "AC-1: For flows/account/more-tab-navigation.yaml — the more-row-subscription row already renders (onboarding-complete is an account owner, showBilling true); the failure is that WI-2187 grew the Account security section ABOVE it (account-security.tsx), pushing more-row-subscription below the fold while this step uses a plain assertVisible with no preceding scroll. Add a scrollUntilVisible for more-row-subscription before the assertVisible (mirroring the flow’s other below-fold rows), or otherwise restore visibility; state which and why.\nAC-2: For flows/subjects/multi-subject.yaml — reproduce on an emulator FIRST (this flow was previously false-green, masked by a shard-runner stdin-drain bug fixed by WI-2215; it never actually ran), then fix the seed/flow so the subject progress screen renders progress-subject-back instead of its progress-subject-error state; state the confirmed root cause.\nAC-3: Device/emulator-verify BOTH flows green (a real Maestro run — the step WI-2596 could not perform on the headless host).\nAC-4: Restore the pr-blocking tag + re-add both entries to apps/mobile/e2e/ci-maestro-manifest.json, and remove the blocked tag + BLOCKED header from each flow.\nAC-5: Do not weaken or delete the two assertions to make them pass (carry WI-2596 AC-5 forward).",
+  "riskImpact": "Two pr-blocking Maestro flows on critical navigation paths (account/subscription, subject progress) are quarantined out of the gate, so that coverage is dark until restored. Bounded by WI-2596's AC-3 health surfacer, which now makes any further Maestro-on-main breakage visible.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "",
+  "bodyText": ""
+}

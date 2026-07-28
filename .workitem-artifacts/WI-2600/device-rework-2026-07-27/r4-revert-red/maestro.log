@@ -1,0 +1,85 @@
+Running on E2E_Device_2
+ > Flow multi-subject-original-repro
+Run ../_setup/seed-and-sign-in.yaml...
+[engine] WARNING: Unable to load the TruffleAttach library.
+As a result, the optimized Truffle runtime is unavailable, and Truffle cannot provide native access to languages and tools.
+To customize the behavior of this warning, use the 'polyglotimpl.AttachLibraryFailureAction' system property.
+Allowed values are:
+  - ignore:    Do not print this warning.
+  - warn:      Print this warning (default value).
+  - diagnose:  Print this warning along with the exception cause.
+  - throw:     Throw an exception instead of printing this warning.
+
+  Run nav-welcome-to-sign-in.yaml...
+    Assert that id: welcome-chooser is visible... COMPLETED
+    Tap on id: welcome-chooser-learner... COMPLETED
+    Assert that id: welcome-card-1 is visible... COMPLETED
+    Tap on id: welcome-next-button... COMPLETED
+    Assert that id: welcome-card-2 is visible... COMPLETED
+    Wait for animation to end... COMPLETED
+    Tap on id: welcome-next-button... COMPLETED
+    Assert that id: welcome-card-3 is visible... COMPLETED
+    Assert that id: welcome-start-button is visible... COMPLETED
+    Tap on id: welcome-start-button... COMPLETED
+    Assert that id: pre-auth-bridge is visible... COMPLETED
+    Tap on id: pre-auth-bridge-secondary... COMPLETED
+    Assert that id: sign-in-button is visible... COMPLETED
+  Run nav-welcome-to-sign-in.yaml... COMPLETED
+  Assert that id: sign-in-button is visible... COMPLETED
+  Take screenshot signin-01-screen-loaded... COMPLETED
+  Tap on id: sign-in-email... COMPLETED
+  Input text ${EMAIL}... COMPLETED
+  Take screenshot signin-02-email-keyboard-open... COMPLETED
+  Scrolling DOWN until id: sign-in-password is visible with speed 60, visibility percentage 50%, timeout 10000 ms, with centering disabled... COMPLETED
+  Tap on id: sign-in-password... COMPLETED
+  Input text ${PASSWORD}... COMPLETED
+  Take screenshot signin-03-password-keyboard-open... COMPLETED
+  Scrolling DOWN until id: sign-in-button is visible with speed 60, visibility percentage 50%, timeout 10000 ms, with centering disabled... COMPLETED
+  Tap on id: sign-in-button... COMPLETED
+  Assert that (Optional) id: learner-screen is visible... COMPLETED
+  Assert that (Optional) id: dashboard-scroll is visible... WARNED
+  Assert that (Optional) id: parent-home-screen is visible... WARNED
+  Run dismiss-post-approval.yaml when "You're approved!" is visible...
+  Run dismiss-post-approval.yaml when "You're approved!" is visible... SKIPPED
+  Tap on (Optional) "Skip for now"... WARNED
+  Assert that id: profile-load-error is not visible... COMPLETED
+  Run return-to-home-safe.yaml when id: learner-screen is not visible...
+  Run return-to-home-safe.yaml when id: learner-screen is not visible... SKIPPED
+  Assert that (Optional) id: learner-screen is visible... COMPLETED
+  Assert that (Optional) id: parent-home-screen is visible... WARNED
+  Assert that (Optional) id: mentor-screen is visible... WARNED
+  Assert that (Optional) id: support-hub-mentor-tab is visible... WARNED
+  Take screenshot signin-04-home-reached... COMPLETED
+  Run dismiss-notifications.yaml when "send you notifications" is visible...
+  Run dismiss-notifications.yaml when "send you notifications" is visible... SKIPPED
+Run ../_setup/seed-and-sign-in.yaml... COMPLETED
+Assert that id: learner-screen is visible... COMPLETED
+Assert that id: tab-home is visible... COMPLETED
+Assert that id: tab-library is visible... COMPLETED
+Assert that id: tab-more is visible... COMPLETED
+Scrolling DOWN until id: home-subject-carousel is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+Assert that id: home-subject-carousel is visible... COMPLETED
+Take screenshot multi-subject-01-home... COMPLETED
+Assert that id: home-subject-card-${ACTIVE_SUBJECT_ID} is visible... COMPLETED
+Assert that id: home-empty-subjects is not visible... COMPLETED
+Tap on id: tab-library... COMPLETED
+Assert that id: shelves-list is visible... COMPLETED
+Assert that id: shelf-row-header-${ACTIVE_SUBJECT_ID} is visible... COMPLETED
+Take screenshot multi-subject-02-library... COMPLETED
+Tap on id: tab-home... COMPLETED
+Assert that id: learner-screen is visible... COMPLETED
+Tap on id: home-subject-card-${ACTIVE_SUBJECT_ID}... COMPLETED
+Assert that id: progress-subject-back is visible... FAILED
+
+Assertion is false: id: progress-subject-back is visible
+
+Assertion 'id: progress-subject-back is visible' failed. Check the UI hierarchy in debug artifacts to verify the element state and properties.
+
+Possible causes:
+- Element selector may be incorrect - check if there are similar elements with slightly different names/properties.
+- Element may be temporarily unavailable due to loading state
+- This could be a real regression that needs to be addressed
+
+==== Debug output (logs & screenshots) ====
+
+C:\Users\ZuzanaKope?ná\.maestro\tests\2026-07-27_111637
