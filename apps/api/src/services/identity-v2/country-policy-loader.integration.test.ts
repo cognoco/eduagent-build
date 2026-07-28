@@ -11,7 +11,7 @@
 // "no country resolves to allowed" is a correctness assertion here, not a gap.
 // ---------------------------------------------------------------------------
 import { resolve } from 'path';
-import { eq } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   countryPolicyRegistry,
@@ -29,6 +29,23 @@ const RUN = !!process.env.DATABASE_URL;
 const AS_OF = new Date('2026-07-25T12:00:00Z');
 const ADULT_BIRTH_DATE = '1990-01-01';
 const OPEN_GATE_ROW_ID = 'c2000000-0000-4000-8000-000000000001';
+const MISSING_GATE_ROW_ID = 'c2000000-0000-4000-8000-000000000002';
+const CLOSED_GATES_CHECK =
+  'country_policy_registry_enabled_requires_closed_gates';
+
+// Drizzle wraps driver failures in DrizzleQueryError ("Failed query: …") and
+// carries the PostgreSQL error — where the violated constraint is named — on
+// the `cause` chain, so the assertion walks the chain instead of matching the
+// wrapper message.
+const errorChainText = (error: unknown): string => {
+  const parts: string[] = [];
+  let current: unknown = error;
+  while (current instanceof Error) {
+    parts.push(current.message);
+    current = current.cause;
+  }
+  return parts.join('\n');
+};
 const GOOD_ASSURANCE = {
   method: 'self_report' as const,
   confidence: 0.8,
@@ -50,7 +67,12 @@ const GOOD_ASSURANCE = {
     afterEach(async () => {
       await db
         .delete(countryPolicyRegistry)
-        .where(eq(countryPolicyRegistry.id, OPEN_GATE_ROW_ID));
+        .where(
+          inArray(countryPolicyRegistry.id, [
+            OPEN_GATE_ROW_ID,
+            MISSING_GATE_ROW_ID,
+          ]),
+        );
     });
 
     it('seeds the full EEA perimeter plus the United Kingdom', () => {
@@ -83,8 +105,9 @@ const GOOD_ASSURANCE = {
         throw new Error('Expected the seeded country-policy registry');
       }
 
-      await expect(
-        db.insert(countryPolicyRegistry).values({
+      const error: unknown = await db
+        .insert(countryPolicyRegistry)
+        .values({
           id: OPEN_GATE_ROW_ID,
           countryCode: 'XG',
           countryName: 'Integration Test Open Gate',
@@ -118,8 +141,66 @@ const GOOD_ASSURANCE = {
             operationalRightsAndIncidents: true,
             launchDayLegalRefresh: true,
           },
-        }),
-      ).rejects.toThrow();
+        })
+        .then(
+          () => null,
+          (cause: unknown) => cause,
+        );
+
+      expect(errorChainText(error)).toContain(CLOSED_GATES_CHECK);
+    });
+
+    it('[WI-2690] rejects an enabled country whose gate object is missing a gate', async () => {
+      const template = rows[0];
+      if (!template) {
+        throw new Error('Expected the seeded country-policy registry');
+      }
+
+      // JSONB equality also rejects an incomplete gate object: seven gates
+      // true and the eighth ABSENT must fail the same CHECK, not sneak past
+      // a per-key comparison.
+      const error: unknown = await db
+        .insert(countryPolicyRegistry)
+        .values({
+          id: MISSING_GATE_ROW_ID,
+          countryCode: 'XH',
+          countryName: 'Integration Test Missing Gate',
+          regimeId: template.regimeId,
+          article8Threshold: 13,
+          authorizationForm: 'self',
+          launchStatus: 'enabled',
+          launchBlockReason: null,
+          legalVerificationStatus: 'verified',
+          legalReviewedAt: new Date('2026-07-26T00:00:00Z'),
+          legalReviewValidUntil: new Date('2026-12-31T00:00:00Z'),
+          launchDayReviewRequired: false,
+          processingLocationClass: 'eea_only',
+          policyVersion: 'integration-missing-gate',
+          effectiveAt: new Date('2026-07-26T00:00:00Z'),
+          expiresAt: null,
+          sourceProvenance: [
+            {
+              title: 'Integration-test policy record',
+              url: 'https://example.test/country-policy',
+              checkedAt: '2026-07-26T00:00:00Z',
+            },
+          ],
+          controllerGates: {
+            externalPrivacyLegalReview: true,
+            aiActClassification: true,
+            reliableAgeAndResidence: true,
+            childTransparency: true,
+            adultCommercialRelationship: true,
+            countryAllowlist: true,
+            operationalRightsAndIncidents: true,
+          },
+        })
+        .then(
+          () => null,
+          (cause: unknown) => cause,
+        );
+
+      expect(errorChainText(error)).toContain(CLOSED_GATES_CHECK);
     });
 
     it('flags exactly the two countries with live-law rechecks', () => {
