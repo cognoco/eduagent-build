@@ -25,12 +25,41 @@ import type { ConversationLanguage } from '@eduagent/schemas';
 
 export type CorpusConfidence = 'reviewed' | 'model-generated';
 
+/**
+ * How a condition term may be detected — the explicit lexeme-scope contract the
+ * Stage-3 reachability ruling requires (2026-07-26).
+ *
+ * `broad` — detectable on its own, in ANY of the ten languages' prose. A bare
+ * mention is enough to make the text non-clear (ambiguous, then judged).
+ *
+ * `attributed-only` — detectable ONLY inside an attribution construction, and
+ * ONLY through the grammar of the language that declares it. These are terms
+ * that are homographs of ordinary words in another supported language: Spanish
+ * `TEA`, German `ADS`, Norwegian `ADD` collide with English "tea", "ads",
+ * "add". They were previously OMITTED from the corpus outright, which made
+ * `El alumno tiene TEA` classify `clear` and — because the gate reaches
+ * attribution analysis only after a protected-lexeme match — unreachable by any
+ * judge-side change. Putting them in this scope makes the attributed use
+ * deterministically `block` while leaving the bare mention outside the
+ * cross-language detector entirely, so "tea the drink" never fires.
+ *
+ * The scanner assigns each scope to a detection policy through an EXHAUSTIVE
+ * switch, so adding a third scope is a compile error rather than a silent
+ * no-op. See `scan.ts` → `detectionPolicyFor`.
+ */
+export type LexemeScope = 'broad' | 'attributed-only';
+
 export interface LanguageCorpus {
   readonly language: ConversationLanguage;
   /** 'reviewed' = expert-validated. 'model-generated' = needs native review. */
   readonly confidence: CorpusConfidence;
-  /** Condition / diagnosis terms. Contribute the "protected lexeme present" signal. */
-  readonly lexemes: readonly string[];
+  /**
+   * Condition / diagnosis terms, partitioned by detection scope. Contribute the
+   * "protected lexeme present" signal — `broad` on its own, `attributed-only`
+   * only within this language's attribution grammar. Both keys are REQUIRED, so
+   * a newly added language cannot silently omit the scope decision.
+   */
+  readonly lexemes: Readonly<Record<LexemeScope, readonly string[]>>;
   /** Generic person references (pronouns, learner roles) usable as an attribution subject. */
   readonly personReferences: readonly string[];
   /** Possessive determiners: "<det> <lexeme>" is attribution without a verb. */
@@ -58,26 +87,29 @@ const EN: LanguageCorpus = {
   language: 'en',
   // Direct port of the shipped WI-1195 Art-9 list — the only expert-scoped set.
   confidence: 'reviewed',
-  lexemes: [
-    'adhd',
-    'autism',
-    'autistic',
-    'dyslexia',
-    'dyslexic',
-    'dyscalculia',
-    'dyscalculic',
-    'learning disability',
-    'learning disabilities',
-    // Hyphenated compounds, matching how 'mental-health condition' is already
-    // carried. Without these, "a learning-disability diagnosis" scanned clear
-    // while the space-separated form blocked.
-    'learning-disability',
-    'learning-disabilities',
-    'mental health condition',
-    'mental-health condition',
-    'physical health condition',
-    'physical-health condition',
-  ],
+  lexemes: {
+    broad: [
+      'adhd',
+      'autism',
+      'autistic',
+      'dyslexia',
+      'dyslexic',
+      'dyscalculia',
+      'dyscalculic',
+      'learning disability',
+      'learning disabilities',
+      // Hyphenated compounds, matching how 'mental-health condition' is already
+      // carried. Without these, "a learning-disability diagnosis" scanned clear
+      // while the space-separated form blocked.
+      'learning-disability',
+      'learning-disabilities',
+      'mental health condition',
+      'mental-health condition',
+      'physical health condition',
+      'physical-health condition',
+    ],
+    'attributed-only': [],
+  },
   personReferences: [
     'i',
     'you',
@@ -141,43 +173,46 @@ const EN: LanguageCorpus = {
 const CS: LanguageCorpus = {
   language: 'cs',
   confidence: 'model-generated',
-  lexemes: [
-    'adhd',
-    // Czech declines: nominative/genitive/dative/instrumental forms listed.
-    'autismus',
-    'autismu',
-    'autismem',
-    'autista',
-    'autisty',
-    'autistou',
-    'autistický',
-    'autistická',
-    'autistické',
-    'autistického',
-    'autistickou',
-    'dyslexie',
-    'dyslexii',
-    'dyslexií',
-    'dyslektik',
-    'dyslektika',
-    'dyslektický',
-    'dyslektická',
-    'dyskalkulie',
-    'dyskalkulii',
-    'dyskalkulií',
-    'dyskalkulik',
-    'porucha učení',
-    'poruchu učení',
-    'poruchou učení',
-    'poruchy učení',
-    'specifická porucha učení',
-    'duševní onemocnění',
-    'duševní porucha',
-    'duševní poruchu',
-    'psychické onemocnění',
-    'tělesné postižení',
-    'tělesným postižením',
-  ],
+  lexemes: {
+    broad: [
+      'adhd',
+      // Czech declines: nominative/genitive/dative/instrumental forms listed.
+      'autismus',
+      'autismu',
+      'autismem',
+      'autista',
+      'autisty',
+      'autistou',
+      'autistický',
+      'autistická',
+      'autistické',
+      'autistického',
+      'autistickou',
+      'dyslexie',
+      'dyslexii',
+      'dyslexií',
+      'dyslektik',
+      'dyslektika',
+      'dyslektický',
+      'dyslektická',
+      'dyskalkulie',
+      'dyskalkulii',
+      'dyskalkulií',
+      'dyskalkulik',
+      'porucha učení',
+      'poruchu učení',
+      'poruchou učení',
+      'poruchy učení',
+      'specifická porucha učení',
+      'duševní onemocnění',
+      'duševní porucha',
+      'duševní poruchu',
+      'psychické onemocnění',
+      'tělesné postižení',
+      'tělesným postižením',
+    ],
+    'attributed-only': [],
+  },
   personReferences: [
     'já',
     'ty',
@@ -242,27 +277,32 @@ const CS: LanguageCorpus = {
 const ES: LanguageCorpus = {
   language: 'es',
   confidence: 'model-generated',
-  lexemes: [
-    'tdah',
-    'adhd',
-    'autismo',
-    'autista',
-    'trastorno del espectro autista',
-    // NOTE: the Spanish acronym "TEA" is deliberately OMITTED — it is the
-    // English word "tea", and lexeme detection runs across all ten languages.
-    'dislexia',
-    'disléxico',
-    'disléxica',
-    'discalculia',
-    'trastorno de aprendizaje',
-    'trastornos de aprendizaje',
-    'dificultad de aprendizaje',
-    'dificultades de aprendizaje',
-    'discapacidad de aprendizaje',
-    'trastorno de salud mental',
-    'enfermedad mental',
-    'discapacidad física',
-  ],
+  lexemes: {
+    broad: [
+      'tdah',
+      'adhd',
+      'autismo',
+      'autista',
+      'trastorno del espectro autista',
+      // NOTE: the Spanish acronym "TEA" is NOT here — it is the English word
+      // "tea", and broad lexeme detection runs across all ten languages. It lives
+      // in this corpus's 'attributed-only' scope instead, so `El alumno tiene TEA`
+      // blocks while an English "a cup of tea" never fires.
+      'dislexia',
+      'disléxico',
+      'disléxica',
+      'discalculia',
+      'trastorno de aprendizaje',
+      'trastornos de aprendizaje',
+      'dificultad de aprendizaje',
+      'dificultades de aprendizaje',
+      'discapacidad de aprendizaje',
+      'trastorno de salud mental',
+      'enfermedad mental',
+      'discapacidad física',
+    ],
+    'attributed-only': ['tea'],
+  },
   personReferences: [
     'yo',
     'tú',
@@ -328,23 +368,26 @@ const ES: LanguageCorpus = {
 const FR: LanguageCorpus = {
   language: 'fr',
   confidence: 'model-generated',
-  lexemes: [
-    'tdah',
-    'adhd',
-    'autisme',
-    'autiste',
-    'trouble du spectre autistique',
-    'dyslexie',
-    'dyslexique',
-    'dyscalculie',
-    "trouble d'apprentissage",
-    "troubles d'apprentissage",
-    "difficulté d'apprentissage",
-    "difficultés d'apprentissage",
-    'trouble de santé mentale',
-    'maladie mentale',
-    'handicap physique',
-  ],
+  lexemes: {
+    broad: [
+      'tdah',
+      'adhd',
+      'autisme',
+      'autiste',
+      'trouble du spectre autistique',
+      'dyslexie',
+      'dyslexique',
+      'dyscalculie',
+      "trouble d'apprentissage",
+      "troubles d'apprentissage",
+      "difficulté d'apprentissage",
+      "difficultés d'apprentissage",
+      'trouble de santé mentale',
+      'maladie mentale',
+      'handicap physique',
+    ],
+    'attributed-only': [],
+  },
   personReferences: [
     'je',
     'tu',
@@ -409,29 +452,34 @@ const FR: LanguageCorpus = {
 const DE: LanguageCorpus = {
   language: 'de',
   confidence: 'model-generated',
-  lexemes: [
-    'adhs',
-    // NOTE: German "ADS" deliberately OMITTED — homograph of English "ads".
-    'adhd',
-    'autismus',
-    'autistisch',
-    'autistische',
-    'autistischer',
-    'autist',
-    'autismus-spektrum-störung',
-    'legasthenie',
-    'legastheniker',
-    'legasthenikerin',
-    'dyslexie',
-    'dyskalkulie',
-    'rechenstörung',
-    'lernbehinderung',
-    'lernstörung',
-    'lernstörungen',
-    'psychische erkrankung',
-    'psychische störung',
-    'körperliche behinderung',
-  ],
+  lexemes: {
+    broad: [
+      'adhs',
+      // NOTE: German "ADS" is not broad — homograph of English "ads". It sits in
+      // this corpus's 'attributed-only' scope: `Der Schüler hat ADS` blocks, a
+      // bare "ads" never fires.
+      'adhd',
+      'autismus',
+      'autistisch',
+      'autistische',
+      'autistischer',
+      'autist',
+      'autismus-spektrum-störung',
+      'legasthenie',
+      'legastheniker',
+      'legasthenikerin',
+      'dyslexie',
+      'dyskalkulie',
+      'rechenstörung',
+      'lernbehinderung',
+      'lernstörung',
+      'lernstörungen',
+      'psychische erkrankung',
+      'psychische störung',
+      'körperliche behinderung',
+    ],
+    'attributed-only': ['ads'],
+  },
   personReferences: [
     'ich',
     'du',
@@ -494,25 +542,28 @@ const DE: LanguageCorpus = {
 const IT: LanguageCorpus = {
   language: 'it',
   confidence: 'model-generated',
-  lexemes: [
-    'adhd',
-    'ddai',
-    'autismo',
-    'autistico',
-    'autistica',
-    'disturbo dello spettro autistico',
-    'dislessia',
-    'dislessico',
-    'dislessica',
-    'discalculia',
-    "disturbo dell'apprendimento",
-    "disturbi dell'apprendimento",
-    'difficoltà di apprendimento',
-    'disturbo specifico di apprendimento',
-    'disturbo di salute mentale',
-    'malattia mentale',
-    'disabilità fisica',
-  ],
+  lexemes: {
+    broad: [
+      'adhd',
+      'ddai',
+      'autismo',
+      'autistico',
+      'autistica',
+      'disturbo dello spettro autistico',
+      'dislessia',
+      'dislessico',
+      'dislessica',
+      'discalculia',
+      "disturbo dell'apprendimento",
+      "disturbi dell'apprendimento",
+      'difficoltà di apprendimento',
+      'disturbo specifico di apprendimento',
+      'disturbo di salute mentale',
+      'malattia mentale',
+      'disabilità fisica',
+    ],
+    'attributed-only': [],
+  },
   personReferences: [
     'io',
     'tu',
@@ -575,25 +626,28 @@ const IT: LanguageCorpus = {
 const PT: LanguageCorpus = {
   language: 'pt',
   confidence: 'model-generated',
-  lexemes: [
-    'tdah',
-    'adhd',
-    'autismo',
-    'autista',
-    'transtorno do espectro autista',
-    'dislexia',
-    'disléxico',
-    'disléxica',
-    'discalculia',
-    'transtorno de aprendizagem',
-    'transtornos de aprendizagem',
-    'dificuldade de aprendizagem',
-    'dificuldades de aprendizagem',
-    'distúrbio de aprendizagem',
-    'transtorno de saúde mental',
-    'doença mental',
-    'deficiência física',
-  ],
+  lexemes: {
+    broad: [
+      'tdah',
+      'adhd',
+      'autismo',
+      'autista',
+      'transtorno do espectro autista',
+      'dislexia',
+      'disléxico',
+      'disléxica',
+      'discalculia',
+      'transtorno de aprendizagem',
+      'transtornos de aprendizagem',
+      'dificuldade de aprendizagem',
+      'dificuldades de aprendizagem',
+      'distúrbio de aprendizagem',
+      'transtorno de saúde mental',
+      'doença mental',
+      'deficiência física',
+    ],
+    'attributed-only': [],
+  },
   personReferences: [
     'eu',
     'tu',
@@ -657,32 +711,35 @@ const PT: LanguageCorpus = {
 const PL: LanguageCorpus = {
   language: 'pl',
   confidence: 'model-generated',
-  lexemes: [
-    'adhd',
-    'autyzm',
-    'autyzmu',
-    'autystyczny',
-    'autystyczna',
-    'autystyczne',
-    'autysta',
-    'spektrum autyzmu',
-    'dysleksja',
-    'dysleksję',
-    'dysleksji',
-    'dyslektyk',
-    'dyslektyczka',
-    'dyskalkulia',
-    'dyskalkulię',
-    'dyskalkulii',
-    'trudności w uczeniu się',
-    'trudności w nauce',
-    'zaburzenia uczenia się',
-    'niepełnosprawność intelektualna',
-    'choroba psychiczna',
-    'chorobę psychiczną',
-    'zaburzenie psychiczne',
-    'niepełnosprawność fizyczna',
-  ],
+  lexemes: {
+    broad: [
+      'adhd',
+      'autyzm',
+      'autyzmu',
+      'autystyczny',
+      'autystyczna',
+      'autystyczne',
+      'autysta',
+      'spektrum autyzmu',
+      'dysleksja',
+      'dysleksję',
+      'dysleksji',
+      'dyslektyk',
+      'dyslektyczka',
+      'dyskalkulia',
+      'dyskalkulię',
+      'dyskalkulii',
+      'trudności w uczeniu się',
+      'trudności w nauce',
+      'zaburzenia uczenia się',
+      'niepełnosprawność intelektualna',
+      'choroba psychiczna',
+      'chorobę psychiczną',
+      'zaburzenie psychiczne',
+      'niepełnosprawność fizyczna',
+    ],
+    'attributed-only': [],
+  },
   personReferences: [
     'ja',
     'ty',
@@ -747,33 +804,36 @@ const JA: LanguageCorpus = {
   // Japanese needs explicit SCRIPT VARIATION, not just NFKC: NFKC folds
   // half-width/full-width (ＡＤＨＤ -> ADHD, ｱｽﾍﾟﾙｶﾞｰ -> アスペルガー) but does
   // NOT bridge kanji <-> katakana <-> romaji. Those are separate entries.
-  lexemes: [
-    'adhd',
-    '注意欠陥多動性障害',
-    '注意欠如多動症',
-    '注意欠如・多動症',
-    'エーディーエイチディー',
-    '自閉症',
-    '自閉スペクトラム症',
-    '自閉症スペクトラム',
-    'asd',
-    'アスペルガー',
-    'アスペルガー症候群',
-    '発達障害',
-    '発達障がい',
-    'ディスレクシア',
-    '失読症',
-    '読字障害',
-    'dyslexia',
-    '学習障害',
-    '学習障がい',
-    'ディスカリキュリア',
-    '算数障害',
-    '精神疾患',
-    '精神障害',
-    '身体障害',
-    '身体障がい',
-  ],
+  lexemes: {
+    broad: [
+      'adhd',
+      '注意欠陥多動性障害',
+      '注意欠如多動症',
+      '注意欠如・多動症',
+      'エーディーエイチディー',
+      '自閉症',
+      '自閉スペクトラム症',
+      '自閉症スペクトラム',
+      'asd',
+      'アスペルガー',
+      'アスペルガー症候群',
+      '発達障害',
+      '発達障がい',
+      'ディスレクシア',
+      '失読症',
+      '読字障害',
+      'dyslexia',
+      '学習障害',
+      '学習障がい',
+      'ディスカリキュリア',
+      '算数障害',
+      '精神疾患',
+      '精神障害',
+      '身体障害',
+      '身体障がい',
+    ],
+    'attributed-only': [],
+  },
   personReferences: [
     '私',
     'わたし',
@@ -822,27 +882,32 @@ const JA: LanguageCorpus = {
 const NB: LanguageCorpus = {
   language: 'nb',
   confidence: 'model-generated',
-  lexemes: [
-    'adhd',
-    // NOTE: Norwegian "ADD" deliberately OMITTED — homograph of English "add".
-    'autisme',
-    'autistisk',
-    'autist',
-    'autismespekterforstyrrelse',
-    'dysleksi',
-    'dyslektiker',
-    'dyslektisk',
-    'ordblind',
-    'ordblindhet',
-    'dyskalkuli',
-    'lærevansker',
-    'lærevanske',
-    'lese- og skrivevansker',
-    'psykisk lidelse',
-    'psykisk sykdom',
-    'fysisk funksjonsnedsettelse',
-    'funksjonsnedsettelse',
-  ],
+  lexemes: {
+    broad: [
+      'adhd',
+      // NOTE: Norwegian "ADD" is not broad — homograph of English "add". It sits
+      // in this corpus's 'attributed-only' scope: `Eleven har ADD` blocks, a bare
+      // "add" never fires.
+      'autisme',
+      'autistisk',
+      'autist',
+      'autismespekterforstyrrelse',
+      'dysleksi',
+      'dyslektiker',
+      'dyslektisk',
+      'ordblind',
+      'ordblindhet',
+      'dyskalkuli',
+      'lærevansker',
+      'lærevanske',
+      'lese- og skrivevansker',
+      'psykisk lidelse',
+      'psykisk sykdom',
+      'fysisk funksjonsnedsettelse',
+      'funksjonsnedsettelse',
+    ],
+    'attributed-only': ['add'],
+  },
   personReferences: [
     'jeg',
     'du',

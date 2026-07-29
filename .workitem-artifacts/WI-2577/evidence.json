@@ -1,0 +1,41 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Trace of the later-phases path: webServer defined once at config root, shared by every project; later-phases project block adds no env override, so project selection has zero effect on which flag values reach the export.",
+      "pointer": "apps/mobile/playwright.config.ts:143"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Environment materialization: applyExpoPublicEnvOverrides replace-or-appends EXPO_PUBLIC_ENABLE_MODE_NAV + V1 + V2 (+ E2E) from the invoking shell into the env files Expo reads before web export — the effective values are proven by this code path, not inferred from the project name.",
+      "pointer": "apps/mobile/e2e-web/helpers/serve-exported-web-env.mjs:22"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Already Fixed ancestor: the wiring landed in this commit (2026-06-21) and is byte-present at the current execution base; verified reachable from origin/main via merge-base ancestry.",
+      "pointer": "b3b9c8155cbdcd4b1cc9569f3b605999c7f6dd99"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Regression coverage for the wiring ran locally with zero failures via the node test runner.",
+      "pointer": "node --test apps/mobile/e2e-web/helpers/serve-exported-web-env.test.mjs"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "No gap found, so no source change was made; the maintained later-phases invocations are the two README commands, both already exporting all three values true, and the explicit V0/V1 matrix commands outside the release project are preserved.",
+      "pointer": "apps/mobile/e2e-web/README.md:20"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Config-level verification only: the helper regression test asserts the V2 key is written true into the env file; no seeded Playwright web run executed, no credential-bearing artifact generated (WI-2593 redaction gate honored).",
+      "pointer": "apps/mobile/e2e-web/helpers/serve-exported-web-env.test.mjs:21"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "Completion evidence names the outcome (Already Fixed), the ancestor commit, every maintained invocation checked (e2e-web.yml smoke lanes enumeration + README commands), and the safe non-credential verification command (the node --test run above).",
+      "pointer": "b3b9c8155cbdcd4b1cc9569f3b605999c7f6dd99"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": "apps/mobile/e2e-web/helpers/serve-exported-web-env.test.mjs:21"
+}

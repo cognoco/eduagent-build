@@ -205,6 +205,47 @@ describe('useSessionActions', () => {
     );
   });
 
+  it('[WI-2811] keeps an accepted close callback on Session', async () => {
+    const onSessionClosed = jest.fn().mockReturnValue(true);
+    const opts = createMockOpts({ onSessionClosed });
+    const { result } = renderHook(() => useSessionActions(opts as any));
+
+    await act(async () => {
+      await result.current.handleEndSession();
+      await confirmEndSession();
+    });
+
+    expect(onSessionClosed).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      wallClockSeconds: 120,
+      fastCelebrations: [],
+    });
+    expect(opts.router.replace).not.toHaveBeenCalled();
+    expect(opts.fetchFastCelebrations).not.toHaveBeenCalled();
+  });
+
+  it('[WI-2811] keeps close-rejection recovery on Session', async () => {
+    const opts = createMockOpts({
+      closeSession: {
+        mutateAsync: jest.fn().mockRejectedValue(new Error('close failed')),
+      },
+    });
+    const { result } = renderHook(() => useSessionActions(opts as any));
+
+    await act(async () => {
+      await result.current.handleEndSession();
+      await confirmEndSession();
+    });
+
+    expect(opts.router.replace).not.toHaveBeenCalled();
+    expect(opts.setIsClosing).toHaveBeenCalledWith(false);
+    expect(platformAlert).toHaveBeenLastCalledWith(
+      'Could not end this session cleanly',
+      expect.any(String),
+      expect.any(Array),
+    );
+  });
+
   it('auto-files homework sessions then navigates to the (home-bound) summary', async () => {
     const opts = createMockOpts({ effectiveMode: 'homework' });
     const { result } = renderHook(() => useSessionActions(opts as any));

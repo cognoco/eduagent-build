@@ -13,7 +13,7 @@ export async function closePoolAndDropScratchDatabase({
   adminPool,
   scratchPool,
   databaseName,
-  timeoutMs = 10_000,
+  timeoutMs = 30_000,
   now = Date.now,
   sleep = (delayMs) =>
     new Promise<void>((resolve) => setTimeout(resolve, delayMs)),

@@ -14,11 +14,28 @@ async function openJournal(page: Page): Promise<void> {
   await expect(page.getByTestId('scope-chip')).toHaveCount(0);
 }
 
-async function expectJournalReturn(page: Page): Promise<void> {
-  await expect(page).toHaveURL(/\/journal$/);
+async function expectJournalReturn(
+  page: Page,
+  section?: 'reports',
+): Promise<void> {
+  await expect
+    .poll(() => {
+      const url = new URL(page.url());
+      return {
+        pathname: url.pathname,
+        section: url.searchParams.get('section'),
+      };
+    })
+    .toEqual({
+      pathname: '/journal',
+      section: section ?? null,
+    });
   await expect(page.getByTestId('journal-screen')).toHaveCount(1);
   await expect(page.getByTestId('journal-screen')).toBeVisible();
   await expect(page.getByTestId('scope-chip')).toHaveCount(0);
+  if (section === 'reports') {
+    await expect(page.getByTestId('journal-reports-section')).toBeVisible();
+  }
 }
 
 test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor bookmark, Practice, Memory, and exact weekly/monthly reports open their owning surfaces and return to Journal Me', async ({
@@ -241,8 +258,7 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
   // another tab or a synthetic Progress screen. Native stack ancestry is
   // established separately by the caller's complete push chain.
   await page.goBack();
-  await expectJournalReturn(page);
-  await pressableClick(page.getByTestId('journal-tab-reports'));
+  await expectJournalReturn(page, 'reports');
   await expect(
     page
       .getByTestId('journal-reports-list')
@@ -280,8 +296,7 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
     page.getByText('112 topics mastered', { exact: true }),
   ).toHaveCount(0);
   await pressableClick(page.getByTestId('progress-report-back'));
-  await expectJournalReturn(page);
-  await pressableClick(page.getByTestId('journal-tab-reports'));
+  await expectJournalReturn(page, 'reports');
   await expect(
     page
       .getByTestId('journal-reports-list')

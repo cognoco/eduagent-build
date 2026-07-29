@@ -36,7 +36,10 @@ export function SubjectHubNextUp({
       <Text className="text-caption font-semibold uppercase text-text-secondary">
         {t('subjectHub.nextUp.heading')}
       </Text>
-      <Text className="mt-2 text-body font-semibold text-text-primary">
+      <Text
+        className="mt-2 text-body font-semibold text-text-primary"
+        testID="subject-hub-next-up-topic"
+      >
         {nextUp.topicTitle ?? t('subjectHub.nextUp.allCaughtUp')}
       </Text>
 

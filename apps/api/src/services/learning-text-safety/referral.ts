@@ -43,12 +43,42 @@
  */
 export const referralPayloadKey = Symbol('learningTextSafety.referralPayload');
 
-export interface LearningTextReferralPayload {
-  /**
-   * The EXACT text the scan ran over. Not normalized — normalization is
-   * match-only and never escapes `scan.ts`.
-   */
-  readonly text: string;
-  /** The producer vendor, already validated non-blank and trimmed by the scan. */
-  readonly producerVendor: string;
-}
+/**
+ * WHY THIS IS A DISCRIMINATED UNION (operator ruling, 2026-07-26).
+ *
+ * The ruling extends `refer` to USER provenance: learner-authored ambiguous
+ * educational text now reaches the independent judge instead of being blocked
+ * outright. That changes what independence MEANS for a referral, and the two
+ * cases need different router declarations:
+ *
+ *   `llm`  — the text is model output, so the producing vendor must be EXCLUDED
+ *            from judge selection or a vendor judges its own work
+ *            (`JudgeIndependence` mode 'model-output').
+ *   `user` — the text is the LEARNER's own writing. There is no producer vendor
+ *            to exclude, and inventing one would be a lie the router acts on.
+ *            This is precisely the case `JudgeIndependence` mode
+ *            'not-applicable' is documented for ("the judge is grading the
+ *            LEARNER's input … there is no producer vendor to exclude").
+ *
+ * Modelling it as a union rather than an optional `producerVendor?: string` is
+ * the point: an LLM referral CANNOT be constructed without a vendor, so the
+ * fail-closed rule for a genuinely unknown producer stays a type-level
+ * guarantee rather than a runtime check someone can forget. `origin: 'user'`
+ * has no vendor field at all, so it cannot accidentally supply one.
+ */
+export type LearningTextReferralPayload =
+  | {
+      readonly origin: 'llm';
+      /**
+       * The EXACT text the scan ran over. Not normalized — normalization is
+       * match-only and never escapes `scan.ts`.
+       */
+      readonly text: string;
+      /** Already validated non-blank and trimmed by the scan. */
+      readonly producerVendor: string;
+    }
+  | {
+      readonly origin: 'user';
+      /** As above — the exact text, never the normalized form. */
+      readonly text: string;
+    };

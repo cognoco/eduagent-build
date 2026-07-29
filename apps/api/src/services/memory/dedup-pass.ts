@@ -9,6 +9,7 @@ import {
 } from '@eduagent/database';
 
 import { applyDedupAction } from './dedup-actions';
+import { evaluateLearningTextByContent } from '../learning-text-safety/gate';
 import { runDedupLlm } from './dedup-llm';
 import type { DedupResponse } from './dedup-prompt';
 import { isSuppressedFact } from './suppressed-prewrite';
@@ -162,6 +163,14 @@ export async function runDedupForProfile(
 
     let decision = memo[0] ? decisionFromMemo(memo[0]) : null;
     let modelVersion = memo[0]?.modelVersion ?? 'memo';
+    // [WI-2628] The producing VENDOR, tracked separately from `modelVersion` and
+    // deliberately starting at null. `modelVersion` holds `result.model` (and the
+    // literal 'memo' on a memo hit); neither is a vendor, and the judge's
+    // independence exclusion filters a vendor pool — so passing either would
+    // exclude nothing and let a vendor grade its own output. Null on every path
+    // where the vendor is not known FOR THE TEXT BEING GATED, which fails the
+    // scan closed rather than asserting a producer we cannot substantiate.
+    let producerVendor: string | null = null;
     if (decision) report.memoHits += 1;
 
     if (!decision) {
@@ -199,6 +208,7 @@ export async function runDedupForProfile(
 
       const llmDecision = llmResult.decision;
       modelVersion = llmResult.modelVersion;
+      producerVendor = llmResult.provider;
       await args.db
         .insert(memoryDedupDecisions)
         .values({
@@ -231,10 +241,47 @@ export async function runDedupForProfile(
         // in that edge case so decision is always non-null below.
         decision = decisionFromMemo(persisted[0]) ?? llmDecision;
         modelVersion = persisted[0].modelVersion;
+        // [WI-2628] The vendor is ours only if the row that landed is the row WE
+        // inserted. Under `onConflictDoNothing` a concurrent pass may have won,
+        // in which case the merged text about to be gated was produced by a call
+        // this pass never made — so our provider does not describe it. Compare the
+        // gated VALUE, not a proxy like the model string: identical models across
+        // providers are possible, and "same model implies same vendor" is the
+        // inference class that produced this bug.
+        const landedMergedText =
+          persisted[0].decision === 'merge' ? persisted[0].mergedText : null;
+        const ourMergedText =
+          llmDecision.action === 'merge' ? llmDecision.merged_text : null;
+        if (landedMergedText !== ourMergedText) producerVendor = null;
       } else {
         decision = llmDecision;
       }
     }
+
+    // [WI-2628] Evaluate the merge text against the shared multilingual gate HERE,
+    // before the transaction opens. `decision` is already resolved at this point,
+    // so the text is known; the gate may call the independent judge, and an LLM
+    // round-trip inside an open transaction pins a pooled connection for its whole
+    // duration. Keyed by CONTENT, so `applyDedupAction` cannot apply this decision
+    // to different text, and text that was never evaluated resolves unsafe.
+    //
+    // `provenance: 'llm'` — merge text is authored by the dedup model.
+    // `producerVendor` is the real VENDOR (`result.provider`) that produced THIS
+    // merge text, so the judge excludes it rather than grading its own output. It
+    // is null whenever the vendor is not known for this exact text — a memo hit
+    // (the stored row keeps only `model_version`, so the vendor is unrecoverable)
+    // or a concurrent pass winning the insert. Null fails the scan closed per
+    // AC-4, which is the correct reading of an unknown producer; a confidently
+    // wrong vendor would silently defeat the independence guarantee instead.
+    const learningTextGate = await evaluateLearningTextByContent({
+      texts: [decision.action === 'merge' ? decision.merged_text : null],
+      fieldKind: 'memory_dedup_action',
+      // No profile read on this path; the gate then scans all ten attribution
+      // grammars and keeps the strictest verdict. Never `'en'`.
+      conversationLanguage: undefined,
+      provenance: 'llm',
+      producerVendor,
+    });
 
     const outcome = await args.db.transaction(async (tx) => {
       const [freshCandidate] = await tx
@@ -269,6 +316,7 @@ export async function runDedupForProfile(
         action: decision,
         candidate: freshCandidate as MemoryFactRow,
         neighbour: freshNeighbour as MemoryFactRow,
+        learningTextGate,
       });
     });
 

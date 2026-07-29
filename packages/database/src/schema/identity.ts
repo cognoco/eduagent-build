@@ -712,10 +712,10 @@ export const policyRules = pgTable(
  * setting its `expires_at`).
  *
  * `controller_gates` is a flat object of booleans (one per controller-approved
- * launch gate). The "every gate must be closed before a country may be
- * enabled" invariant is enforced by `countryPolicyRecordSchema` at the loader
- * boundary rather than here: a CHECK constraint cannot iterate a jsonb object
- * without a subquery, which Postgres does not permit in CHECK.
+ * launch gate). The database also requires the controller-approved gate set
+ * to be complete and closed before a country can be enabled. JSONB equality
+ * is order-insensitive, so the CHECK rejects both an open gate and a missing
+ * or unknown gate without relying on the application loader.
  */
 export const countryPolicyRegistry = pgTable(
   'country_policy_registry',
@@ -790,6 +790,10 @@ export const countryPolicyRegistry = pgTable(
     check(
       'country_policy_registry_enabled_requires_verified',
       sql`${table.launchStatus} <> 'enabled' OR ${table.legalVerificationStatus} = 'verified'`,
+    ),
+    check(
+      'country_policy_registry_enabled_requires_closed_gates',
+      sql`${table.launchStatus} <> 'enabled' OR ${table.controllerGates} = '{"externalPrivacyLegalReview": true, "aiActClassification": true, "reliableAgeAndResidence": true, "childTransparency": true, "adultCommercialRelationship": true, "countryAllowlist": true, "operationalRightsAndIncidents": true, "launchDayLegalRefresh": true}'::jsonb`,
     ),
     // AC4: a blocked country carries a stable fast-follow reason.
     check(

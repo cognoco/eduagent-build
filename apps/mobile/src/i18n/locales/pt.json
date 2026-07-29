@@ -234,7 +234,8 @@
       "passwordPlaceholder": "Introduza a sua palavra-passe",
       "forgotPassword": "Esqueceu-se da palavra-passe?",
       "signInButton": "Iniciar sessão",
-      "sendVerificationCode": "Enviar código de verificação"
+      "sendVerificationCode": "Enviar código de verificação",
+      "verificationStartFailed": "Não foi possível iniciar a verificação. Tente iniciar a sessão novamente."
     },
     "signUp": {
       "title": "Criar conta",
@@ -291,6 +292,27 @@
       "backToSignIn": "Voltar ao início de sessão",
       "emailPlaceholder": "voce@exemplo.com",
       "sendResetCode": "Enviar código de reposição"
+    },
+    "errors": {
+      "generic": "Algo não correu bem. Tente novamente.",
+      "form_identifier_not_found": "Não encontrámos uma conta com esse e-mail.",
+      "form_password_incorrect": "Essa palavra-passe não parece correta. Tente novamente.",
+      "form_password_or_identifier_incorrect": "Esse e-mail ou palavra-passe não parece correto. Tente novamente.",
+      "form_password_pwned": "Esta palavra-passe apareceu numa fuga de dados. Escolha uma palavra-passe diferente.",
+      "form_password_compromised": "Esta palavra-passe não é segura. Escolha uma palavra-passe diferente.",
+      "form_password_not_strong_enough": "Esta palavra-passe não é suficientemente forte. Adicione mais variedade.",
+      "form_password_length_too_short": "A palavra-passe é demasiado curta. Use pelo menos 8 caracteres.",
+      "form_password_length_too_long": "A palavra-passe é demasiado longa. Use uma mais curta.",
+      "form_password_no_uppercase": "A palavra-passe precisa de ter pelo menos uma letra maiúscula.",
+      "form_password_no_lowercase": "A palavra-passe precisa de ter pelo menos uma letra minúscula.",
+      "form_password_no_number": "A palavra-passe precisa de ter pelo menos um número.",
+      "form_password_no_special_char": "A palavra-passe precisa de ter pelo menos um caráter especial.",
+      "form_password_validation_failed": "Essa palavra-passe não cumpre os requisitos.",
+      "form_code_incorrect": "O código não corresponde. Tente novamente.",
+      "form_identifier_exists": "Já existe uma conta com esse e-mail.",
+      "form_param_format_invalid": "Isso não parece ser um endereço de e-mail válido.",
+      "captcha_invalid": "Não foi possível verificar que é humano. Tente novamente.",
+      "signup_rate_limit_exceeded": "Demasiadas tentativas de registo. Tente novamente mais tarde."
     }
   },
   "guards": {
