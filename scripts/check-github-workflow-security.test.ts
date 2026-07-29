@@ -92,6 +92,32 @@ interface ClaudeReviewContractFixtureOptions {
   thirdAttemptIf?: string;
 }
 
+// Shared, real capture/refresh manifest logic (identical to the production
+// workflow's "Capture authoritative PR files" / "Refresh authoritative PR
+// files" steps) so the fixture satisfies validateClaudeReviewScopeContract's
+// writesAuthoritativeExactHeadManifest check without duplicating drift-prone
+// bespoke script text per test.
+const AUTHORITATIVE_MANIFEST_RUN = `
+                pull_json="$(gh api "repos/\${REPO}/pulls/\${PR_NUMBER}")"
+                api_head="$(jq -r '.head.sha // empty' <<< "$pull_json")"
+                if [[ -z "$api_head" || "$api_head" != "$HEAD_SHA" ]]; then
+                  echo "::error::head changed"
+                  exit 1
+                fi
+                changed_paths="$(
+                  gh api --paginate "repos/\${REPO}/pulls/\${PR_NUMBER}/files?per_page=100" --jq '.[]' \\
+                    | jq -sce '[.[].filename] | unique'
+                )"
+                api_head_after="$(gh api "repos/\${REPO}/pulls/\${PR_NUMBER}" --jq '.head.sha')"
+                if [[ "$api_head_after" != "$HEAD_SHA" ]]; then
+                  echo "::error::head changed"
+                  exit 1
+                fi
+                jq -n \\
+                  --arg head_sha "$HEAD_SHA" \\
+                  --argjson paths "$changed_paths" \\
+                  '{head_sha: $head_sha, paths: $paths}' > "$CHANGED_FILES_MANIFEST"`;
+
 function writeClaudeReviewContractFixture(
   root: string,
   {
@@ -130,6 +156,8 @@ function writeClaudeReviewContractFixture(
           env:
             CLAUDE_REVIEW_PROMPT: |
               Review comment metadata:
+              Read \`.trusted-actions/claude-review-changed-files.json\`.
+              Review only paths listed in the authoritative changed-files manifest.
 ${promptHeadMarker}          steps:
             - name: Initialize fail-closed review result
               run: |
@@ -140,6 +168,8 @@ ${promptHeadMarker}          steps:
                   run_id: "123",
                   recovery_command: "gh run rerun 123 --failed --repo example/repo"
                 }' > claude-review-verdict.json
+            - name: Capture authoritative PR files
+              run: |${AUTHORITATIVE_MANIFEST_RUN}
             - id: review-1
 ${ifLine(firstAttemptIf)}              uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
               continue-on-error: true
@@ -152,6 +182,9 @@ ${ifLine(secondAttemptIf)}              uses: anthropics/claude-code-action@20c8
 ${ifLine(thirdAttemptIf)}              uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
               continue-on-error: true
               timeout-minutes: 20
+            - name: Refresh authoritative PR files
+              if: always()
+              run: |${AUTHORITATIVE_MANIFEST_RUN}
             - name: Evaluate review verdict
               env:
                 HEAD_SHA: \${{ github.event.pull_request.head.sha }}
@@ -159,20 +192,44 @@ ${ifLine(thirdAttemptIf)}              uses: anthropics/claude-code-action@20c8a
                 comments_json="$(gh api "repos/\${REPO}/issues/\${PR_NUMBER}/comments" --paginate)"
                 review_json="$(
                   jq -c \\
+                    --arg started "$REVIEW_RUN_STARTED_AT" \\
 ${selectorHeadArgument}                    '[
                       .[]
                       | select(.user.login == "claude[bot]")
                       | select(.user.type == "Bot")
+                      | select(.created_at >= $started)
                       | select(.body | contains("## Claude Code Review:"))
-${selectorHeadFilter}                    ] | last // empty' <<< "$comments_json"
+${selectorHeadFilter}                    ]
+                    | sort_by(.created_at)
+                    | last // empty' <<< "$comments_json"
                 )"
                 if [[ -z "$review_json" ]]; then
                   exit 1
                 fi
+                finding_paths="$(jq -Rsc 'split("\\n") | map(select(length > 0))' <<< "")"
+                out_of_scope_paths="$(
+                  jq -cn \\
+                    --argjson findings "$finding_paths" \\
+                    --slurpfile manifest "$CHANGED_FILES_MANIFEST" \\
+                    '$findings - $manifest[0].paths | unique'
+                )"
+                scope_valid=true
+                if [[ "$(jq 'length' <<< "$out_of_scope_paths")" -gt 0 ]]; then
+                  scope_valid=false
+                fi
                 metadata_complete=true
-                jq -n --argjson metadata_complete "$metadata_complete" '{
-                  merge_eligible: $metadata_complete
-                }' > claude-review-verdict.json
+                jq -n \\
+                  --arg status "$(if [[ "$scope_valid" == "true" ]]; then echo REVIEW_COMPLETED; else echo REVIEW_SCOPE_CORRUPTION; fi)" \\
+                  --argjson metadata_complete "$metadata_complete" \\
+                  --argjson scope_valid "$scope_valid" \\
+                  '{
+                    status: $status,
+                    merge_eligible: $metadata_complete
+                  }' > "$VERDICT_ARTIFACT"
+                if [[ "$scope_valid" != "true" ]]; then
+                  echo "::error::REVIEW_SCOPE_CORRUPTION"
+                  exit 1
+                fi
             - name: Upload review verdict artifact
               if: always()
               uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
@@ -965,6 +1022,66 @@ describe('checkGithubWorkflowSecurity', () => {
     );
 
     expect(checkGithubWorkflowSecurity(root)).toEqual([]);
+  });
+
+  it('rejects the Claude review workflow when authoritative pull-file capture is removed', () => {
+    const workflow = readFileSync(
+      join(process.cwd(), '.github/workflows/claude-code-review.yml'),
+      'utf8',
+    ).replace(
+      'repos/${REPO}/pulls/${PR_NUMBER}/files?per_page=100',
+      'repos/${REPO}/commits/${HEAD_SHA}',
+    );
+    writeFixture(root, '.github/workflows/claude-code-review.yml', workflow);
+
+    expect(messages(root)).toContain(
+      'Claude review must bind findings to GitHub-authoritative pull files for the exact head and fail closed on scope corruption',
+    );
+  });
+
+  it('rejects the Claude review workflow when the post-capture head check is removed', () => {
+    const workflow = readFileSync(
+      join(process.cwd(), '.github/workflows/claude-code-review.yml'),
+      'utf8',
+    ).replace(
+      'api_head_after="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq \'.head.sha\')"',
+      'api_head_after="$HEAD_SHA"',
+    );
+    writeFixture(root, '.github/workflows/claude-code-review.yml', workflow);
+
+    expect(messages(root)).toContain(
+      'Claude review must bind findings to GitHub-authoritative pull files for the exact head and fail closed on scope corruption',
+    );
+  });
+
+  it('rejects the Claude review workflow when the post-review manifest refresh is removed', () => {
+    const workflow = readFileSync(
+      join(process.cwd(), '.github/workflows/claude-code-review.yml'),
+      'utf8',
+    ).replace(
+      '      - name: Refresh authoritative PR files\n',
+      '      - name: Unchecked PR manifest\n',
+    );
+    writeFixture(root, '.github/workflows/claude-code-review.yml', workflow);
+
+    expect(messages(root)).toContain(
+      'Claude review must bind findings to GitHub-authoritative pull files for the exact head and fail closed on scope corruption',
+    );
+  });
+
+  it('rejects the Claude review workflow when out-of-diff findings stop failing closed', () => {
+    const workflow = readFileSync(
+      join(process.cwd(), '.github/workflows/claude-code-review.yml'),
+      'utf8',
+    ).replace(
+      'echo "::error::Claude review scope corruption: finding paths are outside GitHub\'s authoritative PR diff: $(jq -c \'.\' <<< "$out_of_scope_paths")"\n            exit 1',
+      'echo "::warning::Ignoring review scope mismatch"',
+    );
+    writeFixture(root, '.github/workflows/claude-code-review.yml', workflow);
+
+    expect(messages(root)).toContain(
+      'Claude review must bind findings to GitHub-authoritative pull files for the exact head and fail closed on scope corruption',
+    );
   });
 
   // [F-119] A secret-backed @claude agent job triggered by issue/comment/review
