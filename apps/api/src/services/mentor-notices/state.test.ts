@@ -1,6 +1,7 @@
 import { mentorNotices, type Database } from '@eduagent/database';
 import { sql } from 'drizzle-orm';
 
+import { inngest } from '../../inngest/client';
 import { acceptMentorNotice, prepareMentorNoticeCopy } from './state';
 
 const input = {
@@ -26,7 +27,27 @@ function makeInsertDb(rows: unknown[]) {
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 describe('mentor notice creation state', () => {
+  let sendSpy: jest.SpiedFunction<typeof inngest.send>;
+
+  beforeEach(() => {
+    sendSpy = jest
+      .spyOn(inngest, 'send')
+      .mockResolvedValue({ ids: [] } as never);
+  });
+
+  afterEach(() => {
+    sendSpy.mockRestore();
+  });
+
   // [WI-2628] `prepareMentorNoticeCopy` is now async — the shared multilingual
   // gate resolves an ambiguous verdict through an independent judge. The asserted
   // BEHAVIOUR is unchanged (unsafe concept -> null row; unsafe hint -> nulled,
@@ -70,6 +91,7 @@ describe('mentor notice creation state', () => {
     const { db, onConflictDoNothing } = makeInsertDb([]);
     await expect(acceptMentorNotice(db, input)).resolves.toBeNull();
     expect(onConflictDoNothing).toHaveBeenCalledTimes(1);
+    expect(sendSpy).not.toHaveBeenCalled();
   });
 
   it('targets the evidence-backed partial unique index, not the retired session-only one', async () => {
@@ -86,6 +108,7 @@ describe('mentor notice creation state', () => {
       ]),
       where: sql`${mentorNotices.answerEventId} IS NOT NULL`,
     });
+    expect(sendSpy).not.toHaveBeenCalled();
   });
 
   it('returns the server-owned accepted notice projection', async () => {
@@ -95,6 +118,61 @@ describe('mentor notice creation state', () => {
       correctionHint: input.correctionHint,
     };
     const { db } = makeInsertDb([accepted]);
-    await expect(acceptMentorNotice(db, input)).resolves.toEqual(accepted);
+    const sendStarted = deferred<void>();
+    const sendResult = deferred<{ ids: never[] }>();
+    sendSpy.mockImplementationOnce(() => {
+      sendStarted.resolve();
+      return sendResult.promise as never;
+    });
+
+    const acceptance = acceptMentorNotice(db, input);
+    await sendStarted.promise;
+
+    try {
+      const acceptanceSettled = jest.fn();
+      void acceptance.then(acceptanceSettled, acceptanceSettled);
+      await Promise.resolve();
+      expect(acceptanceSettled).not.toHaveBeenCalled();
+
+      expect(sendSpy).toHaveBeenCalledTimes(1);
+      expect(sendSpy).toHaveBeenCalledWith({
+        name: 'app/notice.created',
+        data: { noticeId: accepted.id, profileId: input.profileId },
+      });
+    } finally {
+      sendResult.resolve({ ids: [] });
+    }
+
+    await expect(acceptance).resolves.toEqual(accepted);
+  });
+
+  it('preserves an accepted notice when the created-event send rejects', async () => {
+    const accepted = {
+      id: '00000000-0000-4000-8000-000000000004',
+      concept: input.concept,
+      correctionHint: input.correctionHint,
+    };
+    const { db } = makeInsertDb([accepted]);
+    const consoleErrorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    sendSpy.mockRejectedValueOnce(new Error('inngest unavailable'));
+
+    try {
+      await expect(acceptMentorNotice(db, input)).resolves.toEqual(accepted);
+      expect(sendSpy).toHaveBeenCalledTimes(1);
+      expect(sendSpy).toHaveBeenCalledWith({
+        name: 'app/notice.created',
+        data: { noticeId: accepted.id, profileId: input.profileId },
+      });
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+
+      await new Promise<void>((resolve) => {
+        setImmediate(resolve);
+      });
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 });
