@@ -41,7 +41,12 @@
 
 import { z } from 'zod';
 import type { ConversationLanguage } from '@eduagent/schemas';
-import { escapeXml, extractFirstJsonObject, routeAndCall } from '../llm';
+import {
+  escapeXml,
+  extractFirstJsonObject,
+  routeAndCall,
+  type JudgeIndependence,
+} from '../llm';
 import { createLogger } from '../logger';
 import { referralPayloadKey } from './referral';
 import type {
@@ -251,14 +256,39 @@ export async function judgeReferredLearningText(
     return BLOCKED_UNCLEAR;
   }
 
-  // Defense in depth. `scanLearningText` cannot produce a `refer` with a blank
-  // vendor, so this is unreachable through the public API — it exists because a
-  // blank vendor would yield a JudgeIndependence descriptor that excludes
-  // NOTHING, letting the producing vendor judge its own output, and that
-  // failure is silent. A forged payload must not be able to buy that.
-  if (referral.producerVendor.trim().length === 0) {
-    logDegraded('missing_producer_vendor', fieldKind);
-    return BLOCKED_UNCLEAR;
+  // INDEPENDENCE IS DERIVED FROM THE PAYLOAD'S ORIGIN, and the two cases are not
+  // interchangeable:
+  //
+  //   'llm'  → the text is model output, so the producing vendor is EXCLUDED
+  //            from judge selection. The blank-vendor check below is defense in
+  //            depth: `scanLearningText` cannot build an `origin: 'llm'` payload
+  //            with a blank vendor, but a blank one would yield a descriptor
+  //            that excludes NOTHING — letting the producing vendor bless its
+  //            own output, silently. A forged payload must not buy that.
+  //   'user' → the text is the LEARNER's own writing (the operator's 2026-07-26
+  //            ruling routes it here). There is no producing vendor, so there is
+  //            nothing to exclude, and 'not-applicable' is exactly the mode the
+  //            router documents for grading learner input. Inventing a vendor
+  //            here would be a lie the router acts on; omitting the mode
+  //            entirely would drop the judge capability's grader branch.
+  //
+  // The union is narrowed BEFORE the vendor is read, so the guard cannot become
+  // unreachable as a side effect of adding the user variant.
+  let judgeIndependence: JudgeIndependence;
+  if (referral.origin === 'llm') {
+    if (referral.producerVendor.trim().length === 0) {
+      logDegraded('missing_producer_vendor', fieldKind);
+      return BLOCKED_UNCLEAR;
+    }
+    judgeIndependence = {
+      mode: 'model-output',
+      // Derived from the scan, never from a caller argument — this is what
+      // makes "the excluded vendor is the vendor that actually produced the
+      // text" a property rather than a caller obligation.
+      producerVendor: referral.producerVendor,
+    };
+  } else {
+    judgeIndependence = { mode: 'not-applicable' };
   }
 
   const messages = buildJudgePrompt({ text: referral.text, fieldKind });
@@ -267,13 +297,7 @@ export async function judgeReferredLearningText(
   try {
     const result = await routeAndCall(messages, JUDGE_RUNG, {
       capability: 'judge',
-      judgeIndependence: {
-        mode: 'model-output',
-        // Derived from the scan, never from a caller argument — this is what
-        // makes "the excluded vendor is the vendor that actually produced the
-        // text" a property rather than a caller obligation.
-        producerVendor: referral.producerVendor,
-      },
+      judgeIndependence,
       flow: JUDGE_LEARNING_TEXT_SAFETY_FLOW,
       conversationLanguage: input.conversationLanguage,
       responseFormat: 'json',

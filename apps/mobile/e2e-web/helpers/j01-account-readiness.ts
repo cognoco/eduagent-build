@@ -118,7 +118,9 @@ export function armJ01AccountReadiness(
     try {
       const committedPath = new URL(page.url()).pathname;
       const phase = await visiblePhase(committedPath);
-      if (!disposed && phase !== 'unknown') retainedPhase = phase;
+      if (!disposed && phase !== 'unknown' && retainedPhase === null) {
+        retainedPhase = phase;
+      }
     } finally {
       phaseSampleInFlight = false;
     }

@@ -98,7 +98,7 @@ Any future UK enablement reopens the full UK legal review.
 | EEA country perimeter | **All 30 EEA countries**, subject to common launch gates, national review, localization, and implementation of the applicable consent band. An allowlist entry is not a legal-safety guarantee. | product + DPO/counsel |
 | Residence-based consent gate | Apply the national Article 8 threshold by habitual residence: 13 → self-consent from 13; 14 → guardian at 13; 15 → guardian at 13–14; 16 → guardian at 13–15. France requires joint child + parental consent below 15. | product + DPO/counsel |
 | Live-law rechecks | **NO and PT** require launch-day review of active legislation. Update the threshold policy or fail closed if the law has changed. | product + DPO/counsel |
-| Country exclusions | **GB denylisted**; all other non-EEA countries disabled until separately ruled. | product + DPO/counsel |
+| Country exclusions | **GB denylisted at launch** (expansion candidate); other non-EEA countries disabled unless admitted via the Route-2 screen of `2026-07-26-launch-perimeter-ruling-screen-based-allowlist.md` — **US is the first conditional Route-2 pass** (`2026-07-26-us-launch-screen-record.md`). | product + DPO/counsel |
 | Dormancy → cleanup | **~24 months** inactivity, **30-day** pre-deletion notice + export window | counsel |
 | Moved-country grace window | parameter, value *(counsel)* | counsel |
 | Retention periods (consent receipt / deletion audit / financial record) | *(counsel fills `retention_period`)* | counsel |

@@ -1,0 +1,18 @@
+{
+  "pageId": "3a38bce9-1f7c-8197-967b-c2ad496f6cce",
+  "id": "WI-2539",
+  "name": "Replace six full internal mocks in ChatShell tests",
+  "description": "Burn down the six full-replacement internal mocks in the two ChatShell test files mechanically touched by WI-2236 without expanding the manual-homework E2E delivery item.",
+  "acceptanceCriteria": "1. apps/mobile/src/components/session/ChatShell.perf.test.tsx replaces its three full-replacement internal mocks with real implementations or targeted jest.requireActual overrides; the existing MessageBubble passthrough remains canonical Pattern A.\n2. apps/mobile/src/components/session/ChatShell.test.tsx replaces its three full-replacement internal mocks with real implementations or targeted jest.requireActual overrides.\n3. ChatShell component, voice, markdown, animation, and render-count properties remain covered without weakening assertions.\n4. The GC1/GC6 repository guard reports no internal-mock finding for these two files.",
+  "riskImpact": "",
+  "type": "Hygiene",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "",
+  "bodyText": ""
+}

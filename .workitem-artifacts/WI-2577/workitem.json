@@ -1,0 +1,18 @@
+{
+  "pageId": "3a48bce9-1f7c-8188-815f-d39a92ee5f21",
+  "id": "WI-2577",
+  "name": "Wire V2 build-time flags into the later-phases Playwright project so V2 web journeys can execute",
+  "description": "Verify-first stale-capture candidate. The requested V2 build-time posture appears already present on origin/main: commit b3b9c8155 (2026-06-21) added EXPO_PUBLIC_ENABLE_MODE_NAV, V1, and V2 to the e2e-web export/CI path and documented the same flags for later-phases runs, before this Work Item was captured. Establish whether any later-phases invocation still exports or runs without those values; if none does, dispose as Already Fixed with durable evidence rather than making a no-op code change.",
+  "acceptanceCriteria": "1. At the current execution base, trace the later-phases path from its package/workflow invocation through serve-exported-web environment materialization into the exported bundle and project selection. Prove the effective EXPO_PUBLIC_ENABLE_MODE_NAV, V1, and V2 values; do not infer them from the project name. 2. Verify the existing b3b9c8155 wiring and its helper/config regression coverage. If every maintained later-phases invocation already builds and runs with all three values true, make no source change and return Already Fixed evidence naming the ancestor commit, current source lines, and passing config/helper tests. 3. If a maintained invocation still lacks the V2 posture, fix only that gap and add a deterministic config-level regression test that fails when later-phases exports or executes without all three values true; preserve explicit V0/V1 matrix commands outside the release project. 4. Development and config-level tests may proceed, but no seeded credential-bearing Playwright report, trace, screenshot, video, test-results payload, or uploaded artifact may be generated until WI-2593’s technical redaction control is effective. Existing upload guards remain enabled and are tested. 5. Completion evidence states whether the result is Already Fixed or changed, identifies every maintained invocation checked, and includes safe non-credential verification commands; historical artifact deletion and credential rotation remain out of scope.",
+  "riskImpact": "P1 dual risk: a false-green later-phases run against a non-V2 bundle can certify the wrong navigation surface, while credential-bearing Playwright reports/traces/screenshots/videos can expose reusable staging logins. No artifact generation or upload is permitted until WI-2593’s technical redaction control is effective.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "builder:claude:wi-2577",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "",
+  "bodyText": ""
+}

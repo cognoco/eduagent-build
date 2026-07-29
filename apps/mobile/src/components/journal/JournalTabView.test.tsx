@@ -10,6 +10,11 @@ import type { NowResponse, RecapListItem } from '@eduagent/schemas';
 import { JournalTabView } from './JournalTabView';
 
 const mockPush = jest.fn();
+const mockSetParams = jest.fn(
+  (params: { section?: string | undefined }): void => {
+    mockJournalSection = params.section;
+  },
+);
 const mockSetActiveScope = jest.fn();
 const originalPlatformOs = Object.getOwnPropertyDescriptor(Platform, 'OS');
 let mockJournalSection: string | undefined;
@@ -36,7 +41,10 @@ function setPlatformOs(os: 'android' | 'ios' | 'web'): void {
 }
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({
+    push: mockPush,
+    setParams: mockSetParams,
+  }),
   useLocalSearchParams: () => ({ section: mockJournalSection }),
 }));
 
@@ -84,8 +92,7 @@ jest.mock(
 );
 
 jest.mock(
-  // gc1-allow: Journal composes the practice-history hook; endpoint and hook have dedicated coverage
-  '../../hooks/use-practice-activity-history',
+  '../../hooks/use-practice-activity-history' /* gc1-allow: Journal composes the practice-history hook; endpoint and hook have dedicated coverage */,
   () => ({
     usePracticeActivityHistory: (opts?: { limit?: number; type?: string }) => {
       lastPracticeOpts = opts;
@@ -396,6 +403,27 @@ describe('JournalTabView', () => {
     screen.getByTestId('journal-practice-section');
   });
 
+  it.each([
+    ['sessions', 'recaps'],
+    ['notes', 'notes'],
+    ['practice', 'practice'],
+    ['memory', 'memory'],
+  ] as const)(
+    '[WI-2239] treats the Reports route section as an initial selection and permits switching to %s',
+    (tab, section) => {
+      mockJournalSection = 'reports';
+      const { rerender } = render(<JournalTabView />);
+
+      screen.getByTestId('journal-reports-section');
+      fireEvent.press(screen.getByTestId(`journal-tab-${tab}`));
+      // The router mock does not schedule the route update that a real
+      // setParams call does, so explicitly render the updated route params.
+      rerender(<JournalTabView />);
+      screen.getByTestId(`journal-${section}-section`);
+      expect(screen.queryByTestId('journal-reports-section')).toBeNull();
+    },
+  );
+
   it('[WI-2110 AC-2] ignores an unknown section and preserves organic selection', () => {
     const { rerender } = render(<JournalTabView />);
 
@@ -490,7 +518,7 @@ describe('JournalTabView', () => {
       },
     ],
   ])(
-    'routes a web %s report directly to its exact leaf without synthetic Progress ancestry',
+    'commits the web Reports owner before routing a %s report to its exact leaf',
     (_kind, reportTestId, expectedHref) => {
       setPlatformOs('web');
       render(<JournalTabView />);
@@ -498,6 +526,11 @@ describe('JournalTabView', () => {
       fireEvent.press(screen.getByTestId('journal-tab-reports'));
       fireEvent.press(screen.getByTestId(reportTestId));
 
+      expect(mockSetParams).toHaveBeenCalledTimes(1);
+      expect(mockSetParams).toHaveBeenCalledWith({ section: 'reports' });
+      expect(firstCallOrder(mockSetParams)).toBeLessThan(
+        firstCallOrder(mockPush),
+      );
       expect(mockPush).toHaveBeenCalledTimes(1);
       expect(mockPush).toHaveBeenCalledWith(expectedHref);
     },
