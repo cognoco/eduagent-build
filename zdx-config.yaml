@@ -19,6 +19,12 @@ zdx:
       # secret store) or export it in the shell that launches the Archon run.
       env_var: NOTION_TOKEN
 
+  # Estate-wide Workstreams lookup consumed by /cosmo:queue-health.
+  # Keep these identifiers aligned with the canonical Nexus zdx-config.yaml.
+  workstreams:
+    database_id: "47d8bc5ce0744cd995bdddbb81978bdf"
+    data_source_id: "08b3ab36-709d-44af-b78c-5e9f74f6e745"
+
   operator-queue:
     # Cosmo Operator Queue for human approvals, decisions, and operator-only
     # actions. Role bindings are verified against the queue's existing

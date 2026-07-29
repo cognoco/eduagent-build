@@ -1,0 +1,18 @@
+{
+  "pageId": "3a98bce9-1f7c-815b-a498-c0e50ae573a9",
+  "id": "WI-2840",
+  "name": "Keep Claude PR review scoped to the authoritative PR diff after normal merges",
+  "description": "Claude PR review can mis-scope a synchronized pull request after a normal merge from main: on PR #2664 at exact head a9d5f5e, GitHub's authoritative current diff contained 8 WI-2838 files, but the reviewer reported 31 files and requested changes solely for unrelated base-branch WI-2628 files. The strict-green gate must mechanically bind review findings to the authoritative PR diff while preserving trusted-base and latest-verdict protections.",
+  "acceptanceCriteria": "Root cause: review scope is prompt-only. The workflow asks Claude to run `gh pr diff`, but does not provide or mechanically enforce a GitHub-authoritative changed-file manifest; after a normal main merge the model can treat base-only checkout/history files as PR changes. The evaluator validates verdict author, head, freshness, and polarity, but not finding-path scope.\n\nVariants: (a) clean PR diff; (b) synchronize after normal merge containing unrelated base files; (c) true finding in an authoritative changed path; (d) finding only in an out-of-diff path; (e) unchanged-head rerun; (f) absent/malformed verdict.\n\nDone when:\n1. Preserve incident evidence: PR #2664 head a9d5f5e had 8 authoritative changed files while Claude reported 31 and cited base-only paths.\n2. A deterministic regression fixture covers synchronize after a normal merge.\n3. Out-of-diff finding paths fail closed as review-scope corruption and cannot authorize a merge; valid changed-path findings retain current behavior.\n4. An unchanged-head rerun can recover without commit churn.\n5. Trusted-base execution, bot identity, prompt-injection defenses, least privilege, and WI-2512 latest-fresh-verdict semantics remain intact.\n6. Structural/security tests pass, plus a live probe or repaired PR #2664 demonstrates correct scope.",
+  "riskImpact": "P1: a fresh approved implementation can be falsely blocked by unrelated base-branch code after the mandated normal-merge policy. This corrupts a required strict-green authority gate and can stall every PR that refreshes from main.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "",
+  "bodyText": ""
+}

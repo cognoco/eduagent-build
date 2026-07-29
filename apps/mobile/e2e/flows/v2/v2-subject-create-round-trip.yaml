@@ -29,6 +29,10 @@ tags:
       id: 'subjects-screen'
     timeout: 15000
 - assertVisible:
+    id: 'subjects-browse-empty'
+- assertNotVisible:
+    id: 'subjects-browse-row-.*'
+- assertVisible:
     id: 'subjects-browse-create'
 
 # Cancel returns semantically to Subjects rather than account onboarding.
@@ -160,6 +164,10 @@ tags:
       id: 'session-screen'
     timeout: 45000
 - assertVisible:
+    id: 'message-bubble-assistant-0'
+    containsDescendants:
+      - text: '.*Photosynthesis.*'
+- assertVisible:
     id: 'chat-shell-back'
 - tapOn:
     id: 'chat-shell-back'
@@ -175,3 +183,14 @@ tags:
 - assertVisible:
     id: '^subjects-browse-row-.*$'
     text: 'Open Photosynthesis'
+
+# Prove the same seeded learner remains active, then require the exact
+# Photosynthesis row owner again after returning to Subjects.
+- runFlow:
+    file: ../_setup/assert-v2-active-profile-and-return.yaml
+    env:
+      PROFILE_ID: ${PROFILE_ID}
+      PROFILE_NAME: 'Test Learner'
+      RETURN_SCREEN_ID: 'subjects-screen'
+      RETURN_ROW_ID: 'subjects-browse-row-.*'
+      RETURN_ROW_NAME: 'Photosynthesis'

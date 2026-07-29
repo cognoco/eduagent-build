@@ -1,0 +1,41 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "scrollUntilVisible on the subscription row immediately before the retained assertVisible — the remedy AC-1 named for the WI-2187 below-the-fold regression (landed upstream, verified on this branch's device run: the flow ran green end-to-end on the emulator with the scroll-then-assert exercised).",
+      "pointer": "apps/mobile/e2e/flows/account/more-tab-navigation.yaml:95"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Restored progress leg: the flow enters the subject progress screen through its supported direct route (home cards route to the shelf since the June 12 navigation change) and asserts the LOADED state — progress-subject-back visible. Emulator reproduction executed FIRST: the pre-quarantine original flow reds at this wait with the subject shelf visibly on screen (screenshot in the page comment record). Confirmed root cause: stale navigation premise; the error-state attribution in the quarantine header did not reproduce and the seed was never at fault.",
+      "pointer": "apps/mobile/e2e/flows/subjects/multi-subject.yaml:150"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "The restored leg additionally asserts the error state is ABSENT on the same screen, and exits through the back control to its device-verified landing before returning Home — the full contract the quarantined assertion protected, now stronger.",
+      "pointer": "apps/mobile/e2e/flows/subjects/multi-subject.yaml:154"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Device/emulator verification EXECUTED 2026-07-27 on emulator-5554 using the exact CI vehicle (release APK artifact from run 30249719024) against a locally hosted maestro-e2e-worker: reproduction RED on the original flow, reworked multi-subject GREEN end-to-end, more-tab-navigation GREEN end-to-end, then revert RED / restore GREEN. Recorded as a page comment with screenshots retained in the artifacts directory. CI corroboration: dispatched nightly release run 30253853415 on this branch concluded success with every shard green, both flows executing (shard logs: flow five of twenty and flow fourteen of fifteen). Pointer is the run's head commit.",
+      "pointer": "10b9f7f3857fb8f87abe9de75ccd2ae1c7604bbe"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Both flows registered in the PR manifest with the pr-blocking tag; no blocked tag or BLOCKED header in either flow file at the pinned revision.",
+      "pointer": "apps/mobile/e2e/ci-maestro-manifest.json:4"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "The multi-subject manifest entry with its seed scenario.",
+      "pointer": "apps/mobile/e2e/ci-maestro-manifest.json:33"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "Nothing weakened or deleted: the subscription-row assertVisible is retained after its scroll, and the quarantined progress assertion is RESTORED rather than replaced — the structural guard now affirmatively requires the deep link, the progress-subject-back wait, the error-state absence assert, the back-control tap, and the verified landing, in order, superseding the interim guard that required absence.",
+      "pointer": "scripts/e2e-ci-injection-and-smoke-gate.test.ts:5027"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": "apps/mobile/e2e/flows/subjects/multi-subject.yaml:150"
+}

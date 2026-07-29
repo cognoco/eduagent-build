@@ -8,6 +8,7 @@ interface CleanupCurriculumDedupIndexRepairTestOptions {
   adminPool: Pick<Pool, 'end' | 'query'> | undefined;
   scratchPool: Pick<Pool, 'end'> | undefined;
   databaseName: string;
+  ownedApplicationName: string;
   tempDirs: string[];
 }
 
@@ -15,6 +16,7 @@ export async function cleanupCurriculumDedupIndexRepairTest({
   adminPool,
   scratchPool,
   databaseName,
+  ownedApplicationName,
   tempDirs,
 }: CleanupCurriculumDedupIndexRepairTestOptions): Promise<void> {
   try {
@@ -23,6 +25,7 @@ export async function cleanupCurriculumDedupIndexRepairTest({
         adminPool,
         scratchPool,
         databaseName,
+        ownedApplicationName,
       });
     }
   } finally {

@@ -1,0 +1,21 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Submission now gates on isFinalTranscript in addition to the stop-listening transition; late final replaces interim for grading; per-cycle guard bounds empty/cancelled/error paths to at most one submission.",
+      "pointer": "apps/mobile/src/components/session/SpeakingPracticeActivity.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Three red-first regression tests distinguish stop-listening from final-transcript readiness: late-final replacement with exactly one submission, cancelled with zero submissions, terminal error with zero submissions.",
+      "pointer": "apps/mobile/src/components/session/SpeakingPracticeActivity.test.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Related suites re-runnable via the standard focused jest invocation.",
+      "pointer": "pnpm exec jest --findRelatedTests apps/mobile/src/components/session/SpeakingPracticeActivity.test.tsx --no-coverage"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": "apps/mobile/src/components/session/SpeakingPracticeActivity.test.tsx"
+}
