@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test';
 import {
   NOW_REFRESH_OBSERVATION_WINDOW_MS,
+  assertRequestAttempted,
   observeExactNowRefresh,
+  observeNowRefreshRequestAttempt,
 } from '../../helpers/now-refresh-observation';
 import { pressableClick } from '../../helpers/pressable';
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
@@ -99,15 +101,31 @@ test('WI-2234 returning learner: unfinished session resumes, exchanges, and retu
   // already have reached Mentor before a test-side release ever runs. Arm a
   // plain, production-compatible observation BEFORE the click instead, and
   // let the response flow through exactly as production sees it.
+  //
+  // [WI-2833 rework] Observing only the RESPONSE is not enough: if production
+  // regresses and never sends the post-Back request at all, the response
+  // promise below simply times out the same way a legitimate abort or
+  // non-settlement does, and this spec would still pass. Arm an independent
+  // REQUEST observation too, so "no matching request fired" is always a
+  // distinct, asserted failure -- never silently absorbed into the response's
+  // rejected/unsettled classification.
+  const postBackNowMatchesUrl = (url: URL) =>
+    url.pathname.endsWith('/v1/now') &&
+    url.searchParams.get('scope') === 'self';
+
   const postBackNowArmedAtMs = Date.now();
+  const postBackNowRequestPromise = page.waitForRequest(
+    (request) =>
+      request.method() === 'GET' &&
+      postBackNowMatchesUrl(new URL(request.url())),
+    { timeout: NOW_REFRESH_OBSERVATION_WINDOW_MS },
+  );
   const postBackNowResponsePromise = page.waitForResponse(
     (response) => {
       const request = response.request();
-      const url = new URL(response.url());
       return (
         request.method() === 'GET' &&
-        url.pathname.endsWith('/v1/now') &&
-        url.searchParams.get('scope') === 'self'
+        postBackNowMatchesUrl(new URL(response.url()))
       );
     },
     { timeout: NOW_REFRESH_OBSERVATION_WINDOW_MS },
@@ -117,6 +135,15 @@ test('WI-2234 returning learner: unfinished session resumes, exchanges, and retu
   const postBackNowActionAtMs = Date.now();
   await expect(page).toHaveURL(/\/session(?:\?|$)/);
   await expect(page.getByTestId('session-screen')).toBeVisible();
+
+  const postBackNowRequestOutcome = await observeNowRefreshRequestAttempt(
+    postBackNowRequestPromise,
+    { armedAtMs: postBackNowArmedAtMs, actionAtMs: postBackNowActionAtMs },
+  );
+  // Required in EVERY accepted variant below (settled, aborted/rejected, or
+  // bounded-unsettled) -- a variant where no matching request ever fired must
+  // fail the spec, not be accepted as a legitimate WI-2818 outcome.
+  assertRequestAttempted(postBackNowRequestOutcome);
 
   const postBackNowOutcome = await observeExactNowRefresh(
     postBackNowResponsePromise,
@@ -135,7 +162,9 @@ test('WI-2234 returning learner: unfinished session resumes, exchanges, and retu
   }
   // A rejected or unsettled exact refresh is a legitimate WI-2818 production
   // outcome (network hiccup, or Session already gave up waiting past the
-  // 2-second bound) — Mentor is still reached either way, proven below.
+  // 2-second bound) — Mentor is still reached either way, proven below. The
+  // request-attempt assertion above already ruled out "no request fired" as
+  // the cause of a rejected/unsettled response.
 
   await expect(page).toHaveURL(/\/mentor(?:\?|$)/);
   await expect(page.getByTestId('mentor-screen')).toBeVisible({
