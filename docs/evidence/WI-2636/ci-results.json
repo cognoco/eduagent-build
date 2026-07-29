@@ -1,0 +1,27 @@
+{
+  "source": {
+    "pullRequest": "https://github.com/cognoco/eduagent-build/pull/2624",
+    "workflowRun": "https://github.com/cognoco/eduagent-build/actions/runs/30206001832",
+    "job": "https://github.com/cognoco/eduagent-build/actions/runs/30206001832/job/89804052076",
+    "jobName": "Flag-ON integration (IDENTITY_V2_ENABLED)",
+    "conclusion": "success"
+  },
+  "crossPackageIntegration": {
+    "command": "pnpm exec nx run api:test:integration",
+    "totalSuites": 71,
+    "passedSuites": 71,
+    "skippedSuites": 0,
+    "totalTests": 592,
+    "passedTests": 589,
+    "skippedTests": 3
+  },
+  "coLocatedIntegration": {
+    "command": "pnpm exec nx run api:integration-api",
+    "totalSuites": 152,
+    "passedSuites": 150,
+    "skippedSuites": 2,
+    "totalTests": 1145,
+    "passedTests": 1137,
+    "skippedTests": 8
+  }
+}
