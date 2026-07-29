@@ -930,14 +930,14 @@ describe('[WI-2571] selected Playwright seed-scenario collector', () => {
     ]);
   });
 
-  it('excludes computed static class keys while retaining static initializers', () => {
+  it('includes computed static class keys and static initializers', () => {
     writeFixture(
       fixtureRoot,
       'e2e/helpers/computed-static.ts',
       `
         import { seedScenario } from './test-seed';
         export class Computed {
-          static [seedScenario({ scenario: 'computed-key-out' })] = seedScenario({ scenario: 'computed-value-in' });
+          static [seedScenario({ scenario: 'computed-key-selected-scenario' })] = seedScenario({ scenario: 'computed-value-in' });
         }
       `,
     );
@@ -947,7 +947,10 @@ describe('[WI-2571] selected Playwright seed-scenario collector', () => {
       `import { Computed } from './helpers/computed-static'; void Computed;`,
     );
 
-    expect(collectShapeScenarios(fixtureRoot)).toEqual(['computed-value-in']);
+    expect(collectShapeScenarios(fixtureRoot)).toEqual([
+      'computed-key-selected-scenario',
+      'computed-value-in',
+    ]);
   });
 
   it('resolves bracket and destructured members of an exported namespace', () => {

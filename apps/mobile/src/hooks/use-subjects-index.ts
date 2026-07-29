@@ -77,13 +77,18 @@ export function buildSubjectsIndex({
   });
 }
 
-export function useSubjectsIndex(): {
+interface UseSubjectsIndexOptions {
+  includeInactive?: boolean;
+}
+
+export function useSubjectsIndex(options: UseSubjectsIndexOptions = {}): {
   subjects: SubjectIndexItem[];
   isLoading: boolean;
   isError: boolean;
   refetch: () => void;
 } {
-  const subjectsQuery = useSubjects();
+  const { includeInactive = false } = options;
+  const subjectsQuery = useSubjects({ includeInactive });
   const libraryBooks = useAllBooks();
   const progressQuery = useOverallProgress();
 
@@ -116,12 +121,8 @@ export function useSubjectsIndex(): {
 
   return {
     subjects,
-    isLoading:
-      subjectsQuery.isLoading ||
-      libraryBooks.isLoading ||
-      progressQuery.isLoading,
-    isError:
-      subjectsQuery.isError || libraryBooks.isError || progressQuery.isError,
+    isLoading: subjectsQuery.isLoading,
+    isError: subjectsQuery.isError,
     refetch: () => {
       void subjectsQuery.refetch();
       libraryBooks.refetch();

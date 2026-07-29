@@ -128,9 +128,16 @@ describe('ChangePassword', () => {
     });
   });
 
+  // [WI-2768] extractClerkError now maps Clerk's locale-independent `code` to
+  // localized copy rather than surfacing the raw English longMessage.
   it('shows Clerk error when current password is wrong', async () => {
     mockUpdatePassword.mockRejectedValue({
-      errors: [{ longMessage: 'Password is incorrect.' }],
+      errors: [
+        {
+          code: 'form_password_incorrect',
+          longMessage: 'Password is incorrect.',
+        },
+      ],
     });
     active = renderWithProviders(<ChangePassword />);
     fireEvent.changeText(screen.getByTestId('current-password'), 'WrongPass!');
@@ -138,7 +145,7 @@ describe('ChangePassword', () => {
     fireEvent.changeText(screen.getByTestId('confirm-password'), 'NewPass123!');
     fireEvent.press(screen.getByTestId('update-password-button'));
     await waitFor(() => {
-      screen.getByText('Password is incorrect.');
+      screen.getByText("That password doesn't look right. Please try again.");
     });
   });
 

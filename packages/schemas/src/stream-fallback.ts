@@ -5,7 +5,10 @@ import {
   escalationRungSchema,
 } from './sessions.ts';
 import { cefrLevelSchema } from './language.ts';
-import { mentorNoticeAcceptedSchema } from './mentor-notices.ts';
+import {
+  mentorNoticeAcceptedSchema,
+  mentorNoticePolicyObservationField,
+} from './mentor-notices.ts';
 import { answerEvaluationSchema } from './llm-envelope.ts';
 
 // ---------------------------------------------------------------------------
@@ -255,5 +258,12 @@ export const streamDoneFrameSchema = z.object({
   topicOpenedPendingContent: z.boolean().optional(),
   mentorNotice: mentorNoticeAcceptedSchema.optional(),
   answerEvaluation: answerEvaluationSchema.optional(),
+  /**
+   * [WI-2627] Policy observation on the terminal frame of an exchange. The done
+   * frame can carry a `mentorNotice`, so it is a notice-bearing surface; the
+   * observation lets a client order that notice against a rollback it may
+   * already have observed on another surface.
+   */
+  mentorNoticePolicy: mentorNoticePolicyObservationField,
 });
 export type StreamDoneFrame = z.infer<typeof streamDoneFrameSchema>;

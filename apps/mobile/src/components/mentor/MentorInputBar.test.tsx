@@ -145,6 +145,23 @@ describe('MentorInputBar', () => {
     expect(onSubmitText).toHaveBeenCalledWith('Teach me something new');
   });
 
+  it('keeps one camera control after selecting the homework starter', () => {
+    const onOpenCamera = jest.fn();
+    const { getByTestId, queryByTestId } = render(
+      <MentorInputBar
+        {...baseProps}
+        showColdStartPrompts
+        onOpenCamera={onOpenCamera}
+      />,
+    );
+
+    fireEvent.press(getByTestId('cold-start-chip-homework'));
+
+    expect(queryByTestId('cold-start-homework-camera')).toBeNull();
+    fireEvent.press(getByTestId('mentor-bar-camera'));
+    expect(onOpenCamera).toHaveBeenCalledTimes(1);
+  });
+
   it('does not replace an existing typed draft with a starter', () => {
     const { getByTestId } = render(
       <MentorInputBar {...baseProps} showColdStartPrompts />,

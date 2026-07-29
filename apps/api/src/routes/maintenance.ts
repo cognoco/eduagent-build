@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { inngest } from '../inngest/client';
+import { emitLlmVolumeAlertProbe } from '../services/llm-volume-alert-sink';
 import { captureException } from '../services/sentry';
 import { apiError } from '../errors';
 import { isMaintenanceProductionEnabled } from '../config';
@@ -167,6 +168,18 @@ export const maintenanceRoutes = new Hono<MaintenanceEnv>()
       smokeId,
       sentryConfigured: Boolean(c.env.SENTRY_DSN),
     });
+  })
+  .post('/maintenance/llm-volume-alert-probe', async (c) => {
+    if (!(await verifyMaintenanceSecret(c))) {
+      return apiError(
+        c,
+        403,
+        ERROR_CODES.FORBIDDEN,
+        'Maintenance secret required',
+      );
+    }
+
+    return c.json(emitLlmVolumeAlertProbe(c.env.ENVIRONMENT));
   })
   .post('/maintenance/memory-facts-backfill', async (c) => {
     const environmentRefusal = refuseBackfillByEnvironment(c);

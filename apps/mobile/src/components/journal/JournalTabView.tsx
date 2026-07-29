@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import {
+  useLocalSearchParams,
+  useRouter,
+  type Href,
+  type Router,
+} from 'expo-router';
 
 import { ErrorFallback, TimeoutLoader } from '../common';
 import { BookPageFlipAnimation } from '../common/BookPageFlipAnimation';
@@ -17,6 +22,7 @@ import { JournalSegmentedControl } from './JournalSegmentedControl';
 import { JournalNotesArchive } from './JournalNotesArchive';
 import { JournalPracticeSection } from './JournalPracticeSection';
 import { RecapRow } from './RecapRow';
+import { JOURNAL_RETURN_TO } from '../../lib/navigation';
 import {
   JOURNAL_SECTION_IDS,
   PracticeReportsEmptyMotif,
@@ -44,6 +50,39 @@ function sectionSubtitle(section: JournalSectionId, t: TFunction): string {
     case 'reports':
       return t('journal.sections.reportsSubtitle');
   }
+}
+
+type JournalReportTarget =
+  | { kind: 'monthly'; reportId: string }
+  | { kind: 'weekly'; reportId: string };
+
+function pushJournalReport(
+  router: Pick<Router, 'push'>,
+  target: JournalReportTarget,
+): void {
+  if (Platform.OS !== 'web') {
+    router.push('/(app)/progress' as Href);
+    router.push('/(app)/progress/reports' as Href);
+  }
+
+  if (target.kind === 'weekly') {
+    router.push({
+      pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
+      params: {
+        weeklyReportId: target.reportId,
+        returnTo: JOURNAL_RETURN_TO,
+      },
+    } as Href);
+    return;
+  }
+
+  router.push({
+    pathname: '/(app)/progress/reports/[reportId]',
+    params: {
+      reportId: target.reportId,
+      returnTo: JOURNAL_RETURN_TO,
+    },
+  } as Href);
 }
 
 function JournalRecapsSection(): React.ReactElement {
@@ -109,7 +148,11 @@ function JournalRecapsSection(): React.ReactElement {
   return (
     <View className="gap-3" testID="journal-recaps-section">
       {rows.map((recap) => (
-        <RecapRow key={recap.recapId} recap={recap} />
+        <RecapRow
+          key={recap.recapId}
+          recap={recap}
+          returnTo={JOURNAL_RETURN_TO}
+        />
       ))}
     </View>
   );
@@ -133,17 +176,10 @@ function JournalReportsSection(): React.ReactElement {
   const isSettled = !monthlyReports.isLoading && !weeklyReports.isLoading;
   const openLatestReport = () => {
     if (!latestReport) return;
-    if (latestReport.kind === 'weekly') {
-      router.push({
-        pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
-        params: { weeklyReportId: latestReport.report.id },
-      } as Href);
-    } else {
-      router.push({
-        pathname: '/(app)/progress/reports/[reportId]',
-        params: { reportId: latestReport.report.id },
-      } as Href);
-    }
+    pushJournalReport(router, {
+      kind: latestReport.kind,
+      reportId: latestReport.report.id,
+    });
   };
   const refetchReports = () => {
     void monthlyReports.refetch();
@@ -216,16 +252,10 @@ function JournalReportsSection(): React.ReactElement {
         showEmptyState={false}
         testID="journal-reports-list"
         onPressMonthly={(reportId) =>
-          router.push({
-            pathname: '/(app)/progress/reports/[reportId]',
-            params: { reportId },
-          } as Href)
+          pushJournalReport(router, { kind: 'monthly', reportId })
         }
-        onPressWeekly={(weeklyReportId) =>
-          router.push({
-            pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
-            params: { weeklyReportId },
-          } as Href)
+        onPressWeekly={(reportId) =>
+          pushJournalReport(router, { kind: 'weekly', reportId })
         }
       />
     </View>
@@ -251,7 +281,10 @@ function JournalMemorySection(): React.ReactElement {
         accessibilityRole="button"
         accessibilityLabel={t('journal.memory.open')}
         onPress={() =>
-          router.push('/(app)/mentor-memory?returnTo=journal' as Href)
+          router.push({
+            pathname: '/(app)/mentor-memory',
+            params: { returnTo: JOURNAL_RETURN_TO },
+          } as Href)
         }
         testID="journal-memory-open"
         className="mt-4 self-start rounded-button bg-primary px-4 py-2"
@@ -285,10 +318,25 @@ function ActiveSection({
 
 export function JournalTabView(): React.ReactElement {
   const { t } = useTranslation();
+  const router = useRouter();
   const { section } = useLocalSearchParams<{ section?: string | string[] }>();
   const [organicSection, setOrganicSection] =
     useState<JournalSectionId>('sessions');
-  const activeSection = journalSectionOverride(section) ?? organicSection;
+  const routeSection = journalSectionOverride(section);
+  const activeSection = routeSection ?? organicSection;
+  const selectSection = (nextSection: JournalSectionId): void => {
+    setOrganicSection(nextSection);
+    // Web history must own Reports before a later report click pushes its leaf.
+    // Keeping these as separate user events prevents the router from coalescing
+    // both states into the final report entry.
+    if (Platform.OS === 'web' && nextSection === 'reports') {
+      router.setParams({ section: 'reports' });
+      return;
+    }
+    if (routeSection) {
+      router.setParams({ section: undefined });
+    }
+  };
 
   return (
     <ScrollView
@@ -307,10 +355,7 @@ export function JournalTabView(): React.ReactElement {
 
       <JournalMomentsStrip />
 
-      <JournalSegmentedControl
-        value={activeSection}
-        onChange={setOrganicSection}
-      />
+      <JournalSegmentedControl value={activeSection} onChange={selectSection} />
       <Text className="text-body-sm text-text-secondary">
         {sectionSubtitle(activeSection, t)}
       </Text>

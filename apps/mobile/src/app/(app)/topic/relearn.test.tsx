@@ -11,6 +11,7 @@ import {
   createTestProfile,
 } from '../../../test-utils/screen-render';
 import type { Profile } from '../../../lib/profile';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
@@ -103,11 +104,10 @@ jest.mock(
 // list is computed by the real hook from `profiles[]` instead of stubbed.
 
 jest.mock(
-  '../../../lib/navigation' /* gc1-allow: imports expo-router Router type; goBackOrReplace calls router.back which requires native navigation context */,
+  '../../../lib/navigation' /* gc1-allow: goBackOrReplace calls router.back which requires native navigation context */,
   () => ({
+    ...jest.requireActual('../../../lib/navigation'),
     goBackOrReplace: (...args: unknown[]) => mockBack(...args),
-    homeHrefForReturnTo: (returnTo: string | undefined) =>
-      returnTo === 'practice' ? '/(app)/practice' : '/(app)/home',
   }),
 );
 
@@ -568,6 +568,51 @@ describe('RelearnScreen', () => {
 
     expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
     expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  // [WI-2331 rework] the empty-state exit label must never claim a tab
+  // handleLeave isn't actually routing to: a non-tab returnTo (e.g. the
+  // practice hub) resolves to its real, non-tab destination, so the label
+  // falls back to the generic action instead of mislabeling as "Back to
+  // Mentor".
+  describe('exit label under V2 with a non-tab returnTo', () => {
+    let originalV2: boolean;
+
+    beforeEach(() => {
+      originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        true;
+    });
+
+    afterEach(() => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        originalV2;
+    });
+
+    it('uses the generic fallback label and still resolves the real destination', async () => {
+      mockSearchParams = { returnTo: 'practice' };
+      mockOverdueTopicsReturn = {
+        data: { totalOverdue: 0, subjects: [] },
+        isLoading: false,
+        isError: false,
+        refetch: mockRefetch,
+      };
+
+      renderRelearn();
+
+      const exitControl = await waitFor(() =>
+        screen.getByTestId('relearn-empty-back'),
+      );
+      // This suite uses the real i18n bundle (no key-passthrough mock), so
+      // assert on the rendered English string for `common.goBackAction`
+      // rather than the raw key.
+      expect(exitControl.props.accessibilityLabel).toBe('Go back');
+
+      fireEvent.press(exitControl);
+
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
+      expect(mockBack).not.toHaveBeenCalled();
+    });
   });
 
   it('renders a fetch error state and retries', async () => {

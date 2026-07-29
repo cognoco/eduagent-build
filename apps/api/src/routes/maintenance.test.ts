@@ -143,6 +143,89 @@ describe('maintenanceRoutes', () => {
     });
   });
 
+  it('rejects the LLM volume alert probe without the maintenance secret', async () => {
+    const app = createTestApp({ MAINTENANCE_SECRET: 'secret' });
+    const warnSpy = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+
+    try {
+      const res = await app.request('/maintenance/llm-volume-alert-probe', {
+        method: 'POST',
+      });
+
+      expect(res.status).toBe(403);
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('emits one bounded LLM volume alert probe with a valid secret', async () => {
+    const app = createTestApp({
+      ENVIRONMENT: 'production',
+      MAINTENANCE_SECRET: 'secret',
+    });
+    const warnSpy = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+
+    try {
+      const res = await app.request('/maintenance/llm-volume-alert-probe', {
+        method: 'POST',
+        headers: { 'X-Maintenance-Secret': 'secret' },
+      });
+      const body = (await res.json()) as {
+        emitted: boolean;
+        provider: string;
+        emittedAt: string;
+        utcDate: string;
+      };
+
+      expect(res.status).toBe(200);
+      expect(body).toEqual({
+        emitted: true,
+        provider: 'synthetic-operator-probe',
+        emittedAt: expect.stringMatching(
+          /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+        ),
+        utcDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      });
+      expect(body.emittedAt.slice(0, 10)).toBe(body.utcDate);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+
+      const entry = JSON.parse(String(warnSpy.mock.calls[0]?.[0])) as {
+        level: string;
+        message: string;
+        context: Record<string, unknown>;
+      };
+      expect(entry).toMatchObject({
+        level: 'warn',
+        message: 'llm.volume.daily_threshold_exceeded',
+        context: {
+          event: 'llm.volume.daily_threshold_exceeded',
+          surface: 'llm_volume_alert',
+          provider: 'synthetic-operator-probe',
+          environment: 'production',
+          count: 1,
+          threshold: 1,
+          utc_date: body.utcDate,
+        },
+      });
+      expect(Object.keys(entry.context).sort()).toEqual([
+        'count',
+        'environment',
+        'event',
+        'provider',
+        'surface',
+        'threshold',
+        'utc_date',
+      ]);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
   it('rejects memory facts backfill without the maintenance secret', async () => {
     const app = createTestApp({ MAINTENANCE_SECRET: 'secret' });
 

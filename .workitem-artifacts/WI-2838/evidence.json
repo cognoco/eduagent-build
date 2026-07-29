@@ -1,0 +1,69 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The held request receives a unique correlation before release; its capture-guarded route fetches, verifies, fulfills, and returns the exact correlated GET response without a later Request wrapper.",
+      "pointer": "apps/mobile/e2e-web/helpers/held-now-request.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "The named journey preserves the held Session boundary, successful fresh response, Mentor destination, and both exact returning-learner cards.",
+      "pointer": "apps/mobile/e2e-web/flows/v2/returning-learner-resume.spec.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Executed red-green evidence reproduces both wrapper identity and continued-URL lifecycle failures, mutation-removing route.fulfill fails the lifecycle assertion, and the restored route-owned response seam passes 5/5 with the retained 15-second bound.",
+      "pointer": ".workitem-artifacts/WI-2838/red-green.md"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "The independently corrected named journey passed 5/5 with one worker and retries disabled; hosted E2E run 30224090382 on implementation head 83c6d29d passed V2 16/16 and required-stable legacy 24/24 before resetting staging.",
+      "pointer": ".workitem-artifacts/WI-2838/verification.md"
+    }
+  ],
+  "headProvenance": {
+    "executorAuthoredMerge": false,
+    "baseSyncHead": "d3caddaa3ece0a187cc3b34ec3625f3c6aebbb3c",
+    "strictGreenEvidenceHead": "aaff1546c8d1e241bf56016bdd3c23988dac0a6e",
+    "strictGreenE2ERun": 30222631190,
+    "bounceHead": "fe52d114192d15373ef5ba215c19b19e3e24ebda",
+    "bounceE2ERun": 30223075316,
+    "bounceCorrectionHead": "83c6d29d075feec909680aae9610ca3fef5452db",
+    "bounceCorrectionE2ERun": 30224090382,
+    "bounceCorrectionE2EConclusion": "success",
+    "bounceCorrectionPendingHosted": false,
+    "independentPatchCommit": "6de10687d9d82e13c61ac38f985f82de20623ed2",
+    "remoteReviewFollowupHead": "c72191f666199d07f650b3c618a2320c63949d21",
+    "reconciliationParents": [
+      "6de10687d9d82e13c61ac38f985f82de20623ed2",
+      "c72191f666199d07f650b3c618a2320c63949d21"
+    ],
+    "reconciliationMergeHead": "329725298f43a9edfa266ab27691d4edf1de2364",
+    "reconciledHeadHostedPending": true,
+    "parents": [
+      "732b684eb69d1ffaa8613c59318e804f18566fbe",
+      "f8aa11b086e8787f672c6d326018ee4bcfc32c6f"
+    ],
+    "tree": "7df708ac08df6a4531d9fa41d0eddfff9e396b72",
+    "initialWiPatchSha256": "e2db8f4c352bf32013b5a747ed8f8b0cc167a99dd673079ecab51478772776c5"
+  },
+  "independentVerification": {
+    "focusedJest": "5/5 passed",
+    "mutationProof": "removing route.fulfill failed 1/5; restoration passed 5/5",
+    "namedBrowser": "5/5 passed in 2.2m; workers=1; retries=0; no-deps",
+    "prettier": "passed",
+    "targetedEslint": "passed",
+    "mobileTypecheck": "passed with all six dependencies",
+    "gc1": "no internal jest.mock in the changed test",
+    "branchFastGate": "1 passed, 0 failed, 0 skipped"
+  },
+  "unrelatedHostedFailure": {
+    "run": 30224090384,
+    "job": 89851383157,
+    "test": "apps/api/src/inngest/functions/weekly-progress-push.integration.test.ts",
+    "assertion": "queuedParents expected >= 1, received 0",
+    "scopeReason": "WI-2838 changes only E2E files; 151 other API suites and 1160 tests passed"
+  },
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": "apps/mobile/e2e-web/helpers/held-now-request.test.ts"
+}

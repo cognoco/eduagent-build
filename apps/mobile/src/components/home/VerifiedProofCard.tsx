@@ -1,5 +1,6 @@
-import { Pressable } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useVerifiedProof } from '../../hooks/use-dashboard';
 import { FAMILY_HOME_RETURN_TO } from '../../lib/navigation';
 import { VerifiedProofBlock } from '../family/VerifiedProofBlock';
@@ -24,8 +25,23 @@ export function VerifiedProofCard({
   accentColor: string;
 }): React.ReactElement | null {
   const router = useRouter();
+  const { t } = useTranslation();
   const query = useVerifiedProof(childProfileId);
   const proof = query.data;
+
+  if (query.isError) {
+    return (
+      <View
+        className="rounded-button px-3 py-3 mt-3 bg-background"
+        style={{ borderColor: accentColor + '24', borderWidth: 1 }}
+        testID={`parent-home-child-verified-proof-unavailable-${childProfileId}`}
+      >
+        <Text className="text-body-sm text-text-secondary">
+          {t('recaps.verifiedProof.lookupUnavailable')}
+        </Text>
+      </View>
+    );
+  }
 
   if (
     !proof?.hasProof ||

@@ -862,7 +862,6 @@ describe('normaliseSignals', () => {
     expect(result.challenge_round_offer).toBe(false);
     expect(result.challenge_round_evaluation).toEqual([]);
     expect(result.noticed_gap).toBeNull();
-    expect(result.notice_recheck).toBeNull();
   });
 
   // [H2 — 2026-06-05 safety audit] crisis_redirect signal
@@ -880,7 +879,6 @@ describe('normaliseSignals', () => {
 
 describe('mentor notice envelope fields', () => {
   const answerEventId = '00000000-0000-4000-8000-000000000001';
-  const noticeId = '00000000-0000-4000-8000-000000000002';
 
   it('accepts a grounded noticed_gap proposal', () => {
     const parsed = llmResponseEnvelopeSchema.parse({
@@ -942,22 +940,6 @@ describe('mentor notice envelope fields', () => {
       }).success,
     ).toBe(false);
   });
-
-  it('accepts deferred as a non-terminal re-check verdict', () => {
-    const parsed = llmResponseEnvelopeSchema.parse({
-      reply: 'No problem — we can leave it there.',
-      signals: {
-        notice_recheck: {
-          noticeId,
-          verdict: 'deferred',
-          answerEventId,
-          learnerQuote: 'not now please',
-        },
-      },
-    });
-
-    expect(parsed.signals?.notice_recheck?.verdict).toBe('deferred');
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1012,6 +994,15 @@ describe('challenge round envelope fields', () => {
             answerEventId: '00000000-0000-4000-8000-000000000001',
             learnerQuote:
               'photosynthesis stores energy in glucose and respiration releases it',
+            questionIdentity: {
+              questionText:
+                'Why does photosynthesis store energy while respiration releases it?',
+              minimalLearningClaim:
+                'photosynthesis stores energy while respiration releases it',
+              cognitiveOperation: 'causal_explanation',
+              materialContext: '',
+              noveltyBasis: 'new_reasoning',
+            },
           },
           {
             concept: 'role of ATP',
@@ -1033,9 +1024,58 @@ describe('challenge round envelope fields', () => {
       confidence: 'high',
     });
     expect(parsed.signals?.challenge_round_evaluation).toHaveLength(3);
+    expect(
+      parsed.signals?.challenge_round_evaluation?.[0]?.questionIdentity
+        ?.cognitiveOperation,
+    ).toBe('causal_explanation');
+    expect(
+      parsed.signals?.challenge_round_evaluation?.[0]?.questionIdentity
+        ?.noveltyBasis,
+    ).toBe('new_reasoning');
     expect(parsed.signals?.challenge_round_evaluation?.[2]?.correction).toBe(
       'occurs in chloroplasts',
     );
+  });
+
+  it('accepts a legacy question identity without noveltyBasis', () => {
+    const result = challengeRoundEvaluationItemSchema.safeParse({
+      concept: 'photosynthesis',
+      result: 'solid',
+      evidence: 'learner explains stored chemical energy',
+      answerEventId: '00000000-0000-4000-8000-000000000001',
+      learnerQuote: 'sunlight becomes energy stored in glucose',
+      questionIdentity: {
+        questionText: 'How does photosynthesis store energy?',
+        minimalLearningClaim:
+          'photosynthesis stores light energy as chemical energy',
+        cognitiveOperation: 'causal_explanation',
+        materialContext: '',
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.questionIdentity?.noveltyBasis).toBeUndefined();
+  });
+
+  it('rejects an unsupported question identity noveltyBasis', () => {
+    const result = challengeRoundEvaluationItemSchema.safeParse({
+      concept: 'photosynthesis',
+      result: 'solid',
+      evidence: 'learner explains stored chemical energy',
+      answerEventId: '00000000-0000-4000-8000-000000000001',
+      learnerQuote: 'sunlight becomes energy stored in glucose',
+      questionIdentity: {
+        questionText: 'How does photosynthesis store energy?',
+        minimalLearningClaim:
+          'photosynthesis stores light energy as chemical energy',
+        cognitiveOperation: 'causal_explanation',
+        materialContext: '',
+        noveltyBasis: 'cosmetic_paraphrase',
+      },
+    });
+
+    expect(result.success).toBe(false);
   });
 
   it('rejects an item missing answerEventId (HIGH-6 grounding requirement)', () => {
@@ -1226,6 +1266,12 @@ describe('challengeRoundGraderVerdictSchema (T1 — grader verdict)', () => {
     result: 'solid' as const,
     evidence: 'links speed to collision frequency and energy',
     learnerQuote: 'particles move faster and collide more often',
+    questionIdentity: {
+      questionText: 'Why does increasing temperature speed up reactions?',
+      minimalLearningClaim: 'temperature raises productive collision frequency',
+      cognitiveOperation: 'causal_explanation' as const,
+      materialContext: 'most chemical reactions',
+    },
   };
 
   // (a) a one-item verdict without answerEventId parses successfully
@@ -1350,12 +1396,14 @@ describe('challengeRoundGraderDegradedEventSchema (T1 — degraded event payload
     expect(result.success).toBe(true);
   });
 
-  it('accepts all four reason enum values', () => {
+  it('accepts all five reason enum values', () => {
     for (const reason of [
       'route_error',
       'no_json',
       'parse_error',
       'schema_invalid',
+      // [WI-2670] producer vendor unresolved — fail-open degraded reason.
+      'producer_vendor_unresolved',
     ] as const) {
       const r = challengeRoundGraderDegradedEventSchema.safeParse({
         ...REQUIRED,

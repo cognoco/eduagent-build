@@ -59,9 +59,9 @@ Each row is a processor confirmed **wired in code** (see §1.3 / §2.3.c for `fi
 | --- | --- |
 | Current version & version log | v0.1, 2026-06-30 — initial code-grounded completion of the EDPB 2026 template. |
 | Team conducting this DPIA | Engineering (evidence-gathering from source, `file:line`-cited); **DPO + privacy counsel own and sign** (pending appointment). |
-| Guidelines / standards used | EDPB DPIA template 2026 v1.0; WP248rev.01; GDPR Arts 5, 6, 8, 9, 13–22, 25, 28, 30, 32, 35; Datatilsynet Art 35(4) list; UK Children's Code (AADC, retained only as a design benchmark); EU AI Act Arts 5(1)(f) & 50. Companion repo artifacts: `ropa.md`, `art9-special-category-decision.md`, `breach-response-plan.md`, `2026-07-23-13-plus-eea-launch-country-ruling.md`. |
+| Guidelines / standards used | EDPB DPIA template 2026 v1.0; WP248rev.01; GDPR Arts 5, 6, 8, 9, 13–22, 25, 28, 30, 32, 35; Datatilsynet Art 35(4) list; UK Children's Code (AADC, retained only as a design benchmark); EU AI Act Arts 5(1)(f) & 50. Companion repo artifacts: `ropa.md`, `art9-special-category-position.md`, `breach-response-plan.md`, `2026-07-23-13-plus-eea-launch-country-ruling.md`. |
 | Reasons to conduct the DPIA | **Category 1 (Art 35(3)) + Category 3 (EDPB/Datatilsynet guidance).** Selected: ☒ Systematic & extensive evaluation based on automated processing incl. profiling (learner knowledge evaluation & tailoring); ☒ Evaluation/scoring incl. profiling & predicting (mastery, misconceptions, learning preferences); ☒ Sensitive/highly-personal data risk (incidental special-category in free-text — see §1.1.a); ☒ Data concerning **vulnerable data subjects (children)** — the decisive factor; ☒ Innovative use / new technology (large language models). **Three+ criteria → DPIA mandatory.** Trigger = first real child's data at scale; **the free tier is not exempt.** |
-| Scope of this DPIA | **In scope:** all personal-data processing in the live mobile app + API (auth, onboarding/age-gating, tutoring conversation, persistent learning memory, assessments/progress, guardian dashboard, billing, transactional email, error monitoring, background jobs, LLM/embedding egress). **Out of scope (cross-referenced, not re-assessed here):** the full EU AI Act high-risk provider conformity regime (deferred to ~2 Dec 2027 per the launch-gate memo; see `art9-special-category-decision.md` + the E5 launch-gate analysis); marketing/website analytics (none wired in app code). |
+| Scope of this DPIA | **In scope:** all personal-data processing in the live mobile app + API (auth, onboarding/age-gating, tutoring conversation, persistent learning memory, assessments/progress, guardian dashboard, billing, transactional email, error monitoring, background jobs, LLM/embedding egress). **Out of scope (cross-referenced, not re-assessed here):** the full EU AI Act high-risk provider conformity regime (addressed through the separate AI Act classification review); marketing/website analytics (none wired in app code). |
 | Completion date | `[TODO — DPO]` |
 | Formal validation date | `[TODO — DPO sign-off]` |
 | Published / shared externally? | ☒ No (internal accountability document; shown to Datatilsynet on request). A child-readable privacy summary is published separately. |
@@ -94,7 +94,17 @@ Data subjects: **adult Subscription-administrator/owner** (`isOwner`/`admin`), *
 | 14 | **Device / notification** — `notification_preferences.expo_push_token`, `email_suppressions.email`, `notification_log` | Learner/owner. `schema/progress.ts:96-181`, `schema/email-suppressions.ts:24-50`. | ☒ No |
 | 15 | **BYOK waitlist** — `byok_waitlist.email` | Prospect. `schema/billing.ts:258-266`. Outside the identity cascade → erased explicitly on delete. | ☒ No |
 
-> **Special-category (Art 9) position — read carefully.** The controller has a **deliberate, enforced policy of NOT processing Art 9 data** (no health/disability collection, inference, labelling or storage — see [`art9-special-category-decision.md`](art9-special-category-decision.md)), backed by CI guards (no-clinical-copy, persona-fossil, functional-vocabulary). **However**, the items marked "Incidental risk" are **free-text or LLM-inferred fields** where a learner could volunteer, or a model could surface, special-category content (health, disability, religion, sexuality, political opinion) even though no feature solicits it. The **highest-risk surfaces are `session_events.content` (full transcript) and `memory_facts.text` / `learning_profiles.struggles` / `accommodation_mode`** (which can proxy a disability signal). This DPIA treats incidental Art 9 as a **risk to mitigate (minimisation, no-clinical-copy guard extended to LLM-written fields, no third-party disclosure of raw transcript)**, not as a deliberate Art 9 processing operation. The Art 9(2) conditions are therefore **not relied upon**; the policy + guards are the control. **DPO/counsel must confirm this characterisation holds for the shipped feature set (§2.1.b).**
+> **Special-category (Art 9) position — read carefully.** The service does not
+> solicit or intend to use special-category data, but free-text and
+> LLM-inferred fields make incidental disclosure, inference, transmission, and
+> temporary storage foreseeable. The highest-risk surfaces include
+> `session_events.content`, `memory_facts.text`,
+> `learning_profiles.struggles`, and `accommodation_mode`. The proposed
+> treatment is minimisation, durable-record suppression, short justified
+> retention, and no use for profiling, advertising, or model training. The
+> applicable Article 9 condition and final safeguards remain questions for
+> independent DPO/privacy advice. See
+> [`art9-special-category-position.md`](art9-special-category-position.md).
 
 ### 1.1.b Purposes of the processing
 
@@ -181,7 +191,13 @@ Data subjects: **adult Subscription-administrator/owner** (`isOwner`/`admin`), *
 
 ### 2.1.b Reasons to lift the processing prohibition (Art 9(2))
 
-**Not relied upon.** The controller's position is that **no Art 9 special-category data is deliberately processed** (`art9-special-category-decision.md`); therefore no Art 9(2) condition is invoked. The residual **incidental** Art 9 risk in free-text/LLM-inferred fields (§1.1.a note) is managed as a security/minimisation risk, **not** by establishing an Art 9(2) basis. **If counsel concludes the incidental exposure is in substance Art 9 processing** (e.g. `learning_profiles.accommodation_mode` as a disability proxy), the appropriate condition would be **(a) explicit consent** and this section must be reopened with an expanded assessment. **This is a DPO/counsel decision point.**
+No Article 9(2) condition is adopted in this engineering draft. The service
+does not deliberately solicit or use special-category data, but incidental
+handling is foreseeable. The DPO/privacy adviser must determine whether that
+handling constitutes Article 9 processing and, if so, which condition and
+safeguards apply. The controller must then update this section, the ROPA,
+retention schedule, and transparency materials before approval. See
+[`art9-special-category-position.md`](art9-special-category-position.md).
 
 ## 2.2 Data minimisation, retention & data quality
 

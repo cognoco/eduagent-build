@@ -4,7 +4,10 @@ import {
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
-import type { ChallengeRoundEvaluationItem } from '@eduagent/schemas';
+import type {
+  ChallengeRoundEvaluationItem,
+  ChallengeRoundQuestionIdentity,
+} from '@eduagent/schemas';
 
 /**
  * Per-answer evaluation outcomes and mastery decision for a finished
@@ -19,6 +22,8 @@ import type { ChallengeRoundEvaluationItem } from '@eduagent/schemas';
  *  - An empty evaluation array → `outcome: 'invalid'` and NEVER
  *    `markMasteryVerified` (CRIT-9: `0 === 0` would otherwise pass a
  *    naive "all solid" check).
+ *  - Verified mastery requires at least two genuinely non-equivalent probes.
+ *    Equivalent paraphrases cannot manufacture breadth from repeated evidence.
  *  - A single `partial` or `misconception` is sufficient to block
  *    `markMasteryVerified` regardless of how many concepts were solid.
  *  - `solidConcepts` / `solidAnswerQuotes` only ever contain items
@@ -45,7 +50,12 @@ export interface ReviewTarget {
   source: 'challenge_round';
 }
 
-export type MasteryOutcome = 'verified' | 'partial' | 'reteach' | 'invalid';
+export type MasteryOutcome =
+  | 'verified'
+  | 'partial'
+  | 'reteach'
+  | 'insufficient_breadth'
+  | 'invalid';
 
 export interface MasteryDecision {
   outcome: MasteryOutcome;
@@ -61,6 +71,87 @@ export interface EvaluationSummary {
   missing: number;
   misconception: number;
   total: number;
+}
+
+const REQUIRED_DISTINCT_PROBES = 2;
+
+function normalizeIdentityPart(value: string): string {
+  return value
+    .normalize('NFKC')
+    .toLocaleLowerCase('en')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function noveltyBasisMatchesStructuredDifference(
+  identity: ChallengeRoundQuestionIdentity,
+  priorIdentities: ChallengeRoundQuestionIdentity[],
+): boolean {
+  if (!identity.noveltyBasis) return false;
+
+  switch (identity.noveltyBasis) {
+    case 'new_minimal_learning_claim':
+      return priorIdentities.every(
+        (prior) =>
+          normalizeIdentityPart(prior.minimalLearningClaim) !==
+          normalizeIdentityPart(identity.minimalLearningClaim),
+      );
+    case 'new_material_evidence_or_context':
+      return priorIdentities.every(
+        (prior) =>
+          normalizeIdentityPart(prior.materialContext) !==
+          normalizeIdentityPart(identity.materialContext),
+      );
+    case 'new_reasoning':
+      // Cognitive operation is the deterministic reasoning dimension in the
+      // identity contract. A same-operation free-text novelty assertion cannot
+      // independently prove new reasoning, so it fails closed.
+      return priorIdentities.every(
+        (prior) => prior.cognitiveOperation !== identity.cognitiveOperation,
+      );
+  }
+}
+
+function countDistinctProbes(evals: ChallengeRoundEvaluationItem[]): number {
+  const identities = evals.flatMap((evaluation) =>
+    evaluation.questionIdentity ? [evaluation.questionIdentity] : [],
+  );
+  const [firstIdentity, ...remainingIdentities] = identities;
+  if (!firstIdentity) return 0;
+
+  let distinctCount = 1;
+  const priorIdentities = [firstIdentity];
+
+  for (const identity of remainingIdentities) {
+    const repeatsExactQuestion = priorIdentities.some(
+      (prior) =>
+        normalizeIdentityPart(prior.questionText) ===
+        normalizeIdentityPart(identity.questionText),
+    );
+
+    if (!repeatsExactQuestion) {
+      const sameOperationPriors = priorIdentities.filter(
+        (prior) => prior.cognitiveOperation === identity.cognitiveOperation,
+      );
+      const introducesNewOperation = sameOperationPriors.length === 0;
+
+      // Natural-language claim/context mismatches are ambiguous: they may be
+      // synonyms rather than new evidence. A history-relative novelty basis
+      // can create breadth only when its declared structured dimension also
+      // differs from every earlier probe using this operation.
+      if (
+        introducesNewOperation ||
+        noveltyBasisMatchesStructuredDifference(identity, sameOperationPriors)
+      ) {
+        distinctCount += 1;
+      }
+    }
+
+    priorIdentities.push(identity);
+  }
+
+  return distinctCount;
 }
 
 /**
@@ -167,6 +258,16 @@ export function decideMasteryAndReview(
   }
 
   if (solidItems.length === evals.length && !hasMisconception && !hasPartial) {
+    if (countDistinctProbes(solidItems) < REQUIRED_DISTINCT_PROBES) {
+      return {
+        outcome: 'insufficient_breadth',
+        markMasteryVerified: false,
+        solidConcepts,
+        solidAnswerQuotes,
+        reviewTargets: [],
+      };
+    }
+
     return {
       outcome: 'verified',
       markMasteryVerified: true,

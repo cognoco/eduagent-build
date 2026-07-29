@@ -12,7 +12,10 @@ import {
   childProfileHref,
   goBackOrReplace,
   homeHrefForReturnTo,
+  resolvedV2TabForReturnTo,
+  V2_TAB_TITLE_KEYS,
 } from '../../../../../lib/navigation';
+import { FEATURE_FLAGS } from '../../../../../lib/feature-flags';
 import { firstParam } from '../../../../../lib/route-params';
 import { EngagementChip } from '../../../../../components/parent/EngagementChip';
 import { MetricInfoDot } from '../../../../../components/parent/MetricInfoDot';
@@ -63,13 +66,54 @@ export default function SessionDetailScreen() {
     refetch,
   } = useChildSessionDetail(profileId, sessionId);
   const childDetailQuery = useChildDetail(profileId);
+  const v2Enabled = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
   const backFallbackHref =
     returnTo != null
-      ? homeHrefForReturnTo(returnTo, returnId)
+      ? homeHrefForReturnTo(returnTo, returnId, v2Enabled)
       : profileId
         ? childProfileHref(profileId)
-        : ('/(app)/home' as Href);
+        : ((v2Enabled ? '/(app)/mentor' : '/(app)/home') as Href);
   const handleBack = () => goBackOrReplace(router, backFallbackHref);
+
+  // WI-2331 rework, F1b: the header/error/narrative-unavailable Back
+  // controls route through handleBack/backFallbackHref, so they name the
+  // same actual destination — the owning V2 tab named by returnTo
+  // (via resolvedV2TabForReturnTo, which only claims a tab when
+  // backFallbackHref genuinely resolves to one), the child's profile (this
+  // screen's real, unchanged parent when there's no returnTo), or the Mentor
+  // default — instead of the generic `common.goBack` most of them showed
+  // before. V0/V1 keep their prior copy unchanged (`common.goBack`). When
+  // returnTo names a non-tab destination (practice, family-recaps, …) the
+  // label falls back to the generic Back action rather than mislabeling.
+  const returnToBackTab =
+    returnTo != null
+      ? resolvedV2TabForReturnTo(returnTo, returnId, v2Enabled)
+      : null;
+  const v2ExitLabel =
+    returnTo != null
+      ? returnToBackTab
+        ? t('common.backTo', {
+            destination: t(V2_TAB_TITLE_KEYS[returnToBackTab]),
+          })
+        : t('common.goBack')
+      : profileId
+        ? t('parentView.session.backToChildProfile')
+        : t('common.backTo', { destination: t(V2_TAB_TITLE_KEYS.mentor) });
+  const backLabel = v2Enabled ? v2ExitLabel : t('common.goBack');
+  // The footer "back to child" CTA is a distinct control from the header
+  // Back: it always names and routes to the child's profile specifically,
+  // regardless of `returnTo` — so a parent who followed a `returnTo` deep
+  // link (e.g. from Recaps) still has a direct way back to the child.
+  // Keeping this separate from `backLabel`/`handleBack` avoids the two
+  // controls becoming indistinguishable when `returnTo` is set.
+  const childProfileBackLabel = t('parentView.session.backToChildProfile');
+  const handleBackToChildProfile = () => {
+    if (profileId) {
+      router.push(childProfileHref(profileId));
+      return;
+    }
+    handleBack();
+  };
 
   useEffect(() => {
     if (copyState === 'idle') return undefined;
@@ -96,7 +140,11 @@ export default function SessionDetailScreen() {
         isLoading={isLoading}
         error={isError && !session ? true : undefined}
         retry={{ onPress: () => refetch(), testID: 'retry-session' }}
-        back={{ onPress: handleBack, testID: 'error-go-back' }}
+        back={{
+          onPress: handleBack,
+          label: backLabel,
+          testID: 'error-go-back',
+        }}
         errorTitle={t('parentView.session.somethingWentWrong')}
         testID="loading"
       >
@@ -119,9 +167,7 @@ export default function SessionDetailScreen() {
           onPress={handleBack}
           className="mt-4 rounded-lg bg-primary px-6 py-3"
         >
-          <Text className="text-text-inverse font-medium">
-            {t('common.goBack')}
-          </Text>
+          <Text className="text-text-inverse font-medium">{backLabel}</Text>
         </Pressable>
       </View>
     );
@@ -165,7 +211,7 @@ export default function SessionDetailScreen() {
           onPress={handleBack}
           className="mb-4 flex-row items-center"
           accessibilityRole="button"
-          accessibilityLabel={t('common.goBack')}
+          accessibilityLabel={backLabel}
         >
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </Pressable>
@@ -309,12 +355,10 @@ export default function SessionDetailScreen() {
             onPress={handleBack}
             className="mt-4 self-start rounded-lg bg-primary px-4 py-3"
             accessibilityRole="button"
-            accessibilityLabel={t('common.goBack')}
+            accessibilityLabel={backLabel}
             testID="narrative-unavailable-back"
           >
-            <Text className="text-text-inverse font-medium">
-              {t('common.goBack')}
-            </Text>
+            <Text className="text-text-inverse font-medium">{backLabel}</Text>
           </Pressable>
         </View>
       )}
@@ -394,14 +438,14 @@ export default function SessionDetailScreen() {
           </Pressable>
         ) : null}
         <Pressable
-          onPress={handleBack}
+          onPress={handleBackToChildProfile}
           className="rounded-lg px-4 py-3 items-center min-h-[48px] justify-center"
           accessibilityRole="button"
-          accessibilityLabel={t('parentView.session.backToChildProfile')}
+          accessibilityLabel={childProfileBackLabel}
           testID="session-detail-back-to-child"
         >
           <Text className="text-primary font-medium">
-            {t('parentView.session.backToChildProfile')}
+            {childProfileBackLabel}
           </Text>
         </Pressable>
       </View>

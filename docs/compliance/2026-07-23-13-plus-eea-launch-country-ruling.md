@@ -1,7 +1,7 @@
 # 13+ EEA Launch Perimeter — Child Consent Ages and Country Ruling
 
 **Status:** Product/compliance ruling for launch planning; external privacy and AI-regulatory counsel sign-off still required  
-**As of:** 2026-07-24 — launch/expansion split clarified
+**As of:** 2026-07-24 — launch/expansion and pre-launch status clarified<br>
 **Scope:** EEA residents only (EU-27 + Iceland, Liechtenstein, Norway)  
 **Explicitly excluded:** United Kingdom  
 **Controller assumed:** ZWIZZLY AS, established in Norway  
@@ -54,9 +54,9 @@ higher-threshold, unknown, stale, unsupported, or legally unverified country
 remains disabled.
 
 **Later expansion:** add further countries MentoMate can lawfully and
-operationally support after the country matrix and jurisdiction-correct
-guardian-authorisation flow are implemented, legally verified, tested, and
-enabled. In that phase:
+operationally support after the DB-mastered country matrix/resolver and the
+jurisdiction-correct guardian-authorisation flow are implemented, legally
+verified, tested, and enabled. In that phase:
 
 - threshold 13: ages 13–17 may self-consent;
 - threshold 14: age 13 requires guardian authorization;
@@ -70,11 +70,13 @@ operational risk-reduction decision, not a claim that a 13+ service can never
 operate in higher-threshold countries.
 
 **Portugal's current threshold is 13, but it requires a launch-day legal
-refresh.** Its Parliament is actively considering **Bill 398/XVII/1 — proposed
-child protection rules for digital environments; in committee-stage scrutiny
-during 2026**. Portugal is not excluded merely because the bill is pending, but
-it must not be enabled until counsel confirms the then-current threshold and
-any additional enacted duties. The bill is not treated here as enacted law.
+refresh.** Its Parliament is actively considering
+[Bill 398/XVII/1](https://www.parlamento.pt/ActividadeParlamentar/Paginas/DetalheIniciativa.aspx?BID=304173)
+— proposed child protection rules for digital environments; in committee-stage
+scrutiny during 2026. Portugal is not excluded merely because the bill is
+pending, but it must not be enabled until counsel confirms the then-current
+threshold and any additional enacted duties. The bill is not treated here as
+enacted law.
 
 **Norway's current threshold is 13, but that rule is not stable enough to cache.**
 The Ministry of Justice's 2025 proposal to raise the threshold to 15 remains
@@ -88,27 +90,26 @@ unavailable.
 Children's Code, UK representative requirements, consumer law, or Online Safety
 Act obligations.
 
-## Current implementation status
+## Launch enforcement condition
 
-This ruling sets product policy; it does not claim that the country gate is
-already production-ready.
+This ruling determines which country-and-age combinations may be enabled. It
+does not itself enable a country.
 
-- The 13+ floor is implemented through `PROFILE_MINIMUM_AGE = 13`.
-- Mobile profile creation collects an exact birth date and sends year, month,
-  and day; identity v2 persists `person.birth_date`.
-- Identity v2 has `person.residence_jurisdiction`, but the current creation
-  bridge only maps the legacy coarse values `EU | US | OTHER` to
-  `EU | US | ROW`. Mobile profile creation does not collect an EEA country of
-  habitual residence.
-- Consent remains a location-blind GDPR path with a conservative guardian gate
-  through age 16. There is no server-owned ISO-country allowlist implementing
-  either the initial threshold-13-country allowlist or the later 30-country
-  support perimeter, and no Article 8 threshold lookup by habitual residence.
+Before launch, the approved release must:
 
-Therefore **no EEA country is technically enabled by this ruling alone**.
-Country-level residence capture, assurance, threshold evaluation, policy
-snapshotting, and server/store allowlist enforcement are launch blockers under
-common gates 3, 4, and 8 below.
+- obtain an exact date of birth and habitual-residence country;
+- resolve an effective, legally verified country rule from a DB-mastered
+  registry;
+- allow initial access only where the person is at least 13 and has reached
+  that country’s Article 8 threshold;
+- fail closed for unknown, unsupported, stale, unverified, or disabled rules;
+- preserve the policy version and jurisdiction used for the decision; and
+- enforce the same country decision at onboarding, AI processing, and store
+  availability.
+
+The launch evidence must demonstrate those outcomes against the exact release
+and configuration submitted for approval. Internal delivery status is tracked
+separately and is not part of this policy ruling.
 
 ## What Article 8 does — and does not — answer
 
@@ -156,13 +157,13 @@ that the country has no additional child rules.
 | Residence country | Article 8 age | Can a 13-year-old self-consent? | Guardian authorization band within a 13+ product | Primary source | Launch disposition / caveat |
 |---|---:|---|---|---|---|
 | Belgium | 13 | Yes | None within 13–17 | [Belgian Data Protection Authority — consent](https://www.dataprotectionauthority.be/professioneel/avg/rechtsgronden/toestemming) | May be enabled after common gates; guardian-free at 13. |
-| Estonia | 13 | Yes | None within 13–17 | [Personal Data Protection Act §8, Riigi Teataja](https://www.riigiteataja.ee/en/compare_wordings?grupiId=100724&vasakAktId=515012025002) | May be enabled after common gates; guardian-free at 13. |
-| Finland | 13 | Yes | None within 13–17 | [Data Protection Act §5, Finlex](https://www.finlex.fi/en/legislation/2018/1050/amendment-history/20230239) | May be enabled after common gates; guardian-free at 13. |
-| Iceland | 13 | Yes | None within 13–17 | [Act 90/2018 Article 10, Alþingi](https://www.althingi.is/lagas/151b/2018090.html) | May be enabled after common gates; guardian-free at 13. |
+| Estonia | 13 | Yes | None within 13–17 | [Personal Data Protection Act §8, current consolidated Riigi Teataja text](https://www.riigiteataja.ee/en/eli/507112023002/consolide) | May be enabled after common gates; guardian-free at 13. |
+| Finland | 13 | Yes | None within 13–17 | [Data Protection Act §5, Finlex](https://www.finlex.fi/en/legislation/2018/1050) | May be enabled after common gates; guardian-free at 13. |
+| Iceland | 13 | Yes | None within 13–17 | [Act 90/2018 Article 10, current Alþingi law collection](https://www.althingi.is/lagas/nuna/2018090.html#G10) | May be enabled after common gates; guardian-free at 13. |
 | Latvia | 13 | Yes | None within 13–17 | [Personal Data Processing Law §33, Likumi](https://likumi.lv/ta/en/en/id/300099-personal-data-processing-law) | May be enabled after common gates; guardian-free at 13. |
 | Malta | 13 | Yes | None within 13–17 | [Malta IDPC — national legislation, including S.L. 586.11](https://idpc.org.mt/our-office/legislation/) | May be enabled after common gates; guardian-free at 13. Counsel should retain the operative subsidiary legislation in the launch evidence pack. |
 | Norway | 13 under current law | Yes under current law | None within 13–17 under current law | [Personal Data Act §5, Lovdata](https://lovdata.no/dokument/NLE/lov/2018-06-15-38/%C2%A75); [official proposal to raise the threshold to 15](https://www.regjeringen.no/no/dokumenter/horing-endringer-i-personopplysningsloven-aldersgrense-for-barns-samtykke-ved-bruk-av-informasjonssamfunnstjenester-sosiale-medier-mv/id3114264/) | May be enabled after common gates, but launch-day counsel must confirm the proposal remains unenacted and update the threshold if needed. |
-| Portugal | 13 | Yes under current law | None within 13–17 under current law | [Law 58/2019, Diário da República](https://diariodarepublica.pt/dr/detalhe/lei/58-2019-123815982); [official education authority summary](https://www.dge.mec.pt/node/2941) | May be enabled after common gates and a launch-day recheck of [Bill 398/XVII/1](https://www.parlamento.pt/Paginas/2026/maio/audicao-publica-prjeto-lei-398.aspx?n=20) and the Diário da República. |
+| Portugal | 13 | Yes under current law | None within 13–17 under current law | [Law 58/2019, Diário da República](https://diariodarepublica.pt/dr/detalhe/lei/58-2019-123815982); [official education authority summary](https://www.dge.mec.pt/node/2941) | May be enabled after common gates and a launch-day recheck of [Bill 398/XVII/1](https://www.parlamento.pt/ActividadeParlamentar/Paginas/DetalheIniciativa.aspx?BID=304173) and the Diário da República. |
 | Sweden | 13 | Yes | None within 13–17 | [Swedish Authority for Privacy Protection — consent](https://www.imy.se/verksamhet/dataskydd/det-har-galler-enligt-gdpr/rattslig-grund/samtycke/) | May be enabled after common gates; guardian-free at 13. Capacity for consent outside Article 8 and contracting remains context-specific. |
 | Austria | 14 | No | Age 13 | [Austrian DPA decision applying DSG §4(4), RIS](https://www.ris.bka.gv.at/JudikaturEntscheidung.wxe?Abfrage=Dsk&Dokumentnummer=DSBT_20250211_2024_0_195_679_00) | Enable only with the age-13 guardian flow and national review. |
 | Bulgaria | 14 | No | Age 13 | [Personal Data Protection Act Article 25c, CPDP](https://cpdp.bg/en/legislation/personal-data-protection-act/) | Enable only with the age-13 guardian flow and national review. |
@@ -233,7 +234,8 @@ counsel confirms the launch-day position.
 
 ### Wave 2 — age-14 and age-15 consent bands
 
-Add only after verified guardian authorization is production-ready:
+Add only after verified guardian authorization is implemented and evidenced
+for launch:
 
 - Age 14: Austria, Bulgaria, Cyprus, Italy, Lithuania, Spain
 - Age 15: Czechia, Denmark, France, Greece, Slovenia
@@ -283,12 +285,21 @@ As of this note, the EU AI Act is still
 it is not yet incorporated into the EEA Agreement. For EU-market purposes a
 Norwegian provider may therefore be a third-country provider under the EU act.
 
-The [EU AI Act](https://eur-lex.europa.eu/eli/reg/2024/1689/) applies generally
-from **2 August 2026**. Article 50 requires users interacting directly with an
-AI system to be informed unless that fact is obvious. More importantly for the
-country decision, Article 22 requires a third-country provider of a **high-risk
-AI system** to appoint an authorized representative established in the EU
-before making that system available on the EU market.
+Application dates are moving and must not be reduced to one launch-day
+assumption. The current
+[EU AI Act text](https://eur-lex.europa.eu/eli/reg/2024/1689/) states general
+application from **2 August 2026**, with staged exceptions in Article 113.
+Article 50 requires users interacting directly with an AI system to be informed
+unless that fact is obvious. Following the 7 May political agreement, the
+[Council gave final approval on 29 June 2026](https://www.consilium.europa.eu/en/press/press-releases/2026/06/29/artificial-intelligence-council-gives-final-green-light-to-simplify-and-streamline-rules/)
+to an amending regulation that moves the stand-alone Annex III high-risk rules,
+including education, to **2 December 2027**. The Council stated that the act
+would enter into force three days after Official Journal publication. The
+Official Journal citation, entry-into-force date, consolidated text, and EEA
+status must therefore be checked rather than relying on either the original
+Article 113 date or a press release alone. Article 22 requires a third-country
+provider of a **high-risk AI system** to appoint an authorized representative
+established in the EU before making that system available on the EU market.
 
 MentoMate's classification cannot be assumed from the label “AI tutor.”
 Annex III includes certain educational systems used to evaluate learning
@@ -312,9 +323,10 @@ that pilot's launch date.
 The country matrix answers only the child-consent-age question. No country
 becomes “safe” until all of the following are closed:
 
-1. **External DPO/privacy-counsel sign-off.** Approve the ROPA, DPIA, lawful
-   bases, international transfers, retention, child notices, and consent
-   evidence.
+1. **External privacy/legal review and accountable approval.** Obtain the
+   appointed DPO’s advice where applicable and counsel input where required;
+   accountable management approves the ROPA, DPIA, lawful bases, international
+   transfers, retention, child notices, and consent evidence.
 2. **AI Act classification and territorial analysis.** Close the Article 22,
    Article 49, Article 50, and Annex III questions above before an EU launch.
 3. **Reliable age and residence assurance.** Record exact age and habitual
@@ -337,9 +349,11 @@ becomes “safe” until all of the following are closed:
    research does not clear targeted advertising, third-party tracking, or
    marketing profiling of minors.
 8. **Country allowlist enforcement.** Gate onboarding and store distribution
-   using a server-owned allowlist. Explicitly deny the UK, Switzerland, the US,
-   and every other non-EEA jurisdiction not separately cleared. Do not rely on
-   store listing alone.
+   using a DB-mastered, effective-dated resolver and an independently
+   configured store allowlist. Explicitly deny the UK,
+   Switzerland, the US, and every other non-EEA jurisdiction not separately
+   cleared. Store listing is an interim compliance-load-bearing control, not a
+   permanent substitute for server enforcement.
 9. **Operational rights and incident readiness.** Test access, export,
    correction, deletion, consent withdrawal, guardian-authority changes,
    processor incidents, and regulator/contact paths before launch.
@@ -376,9 +390,9 @@ initial launch. The empty enabled allowlist records the current implementation
 truth: no country is enabled by this document alone. For initial launch, add
 only threshold-13 countries after their common gates, launch-day legal review,
 and localisation are complete. Add higher-threshold countries only in the later
-expansion phase after their jurisdiction-correct guardian flow is
-production-ready. The UK and every other non-EEA country require a separate
-ruling before support.
+expansion phase after their jurisdiction-correct guardian flow is implemented,
+legally verified, tested, and enabled. The UK and every other non-EEA country
+require a separate ruling before support.
 
 ## Primary framework sources
 

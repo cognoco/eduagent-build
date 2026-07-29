@@ -57,11 +57,19 @@ function PracticeActivityRow({
       testID={`journal-activity-${item.id}`}
       className="rounded-card border border-border bg-surface p-4"
     >
-      <Text className="text-body font-semibold text-text-primary">
+      <Text
+        testID={`journal-activity-headline-${item.id}`}
+        className="text-body font-semibold text-text-primary"
+      >
         {headline}
       </Text>
       {meta ? (
-        <Text className="mt-1 text-body-sm text-text-secondary">{meta}</Text>
+        <Text
+          testID={`journal-activity-meta-${item.id}`}
+          className="mt-1 text-body-sm text-text-secondary"
+        >
+          {meta}
+        </Text>
       ) : null}
     </View>
   );

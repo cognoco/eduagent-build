@@ -219,6 +219,15 @@ describe('SupportHubMentorTab', () => {
     mockFetch.setRoute('/scopes/coldstart', EMPTY_COLD_START);
   });
 
+  it('[WI-2176] exposes stable heading and subtitle nodes for native geometry evidence', () => {
+    queryClient = renderWithProfile(
+      <SupportHubMentorTab personScopes={[EMMA_SCOPE]} />,
+    );
+
+    screen.getByTestId('support-hub-mentor-heading');
+    screen.getByTestId('support-hub-mentor-subtitle');
+  });
+
   it('renders visibility-backed cockpit cards with Mentor, Subjects, and Journal actions', async () => {
     const openMentor = jest.fn();
     const openSubjects = jest.fn();

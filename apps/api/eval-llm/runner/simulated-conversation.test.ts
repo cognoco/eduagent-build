@@ -109,10 +109,22 @@ describe('runSimulatedRound — conversation loop', () => {
     expect(contexts.flat().join('\n')).not.toContain('<server_note');
   });
 
-  it('classifies Sylvia Plath cosmetic paraphrase as a repeat while preserving a new comparison as new', async () => {
+  it('starts Sylvia Plath Challenge with a new probe and preserves later new operations', async () => {
     const fixtureScenario = CHALLENGE_SIM_SCENARIOS.find(
       (s) => s.id === 'CRS08-sylvia-plath-transfer',
     )!;
+    const conceptEquivalenceKeys = fixtureScenario.conceptEquivalenceKeys;
+    expect(conceptEquivalenceKeys).toBeDefined();
+    if (!conceptEquivalenceKeys) {
+      throw new Error(
+        'Sylvia Plath fixture must define concept equivalence keys',
+      );
+    }
+    expect(
+      conceptEquivalenceKeys['rebirth imagery makes the speaker powerful'],
+    ).not.toBe(
+      conceptEquivalenceKeys['rebirth imagery changes reader interpretation'],
+    );
     let tutorQuestionCount = 0;
     const result = await runSimulatedRound(
       {
@@ -155,7 +167,7 @@ describe('runSimulatedRound — conversation loop', () => {
     expect(result.questionDiagnostics).toEqual([
       expect.objectContaining({
         source: 'seed',
-        repeatsPriorQuestion: true,
+        repeatsPriorQuestion: false,
       }),
       expect.objectContaining({
         source: 'model',
@@ -290,11 +302,42 @@ describe('runSimulatedRound — conversation loop', () => {
     const verifiedProfile = PROFILES.find(
       (p) => p.id === verifiedScenario.profileId,
     )!;
+    const tutorQuestions = [
+      'Compare rapid burial with remains left exposed at the surface.',
+      'Apply that reasoning to remains buried by a sudden ash fall.',
+    ];
+    const identities = [
+      {
+        minimalLearningClaim: 'rapid burial protects remains from decay',
+        cognitiveOperation: 'causal_explanation' as const,
+        materialContext: 'bones buried rapidly in sediment',
+      },
+      {
+        minimalLearningClaim: 'rapid burial protects remains from decay',
+        cognitiveOperation: 'comparison' as const,
+        materialContext: 'buried remains compared with exposed remains',
+      },
+      {
+        minimalLearningClaim: 'rapid burial protects remains from decay',
+        cognitiveOperation: 'application' as const,
+        materialContext: 'remains buried by a sudden ash fall',
+      },
+    ];
+    let tutorIndex = 0;
+    let graderIndex = 0;
     const overrides: SimulatedRoundOverrides = {
       learnerTurn: async () =>
         'Because rapid burial protects the bones from decay.',
-      tutorTurn: async () => 'Great — and then what?',
-      graderTurn: async () => gradedItems('solid'),
+      tutorTurn: async () => tutorQuestions[tutorIndex++]!,
+      graderTurn: async ({ askedQuestion }) => [
+        {
+          ...gradedItems('solid')[0]!,
+          questionIdentity: {
+            questionText: askedQuestion,
+            ...identities[graderIndex++]!,
+          },
+        },
+      ],
     };
     const result = await runSimulatedRound(
       {

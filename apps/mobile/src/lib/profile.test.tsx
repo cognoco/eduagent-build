@@ -17,6 +17,11 @@ import {
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
 import { queryKeys } from './query-keys';
 import { NOW_FEED_CACHE_POLICY_EPOCH } from './now-feed-cache';
+import {
+  consumeHubToSessionTransition,
+  markHubToSessionTransition,
+  resetNavigationTransitionProvenanceForTests,
+} from './navigation-transition-provenance';
 
 // ./secure-storage uses real implementation: expo-secure-store is globally mocked
 // in test-setup.ts with an in-memory store. We control behavior via ExpoSecureStore fns directly.
@@ -105,6 +110,7 @@ describe('ProfileProvider', () => {
   beforeEach(() => {
     mockFetch.mockReset();
     jest.clearAllMocks();
+    resetNavigationTransitionProvenanceForTests();
     jest.mocked(ExpoSecureStore.getItemAsync).mockResolvedValue(null);
     jest.mocked(ExpoSecureStore.setItemAsync).mockResolvedValue(undefined);
     mockFetch.mockResolvedValueOnce(
@@ -283,6 +289,22 @@ describe('ProfileProvider', () => {
     );
   });
 
+  it('automatic removed-profile fallback clears navigation proof owned by the removed profile', async () => {
+    jest.mocked(ExpoSecureStore.getItemAsync).mockResolvedValue('deleted-id');
+    markHubToSessionTransition('removed-profile-subject');
+
+    const { result } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeProfile?.id).toBe(OWNER_PROFILE_ID);
+    });
+    expect(consumeHubToSessionTransition('removed-profile-subject')).toBe(
+      false,
+    );
+  });
+
   it('[BREAK] falls back to owner when active-profile SecureStore restore hangs', async () => {
     jest.useFakeTimers();
     jest
@@ -405,6 +427,39 @@ describe('ProfileProvider', () => {
       CHILD_PROFILE_ID,
     );
     expect(result.current.activeProfile?.id).toBe(CHILD_PROFILE_ID);
+  });
+
+  it('successful profile switch clears navigation proof owned by the previous profile', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    );
+    const { result } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    markHubToSessionTransition('shared-subject-id');
+
+    await act(async () => {
+      await result.current.switchProfile(CHILD_PROFILE_ID);
+    });
+
+    expect(consumeHubToSessionTransition('shared-subject-id')).toBe(false);
+  });
+
+  it('ProfileProvider unmount clears navigation proof owned by its account', async () => {
+    const { result, unmount } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    markHubToSessionTransition('shared-subject-id');
+
+    unmount();
+
+    expect(consumeHubToSessionTransition('shared-subject-id')).toBe(false);
   });
 
   it('[BREAK] updates API-client profile and proxy mode before query resets on parent-to-child switch', async () => {

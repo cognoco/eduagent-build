@@ -13,7 +13,6 @@ import {
   curricula,
   curriculumBooks,
   curriculumTopics,
-  learningModes,
   learningSessions,
   sessionEvents,
   sessionSummaries,
@@ -253,13 +252,6 @@ async function loadSummary(sessionId: string) {
   });
 }
 
-async function loadLearningMode(profileId: string) {
-  const db = createIntegrationDb();
-  return db.query.learningModes.findFirst({
-    where: eq(learningModes.profileId, profileId),
-  });
-}
-
 beforeEach(async () => {
   await cleanupAccounts({
     emails: ALL_EMAILS,
@@ -416,8 +408,11 @@ describe('Integration: session service', () => {
       'system_prompt',
     ]);
     expect(transcript).not.toBeNull();
-    expect(transcript!.session.inputMode).toBe('voice');
-    expect(transcript!.exchanges).toEqual([
+    if (!transcript || transcript.archived) {
+      throw new Error('Expected an active session transcript');
+    }
+    expect(transcript.session.inputMode).toBe('voice');
+    expect(transcript.exchanges).toEqual([
       expect.objectContaining({
         role: 'user',
         content: 'What is an atom?',

@@ -96,6 +96,12 @@ import { reviewContinuityOpenerFlow } from './flows/review-continuity-opener';
 // single-model live run proving a fenced learner-message directive cannot
 // flip an unsuitable reply's verdict to a clean "ok". See flow file.
 import { judgeSuitabilityFlow } from './flows/judge-suitability';
+import { learningTextSafetyJudgeFlow } from './flows/learning-text-safety-judge';
+// [WI-2625] Mentor-notice re-check judge — behavioral live run proving the
+// independent server-side judge lands on the correct verdict per accepted
+// pair, resolves an off-topic message to "continue", and resists an
+// injected directive trying to force locked_in. See flow file.
+import { recheckJudgeFlow } from './flows/recheck-judge';
 import {
   listFlows,
   parseCliArgs,
@@ -219,6 +225,8 @@ const FLOWS: FlowDefinition[] = [
   reviewContinuityOpenerFlow as FlowDefinition,
   recallGraderFlow as FlowDefinition,
   judgeSuitabilityFlow as FlowDefinition,
+  recheckJudgeFlow as FlowDefinition,
+  learningTextSafetyJudgeFlow as FlowDefinition,
 ];
 
 async function main(): Promise<void> {

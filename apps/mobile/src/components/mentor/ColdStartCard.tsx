@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 
 export interface ColdStartCardProps {
   onFill: (text: string) => void;
-  onOpenCamera: () => void;
 }
 
 const EQUAL_WEIGHT_TOKEN = 'mentorHome.coldStart.equalWeight';
@@ -24,7 +23,7 @@ const CHIPS = [
   },
 ] as const;
 
-export function ColdStartCard({ onFill, onOpenCamera }: ColdStartCardProps) {
+export function ColdStartCard({ onFill }: ColdStartCardProps) {
   const { t } = useTranslation();
   const [showHomeworkReply, setShowHomeworkReply] = useState(false);
 
@@ -64,17 +63,6 @@ export function ColdStartCard({ onFill, onOpenCamera }: ColdStartCardProps) {
           testID="cold-start-homework-reply"
           className="mt-3 rounded-xl border border-border p-3"
         >
-          <Pressable
-            testID="cold-start-homework-camera"
-            accessibilityRole="button"
-            accessibilityLabel={t('mentorHome.bar.cameraLabel')}
-            onPress={onOpenCamera}
-            className="mb-2 rounded-xl bg-primary px-3 py-2"
-          >
-            <Text className="text-text-inverse">
-              {t('mentorHome.bar.cameraLabel')}
-            </Text>
-          </Pressable>
           <Text className="text-sm text-text-primary">
             {t('mentorHome.coldStart.homeworkReply')}
           </Text>

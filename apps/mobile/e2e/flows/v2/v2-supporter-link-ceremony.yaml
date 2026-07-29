@@ -26,25 +26,13 @@
 # itself (initiateLink/acceptLink) is reachable and correct via that deep
 # link, which is what this AC's happy path names.
 #
-# [Disclosure] Written and testID-verified against source (initiate.tsx,
-# [contractId].tsx, ContractCard.tsx, linking-ceremony.ts,
-# test-seed-v2-supporter.ts's seedV2SupporterPendingLink), and registered in
-# ci-maestro-manifest.json / scripts/e2e-ci-injection-and-smoke-gate.test.ts's
-# exhaustive v2-suite plan assertion (that consistency check IS runnable and
-# was run locally without an emulator — ci-maestro-plan.mjs fails closed on a
-# v2-tagged flow missing from the manifest, or a scenario mismatch against
-# this file's SEED_SCENARIO comment). What was NOT run is the flow itself: no
-# Android emulator or staging DB is reachable in this build environment, so
-# the actual Maestro walk (this file's tapOn/assertVisible steps against a
-# real app, and the sign-out/sign-in-only cross-login it relies on) has not
-# been executed — do not read a passing CI run into this file until the `v2`
-# workflow-dispatch suite has actually run it. The real, DB-backed proof of
-# the create -> accept -> accept sequence (including the NO-EARLY-AUTH
-# boundary and recovery variants) is
-# test-seed-v2-supporter.integration.test.ts's
-# "[WI-2242] v2-supporter-pending-link seed" suite (runnable in CI against a
-# real DB); this flow proves the on-device walk those server-side assertions
-# back.
+# [Disclosure] This explicit-lane flow covers Android Back, process relaunch,
+# offline retry, invalid-link recovery, and both login handoffs in
+# addition to the happy path. Completion evidence must cite an executed green
+# run; source presence alone is not a receipt. DB-backed scenario-state
+# assertions live in test-seed-v2-supporter.integration.test.ts; concurrent
+# acceptance and audit side-effect invariants live in
+# linking-ceremony.integration.test.ts.
 #
 # SEED_SCENARIO: 'v2-supporter-pending-link'
 appId: com.mentomate.app
@@ -52,6 +40,8 @@ tags:
   - v2
   - navigation
 ---
+- setAirplaneMode: disabled
+
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
@@ -64,10 +54,9 @@ tags:
     timeout: 30000
 
 # REACHABILITY: deep-link into the initiate screen with the existing
-# supportee pre-filled. Screen-render only — the create this AC's happy path
-# names is exercised against the already-seeded pending contract below, not
-# resubmitted here (a second initiateLink call for the same pair would just
-# mint an unrelated, unused second edge).
+# supportee pre-filled. Screen-render only — the pending fixture already
+# exercised the real initiateLink write path and supplies the deterministic
+# contract ID used across both login handoffs below.
 - openLink: 'mentomate:///link/initiate?supporteePersonId=${SUPPORTEE_PERSON_ID}&relation=other'
 - extendedWaitUntil:
     visible:
@@ -75,6 +64,24 @@ tags:
     timeout: 15000
 - assertVisible:
     id: 'visibility-link-create'
+
+# NAVIGATION — Android hardware Back from the deep-linked initiate route must
+# return to the V2 Mentor root, never legacy Home/Recaps. Reopen to prove the
+# pending ceremony remains reachable after the round trip.
+- pressKey: back
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 15000
+- assertNotVisible:
+    id: 'home-screen'
+- assertNotVisible:
+    id: 'recaps-screen'
+- openLink: 'mentomate:///link/initiate?supporteePersonId=${SUPPORTEE_PERSON_ID}&relation=other'
+- extendedWaitUntil:
+    visible:
+      id: 'visibility-link-initiate-screen'
+    timeout: 15000
 
 # CEREMONY: open the seeded pending contract and accept as supporter. Status
 # stays 'pending' until the supportee also accepts (linking-ceremony.ts's
@@ -112,11 +119,41 @@ tags:
       EMAIL: ${SUPPORTEE_EMAIL}
       PASSWORD: ${SUPPORTEE_PASSWORD}
 
+# NAVIGATION + RECOVERY — a cold process relaunch clears the in-memory query
+# cache while preserving the one-sided/pending contract in the API. Force that
+# valid contract's first read offline, then use the real retry control after
+# restoring connectivity. This proves both cold persistence and recovery on
+# the same real agreement the two participants are accepting.
+- stopApp
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible:
+      id: 'account-avatar-button'
+    timeout: 30000
+- setAirplaneMode: enabled
 - openLink: 'mentomate:///link/${CONTRACT_ID}'
 - extendedWaitUntil:
     visible:
-      id: 'visibility-link-screen'
+      id: 'visibility-link-error'
+    timeout: 30000
+- setAirplaneMode: disabled
+- extendedWaitUntil:
+    visible:
+      id: 'visibility-link-error-retry'
     timeout: 15000
+- tapOn:
+    id: 'visibility-link-error-retry'
+- extendedWaitUntil:
+    visible:
+      id: 'visibility-contract-card'
+    timeout: 30000
+- assertVisible:
+    id: 'visibility-contract-accept'
+- assertNotVisible:
+    id: 'visibility-link-review'
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn:
     id: 'visibility-contract-accept'
 - extendedWaitUntil:
@@ -139,11 +176,42 @@ tags:
 - runFlow:
     file: ../_setup/sign-in-only-returning.yaml
 
+# NAVIGATION — completed stage also survives a cold process relaunch.
+- stopApp
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible:
+      id: 'account-avatar-button'
+    timeout: 30000
 - openLink: 'mentomate:///link/${CONTRACT_ID}'
 - extendedWaitUntil:
     visible:
       id: 'visibility-link-review'
+    timeout: 30000
+
+# RECOVERY — a nonexistent contract fails closed and its explicit Back action
+# returns to the post-acceptance V2 Support hub Mentor root.
+- pressKey: back
+- extendedWaitUntil:
+    visible:
+      id: 'support-hub-mentor-tab'
     timeout: 15000
+- openLink: 'mentomate:///link/00000000-0000-7000-8000-000000000099'
+- extendedWaitUntil:
+    visible:
+      id: 'visibility-link-error'
+    timeout: 30000
+- tapOn:
+    id: 'visibility-link-error-back'
+- extendedWaitUntil:
+    visible:
+      id: 'support-hub-mentor-tab'
+    timeout: 15000
+- assertNotVisible:
+    id: 'home-screen'
+- assertNotVisible:
+    id: 'recaps-screen'
 
 - openLink: 'mentomate:///mentor'
 - extendedWaitUntil:

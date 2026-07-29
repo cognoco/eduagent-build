@@ -24,6 +24,7 @@ import { generateUUIDv7 } from '../utils/uuid';
  *   1 = accepted_partial  → 24h cooldown enforced by trigger
  *   2 = verified          → 24h cooldown enforced by trigger
  *   3 = reteach           → 24h cooldown enforced by trigger
+ *   4 = insufficient breadth → 24h cooldown enforced by trigger
  *
  * Both FKs cascade on delete (MED-2 from the Challenge Round plan): profile
  * delete wipes cooldown rows (correct under GDPR export-delete), and a
@@ -59,7 +60,7 @@ export const challengeRoundCooldowns = pgTable(
     ),
     check(
       'challenge_round_cooldowns_last_outcome_range',
-      sql`${table.lastOutcome} IS NULL OR (${table.lastOutcome} >= 0 AND ${table.lastOutcome} <= 3)`,
+      sql`${table.lastOutcome} IS NULL OR (${table.lastOutcome} >= 0 AND ${table.lastOutcome} <= 4)`,
     ),
   ],
 ).enableRLS();

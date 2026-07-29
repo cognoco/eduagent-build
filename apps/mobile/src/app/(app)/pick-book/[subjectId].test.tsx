@@ -1,4 +1,8 @@
-import { fireEvent, waitFor, act } from '@testing-library/react-native';
+import {
+  fireEvent,
+  waitFor as testingLibraryWaitFor,
+  act,
+} from '@testing-library/react-native';
 import { Alert, StyleSheet } from 'react-native';
 import type { RoutedMockFetch } from '../../../test-utils/mock-api-routes';
 import {
@@ -9,9 +13,9 @@ import PickBookScreen from './[subjectId]';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 // ---------------------------------------------------------------------------
-// Fetch-boundary mock — mockFetch assigned inside factory to bypass hoisting.
-// lib/api-client is mocked at the transport boundary so the real Hono RPC
-// client routes through our routed mock fetch, keeping React Query, assertOk,
+// Fetch-boundary seam — mockFetch is assigned inside the factory to bypass
+// hoisting. The real api-client exports stay intact; only useApiClient routes
+// the Hono RPC client through our mock fetch, keeping React Query, assertOk,
 // and all hooks real.
 // ---------------------------------------------------------------------------
 
@@ -20,12 +24,16 @@ let mockFetch: RoutedMockFetch;
 jest.mock(
   '../../../lib/api-client', // gc1-allow: transport-boundary — routed mock fetch drives real hooks
   () => {
+    const actual = jest.requireActual('../../../lib/api-client');
     const {
       createRoutedMockFetch,
-      mockApiClientFactory,
     } = require('../../../test-utils/mock-api-routes');
+    const { hc } = require('hono/client');
     mockFetch = createRoutedMockFetch();
-    return mockApiClientFactory(mockFetch);
+    return {
+      ...actual,
+      useApiClient: () => hc('http://localhost/v1', { fetch: mockFetch }),
+    };
   },
 );
 
@@ -171,6 +179,12 @@ function renderPickBook() {
     installGlobalFetch: false,
   });
 }
+
+// The screen deliberately holds its loading state for at least 800ms. Keep
+// this suite's async assertions above that boundary without changing the
+// repository-wide RNTL timeout; callers can still override it when needed.
+const waitFor: typeof testingLibraryWaitFor = (expectation, options) =>
+  testingLibraryWaitFor(expectation, { timeout: 3000, ...options });
 
 describe('PickBookScreen', () => {
   beforeEach(() => {
@@ -325,9 +339,12 @@ describe('PickBookScreen', () => {
 
     const { result } = renderPickBook();
 
-    await waitFor(() => {
-      result.getByText('Europe');
-    });
+    await waitFor(
+      () => {
+        result.getByText('Europe');
+      },
+      { timeout: 3000 },
+    );
     fireEvent.press(result.getByText('Europe'));
 
     await waitFor(() => {
@@ -529,9 +546,12 @@ describe('PickBookScreen', () => {
               }),
             ),
           );
-          await waitFor(() => {
-            result.getByText('Europe');
-          });
+          await waitFor(
+            () => {
+              result.getByText('Europe');
+            },
+            { timeout: 3000 },
+          );
           fireEvent.press(result.getByText('Europe'));
         },
       },
@@ -547,9 +567,12 @@ describe('PickBookScreen', () => {
               }),
             ),
           );
-          await waitFor(() => {
-            result.getByText('Something else...');
-          });
+          await waitFor(
+            () => {
+              result.getByText('Something else...');
+            },
+            { timeout: 3000 },
+          );
           fireEvent.press(result.getByText('Something else...'));
           fireEvent.changeText(
             result.getByTestId('pick-book-custom-input'),

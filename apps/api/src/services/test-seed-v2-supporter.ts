@@ -39,6 +39,7 @@ import {
   membership,
   milestones,
   sessionEvents,
+  supportVisibilityContracts,
   topicNotes,
   type Database,
 } from '@eduagent/database';
@@ -171,10 +172,12 @@ async function seedAcceptedEdge(
   await acceptLink(db, initiated.id, {
     actorPersonId: input.supporterPersonId,
     audience: 'supporter' as RenderAudience,
+    contractVersion: initiated.contractVersion,
   });
   const accepted = await acceptLink(db, initiated.id, {
     actorPersonId: input.supporteePersonId,
     audience: 'supportee' as RenderAudience,
+    contractVersion: initiated.contractVersion,
   });
   return {
     edgeId: accepted.supportershipId,
@@ -617,6 +620,31 @@ export async function seedV2SupporterPendingLink(
     managedTierActive: false,
   });
 
+  // There is no production expiry scheduler yet, so the lapsed recovery
+  // surface needs the same raw-row convention as the authorization
+  // integration suite. Keeping it on the real edge and identities makes the
+  // contract UI reachable while status gating remains production-owned.
+  const [lapsedContract] = await db
+    .insert(supportVisibilityContracts)
+    .values({
+      supportershipId: contract.supportershipId,
+      supporterPersonId: supporter.personId,
+      supporteePersonId: supportee.personId,
+      relation: 'other',
+      status: 'lapsed',
+      contractVersion: contract.contractVersion,
+      reportableKinds: contract.reportableKinds,
+      artifactWall: true,
+      renderEquivalence: true,
+      safetyException: true,
+      supporterAcceptedAt: null,
+      supporteeAcceptedAt: null,
+    })
+    .returning({ id: supportVisibilityContracts.id });
+  if (!lapsedContract) {
+    throw new Error('Lapsed visibility contract insert returned no row');
+  }
+
   return {
     scenario: 'v2-supporter-pending-link',
     accountId: supporter.organizationId,
@@ -634,6 +662,7 @@ export async function seedV2SupporterPendingLink(
 
       edgeId: contract.supportershipId,
       contractId: contract.id,
+      lapsedContractId: lapsedContract.id,
       contractVersion: String(contract.contractVersion),
       visibilityStatus: contract.status,
       relation: contract.relation,

@@ -5,6 +5,8 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
+import { Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import i18n from 'i18next';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -24,6 +26,7 @@ import {
   extractJsonBody,
   fetchCallsMatching,
 } from '../../test-utils/mock-api-routes';
+import { tokens } from '../../lib/design-tokens';
 
 const mockFetch = createRoutedMockFetch();
 
@@ -39,6 +42,20 @@ const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockCanGoBack = jest.fn(() => false);
 const mockClerkSignOut = jest.fn();
+// [WI-2331 rework #2, AC-5 own/supporting axis] the real production wiring
+// for each Tabs.Screen entry closes over resolveV2TabIsActive(pathname,
+// tabName, v2Enabled, focused, activeReturnTo) inside its `tabBarIcon` /
+// `tabBarLabel` options (see _layout.tsx). Capturing those `options` objects
+// by route name — rather than re-deriving `resolveV2TabIsActive` results by
+// hand — lets a test invoke the SAME closures AppLayout actually wires up,
+// driven only by activeReturnTo (see mockUseGlobalSearchParams below).
+const capturedTabScreenOptions: Record<
+  string,
+  {
+    tabBarIcon?: (p: { focused: boolean }) => React.ReactElement;
+    tabBarLabel?: (p: { focused: boolean }) => React.ReactElement;
+  }
+> = {};
 const mockTabs = Object.assign(
   ({
     children,
@@ -65,8 +82,27 @@ const mockTabs = Object.assign(
     );
   },
   {
-    Screen: () => null,
+    Screen: ({
+      name,
+      options,
+    }: {
+      name: string;
+      options?: (typeof capturedTabScreenOptions)[string];
+    }) => {
+      if (options) capturedTabScreenOptions[name] = options;
+      return null;
+    },
   },
+);
+
+// mockUseGlobalSearchParams is the ONLY seam feeding `returnTo` into
+// resolveV2TabIsActive's real call sites (see AppLayout's `activeReturnTo`) —
+// making it dynamic (mirroring mockUsePathname) lets a test drive the exact
+// same own-scope / supporting-scope returnTo tokens the real own-learning
+// and family-recap/-progress screens push, instead of calling
+// resolveV2TabIsActive by hand.
+const mockUseGlobalSearchParams = jest.fn<{ returnTo?: string }, []>(
+  () => ({}),
 );
 
 jest.mock('expo-router', () => ({
@@ -76,6 +112,7 @@ jest.mock('expo-router', () => ({
   },
   Tabs: mockTabs,
   usePathname: () => mockUsePathname(),
+  useGlobalSearchParams: () => mockUseGlobalSearchParams(),
   useRouter: () => ({
     push: jest.fn(),
     replace: mockReplace,
@@ -141,23 +178,17 @@ jest.mock(
 // use-consent uses useApiClient — mocked at the fetch boundary via mockFetch.
 // Routes: GET /consent/my-status, POST /consent/request
 
+// [WI-2331 rework #2, AC-5 dark/light axis] colorScheme is mutable per-test
+// (see the "TabIcon / TabLabel theme-token wiring" describe below) and
+// useThemeColors reads the REAL design-token table keyed by that scheme, so
+// dark-vs-light assertions exercise genuine token values instead of a fixed
+// fixture that could never fail a real theme regression.
+let mockColorScheme: 'light' | 'dark' = 'light';
 // prettier-ignore
 jest.mock('../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
-  useTheme: () => ({ colorScheme: 'light' }),
-  useThemeColors: () => ({
-    accent: '#0ea5e9',
-    border: '#d4d4d8',
-    muted: '#71717a',
-    surface: '#ffffff',
-    textInverse: '#ffffff',
-    textPrimary: '#18181b',
-    textSecondary: '#52525b',
-    warning: '#a16207',
-    proxyPreviewBackground: '#fff7ed',
-    proxyPreviewBorder: '#f59e0b',
-    proxyPreviewSceneBackground: '#fffaf3',
-    proxyPreviewTabBackground: '#fff7ed',
-  }),
+  useTheme: () => ({ colorScheme: mockColorScheme }),
+  useThemeColors: () =>
+    require('../../lib/design-tokens').tokens[mockColorScheme].colors,
   useTokenVars: () => ({}),
 }));
 
@@ -212,6 +243,9 @@ const {
   V2_ROOT_SAFE_AREA_EXCEPTIONS,
   assertV2SafeAreaOwnershipInvariant,
   resolveV2PushedScenePaddingTop,
+  resolveV2TabIsActive,
+  TabIcon,
+  TabLabel,
 } = require('./_layout');
 const {
   computeModeVisibleTabs,
@@ -222,6 +256,13 @@ const {
   resolveTabShape,
 } = require('../../lib/legacy-navigation-contract');
 const { resolveNavigationContract } = require('../../lib/navigation-contract');
+const {
+  OWN_LEARNING_RETURN_TO,
+  OWN_LEARNING_HREF,
+  FAMILY_RECAPS_RETURN_TO,
+  FAMILY_RECAPS_HREF,
+  homeHrefForReturnTo,
+} = require('../../lib/navigation');
 
 describe('mode tab helpers', () => {
   it('returns Study tabs for study mode', () => {
@@ -339,6 +380,7 @@ describe('AppLayout', () => {
     mockClerkSignOut.mockReset();
     mockClerkSignOut.mockResolvedValue(undefined);
     mockUsePathname.mockReturnValue('/home');
+    mockUseGlobalSearchParams.mockReturnValue({});
     mockSpeechGetPermissions.mockResolvedValue({
       granted: true,
       canAskAgain: true,
@@ -415,6 +457,14 @@ describe('AppLayout', () => {
       '/subjects',
       () =>
         new Response(JSON.stringify({ subjects: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    mockFetch.setRoute(
+      '/scopes',
+      () =>
+        new Response(JSON.stringify({ shape: 'learner' }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         }),
@@ -1035,6 +1085,202 @@ describe('AppLayout', () => {
     }
   });
 
+  // [WI-2331 AC-5] the central resolveV2TabIsActive() resolver is
+  // size-independent, but AC-1/AC-2 are integrated UI outcomes that can
+  // regress through LAYOUT at a small viewport. Distinct from the
+  // all-zero-inset web surface above: this uses a small-phone inset (modest
+  // status bar, no home-indicator gesture area — e.g. iPhone SE-class) to
+  // prove the V2 tab bar stays visible and the owning tab's highlight is
+  // correct at that viewport, not just that the resolver returns the right
+  // boolean in isolation. Small-phone coverage here IS the inset +
+  // minimum-height-floor guarantee: height = 56 + max(insets.bottom,
+  // V2_TAB_BAR_MIN_BOTTOM_INSET), so at bottom:0 the floor forces height 104
+  // with display!='none' and the bar cannot collapse regardless of viewport
+  // width. The shell reads no window dimension (no useWindowDimensions /
+  // Dimensions.get in the render path), so a viewport mock would be inert;
+  // per operator ruling 2026-07-26 the floor guarantee is the genuine
+  // small-phone signal (docs/evidence/wi2331-rgr-v2-wayfinding.md → "Rework #2
+  // / Axis 3 — small-phone layout").
+  it('keeps the V2 tab bar visible with correct tab highlight at a small-phone viewport', async () => {
+    const flags = require('../../lib/feature-flags') as {
+      FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+    };
+    const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    try {
+      (
+        flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+      ).MODE_NAV_V2_ENABLED = true;
+      mockSafeAreaInsets = { top: 20, bottom: 0, left: 0, right: 0 };
+      mockUsePathname.mockReturnValue('/mentor');
+
+      renderLayout();
+
+      // Top chrome clears the small status-bar inset and the pushed scene
+      // sits below it — this would fail if a future change collapsed the
+      // floating chrome (and thus the content clearance) at a small top
+      // inset.
+      expect(await screen.findByTestId('account-avatar-shell')).toHaveStyle({
+        top: 32,
+      });
+      expect(await screen.findByTestId('active-root-scene')).toHaveStyle({
+        paddingTop: 76,
+      });
+
+      // The tab bar itself must remain visible (not collapsed to
+      // display:'none'/zero-height) at this viewport.
+      const tabs = await screen.findByTestId('tabs');
+      const screenOptions = tabs.props.screenOptions as ({
+        route,
+      }: {
+        route: { name: string };
+      }) => {
+        tabBarStyle: {
+          display?: string;
+          height?: number;
+          paddingBottom?: number;
+        };
+      };
+      const mentorTabBarStyle = screenOptions({
+        route: { name: 'mentor' },
+      }).tabBarStyle;
+      expect(mentorTabBarStyle.display).not.toBe('none');
+      expect(mentorTabBarStyle).toEqual(
+        expect.objectContaining({ height: 104, paddingBottom: 48 }),
+      );
+
+      // The owning tab (Mentor, for pathname /mentor) highlights; a
+      // non-owning tab (Subjects) does not — proving the highlight itself
+      // (not just the bar's presence) survives at this viewport. TabIcon
+      // and TabLabel are rendered directly (real components, not mocked)
+      // off the same resolveV2TabIsActive() result the Tabs.Screen entries
+      // use.
+      const mentorFocused = resolveV2TabIsActive(
+        '/mentor',
+        'mentor',
+        true,
+        true,
+      );
+      const subjectsFocused = resolveV2TabIsActive(
+        '/mentor',
+        'subjects',
+        true,
+        false,
+      );
+      expect(mentorFocused).toBe(true);
+      expect(subjectsFocused).toBe(false);
+
+      render(<TabLabel title="Mentor" focused={mentorFocused} />);
+      expect(screen.getByText('Mentor')).toHaveStyle({
+        color: tokens.light.colors.accent,
+      });
+
+      render(<TabLabel title="Subjects" focused={subjectsFocused} />);
+      expect(screen.getByText('Subjects')).toHaveStyle({
+        color: tokens.light.colors.textSecondary,
+      });
+    } finally {
+      (
+        flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+      ).MODE_NAV_V2_ENABLED = original;
+    }
+  });
+
+  // [WI-2331 rework #2, F2 / AC-5] CONSUMER-side wiring test: given a
+  // supplied returnTo token, does AppLayout's real production wiring
+  // (Tabs.Screen closures over resolveV2TabIsActive + homeHrefForReturnTo)
+  // resolve the correct owning tab and Back destination? Injection is
+  // legitimate HERE — this test is deliberately scoped to the consumer half
+  // of the own/supporting axis. It does NOT prove where OWN_LEARNING_RETURN_TO
+  // or FAMILY_RECAPS_RETURN_TO actually come from in production; that
+  // producer proof lives in own-learning.test.tsx ("emits
+  // OWN_LEARNING_RETURN_TO as returnToTab...") and
+  // recaps/[recapId].test.tsx ("emits FAMILY_RECAPS_RETURN_TO via
+  // handleOpenChildSession..."), which render the real producer screens and
+  // assert on their real emitted params — no profile fixture is needed here
+  // to make that point, so this test uses ONE neutral profile purely to
+  // mount AppLayout.
+  //
+  // Both tokens collapse to the SAME Mentor tab highlight (accountReturnToken's
+  // catch-all — see resolveV2TabIsActive's doc comment), so the highlight
+  // check below is a light sanity check; the genuine differentiator this
+  // test weighs on is the Back DESTINATION, which genuinely differs by token.
+  it.each([
+    {
+      context: 'own-scope returnTo (own-learning)' as const,
+      returnTo: OWN_LEARNING_RETURN_TO,
+      backDestination: OWN_LEARNING_HREF,
+    },
+    {
+      context: 'supporting-scope returnTo (family-recaps)' as const,
+      returnTo: FAMILY_RECAPS_RETURN_TO,
+      backDestination: FAMILY_RECAPS_HREF,
+    },
+  ])(
+    'resolves the owning tab and Back destination for a supplied $context token',
+    async ({ returnTo, backDestination }) => {
+      const flags = require('../../lib/feature-flags') as {
+        FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+      };
+      const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      try {
+        flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED = true;
+        // One neutral profile — just enough for AppLayout to mount. Its
+        // shape is irrelevant here; the token is supplied directly below,
+        // not derived from this fixture.
+        mockUseProfile.mockReturnValue({
+          profiles: [
+            { id: 'p1', displayName: 'Parent', isOwner: true, birthYear: 1990 },
+          ],
+          activeProfile: {
+            id: 'p1',
+            displayName: 'Parent',
+            isOwner: true,
+            birthYear: 1990,
+          },
+          isLoading: false,
+          profileWasRemoved: false,
+          acknowledgeProfileRemoval: jest.fn(),
+          switchProfile: jest.fn(),
+          isExplicitProxyMode: false,
+        });
+        mockUsePathname.mockReturnValue('/practice');
+        mockUseGlobalSearchParams.mockReturnValue({ returnTo });
+
+        renderLayout();
+        await screen.findByTestId('tabs');
+
+        // Sanity check: both tokens resolve to the same Mentor highlight
+        // (the catch-all), via the real captured Tabs.Screen tabBarIcon
+        // closures — not by calling resolveV2TabIsActive directly.
+        const mentorOptions = capturedTabScreenOptions.mentor;
+        const subjectsOptions = capturedTabScreenOptions.subjects;
+        expect(mentorOptions?.tabBarIcon).toBeDefined();
+        const mentorIcon = mentorOptions!.tabBarIcon!({ focused: false });
+        render(mentorIcon);
+        expect(screen.UNSAFE_getByType(Ionicons).props.color).toBe(
+          tokens.light.colors.accent,
+        );
+
+        const subjectsIcon = subjectsOptions!.tabBarIcon!({ focused: false });
+        render(subjectsIcon);
+        expect(screen.UNSAFE_getByType(Ionicons).props.color).toBe(
+          tokens.light.colors.textSecondary,
+        );
+
+        // The genuine differentiator: Back DESTINATION, via the SAME
+        // production resolver real pushed screens use
+        // (child/[profileId]/session/[sessionId].tsx, topic/relearn.tsx) for
+        // their Back control. own-scope returns to the owner's own-learning
+        // screen; supporting-scope returns to the child's recap.
+        expect(homeHrefForReturnTo(returnTo, undefined, true)).toBe(
+          backDestination,
+        );
+      } finally {
+        flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED = original;
+      }
+    },
+  );
+
   it.each(
     [
       '/dashboard',
@@ -1222,6 +1468,112 @@ describe('AppLayout', () => {
       ).MODE_NAV_V2_ENABLED = original;
     }
   });
+
+  it.each([
+    {
+      expectedOptionIds: ['scope-chip-option-supporter-hub'],
+      scopeShape: 'one scope',
+      scopes: [{ kind: 'supporter-hub' }],
+    },
+    {
+      expectedOptionIds: [
+        'scope-chip-option-supporter-hub',
+        'scope-chip-option-person-00000000-0000-4000-8000-000000000201',
+        'scope-chip-option-me',
+      ],
+      scopeShape: 'multiple scopes',
+      scopes: [
+        { kind: 'supporter-hub' },
+        {
+          kind: 'person',
+          personId: '00000000-0000-4000-8000-000000000201',
+          edgeId: '00000000-0000-4000-8000-000000000301',
+          displayName: 'Alexandria-Cassandra',
+        },
+        { kind: 'me' },
+      ],
+    },
+  ])(
+    '[WI-2176] moves visible content through the real loading-to-loaded transition with $scopeShape',
+    async ({ expectedOptionIds, scopes }) => {
+      const flags = require('../../lib/feature-flags') as {
+        FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+      };
+      const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      let resolveScopes!: (response: Response) => void;
+      const scopesResponse = new Promise<Response>((resolve) => {
+        resolveScopes = resolve;
+      });
+
+      try {
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = true;
+        mockSafeAreaInsets = { top: 47, bottom: 0, left: 0, right: 0 };
+        mockUsePathname.mockReturnValue('/subjects');
+        mockFetch.setRoute('/scopes', () => scopesResponse);
+
+        renderLayout();
+
+        const activeScene = await screen.findByTestId(
+          'active-root-scene',
+          {
+            includeHiddenElements: true,
+          },
+          {
+            timeout: 5000,
+          },
+        );
+        expect(screen.queryByTestId('scope-chip')).toBeNull();
+        expect(activeScene).toHaveStyle({ paddingTop: 99 });
+
+        resolveScopes(
+          new Response(
+            JSON.stringify({
+              shape: 'supporter',
+              scopes,
+              defaultScopeIndex: 0,
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+
+        await screen.findByTestId(
+          'scope-chip',
+          { includeHiddenElements: true },
+          { timeout: 5000 },
+        );
+        expect(screen.getAllByTestId(/^scope-chip-option-/)).toHaveLength(
+          expectedOptionIds.length,
+        );
+        for (const optionId of expectedOptionIds) {
+          expect(screen.getByTestId(optionId)).toBeTruthy();
+        }
+        const scopeShell = screen.getByTestId('scope-chip-shell', {
+          includeHiddenElements: true,
+        });
+        fireEvent(scopeShell, 'layout', {
+          nativeEvent: { layout: { height: 64 } },
+        });
+
+        await waitFor(() => {
+          expect(activeScene).toHaveStyle({ paddingTop: 119 });
+        });
+      } finally {
+        mockFetch.setRoute(
+          '/scopes',
+          () =>
+            new Response(JSON.stringify({ shape: 'learner' }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+        );
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = original;
+      }
+    },
+  );
 
   it.each([
     { surface: '360x760 web', safeAreaTop: 0, expectedPadding: 76 },
@@ -2078,6 +2430,258 @@ describe('V2 pushed-route safe-area ownership invariant', () => {
         safeAreaTop: 47,
       }),
     ).toBe(52);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2331 AC-1] V2 pushed screens lose the highlighted owning tab
+//
+// V2's tab bar only shows Mentor/Subjects/Journal, but every other route
+// (progress, subject-hub, child/[id], account, …) is a hidden SIBLING
+// Tabs.Screen. React Navigation tracks that hidden sibling as the actually
+// focused route, so none of the three visible tab buttons is ever reported
+// `focused` while on a pushed screen — the bug this suite locks down.
+// ---------------------------------------------------------------------------
+describe('resolveV2TabIsActive [WI-2331 AC-1]', () => {
+  it('passes React Navigation focus straight through when V2 is disabled', () => {
+    expect(resolveV2TabIsActive('/progress', 'mentor', false, true)).toBe(true);
+    expect(resolveV2TabIsActive('/progress', 'mentor', false, false)).toBe(
+      false,
+    );
+  });
+
+  it('highlights the owning tab for a pushed route React Navigation does not focus', () => {
+    // /progress is a hidden sibling Tabs.Screen — React Navigation reports
+    // focused=false for all three real tab buttons while it is active. The
+    // pre-fix behavior (bare `focused` passthrough) would leave every tab
+    // unhighlighted here; this is the regression this WI closes.
+    expect(resolveV2TabIsActive('/progress', 'mentor', true, false)).toBe(true);
+    expect(resolveV2TabIsActive('/progress', 'subjects', true, false)).toBe(
+      false,
+    );
+    expect(resolveV2TabIsActive('/progress', 'journal', true, false)).toBe(
+      false,
+    );
+  });
+
+  it('resolves Subjects-owned pushed routes (subject-hub, pick-book, shelf, …)', () => {
+    expect(
+      resolveV2TabIsActive('/subject-hub/subject-1', 'subjects', true, false),
+    ).toBe(true);
+    expect(
+      resolveV2TabIsActive('/subject-hub/subject-1', 'mentor', true, false),
+    ).toBe(false);
+    expect(
+      resolveV2TabIsActive('/pick-book/subject-1', 'subjects', true, false),
+    ).toBe(true);
+  });
+
+  it('resolves Journal-owned pushed routes', () => {
+    expect(
+      resolveV2TabIsActive('/journal/practice', 'journal', true, false),
+    ).toBe(true);
+    expect(
+      resolveV2TabIsActive('/journal/practice', 'mentor', true, false),
+    ).toBe(false);
+  });
+
+  it('agrees with React Navigation when a real tab root is actually focused', () => {
+    expect(resolveV2TabIsActive('/mentor', 'mentor', true, true)).toBe(true);
+    expect(resolveV2TabIsActive('/subjects', 'subjects', true, true)).toBe(
+      true,
+    );
+    expect(resolveV2TabIsActive('/journal', 'journal', true, true)).toBe(true);
+  });
+
+  // [WI-2331 rework, F1a] `/my-notes/*` is multi-origin: Mentor's home
+  // screen pushes it plain, Journal's notes archive pushes it with
+  // `returnTo: 'journal'`. Pathname-only resolution always fell through to
+  // the Mentor catch-all, wrongly highlighting Mentor for a Journal-origin
+  // visit. `returnTo` disambiguates the catch-all; `subjects`/`journal`
+  // pathname owners stay definitive regardless of `returnTo`.
+  it('disambiguates the multi-origin /my-notes/* catch-all via returnTo', () => {
+    expect(
+      resolveV2TabIsActive(
+        '/my-notes/notes',
+        'journal',
+        true,
+        false,
+        'journal',
+      ),
+    ).toBe(true);
+    expect(
+      resolveV2TabIsActive('/my-notes/notes', 'mentor', true, false, 'journal'),
+    ).toBe(false);
+    // Mentor-origin (no returnTo, or a non subjects/journal token) still
+    // defaults to Mentor — unchanged behavior.
+    expect(resolveV2TabIsActive('/my-notes/notes', 'mentor', true, false)).toBe(
+      true,
+    );
+    expect(
+      resolveV2TabIsActive('/my-notes', 'mentor', true, false, undefined),
+    ).toBe(true);
+  });
+
+  it('never lets returnTo override a definitive subjects/journal pathname owner', () => {
+    // A /subjects/* or /journal/* pathname can only have been pushed by its
+    // own tab — returnTo must not be able to relabel it as Mentor.
+    expect(
+      resolveV2TabIsActive(
+        '/subjects/subject-1',
+        'mentor',
+        true,
+        false,
+        'journal',
+      ),
+    ).toBe(false);
+    expect(
+      resolveV2TabIsActive(
+        '/subjects/subject-1',
+        'subjects',
+        true,
+        false,
+        'journal',
+      ),
+    ).toBe(true);
+  });
+
+  // [WI-2331 rework, F2 / AC-5] "own vs supporting context" coverage: the
+  // resolver takes no scope/profile input at all (pathname, tabName,
+  // v2Enabled, reactNavigationFocused, returnTo) — it cannot branch on
+  // whether the active profile is a learner's own scope or a supporter's
+  // linked-child scope. This test makes that structural axis explicit rather
+  // than leaving it merely implicit in the generic returnTo cases above:
+  // supporter-only returnTo tokens (family-recaps/family-progress, used by
+  // ParentHomeScreen/dashboard flows) resolve through the SAME Mentor
+  // catch-all as an owner's own-learning tokens, because none of them are
+  // 'subjects' or 'journal'.
+  it('resolves identically for own-scope and supporter-scope returnTo tokens (both fall to the Mentor catch-all)', () => {
+    expect(
+      resolveV2TabIsActive('/my-notes', 'mentor', true, false, 'own-learning'),
+    ).toBe(true);
+    expect(
+      resolveV2TabIsActive('/my-notes', 'mentor', true, false, 'family-recaps'),
+    ).toBe(true);
+    expect(
+      resolveV2TabIsActive(
+        '/my-notes',
+        'mentor',
+        true,
+        false,
+        'family-progress',
+      ),
+    ).toBe(true);
+    // None of the above ever highlight Subjects or Journal.
+    expect(
+      resolveV2TabIsActive(
+        '/my-notes',
+        'subjects',
+        true,
+        false,
+        'family-recaps',
+      ),
+    ).toBe(false);
+  });
+
+  // [WI-2331 rework, F2 / AC-5] "deep link" coverage: a cold app-launch
+  // straight into a pushed route (no upstream returnTo param, no prior
+  // React Navigation focus history — the exact shape of a universal-link
+  // landing) must still resolve to a sane owning tab rather than leaving
+  // every tab unhighlighted.
+  it('resolves a cold deep-link landing (no returnTo, reactNavigationFocused=false) to its owning tab', () => {
+    // A Journal-owned deep link (e.g. a shared journal report URL).
+    expect(
+      resolveV2TabIsActive('/journal/report-1', 'journal', true, false),
+    ).toBe(true);
+    expect(
+      resolveV2TabIsActive('/journal/report-1', 'mentor', true, false),
+    ).toBe(false);
+    // A Subjects-owned deep link (e.g. a shared subject-hub URL).
+    expect(
+      resolveV2TabIsActive('/subject-hub/subject-1', 'subjects', true, false),
+    ).toBe(true);
+    // A multi-origin deep link with no returnTo at all (the raw-URL case
+    // Finding 1a's fix targets) still falls to the Mentor default, not an
+    // unhighlighted dead state.
+    expect(resolveV2TabIsActive('/my-notes/notes', 'mentor', true, false)).toBe(
+      true,
+    );
+  });
+});
+
+// [WI-2331 rework #2, F2 / AC-5] "dark/light theme" coverage: TabIcon and
+// TabLabel (the two components every V2 tab button renders — see the
+// Tabs.Screen `tabBarIcon`/`tabBarLabel` wiring above, all fed by
+// resolveV2TabIsActive's boolean result) never hardcode a hex color. They
+// read `colors.accent` / `colors.textSecondary` from useThemeColors() —
+// semantic tokens that resolve differently per theme. Unlike the prior round
+// (a single fixed light-theme mock, dark never exercised), `mockColorScheme`
+// (declared with the theme mock near the top of this file) is flipped
+// between 'light' and 'dark' for each render below, and useThemeColors()
+// resolves against the REAL design-token table — so this proves the wiring
+// against genuine per-theme values, not a fixture that can't fail. Base
+// `accent` happens to be the same hex in both themes (design-tokens.ts), so
+// the "resolves differently per theme" claim is proven on `textSecondary`
+// (the unfocused color), which does differ — light '#525252' vs dark
+// '#94a3b8'.
+describe('TabIcon / TabLabel theme-token wiring [WI-2331 rework, AC-5 dark/light axis]', () => {
+  afterEach(() => {
+    mockColorScheme = 'light';
+  });
+
+  it.each(['light', 'dark'] as const)(
+    'TabIcon colors the icon with %s theme colors.accent when focused, colors.textSecondary when not',
+    (scheme) => {
+      mockColorScheme = scheme;
+      const focused = resolveV2TabIsActive('/mentor', 'mentor', true, true);
+      render(<TabIcon name="Home" focused={focused} />);
+      expect(screen.UNSAFE_getByType(Ionicons).props.color).toBe(
+        tokens[scheme].colors.accent,
+      );
+
+      const notFocused = resolveV2TabIsActive(
+        '/subjects',
+        'mentor',
+        true,
+        true,
+      );
+      render(<TabIcon name="Home" focused={notFocused} />);
+      expect(screen.UNSAFE_getByType(Ionicons).props.color).toBe(
+        tokens[scheme].colors.textSecondary,
+      );
+    },
+  );
+
+  it.each(['light', 'dark'] as const)(
+    'TabLabel colors the label text with %s theme colors.accent when focused, colors.textSecondary when not',
+    (scheme) => {
+      mockColorScheme = scheme;
+      const focused = resolveV2TabIsActive('/journal', 'journal', true, true);
+      render(<TabLabel title="Journal" focused={focused} />);
+      expect(screen.UNSAFE_getByType(Text).props.style.color).toBe(
+        tokens[scheme].colors.accent,
+      );
+
+      const notFocused = resolveV2TabIsActive('/mentor', 'journal', true, true);
+      render(<TabLabel title="Journal" focused={notFocused} />);
+      expect(screen.UNSAFE_getByType(Text).props.style.color).toBe(
+        tokens[scheme].colors.textSecondary,
+      );
+    },
+  );
+
+  it('resolves a different unfocused color for dark than for light (proves the theme is genuinely wired, not hardcoded)', () => {
+    mockColorScheme = 'light';
+    render(<TabLabel title="Journal" focused={false} />);
+    const lightColor = screen.UNSAFE_getByType(Text).props.style.color;
+
+    mockColorScheme = 'dark';
+    render(<TabLabel title="Journal" focused={false} />);
+    const darkColor = screen.UNSAFE_getByType(Text).props.style.color;
+
+    expect(lightColor).not.toBe(darkColor);
+    expect(lightColor).toBe(tokens.light.colors.textSecondary);
+    expect(darkColor).toBe(tokens.dark.colors.textSecondary);
   });
 });
 

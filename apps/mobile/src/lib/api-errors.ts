@@ -127,7 +127,7 @@ export async function fetchOrThrowNetworkError(
   try {
     return await globalThis.fetch(input, init);
   } catch (err) {
-    throw classifyFetchRejection(err, init?.signal);
+    throw classifyFetchRejection(err, init?.signal ?? undefined);
   }
 }
 

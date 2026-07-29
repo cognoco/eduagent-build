@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test';
 
+import {
+  armEmptySelfNowFeedObservation,
+  describeMentorRenderedBranch,
+} from '../../helpers/now-observation';
 import { pressableClick } from '../../helpers/pressable';
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 
@@ -8,6 +12,26 @@ test.use({ storageState: { cookies: [], origins: [] } });
 test('V2 zero-state Mentor renders one enabled free-form composer with secondary starters and capture actions', async ({
   page,
 }) => {
+  let releaseNow!: () => void;
+  const heldNow = new Promise<void>((resolve) => {
+    releaseNow = resolve;
+  });
+  let holdSelfNow = true;
+  await page.route('**/v1/now?*', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (
+      holdSelfNow &&
+      request.method() === 'GET' &&
+      url.pathname.endsWith('/v1/now') &&
+      url.searchParams.get('scope') === 'self'
+    ) {
+      await heldNow;
+    }
+    await route.continue();
+  });
+
+  const nowObserver = armEmptySelfNowFeedObservation(page);
   await seedAndSignIn(page, {
     scenario: 'onboarding-no-subject',
     alias: 'wi-2129-single-composer',
@@ -18,7 +42,34 @@ test('V2 zero-state Mentor renders one enabled free-form composer with secondary
   await expect(page.getByTestId('mentor-screen')).toBeVisible({
     timeout: 60_000,
   });
-  await expect(page.getByTestId('mentor-cold-start-card')).toBeVisible();
+  await expect(page.getByTestId('mentor-cold-start-card')).toHaveCount(0);
+
+  holdSelfNow = false;
+  releaseNow();
+  const nowObservation = await nowObserver
+    .settle()
+    .finally(() => nowObserver.dispose());
+  expect(nowObservation).toEqual({
+    status: 200,
+    authenticated: true,
+    classification: {
+      scope: 'self',
+      cardCount: 0,
+      overflowCount: 0,
+      generatedAtPresent: true,
+    },
+  });
+
+  try {
+    await expect(page.getByTestId('mentor-cold-start-card')).toBeVisible();
+  } catch (cause) {
+    const renderedBranch = await describeMentorRenderedBranch(page);
+    throw new Error(
+      `[now:render] Empty self feed settled with status ${nowObservation.status}; rendered branch=${renderedBranch}`,
+      { cause },
+    );
+  }
+  await expect(describeMentorRenderedBranch(page)).resolves.toBe('cold-start');
 
   const composer = page.getByRole('textbox', { name: 'Ask anything' });
   await expect(composer).toBeEnabled();
@@ -39,4 +90,11 @@ test('V2 zero-state Mentor renders one enabled free-form composer with secondary
   await expect(composer).toBeFocused();
   await expect(page.getByTestId('mentor-bar-send')).toBeEnabled();
   await expect(page).toHaveURL(/\/mentor(?:\?.*)?$/);
+
+  await pressableClick(page.getByTestId('cold-start-chip-homework'));
+
+  await expect(page.getByTestId('cold-start-homework-reply')).toBeVisible();
+  await expect(page.getByTestId('cold-start-homework-camera')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Camera' })).toHaveCount(1);
+  await expect(composer).toHaveValue('Teach me something new');
 });

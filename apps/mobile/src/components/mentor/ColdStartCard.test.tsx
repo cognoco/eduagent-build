@@ -5,30 +5,22 @@ import { ColdStartCard } from './ColdStartCard';
 describe('ColdStartCard', () => {
   it('chips request a primary-draft fill without navigating or submitting', () => {
     const onFill = jest.fn();
-    const onOpenCamera = jest.fn();
-    const { getByTestId } = render(
-      <ColdStartCard onFill={onFill} onOpenCamera={onOpenCamera} />,
-    );
+    const { getByTestId } = render(<ColdStartCard onFill={onFill} />);
 
     fireEvent.press(getByTestId('cold-start-chip-learn'));
 
     expect(onFill).toHaveBeenCalledWith('Teach me something new');
-    expect(onOpenCamera).not.toHaveBeenCalled();
   });
 
   it('renders starter suggestions without its own text-entry or send controls', () => {
-    const { queryByTestId } = render(
-      <ColdStartCard onFill={jest.fn()} onOpenCamera={jest.fn()} />,
-    );
+    const { queryByTestId } = render(<ColdStartCard onFill={jest.fn()} />);
 
     expect(queryByTestId('cold-start-input')).toBeNull();
     expect(queryByTestId('cold-start-send')).toBeNull();
   });
 
   it('gives every starter a distinct accessible example-prompt name', () => {
-    const { getByTestId } = render(
-      <ColdStartCard onFill={jest.fn()} onOpenCamera={jest.fn()} />,
-    );
+    const { getByTestId } = render(<ColdStartCard onFill={jest.fn()} />);
 
     expect(
       getByTestId('cold-start-chip-homework').props.accessibilityLabel,
@@ -41,22 +33,21 @@ describe('ColdStartCard', () => {
     );
   });
 
-  it('shows the deterministic homework dual-path reply with camera first', () => {
-    const { getByTestId, queryByText } = render(
-      <ColdStartCard onFill={jest.fn()} onOpenCamera={jest.fn()} />,
+  it('shows the deterministic homework reply without a duplicate camera control', () => {
+    const { getByTestId, queryByTestId, queryByText } = render(
+      <ColdStartCard onFill={jest.fn()} />,
     );
 
     fireEvent.press(getByTestId('cold-start-chip-homework'));
 
-    expect(
-      getByTestId('cold-start-homework-camera').props.accessibilityLabel,
-    ).toBe('Camera');
+    expect(getByTestId('cold-start-homework-reply')).toBeTruthy();
+    expect(queryByTestId('cold-start-homework-camera')).toBeNull();
     expect(queryByText(/what subject/i)).toBeNull();
   });
 
   it('hides the homework reply after selecting another starter', () => {
     const { getByTestId, queryByTestId } = render(
-      <ColdStartCard onFill={jest.fn()} onOpenCamera={jest.fn()} />,
+      <ColdStartCard onFill={jest.fn()} />,
     );
 
     fireEvent.press(getByTestId('cold-start-chip-homework'));

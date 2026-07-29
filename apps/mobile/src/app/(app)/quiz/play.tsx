@@ -35,6 +35,7 @@ import { platformAlert } from '../../../lib/platform-alert';
 // styled in-app Modal — same pattern as parent withdraw-consent (BUG-553).
 import { formatApiError } from '../../../lib/format-api-error';
 import { homeHrefForReturnTo } from '../../../lib/navigation';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { useThemeColors } from '../../../lib/theme';
 import { formatTimer } from '../../../lib/format-relative-date';
 import { Sentry } from '../../../lib/sentry';
@@ -86,7 +87,11 @@ export default function QuizPlayScreen(): React.ReactElement {
   const { round, activityType, returnTo, setRound, setCompletionResult } =
     useQuizFlow();
   const exitHref = returnTo
-    ? homeHrefForReturnTo(returnTo)
+    ? homeHrefForReturnTo(
+        returnTo,
+        undefined,
+        FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+      )
     : ('/(app)/quiz' as Href);
   const completeRound = useCompleteRound();
   const completeRoundMutate = completeRound.mutate;

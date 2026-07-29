@@ -15,6 +15,7 @@ Status: repo-evidence draft for Apple App Privacy and Google Play Data Safety. D
 - [ ] Final third-party processor list is not confirmed against production configuration.
 - [ ] Final tracking/advertising answers require legal/admin review.
 - [ ] Final retention/deletion language must match the live privacy policy.
+- [ ] Store copy must stay consumer/family only. No school, classroom, LMS/SIS, formal-assessment, proctoring, or EU AI Act high-risk-compliance claims without DPO/counsel approval under [`../compliance/2026-07-06-school-institutional-ai-act-tripwire.md`](../compliance/2026-07-06-school-institutional-ai-act-tripwire.md).
 
 ## App Facts From Repo
 
@@ -111,6 +112,11 @@ Use these for drafting the store forms after legal review:
 - Camera/photo access is used only when the user chooses to capture or import homework.
 - Microphone access is used for voice-based learning; the app's own code never uploads raw audio, but whether the platform speech-recognition module runs purely on-device is not independently verified — confirm before store submission.
 - Mobile purchases use native IAP through RevenueCat; Stripe is dormant for future web.
+
+## Compliance Disposition & Provenance (WI-1561 · OPQ-132)
+
+- **OPQ-132 — RULED & RESOLVED (Zuzka, 2026-07-23), Option A.** The homework-image and raw-audio retention answers above stay in their **honest, unresolved state**: categorical image-retention ("not retained") and on-device-only audio ("no raw audio leaves the device") claims are **prohibited here as not evidenced in-repo**. Provider-side OCR/vision retention is governed by pending DPAs (tracked separately, WI-1192); OS/platform speech-recognition on-device behaviour is unverified (tracked separately). The ruling asserts no unproven technical fact.
+- **AC-5 (final Review & Sign-off) relocated to WI-1577.** Per OPQ-132, the store-submission Review & Sign-off below is intentionally left **unsigned under WI-1561** and is completed under the **WI-1577** final launch gate (signatory: Zuzka per OPQ-119; DPO countersign on appointment). WI-1561 closes on this disposition; the physical sign-off is WI-1577's.
 
 ## Review & Sign-off
 

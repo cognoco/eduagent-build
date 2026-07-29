@@ -178,7 +178,16 @@ async function executeTrialExpiry() {
   };
 
   const result = await (
-    trialExpiry as { fn: (input: unknown) => Promise<any> }
+    trialExpiry as unknown as {
+      fn: (input: unknown) => Promise<{
+        status: string;
+        date: string;
+        expiredCount: number;
+        extendedExpiredCount: number;
+        warningsQueued: number;
+        softLandingQueued: number;
+      }>;
+    }
   ).fn({
     event: {
       name: 'inngest/scheduled.timer',
@@ -431,7 +440,9 @@ describe('Integration: trial-expiry Inngest function', () => {
     // — the cron-sends-directly path no longer exists.
     for (const evt of [...warningPayload, ...softLandingPayload]) {
       await (
-        trialNotificationSend as { fn: (input: unknown) => Promise<unknown> }
+        trialNotificationSend as unknown as {
+          fn: (input: unknown) => Promise<unknown>;
+        }
       ).fn({
         event: { name: evt.name, data: evt.data },
         step: {
