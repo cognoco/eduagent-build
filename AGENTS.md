@@ -163,6 +163,8 @@ Always use the repo commit skill for every commit and push — `/commit` in Clau
 
 Agents perform code changes in isolated worktrees they own (see Worktree Placement below) and commit from there. In the residual shared-tree case, commit only your own session's work — own-work scope, which the commit skill enforces — and never stage files another session modified.
 
+**Docs-only exception (operator-ruled 2026-07-29):** a change touching ONLY documentation artifacts (`docs/**` markdown/HTML/PDF evidence, repo meta-docs — no code, config, CI, schema, or test files) may be committed directly on `main` in the shared checkout via the WI-1246 guard's documented human escape (`git commit --no-verify`, then `git push --no-verify` for the matching push guard), skipping the worktree+PR ceremony. Stage the explicit docs-only file list, and note the bypass in the commit body. Any change that mixes in non-doc files still goes worktree→PR.
+
 ## Pull Requests
 
 The commit skill ends at push — creating a PR is a separate, deliberate act (this is the PR-creation side of the `superpowers:finishing-a-development-branch` override above):
@@ -512,4 +514,4 @@ bash scripts/check-change-class.sh --branch     # check full branch diff vs main
 # See docs/change-classes.md for the full reference table.
 ```
 
-Last updated: 2026-06-12
+Last updated: 2026-07-29
