@@ -234,7 +234,8 @@
       "passwordPlaceholder": "Wpisz swoje hasło",
       "forgotPassword": "Nie pamiętasz hasła?",
       "signInButton": "Zaloguj się",
-      "sendVerificationCode": "Wyślij kod weryfikacyjny"
+      "sendVerificationCode": "Wyślij kod weryfikacyjny",
+      "verificationStartFailed": "Nie udało się rozpocząć weryfikacji. Spróbuj zalogować się ponownie."
     },
     "signUp": {
       "title": "Utwórz konto",
@@ -291,6 +292,27 @@
       "backToSignIn": "Wróć do logowania",
       "emailPlaceholder": "ty@example.com",
       "sendResetCode": "Wyślij kod resetujący"
+    },
+    "errors": {
+      "generic": "Coś poszło nie tak. Spróbuj ponownie.",
+      "form_identifier_not_found": "Nie znaleziono konta z tym adresem e-mail.",
+      "form_password_incorrect": "To hasło wygląda na nieprawidłowe. Spróbuj ponownie.",
+      "form_password_or_identifier_incorrect": "Ten e-mail lub hasło wygląda na nieprawidłowe. Spróbuj ponownie.",
+      "form_password_pwned": "To hasło pojawiło się w wycieku danych. Wybierz inne hasło.",
+      "form_password_compromised": "To hasło nie jest bezpieczne. Wybierz inne hasło.",
+      "form_password_not_strong_enough": "To hasło nie jest wystarczająco silne. Użyj bardziej zróżnicowanych znaków.",
+      "form_password_length_too_short": "Hasło jest za krótkie. Musi mieć co najmniej 8 znaków.",
+      "form_password_length_too_long": "Hasło jest za długie. Użyj krótszego hasła.",
+      "form_password_no_uppercase": "Hasło musi zawierać co najmniej jedną wielką literę.",
+      "form_password_no_lowercase": "Hasło musi zawierać co najmniej jedną małą literę.",
+      "form_password_no_number": "Hasło musi zawierać co najmniej jedną cyfrę.",
+      "form_password_no_special_char": "Hasło musi zawierać co najmniej jeden znak specjalny.",
+      "form_password_validation_failed": "To hasło nie spełnia wymagań.",
+      "form_code_incorrect": "Ten kod jest nieprawidłowy. Spróbuj ponownie.",
+      "form_identifier_exists": "Konto z tym adresem e-mail już istnieje.",
+      "form_param_format_invalid": "To nie wygląda na prawidłowy adres e-mail.",
+      "captcha_invalid": "Nie udało się zweryfikować, że jesteś człowiekiem. Spróbuj ponownie.",
+      "signup_rate_limit_exceeded": "Zbyt wiele prób rejestracji. Spróbuj ponownie później."
     }
   },
   "guards": {
@@ -4716,7 +4738,6 @@
       "activeMessage": "Możesz przejrzeć tę umowę tutaj w dowolnym momencie.",
       "revoke": "Zakończ udostępnianie",
       "revoking": "Kończenie udostępniania...",
-      "revoked": "Udostępnianie kończy się. Osoba wspierająca zobaczy powiadomienie.",
       "revokeErrorTitle": "Błąd kończenia udostępniania",
       "missingActor": "Nie mogliśmy zidentyfikować aktywnej osoby.",
       "relationLabel": "Relacja",

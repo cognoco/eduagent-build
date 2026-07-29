@@ -140,6 +140,7 @@ async function seedAcceptedContract(
   await linkingCeremonyService.acceptLink(database, initiated.id, {
     actorPersonId: supporterPersonId,
     audience: 'supporter',
+    contractVersion: initiated.contractVersion,
   });
   const accepted = await linkingCeremonyService.acceptLink(
     database,
@@ -147,6 +148,7 @@ async function seedAcceptedContract(
     {
       actorPersonId: supporteePersonId,
       audience: 'supportee',
+      contractVersion: initiated.contractVersion,
     },
   );
 

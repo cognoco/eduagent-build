@@ -1,5 +1,11 @@
 import React from 'react';
-import { Tabs, Redirect, usePathname, useRouter } from 'expo-router';
+import {
+  Tabs,
+  Redirect,
+  usePathname,
+  useRouter,
+  useGlobalSearchParams,
+} from 'expo-router';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,6 +35,7 @@ import { ModeSwitcher } from '../../components/chrome/ModeSwitcher';
 import { ScopeChip } from '../../components/chrome/ScopeChip';
 import { AccountAvatar } from '../../components/chrome/AccountAvatar';
 import {
+  accountReturnToken,
   accountReturnTokenForPathname,
   goBackOrReplace,
   type V2AccountReturnToken,
@@ -281,15 +288,30 @@ export function resolveV2PushedScenePaddingTop({
  * V0/V1 never register mentor/subjects/journal as visible tabs, so
  * `reactNavigationFocused` passes straight through when V2 is off — this
  * function only overrides the highlight while V2 is active.
+ *
+ * [WI-2331 rework, F1a] `accountReturnTokenForPathname` is pathname-only, but
+ * some routes (e.g. `/my-notes/*`) are multi-origin — reachable from more
+ * than one owning tab — and fall through to its Mentor catch-all regardless
+ * of which tab actually pushed the screen. `returnTo` disambiguates that
+ * catch-all case: `subjects`/`journal` are still definitive pathname owners
+ * (a `/subjects/*` or `/journal/*` route can only ever have been pushed by
+ * its own tab), so only the catch-all (Mentor-default) branch consults
+ * `returnTo` via `accountReturnToken` — the same resolver `homeHrefForReturnTo`
+ * uses for the Back destination, so highlight and Back always agree.
  */
 export function resolveV2TabIsActive(
   pathname: string,
   tabName: V2AccountReturnToken,
   v2Enabled: boolean,
   reactNavigationFocused: boolean,
+  returnTo?: string | string[],
 ): boolean {
   if (!v2Enabled) return reactNavigationFocused;
-  return accountReturnTokenForPathname(pathname) === tabName;
+  const pathToken = accountReturnTokenForPathname(pathname);
+  if (pathToken === 'subjects' || pathToken === 'journal') {
+    return pathToken === tabName;
+  }
+  return accountReturnToken(returnTo) === tabName;
 }
 
 const ACCOUNT_AVATAR_HIDDEN_PATHS = [
@@ -328,7 +350,7 @@ const iconMap: Record<
   More: { focused: 'menu', default: 'menu-outline' },
 };
 
-function TabIcon({ name, focused }: { name: string; focused: boolean }) {
+export function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   const colors = useThemeColors();
   const entry = iconMap[name];
   return (
@@ -348,7 +370,13 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
 // state. Only ever wired to those three tabs — see the Tabs.Screen entries
 // below — so it never renders alongside the default title-based label used
 // by every other (hidden-when-V2) tab.
-function TabLabel({ title, focused }: { title: string; focused: boolean }) {
+export function TabLabel({
+  title,
+  focused,
+}: {
+  title: string;
+  focused: boolean;
+}) {
   const colors = useThemeColors();
   return (
     <Text
@@ -379,6 +407,12 @@ export default function AppLayout() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
+  // [WI-2331 rework, F1a] the active leaf screen's own `returnTo` param —
+  // needed to disambiguate multi-origin routes (e.g. `/my-notes/*`) in
+  // resolveV2TabIsActive's Mentor catch-all branch. See that function's doc.
+  const { returnTo: activeReturnTo } = useGlobalSearchParams<{
+    returnTo?: string | string[];
+  }>();
   const currentAppPath = toInternalAppRedirectPath(pathname);
   const {
     profiles,
@@ -923,6 +957,9 @@ export default function AppLayout() {
            (immersive screens like session, onboarding, homework).
          ──────────────────────────────────────────────────────────── */}
           <Tabs
+            backBehavior={
+              FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? 'history' : 'firstRoute'
+            }
             screenOptions={({ route }) => {
               const isVisible = visibleTabs.has(route.name);
               const isFullScreen = FULL_SCREEN_ROUTES.has(route.name);
@@ -1007,6 +1044,7 @@ export default function AppLayout() {
                       'mentor',
                       FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
                       focused,
+                      activeReturnTo,
                     )}
                   />
                 ),
@@ -1018,6 +1056,7 @@ export default function AppLayout() {
                       'mentor',
                       FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
                       focused,
+                      activeReturnTo,
                     )}
                   />
                 ),
@@ -1037,6 +1076,7 @@ export default function AppLayout() {
                       'subjects',
                       FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
                       focused,
+                      activeReturnTo,
                     )}
                   />
                 ),
@@ -1048,6 +1088,7 @@ export default function AppLayout() {
                       'subjects',
                       FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
                       focused,
+                      activeReturnTo,
                     )}
                   />
                 ),
@@ -1067,6 +1108,7 @@ export default function AppLayout() {
                       'journal',
                       FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
                       focused,
+                      activeReturnTo,
                     )}
                   />
                 ),
@@ -1078,6 +1120,7 @@ export default function AppLayout() {
                       'journal',
                       FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
                       focused,
+                      activeReturnTo,
                     )}
                   />
                 ),

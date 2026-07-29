@@ -55,11 +55,11 @@ function normalizeExpression(value: unknown): string {
 }
 
 describe('API co-located integration routing', () => {
-  it('maps the root API integration script to the co-located API integration target', () => {
+  it('maps the root API integration script through the guarded launcher', () => {
     const pkg = readJson<PackageJson>('package.json');
     const command = pkg.scripts?.['test:api:integration'] ?? '';
 
-    expect(command).toContain('api:integration-api');
+    expect(command).toBe('node scripts/run-api-integration.mjs');
     expect(command).not.toContain('apps/api/jest.config.cjs');
   });
 
@@ -70,8 +70,8 @@ describe('API co-located integration routing', () => {
     expect(targets['test:integration']?.options?.command).toContain(
       'tests/integration/jest.config.cjs',
     );
-    expect(targets['integration-api']?.options?.command).toContain(
-      'apps/api/jest.integration.config.cjs',
+    expect(targets['integration-api']?.options?.command).toBe(
+      'node scripts/run-api-integration.mjs --jest',
     );
     expect(targets['test-integration']).toBeUndefined();
   });

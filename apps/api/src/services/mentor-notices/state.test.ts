@@ -48,23 +48,44 @@ describe('mentor notice creation state', () => {
     sendSpy.mockRestore();
   });
 
-  it('rejects a clinical characterization in the concept', () => {
-    expect(
+  // [WI-2628] `prepareMentorNoticeCopy` is now async — the shared multilingual
+  // gate resolves an ambiguous verdict through an independent judge. The asserted
+  // BEHAVIOUR is unchanged (unsafe concept -> null row; unsafe hint -> nulled,
+  // notice kept), which is the point: the derived-write drop semantics AC-5
+  // requires are exactly what the English-only guard already did here.
+  it('rejects a clinical characterization in the concept', async () => {
+    await expect(
       prepareMentorNoticeCopy({
         concept: 'the learner has dyslexia',
         correctionHint: 'Use one step at a time.',
       }),
-    ).toBeNull();
+    ).resolves.toBeNull();
   });
 
-  it('drops a clinical correction hint while retaining a safe concept', () => {
-    expect(
+  it('drops a clinical correction hint while retaining a safe concept', async () => {
+    await expect(
       prepareMentorNoticeCopy({
         concept: input.concept,
         correctionHint: 'the learner has dyscalculia',
       }),
-    ).toEqual({ concept: input.concept, correctionHint: null });
+    ).resolves.toEqual({ concept: input.concept, correctionHint: null });
   });
+
+  // [WI-2628] The reason this WI exists: the English-only guard let every one of
+  // these through. Same two drop shapes, non-English.
+  it.each([
+    ['Czech', 'Žák má dyslexii.'],
+    ['Spanish', 'El alumno tiene TEA.'],
+    ['German', 'Der Schüler hat ADS.'],
+    ['Japanese', '田中さんは自閉症です。'],
+  ])(
+    'rejects a %s clinical characterization in the concept',
+    async (_name, concept) => {
+      await expect(
+        prepareMentorNoticeCopy({ concept, correctionHint: null }),
+      ).resolves.toBeNull();
+    },
+  );
 
   it('returns null when another concurrent writer already accepted the same evidence', async () => {
     const { db, onConflictDoNothing } = makeInsertDb([]);

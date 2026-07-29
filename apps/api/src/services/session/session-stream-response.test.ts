@@ -29,9 +29,19 @@ function makeCreateSseResponse() {
   };
 }
 
+// [WI-2627] The observation the route resolves and hands to every terminal
+// frame. `r6` is arbitrary but non-zero, so a test that passed only because the
+// default happens to be 0 cannot pass silently.
+const NOTICE_POLICY_OBSERVATION = {
+  rolloutRevision: 6,
+  rolloutEnabled: true,
+  projectionEpoch: 'notice-policy-v1:r6:on:self:consented',
+};
+
 function baseParams(overrides = {}) {
   return {
     db: {} as Database,
+    noticePolicyObservation: NOTICE_POLICY_OBSERVATION,
     profileId: PROFILE_ID,
     sessionId: SESSION_ID,
     input: { message: 'Explain gravity' },
@@ -280,6 +290,158 @@ describe('streamSessionResponse', () => {
       profileId: PROFILE_ID,
       exchangeCount: 2,
       reason: 'empty_reply',
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-2627] EVERY terminal `done` frame carries the policy observation.
+  //
+  // The observation describes the POLICY, not the outcome of the turn. There are
+  // four distinct paths that emit a terminal frame — the normal one, two
+  // non-streaming fallbacks, and the hand-built empty-reply frame that does not
+  // go through `buildDoneFramePayload` at all — and a client cannot tell "this
+  // path forgot to include it" from "this worker is too old to send it". So a
+  // dropped observation on any one path silently means "no policy change
+  // observed" and leaves a rollback unpropagated on exactly the turns that
+  // already went wrong.
+  //
+  // This table asserts the property over all four paths rather than the happy
+  // one, so a future path added without the observation fails here.
+  // -------------------------------------------------------------------------
+  describe('[WI-2627] policy observation on every terminal done frame', () => {
+    function doneFrameFrom(frames: string[]) {
+      return frames
+        .map((frame) => JSON.parse(frame))
+        .find((frame) => frame.type === 'done');
+    }
+
+    it('normal streaming completion', async () => {
+      const { frames, createSseResponse } = makeCreateSseResponse();
+      const params = baseParams({ createSseResponse });
+      params.deps.streamMessage.mockResolvedValueOnce({
+        stream: (async function* () {
+          yield 'Streamed response';
+        })(),
+        onComplete: jest.fn().mockResolvedValue({
+          response: 'Streamed response',
+          exchangeCount: 3,
+          escalationRung: 2,
+        }),
+      });
+
+      await streamSessionResponse(
+        params as unknown as StreamSessionResponseParams,
+      );
+
+      expect(doneFrameFrom(frames).mentorNoticePolicy).toEqual(
+        NOTICE_POLICY_OBSERVATION,
+      );
+    });
+
+    it('mid-stream failure recovered by the non-streaming fallback', async () => {
+      const { frames, createSseResponse } = makeCreateSseResponse();
+      const params = baseParams({ createSseResponse });
+      params.deps.streamMessage.mockResolvedValueOnce({
+        stream: (async function* () {
+          yield 'partial ';
+          throw new Error('stream failed');
+        })(),
+        onComplete: jest.fn(),
+      });
+      params.deps.processMessage.mockResolvedValueOnce({
+        response: 'Recovered response',
+        exchangeCount: 3,
+        escalationRung: 2,
+        expectedResponseMinutes: 1,
+        aiEventId: AI_EVENT_ID,
+      });
+
+      await streamSessionResponse(
+        params as unknown as StreamSessionResponseParams,
+      );
+
+      expect(doneFrameFrom(frames).mentorNoticePolicy).toEqual(
+        NOTICE_POLICY_OBSERVATION,
+      );
+    });
+
+    it('pre-stream setup failure recovered by the non-streaming fallback', async () => {
+      const { frames, createSseResponse } = makeCreateSseResponse();
+      const params = baseParams({ createSseResponse });
+      params.deps.streamMessage.mockRejectedValueOnce(
+        new Error('stream setup failed'),
+      );
+      params.deps.processMessage.mockResolvedValueOnce({
+        response: 'Recovered before streaming',
+        exchangeCount: 3,
+        escalationRung: 2,
+        expectedResponseMinutes: 1,
+        aiEventId: AI_EVENT_ID,
+      });
+
+      await streamSessionResponse(
+        params as unknown as StreamSessionResponseParams,
+      );
+
+      expect(doneFrameFrom(frames).mentorNoticePolicy).toEqual(
+        NOTICE_POLICY_OBSERVATION,
+      );
+    });
+
+    // The one hand-built terminal frame — it bypasses buildDoneFramePayload, so
+    // it is the path most likely to be missed.
+    it('empty-reply fallback frame, which is built by hand rather than through buildDoneFramePayload', async () => {
+      const { frames, createSseResponse } = makeCreateSseResponse();
+      const params = baseParams({ createSseResponse });
+      params.deps.streamMessage.mockResolvedValueOnce({
+        stream: (async function* () {
+          yield* [];
+        })(),
+        onComplete: jest.fn().mockResolvedValue({
+          exchangeCount: 2,
+          escalationRung: 1,
+          fallback: {
+            reason: 'empty_reply',
+            fallbackText: "I didn't have a reply — tap to try again.",
+          },
+        }),
+      });
+
+      await streamSessionResponse(
+        params as unknown as StreamSessionResponseParams,
+      );
+
+      expect(doneFrameFrom(frames).mentorNoticePolicy).toEqual(
+        NOTICE_POLICY_OBSERVATION,
+      );
+    });
+
+    // A worker that has no observation to give must send NOTHING rather than a
+    // synthesised one — absence is the client's only signal for "this response
+    // carries no observation", and a fabricated default would be indistinguishable
+    // from a real reading of the live policy.
+    it('omits the field entirely when the route supplied no observation', async () => {
+      const { frames, createSseResponse } = makeCreateSseResponse();
+      const params = baseParams({
+        createSseResponse,
+        noticePolicyObservation: undefined,
+      });
+      params.deps.streamMessage.mockResolvedValueOnce({
+        stream: (async function* () {
+          yield 'Streamed response';
+        })(),
+        onComplete: jest.fn().mockResolvedValue({
+          response: 'Streamed response',
+          exchangeCount: 3,
+          escalationRung: 2,
+        }),
+      });
+
+      await streamSessionResponse(
+        params as unknown as StreamSessionResponseParams,
+      );
+
+      expect(doneFrameFrom(frames)).not.toHaveProperty('mentorNoticePolicy');
     });
   });
 });

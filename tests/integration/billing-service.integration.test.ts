@@ -49,7 +49,7 @@ const ORG_NAMES = Array.from(
 const REATTRIBUTION_ORG_NAMES = [
   'integration-billing-service-reattribution-target',
   'integration-billing-service-reattribution-other',
-];
+] as const;
 
 async function cleanupOrgAccounts() {
   const db = createIntegrationDb();

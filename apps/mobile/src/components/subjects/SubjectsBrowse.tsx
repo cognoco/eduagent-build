@@ -150,7 +150,10 @@ export function SubjectsBrowse({
   };
 
   return (
-    <ScrollView className="flex-1 bg-bg px-5 py-4">
+    <ScrollView
+      className="flex-1 bg-bg px-5 py-4"
+      keyboardShouldPersistTaps="handled"
+    >
       <Text className="text-h2 font-semibold text-text-primary">
         {t('subjectsBrowse.title')}
       </Text>
@@ -232,7 +235,10 @@ export function SubjectsBrowse({
               </Text>
 
               {subjects.length === 0 ? (
-                <View className="mt-8 rounded-card bg-coaching-card p-5">
+                <View
+                  className="mt-8 rounded-card bg-coaching-card p-5"
+                  testID="subjects-browse-empty"
+                >
                   <View className="items-center" pointerEvents="none">
                     <BookPageFlipAnimation
                       size={112}
@@ -260,7 +266,11 @@ export function SubjectsBrowse({
               ) : (
                 <>
                   {groups.map((group) => (
-                    <View key={group.status} className="mt-5">
+                    <View
+                      key={group.status}
+                      className="mt-5"
+                      testID={`subjects-browse-status-group-${group.status}`}
+                    >
                       <Text
                         testID={`subjects-browse-section-${group.status}`}
                         className="text-caption font-semibold uppercase text-text-secondary"

@@ -1,0 +1,18 @@
+{
+  "pageId": "3a78bce9-1f7c-81fe-91ea-f270afd6be0a",
+  "id": "WI-2714",
+  "name": "Wait for the final speech transcript before submitting speaking practice",
+  "description": "SpeakingPracticeActivity submits when isListening becomes false even though the speech-recognition hook enters a processing state and may deliver the final transcript afterward, so the persisted attempt can use the last interim transcript.",
+  "acceptanceCriteria": "A speaking-practice attempt is not submitted until speech recognition has produced its final transcript. A late final transcript replaces the interim text used for grading, while empty/cancelled/error paths remain bounded and submit at most once. Regression tests distinguish the stop-listening transition from final-transcript readiness.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "builder:claude:wi-2714",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "",
+  "bodyText": ""
+}

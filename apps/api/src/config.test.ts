@@ -13,6 +13,7 @@ import {
   isTopicIntentMatcherEnabled,
   isMentorNoticeEnabled,
   isMentorNoticePushPostMvpEnabled,
+  resolveMentorNoticePolicyRevision,
   validateEnv,
   validateProductionBindings,
   validateProductionKeys,
@@ -281,6 +282,32 @@ describe('validateEnv', () => {
 
     expect(env.ENVIRONMENT).toBe('development');
     expect(env.DATABASE_URL).toBe('postgresql://localhost/test');
+  });
+
+  it('[WI-2705] preserves a non-empty sandbox verification authorization binding', () => {
+    const authorization = JSON.stringify({
+      version: 1,
+      authorizationId: 'wi-2705-config-proof',
+    });
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+      REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION: authorization,
+    });
+
+    expect(env.REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION).toBe(
+      authorization,
+    );
+  });
+
+  it('[WI-2705] rejects an empty sandbox verification authorization binding', () => {
+    expect(() =>
+      validateEnv({
+        ENVIRONMENT: 'development',
+        DATABASE_URL: 'postgresql://localhost/test',
+        REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION: '',
+      }),
+    ).toThrow('Invalid environment');
   });
 
   it('throws on missing DATABASE_URL', () => {
@@ -705,6 +732,43 @@ describe('validateEnv', () => {
     expect(isMentorNoticeEnabled(env.MENTOR_NOTICE_ENABLED)).toBe(false);
     expect(isMentorNoticeEnabled('true')).toBe(true);
     expect(isMentorNoticeEnabled('yes')).toBe(false);
+  });
+
+  // [WI-2627] The revision is what makes rollout observations ORDERABLE. The
+  // guaranteed property under test is not "it parses integers" but "no
+  // admissible input can RAISE the ordering above a real deployment value":
+  // every rejected form resolves to 0, the lowest revision, and a client only
+  // re-enables on a strictly HIGHER revision. So a typo'd or absent binding is
+  // structurally incapable of re-enabling a client that has observed a rollback.
+  it('[WI-2627] resolves the policy revision, clamping every malformed form to the lowest admissible value', () => {
+    expect(resolveMentorNoticePolicyRevision('7')).toBe(7);
+    expect(resolveMentorNoticePolicyRevision(' 12 ')).toBe(12);
+    expect(resolveMentorNoticePolicyRevision('0')).toBe(0);
+
+    for (const malformed of [
+      undefined,
+      '',
+      '   ',
+      'latest',
+      '2.5',
+      '-3',
+      'NaN',
+      'Infinity',
+      '1e999',
+    ]) {
+      expect(resolveMentorNoticePolicyRevision(malformed)).toBe(0);
+    }
+  });
+
+  it('[WI-2627] MENTOR_NOTICE_POLICY_REVISION is optional in the env schema, so no deployment needs the binding to boot', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(env.MENTOR_NOTICE_POLICY_REVISION).toBeUndefined();
+    expect(
+      resolveMentorNoticePolicyRevision(env.MENTOR_NOTICE_POLICY_REVISION),
+    ).toBe(0);
   });
 
   it('[WI-2573] MENTOR_NOTICE_PUSH_POST_MVP_ENABLED defaults off and is independent of the in-app flag', () => {

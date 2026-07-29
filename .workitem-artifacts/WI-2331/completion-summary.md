@@ -50,3 +50,59 @@ sweep (the tail of AC-2) were split to follow-up items rather than built here.
   WI-2678.
 - Scope reconciliation and the PM-ruling provenance are recorded in
   docs/evidence/wi2331-rgr-v2-wayfinding.md.
+
+## Rework — independent-reviewer findings addressed (2026-07-25)
+
+The independent reviewer returned the item to rework with two substantive findings; both
+are resolved, stacking on the original landed fix (unchanged).
+
+- Finding 1a (AC-1/2/5, multi-origin route): the owning-tab resolver was pathname-only, so a
+  my-notes screen reached from the Journal tab wrongly highlighted Mentor and its Back label
+  read "Back to Mentor" while actually returning to Journal. The resolver is now returnTo-aware
+  (a definitive Subjects/Journal pathname owner still wins; the Mentor catch-all defers to the
+  same returnTo→tab mapping the Back destination already used), and the my-notes hub label is
+  derived from returnTo. Red-green-revert proven.
+- Finding 1b (AC-2, remaining generic Back labels): every "fixed this pass" screen was
+  re-audited across its chevron, loading-state, and error-state controls; the remaining generic
+  Back labels — including the reviewer-named progress and quiz launch screens — now name their
+  semantic destination, V2-gated, V0/V1 copy unchanged. Deliberately-different controls
+  (phase-stepping chevrons, in-flight Cancel, icon-only camera buttons) were left as-is.
+- Finding 2 (AC-5 coverage): representative regression coverage is now identified per axis —
+  all three tabs, own vs supporting context, deep links, dark/light themes (the semantic
+  accent-token mechanism), and small-phone layout (tab bar stays visible and highlighted, and a
+  representative named Back control stays usable, at a small viewport) — rather than asserted in
+  the aggregate. The per-axis mapping is in the red-green-revert evidence document.
+
+Verification: mobile typecheck clean; the full related-test run across every changed file is
+green on Node 22; lint is clean apart from two warnings confirmed pre-existing in untouched
+code. The small-phone axis was retained (not treated as vestigial to the removed AC-4) per the
+orchestrator's KEEP recommendation, since bottom-nav visibility/highlight and Back-label
+usability are layout outcomes that can regress at a small viewport even when route resolution
+takes no size input.
+
+## Rework #2 — independent-reviewer findings addressed (2026-07-26)
+
+The independent reviewer returned the item a second time on one finding: the AC-5 per-axis
+regression tests were structural proxies rather than genuine coverage. Resolved as follows,
+stacking on the landed fix (unchanged, still on the base branch).
+
+- Dark/light axis: the theme mock now reads the real design-tokens table keyed by a mutable
+  colour-scheme, and both tab components are asserted under each theme, proving the unfocused
+  colour differs between light and dark. Red-green proven.
+- Own/supporting axis: split along the seam the fix actually changed. The token-origin proof is
+  driven from the real producers in their co-located tests — own-learning emits its own-scope
+  return token for a reachable guardian fixture (asserted no redirect), and the recap detail
+  screen emits the supporting-scope token off its real navigation push — each resolved through
+  the shared home-destination helper. The layout test keeps the consumer half (given a supplied
+  token, resolve the correct owning tab and distinct Back destination), with the misleading
+  profile fixtures removed. Red-green proven on each producer and on the consumer.
+- Small-phone axis: resolved by operator scope ruling. The V2 tab-bar layout reads only
+  safe-area insets floored by a minimum height and takes no window-dimension input, so a
+  viewport mock would be inert. The ruling records that the inset plus height-floor guarantee is
+  the genuine small-phone signal for this inset-driven layout; the covering test asserts the
+  floored height and surviving owning-tab highlight at a zero bottom inset. Recorded as an
+  in-repo provenance note; the Cosmo AC field is unchanged.
+
+Verification: mobile suite over the touched files green on Node 22; mobile typecheck and eslint
+clean; production source byte-identical (test-only change). Full red-green detail in
+docs/evidence/wi2331-rgr-v2-wayfinding.md under "Rework #2".

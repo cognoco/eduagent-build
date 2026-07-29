@@ -37,6 +37,11 @@ import {
   clearJWKSCache,
 } from '../../apps/api/src/middleware/jwt';
 
+function requireValue<T>(value: T | undefined, message: string): T {
+  if (value === undefined) throw new Error(message);
+  return value;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Test RSA Keys & JWT Signing
 // ═══════════════════════════════════════════════════════════════════════════
@@ -45,13 +50,14 @@ describe('test-keys', () => {
   describe('TEST_JWKS', () => {
     it('has exactly one key with the expected kid', () => {
       expect(TEST_JWKS.keys).toHaveLength(1);
-      expect(TEST_JWKS.keys[0].kid).toBe(TEST_KID);
-      expect(TEST_JWKS.keys[0].kty).toBe('RSA');
-      expect(TEST_JWKS.keys[0].alg).toBe('RS256');
+      const key = requireValue(TEST_JWKS.keys[0], 'Expected one test JWK');
+      expect(key.kid).toBe(TEST_KID);
+      expect(key.kty).toBe('RSA');
+      expect(key.alg).toBe('RS256');
     });
 
     it('has n and e fields required for Web Crypto import', () => {
-      const key = TEST_JWKS.keys[0];
+      const key = requireValue(TEST_JWKS.keys[0], 'Expected one test JWK');
       expect(typeof key.n).toBe('string');
       expect(typeof key.e).toBe('string');
       expect(key.n!.length).toBeGreaterThan(10);
@@ -132,7 +138,11 @@ describe('test-keys', () => {
         string,
         string
       >;
-      const token = headers.Authorization.replace('Bearer ', '');
+      const authorization = requireValue(
+        headers.Authorization,
+        'Expected an Authorization header',
+      );
+      const token = authorization.replace('Bearer ', '');
       const payload = decodeJWTPayload(token);
       expect(payload.sub).toBe('user_abc');
     });
@@ -147,7 +157,7 @@ describe('test-keys', () => {
         iss: 'https://clerk.test',
       });
 
-      const jwk = TEST_JWKS.keys[0];
+      const jwk = requireValue(TEST_JWKS.keys[0], 'Expected one test JWK');
       const payload = await verifyJWT(token, jwk, {
         issuer: 'https://clerk.test',
       });
@@ -158,7 +168,7 @@ describe('test-keys', () => {
 
     it('verifyJWT rejects an expired token', async () => {
       const token = signExpiredJWT({ iss: 'https://clerk.test' });
-      const jwk = TEST_JWKS.keys[0];
+      const jwk = requireValue(TEST_JWKS.keys[0], 'Expected one test JWK');
 
       await expect(
         verifyJWT(token, jwk, { issuer: 'https://clerk.test' }),
@@ -167,7 +177,7 @@ describe('test-keys', () => {
 
     it('verifyJWT rejects a token with wrong issuer', async () => {
       const token = signTestJWT({ iss: 'https://wrong-issuer.test' });
-      const jwk = TEST_JWKS.keys[0];
+      const jwk = requireValue(TEST_JWKS.keys[0], 'Expected one test JWK');
 
       await expect(
         verifyJWT(token, jwk, { issuer: 'https://clerk.test' }),
@@ -179,7 +189,7 @@ describe('test-keys', () => {
         iss: 'https://clerk.test',
         aud: 'my-audience',
       });
-      const jwk = TEST_JWKS.keys[0];
+      const jwk = requireValue(TEST_JWKS.keys[0], 'Expected one test JWK');
 
       const payload = await verifyJWT(token, jwk, {
         issuer: 'https://clerk.test',
@@ -255,9 +265,10 @@ describe('fetch-interceptor', () => {
 
     const calls = getFetchCalls('capture.test');
     expect(calls).toHaveLength(1);
-    expect(calls[0].method).toBe('POST');
-    expect(calls[0].headers['X-Custom']).toBe('value');
-    expect(JSON.parse(calls[0].body!)).toEqual({ key: 'val' });
+    const call = requireValue(calls[0], 'Expected one captured fetch call');
+    expect(call.method).toBe('POST');
+    expect(call.headers['X-Custom']).toBe('value');
+    expect(JSON.parse(call.body!)).toEqual({ key: 'val' });
   });
 
   it('getFetchCalls filters by pattern', async () => {
@@ -301,7 +312,8 @@ describe('fetch-interceptor', () => {
 
     const calls = getFetchCalls('no-handler.test');
     expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe('https://no-handler.test/path');
+    const call = requireValue(calls[0], 'Expected one failed fetch call');
+    expect(call.url).toBe('https://no-handler.test/path');
   });
 
   // BUG-396: a per-suite afterAll calling restoreFetch() used to wipe handlers
@@ -397,7 +409,8 @@ describe('external-mocks', () => {
 
       const calls = getFetchCalls('exp.host');
       expect(calls).toHaveLength(1);
-      expect(JSON.parse(calls[0].body!).to).toBe('ExponentPushToken[xyz]');
+      const call = requireValue(calls[0], 'Expected one Expo push call');
+      expect(JSON.parse(call.body!).to).toBe('ExponentPushToken[xyz]');
     });
   });
 

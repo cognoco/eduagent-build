@@ -7,6 +7,7 @@ import {
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRoutedMockFetch } from '../../../test-utils/mock-api-routes';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 const mockFetch = createRoutedMockFetch({
   '/progress/sessions': { sessions: [], nextCursor: null },
@@ -53,8 +54,9 @@ jest.mock('expo-router', () => ({
   }),
 }));
 
+let mockSafeAreaInsets = { top: 0, bottom: 0, left: 0, right: 0 };
 jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => mockSafeAreaInsets,
 }));
 
 function createWrapper() {
@@ -78,6 +80,7 @@ describe('MyNotesHubScreen', () => {
       nextCursor: null,
     });
     mockReturnTo = undefined;
+    mockSafeAreaInsets = { top: 0, bottom: 0, left: 0, right: 0 };
   });
 
   it('shows the three archive doors and opens a selected list', () => {
@@ -186,6 +189,64 @@ describe('MyNotesHubScreen', () => {
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/my-notes/[kind]',
       params: { kind: 'bookmarks', returnTo: 'own-learning' },
+    });
+  });
+
+  // [WI-2331 rework, F1a] my-notes is multi-origin: Mentor's home screen
+  // pushes it plain (owning tab = Mentor), Journal's notes archive
+  // (JournalNotesArchive.tsx) pushes it with `returnTo: 'journal'`. Before
+  // this fix, the hub's Back LABEL was hard-coded to `V2_TAB_TITLE_KEYS.mentor`
+  // even though its Back DESTINATION already honored `returnTo` — a
+  // Journal-origin visit showed "Back to Mentor" while actually returning to
+  // Journal. The label must be derived from `returnTo` the same way the
+  // destination is.
+  describe('Back label names the actual returnTo destination under V2 [WI-2331 rework F1a]', () => {
+    let originalV2: boolean;
+
+    beforeEach(() => {
+      originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        true;
+    });
+
+    afterEach(() => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        originalV2;
+    });
+
+    it('labels and routes Back to Journal when returnTo is journal', () => {
+      mockReturnTo = 'journal';
+      render(<MyNotesHubScreen />, { wrapper: createWrapper() });
+
+      screen.getByLabelText('Back to Journal');
+
+      fireEvent.press(screen.getByTestId('my-notes-back'));
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/journal');
+    });
+
+    it('labels and routes Back to Mentor for a Mentor-origin visit (returnTo=mentor)', () => {
+      mockReturnTo = 'mentor';
+      render(<MyNotesHubScreen />, { wrapper: createWrapper() });
+
+      screen.getByLabelText('Back to Mentor');
+
+      fireEvent.press(screen.getByTestId('my-notes-back'));
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor');
+    });
+
+    // [WI-2331 AC-5] this multi-origin screen's named Back control must
+    // remain rendered and usable at a small-phone viewport (modest status
+    // bar, no home-indicator gesture area — e.g. iPhone SE-class), not just
+    // at the all-zero-inset default the rest of this describe block uses.
+    it('keeps the named Back control usable at a small-phone viewport', () => {
+      mockSafeAreaInsets = { top: 20, bottom: 0, left: 0, right: 0 };
+      mockReturnTo = 'journal';
+      render(<MyNotesHubScreen />, { wrapper: createWrapper() });
+
+      screen.getByLabelText('Back to Journal');
+
+      fireEvent.press(screen.getByTestId('my-notes-back'));
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/journal');
     });
   });
 });

@@ -1,7 +1,12 @@
-import { expect, test, type Request } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import {
+  NOW_REFRESH_OBSERVATION_WINDOW_MS,
+  observeExactNowRefresh,
+} from '../../helpers/now-refresh-observation';
 import { pressableClick } from '../../helpers/pressable';
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 import { fillTextInput } from '../../helpers/text-input';
+import { observeSeededTranscript } from '../../helpers/transcript-observation';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -38,18 +43,33 @@ test('WI-2234 returning learner: unfinished session resumes, exchanges, and retu
   await expect(unfinishedCard).toBeVisible();
   await expect(dueReviewCard).toBeVisible();
 
+  const transcriptObservationPromise = observeSeededTranscript(page, {
+    sessionId: seeded.ids.sessionId,
+    exchanges: [
+      {
+        role: 'user',
+        content: 'Why did the Romans build so many roads?',
+      },
+      {
+        role: 'assistant',
+        content: 'They connected cities, trade, armies, and new ideas.',
+      },
+    ],
+  });
   await pressableClick(unfinishedCard.getByTestId('now-card-continue'));
   const chatInput = page.getByTestId('chat-input');
   await expect(chatInput).toBeVisible({ timeout: 30_000 });
   await expect
     .poll(() => new URL(page.url()).searchParams.get('sessionId'))
     .toBe(seeded.ids.sessionId);
+  await transcriptObservationPromise;
   await expect(
     page
       .getByTestId('chat-messages')
       .getByText('They connected cities, trade, armies, and new ideas.', {
         exact: true,
       }),
+    '[transcript:hydration] API returned the exact persisted exchange, but the assistant message was not rendered',
   ).toBeVisible();
 
   await fillTextInput(
@@ -69,58 +89,54 @@ test('WI-2234 returning learner: unfinished session resumes, exchanges, and retu
   });
   await expect(completedReplyBelowExactMessage).not.toHaveText(/^\s*$/);
 
-  // Hold the self-scoped Now response caused by Back. The Session route must
-  // remain active until this exact response is allowed through; the tab
-  // navigator keeps Mentor mounted underneath the pushed Session route.
-  let capturePostBackNowRequest = false;
-  let releasePostBackNowResponse!: () => void;
-  let observePostBackNowRequest!: (request: Request) => void;
-  const postBackNowRequest = new Promise<Request>((resolve) => {
-    observePostBackNowRequest = resolve;
-  });
-  const allowPostBackNowResponse = new Promise<void>((resolve) => {
-    releasePostBackNowResponse = resolve;
-  });
-  await page.route('**/v1/now?*', async (route) => {
-    const request = route.request();
-    const url = new URL(request.url());
-    if (
-      request.method() !== 'GET' ||
-      url.searchParams.get('scope') !== 'self' ||
-      !capturePostBackNowRequest
-    ) {
-      await route.continue();
-      return;
-    }
-
-    capturePostBackNowRequest = false;
-    observePostBackNowRequest(request);
-    await allowPostBackNowResponse;
-    await route.continue();
-  });
-
-  await pressableClick(page.getByTestId('chat-shell-back'), {
-    beforeDispatch: () => {
-      capturePostBackNowRequest = true;
-      return () => {
-        capturePostBackNowRequest = false;
-      };
+  // [WI-2833] Observe (never hold) the self-scoped Now response caused by
+  // Back. WI-2818 bounds the Session→Mentor refresh gate to 2s in production
+  // (apps/mobile/src/app/(app)/session/index.tsx MENTOR_RETURN_REFRESH_WAIT_MS):
+  // it waits for the exact refresh, but gives up and completes the Back
+  // navigation regardless once that bound elapses. Pausing the real network
+  // response and releasing it only after unrelated post-Back assertions (the
+  // previous pattern) can lose that race under parallel load — production may
+  // already have reached Mentor before a test-side release ever runs. Arm a
+  // plain, production-compatible observation BEFORE the click instead, and
+  // let the response flow through exactly as production sees it.
+  const postBackNowArmedAtMs = Date.now();
+  const postBackNowResponsePromise = page.waitForResponse(
+    (response) => {
+      const request = response.request();
+      const url = new URL(response.url());
+      return (
+        request.method() === 'GET' &&
+        url.pathname.endsWith('/v1/now') &&
+        url.searchParams.get('scope') === 'self'
+      );
     },
-  });
-  const heldPostBackNowRequest = await postBackNowRequest;
+    { timeout: NOW_REFRESH_OBSERVATION_WINDOW_MS },
+  );
+
+  await pressableClick(page.getByTestId('chat-shell-back'));
+  const postBackNowActionAtMs = Date.now();
   await expect(page).toHaveURL(/\/session(?:\?|$)/);
   await expect(page.getByTestId('session-screen')).toBeVisible();
-  const postBackNowResponsePromise = page.waitForResponse(
-    (response) => response.request() === heldPostBackNowRequest,
+
+  const postBackNowOutcome = await observeExactNowRefresh(
+    postBackNowResponsePromise,
+    { armedAtMs: postBackNowArmedAtMs, actionAtMs: postBackNowActionAtMs },
   );
-  releasePostBackNowResponse();
-  const postBackNowResponse = await postBackNowResponsePromise;
-  expect(postBackNowResponse.ok()).toBe(true);
-  const postBackNowFeed = (await postBackNowResponse.json()) as {
-    generatedAt?: unknown;
-  };
-  expect(typeof postBackNowFeed.generatedAt).toBe('string');
-  expect(postBackNowFeed.generatedAt).not.toBe(initialNowFeed.generatedAt);
+  if (postBackNowOutcome.kind === 'settled') {
+    // Evidence is strongest when the exact refresh settles inside the
+    // observation window: prove it succeeded and was actually fresh.
+    const postBackNowResponse = postBackNowOutcome.response;
+    expect(postBackNowResponse.ok()).toBe(true);
+    const postBackNowFeed = (await postBackNowResponse.json()) as {
+      generatedAt?: unknown;
+    };
+    expect(typeof postBackNowFeed.generatedAt).toBe('string');
+    expect(postBackNowFeed.generatedAt).not.toBe(initialNowFeed.generatedAt);
+  }
+  // A rejected or unsettled exact refresh is a legitimate WI-2818 production
+  // outcome (network hiccup, or Session already gave up waiting past the
+  // 2-second bound) — Mentor is still reached either way, proven below.
+
   await expect(page).toHaveURL(/\/mentor(?:\?|$)/);
   await expect(page.getByTestId('mentor-screen')).toBeVisible({
     timeout: 30_000,

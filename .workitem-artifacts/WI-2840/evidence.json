@@ -1,0 +1,41 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Red-green evidence demonstrates the prompt-only scope gap and the repaired workflow's fail-closed handling across the enumerated review variants.",
+      "pointer": ".workitem-artifacts/WI-2840/red-green.md"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Durable PR #2664 incident evidence records the exact head, eight authoritative paths, reported count of 31, and three base-only findings.",
+      "pointer": ".workitem-artifacts/WI-2840/incident-evidence.md"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "The deterministic fixture executes the workflow after a simulated normal main merge and excludes the fixture's base-only paths from the GitHub manifest.",
+      "pointer": "scripts/claude-review-scope-workflow.test.ts"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Out-of-diff findings emit REVIEW_SCOPE_CORRUPTION and exit non-zero; in-diff findings retain their verdict behavior.",
+      "pointer": "pnpm exec jest --config scripts/jest.config.cjs scripts/claude-review-scope-workflow.test.ts --runInBand --no-coverage"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "The latest fresh exact-head verdict on an unchanged-head rerun recovers to a clean authorization without commit churn.",
+      "pointer": "scripts/claude-review-scope-workflow.test.ts"
+    },
+    {
+      "acRef": "AC-6",
+      "description": "Structural and security ratchets preserve trusted-base rules, bot identity, freshness, exact head, prompt-injection posture, and existing permissions.",
+      "pointer": "pnpm check:github-workflow-security"
+    },
+    {
+      "acRef": "AC-7",
+      "description": "Structural and security tests pass, and the live read-only PR #2664 probe reproduces the authoritative eight-path scope with all three review findings out of scope.",
+      "pointer": ".workitem-artifacts/WI-2840/verification.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-27",
+  "redGreenPointer": ".workitem-artifacts/WI-2840/red-green.md"
+}

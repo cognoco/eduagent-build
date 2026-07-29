@@ -19,6 +19,22 @@ zdx:
       # secret store) or export it in the shell that launches the Archon run.
       env_var: NOTION_TOKEN
 
+  # Estate-wide Workstreams lookup consumed by /cosmo:queue-health.
+  # Keep these identifiers aligned with the canonical Nexus zdx-config.yaml.
+  workstreams:
+    database_id: "47d8bc5ce0744cd995bdddbb81978bdf"
+    data_source_id: "08b3ab36-709d-44af-b78c-5e9f74f6e745"
+
+  operator-queue:
+    # Cosmo Operator Queue for human approvals, decisions, and operator-only
+    # actions. Role bindings are verified against the queue's existing
+    # product and technical authority assignments.
+    database_id: "3948bce91f7c810096d9d78f2351a442"
+    data_source_id: "3948bce9-1f7c-81cd-aef5-000b10a9ec94"
+    authority_bindings:
+      product_authority: "13ad872b-594c-81f6-b01b-0002ce8c3fd8"
+      technical_authority: "2c39e7c4-b72a-4a73-bcdf-77897103dcf3"
+
   # Command run by execute-workitem's setup-worktree node, after the
   # worktree is created and before plan/implement. Archon only does
   # `git worktree add` — dependency install and repo-local env

@@ -71,11 +71,11 @@ export async function countPastDueLaunchHealth(
   const agedCutoff = new Date(observedAt.getTime() - 24 * 60 * 60 * 1000);
   const [result] = await db
     .select({
-      // updatedAt is the canonical row's only status-transition timestamp.
-      // A provider event that leaves the row past_due refreshes it, correctly
-      // restarting the "remained past due" clock.
+      // pastDueAt changes only when the subscription enters past_due. Other
+      // provider bookkeeping must not reset the "remained past due" clock.
       agedPastDueCount: sql<number>`count(*) filter (
-        where ${subscription.updatedAt} <= ${agedCutoff}
+        where ${subscription.pastDueAt} is not null
+          and ${subscription.pastDueAt} <= ${agedCutoff}
       )::int`,
       // periodEndAt carries a provider-declared grace deadline when one exists.
       // Null means "no declared deadline", not "deadline already exceeded".

@@ -26,6 +26,7 @@ import {
   regimes,
   policyCells,
   policyRules,
+  countryPolicyRegistry,
   knowledgeAssertions,
   allowedModels,
   subscriptionPayers,
@@ -177,6 +178,28 @@ describe('identity schema — table exports', () => {
     expect(policyRules.ruleText).toBeDefined();
     expect(policyRules.effectiveAt).toBeDefined();
     expect(policyRules.expiresAt).toBeDefined();
+  });
+
+  it('[WI-2690] exports the effective-dated country policy registry', () => {
+    expect(countryPolicyRegistry).toBeDefined();
+    expect(countryPolicyRegistry.id).toBeDefined();
+    expect(countryPolicyRegistry.countryCode).toBeDefined();
+    expect(countryPolicyRegistry.countryName).toBeDefined();
+    expect(countryPolicyRegistry.regimeId).toBeDefined();
+    expect(countryPolicyRegistry.article8Threshold).toBeDefined();
+    expect(countryPolicyRegistry.authorizationForm).toBeDefined();
+    expect(countryPolicyRegistry.launchStatus).toBeDefined();
+    expect(countryPolicyRegistry.launchBlockReason).toBeDefined();
+    expect(countryPolicyRegistry.legalVerificationStatus).toBeDefined();
+    expect(countryPolicyRegistry.legalReviewedAt).toBeDefined();
+    expect(countryPolicyRegistry.legalReviewValidUntil).toBeDefined();
+    expect(countryPolicyRegistry.launchDayReviewRequired).toBeDefined();
+    expect(countryPolicyRegistry.processingLocationClass).toBeDefined();
+    expect(countryPolicyRegistry.policyVersion).toBeDefined();
+    expect(countryPolicyRegistry.effectiveAt).toBeDefined();
+    expect(countryPolicyRegistry.expiresAt).toBeDefined();
+    expect(countryPolicyRegistry.sourceProvenance).toBeDefined();
+    expect(countryPolicyRegistry.controllerGates).toBeDefined();
   });
 
   it('exports knowledge_assertions table', () => {

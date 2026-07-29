@@ -8,6 +8,7 @@ describe('LLM fallback-rate launch-health signal', () => {
   let emitted: LlmFallbackRateSignal[];
 
   beforeEach(() => {
+    nowMs = Date.parse('2026-07-25T10:00:00.000Z');
     emitted = [];
   });
 
@@ -98,6 +99,42 @@ describe('LLM fallback-rate launch-health signal', () => {
       numerator: 0,
       rate_pct: 0,
     });
+  });
+
+  it('does not recover a breach while the window is below minimum volume', () => {
+    const monitor = tracker();
+    recordCalls(monitor, 20, 3);
+    expect(emitted.at(-1)?.tier).toBe('page');
+
+    nowMs += 15 * 60 * 1000 + 1;
+    monitor.record({
+      environment: 'production',
+      fallbackUsed: false,
+      provider: 'cerebras',
+      capability: 'text',
+    });
+
+    expect(emitted).toHaveLength(1);
+
+    recordCalls(monitor, 19, 0);
+    expect(emitted).toHaveLength(2);
+    expect(emitted.at(-1)).toMatchObject({
+      event: 'llm.fallback_rate_recovered',
+      tier: 'recovered',
+      denominator: 20,
+      numerator: 0,
+    });
+  });
+
+  it('contains alert-emitter failures inside telemetry', () => {
+    const monitor = createLlmFallbackRateTracker({
+      now: () => nowMs,
+      emit: () => {
+        throw new Error('alert sink unavailable');
+      },
+    });
+
+    expect(() => recordCalls(monitor, 20, 1)).not.toThrow();
   });
 
   it('emits only the bounded diagnostic contract', () => {

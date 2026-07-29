@@ -114,6 +114,7 @@ type Job = {
   if?: unknown;
   env?: Record<string, unknown>;
   needs?: unknown;
+  'runs-on'?: unknown;
   strategy?: Record<string, unknown>;
   steps?: Array<Record<string, unknown>>;
   'continue-on-error'?: unknown;
@@ -180,6 +181,50 @@ function allRunScripts(workflow: Record<string, unknown>): string[] {
   }
   return scripts;
 }
+
+describe('[WI-2836] CI preserves the Windows-owned WI-2176 PowerShell contract', () => {
+  const workflow = loadWorkflow('ci.yml');
+  const jobs = workflow.jobs as Record<string, Job>;
+  const contractJobId = 'wi2176-windows-orion-contract';
+
+  it('makes the Windows/Orion contract a dependency of the required main check', () => {
+    const contractJob = jobs[contractJobId];
+    const mainJob = jobs['main'];
+    const mainNeeds = Array.isArray(mainJob?.needs)
+      ? mainJob.needs
+      : [mainJob?.needs];
+
+    expect(contractJob).toBeDefined();
+    expect(contractJob?.['runs-on']).toBe('windows-latest');
+    expect(mainNeeds).toContain(contractJobId);
+    expect(mainJob?.if).toBe('${{ always() }}');
+
+    const dependencyGate = mainJob?.steps?.find(
+      (step) =>
+        step.name === 'Require the WI-2176 Windows/Orion PowerShell contract',
+    );
+    expect(dependencyGate?.env).toEqual({
+      WI2176_CONTRACT_RESULT:
+        '${{ needs.wi2176-windows-orion-contract.result }}',
+    });
+    expect(dependencyGate?.run).toContain(
+      'WI2176_CONTRACT_RESULT" != "success"',
+    );
+    expect(dependencyGate?.run).toContain('exit 1');
+  });
+
+  it('executes the full WI-2176 PowerShell harness in the Windows job', () => {
+    const contractJob = jobs[contractJobId];
+    const contractCommand = contractJob?.steps?.find(
+      (step) => step.name === 'Run WI-2176 Windows/Orion PowerShell contract',
+    )?.run;
+
+    expect(contractCommand).toContain(
+      'apps/mobile/scripts/run-wi2176-orion-evidence.test.ts',
+    );
+    expect(contractCommand).toContain('--runInBand');
+  });
+});
 
 describe('[F-151] e2e-ci.yml has no workflow_run.pull_requests injection sink', () => {
   const raw = loadWorkflowRaw('e2e-ci.yml');
@@ -1683,6 +1728,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(plan.every(({ shard }) => shard >= 1 && shard <= 8)).toBe(true);
   });
 
+  // Executed red/green/revert/restore receipt: docs/evidence/WI-1864/report.md
   it('[WI-1864] keeps every prose-parked flow machine-excluded from scheduled suites', () => {
     const e2eRoot = join(repoRoot, 'apps/mobile/e2e');
     const flowsRoot = join(e2eRoot, 'flows');
@@ -1697,7 +1743,11 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       .filter((path) => /^# PARKED\b/m.test(readFileSync(path, 'utf8')))
       .map((path) => relative(e2eRoot, path).replaceAll('\\', '/'));
 
-    expect(parkedFlows.length).toBeGreaterThanOrEqual(10);
+    // Corpus-size canary proving the PARKED-prose detector still detects —
+    // calibrated to the current parked corpus, not a policy target. WI-2548
+    // un-parked the two coach-bubble flows (11 → 9); re-calibrate when flows
+    // are parked or un-parked, never to paper over a detector regression.
+    expect(parkedFlows.length).toBeGreaterThanOrEqual(9);
 
     for (const flow of parkedFlows) {
       const source = readFileSync(
@@ -4978,13 +5028,15 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(source).not.toContain('progress-subject-back');
   });
 
-  it('[WI-1864] opens a multi-subject home card on its shelf before returning home', () => {
+  it('[WI-1864][WI-2600] opens a multi-subject home card on its shelf, then verifies the subject progress screen through its direct route', () => {
     const source = readFileSync(
       join(repoRoot, 'apps/mobile/e2e/flows/subjects/multi-subject.yaml'),
       'utf8',
     );
     const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
       tapOn?: { id?: string } | string;
+      openLink?: string;
+      assertNotVisible?: { id?: string; optional?: boolean } | string;
       extendedWaitUntil?: {
         visible?: { id?: string } | string;
         optional?: boolean;
@@ -5024,10 +5076,59 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         extendedWaitUntil.visible.id === 'learner-screen' &&
         extendedWaitUntil.optional !== true,
     );
-    const staleProgressWait = commands.findIndex(
-      ({ extendedWaitUntil }) =>
+    // [WI-2600] The WI-2596-quarantined progress assertion is restored: after
+    // the shelf round-trip the flow MUST enter the subject progress screen
+    // through its supported direct route (home cards navigate to the shelf
+    // since a148e4811, so a tapOn cannot reach it) and assert the loaded
+    // state — back control present, error state absent. This supersedes the
+    // earlier WI-1864 interim guard that required the wait to be absent.
+    const progressDeepLink = commands.findIndex(
+      ({ openLink }, index) =>
+        index > home &&
+        openLink === 'mentomate:///progress/${ACTIVE_SUBJECT_ID}',
+    );
+    const progressDetail = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > progressDeepLink &&
         typeof extendedWaitUntil?.visible === 'object' &&
-        extendedWaitUntil.visible.id === 'progress-subject-back',
+        extendedWaitUntil.visible.id === 'progress-subject-back' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const progressNoError = commands.findIndex(
+      ({ assertNotVisible }, index) =>
+        index > progressDetail &&
+        typeof assertNotVisible === 'object' &&
+        assertNotVisible.id === 'progress-subject-error' &&
+        assertNotVisible.optional !== true,
+    );
+    const progressBackTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > progressNoError &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'progress-subject-back',
+    );
+    // Direct-entry back routes to the screen's backFallback — the Progress
+    // tab — not Home (device-verified 2026-07-27), so the flow must wait for
+    // progress-screen before returning home via the tab bar.
+    const progressBackLanding = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > progressBackTap &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'progress-screen' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const progressReturnHome = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > progressBackLanding &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'tab-home',
+    );
+    const progressFinalHome = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > progressReturnHome &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'learner-screen' &&
+        extendedWaitUntil.optional !== true,
     );
 
     expect(subject).toBeGreaterThan(-1);
@@ -5036,7 +5137,13 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(library).toBeGreaterThan(back);
     expect(homeTab).toBeGreaterThan(library);
     expect(home).toBeGreaterThan(homeTab);
-    expect(staleProgressWait).toBe(-1);
+    expect(progressDeepLink).toBeGreaterThan(home);
+    expect(progressDetail).toBeGreaterThan(progressDeepLink);
+    expect(progressNoError).toBeGreaterThan(progressDetail);
+    expect(progressBackTap).toBeGreaterThan(progressNoError);
+    expect(progressBackLanding).toBeGreaterThan(progressBackTap);
+    expect(progressReturnHome).toBeGreaterThan(progressBackLanding);
+    expect(progressFinalHome).toBeGreaterThan(progressReturnHome);
   });
 
   it('[WI-1864] scrolls through every off-screen populated recap control before using it', () => {
@@ -6820,6 +6927,70 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(noMatchInput).toBeGreaterThan(-1);
   });
 
+  it('[WI-2741] dismisses the Mentor keyboard before selecting the hard Homework starter case', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-mentor-single-composer.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as unknown[];
+    const expectedSequence: unknown[] = [
+      { tapOn: { id: 'cold-start-chip-learn' } },
+      { inputText: ' please' },
+      {
+        assertVisible: {
+          id: 'mentor-bar-input',
+          text: 'Teach me something new please',
+        },
+      },
+      { assertVisible: { id: 'mentor-bar-send', enabled: true } },
+      'hideKeyboard',
+      { assertVisible: { id: 'cold-start-chip-homework' } },
+      { tapOn: { id: 'cold-start-chip-homework' } },
+      { assertVisible: { id: 'cold-start-homework-reply' } },
+      { assertVisible: { id: 'mentor-bar-camera' } },
+      { assertNotVisible: { text: '^Camera$', index: 1 } },
+      {
+        assertVisible: {
+          id: 'mentor-bar-input',
+          text: 'Teach me something new please',
+        },
+      },
+    ];
+    const hasExactSequence = (candidate: unknown[]): boolean =>
+      candidate.some((_, index) =>
+        isDeepStrictEqual(
+          candidate.slice(index, index + expectedSequence.length),
+          expectedSequence,
+        ),
+      );
+
+    expect(hasExactSequence(commands)).toBe(true);
+
+    for (const mutate of [
+      (candidate: unknown[]) =>
+        candidate.filter((command) => command !== 'hideKeyboard'),
+      (candidate: unknown[]) => {
+        const keyboardIndex = candidate.indexOf('hideKeyboard');
+        const [keyboardDismiss] = candidate.splice(keyboardIndex, 1);
+        candidate.splice(keyboardIndex + 2, 0, keyboardDismiss);
+        return candidate;
+      },
+      (candidate: unknown[]) =>
+        candidate.map((command) =>
+          isDeepStrictEqual(command, {
+            assertVisible: { id: 'cold-start-chip-homework' },
+          })
+            ? {
+                assertVisible: { id: 'cold-start-chip-homework' },
+                optional: true,
+              }
+            : command,
+        ),
+    ]) {
+      expect(hasExactSequence(mutate(structuredClone(commands)))).toBe(false);
+    }
+  });
+
   it('[WI-1406] keeps native MFA placeholders explicitly non-executable until OPQ-26 fixtures exist', () => {
     const nightlyFlows = new Set(loadPlan('nightly').map(({ flow }) => flow));
     const placeholders = [
@@ -6942,6 +7113,16 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scenario: 'onboarding-no-subject',
         shard: 1,
       },
+      {
+        flow: 'flows/v2/v2-subjects-browse-resume.yaml',
+        scenario: 'learning-active',
+        shard: 1,
+      },
+      {
+        flow: 'flows/v2/v2-subjects-due-review.yaml',
+        scenario: 'retention-due',
+        shard: 1,
+      },
       // [WI-2226 owner-gate retarget] Supporter cold-start mount — the
       // owner-gated managed card renders on Support hub landing for a
       // same-org managed child (hasOwnAccount=false, on the SUPPORTER's own
@@ -7027,6 +7208,1458 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(flow.match(/assertNotVisible:/g)).toHaveLength(6);
     expect(flow.match(/id: ['"]tab-subjects['"]/g)).toHaveLength(3);
     expect(flow.match(/retryTapIfNoChange: true/g)).toHaveLength(3);
+  });
+
+  it('[WI-2238] binds exact case properties to their ID-bearing owners', () => {
+    type Selector = Record<string, unknown>;
+    const includesSelectorProperties = (
+      actual: unknown,
+      expected: Selector,
+    ): boolean =>
+      actual !== null &&
+      typeof actual === 'object' &&
+      Object.entries(expected).every(
+        ([key, value]) => (actual as Selector)[key] === value,
+      );
+    const hasHardOwnedAssertion = (
+      value: unknown,
+      ownerId: string,
+      descendants: Selector[],
+    ): boolean => {
+      if (Array.isArray(value)) {
+        return value.some((entry) =>
+          hasHardOwnedAssertion(entry, ownerId, descendants),
+        );
+      }
+      if (value === null || typeof value !== 'object') return false;
+
+      const record = value as Record<string, unknown>;
+      const asserted = record.assertVisible;
+      if (asserted !== null && typeof asserted === 'object') {
+        const selector = asserted as Selector;
+        const actualDescendants = selector.containsDescendants;
+        if (
+          selector.id === ownerId &&
+          selector.optional !== true &&
+          Array.isArray(actualDescendants) &&
+          descendants.every((expected) =>
+            actualDescendants.some((actual) =>
+              includesSelectorProperties(actual, expected),
+            ),
+          )
+        ) {
+          return true;
+        }
+      }
+
+      return Object.values(record).some((entry) =>
+        hasHardOwnedAssertion(entry, ownerId, descendants),
+      );
+    };
+    const hasHardIdAssertion = (value: unknown, ownerId: string): boolean => {
+      if (Array.isArray(value)) {
+        return value.some((entry) => hasHardIdAssertion(entry, ownerId));
+      }
+      if (value === null || typeof value !== 'object') return false;
+
+      const record = value as Record<string, unknown>;
+      const asserted = record.assertVisible;
+      if (asserted !== null && typeof asserted === 'object') {
+        const selector = asserted as Selector;
+        if (selector.id === ownerId && selector.optional !== true) return true;
+      }
+
+      return Object.values(record).some((entry) =>
+        hasHardIdAssertion(entry, ownerId),
+      );
+    };
+    const hasRunFlowWithEnv = (
+      value: unknown,
+      file: string,
+      expectedEnv: Selector,
+    ): boolean => {
+      if (Array.isArray(value)) {
+        return value.some((entry) =>
+          hasRunFlowWithEnv(entry, file, expectedEnv),
+        );
+      }
+      if (value === null || typeof value !== 'object') return false;
+
+      const record = value as Record<string, unknown>;
+      const runFlow = record.runFlow;
+      if (runFlow !== null && typeof runFlow === 'object') {
+        const command = runFlow as Record<string, unknown>;
+        const env = command.env;
+        if (
+          command.file === file &&
+          env !== null &&
+          typeof env === 'object' &&
+          Object.entries(expectedEnv).every(
+            ([key, expected]) =>
+              (env as Record<string, unknown>)[key] === expected,
+          )
+        ) {
+          return true;
+        }
+      }
+
+      return Object.values(record).some((entry) =>
+        hasRunFlowWithEnv(entry, file, expectedEnv),
+      );
+    };
+    const hasExactCommandSequence = (
+      value: unknown,
+      expected: Selector[],
+    ): boolean =>
+      Array.isArray(value) &&
+      expected.length > 0 &&
+      value.some((_, start) =>
+        expected.every(
+          (command, offset) =>
+            JSON.stringify(value[start + offset]) === JSON.stringify(command),
+        ),
+      );
+    const loadCommands = (...segments: string[]): unknown =>
+      parseAllDocuments(
+        readFileSync(
+          join(repoRoot, 'apps/mobile/e2e/flows', ...segments),
+          'utf8',
+        ),
+      )[1]?.toJS();
+
+    const resume = loadCommands('v2', 'v2-subjects-browse-resume.yaml');
+    const dueReview = loadCommands('v2', 'v2-subjects-due-review.yaml');
+    const subjectCreate = loadCommands(
+      'v2',
+      'v2-subject-create-round-trip.yaml',
+    );
+    const profileIdentity = loadCommands(
+      '_setup',
+      'assert-v2-active-profile-and-return.yaml',
+    );
+
+    const impossibleSearchAbsence: Selector[] = [
+      { tapOn: { id: 'subjects-browse-search' } },
+      { inputText: 'zzzz-no-such-subject-2238' },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'library-search-empty' },
+          timeout: 15000,
+        },
+      },
+      {
+        assertNotVisible: {
+          id: 'subjects-browse-row-${SUBJECT_ID}',
+        },
+      },
+      { tapOn: { id: 'library-search-clear-results' } },
+    ];
+    const exactWorldHistoryRestore: Selector[] = [
+      ...impossibleSearchAbsence,
+      {
+        extendedWaitUntil: {
+          visible: { id: 'subjects-browse-row-${SUBJECT_ID}' },
+          timeout: 15000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'subjects-browse-row-${SUBJECT_ID}',
+          containsDescendants: [{ text: '^World History$' }],
+        },
+      },
+    ];
+    const exactWorldHistoryHubTitle: Selector = {
+      assertVisible: {
+        id: 'subject-hub-title-${SUBJECT_ID}',
+        text: '^World History$',
+      },
+    };
+    const exactHubEntry: Selector[] = [
+      { tapOn: { id: 'subjects-browse-row-${SUBJECT_ID}' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'subject-hub-screen' },
+          timeout: 15000,
+        },
+      },
+      exactWorldHistoryHubTitle,
+    ];
+    const exactTopicVisibilitySync: Selector[] = [
+      {
+        scrollUntilVisible: {
+          element: { id: 'subject-hub-topic-${TOPIC_ID}' },
+          direction: 'DOWN',
+          timeout: 15000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'subject-hub-topic-${TOPIC_ID}',
+          containsDescendants: [{ text: '^World History Topic 1$' }],
+        },
+      },
+      { tapOn: { id: 'subject-hub-topic-${TOPIC_ID}' } },
+    ];
+    const exactPostSheetCloseHub: Selector[] = [
+      { tapOn: { id: 'subject-hub-topic-sheet-close' } },
+      { assertNotVisible: { id: 'subject-hub-topic-sheet' } },
+      { assertVisible: { id: 'subject-hub-screen' } },
+      {
+        scrollUntilVisible: {
+          element: { id: 'subject-hub-title-${SUBJECT_ID}' },
+          direction: 'UP',
+          timeout: 15000,
+        },
+      },
+      exactWorldHistoryHubTitle,
+    ];
+    const exactNextUpVisibilitySync: Selector[] = [
+      {
+        scrollUntilVisible: {
+          element: { id: 'subject-hub-next-up' },
+          direction: 'DOWN',
+          timeout: 15000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'subject-hub-next-up-topic',
+          text: '^World History Topic 1$',
+        },
+      },
+      {
+        assertVisible: {
+          id: 'subject-hub-next-up-action',
+        },
+      },
+      {
+        assertVisible: {
+          id: 'subject-hub-next-up-primary',
+          text: '^Resume$',
+        },
+      },
+    ];
+    const exactDueReviewNextUp: Selector[] = [
+      {
+        assertVisible: {
+          id: 'subject-hub-next-up-topic',
+          text: '^Biology Topic 1$',
+        },
+      },
+      {
+        assertVisible: {
+          id: 'subject-hub-next-up-action',
+        },
+      },
+      {
+        assertVisible: {
+          id: 'subject-hub-next-up-primary',
+          text: '^Review$',
+        },
+      },
+      {
+        tapOn: {
+          id: 'subject-hub-next-up-action',
+        },
+      },
+    ];
+    const exactDueReviewTopicDetail: Selector[] = [
+      {
+        extendedWaitUntil: {
+          visible: { id: 'topic-detail-scroll' },
+          timeout: 30000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'topic-detail-scroll',
+          containsDescendants: [
+            { text: '^Biology Topic 1$' },
+            {
+              id: 'retention-pill-elapsed',
+              text: '^Ready for a refresh after 8 days$',
+            },
+          ],
+        },
+      },
+    ];
+    const exactTopicSheetOwnership: Selector[] = [
+      {
+        extendedWaitUntil: {
+          visible: { id: 'subject-hub-topic-sheet' },
+          timeout: 10000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'subject-hub-topic-sheet',
+          containsDescendants: [{ text: '^World History Topic 1$' }],
+        },
+      },
+    ];
+    const exactSeededTranscriptOwnership: Selector[] = [
+      {
+        extendedWaitUntil: {
+          visible: {
+            id: 'message-bubble-user-0',
+            containsDescendants: [{ text: '^Tell me about ancient Rome$' }],
+          },
+          timeout: 30000,
+        },
+      },
+      {
+        extendedWaitUntil: {
+          visible: {
+            id: 'message-bubble-assistant-1',
+            containsDescendants: [
+              { text: '^Ancient Rome was founded in 753 BC…$' },
+            ],
+          },
+          timeout: 30000,
+        },
+      },
+    ];
+    const exactNextUpResumeTap: Selector = {
+      tapOn: {
+        id: 'subject-hub-next-up-action',
+      },
+    };
+    const exactSeededSessionArrival: Selector[] = [
+      {
+        extendedWaitUntil: {
+          visible: { id: 'session-screen' },
+          timeout: 45000,
+        },
+      },
+      ...exactSeededTranscriptOwnership,
+    ];
+    const exactNextUpHardwareBackToSubjects: Selector[] = [
+      exactNextUpResumeTap,
+      ...exactSeededSessionArrival,
+      { pressKey: 'back' },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'subjects-screen' },
+          timeout: 15000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'subjects-browse-row-${SUBJECT_ID}',
+          containsDescendants: [{ text: '^World History$' }],
+        },
+      },
+    ];
+    const exactNextUpVisibleBackToSubjects: Selector[] = [
+      exactNextUpResumeTap,
+      ...exactSeededSessionArrival,
+      { tapOn: { id: 'chat-shell-back' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'subjects-screen' },
+          timeout: 15000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'subjects-browse-row-${SUBJECT_ID}',
+          containsDescendants: [{ text: '^World History$' }],
+        },
+      },
+    ];
+    const exactTopicResumeToOwningHub: Selector[] = [
+      ...exactTopicVisibilitySync,
+      ...exactTopicSheetOwnership,
+      {
+        tapOn: {
+          text: '^Study$',
+          childOf: { id: 'subject-hub-topic-sheet' },
+        },
+      },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'topic-detail-scroll' },
+          timeout: 15000,
+        },
+      },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'study-cta' },
+          timeout: 15000,
+        },
+      },
+      { tapOn: { id: 'study-cta' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'session-screen' },
+          timeout: 45000,
+        },
+      },
+      ...exactSeededTranscriptOwnership,
+      { pressKey: 'back' },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'subject-hub-screen' },
+          timeout: 15000,
+        },
+      },
+      { assertNotVisible: { id: 'mentor-screen' } },
+      {
+        scrollUntilVisible: {
+          element: { id: 'subject-hub-title-${SUBJECT_ID}' },
+          direction: 'UP',
+          timeout: 15000,
+        },
+      },
+      exactWorldHistoryHubTitle,
+      { assertNotVisible: { id: 'topic-detail-scroll' } },
+      { assertNotVisible: { id: 'session-screen' } },
+      { assertNotVisible: { id: 'subject-hub-topic-sheet' } },
+    ];
+
+    expect(hasExactCommandSequence(resume, exactWorldHistoryRestore)).toBe(
+      true,
+    );
+    expect(hasExactCommandSequence(resume, exactTopicVisibilitySync)).toBe(
+      true,
+    );
+    expect(hasExactCommandSequence(resume, exactNextUpVisibilitySync)).toBe(
+      true,
+    );
+    expect(hasExactCommandSequence(dueReview, exactDueReviewNextUp)).toBe(true);
+    expect(hasExactCommandSequence(dueReview, exactDueReviewTopicDetail)).toBe(
+      true,
+    );
+    expect(hasExactCommandSequence(resume, exactTopicResumeToOwningHub)).toBe(
+      true,
+    );
+    const exactResumePaths = [
+      exactTopicResumeToOwningHub,
+      exactNextUpHardwareBackToSubjects,
+      exactNextUpVisibleBackToSubjects,
+    ];
+    const hasEveryExactResumePath = (value: unknown): boolean =>
+      exactResumePaths.every((path) => hasExactCommandSequence(value, path));
+    const mutateExactPath = (
+      value: unknown,
+      path: Selector[],
+      offset: number,
+      replacement?: Selector,
+    ): Selector[] => {
+      if (!Array.isArray(value)) {
+        throw new Error('Subjects resume flow did not parse as commands');
+      }
+      const start = value.findIndex((_, candidateStart) =>
+        path.every((command, commandOffset) =>
+          isDeepStrictEqual(value[candidateStart + commandOffset], command),
+        ),
+      );
+      if (start < 0) {
+        throw new Error('Exact Subjects resume path is missing');
+      }
+      const target = start + offset;
+      return replacement === undefined
+        ? value.filter((_, index) => index !== target)
+        : value.with(target, replacement);
+    };
+
+    expect(hasEveryExactResumePath(resume)).toBe(true);
+    for (const path of [
+      exactNextUpHardwareBackToSubjects,
+      exactNextUpVisibleBackToSubjects,
+    ]) {
+      for (const mutation of [
+        mutateExactPath(resume, path, 2),
+        mutateExactPath(resume, path, 2, {
+          extendedWaitUntil: {
+            visible: {
+              id: 'message-bubble-user-adjacent',
+              containsDescendants: [{ text: '^Tell me about ancient Rome$' }],
+            },
+            timeout: 30000,
+          },
+        }),
+        mutateExactPath(resume, path, 2, {
+          extendedWaitUntil: {
+            visible: {
+              id: 'message-bubble-user-0',
+              containsDescendants: [
+                { text: '^Tell me about adjacent history$' },
+              ],
+              optional: true,
+            },
+            timeout: 30000,
+          },
+        }),
+        mutateExactPath(resume, path, 3),
+        mutateExactPath(resume, path, 3, {
+          extendedWaitUntil: {
+            visible: {
+              id: 'message-bubble-assistant-adjacent',
+              containsDescendants: [
+                { text: '^Ancient Rome was founded in 753 BC…$' },
+              ],
+            },
+            timeout: 30000,
+          },
+        }),
+        mutateExactPath(resume, path, 3, {
+          extendedWaitUntil: {
+            visible: {
+              id: 'message-bubble-assistant-1',
+              containsDescendants: [{ text: '^Adjacent history reply$' }],
+              optional: true,
+            },
+            timeout: 30000,
+          },
+        }),
+        mutateExactPath(resume, path, 4),
+      ]) {
+        expect(hasEveryExactResumePath(mutation)).toBe(false);
+      }
+    }
+    for (const transcriptSelector of exactSeededTranscriptOwnership) {
+      expect(
+        Array.isArray(resume)
+          ? resume.filter((command) =>
+              isDeepStrictEqual(command, transcriptSelector),
+            ).length
+          : 0,
+      ).toBe(3);
+    }
+    for (const mutation of [
+      exactTopicResumeToOwningHub.filter((_, index) => index !== 1),
+      exactTopicResumeToOwningHub.with(1, {
+        assertVisible: {
+          id: 'subject-hub-topic-${TOPIC_ID}',
+          containsDescendants: [
+            { text: '^World History Topic 1$', optional: true },
+          ],
+        },
+      }),
+      exactTopicResumeToOwningHub.with(1, {
+        assertVisible: {
+          id: 'subject-hub-topic-adjacent-topic',
+          containsDescendants: [{ text: '^World History Topic 1$' }],
+        },
+      }),
+      exactTopicResumeToOwningHub.with(1, {
+        assertVisible: {
+          id: 'subject-hub-topic-${TOPIC_ID}',
+          containsDescendants: [{ text: '^Adjacent History Topic$' }],
+        },
+      }),
+      exactTopicResumeToOwningHub.filter((_, index) => index !== 2),
+      exactTopicResumeToOwningHub.filter((_, index) => index !== 4),
+      exactTopicResumeToOwningHub.with(4, {
+        assertVisible: {
+          id: 'subject-hub-topic-sheet',
+          containsDescendants: [
+            { text: '^World History Topic 1$', optional: true },
+          ],
+        },
+      }),
+      exactTopicResumeToOwningHub.with(4, {
+        assertVisible: {
+          id: 'subject-hub-topic-sheet-adjacent-topic',
+          containsDescendants: [{ text: '^World History Topic 1$' }],
+        },
+      }),
+      exactTopicResumeToOwningHub.with(4, {
+        assertVisible: {
+          id: 'subject-hub-topic-sheet',
+          containsDescendants: [{ text: '^Adjacent History Topic$' }],
+        },
+      }),
+      exactTopicResumeToOwningHub.filter((_, index) => index !== 10),
+      exactTopicResumeToOwningHub.with(10, {
+        extendedWaitUntil: {
+          visible: {
+            id: 'message-bubble-user-0',
+            containsDescendants: [{ text: '^Tell me about adjacent history$' }],
+            optional: true,
+          },
+          timeout: 30000,
+        },
+      }),
+      exactTopicResumeToOwningHub.filter((_, index) => index !== 11),
+      exactTopicResumeToOwningHub.with(11, {
+        extendedWaitUntil: {
+          visible: {
+            id: 'message-bubble-assistant-adjacent',
+            containsDescendants: [
+              { text: '^Ancient Rome was founded in 753 BC…$' },
+            ],
+            optional: true,
+          },
+          timeout: 30000,
+        },
+      }),
+      exactTopicResumeToOwningHub.filter((_, index) => index !== 12),
+      exactTopicResumeToOwningHub.with(14, {
+        assertNotVisible: { id: 'mentor-screen', optional: true },
+      }),
+      exactTopicResumeToOwningHub.with(16, {
+        assertVisible: {
+          id: 'subject-hub-title-adjacent-subject',
+          text: '^World History$',
+        },
+      }),
+      exactTopicResumeToOwningHub.filter((_, index) => index !== 17),
+      exactTopicResumeToOwningHub.with(17, {
+        assertNotVisible: { id: 'topic-detail-scroll', optional: true },
+      }),
+      exactTopicResumeToOwningHub.filter((_, index) => index !== 18),
+      exactTopicResumeToOwningHub.with(18, {
+        assertNotVisible: { id: 'session-screen', optional: true },
+      }),
+      exactTopicResumeToOwningHub.filter((_, index) => index !== 19),
+      exactTopicResumeToOwningHub.with(19, {
+        assertNotVisible: {
+          id: 'subject-hub-topic-sheet',
+          optional: true,
+        },
+      }),
+    ]) {
+      expect(
+        hasExactCommandSequence(mutation, exactTopicResumeToOwningHub),
+      ).toBe(false);
+    }
+    const titleCheckpointMutations = (checkpoint: Selector[]): Selector[][] => {
+      const titleIndex = checkpoint.findIndex((command) =>
+        isDeepStrictEqual(command, exactWorldHistoryHubTitle),
+      );
+      if (titleIndex < 0) {
+        throw new Error('Subject Hub checkpoint is missing its exact title');
+      }
+      const replaceTitle = (titleSelector: Selector): Selector[] =>
+        checkpoint.with(titleIndex, { assertVisible: titleSelector });
+
+      return [
+        checkpoint.filter((_, index) => index !== titleIndex),
+        replaceTitle({
+          id: 'subject-hub-screen',
+          containsDescendants: [{ text: '^World History$' }],
+        }),
+        replaceTitle({
+          id: 'subject-hub-title-adjacent-subject',
+          text: '^World History$',
+        }),
+        replaceTitle({
+          id: 'subject-hub-title-${SUBJECT_ID}',
+          text: '^Adjacent History$',
+        }),
+        replaceTitle({
+          id: 'subject-hub-title-${SUBJECT_ID}',
+          text: '^World History$',
+          optional: true,
+        }),
+        [
+          ...checkpoint.slice(0, titleIndex),
+          { assertVisible: { id: 'subject-hub-title-${SUBJECT_ID}' } },
+          { assertVisible: { text: '^World History$' } },
+          ...checkpoint.slice(titleIndex + 1),
+        ],
+      ];
+    };
+    for (const checkpoint of [exactHubEntry, exactPostSheetCloseHub]) {
+      expect(hasExactCommandSequence(resume, checkpoint)).toBe(true);
+      for (const mutation of titleCheckpointMutations(checkpoint)) {
+        expect(hasExactCommandSequence(mutation, checkpoint)).toBe(false);
+      }
+    }
+
+    const exactBiologyHubTitle: Selector = {
+      assertVisible: {
+        id: 'subject-hub-title-${SUBJECT_ID}',
+        text: '^Biology$',
+      },
+    };
+    const exactDueReviewHubEntry: Selector[] = [
+      { tapOn: { id: 'subjects-browse-row-${SUBJECT_ID}' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'subject-hub-screen' },
+          timeout: 15000,
+        },
+      },
+      exactBiologyHubTitle,
+      ...exactDueReviewNextUp,
+    ];
+    const exactDueReviewPostTopicBack: Selector[] = [
+      { pressKey: 'back' },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'subject-hub-screen' },
+          timeout: 15000,
+        },
+      },
+      exactBiologyHubTitle,
+      {
+        scrollUntilVisible: {
+          element: { id: 'subject-hub-topic-${TOPIC_ID}' },
+          direction: 'DOWN',
+          timeout: 15000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'subject-hub-topic-${TOPIC_ID}',
+          containsDescendants: [{ text: '^Biology Topic 1$' }],
+        },
+      },
+    ];
+    const dueReviewTitleMutations = (checkpoint: Selector[]): Selector[][] => {
+      const titleIndex = checkpoint.findIndex((command) =>
+        isDeepStrictEqual(command, exactBiologyHubTitle),
+      );
+      if (titleIndex < 0) {
+        throw new Error('Due-review Hub checkpoint is missing its exact title');
+      }
+      const replaceTitle = (titleSelector: Selector): Selector[] =>
+        checkpoint.with(titleIndex, { assertVisible: titleSelector });
+
+      return [
+        // Removing the exact title leaves the seeded subject identity unproved.
+        checkpoint.filter((_, index) => index !== titleIndex),
+        // The generic Hub screen cannot own the exact Biology title property.
+        replaceTitle({
+          id: 'subject-hub-screen',
+          containsDescendants: [{ text: '^Biology$' }],
+        }),
+        // Global text can be rendered outside the seeded Subject Hub title.
+        replaceTitle({ text: '^Biology$' }),
+        // An adjacent title owner proves a different seeded subject.
+        replaceTitle({
+          id: 'subject-hub-title-adjacent-subject',
+          text: '^Biology$',
+        }),
+        // Optional title evidence does not establish the guaranteed property.
+        replaceTitle({
+          id: 'subject-hub-title-${SUBJECT_ID}',
+          text: '^Biology$',
+          optional: true,
+        }),
+        // The exact title must follow readiness of its Subject Hub ancestor.
+        checkpoint.with(1, checkpoint[2]!).with(2, checkpoint[1]!),
+      ];
+    };
+    for (const checkpoint of [
+      exactDueReviewHubEntry,
+      exactDueReviewPostTopicBack,
+    ]) {
+      expect(hasExactCommandSequence(dueReview, checkpoint)).toBe(true);
+      for (const mutation of dueReviewTitleMutations(checkpoint)) {
+        expect(hasExactCommandSequence(mutation, checkpoint)).toBe(false);
+      }
+    }
+    for (const mutation of [
+      // The exact topic row is below the fold after returning to the Hub.
+      exactDueReviewPostTopicBack.filter((_, index) => index !== 3),
+      // Scrolling toward an adjacent owner cannot synchronize the exact row.
+      exactDueReviewPostTopicBack.with(3, {
+        scrollUntilVisible: {
+          element: { id: 'subject-hub-topic-adjacent-topic' },
+          direction: 'DOWN',
+          timeout: 15000,
+        },
+      }),
+      // The row is below the fold, so the synchronization direction is owned.
+      exactDueReviewPostTopicBack.with(3, {
+        scrollUntilVisible: {
+          element: { id: 'subject-hub-topic-${TOPIC_ID}' },
+          direction: 'UP',
+          timeout: 15000,
+        },
+      }),
+      // Synchronization must precede the hard exact-owner assertion.
+      exactDueReviewPostTopicBack
+        .with(3, exactDueReviewPostTopicBack[4]!)
+        .with(4, exactDueReviewPostTopicBack[3]!),
+    ]) {
+      expect(
+        hasExactCommandSequence(mutation, exactDueReviewPostTopicBack),
+      ).toBe(false);
+    }
+    for (const mutation of [
+      // No-result row-absence removal.
+      exactWorldHistoryRestore.filter((_, index) => index !== 3),
+      // No-result row-absence optionalization.
+      exactWorldHistoryRestore.with(3, {
+        assertNotVisible: {
+          id: 'subjects-browse-row-${SUBJECT_ID}',
+          optional: true,
+        },
+      }),
+      // No-result row-absence wrong owner.
+      exactWorldHistoryRestore.with(3, {
+        assertNotVisible: { id: 'subjects-browse-row-adjacent' },
+      }),
+      // No-result row-absence reordering after the recovery action.
+      exactWorldHistoryRestore
+        .with(3, exactWorldHistoryRestore[4]!)
+        .with(4, exactWorldHistoryRestore[3]!),
+      // Exact restored-row assertion removal.
+      exactWorldHistoryRestore.filter((_, index) => index !== 6),
+      // Exact restored-row assertion optionalization.
+      exactWorldHistoryRestore.with(6, {
+        assertVisible: {
+          id: 'subjects-browse-row-${SUBJECT_ID}',
+          containsDescendants: [{ text: '^World History$' }],
+          optional: true,
+        },
+      }),
+      // Exact restored-row wrong owner.
+      exactWorldHistoryRestore.with(6, {
+        assertVisible: {
+          id: 'subjects-browse-row-adjacent',
+          containsDescendants: [{ text: '^World History$' }],
+        },
+      }),
+      // Exact restored-row wrong name.
+      exactWorldHistoryRestore.with(6, {
+        assertVisible: {
+          id: 'subjects-browse-row-${SUBJECT_ID}',
+          containsDescendants: [{ text: '^Adjacent History$' }],
+        },
+      }),
+      // Exact restored-row wait/assertion reordering.
+      exactWorldHistoryRestore
+        .with(5, exactWorldHistoryRestore[6]!)
+        .with(6, exactWorldHistoryRestore[5]!),
+    ]) {
+      expect(hasExactCommandSequence(mutation, exactWorldHistoryRestore)).toBe(
+        false,
+      );
+    }
+    for (const mutation of [
+      // Topic-sheet absence removal.
+      exactPostSheetCloseHub.filter((_, index) => index !== 1),
+      // Topic-sheet absence optionalization.
+      exactPostSheetCloseHub.with(1, {
+        assertNotVisible: {
+          id: 'subject-hub-topic-sheet',
+          optional: true,
+        },
+      }),
+      // Topic-sheet absence wrong owner.
+      exactPostSheetCloseHub.with(1, {
+        assertNotVisible: { id: 'subject-hub-screen' },
+      }),
+      // Topic-sheet absence reordering after the next Subject Hub assertion.
+      exactPostSheetCloseHub
+        .with(1, exactPostSheetCloseHub[2]!)
+        .with(2, exactPostSheetCloseHub[1]!),
+      // Exact title reordering before Subject Hub readiness.
+      exactPostSheetCloseHub
+        .with(2, exactPostSheetCloseHub[4]!)
+        .with(4, exactPostSheetCloseHub[2]!),
+    ]) {
+      expect(hasExactCommandSequence(mutation, exactPostSheetCloseHub)).toBe(
+        false,
+      );
+    }
+
+    expect(Array.isArray(subjectCreate)).toBe(true);
+    if (!Array.isArray(subjectCreate)) {
+      throw new Error('V2 subject-create Maestro commands must be a YAML list');
+    }
+    const initialSubjectsReady = subjectCreate.findIndex(
+      (command) =>
+        JSON.stringify(command) ===
+        JSON.stringify({
+          extendedWaitUntil: {
+            visible: { id: 'subjects-screen' },
+            timeout: 15000,
+          },
+        }),
+    );
+    expect(initialSubjectsReady).toBeGreaterThanOrEqual(0);
+    expect(
+      subjectCreate.slice(initialSubjectsReady + 1, initialSubjectsReady + 3),
+    ).toEqual([
+      { assertVisible: { id: 'subjects-browse-empty' } },
+      { assertNotVisible: { id: 'subjects-browse-row-.*' } },
+    ]);
+
+    const exactPhotosynthesisRow: Selector = {
+      assertVisible: {
+        id: '^subjects-browse-row-.*$',
+        text: 'Open Photosynthesis',
+      },
+    };
+    const exactPhotosynthesisSession: Selector[] = [
+      {
+        extendedWaitUntil: {
+          visible: { id: 'session-screen' },
+          timeout: 45000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'message-bubble-assistant-0',
+          containsDescendants: [{ text: '.*Photosynthesis.*' }],
+        },
+      },
+      { assertVisible: { id: 'chat-shell-back' } },
+    ];
+    const exactCreatedSubjectReturn: Selector[] = [
+      {
+        extendedWaitUntil: {
+          visible: {
+            id: '^subjects-browse-row-.*$',
+            text: 'Open Photosynthesis',
+          },
+          timeout: 15000,
+        },
+      },
+      exactPhotosynthesisRow,
+      {
+        runFlow: {
+          file: '../_setup/assert-v2-active-profile-and-return.yaml',
+          env: {
+            PROFILE_ID: '${PROFILE_ID}',
+            PROFILE_NAME: 'Test Learner',
+            RETURN_SCREEN_ID: 'subjects-screen',
+            RETURN_ROW_ID: 'subjects-browse-row-.*',
+            RETURN_ROW_NAME: 'Photosynthesis',
+          },
+        },
+      },
+    ];
+    const exactActiveProfileReturn: Selector[] = [
+      {
+        assertVisible: {
+          id: 'profile-row-${PROFILE_ID}',
+          containsDescendants: [
+            { text: '^${PROFILE_NAME}$' },
+            { id: 'profile-active-check' },
+          ],
+        },
+      },
+      { tapOn: { id: 'profiles-close' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'account-admin-sheet' },
+          timeout: 10000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'account-admin-sheet',
+          containsDescendants: [{ text: '^${PROFILE_NAME}$' }],
+        },
+      },
+      { tapOn: { id: 'account-back' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: '${RETURN_SCREEN_ID}' },
+          timeout: 15000,
+        },
+      },
+      { assertVisible: { id: '${RETURN_SCREEN_ID}' } },
+      {
+        assertVisible: {
+          id: '${RETURN_ROW_ID}',
+          containsDescendants: [{ text: '^${RETURN_ROW_NAME}$' }],
+        },
+      },
+    ];
+    const hasExactCreatedSubjectIdentityReturn = (
+      subjectCommands: unknown,
+      identityCommands: unknown,
+    ): boolean =>
+      hasExactCommandSequence(subjectCommands, exactCreatedSubjectReturn) &&
+      hasExactCommandSequence(identityCommands, exactActiveProfileReturn);
+    expect(
+      hasExactCreatedSubjectIdentityReturn(subjectCreate, profileIdentity),
+    ).toBe(true);
+    expect(
+      hasExactCommandSequence(subjectCreate, exactPhotosynthesisSession),
+    ).toBe(true);
+
+    for (const mutation of [
+      exactPhotosynthesisSession.filter((_, index) => index !== 1),
+      exactPhotosynthesisSession.with(1, {
+        assertVisible: {
+          id: 'message-bubble-assistant-0',
+          containsDescendants: [{ text: '.*Adjacent Science.*' }],
+        },
+      }),
+      exactPhotosynthesisSession.with(1, {
+        assertVisible: {
+          id: 'message-bubble-assistant-0',
+          containsDescendants: [{ text: '.*Photosynthesis.*' }],
+          optional: true,
+        },
+      }),
+      exactPhotosynthesisSession.with(1, {
+        assertVisible: {
+          id: 'message-bubble-assistant-1',
+          containsDescendants: [{ text: '.*Photosynthesis.*' }],
+        },
+      }),
+      exactPhotosynthesisSession.with(1, {
+        assertVisible: { text: '.*Photosynthesis.*' },
+      }),
+    ]) {
+      expect(
+        hasExactCommandSequence(mutation, exactPhotosynthesisSession),
+      ).toBe(false);
+    }
+
+    const replaceCreatedReturn = (
+      index: number,
+      replacement: Selector[],
+    ): Selector[] => [
+      ...exactCreatedSubjectReturn.slice(0, index),
+      ...replacement,
+      ...exactCreatedSubjectReturn.slice(index + 1),
+    ];
+    for (const mutation of [
+      // Global text can be rendered outside the created Subject row.
+      replaceCreatedReturn(1, [
+        { assertVisible: { text: '^Photosynthesis$' } },
+      ]),
+      // Split sibling assertions do not prove the name belongs to the row.
+      replaceCreatedReturn(1, [
+        { assertVisible: { id: 'subjects-browse-row-.*' } },
+        { assertVisible: { text: '^Photosynthesis$' } },
+      ]),
+      // Optional row evidence does not establish the guaranteed property.
+      replaceCreatedReturn(1, [
+        {
+          assertVisible: {
+            id: 'subjects-browse-row-.*',
+            containsDescendants: [{ text: '^Photosynthesis$' }],
+            optional: true,
+          },
+        },
+      ]),
+      // The correct owner with an adjacent name proves the wrong case.
+      replaceCreatedReturn(1, [
+        {
+          assertVisible: {
+            id: 'subjects-browse-row-.*',
+            containsDescendants: [{ text: '^Biology$' }],
+          },
+        },
+      ]),
+      // The active seeded learner must be verified after the return.
+      exactCreatedSubjectReturn.slice(0, -1),
+    ]) {
+      expect(
+        hasExactCreatedSubjectIdentityReturn(mutation, profileIdentity),
+      ).toBe(false);
+    }
+
+    const replaceActiveProfileReturn = (
+      index: number,
+      replacement: Selector[],
+    ): Selector[] => [
+      ...exactActiveProfileReturn.slice(0, index),
+      ...replacement,
+      ...exactActiveProfileReturn.slice(index + 1),
+    ];
+    for (const mutation of [
+      // Removing the active-profile property leaves the named learner unproved.
+      exactActiveProfileReturn.slice(1),
+      // Optional identity evidence does not establish the guaranteed property.
+      replaceActiveProfileReturn(0, [
+        {
+          assertVisible: {
+            id: 'profile-row-${PROFILE_ID}',
+            containsDescendants: [
+              { text: '^${PROFILE_NAME}$' },
+              { id: 'profile-active-check' },
+            ],
+            optional: true,
+          },
+        },
+      ]),
+      // An adjacent profile row cannot own the active Test Learner evidence.
+      replaceActiveProfileReturn(0, [
+        {
+          assertVisible: {
+            id: 'profile-row-adjacent',
+            containsDescendants: [
+              { text: '^${PROFILE_NAME}$' },
+              { id: 'profile-active-check' },
+            ],
+          },
+        },
+      ]),
+      // The correct profile row with an adjacent name proves the wrong case.
+      replaceActiveProfileReturn(0, [
+        {
+          assertVisible: {
+            id: 'profile-row-${PROFILE_ID}',
+            containsDescendants: [
+              { text: '^Adjacent Learner$' },
+              { id: 'profile-active-check' },
+            ],
+          },
+        },
+      ]),
+      // Identity must be established before the return navigation begins.
+      exactActiveProfileReturn
+        .with(0, exactActiveProfileReturn[1]!)
+        .with(1, exactActiveProfileReturn[0]!),
+      // Removing the returned row loses the post-return Photosynthesis proof.
+      exactActiveProfileReturn.slice(0, -1),
+      // Optional returned-row evidence does not establish the property.
+      replaceActiveProfileReturn(7, [
+        {
+          assertVisible: {
+            id: '${RETURN_ROW_ID}',
+            containsDescendants: [{ text: '^${RETURN_ROW_NAME}$' }],
+            optional: true,
+          },
+        },
+      ]),
+      // The returned name must belong to the same row owner from the caller.
+      replaceActiveProfileReturn(7, [
+        {
+          assertVisible: {
+            id: 'subjects-browse-row-adjacent',
+            containsDescendants: [{ text: '^${RETURN_ROW_NAME}$' }],
+          },
+        },
+      ]),
+      // The returned row must own the exact Photosynthesis case name.
+      replaceActiveProfileReturn(7, [
+        {
+          assertVisible: {
+            id: '${RETURN_ROW_ID}',
+            containsDescendants: [{ text: '^Adjacent Science$' }],
+          },
+        },
+      ]),
+      // The owned row proof must follow restoration of its return screen.
+      exactActiveProfileReturn
+        .with(6, exactActiveProfileReturn[7]!)
+        .with(7, exactActiveProfileReturn[6]!),
+    ]) {
+      expect(
+        hasExactCreatedSubjectIdentityReturn(subjectCreate, mutation),
+      ).toBe(false);
+    }
+
+    const expectedBindings: Array<[unknown, string, Selector[]]> = [
+      [
+        resume,
+        'subjects-browse-row-${SUBJECT_ID}',
+        [{ text: '^World History$' }],
+      ],
+      [
+        resume,
+        'subject-hub-topic-${TOPIC_ID}',
+        [{ text: '^World History Topic 1$' }],
+      ],
+      [dueReview, 'subjects-browse-row-${SUBJECT_ID}', [{ text: '^Biology$' }]],
+      [profileIdentity, 'account-admin-sheet', [{ text: '^${PROFILE_NAME}$' }]],
+      [
+        profileIdentity,
+        'profile-row-${PROFILE_ID}',
+        [{ text: '^${PROFILE_NAME}$' }, { id: 'profile-active-check' }],
+      ],
+      [profileIdentity, '${RETURN_ROW_ID}', [{ text: '^${RETURN_ROW_NAME}$' }]],
+    ];
+
+    for (const [commands, ownerId, descendants] of expectedBindings) {
+      expect(hasHardOwnedAssertion(commands, ownerId, descendants)).toBe(true);
+    }
+
+    expect(hasHardIdAssertion(profileIdentity, '${RETURN_SCREEN_ID}')).toBe(
+      true,
+    );
+    expect(
+      hasRunFlowWithEnv(
+        resume,
+        '../_setup/assert-v2-active-profile-and-return.yaml',
+        {
+          PROFILE_ID: '${PROFILE_ID}',
+          PROFILE_NAME: 'Active Learner',
+          RETURN_SCREEN_ID: 'subjects-screen',
+          RETURN_ROW_ID: 'subjects-browse-row-${SUBJECT_ID}',
+          RETURN_ROW_NAME: 'World History',
+        },
+      ),
+    ).toBe(true);
+    expect(
+      hasRunFlowWithEnv(
+        dueReview,
+        '../_setup/assert-v2-active-profile-and-return.yaml',
+        {
+          PROFILE_ID: '${PROFILE_ID}',
+          PROFILE_NAME: 'Review Learner',
+          RETURN_SCREEN_ID: 'subjects-screen',
+          RETURN_ROW_ID: 'subjects-browse-row-${SUBJECT_ID}',
+          RETURN_ROW_NAME: 'Biology',
+        },
+      ),
+    ).toBe(true);
+
+    const splitAcrossSiblings = [
+      { assertVisible: { id: 'subjects-browse-row-${SUBJECT_ID}' } },
+      { assertVisible: { text: '^World History$' } },
+    ];
+    expect(
+      hasHardOwnedAssertion(
+        splitAcrossSiblings,
+        'subjects-browse-row-${SUBJECT_ID}',
+        [{ text: '^World History$' }],
+      ),
+    ).toBe(false);
+
+    const liftedToCommonAncestor = [
+      {
+        assertVisible: {
+          id: 'subjects-screen',
+          containsDescendants: [
+            { id: 'subjects-browse-row-${SUBJECT_ID}' },
+            { text: '^World History$' },
+          ],
+        },
+      },
+    ];
+    expect(
+      hasHardOwnedAssertion(
+        liftedToCommonAncestor,
+        'subjects-browse-row-${SUBJECT_ID}',
+        [{ text: '^World History$' }],
+      ),
+    ).toBe(false);
+
+    const adjacentSeedCase = exactDueReviewNextUp.with(0, {
+      assertVisible: {
+        id: 'subject-hub-next-up-topic',
+        text: '^Biology Topic 2$',
+      },
+    });
+    expect(
+      hasExactCommandSequence(adjacentSeedCase, exactDueReviewNextUp),
+    ).toBe(false);
+
+    const topicDetailAssertion = exactDueReviewTopicDetail[1]!;
+    const topicDetailMutations: Selector[][] = [
+      // The exact seeded topic name is required on the Topic Detail owner.
+      exactDueReviewTopicDetail.with(1, {
+        assertVisible: {
+          id: 'topic-detail-scroll',
+          containsDescendants: [
+            {
+              id: 'retention-pill-elapsed',
+              text: '^Ready for a refresh after 8 days$',
+            },
+          ],
+        },
+      }),
+      // An adjacent topic cannot prove the Biology Topic 1 case.
+      exactDueReviewTopicDetail.with(1, {
+        assertVisible: {
+          id: 'topic-detail-scroll',
+          containsDescendants: [
+            { text: '^Biology Topic 2$' },
+            {
+              id: 'retention-pill-elapsed',
+              text: '^Ready for a refresh after 8 days$',
+            },
+          ],
+        },
+      }),
+      // The retention receipt must be owned by the exact learner-route pill.
+      exactDueReviewTopicDetail.with(1, {
+        assertVisible: {
+          id: 'topic-detail-scroll',
+          containsDescendants: [
+            { text: '^Biology Topic 1$' },
+            {
+              id: 'topic-retention-card',
+              text: '^Ready for a refresh after 8 days$',
+            },
+          ],
+        },
+      }),
+      // A neighboring retention age does not establish the seeded due state.
+      exactDueReviewTopicDetail.with(1, {
+        assertVisible: {
+          id: 'topic-detail-scroll',
+          containsDescendants: [
+            { text: '^Biology Topic 1$' },
+            {
+              id: 'retention-pill-elapsed',
+              text: '^Ready for a refresh after 7 days$',
+            },
+          ],
+        },
+      }),
+      // Optional retention evidence cannot establish the guaranteed property.
+      exactDueReviewTopicDetail.with(1, {
+        assertVisible: {
+          id: 'topic-detail-scroll',
+          containsDescendants: [
+            { text: '^Biology Topic 1$' },
+            {
+              id: 'retention-pill-elapsed',
+              text: '^Ready for a refresh after 8 days$',
+              optional: true,
+            },
+          ],
+        },
+      }),
+      // Every Topic Detail property is hard evidence.
+      exactDueReviewTopicDetail.with(1, {
+        assertVisible: {
+          ...(topicDetailAssertion.assertVisible as Selector),
+          optional: true,
+        },
+      }),
+    ];
+    for (const mutation of topicDetailMutations) {
+      expect(hasExactCommandSequence(mutation, exactDueReviewTopicDetail)).toBe(
+        false,
+      );
+    }
+
+    expect(
+      hasRunFlowWithEnv(
+        resume,
+        '../_setup/assert-v2-active-profile-and-return.yaml',
+        {
+          PROFILE_ID: '${PROFILE_ID}',
+          PROFILE_NAME: 'Adjacent Learner',
+          RETURN_SCREEN_ID: 'subjects-screen',
+          RETURN_ROW_ID: 'subjects-browse-row-${SUBJECT_ID}',
+          RETURN_ROW_NAME: 'World History',
+        },
+      ),
+    ).toBe(false);
+  });
+
+  describe.each([
+    {
+      name: 'learning-active World History Hub owner',
+      file: ['v2', 'v2-subjects-browse-resume.yaml'],
+      expected: [
+        { tapOn: { id: 'subjects-browse-row-${SUBJECT_ID}' } },
+        {
+          extendedWaitUntil: {
+            visible: { id: 'subject-hub-screen' },
+            timeout: 15000,
+          },
+        },
+        {
+          assertVisible: {
+            id: 'subject-hub-title-${SUBJECT_ID}',
+            text: '^World History$',
+          },
+        },
+      ],
+      mutation: [
+        { tapOn: { id: 'subjects-browse-row-${SUBJECT_ID}' } },
+        {
+          extendedWaitUntil: {
+            visible: { id: 'subject-hub-screen' },
+            timeout: 15000,
+          },
+        },
+        {
+          assertVisible: {
+            id: 'subject-hub-title-adjacent-subject',
+            text: '^World History$',
+          },
+        },
+      ],
+    },
+    {
+      name: 'retention-due Biology review owner',
+      file: ['v2', 'v2-subjects-due-review.yaml'],
+      expected: [
+        {
+          assertVisible: {
+            id: 'subject-hub-next-up-topic',
+            text: '^Biology Topic 1$',
+          },
+        },
+        {
+          assertVisible: {
+            id: 'subject-hub-next-up-action',
+          },
+        },
+        {
+          assertVisible: {
+            id: 'subject-hub-next-up-primary',
+            text: '^Review$',
+          },
+        },
+        {
+          tapOn: {
+            id: 'subject-hub-next-up-action',
+          },
+        },
+      ],
+      mutation: [
+        {
+          assertVisible: {
+            id: 'subject-hub-next-up-topic',
+            text: '^Biology Topic 2$',
+          },
+        },
+        {
+          assertVisible: {
+            id: 'subject-hub-next-up-action',
+          },
+        },
+        {
+          assertVisible: {
+            id: 'subject-hub-next-up-primary',
+            text: '^Review$',
+          },
+        },
+        {
+          tapOn: {
+            id: 'subject-hub-next-up-action',
+          },
+        },
+      ],
+    },
+    {
+      name: 'created Photosynthesis row owner',
+      file: ['v2', 'v2-subject-create-round-trip.yaml'],
+      expected: [
+        {
+          assertVisible: {
+            id: '^subjects-browse-row-.*$',
+            text: 'Open Photosynthesis',
+          },
+        },
+      ],
+      mutation: [
+        {
+          assertVisible: {
+            id: '^subjects-browse-row-.*$',
+            text: 'Open Adjacent Science',
+          },
+        },
+      ],
+    },
+  ])('[WI-2238] $name structural property', ({ file, expected, mutation }) => {
+    const commands = parseAllDocuments(
+      readFileSync(join(repoRoot, 'apps/mobile/e2e/flows', ...file), 'utf8'),
+    )[1]?.toJS() as unknown[];
+    const hasExactSequence = (candidate: unknown[]): boolean =>
+      candidate.some((_, start) =>
+        expected.every((command, offset) =>
+          isDeepStrictEqual(candidate[start + offset], command),
+        ),
+      );
+
+    it('keeps its asserted identity on the named owner and rejects its mutation', () => {
+      expect(hasExactSequence(commands)).toBe(true);
+      expect(hasExactSequence(mutation)).toBe(false);
+    });
   });
 
   it('[WI-2236] routes the V2 shell Mentor homework action through manual entry and back to Mentor', () => {
@@ -8876,6 +10509,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       'assertVisible:id:ready-start',
       'tapOn:id:ready-start',
       'extendedWaitUntil:id:session-screen',
+      'assertVisible:id:message-bubble-assistant-0:containsDescendants:text:.*Photosynthesis.*',
       'assertVisible:id:chat-shell-back',
       'tapOn:id:chat-shell-back',
       'extendedWaitUntil:id:subjects-screen',
@@ -9028,6 +10662,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       'assertVisible:text:Starting with Photosynthesis',
       'assertVisible:id:ready-start',
       'extendedWaitUntil:id:session-screen',
+      'assertVisible:id:message-bubble-assistant-0:containsDescendants:text:.*Photosynthesis.*',
       'assertVisible:id:chat-shell-back',
       'extendedWaitUntil:id:subjects-screen',
       exactSubjectRowWaitSignature,

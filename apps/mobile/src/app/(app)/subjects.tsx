@@ -20,6 +20,8 @@ import {
   pushLinkInitiatePicker,
   SUBJECTS_RETURN_TO,
 } from '../../lib/navigation';
+import { markSubjectsToHubTransition } from '../../lib/navigation-transition-provenance';
+import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { useScopeContext } from '../../lib/scope-context';
 import { buildSessionDetailHref } from '../../lib/session-detail-navigation';
 
@@ -27,7 +29,9 @@ export default function SubjectsScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const { activeScope, availableScopes, setActiveScope } = useScopeContext();
-  const subjectsIndex = useSubjectsIndex();
+  const subjectsIndex = useSubjectsIndex({
+    includeInactive: FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+  });
   const eligiblePersons = useEligibleManagedPersons();
 
   // Navigation handlers wired to search results from cross-entity library search.
@@ -122,12 +126,13 @@ export default function SubjectsScreen(): React.ReactElement {
       <SubjectsBrowse
         subjects={subjectsIndex.subjects}
         isLoading={subjectsIndex.isLoading}
-        onOpenSubject={(subjectId) =>
+        onOpenSubject={(subjectId) => {
+          markSubjectsToHubTransition(subjectId);
           router.push({
             pathname: '/(app)/subject-hub/[subjectId]',
             params: { subjectId },
-          } as Href)
-        }
+          } as Href);
+        }}
         onCreateSubject={() =>
           router.push({
             pathname: '/create-subject',

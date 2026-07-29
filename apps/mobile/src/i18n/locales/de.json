@@ -234,7 +234,8 @@
       "passwordPlaceholder": "Passwort eingeben",
       "forgotPassword": "Passwort vergessen?",
       "signInButton": "Anmelden",
-      "sendVerificationCode": "Bestätigungscode senden"
+      "sendVerificationCode": "Bestätigungscode senden",
+      "verificationStartFailed": "Wir konnten die Verifizierung nicht starten. Bitte versuche erneut, dich anzumelden."
     },
     "signUp": {
       "title": "Konto erstellen",
@@ -291,6 +292,27 @@
       "backToSignIn": "Zurück zur Anmeldung",
       "emailPlaceholder": "du@beispiel.com",
       "sendResetCode": "Reset-Code senden"
+    },
+    "errors": {
+      "generic": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+      "form_identifier_not_found": "Wir konnten kein Konto mit dieser E-Mail-Adresse finden.",
+      "form_password_incorrect": "Das Passwort ist nicht richtig. Bitte versuche es erneut.",
+      "form_password_or_identifier_incorrect": "E-Mail-Adresse oder Passwort ist falsch. Bitte versuche es erneut.",
+      "form_password_pwned": "Dieses Passwort ist bei einem Datenleck aufgetaucht. Bitte wähle ein anderes Passwort.",
+      "form_password_compromised": "Dieses Passwort ist nicht sicher. Bitte wähle ein anderes Passwort.",
+      "form_password_not_strong_enough": "Dieses Passwort ist nicht stark genug. Bitte sorge für mehr Abwechslung.",
+      "form_password_length_too_short": "Das Passwort ist zu kurz. Bitte verwende mindestens 8 Zeichen.",
+      "form_password_length_too_long": "Das Passwort ist zu lang. Bitte verwende ein kürzeres.",
+      "form_password_no_uppercase": "Das Passwort muss mindestens einen Großbuchstaben enthalten.",
+      "form_password_no_lowercase": "Das Passwort muss mindestens einen Kleinbuchstaben enthalten.",
+      "form_password_no_number": "Das Passwort muss mindestens eine Ziffer enthalten.",
+      "form_password_no_special_char": "Das Passwort muss mindestens ein Sonderzeichen enthalten.",
+      "form_password_validation_failed": "Dieses Passwort erfüllt die Anforderungen nicht.",
+      "form_code_incorrect": "Dieser Code ist nicht korrekt. Bitte versuche es erneut.",
+      "form_identifier_exists": "Ein Konto mit dieser E-Mail-Adresse existiert bereits.",
+      "form_param_format_invalid": "Das scheint keine gültige E-Mail-Adresse zu sein.",
+      "captcha_invalid": "Wir konnten dich nicht verifizieren. Bitte versuche es erneut.",
+      "signup_rate_limit_exceeded": "Zu viele Registrierungsversuche. Bitte versuche es später erneut."
     }
   },
   "guards": {
@@ -4546,7 +4568,6 @@
       "activeMessage": "Du kannst diese Vereinbarung hier jederzeit überprüfen.",
       "revoke": "Freigabe beenden",
       "revoking": "Freigabe wird beendet ...",
-      "revoked": "Die Freigabe wird beendet. Der Unterstützer erhält eine Benachrichtigung.",
       "revokeErrorTitle": "Freigabe konnte nicht beendet werden",
       "missingActor": "Wir konnten die aktive Person nicht identifizieren.",
       "relationLabel": "Beziehung",

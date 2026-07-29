@@ -49,6 +49,8 @@ export const LLM_CALL_SITE_FILES: readonly string[] = [
   'apps/api/src/services/language-detect.ts',
   'apps/api/src/services/learner-input.ts',
   'apps/api/src/services/learner-profile.ts',
+  'apps/api/src/services/learning-text-safety/judge.ts',
+  'apps/api/src/services/mentor-notices/recheck-judge.ts',
   'apps/api/src/services/ocr.ts',
   'apps/api/src/services/parking-lot.ts',
   'apps/api/src/services/progress-summary.ts',

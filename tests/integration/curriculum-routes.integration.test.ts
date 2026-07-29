@@ -21,6 +21,7 @@ import {
   seedSubject,
 } from './route-fixtures';
 import { registerProvider } from '../../apps/api/src/services/llm';
+import { createMockProvider } from '../../apps/api/src/services/llm/test-utils';
 import { app } from '../../apps/api/src/index';
 
 // Controllable mock provider — overrides the default mock registered in setup.ts.
@@ -40,10 +41,19 @@ const CURRICULUM_USER = {
 // Register controllable mock provider once — overrides setup.ts's default mock.
 beforeAll(() => {
   registerProvider({
-    id: 'gemini',
-    chat: mockChat,
-    async *chatStream() {
-      yield* []; // no-op: streaming not used in these tests
+    ...createMockProvider('gemini'),
+    async chat(messages, config) {
+      const textMessages = messages.map((message) => ({
+        role: message.role,
+        content:
+          typeof message.content === 'string'
+            ? message.content
+            : JSON.stringify(message.content),
+      }));
+      return {
+        content: await mockChat(textMessages, config),
+        stopReason: 'stop',
+      };
     },
   });
 });

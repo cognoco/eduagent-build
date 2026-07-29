@@ -31,6 +31,8 @@ import {
   JOURNAL_HREF,
   JOURNAL_RETURN_TO,
   PRACTICE_RETURN_TO,
+  resolvedV2TabForReturnTo,
+  V2_TAB_TITLE_KEYS,
 } from '../../../lib/navigation';
 import { useReviewSummary } from '../../../hooks/use-progress';
 import { useEntryGate } from '../../../hooks/use-entry-gate';
@@ -420,6 +422,26 @@ export default function PracticeScreen(): React.ReactElement {
     );
   };
 
+  // WI-2331 rework, F1b: handleBack always exits this screen (Journal
+  // directly, or the owning V2 tab named by returnTo/the Mentor default via
+  // homeHrefForReturnTo), so the header Back control names that destination
+  // instead of the generic `common.goBack` it showed before. When returnTo
+  // names a non-tab destination (practice/family-recaps/own-learning/…) —
+  // reachable here via a forwarded `practiceReturnTo` — resolvedV2TabForReturnTo
+  // returns null and the label falls back to the generic action rather than
+  // mislabeling as a tab it isn't going to.
+  const practiceBackTab = resolvedV2TabForReturnTo(
+    returnTo,
+    undefined,
+    FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+  );
+  const backLabel =
+    FEATURE_FLAGS.MODE_NAV_V2_ENABLED && practiceBackTab
+      ? t('common.backTo', {
+          destination: t(V2_TAB_TITLE_KEYS[practiceBackTab]),
+        })
+      : t('common.goBack');
+
   const openQuiz = () =>
     router.push({
       pathname: '/(app)/quiz',
@@ -480,7 +502,7 @@ export default function PracticeScreen(): React.ReactElement {
               pointerStyle(),
             ]}
             accessibilityRole="button"
-            accessibilityLabel={t('common.goBack')}
+            accessibilityLabel={backLabel}
             testID="practice-back"
           >
             <Ionicons name="arrow-back" size={24} color={colors.ink} />

@@ -4,6 +4,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 // Translations table — mirrors what will be in en.json onboarding namespace once coordinator merges.
 // Keeps tests asserting on real English strings rather than i18n keys.
@@ -408,6 +409,39 @@ describe('LanguageSetup', () => {
       expect.anything(),
       '/(app)/subjects',
     );
+  });
+
+  // [WI-2331 rework] the header Back label must never claim a tab handleBack
+  // isn't actually routing to: a non-tab returnTo (e.g. the practice hub)
+  // resolves to its real, non-tab destination, so the label falls back to
+  // the generic "Go Back" instead of mislabeling as "Back to Mentor".
+  describe('Back label under V2 with a non-tab returnTo', () => {
+    let originalV2: boolean;
+
+    beforeEach(() => {
+      originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        true;
+    });
+
+    afterEach(() => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        originalV2;
+    });
+
+    it('uses the generic label and still routes to the real destination', () => {
+      mockReturnTo = 'practice';
+      render(<LanguageSetup />);
+
+      const backButton = screen.getByTestId('language-setup-back');
+      expect(backButton.props.accessibilityLabel).toBe('Go Back');
+
+      fireEvent.press(backButton);
+      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+        expect.anything(),
+        '/(app)/practice',
+      );
+    });
   });
 
   it('[BUG-692-FOLLOWUP] router.replace does not fire when user presses Back during configureLanguageSubject', async () => {

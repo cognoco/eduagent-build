@@ -12,7 +12,11 @@ import { buildNowFeed, buildNowOverflow } from '../services/now-feed';
 import { resolveMentorNoticeVisibility } from '../services/mentor-notices';
 
 type NowRouteEnv = {
-  Bindings: RouteEnv['Bindings'] & { MENTOR_NOTICE_ENABLED?: string };
+  Bindings: RouteEnv['Bindings'] & {
+    MENTOR_NOTICE_ENABLED?: string;
+    // [WI-2627] Orders rollout observations across deployments.
+    MENTOR_NOTICE_POLICY_REVISION?: string;
+  };
   Variables: RouteEnv['Variables'] & {
     // [WI-2498] Server-resolved caller identity (set app-wide by
     // accountMiddleware from the login→person binding). The selfhood conjunct
@@ -41,6 +45,7 @@ export const nowRoutes = new Hono<NowRouteEnv>()
       profileId,
       c.env?.MENTOR_NOTICE_ENABLED,
       { proxyModeHeader: c.req.header('X-Proxy-Mode') },
+      c.env?.MENTOR_NOTICE_POLICY_REVISION,
     );
     const feed = await buildNowFeed(db, profileId, query, {
       mentorNoticeEnabled: policy.visible,
@@ -49,6 +54,11 @@ export const nowRoutes = new Hono<NowRouteEnv>()
       nowResponseSchema.parse({
         ...feed,
         mentorNoticePolicyEpoch: policy.policyEpoch,
+        // [WI-2627] The ORDERABLE form of the same answer. The epoch above
+        // stays for already-shipped clients that key on it (and now carries the
+        // revision, so a bump alone re-keys them); the observation adds the
+        // revision a client needs to reject an out-of-order re-enable.
+        mentorNoticePolicy: policy.observation,
       }),
     );
   })
@@ -65,6 +75,7 @@ export const nowRoutes = new Hono<NowRouteEnv>()
       profileId,
       c.env?.MENTOR_NOTICE_ENABLED,
       { proxyModeHeader: c.req.header('X-Proxy-Mode') },
+      c.env?.MENTOR_NOTICE_POLICY_REVISION,
     );
     const overflow = await buildNowOverflow(db, profileId, query, {
       mentorNoticeEnabled: policy.visible,
@@ -73,6 +84,7 @@ export const nowRoutes = new Hono<NowRouteEnv>()
       nowOverflowResponseSchema.parse({
         ...overflow,
         mentorNoticePolicyEpoch: policy.policyEpoch,
+        mentorNoticePolicy: policy.observation,
       }),
     );
   });

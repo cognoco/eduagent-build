@@ -1,5 +1,6 @@
 import type { Href, Router } from 'expo-router';
 import type { LearningResumeTarget } from '@eduagent/schemas';
+import { markHubToSessionTransition } from './navigation-transition-provenance';
 
 export const FAMILY_HOME_PATH = '/(app)/home';
 // [WI-1658]
@@ -12,10 +13,15 @@ export const PRACTICE_RETURN_TO = 'practice';
 export const PRACTICE_HREF = '/(app)/practice';
 export const JOURNAL_RETURN_TO = 'journal';
 export const JOURNAL_HREF = '/(app)/journal';
+export const JOURNAL_REPORTS_HREF = {
+  pathname: JOURNAL_HREF,
+  params: { section: 'reports' },
+} as const;
 export const MENTOR_RETURN_TO = 'mentor';
 export const MENTOR_HREF = '/(app)/mentor';
 export const SUBJECTS_RETURN_TO = 'subjects';
 export const SUBJECTS_HREF = '/(app)/subjects';
+export const SUBJECT_HUB_RETURN_TO = 'subject-hub';
 export const SETTINGS_RETURN_TO = 'settings';
 export const FAMILY_RECAPS_RETURN_TO = 'family-recaps';
 export const FAMILY_RECAPS_HREF = '/(app)/recaps';
@@ -25,6 +31,42 @@ export const STUDY_PROGRESS_RETURN_TO = 'study-progress';
 export const STUDY_PROGRESS_HREF = '/(app)/progress';
 export const FAMILY_CHILDREN_RETURN_TO = 'family-children';
 export const FAMILY_CHILDREN_HREF = '/(app)/home';
+
+type StaticHomeReturnToken =
+  | typeof OWN_LEARNING_RETURN_TO
+  | typeof LEARNER_HOME_RETURN_TO
+  | typeof PRACTICE_RETURN_TO
+  | typeof JOURNAL_RETURN_TO
+  | typeof MENTOR_RETURN_TO
+  | typeof SUBJECTS_RETURN_TO
+  | typeof FAMILY_RECAPS_RETURN_TO
+  | typeof FAMILY_HOME_RETURN_TO
+  | typeof FAMILY_CHILDREN_RETURN_TO
+  | typeof FAMILY_PROGRESS_RETURN_TO
+  | typeof STUDY_PROGRESS_RETURN_TO;
+
+const STATIC_HOME_RETURN_HREFS = {
+  [OWN_LEARNING_RETURN_TO]: OWN_LEARNING_HREF,
+  [LEARNER_HOME_RETURN_TO]: LEARNER_HOME_HREF,
+  [PRACTICE_RETURN_TO]: PRACTICE_HREF,
+  [JOURNAL_RETURN_TO]: JOURNAL_HREF,
+  [MENTOR_RETURN_TO]: MENTOR_HREF,
+  [SUBJECTS_RETURN_TO]: SUBJECTS_HREF,
+  [FAMILY_RECAPS_RETURN_TO]: FAMILY_RECAPS_HREF,
+  [FAMILY_HOME_RETURN_TO]: FAMILY_HOME_PATH,
+  [FAMILY_CHILDREN_RETURN_TO]: FAMILY_CHILDREN_HREF,
+  [FAMILY_PROGRESS_RETURN_TO]: FAMILY_PROGRESS_HREF,
+  [STUDY_PROGRESS_RETURN_TO]: STUDY_PROGRESS_HREF,
+} as const satisfies Record<StaticHomeReturnToken, Href>;
+
+function isStaticHomeReturnToken(
+  token: string | undefined,
+): token is StaticHomeReturnToken {
+  return (
+    token !== undefined &&
+    Object.prototype.hasOwnProperty.call(STATIC_HOME_RETURN_HREFS, token)
+  );
+}
 
 export type V2AccountReturnToken = 'mentor' | 'subjects' | 'journal';
 
@@ -145,27 +187,60 @@ export function homeHrefForReturnTo(
 ): Href {
   const token = firstParam(returnTo);
   const id = firstParam(returnId);
-  if (token === OWN_LEARNING_RETURN_TO) return OWN_LEARNING_HREF as Href;
-  if (token === LEARNER_HOME_RETURN_TO) return LEARNER_HOME_HREF as Href;
-  if (token === PRACTICE_RETURN_TO) return PRACTICE_HREF as Href;
-  if (token === JOURNAL_RETURN_TO) return JOURNAL_HREF as Href;
-  if (token === MENTOR_RETURN_TO) return MENTOR_HREF as Href;
-  if (token === SUBJECTS_RETURN_TO) return SUBJECTS_HREF as Href;
-  if (token === FAMILY_RECAPS_RETURN_TO && id) {
-    return {
-      pathname: '/(app)/recaps/[recapId]',
-      params: { recapId: id },
-    } as Href;
+  switch (token) {
+    case SUBJECT_HUB_RETURN_TO:
+      if (id) {
+        return {
+          pathname: '/(app)/subject-hub/[subjectId]',
+          params: { subjectId: id },
+        } as Href;
+      }
+      break;
+    case FAMILY_RECAPS_RETURN_TO:
+      if (id) {
+        return {
+          pathname: '/(app)/recaps/[recapId]',
+          params: { recapId: id },
+        } as Href;
+      }
+      break;
+    case FAMILY_CHILDREN_RETURN_TO:
+      if (id) return childProfileHref(id);
+      break;
   }
-  if (token === FAMILY_RECAPS_RETURN_TO) return FAMILY_RECAPS_HREF as Href;
-  if (token === FAMILY_HOME_RETURN_TO) return FAMILY_HOME_PATH as Href;
-  if (token === FAMILY_CHILDREN_RETURN_TO && id) return childProfileHref(id);
-  if (token === FAMILY_PROGRESS_RETURN_TO) return FAMILY_PROGRESS_HREF as Href;
-  if (token === STUDY_PROGRESS_RETURN_TO) return STUDY_PROGRESS_HREF as Href;
-  if (token === FAMILY_CHILDREN_RETURN_TO) return FAMILY_CHILDREN_HREF as Href;
+  if (isStaticHomeReturnToken(token)) {
+    return STATIC_HOME_RETURN_HREFS[token];
+  }
+
+  // Unknown or incomplete tokens never become paths. V2 returns to Mentor;
+  // V0/V1 retains the canonical family Home fallback.
   return v2Enabled
     ? (V2_ACCOUNT_RETURN_HREFS.mentor as Href)
-    : ('/(app)/home' as Href);
+    : (FAMILY_HOME_PATH as Href);
+}
+
+/**
+ * WI-2331 rework: `accountReturnToken` collapses every non-tab `returnTo`
+ * token (practice, family-recaps, own-learning, home, …) to `'mentor'`, but
+ * `homeHrefForReturnTo` routes those same tokens to their real, non-tab
+ * destinations. A "Back to {tab}" label built from `accountReturnToken`
+ * therefore lies whenever the actual Back destination isn't a tab root. This
+ * helper resolves the Back destination the same way `homeHrefForReturnTo`
+ * does and returns the owning tab ONLY when that destination genuinely is
+ * one of the three V2 tab roots — null otherwise, so callers fall back to a
+ * generic label instead of mislabeling.
+ */
+export function resolvedV2TabForReturnTo(
+  returnTo: string | string[] | undefined,
+  returnId: string | string[] | undefined,
+  v2Enabled: boolean,
+): V2AccountReturnToken | null {
+  if (!v2Enabled) return null;
+  const href = homeHrefForReturnTo(returnTo, returnId, v2Enabled);
+  if (href === MENTOR_HREF) return 'mentor';
+  if (href === SUBJECTS_HREF) return 'subjects';
+  if (href === JOURNAL_HREF) return 'journal';
+  return null;
 }
 
 /**
@@ -211,25 +286,29 @@ export function goBackOrReplace(
  * Return a Journal-origin report to Journal without leaving Reports behind.
  *
  * Web replaces the report with Journal because Expo Router's stack can point
- * at the hidden Progress ancestor instead of the visible Journal caller.
- * Native dismisses the complete cross-tab Progress ancestry to Journal.
+ * at the hidden Progress ancestor instead of the visible Journal caller. Native
+ * first replaces the report leaf with Progress root so the report cannot
+ * resurrect when Progress is revisited, then uses the tab-supported NAVIGATE
+ * action to restore Journal Reports. POP_TO is unhandled across sibling tabs.
  */
 export function returnJournalReportToCaller(
-  router: Pick<Router, 'dismissTo' | 'replace'>,
+  router: Pick<Router, 'navigate' | 'replace'>,
   platform: 'web' | 'native',
 ): void {
   if (platform === 'web') {
-    router.replace(JOURNAL_HREF);
+    router.replace(JOURNAL_REPORTS_HREF);
     return;
   }
 
-  router.dismissTo(JOURNAL_HREF);
+  router.replace(STUDY_PROGRESS_HREF);
+  router.navigate(JOURNAL_REPORTS_HREF);
 }
 
 export function pushLearningResumeTarget(
   router: Pick<Router, 'push'>,
   target: LearningResumeTarget,
   returnTo?: string,
+  returnId?: string,
 ): void {
   // [BUG-977 / CCR-PR126-M-2] Replace the previous `as never` cast (which
   // silenced the typed Href system entirely) with `as Href`. The Expo Router
@@ -244,9 +323,8 @@ export function pushLearningResumeTarget(
   // ancestor chain. A single push to /(app)/session synthesises a 1-deep stack,
   // so back() from session falls through to the active tab's first-route
   // (Home) instead of the caller's previous screen.
-  // Fix: push the home screen first to seed the back-stack, then push session
-  // on top. The session screen uses homeHrefForReturnTo(returnTo) for its own
-  // back-navigation, so this also gives the correct target when returnTo is set.
+  // Preserve the legacy contract for V0/V1 callers: Home is always seeded as
+  // the ancestor, while returnTo controls only Session's deterministic Back.
   router.push('/(app)/home' as Href);
   router.push({
     pathname: '/(app)/session',
@@ -261,6 +339,34 @@ export function pushLearningResumeTarget(
         ? { resumeFromSessionId: target.resumeFromSessionId }
         : {}),
       ...(returnTo ? { returnTo } : {}),
+      ...(returnId ? { returnId } : {}),
+    },
+  } as Href);
+}
+
+export function replaceV2LearningResumeTarget(
+  router: Pick<Router, 'replace'>,
+  target: LearningResumeTarget,
+  returnTo: typeof SUBJECTS_RETURN_TO,
+  options: { preserveSubjectsHistory: boolean },
+): void {
+  if (options.preserveSubjectsHistory) {
+    markHubToSessionTransition(target.subjectId);
+  }
+
+  router.replace({
+    pathname: '/(app)/session',
+    params: {
+      mode: 'learning',
+      subjectId: target.subjectId,
+      subjectName: target.subjectName,
+      ...(target.topicId ? { topicId: target.topicId } : {}),
+      ...(target.topicTitle ? { topicName: target.topicTitle } : {}),
+      ...(target.sessionId ? { sessionId: target.sessionId } : {}),
+      ...(target.resumeFromSessionId
+        ? { resumeFromSessionId: target.resumeFromSessionId }
+        : {}),
+      returnTo,
     },
   } as Href);
 }

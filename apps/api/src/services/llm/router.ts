@@ -678,7 +678,7 @@ const FALLBACK_FORBIDDEN: ReadonlySet<string> = new Set(['gemini', 'vertex']);
  * (§10.1 — under-18 ban, and the judge role never wants Gemini regardless of
  * age). Order matters: Anthropic first, OpenAI second (spec + WI-2624).
  */
-const JUDGE_VENDOR_ORDER: ReadonlyArray<'anthropic' | 'openai'> = [
+export const JUDGE_VENDOR_ORDER: ReadonlyArray<'anthropic' | 'openai'> = [
   'anthropic',
   'openai',
 ];
@@ -708,7 +708,7 @@ function normalizeVendorForExclusion(vendor: string): string {
  * returns an empty array from a single exclusion — the pool has 2 members
  * and a producer can match at most 1.
  */
-function resolveJudgeEligibleVendors(
+export function resolveJudgeEligibleVendors(
   independence: JudgeIndependence | undefined,
 ): ReadonlyArray<'anthropic' | 'openai'> {
   if (independence?.mode !== 'model-output') return JUDGE_VENDOR_ORDER;
@@ -2260,11 +2260,15 @@ async function* wrapStreamWithCircuitBreaker(
 /**
  * Streaming variant of routeAndCall.
  *
- * NOTE: The `provider` and `model` fields in the returned StreamResult
- * reflect the initially selected provider. If wrapStreamWithCircuitBreaker
- * transparently falls back (pre-first-byte failure), these fields still
- * report the original provider. Callers using these fields for cost
- * attribution or observability should be aware of this limitation.
+ * [WI-2670] The `provider` and `model` fields on the returned StreamResult
+ * are lazy getters (mirroring `fallbackUsed` on the same object): they
+ * report the EFFECTIVE provider — the fallback's, if
+ * `wrapStreamWithCircuitBreaker` transparently fell back before the first
+ * byte — not the originally-selected one. Read them only after the stream
+ * has drained (or after `fallbackUsed`/`stopReasonPromise` has settled);
+ * reading them earlier (e.g. destructuring `{ provider }` or spreading the
+ * result immediately after this function resolves) captures the
+ * pre-fallback value, because the fallback only happens during iteration.
  */
 export async function routeAndStream(
   messages: ChatMessage[],
@@ -2402,8 +2406,20 @@ export async function routeAndStream(
       });
     return {
       stream,
-      provider: config.provider,
-      model: config.model,
+      // [WI-2670] Lazy getters — same closure as `fallbackUsed` below.
+      // Read the fallback's config once a pre-first-byte transparent
+      // fallback has fired; otherwise the primary's. See the JSDoc above
+      // this function for why these must not be read before stream drain.
+      get provider() {
+        return fallbackFired && fallbackConfig
+          ? fallbackConfig.provider
+          : config.provider;
+      },
+      get model() {
+        return fallbackFired && fallbackConfig
+          ? fallbackConfig.model
+          : config.model;
+      },
       stopReasonPromise,
       get fallbackUsed() {
         return fallbackFired;
@@ -2485,6 +2501,8 @@ async function attemptStreamProvider(
   const providerResult = normalizeStreamResult(
     provider.chatStream(messages, config),
   );
+  // This helper is reached only from the direct-fallback branch above, so the
+  // stream and returned result are intentionally marked as fallback usage.
   const stream = wrapStreamWithCircuitBreaker(
     providerResult.stream,
     config.provider,
@@ -2528,5 +2546,6 @@ async function attemptStreamProvider(
     provider: config.provider,
     model: config.model,
     stopReasonPromise,
+    fallbackUsed: true,
   };
 }

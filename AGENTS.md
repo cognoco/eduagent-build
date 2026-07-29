@@ -2,13 +2,13 @@
 
 ## Snapshot
 
-- Mobile: ~88 screens, 494 test suites, ~5644 tests
-- API: 53 route groups, 329 test suites, ~8380 tests, 78 Inngest functions
-- Cross-package integration tests: 70 suites in `tests/integration/`, ~290 cases
+- Mobile: ~88 screens, 515 test suites, ~6,055 tests
+- API: 53 route groups, 329 test suites, ~8,818 tests, 78 Inngest functions
+- Cross-package integration tests: 71 suites in `tests/integration/`, ~290 cases
 - Monorepo: `apps/api`, `apps/mobile`, shared packages in `packages/`
 - Core docs: `docs/project_context.md`, `docs/architecture.md`, relevant spec/plan under `docs/plans/` or `docs/specs/`
 
-> Counts verified 2026-07-21. Test-case totals are a heuristic grep of `it(` / `test(` line starts; jest-reported totals may be slightly higher due to `it.each(...)` expansion at runtime. Re-verify with `git ls-files | grep '\.test\.'` for suite counts.
+> Counts verified 2026-07-29. Test-case totals are a heuristic grep of `it(` / `test(` line starts; jest-reported totals may be slightly higher due to `it.each(...)` expansion at runtime. Re-verify with `git ls-files | grep '\.test\.'` for suite counts.
 
 ## How to Work
 
@@ -162,6 +162,22 @@ concern and may override the commands named here. Standard:
 Always use the repo commit skill for every commit and push — `/commit` in Claude Code, or load `.agents/skills/commit/SKILL.md` in Codex. It is the single source of truth for staging, message format, hook handling, and push behavior (a thin overlay over the global `/zdx-core:commit`). The global primitive ships in the `zdx-core` plugin from the `cognoco/zdx-marketplace` plugin registry — if `/zdx-core:commit` is unavailable, install/enable that plugin; never fall back to ad-hoc git. Never hand-roll a commit flow, use the runtime's built-in commit protocol, or stage broadly without first checking scope. The skill lets hooks run and never bypasses them autonomously; the `--no-verify` doctrine lives in Required Validation below.
 
 Agents perform code changes in isolated worktrees they own (see Worktree Placement below) and commit from there. In the residual shared-tree case, commit only your own session's work — own-work scope, which the commit skill enforces — and never stage files another session modified.
+
+**Docs-only exception (operator-ruled 2026-07-29):** a change touching ONLY documentation artifacts (`docs/**` markdown/HTML/PDF evidence, repo meta-docs — no code, config, CI, schema, or test files) still lands via **branch + PR**, but does NOT need an isolated worktree (no `setup-worktree.sh`, no `pnpm install`/`env:sync`). Build the commit against `origin/main` with git plumbing from the shared checkout and push it to a branch — never commit on `main` directly, never switch the shared checkout's branch:
+
+```bash
+base=$(git rev-parse origin/main)
+export GIT_INDEX_FILE=$(mktemp -u)
+git read-tree "$base"
+blob=$(git hash-object -w <local-file>)                      # repeat per file
+git update-index --add --cacheinfo 100644 "$blob" <repo-path> # (or --force-remove to delete)
+tree=$(git write-tree); unset GIT_INDEX_FILE
+commit=$(git commit-tree "$tree" -p "$base" -m "docs(scope): summary")
+git push origin "$commit":refs/heads/<branch>
+gh pr create --head <branch> ...
+```
+
+Local hooks don't run on a plumbing commit; the PR's CI is the gate (docs change-class routes light checks). Any change that mixes in non-doc files still goes worktree→PR.
 
 ## Pull Requests
 
@@ -450,6 +466,28 @@ Before declaring a PR ready to merge:
 3. Always read the Claude Code Review comment and triage its findings — the check colour does not surface them. The verdict (APPROVED / CHANGES_REQUESTED / BLOCKED + MUST_FIX/SHOULD_FIX/CONSIDER tables) is a TOP-LEVEL PR comment, returned ONLY by `gh api repos/{owner}/{repo}/issues/<number>/comments` (newest = latest head) — NOT `pulls/<number>/comments`, which is diff-anchored inline comments (Codex/CodeRabbit). Also read `gh api repos/{owner}/{repo}/pulls/<number>/reviews`. Fix MUST_FIX / SHOULD_FIX before merge.
 4. Never dismiss advisory findings just because the check is green — advisory means triage it yourself, not ignore it.
 
+### Claude reviewer-unavailable recovery
+
+The `Claude Code Review` workflow runs for every pull request, including documentation-only changes. It makes three reviewer attempts capped at 20 minutes each and initializes `claude-review-verdict.json` before the first attempt. If quota exhaustion, timeout, or another reviewer failure prevents a fresh trusted verdict, the workflow uploads that artifact with `status = REVIEWER_UNAVAILABLE` and `merge_eligible = false`, then fails. This is a machine-readable non-merge result, not an approval or an exception.
+
+After reviewer capacity returns, download the artifact if diagnosis is needed, then execute its `recovery_command` (the command reruns the failed workflow job against the same PR head):
+
+```bash
+gh run download <run-id> --name claude-review-verdict --dir /tmp/claude-review-<run-id>
+jq . /tmp/claude-review-<run-id>/claude-review-verdict.json
+gh run rerun <run-id> --failed --repo cognoco/eduagent-build
+```
+
+PRs that modify `.github/workflows/claude-code-review.yml` are a special self-reference case: `anthropics/claude-code-action` rejects the automatic run while the PR's workflow differs from the default branch. Once reviewer quota is available, a trusted repository member must invoke the unchanged interactive workflow with an exact-head request:
+
+```bash
+pr=<pr-number>
+head="$(gh pr view "$pr" --json headRefOid --jq .headRefOid)"
+gh pr comment "$pr" --body "@claude Perform the final exact-head review for ${head}. Review the full diff against the trusted repository instructions. Post the canonical Claude Code Review verdict, including the exact metadata line '- Reviewed head SHA: ${head}'; do not modify the branch."
+```
+
+Neither recovery route weakens the armed gate. Do not merge until a fresh `claude[bot]` exact clean verdict exists for the current head.
+
 A required check stuck on "Waiting for status to be reported" (never red, never green) is usually **workflow-trigger drift, not failing code** — the check is required in branch protection but its workflow only runs on `push`/`workflow_dispatch`, not `pull_request`. Fix the trigger (a small PR-only job that reports the required check name; guard deploy/build jobs with `github.event_name == 'push' || github.event_name == 'workflow_dispatch'` so PRs can't deploy), not the code. For a Playwright web-smoke failure, read `error-context.md` + the `0-trace.network` log before touching selectors: `net::ERR_FAILED`/CORS in the trace means fix the staging/API target, not the assertion.
 
 When rebasing PRs:
@@ -512,4 +550,4 @@ bash scripts/check-change-class.sh --branch     # check full branch diff vs main
 # See docs/change-classes.md for the full reference table.
 ```
 
-Last updated: 2026-06-12
+Last updated: 2026-07-29

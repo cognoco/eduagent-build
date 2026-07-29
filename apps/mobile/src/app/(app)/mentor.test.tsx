@@ -610,6 +610,7 @@ describe('MentorScreen', () => {
 
       renderMentorScreen();
 
+      screen.getByTestId('mentor-screen');
       screen.getByTestId('mentor-input-bar');
       expect(screen.queryByTestId('mentor-cold-start-card')).toBeNull();
     },

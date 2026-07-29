@@ -234,7 +234,8 @@
       "passwordPlaceholder": "パスワードを入力",
       "forgotPassword": "パスワードをお忘れですか？",
       "signInButton": "サインイン",
-      "sendVerificationCode": "認証コードを送信"
+      "sendVerificationCode": "認証コードを送信",
+      "verificationStartFailed": "認証を開始できませんでした。もう一度サインインしてください。"
     },
     "signUp": {
       "title": "アカウント作成",
@@ -291,6 +292,27 @@
       "backToSignIn": "サインインに戻る",
       "emailPlaceholder": "mail@example.com",
       "sendResetCode": "リセットコードを送信"
+    },
+    "errors": {
+      "generic": "処理が完了しませんでした。もう一度お試しください。",
+      "form_identifier_not_found": "そのメールアドレスのアカウントが見つかりませんでした。",
+      "form_password_incorrect": "パスワードが正しくないようです。もう一度お試しください。",
+      "form_password_or_identifier_incorrect": "メールアドレスまたはパスワードが正しくないようです。もう一度お試しください。",
+      "form_password_pwned": "このパスワードはデータ漏洩で流出しています。別のパスワードを選択してください。",
+      "form_password_compromised": "このパスワードは安全ではありません。別のパスワードを選択してください。",
+      "form_password_not_strong_enough": "このパスワードは十分に強力ではありません。より複雑なものにしてください。",
+      "form_password_length_too_short": "パスワードが短すぎます。8文字以上で入力してください。",
+      "form_password_length_too_long": "パスワードが長すぎます。もっと短いものを入力してください。",
+      "form_password_no_uppercase": "パスワードには大文字が1文字以上必要です。",
+      "form_password_no_lowercase": "パスワードには小文字が1文字以上必要です。",
+      "form_password_no_number": "パスワードには数字が1文字以上必要です。",
+      "form_password_no_special_char": "パスワードには特殊文字が1文字以上必要です。",
+      "form_password_validation_failed": "そのパスワードは要件を満たしていません。",
+      "form_code_incorrect": "コードが一致しません。もう一度お試しください。",
+      "form_identifier_exists": "そのメールアドレスのアカウントはすでに存在します。",
+      "form_param_format_invalid": "有効なメールアドレスの形式ではないようです。",
+      "captcha_invalid": "人間であることを確認できませんでした。もう一度お試しください。",
+      "signup_rate_limit_exceeded": "サインアップの試行回数が多すぎます。後でもう一度お試しください。"
     }
   },
   "guards": {
@@ -4546,7 +4568,6 @@
       "activeMessage": "この同意書はいつでもここで確認できます。",
       "revoke": "共有を終了",
       "revoking": "共有を終了中...",
-      "revoked": "共有を終了します。サポーターに通知が表示されます。",
       "revokeErrorTitle": "共有を終了できませんでした",
       "missingActor": "アクティブなユーザーを特定できませんでした。",
       "relationLabel": "関係",

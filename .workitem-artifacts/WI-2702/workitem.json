@@ -1,0 +1,18 @@
+{
+  "pageId": "3a68bce9-1f7c-81dd-86ca-e0508d9f3a2b",
+  "id": "WI-2702",
+  "name": "Assert zero persistence on rejected speaking-practice writes",
+  "description": "Harden speaking-practice route integration coverage so both forbidden write paths prove that rejection leaves no persistence residue.",
+  "acceptanceCriteria": "- The cross-account FORBIDDEN route case asserts that no speaking-practice attempt or related write residue is persisted.\n- The missing-profile PROXY_MODE route case asserts that no speaking-practice attempt or related write residue is persisted.\n- The assertions exercise the exported production app against an isolated real database.",
+  "riskImpact": "",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "builder:claude:wi-2702",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "",
+  "bodyText": ""
+}
