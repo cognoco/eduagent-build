@@ -163,6 +163,22 @@ Always use the repo commit skill for every commit and push — `/commit` in Clau
 
 Agents perform code changes in isolated worktrees they own (see Worktree Placement below) and commit from there. In the residual shared-tree case, commit only your own session's work — own-work scope, which the commit skill enforces — and never stage files another session modified.
 
+**Docs-only exception (operator-ruled 2026-07-29):** a change touching ONLY documentation artifacts (`docs/**` markdown/HTML/PDF evidence, repo meta-docs — no code, config, CI, schema, or test files) still lands via **branch + PR**, but does NOT need an isolated worktree (no `setup-worktree.sh`, no `pnpm install`/`env:sync`). Build the commit against `origin/main` with git plumbing from the shared checkout and push it to a branch — never commit on `main` directly, never switch the shared checkout's branch:
+
+```bash
+base=$(git rev-parse origin/main)
+export GIT_INDEX_FILE=$(mktemp -u)
+git read-tree "$base"
+blob=$(git hash-object -w <local-file>)                      # repeat per file
+git update-index --add --cacheinfo 100644 "$blob" <repo-path> # (or --force-remove to delete)
+tree=$(git write-tree); unset GIT_INDEX_FILE
+commit=$(git commit-tree "$tree" -p "$base" -m "docs(scope): summary")
+git push origin "$commit":refs/heads/<branch>
+gh pr create --head <branch> ...
+```
+
+Local hooks don't run on a plumbing commit; the PR's CI is the gate (docs change-class routes light checks). Any change that mixes in non-doc files still goes worktree→PR.
+
 ## Pull Requests
 
 The commit skill ends at push — creating a PR is a separate, deliberate act (this is the PR-creation side of the `superpowers:finishing-a-development-branch` override above):
@@ -512,4 +528,4 @@ bash scripts/check-change-class.sh --branch     # check full branch diff vs main
 # See docs/change-classes.md for the full reference table.
 ```
 
-Last updated: 2026-06-12
+Last updated: 2026-07-29

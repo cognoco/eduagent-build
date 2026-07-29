@@ -71,6 +71,7 @@ Checklist:
 - [ ] Confirm whether any production telemetry or third-party SDK behavior counts as tracking under Apple/Google rules.
 - [ ] Confirm whether legacy optional `profiles.location` data exists in production exports and needs disclosure, even though the current create-profile flow does not collect location.
 - [ ] Confirm data deletion and retention wording with the live privacy policy.
+- [ ] Publish the web account-deletion request page for the Play data-safety form — artifact ready at [`docs/delete-account.html`](../delete-account.html) (landed 2026-07-29); its in-file pre-publish checklist (monitored inbox, request-path test, legal sign-off) gates actual publication to mentomate.com.
 
 Status: draftable from repo evidence, but store-console submission is blocked on admin/legal input.
 
