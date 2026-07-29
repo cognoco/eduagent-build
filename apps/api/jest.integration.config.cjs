@@ -4,8 +4,8 @@ const { join } = require('path');
 // to prevent concurrent worker connections from exhausting the Neon WebSocket
 // pool and causing FK violations between test suites.
 //
-// Run via: pnpm exec nx run api:integration-api
-// (equivalent to: pnpm exec jest --config apps/api/jest.integration.config.cjs)
+// Canonical workstation command: corepack pnpm run test:api:integration
+// CI/local-container target: corepack pnpm exec nx run api:integration-api
 
 module.exports = {
   displayName: '@eduagent/api:integration',
