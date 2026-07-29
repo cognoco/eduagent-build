@@ -41,6 +41,18 @@ const INCIDENT_CHANGED_PATHS = [
 const BASE_ONLY_PATH =
   'apps/api/src/services/persisted-learning-text-guard.guard.test.ts';
 
+// Real GitHub Actions substitutes ${{ }} expressions in a run: block before
+// the shell ever sees it. This harness executes the extracted run: text
+// directly via local bash, bypassing that substitution — so any ${{ }} token
+// a step references (that isn't already routed through a step-level env var,
+// per this workflow's env-var-indirection convention) must be replaced here
+// with a literal stand-in, mirroring what Actions would have substituted.
+const GITHUB_EXPRESSION_STAND_INS: Record<string, string> = {
+  '${{ steps.review-1.outcome }}': 'success',
+  '${{ steps.review-2.outcome }}': 'skipped',
+  '${{ steps.review-3.outcome }}': 'skipped',
+};
+
 function workflowStep(name: string): string {
   const workflow = parse(
     readFileSync('.github/workflows/claude-code-review.yml', 'utf8'),
@@ -51,7 +63,13 @@ function workflowStep(name: string): string {
     (candidate) => candidate.name === name,
   );
   if (!step?.run) throw new Error(`Missing workflow run step: ${name}`);
-  return step.run;
+  let run = step.run;
+  for (const [expression, standIn] of Object.entries(
+    GITHUB_EXPRESSION_STAND_INS,
+  )) {
+    run = run.split(expression).join(standIn);
+  }
+  return run;
 }
 
 function reviewBody({
@@ -146,6 +164,7 @@ esac
     HEAD_SHA: INCIDENT_HEAD,
     PR_NUMBER: '2664',
     REPO: 'cognoco/eduagent-build',
+    RUN_ID: '999999',
     REVIEW_RUN_STARTED_AT: '2026-07-26T23:20:00Z',
   };
   const manifest = spawnSync(

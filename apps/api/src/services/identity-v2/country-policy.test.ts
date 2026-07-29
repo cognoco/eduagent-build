@@ -533,6 +533,57 @@ describe('resolveCountryPolicy', () => {
     expect(acrossVersions.policyVersion).toBe('2026-07-24.2');
   });
 
+  it('[WI-2850] resolves the seeded United States record through the registry, still blocked', () => {
+    // AC4: a US record shaped like the 0161 seed row (blocked, unverified,
+    // zero-length review window, threshold 13, launch-day review required)
+    // must resolve THROUGH the registry — i.e. take the "row found but not
+    // launch-ready" path, not the fail-closed COUNTRY_UNSUPPORTED path a
+    // missing country would hit — and still decide blocked.
+    const usPolicy = policy('US', 13, {
+      countryName: 'United States',
+      regimeKey: 'US_COPPA',
+      launchStatus: 'blocked',
+      launchBlockReason: 'launch_gates_pending',
+      legalVerificationStatus: 'unverified',
+      legalReviewedAt: new Date('2026-07-28T00:00:00Z'),
+      legalReviewValidUntil: new Date('2026-07-28T00:00:00Z'),
+      launchDayReviewRequired: true,
+      controllerGates: {
+        externalPrivacyLegalReview: false,
+        aiActClassification: false,
+        reliableAgeAndResidence: false,
+        childTransparency: false,
+        adultCommercialRelationship: false,
+        countryAllowlist: false,
+        operationalRightsAndIncidents: false,
+        launchDayLegalRefresh: false,
+      },
+    });
+
+    const decision = resolveCountryPolicy({
+      policies: [usPolicy],
+      habitualResidence: 'US',
+      birthDate: '2010-07-23',
+      residenceAssurance,
+      asOf: new Date('2026-07-28T12:00:00Z'),
+    });
+
+    expect(decision.reasonCodes).not.toContain('COUNTRY_UNSUPPORTED');
+    expect(decision.habitualResidence).toBe('US');
+    expect(decision.regimeKey).toBe('US_COPPA');
+    expect(decision.article8Threshold).toBe(13);
+    expect(decision.launchDecision).toBe('blocked');
+    expect(decision.legalRefreshRequired).toBe(true);
+    expect(decision.reasonCodes).toEqual(
+      expect.arrayContaining([
+        'COUNTRY_BLOCKED',
+        'CONTROLLER_GATES_OPEN',
+        'LEGAL_VERIFICATION_UNVERIFIED',
+        'LEGAL_REVIEW_STALE',
+      ]),
+    );
+  });
+
   it('selects the newest active effective-dated policy row', () => {
     const decision = resolveCountryPolicy({
       policies: [

@@ -85,6 +85,161 @@ function messages(root: string): string {
     .join('\n');
 }
 
+interface ClaudeReviewContractFixtureOptions {
+  bindExpectedHead?: boolean;
+  firstAttemptIf?: string;
+  secondAttemptIf?: string;
+  thirdAttemptIf?: string;
+}
+
+// Shared, real capture/refresh manifest logic (identical to the production
+// workflow's "Capture authoritative PR files" / "Refresh authoritative PR
+// files" steps) so the fixture satisfies validateClaudeReviewScopeContract's
+// writesAuthoritativeExactHeadManifest check without duplicating drift-prone
+// bespoke script text per test.
+const AUTHORITATIVE_MANIFEST_RUN = `
+                pull_json="$(gh api "repos/\${REPO}/pulls/\${PR_NUMBER}")"
+                api_head="$(jq -r '.head.sha // empty' <<< "$pull_json")"
+                if [[ -z "$api_head" || "$api_head" != "$HEAD_SHA" ]]; then
+                  echo "::error::head changed"
+                  exit 1
+                fi
+                changed_paths="$(
+                  gh api --paginate "repos/\${REPO}/pulls/\${PR_NUMBER}/files?per_page=100" --jq '.[]' \\
+                    | jq -sce '[.[].filename] | unique'
+                )"
+                api_head_after="$(gh api "repos/\${REPO}/pulls/\${PR_NUMBER}" --jq '.head.sha')"
+                if [[ "$api_head_after" != "$HEAD_SHA" ]]; then
+                  echo "::error::head changed"
+                  exit 1
+                fi
+                jq -n \\
+                  --arg head_sha "$HEAD_SHA" \\
+                  --argjson paths "$changed_paths" \\
+                  '{head_sha: $head_sha, paths: $paths}' > "$CHANGED_FILES_MANIFEST"`;
+
+function writeClaudeReviewContractFixture(
+  root: string,
+  {
+    bindExpectedHead = true,
+    firstAttemptIf,
+    secondAttemptIf = "steps.review-1.outcome == 'failure'",
+    thirdAttemptIf = "steps.review-1.outcome == 'failure' && steps.review-2.outcome == 'failure'",
+  }: ClaudeReviewContractFixtureOptions = {},
+) {
+  const ifLine = (condition: string | undefined) =>
+    condition === undefined ? '' : `              if: ${condition}\n`;
+  const promptHeadMarker = bindExpectedHead
+    ? '                - Reviewed head SHA: ${{ github.event.pull_request.head.sha }}\n'
+    : '';
+  const selectorHeadArgument = bindExpectedHead
+    ? '                  --arg expected_head "$HEAD_SHA" \\\n'
+    : '';
+  const selectorHeadFilter = bindExpectedHead
+    ? '                    | select((.body | split("\\n") | index("- Reviewed head SHA: \\($expected_head)")) != null)\n'
+    : '';
+
+  writeFixture(
+    root,
+    '.github/workflows/claude-code-review.yml',
+    `
+      name: Claude Code Review
+      on:
+        pull_request:
+          types: [opened, synchronize, ready_for_review, reopened]
+      permissions: {}
+      jobs:
+        claude-review:
+          runs-on: ubuntu-latest
+          permissions:
+            id-token: write
+          env:
+            CLAUDE_REVIEW_PROMPT: |
+              Review comment metadata:
+              Read \`.trusted-actions/claude-review-changed-files.json\`.
+              Review only paths listed in the authoritative changed-files manifest.
+${promptHeadMarker}          steps:
+            - name: Initialize fail-closed review result
+              run: |
+                jq -n '{
+                  status: "REVIEWER_UNAVAILABLE",
+                  merge_eligible: false,
+                  head_sha: "abc123",
+                  run_id: "123",
+                  recovery_command: "gh run rerun 123 --failed --repo example/repo"
+                }' > claude-review-verdict.json
+            - name: Capture authoritative PR files
+              run: |${AUTHORITATIVE_MANIFEST_RUN}
+            - id: review-1
+${ifLine(firstAttemptIf)}              uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              continue-on-error: true
+              timeout-minutes: 20
+            - id: review-2
+${ifLine(secondAttemptIf)}              uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              continue-on-error: true
+              timeout-minutes: 20
+            - id: review-3
+${ifLine(thirdAttemptIf)}              uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              continue-on-error: true
+              timeout-minutes: 20
+            - name: Refresh authoritative PR files
+              if: always()
+              run: |${AUTHORITATIVE_MANIFEST_RUN}
+            - name: Evaluate review verdict
+              env:
+                HEAD_SHA: \${{ github.event.pull_request.head.sha }}
+              run: |
+                comments_json="$(gh api "repos/\${REPO}/issues/\${PR_NUMBER}/comments" --paginate)"
+                review_json="$(
+                  jq -c \\
+                    --arg started "$REVIEW_RUN_STARTED_AT" \\
+${selectorHeadArgument}                    '[
+                      .[]
+                      | select(.user.login == "claude[bot]")
+                      | select(.user.type == "Bot")
+                      | select(.created_at >= $started)
+                      | select(.body | contains("## Claude Code Review:"))
+${selectorHeadFilter}                    ]
+                    | sort_by(.created_at)
+                    | last // empty' <<< "$comments_json"
+                )"
+                if [[ -z "$review_json" ]]; then
+                  exit 1
+                fi
+                finding_paths="$(jq -Rsc 'split("\\n") | map(select(length > 0))' <<< "")"
+                out_of_scope_paths="$(
+                  jq -cn \\
+                    --argjson findings "$finding_paths" \\
+                    --slurpfile manifest "$CHANGED_FILES_MANIFEST" \\
+                    '$findings - $manifest[0].paths | unique'
+                )"
+                scope_valid=true
+                if [[ "$(jq 'length' <<< "$out_of_scope_paths")" -gt 0 ]]; then
+                  scope_valid=false
+                fi
+                metadata_complete=true
+                jq -n \\
+                  --arg status "$(if [[ "$scope_valid" == "true" ]]; then echo REVIEW_COMPLETED; else echo REVIEW_SCOPE_CORRUPTION; fi)" \\
+                  --argjson metadata_complete "$metadata_complete" \\
+                  --argjson scope_valid "$scope_valid" \\
+                  '{
+                    status: $status,
+                    merge_eligible: $metadata_complete
+                  }' > "$VERDICT_ARTIFACT"
+                if [[ "$scope_valid" != "true" ]]; then
+                  echo "::error::REVIEW_SCOPE_CORRUPTION"
+                  exit 1
+                fi
+            - name: Upload review verdict artifact
+              if: always()
+              uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+              with:
+                path: claude-review-verdict.json
+                if-no-files-found: error
+    `,
+  );
+}
+
 describe('checkGithubWorkflowSecurity', () => {
   let root: string;
 
@@ -681,6 +836,98 @@ describe('checkGithubWorkflowSecurity', () => {
     jobs['build-preview'].if = `${jobs['build-preview'].if} || true`;
 
     expect(() => expectSensitiveMobileIfExpressions(workflow)).toThrow('toBe');
+  });
+
+  it('rejects documentation path filters on the Claude review workflow', () => {
+    writeFixture(
+      root,
+      '.github/workflows/claude-code-review.yml',
+      `
+      name: Claude Code Review
+      on:
+        pull_request:
+          types: [opened, synchronize, ready_for_review, reopened]
+          paths-ignore:
+            - '**.md'
+            - 'docs/**'
+      permissions: {}
+      jobs: {}
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'Claude review must be eligible for every pull request; remove pull_request paths and paths-ignore filters',
+    );
+  });
+
+  it('rejects a Claude review workflow without a machine-readable unavailable result', () => {
+    writeFixture(
+      root,
+      '.github/workflows/claude-code-review.yml',
+      `
+      name: Claude Code Review
+      on:
+        pull_request:
+          types: [opened, synchronize, ready_for_review, reopened]
+      permissions: {}
+      jobs:
+        claude-review:
+          runs-on: ubuntu-latest
+          permissions:
+            id-token: write
+          steps:
+            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              continue-on-error: true
+              timeout-minutes: 20
+            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              continue-on-error: true
+              timeout-minutes: 20
+            - uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1
+              continue-on-error: true
+              timeout-minutes: 20
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'Claude review must bound reviewer attempts and always upload a machine-readable fail-closed result with an executable recovery command',
+    );
+  });
+
+  it('allows the bounded fail-closed Claude review contract', () => {
+    writeClaudeReviewContractFixture(root);
+
+    expect(checkGithubWorkflowSecurity(root)).toEqual([]);
+  });
+
+  it('rejects a Claude review selector that could accept a stale cross-head comment', () => {
+    writeClaudeReviewContractFixture(root, { bindExpectedHead: false });
+
+    expect(messages(root)).toContain(
+      'Claude review verdict comments must carry and exactly match the expected pull request head SHA',
+    );
+  });
+
+  it('rejects a conditional first Claude review attempt', () => {
+    writeClaudeReviewContractFixture(root, {
+      firstAttemptIf: 'false',
+      secondAttemptIf: 'false',
+      thirdAttemptIf: 'false',
+    });
+
+    expect(messages(root)).toContain(
+      'Claude review token attempts must be an unconditional first attempt followed by fallbacks gated on all preceding failures',
+    );
+  });
+
+  it('rejects Claude review fallbacks not gated on all preceding failures', () => {
+    writeClaudeReviewContractFixture(root, {
+      secondAttemptIf: "steps.review-1.outcome == 'success'",
+      thirdAttemptIf: "steps.review-2.outcome == 'failure'",
+    });
+
+    expect(messages(root)).toContain(
+      'Claude review token attempts must be an unconditional first attempt followed by fallbacks gated on all preceding failures',
+    );
   });
 
   // [F-132] The review-verdict gate must not parse a comment as the verdict
