@@ -16,19 +16,24 @@ function pageWith(options: {
   moreTitleVisible?: boolean;
 }): {
   page: Page;
+  setReadinessState(next: {
+    pathname: string;
+    visibleTestIds?: readonly string[];
+  }): void;
   emitRequest(request: Request): void;
   emitRequestFailed(request: Request): void;
   emitResponse(response: Response): void;
 } {
   const listeners = new Map<string, PageListener>();
-  const visibleTestIds = new Set(options.visibleTestIds ?? []);
+  let pathname = options.pathname;
+  let visibleTestIds = new Set(options.visibleTestIds ?? []);
   const locator = (visible: boolean) =>
     ({
       isVisible: async () => visible,
       first: () => locator(visible),
     }) as unknown as Locator;
   const page = {
-    url: () => `https://app.example.test${options.pathname}`,
+    url: () => `https://app.example.test${pathname}`,
     getByTestId: (testId: string) => locator(visibleTestIds.has(testId)),
     getByText: () => locator(options.moreTitleVisible ?? false),
     getByRole: () => locator(false),
@@ -42,6 +47,10 @@ function pageWith(options: {
 
   return {
     page,
+    setReadinessState(next) {
+      pathname = next.pathname;
+      visibleTestIds = new Set(next.visibleTestIds ?? []);
+    },
     emitRequest(request) {
       listeners.get('request')?.(request as never);
     },
@@ -55,6 +64,28 @@ function pageWith(options: {
 }
 
 describe('armJ01AccountReadiness', () => {
+  it('retains an auth redirect that clears before the avatar timeout is reported', async () => {
+    jest.useFakeTimers();
+    try {
+      const state = pageWith({
+        pathname: '/sign-in?redirectTo=%2Fmore&ticket=secret',
+        visibleTestIds: ['sign-in-email'],
+      });
+      const observation = armJ01AccountReadiness(state.page);
+
+      await jest.advanceTimersByTimeAsync(250);
+      state.setReadinessState({ pathname: '/more?ticket=secret' });
+
+      await expect(observation.failureMessage(60_000)).resolves.toBe(
+        '[J-01 account-readiness:auth-redirect] account-avatar-shell remained absent within 60000ms; committedPath=/more; profiles=not-requested',
+      );
+
+      observation.dispose();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('distinguishes profile-pending from auth-redirect when the avatar is absent in both', async () => {
     const profilePending = pageWith({
       pathname: '/more?private=value',

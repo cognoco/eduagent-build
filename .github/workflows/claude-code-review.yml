@@ -3,12 +3,6 @@ name: Claude Code Review
 on:
   pull_request:
     types: [opened, synchronize, ready_for_review, reopened]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.vscode/**'
-      - '.idea/**'
-      - '.claude/**'
 
 # [CR-794] Workflow-level least-privilege default. Without this, GitHub falls
 # back to the repo default token permissions (often `write-all`) for any job
@@ -157,6 +151,7 @@ jobs:
         <details><summary>Review metadata</summary>
 
         - Verdict: {VERDICT}
+        - Reviewed head SHA: ${{ github.event.pull_request.head.sha }}
         - Review green: true|false
         - Must-fix count: {count}
         - Should-fix count: {count}
@@ -177,6 +172,7 @@ jobs:
         <details><summary>Review metadata</summary>
 
         - Verdict: APPROVED
+        - Reviewed head SHA: ${{ github.event.pull_request.head.sha }}
         - Review green: true
         - Must-fix count: 0
         - Should-fix count: 0
@@ -197,7 +193,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           fetch-depth: 1
           persist-credentials: false
@@ -213,9 +209,45 @@ jobs:
       - name: Record review run start
         run: echo "REVIEW_RUN_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
 
+      # Fail-closed default: this artifact exists before any reviewer call, so
+      # quota exhaustion, action failure, or verdict-evaluation failure always
+      # leaves a bounded machine-readable non-merge result. A completed review
+      # replaces it below. Recovery reruns this exact workflow run/head after
+      # reviewer capacity returns; it never manufactures or bypasses a verdict.
+      - name: Initialize fail-closed review result
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          jq -n \
+            --arg head_sha "$HEAD_SHA" \
+            --arg pr_number "$PR_NUMBER" \
+            --arg repo "$REPO" \
+            --arg run_id "$RUN_ID" \
+            --arg recovery_command "gh run rerun ${RUN_ID} --failed --repo ${REPO}" \
+            '{
+              schema: "eduagent.claude-review-result.v1",
+              status: "REVIEWER_UNAVAILABLE",
+              merge_eligible: false,
+              reason: "review_not_completed",
+              head_sha: $head_sha,
+              pr_number: ($pr_number | tonumber),
+              repository: $repo,
+              run_id: ($run_id | tonumber),
+              attempts: {
+                maximum: 3,
+                outcomes: []
+              },
+              recovery_condition: "Reviewer capacity is available",
+              recovery_command: $recovery_command
+            }' > claude-review-verdict.json
+
       - name: Run Claude Code Review (token 1)
         id: review-1
         continue-on-error: true
+        timeout-minutes: 20
         uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1 # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -228,6 +260,7 @@ jobs:
         id: review-2
         if: steps.review-1.outcome == 'failure'
         continue-on-error: true
+        timeout-minutes: 20
         uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1 # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_2 }}
@@ -238,6 +271,7 @@ jobs:
         id: review-3
         if: steps.review-1.outcome == 'failure' && steps.review-2.outcome == 'failure'
         continue-on-error: true
+        timeout-minutes: 20
         uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1 # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_3 }}
@@ -260,23 +294,29 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
         run: |
           comments_json="$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --paginate)"
           # The verdict source of truth must be the review comment posted by the
-          # Claude GitHub App (claude[bot]), not any comment that happens to
-          # carry the verdict marker. Without the author constraint, a PR author
-          # could post "## Claude Code Review: APPROVED" and forge the verdict.
-          # GitHub owns the claude[bot] identity; a PR author cannot post as it.
-          # The Bot type check is defence in depth.
+          # Claude GitHub App (claude[bot]) for this exact PR head, not any
+          # comment that happens to carry the verdict marker. Without the author
+          # constraint, a PR author could forge the verdict. Without the head
+          # constraint, a late comment from a cancelled review of an older head
+          # could certify the current head. GitHub owns the claude[bot] identity;
+          # a PR author cannot post as it. The Bot type check is defence in depth.
           review_json="$(
-            jq -c --arg started "$REVIEW_RUN_STARTED_AT" '
+            jq -c \
+              --arg started "$REVIEW_RUN_STARTED_AT" \
+              --arg expected_head "$HEAD_SHA" '
               [ .[]
                 | select(.user.login == "claude[bot]")
                 | select(.user.type == "Bot")
                 | select(.created_at >= $started)
                 | select(.body | contains("## Claude Code Review:"))
+                | select((.body | split("\n") | index("- Reviewed head SHA: \($expected_head)")) != null)
               ]
               | sort_by(.created_at)
               | last // empty
@@ -290,6 +330,14 @@ jobs:
           # run it is ADVISORY — findings are posted for triage via the PR protocol
           # and never turn this check red.
           if [[ -z "$review_json" ]]; then
+            jq \
+              --arg review_1 "${{ steps.review-1.outcome }}" \
+              --arg review_2 "${{ steps.review-2.outcome }}" \
+              --arg review_3 "${{ steps.review-3.outcome }}" \
+              '.reason = "no_fresh_trusted_verdict"
+                | .attempts.outcomes = [$review_1, $review_2, $review_3]' \
+              claude-review-verdict.json > claude-review-verdict.tmp
+            mv claude-review-verdict.tmp claude-review-verdict.json
             echo "::error::No Claude Code Review verdict marker found for this run — review did not run (token exhaustion / timeout / crash). Blocking."
             exit 1
           fi
@@ -301,22 +349,41 @@ jobs:
           consider="$(sed -nE 's/^- Consider count: ([0-9]+).*/\1/ip' <<< "$body" | head -n1)"
 
           # The marker is present (review ran). Metadata is best-effort for the
-          # artifact + the all-clear/advisory notice; a malformed metadata block
-          # degrades to "advisory, counts unknown" and must NOT flip the check red.
+          # advisory check conclusion, but only complete metadata can make the
+          # machine-readable artifact merge-eligible. A malformed metadata block
+          # degrades to "advisory, counts unknown" and must NOT fabricate an exact
+          # clean result or flip the existing advisory check red.
+          metadata_complete=true
           if [[ -z "$verdict" ]]; then
             echo "::warning::Review comment posted but verdict header unparseable; treating as advisory."
+          fi
+          if [[ -z "$must_fix" || -z "$should_fix" ]]; then
+            metadata_complete=false
           fi
           must_fix="${must_fix:-0}"; should_fix="${should_fix:-0}"; consider="${consider:-0}"
 
           jq -n \
+            --arg head_sha "$HEAD_SHA" \
+            --arg pr_number "$PR_NUMBER" \
+            --arg repo "$REPO" \
+            --arg run_id "$RUN_ID" \
             --arg verdict "${verdict:-UNKNOWN}" \
+            --argjson metadata_complete "$metadata_complete" \
             --argjson must_fix "$must_fix" \
             --argjson should_fix "$should_fix" \
             --argjson consider "$consider" \
             '{
+              schema: "eduagent.claude-review-result.v1",
+              status: "REVIEW_COMPLETED",
+              merge_eligible: ($metadata_complete and $verdict == "APPROVED" and $must_fix == 0 and $should_fix == 0),
+              head_sha: $head_sha,
+              pr_number: ($pr_number | tonumber),
+              repository: $repo,
+              run_id: ($run_id | tonumber),
               verdict: $verdict,
               advisory: true,
-              review_green: ($verdict == "APPROVED" and $must_fix == 0 and $should_fix == 0),
+              metadata_complete: $metadata_complete,
+              review_green: ($metadata_complete and $verdict == "APPROVED" and $must_fix == 0 and $should_fix == 0),
               counts: {
                 must_fix: $must_fix,
                 should_fix: $should_fix,
@@ -324,7 +391,7 @@ jobs:
               }
             }' > claude-review-verdict.json
 
-          if [[ "$verdict" == "APPROVED" && "$must_fix" -eq 0 && "$should_fix" -eq 0 ]]; then
+          if [[ "$metadata_complete" == "true" && "$verdict" == "APPROVED" && "$must_fix" -eq 0 && "$should_fix" -eq 0 ]]; then
             echo "::notice::Claude Code Review ✅ all-clear — no findings."
           else
             echo "::notice::Claude Code Review ran (verdict=${verdict:-UNKNOWN}, must_fix=${must_fix}, should_fix=${should_fix}): findings posted as ADVISORY — triage via the PR protocol; check stays green."
@@ -336,4 +403,4 @@ jobs:
         with:
           name: claude-review-verdict
           path: claude-review-verdict.json
-          if-no-files-found: ignore
+          if-no-files-found: error

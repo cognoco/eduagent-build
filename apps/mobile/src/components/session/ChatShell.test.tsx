@@ -50,6 +50,15 @@ jest.mock('@expo/vector-icons', () => {
   };
 });
 
+// Pattern A evaluates the real TTS hook module; keep its native dependency at
+// the external boundary so the component suite remains Jest-runnable.
+jest.mock('expo-speech', () => ({
+  speak: jest.fn(),
+  stop: jest.fn(),
+  pause: jest.fn(),
+  resume: jest.fn(),
+}));
+
 // STT mock
 const mockStartListening = jest.fn().mockResolvedValue(undefined);
 const mockStopListening = jest.fn().mockResolvedValue(undefined);
@@ -65,8 +74,8 @@ let mockSttState = {
   isListening: false,
 };
 
-// prettier-ignore
-jest.mock('../../hooks/use-speech-recognition', () => ({ // gc1-allow: voice hook touches native recording APIs outside component scope
+jest.mock('../../hooks/use-speech-recognition', () => ({
+  ...jest.requireActual('../../hooks/use-speech-recognition'),
   useSpeechRecognition: () => ({
     ...mockSttState,
     startListening: mockStartListening,
@@ -83,8 +92,8 @@ const mockStopSpeaking = jest.fn();
 const mockReplay = jest.fn();
 const mockSetRate = jest.fn();
 
-// prettier-ignore
-jest.mock('../../hooks/use-text-to-speech', () => ({ // gc1-allow: voice output hook touches native speech APIs outside component scope
+jest.mock('../../hooks/use-text-to-speech', () => ({
+  ...jest.requireActual('../../hooks/use-text-to-speech'),
   useTextToSpeech: () => ({
     isSpeaking: false,
     rate: 1.0,
@@ -97,8 +106,8 @@ jest.mock('../../hooks/use-text-to-speech', () => ({ // gc1-allow: voice output 
 
 // Stub shared components that add native renderer/timer dependencies the shell
 // suite does not exercise directly.
-// prettier-ignore
-jest.mock('../common', () => ({ // gc1-allow: animations leak timers; ThemedMarkdown wraps react-native-markdown-display + theme context and has focused coverage
+jest.mock('../common', () => ({
+  ...jest.requireActual('../common'),
   DeskLampAnimation: () => null,
   MagicPenAnimation: () => null,
   ThemedMarkdown: ({ children }: { children: unknown }) => {

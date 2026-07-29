@@ -1,0 +1,18 @@
+{
+  "pageId": "3a48bce9-1f7c-812e-b373-d37a186da39c",
+  "id": "WI-2540",
+  "name": "Add an empty-subject escape path to manual homework entry",
+  "description": "The E2E-only manual homework entry screen leaves learners with no active Subjects on a disabled confirmation surface without an explicit empty state or recovery action.",
+  "acceptanceCriteria": "When the active Subject list finishes loading empty, manual homework entry names the empty condition and provides a usable escape or Subject-creation path; confirmation remains disabled until a real active Subject is selected; focused coverage asserts this exact zero-active-Subject property and does not substitute a loading, inactive-Subject, or seeded-active-Subject case.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "builder:claude:wi-2540",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "",
+  "bodyText": ""
+}
