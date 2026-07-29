@@ -69,24 +69,39 @@ Shepherd-owned runtime pointers named below.
   `PR` or `Pipeline` cache.
 - Durable executor evidence:
   each live Work Item discussion plus
-  `/Users/vetinari/nexus/.cosmo-watch/release-eng/executors/<WI-ID>/`.
+  `.cosmo-watch/release-eng/executors/<WI-ID>/` — repo-relative, gitignored
+  (`.gitignore:221`), the same convention already in use at
+  `.cosmo-watch/bid-49/executors/` and `.cosmo-watch/platform-hardening/logs/`.
   Prefer the latest `execution-*-last-message.md` or `last-message.md`, then
   verify its claims against Cosmo/GitHub.
 - Shepherd runtime:
-  `/Users/vetinari/nexus/.cosmo-watch/release-eng/SESSION-HANDOFF.md` and
-  `/Users/vetinari/nexus/.cosmo-watch/release-eng/monitor-manifest.json`.
-  These are Shepherd-owned, gitignored runtime state; they point here and never
-  replace this tracker.
+  [`_quartet/working/lanes/release-eng/_state/SESSION-HANDOFF.md`](_state/SESSION-HANDOFF.md)
+  — repo-relative and **git-tracked**, the same convention as
+  `_quartet/working/lanes/platform-hardening/_state/SESSION-HANDOFF.md` and
+  three other sibling lanes; not gitignored (`.gitignore` only excludes
+  `_state/*.jsonl`, `_state/monitor-manifest.json`, `_state/**/*.log`,
+  `_state/**/state.json`, `_state/**/launched-transitions.json`, and
+  `_state/**/reviews/` — the handoff `.md` itself is not on that list) — and
+  `_quartet/working/lanes/release-eng/_state/monitor-manifest.json` — repo-relative,
+  gitignored per `.gitignore:224`, the same convention as every sibling lane
+  (none of which pre-exist this file in the repo either — it is Shepherd-session-live
+  state, created/refreshed only while a Shepherd actively runs the lane, not a
+  file that sits pre-created at rest).
+  These are Shepherd-owned runtime state; they point here and never replace
+  this tracker.
 
 ### Runtime consistency contract
 
-The Shepherd must add the exact repo-relative pointer
-`_quartet/working/lanes/release-eng/execution-tracker.md` to both runtime
-artifacts. `SESSION-HANDOFF.md` must begin its resume path with that pointer and
-must describe membership as a timestamped live-relation observation, not a
-fixed three- or seven-member authority. `monitor-manifest.json` must retain a
-dynamic stage monitor over the BID-42 Brief, Status, Delivery Batch relation,
-and every member returned by that relation, and add top-level
+`_state/SESSION-HANDOFF.md` exists, begins its resume path with the exact
+repo-relative pointer `_quartet/working/lanes/release-eng/execution-tracker.md`,
+and describes membership as a timestamped live-relation observation, not a
+fixed three- or seven-member authority (materialized 2026-07-29; see its own
+`Updated` timestamp for currency). `_state/monitor-manifest.json` is
+Shepherd-session-live state (gitignored per `.gitignore:224`, exactly like
+every sibling lane's monitor manifest) rather than a file pre-created at rest;
+whenever a Shepherd creates or refreshes it, the file must retain a dynamic
+stage monitor over the BID-42 Brief, Status, Delivery Batch relation, and
+every member returned by that relation, and add top-level
 `"tracker": "_quartet/working/lanes/release-eng/execution-tracker.md"`.
 Whenever either runtime artifact disagrees with live Cosmo/GitHub, update the
 runtime artifact; never edit this tracker to preserve stale runtime prose.
@@ -181,6 +196,21 @@ back to the Orchestrator. No tracker text can waive those conditions.
 
 ## Change log
 
+- 2026-07-29 — WI-2686 rework (reviewer bounce on AC-4/AC-5). The Pointers and
+  Runtime consistency contract sections named `/Users/vetinari/nexus/.cosmo-watch/
+  release-eng/...` for durable executor evidence, `SESSION-HANDOFF.md`, and
+  `monitor-manifest.json` — a single-user absolute host path that cannot
+  resolve on any host (verified absent on both the macOS and Linux estate
+  hosts named in the bounce) and that also misclassified the git-tracked
+  `SESSION-HANDOFF.md` as gitignored. Corrected all three pointers to the
+  repo-relative paths every sibling lane already uses:
+  `.cosmo-watch/release-eng/executors/<WI-ID>/` (gitignored, matches
+  `bid-49`/`platform-hardening`) and `_state/SESSION-HANDOFF.md` (git-tracked)
+  plus `_state/monitor-manifest.json` (gitignored) under this lane directory.
+  Materialized `_state/SESSION-HANDOFF.md` so AC-4's reciprocal pointer now
+  verifiably exists and begins its resume path with this tracker. No Delivery
+  Batch membership, lifecycle field, credential, service, production behavior,
+  or operator gate changed.
 - 2026-07-24 — Canonical tracker materialized for WI-2686. Direct reads
   verified the committed release-eng topology, BID-42 Brief/relation parity
   (eight rows, `has_more=false`, including the mid-execution admission of
