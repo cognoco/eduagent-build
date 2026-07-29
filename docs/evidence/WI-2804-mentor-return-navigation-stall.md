@@ -167,7 +167,7 @@ Tests:       92 skipped, 3 passed, 95 total
 
 Only 3 tests match at this revision, not 4: `[WI-2234] keeps the learner in Session
 when the Mentor refresh fails and allows a successful retry` no longer exists.
-WI-2818's fix commit (`cfeeaed7d`) replaced it with three renamed/rescoped tests
+WI-2818's fix commit (`cfeeaed7d`) replaced it with four renamed/rescoped tests
 that assert the repaired contract instead —
 `[WI-2818] returns %s to Mentor after one failed exact refresh`,
 `[WI-2818] waits for a successful exact Now-feed refresh before the first Back
@@ -176,8 +176,10 @@ Now-feed refresh rejects`, and `[WI-2818] bounds a non-settling exact Now-feed
 refresh on the first Back` (`apps/mobile/src/app/(app)/session/index.test.tsx`).
 The cited `[WI-2234]`-scoped filter does not — and after WI-2818 landed, cannot —
 exercise the rejection/non-settlement paths; it only covers the three success-path
-assertions that were never in question. Running it at the current head is
-confirmation the repair is in place, not a reproduction of the original symptom.
+assertions that were never in question. Running it at the current head confirms
+only that those retained success-path tests still pass; the four `[WI-2818]`
+tests named above, landed at `cfeeaed7d`, are the direct repair evidence, not
+this filtered run.
 
 ## Disposition
 
