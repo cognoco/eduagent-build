@@ -1,0 +1,9 @@
+{
+  "tracker": "_quartet/working/lanes/release-eng/execution-tracker.md",
+  "lane": "release-eng",
+  "role": "shepherd",
+  "updatedAt": "2026-07-29T19:33:29Z",
+  "updatedBy": "executor:wave14 (WI-2686 rework 2)",
+  "monitors": [],
+  "note": "Materialized at rest (WI-2686 rework 2) as a truthful empty-monitors placeholder so the tracker/SESSION-HANDOFF pointer chain resolves for a fresh Shepherd. No live monitor is armed. An actively running Shepherd appends one entry per armed monitor to the monitors array (schema: target/purpose/command/task-id, matching sibling lanes e.g. platform-hardening's _state/monitor-manifest.json) and removes it on teardown; it must keep this file's top-level tracker key pointing at execution-tracker.md."
+}

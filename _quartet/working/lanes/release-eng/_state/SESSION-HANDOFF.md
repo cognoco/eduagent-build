@@ -2,7 +2,7 @@
 
 Resume: `_quartet/working/lanes/release-eng/execution-tracker.md`
 
-Updated: 2026-07-29T18:47:55Z
+Updated: 2026-07-29T19:33:29Z
 Identity: `codex:shepherd:release-eng`
 
 ## Current Position
@@ -25,12 +25,15 @@ session-continuity notes only.
 
 ## Monitors / Clacks
 
-- `_quartet/working/lanes/release-eng/_state/monitor-manifest.json` —
-  Shepherd-session-live, gitignored (`.gitignore:224`); created/refreshed by
-  an actively running Shepherd, not pre-created at rest. When present it
-  carries a dynamic stage monitor over the BID-42 Brief, Status, Delivery
-  Batch relation, and every member returned by that relation, plus top-level
-  `"tracker": "_quartet/working/lanes/release-eng/execution-tracker.md"`.
+- [`_quartet/working/lanes/release-eng/_state/monitor-manifest.json`](monitor-manifest.json)
+  — materialized at rest and git-tracked via a lane-scoped `.gitignore`
+  negation (`.gitignore:228`) layered over the general rule (`.gitignore:224`)
+  that still gitignores every sibling lane's manifest. Currently an empty
+  `monitors: []` placeholder plus top-level
+  `"tracker": "_quartet/working/lanes/release-eng/execution-tracker.md"`. When
+  a Shepherd actively runs the lane and arms a monitor, it appends an entry
+  (schema: target/purpose/command/task-id) and removes it on teardown,
+  preserving the `tracker` pointer and never deleting the file.
 - Durable executor evidence lives under
   `.cosmo-watch/release-eng/executors/<WI-ID>/` (repo-relative, gitignored),
   the same convention as `.cosmo-watch/bid-49/executors/` and
