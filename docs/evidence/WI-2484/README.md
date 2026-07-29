@@ -77,6 +77,9 @@ node scripts/doppler-run.mjs run -c dev -- \
 [`rollback.sql`](rollback.sql) records the exact inverse for these two
 constraints. It is an audit artifact, not an instruction to run it: applying
 it would deliberately restore the identity-v1 drift. The script refuses any
-target other than the exact dev project and branch and verifies the current
-person-target state before changing either constraint.
+target other than the exact dev project and branch and compares each
+constraint's full `pg_get_constraintdef()` output against the expected
+definition (columns, actions, deferrability) before changing either
+constraint, aborting on any mismatch instead of dropping a constraint whose
+semantics have since changed.
 
