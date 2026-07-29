@@ -1,0 +1,25 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The three internal mocks in the ChatShell performance suite now preserve every real module export through same-specifier jest.requireActual spreads and override only the hook/component exports needed by the suite. The existing real-MessageBubble render-count passthrough remains unchanged.",
+      "pointer": "apps/mobile/src/components/session/ChatShell.perf.test.tsx"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "The three internal mocks in the main ChatShell suite now preserve every real module export through same-specifier jest.requireActual spreads and override only the hook/component exports needed by the suite.",
+      "pointer": "apps/mobile/src/components/session/ChatShell.test.tsx"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "The unchanged component, voice, markdown, animation, image-isolation, and render-count assertions all pass: both focused suites report 106 tests passed, 0 failed.",
+      "pointer": "pnpm exec jest src/components/session/ChatShell.test.tsx src/components/session/ChatShell.perf.test.tsx --runInBand --no-coverage"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "The staged-diff GC1 structural guard exits zero with all six converted internal sites recognized as Pattern A; the only remaining internal site is the already-canonical MessageBubble requireActual passthrough.",
+      "pointer": "pnpm exec tsx scripts/check-gc1-pattern-a.ts"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13"
+}

@@ -7,13 +7,21 @@ import { and, eq, isNull, lt, or, sql } from 'drizzle-orm';
 import type { MentorNoticeAccepted } from '@eduagent/schemas';
 import type { MentorNoticeRecheckOutcome } from '@eduagent/schemas';
 
-import { scrubClinicalInferenceFromLearningRecord } from '../persisted-learning-text-guard';
+import { evaluateLearningTextFields } from '../learning-text-safety/gate';
 import { safeSend } from '../safe-non-core';
 import { inngest } from '../../inngest/client';
 
 interface MentorNoticeCopyInput {
   concept: string;
   correctionHint?: string | null;
+  /**
+   * [WI-2628] The vendor whose model authored this copy. Present on the exchange
+   * path (`result.provider`, the same `result` that produced `noticedGap`), so
+   * the gate can refer ambiguous copy to a judge that excludes it. Nullable
+   * because an untyped or future caller may not have it — and a genuinely
+   * unknown producer must fail closed, which AC-4 requires and the scan enforces.
+   */
+  producerVendor?: string | null;
 }
 
 interface AcceptMentorNoticeInput extends MentorNoticeCopyInput {
@@ -34,17 +42,63 @@ interface AcceptMentorNoticeInput extends MentorNoticeCopyInput {
   answerEventId: string;
 }
 
-export function prepareMentorNoticeCopy(
+/**
+ * [WI-2628] Notice copy is LLM-DERIVED, so this is the derived-write half of
+ * AC-5's asymmetry: unsafe data is DROPPED, never raised. An unsafe `concept`
+ * returns null and `acceptMentorNotice` writes no row at all; an unsafe
+ * `correctionHint` is nulled and the notice persists without it. That is exactly
+ * the shape the English-only guard had — only the gate behind it changed.
+ *
+ * ASYNC because the gate is: an ambiguous verdict is resolved by the independent
+ * judge. The single caller (`acceptMentorNotice`) already awaited, and this runs
+ * before its `db.insert`, so no LLM round-trip happens inside a transaction.
+ *
+ * `producerVendor` is THREADED, not defaulted. An earlier revision hard-coded
+ * null here with a comment claiming the vendor was "not reachable" — that was
+ * false: the exchange path has `result.provider` in scope and already passes it
+ * as `tutorVendor` a few lines below its `createMentorNoticeFromExchange` call.
+ * Hard-coding null meant every ambiguous notice concept blocked with `unclear`
+ * and the notice was never written at all, with the judge never consulted.
+ * AC-4's fail-closed-on-missing-producer exists for a GENUINELY unknown
+ * producer, not for one the caller declined to thread. It still applies when the
+ * value really is absent.
+ *
+ * `conversationLanguage: undefined` — no profile read on this path; the gate then
+ * scans all ten attribution grammars and keeps the strictest verdict. Stricter
+ * than any single language, and never `'en'`, which would reinstate the
+ * English-only bug.
+ */
+export async function prepareMentorNoticeCopy(
   input: MentorNoticeCopyInput,
-): { concept: string; correctionHint: string | null } | null {
-  const concept = scrubClinicalInferenceFromLearningRecord(
-    input.concept.trim(),
-  );
-  if (!concept) return null;
-
+): Promise<{ concept: string; correctionHint: string | null } | null> {
+  const trimmedConcept = input.concept.trim();
   const rawHint = input.correctionHint?.trim() || null;
-  const correctionHint = scrubClinicalInferenceFromLearningRecord(rawHint);
-  return { concept, correctionHint };
+
+  const gate = await evaluateLearningTextFields({
+    conversationLanguage: undefined,
+    provenance: 'llm',
+    producerVendor: input.producerVendor,
+    fields: [
+      {
+        key: 'concept',
+        fieldKind: 'mentor_notice_concept',
+        text: trimmedConcept,
+      },
+      {
+        key: 'correctionHint',
+        fieldKind: 'mentor_notice_correction_hint',
+        text: rawHint,
+      },
+    ],
+  });
+
+  // An empty concept was already a no-write case before this change; keep that.
+  if (!trimmedConcept || !gate.isSafe('concept')) return null;
+
+  return {
+    concept: trimmedConcept,
+    correctionHint: gate.isSafe('correctionHint') ? rawHint : null,
+  };
 }
 
 export async function acceptMentorNotice(
@@ -59,7 +113,7 @@ export async function acceptMentorNotice(
   // the database and readable; this only guards new writes.
   if (!input.answerEventId) return null;
 
-  const copy = prepareMentorNoticeCopy(input);
+  const copy = await prepareMentorNoticeCopy(input);
   if (!copy) return null;
 
   const [accepted] = await db

@@ -1,0 +1,18 @@
+# WI-2548 completion summary (rework of the 2026-07-26 bounce — fourth criterion delivered)
+
+## What was done
+
+Closed the single rework finding from the 2026-07-26 review bounce: the fourth acceptance criterion — both coach-bubble visual flows passing on a real Android release build and their quarantine removed — is now delivered and landed. The evidence was produced where these flows permanently live: workflow_dispatch nightly runs of the e2e CI pipeline on the rework branch itself, which build the release-variant APK, boot the hosted deterministic worker, and execute the full nightly suite on a CI emulator. The first evidence run failed exactly one assertion and thereby proved its worth: the failure screenshot showed the deterministic fixture reply rendered and readable in the dark bubble, and the root cause was that the chat markdown renderer's underlying markdown-it instance enables the typographer option by default, so the fixture's ASCII apostrophe is rendered as the typographic apostrophe — the flow's anchored copy assertion could never match. The assertion was widened to a two-character class accepting both apostrophe forms (matching rendered reality, not weakening the oracle), and the second run completed the entire suite without a failing shard. The earlier code phase (uiMode plumbing, real response-complete oracle, deterministic provider verification) landed previously and is recorded in this item's prior completion summary.
+
+## What changed
+
+- apps/mobile/e2e/flows/learning/coach-bubble-light.yaml and coach-bubble-dark.yaml — blocked tag removed (both flows now enter the nightly suite via their smoke tag), PARKED headers rewritten to the verified fourth-criterion note, and the two exact-copy assertions per flow widened to accept ASCII and typographic apostrophes.
+- scripts/e2e-ci-injection-and-smoke-gate.test.ts — the parked-flows corpus-size canary floor recalibrated from ten to nine with an explanatory comment: un-parking two flows legitimately shrank the parked corpus, and the canary's purpose (proving the PARKED-prose detector still detects) is preserved; the per-flow machine-exclusion loop that does the real guarding is untouched.
+
+## Verification
+
+Evidence run 30219395887 (workflow e2e-ci, dispatched on the rework branch, nightly suite): concluded success with every shard on the release-variant APK; the shard log shows coach-bubble-dark executing fourth of twenty-two with uiMode dark applied via adb immediately before launch, and coach-bubble-light executing fifth with uiMode light applied — each completing its seeded sign-in, the real response-complete oracle waits, and the exact deterministic fixture-copy assertions in both exchanges. The prior run 30217730898 is retained as the diagnostic record of the apostrophe failure with its screenshot. The plan generator was verified locally to include both flows in the nightly suite with their uiMode threaded. Pull request #2675 carried a fully successful check set and a fresh automated-review approval with zero findings of any severity, and was merged through the armed lane merge gate; the landed squash commit is recorded in Fixed In. The recalibrated canary was re-run in isolation and completed without a failing case before push.
+
+## Caveats / Follow-ups
+
+The scheduled nightlies of 2026-07-25 and 2026-07-26 remain red on an unrelated seed-endpoint race (tracked as WI-2820, related to the WI-2788 seed-atomicity remediation); the evidence run for this item happened not to hit that race and both of this item's flows seed early in their shard, but the flows' ongoing nightly signal will share that environmental flakiness until WI-2820 lands. No further follow-ups for this item.

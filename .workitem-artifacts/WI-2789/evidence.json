@@ -1,0 +1,36 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Absorbed WI-2768 holds: Clerk error-code to i18n mapping with generic localized fallback, consumed by all three auth screens; regression test covers the incorrect-password path in German and the unknown-code fallback. Red-green-revert-restore executed and recorded as a page comment (2026-07-26) with the transcript retained in the artifacts directory.",
+      "pointer": "apps/mobile/src/lib/clerk-error.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Absorbed WI-2771 holds: sign-in forwards the entered email as a route param and forgot-password seeds from it (editable, partial-input tolerant), with param-seeding tests on both screens. Absorbed WI-2769 holds: keyboard scroll anchors on the submit button's measured bottom edge with fallback preserved for unwired screens.",
+      "pointer": "apps/mobile/src/hooks/use-keyboard-scroll.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Consolidated S10e-class German-locale device pass EXECUTED 2026-07-26, keyboard-open leg completed 2026-07-27 after enabling the soft IME alongside the AVD's hardware keyboard (emulator, S10e display override, locale de-DE, EAS preview APK + preview-channel OTA carrying the landed commit, staging API + staging Clerk): wrong-password renders the mapped German copy inline; unknown-email routes to a localized German sign-up notice with email preserved; forgot-password opens seeded with the exact sign-in email; and with the German soft keyboard fully open on the focused password field the submit button is entirely visible and tappable above it on the S10e profile, with a harsher native-geometry stress capture showing the anchor scroll firing and no recurrence of the original hidden-submit symptom. Screenshots and the per-finding records are on the Work Item as device-session comments. Pointer shows the verified sign-in surface.",
+      "pointer": "apps/mobile/src/app/(auth)/sign-in.tsx"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Ratchets re-runnable and reported clean on the landed revision (orphan-key across the mobile sources, JSX-literal with no new entries); jest covers the error mapping and the prefill param seeding.",
+      "pointer": "pnpm exec tsx scripts/check-i18n-orphan-keys.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Error-mapping and prefill regression tests on the landed revision; the red-green-revert-restore execution over this suite is recorded on the page.",
+      "pointer": "apps/mobile/src/lib/clerk-error.test.ts"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Both verify-first children adjudicated WITH device evidence in the same session (screenshots retained; details in the device-session page comment): WI-2770 masking default resolves fixed/correct-behavior — password fields render masked by default with the localized reveal toggle on both auth screens; WI-2772 first-frame safe-area squeeze resolves Not Reproducible — seven cold-start first-frame captures across three launches on the S10e profile show properly inset content with no status-bar overlap. Pointer shows the shared masked-by-default component.",
+      "pointer": "apps/mobile/src/components/common/PasswordInput.tsx"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": "apps/mobile/src/lib/clerk-error.test.ts"
+}

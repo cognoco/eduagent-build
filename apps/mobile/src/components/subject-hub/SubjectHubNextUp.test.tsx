@@ -26,7 +26,9 @@ describe('SubjectHubNextUp', () => {
     );
 
     screen.getByText('subjectHub.nextUp.heading');
-    screen.getByText('Cell division');
+    expect(screen.getByTestId('subject-hub-next-up-topic')).toHaveTextContent(
+      'Cell division',
+    );
     screen.getByText('subjectHub.nextUp.resume');
     expect(screen.getAllByTestId('subject-hub-next-up-action')).toHaveLength(1);
 

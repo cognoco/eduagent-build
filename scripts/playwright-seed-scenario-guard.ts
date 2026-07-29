@@ -126,6 +126,9 @@ function walkRuntimeClass(
 ): void {
   visit(node);
   for (const member of node.members) {
+    if (member.name && ts.isComputedPropertyName(member.name)) {
+      walkRuntime(member.name.expression, visit);
+    }
     if (ts.isClassStaticBlockDeclaration(member)) {
       walkRuntime(member, visit);
     } else if (

@@ -263,7 +263,11 @@ describe('judgeReferredLearningText — fails CLOSED on every degraded path', ()
     // its own output, silently — so it must not be buyable.
     const forged: ScanLearningTextResult = {
       ...referredScan(),
-      [referralPayloadKey]: { text: AMBIGUOUS_TEXT, producerVendor: '   ' },
+      [referralPayloadKey]: {
+        origin: 'llm',
+        text: AMBIGUOUS_TEXT,
+        producerVendor: '   ',
+      },
     };
 
     await expect(judgeReferredLearningText({ scan: forged })).resolves.toEqual({
@@ -279,8 +283,13 @@ describe('judgeReferredLearningText — fails CLOSED on every degraded path', ()
 // ---------------------------------------------------------------------------
 
 describe('judgeReferredLearningText — non-referred scans never reach the judge', () => {
+  // [operator ruling 2026-07-26] 'user-authored ambiguous' USED TO HEAD this
+  // list. It now REFERS, so it belongs to the sibling test below rather than
+  // here — moved, not dropped. Everything still on this list must stay on it:
+  // migration/backfill has no live author and no learner waiting, and an LLM
+  // producer that cannot be named must never have its output judged by a vendor
+  // the router failed to exclude.
   it.each([
-    ['user-authored ambiguous', 'user' as LearningTextProvenance, 'anthropic'],
     [
       'migration/backfill ambiguous',
       'migration' as LearningTextProvenance,
@@ -319,6 +328,54 @@ describe('judgeReferredLearningText — non-referred scans never reach the judge
       expect(mockRouteAndCall).not.toHaveBeenCalled();
     },
   );
+
+  it('user-authored ambiguity DOES reach the judge, declaring not-applicable independence', async () => {
+    // The other half of the ruling. Two properties in one place: the judge is
+    // actually consulted (so AC-4's allow/educational_reference is reachable in
+    // production at all), and the independence declared is 'not-applicable' —
+    // because a learner is not a vendor, so there is no producer to exclude.
+    // Naming one here would make the router exclude a vendor that produced
+    // nothing.
+    mockRouteAndCall.mockResolvedValue(
+      routeResult(
+        JSON.stringify({ verdict: 'allow', reason: 'educational_reference' }),
+      ),
+    );
+    const scan = scanLearningText({
+      text: AMBIGUOUS_TEXT,
+      conversationLanguage: 'en',
+      provenance: 'user',
+      fieldKind: 'note_text',
+    });
+    expect(scan.disposition).toBe('refer');
+
+    await expect(
+      judgeReferredLearningText({ scan, conversationLanguage: 'en' }),
+    ).resolves.toEqual({ disposition: 'clear', reason: null });
+
+    expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
+    expect(mockRouteAndCall.mock.calls[0]?.[2]).toMatchObject({
+      capability: 'judge',
+      judgeIndependence: { mode: 'not-applicable' },
+    });
+  });
+
+  it('still BLOCKS user-authored ambiguity when the judge is unavailable', async () => {
+    // "Goes to the judge" is not "passes". The ruling moved the case to the
+    // judge and left the fail-closed floor untouched, so a degraded judge on the
+    // user path still refuses the write.
+    mockRouteAndCall.mockRejectedValue(new Error('circuit open'));
+    const scan = scanLearningText({
+      text: AMBIGUOUS_TEXT,
+      conversationLanguage: 'en',
+      provenance: 'user',
+      fieldKind: 'note_text',
+    });
+
+    await expect(
+      judgeReferredLearningText({ scan, conversationLanguage: 'en' }),
+    ).resolves.toEqual({ disposition: 'block', reason: 'unclear' });
+  });
 
   it('a scan that already cleared deterministically is not re-judged', async () => {
     const scan = scanLearningText({
@@ -472,10 +529,14 @@ describe('judgeReferredLearningText — no external disclosure', () => {
   });
 
   it('logs no scanned text when a non-referred scan is refused', async () => {
+    // `migration`, not `user` — the 2026-07-26 ruling makes user-authored
+    // ambiguity referred, and this test needs a scan the judge REFUSES to
+    // consider. The property (a refused scan leaks no text to the logs) is
+    // unchanged.
     const scan = scanLearningText({
       text: SENTINEL_TEXT,
       conversationLanguage: 'en',
-      provenance: 'user',
+      provenance: 'migration',
       fieldKind: 'note_text',
       producerVendor: PRODUCER_VENDOR,
     });
@@ -566,10 +627,14 @@ describe('judgeReferredLearningText — the referral is bound to the scan', () =
   it('blocks a forged refer scan with no referral payload, and sends nothing', async () => {
     mockRouteAndCall.mockResolvedValue(routeResult(CLEAN_ALLOW));
 
+    // Was `user` provenance; the 2026-07-26 ruling makes that REFER, so this
+    // test needs the case that is still non-referred. `migration` is it. The
+    // property under test — a forged `refer` cannot smuggle a non-referred scan's
+    // text to the judge — is unchanged.
     const userScan = scanLearningText({
       text: SENTINEL_TEXT,
       conversationLanguage: 'en',
-      provenance: 'user',
+      provenance: 'migration',
       fieldKind: 'note_text',
       producerVendor: PRODUCER_VENDOR,
     });
@@ -653,16 +718,20 @@ describe('scanLearningText referral payload', () => {
       fieldKind: 'note_text',
       producerVendor: PRODUCER_VENDOR,
     });
+    // `migration`, not `user` — user-authored ambiguity now refers and so IS
+    // stamped. The invariant being asserted (a payload exists iff the
+    // disposition is `refer`) is unchanged.
     const blocked = scanLearningText({
       text: AMBIGUOUS_TEXT,
       conversationLanguage: 'en',
-      provenance: 'user',
+      provenance: 'migration',
       fieldKind: 'note_text',
     });
 
     expect(cleared[referralPayloadKey]).toBeUndefined();
     expect(blocked[referralPayloadKey]).toBeUndefined();
     expect(referredScan()[referralPayloadKey]).toEqual({
+      origin: 'llm',
       text: AMBIGUOUS_TEXT,
       producerVendor: PRODUCER_VENDOR,
     });
