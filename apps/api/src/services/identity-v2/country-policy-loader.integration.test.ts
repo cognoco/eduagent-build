@@ -240,6 +240,36 @@ const GOOD_ASSURANCE = {
       }
     });
 
+    it('[WI-2850] asserts the United States row shape jointly, including both COPPA authorities', async () => {
+      // The other US assertions in this file check membership, the threshold
+      // histogram, and the launch-day-review set separately — none of them
+      // binds threshold/regime/flag/provenance to the US row as ONE record.
+      // This test loads the actual seeded row and asserts on it jointly, so
+      // it fails if the row shape drifts from what 0161+0162 actually wrote.
+      const [usRecord] = await loadCountryPolicies(db, 'US');
+      if (!usRecord) {
+        throw new Error('Expected the seeded United States row');
+      }
+
+      expect(usRecord.article8Threshold).toBe(13);
+      expect(usRecord.regimeKey).toBe('US_COPPA');
+      expect(usRecord.launchDayReviewRequired).toBe(true);
+      expect(usRecord.launchStatus).toBe('blocked');
+      expect(usRecord.legalVerificationStatus).toBe('unverified');
+
+      // 0162 (WI-2850 rework): source_provenance must cite BOTH COPPA
+      // authorities — the statute and its implementing FTC rule.
+      const titles = usRecord.sourceProvenance.map((entry) => entry.title);
+      expect(
+        titles.some(
+          (title) => title.includes('15 U.S.C.') && title.includes('6501'),
+        ),
+      ).toBe(true);
+      expect(titles.some((title) => title.includes('16 CFR Part 312'))).toBe(
+        true,
+      );
+    });
+
     it('blocks an adult in every seeded country while the gates are open', async () => {
       const codes = [...new Set(rows.map((row) => row.countryCode))];
       for (const code of codes) {
