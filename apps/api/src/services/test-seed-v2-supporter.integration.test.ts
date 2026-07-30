@@ -27,6 +27,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   createDatabase,
+  createScopedRepository,
   login,
   membership,
   person,
@@ -251,19 +252,16 @@ function createIntegrationDb(): Database {
 
     it('[WI-2385 AC-7: NEGATIVE WALL — existing seeded person without an edge] an existing person with structural data but zero supportership to the caller is denied identically', async () => {
       const targetPersonId = existingUnlinkedSeeded.ids.supporteePersonId;
+      const targetRepo = createScopedRepository(db, targetPersonId);
       const [existingTarget, existingSubject, unexpectedEdge] =
         await Promise.all([
           db.query.person.findFirst({
             where: eq(person.id, targetPersonId),
             columns: { id: true },
           }),
-          db.query.subjects.findFirst({
-            where: and(
-              eq(subjects.id, existingUnlinkedSeeded.ids.subjectId),
-              eq(subjects.profileId, targetPersonId),
-            ),
-            columns: { id: true, profileId: true },
-          }),
+          targetRepo.subjects.findFirst(
+            eq(subjects.id, existingUnlinkedSeeded.ids.subjectId),
+          ),
           db.query.supportership.findFirst({
             where: and(
               eq(supportership.supporterPersonId, seeded.ids.supporterPersonId),
@@ -274,7 +272,7 @@ function createIntegrationDb(): Database {
         ]);
 
       expect(existingTarget).toEqual({ id: targetPersonId });
-      expect(existingSubject).toEqual({
+      expect(existingSubject).toMatchObject({
         id: existingUnlinkedSeeded.ids.subjectId,
         profileId: targetPersonId,
       });
