@@ -162,6 +162,32 @@ describe('PersonScopeJournalPlaceholder', () => {
     ).toHaveLength(1);
   });
 
+  it('renders structured shared-record facts through the shared renderer', async () => {
+    mockFetch.setRoute(`/visibility/reports/${PERSON_ID}/shared-record`, {
+      ...SHARED_RECORD,
+      supporterView: {
+        ...SHARED_RECORD.supporterView,
+        facts: [
+          {
+            ...SHARED_RECORD.supporterView.facts[0],
+            title: 'Session recap ready',
+            detail: 'Legacy recap detail',
+            metadata: {
+              templateKey: 'sessionRecap',
+              sessionDate: '2026-06-28T12:00:00.000Z',
+            },
+          },
+        ],
+      },
+    });
+    queryClient = renderWithProfile(
+      <PersonScopeJournalPlaceholder scope={EMMA_SCOPE} />,
+    );
+
+    await waitFor(() => screen.getByText('Session recap ready'));
+    expect(screen.queryByText('Legacy recap detail')).toBeNull();
+  });
+
   it('shows a visual empty state when the fetched record has no facts', async () => {
     mockFetch.setRoute(
       `/visibility/reports/${PERSON_ID}/shared-record`,

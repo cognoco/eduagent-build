@@ -4477,7 +4477,8 @@
       "bookCount_other": "{{count}} bøker",
       "errorTitle": "Kunne ikke laste inn fag",
       "errorMessage": "Prøv igjen om et øyeblikk.",
-      "addSupporterLabel": "Begynn å støtte"
+      "addSupporterLabel": "Begynn å støtte",
+      "learnerAsked": "{{name}} spurte: {{question}}"
     },
     "journal": {
       "title": "Logg",
@@ -4640,6 +4641,41 @@
       "title": "Vi kunne ikke gjenopprette familieoppsettet",
       "message": "Valget ditt er fortsatt beskyttet. Prøv igjen før du fortsetter.",
       "retry": "Prøv igjen"
+    }
+  },
+  "sharedRecord": {
+    "fact": {
+      "headline_one": "{{name}} har 1 oppdatering som kan deles.",
+      "headline_other": "{{name}} har {{count}} oppdateringer som kan deles.",
+      "weeklyReport": {
+        "title": "Ukerapport",
+        "topicsMastered_one": "{{count}} emne mestret",
+        "topicsMastered_other": "{{count}} emner mestret",
+        "wordsLearned_one": "{{count}} ord lært",
+        "wordsLearned_other": "{{count}} ord lært",
+        "topicsExplored_one": "{{count}} emne utforsket",
+        "topicsExplored_other": "{{count}} emner utforsket"
+      },
+      "sessionRecap": {
+        "title": "Øktoppsummering klar",
+        "detail": "En delbar læringsoppsummering fra {{date}} er klar."
+      },
+      "milestone": {
+        "title": "Milepæl nådd",
+        "vocabularyCount_one": "{{count}} ord lært",
+        "vocabularyCount_other": "{{count}} ord lært",
+        "topicMasteredCount_one": "{{count}} emne mestret",
+        "topicMasteredCount_other": "{{count}} emner mestret",
+        "sessionCount_one": "{{count}} læringsøkt fullført",
+        "sessionCount_other": "{{count}} læringsøkter fullført",
+        "streakLength": "{{count}}-dagers streak",
+        "subjectMastered": "{{subject}} mestret",
+        "bookCompleted": "En bok fullført",
+        "learningTime_one": "{{count}} time lært",
+        "learningTime_other": "{{count}} timer lært",
+        "cefrLevelUp": "Språknivå økt",
+        "topicsExplored": "{{count}} emner utforsket i {{subject}}"
+      }
     }
   }
 }

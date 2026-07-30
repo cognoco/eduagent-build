@@ -10,7 +10,6 @@ import { useTranslation } from 'react-i18next';
 import {
   supporteeStructuralSubjectsResponseSchema,
   type ScopeDescriptor,
-  type SupporteeStructuralBook,
   type SupporteeStructuralSubject,
   type SupporteeStructuralTopic,
 } from '@eduagent/schemas';
@@ -25,6 +24,7 @@ import {
   type SubjectHubData,
 } from '../subject-hub';
 import { useApiQuery } from '../../hooks/use-api-query';
+import type { Translate } from '../../i18n';
 import { useApiClient } from '../../lib/api-client';
 
 type PersonScope = Extract<ScopeDescriptor, { kind: 'person' }>;
@@ -46,16 +46,10 @@ function topicState(topic: SupporteeStructuralTopic): HubTopicState {
   }
 }
 
-function topicChapter(
-  book: SupporteeStructuralBook,
-  topic: SupporteeStructuralTopic,
-): string {
-  const chapter = topic.chapter?.trim();
-  return chapter ? `${book.title} / ${chapter}` : book.title;
-}
-
 function buildMaskedHubData(
   subject: SupporteeStructuralSubject,
+  t: Translate,
+  learnerName: string,
 ): SubjectHubData {
   const chaptersByName = new Map<string, HubChapter['topics']>();
   const activeTopics = subject.books.flatMap((book) =>
@@ -65,13 +59,19 @@ function buildMaskedHubData(
   );
 
   for (const { book, topic } of activeTopics) {
-    const chapter = topicChapter(book, topic);
+    const chapter = book.title;
+    const learnerChapter = topic.chapter?.trim();
     const topics = chaptersByName.get(chapter) ?? [];
     topics.push({
       topic: {
         id: topic.id,
         title: topic.title,
-        description: topic.description,
+        description: learnerChapter
+          ? `${t('supportHub.subjects.learnerAsked', {
+              name: learnerName,
+              question: learnerChapter,
+            })}\n\n${topic.description}`
+          : topic.description,
         sortOrder: topic.sortOrder,
         relevance: 'core',
         estimatedMinutes: topic.estimatedMinutes,
@@ -156,8 +156,11 @@ export function PersonScopeStructuralSubjects({
     (subject) => subject.id === selectedSubjectId,
   );
   const selectedHubData = useMemo(
-    () => (selectedSubject ? buildMaskedHubData(selectedSubject) : null),
-    [selectedSubject],
+    () =>
+      selectedSubject
+        ? buildMaskedHubData(selectedSubject, t, scope.displayName)
+        : null,
+    [scope.displayName, selectedSubject, t],
   );
 
   if (query.isLoading) {
