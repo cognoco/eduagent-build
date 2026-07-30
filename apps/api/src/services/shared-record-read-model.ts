@@ -132,7 +132,6 @@ async function projectSharedRecordForSupportee(
     }),
     supporterRepo.weeklyReports.findMany(
       eq(weeklyReports.childProfileId, input.supporteePersonId),
-      { limit: 3 },
     ),
     supporteeRepo.sessionSummaries.findMany(
       eq(sessionSummaries.status, 'accepted'),
@@ -145,9 +144,9 @@ async function projectSharedRecordForSupportee(
     return fact ? [fact] : [];
   });
 
-  const recapFacts: CandidateReportFact[] = recapRows
-    .slice(0, 5)
-    .map(projectSessionRecapFact);
+  const recapFacts: CandidateReportFact[] = recapRows.map(
+    projectSessionRecapFact,
+  );
 
   const milestoneFacts: CandidateReportFact[] = milestoneRows
     .slice(0, 5)

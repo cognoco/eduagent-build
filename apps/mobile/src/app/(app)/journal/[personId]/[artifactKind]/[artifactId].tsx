@@ -12,6 +12,7 @@ import { Button, ErrorFallback } from '../../../../../components/common';
 import { StructuralFactCard } from '../../../../../components/learning-surface';
 import { useSharedRecordArtifact } from '../../../../../components/support/use-shared-record';
 import { extractApiErrorCode } from '../../../../../lib/format-api-error';
+import { navigateBackToJournal } from '../../../../../lib/journal-navigation';
 import { firstParam } from '../../../../../lib/route-params';
 import { useScopeContext } from '../../../../../lib/scope-context';
 
@@ -177,7 +178,7 @@ export default function PersonJournalArtifactScreen(): React.ReactElement {
       candidate.kind === 'person' && candidate.personId === personId,
   );
   const onBack = (): void => {
-    router.replace('/(app)/journal');
+    navigateBackToJournal(router);
   };
 
   if (!personId || !artifactId || !artifactKindResult.success) {

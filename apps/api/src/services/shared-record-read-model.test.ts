@@ -210,6 +210,66 @@ describe('readSharedRecordForSupportee', () => {
     expect(JSON.stringify(record)).not.toContain('raw prompt');
   });
 
+  it('keeps every durable report and accepted recap discoverable in the Journal', async () => {
+    const db = createDb();
+    jest.mocked(db.query.weeklyReports.findMany).mockResolvedValueOnce(
+      Array.from({ length: 4 }, (_, index) => ({
+        id: `00000000-0000-4000-8000-${String(100 + index).padStart(12, '0')}`,
+        profileId: UUID.supporter,
+        childProfileId: UUID.supportee,
+        reportWeek: `2026-06-${String(1 + index).padStart(2, '0')}`,
+        reportData: weeklyReportData,
+        viewedAt: null,
+        createdAt: new Date(
+          `2026-06-${String(8 + index).padStart(2, '0')}T12:00:00.000Z`,
+        ),
+      })),
+    );
+    jest.mocked(db.query.sessionSummaries.findMany).mockResolvedValueOnce(
+      Array.from({ length: 6 }, (_, index) => ({
+        id: `00000000-0000-4000-8000-${String(200 + index).padStart(12, '0')}`,
+        sessionId: `00000000-0000-4000-8000-${String(300 + index).padStart(12, '0')}`,
+        profileId: UUID.supportee,
+        topicId: null,
+        content: 'raw learner-facing summary',
+        aiFeedback: null,
+        highlight: null,
+        narrative: null,
+        conversationPrompt: null,
+        engagementSignal: null,
+        closingLine: null,
+        learnerRecap: null,
+        nextTopicId: null,
+        nextTopicReason: null,
+        status: 'accepted' as const,
+        createdAt: new Date(
+          `2026-06-${String(14 + index).padStart(2, '0')}T12:00:00.000Z`,
+        ),
+        updatedAt: new Date(
+          `2026-06-${String(14 + index).padStart(2, '0')}T12:00:00.000Z`,
+        ),
+        llmSummary: null,
+        summaryGeneratedAt: null,
+        purgedAt: null,
+        languageLearningSummary: null,
+      })),
+    );
+
+    const record = await readSharedRecordForSupportee(db, {
+      supporterPersonId: UUID.supporter,
+      supporteePersonId: UUID.supportee,
+    });
+
+    expect(
+      record.supporterView.facts.flatMap((fact) =>
+        fact.artifact ? [fact.artifact] : [],
+      ),
+    ).toHaveLength(10);
+    expect(db.query.weeklyReports.findMany).toHaveBeenCalledWith(
+      expect.not.objectContaining({ limit: expect.anything() }),
+    );
+  });
+
   it('does not read artifacts when accepted visibility is absent in the transaction snapshot', async () => {
     const db = createDb(false);
 
