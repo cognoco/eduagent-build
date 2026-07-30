@@ -29,6 +29,7 @@ import {
   debugAccountsByEmail,
   VALID_SCENARIOS,
   SEED_CLERK_PREFIX,
+  type ResetOptions,
   type SeedScenario,
 } from './test-seed';
 import { getTierConfig } from './subscription';
@@ -830,13 +831,15 @@ describe('resetDatabase', () => {
     } as unknown as Database;
   }
 
-  it.each([
+  const RESET_TRANSACTION_CASES: Array<[string, ResetOptions]> = [
     [
       'prefix',
       { prefix: 'repeat-', clerkUserIds: [`${SEED_CLERK_PREFIX}repeat`] },
     ],
     ['unscoped', { clerkUserIds: [`${SEED_CLERK_PREFIX}repeat`] }],
-  ] as const)(
+  ];
+
+  it.each(RESET_TRANSACTION_CASES)(
     '[WI-2820] runs the %s select-to-delete reset path in one transaction',
     async (_path, options) => {
       const rootDb = makeResetDb();
