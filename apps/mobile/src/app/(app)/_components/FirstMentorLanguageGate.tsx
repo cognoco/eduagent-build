@@ -6,7 +6,10 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useClerk, useUser } from '@clerk/expo';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ConversationLanguage } from '@eduagent/schemas';
 
 import { useUpdateConversationLanguage } from '../../../hooks/use-onboarding-dimensions';
@@ -16,13 +19,19 @@ import {
   isConversationOnlyLocale,
 } from '../../../lib/conversation-languages';
 import { beginExplicitMentorLanguageUpdate } from '../../../lib/mentor-language-coordination';
+import { platformAlert } from '../../../lib/platform-alert';
 import { useProfile } from '../../../lib/profile';
+import { signOutWithCleanup } from '../../../lib/sign-out';
 import { useThemeColors } from '../../../lib/theme';
 
 export function FirstMentorLanguageGate(): React.ReactElement {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const { activeProfile } = useProfile();
+  const insets = useSafeAreaInsets();
+  const { signOut } = useClerk();
+  const { user } = useUser();
+  const queryClient = useQueryClient();
+  const { activeProfile, profiles } = useProfile();
   const updateLanguage = useUpdateConversationLanguage();
   const persistedLanguage =
     (activeProfile?.conversationLanguage as ConversationLanguage | undefined) ??
@@ -53,12 +62,33 @@ export function FirstMentorLanguageGate(): React.ReactElement {
     );
   }, [activeProfile, selectedLanguage, updateLanguage]);
 
+  const handleSignOut = async () => {
+    try {
+      await signOutWithCleanup({
+        clerkSignOut: signOut,
+        queryClient,
+        profileIds: profiles.map((profile) => profile.id),
+        clerkUserId: user?.id,
+      });
+    } catch (err: unknown) {
+      console.error('signOut failed:', err);
+      platformAlert(
+        t('tabs.createProfile.signOutFailedTitle'),
+        t('tabs.createProfile.signOutFailedMessage'),
+      );
+    }
+  };
+
   return (
     <View className="flex-1 bg-background" testID="first-mentor-language-gate">
       <ScrollView
         className="flex-1 px-6"
-        contentContainerStyle={{ paddingTop: 48, paddingBottom: 32 }}
+        contentContainerStyle={{
+          paddingTop: insets.top + 24,
+          paddingBottom: insets.bottom + 24,
+        }}
         keyboardShouldPersistTaps="handled"
+        testID="first-mentor-language-scroll"
       >
         <Text
           className="text-h1 font-bold text-text-primary mb-2"
@@ -137,6 +167,17 @@ export function FirstMentorLanguageGate(): React.ReactElement {
               {t('common.continue')}
             </Text>
           )}
+        </Pressable>
+        <Pressable
+          onPress={() => void handleSignOut()}
+          className="py-3.5 items-center mt-3"
+          testID="first-mentor-language-sign-out"
+          accessibilityRole="button"
+          accessibilityLabel={t('common.signOut')}
+        >
+          <Text className="text-body font-semibold text-primary">
+            {t('common.signOut')}
+          </Text>
         </Pressable>
       </ScrollView>
     </View>
