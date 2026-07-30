@@ -32,7 +32,7 @@ const mockBack = jest.fn();
 const mockReplace = jest.fn();
 const mockCanGoBack = jest.fn();
 const mockPush = jest.fn();
-let mockSearchParams: { for?: string } = {};
+let mockSearchParams: { for?: string; firstSetup?: string } = {};
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -479,7 +479,9 @@ describe('CreateProfileScreen', () => {
     });
 
     await waitFor(() => {
-      expect(mockBack).toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith(
+        FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? '/(app)/mentor' : '/(app)/home',
+      );
     });
     expect(getMentorBornCeremonySnapshot()).toMatchObject({
       activeRequest: {
@@ -496,6 +498,81 @@ describe('CreateProfileScreen', () => {
       profileId: PROFILE_IDS.new,
       reason: 'first-profile-created',
     });
+  });
+
+  describe('[WI-2231] shell-aware first-profile completion', () => {
+    const mutableFlags = FEATURE_FLAGS as {
+      MODE_NAV_V0_ENABLED: boolean;
+      MODE_NAV_V1_ENABLED: boolean;
+      MODE_NAV_V2_ENABLED: boolean;
+    };
+    const originalFlags = {
+      v0: mutableFlags.MODE_NAV_V0_ENABLED,
+      v1: mutableFlags.MODE_NAV_V1_ENABLED,
+      v2: mutableFlags.MODE_NAV_V2_ENABLED,
+    };
+
+    afterEach(() => {
+      mutableFlags.MODE_NAV_V0_ENABLED = originalFlags.v0;
+      mutableFlags.MODE_NAV_V1_ENABLED = originalFlags.v1;
+      mutableFlags.MODE_NAV_V2_ENABLED = originalFlags.v2;
+    });
+
+    it.each([
+      {
+        shell: 'flags-off',
+        flags: { v0: false, v1: false, v2: false },
+        destination: '/(app)/home',
+      },
+      {
+        shell: 'V0',
+        flags: { v0: true, v1: false, v2: false },
+        destination: '/(app)/home',
+      },
+      {
+        shell: 'V1',
+        flags: { v0: true, v1: true, v2: false },
+        destination: '/(app)/home',
+      },
+      {
+        shell: 'V2',
+        flags: { v0: true, v1: true, v2: true },
+        destination: '/(app)/mentor',
+      },
+    ])(
+      'replaces to $destination after a successful $shell first profile',
+      async ({ flags, destination }) => {
+        mutableFlags.MODE_NAV_V0_ENABLED = flags.v0;
+        mutableFlags.MODE_NAV_V1_ENABLED = flags.v1;
+        mutableFlags.MODE_NAV_V2_ENABLED = flags.v2;
+        mockCanGoBack.mockReturnValue(true);
+        mockFetch.mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              profile: makeProfileResponse({
+                id: PROFILE_IDS.new,
+                displayName: 'Sam',
+                isOwner: true,
+              }),
+            }),
+            { status: 200 },
+          ),
+        );
+
+        render(<CreateProfileScreen />, { wrapper: Wrapper });
+        fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Sam');
+        fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+        await act(() => {
+          datePickerOnChange?.({ type: 'set' }, new Date(2000, 5, 15));
+        });
+        fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+        await waitFor(() => {
+          expect(mockReplace).toHaveBeenCalledWith(destination);
+        });
+        expect(mockBack).not.toHaveBeenCalled();
+      },
+    );
   });
 
   it('optimistically writes the new profile into scoped profiles cache', async () => {
@@ -1327,6 +1404,51 @@ describe('CreateProfileScreen', () => {
         activeProfile: parentProfile,
         profiles: [parentProfile],
       });
+    });
+
+    it('[WI-2231] completes the parent first-setup child leg at Mentor in V2', async () => {
+      const mutableFlags = FEATURE_FLAGS as {
+        MODE_NAV_V2_ENABLED: boolean;
+      };
+      const originalV2 = mutableFlags.MODE_NAV_V2_ENABLED;
+      mutableFlags.MODE_NAV_V2_ENABLED = true;
+      mockSearchParams = { for: 'child', firstSetup: 'true' };
+      mockFetch
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ profile: childProfile }), {
+            status: 200,
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              profile: {
+                ...parentProfile,
+                defaultAppContext: 'family',
+                hasFamilyLinks: true,
+              },
+            }),
+            { status: 200 },
+          ),
+        );
+
+      try {
+        render(<CreateProfileScreen />, { wrapper: Wrapper });
+        fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Lily');
+        fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+        await act(() => {
+          datePickerOnChange?.({ type: 'set' }, birthDateAtMinimumAge());
+        });
+        fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+        await waitFor(() => {
+          expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor');
+        });
+        expect(mockBack).not.toHaveBeenCalled();
+        expect(mockSwitchProfile).not.toHaveBeenCalled();
+      } finally {
+        mutableFlags.MODE_NAV_V2_ENABLED = originalV2;
+      }
     });
 
     it('[QA-08] shows confirmation alert and does NOT switch profile when parent adds child', async () => {
@@ -2313,14 +2435,14 @@ describe('CreateProfileScreen', () => {
       await waitFor(() => {
         expect(mockReplace).toHaveBeenCalledWith({
           pathname: '/create-profile',
-          params: { for: 'child' },
+          params: { for: 'child', firstSetup: 'true' },
         });
       });
       expect(mockSwitchProfile).toHaveBeenCalledWith(PROFILE_IDS.adult);
       expect(getMentorBornCeremonySnapshot().requestCount).toBe(0);
     });
 
-    it('learner audience (adult): no PATCH, no add-child redirect, returns to home', async () => {
+    it('learner audience (adult): no PATCH, no add-child redirect, uses the shell-aware completion', async () => {
       mockAudience = 'learner';
       mockFetch.mockResolvedValueOnce(
         new Response(JSON.stringify({ profile: adultOwner }), { status: 200 }),
@@ -2339,11 +2461,12 @@ describe('CreateProfileScreen', () => {
       });
       // Single POST only — no family PATCH.
       expect(mockFetch).toHaveBeenCalledTimes(1);
-      // handleClose → back (canGoBack true); NOT the add-child redirect.
-      expect(mockBack).toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith(
+        FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? '/(app)/mentor' : '/(app)/home',
+      );
       expect(mockReplace).not.toHaveBeenCalledWith({
         pathname: '/create-profile',
-        params: { for: 'child' },
+        params: { for: 'child', firstSetup: 'true' },
       });
       expect(getMentorBornCeremonySnapshot()).toMatchObject({
         activeRequest: {
@@ -2380,11 +2503,12 @@ describe('CreateProfileScreen', () => {
       // Single POST only — no family PATCH (no person scope, no family
       // context granted from a bare supporter intent).
       expect(mockFetch).toHaveBeenCalledTimes(1);
-      // handleClose → back (canGoBack true); NOT the add-child redirect.
-      expect(mockBack).toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith(
+        FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? '/(app)/mentor' : '/(app)/home',
+      );
       expect(mockReplace).not.toHaveBeenCalledWith({
         pathname: '/create-profile',
-        params: { for: 'child' },
+        params: { for: 'child', firstSetup: 'true' },
       });
     });
 

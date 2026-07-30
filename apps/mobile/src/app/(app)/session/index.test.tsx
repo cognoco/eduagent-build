@@ -3289,6 +3289,111 @@ describe('SessionScreen homework flow', () => {
     });
   });
 
+  describe('[WI-2231] persisted Mentor opener E2E evidence', () => {
+    const originalE2E = process.env.EXPO_PUBLIC_E2E;
+    const mentorOpener = 'Teach me why leaves are green.';
+    const persistedExchange: NonNullable<
+      TranscriptMockReturn['data']
+    >['exchanges'] = [
+      {
+        role: 'user',
+        content: mentorOpener,
+        timestamp: '2026-07-30T10:00:00Z',
+        eventId: '10000000-0000-4000-8000-000000000011',
+        isSystemPrompt: false,
+        escalationRung: 1,
+      },
+      {
+        role: 'assistant',
+        content: 'Leaves look green because chlorophyll reflects green light.',
+        timestamp: '2026-07-30T10:00:05Z',
+        eventId: '10000000-0000-4000-8000-000000000012',
+        isSystemPrompt: false,
+        escalationRung: 1,
+      },
+    ];
+
+    beforeEach(() => {
+      process.env.EXPO_PUBLIC_E2E = 'true';
+      getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
+      (useLocalSearchParams as jest.Mock).mockReturnValue({
+        mode: 'freeform',
+        entrySource: 'mentor',
+        returnTo: 'mentor',
+        rawInput: mentorOpener,
+        sessionId: SESSION_ID,
+      });
+    });
+
+    afterEach(() => {
+      if (originalE2E === undefined) {
+        delete process.env.EXPO_PUBLIC_E2E;
+      } else {
+        process.env.EXPO_PUBLIC_E2E = originalE2E;
+      }
+    });
+
+    it('marks one persisted opening exchange and no duplicate', async () => {
+      mockUseSessionTranscript.mockReturnValue({
+        data: {
+          archived: false,
+          session: {
+            sessionId: SESSION_ID,
+            subjectId: SUBJECT_ID,
+            exchangeCount: 1,
+            inputMode: 'text',
+            milestonesReached: [],
+            verificationType: undefined,
+          },
+          exchanges: persistedExchange,
+        },
+      });
+
+      const testScreen = renderSessionScreen();
+      await flushAsyncWork();
+
+      testScreen.getByTestId('mentor-opener-persisted-once');
+      expect(
+        testScreen.queryByTestId('mentor-opener-persisted-more-than-once'),
+      ).toBeNull();
+    });
+
+    it('withholds the exactly-once marker when the opening pair is duplicated', async () => {
+      mockUseSessionTranscript.mockReturnValue({
+        data: {
+          archived: false,
+          session: {
+            sessionId: SESSION_ID,
+            subjectId: SUBJECT_ID,
+            exchangeCount: 2,
+            inputMode: 'text',
+            milestonesReached: [],
+            verificationType: undefined,
+          },
+          exchanges: [
+            ...persistedExchange,
+            {
+              ...persistedExchange[0]!,
+              eventId: '10000000-0000-4000-8000-000000000013',
+            },
+            {
+              ...persistedExchange[1]!,
+              eventId: '10000000-0000-4000-8000-000000000014',
+            },
+          ],
+        },
+      });
+
+      const testScreen = renderSessionScreen();
+      await flushAsyncWork();
+
+      expect(
+        testScreen.queryByTestId('mentor-opener-persisted-once'),
+      ).toBeNull();
+      testScreen.getByTestId('mentor-opener-persisted-more-than-once');
+    });
+  });
+
   it('auto-resumes the active session for a learning topic when no sessionId is in the route', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
