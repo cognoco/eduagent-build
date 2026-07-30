@@ -1,6 +1,6 @@
 # Mentor Notices — MVP specification
 
-**Status:** Ratified MVP specification · 2026-07-21 · amended 2026-07-22
+**Status:** Ratified MVP specification · 2026-07-21 · amended 2026-07-22 · amended 2026-07-26
 **Owner:** Product and Architecture
 **Decision authority:** [`MMT-ADR-0036`](../adr/MMT-ADR-0036-mentor-notice-mvp-boundaries-and-server-authority.md)
 
@@ -82,7 +82,7 @@ Creation identity is evidence-aware and retry-safe: replaying or racing the same
 
 `answerEventId` deliberately has no foreign key to the transcript event. Creation proves that the event then exists, is the learner's `user_message`, and belongs to the same learner and source session. Transcript purge may later delete the event while the active notice and its original UUID remain. Profile and source-session deletion retain their existing notice cascades. New accepted notices always carry the identifier; legacy nullable rows remain readable. A rollback may re-add a foreign key only if no dangling identifiers exist and must not erase identity to manufacture that precondition.
 
-Every persisted learning-text boundary uses one shared async clinical-safety gate. It Unicode-normalizes and scans all supported Conversation Languages—English, Czech, Spanish, French, German, Italian, Portuguese, Polish, Japanese, and Norwegian Bokmål—including cross-language phrases. Known-person clinical attribution blocks deterministically. Ambiguous text is referred to an independent judge regardless of provenance — user-authored ambiguous educational text refers exactly as LLM-authored text does, rather than blocking outright — and may pass only when that judge returns `allow/educational_reference`; missing producer identity, unavailable or malformed judging, `unclear`, and migration/backfill ambiguity all block. Unsafe derived fields are dropped, user mutations return the existing validation error, and observability records no protected text.
+Every persisted learning-text boundary uses one shared async clinical-safety gate. It Unicode-normalizes and scans all supported Conversation Languages—English, Czech, Spanish, French, German, Italian, Portuguese, Polish, Japanese, and Norwegian Bokmål—including cross-language phrases. Known-person clinical attribution blocks deterministically. Ambiguous text is referred to an independent judge on a three-way provenance split: user-authored text refers with judge independence `not-applicable` and no producer vendor — it has no model producer to exclude — rather than blocking outright; LLM-authored text refers only with a known, non-blank producer vendor; migration and backfill text never refers. Referred text may pass only when that judge returns `allow/educational_reference`; a missing or blank LLM producer vendor, unavailable or malformed judging, `unclear`, and migration/backfill ambiguity all block. Unsafe derived fields are dropped, user mutations return the existing validation error, and observability records no protected text.
 
 Clients request transitions and render authoritative results. Optimistic navigation or hiding is committed only after a schema-valid server success. A rejection, conflict, malformed response, or transport failure leaves the card present or triggers an authoritative refetch.
 
