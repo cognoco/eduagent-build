@@ -24,7 +24,17 @@ describe('[WI-1641] production secret-sync workflow', () => {
 
   it('runs every 30 minutes and supports an operator-triggered retry', () => {
     expect(workflow.on.schedule).toEqual([{ cron: '17,47 * * * *' }]);
-    expect(workflow.on.workflow_dispatch).toEqual({});
+    expect(workflow.on.workflow_dispatch.inputs).toMatchObject({
+      apply_manifest_deletions: {
+        required: true,
+        default: false,
+        type: 'boolean',
+      },
+      deletion_approval: {
+        required: false,
+        type: 'string',
+      },
+    });
   });
 
   it('is default-branch-only, serialized, and least privilege', () => {
@@ -88,7 +98,8 @@ describe('[WI-1641] production secret-sync workflow', () => {
       expect(step.uses).toMatch(/@[0-9a-f]{40}$/);
     }
     const notify = steps.find(
-      (step) => step.name === 'Notify on sync or health failure',
+      (step) =>
+        step.name === 'Notify on sync, reconciliation, or health failure',
     );
     expect(notify?.with?.script).toContain('issues.listForRepo');
     expect(notify?.with?.script).toContain('github.paginate');
@@ -97,5 +108,36 @@ describe('[WI-1641] production secret-sync workflow', () => {
     expect(notify?.with?.script).toContain(
       'Production worker secret sync failed',
     );
+  });
+
+  it('[WI-1837] dry-runs manifest reconciliation and gates apply before health verification', () => {
+    const steps = workflow.jobs.sync.steps as Array<{
+      name?: string;
+      if?: string;
+      run?: string;
+      env?: Record<string, string>;
+    }>;
+    const dryRunIndex = steps.findIndex(
+      (step) => step.name === 'Plan manifest-owned secret deletions',
+    );
+    const applyIndex = steps.findIndex(
+      (step) => step.name === 'Apply approved manifest-owned secret deletions',
+    );
+    const healthIndex = steps.findIndex(
+      (step) => step.name === 'Verify production environment health',
+    );
+    const apply = steps[applyIndex];
+
+    expect(dryRunIndex).toBeGreaterThan(-1);
+    expect(applyIndex).toBeGreaterThan(dryRunIndex);
+    expect(healthIndex).toBeGreaterThan(applyIndex);
+    expect(steps[dryRunIndex]?.run).toContain(
+      'pnpm secrets:reconcile --env prd --dry-run',
+    );
+    expect(apply?.if).toContain('apply_manifest_deletions');
+    expect(apply?.env?.WORKER_SECRET_RECONCILIATION_APPROVAL).toContain(
+      'deletion_approval',
+    );
+    expect(apply?.run).toContain('pnpm secrets:reconcile --env prd --apply');
   });
 });
