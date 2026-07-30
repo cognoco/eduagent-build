@@ -17,20 +17,18 @@ import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
  * scope-context.tsx reacts to navigation events, so only a real nav stack can
  * show what the visible layout actually does after Back).
  *
- * CAVEAT (verified at runtime, not assumed): the `v2-supporter-accepted` seed
- * scenario gives the supporter zero learning state of their own, so 'me'
- * never enters the server-resolved scope list (scope-resolution.ts:85-87
- * `hasFirstRealLearningState`), and the one client-side path that can reach
- * 'me' regardless (SupporterSelfLearningDoorway, scope-context.tsx:132-136's
- * "'me' is always valid" exemption) is not mounted by any screen — confirmed
- * below by asserting its testid and the 'me' scope chip are both absent. So
- * the specific "support.hub pointer pressed from Me scope" journey the
- * product code guards against (now-feed.ts:459-474's `support_hub_pointer`
- * card, `scope==='self'`-only) is not reachable with the current seed
- * fixture, and this file cannot exercise the "into the Me scope" half of
- * AC-3 end-to-end — that half stays evidenced by the co-located jest. What IS
- * real-navigation-reachable, and is exercised below, is the surface AC-3
- * actually names: Back FROM the support-hub Mentor surface.
+ * SCOPE VARIANT (verified at runtime, not assumed): the
+ * `v2-supporter-accepted` seed gives the supporter zero learning state of
+ * their own, so 'me' never enters the server-resolved scope list
+ * (scope-resolution.ts:85-87 `hasFirstRealLearningState`) and no Me scope chip
+ * renders. WI-2243 deliberately mounts SupporterSelfLearningDoorway on this
+ * exact unfiltered Support Hub surface: it is the first-time entry into Me,
+ * using scope-context.tsx:132-136's "'me' is always valid" exemption. The
+ * doorway therefore remains visible before and after Back while the supporter
+ * has no Me scope; it is absent in person scope and after entering the Me
+ * learner surface. The Me-already-available Support Hub variant is covered by
+ * J-32 and the WI-2243 component tests. This case keeps AC-3's two real Back
+ * paths and also proves the remaining reachable doorway surfaces.
  *
  * Navigation-depth note (verified empirically, not assumed): a single real
  * tab press away from the landing route, then Back, reliably returns to the
@@ -68,13 +66,14 @@ test('V2 nav shell: real Back from the support-hub Mentor surface keeps the supp
   });
   const richPersonId = seeded.ids.supporteePersonId;
 
-  // --- Caveat, proven not assumed: 'me' scope is unreachable for this seed
-  // fixture. No chip, no doorway CTA — the AC-3 "into Me" journey has no real
-  // entry point here.
+  // --- WI-2822 surface: support-hub/no-Me — initial. The server-resolved Me
+  // chip is absent, but WI-2243's first-time doorway is intentionally present.
+  await expect(page.getByTestId('support-hub-mentor-tab')).toBeVisible();
+  await expect(page.getByTestId('mentor-screen')).toHaveCount(0);
   await expect(page.getByTestId('scope-chip-option-me')).toHaveCount(0);
-  await expect(page.getByTestId('supporter-self-learning-doorway')).toHaveCount(
-    0,
-  );
+  await expect(
+    page.getByTestId('supporter-self-learning-doorway'),
+  ).toBeVisible();
 
   // --- One real cross-tab navigation away from the landing surface (an
   // actual Pressable tap on the tab bar, the same mechanism a user drives).
@@ -96,6 +95,9 @@ test('V2 nav shell: real Back from the support-hub Mentor surface keeps the supp
   // fresh push.
   await expect(page.getByTestId('support-hub-mentor-tab')).toBeVisible();
   await expect(page.getByTestId('mentor-screen')).toHaveCount(0);
+  await expect(
+    page.getByTestId('supporter-self-learning-doorway'),
+  ).toBeVisible();
 
   // --- Second real path: switch into a person scope (real tap, not a direct
   // setter call), navigate to Journal (real cross-tab push), switch back to
@@ -105,7 +107,13 @@ test('V2 nav shell: real Back from the support-hub Mentor surface keeps the supp
   await pressableClick(
     page.getByTestId(`support-hub-mentor-open-${richPersonId}`),
   );
+  // --- WI-2822 surface: person. The self-learning doorway belongs only to
+  // the unfiltered Support Hub, never a supportee's person scope; next,
+  // navigate to Journal through the real tab bar.
   await expect(page.getByTestId('person-scope-mentor-tab')).toBeVisible();
+  await expect(page.getByTestId('supporter-self-learning-doorway')).toHaveCount(
+    0,
+  );
   await pressableClick(page.getByTestId('tab-journal'));
   await expect(page).toHaveURL(/\/journal$/);
   await pressableClick(page.getByTestId('scope-chip-option-supporter-hub'));
@@ -122,4 +130,15 @@ test('V2 nav shell: real Back from the support-hub Mentor surface keeps the supp
   await expect(
     page.getByTestId('person-scope-journal-placeholder'),
   ).not.toBeVisible();
+
+  // --- WI-2822 surface: Me/learner. With both Back contracts established,
+  // use the intentional first-time doorway and prove the learner surface owns
+  // the route: neither the Support Hub nor its doorway remains mounted.
+  await pressableClick(page.getByTestId('supporter-self-learning-doorway'));
+  await expect(page.getByTestId('mentor-screen')).toBeVisible();
+  await expect(page.getByTestId('support-hub-mentor-tab')).not.toBeVisible();
+  await expect(page.getByTestId('supporter-self-learning-doorway')).toHaveCount(
+    0,
+  );
+  // WI-2822 contract end.
 });

@@ -28,7 +28,41 @@ import { assertOwnedCurriculumTopic } from './curriculum-topic-ownership';
 import { createLogger } from './logger';
 import { paginateRows } from './pagination';
 import { captureException } from './sentry';
-import * as learningTextGuard from './persisted-learning-text-guard';
+import {
+  assertLearningTextSafe,
+  evaluateLearningTextFields,
+} from './learning-text-safety/gate';
+
+/**
+ * [WI-2628] Note content is LEARNER-AUTHORED, so this is the user-mutation half
+ * of AC-5's asymmetry: an unsafe value raises `BadRequestError` rather than being
+ * silently dropped. Same class and same message as the English-only guard this
+ * replaces, so the client-visible contract is unchanged.
+ *
+ * [operator ruling 2026-07-26] THIS IS NOW A LIVE LLM CALL SITE ON A USER-FACING
+ * WRITE. Ambiguous educational text (a protected term with no person attributed)
+ * is REFERRED to the independent judge rather than blocked, so a learner saving a
+ * note containing e.g. "dyslexia" incurs one judge round-trip — measured ~1.1-1.2s
+ * at rung 1 in the WI-2628 live eval. Three properties this depends on:
+ *   - it runs BEFORE `db.transaction` below, so no pooled connection is held
+ *     across the call;
+ *   - a judge failure FAILS CLOSED (`judge.ts` returns block/unclear), which on
+ *     this path surfaces as the BadRequestError below — a judge outage turns an
+ *     educational note save into a 400, deliberately, not into an allowance;
+ *   - text with no protected lexeme never reaches the judge at all, so the
+ *     round-trip is confined to notes that actually mention a protected term.
+ *
+ * `conversationLanguage: undefined` is deliberate, not a gap. Neither write path
+ * here loads the learner's profile, and the gate's unresolved-language branch
+ * scans under all ten attribution grammars and keeps the strictest verdict —
+ * strictly more conservative than any single language, and it needs no extra
+ * read. Substituting `'en'` would be the actual defect: it is the English-only
+ * behaviour this Work Item removes.
+ */
+const NOTE_TEXT_GATE = {
+  conversationLanguage: undefined,
+  provenance: 'user',
+} as const;
 
 const MAX_NOTES_PER_TOPIC = 50;
 const POSTGRES_UNDEFINED_COLUMN = '42703';
@@ -225,7 +259,19 @@ async function insertNoteWithCap(
   },
   options: { dedupeExactSessionContent?: boolean } = {},
 ): Promise<MappedNoteRow> {
-  learningTextGuard.assertNoClinicalInferenceInLearningRecord(values.content);
+  // Evaluated BEFORE `db.transaction` opens below. The gate can make an LLM
+  // round-trip (the independent judge behind an ambiguous verdict); running it
+  // inside an open transaction would pin a pooled connection for the duration
+  // of that call.
+  assertLearningTextSafe(
+    await evaluateLearningTextFields({
+      ...NOTE_TEXT_GATE,
+      fields: [
+        { key: 'content', fieldKind: 'note_text', text: values.content },
+      ],
+    }),
+    'content',
+  );
   const artifactSource = values.artifactSource ?? 'learner_authored_note';
   const verificationState = values.verificationState ?? 'unverified';
   return db.transaction(async (tx) => {
@@ -620,7 +666,13 @@ export async function updateNote(
   noteId: string,
   content: string,
 ): Promise<MappedNoteRow> {
-  learningTextGuard.assertNoClinicalInferenceInLearningRecord(content);
+  assertLearningTextSafe(
+    await evaluateLearningTextFields({
+      ...NOTE_TEXT_GATE,
+      fields: [{ key: 'content', fieldKind: 'note_text', text: content }],
+    }),
+    'content',
+  );
   const [row] = await db
     .update(topicNotes)
     .set({

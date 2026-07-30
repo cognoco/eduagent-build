@@ -1,0 +1,20 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Cross-account FORBIDDEN case asserts zero speaking_practice_attempts rows for both the caller profile and the attacker-targeted profile after the rejected request.",
+      "pointer": "apps/api/src/routes/speaking-practice.integration.test.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Missing-profile PROXY_MODE case asserts zero speaking_practice_attempts rows for the fixture profile after the rejected request.",
+      "pointer": "apps/api/src/routes/speaking-practice.integration.test.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Assertions run inside the existing integration suite that boots the exported production app against the isolated real integration database (createIntegrationDb), same harness as the sibling cases; residue-set completeness anchored on the single transactional insert in the service.",
+      "pointer": "apps/api/src/services/speaking-practice/attempt.ts"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13"
+}

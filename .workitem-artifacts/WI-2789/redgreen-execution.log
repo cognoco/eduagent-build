@@ -1,0 +1,61 @@
+=== STEP 1: GREEN baseline at landed revision (worktree HEAD, file identical to squash commit) ===
+$ pnpm exec jest src/lib/clerk-error.test.ts --no-coverage
+    √ maps a known Clerk error code to the localized message in the active (non-English) locale, never the raw English Clerk text (22 ms)
+    √ maps the incorrect-verification-code path (form_code_incorrect) in German (8 ms)
+    √ falls back to the localized generic message for an unmapped code — never the raw Clerk message (8 ms)
+    √ falls back to the caller-supplied fallback when the error has no code and a fallback is given (3 ms)
+    √ falls back to the localized generic message when there is no clerkErrors array at all (4 ms)
+    √ returns the English message in the English locale (sanity check) (6 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       6 passed, 6 total
+Snapshots:   0 total
+Time:        5.612 s, estimated 14 s
+Ran all test suites matching src/lib/clerk-error.test.ts.
+
+=== STEP 2: REVERT fix — restore pre-fix implementation, test kept at landed revision ===
+$ git checkout cc02b21f5ad4674f9b77adbbe4d9194f2a054269~1 -- apps/mobile/src/lib/clerk-error.ts
+(reverted)
+$ pnpm exec jest src/lib/clerk-error.test.ts --no-coverage   # from apps/mobile
+     [90m 71 |[39m       [32m'localized fallback'[39m[33m,[39m
+     [90m 72 |[39m     )[33m;[39m
+     [90m 73 |[39m   })[33m;[39m[0m
+
+      at Object.toBe (apps/mobile/src/lib/clerk-error.test.ts:70:58)
+
+  ● extractClerkError — locale-aware code mapping (WI-2768) › returns the English message in the English locale (sanity check)
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "That password doesn't look right. Please try again."
+    Received: "irrelevant"
+
+    [0m [90m 86 |[39m     }[33m;[39m
+     [90m 87 |[39m
+    [31m[1m>[22m[39m[90m 88 |[39m     expect(extractClerkError(err))[33m.[39mtoBe(
+     [90m    |[39m                                    [31m[1m^[22m[39m
+     [90m 89 |[39m       [32m"That password doesn't look right. Please try again."[39m[33m,[39m
+     [90m 90 |[39m     )[33m;[39m
+     [90m 91 |[39m   })[33m;[39m[0m
+
+      at Object.toBe (apps/mobile/src/lib/clerk-error.test.ts:88:36)
+      at asyncGeneratorStep (node_modules/.pnpm/@babel+runtime@7.27.6/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/.pnpm/@babel+runtime@7.27.6/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+Test Suites: 1 failed, 1 total
+Tests:       5 failed, 1 passed, 6 total
+Snapshots:   0 total
+Time:        4.564 s, estimated 5 s
+Ran all test suites matching src/lib/clerk-error.test.ts.
+
+=== STEP 3: RESTORE fix and re-run (expect green) ===
+$ git checkout HEAD -- apps/mobile/src/lib/clerk-error.ts
+(restored)
+$ git status --short  # must be clean
+$ pnpm exec jest src/lib/clerk-error.test.ts --no-coverage   # from apps/mobile
+
+Test Suites: 1 passed, 1 total
+Tests:       6 passed, 6 total
+Snapshots:   0 total
+Time:        3.6 s, estimated 4 s
+Ran all test suites matching src/lib/clerk-error.test.ts.

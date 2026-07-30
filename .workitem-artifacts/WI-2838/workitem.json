@@ -1,0 +1,18 @@
+{
+  "pageId": "3a98bce9-1f7c-81f1-b0c6-df228c7d5d26",
+  "id": "WI-2838",
+  "name": "Replace WI-2234 held-response object identity with a stable request discriminator",
+  "description": "Root cause: returning-learner-resume.spec.ts holds the post-Back /v1/now request via page.route, then waits for its response by comparing Playwright Request wrapper object identity. That wrapper identity is not a stable discriminator across the routed request/response lifecycle, so the test can time out after the exact held response was released. Behavioral variants: the intended held post-Back request; adjacent /v1/now requests that must not satisfy the matcher; successful and unsuccessful released responses; and retries-disabled execution under the full V2 gate.",
+  "acceptanceCriteria": "1. Match the post-Back Now response using a stable exact discriminator established before release (method, exact URL/scope, and the single held request lifecycle or an equivalent explicit correlation), never JavaScript wrapper identity. 2. Still prove Session remains active while that exact response is held; the released response succeeds and is freshly generated; Mentor is reached only after that boundary; and both exact returning-learner cards remain visible. 3. Executed red-green evidence shows the old Request-identity predicate times out at the reproducing seam and the corrected discriminator passes without retries. 4. The named WI-2234 case passes repeatedly with retries disabled and the full V2 release gate is strict green. No timeout widening, blanket retry, assertion removal, or adjacent /v1/now match.",
+  "riskImpact": "P1 launch-gate reliability defect: it repeatedly false-reds the required V2 release gate after the product refresh boundary is correct, blocks unrelated surface PRs, and obscures real failures.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "",
+  "bodyText": ""
+}

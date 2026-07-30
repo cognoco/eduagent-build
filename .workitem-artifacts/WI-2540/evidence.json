@@ -1,0 +1,21 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Finished-loading-empty branch renders subject-picker-empty with localized copy naming the condition and a subject-picker-create escape button routing to Subject creation; confirm stays disabled since no Subject is selectable in this branch.",
+      "pointer": "apps/mobile/src/app/(app)/homework/manual.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "AC-required regression test (rework) seeds the real production loaded-empty shape — subjects fetch resolves with an empty array (server excludes inactive Subjects by default) — and asserts the empty container renders, loading and resolution-ready testIDs are absent, confirm remains disabled after text entry, and the escape routes to create-subject. The archived-Subject fixture remains only as an explicitly-labelled defense-in-depth case for the client-filter path. Red-green recorded: pre-fix revision fails both new tests on missing subject-picker-empty; restored fix passes all six.",
+      "pointer": "apps/mobile/src/app/(app)/homework/manual.test.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Related suites re-runnable via the standard focused jest invocation.",
+      "pointer": "pnpm exec jest --findRelatedTests apps/mobile/src/app/(app)/homework/manual.test.tsx --no-coverage"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": "apps/mobile/src/app/(app)/homework/manual.test.tsx"
+}

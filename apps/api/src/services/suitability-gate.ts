@@ -89,10 +89,10 @@ export function shouldBlockSuitabilityVerdict(verdict: JudgeVerdict): boolean {
  */
 export function suitabilityRefusalResponse(): string {
   return (
-    "Let's keep this somewhere I can genuinely help. I don't want to go " +
-    "further down that path, but I'm glad to switch to the schoolwork, the " +
-    'idea behind it, or anything you actually want to understand — just point ' +
-    "me at it and we'll dig in."
+    "That answer may have taken an unhelpful direction, so let's reset. " +
+    'I can still help with the schoolwork, explain the idea at a high level, ' +
+    'or work through a related question with you. Tell me which direction ' +
+    'would be most useful.'
   );
 }
 

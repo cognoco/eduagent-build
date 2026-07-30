@@ -495,6 +495,19 @@ jobs:
           NODE_ENV: production
         run: ./gradlew -Dorg.gradle.jvmargs="-Xmx4096m -XX:MaxMetaspaceSize=1024m" assembleRelease --no-daemon --max-workers=2 --stacktrace
 
+      # Expose the built E2E APK so device-verification legs (e.g. WI-2600
+      # AC-3) can install the exact CI vehicle on a local emulator against a
+      # locally hosted maestro-e2e-worker. Shard 1 only — every shard builds
+      # the identical APK. The APK embeds only EXPO_PUBLIC_* values (all
+      # client-public by policy); no secrets or session credentials.
+      - name: Upload E2E release APK
+        if: matrix.shard == 1
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: e2e-release-apk
+          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 3
+
       # ── Test execution — always runs ──
 
       - name: Cache Maestro CLI

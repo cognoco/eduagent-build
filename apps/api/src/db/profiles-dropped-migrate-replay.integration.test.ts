@@ -162,7 +162,9 @@ async function expectUndefinedTableError(
 
 describe('migration-tail replay on a profiles-dropped database [WI-1167]', () => {
   const baseUrl = requireDatabaseUrl();
-  const databaseName = `wi1167_replay_${randomBytes(4).toString('hex')}`;
+  const scratchRunId = randomBytes(4).toString('hex');
+  const databaseName = `wi1167_replay_${scratchRunId}`;
+  const scratchApplicationName = `wi1167-replay-${scratchRunId}`;
   const ephemeralUrl = buildEphemeralUrl(baseUrl, databaseName);
   const tempDirs: string[] = [];
 
@@ -173,7 +175,10 @@ describe('migration-tail replay on a profiles-dropped database [WI-1167]', () =>
     adminPool = new Pool({ connectionString: baseUrl });
     await adminPool.query(`CREATE DATABASE "${databaseName}"`);
 
-    scratchPool = new Pool({ connectionString: ephemeralUrl });
+    scratchPool = new Pool({
+      connectionString: ephemeralUrl,
+      application_name: scratchApplicationName,
+    });
     await scratchPool.query('CREATE EXTENSION IF NOT EXISTS vector');
 
     // Phase 1: replay the real committed chain through 0123 — the state
@@ -201,6 +206,7 @@ describe('migration-tail replay on a profiles-dropped database [WI-1167]', () =>
         adminPool,
         scratchPool,
         databaseName,
+        ownedApplicationName: scratchApplicationName,
       });
     } finally {
       try {
