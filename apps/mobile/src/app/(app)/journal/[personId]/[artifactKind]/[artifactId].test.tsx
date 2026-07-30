@@ -45,7 +45,7 @@ let mockAvailableScopes: ScopeDescriptor[];
 let mockScopesLoading: boolean;
 
 jest.mock(
-  '../../../../../lib/scope-context' /* gc1-allow: route test fixes the current authorization scope; provider persistence is covered separately */,
+  '../../../../../lib/scope-context' /* gc1-allow: route test must hold the query-backed scope in unresolved-loading and revoked-edge states; the real provider cannot deterministically expose those states without coupling this route test to persistence and scope-query timing */,
   () => ({
     useScopeContext: () => ({
       activeScope: { kind: 'supporter-hub' },

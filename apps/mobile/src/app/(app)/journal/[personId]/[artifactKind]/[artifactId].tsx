@@ -11,15 +11,17 @@ import {
 import { Button, ErrorFallback } from '../../../../../components/common';
 import { StructuralFactCard } from '../../../../../components/learning-surface';
 import { useSharedRecord } from '../../../../../components/support/use-shared-record';
+import { extractApiErrorCode } from '../../../../../lib/format-api-error';
 import { firstParam } from '../../../../../lib/route-params';
 import { useScopeContext } from '../../../../../lib/scope-context';
 
 type PersonScope = Extract<ScopeDescriptor, { kind: 'person' }>;
 
 function isStaleArtifactError(error: unknown): boolean {
-  if (!error || typeof error !== 'object' || !('status' in error)) return false;
-  const status = (error as { status?: unknown }).status;
-  return status === 403 || status === 404 || status === 410;
+  const code = extractApiErrorCode(error);
+  return (
+    code === 'FORBIDDEN' || code === 'NOT_FOUND' || code === 'RESOURCE_GONE'
+  );
 }
 
 function StaleArtifact({
