@@ -373,6 +373,17 @@ describe('AppLayout', () => {
     });
   }
 
+  function expectFamilyIntentNavigatorBlocked() {
+    screen.getByTestId('tabs', { includeHiddenElements: true });
+    const shell = screen.getByTestId('app-navigator-shell', {
+      includeHiddenElements: true,
+    });
+    expect(shell.props.pointerEvents).toBe('none');
+    expect(shell.props.accessibilityElementsHidden).toBe(true);
+    expect(shell.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(shell.props.style).toEqual(expect.objectContaining({ opacity: 0 }));
+  }
+
   beforeEach(async () => {
     jest.clearAllMocks();
     mockSafeAreaInsets = { top: 0, bottom: 0, left: 0, right: 0 };
@@ -574,6 +585,41 @@ describe('AppLayout', () => {
     expect(screen.queryByTestId('tabs')).toBeNull();
   });
 
+  it('[WI-2532] preserves the requested tab navigator while an ordinary profile restore probe is pending', async () => {
+    mockUsePathname.mockReturnValue('/subjects');
+    let resolvePrimaryRead!: (value: null) => void;
+    const pendingPrimaryRead = new Promise<null>((resolve) => {
+      resolvePrimaryRead = resolve;
+    });
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) =>
+        key === FAMILY_INTENT_ONBOARDING_KEY
+          ? pendingPrimaryRead
+          : Promise.resolve(null),
+    );
+
+    renderLayout();
+
+    await waitFor(() => {
+      screen.getByTestId('family-intent-state-loading');
+    });
+    expectFamilyIntentNavigatorBlocked();
+
+    await act(async () => {
+      resolvePrimaryRead(null);
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('family-intent-state-loading')).toBeNull();
+    });
+    screen.getByTestId('tabs');
+    screen.getByTestId('active-root-scene');
+    expect(screen.getByTestId('app-navigator-shell').props.style).toEqual(
+      expect.objectContaining({ opacity: 1 }),
+    );
+  });
+
   it('[WI-2532] mounts the tab navigator before replaying a durable invitation destination', async () => {
     mockPush.mockImplementationOnce(() => {
       screen.getByTestId('tabs');
@@ -617,7 +663,7 @@ describe('AppLayout', () => {
     await waitFor(() => {
       screen.getByTestId('family-intent-restore-error');
     });
-    expect(screen.queryByTestId('tabs')).toBeNull();
+    expectFamilyIntentNavigatorBlocked();
   });
 
   it('[WI-2532] fails closed when the family-intent state read times out', async () => {
@@ -636,7 +682,39 @@ describe('AppLayout', () => {
     });
 
     screen.getByTestId('family-intent-restore-error');
-    expect(screen.queryByTestId('tabs')).toBeNull();
+    expectFamilyIntentNavigatorBlocked();
+  });
+
+  it('[WI-2532] preserves the requested route when a failed restore retries to no pending intent', async () => {
+    mockUsePathname.mockReturnValue('/subjects');
+    const SecureStoreMock = require('../../lib/secure-storage');
+    let familyReads = 0;
+    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) => {
+        if (key !== FAMILY_INTENT_ONBOARDING_KEY) return Promise.resolve(null);
+        familyReads += 1;
+        return familyReads === 1
+          ? Promise.reject(new Error('storage unavailable'))
+          : Promise.resolve(null);
+      },
+    );
+
+    renderLayout();
+    await waitFor(() => {
+      screen.getByTestId('family-intent-restore-error');
+    });
+    expectFamilyIntentNavigatorBlocked();
+
+    fireEvent.press(screen.getByTestId('family-intent-restore-retry'));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('family-intent-restore-error')).toBeNull();
+    });
+    screen.getByTestId('tabs');
+    screen.getByTestId('active-root-scene');
+    expect(screen.getByTestId('app-navigator-shell').props.style).toEqual(
+      expect.objectContaining({ opacity: 1 }),
+    );
   });
 
   it('[WI-2532] retries a failed family-intent restore without exposing tabs first', async () => {
@@ -662,6 +740,7 @@ describe('AppLayout', () => {
     await waitFor(() => {
       screen.getByTestId('family-intent-restore-error');
     });
+    expectFamilyIntentNavigatorBlocked();
     fireEvent.press(screen.getByTestId('family-intent-restore-retry'));
 
     await waitFor(() => {
