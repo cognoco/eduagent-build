@@ -42,6 +42,7 @@ jest.mock('expo-router', () => ({
 
 const mockSetActiveScope = jest.fn();
 let mockAvailableScopes: ScopeDescriptor[];
+let mockScopesLoading: boolean;
 
 jest.mock(
   '../../../../../lib/scope-context' /* gc1-allow: route test fixes the current authorization scope; provider persistence is covered separately */,
@@ -49,6 +50,7 @@ jest.mock(
     useScopeContext: () => ({
       activeScope: { kind: 'supporter-hub' },
       availableScopes: mockAvailableScopes,
+      isLoading: mockScopesLoading,
       setActiveScope: mockSetActiveScope,
     }),
   }),
@@ -138,6 +140,7 @@ describe('PersonJournalArtifactScreen', () => {
       artifactId: ARTIFACT_ID,
     };
     mockAvailableScopes = [PERSON_SCOPE];
+    mockScopesLoading = false;
     mockFetch.setRoute(
       `/visibility/reports/${PERSON_ID}/shared-record`,
       RECORD,
@@ -191,6 +194,8 @@ describe('PersonJournalArtifactScreen', () => {
     await waitFor(() => {
       screen.getByTestId('person-journal-artifact-stale');
     });
+    screen.getByText('This report is no longer available');
+    expect(screen.queryByText('Recap not found')).toBeNull();
     expect(
       screen.queryByTestId(
         `person-journal-artifact-weekly_report-${ARTIFACT_ID}`,
@@ -204,6 +209,22 @@ describe('PersonJournalArtifactScreen', () => {
     queryClient = renderScreen();
 
     screen.getByTestId('person-journal-artifact-stale');
+    expect(
+      fetchCallsMatching(
+        mockFetch,
+        `/visibility/reports/${PERSON_ID}/shared-record`,
+      ),
+    ).toHaveLength(0);
+  });
+
+  it('keeps the deep link loading while authorized scopes are unresolved', () => {
+    mockAvailableScopes = [];
+    mockScopesLoading = true;
+
+    queryClient = renderScreen();
+
+    screen.getByTestId('person-journal-artifact-loading');
+    expect(screen.queryByTestId('person-journal-artifact-stale')).toBeNull();
     expect(
       fetchCallsMatching(
         mockFetch,

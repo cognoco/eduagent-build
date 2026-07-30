@@ -13,6 +13,7 @@ import {
   type SharedRecord,
 } from '@eduagent/schemas';
 
+import { findAcceptedContractForSupportee } from './linking-ceremony';
 import { projectSharedRecord } from './shared-record';
 import type { CandidateReportFact } from './reportability';
 
@@ -39,7 +40,7 @@ function metadataString(metadata: unknown, key: string): string | undefined {
   return trimmed || undefined;
 }
 
-export async function readSharedRecordForSupportee(
+async function projectSharedRecordForSupportee(
   db: Database,
   input: {
     supportershipId: string;
@@ -149,5 +150,25 @@ export async function readSharedRecordForSupportee(
       supporteeDisplayName: supportee?.displayName,
       facts: [...weeklyFacts, ...recapFacts, ...milestoneFacts],
     }),
+  );
+}
+
+export async function readSharedRecordForSupportee(
+  db: Database,
+  input: {
+    supporterPersonId: string;
+    supporteePersonId: string;
+  },
+): Promise<SharedRecord> {
+  return db.transaction(
+    async (tx) => {
+      const txDb = tx as unknown as Database;
+      const contract = await findAcceptedContractForSupportee(txDb, input);
+      return projectSharedRecordForSupportee(txDb, {
+        ...input,
+        supportershipId: contract.supportershipId,
+      });
+    },
+    { isolationLevel: 'repeatable read' },
   );
 }

@@ -32,8 +32,43 @@ const weeklyReportData: WeeklyReportData = {
   },
 };
 
-function createDb(): Database {
-  return {
+function createDb(authorized = true): Database {
+  const authChain = {
+    from: jest.fn(),
+    innerJoin: jest.fn(),
+    where: jest.fn(),
+    limit: jest.fn().mockResolvedValue(
+      authorized
+        ? [
+            {
+              support_visibility_contracts: {
+                id: '00000000-0000-4000-8000-000000000008',
+                supportershipId: UUID.supportership,
+                supporterPersonId: UUID.supporter,
+                supporteePersonId: UUID.supportee,
+                relation: 'other',
+                status: 'accepted',
+                contractVersion: 1,
+                reportableKinds: ['mastery', 'effort', 'observable_engagement'],
+                artifactWall: true,
+                renderEquivalence: true,
+                safetyException: true,
+                supporterAcceptedAt: new Date('2026-06-20T12:00:00.000Z'),
+                supporteeAcceptedAt: new Date('2026-06-20T12:00:00.000Z'),
+                createdAt: new Date('2026-06-20T12:00:00.000Z'),
+                updatedAt: new Date('2026-06-20T12:00:00.000Z'),
+              },
+            },
+          ]
+        : [],
+    ),
+  };
+  authChain.from.mockReturnValue(authChain);
+  authChain.innerJoin.mockReturnValue(authChain);
+  authChain.where.mockReturnValue(authChain);
+
+  const db = {
+    select: jest.fn().mockReturnValue(authChain),
     query: {
       person: {
         findFirst: jest.fn().mockResolvedValue({ displayName: 'Emma' }),
@@ -94,16 +129,29 @@ function createDb(): Database {
       },
     },
   } as unknown as Database;
+  Object.assign(db, {
+    transaction: jest.fn(
+      async (
+        callback: (tx: Database) => Promise<unknown>,
+        _config: { isolationLevel: string },
+      ) => callback(db),
+    ),
+  });
+  return db;
 }
 
 describe('readSharedRecordForSupportee', () => {
   it('projects real report, recap, and milestone facts without raw artifacts', async () => {
-    const record = await readSharedRecordForSupportee(createDb(), {
-      supportershipId: UUID.supportership,
+    const db = createDb();
+    const record = await readSharedRecordForSupportee(db, {
       supporterPersonId: UUID.supporter,
       supporteePersonId: UUID.supportee,
     });
 
+    expect(db.select).toHaveBeenCalledTimes(1);
+    expect(db.transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: 'repeatable read',
+    });
     expect(record.supporterView.headline).toBe('Emma has 3 shareable updates.');
     expect(record.supporterView.facts.map((fact) => fact.source)).toEqual([
       'weekly_report_summary',
@@ -141,5 +189,21 @@ describe('readSharedRecordForSupportee', () => {
     expect(JSON.stringify(record)).not.toContain('raw parent-facing recap');
     expect(JSON.stringify(record)).not.toContain('raw highlight');
     expect(JSON.stringify(record)).not.toContain('raw prompt');
+  });
+
+  it('does not read artifacts when accepted visibility is absent in the transaction snapshot', async () => {
+    const db = createDb(false);
+
+    await expect(
+      readSharedRecordForSupportee(db, {
+        supporterPersonId: UUID.supporter,
+        supporteePersonId: UUID.supportee,
+      }),
+    ).rejects.toThrow('This support link is not active.');
+
+    expect(db.query.person.findFirst).not.toHaveBeenCalled();
+    expect(db.query.weeklyReports.findMany).not.toHaveBeenCalled();
+    expect(db.query.sessionSummaries.findMany).not.toHaveBeenCalled();
+    expect(db.query.milestones.findMany).not.toHaveBeenCalled();
   });
 });

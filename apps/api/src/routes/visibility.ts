@@ -177,12 +177,7 @@ export const visibilityRoutes = new Hono<VisibilityRouteEnv>()
     async (c) => {
       const { db, callerPersonId } = withCaller(c);
       const { personId } = c.req.valid('param');
-      const contract = await findAcceptedContractForSupportee(db, {
-        supporterPersonId: callerPersonId,
-        supporteePersonId: personId,
-      });
       const record = await readSharedRecordForSupportee(db, {
-        supportershipId: contract.supportershipId,
         supporterPersonId: callerPersonId,
         supporteePersonId: personId,
       });

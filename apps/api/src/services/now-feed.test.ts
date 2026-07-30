@@ -9,6 +9,7 @@ import {
   buildNowOverflowFromCandidates,
   isRetentionDueAt,
   rankCandidates,
+  resolveRecapReadyDeepLink,
   resolveDeepLink,
   type NowFeedCandidate,
 } from './now-feed';
@@ -338,6 +339,24 @@ describe('now feed route catalog', () => {
         personId: 'person-1',
         artifactKind: 'weekly_report',
         artifactId: 'artifact-1',
+      },
+      chain: ['journal'],
+    });
+  });
+
+  it('routes a supporter-scoped recap announcement to its durable person Journal artifact', () => {
+    expect(
+      resolveRecapReadyDeepLink(
+        'person',
+        '00000000-0000-4000-8000-000000000011',
+        '00000000-0000-4000-8000-000000000012',
+      ),
+    ).toEqual({
+      route: 'journal.artifact',
+      params: {
+        personId: '00000000-0000-4000-8000-000000000011',
+        artifactKind: 'session_recap',
+        artifactId: '00000000-0000-4000-8000-000000000012',
       },
       chain: ['journal'],
     });

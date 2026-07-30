@@ -22,14 +22,32 @@ function isStaleArtifactError(error: unknown): boolean {
   return status === 403 || status === 404 || status === 410;
 }
 
-function StaleArtifact({ onBack }: { onBack: () => void }): React.ReactElement {
+function StaleArtifact({
+  artifactKind,
+  onBack,
+}: {
+  artifactKind?: SharedRecordArtifactKind;
+  onBack: () => void;
+}): React.ReactElement {
   const { t } = useTranslation();
+  const title =
+    artifactKind === 'weekly_report'
+      ? t('parentView.weeklyReport.reportGoneTitle')
+      : artifactKind === 'session_recap'
+        ? t('recaps.notFoundTitle')
+        : t('errors.resourceNotFound');
+  const message =
+    artifactKind === 'weekly_report'
+      ? t('parentView.weeklyReport.reportGoneBody')
+      : artifactKind === 'session_recap'
+        ? t('recaps.notFoundMessage')
+        : t('errors.resourceGone');
 
   return (
     <View className="flex-1 bg-background px-5 py-4">
       <ErrorFallback
-        title={t('recaps.notFoundTitle')}
-        message={t('recaps.notFoundMessage')}
+        title={title}
+        message={message}
         primaryAction={{
           label: t('common.goBack'),
           onPress: onBack,
@@ -37,6 +55,19 @@ function StaleArtifact({ onBack }: { onBack: () => void }): React.ReactElement {
         }}
         testID="person-journal-artifact-stale"
       />
+    </View>
+  );
+}
+
+function ArtifactLoading(): React.ReactElement {
+  const { t } = useTranslation();
+
+  return (
+    <View
+      className="flex-1 items-center justify-center bg-background"
+      testID="person-journal-artifact-loading"
+    >
+      <ActivityIndicator accessibilityLabel={t('common.loading')} />
     </View>
   );
 }
@@ -61,18 +92,11 @@ function AuthorizedArtifact({
   }, [scope, setActiveScope]);
 
   if (query.isLoading) {
-    return (
-      <View
-        className="flex-1 items-center justify-center bg-background"
-        testID="person-journal-artifact-loading"
-      >
-        <ActivityIndicator accessibilityLabel={t('common.loading')} />
-      </View>
-    );
+    return <ArtifactLoading />;
   }
 
   if (query.isError && isStaleArtifactError(query.error)) {
-    return <StaleArtifact onBack={onBack} />;
+    return <StaleArtifact artifactKind={artifactKind} onBack={onBack} />;
   }
 
   if (query.isError && !query.data) {
@@ -104,7 +128,7 @@ function AuthorizedArtifact({
   );
 
   if (!fact) {
-    return <StaleArtifact onBack={onBack} />;
+    return <StaleArtifact artifactKind={artifactKind} onBack={onBack} />;
   }
 
   return (
@@ -140,7 +164,7 @@ export default function PersonJournalArtifactScreen(): React.ReactElement {
     artifactKind?: string | string[];
     artifactId?: string | string[];
   }>();
-  const { availableScopes } = useScopeContext();
+  const { availableScopes, isLoading: scopesLoading } = useScopeContext();
   const personId = firstParam(params.personId);
   const artifactId = firstParam(params.artifactId);
   const artifactKindResult = sharedRecordArtifactKindSchema.safeParse(
@@ -154,8 +178,25 @@ export default function PersonJournalArtifactScreen(): React.ReactElement {
     router.replace('/(app)/journal');
   };
 
-  if (!scope || !artifactId || !artifactKindResult.success) {
-    return <StaleArtifact onBack={onBack} />;
+  if (!personId || !artifactId || !artifactKindResult.success) {
+    return (
+      <StaleArtifact
+        artifactKind={
+          artifactKindResult.success ? artifactKindResult.data : undefined
+        }
+        onBack={onBack}
+      />
+    );
+  }
+
+  if (scopesLoading) {
+    return <ArtifactLoading />;
+  }
+
+  if (!scope) {
+    return (
+      <StaleArtifact artifactKind={artifactKindResult.data} onBack={onBack} />
+    );
   }
 
   return (

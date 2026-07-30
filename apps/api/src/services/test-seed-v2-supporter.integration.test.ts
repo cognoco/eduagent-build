@@ -184,7 +184,6 @@ function createIntegrationDb(): Database {
 
     it('[AC-5 canary] the shared-record read model surfaces only shareable facts (weekly report / recap / milestone), and a forward-regression canary confirms its payload never carries the private-artifact marker', async () => {
       const record = await readSharedRecordForSupportee(db, {
-        supportershipId: seeded.ids.edgeId,
         supporterPersonId: seeded.ids.supporterPersonId,
         supporteePersonId: seeded.ids.supporteePersonId,
       });
@@ -259,7 +258,6 @@ function createIntegrationDb(): Database {
       expect(structural.subjects).toEqual([]);
 
       const record = await readSharedRecordForSupportee(db, {
-        supportershipId: seeded.ids.emptyEdgeId,
         supporterPersonId: seeded.ids.supporterPersonId,
         supporteePersonId: seeded.ids.emptySupporteePersonId,
       });
@@ -568,7 +566,6 @@ function createIntegrationDb(): Database {
 
     it("[AC-4 direction 1 canary] the supporter's own Me-scope subject never appears in the supportee's shared-record read", async () => {
       const record = await readSharedRecordForSupportee(db, {
-        supportershipId: seeded.ids.edgeId,
         supporterPersonId: seeded.ids.supporterPersonId,
         supporteePersonId: seeded.ids.supporteePersonId,
       });

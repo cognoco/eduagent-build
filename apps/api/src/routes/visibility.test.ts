@@ -329,10 +329,10 @@ describe('visibility routes boundary validation', () => {
   });
 
   it.each(['pending', 'revoked'] as const)(
-    'GET shared record fails closed for a %s relationship before reading artifacts',
+    'GET shared record fails closed for a %s relationship inside the atomic artifact read',
     async () => {
       jest
-        .mocked(findAcceptedContractForSupportee)
+        .mocked(readSharedRecordForSupportee)
         .mockRejectedValueOnce(
           new ForbiddenError('This support link is not active.'),
         );
@@ -343,7 +343,14 @@ describe('visibility routes boundary validation', () => {
       }).request(`/v1/visibility/reports/${SUPPORTEE_PERSON_ID}/shared-record`);
 
       expect(res.status).toBe(403);
-      expect(readSharedRecordForSupportee).not.toHaveBeenCalled();
+      expect(readSharedRecordForSupportee).toHaveBeenCalledWith(
+        expect.anything(),
+        {
+          supporterPersonId: SUPPORTER_PERSON_ID,
+          supporteePersonId: SUPPORTEE_PERSON_ID,
+        },
+      );
+      expect(findAcceptedContractForSupportee).not.toHaveBeenCalled();
     },
   );
 });
