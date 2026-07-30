@@ -570,21 +570,28 @@ async function restoreClerkDeletionMarkers(
   env: SeedEnv,
   pendingDeletions: PendingClerkDeletion[],
 ): Promise<void> {
-  for (const { user, originalExternalId } of pendingDeletions) {
-    const restoreRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
-      method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${env.CLERK_SECRET_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ external_id: originalExternalId }),
-    });
-    if (!restoreRes.ok) {
-      const body = await restoreRes.text();
-      throw new Error(
-        `Clerk deletion marker restore failed (${restoreRes.status}): ${body}`,
-      );
-    }
+  const results = await Promise.allSettled(
+    pendingDeletions.map(async ({ user, originalExternalId }) => {
+      const restoreRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${env.CLERK_SECRET_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ external_id: originalExternalId }),
+      });
+      if (!restoreRes.ok) {
+        throw new Error('Clerk deletion marker restore failed');
+      }
+    }),
+  );
+  const failed = results.filter(
+    (result) => result.status === 'rejected',
+  ).length;
+  if (failed > 0) {
+    throw new Error(
+      `Clerk deletion marker restore failed for ${failed} of ${pendingDeletions.length} users`,
+    );
   }
 }
 
@@ -7031,8 +7038,11 @@ export async function resetDatabase(
   const pendingClerkDeletions: PendingClerkDeletion[] = [];
   const restorePendingClerkDeletions = async (): Promise<void> => {
     if (pendingClerkDeletions.length > 0) {
-      await restoreClerkDeletionMarkers(env, pendingClerkDeletions);
-      pendingClerkDeletions.length = 0;
+      try {
+        await restoreClerkDeletionMarkers(env, pendingClerkDeletions);
+      } finally {
+        pendingClerkDeletions.length = 0;
+      }
     }
   };
 

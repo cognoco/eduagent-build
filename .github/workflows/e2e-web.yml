@@ -367,6 +367,7 @@ jobs:
             PREFIX="pw-${PLAYWRIGHT_RUN_ID}-"
           fi
           echo "Resetting seeded accounts with prefix: ${PREFIX}"
+          # Keep 15 in sync with MAX_WORKER_CLERK_CLEANUP_USERS in test-seed.ts.
           # Each Worker reset handles at most 15 Clerk users (one list plus
           # marker/bypass/delete calls per user stays below CF's 50-request
           # cap). Repeat full batches so V2 runs with more seeded identities

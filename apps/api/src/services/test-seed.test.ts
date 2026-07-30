@@ -1152,6 +1152,80 @@ describe('resetDatabase', () => {
     expect(restoredExternalIds).toEqual([`${SEED_CLERK_PREFIX}rollback`]);
   });
 
+  it('[WI-2940] attempts every Clerk marker restore before reporting partial failure', async () => {
+    const restoreAttempts: string[] = [];
+    const rootDb = makeResetDb();
+    const txDb = makeResetDb();
+    Object.assign(rootDb, {
+      transaction: jest.fn(
+        async (operation: (tx: Database) => Promise<unknown>) => {
+          await operation(txDb);
+          throw new Error('simulated transaction rollback');
+        },
+      ),
+    });
+
+    global.fetch = jest.fn(async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+      if (url.includes('/users?')) {
+        return new Response(
+          JSON.stringify([
+            {
+              id: 'user_seed_restore_first',
+              external_id: `${SEED_CLERK_PREFIX}restore-first`,
+              email_addresses: [{ email_address: 'repeat-first@example.com' }],
+            },
+            {
+              id: 'user_seed_restore_second',
+              external_id: `${SEED_CLERK_PREFIX}restore-second`,
+              email_addresses: [{ email_address: 'repeat-second@example.com' }],
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        external_id?: string;
+      };
+      if (
+        method === 'PATCH' &&
+        body.external_id?.includes('deletion-pending:')
+      ) {
+        return new Response('{}', { status: 200 });
+      }
+      if (method === 'PATCH' && body.external_id) {
+        restoreAttempts.push(body.external_id);
+        return new Response('WI2940_DUMMY_SECRET', {
+          status: body.external_id.endsWith('restore-first') ? 500 : 200,
+        });
+      }
+
+      return new Response('{}', { status: 200 });
+    });
+
+    let failure: unknown;
+    try {
+      await resetDatabase(
+        rootDb,
+        { CLERK_SECRET_KEY: 'test-secret' },
+        { prefix: 'repeat-' },
+      );
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toEqual(
+      new Error('Clerk deletion marker restore failed for 1 of 2 users'),
+    );
+    expect(String(failure)).not.toContain('WI2940_DUMMY_SECRET');
+    expect(restoreAttempts).toEqual([
+      `${SEED_CLERK_PREFIX}restore-first`,
+      `${SEED_CLERK_PREFIX}restore-second`,
+    ]);
+  });
+
   it('[WI-2820 P1] restores a deletion marker before releasing the mutation lock on a DB failure', async () => {
     const events: string[] = [];
     const restoredExternalIds: string[] = [];
