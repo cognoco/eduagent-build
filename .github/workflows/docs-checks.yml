@@ -34,6 +34,14 @@ on:
       - 'docs/flows/mobile-app-flow-inventory.md'
       - 'scripts/check-flow-inventory-cite-rot.ts'
       - 'scripts/check-flow-inventory-cite-rot.test.ts'
+      # teen-consent-claims: every SCANNED ROOT and every CHECKER INPUT must be
+      # listed, or the guard silently fails to run on the files it protects.
+      # docs/plans/**.md above already covers the first scan root; _wip is not
+      # covered by any other entry.
+      - '_wip/mvp-roadmap/**.md'
+      - 'scripts/check-teen-consent-claims.ts'
+      - 'scripts/check-teen-consent-claims.test.ts'
+      - 'scripts/teen-consent-claims-baseline.json'
   pull_request:
     paths:
       - 'docs/plans/**.md'
@@ -60,6 +68,14 @@ on:
       - 'docs/flows/mobile-app-flow-inventory.md'
       - 'scripts/check-flow-inventory-cite-rot.ts'
       - 'scripts/check-flow-inventory-cite-rot.test.ts'
+      # teen-consent-claims: every SCANNED ROOT and every CHECKER INPUT must be
+      # listed, or the guard silently fails to run on the files it protects.
+      # docs/plans/**.md above already covers the first scan root; _wip is not
+      # covered by any other entry.
+      - '_wip/mvp-roadmap/**.md'
+      - 'scripts/check-teen-consent-claims.ts'
+      - 'scripts/check-teen-consent-claims.test.ts'
+      - 'scripts/teen-consent-claims-baseline.json'
   workflow_dispatch:
 
 permissions:

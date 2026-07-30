@@ -79,9 +79,34 @@ const SELF_CONSENT_TOKEN = /\bself[-\s]consent(?:s|ed|ing)?\b/gi;
  */
 const ADJACENCY_WORDS = 3;
 
-/** A negated window is a correction of the claim, not an assertion of it. */
-const NEGATION =
-  /\b(not|never|no longer|isn't|is not|aren't|are not|cannot|can't|nor|rather than|instead of|without|banned|ban|wrong|incorrect|must not|does not|doesn't|beyond)\b/i;
+/**
+ * Grammatical negation only, and only within the matched tokens' own clause
+ * (see CLAUSE_BOUNDARY). A negated clause is a correction of the claim rather
+ * than an assertion of it.
+ *
+ * Deliberately narrow. An earlier revision matched a ±60-char window and a
+ * much broader vocabulary (`ban`, `banned`, `wrong`, `incorrect`, `beyond`,
+ * `without`, `rather than`, `instead of`). Both were wrong in the direction
+ * that matters for a ratchet — a FALSE NEGATIVE, which fails silently and
+ * looks clean:
+ *   - The window let an unrelated negation in a neighbouring clause suppress a
+ *     real assertion: "13+ is not the only launch floor; however all 13+
+ *     learners are self-consenting teens" matched nothing, because `not` sat
+ *     within 60 chars of the later blanket claim.
+ *   - The vocabulary suppressed genuine assertions that merely contained a
+ *     topical word — "13+ learners self-consent without guardian approval" is
+ *     a blanket claim, not a correction of one.
+ * Only sentential negation of the claim itself belongs here.
+ */
+const NEGATION = /\b(not|never|no longer|cannot|nor)\b|n't\b/i;
+
+/**
+ * Clause separators. Negation is judged within the clause holding the match,
+ * so contrasting prose ("A is not X; however B is Y") cannot walk a real claim
+ * past the gate. The em dash is included because this repo's docs lean on it
+ * heavily as a clause break.
+ */
+const CLAUSE_BOUNDARY = /[.;:!?]+|—|--/g;
 
 /** Same-line or preceding-line escape annotation. */
 const ALLOW_ANNOTATION = /teen-consent-allow:/;
@@ -123,9 +148,35 @@ function interveningWords(line: string, a: Match, b: Match): number {
 }
 
 /**
+ * The clause containing offset `at` — the text between the surrounding clause
+ * boundaries. Exported for tests.
+ */
+export function clauseAt(line: string, at: number): string {
+  const bounds: number[] = [];
+  CLAUSE_BOUNDARY.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = CLAUSE_BOUNDARY.exec(line)) !== null) {
+    bounds.push(m.index, m.index + m[0].length);
+    if (m.index === CLAUSE_BOUNDARY.lastIndex) CLAUSE_BOUNDARY.lastIndex++;
+  }
+  let start = 0;
+  let end = line.length;
+  for (let i = 0; i < bounds.length; i += 2) {
+    const bStart = bounds[i];
+    const bEnd = bounds[i + 1];
+    if (bEnd <= at) start = bEnd;
+    else if (bStart > at) {
+      end = bStart;
+      break;
+    }
+  }
+  return line.slice(start, end);
+}
+
+/**
  * Blanket-claim windows on a single line. A window is the span covering both
  * tokens; it is a violation when the tokens are adjacent enough to read as one
- * assertion and the span is not negated.
+ * assertion and the clause holding them is not negated.
  */
 export function findBlanketClaims(line: string): string[] {
   const ages = collect(AGE_TOKEN, line);
@@ -140,12 +191,9 @@ export function findBlanketClaims(line: string): string[] {
       const start = Math.min(age.index, consent.index);
       const end = Math.max(age.end, consent.end);
       const window = line.slice(start, end).replace(/\s+/g, ' ').trim();
-      // Negation is judged on the window plus a little surrounding context, so
-      // that "is not a grant of 13+ self-consent" reads as the correction it is.
-      const context = line
-        .slice(Math.max(0, start - 60), Math.min(line.length, end + 60))
-        .replace(/\s+/g, ' ');
-      if (NEGATION.test(context)) continue;
+      // Negation is judged ONLY within the clause holding the match, so a
+      // negation in a neighbouring clause cannot suppress a real assertion.
+      if (NEGATION.test(clauseAt(line, start))) continue;
       out.push(window);
     }
   }

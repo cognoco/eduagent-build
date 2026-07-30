@@ -6,10 +6,24 @@
 // flagging them, the guard has regressed to useless.
 
 import {
+  clauseAt,
   diffAgainstBaseline,
   findBlanketClaims,
   findFileViolations,
 } from './check-teen-consent-claims';
+
+describe('clauseAt', () => {
+  it('returns the clause holding the offset, split on ; and em-dash', () => {
+    const line = 'first clause; second clause — third clause';
+    expect(clauseAt(line, 0).trim()).toBe('first clause');
+    expect(clauseAt(line, 20).trim()).toBe('second clause');
+    expect(clauseAt(line, 35).trim()).toBe('third clause');
+  });
+
+  it('returns the whole line when there is no clause boundary', () => {
+    expect(clauseAt('one clause only', 4)).toBe('one clause only');
+  });
+});
 
 describe('findBlanketClaims', () => {
   // --- Red anchor: the exact defect text from origin/main ---
@@ -59,6 +73,35 @@ describe('findBlanketClaims', () => {
   });
 
   // --- Negated windows are corrections, not claims ---
+
+  // --- Negation is clause-scoped, not window-scoped (PR #2706 review) ---
+
+  it('FLAGS a real claim when an unrelated negation sits in a neighbouring clause', () => {
+    // Codex finding on PR #2706: the previous +/-60-char negation window let
+    // the leading "not" suppress the trailing blanket assertion. A false
+    // negative in a ratchet fails silently, so this is the load-bearing case.
+    expect(
+      findBlanketClaims(
+        '13+ is not the only launch floor; however all 13+ learners are self-consenting teens',
+      ),
+    ).toContain('13+ learners are self-consenting');
+  });
+
+  it('FLAGS across an em-dash clause break too', () => {
+    expect(
+      findBlanketClaims(
+        'The floor is not settled — every 13+ self-consenting teen ships at launch',
+      ),
+    ).toContain('13+ self-consenting');
+  });
+
+  it('does not suppress on a merely topical word (assertion, not correction)', () => {
+    // "without" / "banned" / "beyond" used to live in the negation vocabulary
+    // and would have suppressed this genuine blanket claim.
+    expect(
+      findBlanketClaims('all 13+ self-consent without guardian approval'),
+    ).toHaveLength(1);
+  });
 
   it('does not flag a negated window (the corrected phrasing must pass)', () => {
     expect(
