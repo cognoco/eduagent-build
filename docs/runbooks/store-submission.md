@@ -13,7 +13,7 @@ The committed Android profile targets **Play internal** testing. The iOS profile
 ## Credential Preflight
 
 Android submission uses the EAS-managed Google Play service account assigned to
-`@zuzanka14/mentomate` for `com.mentomate.app` under **OPQ-37**. Keep
+the app for `com.mentomate.app` under **OPQ-37**. Keep
 `serviceAccountKeyPath` out of `eas.json`: setting it forces EAS to read local
 material and prevents managed-key resolution.
 
@@ -34,7 +34,7 @@ Run from the repository root unless the command starts with `cd apps/mobile`:
 
 ```powershell
 pnpm check:mode-nav-flag-combo
-pnpm exec jest --config scripts/jest.config.cjs scripts/prepare-eas-submit-credentials.test.ts scripts/verify-eas-managed-submit-credential.test.ts --runInBand --no-coverage
+pnpm exec jest --config scripts/jest.config.cjs scripts/eas-managed-submit-profile-contract.test.ts scripts/verify-eas-managed-submit-credential.test.ts --runInBand --no-coverage
 git status --short
 cd apps/mobile
 eas build:list --platform android --limit 3

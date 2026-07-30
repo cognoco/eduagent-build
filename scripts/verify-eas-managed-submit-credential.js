@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
+const { readFileSync } = require('node:fs');
+const { join } = require('node:path');
+
 const EXPO_GRAPHQL_URL = 'https://api.expo.dev/graphql';
-const PROJECT_FULL_NAME = '@zuzanka14/mentomate';
-const ANDROID_APPLICATION_IDENTIFIER = 'com.mentomate.app';
+const APP_CONFIG_PATH = join(__dirname, '..', 'apps', 'mobile', 'app.json');
 
 const submissionCredentialQuery = `
   query AndroidSubmissionCredential($projectFullName: String!, $applicationIdentifier: String!) {
@@ -19,9 +21,41 @@ const submissionCredentialQuery = `
 function assignedSubmissionCredential(response) {
   return Boolean(
     response?.data?.app?.byFullName?.androidAppCredentials?.some(
-      (credentials) => credentials?.googleServiceAccountKeyForSubmissions,
+      (credentials) => {
+        const key = credentials?.googleServiceAccountKeyForSubmissions;
+        return typeof key?.id === 'string' && key.id.trim() !== '';
+      },
     ),
   );
+}
+
+function readAndroidAppIdentity(readFile = readFileSync) {
+  let expo;
+  try {
+    expo = JSON.parse(readFile(APP_CONFIG_PATH, 'utf8')).expo;
+  } catch {
+    throw new Error(
+      'EAS credential metadata preflight cannot read Android app identity',
+    );
+  }
+
+  if (
+    typeof expo?.owner !== 'string' ||
+    typeof expo?.slug !== 'string' ||
+    typeof expo?.android?.package !== 'string' ||
+    expo.owner.trim() === '' ||
+    expo.slug.trim() === '' ||
+    expo.android.package.trim() === ''
+  ) {
+    throw new Error(
+      'EAS credential metadata preflight has invalid Android app identity',
+    );
+  }
+
+  return {
+    projectFullName: `@${expo.owner}/${expo.slug}`,
+    applicationIdentifier: expo.android.package,
+  };
 }
 
 async function verifyEasManagedSubmitCredential({
@@ -39,6 +73,8 @@ async function verifyEasManagedSubmitCredential({
     );
   }
 
+  const identity = readAndroidAppIdentity();
+
   let response;
   try {
     response = await fetchImpl(EXPO_GRAPHQL_URL, {
@@ -50,8 +86,8 @@ async function verifyEasManagedSubmitCredential({
       body: JSON.stringify({
         query: submissionCredentialQuery,
         variables: {
-          projectFullName: PROJECT_FULL_NAME,
-          applicationIdentifier: ANDROID_APPLICATION_IDENTIFIER,
+          projectFullName: identity.projectFullName,
+          applicationIdentifier: identity.applicationIdentifier,
         },
       }),
     });
@@ -79,8 +115,7 @@ async function verifyEasManagedSubmitCredential({
   }
 
   return {
-    projectFullName: PROJECT_FULL_NAME,
-    applicationIdentifier: ANDROID_APPLICATION_IDENTIFIER,
+    applicationIdentifier: identity.applicationIdentifier,
     submissionCredentialAssigned: true,
   };
 }
@@ -100,8 +135,7 @@ if (require.main === module) {
 }
 
 module.exports = {
-  ANDROID_APPLICATION_IDENTIFIER,
-  PROJECT_FULL_NAME,
   assignedSubmissionCredential,
+  readAndroidAppIdentity,
   verifyEasManagedSubmitCredential,
 };

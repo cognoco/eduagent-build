@@ -1,8 +1,12 @@
-import {
-  ANDROID_APPLICATION_IDENTIFIER,
-  PROJECT_FULL_NAME,
-  verifyEasManagedSubmitCredential,
-} from './verify-eas-managed-submit-credential';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { verifyEasManagedSubmitCredential } from './verify-eas-managed-submit-credential';
+
+const appConfig = JSON.parse(
+  readFileSync(join(process.cwd(), 'apps/mobile/app.json'), 'utf8'),
+).expo;
+const expectedProjectFullName = `@${appConfig.owner}/${appConfig.slug}`;
+const expectedApplicationIdentifier = appConfig.android.package;
 
 const assignedPayload = {
   data: {
@@ -22,7 +26,7 @@ const response = (payload: unknown, ok = true) => ({
 });
 
 describe('EAS-managed Google Play submission credential preflight', () => {
-  it('returns only safe assignment metadata when the app has an assigned key', async () => {
+  it('uses the canonical app identity and returns no account identifier', async () => {
     const fetchImpl = jest.fn(async () => response(assignedPayload));
 
     await expect(
@@ -31,17 +35,21 @@ describe('EAS-managed Google Play submission credential preflight', () => {
         fetchImpl,
       }),
     ).resolves.toEqual({
-      projectFullName: PROJECT_FULL_NAME,
-      applicationIdentifier: ANDROID_APPLICATION_IDENTIFIER,
+      applicationIdentifier: expectedApplicationIdentifier,
       submissionCredentialAssigned: true,
     });
     expect(fetchImpl).toHaveBeenCalledWith(
       'https://api.expo.dev/graphql',
       expect.objectContaining({ method: 'POST' }),
     );
+    const request = fetchImpl.mock.calls[0][1];
+    expect(JSON.parse(request.body).variables).toEqual({
+      projectFullName: expectedProjectFullName,
+      applicationIdentifier: expectedApplicationIdentifier,
+    });
   });
 
-  it('fails closed when the managed key is absent or unassigned', async () => {
+  it('fails closed when the managed key is absent, unassigned, or malformed', async () => {
     for (const payload of [
       { data: { app: { byFullName: { androidAppCredentials: [] } } } },
       {
@@ -50,6 +58,17 @@ describe('EAS-managed Google Play submission credential preflight', () => {
             byFullName: {
               androidAppCredentials: [
                 { googleServiceAccountKeyForSubmissions: null },
+              ],
+            },
+          },
+        },
+      },
+      {
+        data: {
+          app: {
+            byFullName: {
+              androidAppCredentials: [
+                { googleServiceAccountKeyForSubmissions: {} },
               ],
             },
           },
