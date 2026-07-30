@@ -24,6 +24,7 @@ import { inArray } from 'drizzle-orm';
 // ---------------------------------------------------------------------------
 
 import {
+  createClerkTestUser,
   seedScenario,
   resetDatabase,
   debugAccountsByEmail,
@@ -795,6 +796,76 @@ describe('seedScenario', () => {
     expect(lookupAttempts).toBeGreaterThanOrEqual(2);
     expect(fetchMock.mock.calls[0]?.[0]).toEqual(fetchMock.mock.calls[1]?.[0]);
   });
+
+  it('[WI-2820 P1] waits for a deletion-pending Clerk user instead of reusing it', async () => {
+    const pendingUser = {
+      id: 'user_pending_delete',
+      primary_email_address_id: 'email_pending_delete',
+      email_addresses: [
+        { id: 'email_pending_delete', email_address: 'pending@example.com' },
+      ],
+      external_id: `${SEED_CLERK_PREFIX}deletion-pending:user_pending_delete`,
+    };
+    const createdUser = {
+      id: 'user_recreated_after_delete',
+      primary_email_address_id: 'email_recreated_after_delete',
+      email_addresses: [
+        {
+          id: 'email_recreated_after_delete',
+          email_address: 'pending@example.com',
+        },
+      ],
+      external_id: `${SEED_CLERK_PREFIX}recreated`,
+    };
+    let lookupCount = 0;
+    const fetchMock = jest.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method ?? 'GET';
+
+        if (url.includes('/users?')) {
+          lookupCount += 1;
+          return new Response(
+            JSON.stringify(lookupCount === 1 ? [pendingUser] : []),
+            { status: 200 },
+          );
+        }
+        if (url.endsWith('/users') && method === 'POST') {
+          return new Response(JSON.stringify(createdUser), { status: 200 });
+        }
+        if (url.endsWith(`/users/${createdUser.id}`) && method === 'PATCH') {
+          return new Response('{}', { status: 200 });
+        }
+        if (url.endsWith(`/users/${createdUser.id}`) && method === 'GET') {
+          return new Response(JSON.stringify(createdUser), { status: 200 });
+        }
+        if (
+          url.endsWith(
+            `/email_addresses/${createdUser.primary_email_address_id}`,
+          ) &&
+          method === 'PATCH'
+        ) {
+          return new Response('{}', { status: 200 });
+        }
+        return new Response(`Unexpected Clerk mock call: ${method} ${url}`, {
+          status: 404,
+        });
+      },
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await createClerkTestUser('pending@example.com', {
+      CLERK_SECRET_KEY: 'test-secret',
+      SEED_PASSWORD: 'test-password',
+    });
+
+    expect(result.clerkUserId).toBe(createdUser.id);
+    expect(lookupCount).toBe(2);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/\/users$/),
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -977,7 +1048,20 @@ describe('resetDatabase', () => {
         );
       }
 
-      events.push(`clerk-${method}`);
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        bypass_client_trust?: boolean;
+        external_id?: string;
+      };
+      if (
+        method === 'PATCH' &&
+        body.external_id?.includes('deletion-pending:')
+      ) {
+        events.push('clerk-marker-PATCH');
+      } else if (method === 'PATCH' && body.bypass_client_trust === false) {
+        events.push('clerk-bypass-PATCH');
+      } else {
+        events.push(`clerk-${method}`);
+      }
       return new Response('{}', { status: 200 });
     });
 
@@ -991,14 +1075,16 @@ describe('resetDatabase', () => {
     expect(events).toEqual([
       'transaction-start',
       'clerk-list',
+      'clerk-marker-PATCH',
       'transaction-commit',
-      'clerk-PATCH',
+      'clerk-bypass-PATCH',
       'clerk-DELETE',
     ]);
   });
 
-  it('[WI-2820 CodeRabbit] does not delete Clerk users when the reset transaction rolls back', async () => {
+  it('[WI-2820 CodeRabbit] restores Clerk markers when the reset transaction commit fails', async () => {
     const events: string[] = [];
+    const restoredExternalIds: string[] = [];
     const rootDb = makeResetDb();
     const txDb = makeResetDb();
     Object.assign(rootDb, {
@@ -1028,7 +1114,20 @@ describe('resetDatabase', () => {
         );
       }
 
-      events.push(`clerk-${method}`);
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        external_id?: string;
+      };
+      if (
+        method === 'PATCH' &&
+        body.external_id?.includes('deletion-pending:')
+      ) {
+        events.push('clerk-marker-PATCH');
+      } else if (method === 'PATCH') {
+        events.push('clerk-restore-PATCH');
+        restoredExternalIds.push(body.external_id ?? '');
+      } else {
+        events.push(`clerk-${method}`);
+      }
       return new Response('{}', { status: 200 });
     });
 
@@ -1040,7 +1139,166 @@ describe('resetDatabase', () => {
       ),
     ).rejects.toThrow('simulated transaction rollback');
 
-    expect(events).toEqual(['transaction-start', 'clerk-list']);
+    expect(events).toEqual([
+      'transaction-start',
+      'clerk-list',
+      'clerk-marker-PATCH',
+      'clerk-restore-PATCH',
+    ]);
+    expect(restoredExternalIds).toEqual([`${SEED_CLERK_PREFIX}rollback`]);
+  });
+
+  it('[WI-2820 P1] restores a deletion marker before releasing the mutation lock on a DB failure', async () => {
+    const events: string[] = [];
+    const restoredExternalIds: string[] = [];
+    const rootDb = makeResetDb();
+    const txDb = makeResetDb();
+    Object.assign(txDb, {
+      select: jest.fn(() => {
+        throw new Error('simulated database operation failure');
+      }),
+    });
+    Object.assign(rootDb, {
+      transaction: jest.fn(
+        async (operation: (tx: Database) => Promise<unknown>) => {
+          events.push('transaction-start');
+          try {
+            return await operation(txDb);
+          } catch (error) {
+            events.push('transaction-rollback');
+            throw error;
+          }
+        },
+      ),
+    });
+
+    global.fetch = jest.fn(async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+      if (url.includes('/users?')) {
+        events.push('clerk-list');
+        return new Response(
+          JSON.stringify([
+            {
+              id: 'user_seed_db_failure',
+              external_id: `${SEED_CLERK_PREFIX}db-failure`,
+              email_addresses: [{ email_address: 'repeat-owner@example.com' }],
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        external_id?: string;
+      };
+      if (
+        method === 'PATCH' &&
+        body.external_id?.includes('deletion-pending:')
+      ) {
+        events.push('clerk-marker-PATCH');
+      } else if (method === 'PATCH') {
+        events.push('clerk-restore-PATCH');
+        restoredExternalIds.push(body.external_id ?? '');
+      } else {
+        events.push(`clerk-${method}`);
+      }
+      return new Response('{}', { status: 200 });
+    });
+
+    await expect(
+      resetDatabase(
+        rootDb,
+        { CLERK_SECRET_KEY: 'test-secret' },
+        { prefix: 'repeat-' },
+      ),
+    ).rejects.toThrow('simulated database operation failure');
+
+    expect(events).toEqual([
+      'transaction-start',
+      'clerk-list',
+      'clerk-marker-PATCH',
+      'clerk-restore-PATCH',
+      'transaction-rollback',
+    ]);
+    expect(restoredExternalIds).toEqual([`${SEED_CLERK_PREFIX}db-failure`]);
+  });
+
+  it('[WI-2820 P1] restores a deletion marker when Clerk rejects the post-commit delete', async () => {
+    const events: string[] = [];
+    const restoredExternalIds: string[] = [];
+    const rootDb = makeResetDb();
+    const txDb = makeResetDb();
+    Object.assign(rootDb, {
+      transaction: jest.fn(
+        async (operation: (tx: Database) => Promise<unknown>) => {
+          events.push('transaction-start');
+          const result = await operation(txDb);
+          events.push('transaction-commit');
+          return result;
+        },
+      ),
+    });
+
+    global.fetch = jest.fn(async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+      if (url.includes('/users?')) {
+        events.push('clerk-list');
+        return new Response(
+          JSON.stringify([
+            {
+              id: 'user_seed_failed_delete',
+              external_id: `${SEED_CLERK_PREFIX}failed-delete`,
+              email_addresses: [{ email_address: 'repeat-owner@example.com' }],
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        bypass_client_trust?: boolean;
+        external_id?: string;
+      };
+      if (
+        method === 'PATCH' &&
+        body.external_id?.includes('deletion-pending:')
+      ) {
+        events.push('clerk-marker-PATCH');
+        return new Response('{}', { status: 200 });
+      }
+      if (method === 'PATCH' && body.bypass_client_trust === false) {
+        events.push('clerk-bypass-PATCH');
+        return new Response('{}', { status: 200 });
+      }
+      if (method === 'DELETE') {
+        events.push('clerk-DELETE');
+        return new Response('{}', { status: 500 });
+      }
+
+      events.push('clerk-restore-PATCH');
+      restoredExternalIds.push(body.external_id ?? '');
+      return new Response('{}', { status: 200 });
+    });
+
+    const result = await resetDatabase(
+      rootDb,
+      { CLERK_SECRET_KEY: 'test-secret' },
+      { prefix: 'repeat-' },
+    );
+
+    expect(result).toEqual({ deletedCount: 1, clerkUsersDeleted: 0 });
+    expect(events).toEqual([
+      'transaction-start',
+      'clerk-list',
+      'clerk-marker-PATCH',
+      'transaction-commit',
+      'clerk-bypass-PATCH',
+      'clerk-DELETE',
+      'clerk-restore-PATCH',
+    ]);
+    expect(restoredExternalIds).toEqual([`${SEED_CLERK_PREFIX}failed-delete`]);
   });
 
   it('returns ResetResult with deletedCount', async () => {

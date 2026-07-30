@@ -81,6 +81,7 @@ const CLERK_API_BASE = 'https://api.clerk.com/v1';
 const CLERK_RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 const CLERK_FETCH_MAX_ATTEMPTS = 4;
 const CLERK_FETCH_BASE_DELAY_MS = 500;
+const CLERK_DELETION_PENDING_PREFIX = `${SEED_CLERK_PREFIX}deletion-pending:`;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -239,6 +240,11 @@ interface ClerkUser {
   external_id: string | null;
 }
 
+interface PendingClerkDeletion {
+  user: ClerkUser;
+  originalExternalId: string;
+}
+
 function isSeedManagedClerkUserId(
   clerkUserId: string,
   seedClerkUserIds: string[] = [],
@@ -251,6 +257,10 @@ function isSeedManagedClerkUserId(
 
 function isSeedManagedClerkUser(user: ClerkUser): boolean {
   return user.external_id?.startsWith(SEED_CLERK_PREFIX) === true;
+}
+
+function isClerkDeletionPending(user: ClerkUser | null): boolean {
+  return user?.external_id?.startsWith(CLERK_DELETION_PENDING_PREFIX) === true;
 }
 
 async function fetchClerkWithRetry(
@@ -434,21 +444,39 @@ async function findClerkUserByEmail(
   if (!env.CLERK_SECRET_KEY) return null;
 
   const params = new URLSearchParams({ email_address: email });
-  const res = await fetchClerkWithRetry(
-    `${CLERK_API_BASE}/users?${params.toString()}`,
-    {
-      headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
-    },
-    `Clerk user lookup`,
-  );
+  const lookup = async (): Promise<ClerkUser | null> => {
+    const res = await fetchClerkWithRetry(
+      `${CLERK_API_BASE}/users?${params.toString()}`,
+      {
+        headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
+      },
+      `Clerk user lookup`,
+    );
 
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Clerk user lookup failed (${res.status}): ${body}`);
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Clerk user lookup failed (${res.status}): ${body}`);
+    }
+
+    const users = (await res.json()) as ClerkUser[];
+    return users.length > 0 && users[0] ? users[0] : null;
+  };
+
+  let user = await lookup();
+  for (
+    let attempt = 0;
+    isClerkDeletionPending(user) && attempt < CLERK_FETCH_MAX_ATTEMPTS - 1;
+    attempt++
+  ) {
+    await sleep(CLERK_FETCH_BASE_DELAY_MS * Math.pow(2, attempt));
+    user = await lookup();
   }
 
-  const users = (await res.json()) as ClerkUser[];
-  return users.length > 0 && users[0] ? users[0] : null;
+  if (isClerkDeletionPending(user)) {
+    throw new Error(`Timed out waiting for pending Clerk deletion of ${email}`);
+  }
+
+  return user;
 }
 
 /**
@@ -462,12 +490,13 @@ async function findClerkUserByEmail(
  */
 async function deleteClerkTestUsers(
   env: SeedEnv,
-  seedUsers: ClerkUser[],
+  pendingDeletions: PendingClerkDeletion[],
 ): Promise<{ count: number; clerkUserIds: string[] }> {
   let deleted = 0;
   const deletedIds: string[] = [];
 
-  for (const user of seedUsers) {
+  for (const [index, pendingDeletion] of pendingDeletions.entries()) {
+    const { user } = pendingDeletion;
     // Revert bypass_client_trust before deleting — belt-and-suspenders in case
     // the delete fails, so the user doesn't retain elevated CAPTCHA-bypass perms.
     await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
@@ -481,17 +510,78 @@ async function deleteClerkTestUsers(
       // Best-effort — don't block cleanup if PATCH fails
     });
 
-    const delRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
-    });
+    let delRes: Response;
+    try {
+      delRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
+      });
+    } catch (error) {
+      await restoreClerkDeletionMarkers(env, pendingDeletions.slice(index));
+      throw error;
+    }
     if (delRes.ok) {
       deleted++;
       deletedIds.push(user.id);
+    } else {
+      await restoreClerkDeletionMarkers(env, [pendingDeletion]);
     }
   }
 
   return { count: deleted, clerkUserIds: deletedIds };
+}
+
+async function markClerkUsersForDeletion(
+  env: SeedEnv,
+  seedUsers: ClerkUser[],
+  pendingDeletions: PendingClerkDeletion[],
+): Promise<void> {
+  for (const user of seedUsers) {
+    if (!user.external_id) continue;
+
+    const markRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${env.CLERK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        external_id: `${CLERK_DELETION_PENDING_PREFIX}${user.id}`,
+      }),
+    });
+    if (!markRes.ok) {
+      const body = await markRes.text();
+      throw new Error(
+        `Clerk deletion marker failed (${markRes.status}): ${body}`,
+      );
+    }
+    pendingDeletions.push({
+      user,
+      originalExternalId: user.external_id,
+    });
+  }
+}
+
+async function restoreClerkDeletionMarkers(
+  env: SeedEnv,
+  pendingDeletions: PendingClerkDeletion[],
+): Promise<void> {
+  for (const { user, originalExternalId } of pendingDeletions) {
+    const restoreRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${env.CLERK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ external_id: originalExternalId }),
+    });
+    if (!restoreRes.ok) {
+      const body = await restoreRes.text();
+      throw new Error(
+        `Clerk deletion marker restore failed (${restoreRes.status}): ${body}`,
+      );
+    }
+  }
 }
 
 async function verifySeedClerkUserIds(
@@ -539,7 +629,11 @@ async function listSeedClerkUsers(
           email.email_address.toLowerCase().startsWith(prefix),
         );
 
-      if (matchesSeedPrefix && matchesEmailPrefix) {
+      if (
+        matchesSeedPrefix &&
+        !isClerkDeletionPending(user) &&
+        matchesEmailPrefix
+      ) {
         seedUsers.push(user);
       }
     }
@@ -6694,6 +6788,7 @@ const TEST_SEED_MUTATION_LOCK = 'test-seed:mutation';
 async function runTestSeedMutation<T>(
   db: Database,
   operation: (txDb: Database) => Promise<T>,
+  onOperationFailure?: () => Promise<void>,
 ): Promise<T> {
   return db.transaction(async (tx) => {
     await tx.execute(
@@ -6713,7 +6808,12 @@ async function runTestSeedMutation<T>(
       },
     });
 
-    return operation(txDb);
+    try {
+      return await operation(txDb);
+    } catch (error) {
+      await onOperationFailure?.();
+      throw error;
+    }
   });
 }
 
@@ -6923,8 +7023,15 @@ export async function resetDatabase(
   options: ResetOptions = {},
 ): Promise<ResetResult> {
   const prefix = options.prefix?.trim();
+  const pendingClerkDeletions: PendingClerkDeletion[] = [];
+  const restorePendingClerkDeletions = async (): Promise<void> => {
+    if (pendingClerkDeletions.length > 0) {
+      await restoreClerkDeletionMarkers(env, pendingClerkDeletions);
+      pendingClerkDeletions.length = 0;
+    }
+  };
 
-  const cleanup = await runTestSeedMutation(db, async (txDb) => {
+  const cleanupMutation = async (txDb: Database) => {
     const verifiedSeedClerkUserIds = options.verifiedSeedClerkUserIds
       ? await verifySeedClerkUserIds(env, options.verifiedSeedClerkUserIds, {
           prefix,
@@ -6958,6 +7065,13 @@ export async function resetDatabase(
       options.preserveClerkUsers
         ? undefined
         : seedClerkUsers;
+    if (clerkUsersToDelete) {
+      await markClerkUsersForDeletion(
+        env,
+        clerkUsersToDelete,
+        pendingClerkDeletions,
+      );
+    }
 
     if (
       options.clerkUserIds &&
@@ -6972,7 +7086,10 @@ export async function resetDatabase(
 
     if (prefix) {
       const seedLogins = await txDb
-        .select({ personId: login.personId, clerkUserId: login.clerkUserId })
+        .select({
+          personId: login.personId,
+          clerkUserId: login.clerkUserId,
+        })
         .from(login)
         .where(like(login.email, `${prefix}%`));
       const filteredLogins = seedLogins.filter((l) =>
@@ -7052,11 +7169,24 @@ export async function resetDatabase(
       result: { deletedCount },
       clerkUsersToDelete,
     };
-  });
+  };
 
-  const clerkUsersDeleted = cleanup.clerkUsersToDelete
-    ? (await deleteClerkTestUsers(env, cleanup.clerkUsersToDelete)).count
-    : 0;
+  let cleanup: { result: { deletedCount: number } };
+  try {
+    cleanup = await runTestSeedMutation(
+      db,
+      cleanupMutation,
+      restorePendingClerkDeletions,
+    );
+  } catch (error) {
+    await restorePendingClerkDeletions();
+    throw error;
+  }
+
+  const clerkUsersDeleted =
+    pendingClerkDeletions.length > 0
+      ? (await deleteClerkTestUsers(env, pendingClerkDeletions)).count
+      : 0;
 
   return { ...cleanup.result, clerkUsersDeleted };
 }
