@@ -1611,7 +1611,7 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
     avatarUrl: null,
     birthDate: '2011-06-15',
     residenceJurisdiction: 'US',
-    conversationLanguage: 'en',
+    conversationLanguage: 'cs',
     pronouns: null,
     defaultAppContext: null,
     createdAt: new Date('2020-01-01T00:00:00Z'),
@@ -1710,7 +1710,7 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
     } as never;
   }
 
-  it('seeds session two, exchange 0 from the pointer session one persisted to subjects (AC1/AC4a)', async () => {
+  it('[WI-1556] threads persisted conversation language into exchange 0 while seeding the next practice pointer', async () => {
     const db = makeDb(buildSubjectRow(persistedPointer));
 
     const result = await prepareExchangeContext(
@@ -1729,6 +1729,9 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
       'language_focus',
     );
     expect(result.context.pedagogyMode).toBe('four_strands');
+    // WI-1556: exchangeCount=0 is the first Mentor request. The confirmed
+    // non-English profile value survives relaunch and reaches prompt routing.
+    expect(result.context.conversationLanguage).toBe('cs');
   });
 
   it('falls back to the default strand when no pointer was persisted (no prior session)', async () => {

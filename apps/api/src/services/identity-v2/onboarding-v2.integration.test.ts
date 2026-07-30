@@ -105,6 +105,7 @@ const RUN = !!process.env.DATABASE_URL;
           profileId,
           orgId,
           'de',
+          false,
         );
 
         expect(result).toBe(true);
@@ -124,6 +125,7 @@ const RUN = !!process.env.DATABASE_URL;
           profileId,
           orgId,
           'de',
+          false,
         );
 
         expect(result).toBe(false);

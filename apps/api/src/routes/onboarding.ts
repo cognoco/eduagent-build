@@ -25,8 +25,8 @@ import { requireProfileId, requireAccount } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import {
   assertChargeNotCredentialed,
+  assertCallerIsActivePerson,
   assertOwnerAndParentAccess,
-  assertOwnerProfile,
   assertCallerIsAccountOwner,
 } from '../services/family-access';
 import { notFound } from '../errors';
@@ -65,12 +65,14 @@ async function dispatchUpdateConversationLanguage(
   profileId: string,
   accountId: string,
   conversationLanguage: Parameters<typeof updateConversationLanguageV2>[3],
+  confirm: boolean,
 ): Promise<void> {
   const ok = await updateConversationLanguageV2(
     db,
     profileId,
     accountId,
     conversationLanguage,
+    confirm,
   );
   if (!ok) throw new OnboardingNotFoundError(profileId);
 }
@@ -95,24 +97,21 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const account = requireAccount(c.get('account'));
       const profileId = requireProfileId(c.get('profileId'));
-      // [CR-2026-05-21-011] conversationLanguage is owner-gated: a child on a
-      // parent's account must not unilaterally change the AI tutor language.
-      assertOwnerProfile(
-        c,
-        'Only the account owner can change the conversation language.',
+      // WI-1556: owner and non-owner credentialed learners may write their own
+      // Person, but a client-selected sibling/proxy target may not use self.
+      assertCallerIsActivePerson(
+        c.get('callerPersonId'),
+        profileId,
+        c.get('profileMeta')?.resolvedVia,
       );
-      // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
-      await assertCallerIsAccountOwner(
-        c,
-        'Only the account owner can change the conversation language.',
-      );
-      const { conversationLanguage } = c.req.valid('json');
+      const { conversationLanguage, confirm } = c.req.valid('json');
       try {
         await dispatchUpdateConversationLanguage(
           db,
           profileId,
           account.id,
           conversationLanguage,
+          confirm === true,
         );
       } catch (err) {
         if (err instanceof OnboardingNotFoundError) {
@@ -147,6 +146,7 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
           childProfileId,
           account.id,
           conversationLanguage,
+          false,
         );
       } catch (err) {
         if (err instanceof OnboardingNotFoundError) {
