@@ -81,6 +81,7 @@ import {
   insertRetentionCardIfAbsent,
 } from '../apply-retention-update';
 import { deleteV2IdentitiesForTest } from '../../test-utils/legacy-identity-anchors';
+import { markConversationLanguageConfirmedForTest } from '../../test-utils/conversation-language-confirmation';
 import {
   getProfileTimeZone,
   MentorNoticeUnavailableError,
@@ -472,8 +473,8 @@ async function seedProfileAndSubject(
     displayName: `Grader Tester ${idx}`,
     birthDate: '2006-01-01',
     residenceJurisdiction: 'US',
-    conversationLanguageConfirmedAt: new Date('2026-01-01T00:00:00Z'),
   });
+  await markConversationLanguageConfirmedForTest(db, profileId);
   await db.insert(membership).values({
     personId: profileId,
     organizationId: accountId,
