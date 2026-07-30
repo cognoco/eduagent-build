@@ -2,7 +2,9 @@ import {
   NOW_REFRESH_OBSERVATION_WINDOW_MS,
   PRODUCTION_MENTOR_RETURN_REFRESH_BOUND_MS,
   assertArmedBeforeAction,
+  assertRequestAttempted,
   observeExactNowRefresh,
+  observeNowRefreshRequestAttempt,
 } from './now-refresh-observation';
 
 describe('exact Now-feed refresh observation (WI-2833)', () => {
@@ -101,5 +103,101 @@ describe('exact Now-feed refresh observation (WI-2833)', () => {
         actionAtMs: 1,
       }),
     ).rejects.toThrow(/\[now-refresh:ordering\]/);
+  });
+});
+
+describe('exact Now-feed refresh REQUEST-attempt observation (WI-2833 rework)', () => {
+  // [WI-2833 rework] The prior spec only ever observed the RESPONSE
+  // (page.waitForResponse). If production regresses and never sends the
+  // post-Back request at all, that promise simply times out the same way a
+  // legitimate abort/non-settlement does -- observeExactNowRefresh reports
+  // both as accepted outcomes ('rejected' / 'unsettled'). This suite covers
+  // an INDEPENDENT observation of the request itself, so "no request fired"
+  // is always a distinct, always-checked failure -- never silently folded
+  // into a response classification.
+
+  it('resolves attempted when a matching request is observed inside the window (variant a: request fires)', async () => {
+    const request = {
+      url: () => 'https://api-stg.mentomate.com/v1/now?scope=self',
+    };
+    const outcome = await observeNowRefreshRequestAttempt(
+      Promise.resolve(request),
+      { armedAtMs: 0, actionAtMs: 1 },
+    );
+    expect(outcome).toEqual({ kind: 'attempted', request });
+  });
+
+  it('resolves not-attempted when no matching request is observed within the window (variant b: production regression -- no request fired)', async () => {
+    jest.useFakeTimers();
+    try {
+      const neverFires = new Promise<never>(() => undefined);
+      const outcomePromise = observeNowRefreshRequestAttempt(neverFires, {
+        armedAtMs: 0,
+        actionAtMs: 1,
+      });
+      const expectation = expect(outcomePromise).resolves.toEqual({
+        kind: 'not-attempted',
+      });
+      await jest.advanceTimersByTimeAsync(NOW_REFRESH_OBSERVATION_WINDOW_MS);
+      await expectation;
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('resolves not-attempted (never throws) when the underlying request promise itself rejects, e.g. Playwright waitForRequest timing out (variant c: request-promise rejection)', async () => {
+    const outcome = await observeNowRefreshRequestAttempt(
+      Promise.reject(new Error('Timeout waiting for request')),
+      { armedAtMs: 0, actionAtMs: 1 },
+    );
+    expect(outcome).toEqual({ kind: 'not-attempted' });
+  });
+
+  it('still bounds correctly when the action lands long after arming (variant d: expanded parallel worker load)', async () => {
+    jest.useFakeTimers();
+    try {
+      const request = {
+        url: () => 'https://api-stg.mentomate.com/v1/now?scope=self',
+      };
+      const outcomePromise = observeNowRefreshRequestAttempt(
+        Promise.resolve(request),
+        { armedAtMs: 0, actionAtMs: 10_000 },
+      );
+      await jest.advanceTimersByTimeAsync(0);
+      await expect(outcomePromise).resolves.toEqual({
+        kind: 'attempted',
+        request,
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('[WI-2833 regression] refuses a late arm before racing anything, same ordering guard as observeExactNowRefresh', async () => {
+    const request = {
+      url: () => 'https://api-stg.mentomate.com/v1/now?scope=self',
+    };
+    await expect(
+      observeNowRefreshRequestAttempt(Promise.resolve(request), {
+        armedAtMs: 5,
+        actionAtMs: 1,
+      }),
+    ).rejects.toThrow(/\[now-refresh:ordering\]/);
+  });
+
+  it('[WI-2833 rework] assertRequestAttempted throws a distinct, actionable error for a not-attempted outcome', () => {
+    expect(() => assertRequestAttempted({ kind: 'not-attempted' })).toThrow(
+      /\[now-refresh:not-attempted\]/,
+    );
+  });
+
+  it('[WI-2833 rework] assertRequestAttempted does not throw for an attempted outcome', () => {
+    const request = {
+      url: () => 'https://api-stg.mentomate.com/v1/now?scope=self',
+    };
+    expect(() =>
+      assertRequestAttempted({ kind: 'attempted', request }),
+    ).not.toThrow();
   });
 });

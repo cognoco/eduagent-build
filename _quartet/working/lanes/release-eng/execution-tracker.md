@@ -82,11 +82,14 @@ Shepherd-owned runtime pointers named below.
   `_state/*.jsonl`, `_state/monitor-manifest.json`, `_state/**/*.log`,
   `_state/**/state.json`, `_state/**/launched-transitions.json`, and
   `_state/**/reviews/` — the handoff `.md` itself is not on that list) — and
-  `_quartet/working/lanes/release-eng/_state/monitor-manifest.json` — repo-relative,
-  gitignored per `.gitignore:224`, the same convention as every sibling lane
-  (none of which pre-exist this file in the repo either — it is Shepherd-session-live
-  state, created/refreshed only while a Shepherd actively runs the lane, not a
-  file that sits pre-created at rest).
+  [`_quartet/working/lanes/release-eng/_state/monitor-manifest.json`](_state/monitor-manifest.json)
+  — repo-relative and **git-tracked** via a lane-scoped negation
+  (`.gitignore:228`, `!/_quartet/working/lanes/release-eng/_state/monitor-manifest.json`)
+  layered under the general rule at `.gitignore:224` that still gitignores
+  every sibling lane's monitor manifest. Materialized at rest (WI-2686 rework
+  2) as a truthful empty-`monitors`-array placeholder — no live monitor is
+  claimed — specifically so this pointer resolves to a real file for a fresh
+  Shepherd instead of only prose describing what a future session must write.
   These are Shepherd-owned runtime state; they point here and never replace
   this tracker.
 
@@ -96,13 +99,15 @@ Shepherd-owned runtime pointers named below.
 repo-relative pointer `_quartet/working/lanes/release-eng/execution-tracker.md`,
 and describes membership as a timestamped live-relation observation, not a
 fixed three- or seven-member authority (materialized 2026-07-29; see its own
-`Updated` timestamp for currency). `_state/monitor-manifest.json` is
-Shepherd-session-live state (gitignored per `.gitignore:224`, exactly like
-every sibling lane's monitor manifest) rather than a file pre-created at rest;
-whenever a Shepherd creates or refreshes it, the file must retain a dynamic
-stage monitor over the BID-42 Brief, Status, Delivery Batch relation, and
-every member returned by that relation, and add top-level
-`"tracker": "_quartet/working/lanes/release-eng/execution-tracker.md"`.
+`Updated` timestamp for currency). `_state/monitor-manifest.json` is now
+materialized at rest and git-tracked (lane-scoped `.gitignore:228` negation
+over the general `.gitignore:224` rule, unlike any sibling lane's manifest),
+carrying an empty `monitors: []` array plus a top-level
+`"tracker": "_quartet/working/lanes/release-eng/execution-tracker.md"` pointer
+back to this file. Whenever a Shepherd actively runs the lane and arms a
+monitor, it appends an entry to the `monitors` array (schema: target/purpose/
+command/task-id, matching sibling lanes) and removes the entry on teardown,
+while preserving the top-level `tracker` pointer and never deleting the file.
 Whenever either runtime artifact disagrees with live Cosmo/GitHub, update the
 runtime artifact; never edit this tracker to preserve stale runtime prose.
 
@@ -196,6 +201,23 @@ back to the Orchestrator. No tracker text can waive those conditions.
 
 ## Change log
 
+- 2026-07-29 — WI-2686 rework 2 (reviewer bounce on AC-4/AC-5, second round).
+  The first rework left `_state/monitor-manifest.json` deliberately absent,
+  documenting only that a future actively-running Shepherd must write it; the
+  reviewer correctly found that description cannot establish the missing
+  artifact's reciprocal pointer or consistency, and that the declared path was
+  git-ignored (`.gitignore:224`), so a fresh Shepherd following the pointer
+  chain reached no manifest. Fixed by materializing
+  `_state/monitor-manifest.json` at rest with a truthful empty-`monitors`
+  placeholder and a lane-scoped `.gitignore` negation
+  (`!/_quartet/working/lanes/release-eng/_state/monitor-manifest.json` at
+  `.gitignore:228`) so this one lane's manifest is git-tracked while every
+  sibling lane keeps the general gitignored/live-only convention. Updated the
+  Pointers and Runtime consistency contract sections above and
+  `_state/SESSION-HANDOFF.md` to describe the manifest as materialized/
+  git-tracked rather than gitignored/not-pre-created. No Delivery Batch
+  membership, lifecycle field, credential, service, production behavior, or
+  operator gate changed.
 - 2026-07-29 — WI-2686 rework (reviewer bounce on AC-4/AC-5). The Pointers and
   Runtime consistency contract sections named `/Users/vetinari/nexus/.cosmo-watch/
   release-eng/...` for durable executor evidence, `SESSION-HANDOFF.md`, and

@@ -138,7 +138,9 @@ export function armJ01AccountReadiness(
       const phase =
         visibleFailurePhase === 'unknown'
           ? (retainedPhase ?? visibleFailurePhase)
-          : visibleFailurePhase;
+          : retainedPhase !== null && retainedPhase !== visibleFailurePhase
+            ? `${retainedPhase}->${visibleFailurePhase}`
+            : visibleFailurePhase;
 
       return (
         `[J-01 account-readiness:${phase}] account-avatar-shell remained absent within ${timeout}ms; ` +
