@@ -106,7 +106,10 @@ const EMPTY_SHARED_RECORD: SharedRecord = {
 
 function renderWithProfile(ui: React.ReactElement): QueryClient {
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { gcTime: 0 },
+    },
   });
   const { wrapper } = createScreenWrapper({
     activeProfile: createTestProfile(),
