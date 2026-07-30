@@ -905,6 +905,46 @@ describe('resetDatabase', () => {
     },
   );
 
+  it('[WI-2820 review] resolves reset Clerk ownership after acquiring the mutation lock', async () => {
+    const events: string[] = [];
+    const rootDb = makeResetDb();
+    const txDb = makeResetDb();
+    const transaction = jest.fn(
+      async (operation: (tx: Database) => Promise<unknown>) => {
+        events.push('transaction');
+        return operation(txDb);
+      },
+    );
+    Object.assign(rootDb, { transaction });
+
+    const clerkUser = {
+      id: 'user_real_seed',
+      email_addresses: [{ email_address: 'repeat-owner@example.com' }],
+      external_id: `${SEED_CLERK_PREFIX}repeat-owner`,
+    };
+    global.fetch = jest.fn(async (input) => {
+      if (String(input).includes('/users?')) {
+        events.push('clerk-ownership');
+        const users = events.filter((event) => event === 'clerk-ownership');
+        return new Response(
+          JSON.stringify(users.length === 1 ? [clerkUser] : []),
+          {
+            status: 200,
+          },
+        );
+      }
+      return new Response('{}', { status: 200 });
+    });
+
+    await resetDatabase(
+      rootDb,
+      { CLERK_SECRET_KEY: 'test-secret' },
+      { prefix: 'repeat-', preserveClerkUsers: true },
+    );
+
+    expect(events).toEqual(['transaction', 'clerk-ownership']);
+  });
+
   it('returns ResetResult with deletedCount', async () => {
     const deleteReturning = jest
       .fn()
@@ -1090,11 +1130,11 @@ describe('resetDatabase', () => {
     const deleteWhere = jest.fn().mockReturnValue({
       returning: deleteReturning,
     });
-    const db = {
+    const db = withMockTransaction({
       delete: jest.fn().mockReturnValue({
         where: deleteWhere,
       }),
-    } as unknown as Database;
+    } as unknown as Database);
 
     const result = await resetDatabase(
       db,
@@ -1122,11 +1162,11 @@ describe('resetDatabase', () => {
     const deleteWhere = jest.fn().mockReturnValue({
       returning: deleteReturning,
     });
-    const db = {
+    const db = withMockTransaction({
       delete: jest.fn().mockReturnValue({
         where: deleteWhere,
       }),
-    } as unknown as Database;
+    } as unknown as Database);
 
     const result = await resetDatabase(
       db,

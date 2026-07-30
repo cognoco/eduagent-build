@@ -6925,49 +6925,49 @@ export async function resetDatabase(
 ): Promise<ResetResult> {
   const prefix = options.prefix?.trim();
 
-  const verifiedSeedClerkUserIds = options.verifiedSeedClerkUserIds
-    ? await verifySeedClerkUserIds(env, options.verifiedSeedClerkUserIds, {
-        prefix,
-      })
-    : undefined;
+  return runTestSeedMutation(db, async (txDb) => {
+    const verifiedSeedClerkUserIds = options.verifiedSeedClerkUserIds
+      ? await verifySeedClerkUserIds(env, options.verifiedSeedClerkUserIds, {
+          prefix,
+        })
+      : undefined;
 
-  if (
-    options.verifiedSeedClerkUserIds &&
-    verifiedSeedClerkUserIds?.length === 0
-  ) {
-    return { deletedCount: 0, clerkUsersDeleted: 0 };
-  }
+    if (
+      options.verifiedSeedClerkUserIds &&
+      verifiedSeedClerkUserIds?.length === 0
+    ) {
+      return { deletedCount: 0, clerkUsersDeleted: 0 };
+    }
 
-  // If caller supplied server-verifiable Clerk IDs, skip Clerk deletion
-  // because the cleanup script handles Clerk locally after DB rows are removed.
-  const { count: clerkUsersDeleted, clerkUserIds } =
-    options.clerkUserIds || verifiedSeedClerkUserIds
-      ? {
-          count: 0,
-          clerkUserIds:
-            verifiedSeedClerkUserIds ??
-            (options.clerkUserIds ?? []).filter((id) =>
-              id.startsWith(SEED_CLERK_PREFIX),
-            ),
-        }
-      : options.preserveClerkUsers
+    // If caller supplied server-verifiable Clerk IDs, skip Clerk deletion
+    // because the cleanup script handles Clerk locally after DB rows are removed.
+    const { count: clerkUsersDeleted, clerkUserIds } =
+      options.clerkUserIds || verifiedSeedClerkUserIds
         ? {
             count: 0,
-            clerkUserIds: (await listSeedClerkUsers(env, { prefix })).map(
-              (user) => user.id,
-            ),
+            clerkUserIds:
+              verifiedSeedClerkUserIds ??
+              (options.clerkUserIds ?? []).filter((id) =>
+                id.startsWith(SEED_CLERK_PREFIX),
+              ),
           }
-        : await deleteClerkTestUsers(env, { prefix });
+        : options.preserveClerkUsers
+          ? {
+              count: 0,
+              clerkUserIds: (await listSeedClerkUsers(env, { prefix })).map(
+                (user) => user.id,
+              ),
+            }
+          : await deleteClerkTestUsers(env, { prefix });
 
-  if (
-    options.clerkUserIds &&
-    !options.verifiedSeedClerkUserIds &&
-    clerkUserIds.length === 0
-  ) {
-    return { deletedCount: 0, clerkUsersDeleted };
-  }
+    if (
+      options.clerkUserIds &&
+      !options.verifiedSeedClerkUserIds &&
+      clerkUserIds.length === 0
+    ) {
+      return { deletedCount: 0, clerkUsersDeleted };
+    }
 
-  return runTestSeedMutation(db, async (txDb) => {
     if (prefix) {
       const seedLogins = await txDb
         .select({ personId: login.personId, clerkUserId: login.clerkUserId })
