@@ -11,8 +11,10 @@ profile creation.
 - Someone else opens an own-login question; credentialed learners reach the
   existing family-join invitation form, while the unavailable managed path is
   explicit.
-- The unfinished fork is stored per profile, restored after remount or relaunch,
-  and cleared after the selected destination mounts or on sign-out.
+- The unfinished fork is stored per profile and restored after remount or
+  relaunch. Me durably clears it before synchronous `onComplete`
+  mounts/reveals the learner shell; invitation clears only after the real route
+  mounts. Sign-out also clears it.
 - Storage failures fail closed with retry; a failed handoff after profile
   creation retries only the durable marker and never repeats the profile POST.
 - Dedicated translated copy, focused mobile coverage, and a preview browser

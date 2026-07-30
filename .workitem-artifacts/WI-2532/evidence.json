@@ -32,7 +32,7 @@
     },
     {
       "acRef": "AC-1",
-      "description": "The blocked learner shell remains React-mounted to preserve navigator state but is display-hidden, pointer-inert, and excluded from native accessibility until the durable fork resolves.",
+      "description": "During the restore-probe and retry window, the blocked learner shell remains React-mounted to preserve navigator state but is display-hidden, pointer-inert, and excluded from native accessibility; restoring a pending fork then early-returns to its gate and unmounts Tabs.",
       "pointer": "apps/mobile/src/app/(app)/_layout.test.tsx"
     },
     {

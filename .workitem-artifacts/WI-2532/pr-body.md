@@ -4,8 +4,9 @@
   Me-or-someone-else onboarding fork
 - keep the fork non-authorizing while routing credentialed learners to the
   existing invitation form and explicitly gating the unavailable managed path
-- restore pending setup across remount/relaunch and clear it only after the
-  selected destination mounts or on sign-out
+- restore pending setup across remount/relaunch; Me durably clears before
+  synchronous `onComplete` mounts/reveals the learner shell, invitation clears
+  after the real route mounts, and sign-out clears either case
 - add focused mobile coverage, translated copy, and a preview browser journey
 
 ## Verification
