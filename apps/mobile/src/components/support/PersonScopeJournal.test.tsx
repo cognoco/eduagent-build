@@ -193,9 +193,7 @@ describe('PersonScopeJournal', () => {
         ],
       },
     });
-    queryClient = renderWithProfile(
-      <PersonScopeJournal scope={EMMA_SCOPE} />,
-    );
+    queryClient = renderWithProfile(<PersonScopeJournal scope={EMMA_SCOPE} />);
 
     await waitFor(() => screen.getByText('Session recap ready'));
     expect(screen.queryByText('Legacy recap detail')).toBeNull();

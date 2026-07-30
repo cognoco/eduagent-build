@@ -102,8 +102,8 @@ export function SharedRecordView({
                   testID: `journal-artifact-${artifact.kind}-${artifact.id}`,
                 }
               : {}),
-            };
-          })}
+          };
+        })}
         appeal={appeal}
         testID="visibility-shared-record"
       />

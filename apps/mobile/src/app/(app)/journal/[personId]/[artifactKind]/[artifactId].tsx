@@ -10,7 +10,6 @@ import {
 
 import { Button, ErrorFallback } from '../../../../../components/common';
 import { StructuralFactCard } from '../../../../../components/learning-surface';
-import { renderSharedRecordFact } from '../../../../../components/support/shared-record-fact-copy';
 import { useSharedRecordArtifact } from '../../../../../components/support/use-shared-record';
 import { extractApiErrorCode } from '../../../../../lib/format-api-error';
 import { firstParam } from '../../../../../lib/route-params';
@@ -102,7 +101,7 @@ function AuthorizedArtifact({
     return <StaleArtifact artifactKind={artifactKind} onBack={onBack} />;
   }
 
-  if (query.isError && !query.data) {
+  if (query.isError) {
     return (
       <View className="flex-1 bg-background px-5 py-4">
         <ErrorFallback
