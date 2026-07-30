@@ -12,6 +12,7 @@ const path = require('path');
 const {
   filterSecrets,
   isWranglerAuthenticated,
+  syncSecrets,
   WRANGLER_CLI,
 } = require('./sync-secrets.js');
 
@@ -170,6 +171,7 @@ function applyDeletionPlan({
   approval,
   expectedApproval,
   deleteSecret,
+  restoreReappearedSecrets,
   listDopplerKeyNames,
   listWorkerSecretNames,
 }) {
@@ -238,6 +240,34 @@ function applyDeletionPlan({
   const reappeared = plan.deleteCandidates.filter((key) =>
     postDeleteDoppler.has(key),
   );
+  if (reappeared.length > 0) {
+    if (typeof restoreReappearedSecrets !== 'function') {
+      throw new Error(
+        `Cannot restore keys that reappeared in Doppler: ${reappeared.join(
+          ', ',
+        )}`,
+      );
+    }
+    const restoration = restoreReappearedSecrets(reappeared);
+    if (!restoration || restoration.success !== true) {
+      throw new Error(
+        `Failed to restore keys that reappeared in Doppler: ${
+          restoration?.error || reappeared.join(', ')
+        }`,
+      );
+    }
+    const restoredWorker = new Set(listWorkerSecretNames());
+    const missingRestored = reappeared.filter(
+      (key) => !restoredWorker.has(key),
+    );
+    if (missingRestored.length > 0) {
+      throw new Error(
+        `Restoration did not replace keys that reappeared in Doppler: ${missingRestored.join(
+          ', ',
+        )}`,
+      );
+    }
+  }
   if (
     stranded.length > 0 ||
     lost.length > 0 ||
@@ -251,7 +281,9 @@ function applyDeletionPlan({
         lost.join(', ') || 'none'
       }; missing required managed: ${
         missingRequired.join(', ') || 'none'
-      }; reappeared in Doppler: ${reappeared.join(', ') || 'none'})`,
+      }; restored after reappearing in Doppler: ${
+        reappeared.join(', ') || 'none'
+      })`,
     );
   }
 }
@@ -432,6 +464,15 @@ function main(args) {
     expectedApproval: expectedApprovalPhrase(manifest, plan.deleteCandidates),
     deleteSecret: (key) =>
       deleteWorkerSecret(key, PRODUCTION_TARGET, configPath),
+    restoreReappearedSecrets: () => {
+      const result = syncSecrets(['prd']);
+      return result.ok
+        ? { success: true }
+        : {
+            success: false,
+            error: 'production Doppler-to-Worker bulk sync failed',
+          };
+    },
     listDopplerKeyNames: () => downloadDopplerKeyNames(PRODUCTION_TARGET),
     listWorkerSecretNames: () =>
       listWorkerSecretNames(PRODUCTION_TARGET, configPath),

@@ -57,8 +57,10 @@ malformed, duplicate, or target-mismatched manifest before listing or deleting
 anything. It uses Wrangler's supported `secret delete` command and verifies
 that every candidate disappeared while every initially present preserved key
 remained. It re-reads Doppler immediately before and after deletion; a key
-reintroduced after the dry-run makes the apply fail closed instead of deleting
-against a stale plan.
+reintroduced before deletion makes the apply fail closed. If a key reappears
+in the narrower interval while deletion is running, the reconciler immediately
+restores it through the normal Doppler-to-Worker bulk sync, verifies the key is
+back on the Worker, and then fails the run for operator review.
 
 `REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION` is manifest-owned even while
 normally absent from Doppler. This permits its exact removal after a bounded
@@ -82,8 +84,10 @@ WI-2705 verification window without granting authority over Worker-only keys.
    `WI-1837:DELETE:<worker>:<doppler-config>:v<manifest-version>:<sorted-candidate-names>`.
    A missing phrase, a different candidate set, or a different order fails
    before the first delete.
-6. Confirm the post-delete health step is green. A delete, post-delete
-   invariant, or health failure opens the deduplicated deployment issue.
+6. Confirm the post-delete health step is green. It runs even when
+   reconciliation fails, so a partial mutation still receives a live health
+   check. A delete, post-delete invariant, restoration, or health failure opens
+   the deduplicated deployment issue.
 
 Do not enable `apply_manifest_deletions` merely to make the dry-run quiet.
 Removing a key from the manifest preserves it; removing it from Doppler makes

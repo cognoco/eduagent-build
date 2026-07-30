@@ -87,6 +87,7 @@ describe('[WI-1641] production secret-sync workflow', () => {
     expect(sync?.run).toContain('pnpm secrets:sync prd');
     expect(health?.run).toContain('https://api.mentomate.com/v1/health');
     expect(health?.run).toContain('ENV_VALIDATION_ERROR');
+    expect(health?.if).toBe('always()');
   });
 
   it('uses SHA-pinned actions and deduplicates scheduled failure issues', () => {

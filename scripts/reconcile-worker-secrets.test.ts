@@ -14,6 +14,10 @@ const {
     approval: string;
     expectedApproval: string;
     deleteSecret: (key: string) => { success: boolean; error?: string };
+    restoreReappearedSecrets?: (keys: string[]) => {
+      success: boolean;
+      error?: string;
+    };
     listDopplerKeyNames: () => string[];
     listWorkerSecretNames: () => string[];
   }) => void;
@@ -226,6 +230,39 @@ describe('[WI-1837] deletion-safe reconciliation', () => {
       }),
     ).toThrow('Doppler state changed');
     expect(deleteSecret).not.toHaveBeenCalled();
+  });
+
+  it('restores a candidate that reappears in Doppler during deletion before failing', () => {
+    const workerStates = jest
+      .fn()
+      .mockReturnValueOnce(['REMOVED_OWNED', 'WORKER_ONLY'])
+      .mockReturnValueOnce(['WORKER_ONLY'])
+      .mockReturnValueOnce(['REMOVED_OWNED', 'WORKER_ONLY']);
+    const dopplerStates = jest
+      .fn()
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce(['REMOVED_OWNED']);
+    const restoreReappearedSecrets = jest.fn(() => ({ success: true }));
+
+    expect(() =>
+      applyDeletionPlan({
+        plan: {
+          deleteCandidates: ['REMOVED_OWNED'],
+          preserveKeys: ['WORKER_ONLY'],
+        },
+        approval: expectedApprovalPhrase(validManifest, ['REMOVED_OWNED']),
+        expectedApproval: expectedApprovalPhrase(validManifest, [
+          'REMOVED_OWNED',
+        ]),
+        deleteSecret: () => ({ success: true }),
+        restoreReappearedSecrets,
+        listDopplerKeyNames: dopplerStates,
+        listWorkerSecretNames: workerStates,
+      }),
+    ).toThrow('restored after reappearing in Doppler');
+
+    expect(restoreReappearedSecrets).toHaveBeenCalledWith(['REMOVED_OWNED']);
+    expect(workerStates).toHaveBeenCalledTimes(3);
   });
 
   it('refuses deletion when a Doppler-present managed key is missing from the Worker', () => {
