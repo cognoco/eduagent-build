@@ -80,7 +80,7 @@ export function SharedRecordView({
       <StructuralFactCard
         headline={
           view
-            ? renderSharedRecordHeadline(view, t, supporteeName ?? '')
+            ? renderSharedRecordHeadline(view, t, supporteeName)
             : t('visibility.sharedRecord.emptyTitle')
         }
         structuralOnlyLabel={t('visibility.sharedRecord.structuralOnly')}

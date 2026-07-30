@@ -134,6 +134,7 @@ describe('shared-record fact copy', () => {
     expect(renderSharedRecordHeadline(view, t, 'Emma')).toBe(
       'Emma hat 1 teilbares Update.',
     );
+    expect(renderSharedRecordHeadline(view, t, undefined)).toBe(view.headline);
     expect(
       renderSharedRecordHeadline(
         { ...view, facts: [fact({ metadata: undefined })] },

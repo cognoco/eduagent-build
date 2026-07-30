@@ -163,8 +163,12 @@ export function renderSharedRecordFact(
 export function renderSharedRecordHeadline(
   view: SharedRecordView,
   t: Translate,
-  supporteeName: string,
+  supporteeName?: string,
 ): string {
+  if (!supporteeName?.trim()) {
+    return view.headline;
+  }
+
   if (view.facts.some((fact) => metadataRecord(fact.metadata)?.templateKey)) {
     return t('sharedRecord.fact.headline', {
       name: supporteeName,
