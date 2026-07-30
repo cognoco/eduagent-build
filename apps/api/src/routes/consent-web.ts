@@ -123,8 +123,8 @@ function withdrawConfirmBody(
 ): string {
   const safeName = escapeHtml(childName);
   return `<h1>Withdraw consent for ${safeName}?</h1>
-    <p>Withdrawing stops ${safeName}'s learning sessions right away. The account is paused, and the data is permanently deleted after a 7-day grace period.</p>
-    <p>You can undo this within those 7 days — we'll show you how on the next screen.</p>
+    <p>Withdrawing stops ${safeName}'s learning sessions right away. The account is paused, and the data is permanently deleted after 7 days.</p>
+    <p>The 7-day period is an internal deletion grace period, not an undo window.</p>
     <form method="POST" action="${withdrawActionUrl}" style="display:contents">
       <input type="hidden" name="token" value="${escapeHtml(token)}" />
       <button type="submit" class="btn btn-danger">Yes, withdraw consent</button>
@@ -133,15 +133,15 @@ function withdrawConfirmBody(
     <p class="info">To keep your consent, just close this tab — nothing changes.</p>`;
 }
 
-/** Post-withdrawal landing (in grace). [WI-2348 / OPQ-114] The link can no
- * longer restore — restoring now requires signing in to the account, so this
- * page informs rather than offers an "Undo" form. */
+/** Post-withdrawal landing (in grace). [WI-2348 / OPQ-114] The bearer link can
+ * no longer restore, and the email-only parent has no restoration path. The
+ * authenticated account-bound guardian path remains separate. */
 function withdrawnLandingBody(childName: string): string {
   const safeName = escapeHtml(childName);
   return `<h1>Consent withdrawn</h1>
-    <p>You've withdrawn consent for ${safeName}. Their learning sessions have stopped, and their data will be permanently deleted after a 7-day grace period.</p>
-    <p>Changed your mind? Restoring consent now requires signing in to the MentoMate account, within those 7 days.</p>
-    <p class="info">After 7 days the data is permanently removed and can no longer be restored. You may now close this tab.</p>`;
+    <p>You've withdrawn consent for ${safeName}. ${safeName}'s learning sessions have stopped. The account is paused, and the data is permanently deleted after 7 days.</p>
+    <p>The 7-day period is an internal deletion grace period, not an undo window.</p>
+    <p class="info">After 7 days the data is permanently removed. You may now close this tab.</p>`;
 }
 
 /** Valid token but no current grant (never approved, or already deleted). */
