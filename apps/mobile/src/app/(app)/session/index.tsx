@@ -879,16 +879,22 @@ function SessionScreenInner() {
     isV2MentorEntry && effectiveMode === 'freeform' && rawInput?.trim().length
       ? rawInput
       : undefined;
-  const mentorOpenerAlreadyPersisted = !!(
-    mentorOpenerText &&
-    liveTranscript?.exchanges.some(
-      (exchange, index, exchanges) =>
-        exchange.role === 'user' &&
-        exchange.content === mentorOpenerText &&
-        exchanges[index + 1]?.role === 'assistant' &&
-        !exchanges[index + 1]?.isSystemPrompt,
-    )
-  );
+  const mentorOpenerPersistedPairCount = mentorOpenerText
+    ? (liveTranscript?.exchanges.filter(
+        (exchange, index, exchanges) =>
+          exchange.role === 'user' &&
+          exchange.content === mentorOpenerText &&
+          exchanges[index + 1]?.role === 'assistant' &&
+          !exchanges[index + 1]?.isSystemPrompt,
+      ).length ?? 0)
+    : 0;
+  const mentorOpenerPersistedLearnerTurnCount = mentorOpenerText
+    ? (liveTranscript?.exchanges.filter(
+        (exchange) =>
+          exchange.role === 'user' && exchange.content === mentorOpenerText,
+      ).length ?? 0)
+    : 0;
+  const mentorOpenerAlreadyPersisted = mentorOpenerPersistedPairCount > 0;
 
   // Auto-resume the latest active/paused session when the user re-enters a
   // learning topic (e.g. tapping "Continue learning" on the topic screen,
@@ -2111,6 +2117,20 @@ function SessionScreenInner() {
         rightAction={headerRight}
         inputAccessory={
           <>
+            {isE2EBuild &&
+            mentorOpenerPersistedPairCount === 1 &&
+            mentorOpenerPersistedLearnerTurnCount === 1 ? (
+              <View
+                testID="mentor-opener-persisted-once"
+                style={{ width: 1, height: 1 }}
+              />
+            ) : null}
+            {isE2EBuild && mentorOpenerPersistedLearnerTurnCount > 1 ? (
+              <View
+                testID="mentor-opener-persisted-more-than-once"
+                style={{ width: 1, height: 1 }}
+              />
+            ) : null}
             {exactManualHomeworkSessionAssociated ? (
               <View
                 testID="homework-session-associated-once"

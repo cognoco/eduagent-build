@@ -76,11 +76,13 @@ describe('[WI-1641] production secret-sync workflow', () => {
       DOPPLER_TOKEN_PRD: '${{ secrets.DOPPLER_TOKEN_PRD }}',
       CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}',
       CLOUDFLARE_ACCOUNT_ID: '${{ secrets.CF_ACCOUNT_ID }}',
+      WORKER_DATABASE_URL: '${{ secrets.DATABASE_URL_PRODUCTION_APP }}',
     });
     expect(sync?.env).toEqual({
       DOPPLER_TOKEN: '${{ secrets.DOPPLER_TOKEN_PRD }}',
       CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}',
       CLOUDFLARE_ACCOUNT_ID: '${{ secrets.CF_ACCOUNT_ID }}',
+      WORKER_DATABASE_URL: '${{ secrets.DATABASE_URL_PRODUCTION_APP }}',
       WRANGLER_SYNC_CONFIG: '${{ runner.temp }}/wrangler-secret-sync.jsonc',
     });
     expect(sync?.run).toContain('WRANGLER_SYNC_CONFIG');
@@ -142,5 +144,23 @@ describe('[WI-1641] production secret-sync workflow', () => {
       'deletion_approval',
     );
     expect(apply?.run).toContain('pnpm secrets:reconcile --env prd --apply');
+  });
+
+  it('[WI-1837] keeps a timed-out restore alertable after the always-run health check', () => {
+    const steps = workflow.jobs.sync.steps as Array<{
+      name?: string;
+      if?: string;
+    }>;
+    const healthIndex = steps.findIndex(
+      (step) => step.name === 'Verify production environment health',
+    );
+    const notifyIndex = steps.findIndex(
+      (step) =>
+        step.name === 'Notify on sync, reconciliation, or health failure',
+    );
+
+    expect(steps[healthIndex]?.if).toBe('always()');
+    expect(notifyIndex).toBeGreaterThan(healthIndex);
+    expect(steps[notifyIndex]?.if).toBe('failure()');
   });
 });

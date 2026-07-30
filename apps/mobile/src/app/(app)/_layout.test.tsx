@@ -38,6 +38,7 @@ jest.mock(
 
 const mockUseProfile = jest.fn();
 const mockUsePathname = jest.fn();
+const mockPush = jest.fn();
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockCanGoBack = jest.fn(() => false);
@@ -114,7 +115,7 @@ jest.mock('expo-router', () => ({
   usePathname: () => mockUsePathname(),
   useGlobalSearchParams: () => mockUseGlobalSearchParams(),
   useRouter: () => ({
-    push: jest.fn(),
+    push: mockPush,
     replace: mockReplace,
     back: mockBack,
     canGoBack: mockCanGoBack,
@@ -2109,6 +2110,27 @@ describe('AppLayout no-profile gate — preview branch', () => {
           PREVIEW_ONBOARDING_ENABLED: boolean;
         }
       ).PREVIEW_ONBOARDING_ENABLED = original;
+    }
+  });
+
+  it('carries the gated deep-link route into first-profile setup', async () => {
+    const flags = require('../../lib/feature-flags') as {
+      FEATURE_FLAGS: { PREVIEW_ONBOARDING_ENABLED: boolean };
+    };
+    const original = flags.FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED;
+    flags.FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED = false;
+    mockUsePathname.mockReturnValue('/quiz');
+
+    try {
+      renderAppLayoutWithNoProfile();
+      fireEvent.press(await screen.findByTestId('create-profile-cta'));
+
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/create-profile',
+        params: { returnTo: '/(app)/quiz' },
+      });
+    } finally {
+      flags.FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED = original;
     }
   });
 
