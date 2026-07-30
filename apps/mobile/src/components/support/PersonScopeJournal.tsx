@@ -90,7 +90,7 @@ export function PersonScopeJournal({
             appealError={appeal.error}
             onRetryAppeal={() => appeal.mutate()}
             onOpenArtifact={(artifact) => {
-              // gc4-allow: this screen is already mounted inside the Journal stack; the dynamic segments identify the leaf artifact
+              // Already inside the Journal stack; dynamic segments identify the leaf artifact.
               router.push({
                 pathname:
                   '/(app)/journal/[personId]/[artifactKind]/[artifactId]',

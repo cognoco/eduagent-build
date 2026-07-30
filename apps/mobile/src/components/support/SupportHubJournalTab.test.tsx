@@ -17,6 +17,7 @@ import {
   createTestProfile,
 } from '../../test-utils/screen-render';
 import {
+  createRoutedMockFetch,
   fetchCallsMatching,
   type RoutedMockFetch,
 } from '../../test-utils/mock-api-routes';
@@ -28,19 +29,7 @@ jest.mock(
 );
 
 let mockFetch: RoutedMockFetch;
-
-jest.mock(
-  // gc1-allow: Clerk useAuth() external boundary; component test exercises real query + schema parsing over a routed Hono client
-  '../../lib/api-client',
-  () => {
-    const {
-      createRoutedMockFetch,
-      mockApiClientFactory,
-    } = require('../../test-utils/mock-api-routes');
-    mockFetch = createRoutedMockFetch();
-    return mockApiClientFactory(mockFetch);
-  },
-);
+let previousFetch: typeof globalThis.fetch;
 
 const PERSON_ID = '550e8400-e29b-41d4-a716-446655440101';
 const EDGE_ID = '550e8400-e29b-41d4-a716-446655440201';
@@ -135,10 +124,14 @@ describe('SupportHubJournalTab', () => {
   afterEach(() => {
     cleanupScreen(queryClient);
     queryClient = undefined;
+    globalThis.fetch = previousFetch;
   });
 
   beforeEach(() => {
     jest.clearAllMocks();
+    previousFetch = globalThis.fetch;
+    mockFetch = createRoutedMockFetch();
+    globalThis.fetch = mockFetch as unknown as typeof globalThis.fetch;
     mockFetch.setRoute(
       `/visibility/reports/${PERSON_ID}/shared-record`,
       SHARED_RECORD,
