@@ -38,6 +38,20 @@ import { addMonthsClamped } from './billing/billing-shared';
 // Mock DB factory
 // ---------------------------------------------------------------------------
 
+function withMockTransaction(db: Database): Database {
+  if (typeof db.execute !== 'function') {
+    Object.assign(db, {
+      execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
+    });
+  }
+  Object.assign(db, {
+    transaction: jest.fn(
+      async (operation: (tx: Database) => Promise<unknown>) => operation(db),
+    ),
+  });
+  return db;
+}
+
 function createMockDb(): Database {
   const deleteWhere = jest.fn().mockReturnValue({
     returning: jest.fn().mockResolvedValue([]),
@@ -65,7 +79,7 @@ function createMockDb(): Database {
     }),
   };
 
-  return {
+  const db = {
     insert: jest.fn().mockReturnValue({
       values: jest.fn().mockReturnValue({
         onConflictDoNothing: jest.fn().mockReturnValue({
@@ -109,6 +123,7 @@ function createMockDb(): Database {
       },
     },
   } as unknown as Database;
+  return withMockTransaction(db);
 }
 
 // ---------------------------------------------------------------------------
@@ -356,6 +371,21 @@ describe('seedScenario', () => {
   const MOCK_DISPATCHABLE_SCENARIOS = (
     VALID_SCENARIOS as SeedScenario[]
   ).filter((scenario) => !DB_TRANSACTION_SCENARIOS.includes(scenario));
+
+  it('[WI-2820] runs cleanup and the complete seed graph in one transaction', async () => {
+    const rootDb = createMockDb();
+    const txDb = createMockDb();
+    const transaction = jest.fn(
+      async (operation: (tx: Database) => Promise<unknown>) => operation(txDb),
+    );
+    Object.assign(rootDb, { transaction });
+
+    await seedScenario(rootDb, 'learning-active', 'repeat@example.com');
+
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(txDb.insert).toHaveBeenCalled();
+    expect(rootDb.insert).not.toHaveBeenCalled();
+  });
 
   it.each(MOCK_DISPATCHABLE_SCENARIOS)(
     'dispatches "%s" and returns SeedResult',
@@ -775,6 +805,56 @@ describe('resetDatabase', () => {
       });
   }
 
+  function makeResetDb(): Database {
+    const select = makeResetSelectMock({
+      logins: [
+        {
+          personId: 'repeat-person',
+          clerkUserId: `${SEED_CLERK_PREFIX}repeat`,
+        },
+      ],
+      orgsForPersons: [{ organizationId: 'repeat-org' }],
+      membersOfOrgs: [{ personId: 'repeat-person' }],
+      fullMemberships: [
+        { personId: 'repeat-person', organizationId: 'repeat-org' },
+      ],
+    });
+    return {
+      select,
+      delete: jest.fn().mockImplementation(() => ({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([{ id: 'repeat-org' }]),
+        }),
+      })),
+      execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
+    } as unknown as Database;
+  }
+
+  it.each([
+    [
+      'prefix',
+      { prefix: 'repeat-', clerkUserIds: [`${SEED_CLERK_PREFIX}repeat`] },
+    ],
+    ['unscoped', { clerkUserIds: [`${SEED_CLERK_PREFIX}repeat`] }],
+  ] as const)(
+    '[WI-2820] runs the %s select-to-delete reset path in one transaction',
+    async (_path, options) => {
+      const rootDb = makeResetDb();
+      const txDb = makeResetDb();
+      const transaction = jest.fn(
+        async (operation: (tx: Database) => Promise<unknown>) =>
+          operation(txDb),
+      );
+      Object.assign(rootDb, { transaction });
+
+      await resetDatabase(rootDb, {}, options);
+
+      expect(transaction).toHaveBeenCalledTimes(1);
+      expect(txDb.delete).toHaveBeenCalled();
+      expect(rootDb.delete).not.toHaveBeenCalled();
+    },
+  );
+
   it('returns ResetResult with deletedCount', async () => {
     const deleteReturning = jest
       .fn()
@@ -798,12 +878,12 @@ describe('resetDatabase', () => {
         { personId: 'p2', organizationId: 'org-2' },
       ],
     });
-    const db = {
+    const db = withMockTransaction({
       select: selectFn,
       delete: jest.fn().mockReturnValue({
         where: deleteWhere,
       }),
-    } as unknown as Database;
+    } as unknown as Database);
 
     const result = await resetDatabase(db);
 
@@ -848,10 +928,10 @@ describe('resetDatabase', () => {
       }),
     }));
 
-    const db = {
+    const db = withMockTransaction({
       select: selectFn,
       delete: deleteFn,
-    } as unknown as Database;
+    } as unknown as Database);
 
     await resetDatabase(db);
 
@@ -864,14 +944,14 @@ describe('resetDatabase', () => {
 
   it('returns deletedCount: 0 when no seed accounts exist', async () => {
     // v2 resetDatabase: select returns no login rows → returns early with count 0.
-    const db = {
+    const db = withMockTransaction({
       select: jest.fn().mockReturnValue({
         from: jest.fn().mockReturnValue({
           where: jest.fn().mockResolvedValue([]),
         }),
       }),
       delete: jest.fn(),
-    } as unknown as Database;
+    } as unknown as Database);
 
     const result = await resetDatabase(db);
 
@@ -881,7 +961,7 @@ describe('resetDatabase', () => {
   it('[WI-84 DS-091] prefix reset does not delete non-seed Clerk accounts', async () => {
     // v2 prefix reset: select login by email prefix, filter by seed marker.
     // A non-seed clerkUserId won't pass isSeedManagedClerkUserId → no delete.
-    const db = {
+    const db = withMockTransaction({
       select: jest.fn().mockReturnValue({
         from: jest.fn().mockReturnValue({
           where: jest.fn().mockResolvedValue([
@@ -898,7 +978,7 @@ describe('resetDatabase', () => {
           .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
       }),
       execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
-    } as unknown as Database;
+    } as unknown as Database);
 
     const result = await resetDatabase(db, {}, { prefix: 'e2e-' });
 
@@ -933,10 +1013,10 @@ describe('resetDatabase', () => {
       membersOfOrgs: [{ personId: 'p1' }],
       fullMemberships: [{ personId: 'p1', organizationId: 'org-1' }],
     });
-    const db = {
+    const db = withMockTransaction({
       select: selectFn,
       delete: deleteFn,
-    } as unknown as Database;
+    } as unknown as Database);
 
     const result = await resetDatabase(
       db,
@@ -1666,7 +1746,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
         where: jest.fn().mockResolvedValue([]),
       }),
     };
-    const db = {
+    const db = withMockTransaction({
       insert: insertMock,
       update: jest.fn().mockReturnValue({
         set: jest
@@ -1680,7 +1760,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
           .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
       }),
       execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
-    } as unknown as Database;
+    } as unknown as Database);
 
     await seedScenario(
       db,
@@ -1717,7 +1797,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
         where: jest.fn().mockResolvedValue([]),
       }),
     };
-    const db = {
+    const db = withMockTransaction({
       insert: insertMock,
       update: jest.fn().mockReturnValue({
         set: jest
@@ -1731,7 +1811,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
           .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
       }),
       execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
-    } as unknown as Database;
+    } as unknown as Database);
 
     await seedScenario(
       db,
@@ -1793,7 +1873,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
         where: jest.fn().mockResolvedValue([]),
       }),
     };
-    const db = {
+    const db = withMockTransaction({
       insert: insertMock,
       update: jest.fn().mockReturnValue({
         set: jest.fn().mockImplementation((row: Record<string, unknown>) => {
@@ -1804,7 +1884,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
       select: jest.fn().mockReturnValue(selectChain),
       delete: deleteMock,
       execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
-    } as unknown as Database;
+    } as unknown as Database);
 
     const result = await seedScenario(
       db,
@@ -1874,7 +1954,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
 
   it('family-pool-members preserves normal mid-month usage at half of the Family allowance', async () => {
     const captured: Array<Record<string, unknown>> = [];
-    const db = {
+    const db = withMockTransaction({
       insert: jest.fn().mockImplementation(() => ({
         values: jest.fn().mockImplementation((row: Record<string, unknown>) => {
           captured.push(row);
@@ -1897,7 +1977,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
           .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
       }),
       execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
-    } as unknown as Database;
+    } as unknown as Database);
 
     const result = await seedScenario(
       db,
@@ -1944,7 +2024,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
         where: jest.fn().mockResolvedValue([]),
       }),
     };
-    const db = {
+    const db = withMockTransaction({
       insert: insertMock,
       update: jest.fn().mockReturnValue({
         set: jest
@@ -1957,7 +2037,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
           .fn()
           .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
       }),
-    } as unknown as Database;
+    } as unknown as Database);
 
     const result = await seedScenario(
       db,
@@ -2021,7 +2101,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
         where: jest.fn().mockResolvedValue([]),
       }),
     };
-    const db = {
+    const db = withMockTransaction({
       insert: insertMock,
       update: jest.fn().mockReturnValue({
         set: jest
@@ -2036,7 +2116,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
       }),
       query: { accounts: { findMany: jest.fn().mockResolvedValue([]) } },
       execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
-    } as unknown as Database;
+    } as unknown as Database);
 
     const result = await seedScenario(
       db,

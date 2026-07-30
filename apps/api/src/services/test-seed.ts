@@ -6682,6 +6682,42 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
 
 export const VALID_SCENARIOS = Object.keys(SCENARIO_MAP) as SeedScenario[];
 
+const TEST_SEED_MUTATION_LOCK = 'test-seed:mutation';
+
+/**
+ * Run a complete seed/reset graph mutation atomically and serialize it against
+ * every other seed mutation in the same job-local database.
+ *
+ * Some seeders call services that normally open their own transaction. The
+ * proxy makes those calls join this transaction instead: neon-serverless does
+ * not safely support nested transactions, while the seed graph must commit or
+ * roll back as one unit.
+ */
+async function runTestSeedMutation<T>(
+  db: Database,
+  operation: (txDb: Database) => Promise<T>,
+): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${TEST_SEED_MUTATION_LOCK}, 0))`,
+    );
+
+    const txDb = new Proxy(tx as unknown as Database, {
+      get(target, property, receiver) {
+        if (property === 'transaction') {
+          return async (
+            nestedOperation: (nestedTx: Database) => Promise<unknown>,
+          ) => nestedOperation(receiver as Database);
+        }
+        const value = Reflect.get(target, property, receiver);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+
+    return operation(txDb);
+  });
+}
+
 export async function seedScenario(
   db: Database,
   scenario: SeedScenario,
@@ -6702,28 +6738,30 @@ export async function seedScenario(
       ? [seedMarkedClerkUser.id]
       : [];
 
-  // Idempotent: delete existing seed organizations with the same email before
-  // seeding. Defence-in-depth: look up login by email first, then delete the
-  // organization only if the login has a recognizable local seed marker
-  // (clerk_seed_* prefix) or a real Clerk user ID that Clerk itself marks
-  // with our seed external_id.
-  // Child tables cascade via ON DELETE CASCADE.
-  const existingLogins = await db
-    .select({ personId: login.personId, clerkUserId: login.clerkUserId })
-    .from(login)
-    .where(eq(login.email, email));
-  for (const existing of existingLogins) {
-    if (isSeedManagedClerkUserId(existing.clerkUserId, seedClerkUserIds)) {
-      const existingMemberships = await db
-        .select({ organizationId: membership.organizationId })
-        .from(membership)
-        .where(eq(membership.personId, existing.personId));
-      const orgIdsToDelete = existingMemberships.map((m) => m.organizationId);
-      await deleteOrganizationGraph(db, orgIdsToDelete);
+  return runTestSeedMutation(db, async (txDb) => {
+    // Idempotent: delete existing seed organizations with the same email before
+    // seeding. Defence-in-depth: look up login by email first, then delete the
+    // organization only if the login has a recognizable local seed marker
+    // (clerk_seed_* prefix) or a real Clerk user ID that Clerk itself marks
+    // with our seed external_id.
+    // Child tables cascade via ON DELETE CASCADE.
+    const existingLogins = await txDb
+      .select({ personId: login.personId, clerkUserId: login.clerkUserId })
+      .from(login)
+      .where(eq(login.email, email));
+    for (const existing of existingLogins) {
+      if (isSeedManagedClerkUserId(existing.clerkUserId, seedClerkUserIds)) {
+        const existingMemberships = await txDb
+          .select({ organizationId: membership.organizationId })
+          .from(membership)
+          .where(eq(membership.personId, existing.personId));
+        const orgIdsToDelete = existingMemberships.map((m) => m.organizationId);
+        await deleteOrganizationGraph(txDb, orgIdsToDelete);
+      }
     }
-  }
 
-  return seeder(db, email, env);
+    return seeder(txDb, email, env);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -6926,21 +6964,56 @@ export async function resetDatabase(
     return { deletedCount: 0, clerkUsersDeleted };
   }
 
-  if (prefix) {
-    const seedLogins = await db
-      .select({ personId: login.personId, clerkUserId: login.clerkUserId })
+  return runTestSeedMutation(db, async (txDb) => {
+    if (prefix) {
+      const seedLogins = await txDb
+        .select({ personId: login.personId, clerkUserId: login.clerkUserId })
+        .from(login)
+        .where(like(login.email, `${prefix}%`));
+      const filteredLogins = seedLogins.filter((l) =>
+        isSeedManagedClerkUserId(l.clerkUserId, clerkUserIds),
+      );
+      const seedPersonIds = filteredLogins.map((l) => l.personId);
+
+      if (seedPersonIds.length === 0) {
+        return { deletedCount: 0, clerkUsersDeleted };
+      }
+
+      const seedMemberships = await txDb
+        .select({ organizationId: membership.organizationId })
+        .from(membership)
+        .where(inArray(membership.personId, seedPersonIds));
+      const seedOrgIds = [
+        ...new Set(seedMemberships.map((m) => m.organizationId)),
+      ];
+
+      if (seedOrgIds.length === 0) {
+        return { deletedCount: 0, clerkUsersDeleted };
+      }
+
+      const deletedCount = await deleteOrganizationGraph(txDb, seedOrgIds);
+
+      return { deletedCount, clerkUsersDeleted };
+    }
+
+    // Build WHERE clause: match fake clerk_seed_* IDs OR real Clerk user IDs
+    // that were created by the seed service.
+    const loginConditions = [like(login.clerkUserId, `${SEED_CLERK_PREFIX}%`)];
+    if (clerkUserIds.length > 0) {
+      loginConditions.push(inArray(login.clerkUserId, clerkUserIds));
+    }
+
+    const seedLogins = await txDb
+      .select({ personId: login.personId })
       .from(login)
-      .where(like(login.email, `${prefix}%`));
-    const filteredLogins = seedLogins.filter((l) =>
-      isSeedManagedClerkUserId(l.clerkUserId, clerkUserIds),
-    );
-    const seedPersonIds = filteredLogins.map((l) => l.personId);
+      .where(or(...loginConditions));
+    const seedPersonIds = seedLogins.map((l) => l.personId);
 
     if (seedPersonIds.length === 0) {
       return { deletedCount: 0, clerkUsersDeleted };
     }
 
-    const seedMemberships = await db
+    const seedMemberships = await txDb
       .select({ organizationId: membership.organizationId })
       .from(membership)
       .where(inArray(membership.personId, seedPersonIds));
@@ -6952,42 +7025,11 @@ export async function resetDatabase(
       return { deletedCount: 0, clerkUsersDeleted };
     }
 
-    const deletedCount = await deleteOrganizationGraph(db, seedOrgIds);
+    // deleteOrganizationGraph handles RESTRICT-gated dependents before org delete.
+    const deletedCount = await deleteOrganizationGraph(txDb, seedOrgIds);
 
     return { deletedCount, clerkUsersDeleted };
-  }
-
-  // Build WHERE clause: match fake clerk_seed_* IDs OR real Clerk user IDs
-  // that were created by the seed service.
-  const loginConditions = [like(login.clerkUserId, `${SEED_CLERK_PREFIX}%`)];
-  if (clerkUserIds.length > 0) {
-    loginConditions.push(inArray(login.clerkUserId, clerkUserIds));
-  }
-
-  const seedLogins = await db
-    .select({ personId: login.personId })
-    .from(login)
-    .where(or(...loginConditions));
-  const seedPersonIds = seedLogins.map((l) => l.personId);
-
-  if (seedPersonIds.length === 0) {
-    return { deletedCount: 0, clerkUsersDeleted };
-  }
-
-  const seedMemberships = await db
-    .select({ organizationId: membership.organizationId })
-    .from(membership)
-    .where(inArray(membership.personId, seedPersonIds));
-  const seedOrgIds = [...new Set(seedMemberships.map((m) => m.organizationId))];
-
-  if (seedOrgIds.length === 0) {
-    return { deletedCount: 0, clerkUsersDeleted };
-  }
-
-  // deleteOrganizationGraph handles RESTRICT-gated dependents before org delete.
-  const deletedCount = await deleteOrganizationGraph(db, seedOrgIds);
-
-  return { deletedCount, clerkUsersDeleted };
+  });
 }
 
 // ---------------------------------------------------------------------------
