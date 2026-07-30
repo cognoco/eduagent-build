@@ -169,7 +169,15 @@ export function renderSharedRecordHeadline(
     return view.headline;
   }
 
-  if (view.facts.some((fact) => metadataRecord(fact.metadata)?.templateKey)) {
+  if (
+    view.facts.some((fact) => {
+      const localized = renderSharedRecordFact(fact, t);
+      const legacy = legacyCopy(fact);
+      return (
+        localized.title !== legacy.title || localized.detail !== legacy.detail
+      );
+    })
+  ) {
     return t('sharedRecord.fact.headline', {
       name: supporteeName,
       count: view.facts.length,

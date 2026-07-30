@@ -35,7 +35,8 @@ function metadataString(metadata: unknown, key: string): string | undefined {
     return undefined;
   }
   const value = (metadata as Record<string, unknown>)[key];
-  return typeof value === 'string' && value.trim() ? value : undefined;
+  const trimmed = typeof value === 'string' ? value.trim() : undefined;
+  return trimmed || undefined;
 }
 
 export async function readSharedRecordForSupportee(
