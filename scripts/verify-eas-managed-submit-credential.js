@@ -1,10 +1,18 @@
 #!/usr/bin/env node
 
-const { readFileSync } = require('node:fs');
+const { existsSync, readFileSync } = require('node:fs');
 const { join } = require('node:path');
 
 const EXPO_GRAPHQL_URL = 'https://api.expo.dev/graphql';
 const APP_CONFIG_PATH = join(__dirname, '..', 'apps', 'mobile', 'app.json');
+const LEGACY_CREDENTIAL_PATH = join(
+  __dirname,
+  '..',
+  'apps',
+  'mobile',
+  '.eas-submit',
+  'google-play-service-account.json',
+);
 
 const submissionCredentialQuery = `
   query AndroidSubmissionCredential($projectFullName: String!, $applicationIdentifier: String!) {
@@ -61,6 +69,7 @@ function readAndroidAppIdentity(readFile = readFileSync) {
 async function verifyEasManagedSubmitCredential({
   accessToken = process.env.EXPO_TOKEN,
   fetchImpl = globalThis.fetch,
+  legacyCredentialExists = () => existsSync(LEGACY_CREDENTIAL_PATH),
 } = {}) {
   if (typeof accessToken !== 'string' || accessToken.trim() === '') {
     throw new Error(
@@ -70,6 +79,11 @@ async function verifyEasManagedSubmitCredential({
   if (typeof fetchImpl !== 'function') {
     throw new Error(
       'EAS credential metadata preflight cannot make its request',
+    );
+  }
+  if (legacyCredentialExists()) {
+    throw new Error(
+      'Remove the stale local credential file before EAS submission preflight',
     );
   }
 
@@ -135,6 +149,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  LEGACY_CREDENTIAL_PATH,
   assignedSubmissionCredential,
   readAndroidAppIdentity,
   verifyEasManagedSubmitCredential,

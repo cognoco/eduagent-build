@@ -31,12 +31,13 @@ describe('WI-2937 production EAS submit contract', () => {
     expect(
       existsSync(join(repoRoot, 'scripts/prepare-eas-submit-credentials.js')),
     ).toBe(false);
-    expect(gitignore).not.toContain('apps/mobile/.eas-submit/');
+    expect(gitignore).toContain('apps/mobile/.eas-submit/');
     expect(packageJson.scripts['mobile:submit:prepare']).toBeUndefined();
     expect(packageJson.scripts['mobile:submit:preflight']).toBe(
       'node scripts/verify-eas-managed-submit-credential.js',
     );
     expect(runbook).toContain('pnpm mobile:submit:preflight');
+    expect(runbook).toContain('stale local credential');
     expect(runbook).not.toContain('GOOGLE_PLAY_SERVICE_ACCOUNT_JSON');
     expect(runbook).toContain('OPQ-37');
     expect(runbook).toContain('OPQ-155');

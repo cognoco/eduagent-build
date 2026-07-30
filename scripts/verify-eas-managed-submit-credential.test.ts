@@ -95,4 +95,17 @@ describe('EAS-managed Google Play submission credential preflight', () => {
       }),
     ).rejects.toThrow('rejected by Expo');
   });
+
+  it('fails closed before the network request when a stale local credential exists', async () => {
+    const fetchImpl = jest.fn();
+
+    await expect(
+      verifyEasManagedSubmitCredential({
+        accessToken: 'test-token',
+        fetchImpl,
+        legacyCredentialExists: () => true,
+      }),
+    ).rejects.toThrow('Remove the stale local credential file');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
 });

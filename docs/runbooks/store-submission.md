@@ -28,6 +28,12 @@ pnpm mobile:submit:preflight
 Stop on a preflight failure. Do not paste, materialize, rotate, or otherwise handle
 the Google service-account JSON locally.
 
+The retired materializer may have left a stale local credential on an existing
+worktree. The preflight fails closed before its Expo request when it finds that
+path; delete the stale local credential file through the approved local-secret
+remediation process, then rerun the preflight. The legacy directory remains
+ignored only to prevent accidental staging while that cleanup happens.
+
 ## Preflight
 
 Run from the repository root unless the command starts with `cd apps/mobile`:
