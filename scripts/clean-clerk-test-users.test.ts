@@ -170,6 +170,17 @@ describe('[WI-2820 P1] clean-clerk-test-users execution protocol', () => {
     );
   });
 
+  it('exhaustively restores the remaining markers and stops after a non-OK delete', () => {
+    const failedDeleteBranch =
+      /\} else \{\s*await restoreClerkDeletionMarkers\(pendingDeletions\.slice\(index\)\);\s*failed\+\+;[\s\S]*?break;\s*\}/;
+
+    expect(executePath).toMatch(failedDeleteBranch);
+    const failedDeleteBranchIndex = executePath.search(failedDeleteBranch);
+    expect(
+      executePath.indexOf('if (failed > 0) process.exit(1);'),
+    ).toBeGreaterThan(failedDeleteBranchIndex);
+  });
+
   it('restores the camel-case external ID mapped from Clerk responses', () => {
     expect(scriptSource).toMatch(
       /const externalId = user\.external_id \?\? null;[\s\S]*const entry = \{[\s\S]*externalId,[\s\S]*pendingDeletions\.push\(\{ user, originalExternalId: user\.externalId \}\);/,

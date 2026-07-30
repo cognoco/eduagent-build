@@ -320,11 +320,12 @@ for (const [index, pendingDeletion] of pendingDeletions.entries()) {
       );
     }
   } else {
-    await restoreClerkDeletionMarkers([pendingDeletion]);
+    await restoreClerkDeletionMarkers(pendingDeletions.slice(index));
     failed++;
     console.warn(
       `[clean-clerk]   WARN: failed to delete ${user.email} (${user.id})`,
     );
+    break;
   }
 }
 
