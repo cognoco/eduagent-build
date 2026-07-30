@@ -15,6 +15,7 @@ export interface ResetResponse {
   message: string;
   deletedCount: number;
   clerkUsersDeleted: number;
+  clerkUsersSelected?: number;
 }
 
 // [BUG-532] Retry config for external seed-service resilience.
@@ -160,7 +161,10 @@ export async function resetSeededAccounts(
     deletedCount += result.deletedCount;
     clerkUsersDeleted += result.clerkUsersDeleted;
 
-    if (result.clerkUsersDeleted < MAX_WORKER_CLEANUP_BATCH_SIZE) {
+    if (
+      (result.clerkUsersSelected ?? result.clerkUsersDeleted) <
+      MAX_WORKER_CLEANUP_BATCH_SIZE
+    ) {
       return { ...result, deletedCount, clerkUsersDeleted };
     }
   }

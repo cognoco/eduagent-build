@@ -217,6 +217,7 @@ export interface SeedResult {
 export interface ResetResult {
   deletedCount: number;
   clerkUsersDeleted: number;
+  clerkUsersSelected?: number;
 }
 
 export interface ResetOptions {
@@ -7207,7 +7208,13 @@ export async function resetDatabase(
       ? (await deleteClerkTestUsers(env, pendingClerkDeletions)).count
       : 0;
 
-  return { ...cleanup.result, clerkUsersDeleted };
+  return {
+    ...cleanup.result,
+    clerkUsersDeleted,
+    ...(prefix
+      ? { clerkUsersSelected: pendingClerkDeletions.length }
+      : undefined),
+  };
 }
 
 // ---------------------------------------------------------------------------

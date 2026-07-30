@@ -40,7 +40,8 @@ describe('[WI-2820 P1] prefix cleanup batching', () => {
           JSON.stringify({
             message: 'Database reset complete',
             deletedCount: 15,
-            clerkUsersDeleted: 15,
+            clerkUsersDeleted: 14,
+            clerkUsersSelected: 15,
           }),
           { status: 200 },
         ),
@@ -51,6 +52,7 @@ describe('[WI-2820 P1] prefix cleanup batching', () => {
             message: 'Database reset complete',
             deletedCount: 2,
             clerkUsersDeleted: 2,
+            clerkUsersSelected: 2,
           }),
           { status: 200 },
         ),
@@ -60,7 +62,8 @@ describe('[WI-2820 P1] prefix cleanup batching', () => {
     await expect(resetSeededAccounts()).resolves.toEqual({
       message: 'Database reset complete',
       deletedCount: 17,
-      clerkUsersDeleted: 17,
+      clerkUsersDeleted: 16,
+      clerkUsersSelected: 2,
     });
     expect(global.fetch).toHaveBeenCalledTimes(2);
     const [url, request] = (global.fetch as jest.Mock).mock.calls[0] as [

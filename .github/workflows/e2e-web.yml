@@ -379,9 +379,9 @@ jobs:
               -H "X-Test-Secret: ${PLAYWRIGHT_TEST_SEED_SECRET}" \
               "${PLAYWRIGHT_API_URL}/v1/__test/reset?prefix=${PREFIX}") \
               || { echo "::warning::seed reset batch ${BATCH} returned non-2xx; nightly cleanup will sweep"; exit 0; }
-            clerk_users_deleted=$(node -e 'const value = JSON.parse(require("node:fs").readFileSync(0, "utf8")).clerkUsersDeleted; if (!Number.isInteger(value) || value < 0) process.exit(1); console.log(value);' <<<"${response}") \
+            clerk_users_selected=$(node -e 'const result = JSON.parse(require("node:fs").readFileSync(0, "utf8")); const value = result.clerkUsersSelected ?? result.clerkUsersDeleted; if (!Number.isInteger(value) || value < 0) process.exit(1); console.log(value);' <<<"${response}") \
               || { echo "::warning::seed reset batch ${BATCH} returned an invalid response; nightly cleanup will sweep"; exit 0; }
-            if [ "${clerk_users_deleted}" -lt 15 ]; then
+            if [ "${clerk_users_selected}" -lt 15 ]; then
               exit 0
             fi
           done

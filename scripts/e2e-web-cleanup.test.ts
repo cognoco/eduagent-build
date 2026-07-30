@@ -78,8 +78,8 @@ describe('[BUG-979] e2e-web cleanup wiring', () => {
       expect(run).toMatch(
         /for BATCH in \$\(seq 1 "\$\{MAX_CLEANUP_BATCHES\}"\)/,
       );
-      expect(run).toMatch(/clerkUsersDeleted/);
-      expect(run).toMatch(/\[ "\$\{clerk_users_deleted\}" -lt 15 \]/);
+      expect(run).toMatch(/clerkUsersSelected \?\? result\.clerkUsersDeleted/);
+      expect(run).toMatch(/\[ "\$\{clerk_users_selected\}" -lt 15 \]/);
     });
 
     it('reset step refuses an unknown prefix instead of using a fallback prefix', () => {

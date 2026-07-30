@@ -1071,7 +1071,11 @@ describe('resetDatabase', () => {
       { prefix: 'repeat-' },
     );
 
-    expect(result).toEqual({ deletedCount: 1, clerkUsersDeleted: 1 });
+    expect(result).toEqual({
+      deletedCount: 1,
+      clerkUsersDeleted: 1,
+      clerkUsersSelected: 1,
+    });
     expect(events).toEqual([
       'transaction-start',
       'clerk-list',
@@ -1288,7 +1292,11 @@ describe('resetDatabase', () => {
       { prefix: 'repeat-' },
     );
 
-    expect(result).toEqual({ deletedCount: 1, clerkUsersDeleted: 0 });
+    expect(result).toEqual({
+      deletedCount: 1,
+      clerkUsersDeleted: 0,
+      clerkUsersSelected: 1,
+    });
     expect(events).toEqual([
       'transaction-start',
       'clerk-list',
@@ -1301,7 +1309,7 @@ describe('resetDatabase', () => {
     expect(restoredExternalIds).toEqual([`${SEED_CLERK_PREFIX}failed-delete`]);
   });
 
-  it('[WI-2820 P1] batches Worker cleanup below the Clerk subrequest budget before marking', async () => {
+  it('[WI-2820 P1] reports a full Worker batch despite a failed Clerk delete', async () => {
     const users = Array.from({ length: 16 }, (_, index) => ({
       id: `user_over_budget_${index}`,
       external_id: `${SEED_CLERK_PREFIX}over-budget-${index}`,
@@ -1309,9 +1317,15 @@ describe('resetDatabase', () => {
         { email_address: `pw-over-budget-${index}@example.com` },
       ],
     }));
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => users,
+    const fetchMock = jest.fn(async (input, init) => {
+      const url = String(input);
+      if (url.includes('/users?')) {
+        return new Response(JSON.stringify(users), { status: 200 });
+      }
+      if (init?.method === 'DELETE' && url.endsWith('/user_over_budget_0')) {
+        return new Response('{}', { status: 500 });
+      }
+      return new Response('{}', { status: 200 });
     });
     global.fetch = fetchMock;
     const db = createMockDb();
@@ -1322,10 +1336,14 @@ describe('resetDatabase', () => {
       { prefix: 'pw-' },
     );
 
-    expect(result).toEqual({ deletedCount: 0, clerkUsersDeleted: 15 });
-    // One Clerk list plus marker/bypass/delete for only 15 users = 46 calls,
+    expect(result).toEqual({
+      deletedCount: 0,
+      clerkUsersDeleted: 14,
+      clerkUsersSelected: 15,
+    });
+    // One list, 15 marker/bypass/delete triplets, and one restore = 47 calls,
     // safely below Cloudflare's 50-subrequest cap.
-    expect(fetchMock).toHaveBeenCalledTimes(46);
+    expect(fetchMock).toHaveBeenCalledTimes(47);
     const markerCalls = fetchMock.mock.calls.filter(([, init]) => {
       const body = JSON.parse(
         String((init as RequestInit | undefined)?.body ?? '{}'),
@@ -1439,7 +1457,10 @@ describe('resetDatabase', () => {
 
     const result = await resetDatabase(db);
 
-    expect(result).toEqual({ deletedCount: 0, clerkUsersDeleted: 0 });
+    expect(result).toEqual({
+      deletedCount: 0,
+      clerkUsersDeleted: 0,
+    });
   });
 
   it('[WI-84 DS-091] prefix reset does not delete non-seed Clerk accounts', async () => {
@@ -1466,7 +1487,11 @@ describe('resetDatabase', () => {
 
     const result = await resetDatabase(db, {}, { prefix: 'e2e-' });
 
-    expect(result).toEqual({ deletedCount: 0, clerkUsersDeleted: 0 });
+    expect(result).toEqual({
+      deletedCount: 0,
+      clerkUsersDeleted: 0,
+      clerkUsersSelected: 0,
+    });
     expect(db.delete).not.toHaveBeenCalled();
   });
 
@@ -1508,7 +1533,11 @@ describe('resetDatabase', () => {
       { prefix: 'test-e2e-native-01', preserveClerkUsers: true },
     );
 
-    expect(result).toEqual({ deletedCount: 1, clerkUsersDeleted: 0 });
+    expect(result).toEqual({
+      deletedCount: 1,
+      clerkUsersDeleted: 0,
+      clerkUsersSelected: 0,
+    });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]?.[0]).toContain('/users?');
     expect(
