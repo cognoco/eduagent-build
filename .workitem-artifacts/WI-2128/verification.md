@@ -16,6 +16,7 @@ The disposable database was the repository-sanctioned `docker-compose.test.yml` 
 | Touched mobile suites | Jest `--runTestsByPath` for the five modified mobile test files plus the profile-request remount and Clerk-session regressions | PASS — 6 suites, 227 tests |
 | Profile authority remount regression | Mounted `useProfiles`, awaited the authoritative response, then remounted it against the same QueryClient/user session | RED — 2 profile requests with `refetchOnMount: 'always'`; GREEN — 1 request with the per-session authority-refresh guard |
 | Clerk session boundary regression | Changed the mocked Clerk `sessionId` for the same `userId` without replacing the QueryClient | PASS — the new session issued a second headerless authority refresh |
+| Supportership-only profile boundary | Flag-ON `test-seed-v2-supporter.integration.test.ts` against the real local database | RED — stale fixture expected the supportee in the operate-as profile list; GREEN — 1 suite, 22 tests, with `/v1/profiles` restricted to the supporter while the separate cold-start assertion still returns the managed supportee card |
 | API type safety | `pnpm exec nx run api:typecheck` | PASS |
 | Mobile type safety | `pnpm exec tsc --noEmit` from `apps/mobile` | PASS |
 | Changed-file lint | ESLint over every changed TypeScript and TSX file | PASS |
