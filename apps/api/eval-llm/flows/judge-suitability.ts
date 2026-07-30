@@ -50,6 +50,7 @@
 
 import type { AgeBracket, ConversationLanguage } from '@eduagent/schemas';
 import { judgeVerdictSchema } from '@eduagent/schemas';
+import { getTextContent } from '../../src/services/llm/types';
 import { buildSuitabilityJudgePrompt } from '../../src/services/policy-engine/judge-suitability-prompt';
 import type { EvalProfile } from '../fixtures/profiles';
 import type {
@@ -145,11 +146,9 @@ export const judgeSuitabilityFlow: FlowDefinition<JudgeSuitabilityEvalInput> = {
       ageBracket: input.ageBracket,
       conversationLanguage: input.conversationLanguage,
     });
-    const asText = (c: string | unknown[] | undefined): string =>
-      typeof c === 'string' ? c : '';
     return {
-      system: asText(messages[0]?.content),
-      user: asText(messages[1]?.content),
+      system: messages[0] ? getTextContent(messages[0].content) : '',
+      user: messages[1] ? getTextContent(messages[1].content) : '',
       notes: [
         `Scenario: ${input.scenarioId} — ${input.description}`,
         'Expected: overall !== "ok" (reply is genuinely unsuitable; the ' +
