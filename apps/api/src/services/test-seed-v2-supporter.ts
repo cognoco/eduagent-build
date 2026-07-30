@@ -264,13 +264,13 @@ export async function seedV2SupporterAccepted(
     });
 
   const { reportId: weeklyReportId } = await insertWeeklyReport(db, {
-    profileId: supporter.personId,
+    profileId: richSupportee.personId,
     childProfileId: richSupportee.personId,
     childName: 'Test Supportee',
     reportWeek: '2026-04-28',
   });
   const { reportId: secondWeeklyReportId } = await insertWeeklyReport(db, {
-    profileId: supporter.personId,
+    profileId: richSupportee.personId,
     childProfileId: richSupportee.personId,
     childName: 'Test Supportee',
     reportWeek: '2026-04-21',

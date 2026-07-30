@@ -124,7 +124,6 @@ async function projectSharedRecordForSupportee(
     supporteePersonId: string;
   },
 ): Promise<SharedRecord> {
-  const supporterRepo = createScopedRepository(db, input.supporterPersonId);
   const supporteeRepo = createScopedRepository(db, input.supporteePersonId);
 
   const [supportee, weeklyRows, recapRows, milestoneRows] = await Promise.all([
@@ -132,7 +131,7 @@ async function projectSharedRecordForSupportee(
       where: eq(person.id, input.supporteePersonId),
       columns: { displayName: true },
     }),
-    supporterRepo.weeklyReports.findMany(
+    supporteeRepo.weeklyReports.findMany(
       eq(weeklyReports.childProfileId, input.supporteePersonId),
     ),
     supporteeRepo.sessionSummaries.findMany(
@@ -196,7 +195,6 @@ async function projectSharedArtifactForSupportee(
     artifactId: string;
   },
 ): Promise<SharedRecord> {
-  const supporterRepo = createScopedRepository(db, input.supporterPersonId);
   const supporteeRepo = createScopedRepository(db, input.supporteePersonId);
 
   const [supportee, fact] = await Promise.all([
@@ -205,7 +203,7 @@ async function projectSharedArtifactForSupportee(
       columns: { displayName: true },
     }),
     input.artifactKind === 'weekly_report'
-      ? supporterRepo.weeklyReports
+      ? supporteeRepo.weeklyReports
           .findFirst(
             and(
               eq(weeklyReports.id, input.artifactId),

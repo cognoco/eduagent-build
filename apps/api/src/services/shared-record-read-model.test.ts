@@ -50,6 +50,26 @@ const weeklyReportData: WeeklyReportData = {
   },
 };
 
+const productionWeeklyReport = {
+  id: UUID.weeklyReport,
+  profileId: UUID.supportee,
+  childProfileId: UUID.supportee,
+  reportWeek: '2026-06-22',
+  reportData: weeklyReportData,
+  viewedAt: null,
+  createdAt: new Date('2026-06-29T12:00:00.000Z'),
+};
+
+function weeklyReportQueryMatches(
+  query: { where?: unknown },
+  row: typeof productionWeeklyReport,
+  exact: boolean,
+): boolean {
+  if (!query.where) return false;
+  const params = new PgDialect().sqlToQuery(query.where as never).params;
+  return params[0] === row.profileId && (!exact || params.includes(row.id));
+}
+
 function createDb(authorized = true): Database {
   const authChain = {
     from: jest.fn(),
@@ -92,18 +112,20 @@ function createDb(authorized = true): Database {
         findFirst: jest.fn().mockResolvedValue({ displayName: 'Emma' }),
       },
       weeklyReports: {
-        findFirst: jest.fn().mockResolvedValue(null),
-        findMany: jest.fn().mockResolvedValue([
-          {
-            id: UUID.weeklyReport,
-            profileId: UUID.supporter,
-            childProfileId: UUID.supportee,
-            reportWeek: '2026-06-22',
-            reportData: weeklyReportData,
-            viewedAt: null,
-            createdAt: new Date('2026-06-29T12:00:00.000Z'),
-          },
-        ]),
+        findFirst: jest
+          .fn()
+          .mockImplementation(async (query) =>
+            weeklyReportQueryMatches(query, productionWeeklyReport, true)
+              ? productionWeeklyReport
+              : null,
+          ),
+        findMany: jest
+          .fn()
+          .mockImplementation(async (query) =>
+            weeklyReportQueryMatches(query, productionWeeklyReport, false)
+              ? [productionWeeklyReport]
+              : [],
+          ),
       },
       sessionSummaries: {
         findFirst: jest.fn().mockResolvedValue(null),
@@ -221,7 +243,7 @@ describe('readSharedRecordForSupportee', () => {
     jest.mocked(db.query.weeklyReports.findMany).mockResolvedValueOnce(
       Array.from({ length: 4 }, (_, index) => ({
         id: `00000000-0000-4000-8000-${String(100 + index).padStart(12, '0')}`,
-        profileId: UUID.supporter,
+        profileId: UUID.supportee,
         childProfileId: UUID.supportee,
         reportWeek: `2026-06-${String(1 + index).padStart(2, '0')}`,
         reportData: weeklyReportData,
@@ -276,6 +298,22 @@ describe('readSharedRecordForSupportee', () => {
     );
   });
 
+  it('loads a production-shaped weekly report through its exact Journal link', async () => {
+    const db = createDb();
+
+    const record = await readSharedArtifactForSupportee(db, {
+      supporterPersonId: UUID.supporter,
+      supporteePersonId: UUID.supportee,
+      artifactKind: 'weekly_report',
+      artifactId: UUID.weeklyReport,
+    });
+
+    expect(record.supporterView.facts[0]?.artifact).toEqual({
+      kind: 'weekly_report',
+      id: UUID.weeklyReport,
+    });
+  });
+
   it('does not read artifacts when accepted visibility is absent in the transaction snapshot', async () => {
     const db = createDb(false);
 
@@ -306,7 +344,7 @@ describe('readSharedRecordForSupportee', () => {
     const db = createDb();
     jest.mocked(db.query.weeklyReports.findFirst).mockResolvedValueOnce({
       id: UUID.olderWeeklyReport,
-      profileId: UUID.supporter,
+      profileId: UUID.supportee,
       childProfileId: UUID.supportee,
       reportWeek: '2026-06-15',
       reportData: weeklyReportData,
@@ -334,7 +372,7 @@ describe('readSharedRecordForSupportee', () => {
     const db = createDb();
     jest.mocked(db.query.weeklyReports.findFirst).mockResolvedValueOnce({
       id: UUID.olderWeeklyReport,
-      profileId: UUID.supporter,
+      profileId: UUID.supportee,
       childProfileId: UUID.supportee,
       reportWeek: '2026-06-15',
       reportData: { headlineStat: 'invalid' },
@@ -354,7 +392,7 @@ describe('readSharedRecordForSupportee', () => {
     expect(captureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({
-        profileId: UUID.supporter,
+        profileId: UUID.supportee,
         extra: expect.objectContaining({
           context: 'projectSharedArtifactForSupportee',
           reportId: UUID.olderWeeklyReport,
