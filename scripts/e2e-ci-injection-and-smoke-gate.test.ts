@@ -1367,14 +1367,21 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     }
   });
 
-  it('[WI-2240] injects each Account flow subject ID without leaking the owner-only ID', () => {
+  it('[WI-2907] runs both Account flows without a seed secret or subject-ID leakage', () => {
     const harness = createMaestroHarness(0);
 
     try {
       const result = runCiMaestro(harness, { MAESTRO_CI_SUITE: 'v2' });
-      const invocations = readFileSync(harness.maestroArgvMarker, 'utf8')
-        .trim()
-        .split('\n');
+      const invocations = readHarnessMarkerLines(
+        harness.maestroArgvMarker,
+        'Maestro argv',
+        result,
+      );
+      const curlInvocations = readHarnessMarkerLines(
+        harness.curlArgvMarker,
+        'curl argv',
+        result,
+      );
       const ownerInvocation = invocations.find((invocation) =>
         invocation.includes('apps/mobile/e2e/flows/v2/v2-account-owner.yaml'),
       );
@@ -1384,12 +1391,119 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         ),
       );
 
-      expect(result.status).toBe(0);
+      expect(curlInvocations.length).toBeGreaterThan(0);
+      expect(curlInvocations).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('\\"scenario\\":\\"parent-multi-child\\"'),
+          expect.stringContaining(
+            '\\"scenario\\":\\"v2-account-non-owner-child\\"',
+          ),
+          expect.stringContaining('/v1/__test/reset'),
+        ]),
+      );
+      expect(
+        curlInvocations.every(
+          (invocation) => !invocation.includes('X-Test-Secret'),
+        ),
+      ).toBe(true);
       expect(ownerInvocation).toBeDefined();
       expect(ownerInvocation).toContain('-e OWNER_SUBJECT_ID=owner-subject ');
+      expect(ownerInvocation).not.toContain('-e SUBJECT_ID=');
       expect(nonOwnerInvocation).toBeDefined();
       expect(nonOwnerInvocation).toContain('-e SUBJECT_ID=non-owner-subject ');
       expect(nonOwnerInvocation).not.toContain('OWNER_SUBJECT_ID');
+    } finally {
+      rmSync(harness.root, { recursive: true, force: true });
+    }
+  });
+
+  it('[WI-2907] preserves the optional seed secret on Account seed and reset calls', () => {
+    const harness = createMaestroHarness(0);
+
+    try {
+      const result = runCiMaestro(harness, {
+        MAESTRO_CI_SUITE: 'v2',
+        TEST_SEED_SECRET: 'fixture-seed-secret',
+      });
+      const curlInvocations = readHarnessMarkerLines(
+        harness.curlArgvMarker,
+        'curl argv',
+        result,
+      );
+
+      expect(curlInvocations.length).toBeGreaterThan(0);
+      expect(
+        curlInvocations.every((invocation) =>
+          invocation.includes('X-Test-Secret:\\ fixture-seed-secret'),
+        ),
+      ).toBe(true);
+    } finally {
+      rmSync(harness.root, { recursive: true, force: true });
+    }
+  });
+
+  it('[WI-2907] reports pre-Maestro failures before attempting to read the argv marker', () => {
+    const harness = createMaestroHarness(0);
+
+    try {
+      const result = runCiMaestro(harness, {
+        MAESTRO_CI_SUITE: 'v2',
+        FAKE_CURL_EXIT: '31',
+      });
+
+      expect(() =>
+        readHarnessMarkerLines(
+          harness.maestroArgvMarker,
+          'Maestro argv',
+          result,
+        ),
+      ).toThrow(
+        /\[maestro-harness\] subprocess failed before Maestro argv marker: status=1[\s\S]*failed to seed scenario=v2-account-non-owner-child/,
+      );
+    } finally {
+      rmSync(harness.root, { recursive: true, force: true });
+    }
+  });
+
+  it('[WI-2907] reports an explicit harness-artifact error when Maestro cannot write the argv marker', () => {
+    const harness = createMaestroHarness(0);
+
+    try {
+      const result = runCiMaestro(harness, {
+        MAESTRO_CI_SUITE: 'v2',
+        FAKE_MAESTRO_ARGV_MARKER: join(
+          harness.root,
+          'missing-directory',
+          'maestro-argv',
+        ),
+      });
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain(
+        '[maestro-harness] artifact error: could not write Maestro argv marker',
+      );
+    } finally {
+      rmSync(harness.root, { recursive: true, force: true });
+    }
+  });
+
+  it('[WI-2907] reports an explicit harness-artifact error when the argv marker is missing at read time', () => {
+    const harness = createMaestroHarness(0);
+
+    try {
+      const result = runCiMaestro(harness, { MAESTRO_CI_SUITE: 'v2' });
+      expect(result.status).toBe(0);
+      rmSync(harness.maestroArgvMarker, { force: true });
+
+      expect(() =>
+        readHarnessMarkerLines(
+          harness.maestroArgvMarker,
+          'Maestro argv',
+          result,
+        ),
+      ).toThrow(
+        '[maestro-harness] artifact error: missing Maestro argv marker',
+      );
     } finally {
       rmSync(harness.root, { recursive: true, force: true });
     }
@@ -11300,9 +11414,45 @@ type MaestroHarness = {
   outputDir: string;
   maestroMarker: string;
   maestroArgvMarker: string;
+  curlArgvMarker: string;
   bashEnv: string;
   maestroExit: number;
 };
+
+type HarnessResult = {
+  status: number | null;
+  stderr: string;
+};
+
+function readHarnessMarkerLines(
+  marker: string,
+  label: string,
+  result: HarnessResult,
+): string[] {
+  if (result.status !== 0) {
+    throw new Error(
+      `[maestro-harness] subprocess failed before ${label} marker: status=${String(result.status)}\nstderr=${result.stderr.trim() || '<empty>'}`,
+    );
+  }
+  if (!existsSync(marker)) {
+    throw new Error(
+      `[maestro-harness] artifact error: missing ${label} marker`,
+    );
+  }
+
+  let contents: string;
+  try {
+    contents = readFileSync(marker, 'utf8').trim();
+  } catch {
+    throw new Error(
+      `[maestro-harness] artifact error: unreadable ${label} marker`,
+    );
+  }
+  if (!contents) {
+    throw new Error(`[maestro-harness] artifact error: empty ${label} marker`);
+  }
+  return contents.split('\n');
+}
 
 function createMaestroHarness(maestroExit: number): MaestroHarness {
   const root = mkdtempSync(join(tmpdir(), 'wi-1651-maestro-'));
@@ -11313,6 +11463,7 @@ function createMaestroHarness(maestroExit: number): MaestroHarness {
   const curl = join(binDir, 'curl');
   const maestroMarker = join(root, 'maestro-ran');
   const maestroArgvMarker = join(root, 'maestro-argv');
+  const curlArgvMarker = join(root, 'curl-argv');
   const bashEnv = join(root, 'bash-env');
 
   mkdirSync(binDir, { recursive: true });
@@ -11321,8 +11472,10 @@ function createMaestroHarness(maestroExit: number): MaestroHarness {
     [
       '#!/usr/bin/env bash',
       'printf "ran\\n" >> "$FAKE_MAESTRO_MARKER"',
-      'printf "%q " "$@" >> "$FAKE_MAESTRO_ARGV_MARKER"',
-      'printf "\\n" >> "$FAKE_MAESTRO_ARGV_MARKER"',
+      'if ! { printf "%q " "$@" >> "$FAKE_MAESTRO_ARGV_MARKER" && printf "\\n" >> "$FAKE_MAESTRO_ARGV_MARKER"; }; then',
+      '  echo "[maestro-harness] artifact error: could not write Maestro argv marker" >&2',
+      '  exit 73',
+      'fi',
       'if [ "${FAKE_MAESTRO_DRAIN_STDIN:-0}" = "1" ]; then cat >/dev/null; fi',
       'exit "$FAKE_MAESTRO_EXIT"',
       '',
@@ -11347,6 +11500,10 @@ function createMaestroHarness(maestroExit: number): MaestroHarness {
     curl,
     [
       '#!/usr/bin/env bash',
+      'if ! { printf "%q " "$@" >> "$FAKE_CURL_ARGV_MARKER" && printf "\\n" >> "$FAKE_CURL_ARGV_MARKER"; }; then',
+      '  echo "[maestro-harness] artifact error: could not write curl argv marker" >&2',
+      '  exit 73',
+      'fi',
       'if [ "${FAKE_CURL_EXIT:-0}" -ne 0 ]; then exit "$FAKE_CURL_EXIT"; fi',
       'case "$*" in',
       '  */v1/__test/seed*\\"scenario\\":\\"parent-multi-child\\"*) printf \'{"email":"test@example.com","password":"pw","accountId":"account","profileId":"profile","ids":{"ownerSubjectId":"owner-subject"}}\' ;;',
@@ -11368,6 +11525,7 @@ function createMaestroHarness(maestroExit: number): MaestroHarness {
     outputDir,
     maestroMarker,
     maestroArgvMarker,
+    curlArgvMarker,
     bashEnv,
     maestroExit,
   };
@@ -11390,6 +11548,7 @@ function runCiMaestro(
         FAKE_MAESTRO_EXIT: String(harness.maestroExit),
         FAKE_MAESTRO_MARKER: harness.maestroMarker,
         FAKE_MAESTRO_ARGV_MARKER: harness.maestroArgvMarker,
+        FAKE_CURL_ARGV_MARKER: harness.curlArgvMarker,
         MAESTRO_CI_SUITE: 'pr',
         MAESTRO_CI_SHARD: '1',
         MAESTRO_OUTPUT_DIR: harness.outputDir,
