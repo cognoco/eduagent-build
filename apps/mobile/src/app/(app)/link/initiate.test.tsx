@@ -12,6 +12,8 @@ import {
   fetchCallsMatching,
 } from '../../../test-utils/mock-api-routes';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
+import { clearFamilyIntentOnboarding } from '../../../lib/family-intent-onboarding-state';
+import { Sentry } from '../../../lib/sentry';
 
 jest.mock(
   'react-i18next',
@@ -47,6 +49,14 @@ jest.mock('../../../lib/scope-context', () => ({
   ...jest.requireActual('../../../lib/scope-context'),
   useScopeContext: () => mockScopeContext,
 }));
+
+jest.mock(
+  '../../../lib/family-intent-onboarding-state' /* gc1-allow: durable-state boundary; this screen test asserts destination consumption after mount */,
+  () => ({
+    ...jest.requireActual('../../../lib/family-intent-onboarding-state'),
+    clearFamilyIntentOnboarding: jest.fn().mockResolvedValue(undefined),
+  }),
+);
 
 // `visibilityContractSchema` requires UUID-shaped person ids; the mock
 // response fixture uses fixed UUIDs independent of the non-UUID
@@ -310,6 +320,77 @@ describe('InitiateLinkScreen', () => {
         original;
     }
   }, 10_000);
+
+  it('[WI-2532] opens the existing-account invitation form and consumes its durable destination marker', async () => {
+    const original = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      true;
+    mockParams = { target: 'existingTeen' };
+
+    try {
+      renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });
+
+      screen.getByTestId('visibility-link-initiate-existing-teen-invite');
+      expect(
+        screen.queryByTestId('visibility-link-initiate-picker'),
+      ).toBeNull();
+      await waitFor(() => {
+        expect(clearFamilyIntentOnboarding).toHaveBeenCalledTimes(1);
+      });
+      expect(
+        screen.queryByTestId(
+          'visibility-link-initiate-existing-teen-unavailable',
+        ),
+      ).toBeNull();
+    } finally {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        original;
+    }
+  });
+
+  it('[WI-2532] preserves the explicit unavailable gate for a direct existing-account target when V2 is off', () => {
+    const original = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      false;
+    mockParams = { target: 'existingTeen' };
+
+    try {
+      renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });
+
+      screen.getByTestId('visibility-link-initiate-existing-teen-unavailable');
+      expect(
+        screen.queryByTestId('visibility-link-initiate-picker'),
+      ).toBeNull();
+    } finally {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        original;
+    }
+  });
+
+  it('[WI-2532] reports destination-marker cleanup failure while leaving the invitation usable', async () => {
+    const error = new Error('storage unavailable');
+    (clearFamilyIntentOnboarding as jest.Mock).mockRejectedValueOnce(error);
+    const captureSpy = jest
+      .spyOn(Sentry, 'captureException')
+      .mockImplementation(() => 'test-event-id');
+    const original = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      true;
+    mockParams = { target: 'existingTeen' };
+
+    try {
+      renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });
+
+      screen.getByTestId('visibility-link-initiate-existing-teen-invite');
+      await waitFor(() => {
+        expect(captureSpy).toHaveBeenCalledWith(error);
+      });
+    } finally {
+      captureSpy.mockRestore();
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        original;
+    }
+  });
 
   it('shows an empty-state message when there are zero eligible managed children', () => {
     renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });

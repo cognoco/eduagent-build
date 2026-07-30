@@ -1,0 +1,35 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The adult family-intent profile creation path records only the pending learner-target UI state; it no longer writes family context or redirects to child-profile creation, and a failed durable write retries without duplicating the profile POST.",
+      "pointer": "apps/mobile/src/app/create-profile.test.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The plain-language Me and Someone else branches, own-login question, credentialed invitation route, and explicit managed-path gate are covered as one non-authorizing UI state machine.",
+      "pointer": "apps/mobile/src/components/onboarding/FamilyIntentOnboardingGate.test.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Profile-scoped pending state survives an in-memory reset that represents remount or relaunch, restores every unfinished step, rejects authorizing-shaped data, and never exposes a write or clear that SecureStore rejected.",
+      "pointer": "apps/mobile/src/lib/family-intent-onboarding-state.test.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The signed-in app layout restores the pending fork for the matching active profile, fails closed with retry on rejected or timed-out reads, and preserves existing preview/profile and navigation-shell gate behavior.",
+      "pointer": "apps/mobile/src/app/(app)/_layout.test.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The existing-account target opens the family-join invitation form directly under the live V2 launch flag, consumes the durable destination marker only after mount, and retains the explicit unavailable state in older flag configurations.",
+      "pointer": "apps/mobile/src/app/(app)/link/initiate.test.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The preview journey starts with no Person or supportership edge, creates the adult, chooses Someone else, answers the login question, and reaches the invitation form without a visibility-link write.",
+      "pointer": "apps/mobile/e2e-web/flows/v2/v2-family-intent-onboarding.spec.ts"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13"
+}

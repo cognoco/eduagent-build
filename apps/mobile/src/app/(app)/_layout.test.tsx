@@ -9,6 +9,7 @@ import { Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import i18n from 'i18next';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuth } from '@clerk/expo';
 import {
@@ -27,6 +28,11 @@ import {
   fetchCallsMatching,
 } from '../../test-utils/mock-api-routes';
 import { tokens } from '../../lib/design-tokens';
+import {
+  FAMILY_INTENT_ONBOARDING_KEY,
+  FAMILY_INTENT_ONBOARDING_RECOVERY_KEY,
+  __resetFamilyIntentOnboardingForTests,
+} from '../../lib/family-intent-onboarding-state';
 
 const mockFetch = createRoutedMockFetch();
 
@@ -39,6 +45,7 @@ jest.mock(
 const mockUseProfile = jest.fn();
 const mockUsePathname = jest.fn();
 const mockReplace = jest.fn();
+const mockPush = jest.fn();
 const mockBack = jest.fn();
 const mockCanGoBack = jest.fn(() => false);
 const mockClerkSignOut = jest.fn();
@@ -114,7 +121,7 @@ jest.mock('expo-router', () => ({
   usePathname: () => mockUsePathname(),
   useGlobalSearchParams: () => mockUseGlobalSearchParams(),
   useRouter: () => ({
-    push: jest.fn(),
+    push: mockPush,
     replace: mockReplace,
     back: mockBack,
     canGoBack: mockCanGoBack,
@@ -366,7 +373,7 @@ describe('AppLayout', () => {
     });
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     mockSafeAreaInsets = { top: 0, bottom: 0, left: 0, right: 0 };
     testQueryClient = new QueryClient({
@@ -374,6 +381,7 @@ describe('AppLayout', () => {
     });
     clearPendingAuthRedirect();
     mockReplace.mockReset();
+    mockPush.mockReset();
     mockBack.mockReset();
     mockCanGoBack.mockReset();
     mockCanGoBack.mockReturnValue(false);
@@ -397,6 +405,8 @@ describe('AppLayout', () => {
     (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
     (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
     (SecureStoreMock.deleteItemAsync as jest.Mock).mockResolvedValue(undefined);
+    __resetFamilyIntentOnboardingForTests();
+    await AsyncStorage.removeItem(FAMILY_INTENT_ONBOARDING_RECOVERY_KEY);
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: true,
       isSignedIn: true,
@@ -513,6 +523,151 @@ describe('AppLayout', () => {
           },
         ),
     );
+  });
+
+  it('[WI-2532] restores the pending family-intent learner choice after app relaunch', async () => {
+    jest
+      .spyOn(require('../../lib/preview-onboarding-state'), 'getPreviewState')
+      .mockResolvedValueOnce(null);
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) =>
+        Promise.resolve(
+          key === FAMILY_INTENT_ONBOARDING_KEY
+            ? JSON.stringify({
+                version: 1,
+                profileId: 'p1',
+                step: 'login-choice',
+              })
+            : null,
+        ),
+    );
+
+    renderLayout();
+
+    await waitFor(
+      () => {
+        screen.getByTestId('family-intent-onboarding-gate');
+        screen.getByTestId('family-intent-login-yes');
+      },
+      { timeout: 10_000 },
+    );
+    expect(screen.queryByTestId('tabs')).toBeNull();
+  });
+
+  it('[WI-2532] restores the post-create recovery journal after the primary marker write failed', async () => {
+    await AsyncStorage.setItem(
+      FAMILY_INTENT_ONBOARDING_RECOVERY_KEY,
+      JSON.stringify({
+        version: 1,
+        profileId: 'p1',
+        step: 'learner-target',
+      }),
+    );
+
+    renderLayout();
+
+    await waitFor(() => {
+      screen.getByTestId('family-intent-target-me');
+      screen.getByTestId('family-intent-target-someone-else');
+    });
+    expect(screen.queryByTestId('tabs')).toBeNull();
+  });
+
+  it('[WI-2532] mounts the tab navigator before replaying a durable invitation destination', async () => {
+    mockPush.mockImplementationOnce(() => {
+      screen.getByTestId('tabs');
+    });
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) =>
+        Promise.resolve(
+          key === FAMILY_INTENT_ONBOARDING_KEY
+            ? JSON.stringify({
+                version: 1,
+                profileId: 'p1',
+                step: 'opening-invitation',
+              })
+            : null,
+        ),
+    );
+
+    renderLayout();
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/link/initiate',
+        params: { target: 'existingTeen' },
+      });
+    });
+    screen.getByTestId('tabs');
+  });
+
+  it('[WI-2532] fails closed and offers retry when the family-intent state read rejects', async () => {
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) =>
+        key === FAMILY_INTENT_ONBOARDING_KEY
+          ? Promise.reject(new Error('storage unavailable'))
+          : Promise.resolve(null),
+    );
+
+    renderLayout();
+
+    await waitFor(() => {
+      screen.getByTestId('family-intent-restore-error');
+    });
+    expect(screen.queryByTestId('tabs')).toBeNull();
+  });
+
+  it('[WI-2532] fails closed when the family-intent state read times out', async () => {
+    jest.useFakeTimers();
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) =>
+        key === FAMILY_INTENT_ONBOARDING_KEY
+          ? new Promise(() => undefined)
+          : Promise.resolve(null),
+    );
+
+    renderLayout();
+    await act(async () => {
+      jest.advanceTimersByTime(2_500);
+    });
+
+    screen.getByTestId('family-intent-restore-error');
+    expect(screen.queryByTestId('tabs')).toBeNull();
+  });
+
+  it('[WI-2532] retries a failed family-intent restore without exposing tabs first', async () => {
+    const SecureStoreMock = require('../../lib/secure-storage');
+    let familyReads = 0;
+    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) => {
+        if (key !== FAMILY_INTENT_ONBOARDING_KEY) return Promise.resolve(null);
+        familyReads += 1;
+        return familyReads === 1
+          ? Promise.reject(new Error('storage unavailable'))
+          : Promise.resolve(
+              JSON.stringify({
+                version: 1,
+                profileId: 'p1',
+                step: 'login-choice',
+              }),
+            );
+      },
+    );
+
+    renderLayout();
+    await waitFor(() => {
+      screen.getByTestId('family-intent-restore-error');
+    });
+    fireEvent.press(screen.getByTestId('family-intent-restore-retry'));
+
+    await waitFor(() => {
+      screen.getByTestId('family-intent-login-yes');
+    });
+    expect(screen.queryByTestId('tabs')).toBeNull();
   });
 
   afterEach(() => {
@@ -2046,6 +2201,8 @@ describe('AppLayout no-profile gate — preview branch', () => {
     (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
     (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
     (SecureStoreMock.deleteItemAsync as jest.Mock).mockResolvedValue(undefined);
+    __resetFamilyIntentOnboardingForTests();
+    await AsyncStorage.removeItem(FAMILY_INTENT_ONBOARDING_RECOVERY_KEY);
     // Also clear the in-memory preview state between tests.
     await clearPreviewState();
     setupDefaultRoutes();
@@ -2145,6 +2302,11 @@ describe('AppLayout no-profile gate — preview branch', () => {
 
     expect(screen.getByTestId('preview-state-loading')).toBeTruthy();
 
+    await act(async () => {
+      // Let the independent family-intent SecureStore probe resolve before
+      // advancing the clock for the deliberately hung preview probe.
+      await Promise.resolve();
+    });
     act(() => {
       jest.advanceTimersByTime(2500);
     });

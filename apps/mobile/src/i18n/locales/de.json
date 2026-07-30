@@ -3872,7 +3872,6 @@
     "parentBirthDateLabel": "Dein Geburtsdatum",
     "childBirthDateLabel": "Geburtsdatum des Kindes",
     "birthDateHint": "Damit dein Mentor richtig mit dir spricht. Mindestalter ist {{age}}.",
-    "parentBirthDateHint": "Das ist für den Erwachsenen, der das Konto einrichtet. Du kannst dein Kind als Nächstes hinzufügen. Mindestalter ist {{age}}.",
     "childBirthDateHint": "Damit der Mentor deines Kindes richtig mit ihm spricht. Mindestalter ist {{age}}.",
     "webDateFormatHint": "Gib dein Geburtsdatum als JJJJ-MM-TT ein.",
     "childWebDateFormatHint": "Gib das Geburtsdatum deines Kindes als JJJJ-MM-TT ein.",
@@ -3885,7 +3884,6 @@
     "upgradeRequiredBody": "Dein Abonnement unterstützt keine zusätzlichen Profile. Bitte upgrade auf Familie oder Pro.",
     "seePlans": "Abos ansehen",
     "minimumAgeError": "Lernende müssen mindestens {{age}} Jahre alt sein. Bitte wähle ein früheres Geburtsdatum.",
-    "parentAdultAgeError": "Elternkonten benötigen das Geburtsdatum eines Erwachsenen. Gib zuerst deine eigenen Daten ein und füge danach dein Kind hinzu.",
     "a11yCloseDatePicker": "Datumsauswahl schließen",
     "createdChildFamilyContextFailedBody": "Das Profil von {{name}} ist fertig, aber wir konnten nicht automatisch in den Familienmodus umschalten.",
     "createdChildFamilyContextTerminalFailedBody": "Das Profil von {{name}} ist fertig, aber wir konnten immer noch nicht in den Familienmodus umschalten. Du kannst später über Mehr > Konto in den Familienmodus wechseln.",
@@ -4616,5 +4614,32 @@
     "errorMessage": "Versuche es gleich noch einmal.",
     "cta": "Lerne selbst etwas",
     "hint": "Beginne oder setze dein eigenes Lernen fort."
+  },
+  "familyIntentOnboarding": {
+    "adultDetailsHint": "Dies ist für den Erwachsenen, der das Konto einrichtet. Danach fragen wir, wer lernen wird. Das Mindestalter ist {{age}}.",
+    "adultAgeError": "Die Familieneinrichtung erfordert das Geburtsdatum eines Erwachsenen. Gib zuerst deine Daten ein und wähle dann, wer lernen soll.",
+    "target": {
+      "title": "Wer wird lernen?",
+      "message": "Wähle aus, was du zuerst einrichten möchtest.",
+      "me": "Ich",
+      "someoneElse": "Jemand anderes"
+    },
+    "login": {
+      "title": "Hat die lernende Person einen eigenen Login?",
+      "message": "Wähle „Ja“, wenn die lernende Person sich bei MentoMate mit einer eigenen E-Mail anmeldet.",
+      "yes": "Ja, haben sie",
+      "no": "Nein, haben sie nicht"
+    },
+    "managedUnavailable": {
+      "title": "Profile ohne eigenen Login sind noch nicht verfügbar",
+      "message": "Vorerst kannst du eine lernende Person einladen, die einen eigenen MentoMate-Login hat."
+    },
+    "actionError": "Diese Auswahl konnte nicht gespeichert werden. Erneut versuchen.",
+    "saveError": "Dein Profil wurde erstellt, aber der nächste Einrichtungsschritt konnte nicht gespeichert werden. Erneut versuchen.",
+    "restoreError": {
+      "title": "Familieneinrichtung nicht wiederhergestellt",
+      "message": "Deine Auswahl ist weiterhin geschützt. Vor dem Fortfahren erneut versuchen.",
+      "retry": "Erneut versuchen"
+    }
   }
 }

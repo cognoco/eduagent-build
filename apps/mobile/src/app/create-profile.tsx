@@ -47,6 +47,7 @@ import { formatApiError } from '../lib/format-api-error';
 import { platformAlert } from '../lib/platform-alert';
 import { errorHasCode } from '../components/session/session-types';
 import { queueMentorBornCeremony } from '../lib/mentor-born-ceremony';
+import { startFamilyIntentOnboarding } from '../lib/family-intent-onboarding-state';
 
 // Captured at module load — safe because these screens are portrait-locked.
 // On web, cap at a mobile-like height to avoid massive whitespace.
@@ -139,9 +140,10 @@ export default function CreateProfileScreen() {
   const inFlightRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const requestSeqRef = useRef(0);
+  const pendingFamilyIntentProfileIdRef = useRef<string | null>(null);
   // Audience chosen at the pre-auth welcome chooser, carried across the signup
-  // wall. Drives first-profile setup: 'parent' (adult) sets family context and
-  // routes to the add-a-child screen; 'learner'/absent gets a clean solo setup.
+  // wall. Drives first-profile setup: 'parent' creates the adult and opens the
+  // durable learner-target fork; 'learner'/absent gets a clean solo setup.
   // The old in-form Study/Family picker was removed — the chooser asks once.
   const [audience, setAudience] = useState(() => readPreAuthAudienceSync());
   useEffect(() => {
@@ -218,9 +220,8 @@ export default function CreateProfileScreen() {
   const isAdultBirthDate =
     birthDate !== null &&
     calculateAgeFromDate(birthDate) >= PARENT_ACCOUNT_MINIMUM_AGE;
-  // A parent (chosen at the chooser) old enough to be a guardian: set family
-  // context and route to the add-a-child screen after creating their own
-  // profile. A parent-intent minor birth date is blocked explicitly in submit
+  // A family-intent adult reaches the learner-target fork after creating
+  // their own profile. A family-intent minor birth date is blocked explicitly
   // so we never silently create a solo learner instead.
   const wantsFamily = isParentFirstProfileSetup && isAdultBirthDate;
 
@@ -248,7 +249,7 @@ export default function CreateProfileScreen() {
   const birthDateHint = isAddingChild
     ? t('createProfile.childBirthDateHint', { age: PROFILE_MINIMUM_AGE })
     : isParentFirstProfileSetup
-      ? t('createProfile.parentBirthDateHint', {
+      ? t('familyIntentOnboarding.adultDetailsHint', {
           age: PARENT_ACCOUNT_MINIMUM_AGE,
         })
       : t('createProfile.birthDateHint', { age: PROFILE_MINIMUM_AGE });
@@ -270,7 +271,7 @@ export default function CreateProfileScreen() {
     }
 
     if (isParentFirstProfileSetup && !isAdultBirthDate) {
-      setError(t('createProfile.parentAdultAgeError'));
+      setError(t('familyIntentOnboarding.adultAgeError'));
       return;
     }
 
@@ -293,6 +294,27 @@ export default function CreateProfileScreen() {
     setLoading(true);
 
     try {
+      const pendingFamilyIntentProfileId =
+        pendingFamilyIntentProfileIdRef.current;
+      if (pendingFamilyIntentProfileId) {
+        // The profile POST already succeeded on the previous attempt. Retry
+        // only the failed durable handoff so pressing Continue cannot create
+        // a duplicate adult profile.
+        setCreatePostPending(false);
+        await startFamilyIntentOnboarding(pendingFamilyIntentProfileId);
+        pendingFamilyIntentProfileIdRef.current = null;
+        handleClose();
+        void clearPreAuthAudience();
+        const switchResult = await switchProfile(pendingFamilyIntentProfileId);
+        if (switchResult?.success === false) {
+          platformAlert(
+            t('createProfile.createdTitle'),
+            switchResult.error ?? t('createProfile.createdSwitchFailedBody'),
+          );
+        }
+        return;
+      }
+
       // i18n Phase 1 — Signup-time fix. Self-create: forward the device UI
       // language so the first LLM card uses the learner's locale instead of
       // the DB default 'en'. Parent-creates-child: OMIT the field — the
@@ -341,15 +363,12 @@ export default function CreateProfileScreen() {
       }
       setCreatePostPending(false);
 
-      // Persist family context immediately after creation for a parent
-      // audience. First-profile parent setup writes the newly-created owner.
-      // Parent-adds-child writes the already-active owner, not the returned
-      // child profile. A learner audience leaves the default — no PATCH needed.
+      // Persist family context only when an owner actually adds a child.
+      // Family intent on first-profile signup is non-authorizing and leaves
+      // the adult learner-shaped until they explicitly choose a later path.
       const familyContextProfileId = isParentAddingChild
         ? activeProfile?.id
-        : wantsFamily
-          ? profile.id
-          : null;
+        : null;
       const persistFamilyContext = async (): Promise<boolean> => {
         if (!familyContextProfileId) return true;
         try {
@@ -452,14 +471,14 @@ export default function CreateProfileScreen() {
       if (needsConsentFlow) {
         handleClose();
       } else if (wantsFamily) {
-        // Parent's own profile is created — take them straight to the
-        // add-a-child screen (skippable via its Cancel) instead of the learner
-        // home. Navigate FIRST (same remount-ordering reason as below), then
-        // switch to the new owner so the add-child route guard resolves.
-        router.replace({
-          pathname: '/create-profile',
-          params: { for: 'child' },
-        });
+        // The family-intent chooser is non-authorizing: persist only the
+        // created adult profile id and pending UI step. AppLayout restores the
+        // gate after switchProfile, remount, or relaunch. It must not silently
+        // select the managed-child path or create any relationship state.
+        pendingFamilyIntentProfileIdRef.current = profile.id;
+        await startFamilyIntentOnboarding(profile.id);
+        pendingFamilyIntentProfileIdRef.current = null;
+        handleClose();
       } else {
         if (isFirstProfileCreation && !isAddingChild) {
           await queueMentorBornCeremony({
@@ -490,7 +509,9 @@ export default function CreateProfileScreen() {
       // message; without this branch the generic UpstreamError path renders it
       // as "Something went wrong on our end" — exactly what QA reported as a
       // fake 500. Surface the upgrade CTA inline so the user can act.
-      if (errorHasCode(err, 'PROFILE_LIMIT_EXCEEDED')) {
+      if (pendingFamilyIntentProfileIdRef.current) {
+        setError(t('familyIntentOnboarding.saveError'));
+      } else if (errorHasCode(err, 'PROFILE_LIMIT_EXCEEDED')) {
         // [BUG-947] Do NOT use `instanceof Error` here — Metro HMR can break
         // module identity so instanceof fails even for genuine Error objects.
         // Read `.message` via property access on the raw value instead; the

@@ -15,6 +15,11 @@ import {
   completeExplicitMentorLanguageUpdate,
   shouldSuppressMentorLanguageAutoSync,
 } from './mentor-language-coordination';
+import {
+  FAMILY_INTENT_ONBOARDING_RECOVERY_KEY,
+  readFamilyIntentOnboarding,
+  startFamilyIntentOnboarding,
+} from './family-intent-onboarding-state';
 
 const mockDelete = jest.mocked(ExpoSecureStore.deleteItemAsync);
 
@@ -44,6 +49,39 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
     await clearProfileSecureStorageOnSignOut([]);
     const calledWith = mockDelete.mock.calls.map((c) => c[0] as string);
     expect(calledWith).toContain('preAuthAudience.v1');
+  });
+
+  it('[WI-2532] clears a pending family-intent onboarding choice on sign-out', async () => {
+    await startFamilyIntentOnboarding('adult-profile');
+    await clearProfileSecureStorageOnSignOut([]);
+    const calledWith = mockDelete.mock.calls.map((c) => c[0] as string);
+    expect(calledWith).toContain('mentomate_family_intent_onboarding_v1');
+    await expect(
+      AsyncStorage.getItem(FAMILY_INTENT_ONBOARDING_RECOVERY_KEY),
+    ).resolves.toBeNull();
+    await expect(readFamilyIntentOnboarding()).resolves.toBeNull();
+  });
+
+  it('[WI-2532] globally clears the recovery journal when its specialized cleanup rejects', async () => {
+    await startFamilyIntentOnboarding('adult-profile');
+    jest
+      .mocked(AsyncStorage.removeItem)
+      .mockRejectedValueOnce(new Error('specialized cleanup unavailable'));
+    jest
+      .mocked(AsyncStorage.multiRemove)
+      .mockImplementation(async (keys: readonly string[]) => {
+        for (const key of keys) {
+          await AsyncStorage.removeItem(key);
+        }
+      });
+
+    await expect(
+      clearProfileSecureStorageOnSignOut([]),
+    ).resolves.toBeUndefined();
+    expect(AsyncStorage.multiRemove).toHaveBeenCalledWith(
+      expect.arrayContaining([FAMILY_INTENT_ONBOARDING_RECOVERY_KEY]),
+    );
+    await expect(readFamilyIntentOnboarding()).resolves.toBeNull();
   });
 
   it('clears global keys even when no profileIds are passed', async () => {

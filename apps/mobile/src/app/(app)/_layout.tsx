@@ -59,6 +59,11 @@ import { PENDING_CONSENT_STATUSES } from './_lib/consent-gate-helpers';
 import { ProxyBanner } from './_components/ProxyBanner';
 import { PostApprovalLanding } from './_components/PostApprovalLanding';
 import { CreateProfileGate } from './_components/CreateProfileGate';
+import { FamilyIntentOnboardingGate } from '../../components/onboarding/FamilyIntentOnboardingGate';
+import {
+  readFamilyIntentOnboarding,
+  type FamilyIntentOnboardingState,
+} from '../../lib/family-intent-onboarding-state';
 import { ConsentWithdrawnGate } from './_components/ConsentWithdrawnGate';
 import { ConsentPendingGate } from './_components/ConsentPendingGate';
 import { usePostApprovalLanding } from './_hooks/use-post-approval-landing';
@@ -329,6 +334,7 @@ const ACCOUNT_AVATAR_HIDDEN_PATHS = [
 const PENDING_AUTH_REDIRECT_SETTLE_MS = 1_000;
 const DEFAULT_AUTH_REDIRECT_PATH = '/(app)/home';
 const PREVIEW_PROBE_TIMEOUT_MS = 2_500;
+const FAMILY_INTENT_PROBE_TIMEOUT_MS = 2_500;
 const V2_CHROME_MIN_TOP_INSET = 24;
 const V2_CHROME_CONTROL_TOP_GAP = 8;
 const V2_CHROME_CONTROL_HEIGHT = 44;
@@ -560,6 +566,31 @@ export default function AppLayout() {
   // actually started, but stale preview state must not hijack existing users
   // who already have an active profile when the layout first loads.
   const [wizardStarted, setWizardStarted] = React.useState(false);
+  const [familyIntentState, setFamilyIntentState] = React.useState<
+    FamilyIntentOnboardingState | null | undefined
+  >(undefined);
+  const [familyIntentProbeFailed, setFamilyIntentProbeFailed] =
+    React.useState(false);
+  const [familyIntentProbeAttempt, setFamilyIntentProbeAttempt] =
+    React.useState(0);
+  const [familyIntentInvitationRequested, setFamilyIntentInvitationRequested] =
+    React.useState(false);
+
+  const openFamilyIntentInvitation = React.useCallback(() => {
+    // Mount Tabs first, then navigate from the committed navigator. Pushing
+    // while this gate replaces Tabs races a torn-down navigator on web.
+    setFamilyIntentState(null);
+    setFamilyIntentInvitationRequested(true);
+  }, []);
+
+  React.useEffect(() => {
+    if (!familyIntentInvitationRequested) return;
+    router.push({
+      pathname: '/(app)/link/initiate',
+      params: { target: 'existingTeen' },
+    });
+    setFamilyIntentInvitationRequested(false);
+  }, [familyIntentInvitationRequested, router]);
 
   React.useEffect(() => {
     if (!FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED) {
@@ -596,6 +627,48 @@ export default function AppLayout() {
       clearTimeout(timeout);
     };
   }, []);
+
+  React.useEffect(() => {
+    if (!isSignedIn || !activeProfile?.id) {
+      setFamilyIntentState(null);
+      setFamilyIntentProbeFailed(false);
+      return;
+    }
+
+    let cancelled = false;
+    let settled = false;
+    setFamilyIntentState(undefined);
+    setFamilyIntentProbeFailed(false);
+    const timeout = setTimeout(() => {
+      if (cancelled || settled) return;
+      settled = true;
+      Sentry.addBreadcrumb({
+        category: 'family-intent-onboarding',
+        level: 'warning',
+        message: 'family-intent SecureStore read timed out',
+      });
+      setFamilyIntentProbeFailed(true);
+    }, FAMILY_INTENT_PROBE_TIMEOUT_MS);
+    void readFamilyIntentOnboarding()
+      .then((pending) => {
+        if (cancelled || settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        setFamilyIntentState(
+          pending?.profileId === activeProfile.id ? pending : null,
+        );
+      })
+      .catch(() => {
+        if (cancelled || settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        setFamilyIntentProbeFailed(true);
+      });
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [activeProfile?.id, familyIntentProbeAttempt, isSignedIn]);
 
   // [CRITICAL-B2] DELIBERATELY no auto-cleanup effect here. A previous
   // iteration had:
@@ -824,6 +897,49 @@ export default function AppLayout() {
         <SaveWizardGate
           onStart={markWizardStarted}
           onComplete={markWizardDone}
+        />
+      </FeedbackProvider>
+    );
+  }
+
+  if (activeProfile && familyIntentProbeFailed) {
+    return (
+      <ErrorFallback
+        variant="centered"
+        title={t('familyIntentOnboarding.restoreError.title')}
+        message={t('familyIntentOnboarding.restoreError.message')}
+        primaryAction={{
+          label: t('familyIntentOnboarding.restoreError.retry'),
+          onPress: () => setFamilyIntentProbeAttempt((attempt) => attempt + 1),
+          testID: 'family-intent-restore-retry',
+        }}
+        testID="family-intent-restore-error"
+      />
+    );
+  }
+
+  if (activeProfile && familyIntentState === undefined) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center"
+        testID="family-intent-state-loading"
+      >
+        <ActivityIndicator
+          size="large"
+          accessibilityLabel={t('common.loading')}
+        />
+      </View>
+    );
+  }
+
+  if (activeProfile && familyIntentState) {
+    return (
+      <FeedbackProvider>
+        <FamilyIntentOnboardingGate
+          state={familyIntentState}
+          onStateChange={setFamilyIntentState}
+          onComplete={() => setFamilyIntentState(null)}
+          onOpenInvitation={openFamilyIntentInvitation}
         />
       </FeedbackProvider>
     );

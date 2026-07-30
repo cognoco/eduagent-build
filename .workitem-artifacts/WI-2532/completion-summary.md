@@ -1,0 +1,36 @@
+## What was done
+
+Added a durable Me-or-someone-else fork after an adult completes family-intent
+profile creation.
+
+## What changed
+
+- The adult profile is created without an automatic family-context write or
+  child-profile redirect.
+- Me continues ordinary learner onboarding.
+- Someone else opens an own-login question; credentialed learners reach the
+  existing family-join invitation form, while the unavailable managed path is
+  explicit.
+- The unfinished fork is stored per profile, restored after remount or relaunch,
+  and cleared after the selected destination mounts or on sign-out.
+- Storage failures fail closed with retry; a failed handoff after profile
+  creation retries only the durable marker and never repeats the profile POST.
+- Dedicated translated copy, focused mobile coverage, and a preview browser
+  journey were added.
+
+## Verification
+
+Six focused mobile suites passed 263 tests across durable state, both branches,
+profile creation, relaunch restoration, invitation routing, and sign-out
+cleanup. The full mobile unit stage, full API unit stage under the sanctioned
+development database boundary, TypeScript build, i18n ratchets, test-only
+export guard, touched-file lint, and whitespace check passed. The dedicated
+preview journey passed in 1.7 minutes and reached the invitation form without a
+supportership write.
+
+## Caveats / Follow-ups
+
+The managed learner without an independent login remains intentionally
+unavailable and is presented as such. This change does not activate or authorize
+that path. The Work Item remains Executing until its PR lands; lifecycle
+completion must not run while the PR is open.
