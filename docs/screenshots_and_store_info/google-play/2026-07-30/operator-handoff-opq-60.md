@@ -57,8 +57,8 @@ screenshot for each:
 - Main store listing: app name, short description, full description.
 - App icon, feature graphic, phone screenshots, and any tablet/video slots.
 - App category and tags.
-- Contact details: monitored support email; support URL only if a real 200 page
-  is approved; privacy policy URL.
+- Contact details: monitored support email; support URL only if a real page
+  returning HTTP 200 is approved; privacy policy URL.
 
 ### App content / policy
 

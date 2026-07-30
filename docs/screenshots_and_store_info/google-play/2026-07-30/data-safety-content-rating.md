@@ -10,9 +10,11 @@ processor ledger, retention schedule, privacy surfaces, and 13+ launch posture:
 
 - identity uses full birth date and residence jurisdiction; the legacy physical
   location field no longer exists;
-- current live recipients are Cerebras, Mistral, OpenAI, Anthropic, Voyage AI,
-  Clerk, Neon, Cloudflare, Inngest, Sentry, Resend, RevenueCat, Apple/Google app
-  stores, Expo push, APNs, and FCM;
+- current live recipients relevant to the Android candidate are Cerebras,
+  Mistral, OpenAI, Anthropic, Voyage AI, Clerk, Neon, Cloudflare, Inngest,
+  Sentry, Resend, RevenueCat, Google Play, Expo push, and FCM. The global
+  processor ledger also records Apple App Store and APNs for iOS; those
+  iOS-specific recipients are excluded from this Android form draft;
 - Gemini/Vertex are policy-excluded, OpenRouter is eval-only,
   DeepInfra/DeepSeek are dormant, and Stripe is production-unconfigured;
 - homework images may be sent to a routed LLM vision provider but are not stored
