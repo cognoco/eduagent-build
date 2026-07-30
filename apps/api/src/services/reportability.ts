@@ -2,6 +2,7 @@ import {
   reportableFactKindSchema,
   type ReportableFact,
   type ReportableFactKind,
+  type SharedRecordArtifactRef,
 } from '@eduagent/schemas';
 
 export class NonReportableFactError extends Error {
@@ -20,6 +21,7 @@ export interface CandidateReportFact {
   detail?: string;
   occurredAt?: string;
   source: string;
+  artifact?: SharedRecordArtifactRef;
   metadata?: Record<string, unknown>;
   safetyEscalation?: boolean;
 }

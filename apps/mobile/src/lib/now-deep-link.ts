@@ -111,6 +111,14 @@ const PATH_BUILDERS: Partial<Record<NowDeepLinkRoute, PathBuilder>> = {
     params['section']
       ? `/(app)/journal?section=${encodeURIComponent(params['section'])}`
       : '/(app)/journal',
+  'journal.artifact': (params) =>
+    `/(app)/journal/${encodeURIComponent(
+      requiredParam(params, 'personId', 'journal.artifact'),
+    )}/${encodeURIComponent(
+      requiredParam(params, 'artifactKind', 'journal.artifact'),
+    )}/${encodeURIComponent(
+      requiredParam(params, 'artifactId', 'journal.artifact'),
+    )}`,
 };
 
 function assertSupportedRoute(

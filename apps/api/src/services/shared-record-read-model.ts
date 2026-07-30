@@ -86,6 +86,10 @@ export async function readSharedRecordForSupportee(
         detail: stat.comparison,
         occurredAt: row.createdAt.toISOString(),
         source: 'weekly_report_summary',
+        artifact: {
+          kind: 'weekly_report',
+          id: row.id,
+        },
         metadata: metricKey
           ? {
               templateKey: 'weeklyReport',
@@ -106,6 +110,10 @@ export async function readSharedRecordForSupportee(
       detail: 'A shareable learning recap was produced.',
       occurredAt: row.createdAt.toISOString(),
       source: 'session_recap_presence',
+      artifact: {
+        kind: 'session_recap',
+        id: row.sessionId,
+      },
       metadata: {
         templateKey: 'sessionRecap',
         sessionDate: row.createdAt.toISOString(),

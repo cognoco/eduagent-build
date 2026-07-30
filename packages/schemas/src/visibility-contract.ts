@@ -8,6 +8,22 @@ export const reportableFactKindSchema = z.enum([
 ]);
 export type ReportableFactKind = z.infer<typeof reportableFactKindSchema>;
 
+export const sharedRecordArtifactKindSchema = z.enum([
+  'weekly_report',
+  'session_recap',
+]);
+export type SharedRecordArtifactKind = z.infer<
+  typeof sharedRecordArtifactKindSchema
+>;
+
+export const sharedRecordArtifactRefSchema = z.object({
+  kind: sharedRecordArtifactKindSchema,
+  id: z.string().uuid(),
+});
+export type SharedRecordArtifactRef = z.infer<
+  typeof sharedRecordArtifactRefSchema
+>;
+
 export const renderAudienceSchema = z.enum(['supporter', 'supportee']);
 export type RenderAudience = z.infer<typeof renderAudienceSchema>;
 
@@ -70,6 +86,7 @@ export const reportableFactSchema = z.object({
   detail: z.string().max(1000).optional(),
   occurredAt: isoDateField.optional(),
   source: z.string().min(1).max(64),
+  artifact: sharedRecordArtifactRefSchema.optional(),
   // open-record: heterogeneous fact metadata — intentionally kept open
   metadata: z.record(z.string(), z.unknown()).optional(),
 });

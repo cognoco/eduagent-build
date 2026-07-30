@@ -325,6 +325,24 @@ describe('now feed route catalog', () => {
     });
   });
 
+  it('builds durable Journal artifact links with their person context', () => {
+    expect(
+      resolveDeepLink('journal.artifact', {
+        personId: 'person-1',
+        artifactKind: 'weekly_report',
+        artifactId: 'artifact-1',
+      }),
+    ).toEqual({
+      route: 'journal.artifact',
+      params: {
+        personId: 'person-1',
+        artifactKind: 'weekly_report',
+        artifactId: 'artifact-1',
+      },
+      chain: ['journal'],
+    });
+  });
+
   it('builds the notice re-check action route with its required identifiers', () => {
     expect(
       resolveDeepLink('notice.recheck', {

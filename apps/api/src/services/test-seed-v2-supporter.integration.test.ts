@@ -123,7 +123,10 @@ function createIntegrationDb(): Database {
       expect(seeded.ids.topicId).toBeTruthy();
       expect(seeded.ids.retentionCardId).toBeTruthy();
       expect(seeded.ids.sessionSummaryId).toBeTruthy();
+      expect(seeded.ids.secondSessionId).toBeTruthy();
+      expect(seeded.ids.secondSessionSummaryId).toBeTruthy();
       expect(seeded.ids.weeklyReportId).toBeTruthy();
+      expect(seeded.ids.secondWeeklyReportId).toBeTruthy();
       expect(seeded.ids.milestoneId).toBeTruthy();
     });
 
@@ -185,7 +188,18 @@ function createIntegrationDb(): Database {
         supporterPersonId: seeded.ids.supporterPersonId,
         supporteePersonId: seeded.ids.supporteePersonId,
       });
-      expect(record.supporterView.facts.length).toBeGreaterThan(0);
+      expect(
+        record.supporterView.facts
+          .map((fact) => fact.artifact)
+          .filter((artifact) => artifact !== undefined),
+      ).toEqual(
+        expect.arrayContaining([
+          { kind: 'weekly_report', id: seeded.ids.weeklyReportId },
+          { kind: 'weekly_report', id: seeded.ids.secondWeeklyReportId },
+          { kind: 'session_recap', id: seeded.ids.sessionId },
+          { kind: 'session_recap', id: seeded.ids.secondSessionId },
+        ]),
+      );
 
       // [Phase-4 review, WI-2241] Same canary caveat as the structural-wall
       // case above: readSharedRecordForSupportee (shared-record-read-model.ts)

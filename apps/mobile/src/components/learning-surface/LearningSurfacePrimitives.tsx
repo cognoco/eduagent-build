@@ -1,5 +1,5 @@
 import type { ReactElement, ReactNode } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { Button } from '../common/Button';
 import { ErrorFallback } from '../common/ErrorFallback';
@@ -235,6 +235,8 @@ interface StructuralFact {
   id: string;
   title: string;
   detail?: string | null;
+  onPress?: () => void;
+  testID?: string;
 }
 
 type StructuralFactAppeal =
@@ -282,18 +284,38 @@ export function StructuralFactCard({
         {structuralOnlyLabel}
       </Text>
       <View className="mt-4 gap-3">
-        {facts.map((fact) => (
-          <View key={fact.id} testID={`structural-fact-${fact.id}`}>
-            <Text className="text-body font-semibold text-text-primary">
-              {fact.title}
-            </Text>
-            {fact.detail ? (
-              <Text className="mt-1 text-body-sm text-text-secondary">
-                {fact.detail}
+        {facts.map((fact) =>
+          fact.onPress ? (
+            <Pressable
+              key={fact.id}
+              onPress={fact.onPress}
+              accessibilityRole="button"
+              accessibilityLabel={fact.title}
+              className="min-h-[44px] justify-center"
+              testID={fact.testID ?? `structural-fact-${fact.id}`}
+            >
+              <Text className="text-body font-semibold text-text-primary">
+                {fact.title}
               </Text>
-            ) : null}
-          </View>
-        ))}
+              {fact.detail ? (
+                <Text className="mt-1 text-body-sm text-text-secondary">
+                  {fact.detail}
+                </Text>
+              ) : null}
+            </Pressable>
+          ) : (
+            <View key={fact.id} testID={`structural-fact-${fact.id}`}>
+              <Text className="text-body font-semibold text-text-primary">
+                {fact.title}
+              </Text>
+              {fact.detail ? (
+                <Text className="mt-1 text-body-sm text-text-secondary">
+                  {fact.detail}
+                </Text>
+              ) : null}
+            </View>
+          ),
+        )}
       </View>
       {appeal ? (
         <View className="mt-4 border-t border-border pt-4">

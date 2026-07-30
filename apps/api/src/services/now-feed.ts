@@ -117,6 +117,10 @@ export const ROUTE_CATALOG = {
     chain: ['subject.hub'],
   },
   journal: { params: [], chain: [] },
+  'journal.artifact': {
+    params: ['personId', 'artifactKind', 'artifactId'],
+    chain: ['journal'],
+  },
   'support.hub': { params: [], chain: [] },
 } as const satisfies Record<
   NowDeepLinkRoute,

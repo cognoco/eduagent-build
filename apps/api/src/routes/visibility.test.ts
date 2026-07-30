@@ -327,4 +327,23 @@ describe('visibility routes boundary validation', () => {
     expect(acceptLink).not.toHaveBeenCalled();
     expectNoVisibilityServiceCalls();
   });
+
+  it.each(['pending', 'revoked'] as const)(
+    'GET shared record fails closed for a %s relationship before reading artifacts',
+    async () => {
+      jest
+        .mocked(findAcceptedContractForSupportee)
+        .mockRejectedValueOnce(
+          new ForbiddenError('This support link is not active.'),
+        );
+
+      const res = await makeApp({
+        profileId: PROFILE_ID,
+        callerPersonId: SUPPORTER_PERSON_ID,
+      }).request(`/v1/visibility/reports/${SUPPORTEE_PERSON_ID}/shared-record`);
+
+      expect(res.status).toBe(403);
+      expect(readSharedRecordForSupportee).not.toHaveBeenCalled();
+    },
+  );
 });

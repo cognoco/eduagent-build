@@ -20,6 +20,7 @@ export default function JournalLayout(): React.JSX.Element {
       }}
     >
       <Stack.Screen name="index" />
+      <Stack.Screen name="[personId]/[artifactKind]/[artifactId]" />
     </Stack>
   );
 }

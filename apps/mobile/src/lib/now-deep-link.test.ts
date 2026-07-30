@@ -205,6 +205,24 @@ describe('pushNowDeepLink', () => {
     expect(router.push).toHaveBeenCalledWith('/(app)/journal');
   });
 
+  it('pushes a supporter announcement to the durable person-Journal artifact', () => {
+    const router = { push: jest.fn() };
+
+    pushNowDeepLink(router, {
+      route: 'journal.artifact',
+      params: {
+        personId: personScope.personId,
+        artifactKind: 'session_recap',
+        artifactId: '00000000-0000-4000-8000-000000000301',
+      },
+      chain: [],
+    });
+
+    expect(router.push).toHaveBeenCalledWith(
+      '/(app)/journal/00000000-0000-4000-8000-000000000101/session_recap/00000000-0000-4000-8000-000000000301',
+    );
+  });
+
   it('[WI-2110 AC-1] carries a Journal section override in the route', () => {
     const router = { push: jest.fn() };
 

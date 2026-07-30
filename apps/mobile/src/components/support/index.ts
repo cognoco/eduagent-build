@@ -1,4 +1,4 @@
-export * from './PersonScopeJournalPlaceholder';
+export * from './PersonScopeJournal';
 export * from './PersonScopeStructuralSubjects';
 export * from './SupportHubMentorTab';
 export * from './SupportHubJournalTab';

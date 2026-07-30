@@ -46,12 +46,8 @@ jest.mock(
     const { Text, View } = require('react-native');
     return {
       SupportHubJournalTab: () => <View testID="support-hub-journal-tab" />,
-      PersonScopeJournalPlaceholder: ({
-        scope,
-      }: {
-        scope: { displayName: string };
-      }) => (
-        <View testID="person-scope-journal-placeholder">
+      PersonScopeJournal: ({ scope }: { scope: { displayName: string } }) => (
+        <View testID="person-scope-journal">
           <Text>{scope.displayName}</Text>
         </View>
       ),
@@ -105,7 +101,7 @@ describe('JournalScreen', () => {
     expect(screen.queryByTestId('journal-tab-view')).toBeNull();
   });
 
-  it('renders the S5 placeholder for a person-scope Journal', () => {
+  it('renders the durable shared record for a person-scope Journal', () => {
     mockScopeContext = {
       ...mockScopeContext,
       activeScope: {
@@ -118,7 +114,7 @@ describe('JournalScreen', () => {
 
     render(<JournalScreen />);
 
-    screen.getByTestId('person-scope-journal-placeholder');
+    screen.getByTestId('person-scope-journal');
     screen.getByText('Emma');
     expect(screen.queryByTestId('journal-tab-view')).toBeNull();
   });

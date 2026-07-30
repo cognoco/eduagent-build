@@ -132,6 +132,11 @@ describe('readSharedRecordForSupportee', () => {
         subjectName: 'Physics',
       },
     ]);
+    expect(record.supporterView.facts.map((fact) => fact.artifact)).toEqual([
+      { kind: 'weekly_report', id: UUID.weeklyReport },
+      { kind: 'session_recap', id: UUID.session },
+      undefined,
+    ]);
     expect(record.supporterView.factIds).toEqual(record.supporteeView.factIds);
     expect(JSON.stringify(record)).not.toContain('raw parent-facing recap');
     expect(JSON.stringify(record)).not.toContain('raw highlight');

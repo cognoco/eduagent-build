@@ -16,8 +16,8 @@
 // supportee identities (their own org/login/Clerk user each, since a
 // supporter/supportee link is not the guardianship same-org model):
 //
-//   - "rich"    — subjects/topics/progress, an accepted session recap, a
-//                 weekly report, and a milestone (all shareable facts the
+//   - "rich"    — subjects/topics/progress, two accepted session recaps,
+//                 two weekly reports, and a milestone (all shareable facts the
 //                 shared-record read model — shared-record-read-model.ts —
 //                 surfaces), alongside PRIVATE artifacts (a topic note, a
 //                 raw session-event/transcript row, a bookmark, and a
@@ -253,11 +253,27 @@ export async function seedV2SupporterAccepted(
     subjectId,
     topicId,
   });
+  const { sessionId: secondSessionId, summaryId: secondSessionSummaryId } =
+    await insertSessionWithRecap(db, {
+      profileId: richSupportee.personId,
+      subjectId,
+      topicId,
+      endedDaysAgo: 2,
+      recapContent:
+        'A second persisted recap proves the person Journal survives relaunch with history.',
+    });
 
   const { reportId: weeklyReportId } = await insertWeeklyReport(db, {
     profileId: supporter.personId,
     childProfileId: richSupportee.personId,
     childName: 'Test Supportee',
+    reportWeek: '2026-04-28',
+  });
+  const { reportId: secondWeeklyReportId } = await insertWeeklyReport(db, {
+    profileId: supporter.personId,
+    childProfileId: richSupportee.personId,
+    childName: 'Test Supportee',
+    reportWeek: '2026-04-21',
   });
 
   const milestoneId = generateUUIDv7();
@@ -372,7 +388,10 @@ export async function seedV2SupporterAccepted(
       topicId,
       sessionId,
       sessionSummaryId: summaryId,
+      secondSessionId,
+      secondSessionSummaryId,
       weeklyReportId,
+      secondWeeklyReportId,
       milestoneId,
       retentionCardId,
       topicNoteId,

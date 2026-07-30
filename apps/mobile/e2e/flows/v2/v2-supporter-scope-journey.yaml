@@ -99,10 +99,28 @@ tags:
     retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
-      id: 'person-scope-journal-placeholder'
+      id: 'person-scope-journal'
     timeout: 15000
 - assertVisible:
     id: 'visibility-shared-record'
+- assertVisible:
+    id: 'journal-artifact-weekly_report-${WEEKLY_REPORT_ID}'
+- assertVisible:
+    id: 'journal-artifact-weekly_report-${SECOND_WEEKLY_REPORT_ID}'
+- scrollUntilVisible:
+    element:
+      id: 'journal-artifact-session_recap-${SESSION_ID}'
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: 'journal-artifact-session_recap-${SESSION_ID}'
+- scrollUntilVisible:
+    element:
+      id: 'journal-artifact-session_recap-${SECOND_SESSION_ID}'
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: 'journal-artifact-session_recap-${SECOND_SESSION_ID}'
 
 # Forward-regression canary (NOT the negative-wall proof — see file header):
 # none of the seeded private-artifact content (topic note, bookmark, raw
@@ -147,10 +165,28 @@ tags:
     retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
-      id: 'person-scope-journal-placeholder'
+      id: 'person-scope-journal'
     timeout: 15000
 - assertVisible:
     id: 'visibility-shared-record'
+- assertVisible:
+    id: 'journal-artifact-weekly_report-${WEEKLY_REPORT_ID}'
+- assertVisible:
+    id: 'journal-artifact-weekly_report-${SECOND_WEEKLY_REPORT_ID}'
+- scrollUntilVisible:
+    element:
+      id: 'journal-artifact-session_recap-${SESSION_ID}'
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: 'journal-artifact-session_recap-${SESSION_ID}'
+- scrollUntilVisible:
+    element:
+      id: 'journal-artifact-session_recap-${SECOND_SESSION_ID}'
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: 'journal-artifact-session_recap-${SECOND_SESSION_ID}'
 
 # EMPTY SHARED RECORD: switching to the empty-record supportee renders an
 # honest empty state, not an error and no leaked private content.
@@ -158,7 +194,7 @@ tags:
     id: 'scope-chip-option-person-${EMPTY_SUPPORTEE_PERSON_ID}'
 - extendedWaitUntil:
     visible:
-      id: 'person-scope-journal-placeholder'
+      id: 'person-scope-journal'
     timeout: 15000
 - assertNotVisible:
     id: 'visibility-shared-record'

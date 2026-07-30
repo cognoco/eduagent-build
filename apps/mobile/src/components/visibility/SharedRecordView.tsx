@@ -1,6 +1,10 @@
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import type { AppealReport, SharedRecord } from '@eduagent/schemas';
+import type {
+  AppealReport,
+  SharedRecord,
+  SharedRecordArtifactRef,
+} from '@eduagent/schemas';
 
 import { ErrorFallback } from '../common/ErrorFallback';
 import { StructuralFactCard } from '../learning-surface';
@@ -19,6 +23,7 @@ interface SharedRecordViewProps {
   appealError?: Error | null;
   onRetryAppeal?: () => void;
   supporteeName?: string;
+  onOpenArtifact?: (artifact: SharedRecordArtifactRef) => void;
 }
 
 export function SharedRecordView({
@@ -31,6 +36,7 @@ export function SharedRecordView({
   appealError,
   onRetryAppeal,
   supporteeName,
+  onOpenArtifact,
 }: SharedRecordViewProps): React.ReactElement {
   const { t, i18n } = useTranslation();
 
@@ -84,10 +90,20 @@ export function SharedRecordView({
             : t('visibility.sharedRecord.emptyTitle')
         }
         structuralOnlyLabel={t('visibility.sharedRecord.structuralOnly')}
-        facts={(view?.facts ?? []).map((fact) => ({
-          id: fact.id,
-          ...renderSharedRecordFact(fact, t, i18n.language),
-        }))}
+        facts={(view?.facts ?? []).map((fact) => {
+          const artifact = fact.artifact;
+
+          return {
+            id: fact.id,
+            ...renderSharedRecordFact(fact, t, i18n.language),
+            ...(artifact && onOpenArtifact
+              ? {
+                  onPress: () => onOpenArtifact(artifact),
+                  testID: `journal-artifact-${artifact.kind}-${artifact.id}`,
+                }
+              : {}),
+            };
+          })}
         appeal={appeal}
         testID="visibility-shared-record"
       />
