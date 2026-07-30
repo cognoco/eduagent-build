@@ -60,7 +60,7 @@ describe('SharedRecordView', () => {
         ...RECORD.supporterView,
         facts: [
           {
-            ...RECORD.supporterView.facts[0],
+            ...RECORD.supporterView.facts[0]!,
             title: 'Legacy English title',
             detail: 'Legacy English detail',
             metadata: {
