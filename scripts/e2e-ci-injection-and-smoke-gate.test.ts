@@ -1371,7 +1371,10 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     const harness = createMaestroHarness(0);
 
     try {
-      const result = runCiMaestro(harness, { MAESTRO_CI_SUITE: 'v2' });
+      const result = runCiMaestro(harness, {
+        MAESTRO_CI_SUITE: 'v2',
+        TEST_SEED_SECRET: '',
+      });
       const invocations = readHarnessMarkerLines(
         harness.maestroArgvMarker,
         'Maestro argv',
@@ -1432,6 +1435,12 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       );
 
       expect(curlInvocations.length).toBeGreaterThan(0);
+      expect(curlInvocations).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('/v1/__test/seed'),
+          expect.stringContaining('/v1/__test/reset'),
+        ]),
+      );
       expect(
         curlInvocations.every((invocation) =>
           invocation.includes('X-Test-Secret:\\ fixture-seed-secret'),
@@ -1449,6 +1458,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       const result = runCiMaestro(harness, {
         MAESTRO_CI_SUITE: 'v2',
         FAKE_CURL_EXIT: '31',
+        TEST_SEED_SECRET: '',
       });
 
       expect(() =>
@@ -1476,6 +1486,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           'missing-directory',
           'maestro-argv',
         ),
+        TEST_SEED_SECRET: '',
       });
 
       expect(result.status).not.toBe(0);
@@ -1491,7 +1502,10 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     const harness = createMaestroHarness(0);
 
     try {
-      const result = runCiMaestro(harness, { MAESTRO_CI_SUITE: 'v2' });
+      const result = runCiMaestro(harness, {
+        MAESTRO_CI_SUITE: 'v2',
+        TEST_SEED_SECRET: '',
+      });
       expect(result.status).toBe(0);
       rmSync(harness.maestroArgvMarker, { force: true });
 
