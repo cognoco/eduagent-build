@@ -11092,7 +11092,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       { tapOn: { id: 'tab-journal', retryTapIfNoChange: true } },
       {
         extendedWaitUntil: {
-          visible: { id: 'person-scope-journal-placeholder' },
+          visible: { id: 'person-scope-journal' },
           timeout: 15000,
         },
       },

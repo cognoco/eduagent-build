@@ -97,12 +97,10 @@ test('J-29 supporter: Support hub -> person scope -> Mentor -> Subjects -> Journ
   // --- Journal (same person/edge, still the rich supportee).
   await pressableClick(page.getByTestId('tab-journal'));
   await expect(page).toHaveURL(/\/journal$/);
-  const journalPlaceholder = page.getByTestId(
-    'person-scope-journal-placeholder',
-  );
-  await expect(journalPlaceholder).toBeVisible();
+  const personJournal = page.getByTestId('person-scope-journal');
+  await expect(personJournal).toBeVisible();
   await expect(
-    journalPlaceholder.getByText(richDisplayName, { exact: true }),
+    personJournal.getByText(richDisplayName, { exact: true }),
   ).toBeVisible();
   await expect(page.getByTestId('visibility-shared-record')).toBeVisible();
 

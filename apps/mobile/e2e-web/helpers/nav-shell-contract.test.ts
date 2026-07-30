@@ -157,6 +157,6 @@ describe('[WI-2822] supporter doorway nav-shell contract', () => {
       );
       expectTestIdAssertion(backSurface, 'mentor-screen', 'toHaveCount', '0');
     }
-    expect(secondBack).toContain('person-scope-journal-placeholder');
+    expect(secondBack).toContain('person-scope-journal');
   });
 });
