@@ -374,7 +374,7 @@ describe('ProfileProvider', () => {
     );
   });
 
-  it('[WI-2128][BREAK] withholds cached owner capabilities until an authoritative profile refetch completes', async () => {
+  it('[WI-2128][J-03] keeps the cached shell mounted during an authoritative remount refetch', async () => {
     mockFetch.mockReset();
     let resolveProfiles!: (response: Response) => void;
     mockFetch.mockReturnValueOnce(
@@ -400,8 +400,8 @@ describe('ProfileProvider', () => {
     await waitFor(() => {
       expect(result.current.activeProfile?.id).toBe(OWNER_PROFILE_ID);
     });
-    expect(result.current.isLoading).toBe(true);
-    expect(pushProfileIdToApiClient).toHaveBeenLastCalledWith(undefined);
+    expect(result.current.isLoading).toBe(false);
+    expect(pushProfileIdToApiClient).toHaveBeenLastCalledWith(OWNER_PROFILE_ID);
     expect(setProxyMode).toHaveBeenLastCalledWith(false);
 
     await act(async () => {
@@ -418,7 +418,7 @@ describe('ProfileProvider', () => {
     expect(result.current.activeProfile?.isOwner).toBe(false);
   });
 
-  it('[WI-2128] revalidates capability metadata before rendering after app resume', async () => {
+  it('[WI-2128][J-03] keeps the cached shell mounted during foreground authority revalidation', async () => {
     let appStateListener: ((state: AppStateStatus) => void) | undefined;
     const removeListener = jest.fn();
     const appStateSpy = jest
@@ -445,9 +445,10 @@ describe('ProfileProvider', () => {
       appStateListener?.('active');
     });
     await waitFor(() => {
-      expect(result.current.isLoading).toBe(true);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
     });
-    expect(pushProfileIdToApiClient).toHaveBeenLastCalledWith(undefined);
+    expect(result.current.isLoading).toBe(false);
+    expect(pushProfileIdToApiClient).toHaveBeenLastCalledWith(OWNER_PROFILE_ID);
     expect(setProxyMode).toHaveBeenLastCalledWith(false);
 
     await act(async () => {

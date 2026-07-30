@@ -551,6 +551,24 @@ describe('AppLayout', () => {
     expect(computeVisibleTabs(shape).has('own-learning')).toBe(true);
   });
 
+  it('[WI-2128][J-03] preserves the navigator while cached profile authority refreshes', async () => {
+    const view = renderLayout();
+    await screen.findByTestId('tabs');
+
+    // ProfileProvider keeps isLoading=false when it has an active cached
+    // profile and only a background authority refetch is in flight. A
+    // language-change invalidation/remount must therefore leave the nested
+    // /more/account screen (including settings-app-language) mounted.
+    mockUseProfile.mockReturnValue({
+      ...mockUseProfile(),
+      isLoading: false,
+    });
+    view.rerender(<AppLayout />);
+
+    expect(screen.getByTestId('tabs')).toBeTruthy();
+    expect(screen.queryByTestId('profile-loading')).toBeNull();
+  });
+
   // [BUG-923] AUTH-DEBUG must log only on auth state transitions, not on
   // every render of the (app) layout. Pre-fix the log fired on every render,
   // drowning real signal in noise during debugging sessions.

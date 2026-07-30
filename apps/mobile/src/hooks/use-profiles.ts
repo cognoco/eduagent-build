@@ -8,11 +8,7 @@ import {
 import { useEffect, useRef } from 'react';
 import { AppState, Platform } from 'react-native';
 import { useAuth } from '@clerk/expo';
-import {
-  useApiClient,
-  setActiveProfileId,
-  setProxyMode,
-} from '../lib/api-client';
+import { useApiClient } from '../lib/api-client';
 import { shouldRetryApiError } from '../lib/api-errors';
 import {
   profileListResponseSchema,
@@ -28,7 +24,11 @@ import { queryKeys } from '../lib/query-keys';
 const refreshedProfileAuthorities = new WeakMap<QueryClient, Set<string>>();
 
 export function useProfiles(): UseQueryResult<Profile[]> {
-  const client = useApiClient();
+  // Profile metadata is the authority refresh itself. This client omits the
+  // selected Person/proxy context only from its own requests, so a stale owner
+  // selection cannot block caller-bound recovery without mutating the shared
+  // identity used by concurrent profile-scoped requests.
+  const client = useApiClient({ profileContext: 'omit' });
   const queryClient = useQueryClient();
   const { isSignedIn, userId, sessionId } = useAuth();
   const authorityKey = isSignedIn ? `${userId}:${sessionId}` : 'signed-out';
@@ -52,12 +52,6 @@ export function useProfiles(): UseQueryResult<Profile[]> {
   const query = useQuery({
     queryKey: queryKeys.profiles.list(userId),
     queryFn: async ({ signal: querySignal }) => {
-      // Profile metadata is the authority refresh itself. Do not attach a
-      // previously selected Person/proxy header: after family join that stale
-      // owner selection must fail closed on normal routes, but it must not
-      // prevent this headerless caller-bound recovery request.
-      setActiveProfileId(undefined);
-      setProxyMode(false);
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
         const res = await client.profiles.$get({}, { init: { signal } });

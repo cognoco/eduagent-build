@@ -28,7 +28,10 @@ import {
 } from '../services/identity-v2/profile-v2';
 import { verifyPersonIsOrgAdminV2 } from '../services/identity-v2/ownership-v2';
 import { repairOrSignalAdultSelfConsentV2 } from '../services/identity-v2/consent-v2';
-import { assertChargeNotCredentialed } from '../services/family-access';
+import {
+  assertCanWriteProfile,
+  assertChargeNotCredentialed,
+} from '../services/family-access';
 
 import {
   notFound,
@@ -396,8 +399,9 @@ export const profileRoutes = new Hono<ProfileEnv>()
           'Only the account owner can update other profiles.',
         );
       }
-      // Owner-or-self check: explicit-header owner may edit any profile; any other
-      // explicit-header caller may only edit their own profile (self-update).
+      // Coarse selected-profile rejection only. This must never grant the
+      // mutation: caller-to-target authority is resolved below from the
+      // authenticated caller Person and the Guardianship edge.
       if (profileMeta?.isOwner !== true && id !== activeProfileId) {
         return apiError(
           c,
@@ -407,9 +411,7 @@ export const profileRoutes = new Hono<ProfileEnv>()
         );
       }
 
-      if (c.get('callerPersonId') !== id) {
-        await assertChargeNotCredentialed(db, id);
-      }
+      await assertCanWriteProfile(c, id);
 
       let profile: Awaited<ReturnType<typeof updateProfileAppContext>>;
       try {
@@ -457,8 +459,9 @@ export const profileRoutes = new Hono<ProfileEnv>()
           'Only the account owner can update other profiles.',
         );
       }
-      // Owner-or-self check: explicit-header owner may edit any profile; any other
-      // explicit-header caller may only edit their own profile (self-update).
+      // Coarse selected-profile rejection only. This must never grant the
+      // mutation: caller-to-target authority is resolved below from the
+      // authenticated caller Person and the Guardianship edge.
       if (profileMeta?.isOwner !== true && id !== activeProfileId) {
         return apiError(
           c,
@@ -468,9 +471,7 @@ export const profileRoutes = new Hono<ProfileEnv>()
         );
       }
 
-      if (c.get('callerPersonId') !== id) {
-        await assertChargeNotCredentialed(db, id);
-      }
+      await assertCanWriteProfile(c, id);
 
       const profile = await updateProfileV2(db, id, account.id, input);
       if (!profile) return notFound(c, 'Profile not found');
@@ -495,12 +496,7 @@ export const profileRoutes = new Hono<ProfileEnv>()
       // reverification, proven by Clerk fva, before targeting the owner profile.
       // [WI-586 T1] v2 seam: getPersonScope verifies person ↔ org membership
       // (no profiles table touch). Returns null when not found → same 403.
-      const found = await getPersonScope(
-        db,
-        profileId,
-        account.id,
-        callerPersonId,
-      );
+      const found = await getPersonScope(db, profileId, account.id);
       if (!found)
         return forbidden(c, 'Profile does not belong to this account');
 

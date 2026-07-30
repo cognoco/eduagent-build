@@ -1,11 +1,16 @@
-import { renderHook, waitFor } from '@testing-library/react-native';
+import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
 import type { PublicProfile } from '@eduagent/schemas';
+import { AppState, type AppStateStatus } from 'react-native';
 import {
   createHookWrapper,
   createTestProfile,
 } from '../test-utils/app-hook-test-utils';
-import { setActiveProfileId } from '../lib/api-client';
+import {
+  setActiveProfileId,
+  setProxyMode,
+  useApiClient,
+} from '../lib/api-client';
 import {
   useProfiles,
   useUpdateProfileAppContext,
@@ -89,6 +94,7 @@ beforeEach(() => {
 afterEach(() => {
   queryClient?.clear();
   setActiveProfileId(undefined);
+  setProxyMode(false);
 });
 
 afterAll(() => {
@@ -178,6 +184,86 @@ describe('useProfiles', () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
     hook.unmount();
+  });
+
+  it('[WI-2128][BREAK] keeps the selected Person on a concurrent request during foreground authority refresh', async () => {
+    let appStateListener: ((state: AppStateStatus) => void) | undefined;
+    const appStateSpy = jest
+      .spyOn(AppState, 'addEventListener')
+      .mockImplementation((_event, listener) => {
+        appStateListener = listener;
+        return { remove: jest.fn() };
+      });
+    let profileListCalls = 0;
+    let resolveRefresh!: (response: Response) => void;
+    mockFetch.mockImplementation((input) => {
+      const url = String(input);
+      if (url.endsWith('/profiles')) {
+        profileListCalls += 1;
+        if (profileListCalls === 1) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({ profiles: [createPublicProfile()] }),
+              { status: 200 },
+            ),
+          );
+        }
+        return new Promise<Response>((resolve) => {
+          resolveRefresh = resolve;
+        });
+      }
+      if (url.endsWith(`/profiles/${CHILD_PROFILE_ID}`)) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              profile: createPublicProfile({ id: CHILD_PROFILE_ID }),
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected request: ${url}`));
+    });
+
+    const wrapper = createWrapper();
+    const hook = renderHook(
+      () => ({ profiles: useProfiles(), client: useApiClient() }),
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(hook.result.current.profiles.isSuccess).toBe(true);
+    });
+
+    setActiveProfileId(CHILD_PROFILE_ID);
+    setProxyMode(true);
+    act(() => {
+      appStateListener?.('active');
+    });
+    await waitFor(() => {
+      expect(profileListCalls).toBe(2);
+    });
+
+    await hook.result.current.client.profiles[':id'].$get({
+      param: { id: CHILD_PROFILE_ID },
+    });
+
+    const scopedCall = mockFetch.mock.calls.find(([input]) =>
+      String(input).endsWith(`/profiles/${CHILD_PROFILE_ID}`),
+    );
+    expect(scopedCall).toBeDefined();
+    const headers = new Headers(scopedCall?.[1]?.headers);
+    expect(headers.get('X-Profile-Id')).toBe(CHILD_PROFILE_ID);
+    expect(headers.get('X-Proxy-Mode')).toBe('true');
+
+    await act(async () => {
+      resolveRefresh(
+        new Response(JSON.stringify({ profiles: [createPublicProfile()] }), {
+          status: 200,
+        }),
+      );
+    });
+    hook.unmount();
+    appStateSpy.mockRestore();
   });
 
   it('returns empty array when no profiles exist', async () => {

@@ -61,6 +61,7 @@ interface IdentityFixture {
   learnerPersonId: string;
   siblingPersonId: string;
   managedChargePersonId: string;
+  unrelatedManagedPersonId: string;
   outsiderPersonId: string;
   familyOrgId: string;
   familySubscriptionId: string;
@@ -246,11 +247,30 @@ beforeAll(async () => {
     chargePersonId: managedCharge.id,
   });
 
+  const [unrelatedManaged] = await db
+    .insert(person)
+    .values({
+      displayName: 'WI-2128 Unrelated Managed Person',
+      birthDate: `${CURRENT_YEAR - 14}-01-01`,
+      residenceJurisdiction: 'EU',
+      conversationLanguage: 'en',
+    })
+    .returning({ id: person.id });
+  if (!unrelatedManaged) {
+    throw new Error('Unrelated managed Person insert returned no row.');
+  }
+  await db.insert(membership).values({
+    personId: unrelatedManaged.id,
+    organizationId: owner.organizationId,
+    roles: ['learner'],
+  });
+
   fixture = {
     ownerPersonId: owner.personId,
     learnerPersonId: learner.personId,
     siblingPersonId: sibling.id,
     managedChargePersonId: managedCharge.id,
+    unrelatedManagedPersonId: unrelatedManaged.id,
     outsiderPersonId: outsider.personId,
     familyOrgId: owner.organizationId,
     familySubscriptionId: familySubscription.id,
@@ -439,7 +459,43 @@ describe('WI-2128 joined-learner credential authority', () => {
     expect(ownerResponse.status).toBe(200);
   });
 
-  it('does not let the learner fresh-factor token elevate into the owner Person', async () => {
+  it('[MANDATORY][WI-2128] denies an explicit admin PATCH to an uncredentialed Person without Guardianship', async () => {
+    const response = await requestAs({
+      clerkUserId: OWNER_CLERK_ID,
+      email: OWNER_EMAIL,
+      path: `/v1/profiles/${fixture.unrelatedManagedPersonId}`,
+      profileId: fixture.ownerPersonId,
+      method: 'PATCH',
+      body: { displayName: 'Unauthorized admin mutation' },
+    });
+
+    expect(response.status).toBe(403);
+    const target = await db.query.person.findFirst({
+      where: eq(person.id, fixture.unrelatedManagedPersonId),
+      columns: { displayName: true },
+    });
+    expect(target?.displayName).toBe('WI-2128 Unrelated Managed Person');
+  });
+
+  it('[MANDATORY][WI-2128] denies an explicit admin app-context PATCH to an uncredentialed Person without Guardianship', async () => {
+    const response = await requestAs({
+      clerkUserId: OWNER_CLERK_ID,
+      email: OWNER_EMAIL,
+      path: `/v1/profiles/${fixture.unrelatedManagedPersonId}/app-context`,
+      profileId: fixture.ownerPersonId,
+      method: 'PATCH',
+      body: { defaultAppContext: 'study' },
+    });
+
+    expect(response.status).toBe(403);
+    const target = await db.query.person.findFirst({
+      where: eq(person.id, fixture.unrelatedManagedPersonId),
+      columns: { defaultAppContext: true },
+    });
+    expect(target?.defaultAppContext).toBeNull();
+  });
+
+  it('does not let the learner elevate into the owner Person without fresh-factor proof', async () => {
     const response = await requestAs({
       clerkUserId: LEARNER_CLERK_ID,
       email: LEARNER_EMAIL,
@@ -447,10 +503,12 @@ describe('WI-2128 joined-learner credential authority', () => {
       profileId: fixture.learnerPersonId,
       method: 'POST',
       body: { profileId: fixture.ownerPersonId },
-      fva: [0, -1],
     });
 
     expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({
+      code: 'OWNER_ELEVATION_REQUIRED',
+    });
   });
 
   it('preserves Person, history, family membership, supportership, and billing relationships across the join', async () => {

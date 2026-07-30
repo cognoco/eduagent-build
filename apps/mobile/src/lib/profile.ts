@@ -390,19 +390,9 @@ export function ProfileProvider({
   // NB: imported as pushProfileIdToApiClient to avoid shadowing the local
   // React state setter (also named setActiveProfileId on line 101).
   useLayoutEffect(() => {
-    if (isProfilesFetching || profileLoadError) {
-      pushProfileIdToApiClient(undefined);
-      setProxyMode(false);
-      return;
-    }
     pushProfileIdToApiClient(activeProfile?.id);
     setProxyMode(isExplicitProxyMode);
-  }, [
-    activeProfile?.id,
-    isExplicitProxyMode,
-    isProfilesFetching,
-    profileLoadError,
-  ]);
+  }, [activeProfile?.id, isExplicitProxyMode]);
 
   const switchProfile = useCallback(
     async (
@@ -529,7 +519,6 @@ export function ProfileProvider({
   // CreateProfileGate ("Welcome!") to flash.
   const isLoading =
     isProfilesLoading ||
-    isProfilesFetching ||
     isRestoringId ||
     isRestoringProxyMode ||
     (!isRestoringId && profiles.length > 0 && activeProfile === null) ||

@@ -65,13 +65,12 @@ jest.mock('../services/identity-v2/identity-graph', () => {
   };
 });
 
-// [WI-1302] POST /v1/profiles/switch's owner-elevation gate now derives
-// "is the caller already the owner" from callerPersonId via
-// verifyPersonIsOrgAdminV2, which runs a raw membership db.select() the
-// `{}` mock DB these route tests inject cannot satisfy. The
-// caller-identity-vs-X-Profile-Id-spoof distinction this guard exists to
-// enforce is covered by the real-DB break test in
-// tests/integration/profile-switch-elevation-idor.integration.test.ts.
+// [WI-1302 / WI-2128] The owner-elevation and profile-write gates derive
+// authority from callerPersonId via raw membership / Guardianship queries the
+// mock DB these route tests inject cannot satisfy. Caller identity versus
+// selected-profile spoofing is covered by the real-DB break tests in
+// profile-switch-elevation-idor.integration.test.ts and
+// wi2128-family-join-identity.integration.test.ts.
 jest.mock('../services/identity-v2/ownership-v2', () => {
   const actual = jest.requireActual(
     '../services/identity-v2/ownership-v2',
@@ -79,6 +78,7 @@ jest.mock('../services/identity-v2/ownership-v2', () => {
   return {
     ...actual,
     verifyPersonIsOrgAdminV2: jest.fn(),
+    verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
   };
 });
 
