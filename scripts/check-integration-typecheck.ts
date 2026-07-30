@@ -1,12 +1,13 @@
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { dirname, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { globsToMatcher, replacePathSepForGlob } from 'jest-util';
 import ts from 'typescript';
 
 const require = createRequire(import.meta.url);
-const repoRoot = resolve(dirname(new URL(import.meta.url).pathname), '..');
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const configPath = resolve(repoRoot, 'tests/integration/jest.config.cjs');
 const tsconfigPath = resolve(repoRoot, 'tests/integration/tsconfig.json');
 

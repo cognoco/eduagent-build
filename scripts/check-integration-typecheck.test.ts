@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -41,5 +41,14 @@ describe('integration typecheck contract', () => {
         rmSync(env.GIT_INDEX_FILE, { force: true });
       }
     }
+  });
+
+  it('derives filesystem paths from the module URL without encoded pathnames', () => {
+    const source = readFileSync(
+      join(repoRoot, 'scripts/check-integration-typecheck.ts'),
+      'utf8',
+    );
+
+    expect(source).toContain('dirname(fileURLToPath(import.meta.url))');
   });
 });
