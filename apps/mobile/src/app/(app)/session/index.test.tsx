@@ -3392,6 +3392,38 @@ describe('SessionScreen homework flow', () => {
       ).toBeNull();
       testScreen.getByTestId('mentor-opener-persisted-more-than-once');
     });
+
+    it('withholds the exactly-once marker when an orphaned opener is retried', async () => {
+      mockUseSessionTranscript.mockReturnValue({
+        data: {
+          archived: false,
+          session: {
+            sessionId: SESSION_ID,
+            subjectId: SUBJECT_ID,
+            exchangeCount: 1,
+            inputMode: 'text',
+            milestonesReached: [],
+            verificationType: undefined,
+          },
+          exchanges: [
+            persistedExchange[0]!,
+            {
+              ...persistedExchange[0]!,
+              eventId: '10000000-0000-4000-8000-000000000015',
+            },
+            persistedExchange[1]!,
+          ],
+        },
+      });
+
+      const testScreen = renderSessionScreen();
+      await flushAsyncWork();
+
+      expect(
+        testScreen.queryByTestId('mentor-opener-persisted-once'),
+      ).toBeNull();
+      testScreen.getByTestId('mentor-opener-persisted-more-than-once');
+    });
   });
 
   it('auto-resumes the active session for a learning topic when no sessionId is in the route', async () => {

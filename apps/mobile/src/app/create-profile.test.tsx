@@ -32,7 +32,11 @@ const mockBack = jest.fn();
 const mockReplace = jest.fn();
 const mockCanGoBack = jest.fn();
 const mockPush = jest.fn();
-let mockSearchParams: { for?: string; firstSetup?: string } = {};
+let mockSearchParams: {
+  for?: string;
+  firstSetup?: string;
+  returnTo?: string;
+} = {};
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -573,6 +577,36 @@ describe('CreateProfileScreen', () => {
         expect(mockBack).not.toHaveBeenCalled();
       },
     );
+
+    it('returns to an existing deep-link route after successful first-profile setup', async () => {
+      mutableFlags.MODE_NAV_V2_ENABLED = true;
+      mockSearchParams = { returnTo: '/(app)/quiz' };
+      mockFetch.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            profile: makeProfileResponse({
+              id: PROFILE_IDS.new,
+              displayName: 'Sam',
+              isOwner: true,
+            }),
+          }),
+          { status: 200 },
+        ),
+      );
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Sam');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(() => {
+        datePickerOnChange?.({ type: 'set' }, new Date(2000, 5, 15));
+      });
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
+      });
+      expect(mockBack).not.toHaveBeenCalled();
+    });
   });
 
   it('optimistically writes the new profile into scoped profiles cache', async () => {

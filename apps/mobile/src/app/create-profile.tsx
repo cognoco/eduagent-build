@@ -47,6 +47,7 @@ import { formatApiError } from '../lib/format-api-error';
 import { platformAlert } from '../lib/platform-alert';
 import { errorHasCode } from '../components/session/session-types';
 import { queueMentorBornCeremony } from '../lib/mentor-born-ceremony';
+import { toInternalAppRedirectPath } from '../lib/normalize-redirect-path';
 import { getPostAuthDefaultPath } from './(app)/_lib/auth-redirect';
 
 // Captured at module load — safe because these screens are portrait-locked.
@@ -108,6 +109,7 @@ export default function CreateProfileScreen() {
   const params = useLocalSearchParams<{
     for?: 'child';
     firstSetup?: 'true';
+    returnTo?: string;
   }>();
   const colors = useThemeColors();
   const { isLoaded, isSignedIn } = useAuth();
@@ -192,8 +194,11 @@ export default function CreateProfileScreen() {
     goBackOrReplace(router, '/(app)/home');
   }, [router]);
   const handleCompleted = useCallback(() => {
-    router.replace(getPostAuthDefaultPath() as Href);
-  }, [router]);
+    const defaultPath = getPostAuthDefaultPath();
+    router.replace(
+      toInternalAppRedirectPath(params.returnTo, defaultPath) as Href,
+    );
+  }, [params.returnTo, router]);
 
   const onDateChange = useCallback(
     (_event: DateTimePickerEvent, selectedDate?: Date) => {

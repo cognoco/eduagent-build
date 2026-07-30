@@ -15,8 +15,26 @@ completion marker so it also exits to the active shell.
 The first-session journeys now cover the same deterministic opener from the
 pre-profile gate through the cold Mentor card, one persisted learner/assistant
 pair, reflection, celebration, and return to a warm Mentor surface. An
-E2E-build-only transcript marker distinguishes exactly one persisted opening
-pair from a duplicate.
+E2E-build-only transcript marker requires exactly one completed opening pair
+and exactly one matching learner turn. Counting the learner turns separately
+detects an orphaned opener followed by a successful retry instead of falsely
+reporting that transcript as exactly once.
+
+## Review rework dispositions
+
+- **Duplicate opener — accepted.** For
+  `[user(opener), user(opener), assistant]`, adjacent-pair counting found only
+  the retry pair. A focused regression test failed because the exactly-once
+  marker was present. The production marker now counts every matching learner
+  opener while retaining completed-pair accounting for retry suppression.
+- **Profile deep link — accepted after code inspection.** `CreateProfileGate`
+  pushes `/create-profile` over the requested app route, while the auth redirect
+  contract preserves explicit non-default destinations. Unconditional
+  completion replacement discarded that supported route. The gate now carries
+  a normalized internal `returnTo` destination and successful completion
+  replays it. When no explicit destination is carried, flags-off/V0/V1 still
+  replace to Home and V2 still replaces to Mentor, preserving this WI's
+  shell-aware acceptance criterion and the parent first-setup child leg.
 
 ## Red, green, production revert, restore
 
@@ -35,7 +53,11 @@ suites passed 102 of 102 tests.
 
 The persisted-opener markers were likewise authored before their production
 surface. Their focused run exited 1 with two missing-marker failures, then
-passed after the marker implementation.
+passed after the marker implementation. Review rework added the
+orphan-and-retry transcript first; its focused run exited 1 because the exactly-once
+marker was still present, then passed after learner-turn counting was added.
+The carried deep-link gate and completion tests also each failed before their
+production wiring and passed afterward.
 
 For the final controlled production-revert proof, only the completion calls
 were restored to history-aware close and the two transcript markers were
@@ -75,8 +97,10 @@ release-APK journeys are intended for their trusted CI environments.
 
 After advancing to current `origin/main`, final local verification produced:
 
-- 199/199 tests passing across the complete create-profile, consent, and
-  session-screen unit suites.
+- 336/336 tests passing across the complete app-layout, create-profile,
+  consent, and session-screen unit suites.
+- 21/21 consent-web route unit tests passing through the sanctioned Route A
+  wrapper with a process-scoped local test database URL.
 - An uncached mobile typecheck passing with all six dependent projects.
 - Changed-file ESLint passing with no errors; its two warnings are pre-existing
   hook-dependency warnings in the touched production files.
