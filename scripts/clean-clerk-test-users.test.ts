@@ -163,6 +163,12 @@ describe('[WI-2820 P1] clean-clerk-test-users execution protocol', () => {
     );
   });
 
+  it('restores the camel-case external ID mapped from Clerk responses', () => {
+    expect(scriptSource).toMatch(
+      /const externalId = user\.external_id \?\? null;[\s\S]*const entry = \{[\s\S]*externalId,[\s\S]*pendingDeletions\.push\(\{ user, originalExternalId: user\.externalId \}\);/,
+    );
+  });
+
   it('fails closed when the verified-ID reset secret is unavailable', () => {
     expect(scriptSource).toMatch(/if \(!testSecret\)/);
     expect(scriptSource).toMatch(/TEST_SEED_SECRET is required/);
