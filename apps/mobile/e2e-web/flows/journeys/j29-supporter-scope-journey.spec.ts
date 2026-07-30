@@ -101,7 +101,9 @@ test('J-29 supporter: Support hub -> person scope -> Mentor -> Subjects -> Journ
     'person-scope-journal-placeholder',
   );
   await expect(journalPlaceholder).toBeVisible();
-  await expect(journalPlaceholder.getByText(richDisplayName)).toBeVisible();
+  await expect(
+    journalPlaceholder.getByText(richDisplayName, { exact: true }),
+  ).toBeVisible();
   await expect(page.getByTestId('visibility-shared-record')).toBeVisible();
 
   // Forward-regression canary (NOT the negative-wall proof — see file
@@ -118,7 +120,9 @@ test('J-29 supporter: Support hub -> person scope -> Mentor -> Subjects -> Journ
   // keyed on profileId, re-hydrated on next mount) — not reverted to the hub.
   await page.reload({ waitUntil: 'commit' });
   await expect(journalPlaceholder).toBeVisible({ timeout: 30_000 });
-  await expect(journalPlaceholder.getByText(richDisplayName)).toBeVisible();
+  await expect(
+    journalPlaceholder.getByText(richDisplayName, { exact: true }),
+  ).toBeVisible();
 
   // --- EMPTY SHARED RECORD: switching to the empty-record supportee renders
   // an honest empty state, not an error and no leaked private content.
@@ -126,7 +130,9 @@ test('J-29 supporter: Support hub -> person scope -> Mentor -> Subjects -> Journ
     page.getByTestId(`scope-chip-option-person-${emptyPersonId}`),
   );
   await expect(journalPlaceholder).toBeVisible();
-  await expect(journalPlaceholder.getByText(emptyDisplayName)).toBeVisible();
+  await expect(
+    journalPlaceholder.getByText(emptyDisplayName, { exact: true }),
+  ).toBeVisible();
   await expect(page.getByTestId('visibility-shared-record')).toHaveCount(0);
   await expect(
     page.getByTestId('person-scope-journal-empty-lamp'),
