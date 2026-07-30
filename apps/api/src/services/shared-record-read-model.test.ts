@@ -275,6 +275,7 @@ describe('readSharedRecordForSupportee', () => {
       llmSummary: null,
       summaryGeneratedAt: null,
       purgedAt: null,
+      languageLearningSummary: null,
     });
 
     const record = await readSharedArtifactForSupportee(db, {
