@@ -2,9 +2,10 @@ import {
   useQuery,
   useMutation,
   useQueryClient,
+  type QueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { AppState, Platform } from 'react-native';
 import { useAuth } from '@clerk/expo';
 import {
@@ -24,9 +25,19 @@ import { assertOk } from '../lib/assert-ok';
 import { parseJson } from '../lib/parse-json';
 import { queryKeys } from '../lib/query-keys';
 
+const refreshedProfileAuthorities = new WeakMap<QueryClient, Set<string>>();
+
 export function useProfiles(): UseQueryResult<Profile[]> {
   const client = useApiClient();
-  const { isSignedIn, userId } = useAuth();
+  const queryClient = useQueryClient();
+  const { isSignedIn, userId, sessionId } = useAuth();
+  const authorityKey = isSignedIn ? `${userId}:${sessionId}` : 'signed-out';
+  const previousAuthorityKeyRef = useRef<string | null>(null);
+  let refreshedAuthorities = refreshedProfileAuthorities.get(queryClient);
+  if (!refreshedAuthorities) {
+    refreshedAuthorities = new Set();
+    refreshedProfileAuthorities.set(queryClient, refreshedAuthorities);
+  }
 
   // Scope the cache by Clerk userId so a previous user's profiles list cannot
   // be served stale to the next signed-in user on a shared device. Without
@@ -52,20 +63,46 @@ export function useProfiles(): UseQueryResult<Profile[]> {
         const res = await client.profiles.$get({}, { init: { signal } });
         await assertOk(res);
         const data = await parseJson(res, profileListResponseSchema);
+        refreshedAuthorities.add(authorityKey);
         return data.profiles as Profile[];
       } finally {
         cleanup();
       }
     },
     enabled: !!isSignedIn,
-    // Profiles carry capability metadata. The Clerk subject and Person id stay
-    // stable across a family join, so a same-subject cache entry can otherwise
-    // retain the pre-join owner shell. Revalidate on every provider mount.
+    // Profiles carry capability metadata. Refresh once per QueryClient/user
+    // session even when a same-subject cache entry exists, then reuse that
+    // authoritative result across route-driven provider remounts. Reconnect
+    // and native foreground boundaries still revalidate below.
     staleTime: 0,
-    refetchOnMount: 'always',
+    refetchOnMount: () => !refreshedAuthorities.has(authorityKey),
     refetchOnReconnect: 'always',
   });
   const { refetch } = query;
+
+  useEffect(() => {
+    const previousAuthorityKey = previousAuthorityKeyRef.current;
+    previousAuthorityKeyRef.current = authorityKey;
+    if (
+      !isSignedIn ||
+      previousAuthorityKey === null ||
+      previousAuthorityKey === authorityKey ||
+      refreshedAuthorities.has(authorityKey)
+    ) {
+      return;
+    }
+
+    void queryClient
+      .cancelQueries({ queryKey: queryKeys.profiles.list(userId) })
+      .then(() => refetch());
+  }, [
+    authorityKey,
+    isSignedIn,
+    queryClient,
+    refetch,
+    refreshedAuthorities,
+    userId,
+  ]);
 
   useEffect(() => {
     if (Platform.OS === 'web' || !isSignedIn) return;

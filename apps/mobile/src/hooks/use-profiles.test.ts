@@ -19,11 +19,13 @@ const mockGetToken = jest.fn().mockResolvedValue('mock-token');
 type MockAuthState = {
   isSignedIn: boolean;
   userId: string | undefined;
+  sessionId: string | undefined;
   getToken: typeof mockGetToken;
 };
 const mockUseAuth = jest.fn<MockAuthState, []>(() => ({
   isSignedIn: true,
   userId: 'user-1',
+  sessionId: 'session-1',
   getToken: mockGetToken,
 }));
 jest.mock('@clerk/expo', () => ({
@@ -76,6 +78,7 @@ beforeEach(() => {
   mockUseAuth.mockReturnValue({
     isSignedIn: true,
     userId: 'user-1',
+    sessionId: 'session-1',
     getToken: mockGetToken,
   });
   jest.clearAllMocks();
@@ -122,6 +125,61 @@ describe('useProfiles', () => {
     expect(result.current.data).toEqual(profiles);
   });
 
+  it('[WI-2128] reuses the authoritative profile result across provider remounts', async () => {
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ profiles: [createPublicProfile()] }), {
+          status: 200,
+        }),
+      ),
+    );
+    const wrapper = createWrapper();
+    const first = renderHook(() => useProfiles(), { wrapper });
+
+    await waitFor(() => {
+      expect(first.result.current.isSuccess).toBe(true);
+    });
+    first.unmount();
+
+    const second = renderHook(() => useProfiles(), { wrapper });
+    await waitFor(() => {
+      expect(second.result.current.fetchStatus).toBe('idle');
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    second.unmount();
+  });
+
+  it('[WI-2128] refreshes authority when the same user starts a new Clerk session', async () => {
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ profiles: [createPublicProfile()] }), {
+          status: 200,
+        }),
+      ),
+    );
+    const wrapper = createWrapper();
+    const hook = renderHook(() => useProfiles(), { wrapper });
+
+    await waitFor(() => {
+      expect(hook.result.current.isSuccess).toBe(true);
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    mockUseAuth.mockReturnValue({
+      isSignedIn: true,
+      userId: 'user-1',
+      sessionId: 'session-2',
+      getToken: mockGetToken,
+    });
+    hook.rerender({});
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+    hook.unmount();
+  });
+
   it('returns empty array when no profiles exist', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ profiles: [] }), { status: 200 }),
@@ -158,6 +216,7 @@ describe('useProfiles', () => {
     mockUseAuth.mockReturnValue({
       isSignedIn: false,
       userId: undefined,
+      sessionId: undefined,
       getToken: mockGetToken,
     });
 

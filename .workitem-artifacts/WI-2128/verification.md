@@ -13,7 +13,9 @@ The disposable database was the repository-sanctioned `docker-compose.test.yml` 
 | Surface | Command or scope | Result |
 |---|---|---|
 | Touched API suites | Jest `--runTestsByPath` for all 19 modified API test files with an explicit local `DATABASE_URL` | PASS |
-| Touched mobile suites | Jest `--runTestsByPath` for the five modified mobile test files | PASS — 5 suites, 217 tests |
+| Touched mobile suites | Jest `--runTestsByPath` for the five modified mobile test files plus the profile-request remount and Clerk-session regressions | PASS — 6 suites, 227 tests |
+| Profile authority remount regression | Mounted `useProfiles`, awaited the authoritative response, then remounted it against the same QueryClient/user session | RED — 2 profile requests with `refetchOnMount: 'always'`; GREEN — 1 request with the per-session authority-refresh guard |
+| Clerk session boundary regression | Changed the mocked Clerk `sessionId` for the same `userId` without replacing the QueryClient | PASS — the new session issued a second headerless authority refresh |
 | API type safety | `pnpm exec nx run api:typecheck` | PASS |
 | Mobile type safety | `pnpm exec tsc --noEmit` from `apps/mobile` | PASS |
 | Changed-file lint | ESLint over every changed TypeScript and TSX file | PASS |
@@ -24,12 +26,24 @@ The disposable database was the repository-sanctioned `docker-compose.test.yml` 
 
 The fast gate's API-unit refusal was a fail-closed environment guard, not a test assertion failure. The full API suite was rerun with an explicit sanctioned local database and succeeded for 496 suites and 9,937 tests, with 9 skipped.
 
+## AC-7 authority-boundary audit
+
+- **Fresh web and native cold start:** a new QueryClient has no successful-refresh marker. A missing profile query always loads, and even a hydrated same-subject cache is revalidated on its first provider mount; `[WI-2128][BREAK] withholds cached owner capabilities until an authoritative profile refetch completes` proves that cached owner metadata cannot render through that boundary.
+- **Same-user sign-out/sign-in:** the centralized `signOutWithCleanup` path synchronously clears the QueryClient before Clerk sign-out, while the refresh marker is also keyed by Clerk `sessionId`. The new-session regression proves that even if the QueryClient survives, a different Clerk session for the same `userId` triggers another headerless authority refresh.
+- **Token refresh:** a JWT refresh inside one Clerk session preserves the same authenticated subject/Person authority; the server re-resolves that current token on every request. The marker is deliberately not keyed to short-lived JWT `iat`, which would recreate the request storm. Out-of-band family-join changes are revalidated at the actual client authority boundaries: web focus, native foreground, reconnect, or a new Clerk session.
+- **Stale saved selection:** `[WI-2128] replaces a saved family-owner ID with the joined learner returned for that credential` proves the refreshed caller-operable list rejects the former owner selection and converges on the learner.
+- **Omitted-header bootstrap:** `useProfiles` clears the previously selected profile and proxy mode before its bootstrap request, and the mandatory real-database regression proves an omitted header resolves from `callerPersonId` to the learner rather than the family owner.
+- **Route remounts and failures:** the successful-refresh marker is written only after an HTTP-successful, schema-valid response. Route-driven provider remounts reuse that authoritative result, while failed refreshes remain unmarked and therefore eligible for retry at the next boundary.
+
 ## Baseline-only findings
 
 - **WI-2892 — correct headerless profile-resolution documentation to caller Person:** `docs/architecture.md` still describes omitted `X-Profile-Id` as an `account.id` fallback, contradicting the login-bound caller-Person contract. Captured and admitted to BID-49 separately; no WI-2128 documentation expansion.
 - **WI-2893 — initialize vector and pg_trgm extensions in the disposable test database:** a fresh temporary database required manual extension initialization before schema push. Captured separately; no WI-2128 scope expansion.
 - **WI-2894 — make the API integration runner resolve Corepack on Windows:** the repository runner uses Node `spawnSync("corepack", ...)`, which returned `ENOENT` on Orion even though Corepack resolves from PowerShell. Captured separately; direct Jest execution supplied the same integration config for this verification.
 - **WI-2896 — restore memory-dedup integration typecheck after the provider contract change:** repository-wide integration typecheck fails in untouched `tests/integration/memory-facts-dedup.integration.test.ts` because five fixtures omit the newly required `provider`. The file is byte-identical to `origin/main`; this memory-workstream drift is formally outside BID-49.
+- **WI-2899 — collapse profile-operation authority listing to one bounded query:** the server-side `listProfilesV2` authority filter can issue multiple bounded lookups per profile. Captured, refined to Ready, and admitted to BID-49 as independent follow-up work.
+- **WI-2900 — keep cached-profile sessions usable after transient authority refetch failures:** the authority refresh currently fails closed over cached profile data after a transient fetch error. Captured, refined to Ready, and admitted to BID-49 as independent follow-up work.
+- **WI-2901 — scope authority-refresh loading to profiles that can confer proxy capability:** the `isProfilesFetching` loading barrier currently applies more broadly than the proxy-capability transition that requires it. Captured, refined to Ready, and admitted to BID-49 as independent follow-up work.
 
 ## Preservation and provenance
 

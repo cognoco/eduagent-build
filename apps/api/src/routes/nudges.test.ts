@@ -64,7 +64,6 @@ jest.mock(
 
 // [WI-867] v2 profile-scope seam continuity mock.
 // Echo profileId back so route handlers receive the X-Profile-Id the caller sent.
-const mockFindOwnerPersonScope = jest.fn().mockResolvedValue(null);
 const mockGetPersonScope = jest
   .fn()
   .mockImplementation((_db: unknown, profileId?: string) =>
@@ -74,7 +73,6 @@ jest.mock(
   '../services/identity-v2/profile-v2' /* gc1-allow: continuity — replaces the pre-collapse findOwnerProfile/getProfile mock; db.select() join chain unrunnable on the unit mock DB; real path covered by the identity integration suite */,
   () => ({
     ...jest.requireActual('../services/identity-v2/profile-v2'),
-    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
     getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
   }),
 );
@@ -155,7 +153,6 @@ beforeEach(() => {
   clearJWKSCache();
   jest.clearAllMocks();
   // [WI-867] Restore v2 seam defaults after clearAllMocks.
-  mockFindOwnerPersonScope.mockResolvedValue(null);
   mockGetPersonScope.mockImplementation((_db: unknown, profileId?: string) =>
     Promise.resolve(personScope({ profileId: profileId ?? 'test-profile-id' })),
   );
