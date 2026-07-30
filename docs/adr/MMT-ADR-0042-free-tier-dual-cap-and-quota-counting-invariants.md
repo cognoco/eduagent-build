@@ -14,7 +14,11 @@ A purely monthly allowance satisfies the second goal and fails a third one that 
 
 1. **The free tier enforces two caps simultaneously, and both are unconditional.** A per-day cap and a per-calendar-month cap apply together, on every day the account exists. Neither is relative to signup date, trial state, or tenure. Current values are 10 per day and 100 per month.
 
-2. **Paid tiers carry a monthly cap only.** A null daily limit is the mechanism by which a paid tier removes the daily rhythm; it is not the absence of configuration.
+2. **Paying removes the daily rhythm for the payer, not for a dependent learner.** Which caps apply is resolved per profile from the tier's quota model and the profile's role, never from the tier name alone:
+   - **Shared-pool tiers** (Family, Pro) have no per-profile caps at all. The pool is the only bound, and per-profile limit resolution deliberately returns nothing for them.
+   - **Per-profile tiers** (Free, Plus) resolve limits by role. The **owner** of a paid per-profile tier has a monthly cap and a null daily limit — that null is the mechanism removing the daily rhythm, not an absence of configuration. A **non-owner (child) profile on that same paid tier retains a daily cap**, and is currently held at the same 10/day and 100/month as the free tier.
+
+   The child-side daily cap is live enforcement, not vestigial config: it is resolved at provisioning, written onto the profile's quota row, and read by the metering middleware on every metered request. **Nothing in this ADR authorises removing it.** A future decision to lift a dependent learner's daily cap would be a deliberate change to a child-facing safeguard, argued on its own merits — never a cleanup justified by this document.
 
 3. **The tier configuration owns the denominators.** Limits are read from one tier configuration, not recomputed at a route or client layer. This extends the same single-denominator discipline MMT-ADR-0035 establishes for shared-pool cycles to the per-profile tiers.
 
@@ -31,6 +35,7 @@ A purely monthly allowance satisfies the second goal and fails a third one that 
 - Free-tier exhaustion has two distinct causes that clients must be able to distinguish, since "come back tomorrow" and "upgrade or wait for the month" are different messages.
 - A daily limit is only meaningful with a reliable daily reset, so the reset job is load-bearing for the free tier's shape rather than a housekeeping task.
 - Because tier numbers may move for experimentation, no code path or document may treat a specific limit as an invariant; anything asserting a particular number is quoting current configuration, not policy.
+- **"What does this tier allow?" is not answerable from the tier alone** — it needs the tier's quota model and the profile's role. Any surface, message, or reasoning that maps tier directly to caps will be wrong for a dependent learner on a per-profile paid plan, in the direction of overstating their allowance.
 - How the cap is *communicated* at the moment it is reached — whether advance warning is given, and whether any unadvertised allowance is permitted before pausing — is **not decided here**. This ADR governs the cap mechanism; the presentation of exhaustion is a separate decision with its own change-set. (A product ruling on that presentation was recorded 2026-07-15 and is not implementation canon; it is noted in the S2-06A disposition ledger rather than folded in here, because doing so would make an undecided thing read as architecture.)
 
 ## Alternatives considered
@@ -43,7 +48,9 @@ A purely monthly allowance satisfies the second goal and fails a third one that 
 
 ## Links
 
-- `apps/api/src/services/subscription.ts` — the tier configuration that owns every denominator.
-- `apps/api/src/middleware/metering.ts` — dual-cap enforcement and decrement ordering.
+- `apps/api/src/services/subscription.ts` — the tier configuration that owns every denominator, including the separate owner/child quota fields per tier.
+- `apps/api/src/services/billing/billing-shared.ts` — `getProfileQuotaLimits(tier, role)`, the per-profile resolution clause 2 describes: it returns nothing for shared-pool tiers and selects the owner or child fields by role for per-profile tiers.
+- `apps/api/src/services/billing/billing-v2/quota-provision-v2.ts` — writes the resolved per-profile limits onto the profile's quota row.
+- `apps/api/src/middleware/metering.ts` — dual-cap enforcement and decrement ordering; reads the per-profile daily limit for per-profile tiers.
 - `docs/adr/MMT-ADR-0035-single-authoritative-family-quota-cycle.md` — the shared-pool cycle and denominator contract this extends to per-profile tiers.
 - `docs/PRD.md` — free-tier presentation; corrected in the same change-set to state the permanent dual cap.
