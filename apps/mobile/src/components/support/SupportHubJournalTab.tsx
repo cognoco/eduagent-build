@@ -87,6 +87,7 @@ function SupportHubJournalPersonCard({
         ) : hasShareableFacts(query.data) ? (
           <SharedRecordView
             record={query.data}
+            supporteeName={scope.displayName}
             error={null}
             onRetry={() => void query.refetch()}
             onAppeal={() => appeal.mutate()}
