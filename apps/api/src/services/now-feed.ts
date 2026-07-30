@@ -594,7 +594,14 @@ async function collectNowCandidates(
     visibility === 'self'
       ? collectTopicMasteredCandidates(db, profileId, scope, now)
       : Promise.resolve([]),
-    collectRecapReadyCandidates(db, profileId, scope, now, accessGuard),
+    collectRecapReadyCandidatesForTesting(
+      db,
+      profileId,
+      scope,
+      now,
+      accessGuard,
+      visibility,
+    ),
     visibility === 'self'
       ? collectSnapshotReadyCandidates(db, profileId, scope, now)
       : Promise.resolve([]),
@@ -1280,12 +1287,16 @@ export function resolveRecapReadyDeepLink(
     : resolveDeepLink('session.summary', { sessionId });
 }
 
-async function collectRecapReadyCandidates(
+/**
+ * @internal - exported for focused query-shape regression coverage.
+ */
+export async function collectRecapReadyCandidatesForTesting(
   db: Database,
   profileId: string,
   scope: NowScope,
   now: Date,
   accessGuard?: SQL,
+  visibility: 'self' | 'supporter' = 'self',
 ): Promise<NowFeedCandidate[]> {
   const cutoff = new Date(
     now.getTime() - LEDGER_PROJECTION_RECENCY_DAYS * DAY_MS,
@@ -1304,6 +1315,9 @@ async function collectRecapReadyCandidates(
         isNotNull(sessionSummaries.learnerRecap),
         isNull(sessionSummaries.purgedAt),
         gt(sessionSummaries.updatedAt, cutoff),
+        visibility === 'supporter'
+          ? eq(sessionSummaries.status, 'accepted')
+          : undefined,
         accessGuard,
       ),
     )

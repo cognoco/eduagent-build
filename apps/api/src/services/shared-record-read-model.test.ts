@@ -1,10 +1,22 @@
 import type { Database } from '@eduagent/database';
-import type { WeeklyReportData } from '@eduagent/schemas';
+import { SchemaDriftError, type WeeklyReportData } from '@eduagent/schemas';
 
 import {
   readSharedArtifactForSupportee,
   readSharedRecordForSupportee,
 } from './shared-record-read-model';
+import { captureException } from './sentry';
+
+jest.mock(
+  './sentry' /* gc1-allow: schema-drift regression must assert the exact Sentry capture side effect without sending telemetry */,
+  () => ({
+    captureException: jest.fn(),
+  }),
+);
+
+beforeEach(() => {
+  jest.mocked(captureException).mockClear();
+});
 
 const UUID = {
   supporter: '00000000-0000-4000-8000-000000000001',
@@ -250,6 +262,41 @@ describe('readSharedRecordForSupportee', () => {
     });
     expect(db.query.weeklyReports.findMany).not.toHaveBeenCalled();
     expect(db.query.sessionSummaries.findMany).not.toHaveBeenCalled();
+  });
+
+  it('surfaces schema drift when an existing weekly report cannot be projected', async () => {
+    const db = createDb();
+    jest.mocked(db.query.weeklyReports.findFirst).mockResolvedValueOnce({
+      id: UUID.olderWeeklyReport,
+      profileId: UUID.supporter,
+      childProfileId: UUID.supportee,
+      reportWeek: '2026-06-15',
+      reportData: { headlineStat: 'invalid' },
+      viewedAt: null,
+      createdAt: new Date('2026-06-22T12:00:00.000Z'),
+    });
+
+    await expect(
+      readSharedArtifactForSupportee(db, {
+        supporterPersonId: UUID.supporter,
+        supporteePersonId: UUID.supportee,
+        artifactKind: 'weekly_report',
+        artifactId: UUID.olderWeeklyReport,
+      }),
+    ).rejects.toBeInstanceOf(SchemaDriftError);
+
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        profileId: UUID.supporter,
+        extra: expect.objectContaining({
+          context: 'projectSharedArtifactForSupportee',
+          reportId: UUID.olderWeeklyReport,
+          childProfileId: UUID.supportee,
+          issues: expect.any(Array),
+        }),
+      }),
+    );
   });
 
   it('loads an older accepted recap by session id without depending on list ordering', async () => {

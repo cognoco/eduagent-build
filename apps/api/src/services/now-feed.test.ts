@@ -1,4 +1,6 @@
+import type { Database } from '@eduagent/database';
 import { nowDeepLinkRouteSchema } from '@eduagent/schemas';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 import {
   PARKED_AGING_WINDOW_DAYS,
@@ -7,6 +9,7 @@ import {
   orderSupporterHubCandidates,
   buildNowFeedFromCandidates,
   buildNowOverflowFromCandidates,
+  collectRecapReadyCandidatesForTesting,
   isRetentionDueAt,
   rankCandidates,
   resolveRecapReadyDeepLink,
@@ -27,6 +30,55 @@ describe('WI-2113 retention transition', () => {
     expect(isRetentionDueAt(new Date('2026-06-11T11:59:59.000Z'), now)).toBe(
       true,
     );
+  });
+});
+
+describe('supporter recap-ready projection', () => {
+  it('requires accepted summaries for supporter links without narrowing the learner feed', async () => {
+    const capturedWhere: unknown[] = [];
+    const query = {} as {
+      from: jest.Mock;
+      where: jest.Mock;
+      orderBy: jest.Mock;
+      limit: jest.Mock;
+    };
+    query.from = jest.fn();
+    query.where = jest.fn((condition: unknown) => {
+      capturedWhere.push(condition);
+      return query;
+    });
+    query.orderBy = jest.fn();
+    query.limit = jest.fn().mockResolvedValue([]);
+    query.from.mockReturnValue(query);
+    query.orderBy.mockReturnValue(query);
+    const db = {
+      select: jest.fn().mockReturnValue(query),
+    } as unknown as Database;
+
+    await collectRecapReadyCandidatesForTesting(
+      db,
+      '00000000-0000-4000-8000-000000000001',
+      'person',
+      now,
+      undefined,
+      'supporter',
+    );
+    await collectRecapReadyCandidatesForTesting(
+      db,
+      '00000000-0000-4000-8000-000000000001',
+      'self',
+      now,
+      undefined,
+      'self',
+    );
+
+    const dialect = new PgDialect();
+    const supporterQuery = dialect.sqlToQuery(capturedWhere[0] as never);
+    const selfQuery = dialect.sqlToQuery(capturedWhere[1] as never);
+    expect(supporterQuery.sql).toContain('"session_summaries"."status" = $');
+    expect(supporterQuery.params).toContain('accepted');
+    expect(selfQuery.sql).not.toContain('"session_summaries"."status" = $');
+    expect(selfQuery.params).not.toContain('accepted');
   });
 });
 

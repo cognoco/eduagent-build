@@ -8,6 +8,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import {
+  SchemaDriftError,
   sharedRecordSchema,
   weeklyReportDataSchema,
   type SharedRecord,
@@ -18,6 +19,7 @@ import { NotFoundError } from '../errors';
 import { findAcceptedContractForSupportee } from './linking-ceremony';
 import { projectSharedRecord } from './shared-record';
 import type { CandidateReportFact } from './reportability';
+import { captureException } from './sentry';
 
 function compactFactParts(parts: Array<string | number | null | undefined>) {
   return parts
@@ -44,9 +46,22 @@ function metadataString(metadata: unknown, key: string): string | undefined {
 
 function projectWeeklyReportFact(
   row: typeof weeklyReports.$inferSelect,
+  invalidRow: 'skip' | 'throw' = 'skip',
 ): CandidateReportFact | null {
   const parsed = weeklyReportDataSchema.safeParse(row.reportData);
-  if (!parsed.success) return null;
+  if (!parsed.success) {
+    if (invalidRow === 'skip') return null;
+    captureException(parsed.error, {
+      profileId: row.profileId,
+      extra: {
+        context: 'projectSharedArtifactForSupportee',
+        reportId: row.id,
+        childProfileId: row.childProfileId,
+        issues: parsed.error.issues,
+      },
+    });
+    throw new SchemaDriftError('WeeklyReport', parsed.error.issues);
+  }
   const stat = parsed.data.headlineStat;
   const metricKey =
     WEEKLY_METRIC_KEY_BY_LABEL[
@@ -192,7 +207,7 @@ async function projectSharedArtifactForSupportee(
               eq(weeklyReports.childProfileId, input.supporteePersonId),
             ),
           )
-          .then((row) => (row ? projectWeeklyReportFact(row) : null))
+          .then((row) => (row ? projectWeeklyReportFact(row, 'throw') : null))
       : supporteeRepo.sessionSummaries
           .findFirst(
             and(
