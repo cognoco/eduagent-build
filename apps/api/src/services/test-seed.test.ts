@@ -945,6 +945,104 @@ describe('resetDatabase', () => {
     expect(events).toEqual(['transaction', 'clerk-ownership']);
   });
 
+  it('[WI-2820 CodeRabbit] deletes Clerk users only after the reset transaction commits', async () => {
+    const events: string[] = [];
+    const rootDb = makeResetDb();
+    const txDb = makeResetDb();
+    Object.assign(rootDb, {
+      transaction: jest.fn(
+        async (operation: (tx: Database) => Promise<unknown>) => {
+          events.push('transaction-start');
+          const result = await operation(txDb);
+          events.push('transaction-commit');
+          return result;
+        },
+      ),
+    });
+
+    global.fetch = jest.fn(async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+      if (url.includes('/users?')) {
+        events.push('clerk-list');
+        return new Response(
+          JSON.stringify([
+            {
+              id: 'user_seed_after_commit',
+              external_id: `${SEED_CLERK_PREFIX}after-commit`,
+              email_addresses: [{ email_address: 'repeat-owner@example.com' }],
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+
+      events.push(`clerk-${method}`);
+      return new Response('{}', { status: 200 });
+    });
+
+    const result = await resetDatabase(
+      rootDb,
+      { CLERK_SECRET_KEY: 'test-secret' },
+      { prefix: 'repeat-' },
+    );
+
+    expect(result).toEqual({ deletedCount: 1, clerkUsersDeleted: 1 });
+    expect(events).toEqual([
+      'transaction-start',
+      'clerk-list',
+      'transaction-commit',
+      'clerk-PATCH',
+      'clerk-DELETE',
+    ]);
+  });
+
+  it('[WI-2820 CodeRabbit] does not delete Clerk users when the reset transaction rolls back', async () => {
+    const events: string[] = [];
+    const rootDb = makeResetDb();
+    const txDb = makeResetDb();
+    Object.assign(rootDb, {
+      transaction: jest.fn(
+        async (operation: (tx: Database) => Promise<unknown>) => {
+          events.push('transaction-start');
+          await operation(txDb);
+          throw new Error('simulated transaction rollback');
+        },
+      ),
+    });
+
+    global.fetch = jest.fn(async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+      if (url.includes('/users?')) {
+        events.push('clerk-list');
+        return new Response(
+          JSON.stringify([
+            {
+              id: 'user_seed_rollback',
+              external_id: `${SEED_CLERK_PREFIX}rollback`,
+              email_addresses: [{ email_address: 'repeat-owner@example.com' }],
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+
+      events.push(`clerk-${method}`);
+      return new Response('{}', { status: 200 });
+    });
+
+    await expect(
+      resetDatabase(
+        rootDb,
+        { CLERK_SECRET_KEY: 'test-secret' },
+        { prefix: 'repeat-' },
+      ),
+    ).rejects.toThrow('simulated transaction rollback');
+
+    expect(events).toEqual(['transaction-start', 'clerk-list']);
+  });
+
   it('returns ResetResult with deletedCount', async () => {
     const deleteReturning = jest
       .fn()

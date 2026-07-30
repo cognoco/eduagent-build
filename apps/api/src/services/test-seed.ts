@@ -462,10 +462,8 @@ async function findClerkUserByEmail(
  */
 async function deleteClerkTestUsers(
   env: SeedEnv,
-  options: ResetOptions = {},
+  seedUsers: ClerkUser[],
 ): Promise<{ count: number; clerkUserIds: string[] }> {
-  const seedUsers = await listSeedClerkUsers(env, options);
-
   let deleted = 0;
   const deletedIds: string[] = [];
 
@@ -6699,12 +6697,13 @@ async function runTestSeedMutation<T>(
 ): Promise<T> {
   return db.transaction(async (tx) => {
     await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtextextended(${TEST_SEED_MUTATION_LOCK}, 0))`,
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${TEST_SEED_MUTATION_LOCK}::text, 0))`,
     );
 
     const txDb = new Proxy(tx as unknown as Database, {
       get(target, property, receiver) {
         if (property === 'transaction') {
+          // Flatten nested calls: this driver has no safe nested savepoint support.
           return async (
             nestedOperation: (nestedTx: Database) => Promise<unknown>,
           ) => nestedOperation(receiver as Database);
@@ -6925,7 +6924,7 @@ export async function resetDatabase(
 ): Promise<ResetResult> {
   const prefix = options.prefix?.trim();
 
-  return runTestSeedMutation(db, async (txDb) => {
+  const cleanup = await runTestSeedMutation(db, async (txDb) => {
     const verifiedSeedClerkUserIds = options.verifiedSeedClerkUserIds
       ? await verifySeedClerkUserIds(env, options.verifiedSeedClerkUserIds, {
           prefix,
@@ -6936,36 +6935,39 @@ export async function resetDatabase(
       options.verifiedSeedClerkUserIds &&
       verifiedSeedClerkUserIds?.length === 0
     ) {
-      return { deletedCount: 0, clerkUsersDeleted: 0 };
+      return {
+        result: { deletedCount: 0 },
+        clerkUsersToDelete: undefined,
+      };
     }
 
     // If caller supplied server-verifiable Clerk IDs, skip Clerk deletion
     // because the cleanup script handles Clerk locally after DB rows are removed.
-    const { count: clerkUsersDeleted, clerkUserIds } =
+    const seedClerkUsers =
       options.clerkUserIds || verifiedSeedClerkUserIds
-        ? {
-            count: 0,
-            clerkUserIds:
-              verifiedSeedClerkUserIds ??
-              (options.clerkUserIds ?? []).filter((id) =>
-                id.startsWith(SEED_CLERK_PREFIX),
-              ),
-          }
-        : options.preserveClerkUsers
-          ? {
-              count: 0,
-              clerkUserIds: (await listSeedClerkUsers(env, { prefix })).map(
-                (user) => user.id,
-              ),
-            }
-          : await deleteClerkTestUsers(env, { prefix });
+        ? undefined
+        : await listSeedClerkUsers(env, { prefix });
+    const clerkUserIds =
+      verifiedSeedClerkUserIds ??
+      (options.clerkUserIds
+        ? options.clerkUserIds.filter((id) => id.startsWith(SEED_CLERK_PREFIX))
+        : (seedClerkUsers ?? []).map((user) => user.id));
+    const clerkUsersToDelete =
+      options.clerkUserIds ||
+      verifiedSeedClerkUserIds ||
+      options.preserveClerkUsers
+        ? undefined
+        : seedClerkUsers;
 
     if (
       options.clerkUserIds &&
       !options.verifiedSeedClerkUserIds &&
       clerkUserIds.length === 0
     ) {
-      return { deletedCount: 0, clerkUsersDeleted };
+      return {
+        result: { deletedCount: 0 },
+        clerkUsersToDelete,
+      };
     }
 
     if (prefix) {
@@ -6979,7 +6981,10 @@ export async function resetDatabase(
       const seedPersonIds = filteredLogins.map((l) => l.personId);
 
       if (seedPersonIds.length === 0) {
-        return { deletedCount: 0, clerkUsersDeleted };
+        return {
+          result: { deletedCount: 0 },
+          clerkUsersToDelete,
+        };
       }
 
       const seedMemberships = await txDb
@@ -6991,12 +6996,18 @@ export async function resetDatabase(
       ];
 
       if (seedOrgIds.length === 0) {
-        return { deletedCount: 0, clerkUsersDeleted };
+        return {
+          result: { deletedCount: 0 },
+          clerkUsersToDelete,
+        };
       }
 
       const deletedCount = await deleteOrganizationGraph(txDb, seedOrgIds);
 
-      return { deletedCount, clerkUsersDeleted };
+      return {
+        result: { deletedCount },
+        clerkUsersToDelete,
+      };
     }
 
     // Build WHERE clause: match fake clerk_seed_* IDs OR real Clerk user IDs
@@ -7013,7 +7024,10 @@ export async function resetDatabase(
     const seedPersonIds = seedLogins.map((l) => l.personId);
 
     if (seedPersonIds.length === 0) {
-      return { deletedCount: 0, clerkUsersDeleted };
+      return {
+        result: { deletedCount: 0 },
+        clerkUsersToDelete,
+      };
     }
 
     const seedMemberships = await txDb
@@ -7025,14 +7039,26 @@ export async function resetDatabase(
     ];
 
     if (seedOrgIds.length === 0) {
-      return { deletedCount: 0, clerkUsersDeleted };
+      return {
+        result: { deletedCount: 0 },
+        clerkUsersToDelete,
+      };
     }
 
     // deleteOrganizationGraph handles RESTRICT-gated dependents before org delete.
     const deletedCount = await deleteOrganizationGraph(txDb, seedOrgIds);
 
-    return { deletedCount, clerkUsersDeleted };
+    return {
+      result: { deletedCount },
+      clerkUsersToDelete,
+    };
   });
+
+  const clerkUsersDeleted = cleanup.clerkUsersToDelete
+    ? (await deleteClerkTestUsers(env, cleanup.clerkUsersToDelete)).count
+    : 0;
+
+  return { ...cleanup.result, clerkUsersDeleted };
 }
 
 // ---------------------------------------------------------------------------
