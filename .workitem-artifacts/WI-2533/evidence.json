@@ -1,0 +1,40 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "A distinct authenticated-adult ceremony consumes a signed, short-lived VPC assertion bound to the server-resolved caller and credentialed learner. It re-resolves current country policy and exact age/residence facts, requires an adult with verified-credential age evidence, and rejects wrong-adult, minor-caller, residence/policy drift, joint-consent without learner assent, multiple/different active guardians, stale/withdrawn/restored grants, and mismatched evidence.",
+      "pointer": "apps/api/src/services/identity-v2/guardian-attachment.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The approved authority assertion is HMAC-authenticated with a domain-separated, production-required secret and carries jurisdiction, policy version, assurance method, tokenised evidence id, qualification, decision, learner assent and expiry. Pending, denied, expired, malformed, tampered and wrong-secret assertions fail closed.",
+      "pointer": "apps/api/src/services/identity-v2/guardian-attachment-token.test.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The transaction takes a charge-scoped advisory lock, creates or confirms the global Guardianship edge, and writes both independently auditable consent purposes with jurisdiction, policy, method, evidence, age and authorization-form stamps. A forced post-edge failure proves rollback leaves neither edge nor grants. The flow never writes Supportership and never mutates the learner Person/Login binding.",
+      "pointer": "apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Real-database coverage proves learning consent is PENDING before attachment and CONSENTED only after both stamped grants exist; exact retry confirms without duplicates; wrong adult, changed residence, withdrawal, legacy restore, minor caller and a different existing valid guardian remain fail closed.",
+      "pointer": "apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The existing family-invite integration contract remains unchanged and independently proves accepting an inviter-issued family invite creates no Guardianship edge; invitation alone is never authority.",
+      "pointer": "apps/api/src/routes/family-join.integration.test.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The shared strict request/result contract exposes only learner id plus opaque assertion to mobile. The mutation disables retries for authority rejection and invalidates the consent/learning access projections after success; mobile tests exercise the real Hono client boundary and a 403 fail-closed response.",
+      "pointer": "apps/mobile/src/hooks/use-guardian-attachment.test.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Broad verification is green: API/schema/mobile TypeScript builds, focused API token and production-config unit suites, focused mobile suite, the disposable-local-PostgreSQL integration suite, repository prepush, and repository-wide lint with no errors.",
+      "pointer": "pnpm prepush"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13"
+}

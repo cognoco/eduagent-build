@@ -12,6 +12,8 @@ import {
   selfConsentWithdrawRequestSchema,
   selfConsentAcceptResultSchema,
   consentAccountabilityReportSchema,
+  guardianAttachmentRequestSchema,
+  guardianAttachmentResultSchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -66,6 +68,11 @@ import {
   createSlidingWindowRateLimiter,
   resolveRateLimitIp,
 } from '../services/rate-limit';
+import {
+  attachGuardianConsentForCredentialedLearner,
+  GuardianAttachmentRejectedError,
+} from '../services/identity-v2/guardian-attachment';
+import { verifyGuardianAuthorityToken } from '../services/identity-v2/guardian-attachment-token';
 
 // [BUG-655 / A-11] /consent/respond is unauthenticated (a parent clicks an
 // emailed link, no session). The token is a 122-bit UUID so brute-force is
@@ -179,6 +186,7 @@ type ConsentRouteEnv = {
     EMAIL_FROM?: string;
     API_ORIGIN?: string;
     CONSENT_POLICY_VERSION: string;
+    GUARDIAN_AUTHORITY_TOKEN_SECRET?: string;
     // [WI-1138] Consent-deny Stripe teardown when the denied person is
     // themselves the payer.
     STRIPE_SECRET_KEY?: string;
@@ -198,6 +206,52 @@ type ConsentRouteEnv = {
 };
 
 export const consentRoutes = new Hono<ConsentRouteEnv>()
+  .post(
+    '/consent/guardian-attachment',
+    zValidator('json', guardianAttachmentRequestSchema),
+    async (c) => {
+      const callerPersonId = c.get('callerPersonId');
+      const secret = c.env.GUARDIAN_AUTHORITY_TOKEN_SECRET;
+      const input = c.req.valid('json');
+      if (!callerPersonId || !secret) {
+        return forbidden(
+          c,
+          'Guardian authority is not valid for this learner.',
+        );
+      }
+
+      const authority = verifyGuardianAuthorityToken(
+        input.authorityToken,
+        secret,
+      );
+      if (!authority) {
+        return forbidden(
+          c,
+          'Guardian authority is not valid for this learner.',
+        );
+      }
+
+      try {
+        const result = await attachGuardianConsentForCredentialedLearner(
+          c.get('db'),
+          {
+            callerPersonId,
+            chargePersonId: input.chargePersonId,
+            authority,
+          },
+        );
+        return c.json(guardianAttachmentResultSchema.parse(result));
+      } catch (error) {
+        if (error instanceof GuardianAttachmentRejectedError) {
+          return forbidden(
+            c,
+            'Guardian authority is not valid for this learner.',
+          );
+        }
+        throw error;
+      }
+    },
+  )
   .post(
     '/consent/request',
     zValidator('json', consentRequestSchema),
