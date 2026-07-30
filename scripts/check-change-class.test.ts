@@ -678,6 +678,14 @@ describe('check-change-class.sh', () => {
         'node --test packages/database/scripts/check-identity-fk-drift.test.mjs',
       flag: 'database_script_guards',
     },
+    {
+      name: 'development schema script guards',
+      file: 'packages/database/scripts/check-development-schema.mjs',
+      className: 'database-script-guards',
+      command:
+        'node --test packages/database/scripts/check-development-schema.test.mjs',
+      flag: 'database_script_guards',
+    },
   ])(
     'routes the narrow $name check through its bounded input surface',
     ({ file, className, command, flag }) => {
@@ -780,6 +788,29 @@ describe('check-change-class.sh', () => {
       );
       expect(step?.if).not.toContain('steps.change-class.outputs');
     }
+  });
+
+  it('runs the development schema guard in the database script CI step', () => {
+    const workflow = parseYaml(
+      readFileSync(
+        join(__dirname, '..', '.github', 'workflows', 'ci.yml'),
+        'utf8',
+      ),
+    ) as {
+      jobs?: {
+        main?: {
+          steps?: Array<{ name?: string; run?: string }>;
+        };
+      };
+    };
+    const step = workflow.jobs?.main?.steps?.find(
+      (candidate) =>
+        candidate.name === 'packages/database/scripts node:test guards',
+    );
+
+    expect(step?.run).toContain(
+      'node --test packages/database/scripts/check-development-schema.test.mjs',
+    );
   });
 
   it('emits docs_only=true for docs and editor metadata changes', () => {

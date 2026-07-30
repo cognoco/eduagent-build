@@ -610,9 +610,10 @@ if hit '(^apps/api/scripts/verify-wrangler-kv-binding(\.test)?\.mjs$|^\.github/w
   add_cmd fast "node --test apps/api/scripts/verify-wrangler-kv-binding.test.mjs" "API KV-binding script guard tests"
 fi
 
-if hit '^(package\.json|packages/database/package\.json|packages/database/scripts/(check-db-push-target(\.test)?|check-identity-fk-drift(\.test)?|verify-db-target-lib)\.mjs|\.github/workflows/ci\.yml)$'; then
+if hit '^(package\.json|packages/database/package\.json|packages/database/scripts/(check-db-push-target(\.test)?|check-development-schema(\.test)?|check-identity-fk-drift(\.test)?|verify-db-target-lib)\.mjs|\.github/workflows/ci\.yml)$'; then
   CLASSES+=("database-script-guards")
   add_cmd fast "node --test packages/database/scripts/check-db-push-target.test.mjs" "Database push-target guard tests"
+  add_cmd fast "node --test packages/database/scripts/check-development-schema.test.mjs" "Development schema freshness guard tests"
   add_cmd fast "node --test packages/database/scripts/check-identity-fk-drift.test.mjs" "Identity FK catalog guard tests"
 fi
 
