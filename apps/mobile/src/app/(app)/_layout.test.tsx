@@ -2279,6 +2279,7 @@ describe('HIDDEN_TAB_ROUTES — tab-bar leak guard (QA-07 / Bug 763)', () => {
       'practice',
       'link/initiate',
       'link/[contractId]',
+      'guardian-attachment',
       'vocabulary',
       'topic',
       'my-notes',
@@ -2303,7 +2304,12 @@ describe('FULL_SCREEN_ROUTES — nested ceremony route guard', () => {
   });
 
   it('hides chrome for every visibility link ceremony screen', () => {
-    for (const route of ['link', 'link/initiate', 'link/[contractId]']) {
+    for (const route of [
+      'link',
+      'link/initiate',
+      'link/[contractId]',
+      'guardian-attachment',
+    ]) {
       expect(FULL_SCREEN_ROUTES.has(route)).toBe(true);
     }
   });

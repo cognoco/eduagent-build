@@ -42,6 +42,11 @@
     },
     {
       "acRef": "AC-1",
+      "description": "The callback is explicitly hidden from tab discovery and classified as a full-screen ceremony route, so V2 does not apply floating-chrome safe-area ownership to it. The focused navigation contract regression failed before that registration and passed 2/2 after it; the full layout suite passed 134/134.",
+      "pointer": "apps/mobile/src/app/(app)/_layout.test.tsx"
+    },
+    {
+      "acRef": "AC-1",
       "description": "Fresh verification is green: token/config API unit 100/100; mobile hook 3/3 and callback 1/1; real-PostgreSQL integration 10/10; API/schema/mobile typechecks; prepush; hardcoded-JSX ratchet; targeted changed-file lint with zero findings; repository-wide lint with zero errors and only its pre-existing warning baseline.",
       "pointer": "pnpm prepush"
     }
