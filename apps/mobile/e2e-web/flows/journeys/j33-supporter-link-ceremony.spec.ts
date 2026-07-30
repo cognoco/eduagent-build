@@ -239,7 +239,7 @@ test('J-33 supporter <-> supportee: reach the link ceremony via deep-link initia
 
   await page.goForward();
   await expect(page).toHaveURL(/\/journal$/);
-  await expect(journalPlaceholder).toBeVisible();
+  await expect(personJournal).toBeVisible();
 
   // RECOVERY — revoke through the production supportee action, then prove
   // both the supportee's safe return and the supporter's fail-closed scope.

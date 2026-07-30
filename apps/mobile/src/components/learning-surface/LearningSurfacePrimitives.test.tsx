@@ -282,6 +282,27 @@ describe('Learning surface primitives', () => {
     screen.getByLabelText('Loading');
   });
 
+  it('includes detail in the accessible label for a pressable structural fact', () => {
+    render(
+      <StructuralFactCard
+        headline="Emma has one shareable update."
+        structuralOnlyLabel="Structural facts only."
+        facts={[
+          {
+            id: 'fact-1',
+            title: 'Practiced fractions',
+            detail: 'Completed a review set.',
+            onPress: jest.fn(),
+          },
+        ]}
+      />,
+    );
+
+    screen.getByRole('button', {
+      name: 'Practiced fractions. Completed a review set.',
+    });
+  });
+
   it('makes SubjectHub study capability explicit and blocks readonly callbacks', () => {
     const onStudyTopic = jest.fn();
     const onReviewTopic = jest.fn();

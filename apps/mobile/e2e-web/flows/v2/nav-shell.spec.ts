@@ -127,7 +127,7 @@ test('V2 nav shell: real Back from the support-hub Mentor surface keeps the supp
   await expect(page.getByTestId('support-hub-mentor-tab')).toBeVisible();
 
   await expect(page.getByTestId('mentor-screen')).toHaveCount(0);
-  await expect(page.getByTestId('person-scope-journal')).not.toBeVisible();
+  await expect(page.getByTestId('person-scope-journal')).toHaveCount(0);
 
   // --- WI-2822 surface: Me/learner. With both Back contracts established,
   // use the intentional first-time doorway and prove the learner surface owns

@@ -290,7 +290,9 @@ export function StructuralFactCard({
               key={fact.id}
               onPress={fact.onPress}
               accessibilityRole="button"
-              accessibilityLabel={fact.title}
+              accessibilityLabel={
+                fact.detail ? `${fact.title}. ${fact.detail}` : fact.title
+              }
               className="min-h-[44px] justify-center"
               testID={fact.testID ?? `structural-fact-${fact.id}`}
             >
