@@ -31,7 +31,7 @@ A purely monthly allowance satisfies the second goal and fails a third one that 
 - Free-tier exhaustion has two distinct causes that clients must be able to distinguish, since "come back tomorrow" and "upgrade or wait for the month" are different messages.
 - A daily limit is only meaningful with a reliable daily reset, so the reset job is load-bearing for the free tier's shape rather than a housekeeping task.
 - Because tier numbers may move for experimentation, no code path or document may treat a specific limit as an invariant; anything asserting a particular number is quoting current configuration, not policy.
-- A separate product ruling on how the daily cap is *communicated* at the moment it is reached — quiet advance warning, and whether an unadvertised goodwill question is permitted before pausing — was made 2026-07-15 and is explicitly not implementation canon. It is deliberately excluded from this ADR: the cap mechanism above is what is decided, and the presentation ruling becomes canon through its own change when built.
+- How the cap is *communicated* at the moment it is reached — whether advance warning is given, and whether any unadvertised allowance is permitted before pausing — is **not decided here**. This ADR governs the cap mechanism; the presentation of exhaustion is a separate decision with its own change-set. (A product ruling on that presentation was recorded 2026-07-15 and is not implementation canon; it is noted in the S2-06A disposition ledger rather than folded in here, because doing so would make an undecided thing read as architecture.)
 
 ## Alternatives considered
 

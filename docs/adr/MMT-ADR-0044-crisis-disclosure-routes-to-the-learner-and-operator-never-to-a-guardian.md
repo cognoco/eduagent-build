@@ -51,7 +51,7 @@ Detection is also not reliable enough to carry an automatic real-world action. D
 
 - `apps/api/src/services/exchanges.ts` — `emitCrisisRedirectEvent`, the telemetry-only server action.
 - `apps/api/src/services/exchange-prompts.ts` — the SAFETY block authoring the learner-facing redirect and the mandatory signal-binding rule.
-- `docs/registers/safety-guards/master.md` — the safety-guard register row recording this guard, its enforcement point, and its code sites.
+- `docs/registers/safety-guards/master.md` — the safety-guard register row recording this guard, its enforcement point, and its code sites. The register, the DPIA, and the ruling record all refer to this decision as `se-032`; the code is a trace handle for those sources only and carries no part of the decision's meaning.
 - `docs/compliance/edpb_dpia_filled_2026_v1.md` — the data-protection impact assessment entry for abuse/crisis-disclosure handling.
 - `docs/plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md` — where the ruling was recorded and a conflicting guardian-notification wording was struck as superseded; historical context, not authority for this ADR.
 - `docs/adr/MMT-ADR-0016-safety-and-judge-architecture.md` — judgement-based safety and the rejection of app-owned denylists.
