@@ -21,6 +21,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import { deleteV2IdentitiesForTest } from '../../test-utils/legacy-identity-anchors';
+import { CONFIRMED_CONVERSATION_LANGUAGE_AT } from '../../test-utils/conversation-language-confirmation';
 import { prepareExchangeContext } from './session-exchange';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
@@ -50,7 +51,7 @@ async function seedProfileWithSubject(
     displayName: `WI-80 Learner ${idx}`,
     birthDate: '2011-06-15',
     residenceJurisdiction: 'US',
-    conversationLanguageConfirmedAt: new Date('2026-01-01T00:00:00Z'),
+    conversationLanguageConfirmedAt: CONFIRMED_CONVERSATION_LANGUAGE_AT,
   });
   await db.insert(membership).values({
     personId: profileId,
