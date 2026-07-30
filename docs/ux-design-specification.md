@@ -391,6 +391,8 @@ Components use semantic class names throughout (`bg-background`, `text-primary`,
 
 > **Implementation note (2026-05-23):** The per-persona named exports above (`teenTheme`, `adultTheme`, `parentTheme`) were not carried forward. The shipped implementation uses `tokens: Record<'light' | 'dark', ThemeTokens>` in `apps/mobile/src/lib/design-tokens.ts` — a two-scheme (light/dark) token map with five accent presets (teal/electric/hotpink/emerald/amber). NativeWind CSS variable injection via `vars()` is applied in `(app)/_layout.tsx`. The semantic class contract described here (e.g., `bg-background`, `text-primary`) is correctly implemented.
 
+> **Correction (2026-07-30) to the note above:** the two-scheme light/dark token map is accurate; **"with five accent presets" is not.** Those presets are residual machinery from an accent-selection capability that was deliberately removed rather than shipped. No surface offers the choice, the selection is unset for every user, and with it unset the fixed teal-and-lavender palette renders unchanged — so the code reads like a shipped picker while being unreachable. It is legacy cleanup, not a feature, and nothing may be built against it. See [`MMT-ADR-0051`](adr/MMT-ADR-0051-one-fixed-brand-palette-varying-only-by-colour-scheme.md) clause 6.
+
 ### Semantic Design Token Set
 
 _Every persona theme MUST define every token. No gaps, no fallbacks. This is the contract._
@@ -525,6 +527,10 @@ This triangle is both positioning and a feature evaluation framework. For every 
 
 ## Visual Design Foundation
 
+> **SUPERSEDED — the per-persona visual system described in this section is not the product's design.** The brand is a single fixed palette (teal primary, lavender secondary) applied identically to every user, varying only between light and dark colour schemes. There are no per-persona moods, no persona-specific expression of a hue family, and no user-selectable accent. The persona attribute this system depended on was removed from the data model and shared components are deliberately persona-unaware, so this direction has no input to run on.
+>
+> Retained as history — it records a direction that was genuinely considered and not taken, and the current single-palette choice is only legible as a decision alongside the alternative it displaced. **Do not build from this section.** The governing decision is [`MMT-ADR-0051`](adr/MMT-ADR-0051-one-fixed-brand-palette-varying-only-by-colour-scheme.md); the shipped token values are in `apps/mobile/src/lib/design-tokens.ts`.
+
 ### Visual Design Philosophy
 
 **Structure is the brand. Color is the mood.** Typography, spacing, component shapes, logo placement, and animation style are consistent across all three personas. Color palette and information density are what shift. A parent glancing at their child's screen should instantly recognize it as the same product, just tuned differently.
@@ -599,6 +605,8 @@ The grid stays consistent. What changes per persona is internal padding and whit
 - **Motion**: Respect reduced-motion preferences. Animations should enhance, not distract.
 
 ## Design Direction Decision
+
+> **SUPERSEDED — this section summarises the per-persona direction, not the shipped one.** Every row below that varies a value by persona (overall approach, the three per-persona moods, persona-specific accent saturation/tone, per-persona density) is superseded: the product ships one fixed teal-and-lavender palette for all users, varying only by light/dark scheme. The rows that are persona-invariant — Inter typography on a consistent scale, and shared component shapes and structure — still hold. Retained as history; see [`MMT-ADR-0051`](adr/MMT-ADR-0051-one-fixed-brand-palette-varying-only-by-colour-scheme.md).
 
 ### Chosen Direction
 
