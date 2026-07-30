@@ -1,18 +1,31 @@
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
-import { and, eq, or } from 'drizzle-orm';
+import { and, eq, or, sql } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   consentGrant,
+  consentRequest,
   countryPolicyRegistry,
   createDatabase,
   guardianship,
+  membership,
   person,
   regimes,
   supportership,
   type Database,
 } from '@eduagent/database';
-import { cleanupAccounts } from '../../../../../tests/integration/helpers';
+import {
+  buildIntegrationEnv,
+  cleanupAccounts,
+} from '../../../../../tests/integration/helpers';
+import {
+  addFetchHandler,
+  installFetchInterceptor,
+  restoreFetch,
+} from '../../../../../tests/integration/fetch-interceptor';
+import { mockClerkJWKS } from '../../../../../tests/integration/external-mocks';
+import { buildAuthHeaders } from '../../../../../tests/integration/route-fixtures';
+import { app } from '../../index';
 import { createIdentityGraph } from './identity-graph';
 import {
   attachGuardianConsentForCredentialedLearner,
@@ -20,7 +33,8 @@ import {
 } from './guardian-attachment';
 import type { GuardianAuthorityAssertion } from './guardian-attachment-token';
 import { resolveConsentSetStatus } from './consent-status-v2';
-import { restoreConsentV2 } from './consent-v2';
+import { processConsentResponseV2, restoreConsentV2 } from './consent-v2';
+import { consentPersonLockKey } from './deletion-v2';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
@@ -30,15 +44,28 @@ const REGIME_ID = 'c2533000-0000-4000-8000-000000000002';
 const COUNTRY = 'XG';
 const POLICY_VERSION = 'XG-WI-2533-v1';
 const AS_OF = new Date('2026-07-30T12:00:00.000Z');
+const TOKEN_SECRET = 'guardian-authority-test-secret-at-least-32-chars';
+const VERIFIER_URL = 'https://guardian-verifier.test/v1/verify';
+const VERIFIER_KEY = 'guardian-verifier-test-key';
 const emails: string[] = [];
 const clerkUserIds: string[] = [];
 
 interface Identity {
   personId: string;
   organizationId: string;
+  email: string;
+  clerkUserId: string;
 }
 
 let db: Database;
+let verifierRequest: {
+  authorization: string | null;
+  body: Record<string, unknown>;
+} | null = null;
+const nativeFetch = globalThis.fetch;
+installFetchInterceptor();
+mockClerkJWKS();
+addFetchHandler(/\.neon\.tech/, (url, init) => nativeFetch(url, init));
 
 async function seedIdentity(label: string, age: number): Promise<Identity> {
   const email = `wi-2533-${RUN_ID}-${label}@test.invalid`;
@@ -71,17 +98,19 @@ async function seedIdentity(label: string, age: number): Promise<Identity> {
       },
     })
     .where(eq(person.id, graph.personId));
-  return graph;
+  return { ...graph, email, clerkUserId };
 }
 
 function assertion(
   guardianPersonId: string,
   chargePersonId: string,
+  organizationId: string,
   overrides: Partial<GuardianAuthorityAssertion> = {},
 ): GuardianAuthorityAssertion {
   return {
     guardianPersonId,
     chargePersonId,
+    organizationId,
     jurisdiction: COUNTRY,
     policyVersion: POLICY_VERSION,
     assuranceMethod: 'verified_parental_responsibility_credential',
@@ -89,6 +118,8 @@ function assertion(
     qualification: 'biological_parent',
     decision: 'approved',
     learnerAssentAt: null,
+    issuedAt: AS_OF,
+    notBefore: AS_OF,
     expiresAt: new Date('2026-07-30T12:15:00.000Z'),
     ...overrides,
   };
@@ -139,6 +170,43 @@ function assertion(
           launchDayLegalRefresh: true,
         },
       });
+      addFetchHandler(VERIFIER_URL, async (_url, init) => {
+        const body = JSON.parse(String(init?.body)) as {
+          verificationHandle: string;
+          expected: {
+            guardianPersonId: string;
+            chargePersonId: string;
+            organizationId: string;
+            jurisdiction: string;
+            policyVersion: string;
+          };
+        };
+        verifierRequest = {
+          authorization: new Headers(init?.headers).get('Authorization'),
+          body: body as unknown as Record<string, unknown>,
+        };
+        return new Response(
+          JSON.stringify({
+            decision: body.verificationHandle.startsWith('denied-')
+              ? 'denied'
+              : 'approved',
+            guardianPersonId: body.expected.guardianPersonId,
+            chargePersonId: body.expected.chargePersonId,
+            organizationId: body.expected.organizationId,
+            jurisdiction: body.expected.jurisdiction,
+            policyVersion: body.expected.policyVersion,
+            assuranceLevel: 'VPC_VERIFIED',
+            assuranceMethod: 'verified_parental_responsibility_credential',
+            evidenceId: `vpc:${randomUUID()}`,
+            qualification: 'biological_parent',
+            learnerAssentAt: null,
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        );
+      });
     });
 
     afterAll(async () => {
@@ -147,6 +215,7 @@ function assertion(
         .delete(countryPolicyRegistry)
         .where(eq(countryPolicyRegistry.id, POLICY_ID));
       await db.delete(regimes).where(eq(regimes.id, REGIME_ID));
+      restoreFetch();
     });
 
     it('atomically attaches authority and stamped grants without supporter visibility', async () => {
@@ -165,11 +234,24 @@ function assertion(
         where: eq(person.id, learner.personId),
         columns: { id: true, loginId: true },
       });
+      const staleEmailToken = randomUUID();
+      await db
+        .update(consentRequest)
+        .set({
+          status: 'requested',
+          token: staleEmailToken,
+          tokenExpiresAt: new Date('2026-07-31T12:00:00.000Z'),
+        })
+        .where(eq(consentRequest.chargePersonId, learner.personId));
 
       const result = await attachGuardianConsentForCredentialedLearner(db, {
         callerPersonId: adult.personId,
         chargePersonId: learner.personId,
-        authority: assertion(adult.personId, learner.personId),
+        authority: assertion(
+          adult.personId,
+          learner.personId,
+          learner.organizationId,
+        ),
         asOf: AS_OF,
       });
 
@@ -177,7 +259,7 @@ function assertion(
         status: 'attached',
         consentSatisfied: true,
       });
-      const [edge, grants, supporters] = await Promise.all([
+      const [edge, grants, requests, supporters] = await Promise.all([
         db.query.guardianship.findFirst({
           where: and(
             eq(guardianship.guardianPersonId, adult.personId),
@@ -189,6 +271,9 @@ function assertion(
             eq(consentGrant.chargePersonId, learner.personId),
             eq(consentGrant.organizationId, learner.organizationId),
           ),
+        }),
+        db.query.consentRequest.findMany({
+          where: eq(consentRequest.chargePersonId, learner.personId),
         }),
         db.query.supportership.findMany({
           where: or(
@@ -219,6 +304,45 @@ function assertion(
         }),
       );
       expect(supporters).toEqual([]);
+      expect(requests).toHaveLength(2);
+      expect(
+        requests.map((request) => ({
+          status: request.status,
+          guardianPersonId: request.guardianPersonId,
+          token: request.token,
+          tokenExpiresAt: request.tokenExpiresAt,
+          grantId: request.consentGrantId,
+        })),
+      ).toEqual(
+        Array(2).fill({
+          status: 'approved',
+          guardianPersonId: adult.personId,
+          token: null,
+          tokenExpiresAt: null,
+          grantId: expect.any(String),
+        }),
+      );
+      expect(
+        new Set(requests.map((request) => request.consentGrantId)),
+      ).toEqual(new Set(grants.map((grant) => grant.id)));
+      await expect(
+        processConsentResponseV2(db, staleEmailToken, true),
+      ).rejects.toThrow('Invalid consent token');
+      await expect(
+        db.query.consentGrant.findMany({
+          where: eq(consentGrant.chargePersonId, learner.personId),
+        }),
+      ).resolves.toEqual(
+        expect.arrayContaining(
+          grants.map((grant) =>
+            expect.objectContaining({
+              id: grant.id,
+              assuranceToken: expect.stringMatching(/^vpc:/),
+              snapshotJurisdictionAtGrant: COUNTRY,
+            }),
+          ),
+        ),
+      );
       await expect(
         db.query.person.findFirst({
           where: eq(person.id, learner.personId),
@@ -238,7 +362,11 @@ function assertion(
     it('confirms an identical retry without duplicating edge or grants', async () => {
       const adult = await seedIdentity('adult-retry', 40);
       const learner = await seedIdentity('learner-retry', 14);
-      const authority = assertion(adult.personId, learner.personId);
+      const authority = assertion(
+        adult.personId,
+        learner.personId,
+        learner.organizationId,
+      );
       await attachGuardianConsentForCredentialedLearner(db, {
         callerPersonId: adult.personId,
         chargePersonId: learner.personId,
@@ -277,7 +405,11 @@ function assertion(
       const adult = await seedIdentity('adult-fail-closed', 40);
       const wrongAdult = await seedIdentity('wrong-adult', 41);
       const learner = await seedIdentity('learner-fail-closed', 14);
-      const authority = assertion(adult.personId, learner.personId);
+      const authority = assertion(
+        adult.personId,
+        learner.personId,
+        learner.organizationId,
+      );
 
       await expect(
         attachGuardianConsentForCredentialedLearner(db, {
@@ -350,7 +482,11 @@ function assertion(
         attachGuardianConsentForCredentialedLearner(db, {
           callerPersonId: adult.personId,
           chargePersonId: learner.personId,
-          authority: assertion(adult.personId, learner.personId),
+          authority: assertion(
+            adult.personId,
+            learner.personId,
+            learner.organizationId,
+          ),
           asOf: AS_OF,
           afterGuardianWrite: () => {
             throw new Error('simulated grant failure');
@@ -378,7 +514,11 @@ function assertion(
       await attachGuardianConsentForCredentialedLearner(db, {
         callerPersonId: adult.personId,
         chargePersonId: learner.personId,
-        authority: assertion(adult.personId, learner.personId),
+        authority: assertion(
+          adult.personId,
+          learner.personId,
+          learner.organizationId,
+        ),
         asOf: AS_OF,
       });
 
@@ -386,7 +526,11 @@ function assertion(
         attachGuardianConsentForCredentialedLearner(db, {
           callerPersonId: minor.personId,
           chargePersonId: learner.personId,
-          authority: assertion(minor.personId, learner.personId),
+          authority: assertion(
+            minor.personId,
+            learner.personId,
+            learner.organizationId,
+          ),
           asOf: AS_OF,
         }),
       ).rejects.toBeInstanceOf(GuardianAttachmentRejectedError);
@@ -395,10 +539,323 @@ function assertion(
         attachGuardianConsentForCredentialedLearner(db, {
           callerPersonId: differentAdult.personId,
           chargePersonId: learner.personId,
-          authority: assertion(differentAdult.personId, learner.personId),
+          authority: assertion(
+            differentAdult.personId,
+            learner.personId,
+            learner.organizationId,
+          ),
           asOf: AS_OF,
         }),
       ).rejects.toBeInstanceOf(GuardianAttachmentRejectedError);
+    });
+
+    it('rejects an assertion after the learner moves organizations', async () => {
+      const adult = await seedIdentity('adult-org-move', 40);
+      const learner = await seedIdentity('learner-org-move', 14);
+      const destination = await seedIdentity('destination-org', 40);
+      const authority = assertion(
+        adult.personId,
+        learner.personId,
+        learner.organizationId,
+      );
+
+      await db
+        .update(membership)
+        .set({ organizationId: destination.organizationId })
+        .where(eq(membership.personId, learner.personId));
+
+      await expect(
+        attachGuardianConsentForCredentialedLearner(db, {
+          callerPersonId: adult.personId,
+          chargePersonId: learner.personId,
+          authority,
+          asOf: AS_OF,
+        }),
+      ).rejects.toBeInstanceOf(GuardianAttachmentRejectedError);
+      await expect(
+        db.query.guardianship.findMany({
+          where: eq(guardianship.chargePersonId, learner.personId),
+        }),
+      ).resolves.toEqual([]);
+      await expect(
+        db.query.consentGrant.findMany({
+          where: eq(consentGrant.chargePersonId, learner.personId),
+        }),
+      ).resolves.toEqual([]);
+    });
+
+    it('serializes on the canonical consent lock across two database connections', async () => {
+      const adult = await seedIdentity('adult-concurrency', 40);
+      const learner = await seedIdentity('learner-concurrency', 14);
+      const secondConnection = createDatabase(process.env.DATABASE_URL!);
+      let releaseBlocker!: () => void;
+      let signalReady!: () => void;
+      const blockerReady = new Promise<void>((resolveReady) => {
+        signalReady = resolveReady;
+      });
+      const release = new Promise<void>((resolveRelease) => {
+        releaseBlocker = resolveRelease;
+      });
+
+      const blocker = db.transaction(async (tx) => {
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtextextended(${consentPersonLockKey(
+            learner.personId,
+          )}, 0))`,
+        );
+        signalReady();
+        await release;
+      });
+      await blockerReady;
+
+      let settled = false;
+      const attachment = attachGuardianConsentForCredentialedLearner(
+        secondConnection,
+        {
+          callerPersonId: adult.personId,
+          chargePersonId: learner.personId,
+          authority: assertion(
+            adult.personId,
+            learner.personId,
+            learner.organizationId,
+          ),
+          asOf: AS_OF,
+        },
+      ).finally(() => {
+        settled = true;
+      });
+
+      await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+      expect(settled).toBe(false);
+      releaseBlocker();
+      await expect(attachment).resolves.toEqual({
+        status: 'attached',
+        consentSatisfied: true,
+      });
+      await blocker;
+    });
+
+    it('executes the authenticated verifier-mint-redemption HTTP path and invalidates the email token', async () => {
+      const adult = await seedIdentity('adult-route', 40);
+      const learner = await seedIdentity('learner-route', 14);
+      const staleEmailToken = randomUUID();
+      await db
+        .update(consentRequest)
+        .set({
+          status: 'requested',
+          token: staleEmailToken,
+          tokenExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        })
+        .where(eq(consentRequest.chargePersonId, learner.personId));
+
+      verifierRequest = null;
+
+      const env = {
+        ...buildIntegrationEnv(),
+        DATABASE_URL: process.env.DATABASE_URL!,
+        GUARDIAN_AUTHORITY_TOKEN_SECRET: TOKEN_SECRET,
+        GUARDIAN_AUTHORITY_VERIFIER_URL: VERIFIER_URL,
+        GUARDIAN_AUTHORITY_VERIFIER_KEY: VERIFIER_KEY,
+      };
+      const headers = buildAuthHeaders(
+        {
+          sub: adult.clerkUserId,
+          email: adult.email,
+        },
+        adult.personId,
+      );
+      const initiation = await app.request(
+        '/v1/consent/guardian-attachment/initiate',
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            chargePersonId: learner.personId,
+            verificationHandle: `verification-${randomUUID()}`,
+          }),
+        },
+        env,
+      );
+      expect(initiation.status).toBe(200);
+      const initiationBody = (await initiation.json()) as {
+        authorityToken: string;
+      };
+      expect(initiationBody.authorityToken).toEqual(expect.any(String));
+      expect(verifierRequest).toEqual({
+        authorization: `Bearer ${VERIFIER_KEY}`,
+        body: expect.objectContaining({
+          expected: expect.objectContaining({
+            guardianPersonId: adult.personId,
+            chargePersonId: learner.personId,
+            organizationId: learner.organizationId,
+            jurisdiction: COUNTRY,
+            policyVersion: POLICY_VERSION,
+            requiredAssuranceLevel: 'VPC_VERIFIED',
+          }),
+        }),
+      });
+
+      const redemption = await app.request(
+        '/v1/consent/guardian-attachment',
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            chargePersonId: learner.personId,
+            authorityToken: initiationBody.authorityToken,
+          }),
+        },
+        env,
+      );
+      expect(redemption.status).toBe(200);
+      await expect(redemption.json()).resolves.toEqual({
+        status: 'attached',
+        consentSatisfied: true,
+      });
+      const routeRequests = await db.query.consentRequest.findMany({
+        where: eq(consentRequest.chargePersonId, learner.personId),
+      });
+      const routeGrantsBeforeStaleApproval =
+        await db.query.consentGrant.findMany({
+          where: eq(consentGrant.chargePersonId, learner.personId),
+        });
+      expect(routeRequests).toHaveLength(2);
+      expect(
+        routeRequests.every(
+          (request) =>
+            request.status === 'approved' &&
+            request.guardianPersonId === adult.personId &&
+            request.token === null &&
+            request.tokenExpiresAt === null &&
+            routeGrantsBeforeStaleApproval.some(
+              (grant) => grant.id === request.consentGrantId,
+            ),
+        ),
+      ).toBe(true);
+
+      const staleApproval = await app.request(
+        '/v1/consent/respond',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: staleEmailToken, approved: true }),
+        },
+        env,
+      );
+      expect(staleApproval.status).toBe(404);
+      const routeGrants = await db.query.consentGrant.findMany({
+        where: eq(consentGrant.chargePersonId, learner.personId),
+      });
+      expect(routeGrants).toHaveLength(2);
+      expect(
+        routeGrants.every(
+          (grant) =>
+            grant.assuranceMethod ===
+              'verified_parental_responsibility_credential' &&
+            grant.assuranceToken?.startsWith('vpc:'),
+        ),
+      ).toBe(true);
+    });
+
+    it('requires a fresh organization-specific HTTP ceremony after an org move', async () => {
+      const adult = await seedIdentity('adult-route-org-move', 40);
+      const learner = await seedIdentity('learner-route-org-move', 14);
+      const destination = await seedIdentity('route-destination-org', 40);
+      const env = {
+        ...buildIntegrationEnv(),
+        DATABASE_URL: process.env.DATABASE_URL!,
+        GUARDIAN_AUTHORITY_TOKEN_SECRET: TOKEN_SECRET,
+        GUARDIAN_AUTHORITY_VERIFIER_URL: VERIFIER_URL,
+        GUARDIAN_AUTHORITY_VERIFIER_KEY: VERIFIER_KEY,
+      };
+      const headers = buildAuthHeaders(
+        { sub: adult.clerkUserId, email: adult.email },
+        adult.personId,
+      );
+      const initiation = await app.request(
+        '/v1/consent/guardian-attachment/initiate',
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            chargePersonId: learner.personId,
+            verificationHandle: `verification-${randomUUID()}`,
+          }),
+        },
+        env,
+      );
+      expect(initiation.status).toBe(200);
+      const { authorityToken } = (await initiation.json()) as {
+        authorityToken: string;
+      };
+
+      await db
+        .update(membership)
+        .set({ organizationId: destination.organizationId })
+        .where(eq(membership.personId, learner.personId));
+
+      const redemption = await app.request(
+        '/v1/consent/guardian-attachment',
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            chargePersonId: learner.personId,
+            authorityToken,
+          }),
+        },
+        env,
+      );
+      expect(redemption.status).toBe(403);
+      await expect(
+        db.query.guardianship.findMany({
+          where: eq(guardianship.chargePersonId, learner.personId),
+        }),
+      ).resolves.toEqual([]);
+      await expect(
+        db.query.consentGrant.findMany({
+          where: eq(consentGrant.chargePersonId, learner.personId),
+        }),
+      ).resolves.toEqual([]);
+    });
+
+    it('fails closed at the authenticated initiation route for a denied VPC result', async () => {
+      const adult = await seedIdentity('adult-route-denied', 40);
+      const learner = await seedIdentity('learner-route-denied', 14);
+      const env = {
+        ...buildIntegrationEnv(),
+        DATABASE_URL: process.env.DATABASE_URL!,
+        GUARDIAN_AUTHORITY_TOKEN_SECRET: TOKEN_SECRET,
+        GUARDIAN_AUTHORITY_VERIFIER_URL: VERIFIER_URL,
+        GUARDIAN_AUTHORITY_VERIFIER_KEY: VERIFIER_KEY,
+      };
+      const response = await app.request(
+        '/v1/consent/guardian-attachment/initiate',
+        {
+          method: 'POST',
+          headers: buildAuthHeaders(
+            { sub: adult.clerkUserId, email: adult.email },
+            adult.personId,
+          ),
+          body: JSON.stringify({
+            chargePersonId: learner.personId,
+            verificationHandle: `denied-${randomUUID()}`,
+          }),
+        },
+        env,
+      );
+
+      expect(response.status).toBe(403);
+      await expect(
+        db.query.guardianship.findMany({
+          where: eq(guardianship.chargePersonId, learner.personId),
+        }),
+      ).resolves.toEqual([]);
+      await expect(
+        db.query.consentGrant.findMany({
+          where: eq(consentGrant.chargePersonId, learner.personId),
+        }),
+      ).resolves.toEqual([]);
     });
   },
 );

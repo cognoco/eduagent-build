@@ -2,37 +2,47 @@
   "claims": [
     {
       "acRef": "AC-1",
-      "description": "A distinct authenticated-adult ceremony consumes a signed, short-lived VPC assertion bound to the server-resolved caller and credentialed learner. It re-resolves current country policy and exact age/residence facts, requires an adult with verified-credential age evidence, and rejects wrong-adult, minor-caller, residence/policy drift, joint-consent without learner assent, multiple/different active guardians, stale/withdrawn/restored grants, and mismatched evidence.",
-      "pointer": "apps/api/src/services/identity-v2/guardian-attachment.ts"
+      "description": "The authenticated initiation route accepts only a learner id plus a single-use provider handle, redeems it over a configured server-to-server VPC boundary, validates an approved VPC_VERIFIED result against the server-resolved caller, learner, destination organization, jurisdiction and policy, then mints the only authority assertion the redemption route accepts.",
+      "pointer": "apps/api/src/services/identity-v2/guardian-attachment-verifier.ts"
     },
     {
       "acRef": "AC-1",
-      "description": "The approved authority assertion is HMAC-authenticated with a domain-separated, production-required secret and carries jurisdiction, policy version, assurance method, tokenised evidence id, qualification, decision, learner assent and expiry. Pending, denied, expired, malformed, tampered and wrong-secret assertions fail closed.",
+      "description": "The domain-separated HMAC assertion is bound to guardian, learner and destination organization and carries jurisdiction, policy, method, tokenised evidence, qualification and learner assent. issuedAt/notBefore/expiresAt validation enforces a 15-minute hard maximum lifetime with 60-second clock skew; pending, denied, expired, future, overlong, malformed, tampered and wrong-secret tokens fail closed.",
       "pointer": "apps/api/src/services/identity-v2/guardian-attachment-token.test.ts"
     },
     {
       "acRef": "AC-1",
-      "description": "The transaction takes a charge-scoped advisory lock, creates or confirms the global Guardianship edge, and writes both independently auditable consent purposes with jurisdiction, policy, method, evidence, age and authorization-form stamps. A forced post-edge failure proves rollback leaves neither edge nor grants. The flow never writes Supportership and never mutates the learner Person/Login binding.",
+      "description": "Redemption uses the canonical consentPersonLockKey with hashtextextended, re-resolves current membership/country policy under that lock, gates age via computeAgeBracketFromDate, creates or confirms the global Guardianship edge, and writes both independently auditable purposes with organization, jurisdiction, policy, method, evidence, age and authorization-form stamps.",
+      "pointer": "apps/api/src/services/identity-v2/guardian-attachment.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The same transaction requires the complete consent_request purpose set, atomically marks every row approved, binds the verified guardian, clears every email token/expiry and back-links each row to its matching stamped grant. Any incomplete/terminal/divergent set or forced post-edge failure rolls back authority, grants and request mutations.",
       "pointer": "apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts"
     },
     {
       "acRef": "AC-1",
-      "description": "Real-database coverage proves learning consent is PENDING before attachment and CONSENTED only after both stamped grants exist; exact retry confirms without duplicates; wrong adult, changed residence, withdrawal, legacy restore, minor caller and a different existing valid guardian remain fail closed.",
+      "description": "Real PostgreSQL coverage proves PENDING-to-CONSENTED transition, terminal request back-links, stale email-token invalidation with no unstamped append, exact retry, rollback, no Supportership, Person/Login preservation, wrong adult, minor caller, residence drift, withdrawn/restored history, different guardian, organization move and denied verifier results.",
       "pointer": "apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts"
     },
     {
       "acRef": "AC-1",
-      "description": "The existing family-invite integration contract remains unchanged and independently proves accepting an inviter-issued family invite creates no Guardianship edge; invitation alone is never authority.",
-      "pointer": "apps/api/src/routes/family-join.integration.test.ts"
+      "description": "The real authenticated Hono stack is exercised with signed JWT verification and only the external Clerk/VPC network boundaries intercepted. Route tests prove verifier-mint-redemption success, denied-provider rejection, organization-specific redemption, complete request terminalization/back-links and later stale-email 404.",
+      "pointer": "apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts"
     },
     {
       "acRef": "AC-1",
-      "description": "The shared strict request/result contract exposes only learner id plus opaque assertion to mobile. The mutation disables retries for authority rejection and invalidates the consent/learning access projections after success; mobile tests exercise the real Hono client boundary and a 403 fail-closed response.",
-      "pointer": "apps/mobile/src/hooks/use-guardian-attachment.test.tsx"
+      "description": "Two database connections prove guardian attachment queues on the exact consentPersonLockKey/hashtextextended namespace shared with approval, withdrawal, restore, deletion and family join before writing.",
+      "pointer": "apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts"
     },
     {
       "acRef": "AC-1",
-      "description": "Broad verification is green: API/schema/mobile TypeScript builds, focused API token and production-config unit suites, focused mobile suite, the disposable-local-PostgreSQL integration suite, repository prepush, and repository-wide lint with no errors.",
+      "description": "The authenticated mobile callback screen is the production consumer of both verifier initiation and authority redemption. It sends only learner id plus opaque handles/tokens; real hooks, React Query, Hono client serialization, retry posture and post-success projection invalidation remain executable and covered.",
+      "pointer": "apps/mobile/src/app/(app)/guardian-attachment.test.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Fresh verification is green: token/config API unit 100/100; mobile hook 3/3 and callback 1/1; real-PostgreSQL integration 10/10; API/schema/mobile typechecks; prepush; hardcoded-JSX ratchet; targeted changed-file lint with zero findings; repository-wide lint with zero errors and only its pre-existing warning baseline.",
       "pointer": "pnpm prepush"
     }
   ],

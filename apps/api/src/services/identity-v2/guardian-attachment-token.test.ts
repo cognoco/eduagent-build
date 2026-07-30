@@ -9,6 +9,7 @@ const NOW = new Date('2026-07-30T12:00:00.000Z');
 const assertion = {
   guardianPersonId: '11111111-1111-4111-8111-111111111111',
   chargePersonId: '22222222-2222-4222-8222-222222222222',
+  organizationId: '33333333-3333-4333-8333-333333333333',
   jurisdiction: 'NO',
   policyVersion: 'NO-2026-07',
   assuranceMethod: 'verified_parental_responsibility_credential',
@@ -16,6 +17,8 @@ const assertion = {
   qualification: 'biological_parent' as const,
   decision: 'approved' as const,
   learnerAssentAt: null,
+  issuedAt: NOW,
+  notBefore: NOW,
   expiresAt: new Date('2026-07-30T12:15:00.000Z'),
 };
 
@@ -40,9 +43,51 @@ describe('guardian authority assertion token', () => {
 
   it('fails closed when the assertion is expired', () => {
     const token = signGuardianAuthorityToken(
-      { ...assertion, expiresAt: new Date('2026-07-30T11:59:59.000Z') },
+      {
+        ...assertion,
+        issuedAt: new Date('2026-07-30T11:44:00.000Z'),
+        notBefore: new Date('2026-07-30T11:44:00.000Z'),
+        expiresAt: new Date('2026-07-30T11:58:59.000Z'),
+      },
       SECRET,
     );
+
+    expect(verifyGuardianAuthorityToken(token, SECRET, NOW)).toBeNull();
+  });
+
+  it('refuses to mint an assertion with an arbitrary future expiry', () => {
+    expect(() =>
+      signGuardianAuthorityToken(
+        {
+          ...assertion,
+          expiresAt: new Date('2026-07-30T12:15:00.001Z'),
+        },
+        SECRET,
+      ),
+    ).toThrow('lifetime is invalid');
+  });
+
+  it('fails closed before not-before beyond the clock-skew allowance', () => {
+    const token = signGuardianAuthorityToken(
+      {
+        ...assertion,
+        notBefore: new Date('2026-07-30T12:02:00.000Z'),
+        expiresAt: new Date('2026-07-30T12:15:00.000Z'),
+      },
+      SECRET,
+    );
+
+    expect(verifyGuardianAuthorityToken(token, SECRET, NOW)).toBeNull();
+  });
+
+  it('fails closed when issued-at is implausibly in the future', () => {
+    const future = {
+      ...assertion,
+      issuedAt: new Date('2026-07-30T12:02:00.000Z'),
+      notBefore: new Date('2026-07-30T12:02:00.000Z'),
+      expiresAt: new Date('2026-07-30T12:15:00.000Z'),
+    };
+    const token = signGuardianAuthorityToken(future, SECRET);
 
     expect(verifyGuardianAuthorityToken(token, SECRET, NOW)).toBeNull();
   });

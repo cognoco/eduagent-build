@@ -183,6 +183,9 @@ type Bindings = {
 
   // Consent policy versioning
   CONSENT_POLICY_VERSION?: string;
+  GUARDIAN_AUTHORITY_TOKEN_SECRET?: string;
+  GUARDIAN_AUTHORITY_VERIFIER_URL?: string;
+  GUARDIAN_AUTHORITY_VERIFIER_KEY?: string;
 
   // Testing & operator tooling
   TEST_SEED_SECRET?: string;
