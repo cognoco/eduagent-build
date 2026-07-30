@@ -1,5 +1,6 @@
 import type { Database } from '@eduagent/database';
 import { SchemaDriftError, type WeeklyReportData } from '@eduagent/schemas';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 import {
   readSharedArtifactForSupportee,
@@ -119,7 +120,7 @@ function createDb(authorized = true): Database {
             conversationPrompt: 'raw prompt should not leak',
             engagementSignal: 'curious',
             closingLine: null,
-            learnerRecap: null,
+            learnerRecap: 'You practiced equivalent fractions.',
             nextTopicId: null,
             nextTopicReason: null,
             status: 'accepted',
@@ -208,6 +209,11 @@ describe('readSharedRecordForSupportee', () => {
     expect(JSON.stringify(record)).not.toContain('raw parent-facing recap');
     expect(JSON.stringify(record)).not.toContain('raw highlight');
     expect(JSON.stringify(record)).not.toContain('raw prompt');
+    const recapWhere = jest.mocked(db.query.sessionSummaries.findMany).mock
+      .calls[0]?.[0]?.where;
+    expect(new PgDialect().sqlToQuery(recapWhere as never).sql).toContain(
+      '"session_summaries"."learner_recap" is not null',
+    );
   });
 
   it('keeps every durable report and accepted recap discoverable in the Journal', async () => {
@@ -238,7 +244,7 @@ describe('readSharedRecordForSupportee', () => {
         conversationPrompt: null,
         engagementSignal: null,
         closingLine: null,
-        learnerRecap: null,
+        learnerRecap: `You completed recap ${index + 1}.`,
         nextTopicId: null,
         nextTopicReason: null,
         status: 'accepted' as const,
@@ -373,7 +379,7 @@ describe('readSharedRecordForSupportee', () => {
       conversationPrompt: null,
       engagementSignal: null,
       closingLine: null,
-      learnerRecap: null,
+      learnerRecap: 'You revisited an earlier fractions session.',
       nextTopicId: null,
       nextTopicReason: null,
       status: 'accepted',
@@ -399,5 +405,46 @@ describe('readSharedRecordForSupportee', () => {
     });
     expect(db.query.weeklyReports.findMany).not.toHaveBeenCalled();
     expect(db.query.sessionSummaries.findMany).not.toHaveBeenCalled();
+    const recapWhere = jest.mocked(db.query.sessionSummaries.findFirst).mock
+      .calls[0]?.[0]?.where;
+    expect(new PgDialect().sqlToQuery(recapWhere as never).sql).toContain(
+      '"session_summaries"."learner_recap" is not null',
+    );
+  });
+
+  it('does not expose an accepted summary whose durable recap was never produced', async () => {
+    const db = createDb();
+    jest.mocked(db.query.sessionSummaries.findFirst).mockResolvedValueOnce({
+      id: UUID.summary,
+      sessionId: UUID.olderSession,
+      profileId: UUID.supportee,
+      topicId: null,
+      content: 'raw learner-facing summary',
+      aiFeedback: null,
+      highlight: null,
+      narrative: null,
+      conversationPrompt: null,
+      engagementSignal: null,
+      closingLine: null,
+      learnerRecap: null,
+      nextTopicId: null,
+      nextTopicReason: null,
+      status: 'accepted',
+      createdAt: new Date('2026-06-21T12:00:00.000Z'),
+      updatedAt: new Date('2026-06-21T12:00:00.000Z'),
+      llmSummary: null,
+      summaryGeneratedAt: null,
+      purgedAt: null,
+      languageLearningSummary: null,
+    });
+
+    await expect(
+      readSharedArtifactForSupportee(db, {
+        supporterPersonId: UUID.supporter,
+        supporteePersonId: UUID.supportee,
+        artifactKind: 'session_recap',
+        artifactId: UUID.olderSession,
+      }),
+    ).rejects.toThrow('Journal artifact not found');
   });
 });

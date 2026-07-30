@@ -1,4 +1,9 @@
-import { render, screen, waitFor } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
 import type { ScopeDescriptor, SharedRecord } from '@eduagent/schemas';
 
@@ -41,8 +46,10 @@ jest.mock('expo-router', () => ({
 }));
 
 const mockSetActiveScope = jest.fn();
+const mockRefetchScopes = jest.fn();
 let mockAvailableScopes: ScopeDescriptor[];
 let mockScopesLoading: boolean;
+let mockScopesError: Error | null;
 
 jest.mock(
   '../../../../../lib/scope-context' /* gc1-allow: route test must hold the query-backed scope in unresolved-loading and revoked-edge states; the real provider cannot deterministically expose those states without coupling this route test to persistence and scope-query timing */,
@@ -51,6 +58,8 @@ jest.mock(
       activeScope: { kind: 'supporter-hub' },
       availableScopes: mockAvailableScopes,
       isLoading: mockScopesLoading,
+      error: mockScopesError,
+      refetchScopes: mockRefetchScopes,
       setActiveScope: mockSetActiveScope,
     }),
   }),
@@ -147,6 +156,7 @@ describe('PersonJournalArtifactScreen', () => {
     };
     mockAvailableScopes = [PERSON_SCOPE];
     mockScopesLoading = false;
+    mockScopesError = null;
     mockFetch.setRoute(
       `/visibility/reports/${PERSON_ID}/artifacts/weekly_report/${ARTIFACT_ID}`,
       RECORD,
@@ -240,6 +250,25 @@ describe('PersonJournalArtifactScreen', () => {
         `/visibility/reports/${PERSON_ID}/artifacts/weekly_report/${ARTIFACT_ID}`,
       ),
     ).toHaveLength(0);
+  });
+
+  it('shows a retryable scope error instead of misreporting a cold deep link as stale', () => {
+    mockAvailableScopes = [];
+    mockScopesError = new Error('scope service unavailable');
+
+    queryClient = renderScreen();
+
+    screen.getByTestId('person-journal-artifact-scope-error');
+    expect(screen.queryByTestId('person-journal-artifact-stale')).toBeNull();
+    expect(
+      fetchCallsMatching(
+        mockFetch,
+        `/visibility/reports/${PERSON_ID}/artifacts/weekly_report/${ARTIFACT_ID}`,
+      ),
+    ).toHaveLength(0);
+
+    fireEvent.press(screen.getByTestId('person-journal-artifact-scope-retry'));
+    expect(mockRefetchScopes).toHaveBeenCalledTimes(1);
   });
 
   it('turns a server-side relationship denial into the stale-link state', async () => {

@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNotNull } from 'drizzle-orm';
 import {
   createScopedRepository,
   milestones,
@@ -95,7 +95,9 @@ function projectWeeklyReportFact(
 
 function projectSessionRecapFact(
   row: typeof sessionSummaries.$inferSelect,
-): CandidateReportFact {
+): CandidateReportFact | null {
+  if (row.learnerRecap === null) return null;
+
   return {
     id: `recap:${row.sessionId}`,
     kind: 'effort',
@@ -134,7 +136,10 @@ async function projectSharedRecordForSupportee(
       eq(weeklyReports.childProfileId, input.supporteePersonId),
     ),
     supporteeRepo.sessionSummaries.findMany(
-      eq(sessionSummaries.status, 'accepted'),
+      and(
+        eq(sessionSummaries.status, 'accepted'),
+        isNotNull(sessionSummaries.learnerRecap),
+      ),
     ),
     supporteeRepo.milestones.findMany(undefined, desc(milestones.createdAt)),
   ]);
@@ -144,9 +149,10 @@ async function projectSharedRecordForSupportee(
     return fact ? [fact] : [];
   });
 
-  const recapFacts: CandidateReportFact[] = recapRows.map(
-    projectSessionRecapFact,
-  );
+  const recapFacts: CandidateReportFact[] = recapRows.flatMap((row) => {
+    const fact = projectSessionRecapFact(row);
+    return fact ? [fact] : [];
+  });
 
   const milestoneFacts: CandidateReportFact[] = milestoneRows
     .slice(0, 5)
@@ -212,6 +218,7 @@ async function projectSharedArtifactForSupportee(
             and(
               eq(sessionSummaries.sessionId, input.artifactId),
               eq(sessionSummaries.status, 'accepted'),
+              isNotNull(sessionSummaries.learnerRecap),
             ),
           )
           .then((row) => (row ? projectSessionRecapFact(row) : null)),

@@ -161,13 +161,19 @@ function AuthorizedArtifact({
 }
 
 export default function PersonJournalArtifactScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<{
     personId?: string | string[];
     artifactKind?: string | string[];
     artifactId?: string | string[];
   }>();
-  const { availableScopes, isLoading: scopesLoading } = useScopeContext();
+  const {
+    availableScopes,
+    isLoading: scopesLoading,
+    error: scopesError,
+    refetchScopes,
+  } = useScopeContext();
   const personId = firstParam(params.personId);
   const artifactId = firstParam(params.artifactId);
   const artifactKindResult = sharedRecordArtifactKindSchema.safeParse(
@@ -194,6 +200,28 @@ export default function PersonJournalArtifactScreen(): React.ReactElement {
 
   if (scopesLoading) {
     return <ArtifactLoading />;
+  }
+
+  if (scopesError) {
+    return (
+      <View className="flex-1 bg-background px-5 py-4">
+        <ErrorFallback
+          title={t('visibility.sharedRecord.errorTitle')}
+          message={t('visibility.sharedRecord.errorMessage')}
+          primaryAction={{
+            label: t('visibility.sharedRecord.retry'),
+            onPress: refetchScopes,
+            testID: 'person-journal-artifact-scope-retry',
+          }}
+          secondaryAction={{
+            label: t('common.goBack'),
+            onPress: onBack,
+            testID: 'person-journal-artifact-scope-error-back',
+          }}
+          testID="person-journal-artifact-scope-error"
+        />
+      </View>
+    );
   }
 
   if (!scope) {

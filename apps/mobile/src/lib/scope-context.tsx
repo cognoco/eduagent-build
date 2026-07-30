@@ -22,6 +22,7 @@ import { sanitizeSecureStoreKey } from './secure-storage';
 
 const LEARNER_SCOPE_LIST: SupporterScopeList = { shape: 'learner' };
 const IMPLICIT_ME_SCOPE: ScopeDescriptor = { kind: 'me' };
+const NOOP_REFETCH = (): void => undefined;
 
 interface ScopeContextValue {
   scopeList: SupporterScopeList;
@@ -31,6 +32,7 @@ interface ScopeContextValue {
   setActiveScope: (scope: ScopeDescriptor) => void;
   isLoading: boolean;
   error: Error | null;
+  refetchScopes: () => void;
 }
 
 const ScopeContext = createContext<ScopeContextValue | null>(null);
@@ -70,12 +72,14 @@ function ScopeStateProvider({
   profileId,
   isLoading = false,
   error = null,
+  refetchScopes = NOOP_REFETCH,
 }: {
   children: ReactNode;
   scopeList: SupporterScopeList;
   profileId?: string;
   isLoading?: boolean;
   error?: Error | null;
+  refetchScopes?: () => void;
 }): React.ReactElement {
   const [userScopeKey, setUserScopeKey] = useState<string | null>(null);
   const [storedScopeKey, setStoredScopeKey] = useState<string | null>(null);
@@ -179,6 +183,7 @@ function ScopeStateProvider({
       setActiveScope,
       isLoading,
       error,
+      refetchScopes,
     }),
     [
       activeScope,
@@ -186,6 +191,7 @@ function ScopeStateProvider({
       error,
       isLoading,
       persistedScopeKey,
+      refetchScopes,
       scopeList,
       setActiveScope,
     ],
@@ -213,6 +219,10 @@ function QueryBackedScopeProvider({
     select: (json) => json,
     notFoundFallback: LEARNER_SCOPE_LIST,
   });
+  const { refetch } = scopesQuery;
+  const refetchScopes = useCallback(() => {
+    void refetch();
+  }, [refetch]);
 
   return (
     <ScopeStateProvider
@@ -220,6 +230,7 @@ function QueryBackedScopeProvider({
       profileId={activeProfile?.id}
       isLoading={scopesQuery.isLoading}
       error={coerceError(scopesQuery.error)}
+      refetchScopes={refetchScopes}
     >
       {children}
     </ScopeStateProvider>

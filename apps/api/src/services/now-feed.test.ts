@@ -11,6 +11,7 @@ import {
   buildNowOverflowFromCandidates,
   collectRecapReadyCandidatesForTesting,
   isRetentionDueAt,
+  mergeSupporterHubCandidatesIntoSelfFeed,
   rankCandidates,
   resolveRecapReadyDeepLink,
   resolveDeepLink,
@@ -334,6 +335,57 @@ describe('now feed ranking', () => {
     expect(
       feed.cards.find((item) => item.kind === 'support_hub_pointer'),
     ).not.toHaveProperty('edgeId');
+  });
+
+  it('preserves supporter recap announcements in the consumed self feed', () => {
+    const recap = candidate({
+      id: 'supportee-recap',
+      kind: 'ledger_moment',
+      templateKey: 'now.ledger_moment.recap_ready',
+      params: { ledgerKind: 'recap_ready', sessionId: 'session-1' },
+      deepLink: resolveDeepLink('journal.artifact', {
+        personId: 'person-1',
+        artifactKind: 'session_recap',
+        artifactId: 'session-1',
+      }),
+      scope: 'person',
+      personId: 'person-1',
+      edgeId: 'edge-1',
+    });
+    const unrelatedHubCandidate = candidate({
+      id: 'supportee-retention',
+      kind: 'retention_due',
+      scope: 'person',
+      personId: 'person-1',
+      edgeId: 'edge-1',
+    });
+
+    const merged = mergeSupporterHubCandidatesIntoSelfFeed(
+      [candidate({ id: 'self-session', kind: 'unfinished_session' })],
+      [recap, unrelatedHubCandidate],
+      'supporter-1',
+      now,
+    );
+
+    expect(merged).toContain(recap);
+    expect(merged).not.toContain(unrelatedHubCandidate);
+    expect(merged).toContainEqual(
+      expect.objectContaining({
+        kind: 'support_hub_pointer',
+        params: { count: 2 },
+      }),
+    );
+    const consumedCards = [
+      ...buildNowFeedFromCandidates(merged, 'self', now).cards,
+      ...buildNowOverflowFromCandidates(merged, 'self', now).items,
+    ];
+    expect(consumedCards).toContainEqual(
+      expect.objectContaining({
+        deepLink: recap.deepLink,
+        personId: 'person-1',
+        edgeId: 'edge-1',
+      }),
+    );
   });
 });
 

@@ -467,12 +467,34 @@ export async function collectCandidatesForRequest(
   if (request.scope !== 'self') return candidates;
 
   const hubCandidates = await collectSupporterHubCandidates(db, personId, now);
-  if (hubCandidates.length === 0) return candidates;
+  return mergeSupporterHubCandidatesIntoSelfFeed(
+    candidates,
+    hubCandidates,
+    personId,
+    now,
+  );
+}
+
+export function mergeSupporterHubCandidatesIntoSelfFeed(
+  selfCandidates: NowFeedCandidate[],
+  hubCandidates: NowFeedCandidate[],
+  supporterPersonId: string,
+  now: Date,
+): NowFeedCandidate[] {
+  if (hubCandidates.length === 0) return selfCandidates;
+
+  const recapAnnouncements = hubCandidates.filter(
+    (candidate) =>
+      candidate.scope === 'person' &&
+      candidate.params.ledgerKind === 'recap_ready' &&
+      candidate.deepLink.route === 'journal.artifact',
+  );
 
   return [
-    ...candidates,
+    ...selfCandidates,
+    ...recapAnnouncements,
     {
-      id: `support-hub-pointer:${personId}`,
+      id: `support-hub-pointer:${supporterPersonId}`,
       kind: 'support_hub_pointer',
       createdAt: now,
       sortAt: now,
