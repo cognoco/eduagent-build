@@ -71,3 +71,16 @@ the pending fork is visible, Tabs remain mounted for route preservation but
 are absent from ordinary accessibility/test queries, use `display: none`, and
 carry native accessibility hiding. The two focused requested-route tests and
 all 267 tests across the six affected suites passed after the corrections.
+
+## Landed WI-2231 merge-forward RED/GREEN
+
+The merge-forward first preserved WI-2532's pre-landing `handleClose` calls and
+added routing assertions before production changed. Both the initial
+family-intent persistence case and the marker-only retry case failed RED:
+`router.replace` had zero calls where shell-aware Home/Mentor completion was
+required.
+
+Both paths now call the landed `handleCompleted` helper after durable
+persistence. The two focused tests passed GREEN. The full merge-forward union
+then passed 410 tests across eight suites, including WI-2532's six suites and
+WI-2231's session and consent routing suites.

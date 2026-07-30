@@ -7,6 +7,11 @@
     },
     {
       "acRef": "AC-1",
+      "description": "After durable initial or retry persistence, family intent completes through the landed shell-aware path: V2 Mentor and older-shell Home, without changing cancel, pending-consent, or ordinary add-child close semantics.",
+      "pointer": "apps/mobile/src/app/create-profile.test.tsx"
+    },
+    {
+      "acRef": "AC-1",
       "description": "The plain-language Me and Someone else branches, own-login question, credentialed invitation route, and explicit managed-path gate are covered as one non-authorizing UI state machine.",
       "pointer": "apps/mobile/src/components/onboarding/FamilyIntentOnboardingGate.test.tsx"
     },

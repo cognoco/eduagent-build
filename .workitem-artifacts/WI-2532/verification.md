@@ -15,11 +15,18 @@
 - Sign-out clears both SecureStore and the in-memory pending-state cache.
 - SecureStore write, clear, rejection, and timeout paths fail closed with
   translated retry UI; retry after adult creation does not repeat the POST.
+- Successful initial and retry persistence use the landed shell-aware
+  completion path: V2 Mentor, older-shell Home. Cancel, pending-consent, and
+  ordinary add-child paths retain their existing close semantics.
 
 ## Focused mobile verification
 
-- Family-intent state, component, profile creation, app-layout,
-  invitation-route, and sign-out suites: 6 suites, 267 tests passed.
+- Merge-forward union covering family-intent state, component, profile
+  creation, app-layout, invitation route, sign-out, session routing, and
+  consent routing: 8 suites, 410 tests passed.
+- Focused RED proved the two family-intent persistence paths made zero
+  shell-aware replace calls under the old `handleClose`; both pass after using
+  the landed completion helper.
 - The two focused route-preservation cases passed: a pending restore keeps the
   requested Tabs navigator mounted but hidden, and a failed restore retry
   preserves the requested route.
@@ -36,8 +43,10 @@
   local-database safety guard; the corrected Doppler `dev` run exited 0.
 - i18n staleness, orphan-key, hardcoded-JSX-literal, and clinical-copy checks:
   passed.
+- Teen-consent claims and GC1 mock-governance ratchets: passed.
 - Test-only export ratchet: passed.
 - Touched-file ESLint with `--max-warnings=0`: passed.
+- Exact candidate Prettier check: passed.
 - Git whitespace check: passed.
 
 ## Preview journey
@@ -50,13 +59,16 @@ form without first writing a visibility/supportership link.
 
 ## Collision and flag audit
 
-- Publication merge-forward used authoritative `origin/main`
-  `47dd24d5024ff8a1be0d9790eb43849c533bbfd4` after a file-map preflight found
-  no overlap with WI-2532. BID-33 PR #2692 remains incorporated with both
-  locale key families retained.
-- WI-2231 PR #2704 remains open and unlanded at reviewed head
-  `2602ee46da16606de91c6a281e579cb8e209a1f5`. Its create-profile changes are
-  therefore not incorporated into this publication head.
+- Publication merge-forward uses authoritative `origin/main`
+  `e90b6c94a2f92d76a8a566d642946779df7033ff`, which includes landed WI-2231
+  PR #2704.
+- The known create-profile overlap was reconciled without rebase or history
+  rewrite. WI-2532 retains the durable non-authorizing fork and adopts WI-2231's
+  current `handleCompleted` / `getPostAuthDefaultPath` completion behavior
+  after successful initial or retry persistence.
+- The app-layout/test tree was reconciled; a duplicate `mockPush` declaration
+  surfaced by the textual merge was removed before the 143-test layout suite
+  and 410-test union passed.
 - Existing flags-off, V0, and V1 shell contracts are unchanged. Direct
   existing-account entry preserves the prior explicit unavailable state when
   V2 is off.

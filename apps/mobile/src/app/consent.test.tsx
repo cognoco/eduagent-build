@@ -5,6 +5,7 @@ import {
   createTestProfile,
 } from '../test-utils/screen-render';
 import type { Profile } from '../lib/profile';
+import { FEATURE_FLAGS } from '../lib/feature-flags';
 
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
@@ -321,7 +322,7 @@ describe('ConsentScreen', () => {
     screen.getByText(/mum@example\.com/);
   });
 
-  it('"Got it" button calls router.back() after child direct submit', async () => {
+  it('"Got it" uses the shell-aware destination after child direct submit', async () => {
     mockMutateAsync.mockResolvedValue({
       message: 'Consent request sent',
       consentType: 'GDPR',
@@ -352,7 +353,9 @@ describe('ConsentScreen', () => {
     flushFadeAnimation();
 
     fireEvent.press(screen.getByTestId('consent-done'));
-    expect(mockBack).toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith(
+      FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? '/(app)/mentor' : '/(app)/home',
+    );
   });
 
   // ── CR-108: Clerk hydration guard ───────────────────────────────
@@ -538,7 +541,7 @@ describe('ConsentScreen', () => {
     screen.getByTestId('consent-resend-email');
   });
 
-  it('hand-back button calls router.back()', async () => {
+  it('hand-back completion uses the shell-aware destination', async () => {
     mockMutateAsync.mockResolvedValue({
       message: 'Consent request sent',
       consentType: 'GDPR',
@@ -564,7 +567,9 @@ describe('ConsentScreen', () => {
     flushFadeAnimation();
 
     fireEvent.press(screen.getByTestId('consent-done'));
-    expect(mockBack).toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith(
+      FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? '/(app)/mentor' : '/(app)/home',
+    );
   });
 
   it('replaces home when closing with no back history', async () => {
@@ -594,6 +599,78 @@ describe('ConsentScreen', () => {
 
     fireEvent.press(screen.getByTestId('consent-done'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+  });
+
+  describe('[WI-2231] shell-aware successful consent exit', () => {
+    const mutableFlags = FEATURE_FLAGS as {
+      MODE_NAV_V0_ENABLED: boolean;
+      MODE_NAV_V1_ENABLED: boolean;
+      MODE_NAV_V2_ENABLED: boolean;
+    };
+    const originalFlags = {
+      v0: mutableFlags.MODE_NAV_V0_ENABLED,
+      v1: mutableFlags.MODE_NAV_V1_ENABLED,
+      v2: mutableFlags.MODE_NAV_V2_ENABLED,
+    };
+
+    afterEach(() => {
+      mutableFlags.MODE_NAV_V0_ENABLED = originalFlags.v0;
+      mutableFlags.MODE_NAV_V1_ENABLED = originalFlags.v1;
+      mutableFlags.MODE_NAV_V2_ENABLED = originalFlags.v2;
+    });
+
+    it.each([
+      {
+        shell: 'flags-off',
+        flags: { v0: false, v1: false, v2: false },
+        destination: '/(app)/home',
+      },
+      {
+        shell: 'V0',
+        flags: { v0: true, v1: false, v2: false },
+        destination: '/(app)/home',
+      },
+      {
+        shell: 'V1',
+        flags: { v0: true, v1: true, v2: false },
+        destination: '/(app)/home',
+      },
+      {
+        shell: 'V2',
+        flags: { v0: true, v1: true, v2: true },
+        destination: '/(app)/mentor',
+      },
+    ])(
+      'replaces to $destination after successful consent in $shell',
+      async ({ flags, destination }) => {
+        mutableFlags.MODE_NAV_V0_ENABLED = flags.v0;
+        mutableFlags.MODE_NAV_V1_ENABLED = flags.v1;
+        mutableFlags.MODE_NAV_V2_ENABLED = flags.v2;
+        mockCanGoBack.mockReturnValue(true);
+        mockMutateAsync.mockResolvedValue({
+          message: 'Consent request sent',
+          consentType: 'GDPR',
+          emailStatus: 'sent',
+        });
+
+        renderConsent();
+        fireEvent.changeText(
+          screen.getByTestId('consent-email'),
+          'parent@example.com',
+        );
+        fireEvent.press(screen.getByTestId('consent-submit'));
+        flushFadeAnimation();
+
+        await waitFor(() => {
+          screen.getByTestId('consent-done');
+        });
+        flushFadeAnimation();
+        fireEvent.press(screen.getByTestId('consent-done'));
+
+        expect(mockReplace).toHaveBeenCalledWith(destination);
+        expect(mockBack).not.toHaveBeenCalled();
+      },
+    );
   });
 
   // ── Error handling ───────────────────────────────────────────────

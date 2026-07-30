@@ -48,6 +48,8 @@ import { platformAlert } from '../lib/platform-alert';
 import { errorHasCode } from '../components/session/session-types';
 import { queueMentorBornCeremony } from '../lib/mentor-born-ceremony';
 import { startFamilyIntentOnboarding } from '../lib/family-intent-onboarding-state';
+import { toInternalAppRedirectPath } from '../lib/normalize-redirect-path';
+import { getPostAuthDefaultPath } from './(app)/_lib/auth-redirect';
 
 // Captured at module load — safe because these screens are portrait-locked.
 // On web, cap at a mobile-like height to avoid massive whitespace.
@@ -105,7 +107,11 @@ export default function CreateProfileScreen() {
   const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const params = useLocalSearchParams<{ for?: 'child' }>();
+  const params = useLocalSearchParams<{
+    for?: 'child';
+    firstSetup?: 'true';
+    returnTo?: string;
+  }>();
   const colors = useThemeColors();
   const { isLoaded, isSignedIn } = useAuth();
   const {
@@ -189,6 +195,12 @@ export default function CreateProfileScreen() {
   const handleClose = useCallback(() => {
     goBackOrReplace(router, '/(app)/home');
   }, [router]);
+  const handleCompleted = useCallback(() => {
+    const defaultPath = getPostAuthDefaultPath();
+    router.replace(
+      toInternalAppRedirectPath(params.returnTo, defaultPath) as Href,
+    );
+  }, [params.returnTo, router]);
 
   const onDateChange = useCallback(
     (_event: DateTimePickerEvent, selectedDate?: Date) => {
@@ -303,7 +315,7 @@ export default function CreateProfileScreen() {
         setCreatePostPending(false);
         await startFamilyIntentOnboarding(pendingFamilyIntentProfileId);
         pendingFamilyIntentProfileIdRef.current = null;
-        handleClose();
+        handleCompleted();
         void clearPreAuthAudience();
         const switchResult = await switchProfile(pendingFamilyIntentProfileId);
         if (switchResult?.success === false) {
@@ -423,7 +435,11 @@ export default function CreateProfileScreen() {
       // request screen, and do NOT switch to the child profile — keep the
       // parent on their own profile.
       if (isParentAddingChild) {
-        handleClose();
+        if (params.firstSetup === 'true') {
+          handleCompleted();
+        } else {
+          handleClose();
+        }
         // Show confirmation — parent stays on their own profile. If the
         // family-context PATCH failed, keep the successful child creation and
         // give the parent an explicit retry path instead of silently landing
@@ -478,7 +494,9 @@ export default function CreateProfileScreen() {
         pendingFamilyIntentProfileIdRef.current = profile.id;
         await startFamilyIntentOnboarding(profile.id);
         pendingFamilyIntentProfileIdRef.current = null;
-        handleClose();
+        // The durable gate owns the next choice. Complete through the current
+        // shell so V2 lands at Mentor while older shells retain Home.
+        handleCompleted();
       } else {
         if (isFirstProfileCreation && !isAddingChild) {
           await queueMentorBornCeremony({
@@ -486,7 +504,7 @@ export default function CreateProfileScreen() {
             reason: 'first-profile-created',
           });
         }
-        handleClose();
+        handleCompleted();
       }
 
       // Audience has served its purpose; clear the cross-signup carrier so a
@@ -564,6 +582,8 @@ export default function CreateProfileScreen() {
     switchProfile,
     router,
     handleClose,
+    handleCompleted,
+    params.firstSetup,
     isAdultBirthDate,
     isParentFirstProfileSetup,
     wantsFamily,

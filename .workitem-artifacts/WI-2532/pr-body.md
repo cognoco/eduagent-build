@@ -8,15 +8,18 @@
   synchronous `onComplete` mounts/reveals the learner shell, and the
   existing-account destination clears after its real route mounts (V2
   invitation form or older-shell unavailable gate)
+- preserve shell-aware completion after durable persistence: V2 lands at Mentor
+  and older shells retain Home, including the marker-only retry path
 - add focused mobile coverage, translated copy, and a preview browser journey
 
 ## Verification
 
-- six focused mobile suites: 267 tests passed
+- merge-forward union: eight suites, 410 tests passed
 - full mobile unit suite: passed
 - full API unit suite under Doppler `dev`: passed
-- TypeScript build and i18n/clinical-copy/test-only-export ratchets: passed
+- TypeScript build and i18n/teen-consent/test-only-export/GC1 ratchets: passed
 - touched-file ESLint with `--max-warnings=0`: passed
+- exact candidate Prettier and `git diff --check`: passed
 - publication-review regressions: focused RED-to-green coverage passed
 - review hardening covers stale-read invalidation after sign-out, recovery-only
   primary repair, all-mode terminal marker consumption, and an inaccessible
@@ -25,9 +28,11 @@
 
 ## Collision note
 
-Publication merged authoritative main `47dd24d50` after a zero-overlap file-map
-preflight. BID-33 PR #2692 remains incorporated with both locale key families
-retained. WI-2231 PR #2704 remains open and unlanded at `2602ee46`; its
-create-profile changes are therefore not incorporated into this branch.
+Publication merge-forward now incorporates authoritative main `e90b6c94a`,
+including landed WI-2231 PR #2704. The known create-profile overlap was
+resolved semantically: WI-2532 retains the non-authorizing durable fork,
+no-PATCH/no-child-redirect contract, retry journal, and all-mode terminal marker
+consumption, while adopting WI-2231's `handleCompleted` /
+`getPostAuthDefaultPath` routing after successful initial or retry persistence.
 
 Refs: WI-2532

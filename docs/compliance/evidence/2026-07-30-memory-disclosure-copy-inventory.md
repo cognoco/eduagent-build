@@ -1,0 +1,43 @@
+# Memory Disclosure Copy Inventory — v0.1 (Draft for DPO review, agent-drafted)
+
+**Status:** Draft v0.1, 2026-07-30. For DPO review (Stephan Hartmann).
+**Feeds:** DPO Action 13 — [`DPO exchanges/2026-07-26-action-register-tracker.md`](../DPO%20exchanges/2026-07-26-action-register-tracker.md) row 13.
+**Method:** direct read of `apps/mobile/src/app/(app)/mentor-memory.tsx`, `apps/mobile/src/app/(app)/child/[profileId]/mentor-memory.tsx`, `apps/mobile/src/components/memory-consent-prompt.tsx`, `apps/mobile/src/i18n/locales/en.json`, `apps/api/src/config.ts`.
+
+## 0. Important correction to the task framing
+
+This inventory was scoped as "every surface that must disclose or control memory **when it unlocks**" — implying the feature and its UI do not yet exist. **That is not what the code shows.** A full persistent-memory feature is already built and shipping copy already exists in `en.json`:
+
+- `apps/mobile/src/app/(app)/mentor-memory.tsx` — the owner's own memory screen (five sections: learning style, focus-area progress, interests, etc., per the `getFocusAreaProgress`/`getLearningStyleRows` imports), with delete-item, delete-all, toggle-injection, and consent-grant actions wired to real hooks (`useDeleteMemoryItem`, `useDeleteAllMemory`, `useToggleMemoryInjection`, `useGrantMemoryConsent`, `useUnsuppressInference`, `useTellMentor`).
+- `apps/mobile/src/app/(app)/child/[profileId]/mentor-memory.tsx` — a guardian-facing equivalent for viewing/managing a managed child's memory.
+- `apps/mobile/src/components/memory-consent-prompt.tsx` — a reusable consent-grant/decline component, with existing shipped copy in `en.json` under the `memoryConsent` namespace (`defaultTitle`, `defaultTitleNoName`, `defaultDescription`, `grant`, `a11yEnable`, `a11ySkip`).
+
+What is actually gated off is the **server-side read path**: `apps/api/src/config.ts:125` — `MEMORY_FACTS_READ_ENABLED` defaults `'false'`, alongside `MEMORY_FACTS_RELEVANCE_RETRIEVAL` and `MEMORY_FACTS_DEDUP_ENABLED` (also default `false`). This matches the action register tracker's interim condition: *"Persistent memory + profiling stay disabled until legal basis/controls/transparency/retention approved."* So the correct framing for this inventory is: **the UI and its copy already exist and are live in the client**, but the feature is inert because the server never returns memory reads while the flag is off. "Unlocking" memory means flipping `MEMORY_FACTS_READ_ENABLED` (and the related flags) to `true` — at which point the existing screens start actually surfacing content, not that new screens get built.
+
+This changes what the DPO needs from Action 13: it is not "design new disclosure surfaces" but **"audit the disclosure copy that already ships today, in a currently-inert feature, for adequacy before the server flag flips."**
+
+## 1. Surface inventory
+
+| Surface | File | Current state | i18n route | Adequacy for DPO review |
+|---|---|---|---|---|
+| **Consent prompt** (grant/decline) | `apps/mobile/src/components/memory-consent-prompt.tsx` | Live component, shipped copy | `memoryConsent.*` (`apps/mobile/src/i18n/locales/en.json:4414-4421`) | Copy exists but is thin — one sentence ("This lets the mentor remember what kinds of explanations work, what is still tricky, and which examples feel relevant") with no mention of duration, deletion rights, or the "not used for advertising/training other models" disclosure the child-readable notice draft makes elsewhere. **Proposed direction:** align this prompt's `defaultDescription` with the fuller framing in [`2026-07-30-child-notice-memory-section-draft.md`](2026-07-30-child-notice-memory-section-draft.md) — not final copy, a direction only. |
+| **Memory settings screen (owner)** | `apps/mobile/src/app/(app)/mentor-memory.tsx` | Live screen, functional (view/delete/toggle) | `mentorMemory.*` — three separate blocks exist in `en.json` (lines ~582, ~710, ~2760 — **[OPEN — needs input]: three near-identical `mentorMemory` blocks were found by a keyword search; not diffed against each other this pass to confirm whether they are legitimate per-context duplicates or copy drift — worth a follow-up check before finalizing.**) | This screen already shows the learner what is remembered and lets them delete it — functionally, this is the strongest transparency surface in the app today. **Proposed direction:** confirm the on-screen explanatory copy (not just row labels) states plainly why the mentor keeps this and links to the privacy notice; not verified line-by-line this pass. |
+| **Memory settings screen (guardian, for a managed child)** | `apps/mobile/src/app/(app)/child/[profileId]/mentor-memory.tsx` | Live screen | Same `mentorMemory.*` namespace, guardian-context variant | **Proposed direction:** this is the surface most directly implicated by the still-open guardian-visibility-scope question (see the child-notice draft's placeholder) — its copy should not be finalized until that scope is ruled, since what a guardian is shown here is the product-level answer to "what can guardians see." |
+| **Onboarding consent moment** | `apps/mobile/src/app/consent.tsx` | File exists; not opened this pass to confirm whether it currently mentions persistent memory specifically or only the general processing consent | **[OPEN — needs input]** — not traced this pass | Needs a direct read to confirm whether a memory-specific consent moment fires at onboarding today, or only the general processing/Article 8 consent the country-policy work covers. |
+| **Chat-level indicator** | Not identified this pass — no file found under session/chat screens that shows an explicit "the mentor remembers you" indicator during an active session | Not built (or not found) | **[OPEN — needs input]** | The child-readable notice draft's "You are talking to AI" disclosure is a session-level indicator for AI-generation, not for persistent memory specifically. **Proposed direction:** if memory unlocks, consider a small in-session indicator (e.g., "Remembers your progress" badge) distinct from the AI-disclosure indicator — this is a new-copy item, unlike the three surfaces above which already exist. |
+| **Privacy screen (top-level)** | `apps/mobile/src/app/(app)/more/privacy.tsx` | Live screen; currently covers export/delete/withdrawal-archive preference, links to `/privacy` (the full privacy policy) and `/terms` — no memory-specific row today | `more.privacy.*`, `more.other.*` (repo i18n convention confirmed by direct read) | **Proposed direction:** add a `more.privacy.memoryRow` entry linking to the mentor-memory screen and/or a short inline explainer, following the existing `SettingsRow` pattern already used for `more.other.exportMyData` / `more.other.deleteAccount` at `privacy.tsx:129-155`. |
+
+## 2. What this inventory recommends before Action 13 can close its memory-specific slice
+
+1. **Audit, don't build.** Three of the five surfaces above already exist and ship copy today, inert only because of the server flag. The compliance work is auditing that existing copy against the transparency bar (duration, purpose limitation, deletion rights, no-training/no-ads statement), not designing new screens.
+2. **Resolve the `mentorMemory` triple-block question** in `en.json` before treating any of its copy as reviewed — three near-identical blocks were found and not reconciled this pass.
+3. **Read `apps/mobile/src/app/consent.tsx` directly** to confirm what onboarding consent currently says about memory, if anything — this pass did not open the file.
+4. **Decide whether a chat-level "remembers you" indicator is wanted** — this is the one surface in the inventory that appears to be a genuine gap, not an existing-copy audit.
+5. Do not finalize any guardian-facing memory copy (row 3 above) until the child-best-interests / guardian-visibility scope question already flagged in the existing child-readable notice draft is settled — it is the same open question, not a new one this document introduces.
+
+## 3. Open items
+
+- **[OPEN — needs input]** Content of `apps/mobile/src/app/consent.tsx` — not read this pass.
+- **[OPEN — needs input]** Whether the three `mentorMemory` blocks in `en.json` are legitimate duplicates (different screens/contexts) or copy drift.
+- **[OPEN — needs input]** Whether a chat-level persistent-memory indicator (distinct from the existing AI-disclosure indicator) is wanted; no such surface was found in this pass.
+- **[OPEN — needs input]** Full text of the `mentorMemory.*` on-screen copy (not just the row-label keys) was not read line-by-line — needed before this inventory can claim adequacy, not just existence.

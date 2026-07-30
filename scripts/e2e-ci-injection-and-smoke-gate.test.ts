@@ -7205,6 +7205,12 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scenario: 'parent-multi-child',
         shard: 1,
       },
+      // [WI-2231] First-run profile/legal gate through one persisted Mentor session.
+      {
+        flow: 'flows/v2/v2-first-mentor-session.yaml',
+        scenario: 'pre-profile',
+        shard: 1,
+      },
       {
         flow: 'flows/v2/v2-homework-manual-entry.yaml',
         scenario: 'trial-active',

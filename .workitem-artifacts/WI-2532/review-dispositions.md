@@ -13,10 +13,12 @@
 | Single microtask drain is fragile | Accepted in substance and adapted | The preview early-return path makes the suggested loading test ID unobservable, so the test explicitly drains the known primary/recovery/state-update microtasks with an explanatory comment. |
 | Gate-ordering comment omits family-intent step | Accepted and fixed | The ordering comment now records the family-intent gate between preview/profile resolution and profile creation/consent/Tabs. |
 | Duplicate hook dependency | Accepted and fixed | The duplicate `isFirstProfileCreation` dependency was removed; touched-file lint is warning-free. |
+| Landed WI-2231 restores shell-aware V2 completion at the create-profile overlap | Accepted and reconciled | The durable fork, no-PATCH/no-child-redirect contract, retry journal, and terminal marker consumption remain intact. Successful initial and retry persistence now use the landed `handleCompleted` / `getPostAuthDefaultPath` path. Two routing assertions failed RED under `handleClose` and pass GREEN. |
 | Clear only after `onComplete` destination mounts | Rejected with contract evidence | `onComplete` is a synchronous `setFamilyIntentState(null)`, not navigation. Durable clear commits completion before mounting/revealing the learner shell; moving it after this callback would make a completed choice resumable after process death. |
 | Deduplicate the handoff helper in this correction | Rejected as out of correction scope | There is no demonstrated correctness defect, and the ruled publication correction preserves the existing narrowly scoped helper rather than adding an unrelated refactor. |
 
-Focused verification after disposition: six affected suites, 267 tests passed;
-the two requested-route preservation cases passed; TypeScript, warning-free
-touched-file ESLint, Prettier, all mobile i18n ratchets, and `git diff --check`
+Focused verification after disposition and merge-forward: eight union suites,
+410 tests passed; the two requested-route preservation cases passed;
+TypeScript, warning-free touched-file ESLint, exact-file Prettier, mobile i18n,
+teen-consent, test-only-export, and GC1 ratchets, plus `git diff --check`,
 passed.

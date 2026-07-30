@@ -1,0 +1,49 @@
+# Residence Determination Design — v0.1 (Draft for DPO review, agent-drafted)
+
+**Status:** Draft v0.1, 2026-07-30. For DPO review (Stephan Hartmann).
+**Feeds:** DPO Action 3 — [`DPO exchanges/2026-07-26-action-register-tracker.md`](../DPO%20exchanges/2026-07-26-action-register-tracker.md) row 3.
+**Method:** direct read of `packages/schemas/src/profiles.ts`, `packages/schemas/src/country-policy.ts`, `apps/api/src/routes/profiles.ts`, `apps/api/src/services/identity-v2/identity-graph.ts`, `apps/api/src/services/identity-v2/profile-v2.ts`, `apps/api/src/services/identity-v2/country-policy.ts`, `apps/api/src/services/identity-v2/country-policy-loader.ts`, and `apps/mobile/eas.json`. Every claim below carries a file:line citation or is marked `[OPEN — needs input]`.
+
+## 1. Summary — two residence signals exist in this codebase, and they are not the same one
+
+There is a **legacy, live, self-declared 3-bucket signal** that is collected at profile creation and stored on every profile, and a **newer, ISO-3166 alpha-2, DB-mastered resolver** that was purpose-built for exactly this DPO ask (WI-2690) but is not yet called from any production code path. The perimeter ruling and the 07-23 country ruling describe residence gating as if the second one is live. It is not, as of 2026-07-30. This gap is the most important finding in this document.
+
+## 2. Signal 1 — the legacy `location` field (live, collected today)
+
+- **Schema:** `locationSchema = z.enum(['EU', 'US', 'OTHER'])` (`packages/schemas/src/profiles.ts:6`).
+- **Collection:** `location: locationSchema.optional()` on `profileCreateSchema` (`packages/schemas/src/profiles.ts:84`) — **self-declared, and optional**, not required. It is asked once, at profile creation, alongside `birthYear`/`birthMonth`/`birthDay`.
+- **Storage:** the profile-creation route passes `input.location` into `createIdentityGraph()` (`apps/api/src/routes/profiles.ts:300`), which maps it through `locationToJurisdiction()` (`apps/api/src/services/identity-v2/identity-graph.ts:73-76`, comment at line 67-71) into a `residenceJurisdiction` column on the `person` row: `US`→`US`, `EU`→`EU`, `OTHER`→`ROW`, and an absent value defaults to `ROW` (the same bucket as `OTHER`). The inverse map, `jurisdictionToLocation()`, lives in `apps/api/src/services/identity-v2/profile-v2.ts:48-55` and is used to read the field back out for API responses.
+- **What consumes it:** `residenceJurisdiction` is read/written across ~90 files, but this is almost entirely test fixtures and the identity-graph plumbing itself (`profile-v2.ts`, `identity-graph.ts`, `child-profile-v2.ts`). A grep of `apps/api/src/services/policy-engine/` and `apps/api/src/services/llm/` for `residenceJurisdiction` returned **zero matches** — it is not consumed by the LLM router or the policy engine for any gating decision. It is stored, not enforced against.
+- **Precision:** three buckets, not a country code. It cannot distinguish Norway from Portugal, or a threshold-13 EEA country from a threshold-16 one — it cannot drive the country register at all in its current shape.
+
+**[OPEN — needs input]:** does any UI surface actually prompt the learner/guardian to choose EU/US/OTHER at signup, or does it default silently to `ROW` for everyone? The field is optional in the schema; whether the mobile onboarding flow presents a picker for it was not traced this pass (mobile onboarding screens were not opened). If it defaults silently, today's "residence signal" is effectively unset for most or all users.
+
+## 3. Signal 2 — the country-policy resolver (built, not wired to any production route)
+
+- **Schema:** `packages/schemas/src/country-policy.ts` defines the full contract WI-2690 was built for: `countryCodeSchema` (ISO 3166-1 alpha-2, uppercase-only, non-coerced), `residenceAssuranceSchema` (a `method` — `self_report` or `verified_credential` as PRIMARY, plus a `corroboratingMethods` array of `billing_address`/`geo_ip`/`storefront_country`/`device_locale` that can only ever corroborate, never substitute), and `countryPolicyRecordSchema` (a full effective-dated registry row: Article 8 threshold, authorization form, launch status, legal verification status/review dates, processing-location class, source provenance).
+- **Resolver:** `resolveCountryPolicy()` (`apps/api/src/services/identity-v2/country-policy.ts:88-236`) is a pure function. Given a habitual-residence code, a birth date, a residence-assurance object, and the registry rows for that country, it returns a typed `CountryPolicyDecision` — `allowed`/`blocked` plus reason codes (`COUNTRY_UNKNOWN`, `COUNTRY_INVALID`, `COUNTRY_UNSUPPORTED`, `POLICY_NOT_EFFECTIVE`, `POLICY_STALE`, `RESIDENCE_ASSURANCE_INSUFFICIENT`, `LEGAL_VERIFICATION_UNVERIFIED`, `LEGAL_REVIEW_STALE`, `COUNTRY_BLOCKED`, `CONTROLLER_GATES_OPEN`, `BELOW_LAUNCH_MINIMUM_AGE`). It is genuinely fail-closed: an unknown, malformed, or unsupported residence code returns `blocked` before ever touching the database (`country-policy.ts:94-101`).
+- **DB loader:** `loadCountryPolicies()` / `resolveJurisdiction()` (`apps/api/src/services/identity-v2/country-policy-loader.ts:52-112`) is the one sanctioned read path from the live `country_policy_registry` table (joined to `regimes`), enforcing that no caller holds its own copy of country/threshold data (matches `AGENTS.md`'s reads convention — a global reference table with no `profile_id`, correctly using direct `db.select()` rather than the scoped repository).
+- **Wiring status — the finding:** a repository-wide search for callers of `resolveJurisdiction(` found exactly one production file (the file it is defined in) and one test file (`country-policy-loader.integration.test.ts`, 5 call sites, all inside `describe`/`it` blocks). **No route, no onboarding handler, no middleware calls this function.** There is no `habitualResidence` field or `residenceAssurance` object collected anywhere in `apps/api/src/routes/` — a grep for `habitualResidence|residenceCountry` across `packages/schemas/src` returned matches only in `country-policy.ts` and its own test file, never in `profiles.ts` (the actual profile-creation schema) or `onboarding.ts`.
+
+**Conclusion:** the country-policy resolver is complete, tested-in-isolation, and correct against its own spec (WI-2690's acceptance criteria are legible in its comments). It is not integrated. As of 2026-07-30, no signup, onboarding, or session-start code path in this repository asserts a learner's habitual residence in the ISO-3166 shape the resolver requires, and no code path calls the resolver to make an allow/block decision.
+
+## 4. How the allowlist is enforced technically today
+
+Per the perimeter ruling (`2026-07-26-launch-perimeter-ruling-screen-based-allowlist.md`, line 11): *"The launch perimeter is an allowlist (enforced via store distribution config + in-app residence gating, per the 07-23 ruling's control model)."* Checking both halves:
+
+- **Store distribution config:** `apps/mobile/eas.json` was read in full. It defines build profiles (production/development/preview/fallback) and one `submit.production.android` block naming a Google Play `track: 'internal'`. **No country/region restriction of any kind appears in this file.** Store-level geographic availability (which countries the app is listed/downloadable in on the App Store and Google Play) is configured directly in App Store Connect and the Google Play Console, not in this repo — so it cannot be verified by reading code. **[OPEN — needs input: confirm current App Store Connect / Google Play Console country-availability settings match the intended allowlist (EEA threshold-13 set + US); this repo contains no evidence either way.]**
+- **In-app residence gating:** per §3, this does not exist in production code today. The `location` field (§2) is collected, stored, but not read by any gating logic.
+
+**This document's central finding for the DPO:** the perimeter ruling's stated enforcement mechanism ("store distribution config + in-app residence gating") is **not currently implemented as a working technical control**. Store-level enforcement is plausible but unverifiable from this repo and needs a direct console check; in-app enforcement is verifiably absent. This is exactly the "technical blocking evidence" gap DPO Action 3 names, and it should not be represented to the DPO as closed or in-progress-only-pending-review — it needs to be represented as **not yet built**, distinct from the country register documents themselves (2026-07-23 ruling, perimeter ruling), which are legal/policy artifacts, not enforcement code.
+
+## 5. Recommendation
+
+1. Treat "wire `resolveJurisdiction()` into the actual signup/onboarding flow, collecting a real ISO alpha-2 `habitualResidence` and a `residenceAssurance` object instead of the legacy 3-bucket `location` field" as a named, tracked engineering item before any country is technically enabled — not a documentation task.
+2. Until that wiring exists, do not represent to the DPO that country-based access is technically blocked. The country register documents state *policy*; nothing in the running application currently *enforces* it beyond the unverified store-listing question in §4.
+3. Confirm store-level country availability directly against the live App Store Connect / Google Play Console configuration, since it cannot be confirmed from this repository.
+
+## 6. Open items
+
+- **[OPEN — needs input]** Does mobile onboarding UI actually prompt for `location` today, or does it silently default? Not traced this pass.
+- **[OPEN — needs input]** Current App Store Connect / Google Play Console country-availability settings.
+- **[OPEN — needs input]** Timeline/owner for wiring `resolveJurisdiction()` into a real route — this affects when Action 3's "technical blocking evidence" sub-item can honestly be marked anything other than `not-started`.

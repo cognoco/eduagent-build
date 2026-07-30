@@ -143,4 +143,22 @@ describe('[WI-1641] production secret-sync workflow', () => {
     );
     expect(apply?.run).toContain('pnpm secrets:reconcile --env prd --apply');
   });
+
+  it('[WI-1837] keeps a timed-out restore alertable after the always-run health check', () => {
+    const steps = workflow.jobs.sync.steps as Array<{
+      name?: string;
+      if?: string;
+    }>;
+    const healthIndex = steps.findIndex(
+      (step) => step.name === 'Verify production environment health',
+    );
+    const notifyIndex = steps.findIndex(
+      (step) =>
+        step.name === 'Notify on sync, reconciliation, or health failure',
+    );
+
+    expect(steps[healthIndex]?.if).toBe('always()');
+    expect(notifyIndex).toBeGreaterThan(healthIndex);
+    expect(steps[notifyIndex]?.if).toBe('failure()');
+  });
 });

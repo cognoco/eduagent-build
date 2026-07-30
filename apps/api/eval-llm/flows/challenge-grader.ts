@@ -109,6 +109,7 @@
 import type { AgeBracket, ConversationLanguage } from '@eduagent/schemas';
 import { challengeRoundGraderVerdictSchema } from '@eduagent/schemas';
 import { buildChallengeRoundGraderPrompt } from '../../src/services/challenge-round/grader-prompt';
+import { getTextContent } from '../../src/services/llm/types';
 import type { EvalProfile } from '../fixtures/profiles';
 import type {
   FlowDefinition,
@@ -493,13 +494,9 @@ export const challengeGraderFlow: FlowDefinition<ChallengeGraderInput> = {
       ageBracket: input.ageBracket,
       conversationLanguage: input.conversationLanguage,
     });
-    // grader-prompt emits string content only; narrow the ChatMessage union
-    // (string | MessagePart[]) to satisfy PromptMessages' string fields.
-    const asText = (c: string | unknown[] | undefined): string =>
-      typeof c === 'string' ? c : '';
     return {
-      system: asText(messages[0]?.content),
-      user: asText(messages[1]?.content),
+      system: messages[0] ? getTextContent(messages[0].content) : '',
+      user: messages[1] ? getTextContent(messages[1].content) : '',
       notes: [
         `Grader scenario: ${input.scenarioId} — ${input.description}`,
         `Expected result: ${input.expectedResult}`,
