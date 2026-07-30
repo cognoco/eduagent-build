@@ -58,6 +58,7 @@ const EXCLUDE_EXACT = ['EXPO_TOKEN', 'API_ORIGIN'];
 // the API project here prevents a valid DSN for another MentoMate surface from
 // silently routing Worker errors into that project's quota and issue stream.
 const API_SENTRY_PROJECT_ID = '4511717632704592';
+const EXTERNAL_COMMAND_TIMEOUT_MS = 30_000;
 
 const DOPPLER_CLI =
   process.platform === 'win32' ? 'C:\\Tools\\doppler\\doppler.exe' : 'doppler';
@@ -93,6 +94,7 @@ function isWranglerAuthenticated(configPath) {
       cwd: API_DIR,
       shell: false,
       stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: EXTERNAL_COMMAND_TIMEOUT_MS,
     },
   );
   return result.status === 0;
@@ -132,7 +134,11 @@ function downloadSecrets(config) {
   try {
     const raw = execSync(
       `"${DOPPLER_CLI}" secrets download --config ${config} --no-file --format json`,
-      { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
+      {
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: EXTERNAL_COMMAND_TIMEOUT_MS,
+      },
     );
     return JSON.parse(raw);
   } catch {
@@ -212,6 +218,7 @@ function pushToWorker(secrets, wranglerEnv, workerName, configPath) {
     cwd: API_DIR,
     shell: false,
     stdio: ['pipe', 'pipe', 'pipe'],
+    timeout: EXTERNAL_COMMAND_TIMEOUT_MS,
   });
 
   if (result.status !== 0) {
@@ -246,6 +253,7 @@ function verifyWorkerSecretNames(
     cwd: API_DIR,
     shell: false,
     stdio: ['pipe', 'pipe', 'pipe'],
+    timeout: EXTERNAL_COMMAND_TIMEOUT_MS,
   });
   if (result.status !== 0) {
     return {
