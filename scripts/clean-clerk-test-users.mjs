@@ -26,7 +26,8 @@
 
 import cleanupRules from './clean-clerk-test-users-lib.js';
 
-const { classifyClerkTestUserForCleanup } = cleanupRules;
+const { classifyClerkTestUserForCleanup, restoreAllClerkDeletionMarkers } =
+  cleanupRules;
 
 const EXECUTE = process.argv.includes('--execute');
 const olderThanArg = process.argv.find((arg) =>
@@ -159,9 +160,11 @@ async function setClerkExternalId(userId, externalId) {
 }
 
 async function restoreClerkDeletionMarkers(pendingDeletions) {
-  for (const { user, originalExternalId } of pendingDeletions) {
-    await setClerkExternalId(user.id, originalExternalId);
-  }
+  await restoreAllClerkDeletionMarkers(
+    pendingDeletions,
+    ({ user, originalExternalId }) =>
+      setClerkExternalId(user.id, originalExternalId),
+  );
 }
 
 async function markClerkUsersForDeletion(users) {
