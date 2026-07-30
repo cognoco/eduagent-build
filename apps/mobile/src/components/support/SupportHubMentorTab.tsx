@@ -76,7 +76,7 @@ function SupportHubMentorPersonCard({
   onOpenSubjects?: (scope: PersonScope) => void;
   onOpenJournal?: (scope: PersonScope) => void;
 }): React.ReactElement {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const query = useSharedRecord(scope);
   const facts = query.data?.supporterView.facts.slice(0, 2) ?? [];
   const showHeaderSubtitle = query.isLoading || !hasShareableFacts(query.data);
@@ -136,7 +136,7 @@ function SupportHubMentorPersonCard({
           structuralOnlyLabel={t('supportHub.mentor.structuralOnly')}
           facts={facts.map((fact) => ({
             id: fact.id,
-            ...renderSharedRecordFact(fact, t),
+            ...renderSharedRecordFact(fact, t, i18n.language),
           }))}
         />
       ) : query.data ? (

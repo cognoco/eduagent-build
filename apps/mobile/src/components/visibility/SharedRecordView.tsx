@@ -32,7 +32,7 @@ export function SharedRecordView({
   onRetryAppeal,
   supporteeName,
 }: SharedRecordViewProps): React.ReactElement {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   if (error) {
     return (
@@ -86,7 +86,7 @@ export function SharedRecordView({
         structuralOnlyLabel={t('visibility.sharedRecord.structuralOnly')}
         facts={(view?.facts ?? []).map((fact) => ({
           id: fact.id,
-          ...renderSharedRecordFact(fact, t),
+          ...renderSharedRecordFact(fact, t, i18n.language),
         }))}
         appeal={appeal}
         testID="visibility-shared-record"
