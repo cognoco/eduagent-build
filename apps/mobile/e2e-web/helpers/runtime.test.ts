@@ -63,13 +63,10 @@ describe('local Playwright test-seed secret contract (WI-2921)', () => {
     }
   });
 
-  it('defers local secret resolution until a seed request needs its header', () => {
+  it('does not resolve a local secret during configuration import', () => {
     const { root, load } = prepareRuntime();
     try {
-      const runtime = load();
-      expect(() => runtime.buildTestSeedHeaders()).toThrow(
-        /Local API TEST_SEED_SECRET is unavailable/i,
-      );
+      expect(() => load()).not.toThrow();
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

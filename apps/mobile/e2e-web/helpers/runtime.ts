@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 import { parse } from 'dotenv';
@@ -43,14 +43,23 @@ function resolveTestSeedSecret(): string | undefined {
     return runnerSecret;
   }
 
+  const cwdApiVarsPath = path.join(process.cwd(), 'apps', 'api', '.dev.vars');
+  const apiVarsPath = existsSync(cwdApiVarsPath)
+    ? cwdApiVarsPath
+    : path.resolve(
+        __dirname,
+        '..',
+        '..',
+        '..',
+        '..',
+        'apps',
+        'api',
+        '.dev.vars',
+      );
+
   let apiSecret: string | undefined;
   try {
-    apiSecret = parse(
-      readFileSync(
-        path.join(process.cwd(), 'apps', 'api', '.dev.vars'),
-        'utf8',
-      ),
-    ).TEST_SEED_SECRET;
+    apiSecret = parse(readFileSync(apiVarsPath, 'utf8')).TEST_SEED_SECRET;
   } catch {
     throw new Error(
       '[playwright:seed-secret] Local API TEST_SEED_SECRET is unavailable. Run pnpm env:sync before a local Playwright run.',
