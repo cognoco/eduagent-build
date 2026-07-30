@@ -34,6 +34,14 @@ CI=1 PLAYWRIGHT_SKIP_LOCAL_API=1 E2E_ENV=staging PLAYWRIGHT_INCLUDE_P1B=1 \
 
 Local API mode starts `wrangler dev` unless `PLAYWRIGHT_SKIP_LOCAL_API=1` is set. The API server and Expo export are launched from `apps/mobile`, so `pnpm --dir ../api exec wrangler dev --port 8787` targets `apps/api` and `node e2e-web/helpers/serve-exported-web.mjs` serves `apps/mobile/dist`.
 
+For a local seeded run, first run `pnpm env:sync`, then invoke Playwright normally — for example:
+
+```bash
+pnpm run test:e2e:web -- --project=v2-release --retries=0
+```
+
+The runner reads the local API test-seed secret from `apps/api/.dev.vars`, the same source used by `wrangler dev`; no manual environment bridge is needed. A supplied `PLAYWRIGHT_TEST_SEED_SECRET` or `TEST_SEED_SECRET` is accepted only when it matches that local API value. A mismatch fails before seeding and never prints either secret. This local alignment is disabled when `PLAYWRIGHT_SKIP_LOCAL_API=1`, so shared staging continues to use its configured external secret path.
+
 Before `expo export`, the web server rewrites `apps/mobile/.env.local` and `apps/mobile/.env.development.local` so the built web bundle uses the same API URL as the Playwright seed helpers. Set `PLAYWRIGHT_API_URL` to override it; `EXPO_PUBLIC_API_URL` is accepted as a fallback for compatibility. If neither is set, local mode uses `http://127.0.0.1:8787` and staging mode uses the default shared test API.
 
 The export also sets `EXPO_PUBLIC_E2E=true`, enabling guarded browser-test hosts such as `/quiz/dev-only/results`. Non-E2E builds redirect those routes to the app home screen.
