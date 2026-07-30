@@ -72,8 +72,6 @@ function resolveTestSeedSecret(): string | undefined {
   return apiSecret;
 }
 
-const testSeedSecret = resolveTestSeedSecret();
-
 function sanitizeEmailAlias(alias: string): string {
   const normalized = alias
     .toLowerCase()
@@ -115,5 +113,6 @@ export function buildSeedEmail(alias: string): string {
 }
 
 export function buildTestSeedHeaders(): Record<string, string> {
+  const testSeedSecret = resolveTestSeedSecret();
   return testSeedSecret ? { 'X-Test-Secret': testSeedSecret } : {};
 }

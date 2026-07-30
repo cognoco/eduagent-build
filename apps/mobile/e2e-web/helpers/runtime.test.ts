@@ -63,6 +63,18 @@ describe('local Playwright test-seed secret contract (WI-2921)', () => {
     }
   });
 
+  it('defers local secret resolution until a seed request needs its header', () => {
+    const { root, load } = prepareRuntime();
+    try {
+      const runtime = load();
+      expect(() => runtime.buildTestSeedHeaders()).toThrow(
+        /Local API TEST_SEED_SECRET is unavailable/i,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('continues to accept an explicitly supplied matching local runner secret', () => {
     const { root, load } = prepareRuntime({
       apiSecret: 'api-local-secret',
@@ -86,7 +98,7 @@ describe('local Playwright test-seed secret contract (WI-2921)', () => {
     try {
       let thrown: unknown;
       try {
-        load();
+        load().buildTestSeedHeaders();
       } catch (error) {
         thrown = error;
       }
