@@ -25,6 +25,7 @@ const MANIFEST_PATH = path.join(
 );
 const DOPPLER_CLI =
   process.platform === 'win32' ? 'C:\\Tools\\doppler\\doppler.exe' : 'doppler';
+const EXTERNAL_COMMAND_TIMEOUT_MS = 30_000;
 
 const PRODUCTION_TARGET = {
   dopplerProject: 'mentomate',
@@ -313,6 +314,7 @@ function listWorkerSecretNames(target, configPath) {
       cwd: API_DIR,
       shell: false,
       stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: EXTERNAL_COMMAND_TIMEOUT_MS,
     },
   );
   if (result.status !== 0) {
@@ -352,6 +354,7 @@ function deleteWorkerSecret(key, target, configPath) {
       cwd: API_DIR,
       shell: false,
       stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: EXTERNAL_COMMAND_TIMEOUT_MS,
     },
   );
   return result.status === 0
@@ -384,6 +387,7 @@ function downloadDopplerKeyNames(target) {
       encoding: 'utf-8',
       shell: false,
       stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: EXTERNAL_COMMAND_TIMEOUT_MS,
     },
   );
   if (result.status !== 0) {

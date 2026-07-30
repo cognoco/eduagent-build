@@ -41,6 +41,8 @@ const {
     now: Date,
   ) => OwnershipManifest;
 };
+const fs = require('fs');
+const path = require('path');
 
 type OwnershipManifest = {
   schemaVersion: 1;
@@ -111,6 +113,18 @@ describe('[WI-1837] Worker secret ownership manifest', () => {
 
 describe('[WI-1837] deletion-safe reconciliation', () => {
   const validManifest = manifest();
+
+  it('caps every external reconciliation command at 30 seconds', () => {
+    const source = fs.readFileSync(
+      path.join(__dirname, 'reconcile-worker-secrets.js'),
+      'utf8',
+    );
+
+    expect(source).toContain('const EXTERNAL_COMMAND_TIMEOUT_MS = 30_000;');
+    expect(source.match(/timeout: EXTERNAL_COMMAND_TIMEOUT_MS/g)).toHaveLength(
+      3,
+    );
+  });
 
   it('dry-runs only manifest-owned Worker keys absent from Doppler', () => {
     const plan = buildReconciliationPlan({
