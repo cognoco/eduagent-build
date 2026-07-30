@@ -11,6 +11,11 @@
       "pointer": "docs/evidence/WI-2636/completion-summary.md"
     },
     {
+      "acRef": "AC-1",
+      "description": "A revision-coherent revalidation records the exact selected-root inventory and clean current command result.",
+      "pointer": "docs/evidence/WI-2636/current-semantic-revalidation.md"
+    },
+    {
       "acRef": "AC-2",
       "description": "The reproduced integration API, signature, union, and narrowing errors are repaired at the named session pipeline sites.",
       "pointer": "tests/integration/session-completed-pipeline.integration.test.ts"
@@ -26,9 +31,19 @@
       "pointer": "apps/mobile/src/lib/assert-ok.ts"
     },
     {
+      "acRef": "AC-2",
+      "description": "The revision-coherent reproduction identifies and verifies the five later provider-field diagnostics as repaired by landed WI-2896 work.",
+      "pointer": "docs/evidence/WI-2636/current-semantic-revalidation.md"
+    },
+    {
       "acRef": "AC-3",
       "description": "The semantic program retains the strict base configuration without suite exclusions, suppressions, filename allowlists, quarantine, or an advisory guard.",
       "pointer": "tests/integration/tsconfig.json"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "The current revalidation records the retained no-suppression and no-exclusion contract.",
+      "pointer": "docs/evidence/WI-2636/current-semantic-revalidation.md"
     },
     {
       "acRef": "AC-4",
@@ -46,9 +61,19 @@
       "pointer": "package.json"
     },
     {
+      "acRef": "AC-4",
+      "description": "The current revalidation preserves the original inventory and records the exact five-diagnostic bounce reproduction and zero-diagnostic restoration.",
+      "pointer": "docs/evidence/WI-2636/current-semantic-revalidation.md"
+    },
+    {
       "acRef": "AC-5",
       "description": "The tracked completion evidence records that the repaired baseline is consumable unchanged and that the exact deliberate assignment remains detectable.",
       "pointer": "docs/evidence/WI-2636/completion-summary.md"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "The current revalidation records the unchanged guard command and the exact deliberate-fixture detection result.",
+      "pointer": "docs/evidence/WI-2636/current-semantic-revalidation.md"
     }
   ],
   "noiseBaselineVersion": "2026-07-26"
