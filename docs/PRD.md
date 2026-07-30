@@ -83,7 +83,7 @@ Motivated learners aged 13+ who really want to learn—not casual browsers:
 - **Pricing:** €18.99/mo (Plus) | €28.99/mo (Family, up to 4 users) | €48.99/mo (Pro, up to 6 users)
 - **Family/Pro:** Shared question pools across all users
 - **Trial:** 14 days Plus access + 14 days soft landing (reverse trial)
-- **Free Tier:** 100 questions/month with first-week boost (10/day for days 1-7)
+- **Free Tier:** dual cap — 10 questions/day AND 100 questions/month, both permanent (see `MMT-ADR-0042`)
 - **Top-ups:** Plus €10/500, Family/Pro €5/500 (12-month expiry)
 
 ---
@@ -1505,11 +1505,11 @@ The EVALUATE prompt template needs access to: (a) the topic's key concepts, (b) 
 | **Family** | €28.99 | €252 (26% off) | Up to 4 | 1,500 shared | €5/500 |
 | **Pro** | €48.99 | €432 (26% off) | Up to 6 | 3,000 shared | €5/500 |
 
-*\*Free tier includes first-week boost: 10 questions/day for days 1-7*
+*\*Free tier is a permanent dual cap: 10 questions/day AND 100 questions/month, applied together on every day of use — not a time-limited boost. See `MMT-ADR-0042`.*
 
 **Free Tier:**
 - Unlimited onboarding (interview + curriculum generation)
-- 100 questions/month with first-week boost (10/day for days 1-7)
+- 10 questions/day AND 100 questions/month — both caps permanent and applied together (`MMT-ADR-0042`)
 - Full feature access (no feature gating, only usage limits)
 - Progress tracking and Library (progress saved forever)
 - Top-ups not available (must upgrade)
