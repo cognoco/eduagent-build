@@ -249,7 +249,7 @@ function createIntegrationDb(): Database {
       ).rejects.toBeInstanceOf(ForbiddenError);
     });
 
-    it('[WI-2385 AC-8: NEGATIVE WALL — existing seeded person without an edge] an existing person with structural data but zero supportership to the caller is denied identically', async () => {
+    it('[WI-2385 AC-7: NEGATIVE WALL — existing seeded person without an edge] an existing person with structural data but zero supportership to the caller is denied identically', async () => {
       const targetPersonId = existingUnlinkedSeeded.ids.supporteePersonId;
       const [existingTarget, existingSubject, unexpectedEdge] =
         await Promise.all([
