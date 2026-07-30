@@ -35,7 +35,7 @@ Last updated: 2026-05-29
   - [ ] `RESEND_WEBHOOK_SECRET` — Resend webhook signing secret
   - [ ] `API_ORIGIN` — `https://api.mentomate.com`
   - [ ] `REVENUECAT_WEBHOOK_SECRET` — from RevenueCat (after store connections)
-  - [ ] `DATABASE_URL` — Neon production branch connection string
+  - [ ] `DATABASE_URL` — Neon production branch read-only lane connection string; do not use the migration-owner or Worker application role
   - [ ] `ALLOW_MISSING_IDEMPOTENCY_KV` — only set to `true` if production must launch before `IDEMPOTENCY_KV` is bound
   - [ ] `ANTHROPIC_API_KEY` — optional, for premium tier
 
@@ -43,6 +43,8 @@ Last updated: 2026-05-29
   - [ ] `CLOUDFLARE_API_TOKEN`
   - [ ] `DATABASE_URL_STAGING`
   - [ ] `DATABASE_URL_PRODUCTION`
+  - [ ] `DATABASE_URL_STAGING_APP` — staging Worker application role; data access without schema DDL/ownership
+  - [ ] `DATABASE_URL_PRODUCTION_APP` — production Worker application role; data access without schema DDL/ownership
   - [ ] `DATABASE_URL_STAGING_HOST`
   - [ ] `DATABASE_URL_PRODUCTION_HOST`
   - [ ] `EXPO_TOKEN`
@@ -52,9 +54,12 @@ Last updated: 2026-05-29
   - [ ] `PRODUCTION_API_URL` — optional smoke-test override; defaults to `https://api.mentomate.com` (set only if the custom domain differs)
 
 - [ ] **Verify production database migration path**
-  - `deploy.yml` runs committed migrations against the selected target after DB host verification and before `wrangler deploy`
+  - `deploy.yml` verifies the selected target and live migration journal/schema effects before running committed migrations
   - Do not run `drizzle-kit push` against staging or production
   - If deploying outside `deploy.yml`, point `DATABASE_URL` at production Neon and run `pnpm exec drizzle-kit migrate` before deploying the Workers bundle
+  - Two-key hold: before merging the credential split, provision both GitHub `*_APP` secrets, verify those roles can perform required application data writes but no schema DDL/ownership, then rotate Doppler `stg` / `prd` `DATABASE_URL` to read-only roles
+  - [ ] Rule the Worker RLS posture: deliberately reviewed temporary `BYPASSRLS` application role with no ownership/DDL/admin capability, or defer the credential swap until complete policies + scoped GUC wiring exist
+  - [ ] Against staging, capture catalog capability evidence, authenticated seeded-profile read/create/update/delete smoke, a negative cross-profile access check, and proof that migration/DDL/ownership operations are refused
 
 - [ ] **Verify KV namespace bindings** in `wrangler.toml [env.production]`:
   - `SUBSCRIPTION_KV`: `cde9f81f19a34022b6dc6951928a0511`

@@ -7,8 +7,19 @@
 can also be dispatched manually from `main`.
 
 The workflow bulk-updates the named `mentomate-api-prd` Worker from Doppler,
-then checks `https://api.mentomate.com/v1/health`. Its maximum normal drift
-window is one schedule interval plus GitHub Actions scheduling delay.
+overlays its database URL from the separate
+`DATABASE_URL_PRODUCTION_APP` GitHub secret, then checks
+`https://api.mentomate.com/v1/health`. Its maximum normal drift window is one
+schedule interval plus GitHub Actions scheduling delay.
+
+The application URL may be activated only after the database credential split
+and RLS gate in `docs/deployment-and-secrets.md` are satisfied. Current RLS
+enablement has incomplete policies and most calls do not set the scoped profile
+GUC, so a normal non-owner/non-`BYPASSRLS` role would break reads and writes.
+Use either the explicitly reviewed temporary `BYPASSRLS` posture with no
+ownership/DDL/admin capability, or defer the swap until scoped RLS is complete.
+Production activation requires prior staging catalog evidence, authenticated
+read/write smoke, and a negative cross-profile access check.
 
 ## Safeguards
 
@@ -16,8 +27,8 @@ window is one schedule interval plus GitHub Actions scheduling delay.
 - The production-specific concurrency group is shared with `deploy.yml` across
   all dispatch refs, so a scheduled sync cannot race a production deployment.
 - SHA-pinned third-party actions and checksum-verified Doppler CLI.
-- Hard failure when the Doppler token, Cloudflare API token, or account ID is
-  missing.
+- Hard failure when the Doppler token, Cloudflare API token, account ID, or
+  Worker application database URL is missing.
 - Explicit temporary Wrangler config and Worker name; no committed Cloudflare
   identifiers and no unrelated KV identifiers in the job.
 - Post-upload key-name verification confirms every non-empty Doppler-managed
@@ -109,17 +120,19 @@ retains it and schedules no deletion.
 
 ## Manual Remediation
 
-1. Confirm `DOPPLER_TOKEN_PRD`, `CLOUDFLARE_API_TOKEN`, and `CF_ACCOUNT_ID` are
-   present in GitHub Actions secrets.
+1. Confirm `DOPPLER_TOKEN_PRD`, `CLOUDFLARE_API_TOKEN`, `CF_ACCOUNT_ID`, and
+   `DATABASE_URL_PRODUCTION_APP` are present in GitHub Actions secrets.
 2. Dispatch `Production Worker Secret Sync` from `main`.
 3. Confirm the sync step targets `mentomate-api-prd` and the health step returns
    HTTP 200 with `status=ok`.
-4. If Actions is unavailable, use PowerShell with the three credentials already
-   loaded by the machine secret profile:
+4. If Actions is unavailable, use PowerShell only after the four credentials
+   above are explicitly loaded into the current shell through the approved
+   machine secret flow:
 
    ```powershell
    $env:DOPPLER_TOKEN = $env:DOPPLER_TOKEN_PRD
    $env:CLOUDFLARE_ACCOUNT_ID = $env:CF_ACCOUNT_ID
+   $env:WORKER_DATABASE_URL = $env:DATABASE_URL_PRODUCTION_APP
    $env:WRANGLER_SYNC_CONFIG = Join-Path $env:TEMP 'wrangler-secret-sync.jsonc'
    Set-Content -LiteralPath $env:WRANGLER_SYNC_CONFIG -Value '{"name":"mentomate-api-prd"}'
    pnpm secrets:sync prd

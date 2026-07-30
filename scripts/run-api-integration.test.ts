@@ -297,6 +297,14 @@ describe('run-api-integration.mjs', () => {
     expect(readMarker(pnpmMarker)).toBe('');
   });
 
+  test('--check-only validates the disposable DB without launching Jest', () => {
+    const result = run(['--check-only'], dedicatedDatabase);
+
+    expect(result.status).toBe(0);
+    expect(readMarker(corepackMarker)).toBe('');
+    expect(readMarker(pnpmMarker)).toBe('');
+  });
+
   test('canonical package command selects mentomate/integration explicitly', () => {
     const pkg = JSON.parse(readFileSync(ROOT_PACKAGE_JSON, 'utf8')) as {
       scripts?: Record<string, string>;

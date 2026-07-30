@@ -58,6 +58,7 @@ const EXCLUDE_EXACT = ['EXPO_TOKEN', 'API_ORIGIN'];
 // the API project here prevents a valid DSN for another MentoMate surface from
 // silently routing Worker errors into that project's quota and issue stream.
 const API_SENTRY_PROJECT_ID = '4511717632704592';
+const EXTERNAL_COMMAND_TIMEOUT_MS = 30_000;
 
 const DOPPLER_CLI =
   process.platform === 'win32' ? 'C:\\Tools\\doppler\\doppler.exe' : 'doppler';
@@ -93,6 +94,7 @@ function isWranglerAuthenticated(configPath) {
       cwd: API_DIR,
       shell: false,
       stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: EXTERNAL_COMMAND_TIMEOUT_MS,
     },
   );
   return result.status === 0;
@@ -132,7 +134,11 @@ function downloadSecrets(config) {
   try {
     const raw = execSync(
       `"${DOPPLER_CLI}" secrets download --config ${config} --no-file --format json`,
-      { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
+      {
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: EXTERNAL_COMMAND_TIMEOUT_MS,
+      },
     );
     return JSON.parse(raw);
   } catch {
@@ -150,6 +156,30 @@ function filterSecrets(secrets) {
       excluded.push(key);
     }
   }
+  return { filtered, excluded };
+}
+
+function prepareWorkerSecrets(envKey, secrets, workerDatabaseUrl) {
+  const { filtered, excluded } = filterSecrets(secrets);
+
+  if (envKey !== 'stg' && envKey !== 'prd') {
+    return { filtered, excluded };
+  }
+
+  if (Object.hasOwn(filtered, 'DATABASE_URL')) {
+    delete filtered.DATABASE_URL;
+    excluded.push('DATABASE_URL');
+  }
+
+  if (!workerDatabaseUrl) {
+    return {
+      filtered: {},
+      excluded,
+      error: 'WORKER_DATABASE_URL is required for protected Worker secret sync',
+    };
+  }
+
+  filtered.DATABASE_URL = workerDatabaseUrl;
   return { filtered, excluded };
 }
 
@@ -212,6 +242,7 @@ function pushToWorker(secrets, wranglerEnv, workerName, configPath) {
     cwd: API_DIR,
     shell: false,
     stdio: ['pipe', 'pipe', 'pipe'],
+    timeout: EXTERNAL_COMMAND_TIMEOUT_MS,
   });
 
   if (result.status !== 0) {
@@ -246,6 +277,7 @@ function verifyWorkerSecretNames(
     cwd: API_DIR,
     shell: false,
     stdio: ['pipe', 'pipe', 'pipe'],
+    timeout: EXTERNAL_COMMAND_TIMEOUT_MS,
   });
   if (result.status !== 0) {
     return {
@@ -297,7 +329,15 @@ function syncEnvironment(envKey, configPath) {
   }
 
   const totalCount = Object.keys(secrets).length;
-  const { filtered, excluded } = filterSecrets(secrets);
+  const { filtered, excluded, error } = prepareWorkerSecrets(
+    envKey,
+    secrets,
+    process.env.WORKER_DATABASE_URL,
+  );
+  if (error) {
+    console.error(`\x1b[31m[sync]\x1b[0m ${error}`);
+    return false;
+  }
   const syncCount = Object.keys(filtered).length;
 
   const sentryProject = validateApiSentryProject(filtered);
@@ -409,6 +449,7 @@ module.exports = {
   findMissingSecretNames,
   isWranglerAuthenticated,
   isRenderedWranglerToml,
+  prepareWorkerSecrets,
   shouldSkipSync,
   syncSecrets,
   validateApiSentryProject,
