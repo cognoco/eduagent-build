@@ -3,11 +3,11 @@
  *
  * Seeds two isolated profiles. For each test, inserts candidate + neighbour
  * fact rows with real embeddings. Runs runDedupForProfile with a real DB and
- * scoped repo. Mocks only the LLM boundary (routeAndCall) via registerProvider.
+ * scoped repo. Mocks only the LLM boundary via the caller dependency.
  * Asserts DB state after each action.
  *
  * Per AGENTS.md: "No internal mocks in integration tests."
- * LLM boundary: registerProvider (real routeAndCall dispatch, mock chat fn).
+ * LLM boundary: caller dependency (real runDedupLlm parsing, mock route result).
  */
 
 import { and, eq, isNull } from 'drizzle-orm';
@@ -43,10 +43,16 @@ type SuccessfulDedupLlmResult = Extract<DedupLlmResult, { ok: true }>;
 
 function llmDecision(
   decision: SuccessfulDedupLlmResult,
-): jest.MockedFunction<
-  NonNullable<Parameters<typeof runDedupForProfile>[0]['llm']>
-> {
-  return jest.fn().mockResolvedValue(decision);
+): NonNullable<Parameters<typeof runDedupForProfile>[0]['llmDeps']> {
+  return {
+    caller: jest.fn().mockResolvedValue({
+      response: JSON.stringify(decision.decision),
+      model: decision.modelVersion,
+      provider: decision.provider,
+      latencyMs: 1,
+      stopReason: 'stop',
+    }),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -94,7 +100,7 @@ describe('memory_facts dedup — action branches (real DB)', () => {
       candidateIds: [cId],
       threshold: 0.5,
       cap: 5,
-      llm: llmDecision({
+      llmDeps: llmDecision({
         ok: true,
         decision: {
           action: 'merge',
@@ -173,7 +179,7 @@ describe('memory_facts dedup — action branches (real DB)', () => {
       candidateIds: [cId],
       threshold: 0.5,
       cap: 5,
-      llm: llmDecision({
+      llmDeps: llmDecision({
         ok: true,
         decision: { action: 'supersede' },
         modelVersion: 'test',
@@ -236,7 +242,7 @@ describe('memory_facts dedup — action branches (real DB)', () => {
       candidateIds: [cId],
       threshold: 0.5,
       cap: 5,
-      llm: llmDecision({
+      llmDeps: llmDecision({
         ok: true,
         decision: { action: 'keep_both' },
         modelVersion: 'test',
@@ -298,7 +304,7 @@ describe('memory_facts dedup — action branches (real DB)', () => {
       candidateIds: [cId],
       threshold: 0.5,
       cap: 5,
-      llm: llmDecision({
+      llmDeps: llmDecision({
         ok: true,
         decision: { action: 'discard_new' },
         modelVersion: 'test',
@@ -377,7 +383,7 @@ describe('memory_facts dedup — action branches (real DB)', () => {
       candidateIds: [cId],
       threshold: 0.5,
       cap: 5,
-      llm: llmDecision({
+      llmDeps: llmDecision({
         ok: true,
         decision: { action: 'discard_new' },
         modelVersion: 'test',
