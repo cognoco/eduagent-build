@@ -27,7 +27,7 @@
     },
     {
       "acRef": "AC-1",
-      "description": "Mobile profile restoration revalidates caller-authorized profiles, clears stale proxy and profile headers, withholds stale authority during refresh failures, and repairs invalid active selections without redesigning navigation.",
+      "description": "Mobile profile restoration revalidates caller-authorized profiles through a request-local profileContext:'omit' client without clearing shared context, then repairs an invalid saved selection or stale proxy state after the authoritative response while withholding stale authority during refresh failures.",
       "pointer": "apps/mobile/src/lib/profile.ts"
     },
     {

@@ -66,8 +66,9 @@ rebound to the organization owner.
 The caller-bound `getPersonScope(...)` call was restored exactly and the same
 named regression, unchanged, passed against the same local database.
 
-The complete WI-specific real-database suite then passed all 13 cases,
-covering:
+The then-current WI-specific real-database suite passed all 13 cases in this
+historical pre-review-bounce run. The later 15-case corrective run is recorded
+in `verification.md`. This historical run covered:
 
 - learner and owner headerless self-binding;
 - fail-closed owner, credentialed-sibling, and unrelated-Person headers;
