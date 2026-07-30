@@ -50,6 +50,7 @@ async function seedProfileWithSubject(
     displayName: `WI-80 Learner ${idx}`,
     birthDate: '2011-06-15',
     residenceJurisdiction: 'US',
+    conversationLanguageConfirmedAt: new Date('2026-01-01T00:00:00Z'),
   });
   await db.insert(membership).values({
     personId: profileId,

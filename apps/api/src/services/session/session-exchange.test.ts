@@ -1660,10 +1660,15 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
         content: string;
         metadata?: unknown;
       }>;
+      conversationLanguageConfirmedAt?: Date | null;
     },
   ) {
     const sessionRow = options?.sessionRow ?? buildSessionRow();
     const subjectsFindFirst = jest.fn().mockResolvedValue(subjectRow);
+    const conversationLanguageConfirmedAt =
+      options?.conversationLanguageConfirmedAt === undefined
+        ? new Date('2026-01-01T00:00:00Z')
+        : options.conversationLanguageConfirmedAt;
     const transactionDb = {
       select: jest.fn(() => ({
         from: () =>
@@ -1696,6 +1701,11 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
         learningProfiles: {
           findFirst: jest.fn().mockResolvedValue(undefined),
         },
+        person: {
+          findFirst: jest.fn().mockResolvedValue({
+            conversationLanguageConfirmedAt,
+          }),
+        },
       },
       select: jest.fn((cols: Record<string, unknown>) => ({
         from: () =>
@@ -1709,6 +1719,26 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
       ),
     } as never;
   }
+
+  it('[WI-1556] rejects exchange 0 when the learner has not confirmed a conversation language', async () => {
+    const db = makeDb(buildSubjectRow(persistedPointer), {
+      conversationLanguageConfirmedAt: null,
+    });
+
+    await expect(
+      prepareExchangeContext(
+        db,
+        PROFILE_ID,
+        SESSION_ID,
+        'Legacy client skips the language gate',
+        { semanticMemoryRetrievalEnabled: false },
+      ),
+    ).rejects.toMatchObject({
+      name: 'ConflictError',
+      message:
+        'Confirm your conversation language before your first Mentor exchange.',
+    });
+  });
 
   it('[WI-1556] threads persisted conversation language into exchange 0 while seeding the next practice pointer', async () => {
     const db = makeDb(buildSubjectRow(persistedPointer));

@@ -54,6 +54,7 @@ async function seedLearner(
     displayName: input.displayName,
     birthDate: `${input.birthYear}-06-15`,
     residenceJurisdiction: 'US',
+    conversationLanguageConfirmedAt: new Date('2026-01-01T00:00:00Z'),
   });
   await db.insert(membership).values({
     personId: profileId,
