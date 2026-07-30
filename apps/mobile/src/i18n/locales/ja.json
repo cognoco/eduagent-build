@@ -4479,7 +4479,8 @@
       "bookCount_other": "{{count}}冊のブック",
       "errorTitle": "科目を読み込めませんでした",
       "errorMessage": "しばらくしてからもう一度お試しください。",
-      "addSupporterLabel": "サポートを開始"
+      "addSupporterLabel": "サポートを開始",
+      "learnerAsked": "{{name}}さんの質問：{{question}}"
     },
     "journal": {
       "title": "ジャーナル",
@@ -4616,5 +4617,40 @@
     "errorMessage": "後でもう一度お試しください。",
     "cta": "自分でも何か学んでみる",
     "hint": "自分の学習を開始または継続しましょう。"
+  },
+  "sharedRecord": {
+    "fact": {
+      "headline_one": "{{name}}さんにはシェアできるアップデートが1件あります。",
+      "headline_other": "{{name}}さんにはシェアできるアップデートが{{count}}件あります。",
+      "weeklyReport": {
+        "title": "週次レポート",
+        "topicsMastered_one": "{{count}}個のトピックをマスター",
+        "topicsMastered_other": "{{count}}個のトピックをマスター",
+        "wordsLearned_one": "{{count}}個の単語を学習",
+        "wordsLearned_other": "{{count}}個の単語を学習",
+        "topicsExplored_one": "{{count}}個のトピックを学習",
+        "topicsExplored_other": "{{count}}個のトピックを学習"
+      },
+      "sessionRecap": {
+        "title": "セッションのまとめができました",
+        "detail": "{{date}}の学習のまとめがシェアできるようになりました。"
+      },
+      "milestone": {
+        "title": "マイルストーン達成",
+        "vocabularyCount_one": "{{count}}個の単語を学習",
+        "vocabularyCount_other": "{{count}}個の単語を学習",
+        "topicMasteredCount_one": "{{count}}個のトピックをマスター",
+        "topicMasteredCount_other": "{{count}}個のトピックをマスター",
+        "sessionCount_one": "{{count}}回の学習セッションを完了",
+        "sessionCount_other": "{{count}}回の学習セッションを完了",
+        "streakLength": "{{count}}日連続ストリーク",
+        "subjectMastered": "{{subject}}をマスター",
+        "bookCompleted": "1冊の本を読了",
+        "learningTime_one": "{{count}}時間学習",
+        "learningTime_other": "{{count}}時間学習",
+        "cefrLevelUp": "語学レベルがアップ",
+        "topicsExplored": "{{subject}}で{{count}}個のトピックを学習"
+      }
+    }
   }
 }

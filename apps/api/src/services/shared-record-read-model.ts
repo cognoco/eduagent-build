@@ -24,6 +24,21 @@ function compactFactParts(parts: Array<string | number | null | undefined>) {
     .join(' ');
 }
 
+const WEEKLY_METRIC_KEY_BY_LABEL = {
+  'Topics mastered': 'topicsMastered',
+  'Words learned': 'wordsLearned',
+  'Topics explored': 'topicsExplored',
+} as const;
+
+function metadataString(metadata: unknown, key: string): string | undefined {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    return undefined;
+  }
+  const value = (metadata as Record<string, unknown>)[key];
+  const trimmed = typeof value === 'string' ? value.trim() : undefined;
+  return trimmed || undefined;
+}
+
 export async function readSharedRecordForSupportee(
   db: Database,
   input: {
@@ -54,6 +69,10 @@ export async function readSharedRecordForSupportee(
     const parsed = weeklyReportDataSchema.safeParse(row.reportData);
     if (!parsed.success) return [];
     const stat = parsed.data.headlineStat;
+    const metricKey =
+      WEEKLY_METRIC_KEY_BY_LABEL[
+        stat.label as keyof typeof WEEKLY_METRIC_KEY_BY_LABEL
+      ];
     return [
       {
         id: `weekly-report:${row.id}`,
@@ -67,6 +86,13 @@ export async function readSharedRecordForSupportee(
         detail: stat.comparison,
         occurredAt: row.createdAt.toISOString(),
         source: 'weekly_report_summary',
+        metadata: metricKey
+          ? {
+              templateKey: 'weeklyReport',
+              reportWeek: row.reportWeek,
+              stats: [{ metricKey, value: stat.value }],
+            }
+          : undefined,
       },
     ];
   });
@@ -80,21 +106,34 @@ export async function readSharedRecordForSupportee(
       detail: 'A shareable learning recap was produced.',
       occurredAt: row.createdAt.toISOString(),
       source: 'session_recap_presence',
+      metadata: {
+        templateKey: 'sessionRecap',
+        sessionDate: row.createdAt.toISOString(),
+      },
     }));
 
   const milestoneFacts: CandidateReportFact[] = milestoneRows
     .slice(0, 5)
-    .map((row) => ({
-      id: `milestone:${row.id}`,
-      kind: 'mastery',
-      title: compactFactParts([
-        'Milestone reached:',
-        row.milestoneType.replaceAll('_', ' '),
-      ]),
-      detail: compactFactParts(['Threshold', row.threshold]),
-      occurredAt: row.createdAt.toISOString(),
-      source: 'milestone',
-    }));
+    .map((row) => {
+      const subjectName = metadataString(row.metadata, 'subjectName');
+      return {
+        id: `milestone:${row.id}`,
+        kind: 'mastery' as const,
+        title: compactFactParts([
+          'Milestone reached:',
+          row.milestoneType.replaceAll('_', ' '),
+        ]),
+        detail: compactFactParts(['Threshold', row.threshold]),
+        occurredAt: row.createdAt.toISOString(),
+        source: 'milestone',
+        metadata: {
+          templateKey: 'milestone',
+          milestoneType: row.milestoneType,
+          threshold: row.threshold,
+          ...(subjectName ? { subjectName } : {}),
+        },
+      };
+    });
 
   return sharedRecordSchema.parse(
     projectSharedRecord({

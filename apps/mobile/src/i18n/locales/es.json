@@ -4479,7 +4479,8 @@
       "bookCount_other": "{{count}} libros",
       "errorTitle": "No se pudieron cargar las asignaturas",
       "errorMessage": "Inténtalo de nuevo en un momento.",
-      "addSupporterLabel": "Empezar a apoyar"
+      "addSupporterLabel": "Empezar a apoyar",
+      "learnerAsked": "{{name}} preguntó: {{question}}"
     },
     "journal": {
       "title": "Diario",
@@ -4616,5 +4617,40 @@
     "errorMessage": "Inténtalo de nuevo en un momento.",
     "cta": "Aprende algo por tu cuenta",
     "hint": "Empieza o continúa tu propio aprendizaje."
+  },
+  "sharedRecord": {
+    "fact": {
+      "headline_one": "{{name}} tiene 1 actualización para compartir.",
+      "headline_other": "{{name}} tiene {{count}} actualizaciones para compartir.",
+      "weeklyReport": {
+        "title": "Informe semanal",
+        "topicsMastered_one": "{{count}} tema dominado",
+        "topicsMastered_other": "{{count}} temas dominados",
+        "wordsLearned_one": "{{count}} palabra aprendida",
+        "wordsLearned_other": "{{count}} palabras aprendidas",
+        "topicsExplored_one": "{{count}} tema explorado",
+        "topicsExplored_other": "{{count}} temas explorados"
+      },
+      "sessionRecap": {
+        "title": "Resumen de la sesión listo",
+        "detail": "Ya está listo un resumen de aprendizaje para compartir del {{date}}."
+      },
+      "milestone": {
+        "title": "Logro alcanzado",
+        "vocabularyCount_one": "{{count}} palabra aprendida",
+        "vocabularyCount_other": "{{count}} palabras aprendidas",
+        "topicMasteredCount_one": "{{count}} tema dominado",
+        "topicMasteredCount_other": "{{count}} temas dominados",
+        "sessionCount_one": "{{count}} sesión de aprendizaje completada",
+        "sessionCount_other": "{{count}} sesiones de aprendizaje completadas",
+        "streakLength": "Racha de {{count}} días",
+        "subjectMastered": "{{subject}} dominado",
+        "bookCompleted": "Libro completado",
+        "learningTime_one": "{{count}} hora de aprendizaje",
+        "learningTime_other": "{{count}} horas de aprendizaje",
+        "cefrLevelUp": "Nivel de idioma aumentado",
+        "topicsExplored": "{{count}} temas explorados en {{subject}}"
+      }
+    }
   }
 }
