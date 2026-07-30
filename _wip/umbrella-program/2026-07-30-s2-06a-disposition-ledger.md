@@ -22,6 +22,15 @@ Executed the eight MVP-relevant MUST decisions from the S2-01 census as ADR reco
 
 **Every authored ADR is `Status: Proposed`, `Deciders: pending Architecture sign-off`.** None asserts sign-off. `MMT-ADR-0000` §II.6 rule 3 reserves `Accepted` for a human representing Architecture and names agent self-promotion as the anti-pattern.
 
+## 1a · The D5 precondition — verified satisfied in fact, not assumed
+
+The ratified sequencing rule (D5) is that ADR-governance amendments land **before** bulk ADR backfill. That precondition was checked against the tree rather than taken on trust, because a backfill this size is exactly what it exists to gate.
+
+- **The substance is present.** `docs/adr/MMT-ADR-0000` §II.6 carries all five amendment rules — reconstruct-vs-launder, L3-in-passing-only, `Accepted` requires human Architecture sign-off, dedicated change-set, and the provenance stamp. All five were applied in this slice.
+- **How it landed:** commit `22122c94adef3b2eba50ef96b51ac8fb3a0f8990` — *"docs(adr): MMT-ADR-0000 provenance discipline; fold amendments \[WI-752]"*.
+- **Why the amendment work items read as unfinished but are not.** They closed as *Superseded* / *Duplicate* because their content was folded into that single change rather than landing separately. Nothing was dropped; the closure reason describes the consolidation, not an abandonment.
+- **Independent corroboration:** the rule is not merely written but *mechanised* — `scripts/check-adr-provenance.ts` fails any newly-added `Accepted` ADR lacking human Architecture sign-off. A governance rule with a working CI guard is stronger evidence of "landed" than prose alone.
+
 ## 2 · The eight-row disposition
 
 | Row | Decision | Disposition | Path | Convergence owner | Source evidence |
