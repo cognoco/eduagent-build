@@ -206,6 +206,14 @@ function assertDatabaseContract() {
 function main() {
   const [mode, ...forwardedArgs] = process.argv.slice(2);
 
+  if (mode === '--check-only') {
+    if (forwardedArgs.length) {
+      refuse('--check-only does not accept arguments.');
+    }
+    assertDatabaseContract();
+    return 0;
+  }
+
   if (mode === '--jest') {
     const { isLocal } = assertDatabaseContract();
     if (

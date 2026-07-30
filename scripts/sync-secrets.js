@@ -164,6 +164,30 @@ function filterSecrets(secrets) {
   return { filtered, excluded };
 }
 
+function prepareWorkerSecrets(envKey, secrets, workerDatabaseUrl) {
+  const { filtered, excluded } = filterSecrets(secrets);
+
+  if (envKey !== 'stg' && envKey !== 'prd') {
+    return { filtered, excluded };
+  }
+
+  if (Object.hasOwn(filtered, 'DATABASE_URL')) {
+    delete filtered.DATABASE_URL;
+    excluded.push('DATABASE_URL');
+  }
+
+  if (!workerDatabaseUrl) {
+    return {
+      filtered: {},
+      excluded,
+      error: 'WORKER_DATABASE_URL is required for protected Worker secret sync',
+    };
+  }
+
+  filtered.DATABASE_URL = workerDatabaseUrl;
+  return { filtered, excluded };
+}
+
 function validateApiSentryProject(secrets) {
   const dsn = secrets.SENTRY_DSN;
   if (!dsn) {
@@ -310,7 +334,15 @@ function syncEnvironment(envKey, configPath) {
   }
 
   const totalCount = Object.keys(secrets).length;
-  const { filtered, excluded } = filterSecrets(secrets);
+  const { filtered, excluded, error } = prepareWorkerSecrets(
+    envKey,
+    secrets,
+    process.env.WORKER_DATABASE_URL,
+  );
+  if (error) {
+    console.error(`\x1b[31m[sync]\x1b[0m ${error}`);
+    return false;
+  }
   const syncCount = Object.keys(filtered).length;
 
   const sentryProject = validateApiSentryProject(filtered);
@@ -422,6 +454,7 @@ module.exports = {
   findMissingSecretNames,
   isWranglerAuthenticated,
   isRenderedWranglerToml,
+  prepareWorkerSecrets,
   shouldSkipSync,
   syncSecrets,
   validateApiSentryProject,

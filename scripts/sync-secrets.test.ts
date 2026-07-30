@@ -13,6 +13,7 @@ const {
   filterSecrets,
   findMissingSecretNames,
   isRenderedWranglerToml,
+  prepareWorkerSecrets,
   shouldSkipSync,
   validateApiSentryProject,
 } = require('./sync-secrets.js') as {
@@ -30,6 +31,15 @@ const {
     actualNames: string[],
   ) => string[];
   isRenderedWranglerToml: (toml: string) => boolean;
+  prepareWorkerSecrets: (
+    envKey: string,
+    secrets: Record<string, string>,
+    workerDatabaseUrl?: string,
+  ) => {
+    filtered: Record<string, string>;
+    excluded: string[];
+    error?: string;
+  };
   shouldSkipSync: (isRendered: boolean, configPath?: string) => boolean;
   validateApiSentryProject: (secrets: Record<string, string>) => {
     valid: boolean;
@@ -64,6 +74,56 @@ describe('[WI-2788] empty Worker secret preflight', () => {
     expect(filterSecrets({ EXPO_TOKEN: '' })).toEqual({
       filtered: {},
       excluded: ['EXPO_TOKEN'],
+    });
+  });
+});
+
+describe('[WI-1628] protected Worker database credential split', () => {
+  it.each(['stg', 'prd'])(
+    'replaces the Doppler %s DATABASE_URL with the CI-only Worker app credential',
+    (envKey) => {
+      const result = prepareWorkerSecrets(
+        envKey,
+        {
+          DATABASE_URL: 'postgresql://lane-read-only',
+          API_SECRET: 'from-doppler',
+        },
+        'postgresql://worker-app-role',
+      );
+
+      expect(result).toEqual({
+        filtered: {
+          DATABASE_URL: 'postgresql://worker-app-role',
+          API_SECRET: 'from-doppler',
+        },
+        excluded: ['DATABASE_URL'],
+      });
+      expect(JSON.stringify(result)).not.toContain('lane-read-only');
+    },
+  );
+
+  it.each(['stg', 'prd'])(
+    'fails closed when the %s Worker app credential is missing',
+    (envKey) => {
+      const result = prepareWorkerSecrets(envKey, {
+        DATABASE_URL: 'postgresql://lane-read-only',
+      });
+
+      expect(result.filtered).toEqual({});
+      expect(result.excluded).toEqual(['DATABASE_URL']);
+      expect(result.error).toMatch(/WORKER_DATABASE_URL/);
+      expect(JSON.stringify(result)).not.toContain('lane-read-only');
+    },
+  );
+
+  it('keeps the dev Worker on the Doppler-managed database credential', () => {
+    expect(
+      prepareWorkerSecrets('dev', {
+        DATABASE_URL: 'postgresql://developer-db',
+      }),
+    ).toEqual({
+      filtered: { DATABASE_URL: 'postgresql://developer-db' },
+      excluded: [],
     });
   });
 });

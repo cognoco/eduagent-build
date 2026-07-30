@@ -141,9 +141,9 @@ Secrets come from **three sources**:
    EMAIL_FROM = "staging-noreply@mentomate.com"
    ```
 
-2. **Sensitive secrets** — synced from Doppler `stg` config to Cloudflare Workers via `pnpm secrets:sync stg`. Stored as Workers Secrets on the `mentomate-api-stg` worker.
+2. **Sensitive secrets** — synced from Doppler `stg` config to Cloudflare Workers via `pnpm secrets:sync stg`. Stored as Workers Secrets on the `mentomate-api-stg` worker. For protected environments, the sync never forwards Doppler's lane-visible `DATABASE_URL`; CI overlays the separate Worker application-role URL.
 
-3. **GitHub Actions secrets** — `CLOUDFLARE_API_TOKEN` authenticates `wrangler deploy`, `DATABASE_URL_STAGING` is used for staging migrations, and `DOPPLER_TOKEN_STG` syncs Doppler secrets to the staging Worker before the deploy. `deploy.yml` hard-fails if `DOPPLER_TOKEN_STG` is unset (unless `SKIP_DOPPLER_SYNC` is set after a local sync). Same pattern for production with `DOPPLER_TOKEN_PRD`.
+3. **GitHub Actions secrets** — `CLOUDFLARE_API_TOKEN` authenticates `wrangler deploy`, `DATABASE_URL_STAGING` is the migration-owner credential, `DATABASE_URL_STAGING_APP` is the Worker data-access credential, and `DOPPLER_TOKEN_STG` syncs the remaining Doppler secrets before deploy. `deploy.yml` hard-fails if a required credential is unset. Same pattern for production with `DATABASE_URL_PRODUCTION`, `DATABASE_URL_PRODUCTION_APP`, and `DOPPLER_TOKEN_PRD`.
 
 ### Approval gate
 
@@ -223,8 +223,66 @@ Manual dispatch (api_environment=production)
 Same pattern as staging:
 
 - **`[env.production.vars]`** in `wrangler.toml`: `APP_URL=https://www.mentomate.com`, `API_ORIGIN=https://api.mentomate.com`, `LOG_LEVEL=info`, `EMAIL_FROM=noreply@mentomate.com`
-- **Workers Secrets**: synced from Doppler `prd` config via `pnpm secrets:sync prd`
-- **GitHub Actions secret**: `DATABASE_URL_PRODUCTION` is used for production migrations in `deploy.yml`
+- **Workers Secrets**: synced from Doppler `prd` config via `pnpm secrets:sync prd`; `DATABASE_URL` is overlaid from `DATABASE_URL_PRODUCTION_APP`, never copied from Doppler
+- **GitHub Actions secrets**: `DATABASE_URL_PRODUCTION` is used for migrations and `DATABASE_URL_PRODUCTION_APP` is used by the deployed Worker
+
+### Database credential split
+
+Staging and production use three intentionally different database capabilities:
+
+| Location | Credential capability |
+|----------|-----------------------|
+| GitHub `DATABASE_URL_STAGING` / `DATABASE_URL_PRODUCTION` | Migration owner; deploy workflow only |
+| GitHub `DATABASE_URL_STAGING_APP` / `DATABASE_URL_PRODUCTION_APP` | Worker application role; table/sequence data access required by the API, but no schema DDL or ownership |
+| Doppler `stg` / `prd` `DATABASE_URL` | Lane-visible read-only role; connect, schema usage, and select only |
+
+`scripts/sync-secrets.js` fails closed for `stg` or `prd` unless
+`WORKER_DATABASE_URL` is supplied by CI. It excludes Doppler's database value
+from the bulk payload before inserting the Worker application credential. Local
+env sync separately verifies the staging role is read-only before writing any
+downloaded secret file.
+
+Activating this split is a coordinated two-key operation: provision and store
+the Worker application roles first, then rotate the Doppler database values to
+read-only roles. Do not merge a workflow that requires the new GitHub secrets
+until both protected environments have them. Role or secret changes are
+external production mutations and require operator approval.
+
+#### RLS activation gate for Worker application roles
+
+Migrations `0027_enable_rls.sql` and `0029_rls_sweep_gaps.sql` enable row-level
+security on application tables but deliberately do not install the complete
+policy set. Most current API calls also do not establish a scoped
+`app.current_profile_id` database setting. A conventional non-owner,
+non-`BYPASSRLS` application role would therefore see zero rows and fail
+required writes even when its table grants are correct.
+
+Before replacing either Worker's current connection, the operator must choose
+and review one of these gates:
+
+1. **Interim launch posture:** create a dedicated application role with
+   deliberately reviewed `BYPASSRLS`, required table/sequence DML only, and no
+   object ownership, database/schema `CREATE`, role administration, or
+   migration capability. Record that bypass as a temporary security exception
+   with an owner and removal milestone.
+2. **Scoped RLS posture:** defer the Worker credential swap until complete RLS
+   policies and per-request scoped GUC wiring are implemented and verified.
+   The application role remains non-owner and without `BYPASSRLS`.
+
+For either posture, prove the candidate against staging before touching
+production:
+
+- catalog evidence for the intended role attributes, memberships, ownership,
+  schema privileges, and table/sequence grants;
+- a staging health check plus authenticated seeded-profile smoke covering a
+  representative read and required create/update/delete path;
+- a negative cross-profile read/write check; and
+- confirmation that `drizzle-kit migrate`, `CREATE`/`ALTER`/`DROP`, and object
+  ownership are unavailable to the application role.
+
+These checks require approved external credentials and controlled staging
+actions. They are not performed by local lane setup or by this repository
+change.
 
 ### Runtime safety net
 
@@ -638,6 +696,8 @@ GitHub Actions secrets (set in GitHub, not Doppler):
 | `CLOUDFLARE_API_TOKEN` | `deploy.yml` — authenticates `wrangler deploy` |
 | `DATABASE_URL_STAGING` | `deploy.yml` — staging Neon migrations before staging deploys |
 | `DATABASE_URL_PRODUCTION` | `deploy.yml` — production Neon migrations before production deploys |
+| `DATABASE_URL_STAGING_APP` | `deploy.yml` — staging Worker application role (data access, no schema DDL) |
+| `DATABASE_URL_PRODUCTION_APP` | `deploy.yml`, `production-secret-sync.yml` — production Worker application role (data access, no schema DDL) |
 | `DATABASE_URL_STAGING_HOST` | `deploy.yml` — expected host guard for staging DB target verification |
 | `DATABASE_URL_PRODUCTION_HOST` | `deploy.yml` — expected host guard for production DB target verification |
 | `DOPPLER_TOKEN_STG` | `deploy.yml`, `e2e-web.yml` — staging Doppler service token for Worker secret sync |
