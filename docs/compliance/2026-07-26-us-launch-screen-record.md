@@ -2,8 +2,8 @@
 
 **Screen date:** 2026-07-26 (desk research; sources dated inline)
 **Screened under:** `2026-07-26-launch-perimeter-ruling-screen-based-allowlist.md`, Route 2
-**Conclusion:** PASS, conditional on (i) DPO concurrence on the GDPR/Norwegian-threshold reading for non-EEA minors, (ii) launch-day recheck of the KOSA/KIDS Act, (iii) resolution of the App Store Accountability Acts item via WI-1116 (see table row — no thresholds shield us there), and (iv) the monitoring triggers below.
-**Status:** Draft → send to DPO with the M1–M7 response package. Not final until management signs the risk acceptance (criterion d).
+**Conclusion:** PASS, conditional on (i) DPO concurrence on the GDPR/Norwegian-threshold reading for non-EEA minors — **received 2026-07-30** (GDPR element of criterion (a) satisfied, as a reasoned interpretation with five conditions; does NOT establish US-law compliance or a minor's contractual capacity to subscribe — the capacity question is routed to the billing model), (ii) launch-day recheck of the KOSA/KIDS Act, (iii) resolution of the App Store Accountability Acts item via WI-1116 (see table row — no thresholds shield us there), and (iv) the monitoring triggers below.
+**Status:** **Provisionally screened per DPO M3 wording (2026-07-30) — the US is NOT finally admitted** until conditions (ii)–(iii) close and management signs the risk acceptance (criterion d). Possible additional condition: local-counsel confirmation where material local-law questions remain — narrowing reading pending DPO confirmation (reply Q2, 2026-07-30).
 
 ## (a) Age — PASS
 
