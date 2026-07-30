@@ -36,7 +36,9 @@ describe('WI-2937 production EAS submit contract', () => {
     expect(packageJson.scripts['mobile:submit:preflight']).toBe(
       'node scripts/verify-eas-managed-submit-credential.js',
     );
-    expect(runbook).toContain('pnpm mobile:submit:preflight');
+    expect(runbook).toContain(
+      'doppler run -c prd -- pnpm mobile:submit:preflight',
+    );
     expect(runbook).toContain('stale local credential');
     expect(runbook).not.toContain('GOOGLE_PLAY_SERVICE_ACCOUNT_JSON');
     expect(runbook).toContain('OPQ-37');

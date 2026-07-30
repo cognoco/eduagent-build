@@ -22,7 +22,7 @@ printing or creating credential material, and fails closed when the key is absen
 or unassigned:
 
 ```powershell
-pnpm mobile:submit:preflight
+doppler run -c prd -- pnpm mobile:submit:preflight
 ```
 
 Stop on a preflight failure. Do not paste, materialize, rotate, or otherwise handle
@@ -30,9 +30,16 @@ the Google service-account JSON locally.
 
 The retired materializer may have left a stale local credential on an existing
 worktree. The preflight fails closed before its Expo request when it finds that
-path; delete the stale local credential file through the approved local-secret
-remediation process, then rerun the preflight. The legacy directory remains
-ignored only to prevent accidental staging while that cleanup happens.
+path. Delete only the stale local credential file, then verify it is absent
+before rerunning the preflight:
+
+```powershell
+rm apps/mobile/.eas-submit/google-play-service-account.json
+test ! -e apps/mobile/.eas-submit/google-play-service-account.json
+```
+
+Do not print, copy, or stage its contents. The legacy directory remains ignored
+only to prevent accidental staging while that cleanup happens.
 
 ## Preflight
 

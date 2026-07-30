@@ -94,6 +94,25 @@ describe('EAS-managed Google Play submission credential preflight', () => {
         fetchImpl: async () => response({}, false),
       }),
     ).rejects.toThrow('rejected by Expo');
+    await expect(
+      verifyEasManagedSubmitCredential({
+        accessToken: 'test-token',
+        fetchImpl: async () => {
+          throw new Error('network unavailable');
+        },
+      }),
+    ).rejects.toThrow('could not reach Expo');
+    await expect(
+      verifyEasManagedSubmitCredential({
+        accessToken: 'test-token',
+        fetchImpl: async () => ({
+          ok: true,
+          json: async () => {
+            throw new Error('invalid JSON');
+          },
+        }),
+      }),
+    ).rejects.toThrow('returned invalid metadata');
   });
 
   it('fails closed before the network request when a stale local credential exists', async () => {
