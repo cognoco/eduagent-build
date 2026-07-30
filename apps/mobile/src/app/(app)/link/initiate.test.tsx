@@ -361,6 +361,7 @@ describe('InitiateLinkScreen', () => {
       expect(
         screen.queryByTestId('visibility-link-initiate-picker'),
       ).toBeNull();
+      expect(clearFamilyIntentOnboarding).not.toHaveBeenCalled();
     } finally {
       (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
         original;

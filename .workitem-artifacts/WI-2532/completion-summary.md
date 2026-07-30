@@ -20,13 +20,15 @@ profile creation.
 
 ## Verification
 
-Six focused mobile suites passed 263 tests across durable state, both branches,
+Six focused mobile suites passed 267 tests across durable state, both branches,
 profile creation, relaunch restoration, invitation routing, and sign-out
 cleanup. The full mobile unit stage, full API unit stage under the sanctioned
 development database boundary, TypeScript build, i18n ratchets, test-only
-export guard, touched-file lint, and whitespace check passed. The dedicated
-preview journey passed in 1.7 minutes and reached the invitation form without a
-supportership write.
+export guard, warning-free touched-file lint, and whitespace check passed.
+Review-bounce coverage also verifies stale-read rejection, recovery-primary
+repair, V2-only destination consumption, and a mounted-but-inaccessible blocked
+navigator. The dedicated preview journey passed in 1.7 minutes and reached the
+invitation form without a supportership write.
 
 ## Caveats / Follow-ups
 

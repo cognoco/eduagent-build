@@ -17,6 +17,11 @@
     },
     {
       "acRef": "AC-1",
+      "description": "A storage read begun before sign-out cannot repopulate discarded state, and recovery-only state repairs the missing SecureStore primary after a successful restore.",
+      "pointer": "apps/mobile/src/lib/family-intent-onboarding-state.test.ts"
+    },
+    {
+      "acRef": "AC-1",
       "description": "The signed-in app layout restores the pending fork for the matching active profile, fails closed with retry on rejected or timed-out reads, and preserves existing preview/profile and navigation-shell gate behavior.",
       "pointer": "apps/mobile/src/app/(app)/_layout.test.tsx"
     },
@@ -24,6 +29,11 @@
       "acRef": "AC-1",
       "description": "The existing-account target opens the family-join invitation form directly under the live V2 launch flag, consumes the durable destination marker only after mount, and retains the explicit unavailable state in older flag configurations.",
       "pointer": "apps/mobile/src/app/(app)/link/initiate.test.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The blocked learner shell remains React-mounted to preserve navigator state but is display-hidden, pointer-inert, and excluded from native accessibility until the durable fork resolves.",
+      "pointer": "apps/mobile/src/app/(app)/_layout.test.tsx"
     },
     {
       "acRef": "AC-1",

@@ -375,13 +375,16 @@ describe('AppLayout', () => {
 
   function expectFamilyIntentNavigatorBlocked() {
     screen.getByTestId('tabs', { includeHiddenElements: true });
+    expect(screen.queryByTestId('tabs')).toBeNull();
     const shell = screen.getByTestId('app-navigator-shell', {
       includeHiddenElements: true,
     });
     expect(shell.props.pointerEvents).toBe('none');
     expect(shell.props.accessibilityElementsHidden).toBe(true);
     expect(shell.props.importantForAccessibility).toBe('no-hide-descendants');
-    expect(shell.props.style).toEqual(expect.objectContaining({ opacity: 0 }));
+    expect(shell.props.style).toEqual(
+      expect.objectContaining({ display: 'none', opacity: 0 }),
+    );
   }
 
   beforeEach(async () => {
@@ -2384,7 +2387,12 @@ describe('AppLayout no-profile gate — preview branch', () => {
     await act(async () => {
       // Let the independent family-intent SecureStore probe resolve before
       // advancing the clock for the deliberately hung preview probe.
-      await Promise.resolve();
+      // The preview loading gate hides the navigator, so there is no
+      // family-intent completion testID to wait on here. Drain the primary
+      // read, recovery fallback, and state-update microtasks explicitly.
+      for (let flush = 0; flush < 5; flush += 1) {
+        await Promise.resolve();
+      }
     });
     act(() => {
       jest.advanceTimersByTime(2500);

@@ -69,7 +69,7 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
       .mockRejectedValueOnce(new Error('specialized cleanup unavailable'));
     jest
       .mocked(AsyncStorage.multiRemove)
-      .mockImplementation(async (keys: readonly string[]) => {
+      .mockImplementationOnce(async (keys: readonly string[]) => {
         for (const key of keys) {
           await AsyncStorage.removeItem(key);
         }

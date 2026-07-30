@@ -5,6 +5,7 @@ import {
   FAMILY_INTENT_ONBOARDING_RECOVERY_KEY,
   __resetFamilyIntentOnboardingForTests,
   clearFamilyIntentOnboarding,
+  discardFamilyIntentOnboardingMemory,
   readFamilyIntentOnboarding,
   startFamilyIntentOnboarding,
   updateFamilyIntentOnboardingStep,
@@ -60,6 +61,32 @@ describe('family-intent onboarding state', () => {
     });
   });
 
+  it('does not resurrect a stale record when account cleanup races an in-flight read', async () => {
+    const serialized = JSON.stringify({
+      version: 1,
+      profileId: 'signed-out-profile',
+      step: 'login-choice',
+    });
+    let resolvePrimaryRead: ((value: string) => void) | undefined;
+    getItemSpy.mockImplementationOnce(
+      () =>
+        new Promise<string>((resolve) => {
+          resolvePrimaryRead = resolve;
+        }),
+    );
+
+    const lateRead = readFamilyIntentOnboarding();
+    await Promise.resolve();
+    discardFamilyIntentOnboardingMemory();
+    resolvePrimaryRead?.(serialized);
+
+    await expect(lateRead).resolves.toBeNull();
+    expect(setItemSpy).not.toHaveBeenCalledWith(
+      FAMILY_INTENT_ONBOARDING_KEY,
+      serialized,
+    );
+  });
+
   it('durably advances to the managed-path unavailable state', async () => {
     await startFamilyIntentOnboarding('adult-profile');
     await updateFamilyIntentOnboardingStep('managed-unavailable');
@@ -85,6 +112,34 @@ describe('family-intent onboarding state', () => {
     await expect(
       AsyncStorage.getItem(FAMILY_INTENT_ONBOARDING_RECOVERY_KEY),
     ).resolves.toContain('"profileId":"adult-profile"');
+  });
+
+  it('repairs the primary store after restoring from the recovery journal', async () => {
+    const serialized = JSON.stringify({
+      version: 1,
+      profileId: 'adult-profile',
+      step: 'login-choice',
+    });
+    await AsyncStorage.setItem(
+      FAMILY_INTENT_ONBOARDING_RECOVERY_KEY,
+      serialized,
+    );
+    __resetFamilyIntentOnboardingForTests();
+    setItemSpy.mockClear();
+
+    await expect(readFamilyIntentOnboarding()).resolves.toEqual({
+      version: 1,
+      profileId: 'adult-profile',
+      step: 'login-choice',
+    });
+    for (let flush = 0; flush < 5; flush += 1) {
+      await Promise.resolve();
+    }
+
+    expect(setItemSpy).toHaveBeenCalledWith(
+      FAMILY_INTENT_ONBOARDING_KEY,
+      serialized,
+    );
   });
 
   it('keeps a healthy primary write successful when the recovery journal rejects', async () => {
@@ -173,13 +228,16 @@ describe('family-intent onboarding state', () => {
     jest.useFakeTimers();
     deleteItemSpy.mockImplementationOnce(() => new Promise(() => undefined));
 
-    const clear = clearFamilyIntentOnboarding();
-    const rejection = expect(clear).rejects.toThrow('timed out');
-    await jest.advanceTimersByTimeAsync(2_500);
+    try {
+      const clear = clearFamilyIntentOnboarding();
+      const rejection = expect(clear).rejects.toThrow('timed out');
+      await jest.advanceTimersByTimeAsync(2_500);
 
-    await rejection;
-    await expect(readFamilyIntentOnboarding()).resolves.toBeNull();
-    jest.useRealTimers();
+      await rejection;
+      await expect(readFamilyIntentOnboarding()).resolves.toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('does not recache a primary record while its timed-out delete later settles', async () => {

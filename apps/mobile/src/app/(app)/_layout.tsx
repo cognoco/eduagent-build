@@ -863,8 +863,9 @@ export default function AppLayout() {
   //   5. profileLoadError fallback  (independent of preview state)
   //   6. preview-probe-loading spinner
   //   7. SaveWizardGate branch
-  //   8. !activeProfile → CreateProfileGate
-  //   9. consent gates → Tabs
+  //   8. FamilyIntentOnboardingGate branch
+  //   9. !activeProfile → CreateProfileGate
+  //  10. consent gates → Tabs
   //
   // The welcome intro used to live at step 8; it moved pre-auth in
   // docs/plans/2026-05-27-pre-auth-welcome-flow.md, so this layout no longer
@@ -995,10 +996,12 @@ export default function AppLayout() {
           <View
             style={{
               flex: 1,
+              display: familyIntentNavigatorBlocked ? 'none' : 'flex',
               opacity: familyIntentNavigatorBlocked ? 0 : 1,
             }}
             pointerEvents={familyIntentNavigatorBlocked ? 'none' : 'auto'}
             accessibilityElementsHidden={familyIntentNavigatorBlocked}
+            aria-hidden={familyIntentNavigatorBlocked}
             importantForAccessibility={
               familyIntentNavigatorBlocked ? 'no-hide-descendants' : 'auto'
             }

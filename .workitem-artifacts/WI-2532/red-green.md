@@ -20,7 +20,7 @@ Focused tests were added before the implementation:
 ## GREEN
 
 After implementing the state carrier and UI fork, the six directly relevant
-mobile suites passed 263 tests:
+mobile suites passed 267 tests:
 
 ```text
 node --max-old-space-size=6144 ./node_modules/jest/bin/jest.js \
@@ -47,3 +47,25 @@ read. The initial timeout implementation failed open, so adversarial review
 required a second red-green cycle. The final layout keeps the shell blocked,
 shows translated retry UI on timeout or rejection, and restores the pending
 step once a retry succeeds.
+
+## Review-bounce RED/GREEN
+
+The publication review produced three reproducible correctness failures:
+
+- A deferred primary read could repopulate signed-out state after memory was
+  discarded. RED expected `null` but received the stale
+  `signed-out-profile/login-choice` record. The read now snapshots both primary
+  and recovery generations before awaiting storage and rejects either stale
+  result.
+- A recovery-only record restored successfully but never repaired the missing
+  SecureStore primary. RED expected a SecureStore `setItem` call and observed
+  zero calls. A successful recovery read now schedules primary repair.
+- The V2-off existing-account placeholder consumed the durable destination
+  marker. RED expected zero clear calls and observed one. Marker consumption is
+  now gated on V2 being enabled.
+
+The blocked-shell review also added an explicit route-state assertion: while
+the pending fork is visible, Tabs remain mounted for route preservation but
+are absent from ordinary accessibility/test queries, use `display: none`, and
+carry native accessibility hiding. The two focused requested-route tests and
+all 267 tests across the six affected suites passed after the corrections.

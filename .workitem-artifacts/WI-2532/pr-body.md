@@ -10,17 +10,18 @@
 
 ## Verification
 
-- six focused mobile suites: 263 tests passed
+- six focused mobile suites: 267 tests passed
 - full mobile unit suite: passed
 - full API unit suite under Doppler `dev`: passed
 - TypeScript build and i18n/clinical-copy/test-only-export ratchets: passed
-- touched-file ESLint: 0 errors (one pre-existing duplicate-dependency warning)
+- touched-file ESLint with `--max-warnings=0`: passed
+- publication-review regressions: focused RED-to-green coverage passed
 - preview Playwright journey: passed in 1.7 minutes
 
 ## Collision note
 
-BID-33 PR #2692 touches the same locale files and generated baseline but adds a
-separate key namespace. This branch was refreshed from current `origin/main`
-and the source baseline was regenerated from source at publication time.
+BID-33 PR #2692 is incorporated from authoritative main with both locale key
+families retained. WI-2231 PR #2704 remains an unlanded collision watch and
+must be reconciled from authoritative main if it lands before this branch.
 
 Refs: WI-2532

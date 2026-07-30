@@ -5,11 +5,8 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import type { FamilyIntentOnboardingState } from '../../lib/family-intent-onboarding-state';
-import {
-  clearFamilyIntentOnboarding,
-  updateFamilyIntentOnboardingStep,
-} from '../../lib/family-intent-onboarding-state';
-import { queueMentorBornCeremony } from '../../lib/mentor-born-ceremony';
+import * as familyIntentOnboardingState from '../../lib/family-intent-onboarding-state';
+import * as mentorBornCeremony from '../../lib/mentor-born-ceremony';
 import { FamilyIntentOnboardingGate } from './FamilyIntentOnboardingGate';
 
 const mockPush = jest.fn();
@@ -18,21 +15,15 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
-jest.mock(
-  '../../lib/family-intent-onboarding-state' /* gc1-allow: SecureStore boundary; component tests assert the state transitions requested by each visible branch */,
-  () => ({
-    ...jest.requireActual('../../lib/family-intent-onboarding-state'),
-    clearFamilyIntentOnboarding: jest.fn().mockResolvedValue(undefined),
-    updateFamilyIntentOnboardingStep: jest.fn().mockResolvedValue(undefined),
-  }),
-);
-
-jest.mock(
-  '../../lib/mentor-born-ceremony' /* gc1-allow: durable SecureStore ceremony boundary; this suite asserts the self-learning handoff request */,
-  () => ({
-    queueMentorBornCeremony: jest.fn().mockResolvedValue(undefined),
-  }),
-);
+const clearFamilyIntentOnboardingSpy = jest
+  .spyOn(familyIntentOnboardingState, 'clearFamilyIntentOnboarding')
+  .mockResolvedValue(undefined);
+const updateFamilyIntentOnboardingStepSpy = jest
+  .spyOn(familyIntentOnboardingState, 'updateFamilyIntentOnboardingStep')
+  .mockResolvedValue(undefined);
+const queueMentorBornCeremonySpy = jest
+  .spyOn(mentorBornCeremony, 'queueMentorBornCeremony')
+  .mockResolvedValue(null);
 
 const learnerTargetState: FamilyIntentOnboardingState = {
   version: 1,
@@ -42,6 +33,12 @@ const learnerTargetState: FamilyIntentOnboardingState = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+});
+
+afterAll(() => {
+  clearFamilyIntentOnboardingSpy.mockRestore();
+  updateFamilyIntentOnboardingStepSpy.mockRestore();
+  queueMentorBornCeremonySpy.mockRestore();
 });
 
 describe('FamilyIntentOnboardingGate', () => {
@@ -60,14 +57,14 @@ describe('FamilyIntentOnboardingGate', () => {
     fireEvent.press(screen.getByTestId('family-intent-target-me'));
 
     await waitFor(() => {
-      expect(queueMentorBornCeremony).toHaveBeenCalledWith({
+      expect(queueMentorBornCeremonySpy).toHaveBeenCalledWith({
         profileId: 'adult-profile',
         reason: 'first-profile-created',
       });
-      expect(clearFamilyIntentOnboarding).toHaveBeenCalledTimes(1);
+      expect(clearFamilyIntentOnboardingSpy).toHaveBeenCalledTimes(1);
       expect(onComplete).toHaveBeenCalledTimes(1);
     });
-    expect(updateFamilyIntentOnboardingStep).not.toHaveBeenCalled();
+    expect(updateFamilyIntentOnboardingStepSpy).not.toHaveBeenCalled();
     expect(mockPush).not.toHaveBeenCalled();
   });
 
@@ -85,7 +82,7 @@ describe('FamilyIntentOnboardingGate', () => {
     fireEvent.press(screen.getByTestId('family-intent-target-someone-else'));
 
     await waitFor(() => {
-      expect(updateFamilyIntentOnboardingStep).toHaveBeenCalledWith(
+      expect(updateFamilyIntentOnboardingStepSpy).toHaveBeenCalledWith(
         'login-choice',
       );
       expect(onStateChange).toHaveBeenCalledWith({
@@ -109,7 +106,7 @@ describe('FamilyIntentOnboardingGate', () => {
     fireEvent.press(screen.getByTestId('family-intent-login-yes'));
 
     await waitFor(() => {
-      expect(updateFamilyIntentOnboardingStep).toHaveBeenCalledWith(
+      expect(updateFamilyIntentOnboardingStepSpy).toHaveBeenCalledWith(
         'opening-invitation',
       );
       expect(onStateChange).toHaveBeenCalledWith({
@@ -117,7 +114,7 @@ describe('FamilyIntentOnboardingGate', () => {
         step: 'opening-invitation',
       });
     });
-    expect(clearFamilyIntentOnboarding).not.toHaveBeenCalled();
+    expect(clearFamilyIntentOnboardingSpy).not.toHaveBeenCalled();
     expect(mockPush).not.toHaveBeenCalled();
   });
 
@@ -136,7 +133,7 @@ describe('FamilyIntentOnboardingGate', () => {
       expect(onOpenInvitation).toHaveBeenCalledTimes(1);
     });
     expect(mockPush).not.toHaveBeenCalled();
-    expect(clearFamilyIntentOnboarding).not.toHaveBeenCalled();
+    expect(clearFamilyIntentOnboardingSpy).not.toHaveBeenCalled();
   });
 
   it('gates the unavailable managed learner path explicitly and durably', async () => {
@@ -153,7 +150,7 @@ describe('FamilyIntentOnboardingGate', () => {
     fireEvent.press(screen.getByTestId('family-intent-login-no'));
 
     await waitFor(() => {
-      expect(updateFamilyIntentOnboardingStep).toHaveBeenCalledWith(
+      expect(updateFamilyIntentOnboardingStepSpy).toHaveBeenCalledWith(
         'managed-unavailable',
       );
       expect(onStateChange).toHaveBeenCalledWith({
@@ -164,7 +161,7 @@ describe('FamilyIntentOnboardingGate', () => {
   });
 
   it('keeps the current choice visible with a retry message when a durable transition fails', async () => {
-    (updateFamilyIntentOnboardingStep as jest.Mock).mockRejectedValueOnce(
+    updateFamilyIntentOnboardingStepSpy.mockRejectedValueOnce(
       new Error('storage unavailable'),
     );
     const onStateChange = jest.fn();

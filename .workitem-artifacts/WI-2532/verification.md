@@ -18,7 +18,13 @@
 ## Focused mobile verification
 
 - Family-intent state, component, profile creation, app-layout,
-  invitation-route, and sign-out suites: 6 suites, 263 tests passed.
+  invitation-route, and sign-out suites: 6 suites, 267 tests passed.
+- The two focused route-preservation cases passed: a pending restore keeps the
+  requested Tabs navigator mounted but hidden, and a failed restore retry
+  preserves the requested route.
+- A blocked navigator is `display: none`, pointer-inert, and hidden from native
+  accessibility while remaining React-mounted; ordinary queries cannot expose
+  blocked content.
 
 ## Repository validation
 
@@ -30,8 +36,7 @@
 - i18n staleness, orphan-key, hardcoded-JSX-literal, and clinical-copy checks:
   passed.
 - Test-only export ratchet: passed.
-- Touched-file ESLint: 0 errors; one pre-existing duplicate dependency warning
-  remains in create-profile.tsx.
+- Touched-file ESLint with `--max-warnings=0`: passed.
 - Git whitespace check: passed.
 
 ## Preview journey
@@ -44,14 +49,20 @@ form without first writing a visibility/supportership link.
 
 ## Collision and flag audit
 
-- BID-33 PR #2692 (WI-2783 shared-record fact localization) remains open at
-  head `5b9a0e5c2555b2363cbb91ec3a4c7cf7539a27a3`. It touches all locale catalogs
-  and the generated source baseline, but contains no
-  `familyIntentOnboarding` keys and does not overlap this change's symbols.
-- This worktree was fast-forwarded to `origin/main`
-  `386555087a81b9db36638e2d94f1339739c3dff5` at the publication boundary.
-  `source-baseline.json` was regenerated from the resulting source tree rather
-  than line-picked.
+- BID-33 PR #2692 landed on `origin/main`
+  `455f1f54c20195cb3d19de64f5567c9051921cb6`. This branch merged that
+  authoritative locale state and retained both key families.
+- WI-2231 PR #2704 is an unlanded collision watch at reviewed head
+  `020c597f`. It has not been merged into this branch; if it lands first, its
+  post-auth routing semantics must be reconciled from the new authoritative
+  main before publication.
 - Existing flags-off, V0, and V1 shell contracts are unchanged. Direct
   existing-account entry preserves the prior explicit unavailable state when
   V2 is off.
+
+## Review disposition
+
+Every actionable publication-review comment was dispositioned in
+`review-dispositions.md`. Accepted findings have focused RED-to-green evidence;
+the two rejected suggestions are documented against the actual synchronous
+handoff contract and the ruled scope boundary.

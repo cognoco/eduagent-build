@@ -67,6 +67,7 @@ export default function InitiateLinkScreen(): React.ReactElement {
 
   useEffect(() => {
     if (paramTarget !== 'existingTeen') return;
+    if (!FEATURE_FLAGS.MODE_NAV_V2_ENABLED) return;
     // The source gate keeps this destination durably pending until this route
     // mounts. If deletion fails, the marker remains recoverable and a later
     // remount/relaunch safely retries this same non-authorizing destination.

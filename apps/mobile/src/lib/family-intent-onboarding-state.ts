@@ -305,6 +305,8 @@ export async function readFamilyIntentOnboarding(): Promise<FamilyIntentOnboardi
   if (activeClearAttempt) return null;
   if (memoryState) return memoryState;
 
+  const primaryGenerationAtStart = primaryGeneration;
+  const recoveryGenerationAtStart = recoveryGeneration;
   const primaryRaw = await withStorageTimeout(
     SecureStore.getItemAsync(FAMILY_INTENT_ONBOARDING_KEY),
     'primary read',
@@ -316,6 +318,12 @@ export async function readFamilyIntentOnboarding(): Promise<FamilyIntentOnboardi
       'recovery read',
     ));
   if (activeClearAttempt) return null;
+  if (
+    primaryGenerationAtStart !== primaryGeneration ||
+    recoveryGenerationAtStart !== recoveryGeneration
+  ) {
+    return null;
+  }
   if (!raw) return null;
 
   const parsed = parseState(raw);
@@ -340,6 +348,9 @@ export async function readFamilyIntentOnboarding(): Promise<FamilyIntentOnboardi
   }
   const parsedSerialized = JSON.stringify(parsed);
   markDesiredPrimary(parsedSerialized);
+  if (primaryRaw === null) {
+    schedulePrimaryRepair();
+  }
   markDesiredRecovery(parsedSerialized);
   memoryState = parsed;
   return parsed;
