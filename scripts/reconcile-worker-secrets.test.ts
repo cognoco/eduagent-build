@@ -162,6 +162,10 @@ describe('[WI-1837] deletion-safe reconciliation', () => {
 
   it('deletes one removed owned key while retaining an unowned key', () => {
     const deleteSecret = jest.fn(() => ({ success: true }));
+    const listWorkerSecretNames = jest
+      .fn()
+      .mockReturnValueOnce(['PRESENT_OWNED', 'REMOVED_OWNED', 'WORKER_ONLY'])
+      .mockReturnValueOnce(['PRESENT_OWNED', 'WORKER_ONLY']);
 
     applyDeletionPlan({
       plan: {
@@ -174,11 +178,12 @@ describe('[WI-1837] deletion-safe reconciliation', () => {
       ]),
       deleteSecret,
       listDopplerKeyNames: () => ['PRESENT_OWNED'],
-      listWorkerSecretNames: () => ['PRESENT_OWNED', 'WORKER_ONLY'],
+      listWorkerSecretNames,
     });
 
     expect(deleteSecret).toHaveBeenCalledTimes(1);
     expect(deleteSecret).toHaveBeenCalledWith('REMOVED_OWNED');
+    expect(listWorkerSecretNames).toHaveBeenCalledTimes(2);
   });
 
   it('fails when deletion is unsupported or post-delete state is unsafe', () => {

@@ -289,12 +289,16 @@ function applyDeletionPlan({
   }
 }
 
-function wranglerTargetArgs(target, configPath) {
+function assertWranglerConfig(configPath) {
   if (!configPath) {
     throw new Error(
       'WRANGLER_SYNC_CONFIG is required for production target safety',
     );
   }
+}
+
+function wranglerTargetArgs(target, configPath) {
+  assertWranglerConfig(configPath);
   return ['--name', target.workerName, '--config', configPath];
 }
 
@@ -442,7 +446,7 @@ function main(args) {
   const { mode } = parseCliArgs(args);
   const manifest = readManifest();
   const configPath = process.env.WRANGLER_SYNC_CONFIG;
-  wranglerTargetArgs(PRODUCTION_TARGET, configPath);
+  assertWranglerConfig(configPath);
   if (!isWranglerAuthenticated(configPath)) {
     throw new Error(
       'Wrangler authentication is required; refusing reconciliation',
