@@ -10,7 +10,12 @@ async function loadChecker() {
   }
 }
 
-async function runChecker({ databaseUrl, rows = [], queryError }) {
+async function runChecker({
+  databaseUrl,
+  dopplerConfig = 'dev',
+  rows = [],
+  queryError,
+}) {
   const checker = await loadChecker();
   assert.ok(checker, 'development schema checker module must exist');
 
@@ -19,6 +24,7 @@ async function runChecker({ databaseUrl, rows = [], queryError }) {
   let queryCalls = 0;
   const exitCode = await checker.runDevelopmentSchemaCheck({
     databaseUrl,
+    dopplerConfig,
     queryCatalog: async () => {
       queryCalls += 1;
       if (queryError) throw queryError;
@@ -40,6 +46,8 @@ test('catalog query requires the retention-feedback and past-due columns', async
   assert.match(normalized, /column_name = 'last_recall_feedback'/);
   assert.match(normalized, /table_name = 'subscription'/);
   assert.match(normalized, /column_name = 'past_due_at'/);
+  assert.match(normalized, /data_type AS "dataType"/);
+  assert.match(normalized, /is_nullable AS "isNullable"/);
 });
 
 test('missing credential fails closed without querying', async () => {
@@ -57,8 +65,18 @@ test('complete development schema returns success', async () => {
   const result = await runChecker({
     databaseUrl: 'postgresql://example.invalid/database',
     rows: [
-      { tableName: 'retention_cards', columnName: 'last_recall_feedback' },
-      { tableName: 'subscription', columnName: 'past_due_at' },
+      {
+        tableName: 'retention_cards',
+        columnName: 'last_recall_feedback',
+        dataType: 'jsonb',
+        isNullable: 'YES',
+      },
+      {
+        tableName: 'subscription',
+        columnName: 'past_due_at',
+        dataType: 'timestamp with time zone',
+        isNullable: 'YES',
+      },
     ],
   });
 
@@ -70,22 +88,107 @@ test('complete development schema returns success', async () => {
   ]);
 });
 
-test('missing columns return actionable reconciliation instructions', async () => {
-  const result = await runChecker({
-    databaseUrl: 'postgresql://example.invalid/database',
+for (const { name, rows, expectedDrift } of [
+  {
+    name: 'both columns absent',
+    rows: [],
+    expectedDrift:
+      'missing retention_cards.last_recall_feedback, subscription.past_due_at',
+  },
+  {
+    name: 'retention feedback column absent',
     rows: [
-      { tableName: 'retention_cards', columnName: 'last_recall_feedback' },
+      {
+        tableName: 'subscription',
+        columnName: 'past_due_at',
+        dataType: 'timestamp with time zone',
+        isNullable: 'YES',
+      },
     ],
-  });
+    expectedDrift: 'missing retention_cards.last_recall_feedback',
+  },
+  {
+    name: 'past-due column absent',
+    rows: [
+      {
+        tableName: 'retention_cards',
+        columnName: 'last_recall_feedback',
+        dataType: 'jsonb',
+        isNullable: 'YES',
+      },
+    ],
+    expectedDrift: 'missing subscription.past_due_at',
+  },
+  {
+    name: 'retention feedback column has an incompatible type',
+    rows: [
+      {
+        tableName: 'retention_cards',
+        columnName: 'last_recall_feedback',
+        dataType: 'json',
+        isNullable: 'YES',
+      },
+      {
+        tableName: 'subscription',
+        columnName: 'past_due_at',
+        dataType: 'timestamp with time zone',
+        isNullable: 'YES',
+      },
+    ],
+    expectedDrift:
+      'incompatible retention_cards.last_recall_feedback (expected jsonb nullable, found json nullable)',
+  },
+  {
+    name: 'past-due column is unexpectedly non-nullable',
+    rows: [
+      {
+        tableName: 'retention_cards',
+        columnName: 'last_recall_feedback',
+        dataType: 'jsonb',
+        isNullable: 'YES',
+      },
+      {
+        tableName: 'subscription',
+        columnName: 'past_due_at',
+        dataType: 'timestamp with time zone',
+        isNullable: 'NO',
+      },
+    ],
+    expectedDrift:
+      'incompatible subscription.past_due_at (expected timestamp with time zone nullable, found timestamp with time zone non-nullable)',
+  },
+]) {
+  test(`${name} returns actionable reconciliation instructions`, async () => {
+    const result = await runChecker({
+      databaseUrl: 'postgresql://example.invalid/database',
+      rows,
+    });
 
-  assert.equal(result.exitCode, 2);
-  assert.equal(result.queryCalls, 1);
-  assert.deepEqual(result.stdout, []);
-  assert.deepEqual(result.stderr, [
-    'development schema freshness failed: missing subscription.past_due_at',
-    'reconcile only after approval with: pnpm db:push:dev',
-  ]);
-});
+    assert.equal(result.exitCode, 2);
+    assert.equal(result.queryCalls, 1);
+    assert.deepEqual(result.stdout, []);
+    assert.deepEqual(result.stderr, [
+      `development schema freshness failed: ${expectedDrift}`,
+      'reconcile only after approval with: pnpm db:push:dev',
+    ]);
+  });
+}
+
+for (const dopplerConfig of ['stg', 'prd']) {
+  test(`${dopplerConfig} target fails closed without querying`, async () => {
+    const result = await runChecker({
+      databaseUrl: 'postgresql://example.invalid/database',
+      dopplerConfig,
+    });
+
+    assert.equal(result.exitCode, 1);
+    assert.equal(result.queryCalls, 0);
+    assert.deepEqual(result.stdout, []);
+    assert.deepEqual(result.stderr, [
+      'development schema freshness unavailable: run through Doppler dev config only',
+    ]);
+  });
+}
 
 test('catalog rejection is unavailable without exposing a credential', async () => {
   const marker = 'WI2938_DUMMY_SECRET';

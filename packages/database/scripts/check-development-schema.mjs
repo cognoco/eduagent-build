@@ -4,7 +4,11 @@ import { pathToFileURL } from 'node:url';
 import { neon } from '@neondatabase/serverless';
 
 export const DEVELOPMENT_SCHEMA_QUERY = `
-SELECT table_name AS "tableName", column_name AS "columnName"
+SELECT
+  table_name AS "tableName",
+  column_name AS "columnName",
+  data_type AS "dataType",
+  is_nullable AS "isNullable"
 FROM information_schema.columns
 WHERE table_schema = 'public'
   AND (
@@ -15,40 +19,82 @@ ORDER BY table_name, column_name
 `;
 
 const REQUIRED_COLUMNS = [
-  'retention_cards.last_recall_feedback',
-  'subscription.past_due_at',
+  {
+    qualifiedName: 'retention_cards.last_recall_feedback',
+    dataType: 'jsonb',
+    isNullable: 'YES',
+  },
+  {
+    qualifiedName: 'subscription.past_due_at',
+    dataType: 'timestamp with time zone',
+    isNullable: 'YES',
+  },
 ];
 
-function qualifiedColumns(rows) {
-  return new Set(
-    rows.map(({ tableName, columnName }) => `${tableName}.${columnName}`),
+function columnsByQualifiedName(rows) {
+  return new Map(
+    rows.map((row) => [`${row.tableName}.${row.columnName}`, row]),
   );
 }
 
 export function missingDevelopmentColumns(rows) {
-  const found = qualifiedColumns(rows);
-  return REQUIRED_COLUMNS.filter((column) => !found.has(column));
+  const found = columnsByQualifiedName(rows);
+  return REQUIRED_COLUMNS.filter(
+    ({ qualifiedName }) => !found.has(qualifiedName),
+  ).map(({ qualifiedName }) => qualifiedName);
+}
+
+export function incompatibleDevelopmentColumns(rows) {
+  const found = columnsByQualifiedName(rows);
+  return REQUIRED_COLUMNS.flatMap((expected) => {
+    const actual = found.get(expected.qualifiedName);
+    if (!actual) return [];
+
+    const compatible =
+      actual.dataType === expected.dataType &&
+      actual.isNullable === expected.isNullable;
+    if (compatible) return [];
+
+    const expectedNullability =
+      expected.isNullable === 'YES' ? 'nullable' : 'non-nullable';
+    const actualNullability =
+      actual.isNullable === 'YES' ? 'nullable' : 'non-nullable';
+    return [
+      `${expected.qualifiedName} (expected ${expected.dataType} ${expectedNullability}, found ${actual.dataType} ${actualNullability})`,
+    ];
+  });
 }
 
 export async function runDevelopmentSchemaCheck({
   databaseUrl,
+  dopplerConfig,
   queryCatalog,
   stdout,
   stderr,
 }) {
+  if (dopplerConfig !== 'dev') {
+    stderr(
+      'development schema freshness unavailable: run through Doppler dev config only',
+    );
+    return 1;
+  }
+
   if (!databaseUrl) {
     stderr('development schema freshness unavailable: DATABASE_URL is not set');
     return 1;
   }
 
   try {
-    const missing = missingDevelopmentColumns(
-      await queryCatalog(databaseUrl, DEVELOPMENT_SCHEMA_QUERY),
-    );
-    if (missing.length > 0) {
-      stderr(
-        `development schema freshness failed: missing ${missing.join(', ')}`,
-      );
+    const rows = await queryCatalog(databaseUrl, DEVELOPMENT_SCHEMA_QUERY);
+    const missing = missingDevelopmentColumns(rows);
+    const incompatible = incompatibleDevelopmentColumns(rows);
+    if (missing.length > 0 || incompatible.length > 0) {
+      const drift = [];
+      if (missing.length > 0) drift.push(`missing ${missing.join(', ')}`);
+      if (incompatible.length > 0) {
+        drift.push(`incompatible ${incompatible.join(', ')}`);
+      }
+      stderr(`development schema freshness failed: ${drift.join('; ')}`);
       stderr('reconcile only after approval with: pnpm db:push:dev');
       return 2;
     }
@@ -68,15 +114,9 @@ async function queryLiveCatalog(databaseUrl, query) {
 }
 
 async function main() {
-  if (process.env.DOPPLER_CONFIG !== 'dev') {
-    console.error(
-      'development schema freshness unavailable: run through Doppler dev config only',
-    );
-    return 1;
-  }
-
   return runDevelopmentSchemaCheck({
     databaseUrl: process.env.DATABASE_URL,
+    dopplerConfig: process.env.DOPPLER_CONFIG,
     queryCatalog: queryLiveCatalog,
     stdout: console.log,
     stderr: console.error,
