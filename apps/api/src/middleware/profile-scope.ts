@@ -216,14 +216,19 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
     if (!callerPersonId) {
       return forbidden(c, 'Profile authority could not be resolved');
     }
-    // This middleware validates organization-scoped visibility only. It must
-    // not substitute for a route's operation/elevation contract: consent
-    // writes, profile mutation, and owner switching derive authority from the
-    // authenticated caller Person at their own boundary.
-    const scope = await getPersonScope(db, profileIdHeader, account.id);
+    // Membership is visibility, not operation authority. The caller may
+    // install only self or an uncredentialed charge they actively guard as
+    // request context. Route-specific write/elevation gates remain additional
+    // constraints; they never widen this central operation boundary.
+    const scope = await getPersonScope(
+      db,
+      profileIdHeader,
+      account.id,
+      callerPersonId,
+    );
     if (!scope) {
       logger.warn('profile_scope.ownership_mismatch', {
-        reason: 'not-visible',
+        reason: 'not-operable',
       });
       return forbidden(c, 'Profile does not belong to this account');
     }

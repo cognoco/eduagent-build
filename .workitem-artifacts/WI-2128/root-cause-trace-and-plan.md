@@ -1,7 +1,7 @@
 # WI-2128 — Bind joined learner credentials to their own Person
 
-Status: implementation plan after GATE-0 premise verification  
-Type: Bug (P0, adversarial review)  
+Status: implementation plan after GATE-0 premise verification
+Type: Bug (P0, adversarial review)
 Claimant: `codex:builder:WI-2128`
 
 ## Goal and success criteria

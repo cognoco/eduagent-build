@@ -55,13 +55,15 @@ describe('profileScopeMiddleware', () => {
     });
   });
 
-  function createApp(): Hono<{ Variables: AppVariables }> {
+  function createApp(
+    callerPersonId = 'valid-profile-id',
+  ): Hono<{ Variables: AppVariables }> {
     const app = new Hono<{ Variables: AppVariables }>();
     // Simulate account middleware having run
     app.use('*', async (c, next) => {
       c.set('account', { id: 'test-account-id' } as AppVariables['account']);
       c.set('db', {} as AppVariables['db']);
-      c.set('callerPersonId', 'valid-profile-id');
+      c.set('callerPersonId', callerPersonId);
       await next();
     });
     app.use('*', profileScopeMiddleware);
@@ -92,7 +94,122 @@ describe('profileScopeMiddleware', () => {
       // 'explicit-header' so the owner-only gates accept it.
       resolvedVia: 'explicit-header',
     });
+    expect(mockGetPersonScope).toHaveBeenCalledWith(
+      expect.anything(),
+      'valid-profile-id',
+      'test-account-id',
+      'valid-profile-id',
+    );
   });
+
+  it.each([
+    ['family owner', 'family-owner-id'],
+    ['credentialed sibling', 'credentialed-sibling-id'],
+  ])(
+    '[WI-2128][BREAK] joined learner cannot install same-org %s context',
+    async (_label, requestedProfileId) => {
+      const callerPersonId = 'joined-learner-id';
+      mockGetPersonScope.mockImplementation(
+        (
+          _db: unknown,
+          profileId: string,
+          _organizationId: string,
+          authorityCallerPersonId?: string,
+        ) => {
+          if (!authorityCallerPersonId) {
+            return Promise.resolve({
+              profileId,
+              meta: {
+                birthYear: 1985,
+                location: 'EU',
+                consentStatus: 'CONSENTED',
+                hasPremiumLlm: false,
+                isOwner: profileId === 'family-owner-id',
+              },
+            });
+          }
+          return Promise.resolve(null);
+        },
+      );
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(jest.fn());
+      const app = createApp(callerPersonId);
+      const res = await app.request('/test', {
+        headers: { 'X-Profile-Id': requestedProfileId },
+      });
+
+      expect(res.status).toBe(403);
+      expect(mockGetPersonScope).toHaveBeenCalledWith(
+        expect.anything(),
+        requestedProfileId,
+        'test-account-id',
+        callerPersonId,
+      );
+      const logged = JSON.parse(warnSpy.mock.calls[0]![0] as string);
+      expect(logged).toMatchObject({
+        level: 'warn',
+        message: 'profile_scope.ownership_mismatch',
+        context: { reason: 'not-operable' },
+      });
+      warnSpy.mockRestore();
+    },
+  );
+
+  it.each([
+    ['self', 'joined-learner-id', 'joined-learner-id'],
+    [
+      'active guardian to uncredentialed charge',
+      'guardian-id',
+      'uncredentialed-charge-id',
+    ],
+  ])(
+    '[WI-2128] preserves explicit %s context',
+    async (_label, callerPersonId, requestedProfileId) => {
+      mockGetPersonScope.mockImplementation(
+        (
+          _db: unknown,
+          profileId: string,
+          _organizationId: string,
+          authorityCallerPersonId?: string,
+        ) => {
+          const operable =
+            profileId === authorityCallerPersonId ||
+            (authorityCallerPersonId === 'guardian-id' &&
+              profileId === 'uncredentialed-charge-id');
+          return Promise.resolve(
+            operable
+              ? {
+                  profileId,
+                  meta: {
+                    birthYear: 2014,
+                    location: 'EU',
+                    consentStatus: 'CONSENTED',
+                    hasPremiumLlm: false,
+                    isOwner: authorityCallerPersonId === 'guardian-id',
+                  },
+                }
+              : null,
+          );
+        },
+      );
+
+      const app = createApp(callerPersonId);
+      const res = await app.request('/test', {
+        headers: { 'X-Profile-Id': requestedProfileId },
+      });
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({
+        profileId: requestedProfileId,
+      });
+      expect(mockGetPersonScope).toHaveBeenCalledWith(
+        expect.anything(),
+        requestedProfileId,
+        'test-account-id',
+        callerPersonId,
+      );
+    },
+  );
 
   it('auto-resolves the login-bound caller Person when X-Profile-Id is absent', async () => {
     const app = createApp();
