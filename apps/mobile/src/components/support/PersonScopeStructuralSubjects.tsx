@@ -24,6 +24,7 @@ import {
   type SubjectHubData,
 } from '../subject-hub';
 import { useApiQuery } from '../../hooks/use-api-query';
+import type { Translate } from '../../i18n';
 import { useApiClient } from '../../lib/api-client';
 
 type PersonScope = Extract<ScopeDescriptor, { kind: 'person' }>;
@@ -47,7 +48,7 @@ function topicState(topic: SupporteeStructuralTopic): HubTopicState {
 
 function buildMaskedHubData(
   subject: SupporteeStructuralSubject,
-  t: ReturnType<typeof useTranslation>['t'],
+  t: Translate,
   learnerName: string,
 ): SubjectHubData {
   const chaptersByName = new Map<string, HubChapter['topics']>();
