@@ -39,8 +39,10 @@ const EMBEDDING_B = axis(0); // identical → cosine distance 0 (best case)
 
 // A far vector so we can control which neighbour is within threshold
 
+type SuccessfulDedupLlmResult = Extract<DedupLlmResult, { ok: true }>;
+
 function llmDecision(
-  decision: DedupLlmResult & { ok: true },
+  decision: SuccessfulDedupLlmResult,
 ): jest.MockedFunction<
   NonNullable<Parameters<typeof runDedupForProfile>[0]['llm']>
 > {
@@ -99,6 +101,7 @@ describe('memory_facts dedup — action branches (real DB)', () => {
           merged_text: 'likes fractions and fraction work',
         },
         modelVersion: 'test',
+        provider: 'test',
       }),
     });
 
@@ -174,6 +177,7 @@ describe('memory_facts dedup — action branches (real DB)', () => {
         ok: true,
         decision: { action: 'supersede' },
         modelVersion: 'test',
+        provider: 'test',
       }),
     });
 
@@ -236,6 +240,7 @@ describe('memory_facts dedup — action branches (real DB)', () => {
         ok: true,
         decision: { action: 'keep_both' },
         modelVersion: 'test',
+        provider: 'test',
       }),
     });
 
@@ -297,6 +302,7 @@ describe('memory_facts dedup — action branches (real DB)', () => {
         ok: true,
         decision: { action: 'discard_new' },
         modelVersion: 'test',
+        provider: 'test',
       }),
     });
 
@@ -375,6 +381,7 @@ describe('memory_facts dedup — action branches (real DB)', () => {
         ok: true,
         decision: { action: 'discard_new' },
         modelVersion: 'test',
+        provider: 'test',
       }),
     });
 
