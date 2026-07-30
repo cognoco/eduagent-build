@@ -58,11 +58,15 @@ and 3 explicitly reported skips. The revalidation changed no runtime or test cod
 ## Governed landing evidence
 
 The evidence-only revalidation was merged through
-[PR #2723](https://github.com/cognoco/eduagent-build/pull/2723) as
-[commit 81e1aa43f](https://github.com/cognoco/eduagent-build/commit/81e1aa43f81501fef7dde85d0541f4b29ef3f86a).
-Its exact-head CI includes the successful
-[Flag-ON integration job](https://github.com/cognoco/eduagent-build/actions/runs/30579841099/job/90997051001)
-and its fresh
-[Claude approval](https://github.com/cognoco/eduagent-build/pull/2723#issuecomment-5136012321).
-These immutable GitHub URLs replace the producer-local merge-gate artifact that was
-not present in the landed tree.
+[PR #2723](https://github.com/cognoco/eduagent-build/pull/2723). Its reviewed PR
+head was `65eacb9caf69b8ebaf757268f43f40ba2f95ead0`; the later merge commit on
+`main` was `81e1aa43f81501fef7dde85d0541f4b29ef3f86a`. The CI and Claude approval
+therefore validate the reviewed PR head, not the later merge commit.
+
+[`governed-landing.json`](governed-landing.json) preserves the source URLs and the
+durable job and approval facts that would otherwise be lost to external retention or
+editing: CI workflow/run/job identity, exact head, status, conclusion, and timestamps;
+and the Claude APPROVED verdict, author, timestamp, Must-fix/Should-fix counts, and
+full approval body. The preserved CI job is the successful
+[Flag-ON integration job](https://github.com/cognoco/eduagent-build/actions/runs/30579841099/job/90997051001),
+and the source approval remains linked from the record.
