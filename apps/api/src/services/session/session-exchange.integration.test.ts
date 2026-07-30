@@ -472,6 +472,7 @@ async function seedProfileAndSubject(
     displayName: `Grader Tester ${idx}`,
     birthDate: '2006-01-01',
     residenceJurisdiction: 'US',
+    conversationLanguageConfirmedAt: new Date('2026-01-01T00:00:00Z'),
   });
   await db.insert(membership).values({
     personId: profileId,
