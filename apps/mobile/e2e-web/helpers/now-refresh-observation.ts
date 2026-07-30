@@ -82,3 +82,71 @@ export async function observeExactNowRefresh<Response>(
     if (timer) clearTimeout(timer);
   }
 }
+
+/**
+ * [WI-2833 rework] Independent observation of whether the post-Back
+ * `/v1/now?scope=self` REQUEST was actually dispatched, decoupled from
+ * whatever happens to its response. `observeExactNowRefresh` alone cannot
+ * prove this: a production regression that stops sending the request
+ * entirely looks identical to a legitimate rejection/non-settlement from
+ * `observeExactNowRefresh`'s point of view (its response promise just times
+ * out either way). This function must be armed (e.g. via
+ * `page.waitForRequest`) BEFORE the triggering action, exactly like
+ * `observeExactNowRefresh`, and races that promise against the same
+ * production-compatible window. "No matching request observed" is always
+ * `{ kind: 'not-attempted' }` -- whether because none ever fired, or because
+ * the underlying promise itself rejected (e.g. Playwright's own
+ * `waitForRequest` timeout) -- so a caller can assert it as a hard failure
+ * distinct from a response-side rejection/abort.
+ */
+export type NowRefreshRequestOutcome<Request> =
+  | { kind: 'attempted'; request: Request }
+  | { kind: 'not-attempted' };
+
+export async function observeNowRefreshRequestAttempt<Request>(
+  requestPromise: Promise<Request>,
+  options: { armedAtMs: number; actionAtMs: number; windowMs?: number },
+): Promise<NowRefreshRequestOutcome<Request>> {
+  assertArmedBeforeAction(options.armedAtMs, options.actionAtMs);
+  const windowMs = options.windowMs ?? NOW_REFRESH_OBSERVATION_WINDOW_MS;
+
+  const NOT_ATTEMPTED = Symbol('not-attempted');
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<typeof NOT_ATTEMPTED>((resolve) => {
+    timer = setTimeout(() => resolve(NOT_ATTEMPTED), windowMs);
+  });
+
+  try {
+    const result = await Promise.race([
+      // A rejection here (e.g. Playwright's own waitForRequest timeout) means
+      // no matching request was observed -- fold it into NOT_ATTEMPTED rather
+      // than rethrowing, so "not attempted" always resolves rather than
+      // requiring every caller to also catch this promise.
+      requestPromise.catch(() => NOT_ATTEMPTED),
+      timeoutPromise,
+    ]);
+    if (result === NOT_ATTEMPTED) {
+      return { kind: 'not-attempted' };
+    }
+    return { kind: 'attempted', request: result as Request };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
+ * Asserts a request-attempt outcome actually fired, narrowing the type.
+ * Call this for EVERY accepted variant (settled, aborted/rejected, or
+ * bounded-unsettled response) so a production regression that stops sending
+ * the post-Back refresh request fails the spec instead of being silently
+ * absorbed into the response's rejected/unsettled classification.
+ */
+export function assertRequestAttempted<Request>(
+  outcome: NowRefreshRequestOutcome<Request>,
+): asserts outcome is { kind: 'attempted'; request: Request } {
+  if (outcome.kind === 'not-attempted') {
+    throw new Error(
+      '[now-refresh:not-attempted] No matching /v1/now?scope=self request was observed within the observation window. Production must attempt this refresh even when its response is later aborted or bounded away -- a missing request is a regression, not a legitimate rejected/unsettled response variant.',
+    );
+  }
+}
