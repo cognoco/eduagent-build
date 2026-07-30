@@ -50,10 +50,24 @@ describe('buildChallengeRoundGraderPrompt', () => {
     const systemContent = buildChallengeRoundGraderPrompt(baseInput)[0]!
       .content as string;
 
-    expect(systemContent).toMatch(
-      /misconception.*takes precedence over partial.*causal mechanism.*demonstrably wrong/is,
+    expect(systemContent).toContain(
+      'Misconception takes precedence over partial when a confident causal mechanism is demonstrably wrong,',
     );
-    expect(systemContent).toMatch(/even if.*another aspect.*correct/is);
+    expect(systemContent).toContain(
+      'even if another aspect or conclusion of the answer is correct.',
+    );
+    expect(systemContent).toContain(
+      'Do not use partial for a correct conclusion supported by a confidently wrong causal explanation; use misconception.',
+    );
+  });
+
+  it('keeps partial broad enough for non-causal assessed concepts', () => {
+    const systemContent = buildChallengeRoundGraderPrompt(baseInput)[0]!
+      .content as string;
+
+    expect(systemContent).toContain(
+      'partial       — the answer shows some understanding but has notable gaps or inaccuracies.',
+    );
   });
 
   it('instructs the model to return a single JSON object with no surrounding prose', () => {
