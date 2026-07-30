@@ -63,6 +63,12 @@ describe('CHALLENGE_SIM_SCENARIOS', () => {
     expect(scenario?.competenceBrief).toContain(
       'Do not choose or repeat "ser" or "estar"',
     );
+    expect(scenario?.competenceBrief).toContain(
+      'Reply to every question with a short, explicit admission',
+    );
+    expect(scenario?.competenceBrief).toContain(
+      'Never provide an explanation or invent a rule',
+    );
     expect(scenario?.competenceBrief).not.toMatch(
       /just get it|makes sense to me|sounds right/i,
     );
