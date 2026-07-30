@@ -27,7 +27,7 @@
     },
     {
       "acRef": "AC-1",
-      "description": "The existing-account target opens the family-join invitation form directly under the live V2 launch flag and consumes the durable marker only after that route mounts; older flag configurations retain the explicit unavailable state without consuming the marker.",
+      "description": "The existing-account target opens the family-join invitation form directly under the live V2 launch flag and consumes the durable marker only after that route mounts; older flag configurations mount the explicit unavailable state and then consume the marker so relaunch cannot replay the terminal gate.",
       "pointer": "apps/mobile/src/app/(app)/link/initiate.test.tsx"
     },
     {

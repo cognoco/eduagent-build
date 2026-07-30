@@ -7,8 +7,9 @@
   ceremony, and enters the learner shell without family or child state.
 - Someone else durably advances to the own-login question.
 - Yes persists an opening-invitation destination, replays that destination
-  after remount if needed, and clears the marker only after the invitation
-  screen mounts under V2.
+  after remount if needed, and clears the marker only after the destination
+  route mounts: the invitation form under V2 or the explicit unavailable gate
+  under older shells.
 - No durably shows the explicit managed-profile unavailable state and can return
   to the login question.
 - Sign-out clears both SecureStore and the in-memory pending-state cache.

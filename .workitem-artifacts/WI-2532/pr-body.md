@@ -5,8 +5,9 @@
 - keep the fork non-authorizing while routing credentialed learners to the
   existing invitation form and explicitly gating the unavailable managed path
 - restore pending setup across remount/relaunch; Me durably clears before
-  synchronous `onComplete` mounts/reveals the learner shell, invitation clears
-  after the real route mounts, and sign-out clears either case
+  synchronous `onComplete` mounts/reveals the learner shell, and the
+  existing-account destination clears after its real route mounts (V2
+  invitation form or older-shell unavailable gate)
 - add focused mobile coverage, translated copy, and a preview browser journey
 
 ## Verification
@@ -18,8 +19,8 @@
 - touched-file ESLint with `--max-warnings=0`: passed
 - publication-review regressions: focused RED-to-green coverage passed
 - review hardening covers stale-read invalidation after sign-out, recovery-only
-  primary repair, V2-off marker preservation, and an inaccessible restore-probe
-  navigator that retains requested route state
+  primary repair, all-mode terminal marker consumption, and an inaccessible
+  restore-probe navigator that retains requested route state
 - preview Playwright journey: passed in 1.7 minutes
 
 ## Collision note

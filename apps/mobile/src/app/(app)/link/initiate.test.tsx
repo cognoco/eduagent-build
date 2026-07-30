@@ -12,7 +12,7 @@ import {
   fetchCallsMatching,
 } from '../../../test-utils/mock-api-routes';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
-import { clearFamilyIntentOnboarding } from '../../../lib/family-intent-onboarding-state';
+import * as familyIntentOnboardingState from '../../../lib/family-intent-onboarding-state';
 import { Sentry } from '../../../lib/sentry';
 
 jest.mock(
@@ -50,13 +50,9 @@ jest.mock('../../../lib/scope-context', () => ({
   useScopeContext: () => mockScopeContext,
 }));
 
-jest.mock(
-  '../../../lib/family-intent-onboarding-state' /* gc1-allow: durable-state boundary; this screen test asserts destination consumption after mount */,
-  () => ({
-    ...jest.requireActual('../../../lib/family-intent-onboarding-state'),
-    clearFamilyIntentOnboarding: jest.fn().mockResolvedValue(undefined),
-  }),
-);
+const clearFamilyIntentOnboardingSpy = jest
+  .spyOn(familyIntentOnboardingState, 'clearFamilyIntentOnboarding')
+  .mockResolvedValue(undefined);
 
 // `visibilityContractSchema` requires UUID-shaped person ids; the mock
 // response fixture uses fixed UUIDs independent of the non-UUID
@@ -96,6 +92,10 @@ function renderInitiateScreen(
 }
 
 describe('InitiateLinkScreen', () => {
+  afterAll(() => {
+    clearFamilyIntentOnboardingSpy.mockRestore();
+  });
+
   afterEach(() => {
     jest.clearAllMocks();
     // [WI-2188] clearAllMocks() clears call history but NOT a prior
@@ -335,7 +335,7 @@ describe('InitiateLinkScreen', () => {
         screen.queryByTestId('visibility-link-initiate-picker'),
       ).toBeNull();
       await waitFor(() => {
-        expect(clearFamilyIntentOnboarding).toHaveBeenCalledTimes(1);
+        expect(clearFamilyIntentOnboardingSpy).toHaveBeenCalledTimes(1);
       });
       expect(
         screen.queryByTestId(
@@ -348,7 +348,7 @@ describe('InitiateLinkScreen', () => {
     }
   });
 
-  it('[WI-2532] preserves the explicit unavailable gate for a direct existing-account target when V2 is off', () => {
+  it('[WI-2532] consumes the durable marker after the V2-off unavailable destination mounts so relaunch does not replay it', async () => {
     const original = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
     (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
       false;
@@ -361,7 +361,9 @@ describe('InitiateLinkScreen', () => {
       expect(
         screen.queryByTestId('visibility-link-initiate-picker'),
       ).toBeNull();
-      expect(clearFamilyIntentOnboarding).not.toHaveBeenCalled();
+      await waitFor(() => {
+        expect(clearFamilyIntentOnboardingSpy).toHaveBeenCalledTimes(1);
+      });
     } finally {
       (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
         original;
@@ -370,7 +372,7 @@ describe('InitiateLinkScreen', () => {
 
   it('[WI-2532] reports destination-marker cleanup failure while leaving the invitation usable', async () => {
     const error = new Error('storage unavailable');
-    (clearFamilyIntentOnboarding as jest.Mock).mockRejectedValueOnce(error);
+    clearFamilyIntentOnboardingSpy.mockRejectedValueOnce(error);
     const captureSpy = jest
       .spyOn(Sentry, 'captureException')
       .mockImplementation(() => 'test-event-id');

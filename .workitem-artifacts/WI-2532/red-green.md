@@ -60,9 +60,11 @@ The publication review produced three reproducible correctness failures:
 - A recovery-only record restored successfully but never repaired the missing
   SecureStore primary. RED expected a SecureStore `setItem` call and observed
   zero calls. A successful recovery read now schedules primary repair.
-- The V2-off existing-account placeholder consumed the durable destination
-  marker. RED expected zero clear calls and observed one. Marker consumption is
-  now gated on V2 being enabled.
+- Exact-head review exposed the inverse V2-off lifecycle defect: the mounted
+  unavailable destination left the durable marker replayable on every relaunch.
+  RED expected one clear call after that terminal route mounted and observed
+  zero. Both the V2 invitation form and older-shell unavailable gate now
+  consume the marker only after mount.
 
 The blocked-shell review also added an explicit route-state assertion: while
 the pending fork is visible, Tabs remain mounted for route preservation but

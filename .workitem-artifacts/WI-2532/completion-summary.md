@@ -13,8 +13,9 @@ profile creation.
   explicit.
 - The unfinished fork is stored per profile and restored after remount or
   relaunch. Me durably clears it before synchronous `onComplete`
-  mounts/reveals the learner shell; invitation clears only after the real route
-  mounts. Sign-out also clears it.
+  mounts/reveals the learner shell; the existing-account destination clears
+  only after its real route mounts, whether that route shows the V2 invitation
+  form or the older-shell unavailable gate. Sign-out also clears it.
 - Storage failures fail closed with retry; a failed handoff after profile
   creation retries only the durable marker and never repeats the profile POST.
 - Dedicated translated copy, focused mobile coverage, and a preview browser
@@ -28,9 +29,10 @@ cleanup. The full mobile unit stage, full API unit stage under the sanctioned
 development database boundary, TypeScript build, i18n ratchets, test-only
 export guard, warning-free touched-file lint, and whitespace check passed.
 Review-bounce coverage also verifies stale-read rejection, recovery-primary
-repair, V2-only destination consumption, and a mounted-but-inaccessible blocked
-navigator. The dedicated preview journey passed in 1.7 minutes and reached the
-invitation form without a supportership write.
+repair, all-mode terminal destination consumption, and a
+mounted-but-inaccessible blocked navigator. The dedicated preview journey
+passed in 1.7 minutes and reached the invitation form without a supportership
+write.
 
 ## Caveats / Follow-ups
 

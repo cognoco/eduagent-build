@@ -4,9 +4,10 @@
 | --- | --- | --- |
 | Late primary read can repopulate state after sign-out | Accepted and fixed | Both primary and recovery generations are captured before storage awaits; a deterministic deferred-read test failed RED with the stale signed-out record and now returns `null`. |
 | Recovery journal restores but never repairs primary | Accepted and fixed | A recovery-only test failed RED with zero SecureStore writes; restore now schedules primary repair. |
-| V2-off unavailable placeholder consumes destination | Accepted and fixed | The V2-off test failed RED with one clear call; marker consumption now returns early while V2 is disabled. |
+| V2-off unavailable destination leaves its marker replayable | Accepted after AC and runtime verification; supersedes the earlier placeholder disposition | Guarding marker creation behind V2 would skip the required family-intent fork. RED instead proved the mounted older-shell terminal gate made zero clear calls; it now consumes after mount, matching the V2 invitation form and preventing relaunch replay. |
 | Blocked Tabs remain keyboard-focusable on web | Accepted and fixed | The mounted shell now combines `display: none`, pointer blocking, `aria-hidden`, and native accessibility hiding. Tests prove Tabs remain mounted through hidden queries but are unavailable to ordinary queries. |
-| Internal relative `jest.mock` calls violate GC6 | Accepted and fixed | Internal mocks were replaced by targeted `jest.spyOn` overrides; only the external `expo-router` mock remains. |
+| Family-intent gate internal relative `jest.mock` calls violate GC6 | Accepted and fixed | Those internal mocks were replaced by targeted `jest.spyOn` overrides; only the external `expo-router` mock remains in that component suite. |
+| Initiate-route durable-state `jest.mock` lacks GC1 justification | Accepted and fixed | The whole-module mock and `gc1-allow` were removed in favor of a targeted `jest.spyOn(clearFamilyIntentOnboarding)` with suite-level restoration. |
 | Fake timers can leak if the assertion fails | Accepted and fixed | The timeout test restores real timers in `finally`. |
 | Sign-out mock override can leak to later cases | Accepted and fixed | The rejection override now uses `mockImplementationOnce`. |
 | Single microtask drain is fragile | Accepted in substance and adapted | The preview early-return path makes the suggested loading test ID unobservable, so the test explicitly drains the known primary/recovery/state-update microtasks with an explanatory comment. |
