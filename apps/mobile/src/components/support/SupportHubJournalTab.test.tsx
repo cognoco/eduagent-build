@@ -104,13 +104,22 @@ const EMPTY_SHARED_RECORD: SharedRecord = {
   },
 };
 
-function renderWithProfile(ui: React.ReactElement): QueryClient {
+function renderWithProfile(
+  ui: React.ReactElement,
+  initialRecord?: SharedRecord,
+): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false, gcTime: 0 },
       mutations: { gcTime: 0 },
     },
   });
+  if (initialRecord) {
+    queryClient.setQueryData(
+      ['visibility-shared-record', PERSON_ID, EDGE_ID],
+      initialRecord,
+    );
+  }
   const { wrapper } = createScreenWrapper({
     activeProfile: createTestProfile(),
     profiles: [createTestProfile()],
@@ -224,6 +233,23 @@ describe('SupportHubJournalTab', () => {
     await waitFor(() => {
       screen.getByTestId('visibility-shared-record-error');
     });
+  });
+
+  it('shows a refresh error instead of cached Support Hub data', async () => {
+    mockFetch.setRoute(
+      `/visibility/reports/${PERSON_ID}/shared-record`,
+      new Response(JSON.stringify({ message: 'nope' }), { status: 500 }),
+    );
+
+    queryClient = renderWithProfile(
+      <SupportHubJournalTab personScopes={[EMMA_SCOPE]} />,
+      SHARED_RECORD,
+    );
+
+    await waitFor(() => {
+      screen.getByTestId('visibility-shared-record-error');
+    });
+    expect(screen.queryByText('Practiced fractions')).toBeNull();
   });
 
   it('requests the attention report when the appeal affordance is pressed', async () => {

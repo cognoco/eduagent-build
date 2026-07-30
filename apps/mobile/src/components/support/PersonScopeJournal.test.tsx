@@ -126,13 +126,22 @@ const EMPTY_SHARED_RECORD: SharedRecord = {
   },
 };
 
-function renderWithProfile(ui: React.ReactElement): QueryClient {
+function renderWithProfile(
+  ui: React.ReactElement,
+  initialRecord?: SharedRecord,
+): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false, gcTime: 0 },
       mutations: { retry: false, gcTime: 0 },
     },
   });
+  if (initialRecord) {
+    queryClient.setQueryData(
+      ['visibility-shared-record', PERSON_ID, EDGE_ID],
+      initialRecord,
+    );
+  }
   const { wrapper } = createScreenWrapper({
     activeProfile: createTestProfile(),
     profiles: [createTestProfile()],
@@ -249,6 +258,23 @@ describe('PersonScopeJournal', () => {
       'Private chats, notes, and mentor memory are not shown here.',
     );
     expect(screen.queryByText('No shared record yet')).toBeNull();
+  });
+
+  it('shows a refresh error instead of cached person Journal data', async () => {
+    mockFetch.setRoute(
+      `/visibility/reports/${PERSON_ID}/shared-record`,
+      new Response(JSON.stringify({ message: 'nope' }), { status: 500 }),
+    );
+
+    queryClient = renderWithProfile(
+      <PersonScopeJournal scope={EMMA_SCOPE} />,
+      SHARED_RECORD,
+    );
+
+    await waitFor(() => {
+      screen.getByTestId('visibility-shared-record-error');
+    });
+    expect(screen.queryByText('Knows equivalent fractions')).toBeNull();
   });
 
   it('requests the attention report when the appeal affordance is pressed', async () => {
