@@ -53,6 +53,32 @@ describe('SharedRecordView', () => {
     expect(screen.queryByText(/raw chat/i)).toBeNull();
   });
 
+  it('renders structured facts through localized templates and retains legacy facts', () => {
+    const structuredRecord: SharedRecord = {
+      ...RECORD,
+      supporterView: {
+        ...RECORD.supporterView,
+        facts: [
+          {
+            ...RECORD.supporterView.facts[0],
+            title: 'Legacy English title',
+            detail: 'Legacy English detail',
+            metadata: {
+              templateKey: 'weeklyReport',
+              stats: [{ metricKey: 'topicsExplored', value: 3 }],
+            },
+          },
+        ],
+      },
+    };
+
+    render(<SharedRecordView record={structuredRecord} supporteeName="Emma" />);
+
+    screen.getByText('Weekly report');
+    screen.getByText('3 topics explored');
+    expect(screen.queryByText('Legacy English title')).toBeNull();
+  });
+
   it('routes fetch errors through ErrorFallback', () => {
     const onRetry = jest.fn();
     render(<SharedRecordView error={new Error('nope')} onRetry={onRetry} />);

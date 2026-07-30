@@ -14,6 +14,10 @@ import { StructuralFactCard } from '../learning-surface';
 import { SupportPersonPickerSheet } from './SupportPersonPickerSheet';
 import { SupporterColdStart } from './SupporterColdStart';
 import { SupporterSelfLearningDoorway } from './SupporterSelfLearningDoorway';
+import {
+  renderSharedRecordFact,
+  renderSharedRecordHeadline,
+} from './shared-record-fact-copy';
 import { useSharedRecord } from './use-shared-record';
 
 type PersonScope = Extract<ScopeDescriptor, { kind: 'person' }>;
@@ -121,14 +125,18 @@ function SupportHubMentorPersonCard({
       ) : hasShareableFacts(query.data) ? (
         <StructuralFactCard
           headline={
-            query.data?.supporterView.headline ??
-            t('supportHub.mentor.loadingHeadline')
+            query.data
+              ? renderSharedRecordHeadline(
+                  query.data.supporterView,
+                  t,
+                  scope.displayName,
+                )
+              : t('supportHub.mentor.loadingHeadline')
           }
           structuralOnlyLabel={t('supportHub.mentor.structuralOnly')}
           facts={facts.map((fact) => ({
             id: fact.id,
-            title: fact.title,
-            detail: fact.detail,
+            ...renderSharedRecordFact(fact, t),
           }))}
         />
       ) : query.data ? (
