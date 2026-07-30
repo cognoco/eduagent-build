@@ -7063,7 +7063,7 @@ export async function resetDatabase(
       (options.clerkUserIds
         ? options.clerkUserIds.filter((id) => id.startsWith(SEED_CLERK_PREFIX))
         : (seedClerkUsers ?? []).map((user) => user.id));
-    const clerkUsersToDelete =
+    let clerkUsersToDelete =
       options.clerkUserIds ||
       verifiedSeedClerkUserIds ||
       options.preserveClerkUsers
@@ -7074,12 +7074,14 @@ export async function resetDatabase(
         'Unprefixed Worker Clerk cleanup is forbidden; use scripts/clean-clerk-test-users.mjs with verified Clerk user IDs',
       );
     }
-    if (
-      clerkUsersToDelete &&
-      clerkUsersToDelete.length > MAX_WORKER_CLERK_CLEANUP_USERS
-    ) {
-      throw new Error(
-        `Worker Clerk cleanup is limited to ${MAX_WORKER_CLERK_CLEANUP_USERS} users; use scripts/clean-clerk-test-users.mjs for bulk cleanup`,
+    if (clerkUsersToDelete) {
+      // Keep each Worker invocation below Cloudflare's subrequest limit. The
+      // caller repeats prefix cleanup while a full batch was deleted; Clerk
+      // users are listed before the DB graph is removed, so later batches can
+      // still delete the remaining Clerk users after their DB rows are gone.
+      clerkUsersToDelete = clerkUsersToDelete.slice(
+        0,
+        MAX_WORKER_CLERK_CLEANUP_USERS,
       );
     }
     if (clerkUsersToDelete) {

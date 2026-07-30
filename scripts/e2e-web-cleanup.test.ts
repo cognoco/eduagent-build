@@ -70,6 +70,18 @@ describe('[BUG-979] e2e-web cleanup wiring', () => {
       expect(run).toMatch(/X-Test-Secret/);
     });
 
+    it('[WI-2820 P1] repeats full Worker cleanup batches for large V2 runs', () => {
+      const step = findStep('Reset seeded staging accounts')!;
+      const run = String(step.run ?? '');
+
+      expect(run).toMatch(/MAX_CLEANUP_BATCHES=20/);
+      expect(run).toMatch(
+        /for BATCH in \$\(seq 1 "\$\{MAX_CLEANUP_BATCHES\}"\)/,
+      );
+      expect(run).toMatch(/clerkUsersDeleted/);
+      expect(run).toMatch(/\[ "\$\{clerk_users_deleted\}" -lt 15 \]/);
+    });
+
     it('reset step refuses an unknown prefix instead of using a fallback prefix', () => {
       const step = findStep('Reset seeded staging accounts')!;
       const run = String(step.run ?? '');
@@ -86,8 +98,9 @@ describe('[BUG-979] e2e-web cleanup wiring', () => {
     it('reset step does not fail the job on a non-2xx response (nightly cleanup is the safety net)', () => {
       const step = findStep('Reset seeded staging accounts')!;
       const run = String(step.run ?? '');
-      // The pipeline ends with `|| echo` so the curl exit code is masked.
-      expect(run).toMatch(/\|\|\s*echo\s+"::warning::/);
+      // The curl failures are converted to warnings so the nightly cleanup
+      // safety net remains available during a staging incident.
+      expect(run).toMatch(/\|\|\s*\{\s*echo\s+"::warning::/);
     });
   });
 

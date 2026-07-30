@@ -1301,7 +1301,7 @@ describe('resetDatabase', () => {
     expect(restoredExternalIds).toEqual([`${SEED_CLERK_PREFIX}failed-delete`]);
   });
 
-  it('[WI-2820 P1] refuses Worker cleanup above the Clerk subrequest budget before marking', async () => {
+  it('[WI-2820 P1] batches Worker cleanup below the Clerk subrequest budget before marking', async () => {
     const users = Array.from({ length: 16 }, (_, index) => ({
       id: `user_over_budget_${index}`,
       external_id: `${SEED_CLERK_PREFIX}over-budget-${index}`,
@@ -1316,11 +1316,27 @@ describe('resetDatabase', () => {
     global.fetch = fetchMock;
     const db = createMockDb();
 
-    await expect(
-      resetDatabase(db, { CLERK_SECRET_KEY: 'test-secret' }, { prefix: 'pw-' }),
-    ).rejects.toThrow(/Worker Clerk cleanup is limited to/);
+    const result = await resetDatabase(
+      db,
+      { CLERK_SECRET_KEY: 'test-secret' },
+      { prefix: 'pw-' },
+    );
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ deletedCount: 0, clerkUsersDeleted: 15 });
+    // One Clerk list plus marker/bypass/delete for only 15 users = 46 calls,
+    // safely below Cloudflare's 50-subrequest cap.
+    expect(fetchMock).toHaveBeenCalledTimes(46);
+    const markerCalls = fetchMock.mock.calls.filter(([, init]) => {
+      const body = JSON.parse(
+        String((init as RequestInit | undefined)?.body ?? '{}'),
+      ) as {
+        external_id?: string;
+      };
+      return body.external_id?.startsWith(
+        `${SEED_CLERK_PREFIX}deletion-pending:`,
+      );
+    });
+    expect(markerCalls).toHaveLength(15);
   });
 
   it('returns ResetResult with deletedCount', async () => {
