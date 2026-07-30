@@ -46,6 +46,16 @@ describe('buildChallengeRoundGraderPrompt', () => {
     }
   });
 
+  it('gives a confidently wrong causal mechanism misconception precedence over partial credit', () => {
+    const systemContent = buildChallengeRoundGraderPrompt(baseInput)[0]!
+      .content as string;
+
+    expect(systemContent).toMatch(
+      /misconception.*takes precedence over partial.*causal mechanism.*demonstrably wrong/is,
+    );
+    expect(systemContent).toMatch(/even if.*another aspect.*correct/is);
+  });
+
   it('instructs the model to return a single JSON object with no surrounding prose', () => {
     const systemContent = buildChallengeRoundGraderPrompt(baseInput)[0]!
       .content as string;

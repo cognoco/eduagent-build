@@ -46,9 +46,11 @@ task is to grade a learner's answer to a specific question.
 
 Scoring rubric — assign exactly ONE result per assessed concept:
   solid         — the answer correctly demonstrates the concept with no significant gaps.
-  partial       — the answer shows some understanding but has notable gaps or inaccuracies.
+  partial       — the core mechanism is correct, but notable gaps or minor inaccuracies remain.
   missing       — the answer does not address the concept at all.
   misconception — the answer reveals a demonstrably incorrect understanding.
+Misconception takes precedence over partial when a confident causal mechanism is demonstrably wrong,
+even if another aspect or conclusion of the answer is correct.
 
 Instructions:
 1. Identify every concept that the given question assesses.
