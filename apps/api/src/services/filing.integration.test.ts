@@ -29,6 +29,7 @@ import {
   fileToLibrary,
   resolveFilingResult,
 } from './filing';
+import { assertFilingDedupBarrierPresent } from '../db/filing-dedup-barrier';
 import type { FilingLlmOutput, LibraryIndex } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
@@ -100,6 +101,16 @@ async function cleanup() {
 // ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
+
+// [WI-2639] Environment contract: resolveFilingResult's concurrent-write
+// dedup guarantees (below) depend on DB-level unique indexes that a
+// push-managed database (dev Neon) never receives — see
+// ../db/filing-dedup-barrier.ts for the full rationale. Fail the whole
+// suite fast with an actionable diagnostic here rather than letting the
+// concurrency tests race silently against an unenforced barrier.
+beforeAll(async () => {
+  await assertFilingDedupBarrierPresent(createIntegrationDb());
+});
 
 beforeEach(async () => {
   await cleanup();

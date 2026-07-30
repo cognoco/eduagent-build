@@ -405,11 +405,14 @@ function syncSecrets(targets) {
 // isRenderedWranglerToml is exported for the regression test.
 module.exports = {
   buildWranglerBulkArgs,
+  filterSecrets,
   findMissingSecretNames,
+  isWranglerAuthenticated,
   isRenderedWranglerToml,
   shouldSkipSync,
   syncSecrets,
   validateApiSentryProject,
+  WRANGLER_CLI,
 };
 
 // CLI entry point — only runs when called directly

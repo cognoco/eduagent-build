@@ -17,12 +17,16 @@
 - TypeScript build and i18n/clinical-copy/test-only-export ratchets: passed
 - touched-file ESLint with `--max-warnings=0`: passed
 - publication-review regressions: focused RED-to-green coverage passed
+- review hardening covers stale-read invalidation after sign-out, recovery-only
+  primary repair, V2-off marker preservation, and an inaccessible restore-probe
+  navigator that retains requested route state
 - preview Playwright journey: passed in 1.7 minutes
 
 ## Collision note
 
-BID-33 PR #2692 is incorporated from authoritative main with both locale key
-families retained. WI-2231 PR #2704 remains an unlanded collision watch and
-must be reconciled from authoritative main if it lands before this branch.
+Publication merged authoritative main `47dd24d50` after a zero-overlap file-map
+preflight. BID-33 PR #2692 remains incorporated with both locale key families
+retained. WI-2231 PR #2704 remains open and unlanded at `2602ee46`; its
+create-profile changes are therefore not incorporated into this branch.
 
 Refs: WI-2532

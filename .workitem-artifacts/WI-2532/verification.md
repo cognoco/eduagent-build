@@ -49,13 +49,13 @@ form without first writing a visibility/supportership link.
 
 ## Collision and flag audit
 
-- BID-33 PR #2692 landed on `origin/main`
-  `455f1f54c20195cb3d19de64f5567c9051921cb6`. This branch merged that
-  authoritative locale state and retained both key families.
-- WI-2231 PR #2704 is an unlanded collision watch at reviewed head
-  `020c597f`. It has not been merged into this branch; if it lands first, its
-  post-auth routing semantics must be reconciled from the new authoritative
-  main before publication.
+- Publication merge-forward used authoritative `origin/main`
+  `47dd24d5024ff8a1be0d9790eb43849c533bbfd4` after a file-map preflight found
+  no overlap with WI-2532. BID-33 PR #2692 remains incorporated with both
+  locale key families retained.
+- WI-2231 PR #2704 remains open and unlanded at reviewed head
+  `2602ee46da16606de91c6a281e579cb8e209a1f5`. Its create-profile changes are
+  therefore not incorporated into this publication head.
 - Existing flags-off, V0, and V1 shell contracts are unchanged. Direct
   existing-account entry preserves the prior explicit unavailable state when
   V2 is off.

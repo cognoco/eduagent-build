@@ -31,6 +31,7 @@
 import { Hono } from 'hono';
 import type { Database } from '@eduagent/database';
 import { CONSENT_PURPOSES, type ConsentPurpose } from '@eduagent/schemas';
+import { signWithdrawalToken } from '../services/consent-withdrawal-token';
 import { consentWebRoutes } from './consent-web';
 
 // ─── DB stub (external boundary) ───────────────────────────────────────────
@@ -78,8 +79,12 @@ function makeRow(overrides: Partial<StubConsentRow> = {}): StubConsentRow {
 function makeDb(opts: {
   row: StubConsentRow | undefined;
   displayName?: string | null;
+  withdrawalGrant?: {
+    withdrawnAt: Date | null;
+    withdrawalTokenId: string | null;
+  };
 }): Database {
-  const { row, displayName = 'Emma' } = opts;
+  const { row, displayName = 'Emma', withdrawalGrant } = opts;
   const requestRows = row
     ? CONSENT_PURPOSES.map((purpose, index) => ({
         ...row,
@@ -142,6 +147,17 @@ function makeDb(opts: {
           .fn()
           .mockResolvedValue(displayName == null ? undefined : { displayName }),
       },
+      consentGrant: {
+        findFirst: jest.fn().mockResolvedValue(
+          withdrawalGrant
+            ? {
+                id: 'grant-current',
+                purpose: CONSENT_PURPOSES[0],
+                ...withdrawalGrant,
+              }
+            : undefined,
+        ),
+      },
     },
     update: jest.fn().mockReturnValue(updateChain),
     delete: jest.fn().mockReturnValue(deleteChain),
@@ -157,6 +173,8 @@ function makeDb(opts: {
 const ENV = {
   DATABASE_URL: 'postgres://stub',
   CONSENT_POLICY_VERSION: 'v1-test',
+  CONSENT_WITHDRAWAL_TOKEN_SECRET:
+    'unit-test-withdrawal-secret-that-is-long-enough',
   // IDENTITY_V2_ENABLED unset ⇒ legacy consent_states path (isIdentityV2Enabled === false)
 } as const;
 
@@ -165,6 +183,7 @@ type ConsentWebTestEnv = {
   Bindings: {
     DATABASE_URL: string;
     CONSENT_POLICY_VERSION: string;
+    CONSENT_WITHDRAWAL_TOKEN_SECRET?: string;
     IDENTITY_V2_ENABLED?: string;
   };
   Variables: { db: Database };
@@ -200,7 +219,63 @@ async function postConfirm(
   );
 }
 
+function withdrawalFixture(withdrawnAt: Date | null): {
+  db: Database;
+  token: string;
+} {
+  const withdrawalTokenId = 'unit-test-withdrawal-token-id';
+  return {
+    db: makeDb({
+      row: undefined,
+      displayName: 'Riley',
+      withdrawalGrant: { withdrawnAt, withdrawalTokenId },
+    }),
+    token: signWithdrawalToken(
+      'person-child-1',
+      'org-1',
+      ENV.CONSENT_WITHDRAWAL_TOKEN_SECRET,
+      { tokenId: withdrawalTokenId },
+    ),
+  };
+}
+
 afterEach(() => jest.clearAllMocks());
+
+describe('GET /consent-page/withdraw — email-only parent policy copy', () => {
+  it('confirmation states pause + deletion after the internal grace without promising undo', async () => {
+    const { db, token } = withdrawalFixture(null);
+    const res = await getPage(
+      db,
+      `/consent-page/withdraw?token=${encodeURIComponent(token)}`,
+    );
+
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("Riley's learning sessions");
+    expect(html).toContain('The account is paused');
+    expect(html).toContain('internal deletion grace period');
+    expect(html).toContain('permanently deleted after 7 days');
+    expect(html).toContain('not an undo window');
+    expect(html).not.toMatch(/you can undo|changed your mind|sign(?:ing)? in/i);
+  });
+
+  it('withdrawn landing states pause + deletion after the internal grace without telling the account-less actor to sign in', async () => {
+    const { db, token } = withdrawalFixture(new Date());
+    const res = await getPage(
+      db,
+      `/consent-page/withdraw?token=${encodeURIComponent(token)}`,
+    );
+
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("Riley's learning sessions have stopped");
+    expect(html).toContain('The account is paused');
+    expect(html).toContain('internal deletion grace period');
+    expect(html).toContain('permanently deleted after 7 days');
+    expect(html).toContain('not an undo window');
+    expect(html).not.toMatch(/you can undo|changed your mind|sign(?:ing)? in/i);
+  });
+});
 
 describe('[ACCOUNT-27] GET /consent-page — decision page + link guards', () => {
   it('400s with "Invalid link" when the token query param is missing', async () => {
