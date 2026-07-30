@@ -437,13 +437,14 @@ describe('bookmark routes', () => {
       expect(res.status).toBe(401);
     });
 
-    it('returns 400 when profile cannot be resolved (no X-Profile-Id and no owner)', async () => {
+    it('[WI-2128] returns 403 when the authenticated caller Person cannot be resolved', async () => {
+      mockGetPersonScope.mockResolvedValueOnce(null);
       const res = await app.request(
         '/v1/bookmarks',
         { headers: makeAuthHeaders() },
         TEST_ENV,
       );
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(403);
       expect(mockListBookmarks).not.toHaveBeenCalled();
     });
   });

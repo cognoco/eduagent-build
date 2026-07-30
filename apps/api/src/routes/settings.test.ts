@@ -62,7 +62,7 @@ jest.mock(
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
-      personId: 'person-test-id',
+      personId: 'profile-1',
       organizationId: 'test-account-id',
       isOwner: true,
       roles: ['admin'],
@@ -342,7 +342,7 @@ describe('settings routes', () => {
       'profile-1',
       'test-account-id',
       true,
-      { callerPersonId: 'person-test-id' },
+      { callerPersonId: 'profile-1' },
     );
   });
 
@@ -440,7 +440,7 @@ describe('settings routes', () => {
       'profile-1',
       'test-account-id',
       expect.objectContaining({ reviewReminders: true }),
-      { callerPersonId: 'person-test-id' },
+      { callerPersonId: 'profile-1' },
     );
   });
 

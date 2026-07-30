@@ -695,9 +695,9 @@ describe('metering middleware', () => {
     });
 
     it('rejects unresolved profile-only LLM routes before quota lookup/decrement', async () => {
-      // WI-867: post-collapse, profile-scope calls findOwnerPersonScope (V2);
-      // findOwnerProfile (V1) is no longer on the hot path. Inject via V2 mock.
-      mockFindOwnerPersonScope.mockResolvedValueOnce(null);
+      // [WI-2128] An authenticated identity-graph mismatch must fail closed
+      // before any quota lookup/decrement.
+      mockGetPersonScope.mockResolvedValueOnce(null);
 
       const res = await app.request(
         '/v1/dictation/prepare-homework',
@@ -710,9 +710,9 @@ describe('metering middleware', () => {
         TEST_ENV,
       );
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(403);
       const body = await res.json();
-      expect(body.code).toBe('VALIDATION_ERROR');
+      expect(body.code).toBe('FORBIDDEN');
       expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
       expect(mockGetQuotaPool).not.toHaveBeenCalled();
       expect(mockDecrementQuota).not.toHaveBeenCalled();

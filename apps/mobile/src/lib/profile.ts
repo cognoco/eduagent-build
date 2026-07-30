@@ -102,7 +102,7 @@ export interface ProfileContextValue {
   isLoading: boolean;
   /** Set when the account's profile list could not be loaded. */
   profileLoadError: unknown | null;
-  /** Set when a saved profile was removed server-side and we fell back to owner */
+  /** Set when a saved profile is no longer operable and we selected a safe fallback. */
   profileWasRemoved: boolean;
   /** Clear the profileWasRemoved flag after user acknowledges */
   acknowledgeProfileRemoval: () => void;
@@ -253,9 +253,10 @@ export function ProfileProvider({
   );
   const isProfilesLoading = profilesQuery.isLoading;
   const isProfilesFetching = profilesQuery.isFetching;
-  // A stale-while-refetch failure should not eject a signed-in user from the
-  // app when we still have a usable profile list in cache.
-  const profileLoadError = profiles.length === 0 ? profilesQuery.error : null;
+  // Profile rows carry capability metadata. A failed authoritative refetch
+  // must not fall back to a cached owner shell after a same-subject family
+  // join, so surface the error even when TanStack still holds old data.
+  const profileLoadError = profilesQuery.error;
   const client = useApiClient();
   const queryClient = useQueryClient();
 
@@ -320,10 +321,19 @@ export function ProfileProvider({
     };
   }, []);
 
+  const clearExplicitProxyMode = useCallback(() => {
+    setProxyMode(false);
+    setIsExplicitProxyMode(false);
+    void SecureStore.deleteItemAsync(PARENT_PROXY_KEY).catch(
+      Sentry.captureException,
+    );
+  }, []);
+
   // Once profiles arrive, validate that saved ID exists in the list.
-  // Fall back to owner profile if saved ID is stale or missing.
+  // Fall back to the owner when present, otherwise the caller's first operable
+  // profile (joined learner credentials receive only their own Person).
   useEffect(() => {
-    if (isRestoringId || profiles.length === 0) return;
+    if (isRestoringId || isRestoringProxyMode || profiles.length === 0) return;
 
     const savedExists = profiles.some((p) => p.id === activeProfileId);
     if (!savedExists) {
@@ -343,7 +353,26 @@ export function ProfileProvider({
         /* non-fatal — in-memory activeProfileId is already set above */
       });
     }
-  }, [profiles, activeProfileId, isRestoringId]);
+
+    const selectedProfile = savedExists
+      ? profiles.find((profile) => profile.id === activeProfileId)
+      : (profiles.find((profile) => profile.isOwner) ?? profiles[0]);
+    const supportsParentProxy =
+      selectedProfile?.isOwner === false &&
+      profiles.some((profile) => profile.isOwner);
+    if (isExplicitProxyMode && !supportsParentProxy) {
+      // The persisted proxy flag belongs to a former family-owner view. A
+      // learner-only operation set cannot support that relationship.
+      clearExplicitProxyMode();
+    }
+  }, [
+    profiles,
+    activeProfileId,
+    isRestoringId,
+    isRestoringProxyMode,
+    isExplicitProxyMode,
+    clearExplicitProxyMode,
+  ]);
 
   const activeProfile = useMemo(
     () => profiles.find((p) => p.id === activeProfileId) ?? null,
@@ -361,8 +390,19 @@ export function ProfileProvider({
   // NB: imported as pushProfileIdToApiClient to avoid shadowing the local
   // React state setter (also named setActiveProfileId on line 101).
   useLayoutEffect(() => {
+    if (isProfilesFetching || profileLoadError) {
+      pushProfileIdToApiClient(undefined);
+      setProxyMode(false);
+      return;
+    }
     pushProfileIdToApiClient(activeProfile?.id);
-  }, [activeProfile?.id]);
+    setProxyMode(isExplicitProxyMode);
+  }, [
+    activeProfile?.id,
+    isExplicitProxyMode,
+    isProfilesFetching,
+    profileLoadError,
+  ]);
 
   const switchProfile = useCallback(
     async (
@@ -489,6 +529,7 @@ export function ProfileProvider({
   // CreateProfileGate ("Welcome!") to flash.
   const isLoading =
     isProfilesLoading ||
+    isProfilesFetching ||
     isRestoringId ||
     isRestoringProxyMode ||
     (!isRestoringId && profiles.length > 0 && activeProfile === null) ||

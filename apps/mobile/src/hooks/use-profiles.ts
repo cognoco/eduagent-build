@@ -4,8 +4,14 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { AppState, Platform } from 'react-native';
 import { useAuth } from '@clerk/expo';
-import { useApiClient } from '../lib/api-client';
+import {
+  useApiClient,
+  setActiveProfileId,
+  setProxyMode,
+} from '../lib/api-client';
 import { shouldRetryApiError } from '../lib/api-errors';
 import {
   profileListResponseSchema,
@@ -32,9 +38,15 @@ export function useProfiles(): UseQueryResult<Profile[]> {
   // "We could not load your profile" error fallback in (app)/_layout.tsx.
   // Prefix-based invalidations (`queryKey: ['profiles']`) still match this
   // scoped key because TanStack invalidation is a prefix match by default.
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.profiles.list(userId),
     queryFn: async ({ signal: querySignal }) => {
+      // Profile metadata is the authority refresh itself. Do not attach a
+      // previously selected Person/proxy header: after family join that stale
+      // owner selection must fail closed on normal routes, but it must not
+      // prevent this headerless caller-bound recovery request.
+      setActiveProfileId(undefined);
+      setProxyMode(false);
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
         const res = await client.profiles.$get({}, { init: { signal } });
@@ -46,7 +58,28 @@ export function useProfiles(): UseQueryResult<Profile[]> {
       }
     },
     enabled: !!isSignedIn,
+    // Profiles carry capability metadata. The Clerk subject and Person id stay
+    // stable across a family join, so a same-subject cache entry can otherwise
+    // retain the pre-join owner shell. Revalidate on every provider mount.
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnReconnect: 'always',
   });
+  const { refetch } = query;
+
+  useEffect(() => {
+    if (Platform.OS === 'web' || !isSignedIn) return;
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void refetch();
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [isSignedIn, refetch]);
+
+  return query;
 }
 
 export function useUpdateProfileName() {

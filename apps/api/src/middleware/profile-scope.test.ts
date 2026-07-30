@@ -13,13 +13,11 @@ jest.mock('../services/sentry', () => {
 });
 
 const mockGetPersonScope = jest.fn();
-const mockFindOwnerPersonScope = jest.fn();
 jest.mock(
-  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — profile-scope mw calls getPersonScope/findOwnerPersonScope (db.select() innerJoin chains, unrunnable on unit mock DB); real path covered by identity integration suite — coverage gap tracked WI-905 */,
+  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — profile-scope mw calls getPersonScope (db.select() innerJoin chains, unrunnable on unit mock DB); real path covered by identity integration suite — coverage gap tracked WI-905 */,
   () => ({
     ...jest.requireActual('../services/identity-v2/profile-v2'),
     getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
-    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
   }),
 );
 
@@ -44,21 +42,9 @@ function captureHttpException(callback: () => unknown): HTTPException {
 describe('profileScopeMiddleware', () => {
   beforeEach(() => {
     mockGetPersonScope.mockReset();
-    mockFindOwnerPersonScope.mockReset();
     // Default: valid profile belongs to account
     mockGetPersonScope.mockResolvedValue({
       profileId: 'valid-profile-id',
-      meta: {
-        birthYear: 2014,
-        location: 'EU',
-        consentStatus: 'CONSENTED',
-        hasPremiumLlm: false,
-        isOwner: true,
-      },
-    });
-    // Default: owner auto-resolve
-    mockFindOwnerPersonScope.mockResolvedValue({
-      profileId: 'owner-profile-id',
       meta: {
         birthYear: 2014,
         location: 'EU',
@@ -75,6 +61,7 @@ describe('profileScopeMiddleware', () => {
     app.use('*', async (c, next) => {
       c.set('account', { id: 'test-account-id' } as AppVariables['account']);
       c.set('db', {} as AppVariables['db']);
+      c.set('callerPersonId', 'valid-profile-id');
       await next();
     });
     app.use('*', profileScopeMiddleware);
@@ -107,26 +94,30 @@ describe('profileScopeMiddleware', () => {
     });
   });
 
-  it('auto-resolves owner profile when X-Profile-Id header is absent', async () => {
+  it('auto-resolves the login-bound caller Person when X-Profile-Id is absent', async () => {
     const app = createApp();
     const res = await app.request('/test');
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.profileId).toBe('owner-profile-id');
+    expect(body.profileId).toBe('valid-profile-id');
     expect(body.profileMeta).toEqual({
       birthYear: 2014,
       location: 'EU',
       consentStatus: 'CONSENTED',
       hasPremiumLlm: false,
       isOwner: true,
-      // [Issue 901] The no-header auto-resolve path synthesizes the owner
-      // identity, so it is tagged 'auto'. The owner-only gates
-      // (assertOwnerProfile / assertNotProxyMode) reject 'auto' even though
-      // isOwner is true — an authenticated non-owner could otherwise omit the
-      // header to be auto-resolved to the owner (privilege escalation).
+      // The no-header path resolves the authenticated caller's own Person and
+      // marks the resolution auto so owner-only transitions still require an
+      // affirmative explicit selection.
       resolvedVia: 'auto',
     });
+    expect(mockGetPersonScope).toHaveBeenCalledWith(
+      expect.anything(),
+      'valid-profile-id',
+      'test-account-id',
+      'valid-profile-id',
+    );
   });
 
   it('returns 403 with proper error body when profile does not belong to account', async () => {
@@ -154,9 +145,10 @@ describe('profileScopeMiddleware', () => {
     expect(logged.level).toBe('warn');
     expect(logged.message).toBe('profile_scope.ownership_mismatch');
     expect(logged.context).toMatchObject({
-      accountId: 'test-account-id',
-      requestedProfileId: 'other-account-profile',
+      reason: 'not-operable',
     });
+    expect(logged.context).not.toHaveProperty('accountId');
+    expect(logged.context).not.toHaveProperty('requestedProfileId');
 
     warnSpy.mockRestore();
   });
@@ -188,7 +180,7 @@ describe('profileScopeMiddleware', () => {
     });
   });
 
-  // [BUG-487 / BUG-502] Break test: when findOwnerPersonScope throws a transient
+  // [BUG-487 / BUG-502] Break test: when caller scope resolution throws a transient
   // DB error, profileScopeMiddleware must respond 503 (fail closed) and must
   // NOT call next(). Previous behavior was to swallow the error and call
   // next() with profileId undefined, allowing consent to skip enforcement.
@@ -198,13 +190,13 @@ describe('profileScopeMiddleware', () => {
   // - Sentry capture (aggregate alerting)
   // This preserves the CR-SILENT-RECOVERY-1 requirement while fixing the
   // fail-open bug.
-  it('[BUG-487/502] returns 503 + logs + captures when findOwnerProfile throws', async () => {
+  it('[BUG-487/502] returns 503 + logs + captures when caller scope resolution throws', async () => {
     // [BUG-231] See above — jest.fn() avoids the empty-function suppression.
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(jest.fn());
     (captureException as jest.Mock).mockClear();
 
     const dbError = new Error('DB connection lost');
-    mockFindOwnerPersonScope.mockRejectedValueOnce(dbError);
+    mockGetPersonScope.mockRejectedValueOnce(dbError);
 
     const app = createApp();
     const res = await app.request('/test');
@@ -220,34 +212,52 @@ describe('profileScopeMiddleware', () => {
     expect(logged.level).toBe('error');
     expect(logged.message).toBe('profile_scope.auto_resolve_failed');
     expect(logged.context).toMatchObject({
-      accountId: 'test-account-id',
-      error: 'DB connection lost',
+      errorType: 'Error',
     });
+    expect(logged.context).not.toHaveProperty('accountId');
+    expect(logged.context).not.toHaveProperty('error');
 
     // Sentry escalation: real exception object + queryable surface tag
     // [CR-2026-05-19-M1] tags.surface allows ops to filter/alert in Sentry.
     expect(captureException).toHaveBeenCalledTimes(1);
-    expect(captureException).toHaveBeenCalledWith(dbError, {
+    expect(captureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: { surface: 'profile_scope.auto_resolve_failure' },
       extra: {
-        context: 'profile-scope.auto_resolve_owner',
-        accountId: 'test-account-id',
+        context: 'profile-scope.auto_resolve_caller',
       },
     });
+    const capturedError = (captureException as jest.Mock).mock.calls[0]![0];
+    expect(capturedError).toMatchObject({
+      message: 'Profile scope auto-resolution failed',
+      cause: { errorType: 'Error' },
+    });
+    expect(capturedError.message).not.toContain(dbError.message);
 
     errorSpy.mockRestore();
   });
 
-  it('leaves profileMeta unset when findOwnerProfile returns null (new account) [BUG-TEMP-28]', async () => {
-    mockFindOwnerPersonScope.mockResolvedValueOnce(null);
+  it('[WI-2128][BREAK] returns 403 and categorical telemetry when caller scope returns null', async () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(jest.fn());
+    mockGetPersonScope.mockResolvedValueOnce(null);
 
     const app = createApp();
     const res = await app.request('/test');
-    const body = await res.json();
 
-    expect(res.status).toBe(200);
-    expect(body.profileId).toBeNull();
-    expect(body.profileMeta).toBeNull();
+    expect(res.status).toBe(403);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    const logged = JSON.parse(warnSpy.mock.calls[0]![0] as string);
+    expect(logged).toMatchObject({
+      level: 'warn',
+      message: 'profile_scope.authority_mismatch',
+      context: {
+        resolutionPath: 'auto',
+        reason: 'caller-scope-not-operable',
+      },
+    });
+    expect(logged.context).not.toHaveProperty('accountId');
+    expect(logged.context).not.toHaveProperty('callerPersonId');
+    expect(logged.context).not.toHaveProperty('profileId');
+    warnSpy.mockRestore();
   });
 
   it('skips auto-resolution and calls next when db or account is missing', async () => {

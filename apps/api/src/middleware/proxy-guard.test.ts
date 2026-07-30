@@ -86,10 +86,13 @@ describe('assertNotProxyMode', () => {
 // (set server-side after verifying X-Profile-Id ownership) is authoritative.
 // ---------------------------------------------------------------------------
 
-function createAppWithProfileMeta(meta: {
-  isOwner: boolean;
-  resolvedVia?: 'auto' | 'explicit-header';
-}) {
+function createAppWithProfileMeta(
+  meta: {
+    isOwner: boolean;
+    resolvedVia?: 'auto' | 'explicit-header';
+  },
+  profileId = CALLER_PERSON_ID,
+) {
   const app = new Hono();
   app.use('*', async (c, next) => {
     c.set('profileMeta' as never, meta);
@@ -99,7 +102,7 @@ function createAppWithProfileMeta(meta: {
     // tests below reject earlier and never touch these.
     c.set('account' as never, { id: 'test-account-id' });
     c.set('callerPersonId' as never, CALLER_PERSON_ID);
-    c.set('profileId' as never, CALLER_PERSON_ID);
+    c.set('profileId' as never, profileId);
     await next();
   });
   app.post('/test', async (c) => {
@@ -110,16 +113,20 @@ function createAppWithProfileMeta(meta: {
 }
 
 describe('assertNotProxyMode — server-derived proxy mode [BUG-718]', () => {
-  it('[BREAK] rejects writes for non-owner profile EVEN when X-Proxy-Mode header is omitted', async () => {
-    const app = createAppWithProfileMeta({ isOwner: false });
+  it('[WI-2128] allows a credentialed learner to write to their own non-owner Person', async () => {
+    const app = createAppWithProfileMeta({
+      isOwner: false,
+      resolvedVia: 'explicit-header',
+    });
     const res = await app.request('/test', { method: 'POST' });
-    expect(res.status).toBe(403);
-    const body = await res.json();
-    expect(body.message).toBe('Not available in proxy mode');
+    expect(res.status).toBe(200);
   });
 
-  it('[BREAK] rejects writes for non-owner profile EVEN when X-Proxy-Mode: false is sent', async () => {
-    const app = createAppWithProfileMeta({ isOwner: false });
+  it('[WI-2128][BREAK] rejects a guardian proxy write when caller and selected Person differ', async () => {
+    const app = createAppWithProfileMeta(
+      { isOwner: false, resolvedVia: 'explicit-header' },
+      'managed-charge-person-id',
+    );
     const res = await app.request('/test', {
       method: 'POST',
       headers: { 'X-Proxy-Mode': 'false' },

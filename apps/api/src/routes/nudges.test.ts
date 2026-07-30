@@ -43,6 +43,25 @@ jest.mock('../services/account', () => {
   };
 });
 
+jest.mock(
+  '../services/identity-v2/identity-resolve' /* gc1-allow: route unit test — DB mocked; resolver covered by identity integration tests */,
+  () => ({
+    resolveIdentityV2: jest.fn().mockResolvedValue({
+      account: {
+        id: 'test-account-id',
+        clerkUserId: 'user_test',
+        email: 'test@example.com',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      personId: '01914d6a-0000-7000-8000-000000000001',
+      organizationId: 'test-account-id',
+      isOwner: true,
+      roles: ['admin'],
+    }),
+  }),
+);
+
 // [WI-867] v2 profile-scope seam continuity mock.
 // Echo profileId back so route handlers receive the X-Profile-Id the caller sent.
 const mockFindOwnerPersonScope = jest.fn().mockResolvedValue(null);

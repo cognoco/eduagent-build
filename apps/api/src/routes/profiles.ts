@@ -151,11 +151,13 @@ export const profileRoutes = new Hono<ProfileEnv>()
       } catch (err) {
         logger.error('adult self-consent repair-or-signal failed', {
           error: err instanceof Error ? err.message : String(err),
-          callerPersonId,
         });
       }
     }
-    const profiles = await listProfilesV2(db, account.id);
+    if (!callerPersonId) {
+      return forbidden(c, 'Profile authority could not be resolved');
+    }
+    const profiles = await listProfilesV2(db, account.id, callerPersonId);
     return c.json(
       profileListResponseSchema.parse({ profiles, needsAdultConsent }),
     );
@@ -201,6 +203,23 @@ export const profileRoutes = new Hono<ProfileEnv>()
         }
 
         const owner = await getOwnerProfileV2(db, resolvedAccount.id);
+
+        // [WI-2128] A post-graph owner-create replay may return the owner only
+        // to that login-bound owner Person. Organization membership alone is
+        // visibility, not authority: a joined learner shares the organization
+        // but must never receive the owner's profile through this replay path.
+        if (
+          input.kind !== 'child' &&
+          owner &&
+          owner.id !== c.get('callerPersonId')
+        ) {
+          return apiError(
+            c,
+            403,
+            ERROR_CODES.FORBIDDEN,
+            'Only the account owner can replay owner profile creation.',
+          );
+        }
 
         // [WI-811 / CUT-B2] Genuine add-child create. The explicit discriminator
         // distinguishes this from an idempotent owner replay so a child-create
@@ -340,6 +359,13 @@ export const profileRoutes = new Hono<ProfileEnv>()
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const account = requireAccount(c.get('account'));
     const id = c.req.param('id');
+    const callerPersonId = c.get('callerPersonId');
+    if (
+      !callerPersonId ||
+      !(await getPersonScope(db, id, account.id, callerPersonId))
+    ) {
+      return forbidden(c, 'Profile does not belong to this account');
+    }
     if (c.get('callerPersonId') !== id) {
       await assertChargeNotCredentialed(db, id);
     }
@@ -358,13 +384,10 @@ export const profileRoutes = new Hono<ProfileEnv>()
 
       const activeProfileId = c.get('profileId');
       const profileMeta = c.get('profileMeta');
-      // [Issue 901] Reject auto-resolved (headerless) identities unconditionally.
-      // profileScopeMiddleware auto-resolves the account owner (isOwner:true) when
-      // no X-Profile-Id is sent — so a non-owner omitting the header gets
-      // id === activeProfileId (both resolve to the owner id), bypassing the
-      // self-edit exception below. Checking resolvedVia first closes that hole:
-      // only explicitly-selected identities (the mobile client always sends the
-      // header) may proceed. Auto-resolved owner self-edit is intentionally 403.
+      // [Issue 901] Reject auto-resolved (headerless) identities
+      // unconditionally. Headerless scope now resolves the caller's own Person,
+      // but profile mutations still require an affirmative explicit selection
+      // (the mobile client always sends the header).
       if (profileMeta?.resolvedVia !== 'explicit-header') {
         return apiError(
           c,
@@ -422,13 +445,10 @@ export const profileRoutes = new Hono<ProfileEnv>()
       // so a non-owner can still update their own displayName/avatar/colorScheme.
       const activeProfileId = c.get('profileId');
       const profileMeta = c.get('profileMeta');
-      // [Issue 901] Reject auto-resolved (headerless) identities unconditionally.
-      // profileScopeMiddleware auto-resolves the account owner (isOwner:true) when
-      // no X-Profile-Id is sent — so a non-owner omitting the header gets
-      // id === activeProfileId (both resolve to the owner id), bypassing the
-      // self-edit exception below. Checking resolvedVia first closes that hole:
-      // only explicitly-selected identities (the mobile client always sends the
-      // header) may proceed. Auto-resolved owner self-edit is intentionally 403.
+      // [Issue 901] Reject auto-resolved (headerless) identities
+      // unconditionally. Headerless scope now resolves the caller's own Person,
+      // but profile mutations still require an affirmative explicit selection
+      // (the mobile client always sends the header).
       if (profileMeta?.resolvedVia !== 'explicit-header') {
         return apiError(
           c,
@@ -465,13 +485,22 @@ export const profileRoutes = new Hono<ProfileEnv>()
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const account = requireAccount(c.get('account'));
       const { profileId } = c.req.valid('json');
+      const callerPersonId = c.get('callerPersonId');
+      if (!callerPersonId) {
+        return forbidden(c, 'Profile authority could not be resolved');
+      }
       // [WI-301 / MMT-ADR-0025] Switching into owner context is account-scoped
       // but security-sensitive: it unlocks Billing, Security, Export/Delete,
       // and Add-child. A non-owner caller therefore needs fresh primary-factor
       // reverification, proven by Clerk fva, before targeting the owner profile.
       // [WI-586 T1] v2 seam: getPersonScope verifies person ↔ org membership
       // (no profiles table touch). Returns null when not found → same 403.
-      const found = await getPersonScope(db, profileId, account.id);
+      const found = await getPersonScope(
+        db,
+        profileId,
+        account.id,
+        callerPersonId,
+      );
       if (!found)
         return forbidden(c, 'Profile does not belong to this account');
 
@@ -479,11 +508,7 @@ export const profileRoutes = new Hono<ProfileEnv>()
       if (
         isOwnerElevationGateEnabled(c.env?.OWNER_ELEVATION_GATE_ENABLED) &&
         targetIsOwner &&
-        !(await isCallerAlreadyOwner(
-          db,
-          c.get('callerPersonId'),
-          account.id,
-        )) &&
+        !(await isCallerAlreadyOwner(db, callerPersonId, account.id)) &&
         !hasRecentOwnerElevation(c.get('user'))
       ) {
         return apiError(

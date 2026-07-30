@@ -100,17 +100,17 @@ const BOUNDARY_FILES: readonly LegitimateRawNavigationGateFile[] = [
     file: 'apps/mobile/src/lib/profile.ts',
     category: 'boundary',
     reason:
-      'boundary: profile provider owns raw owner/child profile selection and isExplicitProxyMode.',
-    expectedFindings: { 'profile-owner-read': 8 },
+      'boundary: profile provider owns raw owner/child profile selection, rejects cached owner fallbacks after authority refresh, and clears impossible persisted proxy state.',
+    expectedFindings: { 'profile-owner-read': 11 },
   },
   {
     file: 'apps/mobile/src/hooks/use-parent-proxy.ts',
     category: 'boundary',
     reason:
-      'boundary: parent-proxy helper owns raw proxy-state derivation before the contract consumes it.',
+      'boundary: parent-proxy helper owns raw proxy-state derivation and requires a current owner plus active non-owner before the contract consumes it.',
     expectedFindings: {
-      'profile-owner-read': 1,
-      'proxy-state-read': 2,
+      'profile-owner-read': 2,
+      'proxy-state-read': 1,
     },
   },
   {

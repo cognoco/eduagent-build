@@ -201,6 +201,13 @@ const OWNER: Profile = createTestProfile({
   isOwner: true,
   birthYear: 1990,
 });
+const PROXY_CHILD: Profile = createTestProfile({
+  id: 'proxy-child-1',
+  accountId: 'account-1',
+  displayName: 'Child',
+  isOwner: false,
+  birthYear: 2014,
+});
 
 type SubjectFixture = {
   id: string;
@@ -519,8 +526,8 @@ function renderProxyLibrary(opts: {
 
   function buildProfileValue(proxy: boolean): ProfileContextValue {
     return {
-      profiles: [OWNER],
-      activeProfile: OWNER,
+      profiles: [OWNER, PROXY_CHILD],
+      activeProfile: proxy ? PROXY_CHILD : OWNER,
       isExplicitProxyMode: proxy,
       switchProfile: async () => ({ success: true }),
       isLoading: false,
@@ -1927,12 +1934,16 @@ describe('LibraryScreen', () => {
       // Proxy mode activates while the modal is still open (state persists).
       rerender(true);
 
-      expect(
-        result.getByTestId(`archive-subject-${SUBJECT_1_ID}`),
-      ).toBeDisabled();
-      expect(
-        result.getByTestId(`pause-subject-${SUBJECT_1_ID}`),
-      ).toBeDisabled();
+      // The active profile also changes, so wait for its keyed subject query
+      // to settle before asserting the still-open modal's controls.
+      await waitFor(() => {
+        expect(
+          result.getByTestId(`archive-subject-${SUBJECT_1_ID}`),
+        ).toBeDisabled();
+        expect(
+          result.getByTestId(`pause-subject-${SUBJECT_1_ID}`),
+        ).toBeDisabled();
+      });
     });
   });
 

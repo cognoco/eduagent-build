@@ -97,22 +97,23 @@ jest.mock('../services/profile', () => {
 // [WI-586 flip-safety] Under IDENTITY_V2_ENABLED the account middleware resolves
 // identity via resolveIdentityV2; stub it so flag-ON route tests authenticate
 // without an unmocked DB (resolver itself is covered by identity integration tests).
+const mockResolveIdentityV2 = jest.fn().mockResolvedValue({
+  account: {
+    id: 'test-account-id',
+    clerkUserId: 'user_test',
+    email: 'test@example.com',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  personId: 'test-profile-id',
+  organizationId: 'test-account-id',
+  isOwner: true,
+  roles: ['admin'],
+});
 jest.mock(
   '../services/identity-v2/identity-resolve' /* gc1-allow: route unit test — DB mocked; resolver covered by identity integration tests */,
   () => ({
-    resolveIdentityV2: jest.fn().mockResolvedValue({
-      account: {
-        id: 'test-account-id',
-        clerkUserId: 'user_test',
-        email: 'test@example.com',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-      personId: 'test-profile-id',
-      organizationId: 'test-account-id',
-      isOwner: true,
-      roles: ['admin'],
-    }),
+    resolveIdentityV2: (...a: unknown[]) => mockResolveIdentityV2(...a),
   }),
 );
 
@@ -761,6 +762,30 @@ describe('session routes', () => {
 
   beforeEach(() => {
     mockGetMentorNoticeReceipt.mockResolvedValue(null);
+    mockGetPersonScope.mockResolvedValue({
+      profileId: 'test-profile-id',
+      meta: {
+        birthYear: 1990,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        isOwner: true,
+      },
+    });
+    mockResolveIdentityV2.mockResolvedValue({
+      account: {
+        id: 'test-account-id',
+        clerkUserId: 'user_test',
+        email: 'test@example.com',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      personId: 'test-profile-id',
+      organizationId: 'test-account-id',
+      isOwner: true,
+      roles: ['admin'],
+    });
     clearJWKSCache();
   });
   describe('POST /v1/sessions/:sessionId/recall-bridge mentor notice suppression', () => {
@@ -1701,6 +1726,30 @@ describe('session routes', () => {
     };
 
     beforeEach(() => {
+      mockGetPersonScope.mockResolvedValue({
+        profileId: AUTO_FILE_PROFILE_ID,
+        meta: {
+          birthYear: null,
+          location: null,
+          consentStatus: 'CONSENTED',
+          hasPremiumLlm: false,
+          conversationLanguage: 'en',
+          isOwner: true,
+        },
+      });
+      mockResolveIdentityV2.mockResolvedValue({
+        account: {
+          id: 'test-account-id',
+          clerkUserId: 'user_test',
+          email: 'test@example.com',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        personId: AUTO_FILE_PROFILE_ID,
+        organizationId: 'test-account-id',
+        isOwner: true,
+        roles: ['admin'],
+      });
       mockSessionCrudGetSession.mockImplementation((...args) =>
         (getSession as jest.Mock)(...args),
       );
@@ -3919,6 +3968,19 @@ describe('session routes', () => {
     };
 
     beforeEach(() => {
+      mockResolveIdentityV2.mockResolvedValue({
+        account: {
+          id: 'test-account-id',
+          clerkUserId: 'user_test',
+          email: 'test@example.com',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        personId: RETRY_PROFILE_ID,
+        organizationId: 'test-account-id',
+        isOwner: true,
+        roles: ['admin'],
+      });
       // Override getProfile to return a UUID profile id so filingRetryEventSchema.parse
       // does not throw (it validates profileId as z.string().uuid()).
       const profileServiceMock = jest.requireMock('../services/profile') as {

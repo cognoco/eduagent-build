@@ -355,7 +355,7 @@ describe('onboarding routes', () => {
       expect(res.status).toBe(401);
     });
 
-    it('returns 400 when profile cannot be resolved (no X-Profile-Id and no owner)', async () => {
+    it('[WI-2128] returns 403 when a profile write omits explicit X-Profile-Id selection', async () => {
       const res = await app.request(
         '/v1/onboarding/language',
         {
@@ -365,7 +365,7 @@ describe('onboarding routes', () => {
         },
         TEST_ENV,
       );
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(403);
       expect(mockUpdateConversationLanguageV2).not.toHaveBeenCalled();
     });
 

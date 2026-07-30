@@ -1503,9 +1503,19 @@ function proxyWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
+  const ownerProfile = createTestProfile({
+    id: 'proxy-owner-1',
+    accountId: 'proxy-account-1',
+    isOwner: true,
+  });
+  const childProfile = createTestProfile({
+    id: 'proxy-child-1',
+    accountId: 'proxy-account-1',
+    isOwner: false,
+  });
   return createScreenWrapper({
-    activeProfile: createTestProfile(),
-    profiles: [createTestProfile()],
+    activeProfile: childProfile,
+    profiles: [ownerProfile, childProfile],
     queryClient,
     isExplicitProxyMode: true,
   }).wrapper;
