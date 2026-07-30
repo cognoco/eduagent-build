@@ -4202,6 +4202,41 @@
     "supportHub": "Support hub",
     "me": "Me"
   },
+  "sharedRecord": {
+    "fact": {
+      "headline_one": "{{name}} has 1 shareable update.",
+      "headline_other": "{{name}} has {{count}} shareable updates.",
+      "weeklyReport": {
+        "title": "Weekly report",
+        "topicsMastered_one": "{{count}} topic mastered",
+        "topicsMastered_other": "{{count}} topics mastered",
+        "wordsLearned_one": "{{count}} word learned",
+        "wordsLearned_other": "{{count}} words learned",
+        "topicsExplored_one": "{{count}} topic explored",
+        "topicsExplored_other": "{{count}} topics explored"
+      },
+      "sessionRecap": {
+        "title": "Session recap ready",
+        "detail": "A shareable learning recap from {{date}} is ready."
+      },
+      "milestone": {
+        "title": "Milestone reached",
+        "vocabularyCount_one": "{{count}} word learned",
+        "vocabularyCount_other": "{{count}} words learned",
+        "topicMasteredCount_one": "{{count}} topic mastered",
+        "topicMasteredCount_other": "{{count}} topics mastered",
+        "sessionCount_one": "{{count}} learning session completed",
+        "sessionCount_other": "{{count}} learning sessions completed",
+        "streakLength": "{{count}}-day streak",
+        "subjectMastered": "{{subject}} mastered",
+        "bookCompleted": "A book completed",
+        "learningTime_one": "{{count}} hour learned",
+        "learningTime_other": "{{count}} hours learned",
+        "cefrLevelUp": "Language level increased",
+        "topicsExplored": "{{count}} topics explored in {{subject}}"
+      }
+    }
+  },
   "supportHub": {
     "mentor": {
       "title": "Support hub",
@@ -4229,6 +4264,7 @@
       "personEmptyTitle": "No subjects yet",
       "personEmptyMessage": "This learner does not have any visible subject structure yet.",
       "structuralOnly": "Subject, chapter and topic structure only.",
+      "learnerAsked": "{{name}} asked: {{question}}",
       "bookCount": "{{count}} book",
       "bookCount_other": "{{count}} books",
       "errorTitle": "Couldn't load subjects",

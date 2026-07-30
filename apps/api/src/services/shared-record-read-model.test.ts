@@ -86,7 +86,7 @@ function createDb(): Database {
             threshold: 3,
             subjectId: null,
             bookId: null,
-            metadata: null,
+            metadata: { subjectName: 'Physics' },
             celebratedAt: null,
             createdAt: new Date('2026-06-27T12:00:00.000Z'),
           },
@@ -114,6 +114,23 @@ describe('readSharedRecordForSupportee', () => {
       'Weekly report 2026-06-22 Topics explored: 3',
       'Session recap ready',
       'Milestone reached: session count',
+    ]);
+    expect(record.supporterView.facts.map((fact) => fact.metadata)).toEqual([
+      {
+        templateKey: 'weeklyReport',
+        reportWeek: '2026-06-22',
+        stats: [{ metricKey: 'topicsExplored', value: 3 }],
+      },
+      {
+        templateKey: 'sessionRecap',
+        sessionDate: '2026-06-28T12:00:00.000Z',
+      },
+      {
+        templateKey: 'milestone',
+        milestoneType: 'session_count',
+        threshold: 3,
+        subjectName: 'Physics',
+      },
     ]);
     expect(record.supporterView.factIds).toEqual(record.supporteeView.factIds);
     expect(JSON.stringify(record)).not.toContain('raw parent-facing recap');

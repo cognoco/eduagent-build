@@ -3899,8 +3899,43 @@
     "connecting": "Sichere Verbindung wird hergestellt..."
   },
   "scopeChip": {
-    "supportHub": "Supportbereich",
+    "supportHub": "Support-Hub",
     "me": "Ich"
+  },
+  "sharedRecord": {
+    "fact": {
+      "headline_one": "{{name}} hat 1 teilbares Update.",
+      "headline_other": "{{name}} hat {{count}} teilbare Updates.",
+      "weeklyReport": {
+        "title": "Wochenbericht",
+        "topicsMastered_one": "{{count}} Thema gemeistert",
+        "topicsMastered_other": "{{count}} Themen gemeistert",
+        "wordsLearned_one": "{{count}} Wort gelernt",
+        "wordsLearned_other": "{{count}} Wörter gelernt",
+        "topicsExplored_one": "{{count}} Thema erkundet",
+        "topicsExplored_other": "{{count}} Themen erkundet"
+      },
+      "sessionRecap": {
+        "title": "Sitzungs-Zusammenfassung fertig",
+        "detail": "Eine teilbare Lernzusammenfassung vom {{date}} ist fertig."
+      },
+      "milestone": {
+        "title": "Meilenstein erreicht",
+        "vocabularyCount_one": "{{count}} Wort gelernt",
+        "vocabularyCount_other": "{{count}} Wörter gelernt",
+        "topicMasteredCount_one": "{{count}} Thema gemeistert",
+        "topicMasteredCount_other": "{{count}} Themen gemeistert",
+        "sessionCount_one": "{{count}} Lernsitzung abgeschlossen",
+        "sessionCount_other": "{{count}} Lernsitzungen abgeschlossen",
+        "streakLength": "{{count}}-Tage-Streak",
+        "subjectMastered": "{{subject}} gemeistert",
+        "bookCompleted": "Ein Buch abgeschlossen",
+        "learningTime_one": "{{count}} Stunde gelernt",
+        "learningTime_other": "{{count}} Stunden gelernt",
+        "cefrLevelUp": "Sprachlevel erhöht",
+        "topicsExplored": "{{count}} Themen in {{subject}} erkundet"
+      }
+    }
   },
   "modeSwitcher": {
     "switchError": "Wechseln fehlgeschlagen. Zum Wiederholen tippen.",
@@ -4475,6 +4510,7 @@
       "personEmptyTitle": "Noch keine Fächer",
       "personEmptyMessage": "Für diesen Lernenden ist noch keine sichtbare Fächerstruktur vorhanden.",
       "structuralOnly": "Nur Fächer-, Kapitel- und Themenstruktur.",
+      "learnerAsked": "{{name}} hat gefragt: {{question}}",
       "bookCount": "{{count}} Buch",
       "bookCount_other": "{{count}} Bücher",
       "errorTitle": "Fächer konnten nicht geladen werden",
