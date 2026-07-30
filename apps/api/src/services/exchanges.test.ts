@@ -33,6 +33,7 @@ import type { OcrResult } from '@eduagent/schemas';
 // Own only the external Inngest boundary so no network promise can survive
 // Jest teardown; the production exchange and safeSend implementations stay real.
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
+// gc1-allow: Own the external Inngest send boundary so network calls cannot outlive Jest teardown.
 jest.mock('../inngest/client', () => {
   const actual = jest.requireActual(
     '../inngest/client',
