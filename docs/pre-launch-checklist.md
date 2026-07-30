@@ -94,7 +94,7 @@ Last updated: 2026-05-29
 
 - [ ] **EAS submit production profile**
   - `apps/mobile/eas.json` intentionally contains no fake Apple/App Store Connect IDs
-  - Store `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` in the approved production secret provider, then run `doppler run -c prd -- pnpm mobile:submit:prepare`
+  - Confirm the EAS-managed Google Play service-account assignment with `pnpm mobile:submit:preflight`; do not create a local credential file
   - Submit Android to Play internal testing first; submit iOS to TestFlight only after candidate verification
   - Follow `docs/runbooks/store-submission.md` and retain IDs/status only, never credential material
 

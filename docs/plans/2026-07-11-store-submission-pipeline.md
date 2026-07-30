@@ -9,7 +9,7 @@ status: in-progress
 # Store submission pipeline - Implementation Plan
 
 **Goal:** Prime a credential-safe EAS production submission path for both stores and hold the Config-T production switch until the operator gate is ruled.
-**Approach:** Commit only stable configuration, validation, and runbook contracts. Materialize the Google Play service-account JSON from a Doppler-injected environment variable into an ignored local file, never into source control or logs. Prepare the Config-T flag triple in the branch, but do not merge or submit until OPQ-155 approves the product configuration. OPQ-37 completed Google Play and App Store Connect credential provisioning on 2026-07-27.
+**Approach:** Commit only stable configuration, validation, and runbook contracts. Use the EAS-managed Google Play submission credential assigned to the app, verified through a metadata-only preflight; do not create local credential material. Prepare the Config-T flag triple in the branch, but do not merge or submit until OPQ-155 approves the product configuration. OPQ-37 completed Google Play and App Store Connect credential provisioning on 2026-07-27.
 
 ## Scope
 
@@ -18,8 +18,8 @@ In scope:
 - `apps/mobile/eas.json`
 - `.gitignore`
 - `package.json`
-- `scripts/prepare-eas-submit-credentials.js`
-- `scripts/prepare-eas-submit-credentials.test.ts`
+- `scripts/verify-eas-managed-submit-credential.js`
+- `scripts/verify-eas-managed-submit-credential.test.ts`
 - `docs/runbooks/store-submission.md`
 - `docs/pre-launch-checklist.md`
 
@@ -32,7 +32,7 @@ Out of scope:
 
 ## Tasks
 
-- [x] T1: Pin the production submission contract - the focused test failed before implementation and now pins Config T, Play internal submission, ignored credentials, and no-secret validation.
-- [x] T2: Implement credential-safe submit priming - the focused test and synthetic materialization smoke pass; `eas.json` carries the held Config-T/submit diff and no credential material is tracked or logged.
-- [x] T3: Document and adversarially verify the operator path - the runbook covers credential injection, build selection, Play internal-track submission, TestFlight submission, rollback, and the OPQ-155 gate; focused validation passed on the refreshed candidate.
-- [ ] T4: Execute the gated production dry run - done when: after OPQ-155 approval, the approved credentials are materialized, the production Config-T build is verified, Android submission succeeds on Play internal testing, iOS submission reaches TestFlight, and evidence is recorded without credential material.
+- [x] T1: Pin the production submission contract - the focused test fails with a forced local path and pins Config T, Play internal submission, EAS-managed credential resolution, and no-secret validation.
+- [x] T2: Implement managed-credential submit priming - `eas.json` omits a local path and the metadata-only preflight fails closed for absent or unassigned credentials without writing material.
+- [x] T3: Document and adversarially verify the operator path - the runbook covers EAS assignment preflight, build selection, Play internal-track submission, TestFlight submission, rollback, and the OPQ-155 gate.
+- [ ] T4: Execute the gated production dry run - done when: after OPQ-155 approval, the managed assignment passes preflight, the production Config-T build is verified, Android submission succeeds on Play internal testing, iOS submission reaches TestFlight, and evidence is recorded without credential material.
