@@ -43,6 +43,7 @@ This is the one-screen operating answer to "how does content get *into* `archite
 - **Body:** `## Context` → `## Decision` → `## Consequences` → `## Alternatives considered`. See `MMT-ADR-0001` / `0002` for the house style; `0004`–`0006` are the seed examples.
 - **Prose wrapping:** soft-wrap — one physical line per paragraph (and per list item). Do not hard-wrap at a fixed column. Renders identically on GitHub, avoids ragged lines, and keeps edits clean.
 - **Reconstructed ADRs** (written after the fact during backfill) carry a `reconstructed YYYY-MM-DD` note; where the original *why* is unrecoverable, record the decision plainly rather than invent a rationale.
+- **`Status: Proposed` is where an agent-authored ADR lands, always.** MMT-ADR-0000 §II.6 rule 3 reserves `Accepted` for a human representing Architecture; an agent following the authoring rules must never promote its own output to canon. Write `**Status:** Proposed · **Deciders:** pending Architecture sign-off` and leave the promotion to the sign-off. This applies to reconstruction backfill as much as to new decisions — reconstruction recovers a decision already made, but recording it as canon is still a human act.
 
 ## Write for the reader three years out — the timelessness rules
 
