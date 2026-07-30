@@ -6729,16 +6729,19 @@ export async function seedScenario(
     throw new Error(`Unknown scenario: ${scenario}`);
   }
 
-  const seedMarkedClerkUser =
-    env.CLERK_SECRET_KEY != null
-      ? await findClerkUserByEmail(email, env)
-      : null;
-  const seedClerkUserIds =
-    seedMarkedClerkUser?.external_id?.startsWith(SEED_CLERK_PREFIX) === true
-      ? [seedMarkedClerkUser.id]
-      : [];
-
   return runTestSeedMutation(db, async (txDb) => {
+    // Resolve Clerk ownership only after the mutation lock is held. Otherwise
+    // two first-time requests can both observe "no Clerk user"; the loser then
+    // skips cleanup even though the winner created a seed-managed real Clerk ID.
+    const seedMarkedClerkUser =
+      env.CLERK_SECRET_KEY != null
+        ? await findClerkUserByEmail(email, env)
+        : null;
+    const seedClerkUserIds =
+      seedMarkedClerkUser?.external_id?.startsWith(SEED_CLERK_PREFIX) === true
+        ? [seedMarkedClerkUser.id]
+        : [];
+
     // Idempotent: delete existing seed organizations with the same email before
     // seeding. Defence-in-depth: look up login by email first, then delete the
     // organization only if the login has a recognizable local seed marker

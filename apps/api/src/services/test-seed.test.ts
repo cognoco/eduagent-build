@@ -388,6 +388,53 @@ describe('seedScenario', () => {
     expect(rootDb.insert).not.toHaveBeenCalled();
   });
 
+  it('[WI-2820 review] resolves real Clerk ownership after acquiring the mutation lock', async () => {
+    const events: string[] = [];
+    const rootDb = createMockDb();
+    const txDb = createMockDb();
+    const transaction = jest.fn(
+      async (operation: (tx: Database) => Promise<unknown>) => {
+        events.push('transaction');
+        return operation(txDb);
+      },
+    );
+    Object.assign(rootDb, { transaction });
+
+    const clerkUser = {
+      id: 'user_seed_repeat',
+      primary_email_address_id: 'email_seed_repeat',
+      email_addresses: [
+        {
+          id: 'email_seed_repeat',
+          email_address: 'repeat@example.com',
+        },
+      ],
+      external_id: `${SEED_CLERK_PREFIX}repeat`,
+    };
+    global.fetch = jest.fn(async (input, init) => {
+      const url = String(input);
+      if (url.includes('/users?')) {
+        events.push('clerk-ownership');
+        return new Response(JSON.stringify([clerkUser]), { status: 200 });
+      }
+      if (url.endsWith(`/users/${clerkUser.id}`) && !init?.method) {
+        return new Response(JSON.stringify(clerkUser), { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    });
+
+    await seedScenario(rootDb, 'learning-active', 'repeat@example.com', {
+      CLERK_SECRET_KEY: 'test-secret',
+      SEED_PASSWORD: 'test-password',
+    });
+
+    expect(events).toEqual([
+      'transaction',
+      'clerk-ownership',
+      'clerk-ownership',
+    ]);
+  });
+
   it.each(MOCK_DISPATCHABLE_SCENARIOS)(
     'dispatches "%s" and returns SeedResult',
     async (scenario: SeedScenario) => {
