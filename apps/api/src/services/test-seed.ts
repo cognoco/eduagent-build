@@ -82,6 +82,9 @@ const CLERK_RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 const CLERK_FETCH_MAX_ATTEMPTS = 4;
 const CLERK_FETCH_BASE_DELAY_MS = 500;
 const CLERK_DELETION_PENDING_PREFIX = `${SEED_CLERK_PREFIX}deletion-pending:`;
+// One Worker reset needs one list plus up to three Clerk writes per user
+// (mark, bypass reset, delete). Keep margin below Cloudflare's 50-subrequest cap.
+const MAX_WORKER_CLERK_CLEANUP_USERS = 15;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -591,7 +594,7 @@ async function verifySeedClerkUserIds(
 ): Promise<string[]> {
   if (clerkUserIds.length === 0) return [];
   const requestedIds = new Set(clerkUserIds);
-  const seedUsers = await listSeedClerkUsers(env, options);
+  const seedUsers = await listSeedClerkUsers(env, options, true);
   return seedUsers
     .filter((user) => requestedIds.has(user.id))
     .map((user) => user.id);
@@ -600,6 +603,7 @@ async function verifySeedClerkUserIds(
 async function listSeedClerkUsers(
   env: SeedEnv,
   options: ResetOptions = {},
+  includeDeletionPending = false,
 ): Promise<ClerkUser[]> {
   if (!env.CLERK_SECRET_KEY) return [];
   const prefix = options.prefix?.trim().toLowerCase();
@@ -631,7 +635,7 @@ async function listSeedClerkUsers(
 
       if (
         matchesSeedPrefix &&
-        !isClerkDeletionPending(user) &&
+        (includeDeletionPending || !isClerkDeletionPending(user)) &&
         matchesEmailPrefix
       ) {
         seedUsers.push(user);
@@ -7065,6 +7069,19 @@ export async function resetDatabase(
       options.preserveClerkUsers
         ? undefined
         : seedClerkUsers;
+    if (clerkUsersToDelete && clerkUsersToDelete.length > 0 && !prefix) {
+      throw new Error(
+        'Unprefixed Worker Clerk cleanup is forbidden; use scripts/clean-clerk-test-users.mjs with verified Clerk user IDs',
+      );
+    }
+    if (
+      clerkUsersToDelete &&
+      clerkUsersToDelete.length > MAX_WORKER_CLERK_CLEANUP_USERS
+    ) {
+      throw new Error(
+        `Worker Clerk cleanup is limited to ${MAX_WORKER_CLERK_CLEANUP_USERS} users; use scripts/clean-clerk-test-users.mjs for bulk cleanup`,
+      );
+    }
     if (clerkUsersToDelete) {
       await markClerkUsersForDeletion(
         env,

@@ -134,13 +134,11 @@ const seedInputSchema = z
   }));
 
 // [WI-983] Local schema for /__test/reset — test-infrastructure only, not in @eduagent/schemas.
-// The whole body is optional. This preserves the pre-WI-983 contract for the CI seed-cleanup
-// callers (`.github/workflows/e2e-web.yml:222-225`, `e2e-web-cleanup.yml:67-70`), which POST
-// with NO body and NO Content-Type: Hono's json validator only calls c.req.json() when a JSON
-// Content-Type is present, so an absent body is passed to the schema as `{}` → parses cleanly
-// to `verifiedSeedClerkUserIds = undefined`, exactly as the old handler behaved. A present body
-// is still strictly validated (a non-string array element → 400). See the bodyless-POST
-// regression test in test-seed.test.ts.
+// The whole body is optional for the prefix-scoped CI cleanup caller
+// (`.github/workflows/e2e-web.yml:222-225`), which POSTs with NO body and NO Content-Type.
+// Hono's json validator then passes `{}` to the schema → `verifiedSeedClerkUserIds = undefined`.
+// Unprefixed cleanup instead requires a verified ID list. A present body remains strictly
+// validated (a non-string array element → 400). See the bodyless-POST regression test.
 const resetBodySchema = z.object({
   verifiedSeedClerkUserIds: z.array(z.string()).optional(),
 });
@@ -277,6 +275,17 @@ testSeedRoutes.post(
     const prefix = c.req.query('prefix')?.trim() || undefined;
     const preserveClerkUsers = c.req.query('preserveClerkUsers') === 'true';
     const { verifiedSeedClerkUserIds } = c.req.valid('json');
+
+    if (!prefix && !verifiedSeedClerkUserIds) {
+      return c.json(
+        {
+          code: ERROR_CODES.VALIDATION_ERROR,
+          message:
+            'Unprefixed reset requires verified Clerk user IDs; use scripts/clean-clerk-test-users.mjs for bulk cleanup',
+        },
+        400,
+      );
+    }
 
     const { deletedCount, clerkUsersDeleted } = await resetDatabase(
       db,

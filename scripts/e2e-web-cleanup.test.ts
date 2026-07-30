@@ -118,19 +118,29 @@ describe('[BUG-979] e2e-web cleanup wiring', () => {
       expect(triggers!).toHaveProperty('workflow_dispatch');
     });
 
-    it('reset job calls POST /v1/__test/reset with the test secret', () => {
+    it('[WI-2820 P1] runs local verified-ID cleanup through Doppler staging', () => {
       const jobs = workflow.jobs as Record<
         string,
         { steps: Array<Record<string, unknown>> }
       >;
       const job = Object.values(jobs)[0]!;
-      const stepWithCurl = job.steps.find((s) =>
-        String(s.run ?? '').includes('/v1/__test/reset'),
+      expect(
+        job.steps.some((step) =>
+          String(step.uses ?? '').startsWith('actions/checkout@'),
+        ),
+      ).toBe(true);
+      const cleanupStep = job.steps.find((s) =>
+        String(s.run ?? '').includes('clean-clerk-test-users.mjs'),
       );
-      expect(stepWithCurl).toBeDefined();
-      const run = String(stepWithCurl!.run ?? '');
-      expect(run).toMatch(/POST/);
-      expect(run).toMatch(/X-Test-Secret/);
+      expect(cleanupStep).toBeDefined();
+      const run = String(cleanupStep!.run ?? '');
+      expect(run).toMatch(/doppler run -p mentomate -c stg/);
+      expect(run).toMatch(
+        /node scripts\/clean-clerk-test-users\.mjs --older-than-hours=24 --execute/,
+      );
+      expect(run).toMatch(/DOPPLER_TOKEN/);
+      expect(run).toMatch(/::error/);
+      expect(run).not.toMatch(/curl[\s\S]*\/v1\/__test\/reset/);
     });
   });
 });

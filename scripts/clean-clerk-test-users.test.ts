@@ -130,3 +130,41 @@ describe('[WI-1771] clean-clerk-test-users classification', () => {
     expect(decision.reason).toBe('unknown-age');
   });
 });
+
+describe('[WI-2820 P1] clean-clerk-test-users execution protocol', () => {
+  const scriptSource = fs.readFileSync(
+    path.join(__dirname, 'clean-clerk-test-users.mjs'),
+    'utf8',
+  );
+  const executePath = scriptSource.slice(
+    scriptSource.indexOf('// --execute path'),
+  );
+
+  it('marks selected Clerk users before verified-ID DB cleanup and local deletion', () => {
+    const markIndex = executePath.indexOf(
+      'markClerkUsersForDeletion(deletableSeedUsers)',
+    );
+    const cleanupIndex = executePath.indexOf('cleanupDbRows(seedIds)');
+    const deleteIndex = executePath.indexOf(
+      'for (const [index, pendingDeletion] of pendingDeletions.entries())',
+    );
+
+    expect(markIndex).toBeGreaterThanOrEqual(0);
+    expect(cleanupIndex).toBeGreaterThan(markIndex);
+    expect(deleteIndex).toBeGreaterThan(cleanupIndex);
+  });
+
+  it('restores markers when DB cleanup or a Clerk delete fails', () => {
+    expect(executePath).toMatch(
+      /try\s*\{\s*result = await cleanupDbRows\(seedIds\);\s*\}\s*catch \(error\) \{\s*await restoreClerkDeletionMarkers\(pendingDeletions\);/,
+    );
+    expect(executePath).toMatch(
+      /catch \(error\) \{\s*await restoreClerkDeletionMarkers\(pendingDeletions\.slice\(index\)\);/,
+    );
+  });
+
+  it('fails closed when the verified-ID reset secret is unavailable', () => {
+    expect(scriptSource).toMatch(/if \(!testSecret\)/);
+    expect(scriptSource).toMatch(/TEST_SEED_SECRET is required/);
+  });
+});

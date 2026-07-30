@@ -1301,6 +1301,28 @@ describe('resetDatabase', () => {
     expect(restoredExternalIds).toEqual([`${SEED_CLERK_PREFIX}failed-delete`]);
   });
 
+  it('[WI-2820 P1] refuses Worker cleanup above the Clerk subrequest budget before marking', async () => {
+    const users = Array.from({ length: 16 }, (_, index) => ({
+      id: `user_over_budget_${index}`,
+      external_id: `${SEED_CLERK_PREFIX}over-budget-${index}`,
+      email_addresses: [
+        { email_address: `pw-over-budget-${index}@example.com` },
+      ],
+    }));
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => users,
+    });
+    global.fetch = fetchMock;
+    const db = createMockDb();
+
+    await expect(
+      resetDatabase(db, { CLERK_SECRET_KEY: 'test-secret' }, { prefix: 'pw-' }),
+    ).rejects.toThrow(/Worker Clerk cleanup is limited to/);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('returns ResetResult with deletedCount', async () => {
     const deleteReturning = jest
       .fn()
@@ -1532,6 +1554,29 @@ describe('resetDatabase', () => {
 
     expect(result).toEqual({ deletedCount: 0, clerkUsersDeleted: 0 });
     expect(db.delete).not.toHaveBeenCalled();
+  });
+
+  it('[WI-2820 P1] verifies deletion-pending Clerk IDs for local bulk DB cleanup', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          id: 'user_pending_local_cleanup',
+          external_id: `${SEED_CLERK_PREFIX}deletion-pending:user_pending_local_cleanup`,
+          email_addresses: [{ email_address: 'pw-stale@example.com' }],
+        },
+      ],
+    });
+    const db = createMockDb();
+
+    const result = await resetDatabase(
+      db,
+      { CLERK_SECRET_KEY: 'sk_test' },
+      { verifiedSeedClerkUserIds: ['user_pending_local_cleanup'] },
+    );
+
+    expect(result).toEqual({ deletedCount: 0, clerkUsersDeleted: 0 });
+    expect(db.select).toHaveBeenCalled();
   });
 });
 

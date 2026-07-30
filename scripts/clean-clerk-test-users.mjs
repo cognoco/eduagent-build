@@ -34,6 +34,7 @@ const olderThanArg = process.argv.find((arg) =>
 );
 const OLDER_THAN_HOURS = olderThanArg ? Number(olderThanArg.split('=')[1]) : 24;
 const SEED_CLERK_PREFIX = 'clerk_seed_';
+const CLERK_DELETION_PENDING_PREFIX = `${SEED_CLERK_PREFIX}deletion-pending:`;
 const CLERK_API_BASE = 'https://api.clerk.com/v1';
 
 if (!Number.isFinite(OLDER_THAN_HOURS) || OLDER_THAN_HOURS <= 0) {
@@ -56,6 +57,13 @@ if (!clerkSecret) {
   console.error(
     '[clean-clerk] CLERK_SECRET_KEY is required.\n' +
       '  Run with Doppler: doppler.exe run -c stg -- node scripts/clean-clerk-test-users.mjs',
+  );
+  process.exit(1);
+}
+
+if (!testSecret) {
+  console.error(
+    '[clean-clerk] TEST_SEED_SECRET is required for verified-ID database cleanup.',
   );
   process.exit(1);
 }
@@ -133,6 +141,46 @@ async function deleteClerkUser(userId) {
   return res.ok;
 }
 
+async function setClerkExternalId(userId, externalId) {
+  const res = await fetch(`${CLERK_API_BASE}/users/${userId}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${clerkSecret}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ external_id: externalId }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(
+      `[clean-clerk] Clerk external_id PATCH failed (${res.status}): ${body}`,
+    );
+  }
+}
+
+async function restoreClerkDeletionMarkers(pendingDeletions) {
+  for (const { user, originalExternalId } of pendingDeletions) {
+    await setClerkExternalId(user.id, originalExternalId);
+  }
+}
+
+async function markClerkUsersForDeletion(users) {
+  const pendingDeletions = [];
+  try {
+    for (const user of users) {
+      await setClerkExternalId(
+        user.id,
+        `${CLERK_DELETION_PENDING_PREFIX}${user.id}`,
+      );
+      pendingDeletions.push({ user, originalExternalId: user.externalId });
+    }
+  } catch (error) {
+    await restoreClerkDeletionMarkers(pendingDeletions);
+    throw error;
+  }
+  return pendingDeletions;
+}
+
 // ---------------------------------------------------------------------------
 // Call server to clean up DB rows for the given Clerk user IDs
 // ---------------------------------------------------------------------------
@@ -151,8 +199,7 @@ async function cleanupDbRows(clerkUserIds) {
 
   const body = await res.text();
   if (!res.ok) {
-    console.error(`[clean-clerk] DB cleanup FAILED (${res.status}): ${body}`);
-    process.exit(1);
+    throw new Error(`[clean-clerk] DB cleanup FAILED (${res.status}): ${body}`);
   }
 
   try {
@@ -239,13 +286,27 @@ console.log(
 );
 
 const seedIds = deletableSeedUsers.map((user) => user.id);
-const result = await cleanupDbRows(seedIds);
+const pendingDeletions = await markClerkUsersForDeletion(deletableSeedUsers);
+let result;
+try {
+  result = await cleanupDbRows(seedIds);
+} catch (error) {
+  await restoreClerkDeletionMarkers(pendingDeletions);
+  throw error;
+}
 
 const deletedIds = [];
 let failed = 0;
 let processed = 0;
-for (const user of deletableSeedUsers) {
-  const ok = await deleteClerkUser(user.id);
+for (const [index, pendingDeletion] of pendingDeletions.entries()) {
+  const { user } = pendingDeletion;
+  let ok;
+  try {
+    ok = await deleteClerkUser(user.id);
+  } catch (error) {
+    await restoreClerkDeletionMarkers(pendingDeletions.slice(index));
+    throw error;
+  }
   processed++;
   if (ok) {
     deletedIds.push(user.id);
@@ -256,6 +317,7 @@ for (const user of deletableSeedUsers) {
       );
     }
   } else {
+    await restoreClerkDeletionMarkers([pendingDeletion]);
     failed++;
     console.warn(
       `[clean-clerk]   WARN: failed to delete ${user.email} (${user.id})`,
