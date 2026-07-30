@@ -160,6 +160,7 @@ describe('[WI-983] POST /__test/reset — Zod body validation', () => {
     (resetDatabase as jest.Mock).mockResolvedValue({
       deletedCount: 0,
       clerkUsersDeleted: 0,
+      clerkUsersSelected: 15,
     });
   });
 
@@ -172,8 +173,12 @@ describe('[WI-983] POST /__test/reset — Zod body validation', () => {
   it('returns 200 and calls resetDatabase when verifiedSeedClerkUserIds is a valid string array', async () => {
     const res = await callReset({ verifiedSeedClerkUserIds: ['user_abc'] });
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { message: string };
+    const body = (await res.json()) as {
+      message: string;
+      clerkUsersSelected: number;
+    };
     expect(body.message).toBe('Database reset complete');
+    expect(body.clerkUsersSelected).toBe(15);
     expect(resetDatabase).toHaveBeenCalledTimes(1);
   });
 

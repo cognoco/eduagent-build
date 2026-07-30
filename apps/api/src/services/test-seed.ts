@@ -82,8 +82,10 @@ const CLERK_RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 const CLERK_FETCH_MAX_ATTEMPTS = 4;
 const CLERK_FETCH_BASE_DELAY_MS = 500;
 const CLERK_DELETION_PENDING_PREFIX = `${SEED_CLERK_PREFIX}deletion-pending:`;
-// One Worker reset needs one list plus up to three Clerk writes per user
-// (mark, bypass reset, delete). Keep margin below Cloudflare's 50-subrequest cap.
+// A successful 15-user Worker reset uses 1 list + 15 marker writes + 30
+// bypass/delete writes = 46 subrequests. On the first failed delete we stop
+// deleting and restore that remaining slice; the worst case is 47 subrequests.
+// Both paths stay below Cloudflare's 50-subrequest cap.
 const MAX_WORKER_CLERK_CLEANUP_USERS = 15;
 
 // ---------------------------------------------------------------------------
@@ -528,7 +530,8 @@ async function deleteClerkTestUsers(
       deleted++;
       deletedIds.push(user.id);
     } else {
-      await restoreClerkDeletionMarkers(env, [pendingDeletion]);
+      await restoreClerkDeletionMarkers(env, pendingDeletions.slice(index));
+      break;
     }
   }
 

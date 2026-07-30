@@ -1412,12 +1412,13 @@ describe('resetDatabase', () => {
 
     expect(result).toEqual({
       deletedCount: 0,
-      clerkUsersDeleted: 14,
+      clerkUsersDeleted: 0,
       clerkUsersSelected: 15,
     });
-    // One list, 15 marker/bypass/delete triplets, and one restore = 47 calls,
-    // safely below Cloudflare's 50-subrequest cap.
-    expect(fetchMock).toHaveBeenCalledTimes(47);
+    // One list, 15 markers, one bypass/delete pair, and 15 restores = 33 calls.
+    // Stopping after the first failed delete reserves safe failure-path margin
+    // below Cloudflare's 50-subrequest cap and leaves the full batch retryable.
+    expect(fetchMock).toHaveBeenCalledTimes(33);
     const markerCalls = fetchMock.mock.calls.filter(([, init]) => {
       const body = JSON.parse(
         String((init as RequestInit | undefined)?.body ?? '{}'),
@@ -1429,6 +1430,63 @@ describe('resetDatabase', () => {
       );
     });
     expect(markerCalls).toHaveLength(15);
+    const restoreCalls = fetchMock.mock.calls.filter(([, init]) => {
+      const body = JSON.parse(
+        String((init as RequestInit | undefined)?.body ?? '{}'),
+      ) as {
+        external_id?: string;
+      };
+      return (
+        init?.method === 'PATCH' &&
+        body.external_id?.startsWith(SEED_CLERK_PREFIX) &&
+        !body.external_id.includes('deletion-pending:')
+      );
+    });
+    expect(restoreCalls).toHaveLength(15);
+  });
+
+  it('[WI-2940] exhausts the remaining marker restores before reporting a failed-delete recovery error', async () => {
+    const users = Array.from({ length: 15 }, (_, index) => ({
+      id: `user_restore_budget_${index}`,
+      external_id: `${SEED_CLERK_PREFIX}restore-budget-${index}`,
+      email_addresses: [
+        { email_address: `pw-restore-budget-${index}@example.com` },
+      ],
+    }));
+    const restoreAttempts: string[] = [];
+    const fetchMock = jest.fn(async (input, init) => {
+      const url = String(input);
+      if (url.includes('/users?')) {
+        return new Response(JSON.stringify(users), { status: 200 });
+      }
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        external_id?: string;
+      };
+      if (init?.method === 'DELETE') {
+        return new Response('{}', { status: 500 });
+      }
+      if (
+        init?.method === 'PATCH' &&
+        body.external_id?.startsWith(SEED_CLERK_PREFIX) &&
+        !body.external_id.includes('deletion-pending:')
+      ) {
+        restoreAttempts.push(body.external_id);
+        return new Response('{}', {
+          status: body.external_id.endsWith('restore-budget-0') ? 500 : 200,
+        });
+      }
+      return new Response('{}', { status: 200 });
+    });
+    global.fetch = fetchMock;
+
+    await expect(
+      resetDatabase(
+        createMockDb(),
+        { CLERK_SECRET_KEY: 'test-secret' },
+        { prefix: 'pw-' },
+      ),
+    ).rejects.toThrow('Clerk deletion marker restore failed for 1 of 15 users');
+    expect(restoreAttempts).toHaveLength(15);
   });
 
   it('returns ResetResult with deletedCount', async () => {

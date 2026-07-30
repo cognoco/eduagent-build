@@ -287,19 +287,17 @@ testSeedRoutes.post(
       );
     }
 
-    const { deletedCount, clerkUsersDeleted } = await resetDatabase(
-      db,
-      seedEnv,
-      {
+    const { deletedCount, clerkUsersDeleted, clerkUsersSelected } =
+      await resetDatabase(db, seedEnv, {
         prefix,
         preserveClerkUsers,
         verifiedSeedClerkUserIds,
-      },
-    );
+      });
     return c.json({
       message: 'Database reset complete',
       deletedCount,
       clerkUsersDeleted,
+      clerkUsersSelected,
     });
   },
 );
