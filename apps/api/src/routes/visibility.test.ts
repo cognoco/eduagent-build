@@ -32,15 +32,19 @@ jest.mock('../services/supporter-report', () => {
   };
 });
 
-jest.mock('../services/shared-record-read-model', () => {
-  const actual = jest.requireActual(
-    '../services/shared-record-read-model',
-  ) as typeof import('../services/shared-record-read-model');
-  return {
-    ...actual,
-    readSharedRecordForSupportee: jest.fn(),
-  };
-});
+jest.mock(
+  '../services/shared-record-read-model' /* gc1-allow: Hono boundary tests isolate validation and caller forwarding; real repeatable-read authorization and artifact queries are exercised in shared-record-read-model.test.ts */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/shared-record-read-model',
+    ) as typeof import('../services/shared-record-read-model');
+    return {
+      ...actual,
+      readSharedArtifactForSupportee: jest.fn(),
+      readSharedRecordForSupportee: jest.fn(),
+    };
+  },
+);
 
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
@@ -61,7 +65,10 @@ import {
 } from '../services/linking-ceremony';
 import { requestSelfUnlink } from '../services/supportership-revocation';
 import { buildAttentionReport } from '../services/supporter-report';
-import { readSharedRecordForSupportee } from '../services/shared-record-read-model';
+import {
+  readSharedArtifactForSupportee,
+  readSharedRecordForSupportee,
+} from '../services/shared-record-read-model';
 import type { AuthUser } from '../middleware/auth';
 
 const PROFILE_ID = '00000000-0000-4000-8000-000000000001';
@@ -181,6 +188,10 @@ function validRouteCases(): RequestCase[] {
       name: 'GET /visibility/reports/:personId/shared-record',
       path: `/v1/visibility/reports/${SUPPORTEE_PERSON_ID}/shared-record`,
     },
+    {
+      name: 'GET /visibility/reports/:personId/artifacts/:artifactKind/:artifactId',
+      path: `/v1/visibility/reports/${SUPPORTEE_PERSON_ID}/artifacts/weekly_report/${CONTRACT_ID}`,
+    },
   ];
 }
 
@@ -191,6 +202,7 @@ function expectNoVisibilityServiceCalls() {
   expect(getContractForVisibleLink).not.toHaveBeenCalled();
   expect(findAcceptedContractForSupportee).not.toHaveBeenCalled();
   expect(buildAttentionReport).not.toHaveBeenCalled();
+  expect(readSharedArtifactForSupportee).not.toHaveBeenCalled();
   expect(readSharedRecordForSupportee).not.toHaveBeenCalled();
 }
 
@@ -227,6 +239,16 @@ describe('visibility routes boundary validation', () => {
       name: 'GET /visibility/reports/:personId/shared-record',
       path: '/v1/visibility/reports/not-a-uuid/shared-record',
       service: findAcceptedContractForSupportee,
+    },
+    {
+      name: 'GET /visibility/reports/:personId/artifacts/:artifactKind/:artifactId',
+      path: `/v1/visibility/reports/${SUPPORTEE_PERSON_ID}/artifacts/weekly_report/not-a-uuid`,
+      service: readSharedArtifactForSupportee,
+    },
+    {
+      name: 'GET /visibility/reports/:personId/artifacts/:artifactKind/:artifactId',
+      path: `/v1/visibility/reports/${SUPPORTEE_PERSON_ID}/artifacts/not-a-kind/${CONTRACT_ID}`,
+      service: readSharedArtifactForSupportee,
     },
   ] as const)(
     '$name returns 400 for invalid UUID params before service work',
@@ -329,7 +351,7 @@ describe('visibility routes boundary validation', () => {
   });
 
   it.each(['pending', 'revoked'] as const)(
-    'GET shared record fails closed for a %s relationship inside the atomic artifact read',
+    'GET shared record propagates the service denial for a %s relationship',
     async () => {
       jest
         .mocked(readSharedRecordForSupportee)

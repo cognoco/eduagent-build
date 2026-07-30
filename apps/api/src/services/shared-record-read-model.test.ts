@@ -1,14 +1,19 @@
 import type { Database } from '@eduagent/database';
 import type { WeeklyReportData } from '@eduagent/schemas';
 
-import { readSharedRecordForSupportee } from './shared-record-read-model';
+import {
+  readSharedArtifactForSupportee,
+  readSharedRecordForSupportee,
+} from './shared-record-read-model';
 
 const UUID = {
   supporter: '00000000-0000-4000-8000-000000000001',
   supportee: '00000000-0000-4000-8000-000000000002',
   supportership: '00000000-0000-4000-8000-000000000003',
   weeklyReport: '00000000-0000-4000-8000-000000000004',
+  olderWeeklyReport: '00000000-0000-4000-8000-000000000009',
   session: '00000000-0000-4000-8000-000000000005',
+  olderSession: '00000000-0000-4000-8000-000000000010',
   summary: '00000000-0000-4000-8000-000000000006',
   milestone: '00000000-0000-4000-8000-000000000007',
 } as const;
@@ -74,6 +79,7 @@ function createDb(authorized = true): Database {
         findFirst: jest.fn().mockResolvedValue({ displayName: 'Emma' }),
       },
       weeklyReports: {
+        findFirst: jest.fn().mockResolvedValue(null),
         findMany: jest.fn().mockResolvedValue([
           {
             id: UUID.weeklyReport,
@@ -87,6 +93,7 @@ function createDb(authorized = true): Database {
         ]),
       },
       sessionSummaries: {
+        findFirst: jest.fn().mockResolvedValue(null),
         findMany: jest.fn().mockResolvedValue([
           {
             id: UUID.summary,
@@ -200,10 +207,89 @@ describe('readSharedRecordForSupportee', () => {
         supporteePersonId: UUID.supportee,
       }),
     ).rejects.toThrow('This support link is not active.');
+    await expect(
+      readSharedArtifactForSupportee(db, {
+        supporterPersonId: UUID.supporter,
+        supporteePersonId: UUID.supportee,
+        artifactKind: 'weekly_report',
+        artifactId: UUID.olderWeeklyReport,
+      }),
+    ).rejects.toThrow('This support link is not active.');
 
     expect(db.query.person.findFirst).not.toHaveBeenCalled();
+    expect(db.query.weeklyReports.findFirst).not.toHaveBeenCalled();
     expect(db.query.weeklyReports.findMany).not.toHaveBeenCalled();
+    expect(db.query.sessionSummaries.findFirst).not.toHaveBeenCalled();
     expect(db.query.sessionSummaries.findMany).not.toHaveBeenCalled();
     expect(db.query.milestones.findMany).not.toHaveBeenCalled();
+  });
+
+  it('loads an older weekly report by id without depending on the capped Journal projection', async () => {
+    const db = createDb();
+    jest.mocked(db.query.weeklyReports.findFirst).mockResolvedValueOnce({
+      id: UUID.olderWeeklyReport,
+      profileId: UUID.supporter,
+      childProfileId: UUID.supportee,
+      reportWeek: '2026-06-15',
+      reportData: weeklyReportData,
+      viewedAt: null,
+      createdAt: new Date('2026-06-22T12:00:00.000Z'),
+    });
+
+    const record = await readSharedArtifactForSupportee(db, {
+      supporterPersonId: UUID.supporter,
+      supporteePersonId: UUID.supportee,
+      artifactKind: 'weekly_report',
+      artifactId: UUID.olderWeeklyReport,
+    });
+
+    expect(record.supporterView.facts).toHaveLength(1);
+    expect(record.supporterView.facts[0]?.artifact).toEqual({
+      kind: 'weekly_report',
+      id: UUID.olderWeeklyReport,
+    });
+    expect(db.query.weeklyReports.findMany).not.toHaveBeenCalled();
+    expect(db.query.sessionSummaries.findMany).not.toHaveBeenCalled();
+  });
+
+  it('loads an older accepted recap by session id without depending on list ordering', async () => {
+    const db = createDb();
+    jest.mocked(db.query.sessionSummaries.findFirst).mockResolvedValueOnce({
+      id: UUID.summary,
+      sessionId: UUID.olderSession,
+      profileId: UUID.supportee,
+      topicId: null,
+      content: 'raw learner-facing summary',
+      aiFeedback: null,
+      highlight: null,
+      narrative: null,
+      conversationPrompt: null,
+      engagementSignal: null,
+      closingLine: null,
+      learnerRecap: null,
+      nextTopicId: null,
+      nextTopicReason: null,
+      status: 'accepted',
+      createdAt: new Date('2026-06-21T12:00:00.000Z'),
+      updatedAt: new Date('2026-06-21T12:00:00.000Z'),
+      llmSummary: null,
+      summaryGeneratedAt: null,
+      purgedAt: null,
+    });
+
+    const record = await readSharedArtifactForSupportee(db, {
+      supporterPersonId: UUID.supporter,
+      supporteePersonId: UUID.supportee,
+      artifactKind: 'session_recap',
+      artifactId: UUID.olderSession,
+    });
+
+    expect(record.supporterView.facts).toHaveLength(1);
+    expect(record.supporterView.facts[0]?.artifact).toEqual({
+      kind: 'session_recap',
+      id: UUID.olderSession,
+    });
+    expect(db.query.weeklyReports.findMany).not.toHaveBeenCalled();
+    expect(db.query.sessionSummaries.findMany).not.toHaveBeenCalled();
   });
 });

@@ -116,7 +116,13 @@ function renderScreen(initialRecord?: SharedRecord): QueryClient {
   });
   if (initialRecord) {
     queryClient.setQueryData(
-      ['visibility-shared-record', PERSON_ID, EDGE_ID],
+      [
+        'visibility-shared-artifact',
+        PERSON_ID,
+        EDGE_ID,
+        'weekly_report',
+        ARTIFACT_ID,
+      ],
       initialRecord,
     );
   }
@@ -142,7 +148,7 @@ describe('PersonJournalArtifactScreen', () => {
     mockAvailableScopes = [PERSON_SCOPE];
     mockScopesLoading = false;
     mockFetch.setRoute(
-      `/visibility/reports/${PERSON_ID}/shared-record`,
+      `/visibility/reports/${PERSON_ID}/artifacts/weekly_report/${ARTIFACT_ID}`,
       RECORD,
     );
   });
@@ -168,26 +174,29 @@ describe('PersonJournalArtifactScreen', () => {
     expect(
       fetchCallsMatching(
         mockFetch,
-        `/visibility/reports/${PERSON_ID}/shared-record`,
+        `/visibility/reports/${PERSON_ID}/artifacts/weekly_report/${ARTIFACT_ID}`,
       ),
     ).toHaveLength(1);
   });
 
   it('shows an explicit stale-link state when the persisted artifact disappeared', async () => {
-    mockFetch.setRoute(`/visibility/reports/${PERSON_ID}/shared-record`, {
-      ...RECORD,
-      factIds: [],
-      supporterView: {
-        ...RECORD.supporterView,
+    mockFetch.setRoute(
+      `/visibility/reports/${PERSON_ID}/artifacts/weekly_report/${ARTIFACT_ID}`,
+      {
+        ...RECORD,
         factIds: [],
-        facts: [],
+        supporterView: {
+          ...RECORD.supporterView,
+          factIds: [],
+          facts: [],
+        },
+        supporteeView: {
+          ...RECORD.supporteeView,
+          factIds: [],
+          facts: [],
+        },
       },
-      supporteeView: {
-        ...RECORD.supporteeView,
-        factIds: [],
-        facts: [],
-      },
-    });
+    );
 
     queryClient = renderScreen(RECORD);
 
@@ -212,7 +221,7 @@ describe('PersonJournalArtifactScreen', () => {
     expect(
       fetchCallsMatching(
         mockFetch,
-        `/visibility/reports/${PERSON_ID}/shared-record`,
+        `/visibility/reports/${PERSON_ID}/artifacts/weekly_report/${ARTIFACT_ID}`,
       ),
     ).toHaveLength(0);
   });
@@ -228,14 +237,14 @@ describe('PersonJournalArtifactScreen', () => {
     expect(
       fetchCallsMatching(
         mockFetch,
-        `/visibility/reports/${PERSON_ID}/shared-record`,
+        `/visibility/reports/${PERSON_ID}/artifacts/weekly_report/${ARTIFACT_ID}`,
       ),
     ).toHaveLength(0);
   });
 
   it('turns a server-side relationship denial into the stale-link state', async () => {
     mockFetch.setRoute(
-      `/visibility/reports/${PERSON_ID}/shared-record`,
+      `/visibility/reports/${PERSON_ID}/artifacts/weekly_report/${ARTIFACT_ID}`,
       new Response(
         JSON.stringify({
           code: 'FORBIDDEN',
@@ -251,5 +260,28 @@ describe('PersonJournalArtifactScreen', () => {
       screen.getByTestId('person-journal-artifact-stale');
     });
     expect(screen.queryByTestId('person-journal-artifact-error')).toBeNull();
+  });
+  it('shows an explicit error instead of cached artifact data when refresh fails', async () => {
+    mockFetch.setRoute(
+      `/visibility/reports/${PERSON_ID}/artifacts/weekly_report/${ARTIFACT_ID}`,
+      new Response(
+        JSON.stringify({
+          code: 'INTERNAL_ERROR',
+          message: 'Shared record refresh failed.',
+        }),
+        { status: 500 },
+      ),
+    );
+
+    queryClient = renderScreen(RECORD);
+
+    await waitFor(() => {
+      screen.getByTestId('person-journal-artifact-error');
+    });
+    expect(
+      screen.queryByTestId(
+        `person-journal-artifact-weekly_report-${ARTIFACT_ID}`,
+      ),
+    ).toBeNull();
   });
 });

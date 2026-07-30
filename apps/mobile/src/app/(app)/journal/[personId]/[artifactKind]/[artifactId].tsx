@@ -10,7 +10,8 @@ import {
 
 import { Button, ErrorFallback } from '../../../../../components/common';
 import { StructuralFactCard } from '../../../../../components/learning-surface';
-import { useSharedRecord } from '../../../../../components/support/use-shared-record';
+import { renderSharedRecordFact } from '../../../../../components/support/shared-record-fact-copy';
+import { useSharedRecordArtifact } from '../../../../../components/support/use-shared-record';
 import { extractApiErrorCode } from '../../../../../lib/format-api-error';
 import { firstParam } from '../../../../../lib/route-params';
 import { useScopeContext } from '../../../../../lib/scope-context';
@@ -87,7 +88,7 @@ function AuthorizedArtifact({
 }): React.ReactElement {
   const { t } = useTranslation();
   const { setActiveScope } = useScopeContext();
-  const query = useSharedRecord(scope);
+  const query = useSharedRecordArtifact(scope, artifactKind, artifactId);
 
   useEffect(() => {
     setActiveScope(scope);
