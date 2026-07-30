@@ -594,7 +594,7 @@ async function collectNowCandidates(
     visibility === 'self'
       ? collectTopicMasteredCandidates(db, profileId, scope, now)
       : Promise.resolve([]),
-    collectRecapReadyCandidatesForTesting(
+    collectRecapReadyCandidates(
       db,
       profileId,
       scope,
@@ -1287,10 +1287,7 @@ export function resolveRecapReadyDeepLink(
     : resolveDeepLink('session.summary', { sessionId });
 }
 
-/**
- * @internal - exported for focused query-shape regression coverage.
- */
-export async function collectRecapReadyCandidatesForTesting(
+async function collectRecapReadyCandidates(
   db: Database,
   profileId: string,
   scope: NowScope,
@@ -1341,6 +1338,9 @@ export async function collectRecapReadyCandidatesForTesting(
     scope,
   }));
 }
+
+/** @internal - exported only for focused query-shape regression coverage. */
+export { collectRecapReadyCandidates as collectRecapReadyCandidatesForTesting };
 
 async function collectSnapshotReadyCandidates(
   db: Database,
