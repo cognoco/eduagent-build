@@ -50,7 +50,9 @@ Deletion requires a manual dispatch with `apply_manifest_deletions=true` and
 an approval phrase bound to the exact sorted candidate set. For the bounded
 RevenueCat authorization cleanup, that phrase is
 `WI-1837:DELETE:mentomate-api-prd:prd:v1:REVENUECAT_SANDBOX_VERIFICATION_AUTHORIZATION`.
-The reconciler rejects a stale,
+That exact example is valid only while the authorization key is absent from
+Doppler and present on the Worker; the reconciler computes the live candidate
+set again during each apply. The reconciler rejects a stale,
 malformed, duplicate, or target-mismatched manifest before listing or deleting
 anything. It uses Wrangler's supported `secret delete` command and verifies
 that every candidate disappeared while every initially present preserved key
@@ -71,6 +73,8 @@ WI-2705 verification window without granting authority over Worker-only keys.
    `prd`, and Wrangler environment `production`.
 3. Advance `reviewedAt` and `validUntil` only in a reviewed PR. An expired
    manifest fails the scheduled dry-run and opens the normal failure alert.
+   Keep `approvalNamespace` explicit in the same reviewed manifest; changing it
+   changes every accepted approval phrase.
 4. Dispatch once with deletion disabled and review the dry-run output. It
    contains only deletion candidate names, never values.
 5. Obtain the required production approval for that candidate set. Then

@@ -34,6 +34,7 @@ const PRODUCTION_TARGET = {
 
 const MANIFEST_KEYS = [
   'schemaVersion',
+  'approvalNamespace',
   'reviewedAt',
   'validUntil',
   'target',
@@ -84,6 +85,12 @@ function validateOwnershipManifest(manifest, expectedTarget, now = new Date()) {
   }
   if (manifest.schemaVersion !== 1) {
     throw new Error('Ownership manifest schemaVersion is unsupported');
+  }
+  if (
+    typeof manifest.approvalNamespace !== 'string' ||
+    !/^[A-Z][A-Z0-9-]*$/.test(manifest.approvalNamespace)
+  ) {
+    throw new Error('Ownership manifest approvalNamespace is malformed');
   }
   if (!hasExactKeys(manifest.target, TARGET_KEYS)) {
     throw new Error('Ownership manifest target is malformed');
@@ -149,7 +156,7 @@ function formatDryRun(deleteCandidates) {
 function expectedApprovalPhrase(manifest, deleteCandidates) {
   const candidateSet = [...new Set(deleteCandidates)].sort();
   return [
-    'WI-1837',
+    manifest.approvalNamespace,
     'DELETE',
     manifest.target.workerName,
     manifest.target.dopplerConfig,

@@ -26,7 +26,6 @@ describe('[WI-1641] production secret-sync workflow', () => {
     expect(workflow.on.schedule).toEqual([{ cron: '17,47 * * * *' }]);
     expect(workflow.on.workflow_dispatch.inputs).toMatchObject({
       apply_manifest_deletions: {
-        required: true,
         default: false,
         type: 'boolean',
       },
@@ -35,6 +34,9 @@ describe('[WI-1641] production secret-sync workflow', () => {
         type: 'string',
       },
     });
+    expect(
+      workflow.on.workflow_dispatch.inputs.apply_manifest_deletions.required,
+    ).toBeUndefined();
   });
 
   it('is default-branch-only, serialized, and least privilege', () => {

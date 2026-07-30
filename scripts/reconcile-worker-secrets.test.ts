@@ -40,6 +40,7 @@ const {
 
 type OwnershipManifest = {
   schemaVersion: 1;
+  approvalNamespace: string;
   reviewedAt: string;
   validUntil: string;
   target: {
@@ -63,6 +64,7 @@ function manifest(
 ): OwnershipManifest {
   return {
     schemaVersion: 1,
+    approvalNamespace: 'WI-1837',
     reviewedAt: '2026-07-30T00:00:00.000Z',
     validUntil: '2026-10-28T00:00:00.000Z',
     target,
@@ -260,6 +262,11 @@ describe('[WI-1837] deletion-safe reconciliation', () => {
     expect(expectedApprovalPhrase(validManifest, ['REMOVED_OWNED'])).not.toBe(
       expectedApprovalPhrase(validManifest, ['ANOTHER_REMOVED_OWNED']),
     );
+    expect(
+      expectedApprovalPhrase(manifest({ approvalNamespace: 'PROD-SECRETS' }), [
+        'REMOVED_OWNED',
+      ]),
+    ).toMatch(/^PROD-SECRETS:DELETE:/);
   });
 
   it('supports rollback by restoring the key in Doppler before the normal bulk sync', () => {
