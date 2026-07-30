@@ -189,6 +189,39 @@ describe('PersonJournalArtifactScreen', () => {
     ).toHaveLength(1);
   });
 
+  it('localizes structured artifact facts instead of rendering API fallback copy', async () => {
+    const localizedRecord: SharedRecord = {
+      ...RECORD,
+      supporterView: {
+        ...RECORD.supporterView,
+        facts: [
+          {
+            ...RECORD.supporterView.facts[0]!,
+            title: 'RAW API weekly report title',
+            detail: 'RAW API weekly report detail',
+            metadata: {
+              templateKey: 'weeklyReport',
+              stats: [{ metricKey: 'wordsLearned', value: 4 }],
+            },
+          },
+        ],
+      },
+    };
+    mockFetch.setRoute(
+      `/visibility/reports/${PERSON_ID}/artifacts/weekly_report/${ARTIFACT_ID}`,
+      localizedRecord,
+    );
+
+    queryClient = renderScreen();
+
+    await waitFor(() => {
+      screen.getByText('Weekly report');
+    });
+    screen.getByText('4 words learned');
+    expect(screen.queryByText('RAW API weekly report title')).toBeNull();
+    expect(screen.queryByText('RAW API weekly report detail')).toBeNull();
+  });
+
   it('shows an explicit stale-link state when the persisted artifact disappeared', async () => {
     mockFetch.setRoute(
       `/visibility/reports/${PERSON_ID}/artifacts/weekly_report/${ARTIFACT_ID}`,

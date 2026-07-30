@@ -10,6 +10,7 @@ import {
 
 import { Button, ErrorFallback } from '../../../../../components/common';
 import { StructuralFactCard } from '../../../../../components/learning-surface';
+import { renderSharedRecordFact } from '../../../../../components/support/shared-record-fact-copy';
 import { useSharedRecordArtifact } from '../../../../../components/support/use-shared-record';
 import { extractApiErrorCode } from '../../../../../lib/format-api-error';
 import { navigateBackToJournal } from '../../../../../lib/journal-navigation';
@@ -86,7 +87,7 @@ function AuthorizedArtifact({
   artifactId: string;
   onBack: () => void;
 }): React.ReactElement {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { setActiveScope } = useScopeContext();
   const query = useSharedRecordArtifact(scope, artifactKind, artifactId);
 
@@ -133,6 +134,7 @@ function AuthorizedArtifact({
   if (!fact) {
     return <StaleArtifact artifactKind={artifactKind} onBack={onBack} />;
   }
+  const localizedFact = renderSharedRecordFact(fact, t, i18n.language);
 
   return (
     <View
@@ -151,9 +153,13 @@ function AuthorizedArtifact({
         {scope.displayName}
       </Text>
       <StructuralFactCard
-        headline={fact.title}
+        headline={localizedFact.title}
         structuralOnlyLabel={t('visibility.sharedRecord.structuralOnly')}
-        facts={fact.detail ? [{ id: fact.id, title: fact.detail }] : []}
+        facts={
+          localizedFact.detail
+            ? [{ id: fact.id, title: localizedFact.detail }]
+            : []
+        }
         testID="person-journal-artifact-detail"
       />
     </View>
