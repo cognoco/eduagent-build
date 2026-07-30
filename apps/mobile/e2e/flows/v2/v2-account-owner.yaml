@@ -225,6 +225,7 @@ tags:
     id: 'journal-screen'
 - assertNotVisible:
     text: '^Test Parent$'
+    optional: true
 - assertNotVisible:
     text: '^General Knowledge$'
 

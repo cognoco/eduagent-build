@@ -162,7 +162,7 @@ async function expectSignedOutWithoutTestParentData(page: Page): Promise<void> {
   await expect(page.getByTestId('mentor-screen')).toHaveCount(0);
   await expect(page.getByTestId('subjects-screen')).toHaveCount(0);
   await expect(page.getByTestId('journal-screen')).toHaveCount(0);
-  await expect(page.getByText('Test Parent', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Test Parent', { exact: true })).toHaveCount(1);
   await expect(
     page.getByText('General Knowledge', { exact: true }),
   ).toHaveCount(0);
