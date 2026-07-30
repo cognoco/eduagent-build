@@ -22,7 +22,7 @@ The choice was therefore between forcing language subjects through a pedagogy th
 
 5. **Proficiency is tracked on the CEFR scale for language subjects**, as a level-and-sublevel pair, and is distinct from the mastery and retention state used by concept subjects. The two are not interchangeable and neither is derived from the other.
 
-6. **The mode selects the pedagogy; it does not fork the product.** Sessions, retention, progress, and the assessment pipeline remain single implementations that read the mode. A change that would require a parallel language-only stack is outside this decision.
+6. **The mode selects the pedagogy within a shared shell; language-specific *state* is separate by design.** The session loop, the exchange path, and the assessment pipeline are single implementations that read the mode rather than forking. The things a language subject must remember, however, are genuinely different in kind and have their own stores: vocabulary carries its own retention cards and scheduling, distinct from concept-subject retention, and CEFR proficiency is tracked and served on its own path rather than folded into mastery. That split is deliberate and load-bearing — collapsing it into the concept-subject equivalents would destroy vocabulary scheduling and proficiency history. What is out of scope is a parallel language-only *session stack*, not language-specific state.
 
 ## Consequences
 

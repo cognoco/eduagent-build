@@ -391,7 +391,7 @@ Components use semantic class names throughout (`bg-background`, `text-primary`,
 
 > **Implementation note (2026-05-23):** The per-persona named exports above (`teenTheme`, `adultTheme`, `parentTheme`) were not carried forward. The shipped implementation uses `tokens: Record<'light' | 'dark', ThemeTokens>` in `apps/mobile/src/lib/design-tokens.ts` — a two-scheme (light/dark) token map with five accent presets (teal/electric/hotpink/emerald/amber). NativeWind CSS variable injection via `vars()` is applied in `(app)/_layout.tsx`. The semantic class contract described here (e.g., `bg-background`, `text-primary`) is correctly implemented.
 
-> **Correction (2026-07-30) to the note above:** the two-scheme light/dark token map is accurate; **"with five accent presets" is not.** Those presets are residual machinery from an accent-selection capability that was deliberately removed rather than shipped. No surface offers the choice, the selection is unset for every user, and with it unset the fixed teal-and-lavender palette renders unchanged — so the code reads like a shipped picker while being unreachable. It is legacy cleanup, not a feature, and nothing may be built against it. See [`MMT-ADR-0051`](adr/MMT-ADR-0051-one-fixed-brand-palette-varying-only-by-colour-scheme.md) clause 6.
+> **Correction (2026-07-30) to the note above:** the two-scheme light/dark token map is accurate; **"with five accent presets" overstates what ships.** Those presets are residual machinery from an accent-selection capability that was deliberately removed rather than shipped: no current surface offers the choice, so on a fresh installation the fixed teal-and-lavender palette is what renders. The machinery is not fully inert, though — the theme layer still reads a per-profile stored selection from device storage, so an installation upgraded from a build that offered the picker may still have one applied. Treat it as legacy awaiting cleanup rather than a feature: nothing may be built against it, and removing it requires clearing the persisted keys rather than deleting the code alone. Rationale drafted at [`MMT-ADR-0051`](adr/MMT-ADR-0051-one-fixed-brand-palette-varying-only-by-colour-scheme.md) (`Status: Proposed`).
 
 ### Semantic Design Token Set
 
@@ -527,9 +527,11 @@ This triangle is both positioning and a feature evaluation framework. For every 
 
 ## Visual Design Foundation
 
-> **SUPERSEDED — the per-persona visual system described in this section is not the product's design.** The brand is a single fixed palette (teal primary, lavender secondary) applied identically to every user, varying only between light and dark colour schemes. There are no per-persona moods, no persona-specific expression of a hue family, and no user-selectable accent. The persona attribute this system depended on was removed from the data model and shared components are deliberately persona-unaware, so this direction has no input to run on.
+> **DRIFT NOTICE — this section does not describe what the product ships.** The shipped implementation applies a single fixed palette (teal primary, lavender secondary) to every user, varying only between light and dark colour schemes: see `apps/mobile/src/lib/design-tokens.ts`. There are no per-persona moods and no persona-specific expression of a hue family. The persona attribute this system depended on was removed from the data model and shared components are deliberately persona-unaware, so this direction has no input to run on.
 >
-> Retained as history — it records a direction that was genuinely considered and not taken, and the current single-palette choice is only legible as a decision alongside the alternative it displaced. **Do not build from this section.** The governing decision is [`MMT-ADR-0051`](adr/MMT-ADR-0051-one-fixed-brand-palette-varying-only-by-colour-scheme.md); the shipped token values are in `apps/mobile/src/lib/design-tokens.ts`.
+> **Do not build from this section** — not because a newer document outranks it, but because the code it describes does not exist. Retained in full as history: it records a direction genuinely considered and not taken.
+>
+> The durable record of *why* is drafted at [`MMT-ADR-0051`](adr/MMT-ADR-0051-one-fixed-brand-palette-varying-only-by-colour-scheme.md), which is **`Status: Proposed` and awaiting human Architecture sign-off**. Until that sign-off it is not canon and does not supersede this section as a matter of governance — this notice records observed drift against shipped code, which stands on its own. When the ADR is accepted, the supersession becomes formal.
 
 ### Visual Design Philosophy
 
@@ -606,7 +608,7 @@ The grid stays consistent. What changes per persona is internal padding and whit
 
 ## Design Direction Decision
 
-> **SUPERSEDED — this section summarises the per-persona direction, not the shipped one.** Every row below that varies a value by persona (overall approach, the three per-persona moods, persona-specific accent saturation/tone, per-persona density) is superseded: the product ships one fixed teal-and-lavender palette for all users, varying only by light/dark scheme. The rows that are persona-invariant — Inter typography on a consistent scale, and shared component shapes and structure — still hold. Retained as history; see [`MMT-ADR-0051`](adr/MMT-ADR-0051-one-fixed-brand-palette-varying-only-by-colour-scheme.md).
+> **DRIFT NOTICE — this section summarises the per-persona direction, not the shipped one.** Every row below that varies a value by persona (overall approach, the three per-persona moods, persona-specific accent saturation/tone, per-persona density) describes behaviour the product does not implement: it ships one fixed teal-and-lavender palette for all users, varying only by light/dark scheme. The rows that are persona-invariant — Inter typography on a consistent scale, and shared component shapes and structure — still hold. Retained as history. The drafted rationale is [`MMT-ADR-0051`](adr/MMT-ADR-0051-one-fixed-brand-palette-varying-only-by-colour-scheme.md), `Status: Proposed`, not yet canon.
 
 ### Chosen Direction
 
