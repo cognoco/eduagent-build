@@ -37,7 +37,7 @@ Local API mode starts `wrangler dev` unless `PLAYWRIGHT_SKIP_LOCAL_API=1` is set
 For a local seeded run, first run `pnpm env:sync`, then invoke Playwright normally — for example:
 
 ```bash
-pnpm run test:e2e:web -- --project=v2-release --retries=0
+pnpm run test:e2e:web -- --project=v2-release
 ```
 
 The runner reads the local API test-seed secret from `apps/api/.dev.vars`, the same source used by `wrangler dev`; no manual environment bridge is needed. A supplied `PLAYWRIGHT_TEST_SEED_SECRET` or `TEST_SEED_SECRET` is accepted only when it matches that local API value. A mismatch fails before seeding and never prints either secret. This local alignment is disabled when `PLAYWRIGHT_SKIP_LOCAL_API=1`, so shared staging continues to use its configured external secret path.
