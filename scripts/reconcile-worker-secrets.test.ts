@@ -119,11 +119,22 @@ describe('[WI-1837] deletion-safe reconciliation', () => {
       path.join(__dirname, 'reconcile-worker-secrets.js'),
       'utf8',
     );
+    const externalCallSites = [
+      ['listWorkerSecretNames', 'deleteWorkerSecret'],
+      ['deleteWorkerSecret', 'downloadDopplerKeyNames'],
+      ['downloadDopplerKeyNames', 'readManifest'],
+    ];
 
     expect(source).toContain('const EXTERNAL_COMMAND_TIMEOUT_MS = 30_000;');
-    expect(source.match(/timeout: EXTERNAL_COMMAND_TIMEOUT_MS/g)).toHaveLength(
-      3,
-    );
+    for (const [functionName, nextFunctionName] of externalCallSites) {
+      const start = source.indexOf(`function ${functionName}(`);
+      const end = source.indexOf(`function ${nextFunctionName}(`, start);
+      expect(start).toBeGreaterThan(-1);
+      expect(end).toBeGreaterThan(start);
+      expect(source.slice(start, end)).toContain(
+        'timeout: EXTERNAL_COMMAND_TIMEOUT_MS',
+      );
+    }
   });
 
   it('dry-runs only manifest-owned Worker keys absent from Doppler', () => {

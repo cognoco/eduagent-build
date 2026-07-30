@@ -299,6 +299,8 @@ function assertWranglerConfig(configPath) {
 
 function wranglerTargetArgs(target, configPath) {
   assertWranglerConfig(configPath);
+  // Exact --name selects the deployed Worker directly. The manifest's
+  // wranglerEnvironment remains audit metadata and is not a second selector.
   return ['--name', target.workerName, '--config', configPath];
 }
 
