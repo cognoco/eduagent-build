@@ -132,6 +132,14 @@ jobs:
               - 'packages/schemas/**'
               - 'packages/retention/**'
               - 'pnpm-lock.yaml'
+            integration_typecheck:
+              - 'tests/integration/**'
+              - 'scripts/check-integration-typecheck.ts'
+              - 'scripts/check-integration-typecheck.test.ts'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'tsconfig.base.json'
+              - '.github/workflows/ci.yml'
 
       # Setup pnpm (version read from packageManager field in package.json)
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
@@ -463,6 +471,12 @@ jobs:
         run: |
           pnpm exec nx run-many -t lint test typecheck
           pnpm exec nx run-many -t build --exclude=@eduagent/mobile
+
+      - name: Integration TypeScript checker
+        if: >-
+          (github.event_name == 'push' && steps.changes.outputs.integration_typecheck == 'true') ||
+          (github.event_name == 'pull_request' && steps.change-class.outputs.integration == 'true')
+        run: pnpm typecheck:integration
 
       # Run API integration tests against real PostgreSQL.
       # PRs: routed by the change-class router (WI-452) — runs whenever the
