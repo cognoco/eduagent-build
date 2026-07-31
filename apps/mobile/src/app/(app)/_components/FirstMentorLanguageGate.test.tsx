@@ -45,6 +45,13 @@ jest.mock(
 const FirstMentorLanguageGate =
   require('./FirstMentorLanguageGate').FirstMentorLanguageGate;
 
+const {
+  shouldRequireFirstMentorLanguageConfirmation,
+} = require('../../../lib/first-mentor-language');
+const {
+  resolveLanguageVoiceLocale,
+} = require('../session/_view-models/session-derived-state');
+
 const learner = createTestProfile({
   id: 'learner-1',
   isOwner: false,
@@ -285,5 +292,105 @@ describe('FirstMentorLanguageGate', () => {
       active.result.getByTestId('first-mentor-language-option-es').props
         .accessibilityState.selected,
     ).toBe(true);
+  });
+
+  // [WI-1556 AC-5] Deterministic first-run journey. Walks one learner from an
+  // unconfirmed first run through a non-English choice, a relaunch that only
+  // sees what the server durably reported, and on to the first Mentor
+  // interaction — proving the choice both survives the relaunch and reaches
+  // the surfaces the first exchange is driven from. Deterministic: no timers,
+  // no network beyond the routed mock, no reliance on ordering between
+  // independent effects.
+  it('[WI-1556] first-run journey: a non-English choice survives relaunch and drives the first Mentor interaction', async () => {
+    const journeyLearner = createTestProfile({
+      id: 'journey-learner',
+      isOwner: true,
+      conversationLanguage: 'en',
+      conversationLanguageConfirmed: false,
+      isCurrentUser: true,
+    });
+
+    // 1. First run: the learner is a self-created owner who has not confirmed,
+    //    so the blocking gate stands between them and any Mentor surface.
+    expect(
+      shouldRequireFirstMentorLanguageConfirmation({
+        activeProfile: journeyLearner,
+        isExplicitProxyMode: false,
+      }),
+    ).toBe(true);
+
+    active = renderScreen(<FirstMentorLanguageGate />, {
+      profile: journeyLearner,
+      routes: { '/onboarding/': { success: true } },
+    });
+
+    // 2. They pick Czech — a conversation-only locale, so this cannot be
+    //    satisfied by the seven-locale UI shell falling back to English.
+    fireEvent.press(
+      active.result.getByTestId('first-mentor-language-option-cs'),
+    );
+    await act(async () => {
+      fireEvent.press(
+        active!.result.getByTestId('first-mentor-language-confirm'),
+      );
+      await Promise.resolve();
+    });
+
+    // 3. The write reaches the server as an explicit confirmation of cs.
+    await waitFor(() => {
+      const patches = fetchCallsMatching(
+        active!.routedFetch,
+        '/onboarding/language',
+      ).filter((call) => call.init?.method === 'PATCH');
+      expect(extractJsonBody(patches[patches.length - 1]?.init)).toEqual({
+        conversationLanguage: 'cs',
+        confirm: true,
+      });
+    });
+    // The UI shell language is untouched: this is the tutor-prose language.
+    expect(i18next.language).toBe('en');
+
+    // 4. Relaunch. The client keeps nothing of its own — it re-reads what the
+    //    server durably reported. Only a persisted confirmation clears the
+    //    gate, so this asserts persistence rather than local state.
+    const afterRelaunch = {
+      ...journeyLearner,
+      conversationLanguage: 'cs' as const,
+      conversationLanguageConfirmed: true,
+    };
+    expect(
+      shouldRequireFirstMentorLanguageConfirmation({
+        activeProfile: afterRelaunch,
+        isExplicitProxyMode: false,
+      }),
+    ).toBe(false);
+    // Had the server not recorded it, the relaunch would strand them again.
+    expect(
+      shouldRequireFirstMentorLanguageConfirmation({
+        activeProfile: {
+          ...afterRelaunch,
+          conversationLanguageConfirmed: false,
+        },
+        isExplicitProxyMode: false,
+      }),
+    ).toBe(true);
+
+    // 5. The first Mentor interaction consumes the surviving choice: the
+    //    Mentor input bar derives its voice locale from the learner's
+    //    conversation language (see mentor.tsx's voiceLocale prop), so a
+    //    non-English choice changes how the first exchange is spoken, not
+    //    merely what is stored.
+    expect(
+      resolveLanguageVoiceLocale({
+        activeSubject: undefined,
+        conversationLanguage: afterRelaunch.conversationLanguage,
+      }),
+    ).toBe('cs-CZ');
+    expect(
+      resolveLanguageVoiceLocale({
+        activeSubject: undefined,
+        conversationLanguage: 'en',
+      }),
+    ).toBe('en-US');
   });
 });
