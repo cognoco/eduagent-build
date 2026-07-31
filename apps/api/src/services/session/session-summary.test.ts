@@ -12,10 +12,12 @@
 
 import {
   getSessionSummary,
+  retrySummaryFeedback,
   skipSummary,
   submitSummary,
 } from './session-summary';
 import { NotFoundError } from '@eduagent/schemas';
+import { ConsentWithdrawnError } from '../identity-v2/consent-errors';
 
 // ---------------------------------------------------------------------------
 // Minimal stub helpers
@@ -118,6 +120,22 @@ function buildSessionRow(overrides: Partial<SessionRow> = {}): SessionRow {
     updatedAt: new Date('2026-01-01T10:30:00Z'),
     createdAt: new Date('2026-01-01T10:00:00Z'),
     ...overrides,
+  };
+}
+
+function buildSubjectRow() {
+  return {
+    id: 'subj-1',
+    profileId: 'prof-1',
+    name: 'Algebra',
+    rawInput: null,
+    status: 'active',
+    pedagogyMode: 'standard',
+    languageCode: null,
+    createdAt: new Date('2026-01-01T10:00:00Z'),
+    updatedAt: new Date('2026-01-01T10:00:00Z'),
+    urgencyBoostUntil: null,
+    urgencyBoostReason: null,
   };
 }
 
@@ -539,5 +557,194 @@ describe('submitSummary', () => {
 
     // Session lookup was scoped by profileId — confirmed by it being called.
     expect(db.query.learningSessions.findFirst).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2543 rework 2] Consent belongs at the final summary-evaluation boundary.
+// ---------------------------------------------------------------------------
+
+describe('[WI-2543 rework 2] granular summary consent boundaries', () => {
+  const withdrawnGate = () =>
+    jest.fn().mockRejectedValue(new ConsentWithdrawnError());
+
+  it('returns a saved submitted summary after consent withdrawal without evaluating again', async () => {
+    const session = buildSessionRow({ topicId: null });
+    const saved = buildSummaryRow({
+      status: 'submitted',
+      aiFeedback: null,
+      content: 'Already saved words',
+    });
+    const assertLlmConsent = withdrawnGate();
+    const evaluateSummary = jest.fn();
+    const db = {
+      query: {
+        learningSessions: { findFirst: jest.fn().mockResolvedValue(session) },
+        sessionSummaries: { findFirst: jest.fn().mockResolvedValue(saved) },
+      },
+    } as unknown as import('@eduagent/database').Database;
+
+    const result = await submitSummary(
+      db,
+      'prof-1',
+      'sess-1',
+      { content: 'A replay that must not replace saved content' },
+      {
+        deps: { assertLlmConsent, evaluateSummary },
+      },
+    );
+
+    expect(result.summary).toEqual(
+      expect.objectContaining({
+        content: 'Already saved words',
+        feedbackStatus: 'unavailable',
+        status: 'submitted',
+      }),
+    );
+    expect(assertLlmConsent).not.toHaveBeenCalled();
+    expect(evaluateSummary).not.toHaveBeenCalled();
+  });
+
+  it('rejects a new summary before evaluation when consent is withdrawn', async () => {
+    const assertLlmConsent = withdrawnGate();
+    const evaluateSummary = jest.fn().mockResolvedValue({
+      feedback: 'Must not be produced',
+      feedbackStatus: 'available',
+      gapAreas: [],
+      hasUnderstandingGaps: false,
+      isAccepted: true,
+    });
+    const db = {
+      query: {
+        learningSessions: {
+          findFirst: jest.fn().mockResolvedValue(buildSessionRow()),
+        },
+        sessionSummaries: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        subjects: {
+          findFirst: jest.fn().mockResolvedValue(buildSubjectRow()),
+        },
+      },
+    } as unknown as import('@eduagent/database').Database;
+
+    await expect(
+      submitSummary(
+        db,
+        'prof-1',
+        'sess-1',
+        { content: 'My new summary' },
+        {
+          deps: { assertLlmConsent, evaluateSummary },
+        },
+      ),
+    ).rejects.toBeInstanceOf(ConsentWithdrawnError);
+
+    expect(assertLlmConsent).toHaveBeenCalledWith(db, 'prof-1');
+    expect(evaluateSummary).not.toHaveBeenCalled();
+  });
+
+  it('returns already-available retry feedback after consent withdrawal', async () => {
+    const session = buildSessionRow({ topicId: null });
+    const saved = buildSummaryRow({
+      status: 'accepted',
+      aiFeedback: 'Feedback is already available',
+    });
+    const assertLlmConsent = withdrawnGate();
+    const evaluateSummary = jest.fn();
+    const db = {
+      query: {
+        learningSessions: { findFirst: jest.fn().mockResolvedValue(session) },
+        sessionSummaries: { findFirst: jest.fn().mockResolvedValue(saved) },
+      },
+    } as unknown as import('@eduagent/database').Database;
+
+    const result = await retrySummaryFeedback(db, 'prof-1', 'sess-1', {
+      deps: { assertLlmConsent, evaluateSummary },
+    });
+
+    expect(result.summary.feedbackStatus).toBe('available');
+    expect(result.summary.aiFeedback).toBe('Feedback is already available');
+    expect(assertLlmConsent).not.toHaveBeenCalled();
+    expect(evaluateSummary).not.toHaveBeenCalled();
+  });
+
+  it('returns the unavailable summary when another retry owns the claim despite consent withdrawal', async () => {
+    const session = buildSessionRow({ topicId: null });
+    const saved = buildSummaryRow({ status: 'submitted', aiFeedback: null });
+    const assertLlmConsent = withdrawnGate();
+    const evaluateSummary = jest.fn();
+    const deleteWhere = jest.fn().mockResolvedValue(undefined);
+    const returning = jest.fn().mockResolvedValue([]);
+    const tx = {
+      delete: jest.fn().mockReturnValue({ where: deleteWhere }),
+      insert: jest.fn().mockReturnValue({
+        values: jest.fn().mockReturnValue({
+          onConflictDoNothing: jest.fn().mockReturnValue({ returning }),
+        }),
+      }),
+    };
+    const db = {
+      query: {
+        learningSessions: { findFirst: jest.fn().mockResolvedValue(session) },
+        sessionSummaries: { findFirst: jest.fn().mockResolvedValue(saved) },
+      },
+      transaction: jest.fn(
+        async (callback: (transaction: unknown) => unknown) => callback(tx),
+      ),
+    } as unknown as import('@eduagent/database').Database;
+
+    const result = await retrySummaryFeedback(db, 'prof-1', 'sess-1', {
+      deps: {
+        assertLlmConsent,
+        evaluateSummary,
+        claimSummaryFeedbackRetry: jest.fn().mockResolvedValue(null),
+      },
+    });
+
+    expect(result.summary.feedbackStatus).toBe('unavailable');
+    expect(assertLlmConsent).not.toHaveBeenCalled();
+    expect(evaluateSummary).not.toHaveBeenCalled();
+  });
+
+  it('rejects a claimed feedback retry before evaluation and releases its lease', async () => {
+    const session = buildSessionRow({ topicId: null });
+    const saved = buildSummaryRow({ status: 'submitted', aiFeedback: null });
+    const claim = {
+      source: 'summary-feedback-retry',
+      key: 'claim-key',
+      claimedAt: new Date('2026-07-31T12:00:00.000Z'),
+    };
+    const assertLlmConsent = withdrawnGate();
+    const evaluateSummary = jest.fn().mockResolvedValue({
+      feedback: 'Must not be produced',
+      feedbackStatus: 'available',
+      gapAreas: [],
+      hasUnderstandingGaps: false,
+      isAccepted: true,
+    });
+    const releaseCoordinationClaim = jest.fn().mockResolvedValue(undefined);
+    const db = {
+      query: {
+        learningSessions: { findFirst: jest.fn().mockResolvedValue(session) },
+        sessionSummaries: { findFirst: jest.fn().mockResolvedValue(saved) },
+        subjects: {
+          findFirst: jest.fn().mockResolvedValue(buildSubjectRow()),
+        },
+      },
+    } as unknown as import('@eduagent/database').Database;
+
+    await expect(
+      retrySummaryFeedback(db, 'prof-1', 'sess-1', {
+        deps: {
+          assertLlmConsent,
+          evaluateSummary,
+          claimSummaryFeedbackRetry: jest.fn().mockResolvedValue(claim),
+          releaseCoordinationClaim,
+        },
+      }),
+    ).rejects.toBeInstanceOf(ConsentWithdrawnError);
+
+    expect(assertLlmConsent).toHaveBeenCalledWith(db, 'prof-1');
+    expect(evaluateSummary).not.toHaveBeenCalled();
+    expect(releaseCoordinationClaim).toHaveBeenCalledWith(db, claim);
   });
 });
