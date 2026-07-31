@@ -1717,7 +1717,7 @@ describe('persistBookTopics', () => {
     ).rejects.toThrow('Subject not found');
   });
 
-  it('does not create a curriculum for a subject outside the profile', async () => {
+  it('does not create a curriculum when the subject is missing', async () => {
     const db = createPersistMockDb({
       subjectExists: false,
       curriculumExists: false,
