@@ -98,3 +98,15 @@ wins the gate order, and language confirmation remains deferred until the
 family-intent fork is complete. The full post-merge union passed 470 tests
 across thirteen suites, including WI-2399 resubmit-generation coverage and the
 five landed WI-1556 mobile suites.
+
+## Independent exact-head invitation-order RED/GREEN
+
+Independent review found that a restored `opening-invitation` marker was
+converted to `familyIntentState=null` before Tabs mounted. For an unconfirmed
+first-Mentor profile, the language gate could therefore render before the
+invitation push. The focused RED observed the push while Tabs were absent
+(`Expected: true`, `Received: false`).
+
+The language gate now also requires that no invitation replay is pending.
+GREEN proves Tabs are mounted when the restored invitation is pushed. The
+post-fix semantic union passed 472 tests across fourteen suites.

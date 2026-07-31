@@ -14,12 +14,14 @@
 | Gate-ordering comment omits family-intent step | Accepted and fixed | The ordering comment now records the family-intent gate between preview/profile resolution and profile creation/consent/Tabs. |
 | Duplicate hook dependency | Accepted and fixed | The duplicate `isFirstProfileCreation` dependency was removed; touched-file lint is warning-free. |
 | Landed WI-2231 restores shell-aware V2 completion at the create-profile overlap | Accepted and reconciled | The durable fork, no-PATCH/no-child-redirect contract, retry journal, and terminal marker consumption remain intact. Successful initial and retry persistence now use the landed `handleCompleted` / `getPostAuthDefaultPath` path. Two routing assertions failed RED under `handleClose` and pass GREEN. |
-| Landed WI-1556 first-Mentor language confirmation can pre-empt an unresolved family-intent restore | Accepted and fixed during semantic merge-forward | A focused RED received the language gate instead of the fail-closed family-intent loading overlay. The language gate now requires the family-intent probe to resolve absent; restored family intent retains priority and the 470-test union passes. |
+| Landed WI-1556 first-Mentor language confirmation can pre-empt an unresolved family-intent restore | Accepted and fixed during semantic merge-forward | A focused RED received the language gate instead of the fail-closed family-intent loading overlay. The language gate now requires the family-intent probe to resolve absent; restored family intent retains priority. |
+| Restored invitation replay can be pre-empted by first-Mentor language confirmation | Accepted and fixed after independent exact-head review | Focused RED observed the invitation push while Tabs were absent. Language gating now remains suppressed while invitation replay is pending; GREEN observes mounted Tabs at push time. |
+| WI-2532 merge commit collapsed unrelated teen-consent checker formatting | Accepted and restored | `scripts/check-teen-consent-claims.ts` now matches main's canonical four-line `path.relative(...).split(...).join('/')` chain. |
 | Clear only after `onComplete` destination mounts | Rejected with contract evidence | `onComplete` is a synchronous `setFamilyIntentState(null)`, not navigation. Durable clear commits completion before mounting/revealing the learner shell; moving it after this callback would make a completed choice resumable after process death. |
 | Deduplicate the handoff helper in this correction | Rejected as out of correction scope | There is no demonstrated correctness defect, and the ruled publication correction preserves the existing narrowly scoped helper rather than adding an unrelated refactor. |
 
-Focused verification after disposition and merge-forward: thirteen union
-suites, 470 tests passed; the two requested-route preservation cases passed;
+Focused verification after disposition and merge-forward: fourteen union
+suites, 472 tests passed; the requested-route and invitation-order cases passed;
 TypeScript, warning-free touched-file ESLint, exact-file Prettier, mobile i18n,
 teen-consent, test-only-export, and GC1 ratchets, plus `git diff --check`,
 passed.

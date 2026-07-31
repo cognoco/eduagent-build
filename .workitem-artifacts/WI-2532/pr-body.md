@@ -14,7 +14,7 @@
 
 ## Verification
 
-- merge-forward union: thirteen suites, 470 tests passed
+- merge-forward union: fourteen suites, 472 tests passed
 - full mobile unit suite: passed
 - full API unit suite under Doppler `dev`: passed
 - TypeScript build and i18n/teen-consent/test-only-export/GC1 ratchets: passed
@@ -24,7 +24,8 @@
 - review hardening covers stale-read invalidation after sign-out, recovery-only
   primary repair, all-mode terminal marker consumption, and an inaccessible
   restore-probe navigator that retains requested route state
-- preview Playwright journey: passed in 1.7 minutes
+- pre-WI-1556 preview journey: historical diagnostic only; final attributable
+  E2E evidence must come from the published exact head
 
 ## Collision note
 
@@ -37,5 +38,8 @@ shell-aware completion routing. WI-2399's resubmit-generation guards and
 WI-2820's test-seed batching remain intact. A focused RED caught WI-1556's
 first-Mentor language gate pre-empting the unresolved durable-state probe; the
 gate now waits for family intent to resolve absent before it can render.
+Independent exact-head review then caught the same gate pre-empting a restored
+invitation replay. It now remains suppressed until Tabs mount and the
+invitation push is issued.
 
 Refs: WI-2532

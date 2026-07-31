@@ -23,9 +23,8 @@
 
 - Merge-forward union covering family-intent state, component, profile
   creation, app-layout, invitation route, sign-out, session routing, consent
-  routing, link resubmit-generation guards, and first-Mentor language
-  confirmation: 13 suites, 470 tests passed.
-- The same union plus the landed E2E test-seed helper: 14 suites, 471 tests
+  routing, link resubmit-generation guards, first-Mentor language
+  confirmation, and the landed E2E test-seed helper: 14 suites, 472 tests
   passed.
 - Focused RED proved the two family-intent persistence paths made zero
   shell-aware replace calls under the old `handleClose`; both pass after using
@@ -54,11 +53,14 @@
 
 ## Preview journey
 
-The dedicated preview Playwright test passed in 1.7 minutes after its refreshed
-run caught and drove a fix for the Tabs-before-route navigation race. It begins with the
-pre-profile seed, persists family intent, creates the adult, selects Someone
-else, answers that the learner has their own login, and reaches the invitation
-form without first writing a visibility/supportership link.
+A pre-WI-1556 preview Playwright run passed in 1.7 minutes and historically
+caught the first Tabs-before-route navigation race. It began with the
+pre-profile seed, persisted family intent, created the adult, selected Someone
+else, answered that the learner has their own login, and reached the invitation
+form without first writing a visibility/supportership link. Because it predates
+the WI-1556 and latest-main merge-forwards, it is retained only as historical
+diagnostic evidence. Final attributable E2E evidence must come from the
+published exact head.
 
 ## Collision and flag audit
 
@@ -78,6 +80,11 @@ form without first writing a visibility/supportership link.
   while the durable family-intent probe was still unresolved. The language
   gate now requires the probe to resolve absent; the focused case and the
   144-test layout suite pass.
+- Independent exact-head review found a second WI-1556 ordering boundary after
+  a restored `opening-invitation` marker moved into layout state. Focused RED
+  observed invitation navigation while Tabs were absent. Language gating now
+  remains suppressed while invitation replay is pending; the 145-test layout
+  suite and 14-suite / 472-test semantic union pass.
 - WI-2399's generation-bound create mutation, Back invalidation, retry, and
   stale-success rejection remain present and pass in the invitation-route
   suite.

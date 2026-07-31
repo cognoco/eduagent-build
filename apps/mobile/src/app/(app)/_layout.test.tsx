@@ -715,6 +715,53 @@ describe('AppLayout', () => {
     screen.getByTestId('tabs');
   });
 
+  it('[WI-2532/WI-1556] replays a durable invitation before gating an unconfirmed first-Mentor language', async () => {
+    const profileState = mockUseProfile();
+    const unconfirmedProfile = {
+      ...profileState.activeProfile,
+      isCurrentUser: true,
+      conversationLanguageConfirmed: false,
+    };
+    mockUseProfile.mockReturnValue({
+      ...profileState,
+      profiles: [
+        unconfirmedProfile,
+        ...profileState.profiles.filter(
+          (profile: { id: string }) => profile.id !== unconfirmedProfile.id,
+        ),
+      ],
+      activeProfile: unconfirmedProfile,
+    });
+    let invitationSawMountedTabs = false;
+    mockPush.mockImplementationOnce(() => {
+      invitationSawMountedTabs =
+        screen.queryByTestId('tabs', { includeHiddenElements: true }) !== null;
+    });
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) =>
+        Promise.resolve(
+          key === FAMILY_INTENT_ONBOARDING_KEY
+            ? JSON.stringify({
+                version: 1,
+                profileId: 'p1',
+                step: 'opening-invitation',
+              })
+            : null,
+        ),
+    );
+
+    renderLayout();
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/link/initiate',
+        params: { target: 'existingTeen' },
+      });
+    });
+    expect(invitationSawMountedTabs).toBe(true);
+  });
+
   it('[WI-2532] fails closed and offers retry when the family-intent state read rejects', async () => {
     const SecureStoreMock = require('../../lib/secure-storage');
     (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(

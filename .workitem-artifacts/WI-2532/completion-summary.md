@@ -26,22 +26,23 @@ profile creation.
 
 ## Verification
 
-The merge-forward union passed 470 tests across thirteen suites: durable state,
+The merge-forward union passed 472 tests across fourteen suites: durable state,
 both branches, profile creation, app-layout restoration, invitation routing,
 sign-out cleanup, session routing, consent routing, link resubmit-generation
 guards, and first-Mentor language confirmation. The durable family-intent probe
-now resolves before the first-Mentor language gate can render. With the landed
-test-seed helper, the post-merge mobile/E2E-helper run passed 471 tests across
-fourteen suites. The full mobile unit stage, full API unit stage under the
+now resolves before the first-Mentor language gate can render, and a restored
+invitation mounts Tabs before replay so that gate cannot pre-empt navigation.
+The union includes the landed test-seed helper. The full mobile unit stage,
+full API unit stage under the
 sanctioned development database boundary, TypeScript build, i18n ratchets,
 teen-consent claims ratchet, test-only export guard, GC1 mock-governance
 ratchet, warning-free touched-file lint, exact-file Prettier, and whitespace
 check passed.
 Review-bounce coverage also verifies stale-read rejection, recovery-primary
 repair, all-mode terminal destination consumption, and a
-mounted-but-inaccessible blocked navigator. The dedicated preview journey
-passed in 1.7 minutes and reached the invitation form without a supportership
-write.
+mounted-but-inaccessible blocked navigator. A pre-WI-1556 preview journey
+historically reached the invitation form without a supportership write; it is
+diagnostic history, not attributable final-head E2E evidence.
 
 ## Caveats / Follow-ups
 
@@ -51,4 +52,5 @@ that path. The branch was merge-forwarded through main `704112725`, preserving
 landed WI-2231 routing, WI-2399 resubmit-generation guards, WI-1556 first-Mentor
 language confirmation, and WI-2820 test-seed batching; no history was rewritten.
 The Work Item remains Executing until its PR lands; lifecycle completion must
-not run while the PR is open.
+not run while the PR is open. Final attributable E2E evidence must come from
+the published exact head.

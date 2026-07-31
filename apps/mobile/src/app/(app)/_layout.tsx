@@ -956,6 +956,7 @@ export default function AppLayout() {
 
   if (
     familyIntentState === null &&
+    !familyIntentInvitationRequested &&
     shouldRequireFirstMentorLanguageConfirmation({
       activeProfile,
       isExplicitProxyMode,
