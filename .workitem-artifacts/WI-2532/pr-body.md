@@ -14,7 +14,7 @@
 
 ## Verification
 
-- merge-forward union: eight suites, 410 tests passed
+- merge-forward union: thirteen suites, 470 tests passed
 - full mobile unit suite: passed
 - full API unit suite under Doppler `dev`: passed
 - TypeScript build and i18n/teen-consent/test-only-export/GC1 ratchets: passed
@@ -28,11 +28,13 @@
 
 ## Collision note
 
-Publication merge-forward now incorporates authoritative main `e90b6c94a`,
-including landed WI-2231 PR #2704. The known create-profile overlap was
-resolved semantically: WI-2532 retains the non-authorizing durable fork,
-no-PATCH/no-child-redirect contract, retry journal, and all-mode terminal marker
-consumption, while adopting WI-2231's `handleCompleted` /
-`getPostAuthDefaultPath` routing after successful initial or retry persistence.
+Publication merge-forward now incorporates authoritative main `23ef357b9`,
+including landed WI-2231 PR #2704, WI-2399 PR #2722, and WI-1556 PR #2727.
+WI-2532 retains the non-authorizing durable fork, no-PATCH/no-child-redirect
+contract, retry journal, and all-mode terminal marker consumption while
+adopting WI-2231's shell-aware completion routing. WI-2399's
+resubmit-generation guards remain intact. A focused RED caught WI-1556's
+first-Mentor language gate pre-empting the unresolved durable-state probe; the
+gate now waits for family intent to resolve absent before it can render.
 
 Refs: WI-2532

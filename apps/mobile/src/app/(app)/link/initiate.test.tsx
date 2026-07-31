@@ -252,6 +252,87 @@ describe('InitiateLinkScreen', () => {
     });
   });
 
+  it('ignores a stale first success after back and resubmit, then handles the second success normally', async () => {
+    let resolveFirstCreate: (value: unknown) => void = () => undefined;
+    let resolveSecondCreate: (value: unknown) => void = () => undefined;
+    const firstCreate = new Promise((resolve) => {
+      resolveFirstCreate = resolve;
+    });
+    const secondCreate = new Promise((resolve) => {
+      resolveSecondCreate = resolve;
+    });
+    let createCount = 0;
+    const secondContract = {
+      ...CONTRACT,
+      id: '00000000-0000-4000-8000-000000000005',
+    };
+    const InitiateLinkScreen = require('./initiate').default;
+    const rendered = renderScreen(<InitiateLinkScreen />, {
+      profile: NAMED_PROFILES.guardian,
+      profiles: [NAMED_PROFILES.guardian, NAMED_PROFILES.linkedChild],
+      routes: {
+        '/visibility/links': () => {
+          createCount += 1;
+          return createCount === 1 ? firstCreate : secondCreate;
+        },
+      },
+    });
+    cleanupRender = rendered.cleanup;
+    const { routedFetch } = rendered;
+    const managedPersonTestId = `visibility-link-initiate-picker-managed-${NAMED_PROFILES.linkedChild.id}`;
+
+    fireEvent.press(screen.getByTestId(managedPersonTestId));
+    fireEvent.press(screen.getByTestId('visibility-link-create'));
+    await waitFor(() =>
+      expect(fetchCallsMatching(routedFetch, '/visibility/links')).toHaveLength(
+        1,
+      ),
+    );
+
+    fireEvent.press(
+      screen.getByTestId('visibility-link-initiate-confirm-back'),
+    );
+    fireEvent.press(screen.getByTestId(managedPersonTestId));
+    fireEvent.press(screen.getByTestId('visibility-link-relation-sibling'));
+    fireEvent.press(screen.getByTestId('visibility-link-create'));
+    await waitFor(() =>
+      expect(fetchCallsMatching(routedFetch, '/visibility/links')).toHaveLength(
+        2,
+      ),
+    );
+
+    await act(async () => {
+      resolveFirstCreate(CONTRACT);
+      await firstCreate;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(
+      screen.getByTestId('visibility-link-relation-sibling').props
+        .accessibilityState.selected,
+    ).toBe(true);
+    expect(screen.getByTestId('visibility-link-create')).toBeDisabled();
+
+    await act(async () => {
+      resolveSecondCreate(secondContract);
+      await secondCreate;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(app)/link/[contractId]',
+        params: {
+          contractId: secondContract.id,
+          audience: 'supporter',
+          supporteeName: NAMED_PROFILES.linkedChild.displayName,
+        },
+      }),
+    );
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+  });
+
   it('selecting an existing family member shows a not-yet-available state instead of a fake flow', () => {
     renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });
 

@@ -238,6 +238,9 @@ export async function createChildProfileV2(
       hasFamilyLinks: true,
       conversationLanguage:
         childRow.conversationLanguage as Profile['conversationLanguage'],
+      conversationLanguageConfirmed:
+        childRow.conversationLanguageConfirmedAt !== null,
+      isCurrentUser: false,
       pronouns: childRow.pronouns ?? null,
       consentStatus: consented ? 'CONSENTED' : null,
       linkCreatedAt: edge.grantedAt.toISOString(),

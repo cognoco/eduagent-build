@@ -92,18 +92,14 @@ export default function InitiateLinkScreen(): React.ReactElement {
     parseRelation(firstParam(params.relation)),
   );
 
-  // [WI-2188 rework] `createMutation.reset()` (in the confirmation Back
-  // handler below) only clears TanStack Query's *observer* state — it does
-  // not cancel an already in-flight request. Without this guard, a create
-  // request that resolves successfully AFTER the user has backed out still
-  // ran its unconditional `onSuccess`, pulling them forward into the
-  // contract screen they had just exited. Set on Back, checked in
-  // `onSuccess`, and cleared before every new submit so a later, deliberate
-  // create still navigates normally.
-  const hasExitedRef = useRef(false);
+  // [WI-2399] `createMutation.reset()` only clears TanStack Query's observer
+  // state; it neither cancels an in-flight request nor distinguishes that
+  // request from a later resubmit. Each submit carries its own generation,
+  // while Back advances the current generation to invalidate pending work.
+  const createGenerationRef = useRef(0);
 
   const createMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (_generation: number) => {
       const supporterPersonId = activeProfile?.id;
       if (!supporterPersonId || !target || target.kind !== 'managedPerson') {
         throw new Error(t('visibility.link.missingCreateParams'));
@@ -119,8 +115,8 @@ export default function InitiateLinkScreen(): React.ReactElement {
       const okRes = await assertOk(res);
       return visibilityContractSchema.parse(await okRes.json());
     },
-    onSuccess: (contract) => {
-      if (hasExitedRef.current) return;
+    onSuccess: (contract, generation) => {
+      if (generation !== createGenerationRef.current) return;
       router.replace({
         pathname: '/(app)/link/[contractId]',
         params: {
@@ -133,6 +129,11 @@ export default function InitiateLinkScreen(): React.ReactElement {
       } as Href);
     },
   });
+
+  const submitCreate = () => {
+    createGenerationRef.current += 1;
+    createMutation.mutate(createGenerationRef.current);
+  };
 
   if (target === null) {
     return (
@@ -207,12 +208,9 @@ export default function InitiateLinkScreen(): React.ReactElement {
           one step, not two. */}
       <LinkCeremonyBackButton
         onPress={() => {
-          // Mark the exit before either branch below runs: reset() does not
-          // cancel a request already in flight, so a late-resolving success
-          // (see `hasExitedRef` above) must not navigate the user forward —
-          // regardless of which exit path (pre-filled vs. inline-picker
-          // entry) they take out of this step.
-          hasExitedRef.current = true;
+          // Invalidate pending generations before either exit branch runs so
+          // no late success can navigate forward after Back.
+          createGenerationRef.current += 1;
           if (paramSupporteePersonId) {
             goBackOrReplace(router, '/(app)/mentor');
             return;
@@ -258,10 +256,7 @@ export default function InitiateLinkScreen(): React.ReactElement {
         accessibilityLabel={t('visibility.link.createAction')}
         className="min-h-[48px] items-center justify-center rounded-button bg-primary px-4 py-3"
         disabled={createMutation.isPending}
-        onPress={() => {
-          hasExitedRef.current = false;
-          createMutation.mutate();
-        }}
+        onPress={submitCreate}
         testID="visibility-link-create"
       >
         <Text className="text-body font-semibold text-text-inverse">
@@ -276,10 +271,7 @@ export default function InitiateLinkScreen(): React.ReactElement {
           message={formatApiError(createMutation.error)}
           primaryAction={{
             label: t('common.tryAgain'),
-            onPress: () => {
-              hasExitedRef.current = false;
-              createMutation.mutate();
-            },
+            onPress: submitCreate,
             testID: 'visibility-link-create-retry',
           }}
           testID="visibility-link-create-error"

@@ -84,3 +84,17 @@ Both paths now call the landed `handleCompleted` helper after durable
 persistence. The two focused tests passed GREEN. The full merge-forward union
 then passed 410 tests across eight suites, including WI-2532's six suites and
 WI-2231's session and consent routing suites.
+
+## Landed WI-1556 merge-forward RED/GREEN
+
+The later merge-forward was textually clean, but first-Mentor language
+confirmation could render while the durable family-intent SecureStore probe
+was still unresolved. RED expected the fail-closed family-intent loading
+overlay and instead received `first-mentor-language-gate`.
+
+The first-Mentor language gate now requires the family-intent probe to resolve
+absent. GREEN proves the probe remains fail closed, a restored pending choice
+wins the gate order, and language confirmation remains deferred until the
+family-intent fork is complete. The full post-merge union passed 470 tests
+across thirteen suites, including WI-2399 resubmit-generation coverage and the
+five landed WI-1556 mobile suites.

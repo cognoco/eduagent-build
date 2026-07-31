@@ -26,13 +26,15 @@ profile creation.
 
 ## Verification
 
-The merge-forward union passed 410 tests across eight suites: durable state,
+The merge-forward union passed 470 tests across thirteen suites: durable state,
 both branches, profile creation, app-layout restoration, invitation routing,
-sign-out cleanup, session routing, and consent routing. The full mobile unit
-stage, full API unit stage under the sanctioned development database boundary,
-TypeScript build, i18n ratchets, teen-consent claims ratchet, test-only export
-guard, GC1 mock-governance ratchet, warning-free touched-file lint, exact-file
-Prettier, and whitespace check passed.
+sign-out cleanup, session routing, consent routing, link resubmit-generation
+guards, and first-Mentor language confirmation. The durable family-intent probe
+now resolves before the first-Mentor language gate can render. The full mobile
+unit stage, full API unit stage under the sanctioned development database
+boundary, TypeScript build, i18n ratchets, teen-consent claims ratchet,
+test-only export guard, GC1 mock-governance ratchet, warning-free touched-file
+lint, exact-file Prettier, and whitespace check passed.
 Review-bounce coverage also verifies stale-read rejection, recovery-primary
 repair, all-mode terminal destination consumption, and a
 mounted-but-inaccessible blocked navigator. The dedicated preview journey
@@ -43,6 +45,7 @@ write.
 
 The managed learner without an independent login remains intentionally
 unavailable and is presented as such. This change does not activate or authorize
-that path. The branch was merge-forwarded with landed WI-2231 routing; no
+that path. The branch was merge-forwarded with landed WI-2231 routing, WI-2399
+resubmit-generation guards, and WI-1556 first-Mentor language confirmation; no
 history was rewritten. The Work Item remains Executing until its PR lands;
 lifecycle completion must not run while the PR is open.

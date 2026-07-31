@@ -34,6 +34,8 @@ interface UpdateLanguageInput {
   childProfileId?: string;
   conversationLanguage: ConversationLanguage;
   languageOperation?: MentorLanguageUpdateOperation;
+  /** Exact-self first-Mentor gate only; settings and parent edits omit it. */
+  confirmFirstMentorLanguage?: true;
 }
 
 interface UpdatePronounsInput {
@@ -83,10 +85,20 @@ export function useUpdateConversationLanguage(): UseMutationResult<
         const res = input.childProfileId
           ? await client.onboarding[':profileId'].language.$patch({
               param: { profileId: input.childProfileId },
-              json: { conversationLanguage: input.conversationLanguage },
+              json: {
+                conversationLanguage: input.conversationLanguage,
+                ...(input.confirmFirstMentorLanguage
+                  ? { confirm: true as const }
+                  : {}),
+              },
             })
           : await client.onboarding.language.$patch({
-              json: { conversationLanguage: input.conversationLanguage },
+              json: {
+                conversationLanguage: input.conversationLanguage,
+                ...(input.confirmFirstMentorLanguage
+                  ? { confirm: true as const }
+                  : {}),
+              },
             });
         await assertOk(res);
         const result = await parseJson(res, onboardingSuccessResponseSchema);

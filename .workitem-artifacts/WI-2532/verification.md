@@ -22,8 +22,9 @@
 ## Focused mobile verification
 
 - Merge-forward union covering family-intent state, component, profile
-  creation, app-layout, invitation route, sign-out, session routing, and
-  consent routing: 8 suites, 410 tests passed.
+  creation, app-layout, invitation route, sign-out, session routing, consent
+  routing, link resubmit-generation guards, and first-Mentor language
+  confirmation: 13 suites, 470 tests passed.
 - Focused RED proved the two family-intent persistence paths made zero
   shell-aware replace calls under the old `handleClose`; both pass after using
   the landed completion helper.
@@ -60,8 +61,8 @@ form without first writing a visibility/supportership link.
 ## Collision and flag audit
 
 - Publication merge-forward uses authoritative `origin/main`
-  `e90b6c94a2f92d76a8a566d642946779df7033ff`, which includes landed WI-2231
-  PR #2704.
+  `23ef357b95ec7e052321f9830c4985acca7c053f`, which includes landed WI-2231
+  PR #2704, WI-2399 PR #2722, and WI-1556 PR #2727.
 - The known create-profile overlap was reconciled without rebase or history
   rewrite. WI-2532 retains the durable non-authorizing fork and adopts WI-2231's
   current `handleCompleted` / `getPostAuthDefaultPath` completion behavior
@@ -69,6 +70,14 @@ form without first writing a visibility/supportership link.
 - The app-layout/test tree was reconciled; a duplicate `mockPush` declaration
   surfaced by the textual merge was removed before the 143-test layout suite
   and 410-test union passed.
+- The later WI-1556 merge was textually clean but exposed a semantic gate-order
+  collision. A focused RED showed first-Mentor language confirmation rendering
+  while the durable family-intent probe was still unresolved. The language
+  gate now requires the probe to resolve absent; the focused case and the
+  144-test layout suite pass.
+- WI-2399's generation-bound create mutation, Back invalidation, retry, and
+  stale-success rejection remain present and pass in the invitation-route
+  suite.
 - Existing flags-off, V0, and V1 shell contracts are unchanged. Direct
   existing-account entry preserves the prior explicit unavailable state when
   V2 is off.

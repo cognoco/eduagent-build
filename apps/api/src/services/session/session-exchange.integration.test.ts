@@ -81,6 +81,7 @@ import {
   insertRetentionCardIfAbsent,
 } from '../apply-retention-update';
 import { deleteV2IdentitiesForTest } from '../../test-utils/legacy-identity-anchors';
+import { markConversationLanguageConfirmedForTest } from '../../test-utils/conversation-language-confirmation';
 import {
   getProfileTimeZone,
   MentorNoticeUnavailableError,
@@ -103,6 +104,7 @@ import {
 import type { StopReason } from '../llm/stop-reason';
 import { MAX_CHALLENGE_QUESTIONS } from '../challenge-round/caps';
 import {
+  prepareExchangeContext,
   processMessage,
   streamMessage,
   finalizeChallengeRoundIfReady,
@@ -473,6 +475,7 @@ async function seedProfileAndSubject(
     birthDate: '2006-01-01',
     residenceJurisdiction: 'US',
   });
+  await markConversationLanguageConfirmedForTest(db, profileId);
   await db.insert(membership).values({
     personId: profileId,
     organizationId: accountId,
@@ -2524,6 +2527,68 @@ describeIfDb('session exchange production-path integration', () => {
       expect(notice).not.toBeNull();
       expect(notice?.concept).toBe('Sign changes when moving terms');
       expect(notice?.answerEventId).toBe(answerEventId);
+    });
+  });
+  // [WI-1556] Real-DB coverage for the first-exchange conversation-language
+  // guard. The unit test in session-exchange.test.ts uses a hand-built db
+  // double, which cannot catch a column-name or relation regression on the
+  // `db.query.person.findFirst` projection the guard depends on. This case
+  // exercises the guard against the real schema, and also reads back the
+  // shared confirmation helper's write through that same relation.
+  describe('[WI-1556] first-exchange conversation-language guard', () => {
+    it('rejects exchange 0 while unconfirmed and admits the same session once confirmed', async () => {
+      const { profileId, subjectId } = await seedProfileAndSubject(db);
+      const topicId = await seedCurriculumTopic(db, subjectId);
+      const session = await seedActiveSession(
+        db,
+        profileId,
+        subjectId,
+        topicId,
+      );
+
+      // seedProfileAndSubject confirms through
+      // markConversationLanguageConfirmedForTest. Read it back through the
+      // exact relation the guard queries, so the helper's write is proven
+      // against the real column rather than a mocked fluent chain.
+      const seeded = await db.query.person.findFirst({
+        columns: { conversationLanguageConfirmedAt: true },
+        where: eq(person.id, profileId),
+      });
+      expect(seeded?.conversationLanguageConfirmedAt).toBeInstanceOf(Date);
+
+      // Model the older-client case the guard exists for: a learner whose
+      // Person carries no confirmation reaching the API directly.
+      await db
+        .update(person)
+        .set({ conversationLanguageConfirmedAt: null })
+        .where(eq(person.id, profileId));
+
+      await expect(
+        prepareExchangeContext(
+          db,
+          profileId,
+          session.id,
+          'Legacy client skips the language gate',
+          { semanticMemoryRetrievalEnabled: false },
+        ),
+      ).rejects.toMatchObject({
+        name: 'ConflictError',
+        message:
+          'Confirm your conversation language before your first Mentor exchange.',
+      });
+
+      // Confirmation is the discriminator: the same exchange-0 session
+      // prepares once the timestamp is present, so the rejection above cannot
+      // be an unrelated seeding failure.
+      await markConversationLanguageConfirmedForTest(db, profileId);
+      const prep = await prepareExchangeContext(
+        db,
+        profileId,
+        session.id,
+        'Ready to start',
+        { semanticMemoryRetrievalEnabled: false },
+      );
+      expect(prep.session.exchangeCount).toBe(0);
     });
   });
 });

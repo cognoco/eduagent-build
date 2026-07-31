@@ -623,6 +623,69 @@ describe('AppLayout', () => {
     );
   });
 
+  it('[WI-2532/WI-1556] resolves durable family intent before showing the first-Mentor language gate', async () => {
+    const flags = require('../../lib/feature-flags') as {
+      FEATURE_FLAGS: { PREVIEW_ONBOARDING_ENABLED: boolean };
+    };
+    const originalPreviewFlag = flags.FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED;
+    flags.FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED = false;
+    const profileState = mockUseProfile();
+    const unconfirmedProfile = {
+      ...profileState.activeProfile,
+      isCurrentUser: true,
+      conversationLanguageConfirmed: false,
+    };
+    mockUseProfile.mockReturnValue({
+      ...profileState,
+      profiles: [
+        unconfirmedProfile,
+        ...profileState.profiles.filter(
+          (profile: { id: string }) => profile.id !== unconfirmedProfile.id,
+        ),
+      ],
+      activeProfile: unconfirmedProfile,
+    });
+
+    let resolvePrimaryRead!: (value: string) => void;
+    const pendingPrimaryRead = new Promise<string>((resolve) => {
+      resolvePrimaryRead = resolve;
+    });
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) =>
+        key === FAMILY_INTENT_ONBOARDING_KEY
+          ? pendingPrimaryRead
+          : Promise.resolve(null),
+    );
+
+    try {
+      renderLayout();
+
+      await waitFor(() => {
+        screen.getByTestId('family-intent-state-loading');
+      });
+      expect(screen.queryByTestId('first-mentor-language-gate')).toBeNull();
+      expectFamilyIntentNavigatorBlocked();
+
+      await act(async () => {
+        resolvePrimaryRead(
+          JSON.stringify({
+            version: 1,
+            profileId: 'p1',
+            step: 'learner-target',
+          }),
+        );
+      });
+
+      await waitFor(() => {
+        screen.getByTestId('family-intent-onboarding-gate');
+      });
+      expect(screen.queryByTestId('first-mentor-language-gate')).toBeNull();
+    } finally {
+      flags.FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED = originalPreviewFlag;
+    }
+  });
+
   it('[WI-2532] mounts the tab navigator before replaying a durable invitation destination', async () => {
     mockPush.mockImplementationOnce(() => {
       screen.getByTestId('tabs');

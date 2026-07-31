@@ -68,6 +68,8 @@ import { ConsentWithdrawnGate } from './_components/ConsentWithdrawnGate';
 import { ConsentPendingGate } from './_components/ConsentPendingGate';
 import { usePostApprovalLanding } from './_hooks/use-post-approval-landing';
 import { SaveWizardGate } from './_components/save-wizard/SaveWizardGate';
+import { FirstMentorLanguageGate } from './_components/FirstMentorLanguageGate';
+import { shouldRequireFirstMentorLanguageConfirmation } from '../../lib/first-mentor-language';
 
 initNotificationHandler();
 
@@ -428,6 +430,7 @@ export default function AppLayout() {
     profileWasRemoved,
     acknowledgeProfileRemoval,
     switchProfile,
+    isExplicitProxyMode,
   } = useProfile();
   useMentorLanguageSync();
   const proxyColors = getProxyChromeColors(colors);
@@ -865,7 +868,9 @@ export default function AppLayout() {
   //   7. SaveWizardGate branch
   //   8. FamilyIntentOnboardingGate branch
   //   9. !activeProfile → CreateProfileGate
-  //  10. consent gates → Tabs
+  //  10. consent gates
+  //  11. first-Mentor language gate, after family-intent restore resolves absent
+  //  12. Tabs
   //
   // The welcome intro used to live at step 8; it moved pre-auth in
   // docs/plans/2026-05-27-pre-auth-welcome-flow.md, so this layout no longer
@@ -945,6 +950,20 @@ export default function AppLayout() {
     return (
       <FeedbackProvider>
         <ConsentWithdrawnGate />
+      </FeedbackProvider>
+    );
+  }
+
+  if (
+    familyIntentState === null &&
+    shouldRequireFirstMentorLanguageConfirmation({
+      activeProfile,
+      isExplicitProxyMode,
+    })
+  ) {
+    return (
+      <FeedbackProvider>
+        <FirstMentorLanguageGate />
       </FeedbackProvider>
     );
   }

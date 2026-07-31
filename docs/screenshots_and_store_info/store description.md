@@ -1,3 +1,8 @@
+  SUPERSEDED FOR GOOGLE PLAY: use the versioned, evidence-reconciled package at
+  docs/screenshots_and_store_info/google-play/2026-07-30/listing-copy.md.
+  The historical draft below is retained for provenance and contains claims
+  that are not approved for submission.
+
   App name: MentoMate
 
   Short description (80 chars):

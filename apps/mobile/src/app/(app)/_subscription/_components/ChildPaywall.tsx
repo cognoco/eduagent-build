@@ -5,6 +5,7 @@ import { useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { ChildCapNotifyParentInput } from '@eduagent/schemas';
 
+import { FEATURE_FLAGS } from '../../../../lib/feature-flags';
 import { platformAlert } from '../../../../lib/platform-alert';
 import * as SecureStore from '../../../../lib/secure-storage';
 import { migrateSecureStoreKey } from '../../../../lib/migrate-secure-store-key';
@@ -309,7 +310,13 @@ export function ChildPaywall({
         )}
 
         <Pressable
-          onPress={() => router.push('/(app)/library' as Href)}
+          onPress={() =>
+            router.push(
+              (FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+                ? '/(app)/subjects'
+                : '/(app)/library') as Href,
+            )
+          }
           className="bg-surface rounded-button py-3.5 px-8 items-center w-full mb-2"
           testID="browse-library-button"
           accessibilityRole="button"
