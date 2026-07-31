@@ -52,7 +52,7 @@ Consent errors must be raised outside any LLM-fallback `try/catch`; otherwise wi
 - [x] T3: Move the five route checks to service dispatch boundaries — done when focused tests pass with authorization and metering code unchanged; `books` threads `db/profileId` into `generateBookTopicsWithFallback`, `first-curriculum` covers both materialization and matching, and assessment/suggestion fallback catches cannot swallow `ConsentWithdrawnError`.
 - [x] T4: Produce red → green → production-revert → restored-green evidence — done when the same focused command fails on tests-before-code, passes on final code, fails after temporarily reverting the production gate movement, and passes again after restoring the exact final production diff; results are recorded in `.workitem-artifacts/WI-2543/red-green-revert.md`.
 - [x] T5: Run routed validation and fresh-base reconciliation — done when focused suites, API typecheck/lint, `git diff --check`, and `bash scripts/check-change-class.sh --run --fast` pass; after a fresh `origin/main` fetch the branch is reconciled without losing the WI diff and required validation is rerun.
-- [ ] T6: Publish through the sanctioned flow — done when the commit skill creates and pushes the own-work commit on `WI-2543`, a non-draft PR references WI-2543, and `cosmo:execute pr-opened` records its URL without running `execute complete`, review, merge, or close.
+- [x] T6: Publish through the sanctioned flow — done when the commit skill creates and pushes the own-work commit on `WI-2543`, a non-draft PR references WI-2543, and `cosmo:execute pr-opened` records its URL without running `execute complete`, review, merge, or close.
 
 ## Self-review
 
