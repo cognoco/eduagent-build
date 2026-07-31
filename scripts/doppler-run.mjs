@@ -11,6 +11,7 @@
 // 'inherit'}, and this process exits with doppler's own exit code.
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 
 const WINDOWS_FALLBACK = 'C:/Tools/doppler/doppler.exe';
 
@@ -25,7 +26,8 @@ function resolveDopplerBinary({
   fileExists = existsSync,
 } = {}) {
   if (pathLookup('doppler')) return 'doppler';
-  if (platform === 'win32' && fileExists(WINDOWS_FALLBACK)) return WINDOWS_FALLBACK;
+  if (platform === 'win32' && fileExists(WINDOWS_FALLBACK))
+    return WINDOWS_FALLBACK;
   throw new Error(
     `doppler not found on PATH or at ${WINDOWS_FALLBACK}. Install the Doppler CLI: https://docs.doppler.com/docs/install-cli`,
   );
@@ -39,9 +41,11 @@ function resolveDopplerBinary({
 // see scripts/sync-skills.test.ts, which drives sync-skills.mjs the same
 // subprocess way), so this mirrors that convention instead of adding one.
 function selfTest() {
-  const platform = process.env.DOPPLER_RUN_SELF_TEST_PLATFORM || process.platform;
+  const platform =
+    process.env.DOPPLER_RUN_SELF_TEST_PLATFORM || process.platform;
   const pathHit = process.env.DOPPLER_RUN_SELF_TEST_PATH_HIT === '1';
-  const fallbackExists = process.env.DOPPLER_RUN_SELF_TEST_FALLBACK_EXISTS === '1';
+  const fallbackExists =
+    process.env.DOPPLER_RUN_SELF_TEST_FALLBACK_EXISTS === '1';
   try {
     const binary = resolveDopplerBinary({
       platform,
@@ -76,6 +80,14 @@ function main() {
   process.exit(result.status ?? 1);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main();
+export function dispatchMainIfEntry({
+  argvPath = process.argv[1],
+  moduleUrl = import.meta.url,
+  windows = process.platform === 'win32',
+} = {}) {
+  if (argvPath && moduleUrl === pathToFileURL(argvPath, { windows }).href) {
+    main();
+  }
 }
+
+dispatchMainIfEntry();

@@ -38,24 +38,44 @@ function pinnedPnpmVersion() {
   return match[1];
 }
 
+function packageManagerLaunch() {
+  const pnpmCli = process.env.npm_execpath?.trim();
+  if (!pnpmCli) {
+    refuse(
+      'npm_execpath is required; run the canonical pnpm test:api:integration command.',
+    );
+  }
+  return /\.(?:c?js)$/i.test(pnpmCli)
+    ? {
+        binary: process.execPath,
+        args: [pnpmCli],
+      }
+    : {
+        binary: pnpmCli,
+        args: [],
+      };
+}
+
 function assertPinnedPnpm() {
   const expected = pinnedPnpmVersion();
-  const result = spawnSync('corepack', ['pnpm', '--version'], {
+  const launch = packageManagerLaunch();
+  const result = spawnSync(launch.binary, [...launch.args, '--version'], {
     cwd: REPO_ROOT,
     encoding: 'utf8',
   });
   if (result.error || result.status !== 0) {
     refuse(
-      `Corepack could not resolve the repository-pinned pnpm ${expected}. ` +
-        'Install/enable Corepack and retry the canonical command.',
+      `npm_execpath could not resolve the repository-pinned pnpm ${expected}. ` +
+        'Retry the canonical pnpm command.',
     );
   }
   const actual = result.stdout.trim();
   if (actual !== expected) {
     refuse(
-      `package.json requires pnpm ${expected}, but Corepack resolved ${actual}.`,
+      `package.json requires pnpm ${expected}, but npm_execpath resolved ${actual}.`,
     );
   }
+  return launch;
 }
 
 function requiredEnv(name) {
@@ -179,9 +199,9 @@ function main() {
 
   if (mode === '--jest') {
     assertDatabaseContract();
-    assertPinnedPnpm();
-    return run('corepack', [
-      'pnpm',
+    const launch = assertPinnedPnpm();
+    return run(launch.binary, [
+      ...launch.args,
       'exec',
       'jest',
       '--config',
@@ -197,9 +217,9 @@ function main() {
     }
     // Defense in depth: --jest repeats both checks after Nx re-invokes this script.
     assertDatabaseContract();
-    assertPinnedPnpm();
-    return run('corepack', [
-      'pnpm',
+    const launch = assertPinnedPnpm();
+    return run(launch.binary, [
+      ...launch.args,
       'exec',
       'nx',
       'run',

@@ -134,7 +134,7 @@ pnpm exec jest -c tests/integration/jest.config.cjs tests/integration/streaks-ro
 
 # API-scoped integration suites (guard first, then pass a Jest path locally)
 $env:DATABASE_URL = "postgresql://test:test@localhost:5433/eduagent_test"
-node scripts/run-api-integration.mjs --jest apps/api/src/services/auth-scoping.integration.test.ts --runInBand --no-coverage
+pnpm run test:api:integration --jest apps/api/src/services/auth-scoping.integration.test.ts --runInBand --no-coverage
 ```
 
 ## Using .env.test.local
