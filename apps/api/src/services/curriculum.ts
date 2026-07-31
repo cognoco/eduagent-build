@@ -2945,7 +2945,10 @@ export async function explainTopicOrdering(
   profileId: string,
   subjectId: string,
   topicId: string,
-  options?: { conversationLanguage?: ConversationLanguage },
+  options?: {
+    conversationLanguage?: ConversationLanguage;
+    ageBracket?: AgeBracket;
+  },
 ): Promise<string> {
   const repo = createScopedRepository(db, profileId);
   const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
