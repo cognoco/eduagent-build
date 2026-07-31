@@ -63,6 +63,8 @@ this branch.
 The following zero-overlap compliance/latest-curriculum/multilingual-safety
 merge completed its affected API unit, integration-typecheck, full TypeScript,
 and Tier-1 zero-drift eval gates successfully.
+The later zero-overlap malformed-parse fail-closed descope merge completed its
+affected mobile hook and notice-policy coverage successfully.
 Review-bounce coverage also verifies stale-read rejection, recovery-primary
 repair, all-mode terminal destination consumption, and a
 mounted-but-inaccessible blocked navigator. A pre-WI-1556 preview journey
@@ -81,7 +83,8 @@ also zero-overlap and its focused API unit set completed successfully. The
 subsequent staging-smoke, Mistral endpoint, and integration-typecheck merge was
 zero-overlap as well. The following production-purge evidence,
 latest-curriculum, and multilingual-safety merge was also zero-overlap; no
-history was rewritten.
+history was rewritten. The later malformed-parse fail-closed descope merge was
+also zero-overlap.
 The Work Item remains Executing until its PR lands; lifecycle completion must
 not run while the PR is open. Final attributable E2E evidence must come from
 the published exact head.

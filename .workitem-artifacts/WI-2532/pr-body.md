@@ -28,6 +28,9 @@
 - subsequent affected API unit set: 15 suites / 1,113 tests passed under
   Doppler `dev`; integration typecheck remained green across 72 roots; full
   TypeScript and Tier-1 zero-drift eval passed
+- latest-main malformed-parse descope coverage: broad related-test run passed;
+  focused hook and notice-policy set passed 3 suites / 179 tests; full
+  TypeScript build passed
 - main-identical metering integration on Orion's pre-repoint development
   database: 4/4 red at
   `quota_pools_subscription_id_subscriptions_id_fk`; known M-REPOINT baseline
@@ -86,5 +89,8 @@ transcript-purge evidence) PR #2751, WI-2463 (centralized latest-curriculum
 reads) PR #2738, and WI-2628 (multilingual safety at remaining persistence
 boundaries) PR #2749. Its affected unit, integration-typecheck, full
 TypeScript, and Tier-1 zero-drift eval gates passed.
+The latest zero-direct-overlap merge incorporates WI-2949 (malformed-parse
+fail-closed descope) PR #2752. Its broad related-test run and focused hook and
+notice-policy set passed.
 
 Refs: WI-2532
