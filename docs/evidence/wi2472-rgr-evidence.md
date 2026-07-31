@@ -31,7 +31,7 @@ The rider is explicit WI-2472 DoR scope and is retained deliberately.
 
 Commands (from repo root):
 
-```
+```sh
 pnpm exec jest --config apps/api/jest.config.cjs --runInBand --no-coverage <spec> [-t <filter>]
 node --max-old-space-size=6144 ./node_modules/jest/bin/jest.js \
   --config apps/mobile/jest.config.cjs --runInBand --forceExit --no-coverage <spec> -t "WI-2472"
