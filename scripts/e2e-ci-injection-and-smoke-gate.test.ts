@@ -7362,8 +7362,16 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       { tapOn: { id: 'create-profile-submit' } },
       {
         extendedWaitUntil: {
-          visible: { id: 'first-mentor-language-confirm' },
+          visible: { id: 'first-mentor-language-gate' },
           timeout: 30000,
+        },
+      },
+      {
+        scrollUntilVisible: {
+          element: { id: 'first-mentor-language-confirm' },
+          direction: 'DOWN',
+          timeout: 10000,
+          visibilityPercentage: 50,
         },
       },
       { tapOn: { id: 'first-mentor-language-confirm' } },

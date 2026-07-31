@@ -76,8 +76,14 @@ tags:
 # WI-1556 requires explicit language confirmation before the first Mentor.
 - extendedWaitUntil:
     visible:
-      id: 'first-mentor-language-confirm'
+      id: 'first-mentor-language-gate'
     timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: 'first-mentor-language-confirm'
+    direction: DOWN
+    timeout: 10000
+    visibilityPercentage: 50
 - tapOn:
     id: 'first-mentor-language-confirm'
 
