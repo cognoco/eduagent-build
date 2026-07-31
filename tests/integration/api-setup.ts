@@ -1,20 +1,15 @@
 /**
- * Integration test database setup for apps/api.
+ * Shared API test driver setup.
  *
  * Swaps the Neon HTTP driver for the standard `pg` driver when DATABASE_URL
  * points at a non-Neon PostgreSQL (CI container, local dev pg).
  *
  * Unit tests that call jest.mock('@eduagent/database', ...) in the test file
- * override this mock — so this setup only activates for integration tests
- * that use the real createDatabase() export.
+ * override this mock. Integration Jest loads api-database-env-setup.ts first;
+ * unit Jest must never load database environment files.
  *
  * Mirrors the logic in tests/integration/setup.ts.
  */
-
-import { resolve } from 'path';
-import { loadDatabaseEnv } from '@eduagent/test-utils';
-
-loadDatabaseEnv(resolve(__dirname, '../..'));
 
 // Integration tests do real Neon HTTP roundtrips; the eslint governance
 // selftest spawns 13 ESLint subprocesses (~4.5 s each). Both blow past Jest's

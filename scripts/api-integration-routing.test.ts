@@ -1,8 +1,12 @@
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 
 const repoRoot = join(__dirname, '..');
+const requireFromTest = createRequire(__filename);
 
 type PackageJson = {
   scripts?: Record<string, string>;
@@ -10,6 +14,11 @@ type PackageJson = {
 
 type NxProject = {
   targets?: Record<string, { options?: { command?: string } }>;
+};
+
+type JestConfig = {
+  setupFilesAfterEnv?: string[];
+  testPathIgnorePatterns?: string[];
 };
 
 type WorkflowStep = {
@@ -55,6 +64,116 @@ function normalizeExpression(value: unknown): string {
 }
 
 describe('API co-located integration routing', () => {
+  it('keeps database setup exclusive to the integration Jest config', () => {
+    const unitConfig = requireFromTest(
+      join(repoRoot, 'apps/api/jest.config.cjs'),
+    ) as JestConfig;
+    const integrationConfig = requireFromTest(
+      join(repoRoot, 'apps/api/jest.integration.config.cjs'),
+    ) as JestConfig;
+
+    expect(unitConfig.setupFilesAfterEnv).toEqual([
+      join(repoRoot, 'tests/integration/api-setup.ts'),
+      join(repoRoot, 'tests/unit/api-env-setup.ts'),
+    ]);
+    expect(unitConfig.testPathIgnorePatterns).toEqual(
+      expect.arrayContaining([expect.stringMatching(/integration/)]),
+    );
+    expect(integrationConfig.setupFilesAfterEnv).toEqual([
+      join(repoRoot, 'tests/integration/api-database-env-setup.ts'),
+      join(repoRoot, 'tests/integration/api-setup.ts'),
+    ]);
+
+    const unitSafeSetup = readFileSync(
+      join(repoRoot, 'tests/integration/api-setup.ts'),
+      'utf8',
+    );
+    const databaseEnvSetup = readFileSync(
+      join(repoRoot, 'tests/integration/api-database-env-setup.ts'),
+      'utf8',
+    );
+    expect(unitSafeSetup).not.toContain('loadDatabaseEnv');
+    expect(databaseEnvSetup).toContain('loadDatabaseEnv');
+  });
+
+  it('runs unit Jest without resolving an env:sync staging database file', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'wi-2806-env-fixture-'));
+    const harnessRoot = mkdtempSync(join(tmpdir(), 'wi-2806-jest-harness-'));
+    const sentinelSetup = join(harnessRoot, 'database-env-sentinel.cjs');
+    const harnessConfig = join(harnessRoot, 'jest.config.cjs');
+    const childEnv = {
+      ...process.env,
+      DOPPLER_CLI: '/definitely/not/a/doppler',
+      WI_2806_FIXTURE_ROOT: fixtureRoot,
+    };
+    delete childEnv.DATABASE_URL;
+    delete childEnv.DOPPLER_PROJECT;
+    delete childEnv.DOPPLER_CONFIG;
+    delete childEnv.DOPPLER_ENVIRONMENT;
+
+    writeFileSync(
+      join(fixtureRoot, '.env.development.local'),
+      [
+        'DATABASE_URL=postgresql://fake:fake@staging.invalid/fake_staging',
+        'CLERK_SECRET_KEY=fake-staging-clerk-secret',
+        'DOPPLER_PROJECT=mentomate',
+        'DOPPLER_CONFIG=stg',
+        'DOPPLER_ENVIRONMENT=stg',
+        '',
+      ].join('\n'),
+    );
+    writeFileSync(
+      sentinelSetup,
+      [
+        "jest.mock('@eduagent/test-utils', () => {",
+        "  const actual = jest.requireActual('@eduagent/test-utils');",
+        '  return {',
+        '    ...actual,',
+        '    loadDatabaseEnv: () =>',
+        '      actual.loadDatabaseEnv(process.env.WI_2806_FIXTURE_ROOT),',
+        '  };',
+        '});',
+        '',
+      ].join('\n'),
+    );
+    writeFileSync(
+      harnessConfig,
+      [
+        `const unitConfig = require(${JSON.stringify(join(repoRoot, 'apps/api/jest.config.cjs'))});`,
+        'module.exports = {',
+        '  ...unitConfig,',
+        `  rootDir: ${JSON.stringify(repoRoot)},`,
+        `  setupFilesAfterEnv: [${JSON.stringify(sentinelSetup)}, ...unitConfig.setupFilesAfterEnv],`,
+        '};',
+        '',
+      ].join('\n'),
+    );
+
+    try {
+      execFileSync(
+        process.execPath,
+        [
+          requireFromTest.resolve('jest/bin/jest'),
+          '--config',
+          harnessConfig,
+          'apps/api/src/config.test.ts',
+          '--runInBand',
+          '--no-coverage',
+          '--silent',
+        ],
+        {
+          cwd: repoRoot,
+          env: childEnv,
+          stdio: 'pipe',
+          timeout: 30_000,
+        },
+      );
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+      rmSync(harnessRoot, { recursive: true, force: true });
+    }
+  });
+
   it('maps the root API integration script through the guarded launcher', () => {
     const pkg = readJson<PackageJson>('package.json');
     const command = pkg.scripts?.['test:api:integration'] ?? '';
