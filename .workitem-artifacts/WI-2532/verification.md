@@ -39,12 +39,17 @@
 ## Repository validation
 
 - Full incremental TypeScript build: passed.
-- Full mobile unit suite on exact code candidate `c7504d9f`: 524 suites /
-  6,955 tests passed, zero failures in 794.937 seconds. Durable local log:
-  `.artifacts/full-mobile-c750.err`.
+- A producer-local historical full-mobile run on code candidate `c7504d9f`
+  reported 524 suites / 6,955 tests passed with zero failures in 794.937
+  seconds. Its log is untracked and ephemeral, so this count is not
+  revision-exact closure evidence. Exact-head hosted and landed verification
+  must re-establish the applicable mobile gates.
 - Full API unit suite under the sanctioned development database boundary:
   passed. A staging-context attempt was rejected before test execution by the
-  local-database safety guard; the corrected Doppler `dev` run exited 0.
+  local-database safety guard; the corrected Doppler `dev` run exited 0. The
+  pre-push occurrence is canonically recorded on WI-2806 (env-sync staging
+  markers), comment `3ae8bce9-1f7c-81a4-8f2c-001d09566bd9`; no network update
+  occurred.
 - After merging authoritative main `09a383cf5`, the affected API unit set for
   the landed test-seed and profile-authority changes passed 3 suites / 203
   tests under Doppler `dev`.
@@ -60,12 +65,11 @@
   `subscription` row and then hits the development database's legacy
   `quota_pools_subscription_id_subscriptions_id_fk` constraint. The same
   fixture and two structurally red cases predate WI-2653 (credentialed
-  non-owner self-write authority); repository cutover
-  canon records this as the expected pre-M-REPOINT baseline previously routed
-  through WI-789 (post-cutover CI repoint baseline) / WI-805 (quota-satellite
-  FK rehome). The batch orchestrator accepted the canonical
-  deduplication; this is preserved as an explicit non-green, non-WI-2532
-  diagnostic and is not claimed as a passing gate.
+  non-owner self-write authority). Dedup identified WI-2633 (pre-repoint
+  metering integration baseline) as the exact owner; canonical comment
+  `3ae8bce9-1f7c-810b-9cdb-001de1216c1d` records the evidence. This is
+  preserved as an explicit non-green, non-WI-2532 diagnostic and is not
+  claimed as a passing gate.
 - i18n staleness, orphan-key, hardcoded-JSX-literal, and clinical-copy checks:
   passed.
 - Teen-consent claims and GC1 mock-governance ratchets: passed.
@@ -88,10 +92,11 @@ published exact head.
 ## Collision and flag audit
 
 - Publication merge-forward uses authoritative `origin/main`
-  `09a383cf5a10dbb96e4f6ad395e3f3ce6f223de3`, which includes landed WI-2231
-  PR #2704, WI-2399 PR #2722, WI-1556 PR #2727, WI-2639 PR #2730, WI-2820
-  PR #2713, WI-2790 PR #2733, WI-2944 (established test-seed profile
-  confirmation) PR #2743, WI-2653 PR #2739, and WI-2737 (learner PII egress
+  `59906b359e593fe214b31b60f8ed68cbb4dac411`, which includes landed WI-2231
+  PR #2704, WI-2399 PR #2722, WI-1556 PR #2727, WI-2639 PR #2730, WI-2820 PR
+  #2713, and WI-2790 PR #2733. The sequence then reached `09a383cf5` through
+  WI-2944 (established test-seed profile confirmation) PR #2743 and WI-2653 PR
+  #2739, before reaching `59906b359` through WI-2737 (learner PII egress
   filtering) PR #2745.
 - The known create-profile overlap was reconciled without rebase or history
   rewrite. WI-2532 retains the durable non-authorizing fork and adopts WI-2231's

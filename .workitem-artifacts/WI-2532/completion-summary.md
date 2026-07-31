@@ -36,19 +36,22 @@ terminal route is observed, and suppresses the language gate on that route
 through destination mount and marker consumption.
 The union includes the landed test-seed helper. On the exact code candidate
 immediately preceding the evidence-only commit, the full mobile unit stage
-completed successfully; its durable local log is
-`.artifacts/full-mobile-c750.err`. The full API unit stage under the sanctioned
-development database boundary, TypeScript build, i18n ratchets, teen-consent
-claims ratchet, test-only export guard, GC1 mock-governance ratchet,
-warning-free touched-file lint, exact-file Prettier, and whitespace check also
-completed successfully.
+completed successfully as producer-local historical evidence. Its log is
+untracked and ephemeral, so exact-head hosted and landed verification must
+re-establish the applicable mobile gates. The full API unit stage under the
+sanctioned development database boundary, TypeScript build, i18n ratchets,
+teen-consent claims ratchet, test-only export guard, GC1 mock-governance
+ratchet, warning-free touched-file lint, exact-file Prettier, and whitespace
+check also completed successfully.
 After the latest API-only authoritative-main merge, the mobile semantic union
 and affected API unit set completed successfully under Doppler `dev`. The
 main-identical metering integration suite is explicitly red on Orion's
 pre-repoint development database because `quota_pools` still targets legacy
 `subscriptions`; that known M-REPOINT baseline predates WI-2653, is
-canonically deduplicated to WI-789 (post-cutover CI repoint baseline) / WI-805
-(quota-satellite FK rehome), and is not represented as a green gate here.
+canonically deduplicated to WI-2633 (pre-repoint metering integration
+baseline), and is not represented as a green gate here. The earlier pre-push
+shared-staging marker rejection is canonically recorded on WI-2806 (env-sync
+staging markers); it made no network update.
 Review-bounce coverage also verifies stale-read rejection, recovery-primary
 repair, all-mode terminal destination consumption, and a
 mounted-but-inaccessible blocked navigator. A pre-WI-1556 preview journey

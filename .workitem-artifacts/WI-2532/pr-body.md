@@ -15,17 +15,22 @@
 ## Verification
 
 - merge-forward union: fourteen suites, 472 tests passed
-- full mobile unit suite on exact code candidate `c7504d9f`: 524 suites /
-  6,955 tests passed, zero failures (durable local log:
-  `.artifacts/full-mobile-c750.err`)
+- producer-local historical full-mobile run on code candidate `c7504d9f`: 524
+  suites / 6,955 tests passed with zero failures; its untracked ephemeral log
+  is not revision-exact closure evidence, so exact-head hosted and landed
+  verification must re-establish the applicable mobile gates
 - full API unit suite under Doppler `dev`: passed
 - post-merge affected API unit coverage under Doppler `dev`: 3 suites /
   203 tests passed
 - main-identical metering integration on Orion's pre-repoint development
   database: 4/4 red at
   `quota_pools_subscription_id_subscriptions_id_fk`; known M-REPOINT baseline
-  canonically deduplicated to WI-789 (post-cutover CI repoint baseline) /
-  WI-805 (quota-satellite FK rehome) and not claimed green
+  canonically deduplicated to WI-2633 (pre-repoint metering integration
+  baseline), comment `3ae8bce9-1f7c-810b-9cdb-001de1216c1d`, and not claimed
+  green
+- the rejected pre-push shared-staging marker occurrence is canonically
+  recorded on WI-2806 (env-sync staging markers), comment
+  `3ae8bce9-1f7c-81a4-8f2c-001d09566bd9`; it made no network update
 - TypeScript build and i18n/teen-consent/test-only-export/GC1 ratchets: passed
 - touched-file ESLint with `--max-warnings=0`: passed
 - exact candidate Prettier and `git diff --check`: passed
