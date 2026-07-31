@@ -13,7 +13,7 @@ import {
   type Database,
 } from '@eduagent/database';
 
-import { acceptMentorNotice } from './state';
+import { acceptMentorNotice, getMentorNoticeReceipt } from './state';
 
 /**
  * [WI-2500] Real-DB proof for clause 4 — durable identity is source session
@@ -243,6 +243,127 @@ describeIfDb(
       expect(rows[0]!.id).toBe(legacyRow!.id);
       expect(rows[0]!.answerEventId).toBeNull();
       expect(rows[0]!.concept).toBe('Legacy no-evidence concept');
+    });
+  },
+);
+
+/**
+ * [WI-2599] The read-side consequence of the uniqueness change proven above: a
+ * session may now hold two notices, but `getSessionSummary` shows exactly one,
+ * so `getMentorNoticeReceipt` must always project the SAME one. Its projection
+ * is latest-by-createdAt with an id tiebreaker (rationale recorded at the
+ * function in `state.ts`), and these cases assert that chosen notice — not that
+ * some notice comes back, which the pre-fix unordered `findFirst` already did.
+ * Real Postgres, real rows, no mocks.
+ */
+describeIfDb(
+  'getMentorNoticeReceipt — deterministic projection (real DB) [WI-2599]',
+  () => {
+    beforeAll(async () => {
+      db = createDatabase(process.env.DATABASE_URL!);
+    });
+
+    it('projects the NEWEST notice when one session holds two differently-evidenced notices', async () => {
+      const fixture = await seedFixture();
+
+      const olderNotice = await acceptMentorNotice(db, {
+        profileId: fixture.profileId,
+        subjectId: fixture.subjectId,
+        topicId: null,
+        sourceSessionId: fixture.sessionId,
+        answerEventId: fixture.eventAId,
+        concept: 'Mitosis versus meiosis',
+        correctionHint: 'Mitosis keeps the chromosome count unchanged.',
+      });
+      const newerNotice = await acceptMentorNotice(db, {
+        profileId: fixture.profileId,
+        subjectId: fixture.subjectId,
+        topicId: null,
+        sourceSessionId: fixture.sessionId,
+        answerEventId: fixture.eventBId,
+        concept: 'Photosynthesis location',
+        correctionHint: 'Photosynthesis happens in the chloroplast.',
+      });
+      expect(olderNotice).not.toBeNull();
+      expect(newerNotice).not.toBeNull();
+      expect(newerNotice!.id).not.toBe(olderNotice!.id);
+
+      // Establish the premise before asserting on it: two rows really are on
+      // this one session, and the notice this test calls "newer" really does
+      // carry the later createdAt. Without this, "newest wins" could pass on a
+      // session that only ever held one row.
+      const rows = await db
+        .select()
+        .from(mentorNotices)
+        .where(eq(mentorNotices.sourceSessionId, fixture.sessionId));
+      expect(rows).toHaveLength(2);
+      const olderRow = rows.find((r) => r.id === olderNotice!.id)!;
+      const newerRow = rows.find((r) => r.id === newerNotice!.id)!;
+      expect(newerRow.createdAt.getTime()).toBeGreaterThan(
+        olderRow.createdAt.getTime(),
+      );
+
+      const receipt = await getMentorNoticeReceipt(
+        db,
+        fixture.profileId,
+        fixture.sessionId,
+      );
+      expect(receipt).toEqual(newerNotice);
+    });
+
+    it('breaks a createdAt tie by id, so the projection is total-ordered and never falls back to storage order', async () => {
+      const fixture = await seedFixture();
+
+      // One instant shared by both rows. Nothing forbids this: created_at has
+      // no unique index, and the column's defaultNow() is transaction-scoped,
+      // so createdAt alone is not by itself a total order.
+      const sharedCreatedAt = new Date();
+      const [smallerId, largerId] = [generateUUIDv7(), generateUUIDv7()].sort();
+
+      // Smaller id inserted FIRST on purpose: storage order then points at the
+      // row this test must not choose, so an unordered read and the required
+      // answer disagree. Insert them the other way and the case proves nothing.
+      await db.insert(mentorNotices).values({
+        id: smallerId,
+        profileId: fixture.profileId,
+        subjectId: fixture.subjectId,
+        topicId: null,
+        sourceSessionId: fixture.sessionId,
+        answerEventId: fixture.eventAId,
+        concept: 'Tie — earlier id',
+        correctionHint: null,
+        createdAt: sharedCreatedAt,
+      });
+      await db.insert(mentorNotices).values({
+        id: largerId,
+        profileId: fixture.profileId,
+        subjectId: fixture.subjectId,
+        topicId: null,
+        sourceSessionId: fixture.sessionId,
+        answerEventId: fixture.eventBId,
+        concept: 'Tie — later id',
+        correctionHint: null,
+        createdAt: sharedCreatedAt,
+      });
+
+      const rows = await db
+        .select()
+        .from(mentorNotices)
+        .where(eq(mentorNotices.sourceSessionId, fixture.sessionId));
+      expect(rows).toHaveLength(2);
+      // The tie is real in the database, not just in the seed values.
+      expect(rows[0]!.createdAt.getTime()).toBe(rows[1]!.createdAt.getTime());
+
+      const receipt = await getMentorNoticeReceipt(
+        db,
+        fixture.profileId,
+        fixture.sessionId,
+      );
+      expect(receipt).toEqual({
+        id: largerId,
+        concept: 'Tie — later id',
+        correctionHint: null,
+      });
     });
   },
 );

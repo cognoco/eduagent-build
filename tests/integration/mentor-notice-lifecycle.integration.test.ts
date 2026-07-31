@@ -204,6 +204,18 @@ describe('mentor notice lifecycle — real database', () => {
       lastRecheckOutcome: 'deferred',
       recheckAttemptCount: 0,
     });
+    const deferredEvents = getCapturedInngestEvents().filter(
+      (event) =>
+        event.name === 'app/notice.recheck_outcome' &&
+        (event.data as { noticeId?: string }).noticeId === noticeId,
+    );
+    expect(deferredEvents).toHaveLength(1);
+    expect(deferredEvents[0]?.data).toMatchObject({
+      noticeId,
+      profileId: fixture.profileId,
+      outcome: 'deferred',
+      timestamp: expect.any(String),
+    });
 
     const starts = await Promise.all([
       startMentorNoticeRecheck(db, fixture.profileId, noticeId),
@@ -308,6 +320,7 @@ describe('mentor notice lifecycle — real database', () => {
           noticeId: notice.id,
           profileId: fixture.profileId,
           outcome: 'locked_in',
+          timestamp: expect.any(String),
         },
       },
     ]);
