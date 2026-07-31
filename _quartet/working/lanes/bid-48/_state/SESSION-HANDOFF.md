@@ -43,7 +43,7 @@ Last reconciled: 2026-07-31 08:00 CEST
 - WI-2941 — member 42, executing the missing sanctioned expired-cross-owner claim
   recovery capability in Marketplace PR #166 at exact head `9652d7d`; two in-scope
   review considerations were repaired, and the expanded focused/full local and hosted
-  functional gates are green. Three exact-head Claude attempts aborted before a
+  functional gates are green. Four exact-head Claude attempts aborted before a
   review turn, so the governed merge gate remains correctly closed. WI-2755 expired
   after capture, so seven stale claims remain untouched pending governed landing,
   independent review, and deployment.

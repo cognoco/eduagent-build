@@ -82,7 +82,7 @@ Delivery Batch as `Done`.
   remains explicitly operator-gated.
 - WI-2941 Marketplace PR #166 is at exact head `9652d7d`; two in-scope review
   considerations were repaired and the expanded focused/full local plus hosted
-  functional gates are green. Three exact-head Claude attempts aborted before a
+  functional gates are green. Four exact-head Claude attempts aborted before a
   review turn, so the governed merge gate remains correctly closed. WI-2755 expired
   after capture, making the post-landing recovery set seven cross-owner claims. All
   remain untouched pending governed landing, Nexus commissioning, and independent
