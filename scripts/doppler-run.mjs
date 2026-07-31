@@ -11,6 +11,7 @@
 // 'inherit'}, and this process exits with doppler's own exit code.
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 
 const WINDOWS_FALLBACK = 'C:/Tools/doppler/doppler.exe';
 
@@ -76,6 +77,14 @@ function main() {
   process.exit(result.status ?? 1);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main();
+export function dispatchMainIfEntry({
+  argvPath = process.argv[1],
+  moduleUrl = import.meta.url,
+  windows = process.platform === 'win32',
+} = {}) {
+  if (argvPath && moduleUrl === pathToFileURL(argvPath, { windows }).href) {
+    main();
+  }
 }
+
+dispatchMainIfEntry();

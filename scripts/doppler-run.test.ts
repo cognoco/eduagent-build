@@ -1,8 +1,10 @@
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const REPO_ROOT = join(__dirname, '..');
 const SCRIPT = join(REPO_ROOT, 'scripts', 'doppler-run.mjs');
+const SCRIPT_URL = pathToFileURL(SCRIPT).href;
 const FAKE_DOPPLER_DIR = join(
   REPO_ROOT,
   'scripts',
@@ -35,6 +37,43 @@ function selfTest(opts: {
         : {}),
       DOPPLER_RUN_SELF_TEST_PATH_HIT: opts.pathHit ? '1' : '0',
       DOPPLER_RUN_SELF_TEST_FALLBACK_EXISTS: opts.fallbackExists ? '1' : '0',
+    },
+  });
+}
+
+function entryGuardTest(entry: {
+  argvPath: string;
+  moduleUrl: string;
+  windows: boolean;
+}) {
+  const source = [
+    `import { dispatchMainIfEntry } from ${JSON.stringify(SCRIPT_URL)};`,
+    `dispatchMainIfEntry(${JSON.stringify(entry)});`,
+  ].join('\n');
+
+  return spawnSync(
+    process.execPath,
+    ['--input-type=module', '--eval', source],
+    {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        DOPPLER_RUN_SELF_TEST: '1',
+        DOPPLER_RUN_SELF_TEST_PATH_HIT: '1',
+        DOPPLER_RUN_SELF_TEST_FALLBACK_EXISTS: '0',
+      },
+    },
+  );
+}
+
+function packageScriptTest(script: string) {
+  return spawnSync('corepack', ['pnpm', 'run', script], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      PATH: `${FAKE_DOPPLER_DIR}:${process.env.PATH}`,
     },
   });
 }
@@ -74,6 +113,44 @@ describe('doppler-run.mjs resolver decision matrix (WI-1247)', () => {
     });
     expect(result.stdout).toMatch(/ERROR: doppler not found/);
     expect(result.status).toBe(1);
+  });
+});
+
+describe('doppler-run.mjs entry-point guard (WI-2522)', () => {
+  test('Windows drive-letter argv dispatches main when its file URL matches', () => {
+    const result = entryGuardTest({
+      argvPath: 'C:\\repo\\scripts\\doppler-run.mjs',
+      moduleUrl: 'file:///C:/repo/scripts/doppler-run.mjs',
+      windows: true,
+    });
+
+    expect(result.stderr).toBe('');
+    expect(result.stdout.trim()).toBe('doppler');
+    expect(result.status).toBe(0);
+  });
+
+  test('Windows drive-letter argv does not dispatch main for a different file URL', () => {
+    const result = entryGuardTest({
+      argvPath: 'C:\\repo\\scripts\\doppler-run.mjs',
+      moduleUrl: 'file:///D:/repo/scripts/doppler-run.mjs',
+      windows: true,
+    });
+
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toBe('');
+    expect(result.status).toBe(0);
+  });
+
+  test('POSIX argv dispatches main when its file URL matches', () => {
+    const result = entryGuardTest({
+      argvPath: '/repo/scripts/doppler-run.mjs',
+      moduleUrl: 'file:///repo/scripts/doppler-run.mjs',
+      windows: false,
+    });
+
+    expect(result.stderr).toBe('');
+    expect(result.stdout.trim()).toBe('doppler');
+    expect(result.status).toBe(0);
   });
 });
 
@@ -118,5 +195,33 @@ describe('doppler-run.mjs real invocation (WI-1247)', () => {
     );
     expect(result.status).not.toBe(0);
     expect(result.stderr).toMatch(/doppler not found/);
+  });
+});
+
+describe('Windows-facing package-script dispatch (WI-2522)', () => {
+  test('pnpm test reaches doppler with the unit-test command', () => {
+    const result = packageScriptTest('test');
+
+    expect(result.stdout).toContain('ARGS:run -- nx run-many -t test');
+    expect(result.status).toBe(0);
+  });
+
+  test('pnpm test:api:integration reaches doppler with the guarded API integration launcher', () => {
+    const result = packageScriptTest('test:api:integration');
+
+    expect(result.stdout).toContain(
+      'ARGS:run --project mentomate --config dev_integration --',
+    );
+    expect(result.stdout).toContain('scripts/run-api-integration.mjs --nx');
+    expect(result.status).toBe(0);
+  });
+
+  test('pnpm test:integration reaches doppler with the cross-package integration command', () => {
+    const result = packageScriptTest('test:integration');
+
+    expect(result.stdout).toContain(
+      'ARGS:run -- jest --config tests/integration/jest.config.cjs --no-coverage',
+    );
+    expect(result.status).toBe(0);
   });
 });
