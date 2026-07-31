@@ -1,22 +1,23 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-07-31 09:22 CEST
+Last reconciled: 2026-07-31 10:22 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
 - Topology: operator-authorized combined Orchestrator/Shepherd, no Clacks.
 - Status: `Running`.
-- Authoritative members (42): WI-2484, WI-2636, WI-2639, WI-2640, WI-2643, WI-2644,
+- Authoritative members (41): WI-2484, WI-2636, WI-2639, WI-2640, WI-2643, WI-2644,
   WI-2649, WI-2667, WI-2755, WI-2790, WI-2791, WI-2792, WI-2794, WI-2795,
   WI-2797, WI-2798, WI-2799, WI-2800, WI-2801, WI-2802, WI-2804, WI-2805,
   WI-2809, WI-2810, WI-2811, WI-2812, WI-2813, WI-2815, WI-2818, WI-2819,
   WI-2822, WI-2826, WI-2833, WI-2921, WI-2922, WI-2923, WI-2924, WI-2925,
-  WI-2931, WI-2936, WI-2939, WI-2941.
-- Brief/relation parity: live-verified at 42 after WI-2941 passed typed capture,
-  dedup, triage, and refinement and was formally admitted with Origin WI-2826.
-  WI-2942 is Closed / Duplicate of WI-2941. The Brief and live relation have zero
-  differences. WI-2926 remains formally excluded as Closed / Duplicate of WI-2925.
-- Live stage count at this reconciliation: 27 Closed, 11 Executing, 4 Ready.
+  WI-2931, WI-2936, WI-2939.
+- Brief/relation parity: live-verified at 41 after the 2026-07-31 operator ruling
+  retracted WI-2941's admission. WI-2941 is Backlog/Active in Nexus / Cosmo
+  Lifecycle Tooling with no Sprint or Delivery Batch; WI-2946 is Backlog/Active
+  in Nexus / Clacks with no Sprint or Delivery Batch. WI-2942 remains Closed /
+  Duplicate of WI-2941. WI-2926 remains Closed / Duplicate of WI-2925.
+- Live stage count at checkpoint: 27 Closed, 3 Executing, 10 Ready, 1 In Review.
 
 ## Current frontier — supersedes stale per-item positions below
 
@@ -44,20 +45,34 @@ Last reconciled: 2026-07-31 09:22 CEST
   WI-2826 dependency, not a new finding. PR #2741 remains draft and red until WI-2826
   supplies the missing hosted discriminator and a fresh smoke reaches strict green.
   No DB connection occurred, and live mutation remains explicitly operator-gated.
-- WI-2941 — member 42, executing the missing sanctioned expired-cross-owner claim
-  recovery capability in Marketplace PR #166 at exact head `9652d7d`; two in-scope
-  review considerations were repaired, and the expanded focused/full local and hosted
-  functional gates are green. Four exact-head Claude attempts aborted before a
-  review turn. A fifth cooldown-bounded attempt reproduced the same pre-review service
-  abort with no verdict or findings, so the governed merge gate remains correctly
-  closed. WI-2946 was captured from WI-2941 after typed duplicate search found WI-2342
-  materially narrower, then triaged/refined to Ready/Active. Its Delivery Batch
-  relation remains empty pending formal BID-48 membership disposition. WI-2755
-  expired after WI-2941's capture, so seven stale claims remain untouched pending
-  governed landing and deployment of
-  WI-2941. WI-2755 itself is already governed-merged from PR #2630 as `37b7a4e6`;
-  after lawful claim recovery it needs execute-complete and independent review, not
-  another implementation.
+- Operator correction — all eight shepherd-created infrastructure Work Items
+  (WI-2792, WI-2812, WI-2815, WI-2819, WI-2924, WI-2931, WI-2941, WI-2946)
+  are assigned to Nexus and normalized as factual issue reports. Their original
+  solution-shaped title/Description/Acceptance Criteria are preserved verbatim in
+  dated page comments. WI-2792 was corrected from ZDX-Marketplace to Nexus while
+  retaining Cosmo Lifecycle Tooling. WI-2941 moved to that workstream, returned to
+  Backlog, and left BID-48; Marketplace PR #166 is preserved only as a proposal.
+  WI-2946 remains outside BID-48 and returned to Backlog in Clacks.
+- Operator-authorized expired-claim recovery — compare-before-write confirmed
+  `Claim Expired=true` and unchanged identity/timestamp/workspace for WI-2643,
+  WI-2755, WI-2795, WI-2798, WI-2802, WI-2805, and WI-2826. Each has an audit
+  comment and is now Ready/Active with claim fields empty. Started, Executed By,
+  Fixed In, PR, evidence, dependencies, and item-specific authority gates remain.
+  WI-2755's `37b7a4e6` is already landed; typed executor finalization is dispatched.
+- Finding Occurrence policy — new incidental observations are factual occurrences
+  only unless explicitly promoted by the operator/owning governance process.
+  Operator-authorized direct-write workaround captured FO-2075 /
+  `OCC-F968A7988008` in the authoritative Finding Occurrences database as Unlinked.
+  No canonical Finding or replacement Work Item was created.
+- WI-2755 — dependency WI-2794 is Closed/Done and landed commit `37b7a4e6` is on
+  origin/main with merged PR #2630 strict green. Executor completion moved the item
+  to Reviewing, but the tool auto-created and recorded draft PR #2746 from a later
+  pre-existing branch and classified the override manifest as Operational. An
+  independent reviewer is adjudicating those integrity discrepancies; PR #2746 is
+  untouched.
+- WI-2802 — typed executor dispatched after stale-claim recovery to reconcile
+  preserved evidence against now-Closed sibling prerequisite WI-2810. No gated
+  hosted/shared-environment mutation is authorized.
 - WI-2800 — Ready/Active after review rejected its already-landed `fdbe36d2` evidence:
   the isolated run diagnosed a different 68.6-second sign-in failure and did not
   attribute the original hosted 90-second exhaustion. WI-2826 plus the hosted gate
@@ -68,13 +83,12 @@ Last reconciled: 2026-07-31 09:22 CEST
 - WI-2922 and WI-2923 — Ready behind explicit development-only shared mutation gates.
 - Remaining shared-database, hosted-reproduction, and credential mutations retain
   their item-specific operator gates; no broad batch mandate silently widens them.
-- Repeated-impasse audit: every presently available ungated lifecycle action,
-  reconciliation step, claim heartbeat, and verified Closed-item cleanup is complete.
-  WI-2946 still lacks a membership disposition; WI-2939, WI-2936, WI-2922, and
-  WI-2923 still lack their item-specific operator rulings. PR #166 remains fail-closed
-  on its fifth pre-review abort and PR #2741 remains fail-closed on the
-  twice-reproduced WI-2826 dependency. The persistent goal is blocked pending those
-  rulings; no gate is bypassed and all same-owner claims are future.
+- The persistent goal is active again. Existing execution WIP is WI-2790,
+  WI-2921, and WI-2939; WI-2802 dispatch is in claim preflight. WI-2755 is
+  independently claimed In Review by the global reviewer. Ready items with explicit
+  database, credential, hosted-reproduction, or worktree/Doppler gates remain held
+  until their recorded authority is satisfied. PR #2741 remains fail-closed on the
+  twice-reproduced WI-2826 dependency.
 
 ## Closed / Done
 
