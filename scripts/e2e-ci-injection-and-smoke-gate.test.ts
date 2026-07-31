@@ -7351,7 +7351,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(flow.match(/retryTapIfNoChange: true/g)).toHaveLength(3);
   });
 
-  it('[WI-2231] confirms the first-Mentor language before waiting for Mentor', () => {
+  it('[WI-2231] gates first Mentor and waits for durable opener hydration', () => {
     const flow = readFileSync(
       join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-first-mentor-session.yaml'),
       'utf8',
@@ -7381,6 +7381,37 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           timeout: 30000,
         },
       },
+      { tapOn: { id: 'mentor-bar-send' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'session-screen' },
+          timeout: 60000,
+        },
+      },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'mentor-opener-persisted-once' },
+          timeout: 30000,
+        },
+      },
+      {
+        extendedWaitUntil: {
+          visible: {
+            id: 'message-bubble-user-.*',
+            containsDescendants: [
+              { text: '^Teach me why leaves are green\\\\.$' },
+            ],
+          },
+          timeout: 30000,
+        },
+      },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'assistant-response-complete-.*' },
+          timeout: 60000,
+        },
+      },
+      { assertNotVisible: { id: 'mentor-opener-persisted-more-than-once' } },
     ]);
   });
 
