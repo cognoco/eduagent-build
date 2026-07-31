@@ -5,19 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MentoMate — Privacy Policy</title>
   <style>
-    :root { color-scheme: dark; --bg: #111827; --text: #f3f4f6; --muted: #d1d5db; --subtle: #9ca3af; }
-    :root[data-theme="light"] { color-scheme: light; --bg: #ffffff; --text: #1a1a1a; --muted: #444; --subtle: #6b7280; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 720px; margin: 0 auto; padding: 24px 16px; background: var(--bg); color: var(--text); line-height: 1.6; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 720px; margin: 0 auto; padding: 24px 16px; color: #1a1a1a; line-height: 1.6; }
     h1 { font-size: 1.5rem; margin-bottom: 4px; }
     h2 { font-size: 1.1rem; margin-top: 1.5em; }
-    p { color: var(--muted); margin: 0.5em 0; }
-    ul { color: var(--muted); }
-    .updated { color: var(--subtle); font-size: 0.85rem; margin-bottom: 1.5em; }
-    .theme-toggle { float: right; border: 1px solid var(--subtle); border-radius: 999px; padding: 6px 10px; background: transparent; color: var(--text); cursor: pointer; }
+    p { color: #444; margin: 0.5em 0; }
+    ul { color: #444; }
+    .updated { color: #888; font-size: 0.85rem; margin-bottom: 1.5em; }
   </style>
 </head>
 <body>
-  <button class="theme-toggle" type="button" aria-label="Switch colour theme">Light theme</button>
   <h1>Privacy Policy</h1>
   <p class="updated">Last updated: July 2026</p>
   <p class="updated"><strong>Pre-launch draft:</strong> this notice is not approved for publication. The applicable provider contracts, transfer safeguards, DPO details, retention controls, and native-speaker legal reviews must be completed before learner data is processed in production.</p>
@@ -79,20 +75,5 @@
     - Confirm each AI provider's no-training, retention, deletion, subprocessor, and international-transfer evidence before publication.
     - Capture production evidence that RETENTION_PURGE_ENABLED remains enabled before publication.
   -->
-  <script>
-    const root = document.documentElement;
-    const toggle = document.querySelector('.theme-toggle');
-    const savedTheme = localStorage.getItem('mentomate-privacy-theme');
-    if (savedTheme === 'light') root.dataset.theme = 'light';
-    const syncToggle = () => {
-      toggle.textContent = root.dataset.theme === 'light' ? 'Dark theme' : 'Light theme';
-    };
-    toggle.addEventListener('click', () => {
-      root.dataset.theme = root.dataset.theme === 'light' ? 'dark' : 'light';
-      localStorage.setItem('mentomate-privacy-theme', root.dataset.theme);
-      syncToggle();
-    });
-    syncToggle();
-  </script>
 </body>
 </html>
