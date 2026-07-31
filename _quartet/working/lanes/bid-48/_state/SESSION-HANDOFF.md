@@ -1,17 +1,53 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-07-26 22:55 CEST
+Last reconciled: 2026-07-31 08:00 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
 - Topology: operator-authorized combined Orchestrator/Shepherd, no Clacks.
 - Status: `Running`.
-- Authoritative members (32): WI-2484, WI-2636, WI-2639, WI-2640, WI-2643, WI-2644,
+- Authoritative members (42): WI-2484, WI-2636, WI-2639, WI-2640, WI-2643, WI-2644,
   WI-2649, WI-2667, WI-2755, WI-2790, WI-2791, WI-2792, WI-2794, WI-2795,
   WI-2797, WI-2798, WI-2799, WI-2800, WI-2801, WI-2802, WI-2804, WI-2805,
   WI-2809, WI-2810, WI-2811, WI-2812, WI-2813, WI-2815, WI-2818, WI-2819,
-  WI-2822, WI-2826.
-- Brief/relation parity: live-verified at 32 after formal WI-2826 admission.
+  WI-2822, WI-2826, WI-2833, WI-2921, WI-2922, WI-2923, WI-2924, WI-2925,
+  WI-2931, WI-2936, WI-2939, WI-2941.
+- Brief/relation parity: live-verified at 42 after WI-2941 passed typed capture,
+  dedup, triage, and refinement and was formally admitted with Origin WI-2826.
+  WI-2942 is Closed / Duplicate of WI-2941. The Brief and live relation have zero
+  differences. WI-2926 remains formally excluded as Closed / Duplicate of WI-2925.
+- Live stage count at this reconciliation: 27 Closed, 11 Executing, 4 Ready.
+
+## Current frontier — supersedes stale per-item positions below
+
+- WI-2636 — governed PR #2726 landed as `30a034dd`; execute-complete and independent
+  QA/review passed; live state is Closed / Done.
+- WI-2812 — replacement PR #344 passed exact-head checks and the governed merge gate,
+  landed as `792e22cf`, passed independent QA/review, and is Closed / Done.
+- WI-2639 — PR #2730 passed the governed gate and landed as `fee204b5`.
+  Execute-complete and independent adversarial QA verified all eight ACs, exact CI,
+  disposable-Postgres proof, merge evidence, and origin/main ancestry; Closed / Done.
+- WI-2794 — landed code, sanctioned database-backed evidence, and corrected
+  completion pointers passed independent re-review; Closed / Done.
+- WI-2790 — source repair PR #2733 passed the governed gate and landed as `70411272`.
+  The item remains Executing until WI-2939 supplies its separate disposable-schema
+  proof.
+- WI-2939 — member 41, executing the distinct revision-pinned schema-bootstrap tooling
+  contract for WI-2790's uniquely named disposable non-staging target. Live mutation
+  remains explicitly operator-gated.
+- WI-2941 — member 42, executing the missing sanctioned expired-cross-owner claim
+  recovery capability. The six stale claims remain untouched pending its governed
+  landing, independent review, and deployment.
+- WI-2800 — Ready/Active after review rejected its already-landed `fdbe36d2` evidence:
+  the isolated run diagnosed a different 68.6-second sign-in failure and did not
+  attribute the original hosted 90-second exhaustion. WI-2826 plus the hosted gate
+  remain prerequisites.
+- WI-2936 — Ready and unclaimed. Execution needs an operator ruling because the
+  mandatory repo worktree script always runs Doppler `env:sync`, while the item scope
+  forbids touching Doppler.
+- WI-2922 and WI-2923 — Ready behind explicit development-only shared mutation gates.
+- Remaining shared-database, hosted-reproduction, and credential mutations retain
+  their item-specific operator gates; no broad batch mandate silently widens them.
 
 ## Closed / Done
 

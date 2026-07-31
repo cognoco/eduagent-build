@@ -55,6 +55,36 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
+## Live reconciliation — 2026-07-31 08:00 CEST
+
+- The live Brief and membership relation agree on 42 authoritative members.
+  WI-2941 was captured from six expired cross-owner BID-48 claims, triaged and
+  refined to DoR, then formally admitted as member 42 with Origin WI-2826. The exact
+  retry duplicate WI-2942 was closed `Duplicate` of WI-2941. Verified Brief/relation
+  parity is 42/42 with zero differences.
+- Current lifecycle slice: 27 Closed, 11 Executing, and 4 Ready.
+  Re-query Cosmo rather than deriving routing from this count.
+- WI-2639 PR #2730 passed the exact-head governed gate and landed as `fee204b5`.
+  Execute-complete recorded exact landed evidence; independent adversarial QA then
+  verified all eight ACs, exact CI, loopback disposable-Postgres proof, governed
+  merge evidence, and origin/main ancestry. The item is Closed / Done.
+- WI-2800 remains honestly Ready after independent review rejected the already-landed
+  `fdbe36d2` artifact: the isolated dev evidence stopped on a different 68.6-second
+  sign-in failure and did not attribute the original hosted 90-second exhaustion.
+  WI-2826 instrumentation plus the item-specific hosted-run authority remain required.
+- WI-2790 source-repair PR #2733 passed the governed gate and landed as `70411272`.
+  The item remains Executing pending the independently deliverable disposable-schema
+  proof. WI-2939 is in typed execution on the landed prerequisite for the bootstrap
+  tooling only; real live bootstrap remains explicitly operator-gated.
+- WI-2941 is in typed execution for the sanctioned race-safe Govern recovery command.
+  Until it lands and is independently reviewed, the six expired cross-owner claims
+  remain untouched rather than being impersonated or hand-edited.
+- WI-2936 remains Ready pending the requested no-Doppler worktree exception.
+  WI-2922 and WI-2923 remain Ready behind their exact shared-development database and
+  Clerk/Doppler mutation approvals. Staging and production remain forbidden.
+- Historical per-item rows below are retained as an audit trail; this reconciliation
+  supersedes their stale lifecycle positions.
+
 ## Units / live slice
 
 | WI | Item | Initial route | Current position |
