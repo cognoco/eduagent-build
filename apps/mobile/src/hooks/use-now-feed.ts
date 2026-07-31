@@ -355,14 +355,14 @@ export function useNowFeed(): NowFeedQueryResult {
   // exists *because* a pair was bound. A device that has NEVER been bound has no
   // cached projection to paint and no floor to consult, so it keeps today's
   // permissive default and nothing is blanked fleet-wide (AC-2).
-  const fallbackPairRef = useRef<{ actorId: string; profileId: string } | null>(
-    null,
-  );
+  // Stores the already-memoised `cacheBinding` rather than a fresh
+  // `{actorId, profileId}` literal — matching `cacheBindingRef` above. A new
+  // literal here would change identity on every bound render, and this ref
+  // feeds `noticeSafeFallback`'s dep array, so the memo would re-run every
+  // render for a value that only changes when the binding does.
+  const fallbackPairRef = useRef<typeof cacheBinding>(null);
   if (cacheBinding) {
-    fallbackPairRef.current = {
-      actorId: cacheBinding.actorId,
-      profileId: cacheBinding.profileId,
-    };
+    fallbackPairRef.current = cacheBinding;
   }
   const fallbackPair = fallbackPairRef.current;
 
