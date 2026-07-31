@@ -64,26 +64,22 @@ Delivery Batch as `Done`.
 - All eight shepherd-created infrastructure Work Items are assigned to Nexus and
   normalized as factual issue reports. Their original solution-oriented records
   are preserved verbatim in dated page comments.
-- Current lifecycle slice: 27 Closed, 4 Executing, and 10 Ready.
+- Current lifecycle slice: 28 Closed, 4 Executing, and 9 Ready.
 - Operator-authorized compare-before-write recovery cleared seven unchanged expired
   claims: WI-2643, WI-2755, WI-2795, WI-2798, WI-2802, WI-2805, and WI-2826.
   Every item-specific environment, database, credential, merge, and review gate
   remains controlling.
 - Active execution WIP:
+  - WI-2755 — review-bounced source-artifact rework; freshly claimed by the typed
+    rework executor after WI-2802 freed capacity.
   - WI-2790 — portable Lancre integration target; landed source repair, awaiting
     WI-2939's disposable-schema proof.
-  - WI-2802 — J-01 Account readiness diagnosis; the one properly prepared retry
-    passed frozen-install/config preflight and its workers=1/retries=0 setup plus
-    targeted J-01 cases. The avatar absence did not recur, so no failing readiness
-    phase was observed and AC1-AC3 remain unmet pending operator disposition.
   - WI-2921 — local Playwright seed-secret alignment; strict-green PR #2718 remains
     blocked by WI-2936.
   - WI-2939 — disposable API schema bootstrap; draft PR #2741 remains blocked by
     WI-2826 evidence and its explicit live-bootstrap gate.
 - Ready queue:
   - WI-2643 — shared integration-role mutation gate.
-  - WI-2755 — review-bounced source-artifact rework; the landed revision still
-    times out and leaves its scratch database.
   - WI-2795 — Workers Logs or controlled telemetry-reproduction gate.
   - WI-2798 — controlled trace-enabled hosted-reproduction gate.
   - WI-2800 — depends on WI-2826 plus hosted evidence.
@@ -98,11 +94,14 @@ Delivery Batch as `Done`.
   (`OCC-42DF599F8508`) records its persistent database teardown failure; FO-2078
   (`OCC-A7536C9B0020`) records the missing-Playwright pre-browser failure; FO-2079
   (`OCC-F6CB34D4EBE4`) records the properly prepared retry's non-reproduction.
+- WI-2802 is independently Closed/Done after the operator-authorized AC amendment,
+  execute completion, manual QA, and autonomous reviewer disposition. No root cause
+  or product fix is claimed.
 - Marketplace PR #166 for WI-2941 is preserved open/draft at `9652d7d`; its clean
   local worktree was removed and its local/remote proposal branch remains.
 - Same-owner claims for WI-2790, WI-2921, and WI-2939 are verified future through
-  12:07 UTC / 14:07 CEST; WI-2802 is future through 12:03 UTC / 14:03 CEST.
-- Checkpoint branch `bid-48-lane-state` is pushed through `24d9d4ec0`.
+  12:07 UTC / 14:07 CEST; WI-2755 was freshly claimed at 10:01 UTC.
+- Checkpoint branch `bid-48-lane-state` is pushed through `cb7a29e55`.
 - The historical sections below are retained only as an audit trail. This section,
   Cosmo, and GitHub supersede every stale lifecycle position below.
 

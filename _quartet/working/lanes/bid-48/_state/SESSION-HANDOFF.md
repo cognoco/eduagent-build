@@ -74,8 +74,10 @@ Last reconciled: 2026-07-31 11:08 CEST
   PR #2746. Full findings are in Cosmo comment
   `3ae8bce9-1f7c-8152-a59d-001d3034c7f3`. PR #2746 remains untouched. FO-2076 /
   `OCC-B9142581EAF8` records the completion/PR mismatch; FO-2077 /
-  `OCC-42DF599F8508` records the persistent source-artifact failure.
-- WI-2802 — claimed by `codex:wi2802-resume:WI-2802`. Closed/Done WI-2810 supplies
+  `OCC-42DF599F8508` records the persistent source-artifact failure. The freed WIP
+  slot from WI-2802 was immediately reused: WI-2755 is now claimed by
+  `codex:wi2755-rework:WI-2755` for bounded source-artifact rework.
+- WI-2802 — Closed/Done. Closed/Done WI-2810 supplies
   the sanitized observer but cannot retroactively classify the 2026-07-26 failure.
   The operator authorized exactly one post-instrumentation isolated hosted J-01
   reproduction. Its sole invocation failed during Playwright config loading because
@@ -86,9 +88,11 @@ Last reconciled: 2026-07-31 11:08 CEST
   and Playwright config preflight; the single workers=1/retries=0 invocation passed
   all three setup cases and the targeted pushed-content J-01 case. The avatar absence
   did not recur and WI-2810 captured no failing phase. FO-2079 /
-  `OCC-F6CB34D4EBE4` records the non-reproduction. AC1-AC3 remain unmet; the
-  same-owner claim is live through 12:03 UTC / 14:03 CEST. Further lifecycle action
-  requires an operator disposition of the diagnostic acceptance contract.
+  `OCC-F6CB34D4EBE4` records the non-reproduction. The operator authorized an AC
+  amendment accepting this as the terminal diagnostic outcome without claiming a
+  root cause or product fix. Execute completion passed, independent manual QA passed,
+  and the autonomous reviewer closed the item Done at 10:00 UTC. The duplicate
+  completion heading and opaque Operational attempt ID were adjudicated non-blocking.
 - WI-2800 — Ready/Active after review rejected its already-landed `fdbe36d2` evidence:
   the isolated run diagnosed a different 68.6-second sign-in failure and did not
   attribute the original hosted 90-second exhaustion. WI-2826 plus the hosted gate
@@ -99,15 +103,14 @@ Last reconciled: 2026-07-31 11:08 CEST
 - WI-2922 and WI-2923 — Ready behind explicit development-only shared mutation gates.
 - Remaining shared-database, hosted-reproduction, and credential mutations retain
   their item-specific operator gates; no broad batch mandate silently widens them.
-- The persistent goal is active again. Existing execution WIP is WI-2790,
-  WI-2802, WI-2921, and WI-2939. WI-2755 is Ready for source-artifact rework
-  and next in dispatch order when capacity opens. Ready items with explicit
+- The persistent goal is active again. Existing execution WIP is WI-2755, WI-2790,
+  WI-2921, and WI-2939. Ready items with explicit
   database, credential, hosted-reproduction, or worktree/Doppler gates remain held
   until their recorded authority is satisfied. PR #2741 remains fail-closed on the
   twice-reproduced WI-2826 dependency.
 - Claim heartbeat (11:07 CEST): same-owner sanctioned renewal verified WI-2790,
   WI-2921, and WI-2939 Executing with `Claim Expired=false`; each expires at
-  12:07 UTC / 14:07 CEST. WI-2802 expires four minutes earlier.
+  12:07 UTC / 14:07 CEST. WI-2755 was freshly claimed at 10:01 UTC.
 
 ## Closed / Done
 
