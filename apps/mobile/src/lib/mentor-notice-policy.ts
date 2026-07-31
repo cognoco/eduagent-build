@@ -511,9 +511,22 @@ const UNBOUND_SNAPSHOT: MentorNoticePolicySnapshot = {
   state: MENTOR_NOTICE_POLICY_BOOTSTRAP,
   observed: false,
   hydrated: false,
-  // [WI-2911] An unbound pair has no key, so there is no read to have failed and
-  // nothing stored to be blind to — matching `hydrated`/`observed` below, which
-  // the hook already reports as true when unbound.
+  // [WI-2933, correcting a WI-2911 rationale] `true` is the right VALUE, and the
+  // reason given for it was wrong. `trusted` asserts "no read of this pair's
+  // stored record has failed"; an unbound pair has no key, so no read was ever
+  // attempted and none can have failed. That stands on its own.
+  //
+  // The struck justification claimed this matched `hydrated`/`observed` "which
+  // the hook already reports as true when unbound". It does not: the literal two
+  // lines above sets BOTH to `false`. The "true when unbound" belongs to the
+  // hook's RETURN (`bound ? snapshot.hydrated : true`), a different object built
+  // from this one — so the old comment justified a field of this literal by
+  // citing values this literal does not hold.
+  //
+  // Rationale corrected rather than value changed: flipping to `false` would
+  // make `noticesSuppressedForPayload` treat an unbound pair as blind-read and
+  // suppress unconditionally, which is the fleet-wide blanking this item's AC-2
+  // forbids. The value was never the defect; the reasoning was.
   trusted: true,
 };
 

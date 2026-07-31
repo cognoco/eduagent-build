@@ -29,7 +29,10 @@ import {
   stripNoticeOverflowItems,
   writeCachedNowFeed,
 } from '../lib/now-feed-cache';
-import { useMentorNoticePolicy } from '../lib/mentor-notice-policy';
+import {
+  mentorNoticePolicySuppressesPayloadFor,
+  useMentorNoticePolicy,
+} from '../lib/mentor-notice-policy';
 import { useNavigationDataScopeContract } from './use-navigation-contract';
 import { parseJson } from '../lib/parse-json';
 import { useApiQuery } from './use-api-query';
@@ -337,12 +340,45 @@ export function useNowFeed(): NowFeedQueryResult {
       : query.data;
   }, [query.data, policy]);
 
+  // [WI-2933] Judge the persisted projection against the floor of the pair it
+  // was CACHED FOR, not against whatever pair happens to be bound at render.
+  //
+  // `fallbackFeed` can only ever be populated while BOUND — the effect above
+  // returns early without a `cacheBinding`. But it SURVIVES the pair going
+  // unbound (sign-out, auth teardown, profile cleared) while this component
+  // stays mounted; that is demonstrated by execution, not argued. Once unbound,
+  // `policy.suppressed(undefined)` took the unbound branch, which has no storage
+  // key, therefore no Entry, therefore no stored disable floor — so a projection
+  // for a pair whose durable floor forbids notices painted anyway.
+  //
+  // Remembering the populating pair is what makes the floor reachable. It is
+  // also the ONLY defensible answer to "what is the safe default when the pair
+  // is unknowable": for this payload the pair is not unknowable — the payload
+  // exists *because* a pair was bound. A device that has NEVER been bound has no
+  // cached projection to paint and no floor to consult, so it keeps today's
+  // permissive default and nothing is blanked fleet-wide (AC-2).
+  const fallbackPairRef = useRef<{ actorId: string; profileId: string } | null>(
+    null,
+  );
+  if (cacheBinding) {
+    fallbackPairRef.current = {
+      actorId: cacheBinding.actorId,
+      profileId: cacheBinding.profileId,
+    };
+  }
+  const fallbackPair = fallbackPairRef.current;
+
   const noticeSafeFallback = useMemo(() => {
     if (!fallbackFeed) return fallbackFeed;
-    return policy.suppressed(undefined)
-      ? stripNoticeCards(fallbackFeed)
-      : fallbackFeed;
-  }, [fallbackFeed, policy]);
+    const suppressed = fallbackPair
+      ? mentorNoticePolicySuppressesPayloadFor(
+          fallbackPair.actorId,
+          fallbackPair.profileId,
+          undefined,
+        )
+      : policy.suppressed(undefined);
+    return suppressed ? stripNoticeCards(fallbackFeed) : fallbackFeed;
+  }, [fallbackFeed, policy, fallbackPair]);
 
   // The cast is the `UseQueryResult` discriminated union, not a type escape:
   // overriding `data` on a spread widens it to `NowResponse | undefined`, which

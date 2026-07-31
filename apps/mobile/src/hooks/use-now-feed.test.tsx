@@ -20,9 +20,15 @@ import {
 // [WI-2498] useNowFeed now reads the authenticated actor id (Clerk userId) to
 // bind the persisted Now-feed cache to actor+profile+policy. External-boundary
 // mock (bare specifier), matching the pattern in use-subscription.test.ts.
+// [WI-2933] The actor id is swappable so a test can drive the BOUND -> UNBOUND
+// transition (sign-out / auth teardown) that the unbound suppression path
+// depends on. Default is unchanged for every pre-existing test.
+let mockActorId: string | null = 'wi2498-test-actor';
 jest.mock('@clerk/expo', () => ({
   useAuth: () => ({
-    userId: 'wi2498-test-actor',
+    get userId() {
+      return mockActorId;
+    },
     getToken: jest.fn().mockResolvedValue('test-token'),
   }),
 }));
@@ -238,6 +244,11 @@ describe('useNowFeed — observed mentor-notice policy epoch', () => {
     globalThis.fetch = mockFetch as unknown as typeof globalThis.fetch;
     setActiveProfileId(CACHE_BINDING.profileId);
     await AsyncStorage.clear();
+    // [WI-2933] The mentor-notice policy store is MODULE-level, so clearing
+    // AsyncStorage alone does not isolate these tests from each other — a
+    // hydrated Entry survives into the next test and its floor is still
+    // consulted. This describe is the first here to depend on that store.
+    resetMentorNoticePolicyStoreForTests();
     jest.useFakeTimers();
   });
 
@@ -245,6 +256,74 @@ describe('useNowFeed — observed mentor-notice policy epoch', () => {
     jest.useRealTimers();
     globalThis.fetch = originalFetch;
     setActiveProfileId(undefined);
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-2933] The persisted projection must be judged against the DISABLE FLOOR
+  // of the pair it was cached for — including after that pair goes unbound.
+  //
+  // `fallbackFeed` can only be POPULATED while bound, but it SURVIVES the pair
+  // going unbound (sign-out, auth teardown) while the component stays mounted.
+  // Once unbound, the suppression call took the unbound branch, which has no
+  // storage key and therefore no stored floor to consult — so a projection whose
+  // pair had been told the rollout is off painted anyway.
+  //
+  // The assertion is on what the surface EXPOSES, never on an internal field.
+  // -------------------------------------------------------------------------
+  it('[WI-2933] does not paint the cached notice surface after sign-out when the pair’s stored floor forbids it', async () => {
+    await seedWarmNoticeCache();
+    await AsyncStorage.setItem(OBSERVED_EPOCH_KEY, ENABLED_EPOCH);
+    // The pair's durable floor: told the rollout is OFF at revision 7.
+    await AsyncStorage.setItem(
+      `mentor-notice-policy-state::${CACHE_BINDING.actorId}::${CACHE_BINDING.profileId}`,
+      '{"revision":7,"enabled":false,"observedDisableRevision":7}',
+    );
+
+    const { result, queryClient } = await renderSlowFallback();
+    // Establish the exposure: the projection really is being served.
+    await waitFor(() => expect(result.current.fallbackFeed).not.toBeNull());
+
+    // Sign-out — the pair goes unbound while this component stays mounted.
+    mockActorId = null;
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+      await Promise.resolve();
+    });
+
+    // THE CRITERION: no notice-bearing card is exposed off that projection.
+    expect(
+      result.current.fallbackFeed?.cards.map((card) => card.kind) ?? [],
+    ).not.toContain('mentor_notice');
+
+    mockActorId = 'wi2498-test-actor';
+    queryClient.clear();
+  });
+
+  // NON-TRIVIALITY CONTROL. Identical sign-out, identical cached projection —
+  // but the pair has NO stored floor. It must STILL paint. Without this, the
+  // assertion above passes on a remedy that blanks every observation-less
+  // payload on every pre-auth render, which is the fleet-wide harm AC-2 forbids
+  // and the reason this was not folded into WI-2911.
+  it('[WI-2933] still paints the cached notice surface after sign-out when the pair has NO stored floor', async () => {
+    await seedWarmNoticeCache();
+    await AsyncStorage.setItem(OBSERVED_EPOCH_KEY, ENABLED_EPOCH);
+    // Deliberately no mentor-notice-policy-state key for this pair.
+
+    const { result, queryClient } = await renderSlowFallback();
+    await waitFor(() => expect(result.current.fallbackFeed).not.toBeNull());
+
+    mockActorId = null;
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+      await Promise.resolve();
+    });
+
+    expect(
+      result.current.fallbackFeed?.cards.map((card) => card.kind) ?? [],
+    ).toContain('mentor_notice');
+
+    mockActorId = 'wi2498-test-actor';
+    queryClient.clear();
   });
 
   it('does not paint a warm cached notice surface after the client observed flag-off', async () => {
