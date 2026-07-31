@@ -1,3 +1,4 @@
+import { join, resolve } from 'node:path';
 import {
   Node,
   Project,
@@ -17,6 +18,7 @@ const PUBLIC_REEXPORT_FILE = 'apps/api/src/services/curriculum.ts';
 const EXPORT_FILE = 'apps/api/src/services/export.ts';
 const FAMILY_BRIDGE_FILE = 'apps/api/src/services/family-bridge.ts';
 const PROGRESS_FILE = 'apps/api/src/services/progress.ts';
+const API_ROOT = resolve(__dirname, '../..');
 const PROGRESS_HISTORY_FUNCTIONS = new Set([
   'getLearningResumeTarget',
   'getContinueSuggestion',
@@ -978,10 +980,10 @@ describe('latest curriculum read guard [WI-2463]', () => {
 
   it('accepts the current production tree', () => {
     const project = new Project({
-      tsConfigFilePath: 'apps/api/tsconfig.json',
+      tsConfigFilePath: join(API_ROOT, 'tsconfig.json'),
       skipAddingFilesFromTsConfig: true,
     });
-    project.addSourceFilesAtPaths('apps/api/src/**/*.ts');
+    project.addSourceFilesAtPaths(join(API_ROOT, 'src/**/*.ts'));
 
     const findings = project
       .getSourceFiles()
