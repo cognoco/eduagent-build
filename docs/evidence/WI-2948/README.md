@@ -1,4 +1,4 @@
-# WI-2948 rework evidence
+# WI-2948 (Repair shared staging/Clerk E2E seeded sign-in path) rework evidence
 
 This directory preserves the secret-free, independently inspectable evidence for the second repair attempt.
 
@@ -26,7 +26,7 @@ The broader focused validation ran the complete workflow contract, Clerk alignme
 
 ## Ramtop Node 22 staging setup
 
-The durable sanitized receipt will be recorded at [ramtop-node22-seeded-signin-receipt.json](ramtop-node22-seeded-signin-receipt.json). It records the UTC interval, machine and Node identity, exact secret-free command shape, zero-retry configuration and observed retry indexes, all three scenario outcomes, candidate source blobs, and the stable repository artifact pointer.
+No durable success receipt exists. A future successful proof would record [ramtop-node22-seeded-signin-receipt.json](ramtop-node22-seeded-signin-receipt.json) with the UTC interval, machine and Node identity, exact secret-free command shape, zero-retry configuration and observed retry indexes, all three scenario outcomes, candidate source blobs, and the stable repository artifact pointer.
 
 The run explicitly removes `CLERK_SECRET_KEY` from the local environment and asks Doppler for only `TEST_SEED_SECRET` and `CLERK_PUBLISHABLE_KEY`. Raw Playwright reporter output is processed only in a mode-`0700` temporary directory and destroyed after allowlisted outcome extraction; it is not a durable artifact because reporter output contains seeded identity data.
 
@@ -66,7 +66,44 @@ After the repair above, a controlled run invoked the setup project once with one
 
 The combined orchestrator/Shepherd operator authorized exactly one new replacement invocation, conditional on repairing that evidence boundary first. The repaired script redirects its sanitized stdout before proof setup to `.workitem-artifacts/WI-2948/ramtop-node22-seeded-signin-classification.txt`, pins that file to mode `0600`, and never includes it in raw-temporary cleanup. Raw Playwright JSON, console, identity, token, screenshot, trace, and video material remain temporary-only or disabled and are never promoted.
 
-Fresh non-Playwright verification on Node 22:
+## Authorized replacement result — no receipt
+
+The replacement authorization was consumed. Its durable sanitized classification is `.workitem-artifacts/WI-2948/ramtop-node22-seeded-signin-classification.txt`:
+
+```text
+PLAYWRIGHT_EXIT=1
+GLOBAL_TEARDOWN_FAILURE_COUNT=0
+[]
+FAILURE_CLASSES=unclassified
+```
+
+This proves only that Playwright exited 1, the wrapper observed no global-teardown failure line, and the JSON reporter contained no setup-project scenario result. It does not prove that any setup scenario ran. The raw JSON top-level errors and console output were intentionally destroyed, so the exact early failure cannot be reconstructed and no success receipt can be promoted.
+
+The zero-result JSON shape is explained by the installed Playwright 1.56.1 runner. `runAllTestsWithConfig()` executes `createGlobalSetupTasks()` before `createLoadTask()`. Those early tasks include the configured web-server plugin and `globalSetup`. If either fails, test loading never occurs. `InternalReporter.onEnd()` then synthesizes an empty root suite, while the JSON reporter preserves the failure separately in its top-level `errors` array. The proof classifier inspected only setup specs and a short console-regex allowlist; it ignored top-level errors and therefore fell through to `unclassified`.
+
+The surviving evidence cannot distinguish an Expo web-export/server startup failure from Clerk global setup or another pre-load failure. Any narrower claim would be speculation.
+
+## Current-main comparison and refresh
+
+The failed proof candidate was 15 commits behind `origin/main` at diagnosis time. Current main at `406823882a693a085351e774948acaf53555755e` had byte-identical blobs for `.github/workflows/e2e-web.yml`, `apps/mobile/playwright.config.ts`, `apps/mobile/e2e-web/helpers/global-setup.ts`, `apps/mobile/e2e-web/helpers/auth.setup.ts`, and `pnpm-lock.yaml`; it contained no prerequisite workflow, config, setup, staging, or dependency repair absent from the candidate. Its E2E changes were downstream V2 flow and Now-response handling changes, not inputs to `--project=setup`.
+
+A main refresh was still mandatory because a new proof must identify and exercise the eventual PR revision rather than a stale ancestor. The validated candidate/evidence was committed first at `acc2df804471223a666cde5048f959e593f3c03a`, then current `origin/main` was merged without rebasing or rewriting history.
+
+## Safe early-run classification
+
+The local proof harness now emits only allowlisted metadata from early failures: Playwright top-level error count, setup-scenario count, the sanitized setup-result array, and `FAILURE_CLASSES=early-run-before-setup` when the setup count is zero. It never copies top-level error messages or raw console text into the durable classification. A synthetic JSON fixture containing sentinel raw error/console material first failed because the classifier did not exist, then passed after the classifier was wired into the proof wrapper; no Playwright command or staging endpoint was used for that test.
+
+## Post-refresh no-rerun verification
+
+- The permitted non-executing Playwright list mode loaded the refreshed config and discovered exactly three setup tests in `helpers/auth.setup.ts`; installed runner source confirms list mode does not start web servers, invoke global setup, launch a browser, or call staging.
+- The Node 22 helper suite passed 2 of 2 tests.
+- The complete workflow contract, Clerk alignment, and workflow-security set passed 237 of 237 tests.
+- `tsc --build`, targeted ESLint, the workflow-security guard, the no-Gemini runtime ratchet, shell syntax, the synthetic classifier contract, and `git diff --check` exited 0.
+- Full mobile lint exited 0 with 52 pre-existing warnings and no errors; the targeted candidate-file lint was clean.
+- The durable evidence/classification scan found zero email, raw key, bearer token, JWT, private-key, or credential-assignment patterns.
+- The exact-flag standalone Expo web export was deliberately not run during this diagnosis. It remains an unmet precondition for any separately authorized proof because web-server startup is one of the early boundaries the destroyed raw output cannot distinguish.
+
+Pre-replacement non-Playwright verification previously recorded on Node 22:
 
 - Helper suite: 2 of 2 tests passed.
 - Clerk alignment plus E2E workflow contract suites: 186 of 186 tests passed.
@@ -75,15 +112,19 @@ Fresh non-Playwright verification on Node 22:
 - Exact no-startup-files two-secret boundary probe: backend key absent; both allowlisted variables present.
 - Durable evidence scan: zero raw Clerk-key, bearer-token, JWT, email-address, and private-key-pattern matches.
 
-## Exact next proof precondition
+## Refusal and exact preconditions for any further proof
 
-Do not launch the authorized replacement staging proof until all of the following are true in this worktree:
+The one replacement authorization is spent. Refuse any further staging proof unless it is separately authorized after all of the following are true in this worktree:
 
-1. The focused Node 22 helper regression and the relevant workflow/alignment suites pass on the final candidate.
-2. `zsh -n scratchpad/wi2948-ramtop-receipt.zsh` exits 0, and a no-startup-files boundary probe reports `CLERK_SECRET_KEY` absent after the exact Doppler `--only-secrets="TEST_SEED_SECRET,CLERK_PUBLISHABLE_KEY"` boundary.
-3. A fresh read-only `doppler run --project mentomate --config stg --no-cache --no-fallback -- node scripts/check-clerk-key-alignment.mjs` prints only `Clerk key alignment OK` under the same Doppler principal that will run the proof.
-4. No raw reporter, trace, screenshot, video, seeded address, password, token, or key is configured for durable output.
+1. The final candidate is committed, contains the current `origin/main` merge, and is zero commits behind that base.
+2. The focused Node 22 helper regression, workflow/alignment suites, TypeScript build, targeted lint, workflow-security guard, no-Gemini ratchet, and `git diff --check` pass on that exact revision without Playwright.
+3. A non-executing `playwright test --list --project=setup` configuration/collection check lists exactly the three expected setup scenarios and reports no config or load error. This check must not start web servers, run global setup, launch a browser, or call staging.
+4. The exact-flag Expo web export used by the configured web server is verified separately without calling staging, and the proof port is free before invocation. This isolates the web-server boundary that runs before test loading.
+5. `zsh -n` passes for the receipt wrapper and classifier, and the synthetic early-run classifier contract passes without leaking its raw sentinel material.
+6. A no-startup-files boundary probe reports `CLERK_SECRET_KEY` absent after the exact Doppler `--only-secrets="TEST_SEED_SECRET,CLERK_PUBLISHABLE_KEY"` boundary.
+7. A fresh read-only `doppler run --project mentomate --config stg --no-cache --no-fallback -- node scripts/check-clerk-key-alignment.mjs` prints only `Clerk key alignment OK` under the same Doppler principal that would run the proof.
+8. No raw reporter, trace, screenshot, video, seeded address, password, token, or key is configured for durable output, and the durable evidence scan remains at zero sensitive-pattern matches.
 
-Once those preconditions hold, invoke `zsh scratchpad/wi2948-ramtop-receipt.zsh` exactly once. Success requires all three setup scenarios to pass with one attempt each, retry index 0, zero teardown failures, and the durable sanitized classification to parse as the receipt promoted at the pointer above. On failure, preserve only the sanitized classification file and stop without another invocation.
+Only a new explicit authorization after those checks would justify one invocation of `zsh scratchpad/wi2948-ramtop-receipt.zsh`. Success still requires all three setup scenarios to pass with one attempt each, retry index 0, zero observed teardown failures, and the durable sanitized classification to parse as the receipt promoted at the pointer above. On failure, preserve only the sanitized classification and stop without another invocation.
 
 After generation, the complete durable evidence directory is scanned explicitly for raw Clerk keys, bearer tokens, JWTs, email addresses, private-key material, and credential assignments. The final zero-match counts are recorded here after the receipt is generated.
