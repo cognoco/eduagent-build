@@ -39,6 +39,7 @@ const RUN_ID = generateUUIDv7();
 const EDGE_HOLDER = {
   userId: `wi2518-edge-holder-${RUN_ID}`,
   email: `wi2518-edge-holder-${RUN_ID}@integration.test`,
+  displayName: 'WI-2518 edge holder',
 };
 const CALLER = {
   userId: `wi2518-caller-${RUN_ID}`,
@@ -47,6 +48,7 @@ const CALLER = {
 const SUPPORTEE = {
   userId: `wi2518-supportee-${RUN_ID}`,
   email: `wi2518-supportee-${RUN_ID}@integration.test`,
+  displayName: 'WI-2518 supportee',
 };
 const ALL_EMAILS = [EDGE_HOLDER.email, CALLER.email, SUPPORTEE.email];
 const ALL_USER_IDS = [EDGE_HOLDER.userId, CALLER.userId, SUPPORTEE.userId];
@@ -71,13 +73,14 @@ afterAll(async () => {
 async function createOwner(user: {
   userId: string;
   email: string;
+  displayName: string;
 }): Promise<{ personId: string; organizationId: string }> {
   const response = await app.request(
     '/v1/profiles',
     {
       method: 'POST',
       headers: buildAuthHeaders({ sub: user.userId, email: user.email }),
-      body: JSON.stringify({ displayName: user.userId, birthYear: 1985 }),
+      body: JSON.stringify({ displayName: user.displayName, birthYear: 1985 }),
     },
     TEST_ENV,
   );
@@ -106,11 +109,20 @@ async function createCredentialedNonOwner(
     })
     .returning({ id: person.id });
   if (!caller) throw new Error('Caller person was not created');
-  await db.insert(login).values({
-    personId: caller.id,
-    clerkUserId: CALLER.userId,
-    email: CALLER.email,
-  });
+  const [loginRow] = await db
+    .insert(login)
+    .values({
+      id: generateUUIDv7(),
+      personId: caller.id,
+      clerkUserId: CALLER.userId,
+      email: CALLER.email,
+    })
+    .returning({ id: login.id });
+  if (!loginRow) throw new Error('Caller login was not created');
+  await db
+    .update(person)
+    .set({ loginId: loginRow.id })
+    .where(eq(person.id, caller.id));
   await db.insert(membership).values({
     personId: caller.id,
     organizationId,

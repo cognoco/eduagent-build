@@ -7,6 +7,8 @@ import { nowRoutes } from './now';
 import { buildNowFeed, buildNowOverflow } from '../services/now-feed';
 import { TEST_PROFILE_ID } from '@eduagent/test-utils';
 
+// gc1-allow: route unit isolation; now-feed has direct service coverage and
+// requires real database query support that this route harness does not expose.
 jest.mock('../services/now-feed', () => ({
   ...jest.requireActual('../services/now-feed'),
   buildNowFeed: jest.fn(),

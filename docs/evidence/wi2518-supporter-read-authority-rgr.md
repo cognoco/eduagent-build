@@ -81,6 +81,31 @@ Command: same 3-suite command as GREEN.
 
 Result: exit 0 — 3 suites, 44 tests passed.
 
+## Flag-on GitHub Actions fixture correction
+
+The authoritative failing surface was GitHub Actions run `30626359298`, job
+`91142452895` (`Flag-ON integration (IDENTITY_V2_ENABLED)`). The cross-package
+integration command completed with 1 failed suite and 71 passed suites (1 failed,
+3 skipped, and 591 passed tests). Its only failure was
+`tests/integration/wi2518-supporter-read-authority.integration.test.ts`:
+`createOwner()` expected `POST /v1/profiles` to return 201 and received 400 before
+any WI-2518 authorization assertion ran. The following API-integration command
+in the same job passed all 155 executed suites and 1,188 tests.
+
+Root-cause proof used the shared request schema directly. The failing edge-holder
+fixture assigned its generated 55-character Clerk user id to `displayName`, while
+`profileCreateSchema` permits at most 50 characters; `safeParse` returned the
+`too_big` issue on `displayName`. The correction gives both route-created owners
+short descriptive display names. It also completes the direct credentialed-person
+fixture's circular identity link by assigning an explicit Login id and persisting
+that id to `person.login_id`, matching the production identity-graph invariant.
+
+This CI failure is distinct from `WI-2958` (Restore missing organization schema
+in canonical dev_integration database): GitHub Actions provisioned its own
+disposable PostgreSQL service, reached the profile-create route, and failed on
+request validation. `WI-2958` continues to own only the separately protected,
+long-lived `mentomate/dev_integration` schema operation described below.
+
 ## Real-database runner blocker
 
 `WI-2958` — the separately admitted disposable-schema operation; currently
@@ -123,7 +148,7 @@ blocked only by the integration database schema residue above.
 - Focused authorization/visibility set: 6 suites, 72 tests passed.
 - Full API unit set: 506 suites passed; 10,056 passed, 11 skipped; 3 snapshots
   passed.
-- `pnpm typecheck:integration`: passed (72 Jest-selected roots, including the
+- `pnpm typecheck:integration`: passed (73 Jest-selected roots, including the
   new end-to-end test).
 - `pnpm exec tsc --build`: passed.
 - `nx run api:typecheck` and `nx run api:lint`: passed with `NX_DAEMON=false`;
@@ -132,3 +157,12 @@ blocked only by the integration database schema residue above.
 - Changed-file ESLint: passed.
 - Prompt-marker, no-Gemini-runtime, test-only-export, and profile-read-authority
   ratchets: passed.
+- CI-rework focused authorization set, run with an unreachable database URL:
+  3 suites and 44 tests passed, proving the route/service RGR remains
+  database-independent.
+- CI-rework routed fast validation, also with the unreachable database URL:
+  5 checks passed and 2 slow integration commands were intentionally routed to
+  GitHub Actions; the executed API unit surface passed 506 suites and 10,056
+  tests.
+- Corrected owner fixture payloads passed `profileCreateSchema.safeParse`, and
+  changed-file ESLint passed before republication.
