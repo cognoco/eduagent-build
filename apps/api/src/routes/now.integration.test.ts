@@ -9,10 +9,12 @@ import {
   curriculumTopics,
   generateUUIDv7,
   learningSessions,
+  login,
   mentorActivityLedger,
   mentorNotices,
   needsDeepeningTopics,
   parkingLotItems,
+  person,
   retentionCards,
   subjects,
   supportership,
@@ -68,8 +70,8 @@ function makeApp(
   db: Database,
   profileId: string,
   // [WI-2498] The mentor-notice visibility predicate reads the server-resolved
-  // caller identity and the rollout binding. Defaults keep every pre-existing
-  // case byte-identical (no callerPersonId, no rollout binding -> notices off).
+  // caller identity and the rollout binding. Existing cases model the normal
+  // correctly-selected profile, so the caller defaults to that profile.
   options: { callerPersonId?: string; mentorNoticeEnabled?: boolean } = {},
 ) {
   const app = new Hono<TestEnv>();
@@ -77,7 +79,10 @@ function makeApp(
     c.set('db', db);
     c.set('profileId', profileId);
     c.set('profileMeta', undefined);
-    c.set('callerPersonId' as never, options.callerPersonId as never);
+    c.set(
+      'callerPersonId' as never,
+      (options.callerPersonId ?? profileId) as never,
+    );
     if (options.mentorNoticeEnabled) {
       c.env = { MENTOR_NOTICE_ENABLED: 'true' } as never;
     }
@@ -101,7 +106,15 @@ const seededProfileIds: string[] = [];
 const seededSupportershipIds: string[] = [];
 
 async function seedProfile(database: Database, label: string): Promise<string> {
-  const accountId = generateUUIDv7();
+  return seedProfileInAccount(database, label, generateUUIDv7(), true);
+}
+
+async function seedProfileInAccount(
+  database: Database,
+  label: string,
+  accountId: string,
+  isOwner: boolean,
+): Promise<string> {
   const profileId = generateUUIDv7();
   const clerkUserId = `${CLERK_PREFIX}-${label}`;
   const email = `${CLERK_PREFIX}-${label}@test.invalid`;
@@ -116,8 +129,28 @@ async function seedProfile(database: Database, label: string): Promise<string> {
     email,
     displayName: `Now ${label}`,
     birthYear: 2010,
-    isOwner: true,
+    isOwner,
   });
+
+  // The legacy test helper intentionally models non-owners as managed people
+  // without a login. This attack requires a credentialed learner-role member,
+  // so add the real login binding while retaining the non-admin membership.
+  if (!isOwner) {
+    const [loginRow] = await database
+      .insert(login)
+      .values({
+        id: generateUUIDv7(),
+        personId: profileId,
+        clerkUserId,
+        email,
+      })
+      .returning({ id: login.id });
+    if (!loginRow) throw new Error('Failed to seed credentialed non-owner');
+    await database
+      .update(person)
+      .set({ loginId: loginRow.id })
+      .where(eq(person.id, profileId));
+  }
 
   return profileId;
 }
@@ -798,6 +831,68 @@ describe('Integration: now routes', () => {
       code: ERROR_CODES.FORBIDDEN,
       message: 'You do not have access to this person.',
     });
+  });
+
+  it('[WI-2518][RGR] rejects a same-account non-owner borrowing the selected profile supportership on both Now endpoints and the hub', async () => {
+    const accountId = generateUUIDv7();
+    const selectedEdgeHolderId = await seedProfileInAccount(
+      db,
+      'idor-selected-edge-holder',
+      accountId,
+      true,
+    );
+    const callerPersonId = await seedProfileInAccount(
+      db,
+      'idor-credentialed-non-owner',
+      accountId,
+      false,
+    );
+    const supporteeId = await seedProfile(db, 'idor-supportee');
+    await seedAcceptedContract(db, selectedEdgeHolderId, supporteeId);
+    await seedRetentionDue(
+      db,
+      supporteeId,
+      'selected-profile-edge-must-not-authorize-caller',
+      new Date('2020-01-01T00:00:00.000Z'),
+    );
+
+    const borrowedApp = makeApp(db, selectedEdgeHolderId, { callerPersonId });
+    const personRes = await borrowedApp.request(
+      `/v1/now?scope=person&personId=${supporteeId}`,
+    );
+    const overflowRes = await borrowedApp.request(
+      `/v1/now/overflow?scope=person&personId=${supporteeId}`,
+    );
+    const hubRes = await borrowedApp.request('/v1/now?scope=supporter-hub');
+
+    expect(personRes.status).toBe(403);
+    expect(overflowRes.status).toBe(403);
+    expect(hubRes.status).toBe(200);
+    const hubBody = (await hubRes.json()) as { cards: unknown[] };
+    expect(hubBody.cards).toEqual([]);
+    expect(JSON.stringify(hubBody)).not.toContain(
+      'selected-profile-edge-must-not-authorize-caller',
+    );
+
+    await seedAcceptedContract(db, callerPersonId, supporteeId);
+    const honestApp = makeApp(db, callerPersonId, { callerPersonId });
+    const honestPersonRes = await honestApp.request(
+      `/v1/now?scope=person&personId=${supporteeId}`,
+    );
+    const honestOverflowRes = await honestApp.request(
+      `/v1/now/overflow?scope=person&personId=${supporteeId}`,
+    );
+    const honestHubRes = await honestApp.request('/v1/now?scope=supporter-hub');
+
+    expect(honestPersonRes.status).toBe(200);
+    expect(honestOverflowRes.status).toBe(200);
+    expect(honestHubRes.status).toBe(200);
+    expect(JSON.stringify(await honestPersonRes.json())).toContain(
+      'selected-profile-edge-must-not-authorize-caller',
+    );
+    expect(JSON.stringify(await honestHubRes.json())).toContain(
+      'selected-profile-edge-must-not-authorize-caller',
+    );
   });
 
   // [WI-2237] negative-path break test: a non-revoked edge whose visibility
