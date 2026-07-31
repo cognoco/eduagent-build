@@ -16,6 +16,19 @@ signatures/schema stayed in place, so every RED below is a genuine assertion
 failure showing V0 behaviour where V2 was expected — not a compile error.
 Driver ran GREEN → REVERT(RED) → RESTORE(GREEN) per layer.
 
+**Reachability — layers A–D vs layer E.** The four assessment-path layers
+(A–D) are reachable in the shipped app: `useSubmitAnswer` is wired into
+`apps/mobile/src/app/(app)/practice/assessment/index.tsx`, so a learner's
+answer travels mobile hook → route → service → `buildAppHelpDirectReply`.
+Layer E is different: `useSendMessage` currently has **no production callers**
+— it is referenced only by its own definition in
+`apps/mobile/src/hooks/use-sessions.ts` and by that file's tests, since the
+live non-stream turn goes through `useStreamMessage`. Layer E is therefore a
+**consistency rider**, not a fix for observable behaviour: it keeps the
+non-stream hook's request body identical to `useStreamMessage`'s (WI-2220) so
+the hook cannot ship a V0-defaulting body the day a caller is wired to it.
+The rider is explicit WI-2472 DoR scope and is retained deliberately.
+
 Commands (from repo root):
 
 ```
@@ -57,7 +70,8 @@ node --max-old-space-size=6144 ./node_modules/jest/bin/jest.js \
 - ✗ `reports shell v2 when MODE_NAV_V2_ENABLED is on`
 - ✗ `reports shell v0 when MODE_NAV_V2_ENABLED is off`
 
-**Layer E** — `apps/mobile/src/hooks/use-sessions.test.ts`
+**Layer E** — `apps/mobile/src/hooks/use-sessions.test.ts` (consistency rider —
+`useSendMessage` has no production callers today; see *Reachability* above)
 - ✗ `reports shell v2 when MODE_NAV_V2_ENABLED is on`
 - ✗ `reports shell v0 when MODE_NAV_V2_ENABLED is off`
 
