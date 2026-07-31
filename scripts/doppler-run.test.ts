@@ -9,6 +9,7 @@ const REPO_ROOT = join(__dirname, '..');
 const SCRIPT = join(REPO_ROOT, 'scripts', 'doppler-run.mjs');
 const SCRIPT_URL = pathToFileURL(SCRIPT).href;
 const CI_WORKFLOW = join(REPO_ROOT, '.github', 'workflows', 'ci.yml');
+const PACKAGE_JSON = join(REPO_ROOT, 'package.json');
 const FAKE_DOPPLER_PRELOAD =
   './scripts/__fixtures__/doppler-run/fake-doppler-preload.cjs';
 const EMPTY_PATH_DIR = join(REPO_ROOT, 'scripts', '__fixtures__'); // has no `doppler` executable
@@ -337,5 +338,24 @@ describe('native Windows CI gate (WI-2522)', () => {
 
     expect(windowsJob?.['runs-on']).toBe('windows-latest');
     expect(dopplerStep?.run).toBe('pnpm test:doppler-run');
+  });
+});
+
+describe('scripts-suite CI command (WI-2522)', () => {
+  test('runs through a pnpm lifecycle that supplies npm_execpath', () => {
+    const packageJson = JSON.parse(readFileSync(PACKAGE_JSON, 'utf8')) as {
+      scripts?: Record<string, string>;
+    };
+    const workflow = parseYaml(readFileSync(CI_WORKFLOW, 'utf8')) as {
+      jobs?: Record<string, { steps?: Array<{ name?: string; run?: string }> }>;
+    };
+    const scriptsStep = workflow.jobs?.main?.steps?.find(
+      (step) => step.name === 'scripts/* tests',
+    );
+
+    expect(packageJson.scripts?.['test:scripts']).toBe(
+      'jest --config scripts/jest.config.cjs --no-coverage',
+    );
+    expect(scriptsStep?.run).toBe('pnpm run test:scripts');
   });
 });

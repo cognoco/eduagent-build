@@ -11,6 +11,7 @@
     "build": "nx run-many -t build",
     "test": "node scripts/doppler-run.mjs run -- nx run-many -t test",
     "test:doppler-run": "jest --config scripts/jest.config.cjs scripts/doppler-run.test.ts --runInBand --no-coverage",
+    "test:scripts": "jest --config scripts/jest.config.cjs --no-coverage",
     "test:api:unit": "jest --config apps/api/jest.config.cjs --runInBand",
     "test:api:integration": "node scripts/run-api-integration.mjs",
     "typecheck:integration": "tsc --project tests/integration/tsconfig.json",

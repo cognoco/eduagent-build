@@ -370,7 +370,7 @@ jobs:
       # them directly through ts-jest via scripts/jest.config.cjs.
       - name: scripts/* tests
         if: steps.scope.outputs.docs_only != 'true'
-        run: pnpm exec jest --config scripts/jest.config.cjs --no-coverage
+        run: pnpm run test:scripts
 
       # Same rationale as scripts/* tests above (WI-2120): tools/scripts/ EAS
       # build hooks live outside any Nx project too.

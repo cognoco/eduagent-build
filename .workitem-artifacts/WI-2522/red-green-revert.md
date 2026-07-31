@@ -236,6 +236,33 @@ Fifth-review TDD cycle under Node `v22.16.0`:
 4. **RESTORE GREEN:** restored the test-mode request:
    18 passed, 0 failed.
 
+## Scripts-suite lifecycle after sixth adversarial review
+
+At the sixth-review head, the focused `pnpm test:doppler-run` command supplied
+`npm_execpath`, but the bundled CI step invoked Jest through `pnpm exec`.
+Consequently, `npm_execpath` was absent inside Jest and all four package-script
+subprocess cases threw before dispatch. The exact old CI command reproduced the
+review result: 64 of 65 suites passed, with 4 failed and 1,131 passed tests.
+
+The root package now owns the bundled command as `test:scripts`, and CI invokes
+it through `pnpm run test:scripts`. That lifecycle supplies the actual pnpm CLI
+path without weakening or skipping the four package-script tests. A focused
+regression assertion pins both the package-script body and the CI `run:` line.
+
+Sixth-review TDD cycle under Node `v22.16.0`:
+
+1. **RED:** added the command-shape assertion before either configuration
+   change. Result: 1 failed, 18 passed; `test:scripts` was absent.
+2. **GREEN:** added `test:scripts` and routed CI through its lifecycle.
+   Result: 19 passed, 0 failed.
+3. **CONFIGURATION-ONLY REVERT RED:** restored only CI's direct Jest command
+   while holding the package script and assertion fixed. Result:
+   1 failed, 18 passed on the exact CI-command mismatch.
+4. **RESTORE GREEN:** restored `pnpm run test:scripts`.
+   Result: 19 passed, 0 failed.
+5. **FULL CI-EQUIVALENT GREEN:** `pnpm run test:scripts` completed with
+   65 suites and 1,136 tests passed, 0 failed.
+
 ## Package-script dispatch coverage
 
 The focused suite runs `pnpm test`, `pnpm test:api:integration`, and
