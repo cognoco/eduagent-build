@@ -169,7 +169,7 @@ for (const { name, rows, expectedDrift } of [
     assert.deepEqual(result.stdout, []);
     assert.deepEqual(result.stderr, [
       `development schema freshness failed: ${expectedDrift}`,
-      'reconcile only after approval with: pnpm db:push:dev',
+      'reconcile only after approval with: pnpm db:reconcile:dev-schema',
     ]);
   });
 }

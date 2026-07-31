@@ -95,7 +95,9 @@ export async function runDevelopmentSchemaCheck({
         drift.push(`incompatible ${incompatible.join(', ')}`);
       }
       stderr(`development schema freshness failed: ${drift.join('; ')}`);
-      stderr('reconcile only after approval with: pnpm db:push:dev');
+      stderr(
+        'reconcile only after approval with: pnpm db:reconcile:dev-schema',
+      );
       return 2;
     }
 
