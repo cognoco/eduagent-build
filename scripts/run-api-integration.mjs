@@ -113,9 +113,9 @@ function assertDatabaseContract() {
       `Doppler project "${dopplerProject}" is refused; expected "mentomate".`,
     );
   }
-  if (dopplerConfig && dopplerConfig !== 'integration') {
+  if (dopplerConfig && dopplerConfig !== 'dev_integration') {
     refuse(
-      `Doppler config "${dopplerConfig}" is refused; expected "integration".`,
+      `Doppler config "${dopplerConfig}" is refused; expected "dev_integration".`,
     );
   }
   if (dopplerEnvironment && dopplerEnvironment !== 'dev') {
@@ -135,8 +135,8 @@ function assertDatabaseContract() {
 
   requiredEnv('DOPPLER_PROJECT');
   requiredEnv('DOPPLER_ENVIRONMENT');
-  if (dopplerConfig !== 'integration') {
-    refuse('DOPPLER_CONFIG=integration is required for a remote database.');
+  if (dopplerConfig !== 'dev_integration') {
+    refuse('DOPPLER_CONFIG=dev_integration is required for a remote database.');
   }
 
   const expectedHost = requiredEnv('INTEGRATION_DATABASE_HOST').toLowerCase();
@@ -218,7 +218,7 @@ function main() {
     '--project',
     'mentomate',
     '--config',
-    'integration',
+    'dev_integration',
     '--',
     process.execPath,
     SCRIPT,

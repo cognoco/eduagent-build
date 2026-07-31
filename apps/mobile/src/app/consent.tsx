@@ -28,6 +28,7 @@ import {
 import { useNetworkStatus } from '../hooks/use-network-status';
 import { formatApiError } from '../lib/format-api-error';
 import { goBackOrReplace } from '../lib/navigation';
+import { getPostAuthDefaultPath } from './(app)/_lib/auth-redirect';
 
 // Captured at module load — safe because these screens are portrait-locked.
 // On web, cap at a mobile-like height to avoid massive whitespace.
@@ -73,6 +74,9 @@ export default function ConsentScreen() {
 
   const handleClose = useCallback(() => {
     goBackOrReplace(router, '/(app)/home');
+  }, [router]);
+  const handleCompleted = useCallback(() => {
+    router.replace(getPostAuthDefaultPath());
   }, [router]);
 
   // BUG-26: Fade animation for phase transitions (child → parent → success)
@@ -475,7 +479,7 @@ export default function ConsentScreen() {
                 }
                 onPress={() =>
                   deliveryState === 'sent'
-                    ? handleClose()
+                    ? handleCompleted()
                     : transitionToPhase('parent')
                 }
                 testID="consent-done"

@@ -30,6 +30,7 @@ import {
   cleanupAccounts,
   createIntegrationDb,
 } from './helpers';
+import { markConversationLanguageConfirmedForTest } from '../../apps/api/src/test-utils/conversation-language-confirmation';
 import { buildAuthHeaders } from './test-keys';
 import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
 import { clearFetchCalls } from './fetch-interceptor';
@@ -103,7 +104,15 @@ async function createOwnerProfile(): Promise<string> {
 
   expect(res.status).toBe(201);
   const body = await res.json();
-  return body.profile.id as string;
+  const profileId = body.profile.id as string;
+  // [WI-1556] The route creates a first-run profile with no confirmed
+  // conversation language. These suites exercise ordinary session flows, so
+  // the learner must be an ordinary confirmed existing user.
+  await markConversationLanguageConfirmedForTest(
+    createIntegrationDb(),
+    profileId,
+  );
+  return profileId;
 }
 
 async function seedSubjectWithTopic(

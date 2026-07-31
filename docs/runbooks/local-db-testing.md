@@ -11,12 +11,12 @@ corepack pnpm run test:api:integration
 
 This is the only canonical workstation command for the API co-located integration
 suite. It uses `package.json#packageManager` (`pnpm@10.19.0`) through Corepack,
-selects Doppler project `mentomate` and config `integration` explicitly, validates
+selects Doppler project `mentomate` and config `dev_integration` explicitly, validates
 the database identity, then enters the Nx `api:integration-api` target. The target
 repeats the same guard before Jest, so invoking Nx directly cannot bypass it.
 
 The command fails before Jest unless the operator has provisioned a dedicated,
-disposable database and added these values to Doppler's `mentomate/integration`
+disposable database and added these values to Doppler's `mentomate/dev_integration`
 config (under the `dev` Doppler environment):
 
 | Variable | Required value |
@@ -30,7 +30,8 @@ config (under the `dev` Doppler environment):
 
 Doppler supplies `DOPPLER_PROJECT`, `DOPPLER_CONFIG`, and
 `DOPPLER_ENVIRONMENT` to the child process. The launcher requires exactly
-`mentomate`, `integration`, and `dev`. Missing identity metadata, a protected
+`mentomate`, `dev_integration`, and `dev`. The `dev_` prefix is required by
+Doppler for non-default development configs. Missing identity metadata, a protected
 endpoint match, staging/production labels, and non-disposable metadata all fail
 closed. Do not point this config at an existing dev, staging, or production
 branch. Database/config provisioning and secret changes are operator-owned.

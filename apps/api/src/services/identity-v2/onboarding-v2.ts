@@ -44,10 +44,16 @@ export async function updateConversationLanguageV2(
   profileId: string,
   organizationId: string,
   conversationLanguage: ConversationLanguage,
+  confirm: boolean,
 ): Promise<boolean> {
+  const now = new Date();
   const result = await db
     .update(person)
-    .set({ conversationLanguage, updatedAt: new Date() })
+    .set({
+      conversationLanguage,
+      ...(confirm ? { conversationLanguageConfirmedAt: now } : {}),
+      updatedAt: now,
+    })
     .where(
       and(
         eq(person.id, profileId),

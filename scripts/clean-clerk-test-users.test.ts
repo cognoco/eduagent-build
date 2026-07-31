@@ -1,19 +1,26 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-const { PROTECTED_REUSABLE_EMAILS, classifyClerkTestUserForCleanup } =
-  require('./clean-clerk-test-users-lib') as {
-    PROTECTED_REUSABLE_EMAILS: Set<string>;
-    classifyClerkTestUserForCleanup: (
-      user: {
-        id: string;
-        email: string;
-        externalId: string | null;
-        createdAt: string | null;
-      },
-      options: { nowMs: number; olderThanHours: number },
-    ) => { eligible: boolean; reason: string };
-  };
+const {
+  PROTECTED_REUSABLE_EMAILS,
+  classifyClerkTestUserForCleanup,
+  restoreAllClerkDeletionMarkers,
+} = require('./clean-clerk-test-users-lib') as {
+  PROTECTED_REUSABLE_EMAILS: Set<string>;
+  classifyClerkTestUserForCleanup: (
+    user: {
+      id: string;
+      email: string;
+      externalId: string | null;
+      createdAt: string | null;
+    },
+    options: { nowMs: number; olderThanHours: number },
+  ) => { eligible: boolean; reason: string };
+  restoreAllClerkDeletionMarkers: <T>(
+    pendingDeletions: T[],
+    restoreOne: (pendingDeletion: T) => Promise<void>,
+  ) => Promise<void>;
+};
 
 describe('[WI-1771] clean-clerk-test-users classification', () => {
   const now = Date.parse('2026-07-10T12:00:00Z');
@@ -128,5 +135,93 @@ describe('[WI-1771] clean-clerk-test-users classification', () => {
 
     expect(decision.eligible).toBe(false);
     expect(decision.reason).toBe('unknown-age');
+  });
+});
+
+describe('[WI-2820 P1] clean-clerk-test-users execution protocol', () => {
+  const scriptSource = fs.readFileSync(
+    path.join(__dirname, 'clean-clerk-test-users.mjs'),
+    'utf8',
+  );
+  const executePath = scriptSource.slice(
+    scriptSource.indexOf('// --execute path'),
+  );
+
+  it('marks selected Clerk users before verified-ID DB cleanup and local deletion', () => {
+    const markIndex = executePath.indexOf(
+      'markClerkUsersForDeletion(deletableSeedUsers)',
+    );
+    const cleanupIndex = executePath.indexOf('cleanupDbRows(seedIds)');
+    const deleteIndex = executePath.indexOf(
+      'for (const [index, pendingDeletion] of pendingDeletions.entries())',
+    );
+
+    expect(markIndex).toBeGreaterThanOrEqual(0);
+    expect(cleanupIndex).toBeGreaterThan(markIndex);
+    expect(deleteIndex).toBeGreaterThan(cleanupIndex);
+  });
+
+  it('restores markers when DB cleanup or a Clerk delete fails', () => {
+    expect(executePath).toMatch(
+      /try\s*\{\s*result = await cleanupDbRows\(seedIds\);\s*\}\s*catch \(error\) \{\s*await restoreClerkDeletionMarkers\(pendingDeletions\);/,
+    );
+    expect(executePath).toMatch(
+      /catch \(error\) \{\s*await restoreClerkDeletionMarkers\(pendingDeletions\.slice\(index\)\);/,
+    );
+  });
+
+  it('exhaustively restores the remaining markers and stops after a non-OK delete', () => {
+    const failedDeleteBranch =
+      /\} else \{\s*await restoreClerkDeletionMarkers\(pendingDeletions\.slice\(index\)\);\s*failed\+\+;[\s\S]*?break;\s*\}/;
+
+    expect(executePath).toMatch(failedDeleteBranch);
+    const failedDeleteBranchIndex = executePath.search(failedDeleteBranch);
+    expect(
+      executePath.indexOf('if (failed > 0) process.exit(1);'),
+    ).toBeGreaterThan(failedDeleteBranchIndex);
+  });
+
+  it('restores the camel-case external ID mapped from Clerk responses', () => {
+    expect(scriptSource).toMatch(
+      /const externalId = user\.external_id \?\? null;[\s\S]*const entry = \{[\s\S]*externalId,[\s\S]*pendingDeletions\.push\(\{ user, originalExternalId: user\.externalId \}\);/,
+    );
+  });
+
+  it('fails closed when the verified-ID reset secret is unavailable', () => {
+    expect(scriptSource).toMatch(/if \(!testSecret\)/);
+    expect(scriptSource).toMatch(/TEST_SEED_SECRET is required/);
+  });
+});
+
+describe('[WI-2940] local Clerk deletion-marker recovery', () => {
+  it('settles every restore before reporting a credential-safe aggregate error', async () => {
+    let laterRestoreSettled = false;
+    const restoreOne = jest.fn(async ({ id }: { id: string }) => {
+      if (id === 'first') {
+        throw new Error('WI2940_LOCAL_RESPONSE_SECRET');
+      }
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      laterRestoreSettled = true;
+    });
+
+    let caught: unknown;
+    try {
+      await restoreAllClerkDeletionMarkers(
+        [{ id: 'first' }, { id: 'later' }],
+        restoreOne,
+      );
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(restoreOne).toHaveBeenCalledTimes(2);
+    expect(laterRestoreSettled).toBe(true);
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).message).toContain(
+      'failed to restore 1 of 2 Clerk deletion markers',
+    );
+    expect((caught as Error).message).not.toContain(
+      'WI2940_LOCAL_RESPONSE_SECRET',
+    );
   });
 });

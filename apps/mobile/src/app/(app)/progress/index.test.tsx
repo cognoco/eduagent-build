@@ -8,6 +8,7 @@ import {
 import { RefreshControl } from 'react-native';
 
 import ProgressScreen from './index';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 // ── Translation stub ─────────────────────────────────────────────────────────
 
@@ -367,6 +368,47 @@ describe('ProgressScreen refresh error handling', () => {
       params: { profileId: 'child-1' },
     });
     expect(mockPush).not.toHaveBeenCalledWith('/(app)/library');
+  });
+
+  describe('no-active-subject empty-state CTA destination [WI-2467]', () => {
+    let originalV2: boolean;
+
+    beforeEach(() => {
+      originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    });
+
+    afterEach(() => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        originalV2;
+    });
+
+    it('navigates to library when V2 nav is off', async () => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        false;
+
+      render(<ProgressScreen />);
+
+      await waitFor(() => {
+        screen.getByTestId('progress-start-learning');
+      });
+      fireEvent.press(screen.getByTestId('progress-start-learning'));
+
+      expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+    });
+
+    it('navigates to V2 Subjects when V2 nav is on', async () => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        true;
+
+      render(<ProgressScreen />);
+
+      await waitFor(() => {
+        screen.getByTestId('progress-start-learning');
+      });
+      fireEvent.press(screen.getByTestId('progress-start-learning'));
+
+      expect(mockPush).toHaveBeenCalledWith('/(app)/subjects');
+    });
   });
 
   it('uses child hero copy when parent proxy views the active child progress', async () => {
