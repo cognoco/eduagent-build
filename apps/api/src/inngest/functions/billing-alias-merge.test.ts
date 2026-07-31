@@ -12,32 +12,10 @@
 // billing-v2/alias-merge-v2.integration.test.ts (real Postgres, v2 table).
 // ---------------------------------------------------------------------------
 
-const consoleErrorSpy = jest
-  .spyOn(console, 'error')
-  .mockImplementation(() => undefined);
-const mockInngestSend = jest.fn().mockResolvedValue({ ids: [] });
-
-// External boundary only: capture inngest.createFunction so the handler fn is
-// directly invocable (mirrors payment-failed-observe.test.ts).
-jest.mock('../client', () => {
-  const actual = jest.requireActual('../client') as typeof import('../client');
-  return {
-    ...actual,
-    inngest: {
-      createFunction: jest.fn(
-        (_opts: unknown, _trigger: unknown, fn: unknown) =>
-          Object.assign(fn as object, {
-            opts: _opts,
-            trigger: _trigger,
-            fn,
-          }),
-      ),
-      send: (...args: unknown[]) => mockInngestSend(...args),
-    },
-  };
-});
+let consoleErrorSpy: jest.SpyInstance;
 
 import { billingAliasMerge } from './billing-alias-merge';
+import { inngest } from '../client';
 // [WI-1057] spy on the REAL merge service (NOT a jest.mock module mock — GC1
 // clean) to assert the v2 merge path runs. getStepDatabase only instantiates
 // a lazy Drizzle handle (no connection) and the spied service never queries
@@ -52,11 +30,14 @@ import * as sentry from '../../services/sentry';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 beforeEach(() => {
-  consoleErrorSpy.mockClear();
+  consoleErrorSpy = jest
+    .spyOn(console, 'error')
+    .mockImplementation(() => undefined);
+  jest.spyOn(safeNonCore, 'safeSend').mockResolvedValue(undefined);
 });
 
-afterAll(() => {
-  consoleErrorSpy.mockRestore();
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 function invoke(data: unknown) {
@@ -71,9 +52,11 @@ function invoke(data: unknown) {
 
 describe('billingAliasMerge worker [BUG-783]', () => {
   it('is registered as the listener for app/billing.alias_received', () => {
-    expect((billingAliasMerge as any).trigger).toEqual({
-      event: 'app/billing.alias_received',
-    });
+    expect((billingAliasMerge as any).opts.triggers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ event: 'app/billing.alias_received' }),
+      ]),
+    );
   });
 
   it('declares event-id idempotency + per-event concurrency', () => {
@@ -142,6 +125,9 @@ describe('billingAliasMerge worker [BUG-783]', () => {
     const safeSendSpy = jest
       .spyOn(safeNonCore, 'safeSend')
       .mockResolvedValue(undefined);
+    const inngestSendSpy = jest
+      .spyOn(inngest, 'send')
+      .mockResolvedValue({ ids: [] });
     const opts = (billingAliasMerge as any).opts;
 
     await opts.onFailure({
@@ -166,7 +152,7 @@ describe('billingAliasMerge worker [BUG-783]', () => {
     });
 
     await expect(sendThunk()).resolves.not.toThrow();
-    expect(mockInngestSend).toHaveBeenCalledWith({
+    expect(inngestSendSpy).toHaveBeenCalledWith({
       name: 'app/billing.alias_merge.failed',
       data: {
         eventId: 'evt-alias-terminal',
@@ -175,7 +161,7 @@ describe('billingAliasMerge worker [BUG-783]', () => {
         timestamp: expect.any(String),
       },
     });
-    expect(JSON.stringify(mockInngestSend.mock.calls)).not.toContain(
+    expect(JSON.stringify(inngestSendSpy.mock.calls)).not.toContain(
       'private context',
     );
   });
