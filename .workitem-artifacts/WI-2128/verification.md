@@ -63,6 +63,13 @@ The fast gate's API-unit refusal was a fail-closed environment guard, not a test
 - **ROOT CAUSE:** WI-2128 intentionally moved that rejection earlier. Shared profile scope now permits only self or an uncredentialed managed charge; the consent route still binds its subsequent write decision to `callerPersonId`, and fresh-factor proof verifies the current login without substituting its Person. The production behavior matched WI-2128's acceptance criteria and mandatory real-database regression; the older test expectations described the superseded boundary.
 - **GREEN:** updated only the stale real-database expectations and their contract comments. With identity-v2 and repointed flags enabled, the two corrected suites plus `wi2128-family-join-identity.integration.test.ts` passed together: 3 suites, 38 tests, 0 failures. No production authorization was relaxed or changed in this correction.
 
+## WI-2518 landed-contract collision correction
+
+- **COLLISION:** `WI-2518` landed on `origin/main` at `da7a1842066765796ed1f1a4ef988b13a5bd01a4` while exact-head PR checks were starting. GitHub's synthetic merge added `wi2518-supporter-read-authority.integration.test.ts`; its borrowed-profile supporter-hub expectation returned HTTP 403 instead of an extra, non-AC HTTP 200 behavior.
+- **AUTHORITATIVE CONTRACT:** WI-2518's live Acceptance Criteria require the credentialed non-owner selecting another same-account Person to be denied 403 on both supporter-read routes, while the same caller using their own correctly selected profile and accepted supportership succeeds. WI-2128 independently requires every explicit owner, credentialed sibling, or unrelated Person selection to fail at central profile scope.
+- **RED:** after merge-forwarding the landed WI-2518 tree, the exact focused suite failed 1/1 at the borrowed-profile supporter-hub assertion: expected 200, received 403. Hosted flag-on CI reproduced the same single failure with 72 other suites and 607 tests passing.
+- **GREEN:** moved the two supporter-hub requests into the borrowed-profile 403 matrix; the honest caller-Person matrix remains unchanged at 200 with the supportee marker. The combined compatibility set passed 4 suites / 39 tests under both identity-v2 flags. No production authorization code changed.
+
 ## Baseline-only findings
 
 - **WI-2892 — correct headerless profile-resolution documentation to caller Person:** `docs/architecture.md` still describes omitted `X-Profile-Id` as an `account.id` fallback, contradicting the login-bound caller-Person contract. Captured and admitted to BID-49 separately; no WI-2128 documentation expansion.

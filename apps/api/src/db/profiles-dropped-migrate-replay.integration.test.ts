@@ -75,11 +75,11 @@ interface JournalEntry {
   breakpoints: boolean;
 }
 
-function requireDatabaseUrl(): string {
-  const url = process.env.DATABASE_URL;
+function requireScratchDatabaseUrl(): string {
+  const url = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
-      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.',
+      'DIRECT_URL or DATABASE_URL is not set. Create .env.test.local or .env.development.local.',
     );
   }
   return url;
@@ -161,7 +161,7 @@ async function expectUndefinedTableError(
 }
 
 describe('migration-tail replay on a profiles-dropped database [WI-1167]', () => {
-  const baseUrl = requireDatabaseUrl();
+  const baseUrl = requireScratchDatabaseUrl();
   const scratchRunId = randomBytes(4).toString('hex');
   const databaseName = `wi1167_replay_${scratchRunId}`;
   const scratchApplicationName = `wi1167-replay-${scratchRunId}`;

@@ -4674,7 +4674,8 @@
         "learningTime_one": "{{count}} hora de aprendizaje",
         "learningTime_other": "{{count}} horas de aprendizaje",
         "cefrLevelUp": "Nivel de idioma aumentado",
-        "topicsExplored": "{{count}} temas explorados en {{subject}}"
+        "topicsExplored_one": "{{count}} tema explorado en {{subject}}",
+        "topicsExplored_other": "{{count}} temas explorados en {{subject}}"
       }
     }
   }

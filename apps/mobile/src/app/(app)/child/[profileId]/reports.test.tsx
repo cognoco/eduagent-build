@@ -733,4 +733,13 @@ describe('getNextReportInfo', () => {
     expect(result.date).toContain('December 22');
     expect(result.date).toContain('2025');
   });
+
+  it.each([
+    ['en-US', 'June 8, 2026'],
+    ['de', '8. Juni 2026'],
+  ])('formats the next report date for the %s locale', (locale, expected) => {
+    const wednesday = new Date(Date.UTC(2026, 5, 3, 12, 0, 0));
+
+    expect(getNextReportInfo(wednesday, locale).date).toBe(expected);
+  });
 });
