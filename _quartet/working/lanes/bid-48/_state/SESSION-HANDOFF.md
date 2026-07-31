@@ -38,10 +38,11 @@ Last reconciled: 2026-07-31 08:00 CEST
   automated review are running. Live mutation remains explicitly operator-gated.
 - WI-2941 — member 42, executing the missing sanctioned expired-cross-owner claim
   recovery capability in Marketplace PR #166 at exact head `9652d7d`; two in-scope
-  review considerations were repaired, and the expanded focused/full local gates are
-  green while fresh hosted CI/review run. WI-2755 expired after capture, so seven
-  stale claims remain untouched pending governed landing, independent review, and
-  deployment.
+  review considerations were repaired, and the expanded focused/full local and hosted
+  functional gates are green. Three exact-head Claude attempts aborted before a
+  review turn, so the governed merge gate remains correctly closed. WI-2755 expired
+  after capture, so seven stale claims remain untouched pending governed landing,
+  independent review, and deployment.
 - WI-2800 — Ready/Active after review rejected its already-landed `fdbe36d2` evidence:
   the isolated run diagnosed a different 68.6-second sign-in failure and did not
   attribute the original hosted 90-second exhaustion. WI-2826 plus the hosted gate

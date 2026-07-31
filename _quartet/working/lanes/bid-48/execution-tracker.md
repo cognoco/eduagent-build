@@ -78,11 +78,12 @@ Delivery Batch as `Done`.
   green and hosted CI/review are running. Real live bootstrap remains explicitly
   operator-gated.
 - WI-2941 Marketplace PR #166 is at exact head `9652d7d`; two in-scope review
-  considerations were repaired and the expanded focused/full local gates are green
-  while fresh hosted CI/review run. WI-2755 expired after capture, so the post-landing
-  recovery set is now seven cross-owner claims. All remain untouched pending governed
-  landing, Nexus commissioning, and independent review rather than being impersonated
-  or hand-edited.
+  considerations were repaired and the expanded focused/full local plus hosted
+  functional gates are green. Three exact-head Claude attempts aborted before a
+  review turn, so the governed merge gate remains correctly closed. WI-2755 expired
+  after capture, making the post-landing recovery set seven cross-owner claims. All
+  remain untouched pending governed landing, Nexus commissioning, and independent
+  review rather than being impersonated or hand-edited.
 - WI-2936 remains Ready pending the requested no-Doppler worktree exception.
   WI-2922 and WI-2923 remain Ready behind their exact shared-development database and
   Clerk/Doppler mutation approvals. Staging and production remain forbidden.
