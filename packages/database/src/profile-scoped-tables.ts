@@ -2,9 +2,9 @@
  * profile-scoped-tables.ts
  *
  * Schema scanner utilities shared by both rls-coverage test suites
- * (packages/database and apps/api). Exported via the package barrel so
- * apps/api can import via @eduagent/database without violating module
- * boundaries.
+ * (packages/database and apps/api). API consumers import the explicit
+ * @eduagent/database/profile-scoped-tables subpath so the eager root barrel
+ * does not evaluate this Node-only scanner in Worker ESM bundles.
  */
 
 import * as fs from 'fs';

@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
@@ -7,6 +8,16 @@ import {
 } from './profile-scoped-tables.js';
 
 describe('getProfileScopedTables', () => {
+  it('documents the explicit public subpath instead of the eager root barrel', () => {
+    const source = readFileSync(
+      join(__dirname, 'profile-scoped-tables.ts'),
+      'utf8',
+    );
+
+    expect(source).toContain('@eduagent/database/profile-scoped-tables');
+    expect(source).not.toContain('Exported via the package barrel');
+  });
+
   it('keeps the Node-only scanner out of the native ESM runtime barrel', () => {
     const result = spawnSync(
       process.execPath,
