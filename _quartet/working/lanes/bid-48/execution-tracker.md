@@ -13,8 +13,9 @@ Delivery Batch as `Done`.
 
 - Operator assignment: thread goal of 2026-07-26; formal Quartet commissioning is
   explicitly bypassed.
-- Topology: combined Orchestrator/Shepherd seat, no Clacks. Direct Cosmo and GitHub
-  polling substitutes for bus events; the earlier no-Clacks ruling remains binding.
+- Topology: combined Orchestrator/Shepherd seat with no standing Clacks attachment.
+  Direct Cosmo and GitHub polling remains primary. The operator explicitly directed
+  the bounded read/action of Clacks handoff 103751 for WI-2939.
 - Shepherd identity: `shepherd:codex:integration-migration`.
 - Repository `AGENTS.md`, ZDX lifecycle rules, the live Batch Brief, and later operator
   rulings outrank this tracker.
@@ -87,8 +88,12 @@ Delivery Batch as `Done`.
     WI-2939's disposable-schema proof.
   - WI-2921 — local Playwright seed-secret alignment; strict-green PR #2718 remains
     blocked by WI-2936.
-  - WI-2939 — disposable API schema bootstrap; draft PR #2741 remains blocked by
-    WI-2826 evidence and its explicit live-bootstrap gate.
+  - WI-2939 — disposable API schema bootstrap. Handoff 103751 corrected ownership to
+    BID-48 only. Exact head `45cad26d0` passed all 14 checks; the governed gate verified
+    four resolved threads and a fresh zero-finding approval, then squash-landed PR
+    #2741 as `42609a6d`. The item remains Executing behind AC-4's explicit operator
+    ruling for the uniquely named disposable non-staging live bootstrap; no DB
+    connection or mutation has occurred.
 - Ready queue:
   - WI-2643 — shared integration-role mutation gate.
   - WI-2795 — Workers Logs or controlled telemetry-reproduction gate.
@@ -125,7 +130,8 @@ Delivery Batch as `Done`.
   remote-mutation effects than isolated local setup; no new Work Item was created.
 - FO-2081 (`OCC-85FD83133D26`) records WI-2755's landed direct-URL preference still
   failing the required DATABASE_URL-only teardown replay; no new Work Item was created.
-- Checkpoint branch `bid-48-lane-state` is pushed through `02c8ba9c8`.
+- Checkpoint branch `bid-48-lane-state` was pushed through `0ecce9bed` before this
+  handoff update.
 - The historical sections below are retained only as an audit trail. This section,
   Cosmo, and GitHub supersede every stale lifecycle position below.
 

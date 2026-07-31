@@ -1,10 +1,12 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-07-31 18:01 CEST
+Last reconciled: 2026-07-31 18:27 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
-- Topology: operator-authorized combined Orchestrator/Shepherd, no Clacks.
+- Topology: operator-authorized combined Orchestrator/Shepherd. No standing Clacks
+  attachment; the operator explicitly directed one bounded read/action of handoff
+  103751 on `mentomate-pgm` for WI-2939.
 - Status: `Running`.
 - Authoritative members (41): WI-2484, WI-2636, WI-2639, WI-2640, WI-2643, WI-2644,
   WI-2649, WI-2667, WI-2755, WI-2790, WI-2791, WI-2792, WI-2794, WI-2795,
@@ -34,17 +36,15 @@ Last reconciled: 2026-07-31 18:01 CEST
 - WI-2790 — source repair PR #2733 passed the governed gate and landed as `70411272`.
   The item remains Executing until WI-2939 supplies its separate disposable-schema
   proof.
-- WI-2939 — member 41, draft PR #2741 at exact head `631355d5` contains the distinct
-  revision-pinned schema-bootstrap tooling contract for WI-2790's uniquely named
-  disposable non-staging target. The corrected path directly replays the pinned SQL
-  journal before guarded schema reconciliation so raw RLS policies are retained; its
-  evidence now distinguishes committed migration DML/reference rows from forbidden
-  copied user data or separate seed commands. Focused/local gates and exact-head
-  review are green; the one bounded rerun of the legacy onboarding smoke reproduced
-  the identical two 60-second signed-in-readiness expirations. This is the admitted
-  WI-2826 dependency, not a new finding. PR #2741 remains draft and red until WI-2826
-  supplies the missing hosted discriminator and a fresh smoke reaches strict green.
-  No DB connection occurred, and live mutation remains explicitly operator-gated.
+- WI-2939 — Clacks handoff 103751 corrected ownership to BID-48 only; the erroneous
+  BID-39 relation and Brief entry were removed by the handing-off lane. PR #2741
+  reached exact head `45cad26d0` after five review findings were fixed with mutation
+  evidence and focused 41/41. Current-head CI passed 14/14; the governed gate verified
+  four resolved review threads and a fresh zero-finding approval, then squash-landed
+  the PR as `42609a6d`. Cosmo comment
+  `3ae8bce9-1f7c-8133-bd98-001dc987bf40` records the topology and landing evidence.
+  The item remains Executing: no DB connection occurred, and AC-4's live bootstrap of
+  the uniquely named disposable non-staging target remains explicitly operator-gated.
 - Operator correction — all eight shepherd-created infrastructure Work Items
   (WI-2792, WI-2812, WI-2815, WI-2819, WI-2924, WI-2931, WI-2941, WI-2946)
   are assigned to Nexus and normalized as factual issue reports. Their original
