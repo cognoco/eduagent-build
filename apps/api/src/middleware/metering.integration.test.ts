@@ -1,9 +1,11 @@
 import { resolve } from 'path';
 
 import { Hono } from 'hono';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, or } from 'drizzle-orm';
 import {
   createDatabase,
+  guardianship,
+  login,
   membership,
   organization,
   person,
@@ -171,6 +173,8 @@ function makeMeteredApp(input: {
   db: Database;
   account: Account;
   profileId: string;
+  callerPersonId?: string;
+  isOwner?: boolean;
 }) {
   const app = new Hono<MeteringEnv>();
   app.use('*', async (c, next) => {
@@ -183,8 +187,9 @@ function makeMeteredApp(input: {
       consentStatus: 'CONSENTED',
       hasPremiumLlm: false,
       conversationLanguage: 'en',
-      // intentional: proves metering reads quota role from DB membership, not from profileMeta — do not change to match the profileId's actual isOwner
-      isOwner: true,
+      // Metering reads quota role from DB membership, not this compatibility
+      // field. The guard still receives it to distinguish owner-role controls.
+      isOwner: input.isOwner ?? true,
       resolvedVia: 'explicit-header',
     });
     // [WI-2398] Caller-self identity — meteringMiddleware's assertNotProxyMode
@@ -194,7 +199,10 @@ function makeMeteredApp(input: {
     // about metering's quota-role lookup, not caller-identity authority.
     // MeteringEnv doesn't declare this Variable (assertNotProxyMode reads it
     // via an internal cast), hence `as never`.
-    c.set('callerPersonId' as never, input.profileId as never);
+    c.set(
+      'callerPersonId' as never,
+      (input.callerPersonId ?? input.profileId) as never,
+    );
     await next();
   });
   app.use('*', meteringMiddleware);
@@ -220,6 +228,14 @@ async function cleanup() {
     .where(inArray(subscriptionTable.organizationId, orgIds));
   await db.delete(membership).where(inArray(membership.organizationId, orgIds));
   if (personIds.length > 0) {
+    await db
+      .delete(guardianship)
+      .where(
+        or(
+          inArray(guardianship.guardianPersonId, personIds),
+          inArray(guardianship.chargePersonId, personIds),
+        ),
+      );
     await db.delete(person).where(inArray(person.id, personIds));
   }
   await db.delete(organization).where(inArray(organization.id, orgIds));
@@ -237,7 +253,7 @@ describe('meteringMiddleware per-profile v2 live path (integration)', () => {
 
   afterAll(cleanup);
 
-  it('lazy-provisions an absent child quota row and decrements it exactly once', async () => {
+  it('[WI-2653][RGR] lets a credentialed non-owner meter their own LLM message exactly once and lazy-provisions quota', async () => {
     const plus = getTierConfig('plus');
     const org = await seedOrganization(0);
     const owner = await seedPerson({
@@ -250,6 +266,13 @@ describe('meteringMiddleware per-profile v2 live path (integration)', () => {
       displayName: 'Child',
       isOwner: false,
     });
+    await createIntegrationDb()
+      .insert(login)
+      .values({
+        personId: child.id,
+        clerkUserId: `clerk-${child.id}`,
+        email: `${child.id}@integration.test`,
+      });
     const sub = await seedPlusSubscription({
       organizationId: org.id,
       payerPersonId: owner.id,
@@ -258,6 +281,7 @@ describe('meteringMiddleware per-profile v2 live path (integration)', () => {
       db: createIntegrationDb(),
       account: accountForOrg(org.id),
       profileId: child.id,
+      isOwner: false,
     });
 
     const res = await app.request(
@@ -279,6 +303,64 @@ describe('meteringMiddleware per-profile v2 live path (integration)', () => {
     const pool = await loadQuotaPool(sub.id);
     expect(pool).toMatchObject({ usedThisMonth: 0, usedToday: 0 });
   });
+
+  it.each([
+    ['managed', false],
+    ['credentialed', true],
+  ] as const)(
+    '[WI-2653] rejects a guardian selecting a %s non-owner before quota decrement',
+    async (_kind, credentialed) => {
+      const org = await seedOrganization(2);
+      const guardian = await seedPerson({
+        organizationId: org.id,
+        displayName: 'Guardian',
+        isOwner: true,
+      });
+      const charge = await seedPerson({
+        organizationId: org.id,
+        displayName: credentialed ? 'Credentialed charge' : 'Managed charge',
+        isOwner: false,
+      });
+      await createIntegrationDb().insert(guardianship).values({
+        guardianPersonId: guardian.id,
+        chargePersonId: charge.id,
+      });
+      if (credentialed) {
+        await createIntegrationDb()
+          .insert(login)
+          .values({
+            personId: charge.id,
+            clerkUserId: `clerk-${charge.id}`,
+            email: `${charge.id}@integration.test`,
+          });
+      }
+      const sub = await seedPlusSubscription({
+        organizationId: org.id,
+        payerPersonId: guardian.id,
+      });
+      const app = makeMeteredApp({
+        db: createIntegrationDb(),
+        account: accountForOrg(org.id),
+        profileId: charge.id,
+        callerPersonId: guardian.id,
+        isOwner: false,
+      });
+
+      const res = await app.request(
+        '/sessions/11111111-1111-4111-8111-111111111111/messages',
+        { method: 'POST' },
+      );
+
+      expect(res.status).toBe(403);
+      await expect(
+        loadProfileQuota(sub.id, charge.id),
+      ).resolves.toBeUndefined();
+      await expect(loadQuotaPool(sub.id)).resolves.toMatchObject({
+        usedThisMonth: 0,
+        usedToday: 0,
+      });
+    },
+  );
 
   it('returns child 402 details without exposing owner top-up availability', async () => {
     const plus = getTierConfig('plus');

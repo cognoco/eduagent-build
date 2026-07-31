@@ -9,7 +9,6 @@ import {
   sessionSummaries,
   curriculumBooks,
   subjects,
-  curricula,
   curriculumTopics,
   topicNotes,
   createScopedRepository,
@@ -21,6 +20,7 @@ import {
   findOwnedCurriculumTopic,
   findOwnedCurriculumTopics,
 } from '../curriculum-topic-ownership';
+import { getLatestCurriculum } from '../curriculum';
 
 // ---------------------------------------------------------------------------
 // FR210: Active time computation (internal analytics)
@@ -205,10 +205,7 @@ export async function buildBookLearningHistoryContext(
   // If the subject doesn't belong to this profile, bail out silently.
   if (!subject) return undefined;
 
-  const curriculum = await db.query.curricula.findFirst({
-    where: eq(curricula.subjectId, book.subjectId),
-    orderBy: desc(curricula.version),
-  });
+  const curriculum = await getLatestCurriculum(db, profileId, book.subjectId);
   if (!curriculum) return undefined;
 
   const topics = await db.query.curriculumTopics.findMany({
@@ -457,10 +454,7 @@ export async function buildHomeworkLibraryContext(
   });
   if (!subject) return undefined;
 
-  const curriculum = await db.query.curricula.findFirst({
-    where: eq(curricula.subjectId, subjectId),
-    orderBy: desc(curricula.version),
-  });
+  const curriculum = await getLatestCurriculum(db, profileId, subjectId);
   if (!curriculum) return undefined;
 
   const topics = await db.query.curriculumTopics.findMany({

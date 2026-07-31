@@ -11,7 +11,6 @@ import {
   subjects,
   curriculumBooks,
   curriculumTopics,
-  curricula,
   quizMissedItems,
   createScopedRepository,
   generateUUIDv7,
@@ -26,6 +25,7 @@ import { captureException } from './sentry';
 import { findOwnedCurriculumTopics } from './curriculum-topic-ownership';
 import { getPersonBirthYear } from './identity-v2/helpers';
 import { calculateAge } from './age-utils';
+import { getLatestCurricula } from './curriculum';
 
 // ---------------------------------------------------------------------------
 // silentDegrade — structured escalation for optional priority branches
@@ -535,15 +535,11 @@ async function findContinueBookCard(
 
   // [BUG-63] Batch: get all curricula for these subjects
   const subjectIds = [...new Set(booksWithSubjects.map((b) => b.subjectId))];
-  const allCurricula = await db.query.curricula.findMany({
-    where: inArray(curricula.subjectId, subjectIds),
-  });
-  const curriculumBySubject = new Map<string, (typeof allCurricula)[0]>();
-  for (const c of allCurricula) {
-    if (!curriculumBySubject.has(c.subjectId)) {
-      curriculumBySubject.set(c.subjectId, c);
-    }
-  }
+  const curriculumBySubject = await getLatestCurricula(
+    db,
+    profileId,
+    subjectIds,
+  );
   const bookIds = booksWithSubjects.map((b) => b.bookId);
   const curriculumIds = [...curriculumBySubject.values()].map((c) => c.id);
   // [L7-F9] Project only the columns the loop actually reads.
@@ -757,13 +753,13 @@ async function findHomeworkConnectionCard(
   if (activeSubjects.length === 0) return null;
 
   const subjectIds = activeSubjects.map((s) => s.id);
-  const allCurricula = await db.query.curricula.findMany({
-    where: inArray(curricula.subjectId, subjectIds),
-  });
-
-  if (allCurricula.length === 0) return null;
-
-  const curriculumIds = allCurricula.map((c) => c.id);
+  const curriculumBySubject = await getLatestCurricula(
+    db,
+    profileId,
+    subjectIds,
+  );
+  const curriculumIds = [...curriculumBySubject.values()].map((c) => c.id);
+  if (curriculumIds.length === 0) return null;
   // [L7-F9] Project only the columns the loop below actually reads.
   const allTopics = await db
     .select({
@@ -869,7 +865,7 @@ async function findHomeworkConnectionCard(
 
         // Resolve subject for boost check
         if (!matchSubjectId) {
-          const curriculum = allCurricula.find(
+          const curriculum = [...curriculumBySubject.values()].find(
             (c) => c.id === ownedTopic.curriculumId,
           );
           matchSubjectId =

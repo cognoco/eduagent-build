@@ -1,9 +1,13 @@
 import type { ScopedRepository } from '@eduagent/database';
 
+import { evaluateLearningTextByContent } from '../learning-text-safety/gate';
 import {
+  buildProjectionFromMergedState,
+  collectMemoryFactTextsForMergedState,
   hasMemoryFactsBackfillMarker,
   hasMemoryFactsMarker,
   readMemorySnapshotFromFacts,
+  replaceActiveMemoryFactsForProfile,
   writeMemoryFactsForAnalysis,
 } from './memory-facts';
 
@@ -106,6 +110,33 @@ describe('readMemorySnapshotFromFacts', () => {
 // ---------------------------------------------------------------------------
 
 describe('[BUG-365] memory-facts marker split', () => {
+  const mergedState = {
+    strengths: [],
+    struggles: [],
+    interests: [],
+    communicationNotes: [] as string[],
+    suppressedInferences: [],
+    interestTimestamps: {},
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+  };
+
+  /**
+   * [WI-2628] A REAL gate over the fixture's own candidate texts.
+   *
+   * Deliberately not a `{ isSafe: () => true }` stand-in. A hand-rolled
+   * always-true gate makes the "force `isSafe` true" mutation unfalsifiable in
+   * exactly the tests meant to catch it — the fixture would already BE the
+   * mutation, so the test would pass identically before and after.
+   * `provenance: 'migration'` never consults the judge, so no LLM call is made.
+   */
+  const gateFor = (profileId: string, state: typeof mergedState) =>
+    evaluateLearningTextByContent({
+      texts: collectMemoryFactTextsForMergedState(profileId, state),
+      fieldKind: 'memory_fact',
+      conversationLanguage: undefined,
+      provenance: 'migration',
+    });
+
   describe('hasMemoryFactsMarker', () => {
     it('returns true when only the backfill-cron marker is set', () => {
       expect(
@@ -175,16 +206,6 @@ describe('[BUG-365] memory-facts marker split', () => {
       return { fakeDb, setCalls };
     }
 
-    const mergedState = {
-      strengths: [],
-      struggles: [],
-      interests: [],
-      communicationNotes: [],
-      suppressedInferences: [],
-      interestTimestamps: {},
-      createdAt: new Date('2026-01-01T00:00:00Z'),
-    };
-
     // Red-green regression: prior single-column setup stamped
     // memoryFactsBackfilledAt from BOTH paths. The fix stamps
     // memoryFactsAnalysedAt from the runtime path so the two are
@@ -196,6 +217,7 @@ describe('[BUG-365] memory-facts marker split', () => {
         fakeDb as never,
         'profile-1',
         mergedState,
+        await gateFor('profile-1', mergedState),
       );
 
       expect(setCalls).toHaveLength(1);
@@ -206,6 +228,92 @@ describe('[BUG-365] memory-facts marker split', () => {
       // After the fix, the runtime path must NOT touch that column — the
       // backfill cron is its sole writer.
       expect(values).not.toHaveProperty('memoryFactsBackfilledAt');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-2628] AC-5 — the multilingual gate now decides what this writer inserts.
+  // -------------------------------------------------------------------------
+  describe('replaceActiveMemoryFactsForProfile (multilingual gate)', () => {
+    const PROFILE_ID = '018f8f3e-0000-7000-8000-00000000000f';
+    // Czech person-attribution. The retired English-only guard PASSED this string
+    // (asserted in persisted-learning-text-guard.guard.test.ts); the gate blocks
+    // it. That asymmetry is what makes this a real control rather than a
+    // formality — a test built only on the English case would stay green if the
+    // wiring silently fell back to the old guard.
+    const CLINICAL_CS = 'Petr má dyslexii a potřebuje pomoc.';
+    const CLEAR_EDUCATIONAL = 'The learner responds well to worked examples.';
+
+    function makeCapturingDb() {
+      const inserted: Array<Record<string, unknown>[]> = [];
+      const db = {
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([]),
+          }),
+        }),
+        delete: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue(undefined),
+        }),
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockImplementation((rows: unknown) => {
+            inserted.push(rows as Record<string, unknown>[]);
+            return Promise.resolve(undefined);
+          }),
+        }),
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(undefined),
+          }),
+        }),
+      };
+      return { db, inserted };
+    }
+
+    const stateWith = (notes: string[]) => ({
+      ...mergedState,
+      communicationNotes: notes,
+    });
+
+    const insertedTexts = (inserted: Array<Record<string, unknown>[]>) =>
+      inserted.flat().map((row) => row['text']);
+
+    it('inserts only the rows the gate cleared', async () => {
+      const state = stateWith([CLINICAL_CS, CLEAR_EDUCATIONAL]);
+      const { db, inserted } = makeCapturingDb();
+
+      await replaceActiveMemoryFactsForProfile(
+        db as never,
+        PROFILE_ID,
+        buildProjectionFromMergedState(state),
+        await gateFor(PROFILE_ID, state),
+      );
+
+      expect(insertedTexts(inserted)).toEqual([CLEAR_EDUCATIONAL]);
+    });
+
+    it('drops every row when the gate evaluated NOTHING — the unset path fails closed', async () => {
+      // Commitment 5, asserted rather than inferred from reading the helper: a
+      // caller that wires an empty batch (the "I forgot to pass the texts" shape)
+      // persists nothing at all, instead of everything. Text here is entirely
+      // benign, so a green depends on the ABSENCE of an evaluation, not on any
+      // verdict about the content.
+      const state = stateWith([CLEAR_EDUCATIONAL]);
+      const { db, inserted } = makeCapturingDb();
+
+      await replaceActiveMemoryFactsForProfile(
+        db as never,
+        PROFILE_ID,
+        buildProjectionFromMergedState(state),
+        await evaluateLearningTextByContent({
+          texts: [],
+          fieldKind: 'memory_fact',
+          conversationLanguage: undefined,
+          provenance: 'migration',
+        }),
+      );
+
+      expect(inserted).toEqual([]);
     });
   });
 });

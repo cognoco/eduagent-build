@@ -7,9 +7,8 @@
 # step in e2e-web.yml is the secondary path. This workflow is the tertiary
 # safety net for the rare hard-kill case where neither runs.
 #
-# It calls POST /v1/__test/reset with no prefix filter, which the API
-# scopes to clerk_seed_* accounts only (see apps/api/src/routes/test-seed.ts).
-# Production data is never touched.
+# It uses the local verified-ID cleanup script. Bulk Clerk mutation never runs
+# in the Cloudflare Worker because the Worker has a 50-subrequest cap.
 
 name: E2E Web Cleanup
 
@@ -39,34 +38,44 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Reset seeded staging accounts
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+
+      - name: Install Doppler CLI
         env:
-          # Match the web smoke fallback; repos can override with E2E_API_URL.
-          API_URL: ${{ vars.E2E_API_URL || 'https://api-stg.mentomate.com' }}
-          TEST_SEED_SECRET: ${{ secrets.TEST_SEED_SECRET }}
-          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          DOPPLER_TOKEN_STG: ${{ secrets.DOPPLER_TOKEN_STG }}
         run: |
-          if [ -z "${TEST_SEED_SECRET}" ]; then
-            echo "::error::TEST_SEED_SECRET is not configured"
+          if [ -z "${DOPPLER_TOKEN_STG:-}" ]; then
+            echo "::error title=Nightly cleanup cannot run::DOPPLER_TOKEN_STG is not configured"
             exit 1
           fi
-          echo "Reset endpoint: ${API_URL}/v1/__test/reset"
-          if [ "${DRY_RUN}" = "true" ]; then
-            echo "::notice::DRY RUN — would POST to ${API_URL}/v1/__test/reset (skipped)"
-            exit 0
+          DOPPLER_VERSION="3.76.0"
+          DOPPLER_ARCHIVE="doppler_${DOPPLER_VERSION}_linux_amd64.tar.gz"
+          DOPPLER_SHA256="04f1ff30ed162d7af1dba7f11ad6a37ef35099de86a7ec6e261b64b1b337a3f3"
+          curl -fsSLO "https://github.com/DopplerHQ/cli/releases/download/${DOPPLER_VERSION}/${DOPPLER_ARCHIVE}"
+          echo "${DOPPLER_SHA256}  ${DOPPLER_ARCHIVE}" | sha256sum -c -
+          sudo tar -xzf "${DOPPLER_ARCHIVE}" -C /usr/local/bin doppler
+          doppler --version
+
+      - name: Clean stale seeded staging accounts
+        env:
+          API_URL: ${{ vars.E2E_API_URL || 'https://api-stg.mentomate.com' }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          if [ -z "${DOPPLER_TOKEN:-}" ]; then
+            echo "::error title=Nightly cleanup cannot run::DOPPLER_TOKEN_STG is not configured"
+            exit 1
           fi
-          # No prefix filter → clears all seed-created accounts older than the
-          # API's safety window. The endpoint guards against deleting non-seed
-          # data via account-naming conventions enforced server-side.
-          #
-          # Graceful degrade on transient failures: this is a *tertiary*
-          # safety net (Playwright globalTeardown + per-job reset run first),
-          # so a single 03:17 UTC hiccup against staging should warn, not
-          # produce nightly red. Mirrors the sibling step in e2e-web.yml:88.
-          # The next nightly run will sweep what this one missed.
-          response=$(curl --fail-with-body --silent --show-error \
-            -X POST \
-            -H "X-Test-Secret: ${TEST_SEED_SECRET}" \
-            "${API_URL}/v1/__test/reset") \
-            || { echo "::warning::seed reset returned non-2xx; next nightly run will sweep"; exit 0; }
-          echo "Response: ${response}"
+          if [ "${DRY_RUN}" = "true" ]; then
+            doppler run -p mentomate -c stg --preserve-env=API_URL -- \
+              node scripts/clean-clerk-test-users.mjs --older-than-hours=24
+          else
+            doppler run -p mentomate -c stg --preserve-env=API_URL -- \
+              node scripts/clean-clerk-test-users.mjs --older-than-hours=24 --execute
+          fi

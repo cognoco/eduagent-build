@@ -133,6 +133,26 @@ describe('generateEmbedding', () => {
     );
   });
 
+  it('[WI-2737][RGR] filters the exact Voyage request body before egress', async () => {
+    mockFetchSuccess(sampleVector);
+
+    await generateEmbedding(
+      'My name is Other Name and my email is other@example.com.',
+      TEST_API_KEY,
+    );
+
+    const request = (globalThis.fetch as jest.Mock).mock.calls[0]?.[1] as {
+      body: string;
+    };
+    expect(JSON.parse(request.body)).toEqual({
+      input: [
+        'My name is [personal information removed] [personal information removed] and my email is [personal information removed].',
+      ],
+      model: 'voyage-3.5',
+      input_type: 'document',
+    });
+  });
+
   it('throws descriptive error on non-200 response', async () => {
     mockFetchError(401, 'Unauthorized: invalid API key');
 

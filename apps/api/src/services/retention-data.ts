@@ -38,6 +38,7 @@ import {
   recallFeedbackSchema,
 } from '@eduagent/schemas';
 import { recordPracticeActivityEvent } from './practice-activity-events';
+import { getLatestCurriculum, getLatestCurricula } from './curriculum';
 import { safeWrite } from './safe-non-core';
 import { extractFirstJsonObject, CONVERSATION_LANGUAGE_NAMES } from './llm';
 import {
@@ -498,9 +499,7 @@ export async function getSubjectRetention(
   if (!subject) return { topics: [], reviewDueCount: 0 };
 
   // Find curriculum topics for this subject
-  const curriculum = await db.query.curricula.findFirst({
-    where: eq(curricula.subjectId, subjectId),
-  });
+  const curriculum = await getLatestCurriculum(db, profileId, subjectId);
   if (!curriculum) return { topics: [], reviewDueCount: 0 };
 
   const topics = await db.query.curriculumTopics.findMany({
@@ -601,17 +600,11 @@ export async function getAllSubjectsRetention(
   const subjectIds = profileSubjects.map((s) => s.id);
 
   // 2. Latest curricula for those subjects (one query, IN clause).
-  const allCurricula = await db.query.curricula.findMany({
-    where: inArray(curricula.subjectId, subjectIds),
-  });
-  // Pick latest per subject — same shape as the per-subject path
-  // (which uses findFirst — Drizzle returns the first row encountered).
-  const curriculumBySubject = new Map<string, (typeof allCurricula)[number]>();
-  for (const c of allCurricula) {
-    if (!curriculumBySubject.has(c.subjectId)) {
-      curriculumBySubject.set(c.subjectId, c);
-    }
-  }
+  const curriculumBySubject = await getLatestCurricula(
+    db,
+    profileId,
+    subjectIds,
+  );
   const curriculumIds = Array.from(curriculumBySubject.values()).map(
     (c) => c.id,
   );

@@ -42,6 +42,20 @@
  * only), so a cross-account supporter can never reach it. Only learner-self
  * and guardian exercise that surface — this is the "applicable projection"
  * qualifier in the AC, not an omission.
+ *
+ * [WI-2583] POSITIVE-ROW ASSERTION SHAPE. Positive rows originally asserted
+ * the notice concept with `JSON.stringify(cards).toContain(concept)` — a
+ * substring match over the serialized array, which any card field carrying
+ * the label would have satisfied. Positive rows now match the concept by
+ * STRING EQUALITY against `params.concept` of a single identified
+ * notice-bearing card (`noticeCardsMatchingConcept`), with the expected
+ * concepts enumerated from the same constants that seed them. The
+ * "positive-row assertion is falsifiable" describe below proves the
+ * tightening bites: it seeds the decoy label into a non-notice card's field
+ * (`retention_due.params.topicTitle`) AND into a different field of the
+ * notice card itself (`params.subjectName`), on a profile that also carries
+ * a genuine notice — so the old substring assertion passes on both decoys
+ * while the tightened one rejects them.
  */
 
 import { eq } from 'drizzle-orm';
@@ -101,15 +115,35 @@ const SUPPORTEE = {
   userId: 'integration-wi2498m-supportee-user',
   email: 'integration-wi2498m-supportee@integration.test',
 };
+/** [WI-2583] Owns the falsifiability fixture only — never a matrix row. */
+const POISON = {
+  userId: 'integration-wi2583-poison-user',
+  email: 'integration-wi2583-poison@integration.test',
+};
 
 const NOTICE_CONCEPT = (label: string) =>
   `WI2498-matrix open concept — ${label}`;
 const NOTICE_HINT = (label: string) => `WI2498-matrix hint — ${label}`;
 const LOCKED_CONCEPT = (label: string) =>
   `WI2498-matrix locked concept — ${label}`;
+/** [WI-2583] The four locked-in concepts seeded per profile, enumerated
+ *  exactly. The SAME array drives seeding and the overflow positive rows'
+ *  expected set, so a seeded value and an asserted value cannot drift apart
+ *  — which is what makes equality matching viable where the old substring
+ *  match only compared the shared prefix. */
+const LOCKED_CONCEPTS = (label: string): string[] =>
+  [0, 1, 2, 3].map((i) => `${LOCKED_CONCEPT(label)} #${i}`);
 const RECEIPT_CONCEPT = (label: string) =>
   `WI2498-matrix receipt concept — ${label}`;
 const RECEIPT_HINT = (label: string) => `WI2498-matrix receipt hint — ${label}`;
+
+/** [WI-2583] Falsifiability fixture labels. The two decoys are seeded into
+ *  fields that are NOT `params.concept` of a notice-bearing card: the notice
+ *  card's own `params.subjectName` (same card, different field) and a
+ *  `retention_due` card's `params.topicTitle` (different card entirely). */
+const POISON_SUBJECT_NAME = 'WI2583-poison decoy carried in subjectName';
+const POISON_TOPIC_TITLE = 'WI2583-poison decoy carried in topicTitle';
+const POISON_REAL_CONCEPT = 'WI2583-poison genuine open notice concept';
 
 type NowCard = { kind: string; params?: Record<string, unknown> };
 
@@ -121,6 +155,35 @@ function noticeBearingCards(cards: NowCard[]): NowCard[] {
       (card.kind === 'ledger_moment' &&
         card.params?.ledgerKind === 'notice_locked_in'),
   );
+}
+
+/** [WI-2583] Reads the concept from ONE card's structured `params.concept`
+ *  field. Returns undefined for a card that is not notice-bearing, and for a
+ *  notice-bearing card whose `concept` is not a string — so a match can never
+ *  originate from a different card kind, from a different field of the same
+ *  card, or from JSON punctuation between two cards. */
+function noticeCardConcept(card: NowCard): string | undefined {
+  const isNoticeBearing =
+    card.kind === 'mentor_notice' ||
+    (card.kind === 'ledger_moment' &&
+      card.params?.ledgerKind === 'notice_locked_in');
+  if (!isNoticeBearing) return undefined;
+  const concept = card.params?.concept;
+  return typeof concept === 'string' ? concept : undefined;
+}
+
+/** [WI-2583] The positive-row concept assertion (AC-1). Identifies the cards
+ *  whose structured concept EQUALS one of the enumerated seeded concepts.
+ *  Replaces `JSON.stringify(cards).toContain(concept)`: equality on a named
+ *  field of an identified card, not a substring of the serialized array. */
+function noticeCardsMatchingConcept(
+  cards: NowCard[],
+  expectedConcepts: readonly string[],
+): NowCard[] {
+  return cards.filter((card) => {
+    const concept = noticeCardConcept(card);
+    return concept !== undefined && expectedConcepts.includes(concept);
+  });
 }
 
 /** The non-vacuity signal: `unfinished_session` and `retention_due` are both
@@ -170,7 +233,7 @@ async function seedNoticeSurfaces(
     status: 'open',
   });
 
-  for (let i = 0; i < 4; i += 1) {
+  for (const lockedConcept of LOCKED_CONCEPTS(label)) {
     const lockedSessionId = await seedLearningSession({
       profileId,
       subjectId: subject.id,
@@ -180,7 +243,7 @@ async function seedNoticeSurfaces(
       profileId,
       subjectId: subject.id,
       sourceSessionId: lockedSessionId,
-      concept: `${LOCKED_CONCEPT(label)} #${i}`,
+      concept: lockedConcept,
       correctionHint: null,
       status: 'locked_in',
       resolvedAt: new Date(),
@@ -235,12 +298,59 @@ async function seedNoticeSurfaces(
   return { profileId, summarySessionId: receiptSessionId };
 }
 
+/** [WI-2583] The falsifiability fixture. Deliberately shaped so that a
+ *  positive-row read against it is GENUINE — it carries a real open notice,
+ *  so `noticeBearingCards(cards)` is non-empty and the positive row's first
+ *  conjunct passes — while two decoy labels ride in fields that are not
+ *  `params.concept` of a notice card:
+ *
+ *    - the subject is NAMED the decoy, so the notice card's own
+ *      `params.subjectName` carries it (same card, wrong field);
+ *    - a past-due retention topic is TITLED the second decoy, so the
+ *      `retention_due` card's `params.topicTitle` carries it (wrong card).
+ *
+ *  Without the genuine notice, a decoy assertion would fail merely because no
+ *  notice card existed — proving nothing about the field selection. */
+async function seedPoisonSurfaces(profileId: string): Promise<ProfileSurfaces> {
+  const db = createIntegrationDb();
+  const subject = await seedSubject(profileId, POISON_SUBJECT_NAME);
+
+  const openSessionId = await seedLearningSession({
+    profileId,
+    subjectId: subject.id,
+    overrides: { sessionType: 'homework', status: 'completed' },
+  });
+  await db.insert(mentorNotices).values({
+    profileId,
+    subjectId: subject.id,
+    sourceSessionId: openSessionId,
+    concept: POISON_REAL_CONCEPT,
+    correctionHint: null,
+    status: 'open',
+  });
+
+  const { topicIds } = await seedCurriculum({
+    subjectId: subject.id,
+    topics: [{ title: POISON_TOPIC_TITLE }],
+  });
+  const [poisonTopicId] = topicIds;
+  if (!poisonTopicId) throw new Error('poison fixture: no topic seeded');
+  await seedRetentionCard({
+    profileId,
+    topicId: poisonTopicId,
+    nextReviewAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+  });
+
+  return { profileId, summarySessionId: openSessionId };
+}
+
 type Fixture = {
   learner: ProfileSurfaces;
   guardianProfileId: string;
   child: ProfileSurfaces;
   supporter: ProfileSurfaces;
   supportee: ProfileSurfaces;
+  poison: ProfileSurfaces;
 };
 
 let fixture: Fixture;
@@ -249,12 +359,19 @@ beforeAll(async () => {
   mockInngestEvents();
   clearFetchCalls();
   await cleanupAccounts({
-    emails: [LEARNER.email, GUARDIAN.email, SUPPORTER.email, SUPPORTEE.email],
+    emails: [
+      LEARNER.email,
+      GUARDIAN.email,
+      SUPPORTER.email,
+      SUPPORTEE.email,
+      POISON.email,
+    ],
     clerkUserIds: [
       LEARNER.userId,
       GUARDIAN.userId,
       SUPPORTER.userId,
       SUPPORTEE.userId,
+      POISON.userId,
     ],
   });
   fixture = await seedFixture();
@@ -262,12 +379,19 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await cleanupAccounts({
-    emails: [LEARNER.email, GUARDIAN.email, SUPPORTER.email, SUPPORTEE.email],
+    emails: [
+      LEARNER.email,
+      GUARDIAN.email,
+      SUPPORTER.email,
+      SUPPORTEE.email,
+      POISON.email,
+    ],
     clerkUserIds: [
       LEARNER.userId,
       GUARDIAN.userId,
       SUPPORTER.userId,
       SUPPORTEE.userId,
+      POISON.userId,
     ],
   });
 });
@@ -374,12 +498,24 @@ async function seedFixture(): Promise<Fixture> {
     );
   }
 
+  // --- [WI-2583] falsifiability profile (own account, no matrix row) -------
+  const poisonOwner = await createProfileViaRoute({
+    app,
+    env: TEST_ENV,
+    user: POISON,
+    displayName: 'WI-2583 Poison',
+    birthYear: 1992,
+  });
+  await consentProfile(poisonOwner.id, POISON.email);
+  const poison = await seedPoisonSurfaces(poisonOwner.id);
+
   return {
     learner,
     guardianProfileId: guardian.id,
     child,
     supporter,
     supportee,
+    poison,
   };
 }
 
@@ -413,10 +549,15 @@ type Row = {
   resolve: (f: Fixture) => {
     path: string;
     headers: HeadersInit;
-    /** true: D must be present (asserted via `concept` when given). false: D
-     *  absent AND the non-vacuity signal present. */
+    /** true: D must be present (asserted via `expectedConcepts` when given).
+     *  false: D absent AND the non-vacuity signal present. */
     expectD: boolean;
-    concept?: string;
+    /** [WI-2583] The exact concept strings this surface is guaranteed to
+     *  carry, enumerated from the same constants that seed them. Matched by
+     *  string equality against the identified card's `params.concept` — the
+     *  substring match over `JSON.stringify(cards)` this replaced would also
+     *  have accepted the label appearing in any other field of any card. */
+    expectedConcepts?: readonly string[];
   };
 };
 
@@ -439,9 +580,9 @@ function nowRows(): Row[] {
         // `/now/overflow` — assert whichever concept is guaranteed for that
         // specific surface: the single `mentor_notice` (open) card for
         // `/now`, one of the 4 `notice_locked_in` cards for `/now/overflow`.
-        concept: isOverflow
-          ? LOCKED_CONCEPT('learner-self')
-          : NOTICE_CONCEPT('learner-self'),
+        expectedConcepts: isOverflow
+          ? LOCKED_CONCEPTS('learner-self')
+          : [NOTICE_CONCEPT('learner-self')],
       }),
     });
   }
@@ -480,11 +621,11 @@ function nowRows(): Row[] {
           path: `${label}?scope=self`,
           headers: headersFor(SUPPORTER, f.supporter.profileId, proxyMode),
           expectD: !proxyMode,
-          concept: proxyMode
+          expectedConcepts: proxyMode
             ? undefined
             : isOverflow
-              ? LOCKED_CONCEPT('supporter-own')
-              : NOTICE_CONCEPT('supporter-own'),
+              ? LOCKED_CONCEPTS('supporter-own')
+              : [NOTICE_CONCEPT('supporter-own')],
         }),
       });
     }
@@ -534,7 +675,8 @@ describe('WI-2498 rework: mentor-notice visibility verification matrix', () => {
     '%s',
     (_name, row) => {
       it('matches the guaranteed D property for this named case', async () => {
-        const { path, headers, expectD, concept } = row.resolve(fixture);
+        const { path, headers, expectD, expectedConcepts } =
+          row.resolve(fixture);
         const res = await app.request(path, { headers }, TEST_ENV);
         expect(res.status).toBe(200);
         const body = (await res.json()) as {
@@ -545,8 +687,25 @@ describe('WI-2498 rework: mentor-notice visibility verification matrix', () => {
 
         if (expectD) {
           expect(noticeBearingCards(cards).length).toBeGreaterThan(0);
-          if (concept) {
-            expect(JSON.stringify(cards)).toContain(concept);
+          if (expectedConcepts) {
+            // [WI-2583] Identify the card(s) whose STRUCTURED `params.concept`
+            // equals a seeded concept. `/now` collects the open notice with
+            // `.limit(1)` and only that notice carries NOTICE_CONCEPT, so the
+            // surface guarantees exactly one match; `/now/overflow` may carry
+            // 1..4 of the seeded locked-in cards depending on ranking, so it
+            // guarantees at least one.
+            const matched = noticeCardsMatchingConcept(cards, expectedConcepts);
+            if (row.isOverflow) {
+              expect(matched.length).toBeGreaterThanOrEqual(1);
+            } else {
+              expect(matched).toHaveLength(1);
+            }
+            // Not a restatement of the filter: `noticeCardsMatchingConcept`
+            // admits BOTH notice-bearing kinds, so this pins which collector
+            // the guaranteed concept came from on this surface.
+            expect([...new Set(matched.map((card) => card.kind))]).toEqual([
+              row.isOverflow ? 'ledger_moment' : 'mentor_notice',
+            ]);
           }
         } else {
           expect(noticeBearingCards(cards)).toEqual([]);
@@ -611,6 +770,64 @@ describe('WI-2498 rework: mentor-notice visibility verification matrix', () => {
       );
     },
   );
+});
+
+// [WI-2583] AC-2: the tightened positive-row assertion is falsifiable. This
+// is a real HTTP read whose payload genuinely contains the decoy labels — the
+// `expect(JSON.stringify(cards)).toContain(decoy)` line below is not
+// decoration, it is the proof that the OLD substring assertion would have
+// passed on a card field that carries no notice at all.
+describe('WI-2583: positive-row concept assertion is falsifiable', () => {
+  it('a concept string seeded into non-concept card fields does not satisfy a positive row', async () => {
+    const res = await app.request(
+      '/v1/now?scope=self',
+      { headers: headersFor(POISON, fixture.poison.profileId, false) },
+      TEST_ENV,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { cards?: NowCard[] };
+    const cards = body.cards ?? [];
+
+    // Control — this read has the exact shape of a POSITIVE row: caller
+    // equals subject, no X-Proxy-Mode header, notice-bearing cards present,
+    // and the genuine concept matches structurally. Without this, the two
+    // rejections below would be satisfiable by an empty/suppressed feed and
+    // would discriminate nothing.
+    expect(noticeBearingCards(cards).length).toBeGreaterThan(0);
+    expect(
+      noticeCardsMatchingConcept(cards, [POISON_REAL_CONCEPT]),
+    ).toHaveLength(1);
+
+    for (const decoy of [POISON_SUBJECT_NAME, POISON_TOPIC_TITLE]) {
+      // The decoy really is in this payload — so the replaced assertion,
+      // `expect(JSON.stringify(cards)).toContain(decoy)`, passes here.
+      expect(JSON.stringify(cards)).toContain(decoy);
+      // …and the tightened assertion rejects it: no notice-bearing card's
+      // `params.concept` equals the decoy.
+      expect(noticeCardsMatchingConcept(cards, [decoy])).toHaveLength(0);
+    }
+  });
+
+  it('carries each decoy on the card field the fixture claims, not merely somewhere in the payload', async () => {
+    const res = await app.request(
+      '/v1/now?scope=self',
+      { headers: headersFor(POISON, fixture.poison.profileId, false) },
+      TEST_ENV,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { cards?: NowCard[] };
+    const cards = body.cards ?? [];
+
+    // Same card as the genuine notice, different field.
+    const noticeCard = cards.find((card) => card.kind === 'mentor_notice');
+    expect(noticeCard?.params?.subjectName).toBe(POISON_SUBJECT_NAME);
+    expect(noticeCard?.params?.concept).toBe(POISON_REAL_CONCEPT);
+
+    // A card that is not notice-bearing at all.
+    const retentionCard = cards.find((card) => card.kind === 'retention_due');
+    expect(retentionCard?.params?.topicTitle).toBe(POISON_TOPIC_TITLE);
+    expect(noticeBearingCards([retentionCard as NowCard])).toEqual([]);
+  });
 });
 
 // Sanity guard: proves the supporter fixture's supportership genuinely
