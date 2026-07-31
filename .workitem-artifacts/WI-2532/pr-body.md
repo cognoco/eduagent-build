@@ -19,6 +19,13 @@
   6,955 tests passed, zero failures (durable local log:
   `.artifacts/full-mobile-c750.err`)
 - full API unit suite under Doppler `dev`: passed
+- post-merge affected API unit coverage under Doppler `dev`: 3 suites /
+  203 tests passed
+- main-identical metering integration on Orion's pre-repoint development
+  database: 4/4 red at
+  `quota_pools_subscription_id_subscriptions_id_fk`; known M-REPOINT baseline
+  canonically deduplicated to WI-789 (post-cutover CI repoint baseline) /
+  WI-805 (quota-satellite FK rehome) and not claimed green
 - TypeScript build and i18n/teen-consent/test-only-export/GC1 ratchets: passed
 - touched-file ESLint with `--max-warnings=0`: passed
 - exact candidate Prettier and `git diff --check`: passed
@@ -31,7 +38,7 @@
 
 ## Collision note
 
-Publication merge-forward now incorporates authoritative main `704112725`,
+Publication merge-forward now incorporates authoritative main `09a383cf5`,
 including landed WI-2231 PR #2704, WI-2399 PR #2722, WI-1556 PR #2727,
 WI-2639 PR #2730, WI-2820 PR #2713, and WI-2790 PR #2733. WI-2532 retains the
 non-authorizing durable fork, no-PATCH/no-child-redirect contract, retry
@@ -44,5 +51,10 @@ Independent exact-head review then caught the same gate pre-empting a restored
 invitation replay. The handoff now stays pending after the push until the
 terminal route is observed, and the terminal route itself suppresses the
 language gate through destination mount and marker consumption.
+The later zero-direct-overlap API merge also incorporates WI-2944 (established
+test-seed profile confirmation) PR #2743 and WI-2653 (credentialed non-owner
+self-write authority) PR #2739. The mobile union remained green and affected API units passed;
+the pre-repoint metering integration baseline is recorded above without any
+unrelated WI-2532 patch.
 
 Refs: WI-2532

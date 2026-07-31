@@ -45,6 +45,24 @@
 - Full API unit suite under the sanctioned development database boundary:
   passed. A staging-context attempt was rejected before test execution by the
   local-database safety guard; the corrected Doppler `dev` run exited 0.
+- After merging authoritative main `09a383cf5`, the affected API unit set for
+  the landed test-seed and profile-authority changes passed 3 suites / 203
+  tests under Doppler `dev`.
+- The main-identical metering integration suite remains 4/4 red on the
+  pre-repoint Orion development database. Exact command:
+  `doppler run --project mentomate --config dev -- pnpm exec jest --config
+  apps/api/jest.integration.config.cjs
+  apps/api/src/middleware/metering.integration.test.ts --runInBand
+  --no-coverage`. All four failures occur when the fixture inserts a v2
+  `subscription` row and then hits the development database's legacy
+  `quota_pools_subscription_id_subscriptions_id_fk` constraint. The same
+  fixture and two structurally red cases predate WI-2653 (credentialed
+  non-owner self-write authority); repository cutover
+  canon records this as the expected pre-M-REPOINT baseline previously routed
+  through WI-789 (post-cutover CI repoint baseline) / WI-805 (quota-satellite
+  FK rehome). The batch orchestrator accepted the canonical
+  deduplication; this is preserved as an explicit non-green, non-WI-2532
+  diagnostic and is not claimed as a passing gate.
 - i18n staleness, orphan-key, hardcoded-JSX-literal, and clinical-copy checks:
   passed.
 - Teen-consent claims and GC1 mock-governance ratchets: passed.
@@ -67,9 +85,10 @@ published exact head.
 ## Collision and flag audit
 
 - Publication merge-forward uses authoritative `origin/main`
-  `704112725285639810726a2aa0cb91a482c5b466`, which includes landed WI-2231
+  `09a383cf5a10dbb96e4f6ad395e3f3ce6f223de3`, which includes landed WI-2231
   PR #2704, WI-2399 PR #2722, WI-1556 PR #2727, WI-2639 PR #2730, WI-2820
-  PR #2713, and WI-2790 PR #2733.
+  PR #2713, WI-2790 PR #2733, WI-2944 (established test-seed profile
+  confirmation) PR #2743, and WI-2653 PR #2739.
 - The known create-profile overlap was reconciled without rebase or history
   rewrite. WI-2532 retains the durable non-authorizing fork and adopts WI-2231's
   current `handleCompleted` / `getPostAuthDefaultPath` completion behavior
@@ -97,6 +116,10 @@ published exact head.
   helper plus its WI-2532 union (14 suites / 471 tests), API test-seed and filing
   unit coverage under the direct Orion Doppler `dev` boundary (3 suites / 204
   tests), and cleanup workflow/script coverage (2 suites / 25 tests).
+- The later zero-direct-overlap WI-2944/WI-2653 API-only merge passed the
+  14-suite / 472-test WI-2532 mobile union and 3 suites / 203 tests of affected
+  API unit coverage. Its pre-repoint metering integration baseline is recorded
+  explicitly above and was not patched on this branch.
 - `scripts/run-api-integration.test.ts` remains 6/12 red on Orion because its
   fake Corepack executables are extensionless shebang files that Windows
   `spawnSync` does not resolve. The batch orchestrator dispositioned this as an
