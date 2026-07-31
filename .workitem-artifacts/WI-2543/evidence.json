@@ -7,8 +7,8 @@
     },
     {
       "acRef": "AC-1",
-      "description": "The production-only mutation and exact restore prove the new tests fail without the three service gates and exhaustive inventory.",
-      "pointer": ".workitem-artifacts/WI-2543/rework-2-red-green-revert.md"
+      "description": "The repeated-command mutation and exact restore prove the new tests fail without the three service gates and exhaustive inventory.",
+      "pointer": ".workitem-artifacts/WI-2543-r2/red-green-revert.md"
     },
     {
       "acRef": "AC-2",
@@ -51,5 +51,6 @@
       "pointer": "apps/api/src/middleware/metering.coverage.guard.test.ts:257"
     }
   ],
-  "noiseBaselineVersion": "2026-07-31"
+  "noiseBaselineVersion": "2026-07-31-r2",
+  "redGreenPointer": ".workitem-artifacts/WI-2543-r2/red-green-revert.md"
 }

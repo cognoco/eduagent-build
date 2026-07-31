@@ -67,7 +67,7 @@ Consent errors must be raised outside any LLM-fallback `try/catch`; otherwise wi
 - [x] R2: Move the three route checks to the final service-owned boundaries — summary submission gates outside the evaluation fallback, retry feedback releases its exact coordination claim when consent refusal occurs, and Recall Bridge gates immediately before `routeAndCall`.
 - [x] R3: Make route assertion coverage exhaustive — every production route-entry `assertLlmConsent` belongs to exactly one classified manifest segment, every service-owned mixed route has no route gate, and every service gate precedes its named dispatch token.
 - [x] R4: Preserve fail-closed discriminants — the original focused suites retain explicit unknown/future-discriminant coverage; none of the three sibling service contracts introduces a discriminant.
-- [x] R5: Produce a fresh production-revert-red → exact restore-green record and a broader 15-suite, 595-case focused green run in `.workitem-artifacts/WI-2543/rework-2-red-green-revert.md`.
+- [x] R5: Produce a fresh tests-before-code red → candidate green → production-revert red → exact restore green record and a combined 13-suite, 589-case focused green run in `.workitem-artifacts/WI-2543-r2/red-green-revert.md`.
 - [x] R6: Re-run the focused set, structural guards, routed fast change-class validation, full diff inspection, and secret scan; publish exact file pointers in the Rework 2 lifecycle artifacts.
 
 ## Self-review
