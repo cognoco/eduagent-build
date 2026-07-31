@@ -286,7 +286,9 @@ describe('Windows-facing package-script dispatch (WI-2522)', () => {
     expect(result.stdout).toContain(
       'ARGS:run --project mentomate --config dev_integration --',
     );
-    expect(result.stdout).toContain('scripts/run-api-integration.mjs --nx');
+    expect(result.stdout.replaceAll('\\', '/')).toContain(
+      'scripts/run-api-integration.mjs --nx',
+    );
     expect(result.stdout).toContain(
       'CHILD_STARTED:["nx","run","api:integration-api"]',
     );
