@@ -556,7 +556,9 @@ jest.mock('../services/recall-bridge', () => {
     ...actual,
     // overrides
     generateRecallBridge: jest.fn().mockResolvedValue({
-      bridge: 'mock bridge',
+      questions: [],
+      topicId: '',
+      topicTitle: '',
     }),
   };
 });
@@ -858,7 +860,7 @@ describe('session routes', () => {
     jest
       .mocked(generateRecallBridge)
       .mockReset()
-      .mockResolvedValue({ bridge: 'mock bridge' });
+      .mockResolvedValue({ questions: [], topicId: '', topicTitle: '' });
     jest.mocked(assertLlmConsent).mockReset().mockResolvedValue(undefined);
     mockGetMentorNoticeReceipt.mockReset().mockResolvedValue(null);
     clearJWKSCache();
