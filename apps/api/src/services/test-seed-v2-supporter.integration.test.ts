@@ -22,14 +22,16 @@
  * unauthorized-deep-link cases.
  */
 import { resolve } from 'path';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   createDatabase,
+  createScopedRepository,
   login,
   membership,
   person,
+  subjects,
   supportVisibilityContracts,
   supportership,
   type Database,
@@ -85,6 +87,9 @@ function createIntegrationDb(): Database {
   () => {
     let db: Database;
     let seeded: Awaited<ReturnType<typeof seedV2SupporterAccepted>>;
+    let existingUnlinkedSeeded: Awaited<
+      ReturnType<typeof seedV2SupporterAccepted>
+    >;
 
     beforeAll(async () => {
       db = createIntegrationDb();
@@ -97,6 +102,11 @@ function createIntegrationDb(): Database {
         `wi2241-int-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`,
         {},
       );
+      existingUnlinkedSeeded = await seedV2SupporterAccepted(
+        db,
+        `wi2385-unlinked-int-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`,
+        {},
+      );
     });
 
     afterAll(async () => {
@@ -105,6 +115,10 @@ function createIntegrationDb(): Database {
         seeded.ids.supporteeOrganizationId,
         seeded.ids.emptySupporteeOrganizationId,
         seeded.ids.revokedSupporteeOrganizationId,
+        existingUnlinkedSeeded.accountId,
+        existingUnlinkedSeeded.ids.supporteeOrganizationId,
+        existingUnlinkedSeeded.ids.emptySupporteeOrganizationId,
+        existingUnlinkedSeeded.ids.revokedSupporteeOrganizationId,
       ].filter((id): id is string => !!id);
       await deleteOrganizationGraph(db, orgIds);
     });
@@ -232,6 +246,43 @@ function createIntegrationDb(): Database {
           db,
           seeded.ids.supporterPersonId,
           unrelatedPersonId,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+    });
+
+    it('[WI-2385 AC-7: NEGATIVE WALL — existing seeded person without an edge] an existing person with structural data but zero supportership to the caller is denied identically', async () => {
+      const targetPersonId = existingUnlinkedSeeded.ids.supporteePersonId;
+      const targetRepo = createScopedRepository(db, targetPersonId);
+      const [existingTarget, existingSubject, unexpectedEdge] =
+        await Promise.all([
+          db.query.person.findFirst({
+            where: eq(person.id, targetPersonId),
+            columns: { id: true },
+          }),
+          targetRepo.subjects.findFirst(
+            eq(subjects.id, existingUnlinkedSeeded.ids.subjectId),
+          ),
+          db.query.supportership.findFirst({
+            where: and(
+              eq(supportership.supporterPersonId, seeded.ids.supporterPersonId),
+              eq(supportership.supporteePersonId, targetPersonId),
+            ),
+            columns: { id: true },
+          }),
+        ]);
+
+      expect(existingTarget).toEqual({ id: targetPersonId });
+      expect(existingSubject).toMatchObject({
+        id: existingUnlinkedSeeded.ids.subjectId,
+        profileId: targetPersonId,
+      });
+      expect(unexpectedEdge).toBeUndefined();
+
+      await expect(
+        readSupporteeStructuralSubjects(
+          db,
+          seeded.ids.supporterPersonId,
+          targetPersonId,
         ),
       ).rejects.toBeInstanceOf(ForbiddenError);
     });

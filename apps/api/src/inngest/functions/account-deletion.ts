@@ -1,4 +1,5 @@
 // @inngest-admin: event-profile (accountId from event; all deletion DB ops scoped to that account)
+import type { AccountDeletionTeardownFailedEvent } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { getStepDatabase, getStepClerkSecretKey } from '../helpers';
 import {
@@ -11,6 +12,7 @@ import {
 } from '../../services/identity-v2/deletion-v2';
 import { deleteClerkUser } from '../../services/clerk-user';
 import { createLogger } from '../../services/logger';
+import { safeSend } from '../../services/safe-non-core';
 import { captureException, captureMessage } from '../../services/sentry';
 
 const logger = createLogger();
@@ -47,13 +49,15 @@ export const scheduledDeletion = inngest.createFunction(
       const accountId =
         (event.data.event?.data as { accountId?: string } | undefined)
           ?.accountId ?? null;
+      const runId = event.data.run_id ?? null;
+      const errorName = error instanceof Error ? error.name : typeof error;
 
       logger.error('account_deletion.terminal_failure', {
         event: 'account_deletion.terminal_failure',
         accountId,
-        runId: event.data.run_id ?? null,
+        runId,
         reason: 'handler_retries_exhausted',
-        errorName: error instanceof Error ? error.name : typeof error,
+        errorName,
       });
 
       captureException(
@@ -68,10 +72,28 @@ export const scheduledDeletion = inngest.createFunction(
           extra: {
             surface: 'account-deletion.terminal_failure',
             accountId,
-            runId: event.data.run_id ?? null,
+            runId,
             hint: 'DB cascade may have completed while external erasure work survives (Clerk login identity and/or subscription provider teardown) — GDPR Art 17 erasure half-completed. Inspect the Inngest run to determine which step failed and finish the erasure manually.',
           },
         },
+      );
+
+      const failureEvent: AccountDeletionTeardownFailedEvent = {
+        accountId,
+        runId,
+        errorName,
+        timestamp: new Date().toISOString(),
+      };
+      await safeSend(
+        () =>
+          inngest.send({
+            // orphan-allow: observability-only dead-letter signal consumed by
+            // launch-health alerting and the Inngest dashboard.
+            name: 'app/account.deletion_teardown.failed',
+            data: failureEvent,
+          }),
+        'account-deletion.terminal_failure',
+        { accountId, runId },
       );
 
       return { status: 'terminal_failure', accountId };

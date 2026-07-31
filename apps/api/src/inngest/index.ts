@@ -111,6 +111,7 @@ import {
   summaryReconciliationRequeuedObserve,
 } from './functions/summary-reconciliation-observe';
 import {
+  sessionPurgeBacklogObserve,
   sessionPurgeDelayedObserve,
   sessionTranscriptPurgedObserve,
   sessionTranscriptPurgeSkippedObserve,
@@ -216,6 +217,7 @@ export {
   sessionCompletedWithErrorsObserve,
   summaryReconciliationScannedObserve,
   summaryReconciliationRequeuedObserve,
+  sessionPurgeBacklogObserve,
   sessionPurgeDelayedObserve,
   sessionTranscriptPurgedObserve,
   sessionTranscriptPurgeSkippedObserve,
@@ -318,6 +320,7 @@ export const functions = [
   sessionCompletedWithErrorsObserve,
   summaryReconciliationScannedObserve,
   summaryReconciliationRequeuedObserve,
+  sessionPurgeBacklogObserve,
   sessionPurgeDelayedObserve,
   sessionTranscriptPurgedObserve,
   sessionTranscriptPurgeSkippedObserve,

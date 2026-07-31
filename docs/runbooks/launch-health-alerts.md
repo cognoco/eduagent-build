@@ -87,7 +87,7 @@ channel. `Page` routes to the accountable launch operator.
 | 2. LLM routing | Structured fallback logs plus `llm.stop_reason`; Sentry `surface=llm-router`, `signal=provider-fallback` | Fallback rate greater than 2% over 15 minutes with at least 20 calls | Fallback rate greater than 10% over 15 minutes with at least 20 calls, or any `primary-circuit-open` signal |
 | 3. Challenge grader | Sentry `surface:challenge-round signal:finalize-failed` | One failure in 24 hours | Three failures in 1 hour |
 | 4. Notification delivery | Sentry `surface:notification signal:suppressed`; `surface:email`; `surface:feedback signal:delivery-failed` | Three suppressions/bounces/retries in 1 hour | One `surface:email signal:complained` or terminal feedback-retry failure, or ten combined failures in 1 hour |
-| 5. Deletion and retention | Sentry `surface:transcript-purge signal:delayed`; `surface:transcript-purge signal:function-failed`; `app/consent.revocation.failed` | Any delayed purge or retrying revocation failure | Any terminal purge or consent-revocation failure; delayed purge count at least 10 |
+| 5. Deletion and retention | Sentry `surface:transcript-purge signal:delayed`; `surface:transcript-purge signal:function-failed`; `app/consent.revocation.failed`; `app/account.deletion_teardown.failed`; `app/billing.subscription_store_teardown.failed`; `app/billing.alias_merge.failed` | Any delayed purge or retrying revocation failure | Any terminal purge, consent-revocation, deletion-teardown, or billing-alias failure; delayed purge count at least 10 |
 | 6. Stranded filing | Sentry `surface:filing` | Any filing auto-retry | Three unrecoverable filings in 1 hour |
 
 Every bucket also has the fleet-wide terminal-failure backstop:
@@ -265,10 +265,18 @@ surface:feedback signal:delivery-failed
 
 ### Meaning
 
-Retention is successful only when purges and consent-driven deletion complete.
+Retention is successful only when purges and consent-driven deletion complete,
+and paid access is not stranded by a failed subscription alias reconciliation.
 Retrying errors warn; terminal errors page. Delayed and terminal transcript
-purges are filterable by real Sentry tags. Consent revocation terminal failures
-emit `app/consent.revocation.failed`.
+purges are filterable by real Sentry tags. The code-owned terminal dead-letter
+contract groups `app/consent.revocation.failed`,
+`app/account.deletion_teardown.failed`,
+`app/billing.subscription_store_teardown.failed`, and
+`app/billing.alias_merge.failed` under the same immediate-page threshold and
+Inngest dashboard query. Their payloads contain only opaque account/event and
+Inngest run IDs, a coarse error class, and a timestamp. Creating or changing the
+production-console rule remains operator-owned as stated at the top of this
+runbook.
 
 Sentry filters:
 
@@ -283,15 +291,24 @@ surface:transcript-purge signal:function-failed
    purge and delayed-session diagnosis.
 2. For consent revocation, inspect the failed Inngest run and confirm whether
    archival, ownership transfer, or dependent-row cleanup failed.
-3. Never mark a purge or revocation complete based only on event delivery;
-   verify the database outcome through the scoped service path.
-4. Do not enable or change retention clocks from this runbook. Those values and
+3. For account or subscription-store teardown, follow
+   [`deletion-irreversible-boundary.md`](deletion-irreversible-boundary.md) and
+   finish the incomplete external erasure leg identified by the `runId`.
+4. For billing alias merge, inspect the failed run and replay the idempotent
+   RevenueCat alias reconciliation only after confirming the surviving
+   subscription has not already received the entitlement/credit repair.
+5. Never mark a purge, revocation, teardown, or alias repair complete based
+   only on event delivery; verify the first-party/provider outcome.
+6. Do not enable or change retention clocks from this runbook. Those values and
    the production purge flag remain counsel/operator actions.
 
 ### Evidence
 
 - `apps/api/src/inngest/functions/transcript-purge-observe.test.ts`
 - `apps/api/src/inngest/functions/consent-revocation.test.ts`
+- `apps/api/src/inngest/functions/account-deletion.test.ts`
+- `apps/api/src/inngest/functions/billing-subscription-store-teardown.test.ts`
+- `apps/api/src/inngest/functions/billing-alias-merge.test.ts`
 
 ## 6. Stranded filing
 
