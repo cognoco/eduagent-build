@@ -52,6 +52,14 @@ canonically deduplicated to WI-2633 (pre-repoint metering integration
 baseline), and is not represented as a green gate here. The earlier pre-push
 shared-staging marker rejection is canonically recorded on WI-2806 (env-sync
 staging markers); it made no network update.
+The later zero-overlap workflow/provider/integration-typecheck merge completed
+its applicable provider, change-class, integration-typecheck, Tier-1 eval,
+TypeScript, lint, formatting, and whitespace gates successfully. Two
+main-identical Windows harness findings were captured for independent delivery:
+WI-2950 (deploy-smoke fake-curl Bash PATH on Windows) and WI-2951
+(integration-typecheck checker pnpm.cmd resolution). Both are mechanically
+DoR-green Ready/Active and formally admitted to BID-49. Neither is patched on
+this branch.
 Review-bounce coverage also verifies stale-read rejection, recovery-primary
 repair, all-mode terminal destination consumption, and a
 mounted-but-inaccessible blocked navigator. A pre-WI-1556 preview journey
@@ -66,8 +74,9 @@ that path. The branch was merge-forwarded through current authoritative main,
 preserving landed WI-2231 routing, WI-2399 resubmit-generation guards, WI-1556
 first-Mentor language confirmation, WI-2820/WI-2944 test-seed batching, and
 WI-2653 profile-authority behavior. The later learner-egress filter merge was
-also zero-overlap and its focused API unit set completed successfully; no
-history was rewritten.
+also zero-overlap and its focused API unit set completed successfully. The
+subsequent staging-smoke, Mistral endpoint, and integration-typecheck merge was
+zero-overlap as well; no history was rewritten.
 The Work Item remains Executing until its PR lands; lifecycle completion must
 not run while the PR is open. Final attributable E2E evidence must come from
 the published exact head.

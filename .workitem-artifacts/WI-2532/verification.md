@@ -56,6 +56,23 @@
 - After merging authoritative main `59906b359`, the affected learner-egress
   filter, embeddings, and LLM-router unit set passed 3 suites / 40 tests under
   Doppler `dev`.
+- After merging authoritative main `88d349973`, the Mistral provider set passed
+  1 suite / 7 tests, change-class coverage passed 1 suite / 56 tests, the
+  integration typecheck passed across 72 Jest-selected roots, and the Tier-1
+  LLM eval rewrote 528 snapshots with zero tracked drift. Full TypeScript,
+  focused lint, formatting, and whitespace checks also passed.
+- Two main-identical Windows harness defects were captured without a WI-2532
+  patch. WI-2950 (deploy-smoke fake-curl Bash PATH on Windows) owns the
+  deploy-smoke suite's 20/24 failures: its native `C:\...` fixture path is
+  prepended to Bash `PATH` with `:`, so the extensionless fake `curl` is not
+  resolved. WI-2951 (integration-typecheck checker pnpm.cmd resolution) owns
+  the checker suite's 2/4 failures: `spawnSync('pnpm', ...)` returns
+  `status=null` because Windows requires the `.cmd` launcher path or a shell.
+  Both findings link their landed origin items and WI-2894 as a sibling; they
+  are mechanically DoR-green Ready/Active and formally admitted to BID-49 after
+  intake found no canonical duplicate. Refine comments:
+  `3ae8bce9-1f7c-819e-88da-001dabeaa675` for WI-2950 and
+  `3ae8bce9-1f7c-81c4-aa2d-001d82e2d8ad` for WI-2951.
 - The main-identical metering integration suite remains 4/4 red on the
   pre-repoint Orion development database. Exact command:
   `doppler run --project mentomate --config dev -- pnpm exec jest --config
@@ -92,12 +109,14 @@ published exact head.
 ## Collision and flag audit
 
 - Publication merge-forward uses authoritative `origin/main`
-  `59906b359e593fe214b31b60f8ed68cbb4dac411`, which includes landed WI-2231
+  `88d349973f9ede30f9dbdb145087fbe79ba77ddf`, which includes landed WI-2231
   PR #2704, WI-2399 PR #2722, WI-1556 PR #2727, WI-2639 PR #2730, WI-2820 PR
   #2713, and WI-2790 PR #2733. The sequence then reached `09a383cf5` through
   WI-2944 (established test-seed profile confirmation) PR #2743 and WI-2653 PR
   #2739, before reaching `59906b359` through WI-2737 (learner PII egress
-  filtering) PR #2745.
+  filtering) PR #2745. It then reached `88d349973` through WI-2947 (staging
+  smoke after deploy) PR #2747, WI-2740 (Mistral EU endpoint) PR #2742, and
+  WI-2578 (Jest integration-source typecheck) PR #2734.
 - The known create-profile overlap was reconciled without rebase or history
   rewrite. WI-2532 retains the durable non-authorizing fork and adopts WI-2231's
   current `handleCompleted` / `getPostAuthDefaultPath` completion behavior
@@ -132,6 +151,12 @@ published exact head.
 - The subsequent zero-direct-overlap WI-2737 API/docs merge passed its focused
   learner-egress filter, embeddings, and LLM-router unit set (3 suites / 40
   tests) under Doppler `dev`.
+- The subsequent zero-direct-overlap WI-2947/WI-2740/WI-2578 workflow,
+  provider, and integration-typecheck merge passed the applicable provider,
+  change-class, integration-typecheck, Tier-1 eval, TypeScript, lint,
+  formatting, and whitespace gates. Its two main-identical Windows harness
+  defects are recorded above as WI-2950 and WI-2951 rather than being patched
+  on this branch.
 - `scripts/run-api-integration.test.ts` remains 6/12 red on Orion because its
   fake Corepack executables are extensionless shebang files that Windows
   `spawnSync` does not resolve. The batch orchestrator dispositioned this as an

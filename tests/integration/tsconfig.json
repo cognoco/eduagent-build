@@ -14,10 +14,6 @@
     // Ambient contract required by the mobile helpers imported by the learning-session suite.
     "../../apps/mobile/nativewind-env.d.ts"
   ],
-  "include": [
-    // Mirrors jest.config.cjs testMatch; TypeScript follows every transitive import.
-    "./**/*.integration.test.ts",
-    // Mirrors jest.config.cjs setupFilesAfterEnv.
-    "./setup.ts"
-  ]
+  // Intentionally empty: scripts/check-integration-typecheck.ts owns Jest-aligned file selection.
+  "include": []
 }

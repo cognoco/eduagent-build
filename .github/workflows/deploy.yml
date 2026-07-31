@@ -407,6 +407,7 @@ jobs:
     # Only run after a staging deploy (push-to-main always deploys staging;
     # manual dispatch to staging also qualifies). Skip for production deploys.
     if: |
+      always() &&
       needs.api-deploy.result == 'success' &&
       (github.event_name == 'push' || inputs.api_environment == 'staging')
     runs-on: ubuntu-latest
