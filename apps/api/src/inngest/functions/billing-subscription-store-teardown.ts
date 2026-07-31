@@ -1,5 +1,7 @@
 // @inngest-admin: no-db (calls Stripe + RevenueCat external APIs for subscription-store erasure; no database access)
 import {
+  billingSubscriptionStoreTeardownFailedEventSchema,
+  classifyTerminalFailureError,
   type BillingSubscriptionStoreTeardownFailedEvent,
   subscriptionStoreTeardownRequestedDataSchema,
   summarizeRawPayload,
@@ -34,7 +36,7 @@ export const billingSubscriptionStoreTeardown = inngest.createFunction(
         (event.data.event?.data as { accountId?: string } | undefined)
           ?.accountId ?? null;
       const runId = event.data.run_id ?? null;
-      const errorName = error instanceof Error ? error.name : typeof error;
+      const errorName = classifyTerminalFailureError(error);
 
       captureException(
         error instanceof Error
@@ -59,12 +61,13 @@ export const billingSubscriptionStoreTeardown = inngest.createFunction(
         errorName,
       });
 
-      const failureEvent: BillingSubscriptionStoreTeardownFailedEvent = {
-        accountId,
-        runId,
-        errorName,
-        timestamp: new Date().toISOString(),
-      };
+      const failureEvent: BillingSubscriptionStoreTeardownFailedEvent =
+        billingSubscriptionStoreTeardownFailedEventSchema.parse({
+          accountId,
+          runId,
+          errorName,
+          timestamp: new Date().toISOString(),
+        });
       await safeSend(
         () =>
           inngest.send({

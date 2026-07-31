@@ -1,0 +1,130 @@
+{
+  "schemaVersion": "wi-2346-rework-rgr.v1",
+  "generatedAt": "2026-07-31T16:24:07Z",
+  "baseCommit": "04ec2da6b00f925a51995331e74c260702f533c2",
+  "publicationBaseCommit": "da7a1842066765796ed1f1a4ef988b13a5bd01a4",
+  "publicationBaseAdvancedBy": 5,
+  "publicationBaseTouchedExercisedFiles": false,
+  "postRebaseVerification": {
+    "focused": {
+      "apiSuitesPassed": 4,
+      "apiTestsPassed": 52,
+      "schemaSuitesPassed": 1,
+      "schemaTestsPassed": 60,
+      "runbookSuitesPassed": 1,
+      "runbookTestsPassed": 2
+    },
+    "routedFast": {
+      "requiredGatesPassed": 6,
+      "requiredGatesFailed": 0,
+      "slowGatesSkipped": 2,
+      "apiSuitesPassed": 506,
+      "apiTestsPassed": 10101,
+      "apiTestsSkipped": 9,
+      "mobileSuitesPassed": 524,
+      "mobileTestsPassed": 6973,
+      "testOnlyExportTestsPassed": 6
+    }
+  },
+  "implementationBlobs": {
+    "apps/api/src/inngest/functions/account-deletion.ts": "3c469701b6ee48b181554f827dc5af78c6fd47ab",
+    "apps/api/src/inngest/functions/billing-subscription-store-teardown.ts": "ba5922557e217b45e993d6009ac162a2410eafa1",
+    "apps/api/src/inngest/functions/billing-alias-merge.ts": "d721b15d57b16f75b07fd9fca74f8a4fdc07c116",
+    "packages/schemas/src/inngest-events.ts": "6a33b5e78542966f33c600132243e7d02491c1de",
+    "docs/runbooks/launch-health-alerts.md": "37f5b5dcef7e7244972ffc3c6b2e7859d40453ad"
+  },
+  "retainedTestBlobs": {
+    "apps/api/src/inngest/functions/account-deletion.test.ts": "7bcea9d942e8523f7c83ecf1584ecfa8ef072334",
+    "apps/api/src/inngest/functions/billing-subscription-store-teardown.test.ts": "11d31c9f5c6640cfdd4d8937fcea2b95016af350",
+    "apps/api/src/inngest/functions/billing-alias-merge.test.ts": "94caf6bec90081849cf8a3b31041ccb2e6d432e8",
+    "packages/schemas/src/inngest-events.test.ts": "fee209cf5acc04101c5285aa2704d366363e7747",
+    "scripts/launch-health-alerts-runbook.test.ts": "182edfa1192172a423ce38b01d684c7876215bcd"
+  },
+  "expectedFailures": {
+    "api": [
+      "[INNGEST-DELETION-ONFAILURE] terminal-failure escalation [BREAK WI-2346] safeSends a PII-minimized account deletion teardown dead-letter event",
+      "billingAliasMerge worker [BUG-783] [BREAK WI-2346] safeSends a PII-minimized billing alias dead-letter event",
+      "billingSubscriptionStoreTeardown Inngest function [BREAK WI-2346] safeSends a PII-minimized subscription teardown dead-letter event"
+    ],
+    "schema": [
+      "[WI-2346] durable terminal-failure event schemas rejects arbitrary or overlong errorName values from accountDeletionTeardownFailedEventSchema",
+      "[WI-2346] durable terminal-failure event schemas rejects arbitrary or overlong errorName values from billingAliasMergeFailedEventSchema",
+      "[WI-2346] durable terminal-failure event schemas rejects arbitrary or overlong errorName values from billingSubscriptionStoreTeardownFailedEventSchema"
+    ],
+    "runbook": [
+      "launch-health durable terminal-failure surface groups terminal dead letters while documenting their distinct privacy shapes"
+    ]
+  },
+  "phases": [
+    {
+      "phase": "baseline-red",
+      "implementation": "origin/main",
+      "result": {
+        "failedSuites": 5,
+        "passedSuites": 0,
+        "totalSuites": 5,
+        "failedTests": 7,
+        "passedTests": 99,
+        "totalTests": 106
+      },
+      "rawOutputSha256": {
+        "api": "7a1747db5630b02ca8998c871a47c24083f1da1d93b47b63884098266ce80dcc",
+        "schema": "3a228921e5e57622efc93699d3514a78221eeaf8cbb8b23577b5ac2792c0e1d9",
+        "runbook": "5025e7a308724b62e060dbdf66fa067475ac6d845eb7b380e3a0bcd0ac684193"
+      }
+    },
+    {
+      "phase": "candidate-green",
+      "implementation": "candidate",
+      "result": {
+        "failedSuites": 0,
+        "passedSuites": 5,
+        "totalSuites": 5,
+        "failedTests": 0,
+        "passedTests": 106,
+        "totalTests": 106
+      },
+      "rawOutputSha256": {
+        "api": "1d72215a64edeefe81f48cda0a2a9d0a0e5c48df4a9ba800ac6ac7442821d9c2",
+        "schema": "1dc42aad355861336105bf389bea27f9c9ba9bbc3c211f7d7dd1f50ad42fb28c",
+        "runbook": "bb6cfbe0508243110401b3ceba45a072492b54977a5eb9bafe312e559a31d825"
+      }
+    },
+    {
+      "phase": "production-revert",
+      "implementation": "origin/main",
+      "result": {
+        "failedSuites": 5,
+        "passedSuites": 0,
+        "totalSuites": 5,
+        "failedTests": 7,
+        "passedTests": 99,
+        "totalTests": 106
+      },
+      "rawOutputSha256": {
+        "api": "3609e9b94e072cea7e602363a80b60efd7eaa5a6338fbf3aaf24089f6420d426",
+        "schema": "efd48360a4e18b02c63d6587d30c7fbe15c25ef98d5aa3a38475d4731fc1d083",
+        "runbook": "9f9b34aabbff0e514e4be146aa12c63e3fb90dad9b4a05aee961077f6ac70fb0"
+      }
+    },
+    {
+      "phase": "exact-restore",
+      "implementation": "candidate",
+      "result": {
+        "failedSuites": 0,
+        "passedSuites": 5,
+        "totalSuites": 5,
+        "failedTests": 0,
+        "passedTests": 106,
+        "totalTests": 106
+      },
+      "rawOutputSha256": {
+        "api": "9c5c2b83ff7c375f45e3863aeed38ed4baeacbacbdbdf1e26bb4975efd3582a3",
+        "schema": "f0ad655ec11e7399d9504850335b98ea0aac7aa4cc2ac8b9a6fcbe8f57dd351f",
+        "runbook": "e2876a92005d07bf7bd60ba46244b4d8bc5a5efc5a0328f042dec10caa6899f5"
+      }
+    }
+  ],
+  "baselineAndRevertFailureSetsEqual": true,
+  "exactRestoreBytesMatched": true
+}
