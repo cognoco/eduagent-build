@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-07-31 17:20 CEST
+Last reconciled: 2026-07-31 17:52 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -17,7 +17,7 @@ Last reconciled: 2026-07-31 17:20 CEST
   Lifecycle Tooling with no Sprint or Delivery Batch; WI-2946 is Backlog/Active
   in Nexus / Clacks with no Sprint or Delivery Batch. WI-2942 remains Closed /
   Duplicate of WI-2941. WI-2926 remains Closed / Duplicate of WI-2925.
-- Live stage count at checkpoint: 28 Closed, 4 Executing, 9 Ready.
+- Live stage count at checkpoint: 28 Closed, 4 Executing, 1 Reviewing, 8 Ready.
 
 ## Current frontier — supersedes stale per-item positions below
 
@@ -83,9 +83,13 @@ Last reconciled: 2026-07-31 17:20 CEST
   operator authorized restoring that file exactly to origin/main and amending the
   still-unpushed merge once with `--no-verify`, solely to prevent the hook from
   recreating the unrelated formatter delta (Cosmo comment
-  `3ae8bce9-1f7c-81f8-83a7-001de03c8ec4`). No pushed history rewrite or force-push
-  is authorized. The executor renewed its exact same-owner claim and is performing
-  the bounded restore/amend/explicit-push sequence.
+  `3ae8bce9-1f7c-81f8-83a7-001de03c8ec4`). The executor restored the unrelated file,
+  pushed normal merge head `02a93cd1` without force, and exact-head CI passed all 14
+  checks. The governed merge gate verified zero unresolved threads and a fresh
+  zero-finding approval, then squash-landed PR #2746 as `cf9434df`. Execute-complete
+  validated the corrected artifacts, set Fixed In to that landed commit, cleared the
+  claim, and moved the item to Reviewing. Independent adversarial review is active;
+  it is also adjudicating the stale displayed Pipeline value `Changes Requested`.
 - WI-2802 — Closed/Done. Closed/Done WI-2810 supplies
   the sanitized observer but cannot retroactively classify the 2026-07-26 failure.
   The operator authorized exactly one post-instrumentation isolated hosted J-01
@@ -106,13 +110,15 @@ Last reconciled: 2026-07-31 17:20 CEST
   the isolated run diagnosed a different 68.6-second sign-in failure and did not
   attribute the original hosted 90-second exhaustion. WI-2826 plus the hosted gate
   remain prerequisites.
-- WI-2936 — Ready and unclaimed. Execution needs an operator ruling because the
+- WI-2936 — Executing/Active under the live unexpired claim
+  `codex:wi2936-exec:WI-2936`. Execution needed an operator ruling because the
   mandatory repo worktree script always runs Doppler `env:sync`, while the item scope
   forbids touching Doppler. The operator authorized a one-worktree exception in
   comment `3ae8bce9-1f7c-8166-8f54-001da619ca14`: create the canonical isolated
   worktree and install dependencies, skip `pnpm env:sync`, and use only existing
   local credentials without printing, committing, uploading, rotating, or remotely
-  synchronizing them. Dispatch waits only for a WIP slot. FO-2080 /
+  synchronizing them. The freed WI-2755 execution slot was immediately reused and
+  the typed executor is operating under that bounded exception. FO-2080 /
   `OCC-894322F2C99D` records the broader setup observation without creating a WI.
 - WI-2922 and WI-2923 — Ready behind explicit development-only shared mutation gates.
 - Remaining shared-database, hosted-reproduction, and credential mutations retain

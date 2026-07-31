@@ -70,15 +70,14 @@ Delivery Batch as `Done`.
   Every item-specific environment, database, credential, merge, and review gate
   remains controlling.
 - Active execution WIP:
-  - WI-2755 — review-bounced source-artifact rework; freshly claimed by the typed
-    rework executor after WI-2802 freed capacity. Direct-URL isolation rework is
-    pushed to draft PR #2746 at `b0981e8c`; the focused regression is green. A
-    normal origin/main merge resolved the two WI-scoped conflicts locally, but the
-    mandatory hook formatted one unrelated current-main line. The operator authorized
-    a narrow restore-to-origin/main plus one-time `--no-verify` amend of the unpushed
-    merge (Cosmo comment `3ae8bce9-1f7c-81f8-83a7-001de03c8ec4`), with explicit
-    refspec push, no force-push, and a strictly WI-2755 final diff. The executor
-    renewed its same-owner claim and is applying that ruling.
+  - WI-2755 — Reviewing after the bounded rework. The operator-authorized
+    restore-to-origin/main plus one-time `--no-verify` amend produced normal merge
+    head `02a93cd1` with a strictly two-file WI-owned diff and no force-push. All 14
+    exact-head checks passed; the governed merge gate verified zero threads and a
+    fresh zero-finding approval, then squash-landed PR #2746 as `cf9434df`.
+    Execute-complete validated the corrected landed evidence, settled the claim, and
+    moved the item to Reviewing. Independent adversarial review is active, including
+    adjudication of the stale displayed Pipeline value `Changes Requested`.
   - WI-2790 — portable Lancre integration target; landed source repair, awaiting
     WI-2939's disposable-schema proof.
   - WI-2921 — local Playwright seed-secret alignment; strict-green PR #2718 remains
@@ -94,10 +93,12 @@ Delivery Batch as `Done`.
   - WI-2826 — instrumentation/live hosted proof gate.
   - WI-2922 — bounded shared-development database reconciliation gate.
   - WI-2923 — bounded development Clerk/Doppler mutation gate.
-  - WI-2936 — operator-authorized one-worktree exception: use the canonical
+  - WI-2936 — now Executing/Active under live claimant
+    `codex:wi2936-exec:WI-2936`. Operator-authorized one-worktree exception: use the canonical
     isolated worktree and install dependencies, skip `pnpm env:sync`, and use only
     already-existing local credentials without printing, committing, uploading,
-    rotating, or remotely synchronizing them. Dispatch waits only for a WIP slot.
+    rotating, or remotely synchronizing them. WI-2755's freed execution slot was
+    immediately reused and the typed executor is active under those boundaries.
 - Finding Occurrences, not new Work Items, now preserve delivery observations:
   FO-2075 (`OCC-F968A7988008`) records the intake/scope correction; FO-2076
   (`OCC-B9142581EAF8`) records the WI-2755 completion/PR mismatch; FO-2077
