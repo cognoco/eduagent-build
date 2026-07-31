@@ -81,9 +81,14 @@ Last reconciled: 2026-07-31 11:08 CEST
   reproduction. Its sole invocation failed during Playwright config loading because
   the disposable checkout lacked `@playwright/test`; no browser or hosted request
   began, no retry occurred, and the clean checkout was removed. FO-2078 /
-  `OCC-A7536C9B0020` records the environment failure. AC1-AC3 remain unmet; the
-  same-owner claim is live through 12:03 UTC / 14:03 CEST. A properly prepared
-  retry requires a new ruling.
+  `OCC-A7536C9B0020` records the environment failure. The operator then authorized
+  one properly prepared retry. A clean current-main checkout passed frozen install
+  and Playwright config preflight; the single workers=1/retries=0 invocation passed
+  all three setup cases and the targeted pushed-content J-01 case. The avatar absence
+  did not recur and WI-2810 captured no failing phase. FO-2079 /
+  `OCC-F6CB34D4EBE4` records the non-reproduction. AC1-AC3 remain unmet; the
+  same-owner claim is live through 12:03 UTC / 14:03 CEST. Further lifecycle action
+  requires an operator disposition of the diagnostic acceptance contract.
 - WI-2800 — Ready/Active after review rejected its already-landed `fdbe36d2` evidence:
   the isolated run diagnosed a different 68.6-second sign-in failure and did not
   attribute the original hosted 90-second exhaustion. WI-2826 plus the hosted gate

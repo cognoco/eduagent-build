@@ -72,9 +72,10 @@ Delivery Batch as `Done`.
 - Active execution WIP:
   - WI-2790 — portable Lancre integration target; landed source repair, awaiting
     WI-2939's disposable-schema proof.
-  - WI-2802 — J-01 Account readiness diagnosis; one authorized run failed before
-    browser start because the disposable checkout lacked Playwright. A properly
-    prepared retry is now authorized and in progress.
+  - WI-2802 — J-01 Account readiness diagnosis; the one properly prepared retry
+    passed frozen-install/config preflight and its workers=1/retries=0 setup plus
+    targeted J-01 cases. The avatar absence did not recur, so no failing readiness
+    phase was observed and AC1-AC3 remain unmet pending operator disposition.
   - WI-2921 — local Playwright seed-secret alignment; strict-green PR #2718 remains
     blocked by WI-2936.
   - WI-2939 — disposable API schema bootstrap; draft PR #2741 remains blocked by
@@ -95,7 +96,8 @@ Delivery Batch as `Done`.
   FO-2075 (`OCC-F968A7988008`) records the intake/scope correction; FO-2076
   (`OCC-B9142581EAF8`) records the WI-2755 completion/PR mismatch; FO-2077
   (`OCC-42DF599F8508`) records its persistent database teardown failure; FO-2078
-  (`OCC-A7536C9B0020`) records the missing-Playwright pre-browser failure.
+  (`OCC-A7536C9B0020`) records the missing-Playwright pre-browser failure; FO-2079
+  (`OCC-F6CB34D4EBE4`) records the properly prepared retry's non-reproduction.
 - Marketplace PR #166 for WI-2941 is preserved open/draft at `9652d7d`; its clean
   local worktree was removed and its local/remote proposal branch remains.
 - Same-owner claims for WI-2790, WI-2921, and WI-2939 are verified future through
