@@ -95,7 +95,8 @@ Last reconciled: 2026-07-31 09:13 CEST
   branches are cleaned; the separate BID-19 integration worktree was not touched.
 - Closed Nexus-side WI-2815, WI-2819, and WI-2931 have no remaining registered
   batch-owned execution/deployment worktrees. WI-2819's two Marketplace worktrees and
-  merged PR head branches are also cleaned. Their landed commits and merged PRs remain
+  merged PR head branches are also cleaned; obsolete Nexus local/remote heads for
+  WI-2815 and WI-2931 are cleaned as well. Their landed commits and merged PRs remain
   authoritative; non-worktree deployment-evidence directories are retained for final
   archive/trash disposition.
 

@@ -75,7 +75,8 @@ Delivery Batch as `Done`.
   batch-owned and remains untouched.
 - Closed Nexus-side WI-2815, WI-2819, and WI-2931 no longer retain registered
   batch-owned execution/deployment worktrees. WI-2819's two Marketplace worktrees and
-  merged PR head branches are also cleaned. Their landed commits and merged PRs remain
+  merged PR head branches are also cleaned; obsolete Nexus local/remote heads for
+  WI-2815 and WI-2931 are cleaned as well. Their landed commits and merged PRs remain
   authoritative; deployment-evidence directories outside the worktrees are retained
   for final archive/trash disposition.
 - WI-2800 remains honestly Ready after independent review rejected the already-landed
