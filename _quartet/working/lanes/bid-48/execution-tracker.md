@@ -55,7 +55,7 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-07-31 09:07 CEST
+## Live reconciliation — 2026-07-31 09:13 CEST
 
 - The live Brief and membership relation agree on 42 authoritative members.
   WI-2941 was captured from six expired cross-owner BID-48 claims, triaged and
@@ -89,7 +89,10 @@ Delivery Batch as `Done`.
   functional gates are green. Four exact-head Claude attempts aborted before a
   review turn. A fifth cooldown-bounded attempt reproduced the same pre-review service
   abort with no verdict or findings, so the governed merge gate remains correctly
-  closed and duplicate-search/capture triage is active. WI-2755 expired after capture,
+  closed. Typed duplicate search found WI-2342 materially narrower because it requires
+  a positive provider-capacity signal; the current incident has none. WI-2946 was
+  captured from WI-2941, triaged and refined to Ready/Active, and is awaiting formal
+  BID-48 membership disposition before dispatch. WI-2755 expired after capture,
   making the post-landing recovery set seven cross-owner claims. WI-2755's governed
   implementation is already landed from PR #2630 as `37b7a4e6`; all seven claims
   remain untouched pending governed landing and Nexus commissioning of WI-2941 rather

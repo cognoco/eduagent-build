@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-07-31 09:07 CEST
+Last reconciled: 2026-07-31 09:13 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -49,8 +49,11 @@ Last reconciled: 2026-07-31 09:07 CEST
   functional gates are green. Four exact-head Claude attempts aborted before a
   review turn. A fifth cooldown-bounded attempt reproduced the same pre-review service
   abort with no verdict or findings, so the governed merge gate remains correctly
-  closed and duplicate-search/capture triage is active. WI-2755 expired after capture, so
-  seven stale claims remain untouched pending governed landing and deployment of
+  closed. WI-2946 was captured from WI-2941 after typed duplicate search found WI-2342
+  materially narrower, then triaged/refined to Ready/Active. Its Delivery Batch
+  relation remains empty pending formal BID-48 membership disposition. WI-2755
+  expired after WI-2941's capture, so seven stale claims remain untouched pending
+  governed landing and deployment of
   WI-2941. WI-2755 itself is already governed-merged from PR #2630 as `37b7a4e6`;
   after lawful claim recovery it needs execute-complete and independent review, not
   another implementation.
@@ -114,7 +117,10 @@ Last reconciled: 2026-07-31 09:07 CEST
 
 ## Captured / refining before membership
 
-- None currently awaiting membership disposition.
+- WI-2946 — Diagnose repeated Claude pre-review aborts blocking governed merges.
+  Ready/Active, valid and unclaimed after capture, triage, and refinement; Origin
+  WI-2941. Its Delivery Batch relation is intentionally empty pending formal BID-48
+  admission or exclusion/defer ruling. Do not dispatch before that disposition.
 
 ## Landing / CI frontier
 
