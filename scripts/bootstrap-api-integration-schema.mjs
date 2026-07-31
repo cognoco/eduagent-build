@@ -6,11 +6,14 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { readMigrationFiles } from 'drizzle-orm/migrator';
 import pg from 'pg';
 
 const { Client } = pg;
 
 const WORK_ITEM = 'WI-2939';
+const REPO_ROOT = resolve(import.meta.dirname, '..');
+const MIGRATIONS_DIR = resolve(REPO_ROOT, 'apps/api/drizzle');
 const MARKER_SCHEMA = 'zdx_integration_bootstrap';
 const MARKER_TABLE = `${MARKER_SCHEMA}.schema_state`;
 const PROTECTED_LABEL =
@@ -205,6 +208,15 @@ export async function bootstrapDisposableApiIntegrationSchema(options, deps) {
   if (!(await deps.schemaSourcesAreClean())) {
     refuse('uncommitted schema or bootstrap sources are present.');
   }
+  const revisionSql = await deps.loadRevisionSql();
+  if (
+    !revisionSql ||
+    !Array.isArray(revisionSql.statements) ||
+    revisionSql.statements.length === 0 ||
+    !revisionSql.fingerprint
+  ) {
+    refuse('the revision-pinned migration journal is empty or unreadable.');
+  }
 
   let action;
   let schemaFingerprint;
@@ -215,6 +227,7 @@ export async function bootstrapDisposableApiIntegrationSchema(options, deps) {
       if (
         marker.targetId !== target.targetId ||
         marker.revision.toLowerCase() !== options.revision.toLowerCase() ||
+        marker.chainFingerprint !== revisionSql.fingerprint ||
         marker.state !== 'ready' ||
         !marker.fingerprint
       ) {
@@ -245,11 +258,16 @@ export async function bootstrapDisposableApiIntegrationSchema(options, deps) {
       await deps.store.createApplyingMarker({
         targetId: target.targetId,
         revision: options.revision.toLowerCase(),
+        chainFingerprint: revisionSql.fingerprint,
         operatorRuling: options.operatorRuling.trim(),
         startedAt,
       });
 
       try {
+        await deps.store.applyDirectSchema({
+          statements: revisionSql.statements,
+          chainFingerprint: revisionSql.fingerprint,
+        });
         await deps.runSchemaPush({
           command: 'corepack',
           args: ['pnpm', '--filter', '@eduagent/database', 'run', 'db:push'],
@@ -287,6 +305,7 @@ export async function bootstrapDisposableApiIntegrationSchema(options, deps) {
       targetId: target.targetId,
       endpointFingerprint: target.endpointFingerprint,
       revision: options.revision.toLowerCase(),
+      chainFingerprint: revisionSql.fingerprint,
       operatorRuling: options.operatorRuling.trim(),
       action,
       schemaFingerprint,
@@ -353,6 +372,7 @@ class PgBootstrapStore {
         SELECT
           target_id AS "targetId",
           repo_revision AS revision,
+          chain_fingerprint AS "chainFingerprint",
           schema_fingerprint AS fingerprint,
           state
         FROM ${MARKER_TABLE}
@@ -395,6 +415,7 @@ class PgBootstrapStore {
         CREATE TABLE ${MARKER_TABLE} (
           target_id text PRIMARY KEY,
           repo_revision char(40) NOT NULL,
+          chain_fingerprint text NOT NULL,
           schema_fingerprint text,
           state text NOT NULL CHECK (state IN ('applying', 'ready', 'failed')),
           operator_ruling text NOT NULL,
@@ -405,10 +426,23 @@ class PgBootstrapStore {
       await this.client.query(
         `
           INSERT INTO ${MARKER_TABLE}
-            (target_id, repo_revision, state, operator_ruling, started_at)
-          VALUES ($1, $2, 'applying', $3, $4)
+            (
+              target_id,
+              repo_revision,
+              chain_fingerprint,
+              state,
+              operator_ruling,
+              started_at
+            )
+          VALUES ($1, $2, $3, 'applying', $4, $5)
         `,
-        [input.targetId, input.revision, input.operatorRuling, input.startedAt],
+        [
+          input.targetId,
+          input.revision,
+          input.chainFingerprint,
+          input.operatorRuling,
+          input.startedAt,
+        ],
       );
       await this.client.query('COMMIT');
     } catch (error) {
@@ -417,10 +451,35 @@ class PgBootstrapStore {
     }
   }
 
+  async applyDirectSchema(input) {
+    await this.connect();
+    await this.client.query('CREATE EXTENSION IF NOT EXISTS vector');
+    for (const statement of input.statements) {
+      await this.client.query(statement);
+    }
+  }
+
   async fingerprint() {
     await this.connect();
     const result = await this.client.query(`
       WITH schema_facts AS (
+        SELECT
+          'relation' AS kind,
+          concat_ws(
+            '|',
+            n.nspname,
+            c.relname,
+            c.relkind,
+            c.relrowsecurity::text,
+            c.relforcerowsecurity::text
+          ) AS definition
+        FROM pg_catalog.pg_class c
+        JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public'
+          AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+
+        UNION ALL
+
         SELECT
           'column' AS kind,
           concat_ws(
@@ -559,9 +618,27 @@ class PgBootstrapStore {
 
 function gitOutput(args) {
   return execFileSync('git', args, {
-    cwd: resolve(import.meta.dirname, '..'),
+    cwd: REPO_ROOT,
     encoding: 'utf8',
   }).trim();
+}
+
+export function loadRevisionSql() {
+  const migrations = readMigrationFiles({
+    migrationsFolder: MIGRATIONS_DIR,
+  });
+  const statements = migrations
+    .flatMap((migration) => migration.sql)
+    .map((statement) => statement.trim())
+    .filter(Boolean);
+  const fingerprint = createHash('sha256')
+    .update(
+      JSON.stringify(
+        migrations.map(({ folderMillis, hash }) => ({ folderMillis, hash })),
+      ),
+    )
+    .digest('hex');
+  return { statements, fingerprint };
 }
 
 function defaultDependencies(env, target) {
@@ -570,6 +647,7 @@ function defaultDependencies(env, target) {
     store: new PgBootstrapStore(target.databaseUrl, target.targetId),
     now: () => new Date(),
     resolveHeadRevision: async () => gitOutput(['rev-parse', 'HEAD']),
+    loadRevisionSql: async () => loadRevisionSql(),
     schemaSourcesAreClean: async () =>
       gitOutput([
         'status',
@@ -579,12 +657,13 @@ function defaultDependencies(env, target) {
         'packages/database/src/schema',
         'packages/database/drizzle.config.ts',
         'packages/database/scripts/check-db-push-target.mjs',
+        'apps/api/drizzle',
         'package.json',
         'scripts/bootstrap-api-integration-schema.mjs',
       ]) === '',
     runSchemaPush: async ({ command, args, env: childEnv }) => {
       const result = spawnSync(command, args, {
-        cwd: resolve(import.meta.dirname, '..'),
+        cwd: REPO_ROOT,
         env: childEnv,
         encoding: 'utf8',
       });

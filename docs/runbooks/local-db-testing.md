@@ -60,24 +60,30 @@ The bootstrap fails closed before schema mutation unless all of these are true:
 - The endpoint differs from the declared shared-development, staging, and
   production hosts and carries no protected-environment label.
 - The checked-out revision matches `--revision`, and its schema/bootstrap
-  sources have no tracked changes.
+  sources and committed migration journal have no tracked changes.
 - The public schema is empty with no marker, or it has a ready marker whose
-  revision and full structural fingerprint still match.
+  revision, migration-chain fingerprint, and full structural fingerprint still
+  match.
 
 For an empty target, the command creates an `applying` marker in a dedicated
-metadata schema, invokes only the package-level `drizzle-kit push` path, records
-the resulting structural fingerprint, and marks the target ready. A repeated
-run at the same revision is read-only and returns `already-compatible`.
-Non-empty unmarked targets, changed fingerprints, prior failed/interrupted
-runs, or another revision are incompatible and must be destroyed and recreated.
-The command never invokes `drizzle-kit migrate`, seeds rows, copies user data,
-or prints/persists the database URL, host, name, or credentials.
+metadata schema, applies the exact committed migration-journal SQL directly in
+journal order (including each migration's explicit transaction boundaries), and
+then invokes the guarded package-level `drizzle-kit push` path to reconcile the
+TypeScript schema. Direct journal execution is necessary for committed SQL-only
+objects such as row-level security policies; it does not invoke the Drizzle
+migrator or write Drizzle's migration ledger. The command then records the
+resulting structural fingerprint and marks the target ready. A repeated run at
+the same revision is read-only and returns `already-compatible`. Non-empty
+unmarked targets, changed fingerprints, partial or interrupted runs, or another
+revision are incompatible and must be destroyed and recreated. The command
+never invokes `drizzle-kit migrate`, seeds rows, copies user data, or
+prints/persists the database URL, host, name, or credentials.
 
 The receipt contains only hashed endpoint identity, target ID, revision,
-operator-ruling reference, schema fingerprint, timestamps, result, and cleanup
-instructions. Ordinary rollback is destruction of that uniquely identified
-disposable target; never attempt an in-place repair or point the command at
-shared development, staging, or production.
+migration-chain fingerprint, operator-ruling reference, schema fingerprint,
+timestamps, result, and cleanup instructions. Ordinary rollback is destruction
+of that uniquely identified disposable target; never attempt an in-place repair
+or point the command at shared development, staging, or production.
 
 CI and the local Docker workflow below may invoke the guarded Nx target directly
 because their `DATABASE_URL` points to `localhost`/`127.0.0.1` and names an

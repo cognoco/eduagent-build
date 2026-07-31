@@ -7,6 +7,7 @@ import { test } from 'node:test';
 
 import {
   bootstrapDisposableApiIntegrationSchema,
+  loadRevisionSql,
   redactDatabaseOutput,
   validateDisposableApiIntegrationTarget,
 } from './bootstrap-api-integration-schema.mjs';
@@ -15,6 +16,7 @@ const REPO_ROOT = resolve(import.meta.dirname, '..');
 
 const REVISION = 'a'.repeat(40);
 const OTHER_REVISION = 'b'.repeat(40);
+const CHAIN_FINGERPRINT = 'migration-chain-fingerprint-v1';
 const TARGET_ID = 'wi2939_a1b2c3d4';
 const DATABASE_NAME = `mentomate_api_integration_${TARGET_ID}`;
 const DATABASE_HOST = 'ep-wi2939-a1b2c3d4.example.test';
@@ -50,6 +52,9 @@ function makeStore({
     async createApplyingMarker(input) {
       calls.push(['createApplyingMarker', input]);
     },
+    async applyDirectSchema(input) {
+      calls.push(['applyDirectSchema', input]);
+    },
     async fingerprint() {
       calls.push(['fingerprint']);
       return fingerprint;
@@ -76,6 +81,13 @@ function baseDependencies(store, overrides = {}) {
       now: () => new Date('2026-07-31T07:00:00.000Z'),
       resolveHeadRevision: async () => REVISION,
       schemaSourcesAreClean: async () => true,
+      loadRevisionSql: async () => ({
+        statements: [
+          'CREATE TABLE organization (id uuid PRIMARY KEY)',
+          'CREATE POLICY organization_isolation ON organization USING (true)',
+        ],
+        fingerprint: CHAIN_FINGERPRINT,
+      }),
       runSchemaPush: async (input) => {
         pushes.push(input);
       },
@@ -142,7 +154,7 @@ test('redacts the complete connection identity from child-process output', () =>
   assert.match(redacted, /REDACTED/);
 });
 
-test('bootstraps an empty target exactly once with push, never migrate', async () => {
+test('bootstraps an empty target with direct journal SQL then push, never migrate', async () => {
   const store = makeStore();
   const { deps, pushes } = baseDependencies(store);
 
@@ -166,9 +178,26 @@ test('bootstraps an empty target exactly once with push, never migrate', async (
   ]);
   assert.equal(pushes[0].env.INTEGRATION_SCHEMA_BOOTSTRAP, 'WI-2939');
   assert.ok(!pushes[0].args.includes('migrate'));
+  const directCall = store.calls.find(
+    ([name]) => name === 'applyDirectSchema',
+  )?.[1];
+  assert.equal(directCall.chainFingerprint, CHAIN_FINGERPRINT);
+  assert.match(directCall.statements[1], /CREATE POLICY/);
+  assert.ok(
+    directCall.statements.every(
+      (statement) => !/\bdrizzle(?:-kit)?\s+migrate\b/i.test(statement),
+    ),
+  );
   assert.deepEqual(
     store.calls.map(([name]) => name),
-    ['inspect', 'createApplyingMarker', 'fingerprint', 'markReady', 'close'],
+    [
+      'inspect',
+      'createApplyingMarker',
+      'applyDirectSchema',
+      'fingerprint',
+      'markReady',
+      'close',
+    ],
   );
 });
 
@@ -178,6 +207,7 @@ test('accepts an already-compatible target idempotently without push', async () 
     marker: {
       targetId: TARGET_ID,
       revision: REVISION,
+      chainFingerprint: CHAIN_FINGERPRINT,
       fingerprint: 'schema-fingerprint-v1',
       state: 'ready',
     },
@@ -229,12 +259,21 @@ test('rejects a marker from another revision or an interrupted bootstrap', async
     {
       targetId: TARGET_ID,
       revision: OTHER_REVISION,
+      chainFingerprint: CHAIN_FINGERPRINT,
       fingerprint: 'schema-fingerprint-v1',
       state: 'ready',
     },
     {
       targetId: TARGET_ID,
       revision: REVISION,
+      chainFingerprint: 'different-migration-chain',
+      fingerprint: 'schema-fingerprint-v1',
+      state: 'ready',
+    },
+    {
+      targetId: TARGET_ID,
+      revision: REVISION,
+      chainFingerprint: CHAIN_FINGERPRINT,
       fingerprint: null,
       state: 'failed',
     },
@@ -257,6 +296,16 @@ test('rejects a marker from another revision or an interrupted bootstrap', async
     );
     assert.equal(pushes.length, 0);
   }
+});
+
+test('loads the committed journal as direct revision-pinned SQL', () => {
+  const plan = loadRevisionSql();
+
+  assert.ok(plan.statements.length > 0);
+  assert.match(plan.fingerprint, /^[0-9a-f]{64}$/);
+  assert.ok(
+    plan.statements.some((statement) => /\bCREATE\s+POLICY\b/i.test(statement)),
+  );
 });
 
 test('records a failed push and refuses to retry it', async () => {
@@ -282,7 +331,45 @@ test('records a failed push and refuses to retry it', async () => {
   assert.equal(pushes.length, 1);
   assert.deepEqual(
     store.calls.map(([name]) => name),
-    ['inspect', 'createApplyingMarker', 'markFailed', 'close'],
+    [
+      'inspect',
+      'createApplyingMarker',
+      'applyDirectSchema',
+      'markFailed',
+      'close',
+    ],
+  );
+});
+
+test('records failed direct SQL and never reaches push', async () => {
+  const store = makeStore();
+  store.applyDirectSchema = async (input) => {
+    store.calls.push(['applyDirectSchema', input]);
+    throw new Error('synthetic direct-SQL failure');
+  };
+  const { deps, pushes } = baseDependencies(store);
+
+  await assert.rejects(
+    bootstrapDisposableApiIntegrationSchema(
+      {
+        revision: REVISION,
+        operatorRuling: 'operator:BID-48/WI-2939:approved',
+      },
+      deps,
+    ),
+    /destroy and recreate/i,
+  );
+
+  assert.equal(pushes.length, 0);
+  assert.deepEqual(
+    store.calls.map(([name]) => name),
+    [
+      'inspect',
+      'createApplyingMarker',
+      'applyDirectSchema',
+      'markFailed',
+      'close',
+    ],
   );
 });
 
