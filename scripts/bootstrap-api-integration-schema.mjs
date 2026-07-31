@@ -22,6 +22,15 @@ const { Client } = pg;
 const WORK_ITEM = 'WI-2939';
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 const MIGRATIONS_DIR = resolve(REPO_ROOT, 'apps/api/drizzle');
+export const REVISION_PINNED_SOURCE_PATHS = Object.freeze([
+  'packages/database/src/schema',
+  'packages/database/drizzle.config.ts',
+  'packages/database/scripts/check-db-push-target.mjs',
+  'packages/database/scripts/verify-disposable-integration-target-lib.mjs',
+  'apps/api/drizzle',
+  'package.json',
+  'scripts/bootstrap-api-integration-schema.mjs',
+]);
 const MARKER_SCHEMA = 'zdx_integration_bootstrap';
 const MARKER_TABLE = `${MARKER_SCHEMA}.schema_state`;
 const REVISION_PATTERN = /^[0-9a-f]{40}$/i;
@@ -549,12 +558,7 @@ function defaultDependencies(env, target) {
         '--porcelain',
         '--untracked-files=no',
         '--',
-        'packages/database/src/schema',
-        'packages/database/drizzle.config.ts',
-        'packages/database/scripts/check-db-push-target.mjs',
-        'apps/api/drizzle',
-        'package.json',
-        'scripts/bootstrap-api-integration-schema.mjs',
+        ...REVISION_PINNED_SOURCE_PATHS,
       ]) === '',
     runSchemaPush: async ({ command, args, env: childEnv }) => {
       const result = spawnSync(resolveSpawnCommand(command), args, {

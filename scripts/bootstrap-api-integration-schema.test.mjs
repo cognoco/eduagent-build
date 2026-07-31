@@ -10,6 +10,7 @@ import {
   isReceiptBelowAllowedRoot,
   loadRevisionSql,
   redactDatabaseOutput,
+  REVISION_PINNED_SOURCE_PATHS,
   resolveSpawnCommand,
   validateDisposableApiIntegrationTarget,
 } from './bootstrap-api-integration-schema.mjs';
@@ -22,6 +23,14 @@ const CHAIN_FINGERPRINT = 'migration-chain-fingerprint-v1';
 const TARGET_ID = 'wi2939_a1b2c3d4';
 const DATABASE_NAME = `mentomate_api_integration_${TARGET_ID}`;
 const DATABASE_HOST = 'ep-wi2939-a1b2c3d4.example.test';
+
+test('revision pinning watches the disposable-target validation library', () => {
+  assert.ok(
+    REVISION_PINNED_SOURCE_PATHS.includes(
+      'packages/database/scripts/verify-disposable-integration-target-lib.mjs',
+    ),
+  );
+});
 
 function validEnv() {
   return {
