@@ -77,9 +77,8 @@ second app route; both restored the durable marker, and Playwright found two
 visible gate nodes on the initial attempt and retry. Focused RED then observed
 zero modal dismissals in both the normal and storage-retry handoffs. The
 corrected paths dismiss the modal before profile activation, and both focused
-cases pass GREEN. Final attributable E2E evidence must be re-established on
-the corrective published head. The corrective semantic union passed 6 suites /
-277 tests; full TypeScript, warning-free touched-file ESLint, Prettier, and
+cases pass GREEN. The pre-publication corrective semantic union passed 6 suites
+/ 277 tests; full TypeScript, warning-free touched-file ESLint, Prettier, and
 whitespace checks also passed.
 An independent pre-publication audit then found the real profile-cache
 auto-activation race: the app shell could settle an absent probe before a
@@ -89,6 +88,13 @@ still visible after retry publication and passes GREEN with the observable
 publication revision. Profile creation, durable state, and the full app-layout
 set pass 3 suites / 229 tests after the correction; the full six-suite affected
 union passes 278 tests.
+The corrective published runtime revision recorded by the hosted workflow
+passed isolated E2E Web run
+[`30628917320`](https://github.com/cognoco/eduagent-build/actions/runs/30628917320):
+the V2 release project passed 23/23 tests, including the named family-intent
+journey and its strict exact-one visible-gate assertion; the required-stable
+legacy suite passed 24/24 tests; no legacy projects were quarantined; cleanup
+passed; and the workflow concluded success.
 Review-bounce coverage also verifies stale-read rejection, recovery-primary
 repair, all-mode terminal destination consumption, and a
 mounted-but-inaccessible blocked navigator. A pre-WI-1556 preview journey
@@ -110,5 +116,6 @@ latest-curriculum, and multilingual-safety merge was also zero-overlap; no
 history was rewritten. The later malformed-parse fail-closed descope merge was
 also zero-overlap.
 The Work Item remains Executing until its PR lands; lifecycle completion must
-not run while the PR is open. Final attributable E2E evidence must come from
-the published exact head.
+not run while the PR is open. The final artifact-only descendant of the tested
+corrective head changes no runtime or test source; its hosted checks remain the
+final-head publication gate before merge.

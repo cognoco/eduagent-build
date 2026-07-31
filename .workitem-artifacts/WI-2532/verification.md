@@ -37,7 +37,7 @@
   replace calls under `handleClose`; those tests passed after adopting the
   landed completion helper, but the first exact-head E2E superseded that
   expectation with runtime evidence of two mounted app shells.
-- Corrective focused RED required dismissal before profile activation and
+- The corrective RED required dismissal before profile activation and
   observed zero `router.back` calls in both normal and marker-only retry paths.
   Both pass GREEN after the two family-specific handoffs use `handleClose`.
 - Corrective semantic union covering profile creation, app-layout restoration,
@@ -140,8 +140,18 @@ The first published exact head `04f2536d2` ran the named family-intent journey
 in E2E Web run `30622899554`. Both the initial attempt and retry failed at the
 first gate assertion because the selector resolved to two visible
 `family-intent-onboarding-gate` nodes; the workflow classified it as a product
-failure. The corrective head must rerun this exact journey and produce one
-visible gate before its evidence can be accepted.
+failure.
+
+Corrective published head
+`c053d525d34274d2af760e478655d2bec85b0d08` then passed isolated E2E Web run
+[`30628917320`](https://github.com/cognoco/eduagent-build/actions/runs/30628917320).
+The V2 release project passed 23/23 tests, including the named family-intent
+journey. Its strict `getByTestId('family-intent-onboarding-gate').toBeVisible()`
+assertion proves exactly one matching visible gate (Playwright strict mode
+rejects multiple matches), and the journey reached the existing-account
+invitation with zero visibility-link writes. The required-stable legacy suite
+also passed 24/24 tests; the workflow reported no quarantined legacy projects,
+completed its staging-account reset, and concluded success.
 
 ## Collision and flag audit
 

@@ -56,9 +56,10 @@
 - publication-review regressions: focused RED-to-green coverage passed
 - first exact-head E2E ran the named family-intent journey and failed on two
   visible gate nodes; focused RED reproduced zero modal dismissals in both
-  durable handoffs, and the corrected tests pass GREEN before republishing
-- corrective semantic union: 6 suites / 277 tests passed; full TypeScript,
-  warning-free touched-file ESLint, Prettier, and whitespace checks passed
+  durable handoffs, and the corrected tests pass GREEN
+- pre-publication corrective semantic union: 6 suites / 277 tests passed; full
+  TypeScript, warning-free touched-file ESLint, Prettier, and whitespace checks
+  passed
 - retry-publication RED/GREEN: an already-active shell initially kept Tabs
   visible after retry; the focused case and the profile-creation, durable-state,
   and full app-layout boundary set now pass 3 suites / 229 tests; the full
@@ -66,8 +67,14 @@
 - review hardening covers stale-read invalidation after sign-out, recovery-only
   primary repair, all-mode terminal marker consumption, and an inaccessible
   restore-probe navigator that retains requested route state
-- pre-WI-1556 preview journey: historical diagnostic only; final attributable
-  E2E evidence must come from the published exact head
+- corrective published head `c053d525d34274d2af760e478655d2bec85b0d08`:
+  isolated [E2E Web run 30628917320](https://github.com/cognoco/eduagent-build/actions/runs/30628917320)
+  passed 23/23 V2 release tests, including the named family-intent journey and
+  its strict exact-one visible-gate assertion; passed 24/24 required-stable
+  legacy tests; reported no quarantined projects; completed cleanup; workflow
+  success
+- pre-WI-1556 preview journey: historical diagnostic only; superseded by the
+  attributable corrective-head run above
 
 ## Collision note
 
