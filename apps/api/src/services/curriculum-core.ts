@@ -1,6 +1,63 @@
-import { and, eq, isNull, sql } from 'drizzle-orm';
-import { curriculumBooks, type Database } from '@eduagent/database';
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import {
+  curricula,
+  curriculumBooks,
+  subjects,
+  type Database,
+} from '@eduagent/database';
 import { ConflictError } from '../errors';
+
+/**
+ * Maximum subjects accepted by one latest-curriculum query. Callers that
+ * aggregate multiple profiles must chunk broader batches at this boundary.
+ */
+export const MAX_LATEST_CURRICULUM_SUBJECTS = 100;
+
+export async function getLatestCurriculum(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+): Promise<typeof curricula.$inferSelect | undefined> {
+  return (await getLatestCurricula(db, profileId, [subjectId])).get(subjectId);
+}
+
+export async function getLatestCurricula(
+  db: Database,
+  profileIds: string | readonly string[],
+  subjectIds: readonly string[],
+): Promise<Map<string, typeof curricula.$inferSelect>> {
+  const uniqueSubjectIds = [...new Set(subjectIds)];
+  if (uniqueSubjectIds.length === 0) return new Map();
+  if (uniqueSubjectIds.length > MAX_LATEST_CURRICULUM_SUBJECTS) {
+    throw new RangeError(
+      `Latest curriculum lookup accepts at most ${MAX_LATEST_CURRICULUM_SUBJECTS} subjects`,
+    );
+  }
+
+  const uniqueProfileIds = [
+    ...new Set(typeof profileIds === 'string' ? [profileIds] : profileIds),
+  ];
+  if (uniqueProfileIds.length === 0) return new Map();
+
+  const rows = await db
+    .select()
+    .from(curricula)
+    .innerJoin(subjects, eq(subjects.id, curricula.subjectId))
+    .where(
+      and(
+        inArray(curricula.subjectId, uniqueSubjectIds),
+        inArray(subjects.profileId, uniqueProfileIds),
+      ),
+    )
+    .orderBy(desc(curricula.version));
+  const latestBySubject = new Map<string, typeof curricula.$inferSelect>();
+  for (const row of rows) {
+    if (!latestBySubject.has(row.curricula.subjectId)) {
+      latestBySubject.set(row.curricula.subjectId, row.curricula);
+    }
+  }
+  return latestBySubject;
+}
 
 /**
  * Finds or creates a default book for a subject. Used by legacy flows

@@ -14,6 +14,10 @@ import { StructuralFactCard } from '../learning-surface';
 import { SupportPersonPickerSheet } from './SupportPersonPickerSheet';
 import { SupporterColdStart } from './SupporterColdStart';
 import { SupporterSelfLearningDoorway } from './SupporterSelfLearningDoorway';
+import {
+  renderSharedRecordFact,
+  renderSharedRecordHeadline,
+} from './shared-record-fact-copy';
 import { useSharedRecord } from './use-shared-record';
 
 type PersonScope = Extract<ScopeDescriptor, { kind: 'person' }>;
@@ -72,7 +76,7 @@ function SupportHubMentorPersonCard({
   onOpenSubjects?: (scope: PersonScope) => void;
   onOpenJournal?: (scope: PersonScope) => void;
 }): React.ReactElement {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const query = useSharedRecord(scope);
   const facts = query.data?.supporterView.facts.slice(0, 2) ?? [];
   const showHeaderSubtitle = query.isLoading || !hasShareableFacts(query.data);
@@ -121,14 +125,18 @@ function SupportHubMentorPersonCard({
       ) : hasShareableFacts(query.data) ? (
         <StructuralFactCard
           headline={
-            query.data?.supporterView.headline ??
-            t('supportHub.mentor.loadingHeadline')
+            query.data
+              ? renderSharedRecordHeadline(
+                  query.data.supporterView,
+                  t,
+                  scope.displayName,
+                )
+              : t('supportHub.mentor.loadingHeadline')
           }
           structuralOnlyLabel={t('supportHub.mentor.structuralOnly')}
           facts={facts.map((fact) => ({
             id: fact.id,
-            title: fact.title,
-            detail: fact.detail,
+            ...renderSharedRecordFact(fact, t, i18n.language),
           }))}
         />
       ) : query.data ? (

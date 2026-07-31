@@ -6,7 +6,7 @@
 #   scripts/check-change-class.sh --staged     # staged files only
 #   scripts/check-change-class.sh --branch     # diff vs main
 #   scripts/check-change-class.sh --run        # execute all identified validation
-#   scripts/check-change-class.sh --run --fast  # execute only fast commands
+#   scripts/check-change-class.sh --run --fast  # exclude database/Doppler actions; may write workspace artifacts
 #
 # Exit codes:
 #   0 — no validation needed, or advisory mode (validation identified but not run)
@@ -251,7 +251,9 @@ while [[ $# -gt 0 ]]; do
       echo "  --staged          Check only staged files"
       echo "  --branch          Check all changes vs main (or vs origin/\$BASE_REF if set)"
       echo "  --run             Execute identified validation commands"
-      echo "  --fast            With --run: skip slow commands"
+      echo "  --fast            With --run: exclude database/Doppler actions"
+      echo "                    Fast commands may still write workspace artifacts"
+      echo "                    Database actions require --run without --fast and separate authorization"
       echo "  --github-output   Also emit router flags (classes, integration, eval, docs_only)"
       echo "                    to \$GITHUB_OUTPUT for CI step gating (WI-452)"
       echo "  -h, --help        Show this help"
@@ -333,8 +335,8 @@ fi
 # ── DB Schema ────────────────────────────────────────────────────────────
 if hit '^packages/database/src/schema/'; then
   CLASSES+=("db-schema")
-  add_cmd fast  "pnpm db:push:dev"          "Push schema to dev DB"
-  add_cmd fast  "pnpm db:generate:dev"       "Generate migration SQL"
+  add_cmd slow  "pnpm db:push:dev"          "Push schema to dev DB"
+  add_cmd slow  "pnpm db:generate:dev"       "Generate migration SQL"
   add_cmd slow  "pnpm test:api:integration"  "API co-located integration tests"
   note "db-schema: Never run db:push against staging/production"
 fi
@@ -342,11 +344,18 @@ fi
 # ── DB Migrations ────────────────────────────────────────────────────────
 if hit '^apps/api/drizzle/(.*\.sql|meta/.*)$'; then
   CLASSES+=("db-migrations")
-  add_cmd fast  "pnpm db:push:dev"           "Apply schema to dev DB (dev is push-only, never migrate)"
+  add_cmd slow  "pnpm db:push:dev"           "Apply schema to dev DB (dev is push-only, never migrate)"
   add_cmd fast  "pnpm exec nx run @eduagent/database:test" "Database package tests (RLS coverage)"
   add_cmd slow  "pnpm test:api:integration"  "API co-located integration tests"
   note "db-migrations: Apply migration BEFORE deploying code that reads new columns"
   note "db-migrations: Include Rollback section if dropping columns/tables/types"
+fi
+
+# ── Cross-package integration typecheck ───────────────────────────────────
+if hit '(^tests/integration/|^scripts/check-integration-typecheck(\.test)?\.ts$|^package\.json$|^pnpm-lock\.yaml$|^tsconfig\.base\.json$|^\.github/workflows/ci\.yml$)'; then
+  CLASSES+=("integration-typecheck")
+  add_cmd fast "pnpm typecheck:integration" "Jest-selected integration TypeScript checker"
+  add_cmd slow "pnpm test:integration" "Cross-package integration tests"
 fi
 
 # ── LLM Prompts ──────────────────────────────────────────────────────────
@@ -667,7 +676,7 @@ if [[ "$MODE" == "advisory" ]]; then
   fi
 
   echo "Run: scripts/check-change-class.sh --run"
-  echo "     scripts/check-change-class.sh --run --fast  (skip slow)"
+  echo "     scripts/check-change-class.sh --run --fast  (database-/Doppler-free; may write workspace artifacts)"
   exit 0
 fi
 

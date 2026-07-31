@@ -1,7 +1,7 @@
 # MMT-ADR-0036 autonomous remediation sequence
 
 **Status:** Executing  
-**Decision authority:** MentoMate operator, interactive rulings on 2026-07-22  
+**Decision authority:** MentoMate operator, interactive rulings on 2026-07-22 and 2026-07-26  
 **Delivery batch:** BID-35 — Mentor-notice feature completion  
 **Final acceptance gate:** WI-2574 — Run final mentor-notice MVP acceptance audit against MMT-ADR-0036
 
@@ -50,7 +50,7 @@ All listed corrective Work Items belong to BID-35. Each one blocks WI-2574.
 
 ### 1. Amend canon — WI-2623
 
-- Amend MMT-ADR-0036 in place, retaining Accepted status and recording the 2026-07-22 operator ruling.
+- Amend MMT-ADR-0036 in place, retaining Accepted status and recording both the 2026-07-22 and the 2026-07-26 operator rulings.
 - Update `docs/PRD.md`, `docs/architecture.md`, the operational mentor-notice specification, and the UX specification in lockstep.
 - Persist this sequence.
 - Land as a dedicated docs-only PR. No feature code belongs in this change.
@@ -92,7 +92,8 @@ Refresh the bounced review findings and reconcile the existing worktree before p
   - `dismissed/explicit_stop`
   - `deferred/explicit_not_now`
   - `continue/unclear`
-- `continue` makes no transition. Malformed or unavailable judging makes no transition before turn three and deterministically terminalizes `not_yet` at the cap.
+- A valid `continue` makes no notice transition at any turn, including turn three. Implement attempt lifecycle separately from notice status: reaching the three-response cap after a valid `continue` ends the attempt and detaches its bookkeeping, leaving the notice unresolved and re-offerable.
+- An unresolved evaluation makes no transition before turn three. At turn three, an unresolved evaluation — and only an unresolved evaluation — deterministically terminalizes `not_yet`. Treat unresolved as an open set, illustrated by malformed or unavailable judging, an unfindable referenced answer event, and a mismatched verdict/reason pair; every member fails in the same safe direction.
 - Reuse the landed WI-2501 idempotency primitive so a valid transition applies once under retries.
 - Persist only event identity needed for idempotency, never answer text, judge reasoning, or confidence.
 - Put the server-committed transition in non-stream responses and SSE done frames; mobile renders only that transition.
@@ -116,8 +117,8 @@ Tests cover cold/warm start, lower/same/higher revisions, storage failure, malfo
 - Introduce one async batch evaluator receiving named fields, Conversation Language, provenance (`user`, `llm`, or `migration`), and producer vendor for LLM output.
 - Apply NFKC/Unicode deterministic detection across English, Czech, Spanish, French, German, Italian, Portuguese, Polish, Japanese, and Norwegian Bokmål, including cross-language phrases.
 - Classify known-person attribution as block, absence of protected lexemes as clear, and uncertain educational/reference uses as ambiguous.
-- Send only ambiguous LLM-authored text with known producer identity to the independent judge. Strict allowance is `allow/educational_reference`; block reasons are `person_attribution`, `diagnostic_inference`, or `unclear`.
-- Block ambiguity from users, migrations/backfills, missing producers, unavailable judging, and malformed output without external disclosure.
+- Refer ambiguous text to the independent judge on a three-way provenance split: `user` provenance refers with judge independence `not-applicable` and no producer vendor — it has no model producer to exclude — so user-authored ambiguous educational text is judged rather than blocked outright; `llm` provenance refers only with a known, non-blank producer vendor; `migration` provenance never refers. Strict allowance is `allow/educational_reference`; block reasons are `person_attribution`, `diagnostic_inference`, or `unclear`.
+- Block ambiguity from migrations/backfills, from a missing or blank `llm` producer vendor, and from unavailable judging or malformed output, without external disclosure.
 - Gate notices, notes, session-analysis Learning Profile fields, memory facts/backfill/dedup, and Needs-Deepening persistence.
 - Derived writes drop unsafe fields/records; user mutations retain `BadRequestError`. Observability records only field kind, reason, and count.
 

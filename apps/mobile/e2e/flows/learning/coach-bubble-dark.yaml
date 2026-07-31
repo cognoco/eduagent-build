@@ -1,4 +1,4 @@
-# PARKED (WI-2548): deterministic coach-bubble visibility (dark mode).
+# WI-2548: deterministic coach-bubble visibility (dark mode).
 # AC-1 (hosted deterministic LLM), AC-2 (per-flow UI_MODE application in
 # release Maestro CI), and AC-3 (real response-complete oracle, no timing on
 # chat-input visibility) are wired below:
@@ -18,9 +18,9 @@
 #     fully committed, non-streaming, non-empty content
 #     (`ChatShell.tsx`'s `isCompletedAssistantResponse`) — not a proxy like
 #     chat-input visibility (which never changes).
-# AC-4 (verified passing on a real Android release APK) is DEVICE-GATED —
-# this flow stays tagged `blocked` until that device run confirms the
-# message indices below and removes the tag (owner: WI-2548 device pass).
+# AC-4: verified passing on the real Android release APK built by a
+# workflow_dispatch nightly run of e2e-ci.yml on this change's branch,
+# confirming the message indices below (run URL recorded on WI-2548).
 #
 # Flow: Coach Bubble Visibility (Dark Mode)
 # Validates: AI/coach message text is visible in dark mode chat bubbles.
@@ -35,7 +35,6 @@ tags:
   - smoke
   - learning
   - visual
-  - blocked
 ---
 # 1. Seed & sign in
 - runFlow:
@@ -97,7 +96,7 @@ tags:
 - assertVisible:
     id: "message-bubble-assistant-3"
     containsDescendants:
-      - text: "^Let's work through this together\\. What have you noticed so far\\?$"
+      - text: "^Let['’]s work through this together\\. What have you noticed so far\\?$"
 - takeScreenshot: coach-bubble-dark-02-ai-response
 
 # 9. Send follow-up to get a second AI response
@@ -120,7 +119,7 @@ tags:
 - assertVisible:
     id: "message-bubble-assistant-5"
     containsDescendants:
-      - text: "^Let's work through this together\\. What have you noticed so far\\?$"
+      - text: "^Let['’]s work through this together\\. What have you noticed so far\\?$"
 
 # 11. Final screenshot — multiple coach bubbles visible
 - takeScreenshot: coach-bubble-dark-03-multi-exchange

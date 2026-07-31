@@ -114,6 +114,24 @@ function removeTempRepo(path: string): void {
   }
 }
 
+function installPnpmStub(repo: string): { binDir: string; logPath: string } {
+  const binDir = join(repo, 'bin');
+  mkdirSync(binDir, { recursive: true });
+  const logPath = join(repo, 'pnpm-calls.log');
+  const fakePnpm = join(binDir, 'pnpm');
+  writeFileSync(
+    fakePnpm,
+    [
+      '#!/usr/bin/env sh',
+      'printf "%s\\n" "$*" >> "$PNPM_LOG"',
+      'exit 0',
+      '',
+    ].join('\n'),
+  );
+  chmodSync(fakePnpm, 0o755);
+  return { binDir, logPath };
+}
+
 describe('check-change-class.sh', () => {
   let repo: string;
 
@@ -192,6 +210,129 @@ describe('check-change-class.sh', () => {
 
     expect(output).toContain('Results: 1 passed, 0 failed');
     expect(readFileSync(pnpmLog, 'utf8')).toContain('exec tsc --build');
+  });
+
+  it('keeps schema database actions out of the fast run', () => {
+    mkdirSync(join(repo, 'packages', 'database', 'src', 'schema'), {
+      recursive: true,
+    });
+    writeFileSync(
+      join(repo, 'packages', 'database', 'src', 'schema', 'users.ts'),
+      'export const users = {};\n',
+    );
+    git(repo, ['add', '.']);
+    const { binDir, logPath } = installPnpmStub(repo);
+
+    const output = String(
+      runChangeClass(repo, ['--branch', '--run', '--fast'], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${toBashPath(binDir)}:${process.env.PATH ?? ''}`,
+          PNPM_LOG: toBashPath(logPath),
+        },
+      }),
+    );
+    const calls = readFileSync(logPath, 'utf8');
+
+    expect(calls).toContain('exec tsc --build');
+    expect(calls).not.toContain('db:push:dev');
+    expect(calls).not.toContain('db:generate:dev');
+    expect(output).toMatch(
+      /Skipped \(slow\)[\s\S]*pnpm db:push:dev[\s\S]*pnpm db:generate:dev/,
+    );
+  });
+
+  it('keeps migration database actions out of the fast run', () => {
+    mkdirSync(join(repo, 'apps', 'api', 'drizzle', 'meta'), {
+      recursive: true,
+    });
+    writeFileSync(
+      join(repo, 'apps', 'api', 'drizzle', 'meta', '0999_snapshot.json'),
+      '{}\n',
+    );
+    git(repo, ['add', '.']);
+    const { binDir, logPath } = installPnpmStub(repo);
+
+    const output = String(
+      runChangeClass(repo, ['--branch', '--run', '--fast'], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${toBashPath(binDir)}:${process.env.PATH ?? ''}`,
+          PNPM_LOG: toBashPath(logPath),
+        },
+      }),
+    );
+    const calls = readFileSync(logPath, 'utf8');
+
+    expect(calls).toContain('exec nx run @eduagent/database:test');
+    expect(calls).not.toContain('db:push:dev');
+    expect(output).toMatch(/Skipped \(slow\)[\s\S]*pnpm db:push:dev/);
+  });
+
+  it('does not push DDL when a stale local main inflates the branch delta to 461 files', () => {
+    git(repo, ['switch', '-c', 'fresh-main']);
+    mkdirSync(join(repo, 'upstream'), { recursive: true });
+    for (let index = 0; index < 460; index += 1) {
+      writeFileSync(
+        join(repo, 'upstream', `file-${String(index).padStart(3, '0')}.txt`),
+        `${index}\n`,
+      );
+    }
+    git(repo, ['add', '.']);
+    git(repo, ['commit', '-m', 'advance upstream main']);
+    git(repo, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    git(repo, ['switch', '-c', 'WI-2790']);
+    mkdirSync(join(repo, 'packages', 'database', 'src', 'schema'), {
+      recursive: true,
+    });
+    writeFileSync(
+      join(repo, 'packages', 'database', 'src', 'schema', 'users.ts'),
+      'export const users = {};\n',
+    );
+    git(repo, ['add', '.']);
+    const { binDir, logPath } = installPnpmStub(repo);
+
+    const output = String(
+      runChangeClass(repo, ['--branch', '--run', '--fast'], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${toBashPath(binDir)}:${process.env.PATH ?? ''}`,
+          PNPM_LOG: toBashPath(logPath),
+        },
+      }),
+    );
+    const calls = readFileSync(logPath, 'utf8');
+
+    expect(output).toContain('Files:   461');
+    expect(calls).toContain('exec tsc --build');
+    expect(calls).not.toContain('db:push:dev');
+    expect(calls).not.toContain('db:generate:dev');
+  });
+
+  it('documents that fast runs exclude database actions but may write workspace artifacts', () => {
+    const output = String(
+      runChangeClass(repo, ['--help'], { encoding: 'utf8' }),
+    );
+    const docs = readFileSync(
+      join(__dirname, '..', 'docs/change-classes.md'),
+      'utf8',
+    );
+
+    expect(output).toContain('exclude database/Doppler actions');
+    expect(output).toContain(
+      'Fast commands may still write workspace artifacts',
+    );
+    expect(output).toContain(
+      'Database actions require --run without --fast and separate authorization',
+    );
+    expect(docs).toContain('is database- and Doppler-free by contract');
+    expect(docs).toMatch(
+      /Fast commands may\s+still update workspace artifacts/,
+    );
+    expect(docs).not.toContain('is non-mutating by contract');
   });
 
   // ── --github-output router mode (WI-452) ──────────────────────────────
@@ -372,6 +513,34 @@ describe('check-change-class.sh', () => {
       expect(flags[flag]).toBe('false');
     }
   });
+
+  it('routes integration checker inputs through the checker and full suite', () => {
+    mkdirSync(join(repo, 'tests', 'integration'), { recursive: true });
+    writeFileSync(
+      join(repo, 'tests', 'integration', 'new.integration.test.ts'),
+      'export const testFixture = true;\n',
+    );
+    git(repo, ['add', '.']);
+
+    const output = runChangeClass(repo, ['--branch'], { encoding: 'utf8' });
+    expect(output).toContain('integration-typecheck');
+    expect(output).toContain('pnpm typecheck:integration');
+    expect(output).toContain('pnpm test:integration');
+    expect(runRouter(repo).integration).toBe('true');
+  });
+
+  it.each(['pnpm-lock.yaml', 'tsconfig.base.json'])(
+    'routes shared compiler input %s through the integration checker',
+    (path) => {
+      writeFileSync(join(repo, path), '{}\n');
+      git(repo, ['add', '.']);
+
+      const output = runChangeClass(repo, ['--branch'], { encoding: 'utf8' });
+      expect(output).toContain('integration-typecheck');
+      expect(output).toContain('pnpm typecheck:integration');
+      expect(runRouter(repo).integration).toBe('true');
+    },
+  );
 
   it('routes API TypeScript changes through the no-Gemini-runtime ratchet', () => {
     mkdirSync(join(repo, 'apps', 'api', 'src', 'services'), {

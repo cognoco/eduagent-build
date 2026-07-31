@@ -1,0 +1,18 @@
+{
+  "pageId": "39f8bce9-1f7c-8149-b63d-f87c763204c8",
+  "id": "WI-2238",
+  "name": "Cover V2 Subjects browse, Subject Hub, and first-subject creation",
+  "description": "CLASSIFICATION/REUSE: this is a V2 release-proof task, not a second implementation bug. Current V2 Maestro has one shell flow that opens one seeded subject hub. Reuse legacy subject/onboarding Maestro flows, j09 Playwright, multi-subject/retention seeds, SubjectsBrowse/SubjectHub testIDs, and the implemented hub routes. First-subject Add wiring is owned by WI-2215 and is a prerequisite, not duplicated here.",
+  "acceptanceCriteria": "SCOPE: add V2 browser and release-APK journeys for Subjects browse/search/no-results, subject row to Subject Hub, Next Up/due review to topic/session, and return to the same subject and Me scope. Do not reimplement subject creation.\nPREREQUISITE: WI-2215 owns the broken Subjects Add route. After it lands, cover zero-subject Add through the existing create-subject/setup flow and assert the final V2 Subjects/subject-hub destination; no /home or legacy Library fallback.\nIDENTITY: every drill-in asserts the expected synthetic subject/topic/session ID or name and the active Me scope, not merely screen visibility. Topic sheet and Android/browser Back preserve the ancestor chain.\nRECOVERY: cover empty list, search no result/clear, API error/retry, and curriculum-preparing/empty hub with stable testIDs.\nREUSE: compose existing learning-active, multi-subject, retention-due, and onboarding-no-subject seed helpers plus legacy onboarding/subject/j09 steps; add only the V2 shell entry/return assertions.\nREGISTRATION: add bounded V2 Playwright coverage and one or more Maestro flows to the explicit V2 lane/manifest; retain legacy V0/V1 Library/onboarding suites.\nEVIDENCE: browser and release APK runs include Android Back and zero-subject creation with synthetic labels. No duplicate leaf assertions already owned by component/service suites.",
+  "riskImpact": "P1 launch-proof gap: the primary Subjects tab can lose identity, scope, or return path while the single seeded-open smoke remains green. The item spans web/native routing, deterministic seeds, Android back, and V0/V1 non-regression, so adversarial review is required.",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "executor:codex:bid19:WI-2238-recovery",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "",
+  "bodyText": ""
+}

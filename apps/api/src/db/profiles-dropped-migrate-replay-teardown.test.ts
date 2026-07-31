@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import type { Pool } from 'pg';
 import { closePoolAndDropScratchDatabase } from './scratch-database-teardown';
 
-describe('profiles-dropped migration replay teardown [WI-2755]', () => {
+describe('profiles-dropped migration replay teardown [WI-2794]', () => {
   it('waits for scratch connections to drain and drops without FORCE', () => {
     const source = readFileSync(
       join(__dirname, 'profiles-dropped-migrate-replay.integration.test.ts'),

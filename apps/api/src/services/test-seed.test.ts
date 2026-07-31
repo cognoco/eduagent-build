@@ -18,17 +18,20 @@ import {
   type Database,
 } from '@eduagent/database';
 import { inArray } from 'drizzle-orm';
+import { CONFIRMED_CONVERSATION_LANGUAGE_AT } from '../test-utils/conversation-language-confirmation';
 
 // ---------------------------------------------------------------------------
 // Test Seed Service — Unit Tests
 // ---------------------------------------------------------------------------
 
 import {
+  createClerkTestUser,
   seedScenario,
   resetDatabase,
   debugAccountsByEmail,
   VALID_SCENARIOS,
   SEED_CLERK_PREFIX,
+  type ResetOptions,
   type SeedScenario,
 } from './test-seed';
 import { getTierConfig } from './subscription';
@@ -37,6 +40,20 @@ import { addMonthsClamped } from './billing/billing-shared';
 // ---------------------------------------------------------------------------
 // Mock DB factory
 // ---------------------------------------------------------------------------
+
+function withMockTransaction(db: Database): Database {
+  if (typeof db.execute !== 'function') {
+    Object.assign(db, {
+      execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
+    });
+  }
+  Object.assign(db, {
+    transaction: jest.fn(
+      async (operation: (tx: Database) => Promise<unknown>) => operation(db),
+    ),
+  });
+  return db;
+}
 
 function createMockDb(): Database {
   const deleteWhere = jest.fn().mockReturnValue({
@@ -65,7 +82,7 @@ function createMockDb(): Database {
     }),
   };
 
-  return {
+  const db = {
     insert: jest.fn().mockReturnValue({
       values: jest.fn().mockReturnValue({
         onConflictDoNothing: jest.fn().mockReturnValue({
@@ -109,6 +126,7 @@ function createMockDb(): Database {
       },
     },
   } as unknown as Database;
+  return withMockTransaction(db);
 }
 
 // ---------------------------------------------------------------------------
@@ -357,6 +375,68 @@ describe('seedScenario', () => {
     VALID_SCENARIOS as SeedScenario[]
   ).filter((scenario) => !DB_TRANSACTION_SCENARIOS.includes(scenario));
 
+  it('[WI-2820] runs cleanup and the complete seed graph in one transaction', async () => {
+    const rootDb = createMockDb();
+    const txDb = createMockDb();
+    const transaction = jest.fn(
+      async (operation: (tx: Database) => Promise<unknown>) => operation(txDb),
+    );
+    Object.assign(rootDb, { transaction });
+
+    await seedScenario(rootDb, 'learning-active', 'repeat@example.com');
+
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(txDb.insert).toHaveBeenCalled();
+    expect(rootDb.insert).not.toHaveBeenCalled();
+  });
+
+  it('[WI-2820 review] resolves real Clerk ownership after acquiring the mutation lock', async () => {
+    const events: string[] = [];
+    const rootDb = createMockDb();
+    const txDb = createMockDb();
+    const transaction = jest.fn(
+      async (operation: (tx: Database) => Promise<unknown>) => {
+        events.push('transaction');
+        return operation(txDb);
+      },
+    );
+    Object.assign(rootDb, { transaction });
+
+    const clerkUser = {
+      id: 'user_seed_repeat',
+      primary_email_address_id: 'email_seed_repeat',
+      email_addresses: [
+        {
+          id: 'email_seed_repeat',
+          email_address: 'repeat@example.com',
+        },
+      ],
+      external_id: `${SEED_CLERK_PREFIX}repeat`,
+    };
+    global.fetch = jest.fn(async (input, init) => {
+      const url = String(input);
+      if (url.includes('/users?')) {
+        events.push('clerk-ownership');
+        return new Response(JSON.stringify([clerkUser]), { status: 200 });
+      }
+      if (url.endsWith(`/users/${clerkUser.id}`) && !init?.method) {
+        return new Response(JSON.stringify(clerkUser), { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    });
+
+    await seedScenario(rootDb, 'learning-active', 'repeat@example.com', {
+      CLERK_SECRET_KEY: 'test-secret',
+      SEED_PASSWORD: 'test-password',
+    });
+
+    expect(events).toEqual([
+      'transaction',
+      'clerk-ownership',
+      'clerk-ownership',
+    ]);
+  });
+
   it.each(MOCK_DISPATCHABLE_SCENARIOS)(
     'dispatches "%s" and returns SeedResult',
     async (scenario: SeedScenario) => {
@@ -465,6 +545,34 @@ describe('seedScenario', () => {
     expect(typeof result.accountId).toBe('string');
     expect(result.accountId.length).toBeGreaterThan(0);
   });
+
+  it.each([
+    'onboarding-complete',
+    'parent-multi-child',
+    'v2-account-non-owner-child',
+  ] as const)(
+    '[WI-2944] seeds the established %s profile with a confirmed conversation language',
+    async (scenario) => {
+      const db = createMockDb();
+      const result = await seedScenario(
+        db,
+        scenario,
+        'established@example.com',
+      );
+      const insertResult = (db.insert as jest.Mock).mock.results[0]?.value as
+        | { values?: jest.Mock }
+        | undefined;
+      const insertedRows =
+        insertResult?.values?.mock.calls.map(([row]) => row) ?? [];
+
+      expect(insertedRows).toContainEqual(
+        expect.objectContaining({
+          id: result.profileId,
+          conversationLanguageConfirmedAt: CONFIRMED_CONVERSATION_LANGUAGE_AT,
+        }),
+      );
+    },
+  );
 
   it('[WI-2554] seeds a credentialed learner-only person without an admin role or managed-child guardianship', async () => {
     const db = createMockDb();
@@ -717,6 +825,76 @@ describe('seedScenario', () => {
     expect(lookupAttempts).toBeGreaterThanOrEqual(2);
     expect(fetchMock.mock.calls[0]?.[0]).toEqual(fetchMock.mock.calls[1]?.[0]);
   });
+
+  it('[WI-2820 P1] waits for a deletion-pending Clerk user instead of reusing it', async () => {
+    const pendingUser = {
+      id: 'user_pending_delete',
+      primary_email_address_id: 'email_pending_delete',
+      email_addresses: [
+        { id: 'email_pending_delete', email_address: 'pending@example.com' },
+      ],
+      external_id: `${SEED_CLERK_PREFIX}deletion-pending:user_pending_delete`,
+    };
+    const createdUser = {
+      id: 'user_recreated_after_delete',
+      primary_email_address_id: 'email_recreated_after_delete',
+      email_addresses: [
+        {
+          id: 'email_recreated_after_delete',
+          email_address: 'pending@example.com',
+        },
+      ],
+      external_id: `${SEED_CLERK_PREFIX}recreated`,
+    };
+    let lookupCount = 0;
+    const fetchMock = jest.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method ?? 'GET';
+
+        if (url.includes('/users?')) {
+          lookupCount += 1;
+          return new Response(
+            JSON.stringify(lookupCount === 1 ? [pendingUser] : []),
+            { status: 200 },
+          );
+        }
+        if (url.endsWith('/users') && method === 'POST') {
+          return new Response(JSON.stringify(createdUser), { status: 200 });
+        }
+        if (url.endsWith(`/users/${createdUser.id}`) && method === 'PATCH') {
+          return new Response('{}', { status: 200 });
+        }
+        if (url.endsWith(`/users/${createdUser.id}`) && method === 'GET') {
+          return new Response(JSON.stringify(createdUser), { status: 200 });
+        }
+        if (
+          url.endsWith(
+            `/email_addresses/${createdUser.primary_email_address_id}`,
+          ) &&
+          method === 'PATCH'
+        ) {
+          return new Response('{}', { status: 200 });
+        }
+        return new Response(`Unexpected Clerk mock call: ${method} ${url}`, {
+          status: 404,
+        });
+      },
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await createClerkTestUser('pending@example.com', {
+      CLERK_SECRET_KEY: 'test-secret',
+      SEED_PASSWORD: 'test-password',
+    });
+
+    expect(result.clerkUserId).toBe(createdUser.id);
+    expect(lookupCount).toBe(2);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/\/users$/),
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -775,6 +953,571 @@ describe('resetDatabase', () => {
       });
   }
 
+  function makeResetDb(): Database {
+    const select = makeResetSelectMock({
+      logins: [
+        {
+          personId: 'repeat-person',
+          clerkUserId: `${SEED_CLERK_PREFIX}repeat`,
+        },
+      ],
+      orgsForPersons: [{ organizationId: 'repeat-org' }],
+      membersOfOrgs: [{ personId: 'repeat-person' }],
+      fullMemberships: [
+        { personId: 'repeat-person', organizationId: 'repeat-org' },
+      ],
+    });
+    return {
+      select,
+      delete: jest.fn().mockImplementation(() => ({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([{ id: 'repeat-org' }]),
+        }),
+      })),
+      execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
+    } as unknown as Database;
+  }
+
+  const RESET_TRANSACTION_CASES: Array<[string, ResetOptions]> = [
+    [
+      'prefix',
+      { prefix: 'repeat-', clerkUserIds: [`${SEED_CLERK_PREFIX}repeat`] },
+    ],
+    ['unscoped', { clerkUserIds: [`${SEED_CLERK_PREFIX}repeat`] }],
+  ];
+
+  it.each(RESET_TRANSACTION_CASES)(
+    '[WI-2820] runs the %s select-to-delete reset path in one transaction',
+    async (_path, options) => {
+      const rootDb = makeResetDb();
+      const txDb = makeResetDb();
+      const transaction = jest.fn(
+        async (operation: (tx: Database) => Promise<unknown>) =>
+          operation(txDb),
+      );
+      Object.assign(rootDb, { transaction });
+
+      await resetDatabase(rootDb, {}, options);
+
+      expect(transaction).toHaveBeenCalledTimes(1);
+      expect(txDb.delete).toHaveBeenCalled();
+      expect(rootDb.delete).not.toHaveBeenCalled();
+    },
+  );
+
+  it('[WI-2820 review] resolves reset Clerk ownership after acquiring the mutation lock', async () => {
+    const events: string[] = [];
+    const rootDb = makeResetDb();
+    const txDb = makeResetDb();
+    const transaction = jest.fn(
+      async (operation: (tx: Database) => Promise<unknown>) => {
+        events.push('transaction');
+        return operation(txDb);
+      },
+    );
+    Object.assign(rootDb, { transaction });
+
+    const clerkUser = {
+      id: 'user_real_seed',
+      email_addresses: [{ email_address: 'repeat-owner@example.com' }],
+      external_id: `${SEED_CLERK_PREFIX}repeat-owner`,
+    };
+    global.fetch = jest.fn(async (input) => {
+      if (String(input).includes('/users?')) {
+        events.push('clerk-ownership');
+        const users = events.filter((event) => event === 'clerk-ownership');
+        return new Response(
+          JSON.stringify(users.length === 1 ? [clerkUser] : []),
+          {
+            status: 200,
+          },
+        );
+      }
+      return new Response('{}', { status: 200 });
+    });
+
+    await resetDatabase(
+      rootDb,
+      { CLERK_SECRET_KEY: 'test-secret' },
+      { prefix: 'repeat-', preserveClerkUsers: true },
+    );
+
+    expect(events).toEqual(['transaction', 'clerk-ownership']);
+  });
+
+  it('[WI-2820 CodeRabbit] deletes Clerk users only after the reset transaction commits', async () => {
+    const events: string[] = [];
+    const rootDb = makeResetDb();
+    const txDb = makeResetDb();
+    Object.assign(rootDb, {
+      transaction: jest.fn(
+        async (operation: (tx: Database) => Promise<unknown>) => {
+          events.push('transaction-start');
+          const result = await operation(txDb);
+          events.push('transaction-commit');
+          return result;
+        },
+      ),
+    });
+
+    global.fetch = jest.fn(async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+      if (url.includes('/users?')) {
+        events.push('clerk-list');
+        return new Response(
+          JSON.stringify([
+            {
+              id: 'user_seed_after_commit',
+              external_id: `${SEED_CLERK_PREFIX}after-commit`,
+              email_addresses: [{ email_address: 'repeat-owner@example.com' }],
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        bypass_client_trust?: boolean;
+        external_id?: string;
+      };
+      if (
+        method === 'PATCH' &&
+        body.external_id?.includes('deletion-pending:')
+      ) {
+        events.push('clerk-marker-PATCH');
+      } else if (method === 'PATCH' && body.bypass_client_trust === false) {
+        events.push('clerk-bypass-PATCH');
+      } else {
+        events.push(`clerk-${method}`);
+      }
+      return new Response('{}', { status: 200 });
+    });
+
+    const result = await resetDatabase(
+      rootDb,
+      { CLERK_SECRET_KEY: 'test-secret' },
+      { prefix: 'repeat-' },
+    );
+
+    expect(result).toEqual({
+      deletedCount: 1,
+      clerkUsersDeleted: 1,
+      clerkUsersSelected: 1,
+    });
+    expect(events).toEqual([
+      'transaction-start',
+      'clerk-list',
+      'clerk-marker-PATCH',
+      'transaction-commit',
+      'clerk-bypass-PATCH',
+      'clerk-DELETE',
+    ]);
+  });
+
+  it('[WI-2820 CodeRabbit] restores Clerk markers when the reset transaction commit fails', async () => {
+    const events: string[] = [];
+    const restoredExternalIds: string[] = [];
+    const rootDb = makeResetDb();
+    const txDb = makeResetDb();
+    Object.assign(rootDb, {
+      transaction: jest.fn(
+        async (operation: (tx: Database) => Promise<unknown>) => {
+          events.push('transaction-start');
+          await operation(txDb);
+          throw new Error('simulated transaction rollback');
+        },
+      ),
+    });
+
+    global.fetch = jest.fn(async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+      if (url.includes('/users?')) {
+        events.push('clerk-list');
+        return new Response(
+          JSON.stringify([
+            {
+              id: 'user_seed_rollback',
+              external_id: `${SEED_CLERK_PREFIX}rollback`,
+              email_addresses: [{ email_address: 'repeat-owner@example.com' }],
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        external_id?: string;
+      };
+      if (
+        method === 'PATCH' &&
+        body.external_id?.includes('deletion-pending:')
+      ) {
+        events.push('clerk-marker-PATCH');
+      } else if (method === 'PATCH') {
+        events.push('clerk-restore-PATCH');
+        restoredExternalIds.push(body.external_id ?? '');
+      } else {
+        events.push(`clerk-${method}`);
+      }
+      return new Response('{}', { status: 200 });
+    });
+
+    await expect(
+      resetDatabase(
+        rootDb,
+        { CLERK_SECRET_KEY: 'test-secret' },
+        { prefix: 'repeat-' },
+      ),
+    ).rejects.toThrow('simulated transaction rollback');
+
+    expect(events).toEqual([
+      'transaction-start',
+      'clerk-list',
+      'clerk-marker-PATCH',
+      'clerk-restore-PATCH',
+    ]);
+    expect(restoredExternalIds).toEqual([`${SEED_CLERK_PREFIX}rollback`]);
+  });
+
+  it('[WI-2940] attempts every Clerk marker restore before reporting partial failure', async () => {
+    const restoreAttempts: string[] = [];
+    const rootDb = makeResetDb();
+    const txDb = makeResetDb();
+    Object.assign(rootDb, {
+      transaction: jest.fn(
+        async (operation: (tx: Database) => Promise<unknown>) => {
+          await operation(txDb);
+          throw new Error('simulated transaction rollback');
+        },
+      ),
+    });
+
+    global.fetch = jest.fn(async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+      if (url.includes('/users?')) {
+        return new Response(
+          JSON.stringify([
+            {
+              id: 'user_seed_restore_first',
+              external_id: `${SEED_CLERK_PREFIX}restore-first`,
+              email_addresses: [{ email_address: 'repeat-first@example.com' }],
+            },
+            {
+              id: 'user_seed_restore_second',
+              external_id: `${SEED_CLERK_PREFIX}restore-second`,
+              email_addresses: [{ email_address: 'repeat-second@example.com' }],
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        external_id?: string;
+      };
+      if (
+        method === 'PATCH' &&
+        body.external_id?.includes('deletion-pending:')
+      ) {
+        return new Response('{}', { status: 200 });
+      }
+      if (method === 'PATCH' && body.external_id) {
+        restoreAttempts.push(body.external_id);
+        return new Response('WI2940_DUMMY_SECRET', {
+          status: body.external_id.endsWith('restore-first') ? 500 : 200,
+        });
+      }
+
+      return new Response('{}', { status: 200 });
+    });
+
+    let failure: unknown;
+    try {
+      await resetDatabase(
+        rootDb,
+        { CLERK_SECRET_KEY: 'test-secret' },
+        { prefix: 'repeat-' },
+      );
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toEqual(
+      new Error('Clerk deletion marker restore failed for 1 of 2 users'),
+    );
+    expect(String(failure)).not.toContain('WI2940_DUMMY_SECRET');
+    expect(restoreAttempts).toEqual([
+      `${SEED_CLERK_PREFIX}restore-first`,
+      `${SEED_CLERK_PREFIX}restore-second`,
+    ]);
+  });
+
+  it('[WI-2820 P1] restores a deletion marker before releasing the mutation lock on a DB failure', async () => {
+    const events: string[] = [];
+    const restoredExternalIds: string[] = [];
+    const rootDb = makeResetDb();
+    const txDb = makeResetDb();
+    Object.assign(txDb, {
+      select: jest.fn(() => {
+        throw new Error('simulated database operation failure');
+      }),
+    });
+    Object.assign(rootDb, {
+      transaction: jest.fn(
+        async (operation: (tx: Database) => Promise<unknown>) => {
+          events.push('transaction-start');
+          try {
+            return await operation(txDb);
+          } catch (error) {
+            events.push('transaction-rollback');
+            throw error;
+          }
+        },
+      ),
+    });
+
+    global.fetch = jest.fn(async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+      if (url.includes('/users?')) {
+        events.push('clerk-list');
+        return new Response(
+          JSON.stringify([
+            {
+              id: 'user_seed_db_failure',
+              external_id: `${SEED_CLERK_PREFIX}db-failure`,
+              email_addresses: [{ email_address: 'repeat-owner@example.com' }],
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        external_id?: string;
+      };
+      if (
+        method === 'PATCH' &&
+        body.external_id?.includes('deletion-pending:')
+      ) {
+        events.push('clerk-marker-PATCH');
+      } else if (method === 'PATCH') {
+        events.push('clerk-restore-PATCH');
+        restoredExternalIds.push(body.external_id ?? '');
+      } else {
+        events.push(`clerk-${method}`);
+      }
+      return new Response('{}', { status: 200 });
+    });
+
+    await expect(
+      resetDatabase(
+        rootDb,
+        { CLERK_SECRET_KEY: 'test-secret' },
+        { prefix: 'repeat-' },
+      ),
+    ).rejects.toThrow('simulated database operation failure');
+
+    expect(events).toEqual([
+      'transaction-start',
+      'clerk-list',
+      'clerk-marker-PATCH',
+      'clerk-restore-PATCH',
+      'transaction-rollback',
+    ]);
+    expect(restoredExternalIds).toEqual([`${SEED_CLERK_PREFIX}db-failure`]);
+  });
+
+  it('[WI-2820 P1] restores a deletion marker when Clerk rejects the post-commit delete', async () => {
+    const events: string[] = [];
+    const restoredExternalIds: string[] = [];
+    const rootDb = makeResetDb();
+    const txDb = makeResetDb();
+    Object.assign(rootDb, {
+      transaction: jest.fn(
+        async (operation: (tx: Database) => Promise<unknown>) => {
+          events.push('transaction-start');
+          const result = await operation(txDb);
+          events.push('transaction-commit');
+          return result;
+        },
+      ),
+    });
+
+    global.fetch = jest.fn(async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+      if (url.includes('/users?')) {
+        events.push('clerk-list');
+        return new Response(
+          JSON.stringify([
+            {
+              id: 'user_seed_failed_delete',
+              external_id: `${SEED_CLERK_PREFIX}failed-delete`,
+              email_addresses: [{ email_address: 'repeat-owner@example.com' }],
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        bypass_client_trust?: boolean;
+        external_id?: string;
+      };
+      if (
+        method === 'PATCH' &&
+        body.external_id?.includes('deletion-pending:')
+      ) {
+        events.push('clerk-marker-PATCH');
+        return new Response('{}', { status: 200 });
+      }
+      if (method === 'PATCH' && body.bypass_client_trust === false) {
+        events.push('clerk-bypass-PATCH');
+        return new Response('{}', { status: 200 });
+      }
+      if (method === 'DELETE') {
+        events.push('clerk-DELETE');
+        return new Response('{}', { status: 500 });
+      }
+
+      events.push('clerk-restore-PATCH');
+      restoredExternalIds.push(body.external_id ?? '');
+      return new Response('{}', { status: 200 });
+    });
+
+    const result = await resetDatabase(
+      rootDb,
+      { CLERK_SECRET_KEY: 'test-secret' },
+      { prefix: 'repeat-' },
+    );
+
+    expect(result).toEqual({
+      deletedCount: 1,
+      clerkUsersDeleted: 0,
+      clerkUsersSelected: 1,
+    });
+    expect(events).toEqual([
+      'transaction-start',
+      'clerk-list',
+      'clerk-marker-PATCH',
+      'transaction-commit',
+      'clerk-bypass-PATCH',
+      'clerk-DELETE',
+      'clerk-restore-PATCH',
+    ]);
+    expect(restoredExternalIds).toEqual([`${SEED_CLERK_PREFIX}failed-delete`]);
+  });
+
+  it('[WI-2820 P1] reports a full Worker batch despite a failed Clerk delete', async () => {
+    const users = Array.from({ length: 16 }, (_, index) => ({
+      id: `user_over_budget_${index}`,
+      external_id: `${SEED_CLERK_PREFIX}over-budget-${index}`,
+      email_addresses: [
+        { email_address: `pw-over-budget-${index}@example.com` },
+      ],
+    }));
+    const fetchMock = jest.fn(async (input, init) => {
+      const url = String(input);
+      if (url.includes('/users?')) {
+        return new Response(JSON.stringify(users), { status: 200 });
+      }
+      if (init?.method === 'DELETE' && url.endsWith('/user_over_budget_0')) {
+        return new Response('{}', { status: 500 });
+      }
+      return new Response('{}', { status: 200 });
+    });
+    global.fetch = fetchMock;
+    const db = createMockDb();
+
+    const result = await resetDatabase(
+      db,
+      { CLERK_SECRET_KEY: 'test-secret' },
+      { prefix: 'pw-' },
+    );
+
+    expect(result).toEqual({
+      deletedCount: 0,
+      clerkUsersDeleted: 0,
+      clerkUsersSelected: 15,
+    });
+    // One list, 15 markers, one bypass/delete pair, and 15 restores = 33 calls.
+    // Stopping after the first failed delete reserves safe failure-path margin
+    // below Cloudflare's 50-subrequest cap and leaves the full batch retryable.
+    expect(fetchMock).toHaveBeenCalledTimes(33);
+    const markerCalls = fetchMock.mock.calls.filter(([, init]) => {
+      const body = JSON.parse(
+        String((init as RequestInit | undefined)?.body ?? '{}'),
+      ) as {
+        external_id?: string;
+      };
+      return body.external_id?.startsWith(
+        `${SEED_CLERK_PREFIX}deletion-pending:`,
+      );
+    });
+    expect(markerCalls).toHaveLength(15);
+    const restoreCalls = fetchMock.mock.calls.filter(([, init]) => {
+      const body = JSON.parse(
+        String((init as RequestInit | undefined)?.body ?? '{}'),
+      ) as {
+        external_id?: string;
+      };
+      return (
+        init?.method === 'PATCH' &&
+        body.external_id?.startsWith(SEED_CLERK_PREFIX) &&
+        !body.external_id.includes('deletion-pending:')
+      );
+    });
+    expect(restoreCalls).toHaveLength(15);
+  });
+
+  it('[WI-2940] exhausts the remaining marker restores before reporting a failed-delete recovery error', async () => {
+    const users = Array.from({ length: 15 }, (_, index) => ({
+      id: `user_restore_budget_${index}`,
+      external_id: `${SEED_CLERK_PREFIX}restore-budget-${index}`,
+      email_addresses: [
+        { email_address: `pw-restore-budget-${index}@example.com` },
+      ],
+    }));
+    const restoreAttempts: string[] = [];
+    const fetchMock = jest.fn(async (input, init) => {
+      const url = String(input);
+      if (url.includes('/users?')) {
+        return new Response(JSON.stringify(users), { status: 200 });
+      }
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        external_id?: string;
+      };
+      if (init?.method === 'DELETE') {
+        return new Response('{}', { status: 500 });
+      }
+      if (
+        init?.method === 'PATCH' &&
+        body.external_id?.startsWith(SEED_CLERK_PREFIX) &&
+        !body.external_id.includes('deletion-pending:')
+      ) {
+        restoreAttempts.push(body.external_id);
+        return new Response('{}', {
+          status: body.external_id.endsWith('restore-budget-0') ? 500 : 200,
+        });
+      }
+      return new Response('{}', { status: 200 });
+    });
+    global.fetch = fetchMock;
+
+    await expect(
+      resetDatabase(
+        createMockDb(),
+        { CLERK_SECRET_KEY: 'test-secret' },
+        { prefix: 'pw-' },
+      ),
+    ).rejects.toThrow('Clerk deletion marker restore failed for 1 of 15 users');
+    expect(restoreAttempts).toHaveLength(15);
+  });
+
   it('returns ResetResult with deletedCount', async () => {
     const deleteReturning = jest
       .fn()
@@ -798,12 +1541,12 @@ describe('resetDatabase', () => {
         { personId: 'p2', organizationId: 'org-2' },
       ],
     });
-    const db = {
+    const db = withMockTransaction({
       select: selectFn,
       delete: jest.fn().mockReturnValue({
         where: deleteWhere,
       }),
-    } as unknown as Database;
+    } as unknown as Database);
 
     const result = await resetDatabase(db);
 
@@ -848,10 +1591,10 @@ describe('resetDatabase', () => {
       }),
     }));
 
-    const db = {
+    const db = withMockTransaction({
       select: selectFn,
       delete: deleteFn,
-    } as unknown as Database;
+    } as unknown as Database);
 
     await resetDatabase(db);
 
@@ -864,24 +1607,27 @@ describe('resetDatabase', () => {
 
   it('returns deletedCount: 0 when no seed accounts exist', async () => {
     // v2 resetDatabase: select returns no login rows → returns early with count 0.
-    const db = {
+    const db = withMockTransaction({
       select: jest.fn().mockReturnValue({
         from: jest.fn().mockReturnValue({
           where: jest.fn().mockResolvedValue([]),
         }),
       }),
       delete: jest.fn(),
-    } as unknown as Database;
+    } as unknown as Database);
 
     const result = await resetDatabase(db);
 
-    expect(result).toEqual({ deletedCount: 0, clerkUsersDeleted: 0 });
+    expect(result).toEqual({
+      deletedCount: 0,
+      clerkUsersDeleted: 0,
+    });
   });
 
   it('[WI-84 DS-091] prefix reset does not delete non-seed Clerk accounts', async () => {
     // v2 prefix reset: select login by email prefix, filter by seed marker.
     // A non-seed clerkUserId won't pass isSeedManagedClerkUserId → no delete.
-    const db = {
+    const db = withMockTransaction({
       select: jest.fn().mockReturnValue({
         from: jest.fn().mockReturnValue({
           where: jest.fn().mockResolvedValue([
@@ -898,11 +1644,15 @@ describe('resetDatabase', () => {
           .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
       }),
       execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
-    } as unknown as Database;
+    } as unknown as Database);
 
     const result = await resetDatabase(db, {}, { prefix: 'e2e-' });
 
-    expect(result).toEqual({ deletedCount: 0, clerkUsersDeleted: 0 });
+    expect(result).toEqual({
+      deletedCount: 0,
+      clerkUsersDeleted: 0,
+      clerkUsersSelected: 0,
+    });
     expect(db.delete).not.toHaveBeenCalled();
   });
 
@@ -933,10 +1683,10 @@ describe('resetDatabase', () => {
       membersOfOrgs: [{ personId: 'p1' }],
       fullMemberships: [{ personId: 'p1', organizationId: 'org-1' }],
     });
-    const db = {
+    const db = withMockTransaction({
       select: selectFn,
       delete: deleteFn,
-    } as unknown as Database;
+    } as unknown as Database);
 
     const result = await resetDatabase(
       db,
@@ -944,7 +1694,11 @@ describe('resetDatabase', () => {
       { prefix: 'test-e2e-native-01', preserveClerkUsers: true },
     );
 
-    expect(result).toEqual({ deletedCount: 1, clerkUsersDeleted: 0 });
+    expect(result).toEqual({
+      deletedCount: 1,
+      clerkUsersDeleted: 0,
+      clerkUsersSelected: 0,
+    });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]?.[0]).toContain('/users?');
     expect(
@@ -960,11 +1714,11 @@ describe('resetDatabase', () => {
     const deleteWhere = jest.fn().mockReturnValue({
       returning: deleteReturning,
     });
-    const db = {
+    const db = withMockTransaction({
       delete: jest.fn().mockReturnValue({
         where: deleteWhere,
       }),
-    } as unknown as Database;
+    } as unknown as Database);
 
     const result = await resetDatabase(
       db,
@@ -992,11 +1746,11 @@ describe('resetDatabase', () => {
     const deleteWhere = jest.fn().mockReturnValue({
       returning: deleteReturning,
     });
-    const db = {
+    const db = withMockTransaction({
       delete: jest.fn().mockReturnValue({
         where: deleteWhere,
       }),
-    } as unknown as Database;
+    } as unknown as Database);
 
     const result = await resetDatabase(
       db,
@@ -1006,6 +1760,29 @@ describe('resetDatabase', () => {
 
     expect(result).toEqual({ deletedCount: 0, clerkUsersDeleted: 0 });
     expect(db.delete).not.toHaveBeenCalled();
+  });
+
+  it('[WI-2820 P1] verifies deletion-pending Clerk IDs for local bulk DB cleanup', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          id: 'user_pending_local_cleanup',
+          external_id: `${SEED_CLERK_PREFIX}deletion-pending:user_pending_local_cleanup`,
+          email_addresses: [{ email_address: 'pw-stale@example.com' }],
+        },
+      ],
+    });
+    const db = createMockDb();
+
+    const result = await resetDatabase(
+      db,
+      { CLERK_SECRET_KEY: 'sk_test' },
+      { verifiedSeedClerkUserIds: ['user_pending_local_cleanup'] },
+    );
+
+    expect(result).toEqual({ deletedCount: 0, clerkUsersDeleted: 0 });
+    expect(db.select).toHaveBeenCalled();
   });
 });
 
@@ -1666,7 +2443,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
         where: jest.fn().mockResolvedValue([]),
       }),
     };
-    const db = {
+    const db = withMockTransaction({
       insert: insertMock,
       update: jest.fn().mockReturnValue({
         set: jest
@@ -1680,7 +2457,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
           .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
       }),
       execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
-    } as unknown as Database;
+    } as unknown as Database);
 
     await seedScenario(
       db,
@@ -1717,7 +2494,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
         where: jest.fn().mockResolvedValue([]),
       }),
     };
-    const db = {
+    const db = withMockTransaction({
       insert: insertMock,
       update: jest.fn().mockReturnValue({
         set: jest
@@ -1731,7 +2508,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
           .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
       }),
       execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
-    } as unknown as Database;
+    } as unknown as Database);
 
     await seedScenario(
       db,
@@ -1793,7 +2570,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
         where: jest.fn().mockResolvedValue([]),
       }),
     };
-    const db = {
+    const db = withMockTransaction({
       insert: insertMock,
       update: jest.fn().mockReturnValue({
         set: jest.fn().mockImplementation((row: Record<string, unknown>) => {
@@ -1804,7 +2581,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
       select: jest.fn().mockReturnValue(selectChain),
       delete: deleteMock,
       execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
-    } as unknown as Database;
+    } as unknown as Database);
 
     const result = await seedScenario(
       db,
@@ -1874,7 +2651,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
 
   it('family-pool-members preserves normal mid-month usage at half of the Family allowance', async () => {
     const captured: Array<Record<string, unknown>> = [];
-    const db = {
+    const db = withMockTransaction({
       insert: jest.fn().mockImplementation(() => ({
         values: jest.fn().mockImplementation((row: Record<string, unknown>) => {
           captured.push(row);
@@ -1897,7 +2674,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
           .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
       }),
       execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
-    } as unknown as Database;
+    } as unknown as Database);
 
     const result = await seedScenario(
       db,
@@ -1944,7 +2721,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
         where: jest.fn().mockResolvedValue([]),
       }),
     };
-    const db = {
+    const db = withMockTransaction({
       insert: insertMock,
       update: jest.fn().mockReturnValue({
         set: jest
@@ -1957,7 +2734,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
           .fn()
           .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
       }),
-    } as unknown as Database;
+    } as unknown as Database);
 
     const result = await seedScenario(
       db,
@@ -2021,7 +2798,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
         where: jest.fn().mockResolvedValue([]),
       }),
     };
-    const db = {
+    const db = withMockTransaction({
       insert: insertMock,
       update: jest.fn().mockReturnValue({
         set: jest
@@ -2036,7 +2813,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
       }),
       query: { accounts: { findMany: jest.fn().mockResolvedValue([]) } },
       execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
-    } as unknown as Database;
+    } as unknown as Database);
 
     const result = await seedScenario(
       db,

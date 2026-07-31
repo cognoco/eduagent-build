@@ -1,6 +1,44 @@
 # Local DB Testing Runbook
 
-Run integration tests against a local PostgreSQL instead of the shared Neon dev database.
+Run integration tests against a disposable PostgreSQL database instead of a shared
+development, staging, or production database.
+
+## Canonical Lancre command
+
+```bash
+corepack pnpm run test:api:integration
+```
+
+This is the only canonical workstation command for the API co-located integration
+suite. It uses `package.json#packageManager` (`pnpm@10.19.0`) through Corepack,
+selects Doppler project `mentomate` and config `dev_integration` explicitly, validates
+the database identity, then enters the Nx `api:integration-api` target. The target
+repeats the same guard before Jest, so invoking Nx directly cannot bypass it.
+
+The command fails before Jest unless the operator has provisioned a dedicated,
+disposable database and added these values to Doppler's `mentomate/dev_integration`
+config (under the `dev` Doppler environment):
+
+| Variable | Required value |
+| --- | --- |
+| `DATABASE_URL` | Connection URL for the dedicated integration database |
+| `INTEGRATION_DATABASE_HOST` | Exact hostname parsed from `DATABASE_URL` |
+| `INTEGRATION_DATABASE_NAME` | Exact database name parsed from `DATABASE_URL` |
+| `INTEGRATION_DATABASE_DISPOSABLE` | Literal `true` |
+| `DATABASE_URL_STAGING_HOST` | Exact protected staging hostname |
+| `DATABASE_URL_PRODUCTION_HOST` | Exact protected production hostname |
+
+Doppler supplies `DOPPLER_PROJECT`, `DOPPLER_CONFIG`, and
+`DOPPLER_ENVIRONMENT` to the child process. The launcher requires exactly
+`mentomate`, `dev_integration`, and `dev`. The `dev_` prefix is required by
+Doppler for non-default development configs. Missing identity metadata, a protected
+endpoint match, staging/production labels, and non-disposable metadata all fail
+closed. Do not point this config at an existing dev, staging, or production
+branch. Database/config provisioning and secret changes are operator-owned.
+
+CI and the local Docker workflow below may invoke the guarded Nx target directly
+because their `DATABASE_URL` points to `localhost`/`127.0.0.1` and names an
+explicit test database. Remote database URLs never receive that exception.
 
 ## Why
 
@@ -25,10 +63,10 @@ docker compose -f docker-compose.test.yml up -d --wait
 $env:DATABASE_URL = "postgresql://test:test@localhost:5433/eduagent_test"
 pnpm --filter @eduagent/database exec tsx node_modules/drizzle-kit/bin.cjs push
 
-# 3. Run integration tests
+# 3. Run API integration tests through the guarded Nx target
 $env:NX_DAEMON = 'false'
 $env:NX_ISOLATE_PLUGINS = 'false'
-pnpm exec jest -c tests/integration/jest.config.cjs --runInBand --no-coverage
+corepack pnpm exec nx run api:integration-api
 
 # 4. Tear down (data is on tmpfs, so this is instant)
 docker compose -f docker-compose.test.yml down
@@ -94,20 +132,24 @@ docker compose -f docker-compose.test.yml up -d --wait
 $env:DATABASE_URL = "postgresql://test:test@localhost:5433/eduagent_test"
 pnpm exec jest -c tests/integration/jest.config.cjs tests/integration/streaks-routes.integration.test.ts --runInBand --no-coverage
 
-# API-scoped integration suites
+# API-scoped integration suites (guard first, then pass a Jest path locally)
 $env:DATABASE_URL = "postgresql://test:test@localhost:5433/eduagent_test"
-pnpm exec jest -c apps/api/jest.integration.config.cjs apps/api/src/services/auth-scoping.integration.test.ts --runInBand --no-coverage
+node scripts/run-api-integration.mjs --jest apps/api/src/services/auth-scoping.integration.test.ts --runInBand --no-coverage
 ```
 
 ## Using .env.test.local
 
-Instead of setting `DATABASE_URL` per command, create `.env.test.local` at the workspace root:
+Instead of setting `DATABASE_URL` per local-Docker command, create
+`.env.test.local` at the workspace root:
 
 ```env
 DATABASE_URL=postgresql://test:test@localhost:5433/eduagent_test
 ```
 
-The `loadDatabaseEnv()` helper (in `packages/test-utils`) checks this file automatically.
+The `loadDatabaseEnv()` helper (in `packages/test-utils`) checks this file
+automatically. The guarded Nx target still requires the URL in the process
+environment; it intentionally does not load env-file or Doppler fallbacks before
+its pre-Jest check.
 
 ## CI
 

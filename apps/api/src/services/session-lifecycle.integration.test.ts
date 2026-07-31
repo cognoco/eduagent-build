@@ -22,6 +22,7 @@ import {
 } from '@eduagent/database';
 import { eq, and } from 'drizzle-orm';
 import { deleteV2IdentitiesForTest } from '../test-utils/legacy-identity-anchors';
+import { markConversationLanguageConfirmedForTest } from '../test-utils/conversation-language-confirmation';
 import { registerProvider, unregisterProvider } from './llm';
 import { createMockProvider } from './llm/test-utils';
 import {
@@ -72,6 +73,7 @@ async function seedProfile() {
     birthDate: `${birthYear}-06-15`,
     residenceJurisdiction: 'US',
   });
+  await markConversationLanguageConfirmedForTest(db, profileId);
   await db.insert(membership).values({
     personId: profileId,
     organizationId: accountId,

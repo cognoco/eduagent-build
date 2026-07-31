@@ -1,9 +1,11 @@
+import type { Database } from '@eduagent/database';
 import { nowDeepLinkRouteSchema } from '@eduagent/schemas';
 
 import {
   PARKED_AGING_WINDOW_DAYS,
   RANKING,
   ROUTE_CATALOG,
+  buildNowFeed,
   orderSupporterHubCandidates,
   buildNowFeedFromCandidates,
   buildNowOverflowFromCandidates,
@@ -251,6 +253,51 @@ describe('now feed ranking', () => {
       edgeId: '00000000-0000-4000-8000-0000000000a1',
       personId: '00000000-0000-4000-8000-000000000101',
     });
+  });
+
+  // The per-request Neon Pool currently caps at 10 connections and queues
+  // further checkouts. This WI's narrower risk exists only if every edge pins
+  // a repeatable-read transaction; ordinary autocommit fan-out is separate.
+  it('[WI-2402] opens no transactions across the 50-edge supporter-hub cap', async () => {
+    const edges = Array.from({ length: 50 }, (_, index) => ({
+      edgeId: `edge-${index}`,
+      personId: `person-${index}`,
+    }));
+    const transaction = jest.fn(() => {
+      throw new Error('supporter-hub production path opened a transaction');
+    });
+    const findMany = jest.fn().mockResolvedValue([]);
+    const select = jest.fn(() => {
+      type FakeSelectQuery = {
+        from: (...args: unknown[]) => FakeSelectQuery;
+        innerJoin: (...args: unknown[]) => FakeSelectQuery;
+        where: (...args: unknown[]) => FakeSelectQuery;
+        orderBy: (...args: unknown[]) => FakeSelectQuery;
+        limit: (limit: number) => Promise<typeof edges>;
+      };
+      const query = {} as FakeSelectQuery;
+      query.from = () => query;
+      query.innerJoin = () => query;
+      query.where = () => query;
+      query.orderBy = () => query;
+      query.limit = (limit) => Promise.resolve(limit === 50 ? edges : []);
+      return query;
+    });
+    const db = {
+      query: { learningSessions: { findMany } },
+      select,
+      transaction,
+    } as unknown as Database;
+
+    await expect(
+      buildNowFeed(db, 'supporter-person', { scope: 'supporter-hub' }),
+    ).resolves.toMatchObject({
+      scope: 'supporter-hub',
+      cards: [],
+      overflowCount: 0,
+    });
+    expect(findMany).toHaveBeenCalledTimes(50);
+    expect(transaction).not.toHaveBeenCalled();
   });
 
   it('represents the Me-scope support hub pointer as one link card', () => {

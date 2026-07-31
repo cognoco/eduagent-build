@@ -48,7 +48,17 @@ const mockDb: Record<string, any> = {
     },
   },
   transaction: jest.fn(),
-  select: jest.fn(),
+  // [WI-2628] Chainable, and resolving to ONE profile row by default. The handler
+  // now does a non-locking pre-read above each transaction so it can evaluate the
+  // candidate rows against the multilingual gate outside it. A bare `jest.fn()` here
+  // made that pre-read throw, and the handler's own per-profile try/catch turned the
+  // throw into a Sentry "per-profile failure" — a stubbing gap that reads exactly
+  // like a product defect.
+  select: jest.fn(() => ({
+    from: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockResolvedValue([{ profileId: 'p-001' }]),
+  })),
   delete: jest.fn(),
   insert: jest.fn(),
   update: jest.fn(),

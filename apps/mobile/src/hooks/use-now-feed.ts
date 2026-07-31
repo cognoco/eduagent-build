@@ -198,26 +198,7 @@ export function useNowFeed(): NowFeedQueryResult {
           { init: { signal } },
         );
         const okRes = await assertOk(res);
-        let data: NowResponse;
-        try {
-          data = await parseJson(okRes, nowResponseSchema, 'GET /now');
-        } catch (err) {
-          // [WI-2627] A malformed `mentorNoticePolicy` fails the WHOLE response
-          // schema, so `parseJson` throws and the fold below never runs. Left
-          // there, the reducer is never REACHED: TanStack Query retains the
-          // prior notice-bearing `data` after a failed background refetch,
-          // policy stays enabled, and those cards keep rendering indefinitely —
-          // "missing/malformed never exposes data" defeated by a route that
-          // never gets to the reducer.
-          //
-          // Deliberately over-broad: this fires on ANY unparseable /now body,
-          // not only a bad policy field, because we cannot tell which field
-          // failed without a second read of a single-use body. That is the
-          // correct side to err on — a response we cannot parse is one whose
-          // policy we cannot confirm, and notices are the private feature.
-          policy.observeMalformed();
-          throw err;
-        }
+        const data = await parseJson(okRes, nowResponseSchema, 'GET /now');
         // [WI-2627] This response is also the ORDERED observation. Fold it
         // before the cache write below, so a response that carries a rollback
         // is not persisted with its own notice cards intact.
@@ -454,7 +435,8 @@ export function useNowOverflow(
     // for the same reason.
     //
     // The STRIP stays outside `select` — baked into the cache entry it would
-    // never re-evaluate when a sibling surface observes a disable.
+    // never re-evaluate when a sibling surface observes a disable, and it is
+    // what blanks data the query RETAINED across a failed refetch.
     select: (json) => {
       policy.observe(json.mentorNoticePolicy);
       return json;

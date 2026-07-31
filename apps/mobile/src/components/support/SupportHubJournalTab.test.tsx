@@ -152,6 +152,33 @@ describe('SupportHubJournalTab', () => {
     ).toHaveLength(1);
   });
 
+  it('renders structured shared-record facts through the shared renderer', async () => {
+    mockFetch.setRoute(`/visibility/reports/${PERSON_ID}/shared-record`, {
+      ...SHARED_RECORD,
+      supporterView: {
+        ...SHARED_RECORD.supporterView,
+        facts: [
+          {
+            ...SHARED_RECORD.supporterView.facts[0],
+            title: 'Weekly report Topics explored: 3',
+            detail: 'Legacy comparison',
+            metadata: {
+              templateKey: 'weeklyReport',
+              stats: [{ metricKey: 'topicsExplored', value: 3 }],
+            },
+          },
+        ],
+      },
+    });
+    queryClient = renderWithProfile(
+      <SupportHubJournalTab personScopes={[EMMA_SCOPE]} />,
+    );
+
+    await waitFor(() => screen.getByText('Weekly report'));
+    screen.getByText('3 topics explored');
+    expect(screen.queryByText('Legacy comparison')).toBeNull();
+  });
+
   it('renders an honest empty journal state when the fetched record has no facts', async () => {
     mockFetch.setRoute(
       `/visibility/reports/${PERSON_ID}/shared-record`,

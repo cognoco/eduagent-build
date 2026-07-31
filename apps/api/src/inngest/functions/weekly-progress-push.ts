@@ -267,9 +267,23 @@ export const weeklyProgressPushCron = inngest.createFunction(
   },
   { cron: '0 * * * 1' },
   async ({ step }) => {
+    // [CR-2026-05-21-189 / WI-2839] Compute the evaluation window in the first
+    // dedicated step so every timezone-sensitive query uses the same memoized
+    // instant, including after an Inngest replay or an hour-boundary crossing.
+    // Date objects don't survive step-result serialization cleanly, so the step
+    // returns millisecond timestamps and reconstructs Dates afterward.
+    const weekWindow = await step.run('resolve-week-window', async () => {
+      const nowUtcMs = Date.now();
+      const currentWeekStartMs = startOfCurrentWeek(
+        new Date(nowUtcMs),
+      ).getTime();
+      return { nowUtcMs, currentWeekStartMs };
+    });
+    const nowUtc = new Date(weekWindow.nowUtcMs);
+    const currentWeekStart = new Date(weekWindow.currentWeekStartMs);
+
     const parentIds = await step.run('find-weekly-parents', async () => {
       const db = getStepDatabase();
-      const nowUtc = new Date();
 
       // 1. Find all parents who can receive a weekly progress digest.
       // Push still requires pushEnabled + weeklyProgressPush; email is its own
@@ -333,24 +347,6 @@ export const weeklyProgressPushCron = inngest.createFunction(
         );
     });
 
-    // [CR-2026-05-21-189] nowUtc/currentWeekStart computed INSIDE a dedicated
-    // step.run so the value is memoized as part of the step's cached result.
-    // Computing them at function entry caused the closure to recompute
-    // new Date() to a later value on Inngest replay while the upstream step
-    // result (find-weekly-self-report-profiles) reflected the original window.
-    // Pattern mirrors session-stale-cleanup.ts and summary-reconciliation-cron.ts
-    // (BUG-189 / CR-029 / CR-031). Date objects don't survive Inngest step
-    // result serialization cleanly — timestamps are returned as ms numbers and
-    // Dates are reconstructed from them after the step.
-    const weekWindow = await step.run('resolve-week-window', async () => {
-      const nowUtcMs = Date.now();
-      const currentWeekStartMs = startOfCurrentWeek(
-        new Date(nowUtcMs),
-      ).getTime();
-      return { nowUtcMs, currentWeekStartMs };
-    });
-    const nowUtc = new Date(weekWindow.nowUtcMs);
-    const currentWeekStart = new Date(weekWindow.currentWeekStartMs);
     const selfReportProfileIds = await step.run(
       'find-weekly-self-report-profiles',
       async () => {

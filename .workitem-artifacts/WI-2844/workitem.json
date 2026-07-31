@@ -1,0 +1,18 @@
+{
+  "pageId": "3aa8bce9-1f7c-81d3-a34f-d75d126b40bb",
+  "id": "WI-2844",
+  "name": "Stabilize PickBookScreen filing-failure test under full mobile-suite load",
+  "description": "Root cause: PickBookScreen deliberately remains in useStickyLoading for at least 800 ms, while this file's async assertions inherited React Native Testing Library's one-second default waitFor budget. Full serialized-suite scheduling load can consume the remaining margin and leave unrelated cases on pick-book-loading even though the complete 30-case suite passes immediately in isolation. Use a file-local bounded wait budget so every PickBook async assertion has headroom without changing the repository-wide timeout or product behavior.",
+  "acceptanceCriteria": "Root cause: PickBookScreen's mandatory 800 ms sticky-loading hold leaves too little scheduling headroom under React Native Testing Library's default one-second waitFor budget. Variant search: the original filing-failure case and a subsequent custom-input case both reproduced on pick-book-loading, establishing a file-wide async boundary. 1. Give PickBookScreen async assertions an explicit file-local bounded wait budget above the sticky-loading hold; do not increase the repository-wide timeout or weaken an assertion. 2. Preserve caller-specific timeout overrides, the exact filing-failure alerts, no-navigation guarantees, and all product behavior. 3. The complete 30-case PickBookScreen suite passes repeatedly in fresh focused processes. 4. With the separately captured WI-2845 heap configuration applied for the control run, the full serialized mobile Jest suite passes without any PickBookScreen loader timeout after WI-2836 removes the pwsh false red. 5. Preserve both full-suite PickBook loader failures, the immediate isolated passes, and the post-repair 514/514-suite green as red/green evidence.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "executor:codex:bid19:WI-2844",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "",
+  "bodyText": ""
+}

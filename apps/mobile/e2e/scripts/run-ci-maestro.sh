@@ -97,18 +97,20 @@ plant_gallery_fixture
 seed_flow() {
   local scenario="$1"
   local payload response
-  local -a secret_header=()
 
   payload=$(node -e \
     'process.stdout.write(JSON.stringify({scenario: process.argv[1], nativeSeedSlot: process.argv[2]}))' \
     "$scenario" "$SEED_SLOT")
   if [ -n "${TEST_SEED_SECRET:-}" ]; then
-    secret_header=(-H "X-Test-Secret: ${TEST_SEED_SECRET}")
+    response=$(curl -fsS -X POST "${HOST_API_URL}/v1/__test/seed" \
+      -H 'Content-Type: application/json' \
+      -H "X-Test-Secret: ${TEST_SEED_SECRET}" \
+      -d "$payload")
+  else
+    response=$(curl -fsS -X POST "${HOST_API_URL}/v1/__test/seed" \
+      -H 'Content-Type: application/json' \
+      -d "$payload")
   fi
-  response=$(curl -fsS -X POST "${HOST_API_URL}/v1/__test/seed" \
-    -H 'Content-Type: application/json' \
-    "${secret_header[@]}" \
-    -d "$payload")
   # The single-quoted program is JavaScript; its ${key} interpolation belongs
   # to Node, not this shell.
   # shellcheck disable=SC2016
@@ -130,14 +132,17 @@ seed_flow() {
 }
 
 reset_seed() {
-  local -a secret_header=()
   if [ -n "${TEST_SEED_SECRET:-}" ]; then
-    secret_header=(-H "X-Test-Secret: ${TEST_SEED_SECRET}")
+    curl -fsS -X POST \
+      "${HOST_API_URL}/v1/__test/reset?prefix=test-e2e-${SEED_SLOT}&preserveClerkUsers=true" \
+      -H "X-Test-Secret: ${TEST_SEED_SECRET}" >/dev/null || \
+      echo "[ci-maestro] WARN: seed cleanup failed for $SEED_SLOT" >&2
+  else
+    curl -fsS -X POST \
+      "${HOST_API_URL}/v1/__test/reset?prefix=test-e2e-${SEED_SLOT}&preserveClerkUsers=true" \
+      >/dev/null || \
+      echo "[ci-maestro] WARN: seed cleanup failed for $SEED_SLOT" >&2
   fi
-  curl -fsS -X POST \
-    "${HOST_API_URL}/v1/__test/reset?prefix=test-e2e-${SEED_SLOT}&preserveClerkUsers=true" \
-    "${secret_header[@]}" >/dev/null || \
-    echo "[ci-maestro] WARN: seed cleanup failed for $SEED_SLOT" >&2
   ACTIVE_SEED=0
 }
 

@@ -1,3 +1,11 @@
+jest.mock(
+  '../llm' /* gc1-allow: mocks the routeAndCall LLM boundary so the memo-path test can assert the independent judge is never CONSULTED. routeAndCall cannot be exercised without a provider registration, and real-router coverage lives in the llm/router suite. */,
+  () => {
+    const actual = jest.requireActual('../llm') as typeof import('../llm');
+    return { ...actual, routeAndCall: jest.fn() };
+  },
+);
+
 import {
   memoryDedupDecisions as _memoryDedupDecisions,
   memoryFacts as _memoryFacts,
@@ -5,6 +13,7 @@ import {
   type ScopedRepository,
 } from '@eduagent/database';
 
+import { routeAndCall } from '../llm';
 import type { DedupActionOutcome } from './dedup-actions';
 import type { DedupLlmResult } from './dedup-llm';
 import {
@@ -13,6 +22,14 @@ import {
   type DedupPassArgs,
   type DedupEventTuple,
 } from './dedup-pass';
+
+const mockRouteAndCall = routeAndCall as jest.MockedFunction<
+  typeof routeAndCall
+>;
+
+beforeEach(() => {
+  mockRouteAndCall.mockReset();
+});
 
 describe('dedupPairKey', () => {
   it('is independent of pair order', () => {
@@ -94,6 +111,16 @@ function makeArgs(opts: {
     mergedText: string | null;
     modelVersion: string;
   } | null;
+  /**
+   * The row the post-insert BUG-402 re-read finds, when it differs from the row
+   * this pass tried to insert — i.e. a concurrent dedup pass won the
+   * `onConflictDoNothing`. Unset leaves the re-read behaving as before.
+   */
+  postInsertRow?: {
+    decision: 'merge' | 'supersede' | 'keep_both' | 'discard_new';
+    mergedText: string | null;
+    modelVersion: string;
+  };
   llmResult?: DedupLlmResult;
   actionOutcome?: DedupActionOutcome;
   profileId?: string;
@@ -125,10 +152,20 @@ function makeArgs(opts: {
     memoryFacts: fakeScopedMemoryFacts,
   } as unknown as ScopedRepository;
 
+  // Call 1 is the memo lookup; call 2 is the post-insert BUG-402 re-read. They are
+  // separable so a test can model a LOST race — no memo, then a different row
+  // landing under `onConflictDoNothing`.
+  let memoSelectCallCount = 0;
   const memoSelect = {
     from: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
-    limit: jest.fn().mockResolvedValue(opts.memoRow ? [opts.memoRow] : []),
+    limit: jest.fn().mockImplementation(() => {
+      memoSelectCallCount += 1;
+      if (memoSelectCallCount > 1 && opts.postInsertRow) {
+        return Promise.resolve([opts.postInsertRow]);
+      }
+      return Promise.resolve(opts.memoRow ? [opts.memoRow] : []);
+    }),
   };
 
   const insertChain = {
@@ -297,6 +334,133 @@ describe('runDedupForProfile', () => {
     expect(report.llmCalls).toBe(0);
   });
 
+  // [WI-2628] A memo hit stores only `model_version` — the producing VENDOR is not
+  // persisted and is therefore unrecoverable. The gate must then treat the producer
+  // as unknown and fail CLOSED, rather than asserting a vendor it cannot
+  // substantiate (the previous code passed the literal 'memo', which is not a vendor
+  // at all and excluded nothing from the judge pool).
+  //
+  // Both cases below keep `merged_text`'s tokens inside the two source facts. That
+  // is load-bearing: `findNewContentTokens` rejects a merge introducing new tokens
+  // BEFORE the gate is consulted, so a merged string built from unrelated words
+  // fails for that reason instead and the test would assert nothing about the gate.
+  it('drops a memo-hit merge whose text needs the judge, because the producing vendor is unrecoverable', async () => {
+    const merged = 'Dyslexia is a reading difference that affects decoding.';
+    const candidate = makeFact({
+      id: 'c1',
+      text: merged,
+      textNormalized: 'dyslexia is a reading difference that affects decoding',
+    });
+    const neighbour = makeFact({
+      id: 'n1',
+      text: 'Dyslexia affects decoding.',
+      textNormalized: 'dyslexia affects decoding',
+    });
+    const args = makeArgs({
+      candidates: [candidate],
+      neighbours: [neighbour],
+      memoRow: {
+        decision: 'merge' as const,
+        // Ambiguous EDUCATIONAL text: a protected lexeme with no person attributed,
+        // so the deterministic scan returns `refer` and the verdict belongs to the
+        // judge. With no producer vendor the referral cannot be constructed, so it
+        // resolves unsafe — the fail-closed behaviour under assertion.
+        mergedText: merged,
+        modelVersion: 'memo',
+      },
+    });
+
+    const { report } = await runDedupForProfile(args);
+    expect(report.memoHits).toBe(1);
+    expect(report.merges).toBe(0);
+    expect(report.failures).toBe(1);
+    // Pins the MECHANISM, not just the outcome. Dropping the merge is also what a
+    // consulted-but-unavailable judge produces, so the outcome alone cannot tell
+    // "the referral was never constructed" from "the referral failed". Asserting
+    // the judge boundary is never reached is what makes this test detect a future
+    // change that starts consulting the judge with an unknown producer.
+    expect(mockRouteAndCall).not.toHaveBeenCalled();
+  });
+
+  // [WI-2628] BUG-402 race. `onConflictDoNothing` means a concurrent pass can win,
+  // and the re-read then re-points `decision` at THAT row — so the text about to be
+  // gated was produced by a call this pass never made, and this pass's provider does
+  // not describe it. The vendor must be dropped, which shows up as the judge never
+  // being consulted even though the LLM path ran and returned a real vendor.
+  it('drops the producing vendor when a concurrent pass won the insert', async () => {
+    const ourText = 'Dyslexia affects decoding.';
+    const landedText =
+      'Dyslexia is a reading difference that affects decoding.';
+    const candidate = makeFact({
+      id: 'c1',
+      text: landedText,
+      textNormalized: 'dyslexia is a reading difference that affects decoding',
+    });
+    const neighbour = makeFact({
+      id: 'n1',
+      text: ourText,
+      textNormalized: 'dyslexia affects decoding',
+    });
+
+    const args = makeArgs({
+      candidates: [candidate],
+      neighbours: [neighbour],
+      memoRow: null,
+      llmResult: {
+        ok: true,
+        decision: { action: 'merge', merged_text: ourText },
+        modelVersion: 'v1',
+        provider: 'anthropic',
+      },
+      // A DIFFERENT merge text landed — the concurrent winner's.
+      postInsertRow: {
+        decision: 'merge',
+        mergedText: landedText,
+        modelVersion: 'v-other',
+      },
+    });
+
+    const { report } = await runDedupForProfile(args);
+    expect(report.llmCalls).toBe(1);
+    expect(report.merges).toBe(0);
+    expect(report.failures).toBe(1);
+    // The discriminating assertion: our vendor was real, so without the race check
+    // the referral would be constructed and the judge consulted.
+    expect(mockRouteAndCall).not.toHaveBeenCalled();
+  });
+
+  // The control that makes the case above about the GATE rather than about memo hits
+  // in general: an otherwise identical memo-hit merge whose text carries no protected
+  // lexeme still merges. Without this pair, "every memo-hit merge is broken" would
+  // satisfy the assertion above just as well.
+  it('still applies a memo-hit merge when the text needs no judge at all', async () => {
+    const merged = 'We read two chapters about volcanoes today.';
+    const candidate = makeFact({
+      id: 'c1',
+      text: merged,
+      textNormalized: 'we read two chapters about volcanoes today',
+    });
+    const neighbour = makeFact({
+      id: 'n1',
+      text: 'We read about volcanoes.',
+      textNormalized: 'we read about volcanoes',
+    });
+    const args = makeArgs({
+      candidates: [candidate],
+      neighbours: [neighbour],
+      memoRow: {
+        decision: 'merge' as const,
+        mergedText: merged,
+        modelVersion: 'memo',
+      },
+    });
+
+    const { report } = await runDedupForProfile(args);
+    expect(report.memoHits).toBe(1);
+    expect(report.failures).toBe(0);
+    expect(report.merges).toBe(1);
+  });
+
   it('does not call LLM when cap is already hit', async () => {
     const candidate = makeFact({ id: 'c1' });
     const neighbour = makeFact({ id: 'n1', text: 'neighbour' });
@@ -310,6 +474,7 @@ describe('runDedupForProfile', () => {
         ok: true,
         decision: { action: 'keep_both' },
         modelVersion: 'v1',
+        provider: 'anthropic',
       },
     });
 
@@ -339,6 +504,7 @@ describe('runDedupForProfile', () => {
       ok: true,
       decision: { action: 'merge', merged_text: 'fractions arithmetic' },
       modelVersion: 'v1',
+      provider: 'anthropic',
     };
 
     // Build a tx that returns fresh candidate and fresh neighbour for the in-tx selects
@@ -425,6 +591,7 @@ describe('runDedupForProfile', () => {
       ok: true,
       decision: { action: 'supersede' },
       modelVersion: 'v1',
+      provider: 'anthropic',
     };
 
     const freshCandidate = makeFact({ id: 'c1', supersededBy: null });
@@ -506,6 +673,7 @@ describe('runDedupForProfile', () => {
       ok: true,
       decision: { action: 'keep_both' },
       modelVersion: 'v1',
+      provider: 'anthropic',
     };
 
     const freshCandidate = makeFact({ id: 'c1', supersededBy: null });
@@ -587,6 +755,7 @@ describe('runDedupForProfile', () => {
       ok: true,
       decision: { action: 'discard_new' },
       modelVersion: 'v1',
+      provider: 'anthropic',
     };
 
     const freshCandidate = makeFact({ id: 'c1', supersededBy: null });

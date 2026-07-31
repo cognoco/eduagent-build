@@ -1,0 +1,45 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Deterministic coaching responses come from the already-wired test-only provider boundary: the e2e CI workflow boots the dedicated test worker entrypoint, unreachable in production (which boots src/index.ts).",
+      "pointer": "apps/api/src/test-utils/maestro-e2e-worker.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The deterministic LLM provider implementation behind that boundary.",
+      "pointer": "apps/api/src/test-utils/maestro-e2e-llm-provider.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Runner applies each flow's declared uiMode via adb cmd uimode immediately before app launch; undeclared flows leave the mode untouched.",
+      "pointer": "apps/mobile/e2e/scripts/run-ci-maestro.sh"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Plan generator threads the uiMode frontmatter field through the TSV/JSON plan as a backwards-compatible third column.",
+      "pointer": "apps/mobile/e2e/scripts/ci-maestro-plan.mjs"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Light flow waits on the real assistant-response-complete testID and asserts the exact deterministic fixture reply copy.",
+      "pointer": "apps/mobile/e2e/flows/learning/coach-bubble-light.yaml"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Dark flow, same oracle and copy assertion, uiMode dark declared in frontmatter.",
+      "pointer": "apps/mobile/e2e/flows/learning/coach-bubble-dark.yaml"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "DELIVERED: blocked tags and PARKED headers removed — both flows enter the nightly suite (smoke tag) and PASSED on a real Android release-variant APK in e2e-ci evidence run 30219395887 (dispatched on the rework branch; every shard succeeded; shard log shows coach-bubble-dark as flow four of twenty-two with uiMode dark applied and coach-bubble-light as flow five with uiMode light applied). Copy assertions widened to accept the typographer-rendered apostrophe after diagnostic run 30217730898 exposed the mismatch. Pointer shows the un-quarantined tag block at the pinned revision.",
+      "pointer": "apps/mobile/e2e/flows/learning/coach-bubble-light.yaml:33"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "The parked-flows corpus canary recalibrated to the post-un-parking corpus size, with the recalibration rationale in an adjacent comment; the per-flow machine-exclusion guard is untouched.",
+      "pointer": "scripts/e2e-ci-injection-and-smoke-gate.test.ts"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13"
+}

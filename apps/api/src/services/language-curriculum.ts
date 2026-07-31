@@ -12,6 +12,7 @@ import {
 import {
   assertBookTopicWriteAvailable,
   ensureDefaultBook,
+  getLatestCurriculum,
 } from './curriculum-core';
 import {
   languageNextPracticePointerSchema,
@@ -680,10 +681,7 @@ export async function getCurrentLanguageProgress(
     subjectId,
   );
 
-  const curriculum = await db.query.curricula.findFirst({
-    where: eq(curricula.subjectId, subjectId),
-    orderBy: desc(curricula.version),
-  });
+  const curriculum = await getLatestCurriculum(db, profileId, subjectId);
   if (!curriculum) {
     return {
       subjectId,

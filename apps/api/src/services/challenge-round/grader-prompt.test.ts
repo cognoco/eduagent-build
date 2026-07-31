@@ -46,6 +46,30 @@ describe('buildChallengeRoundGraderPrompt', () => {
     }
   });
 
+  it('gives a confidently wrong causal mechanism misconception precedence over partial credit', () => {
+    const systemContent = buildChallengeRoundGraderPrompt(baseInput)[0]!
+      .content as string;
+
+    expect(systemContent).toContain(
+      'Misconception takes precedence over partial when a confident causal mechanism is demonstrably wrong,',
+    );
+    expect(systemContent).toContain(
+      'even if another aspect or conclusion of the answer is correct.',
+    );
+    expect(systemContent).toContain(
+      'Do not use partial for a correct conclusion supported by a confidently wrong causal explanation; use misconception.',
+    );
+  });
+
+  it('keeps partial broad enough for non-causal assessed concepts', () => {
+    const systemContent = buildChallengeRoundGraderPrompt(baseInput)[0]!
+      .content as string;
+
+    expect(systemContent).toContain(
+      'partial       — the answer shows some understanding but has notable gaps or inaccuracies.',
+    );
+  });
+
   it('instructs the model to return a single JSON object with no surrounding prose', () => {
     const systemContent = buildChallengeRoundGraderPrompt(baseInput)[0]!
       .content as string;

@@ -70,6 +70,18 @@ describe('[BUG-979] e2e-web cleanup wiring', () => {
       expect(run).toMatch(/X-Test-Secret/);
     });
 
+    it('[WI-2820 P1] repeats full Worker cleanup batches for large V2 runs', () => {
+      const step = findStep('Reset seeded staging accounts')!;
+      const run = String(step.run ?? '');
+
+      expect(run).toMatch(/MAX_CLEANUP_BATCHES=20/);
+      expect(run).toMatch(
+        /for BATCH in \$\(seq 1 "\$\{MAX_CLEANUP_BATCHES\}"\)/,
+      );
+      expect(run).toMatch(/clerkUsersSelected \?\? result\.clerkUsersDeleted/);
+      expect(run).toMatch(/\[ "\$\{clerk_users_selected\}" -lt 15 \]/);
+    });
+
     it('reset step refuses an unknown prefix instead of using a fallback prefix', () => {
       const step = findStep('Reset seeded staging accounts')!;
       const run = String(step.run ?? '');
@@ -86,8 +98,9 @@ describe('[BUG-979] e2e-web cleanup wiring', () => {
     it('reset step does not fail the job on a non-2xx response (nightly cleanup is the safety net)', () => {
       const step = findStep('Reset seeded staging accounts')!;
       const run = String(step.run ?? '');
-      // The pipeline ends with `|| echo` so the curl exit code is masked.
-      expect(run).toMatch(/\|\|\s*echo\s+"::warning::/);
+      // The curl failures are converted to warnings so the nightly cleanup
+      // safety net remains available during a staging incident.
+      expect(run).toMatch(/\|\|\s*\{\s*echo\s+"::warning::/);
     });
   });
 
@@ -118,19 +131,29 @@ describe('[BUG-979] e2e-web cleanup wiring', () => {
       expect(triggers!).toHaveProperty('workflow_dispatch');
     });
 
-    it('reset job calls POST /v1/__test/reset with the test secret', () => {
+    it('[WI-2820 P1] runs local verified-ID cleanup through Doppler staging', () => {
       const jobs = workflow.jobs as Record<
         string,
         { steps: Array<Record<string, unknown>> }
       >;
       const job = Object.values(jobs)[0]!;
-      const stepWithCurl = job.steps.find((s) =>
-        String(s.run ?? '').includes('/v1/__test/reset'),
+      expect(
+        job.steps.some((step) =>
+          String(step.uses ?? '').startsWith('actions/checkout@'),
+        ),
+      ).toBe(true);
+      const cleanupStep = job.steps.find((s) =>
+        String(s.run ?? '').includes('clean-clerk-test-users.mjs'),
       );
-      expect(stepWithCurl).toBeDefined();
-      const run = String(stepWithCurl!.run ?? '');
-      expect(run).toMatch(/POST/);
-      expect(run).toMatch(/X-Test-Secret/);
+      expect(cleanupStep).toBeDefined();
+      const run = String(cleanupStep!.run ?? '');
+      expect(run).toMatch(/doppler run -p mentomate -c stg/);
+      expect(run).toMatch(
+        /node scripts\/clean-clerk-test-users\.mjs --older-than-hours=24 --execute/,
+      );
+      expect(run).toMatch(/DOPPLER_TOKEN/);
+      expect(run).toMatch(/::error/);
+      expect(run).not.toMatch(/curl[\s\S]*\/v1\/__test\/reset/);
     });
   });
 });

@@ -4,6 +4,8 @@ Date: 2026-05-15
 
 Refreshed: 2026-07-23 — privacy URL, controller identity, 13+ launch floor, and seven-day deletion wording reconciled with current source. Final publication and store-console entries remain subject to DPO/legal/admin sign-off.
 
+Perimeter update 2026-07-26: store territory availability must follow the screen-based allowlist in `docs/compliance/2026-07-26-launch-perimeter-ruling-screen-based-allowlist.md` — EEA threshold-13 countries + US (conditional Route-2 pass); UK/PL/CH excluded at launch. Note: no territory allowlist is expressed in repo config (`app.json`/`eas.json`) — it must be set manually in App Store Connect / Play Console and recorded here when done.
+
 Status: working checklist for SC-1 through SC-5 from `docs/audit/2026-05-15-persona-store-compliance-triage.md`. This is not a record of completed App Store Connect or Google Play Console work.
 
 ## Source Snapshot
@@ -69,6 +71,7 @@ Checklist:
 - [ ] Confirm whether any production telemetry or third-party SDK behavior counts as tracking under Apple/Google rules.
 - [ ] Confirm whether legacy optional `profiles.location` data exists in production exports and needs disclosure, even though the current create-profile flow does not collect location.
 - [ ] Confirm data deletion and retention wording with the live privacy policy.
+- [ ] Publish the web account-deletion request page for the Play data-safety form — artifact ready at [`docs/delete-account.html`](../delete-account.html) (landed 2026-07-29); its in-file pre-publish checklist (monitored inbox, request-path test, legal sign-off) gates actual publication to mentomate.com.
 
 Status: draftable from repo evidence, but store-console submission is blocked on admin/legal input.
 
