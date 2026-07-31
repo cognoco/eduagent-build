@@ -6,6 +6,7 @@ import {
 import { and, eq } from 'drizzle-orm';
 import {
   llmSummaryEvaluationSchema,
+  type AgeBracket,
   type ConversationLanguage,
   type SummaryStatus,
 } from '@eduagent/schemas';
@@ -129,6 +130,7 @@ export async function evaluateSummary(
   options?: {
     conversationLanguage?: ConversationLanguage;
     evaluationTimeoutMs?: number;
+    ageBracket?: AgeBracket;
   },
 ): Promise<SummaryEvaluation> {
   // [PROMPT-INJECT-8] topicTitle/description are stored LLM output;
@@ -160,6 +162,7 @@ export async function evaluateSummary(
     const result = await routeAndCall(messages, 2, {
       flow: 'summaries.generate',
       conversationLanguage: options?.conversationLanguage,
+      ageBracket: options?.ageBracket,
       signal: controller.signal,
     });
 

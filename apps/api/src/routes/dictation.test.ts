@@ -288,6 +288,7 @@ describe('POST /v1/dictation/prepare-homework', () => {
 
     expect(prepareHomework).toHaveBeenCalledWith('Test sentence.', {
       conversationLanguage: 'en', // [WI-867] v2 personScope default
+      ageBracket: 'adult',
     });
   });
 
@@ -476,7 +477,10 @@ describe('POST /v1/dictation/generate', () => {
 
     expect(fetchGenerateContext).toHaveBeenCalledTimes(1);
     expect(generateDictation).toHaveBeenCalledTimes(1);
-    expect(generateDictation).toHaveBeenCalledWith(mockCtx);
+    expect(generateDictation).toHaveBeenCalledWith({
+      ...mockCtx,
+      ageBracket: 'adult',
+    });
   });
 
   // RF-01 / BUG-975: Missing X-Profile-Id header — proxy-guard fails closed

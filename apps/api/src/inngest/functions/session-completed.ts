@@ -1576,13 +1576,12 @@ export const sessionCompleted = inngest.createFunction(
           // i18n Phase 1 — load conversation_language so the parent-facing
           // summary renders in the learner's selected language.
           // [WI-586] v2 path: read conversationLanguage from person (profiles dropped).
+          const llmSummaryProfile = await db.query.person.findFirst({
+            where: eq(person.id, profileId),
+            columns: { conversationLanguage: true, birthDate: true },
+          });
           const llmSummaryConversationLanguage =
-            (
-              await db.query.person.findFirst({
-                where: eq(person.id, profileId),
-                columns: { conversationLanguage: true },
-              })
-            )?.conversationLanguage ?? null;
+            llmSummaryProfile?.conversationLanguage ?? null;
 
           const summary = await generateAndStoreLlmSummary(db, {
             sessionId,
@@ -1594,6 +1593,13 @@ export const sessionCompleted = inngest.createFunction(
             conversationLanguage: parseConversationLanguage(
               llmSummaryConversationLanguage,
             ),
+            ageBracket: llmSummaryProfile?.birthDate
+              ? computeAgeBracketFromDate(
+                  Number(llmSummaryProfile.birthDate.slice(0, 4)),
+                  Number(llmSummaryProfile.birthDate.slice(5, 7)),
+                  Number(llmSummaryProfile.birthDate.slice(8, 10)),
+                )
+              : undefined,
           });
 
           if (!summary) {
@@ -2096,12 +2102,15 @@ export const sessionCompleted = inngest.createFunction(
         // which was dropped 2026-06-14).
         let homeworkOrganizationId: string | undefined;
         const [personRow] = await db
-          .select({ conversationLanguage: person.conversationLanguage })
+          .select({
+            conversationLanguage: person.conversationLanguage,
+            birthDate: person.birthDate,
+          })
           .from(person)
           .where(eq(person.id, profileId))
           .limit(1);
         const homeworkProfile:
-          | { conversationLanguage: string | null }
+          | { conversationLanguage: string | null; birthDate: string }
           | undefined = personRow;
         if (personRow) {
           // person → membership(org) resolution. No orderBy: this mirrors the
@@ -2282,6 +2291,13 @@ export const sessionCompleted = inngest.createFunction(
               conversationLanguage: parseConversationLanguage(
                 homeworkProfile?.conversationLanguage,
               ),
+              ageBracket: homeworkProfile?.birthDate
+                ? computeAgeBracketFromDate(
+                    Number(homeworkProfile.birthDate.slice(0, 4)),
+                    Number(homeworkProfile.birthDate.slice(5, 7)),
+                    Number(homeworkProfile.birthDate.slice(8, 10)),
+                  )
+                : undefined,
             });
           } catch (err) {
             // LLM call failed after quota was decremented — refund so

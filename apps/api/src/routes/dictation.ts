@@ -13,6 +13,7 @@ import {
   dictationHistorySchema,
   DICTATION_REVIEW_MAX_PROMPT_CHARS,
   ERROR_CODES,
+  computeAgeBracketFromDate,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -130,6 +131,10 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
         conversationLanguage: parseConversationLanguage(
           profileMeta?.conversationLanguage,
         ),
+        ageBracket:
+          profileMeta == null
+            ? undefined
+            : computeAgeBracketFromDate(profileMeta.birthYear),
       });
       return c.json(prepareHomeworkOutputSchema.parse(result), 200);
     },
@@ -160,6 +165,7 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
     // i18n Phase 1 — forward the learner's UI locale into the dictation LLM.
     const result = await generateDictation({
       ...ctx,
+      ageBracket: computeAgeBracketFromDate(profileMeta.birthYear),
       conversationLanguage: parseConversationLanguage(
         profileMeta?.conversationLanguage,
       ),

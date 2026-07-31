@@ -1,6 +1,7 @@
 import {
   DICTATION_REVIEW_MAX_PROMPT_CHARS,
   DictationPayloadTooLargeError,
+  computeAgeBracketFromDate,
   dictationReviewPromptCharCount,
   dictationReviewResultSchema,
   type ConversationLanguage,
@@ -220,6 +221,10 @@ export async function reviewDictation(
   const result = await routeAndCall(messages, 2, {
     flow: 'dictation.review',
     conversationLanguage,
+    ageBracket:
+      ageYears == null
+        ? undefined
+        : computeAgeBracketFromDate(new Date().getUTCFullYear() - ageYears),
   });
 
   if (!result.response || result.response.trim() === '') {

@@ -8,6 +8,7 @@ import {
 import { NotFoundError } from '@eduagent/schemas';
 import { z } from 'zod';
 import type {
+  AgeBracket,
   ConversationLanguage,
   HomeworkProblem,
   HomeworkSessionMetadata,
@@ -233,7 +234,10 @@ export async function extractHomeworkSummary(
   db: Database,
   profileId: string,
   sessionId: string,
-  options?: { conversationLanguage?: ConversationLanguage },
+  options?: {
+    conversationLanguage?: ConversationLanguage;
+    ageBracket?: AgeBracket;
+  },
 ): Promise<HomeworkSummary> {
   const [sessionRow] = await db
     .select({
@@ -311,6 +315,7 @@ export async function extractHomeworkSummary(
       flow: 'homework.summary',
       sessionId,
       conversationLanguage: options?.conversationLanguage,
+      ageBracket: options?.ageBracket,
     });
     return parseHomeworkSummaryResponse(result.response, fallback);
   } catch (err) {
@@ -333,7 +338,10 @@ export async function extractAndStoreHomeworkSummary(
   db: Database,
   profileId: string,
   sessionId: string,
-  options?: { conversationLanguage?: ConversationLanguage },
+  options?: {
+    conversationLanguage?: ConversationLanguage;
+    ageBracket?: AgeBracket;
+  },
 ): Promise<HomeworkSummary> {
   // [WI-216] Idempotency short-circuit: if the homework summary has already
   // been written for this session, do not call the LLM again. The

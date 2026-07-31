@@ -7,6 +7,7 @@ import { sessionSummaries, type Database } from '@eduagent/database';
 import {
   ConflictError,
   NotFoundError,
+  type AgeBracket,
   type ConversationLanguage,
   type RetrySummaryFeedbackResult,
   type SessionSummary,
@@ -141,7 +142,10 @@ export async function submitSummary(
   profileId: string,
   sessionId: string,
   input: SummarySubmitInput,
-  options?: { conversationLanguage?: ConversationLanguage },
+  options?: {
+    conversationLanguage?: ConversationLanguage;
+    ageBracket?: AgeBracket;
+  },
 ): Promise<{
   summary: {
     id: string;
@@ -199,7 +203,10 @@ export async function submitSummary(
     subject?.name ?? 'Unknown topic',
     'Session learning content',
     input.content,
-    { conversationLanguage: options?.conversationLanguage },
+    {
+      conversationLanguage: options?.conversationLanguage,
+      ageBracket: options?.ageBracket,
+    },
   );
 
   const finalStatus = evaluation.isAccepted ? 'accepted' : 'submitted';
@@ -483,7 +490,10 @@ export async function retrySummaryFeedback(
   db: Database,
   profileId: string,
   sessionId: string,
-  options?: { conversationLanguage?: ConversationLanguage },
+  options?: {
+    conversationLanguage?: ConversationLanguage;
+    ageBracket?: AgeBracket;
+  },
 ): Promise<RetrySummaryFeedbackResult> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) throw new NotFoundError('Session');
@@ -535,7 +545,10 @@ export async function retrySummaryFeedback(
     subject?.name ?? 'Unknown topic',
     'Session learning content',
     reserved.content ?? '',
-    { conversationLanguage: options?.conversationLanguage },
+    {
+      conversationLanguage: options?.conversationLanguage,
+      ageBracket: options?.ageBracket,
+    },
   );
   const recoveredFeedback = hasAvailableSummaryFeedback(evaluation.feedback)
     ? evaluation.feedback

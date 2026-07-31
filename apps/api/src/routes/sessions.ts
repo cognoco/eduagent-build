@@ -20,6 +20,7 @@ import {
   RateLimitedError,
   recallBridgeResultSchema,
   retrySummaryFeedbackResultSchema,
+  computeAgeBracketFromDate,
   sessionAutoFileRequestedEventSchema,
   getSubjectSessionsResponseSchema,
   type SubscriptionTier,
@@ -1067,6 +1068,10 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         conversationLanguage: parseConversationLanguage(
           profileMeta?.conversationLanguage,
         ),
+        ageBracket:
+          profileMeta == null
+            ? undefined
+            : computeAgeBracketFromDate(profileMeta.birthYear),
       });
 
       return c.json(retrySummaryFeedbackResultSchema.parse(result));
@@ -1097,6 +1102,10 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           conversationLanguage: parseConversationLanguage(
             summaryProfileMeta?.conversationLanguage,
           ),
+          ageBracket:
+            summaryProfileMeta == null
+              ? undefined
+              : computeAgeBracketFromDate(summaryProfileMeta.birthYear),
         },
       );
       // BD-09: Surface pipeline status so client knows if post-processing was queued.
