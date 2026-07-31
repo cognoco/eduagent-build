@@ -1,0 +1,55 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The structural guard discovers and classifies every remaining production route-entry consent assertion while retaining service-owned granular boundaries.",
+      "pointer": "apps/api/src/middleware/metering.coverage.guard.test.ts:257"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The production-only mutation and exact restore prove the new tests fail without the three service gates and exhaustive inventory.",
+      "pointer": ".workitem-artifacts/WI-2543/rework-2-red-green-revert.md"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "The books route regression preserves cached results after withdrawal and refuses before generation on the LLM path.",
+      "pointer": "apps/api/src/routes/books.test.ts:1471"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "The original first-session service regressions preserve deterministic matcher returns and refuse before LLM dispatch.",
+      "pointer": "apps/api/src/services/session/session-crud.test.ts:879"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Summary submission and retry tests preserve saved and already-available results while refusing new evaluation and releasing a claimed retry lease.",
+      "pointer": "apps/api/src/services/session/session-summary.test.ts:571"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Recall Bridge tests preserve missing-session and missing-topic returns while refusing immediately before provider routing.",
+      "pointer": "apps/api/src/services/recall-bridge.test.ts:128"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Subject creation tests preserve focused-book and explicit-language deterministic paths and gate the default and unknown discriminants.",
+      "pointer": "apps/api/src/services/subject.test.ts:1019"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "Assessment tests preserve app-help and force-review deterministic branches and refuse before LLM evaluation.",
+      "pointer": "apps/api/src/services/assessments-submit-answer.test.ts:147"
+    },
+    {
+      "acRef": "AC-6",
+      "description": "Suggestion tests preserve cached and no-subject results and refuse before top-up generation when an LLM call is required.",
+      "pointer": "apps/api/src/services/suggestions.test.ts:160"
+    },
+    {
+      "acRef": "AC-6",
+      "description": "The exhaustive route assertion inventory prevents a new route-entry consent gate from arriving without an explicit classification.",
+      "pointer": "apps/api/src/middleware/metering.coverage.guard.test.ts:257"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-31"
+}
