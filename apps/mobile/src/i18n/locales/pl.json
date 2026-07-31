@@ -4860,7 +4860,10 @@
         "learningTime_many": "{{count}} godzin nauki",
         "learningTime_other": "{{count}} godzin nauki",
         "cefrLevelUp": "Wyższy poziom językowy",
-        "topicsExplored": "{{count}} zbadanych tematów w {{subject}}"
+        "topicsExplored_one": "{{subject}}: {{count}} zbadany temat",
+        "topicsExplored_few": "{{subject}}: {{count}} zbadane tematy",
+        "topicsExplored_many": "{{subject}}: {{count}} zbadanych tematów",
+        "topicsExplored_other": "{{subject}}: {{count}} zbadanych tematów"
       }
     }
   }
