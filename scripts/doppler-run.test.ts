@@ -67,6 +67,18 @@ function entryGuardTest(entry: {
   );
 }
 
+function packageManagerLaunch(pnpmCli: string) {
+  return /\.(?:c?js)$/i.test(pnpmCli)
+    ? {
+        command: process.execPath,
+        args: [pnpmCli],
+      }
+    : {
+        command: pnpmCli,
+        args: [],
+      };
+}
+
 function packageScriptTest(script: string) {
   const pnpmCli = process.env.npm_execpath;
   if (!pnpmCli) {
@@ -75,7 +87,9 @@ function packageScriptTest(script: string) {
     );
   }
 
-  return spawnSync(process.execPath, [pnpmCli, 'run', script], {
+  const launch = packageManagerLaunch(pnpmCli);
+
+  return spawnSync(launch.command, [...launch.args, 'run', script], {
     cwd: REPO_ROOT,
     encoding: 'utf8',
     env: fakeDopplerEnv(),
@@ -101,6 +115,27 @@ function dopplerRun(args: string[]) {
     env: fakeDopplerEnv(),
   });
 }
+
+describe('package-manager launcher shape (WI-2522)', () => {
+  test.each(['C:\\pnpm\\pnpm.cjs', '/opt/pnpm/pnpm.js'])(
+    'runs JavaScript CLI %s through Node',
+    (pnpmCli) => {
+      expect(packageManagerLaunch(pnpmCli)).toEqual({
+        command: process.execPath,
+        args: [pnpmCli],
+      });
+    },
+  );
+
+  test('spawns a native Windows pnpm executable directly', () => {
+    const pnpmCli = 'C:\\pnpm\\pnpm.exe';
+
+    expect(packageManagerLaunch(pnpmCli)).toEqual({
+      command: pnpmCli,
+      args: [],
+    });
+  });
+});
 
 describe('doppler-run.mjs resolver decision matrix (WI-1247)', () => {
   test('PATH-present → resolves to bare "doppler" (CI + Homebrew/curl installs, zero behavior change)', () => {

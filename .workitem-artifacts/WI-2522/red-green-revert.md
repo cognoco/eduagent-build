@@ -60,9 +60,12 @@ support the Windows-facing claim. The correction replaced it with a CommonJS
 Node preload that patches only `spawnSync('doppler', ...)`, calls
 `syncBuiltinESMExports()` before `doppler-run.mjs` loads, and returns deterministic
 spawn results without a shell executable. Fake setup is centralized in
-`fakeDopplerEnv()`. Nested package scripts launch through
-`process.execPath` + pnpm's lifecycle-provided `npm_execpath`; the harness does
-not spawn bare `corepack` and does not modify `PATH`.
+`fakeDopplerEnv()`. Nested package scripts launch pnpm's lifecycle-provided
+`npm_execpath` directly when it is executable-shaped (including `pnpm.exe`), or
+through `process.execPath` when it is a `.js`/`.cjs` CLI. The harness does not
+spawn bare `corepack`. The fake-Doppler and package-script cases do not modify
+`PATH`; the missing-Doppler negative case intentionally replaces `PATH` with an
+empty fixture directory.
 
 Correction cycle:
 
@@ -88,6 +91,34 @@ Correction cycle:
 
 6. **REPEATED RESTORE GREEN:** restored `pathToFileURL(...)`. Result:
    14 passed, 0 failed.
+
+## Native pnpm launcher correction after second adversarial review
+
+The required Windows workflow installs pnpm with `pnpm/action-setup` and
+`standalone: true`, so `npm_execpath` is a native `pnpm.exe`, not a JavaScript
+CLI. Passing that executable to `node.exe` would fail before the Doppler preload
+could observe package-script dispatch. The launcher now uses `process.execPath`
+only for `.js` and `.cjs` CLI paths and spawns every other executable shape
+directly.
+
+After a 14/14 behavior-preserving extraction baseline, the launcher
+RED/GREEN/revert/restore phases ran with the repository-required Node
+`v22.16.0`:
+
+1. **BEHAVIOR-PRESERVING REFACTOR GREEN:** extracted the existing unconditional
+   Node launcher into `packageManagerLaunch()`. Result: 14 passed, 0 failed.
+2. **LAUNCHER-SHAPE RED:** added focused `.js`, `.cjs`, and native `pnpm.exe`
+   launcher assertions before changing the predicate. Result: 1 failed,
+   16 passed. Only the native executable case failed because it received
+   `process.execPath` as the command.
+3. **LAUNCHER-SHAPE GREEN:** selected Node only for `.js`/`.cjs` paths and direct
+   execution otherwise. Result: 17 passed, 0 failed.
+4. **LAUNCHER-ONLY REVERT RED:** reverted only the launcher predicate to the
+   unconditional Node behavior, holding the tests, production entry guard,
+   preload, and CI contract fixed. Result: 1 failed, 16 passed; only the native
+   executable case failed.
+5. **RESTORE GREEN:** restored the suffix-based launcher selection. Result:
+   17 passed, 0 failed.
 
 ## Package-script dispatch coverage
 
