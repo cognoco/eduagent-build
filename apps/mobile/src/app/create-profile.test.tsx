@@ -2438,12 +2438,14 @@ describe('CreateProfileScreen', () => {
         ),
       ).toBe(false);
 
-      await waitFor(() => {
-        expect(mockReplace).toHaveBeenCalledWith(
-          FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? '/(app)/mentor' : '/(app)/home',
-        );
-      });
-      expect(mockBack).not.toHaveBeenCalled();
+      expect(mockBack).toHaveBeenCalledTimes(1);
+      expect(mockBack.mock.invocationCallOrder[0]).toBeLessThan(
+        mockSwitchProfile.mock.invocationCallOrder[0] ??
+          Number.POSITIVE_INFINITY,
+      );
+      expect(mockReplace).not.toHaveBeenCalledWith(
+        FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? '/(app)/mentor' : '/(app)/home',
+      );
       expect(mockReplace).not.toHaveBeenCalledWith({
         pathname: '/create-profile',
         params: { for: 'child' },
@@ -2500,10 +2502,14 @@ describe('CreateProfileScreen', () => {
       expect(
         expoSecureStoreMock.__store.get(FAMILY_INTENT_ONBOARDING_KEY),
       ).toContain('"step":"learner-target"');
-      expect(mockReplace).toHaveBeenCalledWith(
+      expect(mockBack).toHaveBeenCalledTimes(1);
+      expect(mockBack.mock.invocationCallOrder[0]).toBeLessThan(
+        mockSwitchProfile.mock.invocationCallOrder[0] ??
+          Number.POSITIVE_INFINITY,
+      );
+      expect(mockReplace).not.toHaveBeenCalledWith(
         FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? '/(app)/mentor' : '/(app)/home',
       );
-      expect(mockBack).not.toHaveBeenCalled();
     });
 
     it('learner audience (adult): no PATCH, no add-child redirect, uses the shell-aware completion', async () => {

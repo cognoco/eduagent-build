@@ -8,8 +8,9 @@
   synchronous `onComplete` mounts/reveals the learner shell, and the
   existing-account destination clears after its real route mounts (V2
   invitation form or older-shell unavailable gate)
-- preserve shell-aware completion after durable persistence: V2 lands at Mentor
-  and older shells retain Home, including the marker-only retry path
+- dismiss the pushed profile-creation modal before activating the adult so one
+  existing app shell restores the durable fork; retain Home as the no-history
+  fallback, including the marker-only retry path
 - add focused mobile coverage, translated copy, and a preview browser journey
 
 ## Verification
@@ -51,6 +52,11 @@
 - touched-file ESLint with `--max-warnings=0`: passed
 - exact candidate Prettier and `git diff --check`: passed
 - publication-review regressions: focused RED-to-green coverage passed
+- first exact-head E2E ran the named family-intent journey and failed on two
+  visible gate nodes; focused RED reproduced zero modal dismissals in both
+  durable handoffs, and the corrected tests pass GREEN before republishing
+- corrective semantic union: 6 suites / 277 tests passed; full TypeScript,
+  warning-free touched-file ESLint, Prettier, and whitespace checks passed
 - review hardening covers stale-read invalidation after sign-out, recovery-only
   primary repair, all-mode terminal marker consumption, and an inaccessible
   restore-probe navigator that retains requested route state
@@ -63,8 +69,11 @@ Publication merge-forward now incorporates authoritative main `c3cb4b327`,
 including landed WI-2231 PR #2704, WI-2399 PR #2722, WI-1556 PR #2727,
 WI-2639 PR #2730, WI-2820 PR #2713, and WI-2790 PR #2733. WI-2532 retains the
 non-authorizing durable fork, no-PATCH/no-child-redirect contract, retry
-journal, and all-mode terminal marker consumption while adopting WI-2231's
-shell-aware completion routing. WI-2399's resubmit-generation guards and
+journal, and all-mode terminal marker consumption. The first exact-head E2E
+showed WI-2231's replace-style completion duplicated the app shell for this
+pushed-modal path, so the family-specific handoff now dismisses the modal
+before profile activation while preserving the no-history Home fallback.
+WI-2399's resubmit-generation guards and
 WI-2820's test-seed batching remain intact. A focused RED caught WI-1556's
 first-Mentor language gate pre-empting the unresolved durable-state probe; the
 gate now waits for family intent to resolve absent before it can render.

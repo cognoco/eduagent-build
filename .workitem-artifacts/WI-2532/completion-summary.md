@@ -18,9 +18,11 @@ profile creation.
   form or the older-shell unavailable gate. Sign-out also clears it.
 - Storage failures fail closed with retry; a failed handoff after profile
   creation retries only the durable marker and never repeats the profile POST.
-- Successful initial and retry persistence complete through the current shell:
-  V2 lands at Mentor and older shells retain Home. Cancel, pending-consent, and
-  ordinary add-child exits retain their existing close behavior.
+- Successful initial and retry persistence dismiss the pushed profile-creation
+  modal back to the existing app shell before activating the new profile. A
+  no-history entry replaces to Home as the fallback. This prevents two app
+  shells from restoring the same durable gate while preserving cancel,
+  pending-consent, and ordinary add-child behavior.
 - Dedicated translated copy, focused mobile coverage, and a preview browser
   journey were added.
 
@@ -65,6 +67,16 @@ merge completed its affected API unit, integration-typecheck, full TypeScript,
 and Tier-1 zero-drift eval gates successfully.
 The later zero-overlap malformed-parse fail-closed descope merge completed its
 affected mobile hook and notice-policy coverage successfully.
+The first published exact head ran the named family-intent Playwright journey
+but failed because `router.replace` left the original app shell beneath a
+second app route; both restored the durable marker, and Playwright found two
+visible gate nodes on the initial attempt and retry. Focused RED then observed
+zero modal dismissals in both the normal and storage-retry handoffs. The
+corrected paths dismiss the modal before profile activation, and both focused
+cases pass GREEN. Final attributable E2E evidence must be re-established on
+the corrective published head. The corrective semantic union passed 6 suites /
+277 tests; full TypeScript, warning-free touched-file ESLint, Prettier, and
+whitespace checks also passed.
 Review-bounce coverage also verifies stale-read rejection, recovery-primary
 repair, all-mode terminal destination consumption, and a
 mounted-but-inaccessible blocked navigator. A pre-WI-1556 preview journey

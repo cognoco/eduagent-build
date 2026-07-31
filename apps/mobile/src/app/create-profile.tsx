@@ -315,7 +315,7 @@ export default function CreateProfileScreen() {
         setCreatePostPending(false);
         await startFamilyIntentOnboarding(pendingFamilyIntentProfileId);
         pendingFamilyIntentProfileIdRef.current = null;
-        handleCompleted();
+        handleClose();
         void clearPreAuthAudience();
         const switchResult = await switchProfile(pendingFamilyIntentProfileId);
         if (switchResult?.success === false) {
@@ -494,9 +494,11 @@ export default function CreateProfileScreen() {
         pendingFamilyIntentProfileIdRef.current = profile.id;
         await startFamilyIntentOnboarding(profile.id);
         pendingFamilyIntentProfileIdRef.current = null;
-        // The durable gate owns the next choice. Complete through the current
-        // shell so V2 lands at Mentor while older shells retain Home.
-        handleCompleted();
+        // The durable gate owns the next choice. Dismiss this pushed modal
+        // back to the existing app shell before switchProfile activates the
+        // new profile; replacing it with another /(app) route leaves both
+        // shells mounted on web and both restore the same durable gate.
+        handleClose();
       } else {
         if (isFirstProfileCreation && !isAddingChild) {
           await queueMentorBornCeremony({

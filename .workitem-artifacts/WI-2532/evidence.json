@@ -7,7 +7,7 @@
     },
     {
       "acRef": "AC-1",
-      "description": "After durable initial or retry persistence, family intent completes through the landed shell-aware path: V2 Mentor and older-shell Home, without changing cancel, pending-consent, or ordinary add-child close semantics.",
+      "description": "After durable initial or retry persistence, the pushed profile-creation modal is dismissed before profile activation so exactly one existing app shell restores the pending fork; a no-history entry falls back to Home without changing cancel, pending-consent, or ordinary add-child close semantics.",
       "pointer": "apps/mobile/src/app/create-profile.test.tsx"
     },
     {

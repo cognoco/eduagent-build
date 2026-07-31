@@ -15,9 +15,11 @@
 - Sign-out clears both SecureStore and the in-memory pending-state cache.
 - SecureStore write, clear, rejection, and timeout paths fail closed with
   translated retry UI; retry after adult creation does not repeat the POST.
-- Successful initial and retry persistence use the landed shell-aware
-  completion path: V2 Mentor, older-shell Home. Cancel, pending-consent, and
-  ordinary add-child paths retain their existing close semantics.
+- Successful initial and retry persistence dismiss the pushed profile-creation
+  modal to the existing app shell before profile activation; no-history entry
+  falls back to Home. This prevents duplicate app shells while cancel,
+  pending-consent, and ordinary add-child paths retain their existing close
+  semantics.
 
 ## Focused mobile verification
 
@@ -26,9 +28,17 @@
   routing, link resubmit-generation guards, first-Mentor language
   confirmation, and the landed E2E test-seed helper: 14 suites, 472 tests
   passed.
-- Focused RED proved the two family-intent persistence paths made zero
-  shell-aware replace calls under the old `handleClose`; both pass after using
-  the landed completion helper.
+- Historical merge-forward RED proved the then-current family paths made zero
+  replace calls under `handleClose`; those tests passed after adopting the
+  landed completion helper, but the first exact-head E2E superseded that
+  expectation with runtime evidence of two mounted app shells.
+- Corrective focused RED required dismissal before profile activation and
+  observed zero `router.back` calls in both normal and marker-only retry paths.
+  Both pass GREEN after the two family-specific handoffs use `handleClose`.
+- Corrective semantic union covering profile creation, app-layout restoration,
+  the fork component, durable state, invitation routing, and sign-out cleanup:
+  6 suites / 277 tests passed. Full TypeScript, warning-free touched-file
+  ESLint, exact-file Prettier, and whitespace checks passed.
 - The two focused route-preservation cases passed: a pending restore keeps the
   requested Tabs navigator mounted but hidden, and a failed restore retry
   preserves the requested route.
@@ -116,6 +126,13 @@ the WI-1556 and latest-main merge-forwards, it is retained only as historical
 diagnostic evidence. Final attributable E2E evidence must come from the
 published exact head.
 
+The first published exact head `04f2536d2` ran the named family-intent journey
+in E2E Web run `30622899554`. Both the initial attempt and retry failed at the
+first gate assertion because the selector resolved to two visible
+`family-intent-onboarding-gate` nodes; the workflow classified it as a product
+failure. The corrective head must rerun this exact journey and produce one
+visible gate before its evidence can be accepted.
+
 ## Collision and flag audit
 
 - Publication merge-forward uses authoritative `origin/main`
@@ -133,9 +150,10 @@ published exact head.
   reaching `b67c2acb1` through WI-2949 (malformed-parse fail-closed descope) PR
   #2752.
 - The known create-profile overlap was reconciled without rebase or history
-  rewrite. WI-2532 retains the durable non-authorizing fork and adopts WI-2231's
-  current `handleCompleted` / `getPostAuthDefaultPath` completion behavior
-  after successful initial or retry persistence.
+  rewrite. WI-2532 retains the durable non-authorizing fork. The first
+  exact-head E2E then proved WI-2231's replace-style completion is unsafe for
+  this pushed-modal flow because it leaves two app shells mounted; the normal
+  and retry handoffs now dismiss the modal before activating the profile.
 - The app-layout/test tree was reconciled; a duplicate `mockPush` declaration
   surfaced by the textual merge was removed before the 143-test layout suite
   and 410-test union passed.

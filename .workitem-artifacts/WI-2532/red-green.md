@@ -85,6 +85,23 @@ persistence. The two focused tests passed GREEN. The full merge-forward union
 then passed 410 tests across eight suites, including WI-2532's six suites and
 WI-2231's session and consent routing suites.
 
+## First exact-head E2E RED/GREEN
+
+The first published exact head ran
+`v2-family-intent-onboarding.spec.ts` and failed identically on its initial
+attempt and retry: `family-intent-onboarding-gate` resolved to two visible
+elements. The family handoff had replaced the pushed create-profile modal with
+another `/(app)` route before `switchProfile`; the original app shell remained
+beneath it, and both shells restored the same durable marker.
+
+Focused RED changed the normal and storage-retry assertions to require modal
+dismissal before profile activation. Both failed with zero `router.back`
+calls. The minimal correction changes only those two family-specific handoffs
+to `handleClose`; both focused cases pass GREEN and prove the dismissal occurs
+before `switchProfile`. The ordinary learner, consent, add-child, and
+no-history fallback paths remain independently owned by their existing
+contracts.
+
 ## Landed WI-1556 merge-forward RED/GREEN
 
 The later merge-forward was textually clean, but first-Mentor language
