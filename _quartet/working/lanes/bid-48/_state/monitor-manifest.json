@@ -21,6 +21,12 @@
       "task-id": "exec-session:70842"
     },
     {
+      "target": "zdx-marketplace PR #166 for WI-2941",
+      "purpose": "enforce exact-head strict green before governed Marketplace landing",
+      "command": "gh pr view/check/review loop for cognoco/zdx-marketplace#166",
+      "task-id": "exec-session:63179"
+    },
+    {
       "target": "cosmo-reviewer-watch.service and Reviewing BID-48 members",
       "purpose": "detect independent-review pickup, source-artifact outcomes, bounces, and Close",
       "command": "systemd journal plus direct Cosmo Work Item state queries",

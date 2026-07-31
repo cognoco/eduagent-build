@@ -77,10 +77,11 @@ Delivery Batch as `Done`.
   proof. WI-2939 draft PR #2741 is at exact head `3678c19d`; focused local gates are
   green and hosted CI/review are running. Real live bootstrap remains explicitly
   operator-gated.
-- WI-2941 is in typed execution for the sanctioned race-safe Govern recovery command.
-  WI-2755 expired after capture, so the post-landing recovery set is now seven
-  cross-owner claims. All remain untouched pending governed landing and independent
-  review rather than being impersonated or hand-edited.
+- WI-2941 Marketplace draft PR #166 is at exact head `62d7510f`; its focused and full
+  local gates are green while hosted CI/review run. WI-2755 expired after capture, so
+  the post-landing recovery set is now seven cross-owner claims. All remain untouched
+  pending governed landing, Nexus commissioning, and independent review rather than
+  being impersonated or hand-edited.
 - WI-2936 remains Ready pending the requested no-Doppler worktree exception.
   WI-2922 and WI-2923 remain Ready behind their exact shared-development database and
   Clerk/Doppler mutation approvals. Staging and production remain forbidden.

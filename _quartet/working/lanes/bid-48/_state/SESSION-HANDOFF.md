@@ -37,8 +37,10 @@ Last reconciled: 2026-07-31 08:00 CEST
   disposable non-staging target. Focused local gates are green; hosted CI and
   automated review are running. Live mutation remains explicitly operator-gated.
 - WI-2941 — member 42, executing the missing sanctioned expired-cross-owner claim
-  recovery capability. WI-2755 expired after capture, so seven stale claims remain
-  untouched pending its governed landing, independent review, and deployment.
+  recovery capability in Marketplace draft PR #166 at exact head `62d7510f`; local
+  focused and full gates are green while hosted CI/review run. WI-2755 expired after
+  capture, so seven stale claims remain untouched pending governed landing,
+  independent review, and deployment.
 - WI-2800 — Ready/Active after review rejected its already-landed `fdbe36d2` evidence:
   the isolated run diagnosed a different 68.6-second sign-in failure and did not
   attribute the original hosted 90-second exhaustion. WI-2826 plus the hosted gate
