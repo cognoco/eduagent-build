@@ -263,6 +263,38 @@ Sixth-review TDD cycle under Node `v22.16.0`:
 5. **FULL CI-EQUIVALENT GREEN:** `pnpm run test:scripts` completed with
    65 suites and 1,136 tests passed, 0 failed.
 
+## API integration CI lifecycle after seventh adversarial review
+
+At the seventh-review head, both co-located API integration CI steps invoked
+`pnpm exec nx run api:integration-api`. Unlike a package-script lifecycle,
+`pnpm exec` did not set `npm_execpath`; the guarded launcher therefore refused
+before Jest. The clean local-database reproduction exited `1` with
+`npm_execpath is required`, matching the review.
+
+The root package now exposes `test:api:integration:ci` as
+`node scripts/run-api-integration.mjs --nx`. Both CI lanes and the canonical
+AGENTS invocation use `pnpm run test:api:integration:ci`, preserving the pinned
+package-manager check. The existing fake preload executes this exact package
+script through the pnpm lifecycle, observes
+`CHILD_STARTED:["nx","run","api:integration-api"]`, and verifies exact child
+exit `23` propagation.
+
+Seventh-review TDD cycle under Node `v22.16.0`:
+
+1. **RED:** added the package-script boundary and route/documentation contracts
+   before implementation. The boundary suite had 1 failed and 19 passed; the
+   routing suite had 4 failed and 3 passed.
+2. **GREEN:** added the dedicated script and routed both CI sites plus AGENTS
+   through it. Result: boundary 20 passed; routing 7 passed.
+3. **CONFIGURATION-ONLY REVERT RED:** restored only both CI steps to direct Nx,
+   holding the script, AGENTS text, preload boundary, and assertions fixed.
+   Result: routing 2 failed, 5 passed, one failure per CI site.
+4. **RESTORE GREEN:** restored both lifecycle commands. Result:
+   boundary 20 passed; routing 7 passed.
+5. **FULL SCRIPTS GREEN:** `pnpm run test:scripts` completed with 65 suites
+   and 1,138 tests passed, 0 failed; the combined launcher/routing run passed
+   26 tests.
+
 ## Package-script dispatch coverage
 
 The focused suite runs `pnpm test`, `pnpm test:api:integration`, and

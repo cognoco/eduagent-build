@@ -487,7 +487,7 @@ jobs:
         if: >-
           (github.event_name == 'push' && steps.changes.outputs.api == 'true') ||
           (github.event_name == 'pull_request' && steps.change-class.outputs.integration == 'true')
-        run: pnpm exec nx run api:integration-api
+        run: pnpm run test:api:integration:ci
 
       # API UNIT tests for a cross-package read nx affected cannot see (WI-886).
       # apps/api/src/services/app-help-map.test.ts reads
@@ -628,7 +628,7 @@ jobs:
       # colon step above is expected-red; allowed-red with the rest of this job.
       - name: API co-located integration tests (flag-ON, apps/api/src)
         if: always()
-        run: pnpm exec nx run api:integration-api
+        run: pnpm run test:api:integration:ci
 
   # ---------------------------------------------------------------------------
   # OTA Update: publish JS bundle to EAS Update (preview channel)

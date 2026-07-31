@@ -85,7 +85,7 @@ function packageScriptTest(script: string, args: string[] = []) {
   const pnpmCli = process.env.npm_execpath;
   if (!pnpmCli) {
     throw new Error(
-      'npm_execpath is required; run this suite through `pnpm test:doppler-run`.',
+      'npm_execpath is required; run this suite through `pnpm test:doppler-run` or `pnpm run test:scripts`.',
     );
   }
 
@@ -287,6 +287,15 @@ describe('Windows-facing package-script dispatch (WI-2522)', () => {
       'ARGS:run --project mentomate --config dev_integration --',
     );
     expect(result.stdout).toContain('scripts/run-api-integration.mjs --nx');
+    expect(result.stdout).toContain(
+      'CHILD_STARTED:["nx","run","api:integration-api"]',
+    );
+    expect(result.status).toBe(CHILD_BOUNDARY_EXIT);
+  });
+
+  test('pnpm test:api:integration:ci reaches the guarded Nx boundary', () => {
+    const result = packageScriptTest('test:api:integration:ci');
+
     expect(result.stdout).toContain(
       'CHILD_STARTED:["nx","run","api:integration-api"]',
     );
