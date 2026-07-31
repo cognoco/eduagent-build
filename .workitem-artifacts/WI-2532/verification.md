@@ -25,6 +25,8 @@
   creation, app-layout, invitation route, sign-out, session routing, consent
   routing, link resubmit-generation guards, and first-Mentor language
   confirmation: 13 suites, 470 tests passed.
+- The same union plus the landed E2E test-seed helper: 14 suites, 471 tests
+  passed.
 - Focused RED proved the two family-intent persistence paths made zero
   shell-aware replace calls under the old `handleClose`; both pass after using
   the landed completion helper.
@@ -61,8 +63,9 @@ form without first writing a visibility/supportership link.
 ## Collision and flag audit
 
 - Publication merge-forward uses authoritative `origin/main`
-  `23ef357b95ec7e052321f9830c4985acca7c053f`, which includes landed WI-2231
-  PR #2704, WI-2399 PR #2722, and WI-1556 PR #2727.
+  `704112725285639810726a2aa0cb91a482c5b466`, which includes landed WI-2231
+  PR #2704, WI-2399 PR #2722, WI-1556 PR #2727, WI-2639 PR #2730, WI-2820
+  PR #2713, and WI-2790 PR #2733.
 - The known create-profile overlap was reconciled without rebase or history
   rewrite. WI-2532 retains the durable non-authorizing fork and adopts WI-2231's
   current `handleCompleted` / `getPostAuthDefaultPath` completion behavior
@@ -78,6 +81,21 @@ form without first writing a visibility/supportership link.
 - WI-2399's generation-bound create mutation, Back invalidation, retry, and
   stale-success rejection remain present and pass in the invitation-route
   suite.
+- The zero-direct-overlap WI-2820/WI-2790 merge passed the mobile E2E test-seed
+  helper plus its WI-2532 union (14 suites / 471 tests), API test-seed and filing
+  unit coverage under the direct Orion Doppler `dev` boundary (3 suites / 204
+  tests), and cleanup workflow/script coverage (2 suites / 25 tests).
+- `scripts/run-api-integration.test.ts` remains 6/12 red on Orion because its
+  fake Corepack executables are extensionless shebang files that Windows
+  `spawnSync` does not resolve. The batch orchestrator dispositioned this as an
+  occurrence of existing WI-2894 (Cosmo comment
+  `3ae8bce9-1f7c-81c8-981f-001d933b970d`). The drive-letter no-op in
+  `scripts/doppler-run.mjs` is an occurrence of canonical WI-2522, owned by
+  BID-31 and excluded from BID-49 (Cosmo comment
+  `3ae8bce9-1f7c-81be-9a00-001d596fb7ee`). Neither is changed on this branch;
+  the intended API gate was rerun through
+  `C:\Tools\doppler\doppler.exe run --project mentomate --config dev -- …` and
+  passed 204 tests.
 - Existing flags-off, V0, and V1 shell contracts are unchanged. Direct
   existing-account entry preserves the prior explicit unavailable state when
   V2 is off.

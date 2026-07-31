@@ -28,12 +28,13 @@
 
 ## Collision note
 
-Publication merge-forward now incorporates authoritative main `23ef357b9`,
-including landed WI-2231 PR #2704, WI-2399 PR #2722, and WI-1556 PR #2727.
-WI-2532 retains the non-authorizing durable fork, no-PATCH/no-child-redirect
-contract, retry journal, and all-mode terminal marker consumption while
-adopting WI-2231's shell-aware completion routing. WI-2399's
-resubmit-generation guards remain intact. A focused RED caught WI-1556's
+Publication merge-forward now incorporates authoritative main `704112725`,
+including landed WI-2231 PR #2704, WI-2399 PR #2722, WI-1556 PR #2727,
+WI-2639 PR #2730, WI-2820 PR #2713, and WI-2790 PR #2733. WI-2532 retains the
+non-authorizing durable fork, no-PATCH/no-child-redirect contract, retry
+journal, and all-mode terminal marker consumption while adopting WI-2231's
+shell-aware completion routing. WI-2399's resubmit-generation guards and
+WI-2820's test-seed batching remain intact. A focused RED caught WI-1556's
 first-Mentor language gate pre-empting the unresolved durable-state probe; the
 gate now waits for family intent to resolve absent before it can render.
 

@@ -30,11 +30,13 @@ The merge-forward union passed 470 tests across thirteen suites: durable state,
 both branches, profile creation, app-layout restoration, invitation routing,
 sign-out cleanup, session routing, consent routing, link resubmit-generation
 guards, and first-Mentor language confirmation. The durable family-intent probe
-now resolves before the first-Mentor language gate can render. The full mobile
-unit stage, full API unit stage under the sanctioned development database
-boundary, TypeScript build, i18n ratchets, teen-consent claims ratchet,
-test-only export guard, GC1 mock-governance ratchet, warning-free touched-file
-lint, exact-file Prettier, and whitespace check passed.
+now resolves before the first-Mentor language gate can render. With the landed
+test-seed helper, the post-merge mobile/E2E-helper run passed 471 tests across
+fourteen suites. The full mobile unit stage, full API unit stage under the
+sanctioned development database boundary, TypeScript build, i18n ratchets,
+teen-consent claims ratchet, test-only export guard, GC1 mock-governance
+ratchet, warning-free touched-file lint, exact-file Prettier, and whitespace
+check passed.
 Review-bounce coverage also verifies stale-read rejection, recovery-primary
 repair, all-mode terminal destination consumption, and a
 mounted-but-inaccessible blocked navigator. The dedicated preview journey
@@ -45,7 +47,8 @@ write.
 
 The managed learner without an independent login remains intentionally
 unavailable and is presented as such. This change does not activate or authorize
-that path. The branch was merge-forwarded with landed WI-2231 routing, WI-2399
-resubmit-generation guards, and WI-1556 first-Mentor language confirmation; no
-history was rewritten. The Work Item remains Executing until its PR lands;
-lifecycle completion must not run while the PR is open.
+that path. The branch was merge-forwarded through main `704112725`, preserving
+landed WI-2231 routing, WI-2399 resubmit-generation guards, WI-1556 first-Mentor
+language confirmation, and WI-2820 test-seed batching; no history was rewritten.
+The Work Item remains Executing until its PR lands; lifecycle completion must
+not run while the PR is open.

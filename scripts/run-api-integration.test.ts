@@ -137,7 +137,7 @@ describe('run-api-integration.mjs', () => {
     DATABASE_URL:
       'postgresql://integration:secret@ep-integration.example.test/eduagent_integration',
     DOPPLER_PROJECT: 'mentomate',
-    DOPPLER_CONFIG: 'integration',
+    DOPPLER_CONFIG: 'dev_integration',
     DOPPLER_ENVIRONMENT: 'dev',
     INTEGRATION_DATABASE_HOST: 'ep-integration.example.test',
     INTEGRATION_DATABASE_NAME: 'eduagent_integration',
@@ -243,7 +243,7 @@ describe('run-api-integration.mjs', () => {
     const result = run(['--jest'], {
       ...localDatabase,
       DOPPLER_PROJECT: 'mentomate',
-      DOPPLER_CONFIG: 'integration',
+      DOPPLER_CONFIG: 'dev_integration',
       DOPPLER_ENVIRONMENT: 'stg',
     });
 
@@ -261,6 +261,17 @@ describe('run-api-integration.mjs', () => {
 
     expect(result.status).toBe(1);
     expect(result.stderr).toMatch(/Doppler config.*stg.*refused/i);
+    expect(readMarker(corepackMarker)).toBe('');
+  });
+
+  test('refuses the former unprefixed dev integration config before Jest', () => {
+    const result = run(['--jest'], {
+      ...dedicatedDatabase,
+      DOPPLER_CONFIG: 'integration',
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/Doppler config.*integration.*refused/i);
     expect(readMarker(corepackMarker)).toBe('');
   });
 
@@ -297,7 +308,7 @@ describe('run-api-integration.mjs', () => {
     expect(readMarker(pnpmMarker)).toBe('');
   });
 
-  test('canonical package command selects mentomate/integration explicitly', () => {
+  test('canonical package command selects mentomate/dev_integration explicitly', () => {
     const pkg = JSON.parse(readFileSync(ROOT_PACKAGE_JSON, 'utf8')) as {
       scripts?: Record<string, string>;
     };
@@ -308,7 +319,7 @@ describe('run-api-integration.mjs', () => {
     const result = run([], dedicatedDatabase);
     expect(result.status).toBe(0);
     expect(readMarker(dopplerMarker)).toContain(
-      'run --project mentomate --config integration --',
+      'run --project mentomate --config dev_integration --',
     );
     expect(readMarker(corepackMarker)).toContain(
       'pnpm exec nx run api:integration-api',

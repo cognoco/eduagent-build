@@ -85,6 +85,11 @@ export function createRecordingDb(): {
       },
     },
   } as unknown as Database;
+  Object.assign(db, {
+    transaction: jest.fn(
+      async (operation: (tx: Database) => Promise<unknown>) => operation(db),
+    ),
+  });
 
   return { db, inserts };
 }
