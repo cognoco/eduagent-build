@@ -38,19 +38,52 @@ export interface CapturedNowRefreshPayload<Response, Payload> {
   payload: Payload;
 }
 
+export type NowRefreshPayloadReadResult<Payload> =
+  | { kind: 'parsed'; payload: Payload }
+  | { kind: 'body-read-failed'; error: unknown };
+
+export type NowRefreshCaptureResult<Response, Payload> =
+  | { kind: 'response-rejected'; error: unknown }
+  | {
+      kind: 'response-settled';
+      response: Response;
+      payloadRead: Promise<NowRefreshPayloadReadResult<Payload>>;
+    };
+
+async function readNowRefreshPayload<Payload>(
+  readPayload: () => Promise<Payload>,
+): Promise<NowRefreshPayloadReadResult<Payload>> {
+  try {
+    return { kind: 'parsed', payload: await readPayload() };
+  } catch (error) {
+    return { kind: 'body-read-failed', error };
+  }
+}
+
 /**
  * [WI-2961] Starts consuming the response body as soon as the already-armed
- * Playwright response promise settles. Call this before the navigation action:
- * Chromium may release the Network body once navigation completes, while the
- * plain `Response` handle itself remains settled and otherwise looks healthy.
+ * Playwright response promise settles. Response rejection and body-read
+ * failure remain separate results so an observer can allow the former without
+ * hiding the latter. Call this before the navigation action: Chromium may
+ * release the Network body once navigation completes, while the plain
+ * `Response` handle itself remains settled and otherwise looks healthy.
  */
 export async function captureNowRefreshPayload<Response, Payload>(
   responsePromise: Promise<Response>,
   readPayload: (response: Response) => Promise<Payload>,
-): Promise<CapturedNowRefreshPayload<Response, Payload>> {
-  const response = await responsePromise;
-  const payload = await readPayload(response);
-  return { response, payload };
+): Promise<NowRefreshCaptureResult<Response, Payload>> {
+  let response: Response;
+  try {
+    response = await responsePromise;
+  } catch (error) {
+    return { kind: 'response-rejected', error };
+  }
+
+  return {
+    kind: 'response-settled',
+    response,
+    payloadRead: readNowRefreshPayload(() => readPayload(response)),
+  };
 }
 
 /**
@@ -72,15 +105,27 @@ export function assertArmedBeforeAction(
 
 /**
  * Races an already-armed response promise against `windowMs` (default
- * `NOW_REFRESH_OBSERVATION_WINDOW_MS`). Never throws for a rejected or
- * unsettled outcome — both are legitimate production behavior per WI-2818,
- * not test failures. Only a late arm throws, and it throws before racing
- * anything.
+ * `NOW_REFRESH_OBSERVATION_WINDOW_MS`). A response-promise rejection or
+ * bounded non-settlement remains legitimate production behavior per WI-2818.
+ * Once a captured response settles, however, its body-read failure propagates
+ * as a hard test failure instead of being misclassified as response absence.
  */
+export function observeExactNowRefresh<Response, Payload>(
+  responsePromise: Promise<NowRefreshCaptureResult<Response, Payload>>,
+  options: { armedAtMs: number; actionAtMs: number; windowMs?: number },
+): Promise<NowRefreshOutcome<CapturedNowRefreshPayload<Response, Payload>>>;
+// TypeScript overload signature; the base ESLint rule does not recognize it.
+// eslint-disable-next-line no-redeclare
+export function observeExactNowRefresh<Response>(
+  responsePromise: Promise<Response>,
+  options: { armedAtMs: number; actionAtMs: number; windowMs?: number },
+): Promise<NowRefreshOutcome<Response>>;
+// TypeScript overload implementation; the base ESLint rule does not recognize it.
+// eslint-disable-next-line no-redeclare
 export async function observeExactNowRefresh<Response>(
   responsePromise: Promise<Response>,
   options: { armedAtMs: number; actionAtMs: number; windowMs?: number },
-): Promise<NowRefreshOutcome<Response>> {
+): Promise<NowRefreshOutcome<unknown>> {
   assertArmedBeforeAction(options.armedAtMs, options.actionAtMs);
   const windowMs = options.windowMs ?? NOW_REFRESH_OBSERVATION_WINDOW_MS;
 
@@ -90,17 +135,43 @@ export async function observeExactNowRefresh<Response>(
     timer = setTimeout(() => resolve(UNSETTLED), windowMs);
   });
 
+  let result: Response | typeof UNSETTLED;
   try {
-    const result = await Promise.race([responsePromise, timeoutPromise]);
-    if (result === UNSETTLED) {
-      return { kind: 'unsettled' };
-    }
-    return { kind: 'settled', response: result as Response };
+    result = await Promise.race([responsePromise, timeoutPromise]);
   } catch (error) {
     return { kind: 'rejected', error };
   } finally {
     if (timer) clearTimeout(timer);
   }
+
+  if (result === UNSETTLED) {
+    return { kind: 'unsettled' };
+  }
+  if (isNowRefreshCaptureResult(result)) {
+    if (result.kind === 'response-rejected') {
+      return { kind: 'rejected', error: result.error };
+    }
+
+    const payloadRead = await result.payloadRead;
+    if (payloadRead.kind === 'body-read-failed') {
+      throw payloadRead.error;
+    }
+    return {
+      kind: 'settled',
+      response: { response: result.response, payload: payloadRead.payload },
+    };
+  }
+  return { kind: 'settled', response: result };
+}
+
+function isNowRefreshCaptureResult(
+  result: unknown,
+): result is NowRefreshCaptureResult<unknown, unknown> {
+  if (typeof result !== 'object' || result === null || !('kind' in result)) {
+    return false;
+  }
+  const kind = (result as { kind?: unknown }).kind;
+  return kind === 'response-rejected' || kind === 'response-settled';
 }
 
 /**
