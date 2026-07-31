@@ -89,6 +89,8 @@ The failed proof candidate was 15 commits behind `origin/main` at diagnosis time
 
 A main refresh was still mandatory because a new proof must identify and exercise the eventual PR revision rather than a stale ancestor. The validated candidate/evidence was committed first at `acc2df804471223a666cde5048f959e593f3c03a`, then current `origin/main` was merged without rebasing or rewriting history.
 
+During non-Playwright validation, `origin/main` advanced to `25162e5d61a9b0a7dba955eda969384495514409`. Those three additional commits changed API export coverage, disposable-schema bootstrap tooling, and documentation only; they did not touch the E2E workflow, Playwright config/setup, seeded-sign-in helper, or Playwright dependency lock. That base was merged normally as a second refresh, leaving the candidate zero commits behind `origin/main` at this audit.
+
 ## Safe early-run classification
 
 The local proof harness now emits only allowlisted metadata from early failures: Playwright top-level error count, setup-scenario count, the sanitized setup-result array, and `FAILURE_CLASSES=early-run-before-setup` when the setup count is zero. It never copies top-level error messages or raw console text into the durable classification. A synthetic JSON fixture containing sentinel raw error/console material first failed because the classifier did not exist, then passed after the classifier was wired into the proof wrapper; no Playwright command or staging endpoint was used for that test.
