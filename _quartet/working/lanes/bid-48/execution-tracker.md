@@ -74,9 +74,10 @@ Delivery Batch as `Done`.
   WI-2826 instrumentation plus the item-specific hosted-run authority remain required.
 - WI-2790 source-repair PR #2733 passed the governed gate and landed as `70411272`.
   The item remains Executing pending the independently deliverable disposable-schema
-  proof. WI-2939 draft PR #2741 is at exact head `3678c19d`; focused local gates are
-  green and hosted CI/review are running. Real live bootstrap remains explicitly
-  operator-gated.
+  proof. WI-2939 draft PR #2741 is at corrected exact head `2ccde359`; direct pinned
+  journal replay now retains the raw RLS policies omitted by schema push alone.
+  Focused/local gates are green and fresh hosted CI/review are running. No DB
+  connection occurred; real live bootstrap remains explicitly operator-gated.
 - WI-2941 Marketplace PR #166 is at exact head `9652d7d`; two in-scope review
   considerations were repaired and the expanded focused/full local plus hosted
   functional gates are green. Three exact-head Claude attempts aborted before a
