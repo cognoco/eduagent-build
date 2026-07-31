@@ -52,6 +52,7 @@ import {
 } from '@eduagent/database';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
+import { ConsentWithdrawnError } from './session';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
 const PROFILE_ID = 'test-profile-id';
@@ -2897,6 +2898,9 @@ describe('repairIncompleteBookGenerationClaim', () => {
         {
           generateBookTopics,
           captureException: jest.fn(),
+          assertLlmConsent: jest
+            .fn()
+            .mockRejectedValue(new ConsentWithdrawnError()),
         },
       );
 
@@ -2980,6 +2984,7 @@ describe('repairIncompleteBookGenerationClaim', () => {
             {
               generateBookTopics: genSpy,
               captureException: jest.fn(),
+              assertLlmConsent: jest.fn().mockResolvedValue(undefined),
             },
           ),
         ).rejects.toBeDefined();
@@ -3559,7 +3564,12 @@ describe('expandExistingBookTopics', () => {
       BOOK_ID,
       existingBook(),
       'I already know about pyramids',
-      { learnerAge: 12, generateBookTopics, captureException },
+      {
+        learnerAge: 12,
+        generateBookTopics,
+        captureException,
+        assertLlmConsent: jest.fn().mockResolvedValue(undefined),
+      },
     );
 
     // Generator called with book title, description, learner age, and a
@@ -3600,7 +3610,12 @@ describe('expandExistingBookTopics', () => {
       BOOK_ID,
       existingBook(),
       undefined,
-      { learnerAge: 12, generateBookTopics, captureException },
+      {
+        learnerAge: 12,
+        generateBookTopics,
+        captureException,
+        assertLlmConsent: jest.fn().mockResolvedValue(undefined),
+      },
     );
 
     expect(generateBookTopics).toHaveBeenCalledTimes(1);
@@ -3637,7 +3652,12 @@ describe('expandExistingBookTopics', () => {
       BOOK_ID,
       bare,
       undefined,
-      { learnerAge: 14, generateBookTopics, captureException },
+      {
+        learnerAge: 14,
+        generateBookTopics,
+        captureException,
+        assertLlmConsent: jest.fn().mockResolvedValue(undefined),
+      },
     );
 
     expect(generateBookTopics).toHaveBeenCalledTimes(1);
@@ -3701,6 +3721,8 @@ describe('generateBookTopicsWithFallback', () => {
     };
 
     const result = await generateBookTopicsWithFallback(
+      {} as Database,
+      PROFILE_ID,
       'Ancient Egypt',
       'Explore pyramids',
       12,
@@ -3710,6 +3732,7 @@ describe('generateBookTopicsWithFallback', () => {
         captureException,
         buildFallbackBookTopics,
         sentryContext,
+        assertLlmConsent: jest.fn().mockResolvedValue(undefined),
       },
     );
 
@@ -3741,6 +3764,8 @@ describe('generateBookTopicsWithFallback', () => {
     };
 
     const result = await generateBookTopicsWithFallback(
+      {} as Database,
+      PROFILE_ID,
       'Ancient Egypt',
       'Explore pyramids',
       14,
@@ -3750,6 +3775,7 @@ describe('generateBookTopicsWithFallback', () => {
         captureException,
         buildFallbackBookTopics,
         sentryContext,
+        assertLlmConsent: jest.fn().mockResolvedValue(undefined),
       },
     );
 
@@ -3763,6 +3789,39 @@ describe('generateBookTopicsWithFallback', () => {
       'Explore pyramids',
     );
     expect(result).toEqual(fallbackOutput());
+  });
+
+  it('fails closed before generation and deterministic fallback when consent is withdrawn', async () => {
+    const db = {} as Database;
+    const generateBookTopics = jest.fn().mockResolvedValue(llmOutput());
+    const captureException = jest.fn();
+    const buildFallbackBookTopics = jest.fn(() => fallbackOutput());
+    const assertLlmConsent = jest
+      .fn()
+      .mockRejectedValue(new ConsentWithdrawnError());
+
+    await expect(
+      generateBookTopicsWithFallback(
+        db,
+        PROFILE_ID,
+        'Ancient Egypt',
+        'Explore pyramids',
+        12,
+        undefined,
+        {
+          generateBookTopics,
+          captureException,
+          buildFallbackBookTopics,
+          sentryContext: { profileId: PROFILE_ID },
+          assertLlmConsent,
+        },
+      ),
+    ).rejects.toBeInstanceOf(ConsentWithdrawnError);
+
+    expect(assertLlmConsent).toHaveBeenCalledWith(db, PROFILE_ID);
+    expect(generateBookTopics).not.toHaveBeenCalled();
+    expect(captureException).not.toHaveBeenCalled();
+    expect(buildFallbackBookTopics).not.toHaveBeenCalled();
   });
 });
 
