@@ -40,9 +40,29 @@ export function FirstMentorLanguageGate(): React.ReactElement {
     React.useState<ConversationLanguage>(persistedLanguage);
   const [saveFailed, setSaveFailed] = React.useState(false);
 
+  // [WI-1556] useMentorLanguageSync runs in (app)/_layout.tsx while this gate
+  // is open, and auto-sync is only suppressed once an explicit operation
+  // begins — at Continue, not while the learner is still choosing. Its PATCH
+  // and the profile refetch can therefore rewrite persistedLanguage
+  // mid-choice. Keep tracking the persisted value while the gate is pristine,
+  // but never overwrite a selection the learner has already made, or Continue
+  // would confirm the auto-synced locale instead of their choice. A profile
+  // switch clears the dirty flag: the prior selection belongs to the old
+  // profile.
+  const activeProfileId = activeProfile?.id;
+  const hasChosenRef = React.useRef(false);
+  const lastProfileIdRef = React.useRef(activeProfileId);
+
   React.useEffect(() => {
+    if (lastProfileIdRef.current !== activeProfileId) {
+      lastProfileIdRef.current = activeProfileId;
+      hasChosenRef.current = false;
+      setSelectedLanguage(persistedLanguage);
+      return;
+    }
+    if (hasChosenRef.current) return;
     setSelectedLanguage(persistedLanguage);
-  }, [activeProfile?.id, persistedLanguage]);
+  }, [activeProfileId, persistedLanguage]);
 
   const confirm = React.useCallback(() => {
     if (!activeProfile) return;
@@ -107,6 +127,7 @@ export function FirstMentorLanguageGate(): React.ReactElement {
               key={language}
               onPress={() => {
                 setSaveFailed(false);
+                hasChosenRef.current = true;
                 setSelectedLanguage(language);
               }}
               disabled={updateLanguage.isPending}

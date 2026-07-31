@@ -192,4 +192,98 @@ describe('FirstMentorLanguageGate', () => {
       paddingBottom: 58,
     });
   });
+
+  // [WI-1556] useMentorLanguageSync runs unconditionally in (app)/_layout.tsx
+  // (line 429) before this gate renders, and auto-sync is only suppressed once
+  // an EXPLICIT operation begins — i.e. at Continue, not while the gate merely
+  // sits open. So an automatic PATCH + profile refetch can rewrite the
+  // persisted language while the learner is still choosing.
+  it('[WI-1556] keeps an in-progress selection when automatic sync rewrites the persisted language', async () => {
+    const syncing = createTestProfile({
+      id: 'learner-sync',
+      isOwner: false,
+      conversationLanguage: 'cs',
+      conversationLanguageConfirmed: false,
+      isCurrentUser: true,
+    });
+
+    active = renderScreen(<FirstMentorLanguageGate />, {
+      profile: syncing,
+      routes: { '/onboarding/': { success: true } },
+    });
+
+    // The learner picks German before the automatic PATCH and its profile-list
+    // refetch settle.
+    fireEvent.press(
+      active.result.getByTestId('first-mentor-language-option-de'),
+    );
+    expect(
+      active.result.getByTestId('first-mentor-language-option-de').props
+        .accessibilityState.selected,
+    ).toBe(true);
+
+    // The automatic sync lands: the refetched profile now carries the
+    // device-locale value instead of the inherited one.
+    syncing.conversationLanguage = 'es';
+    await act(async () => {
+      active!.result.rerender(<FirstMentorLanguageGate />);
+      await Promise.resolve();
+    });
+
+    // The learner's dirty choice must survive the background write.
+    expect(
+      active.result.getByTestId('first-mentor-language-option-de').props
+        .accessibilityState.selected,
+    ).toBe(true);
+    expect(
+      active.result.getByTestId('first-mentor-language-option-es').props
+        .accessibilityState.selected,
+    ).toBe(false);
+
+    // Continue must confirm what the learner chose, not the auto-synced locale.
+    await act(async () => {
+      fireEvent.press(
+        active!.result.getByTestId('first-mentor-language-confirm'),
+      );
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      const patches = fetchCallsMatching(
+        active!.routedFetch,
+        '/onboarding/language',
+      ).filter((call) => call.init?.method === 'PATCH');
+      expect(extractJsonBody(patches[patches.length - 1]?.init)).toEqual({
+        conversationLanguage: 'de',
+        confirm: true,
+      });
+    });
+  });
+
+  it('[WI-1556] still adopts the persisted language when the learner has not chosen yet', async () => {
+    const pristine = createTestProfile({
+      id: 'learner-pristine',
+      isOwner: false,
+      conversationLanguage: 'cs',
+      conversationLanguageConfirmed: false,
+      isCurrentUser: true,
+    });
+
+    active = renderScreen(<FirstMentorLanguageGate />, {
+      profile: pristine,
+      routes: { '/onboarding/': { success: true } },
+    });
+
+    // No interaction — a pristine gate must keep tracking the persisted value.
+    pristine.conversationLanguage = 'es';
+    await act(async () => {
+      active!.result.rerender(<FirstMentorLanguageGate />);
+      await Promise.resolve();
+    });
+
+    expect(
+      active.result.getByTestId('first-mentor-language-option-es').props
+        .accessibilityState.selected,
+    ).toBe(true);
+  });
 });
