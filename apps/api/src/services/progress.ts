@@ -1521,7 +1521,13 @@ export async function getLearningResumeTarget(
         subjectId: curricula.subjectId,
       })
       .from(curricula)
-      .where(inArray(curricula.subjectId, subjectIds)),
+      .innerJoin(subjects, eq(subjects.id, curricula.subjectId))
+      .where(
+        and(
+          inArray(curricula.subjectId, subjectIds),
+          eq(subjects.profileId, profileId),
+        ),
+      ),
     getLatestCurricula(db, profileId, subjectIds),
   ]);
   const latestCurriculumBySubject = new Map(
@@ -1801,7 +1807,13 @@ export async function getContinueSuggestion(
         subjectId: curricula.subjectId,
       })
       .from(curricula)
-      .where(inArray(curricula.subjectId, subjectIds)),
+      .innerJoin(subjects, eq(subjects.id, curricula.subjectId))
+      .where(
+        and(
+          inArray(curricula.subjectId, subjectIds),
+          eq(subjects.profileId, profileId),
+        ),
+      ),
     getLatestCurricula(db, profileId, subjectIds),
   ]);
   const latestCurriculumBySubject = new Map(

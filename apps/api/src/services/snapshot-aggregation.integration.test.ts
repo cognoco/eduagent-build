@@ -207,16 +207,21 @@ describe('snapshot aggregation uses the shared latest curriculum accessor [WI-24
         topicsGenerated: true,
       })
       .returning({ id: curriculumBooks.id });
-    const [v1, v2] = await db
+    const curriculumRows = await db
       .insert(curricula)
       .values([
         { subjectId, version: 1 },
         { subjectId, version: 2 },
       ])
       .returning({ id: curricula.id, version: curricula.version });
+    const v1 = curriculumRows.find((row) => row.version === 1);
+    const v2 = curriculumRows.find((row) => row.version === 2);
+    if (!v1 || !v2) {
+      throw new Error('Expected version 1 and version 2 curriculum fixtures');
+    }
     await db.insert(curriculumTopics).values([
       {
-        curriculumId: v1!.id,
+        curriculumId: v1.id,
         bookId: book!.id,
         title: 'Old topic one',
         description: 'Historical topic',
@@ -224,7 +229,7 @@ describe('snapshot aggregation uses the shared latest curriculum accessor [WI-24
         estimatedMinutes: 20,
       },
       {
-        curriculumId: v1!.id,
+        curriculumId: v1.id,
         bookId: book!.id,
         title: 'Old topic two',
         description: 'Historical topic',
@@ -232,7 +237,7 @@ describe('snapshot aggregation uses the shared latest curriculum accessor [WI-24
         estimatedMinutes: 20,
       },
       {
-        curriculumId: v2!.id,
+        curriculumId: v2.id,
         bookId: book!.id,
         title: 'Current topic',
         description: 'Current topic',

@@ -25,6 +25,7 @@ import {
   needsDeepeningTopics,
   xpLedger,
   createScopedRepository,
+  generateUUIDv7,
   type Database,
 } from '@eduagent/database';
 import {
@@ -460,28 +461,50 @@ export async function ensureCurriculum(
   profileId: string,
   subjectId: string,
 ): Promise<typeof curricula.$inferSelect> {
+  const repo = createScopedRepository(db, profileId);
+  const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
+  if (!subject) {
+    throw new NotFoundError('Subject');
+  }
+
   const existing = await getLatestCurriculum(db, profileId, subjectId);
   if (existing) {
     return existing;
   }
 
   // Use onConflictDoNothing to handle concurrent inserts safely.
-  // The unique index on (subjectId, version) prevents duplicates.
-  await db
+  // The INSERT ... SELECT keeps the profile ownership predicate inside the
+  // write statement; the unique index on (subjectId, version) prevents
+  // duplicate version-1 rows.
+  const curriculumId = generateUUIDv7();
+  const insertedAt = new Date();
+  const [inserted] = await db
     .insert(curricula)
-    .values({
-      subjectId,
-      version: 1,
-    })
-    .onConflictDoNothing();
+    .select(
+      db
+        .select({
+          id: sql<string>`${curriculumId}::uuid`.as('id'),
+          subjectId: subjects.id,
+          version: sql<number>`1`.as('version'),
+          generatedAt: sql<Date>`${insertedAt}::timestamptz`.as('generated_at'),
+          createdAt: sql<Date>`${insertedAt}::timestamptz`.as('created_at'),
+          updatedAt: sql<Date>`${insertedAt}::timestamptz`.as('updated_at'),
+        })
+        .from(subjects)
+        .where(
+          and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
+        ),
+    )
+    .onConflictDoNothing()
+    .returning();
+  if (inserted) {
+    return inserted;
+  }
 
   // Re-read to get the row regardless of whether we inserted or another
   // concurrent caller won the race.
   const row = await getLatestCurriculum(db, profileId, subjectId);
-  if (!row)
-    throw new Error(
-      `Curriculum row not found after upsert for subjectId=${subjectId}`,
-    );
+  if (!row) throw new NotFoundError('Subject');
   return row;
 }
 

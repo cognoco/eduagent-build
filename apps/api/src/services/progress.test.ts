@@ -344,17 +344,23 @@ function createMockDb({
   const latestCurriculumInnerJoin = jest.fn().mockReturnValue({
     where: latestCurriculumWhere,
   });
-  const curriculumFrom = {
+  const historyCurriculumInnerJoin = jest.fn().mockReturnValue({
     where: selectWhere,
-    innerJoin: latestCurriculumInnerJoin,
-  };
+  });
 
   return {
     __allCurriculumOrderBy: orderBy,
     __latestCurriculumOrderBy: latestCurriculumOrderBy,
-    select: jest.fn().mockImplementation(() => ({
+    select: jest.fn().mockImplementation((selection?: unknown) => ({
       from: jest.fn((table: unknown) => {
-        if (table === curricula) return curriculumFrom;
+        if (table === curricula) {
+          return {
+            innerJoin:
+              selection === undefined
+                ? latestCurriculumInnerJoin
+                : historyCurriculumInnerJoin,
+          };
+        }
         if (table === curriculumTopics) return ownedTopicFrom;
         throw new Error('Unexpected table in progress database fixture');
       }),

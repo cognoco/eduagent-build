@@ -60,18 +60,23 @@ async function seedVersionedCurriculum(input: {
       topicsGenerated: input.topicsGenerated,
     })
     .returning({ id: curriculumBooks.id });
-  const [v1, v2] = await db
+  const curriculumRows = await db
     .insert(curricula)
     .values([
       { subjectId: subject!.id, version: 1 },
       { subjectId: subject!.id, version: 2 },
     ])
     .returning({ id: curricula.id, version: curricula.version });
-  const [v1Topic, v2Topic] = await db
+  const v1 = curriculumRows.find((row) => row.version === 1);
+  const v2 = curriculumRows.find((row) => row.version === 2);
+  if (!v1 || !v2) {
+    throw new Error('Expected version 1 and version 2 curriculum fixtures');
+  }
+  const topicRows = await db
     .insert(curriculumTopics)
     .values([
       {
-        curriculumId: v1!.id,
+        curriculumId: v1.id,
         bookId: book!.id,
         title: input.v1Topic,
         description: `${input.v1Topic} description`,
@@ -80,7 +85,7 @@ async function seedVersionedCurriculum(input: {
         skipped: false,
       },
       {
-        curriculumId: v2!.id,
+        curriculumId: v2.id,
         bookId: book!.id,
         title: input.v2Topic,
         description: `${input.v2Topic} description`,
@@ -89,13 +94,21 @@ async function seedVersionedCurriculum(input: {
         skipped: false,
       },
     ])
-    .returning({ id: curriculumTopics.id });
+    .returning({
+      id: curriculumTopics.id,
+      curriculumId: curriculumTopics.curriculumId,
+    });
+  const v1Topic = topicRows.find((row) => row.curriculumId === v1.id);
+  const v2Topic = topicRows.find((row) => row.curriculumId === v2.id);
+  if (!v1Topic || !v2Topic) {
+    throw new Error('Expected one topic fixture for each curriculum version');
+  }
 
   return {
     profileId: profile!.id,
     subjectId: subject!.id,
-    v1TopicId: v1Topic!.id,
-    v2TopicId: v2Topic!.id,
+    v1TopicId: v1Topic.id,
+    v2TopicId: v2Topic.id,
   };
 }
 

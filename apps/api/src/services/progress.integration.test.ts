@@ -78,18 +78,23 @@ describe('progress version-sensitive reads [WI-2463]', () => {
   it('resumes a paused v1 topic after v2 exists', async () => {
     const profileId = await seedPerson('historical');
     const { subjectId, bookId } = await seedSubject(profileId, 'historical');
-    const [v1, v2] = await db
+    const curriculumRows = await db
       .insert(curricula)
       .values([
         { subjectId, version: 1 },
         { subjectId, version: 2 },
       ])
       .returning({ id: curricula.id, version: curricula.version });
-    const [historicalTopic, latestTopic] = await db
+    const v1 = curriculumRows.find((row) => row.version === 1);
+    const v2 = curriculumRows.find((row) => row.version === 2);
+    if (!v1 || !v2) {
+      throw new Error('Expected version 1 and version 2 curriculum fixtures');
+    }
+    const topicRows = await db
       .insert(curriculumTopics)
       .values([
         {
-          curriculumId: v1!.id,
+          curriculumId: v1.id,
           bookId,
           title: 'Historical algebra',
           description: 'Historical algebra description',
@@ -98,7 +103,7 @@ describe('progress version-sensitive reads [WI-2463]', () => {
           skipped: false,
         },
         {
-          curriculumId: v2!.id,
+          curriculumId: v2.id,
           bookId,
           title: 'Current geometry',
           description: 'Current geometry description',
@@ -107,14 +112,22 @@ describe('progress version-sensitive reads [WI-2463]', () => {
           skipped: false,
         },
       ])
-      .returning({ id: curriculumTopics.id });
+      .returning({
+        id: curriculumTopics.id,
+        curriculumId: curriculumTopics.curriculumId,
+      });
+    const historicalTopic = topicRows.find((row) => row.curriculumId === v1.id);
+    const latestTopic = topicRows.find((row) => row.curriculumId === v2.id);
+    if (!historicalTopic || !latestTopic) {
+      throw new Error('Expected one topic fixture for each curriculum version');
+    }
     const sessionId = generateUUIDv7();
     const now = new Date();
     await db.insert(learningSessions).values({
       id: sessionId,
       profileId,
       subjectId,
-      topicId: historicalTopic!.id,
+      topicId: historicalTopic.id,
       sessionType: 'learning',
       status: 'paused',
       exchangeCount: 1,
@@ -127,17 +140,17 @@ describe('progress version-sensitive reads [WI-2463]', () => {
 
     expect(suggestion).toMatchObject({
       subjectId,
-      topicId: historicalTopic!.id,
+      topicId: historicalTopic.id,
       lastSessionId: sessionId,
     });
-    expect(suggestion?.topicId).not.toBe(latestTopic!.id);
+    expect(suggestion?.topicId).not.toBe(latestTopic.id);
 
     const currentSessionId = generateUUIDv7();
     await db.insert(learningSessions).values({
       id: currentSessionId,
       profileId,
       subjectId,
-      topicId: latestTopic!.id,
+      topicId: latestTopic.id,
       sessionType: 'learning',
       status: 'active',
       exchangeCount: 1,
@@ -150,7 +163,7 @@ describe('progress version-sensitive reads [WI-2463]', () => {
 
     expect(currentSuggestion).toMatchObject({
       subjectId,
-      topicId: latestTopic!.id,
+      topicId: latestTopic.id,
       lastSessionId: currentSessionId,
     });
   });
@@ -160,14 +173,30 @@ describe('progress version-sensitive reads [WI-2463]', () => {
     const foreignProfileId = await seedPerson('foreign');
     const owner = await seedSubject(ownerProfileId, 'owner');
     const foreign = await seedSubject(foreignProfileId, 'foreign');
-    const [ownerV1, ownerV2, foreignV1] = await db
+    const curriculumRows = await db
       .insert(curricula)
       .values([
         { subjectId: owner.subjectId, version: 1 },
         { subjectId: owner.subjectId, version: 2 },
         { subjectId: foreign.subjectId, version: 1 },
       ])
-      .returning({ id: curricula.id, subjectId: curricula.subjectId });
+      .returning({
+        id: curricula.id,
+        subjectId: curricula.subjectId,
+        version: curricula.version,
+      });
+    const ownerV1 = curriculumRows.find(
+      (row) => row.subjectId === owner.subjectId && row.version === 1,
+    );
+    const ownerV2 = curriculumRows.find(
+      (row) => row.subjectId === owner.subjectId && row.version === 2,
+    );
+    const foreignV1 = curriculumRows.find(
+      (row) => row.subjectId === foreign.subjectId && row.version === 1,
+    );
+    if (!ownerV1 || !ownerV2 || !foreignV1) {
+      throw new Error('Expected owner and foreign curriculum fixtures');
+    }
 
     const latest = await getLatestCurricula(db, ownerProfileId, [
       owner.subjectId,
@@ -175,10 +204,10 @@ describe('progress version-sensitive reads [WI-2463]', () => {
     ]);
 
     expect([...latest.keys()]).toEqual([owner.subjectId]);
-    expect(latest.get(owner.subjectId)?.id).toBe(ownerV2!.id);
-    expect(latest.get(owner.subjectId)?.id).not.toBe(ownerV1!.id);
+    expect(latest.get(owner.subjectId)?.id).toBe(ownerV2.id);
+    expect(latest.get(owner.subjectId)?.id).not.toBe(ownerV1.id);
     expect([...latest.values()].map((row) => row.id)).not.toContain(
-      foreignV1!.id,
+      foreignV1.id,
     );
   });
 });

@@ -141,9 +141,9 @@ const OPEN_SCOPE_QUESTION_FLOWS: Readonly<Record<string, string>> = {
 const WI_2520_DEFERRED_SITES: Readonly<Record<string, string>> = {
   'apps/api/src/services/book-suggestion-generation.ts:114':
     'deferred, tracked as WI-2520',
-  'apps/api/src/services/curriculum.ts:134': 'deferred, tracked as WI-2520',
-  'apps/api/src/services/curriculum.ts:209': 'deferred, tracked as WI-2520',
-  'apps/api/src/services/curriculum.ts:2942': 'deferred, tracked as WI-2520',
+  'apps/api/src/services/curriculum.ts:135': 'deferred, tracked as WI-2520',
+  'apps/api/src/services/curriculum.ts:210': 'deferred, tracked as WI-2520',
+  'apps/api/src/services/curriculum.ts:2965': 'deferred, tracked as WI-2520',
   'apps/api/src/services/dictation/generate.ts:213':
     'deferred, tracked as WI-2520',
   'apps/api/src/services/dictation/prepare-homework.ts:82':

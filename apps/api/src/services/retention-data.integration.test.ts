@@ -225,18 +225,23 @@ describe('latest curriculum retention reads [WI-2463]', () => {
         sortOrder: 0,
       })
       .returning({ id: curriculumBooks.id });
-    const [secondV1, secondV2] = await db
+    const secondCurriculumRows = await db
       .insert(curricula)
       .values([
         { subjectId: secondSubject!.id, version: 1 },
         { subjectId: secondSubject!.id, version: 2 },
       ])
       .returning({ id: curricula.id, version: curricula.version });
-    const [secondV1Topic, secondV2Topic] = await db
+    const secondV1 = secondCurriculumRows.find((row) => row.version === 1);
+    const secondV2 = secondCurriculumRows.find((row) => row.version === 2);
+    if (!secondV1 || !secondV2) {
+      throw new Error('Expected version 1 and version 2 curriculum fixtures');
+    }
+    const secondTopicRows = await db
       .insert(curriculumTopics)
       .values([
         {
-          curriculumId: secondV1!.id,
+          curriculumId: secondV1.id,
           bookId: secondBook!.id,
           title: 'Obsolete second topic',
           description: 'Obsolete second topic description',
@@ -244,7 +249,7 @@ describe('latest curriculum retention reads [WI-2463]', () => {
           estimatedMinutes: 30,
         },
         {
-          curriculumId: secondV2!.id,
+          curriculumId: secondV2.id,
           bookId: secondBook!.id,
           title: 'Current second topic',
           description: 'Current second topic description',
@@ -252,7 +257,19 @@ describe('latest curriculum retention reads [WI-2463]', () => {
           estimatedMinutes: 30,
         },
       ])
-      .returning({ id: curriculumTopics.id });
+      .returning({
+        id: curriculumTopics.id,
+        curriculumId: curriculumTopics.curriculumId,
+      });
+    const secondV1Topic = secondTopicRows.find(
+      (row) => row.curriculumId === secondV1.id,
+    );
+    const secondV2Topic = secondTopicRows.find(
+      (row) => row.curriculumId === secondV2.id,
+    );
+    if (!secondV1Topic || !secondV2Topic) {
+      throw new Error('Expected one topic fixture for each curriculum version');
+    }
 
     const single = await getSubjectRetention(
       db,

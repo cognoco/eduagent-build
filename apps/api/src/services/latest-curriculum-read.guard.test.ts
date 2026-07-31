@@ -26,14 +26,39 @@ function normalizedPath(sourceFile: SourceFile): string {
   return sourceFile.getFilePath().replaceAll('\\', '/');
 }
 
-function importedCurriculaNames(sourceFile: SourceFile): Set<string> {
+function importedDatabaseNames(
+  sourceFile: SourceFile,
+  exportedName: string,
+): Set<string> {
   const names = new Set<string>();
   for (const declaration of sourceFile.getImportDeclarations()) {
     if (declaration.getModuleSpecifierValue() !== '@eduagent/database')
       continue;
     for (const namedImport of declaration.getNamedImports()) {
-      if (namedImport.getName() !== 'curricula') continue;
-      names.add(namedImport.getAliasNode()?.getText() ?? 'curricula');
+      if (namedImport.getName() !== exportedName) continue;
+      names.add(namedImport.getAliasNode()?.getText() ?? exportedName);
+    }
+    const namespaceImport = declaration.getNamespaceImport();
+    if (namespaceImport) {
+      names.add(`${namespaceImport.getText()}.${exportedName}`);
+    }
+  }
+  return names;
+}
+
+function importedSqlExpressions(sourceFile: SourceFile): Set<string> {
+  // Keep `sql` for terse in-memory fixtures and production files that obtain
+  // the tag through a local re-export.
+  const names = new Set<string>(['sql']);
+  for (const declaration of sourceFile.getImportDeclarations()) {
+    if (declaration.getModuleSpecifierValue() !== 'drizzle-orm') continue;
+    for (const namedImport of declaration.getNamedImports()) {
+      if (namedImport.getName() !== 'sql') continue;
+      names.add(namedImport.getAliasNode()?.getText() ?? 'sql');
+    }
+    const namespaceImport = declaration.getNamespaceImport();
+    if (namespaceImport) {
+      names.add(`${namespaceImport.getText()}.sql`);
     }
   }
   return names;
@@ -43,14 +68,14 @@ function containingFunctionName(node: Node): string | undefined {
   return node.getFirstAncestorByKind(SyntaxKind.FunctionDeclaration)?.getName();
 }
 
-function referencesCurriculaTable(
+function referencesImportedTable(
   node: Node | undefined,
   importedNames: Set<string>,
 ): boolean {
   if (!node) return false;
   if (Node.isIdentifier(node)) return importedNames.has(node.getText());
   return (
-    Node.isPropertyAccessExpression(node) && node.getName() === 'curricula'
+    Node.isPropertyAccessExpression(node) && importedNames.has(node.getText())
   );
 }
 
@@ -58,10 +83,10 @@ function nodeReferencesCurricula(
   node: Node,
   importedNames: Set<string>,
 ): boolean {
-  if (referencesCurriculaTable(node, importedNames)) return true;
+  if (referencesImportedTable(node, importedNames)) return true;
   return node
     .getDescendants()
-    .some((descendant) => referencesCurriculaTable(descendant, importedNames));
+    .some((descendant) => referencesImportedTable(descendant, importedNames));
 }
 
 function chainSelectsWholeRows(call: CallExpression): boolean {
@@ -129,10 +154,130 @@ function chainOrdersByCurriculaVersion(
           .some(
             (property) =>
               property.getName() === 'version' &&
-              referencesCurriculaTable(property.getExpression(), importedNames),
+              referencesImportedTable(property.getExpression(), importedNames),
           ),
       );
   });
+}
+
+function chainHasProfileScopedSubjectJoin(
+  call: CallExpression,
+  subjectNames: Set<string>,
+  curriculaNames: Set<string>,
+): boolean {
+  const candidates = [
+    call,
+    ...call
+      .getAncestors()
+      .filter((ancestor): ancestor is CallExpression =>
+        Node.isCallExpression(ancestor),
+      ),
+  ];
+  const isImportedColumn = (
+    node: Node,
+    importedNames: Set<string>,
+    columnName: string,
+  ): boolean =>
+    Node.isPropertyAccessExpression(node) &&
+    node.getName() === columnName &&
+    referencesImportedTable(node.getExpression(), importedNames);
+
+  const hasMandatoryConjunct = (
+    node: Node,
+    matches: (predicate: CallExpression) => boolean,
+  ): boolean => {
+    if (Node.isParenthesizedExpression(node) || Node.isAsExpression(node)) {
+      return hasMandatoryConjunct(node.getExpression(), matches);
+    }
+    if (!Node.isCallExpression(node)) return false;
+    const operator = node.getExpression().getText();
+    if (operator === 'or') return false;
+    if (operator === 'and') {
+      return node
+        .getArguments()
+        .some((argument) => hasMandatoryConjunct(argument, matches));
+    }
+    return matches(node);
+  };
+
+  const hasSubjectJoin = candidates.some((candidate) => {
+    const expression = candidate.getExpression();
+    if (
+      !Node.isPropertyAccessExpression(expression) ||
+      expression.getName() !== 'innerJoin'
+    ) {
+      return false;
+    }
+    const [table, on] = candidate.getArguments();
+    if (!referencesImportedTable(table, subjectNames) || !on) return false;
+    return hasMandatoryConjunct(on, (predicate) => {
+      if (predicate.getExpression().getText() !== 'eq') return false;
+      const [left, right] = predicate.getArguments();
+      if (!left || !right) return false;
+      return (
+        (isImportedColumn(left, subjectNames, 'id') &&
+          isImportedColumn(right, curriculaNames, 'subjectId')) ||
+        (isImportedColumn(right, subjectNames, 'id') &&
+          isImportedColumn(left, curriculaNames, 'subjectId'))
+      );
+    });
+  });
+  if (!hasSubjectJoin) return false;
+
+  return candidates.some((candidate) => {
+    const expression = candidate.getExpression();
+    if (
+      !Node.isPropertyAccessExpression(expression) ||
+      expression.getName() !== 'where'
+    ) {
+      return false;
+    }
+    return candidate.getArguments().some((argument) =>
+      hasMandatoryConjunct(argument, (predicate) => {
+        if (predicate.getExpression().getText() !== 'eq') return false;
+        const [left, right] = predicate.getArguments();
+        if (!left || !right) return false;
+        const isSubjectProfile = (node: Node): boolean =>
+          Node.isPropertyAccessExpression(node) &&
+          node.getName() === 'profileId' &&
+          referencesImportedTable(node.getExpression(), subjectNames);
+        return (
+          (isSubjectProfile(left) && right.getText() === 'profileId') ||
+          (isSubjectProfile(right) && left.getText() === 'profileId')
+        );
+      }),
+    );
+  });
+}
+
+function staticRawSqlText(argument: Node | undefined): string | undefined {
+  if (!argument) return undefined;
+  if (Node.isStringLiteral(argument)) return argument.getLiteralText();
+  if (Node.isNoSubstitutionTemplateLiteral(argument)) {
+    return argument.getLiteralText();
+  }
+  if (Node.isTemplateExpression(argument)) {
+    return [
+      argument.getHead().getLiteralText(),
+      ...argument
+        .getTemplateSpans()
+        .map((span) => span.getLiteral().getLiteralText()),
+    ].join(' ');
+  }
+  if (Node.isBinaryExpression(argument)) {
+    const left = staticRawSqlText(argument.getLeft());
+    const right = staticRawSqlText(argument.getRight());
+    return [left, right]
+      .filter((part): part is string => part !== undefined)
+      .join(' ');
+  }
+  if (
+    Node.isParenthesizedExpression(argument) ||
+    Node.isAsExpression(argument)
+  ) {
+    return staticRawSqlText(argument.getExpression());
+  }
+  return undefined;
 }
 
 const RAW_CURRICULA_READ =
@@ -140,10 +285,13 @@ const RAW_CURRICULA_READ =
 
 function analyzeLatestCurriculumReads(sourceFile: SourceFile): Finding[] {
   const file = normalizedPath(sourceFile);
-  const curriculaNames = importedCurriculaNames(sourceFile);
+  const curriculaNames = importedDatabaseNames(sourceFile, 'curricula');
+  const subjectNames = importedDatabaseNames(sourceFile, 'subjects');
+  const sqlExpressions = importedSqlExpressions(sourceFile);
 
   const findings: Finding[] = [];
   const progressFunctionsWithAllHistoryRead = new Set<string>();
+  const progressFunctionsWithProfileScopedAllHistoryRead = new Set<string>();
   const progressFunctionsWithDelegation = new Set<string>();
 
   function recordRawSqlRead(node: Node, sqlText: string): void {
@@ -184,15 +332,13 @@ function analyzeLatestCurriculumReads(sourceFile: SourceFile): Finding[] {
     if (!Node.isPropertyAccessExpression(expression)) continue;
     const method = expression.getName();
 
-    if (method === 'raw' && expression.getExpression().getText() === 'sql') {
+    if (
+      method === 'raw' &&
+      sqlExpressions.has(expression.getExpression().getText())
+    ) {
       const [argument] = call.getArguments();
-      if (
-        argument &&
-        (Node.isStringLiteral(argument) ||
-          Node.isNoSubstitutionTemplateLiteral(argument))
-      ) {
-        recordRawSqlRead(call, argument.getLiteralText());
-      }
+      const sqlText = staticRawSqlText(argument);
+      if (sqlText) recordRawSqlRead(call, sqlText);
       continue;
     }
 
@@ -204,7 +350,7 @@ function analyzeLatestCurriculumReads(sourceFile: SourceFile): Finding[] {
       method === 'fullJoin'
     ) {
       const [table] = call.getArguments();
-      if (!referencesCurriculaTable(table, curriculaNames)) continue;
+      if (!referencesImportedTable(table, curriculaNames)) continue;
       if (
         method !== 'from' &&
         !chainSelectsWholeRows(call) &&
@@ -230,6 +376,11 @@ function analyzeLatestCurriculumReads(sourceFile: SourceFile): Finding[] {
         PROGRESS_HISTORY_FUNCTIONS.has(functionName)
       ) {
         progressFunctionsWithAllHistoryRead.add(functionName);
+        if (
+          chainHasProfileScopedSubjectJoin(call, subjectNames, curriculaNames)
+        ) {
+          progressFunctionsWithProfileScopedAllHistoryRead.add(functionName);
+        }
         continue;
       }
 
@@ -273,18 +424,21 @@ function analyzeLatestCurriculumReads(sourceFile: SourceFile): Finding[] {
   for (const tagged of sourceFile.getDescendantsOfKind(
     SyntaxKind.TaggedTemplateExpression,
   )) {
-    if (tagged.getTag().getText() !== 'sql') continue;
+    if (!sqlExpressions.has(tagged.getTag().getText())) continue;
     const sqlText = tagged.getTemplate().getText();
     recordRawSqlRead(tagged, sqlText);
   }
 
   if (file.endsWith(PROGRESS_FILE)) {
     for (const functionName of PROGRESS_HISTORY_FUNCTIONS) {
-      if (!progressFunctionsWithAllHistoryRead.has(functionName)) {
+      if (
+        !progressFunctionsWithAllHistoryRead.has(functionName) ||
+        !progressFunctionsWithProfileScopedAllHistoryRead.has(functionName)
+      ) {
         findings.push({
           file,
           line: 1,
-          message: `${functionName} must retain its intentional all-version curriculum read for historical sessions`,
+          message: `${functionName} must retain its profile-scoped all-version curriculum read for historical sessions`,
         });
       }
       if (!progressFunctionsWithDelegation.has(functionName)) {
@@ -311,7 +465,7 @@ describe('latest curriculum read guard [WI-2463]', () => {
       source(
         'apps/api/src/services/new-consumer.ts',
         `
-          import { curricula } from '@eduagent/database';
+          import { curricula, subjects } from '@eduagent/database';
           async function load(db: any, subjectId: string) {
             return db.query.curricula.findFirst({ where: eq(curricula.subjectId, subjectId) });
           }
@@ -490,6 +644,75 @@ describe('latest curriculum read guard [WI-2463]', () => {
     expect(dynamicFindings).toEqual([]);
   });
 
+  it('rejects interpolated and namespace-qualified raw SQL curricula reads', () => {
+    const interpolatedFindings = analyzeLatestCurriculumReads(
+      source(
+        'apps/api/src/services/new-consumer.ts',
+        `
+          import { sql } from 'drizzle-orm';
+          async function load(db: any, subjectId: string) {
+            return db.execute(sql.raw(\`SELECT * FROM curricula WHERE subject_id = '\${subjectId}'\`));
+          }
+        `,
+      ),
+    );
+    const namespaceFindings = analyzeLatestCurriculumReads(
+      source(
+        'apps/api/src/services/new-consumer.ts',
+        `
+          import * as drizzle from 'drizzle-orm';
+          async function load(db: any) {
+            const tagged = await db.execute(drizzle.sql\`SELECT * FROM curricula\`);
+            const raw = await db.execute(drizzle.sql.raw('SELECT * FROM curricula'));
+            return { tagged, raw };
+          }
+        `,
+      ),
+    );
+    const aliasFindings = analyzeLatestCurriculumReads(
+      source(
+        'apps/api/src/services/new-consumer.ts',
+        `
+          import { sql as drizzleSql } from 'drizzle-orm';
+          async function load(db: any) {
+            return db.execute(drizzleSql.raw('SELECT * FROM curricula'));
+          }
+        `,
+      ),
+    );
+    const dynamicTemplateFindings = analyzeLatestCurriculumReads(
+      source(
+        'apps/api/src/services/new-consumer.ts',
+        `
+          import { sql } from 'drizzle-orm';
+          async function load(db: any, curriculaTable: string) {
+            return db.execute(sql.raw(\`\${curriculaTable}\`));
+          }
+        `,
+      ),
+    );
+
+    expect(interpolatedFindings).toEqual([
+      expect.objectContaining({
+        message: expect.stringContaining('raw SQL'),
+      }),
+    ]);
+    expect(namespaceFindings).toHaveLength(2);
+    expect(namespaceFindings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: expect.stringContaining('raw SQL'),
+        }),
+      ]),
+    );
+    expect(aliasFindings).toEqual([
+      expect.objectContaining({
+        message: expect.stringContaining('raw SQL'),
+      }),
+    ]);
+    expect(dynamicTemplateFindings).toEqual([]);
+  });
+
   it('accepts the named atomic latest-version write predicate', () => {
     const findings = analyzeLatestCurriculumReads(
       source(
@@ -583,6 +806,36 @@ describe('latest curriculum read guard [WI-2463]', () => {
       source(
         PROGRESS_FILE,
         `
+          import { curricula, subjects } from '@eduagent/database';
+          import { getLatestCurricula } from './curriculum';
+          async function getLearningResumeTarget(db: any, profileId: string, subjectIds: string[]) {
+            const history = await db.select().from(curricula)
+              .innerJoin(subjects, eq(subjects.id, curricula.subjectId))
+              .where(and(inArray(curricula.subjectId, subjectIds), eq(subjects.profileId, profileId)));
+            const latest = await getLatestCurricula(db, profileId, subjectIds);
+            return { history, latest };
+          }
+          async function getContinueSuggestion(db: any, profileId: string, subjectIds: string[]) {
+            const history = await db.select().from(curricula)
+              .innerJoin(subjects, eq(subjects.id, curricula.subjectId))
+              .where(and(inArray(curricula.subjectId, subjectIds), eq(subjects.profileId, profileId)));
+            const latest = await getLatestCurricula(db, profileId, subjectIds);
+            return { history, latest };
+          }
+        `,
+      ),
+    );
+
+    expect(exportFindings).toEqual([]);
+    expect(familyFindings).toEqual([]);
+    expect(progressFindings).toEqual([]);
+  });
+
+  it('rejects a progress all-history read without an explicit profile predicate', () => {
+    const findings = analyzeLatestCurriculumReads(
+      source(
+        PROGRESS_FILE,
+        `
           import { curricula } from '@eduagent/database';
           import { getLatestCurricula } from './curriculum';
           async function getLearningResumeTarget(db: any, profileId: string, subjectIds: string[]) {
@@ -599,9 +852,96 @@ describe('latest curriculum read guard [WI-2463]', () => {
       ),
     );
 
-    expect(exportFindings).toEqual([]);
-    expect(familyFindings).toEqual([]);
-    expect(progressFindings).toEqual([]);
+    expect(findings).toEqual([
+      expect.objectContaining({
+        message: expect.stringContaining(
+          'getLearningResumeTarget must retain its profile-scoped all-version curriculum read',
+        ),
+      }),
+      expect.objectContaining({
+        message: expect.stringContaining(
+          'getContinueSuggestion must retain its profile-scoped all-version curriculum read',
+        ),
+      }),
+    ]);
+  });
+
+  it('rejects a progress history read whose subject join does not follow the ownership chain', () => {
+    const findings = analyzeLatestCurriculumReads(
+      source(
+        PROGRESS_FILE,
+        `
+          import { curricula, subjects } from '@eduagent/database';
+          import { getLatestCurricula } from './curriculum';
+          async function getLearningResumeTarget(db: any, profileId: string, subjectIds: string[]) {
+            const history = await db.select().from(curricula)
+              .innerJoin(subjects, eq(subjects.profileId, profileId))
+              .where(and(inArray(curricula.subjectId, subjectIds), eq(subjects.profileId, profileId)));
+            const latest = await getLatestCurricula(db, profileId, subjectIds);
+            return { history, latest };
+          }
+          async function getContinueSuggestion(db: any, profileId: string, subjectIds: string[]) {
+            const history = await db.select().from(curricula)
+              .innerJoin(subjects, eq(subjects.profileId, profileId))
+              .where(and(inArray(curricula.subjectId, subjectIds), eq(subjects.profileId, profileId)));
+            const latest = await getLatestCurricula(db, profileId, subjectIds);
+            return { history, latest };
+          }
+        `,
+      ),
+    );
+
+    expect(findings).toEqual([
+      expect.objectContaining({
+        message: expect.stringContaining(
+          'getLearningResumeTarget must retain its profile-scoped all-version curriculum read',
+        ),
+      }),
+      expect.objectContaining({
+        message: expect.stringContaining(
+          'getContinueSuggestion must retain its profile-scoped all-version curriculum read',
+        ),
+      }),
+    ]);
+  });
+
+  it('rejects progress ownership equalities hidden beneath a disjunction', () => {
+    const findings = analyzeLatestCurriculumReads(
+      source(
+        PROGRESS_FILE,
+        `
+          import { curricula, subjects } from '@eduagent/database';
+          import { getLatestCurricula } from './curriculum';
+          async function getLearningResumeTarget(db: any, profileId: string, subjectIds: string[]) {
+            const history = await db.select().from(curricula)
+              .innerJoin(subjects, or(eq(subjects.id, curricula.subjectId), sql\`true\`))
+              .where(or(eq(subjects.profileId, profileId), sql\`true\`));
+            const latest = await getLatestCurricula(db, profileId, subjectIds);
+            return { history, latest };
+          }
+          async function getContinueSuggestion(db: any, profileId: string, subjectIds: string[]) {
+            const history = await db.select().from(curricula)
+              .innerJoin(subjects, or(eq(subjects.id, curricula.subjectId), sql\`true\`))
+              .where(or(eq(subjects.profileId, profileId), sql\`true\`));
+            const latest = await getLatestCurricula(db, profileId, subjectIds);
+            return { history, latest };
+          }
+        `,
+      ),
+    );
+
+    expect(findings).toEqual([
+      expect.objectContaining({
+        message: expect.stringContaining(
+          'getLearningResumeTarget must retain its profile-scoped all-version curriculum read',
+        ),
+      }),
+      expect.objectContaining({
+        message: expect.stringContaining(
+          'getContinueSuggestion must retain its profile-scoped all-version curriculum read',
+        ),
+      }),
+    ]);
   });
 
   it('rejects a progress history path that stops delegating its latest map', () => {
@@ -609,13 +949,17 @@ describe('latest curriculum read guard [WI-2463]', () => {
       source(
         PROGRESS_FILE,
         `
-          import { curricula } from '@eduagent/database';
+          import { curricula, subjects } from '@eduagent/database';
           import { getLatestCurricula } from './curriculum';
           async function getLearningResumeTarget(db: any, profileId: string, subjectIds: string[]) {
-            return db.select().from(curricula).where(inArray(curricula.subjectId, subjectIds));
+            return db.select().from(curricula)
+              .innerJoin(subjects, eq(subjects.id, curricula.subjectId))
+              .where(and(inArray(curricula.subjectId, subjectIds), eq(subjects.profileId, profileId)));
           }
           async function getContinueSuggestion(db: any, profileId: string, subjectIds: string[]) {
-            const history = await db.select().from(curricula).where(inArray(curricula.subjectId, subjectIds));
+            const history = await db.select().from(curricula)
+              .innerJoin(subjects, eq(subjects.id, curricula.subjectId))
+              .where(and(inArray(curricula.subjectId, subjectIds), eq(subjects.profileId, profileId)));
             const latest = await getLatestCurricula(db, profileId, subjectIds);
             return { history, latest };
           }

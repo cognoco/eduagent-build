@@ -319,13 +319,18 @@ describe('resolveFilingResult (integration)', () => {
         pedagogyMode: 'socratic',
       })
       .returning();
-    const [v1, v2] = await db
+    const curriculumRows = await db
       .insert(curricula)
       .values([
         { subjectId: subject!.id, version: 1 },
         { subjectId: subject!.id, version: 2 },
       ])
       .returning({ id: curricula.id, version: curricula.version });
+    const v1 = curriculumRows.find((row) => row.version === 1);
+    const v2 = curriculumRows.find((row) => row.version === 2);
+    if (!v1 || !v2) {
+      throw new Error('Expected version 1 and version 2 curriculum fixtures');
+    }
     const [book] = await db
       .insert(curriculumBooks)
       .values({
@@ -355,8 +360,8 @@ describe('resolveFilingResult (integration)', () => {
       where: eq(curriculumTopics.id, result.topicId),
     });
 
-    expect(topic?.curriculumId).toBe(v2!.id);
-    expect(topic?.curriculumId).not.toBe(v1!.id);
+    expect(topic?.curriculumId).toBe(v2.id);
+    expect(topic?.curriculumId).not.toBe(v1.id);
   });
 
   it('reuses existing book by ID', async () => {

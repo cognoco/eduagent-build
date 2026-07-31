@@ -30,6 +30,7 @@ import {
   persistNarrowTopics,
   deleteTopicIfSafe,
   deleteBook,
+  ensureCurriculum,
   getLatestCurriculum,
   getLatestCurricula,
 } from './curriculum';
@@ -1648,6 +1649,11 @@ describe('persistBookTopics', () => {
         onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
       };
     });
+    const insertSelect = jest.fn().mockReturnValue({
+      onConflictDoNothing: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([]),
+      }),
+    });
 
     const db = {
       query: {
@@ -1675,6 +1681,7 @@ describe('persistBookTopics', () => {
       }),
       insert: jest.fn().mockReturnValue({
         values: insertValues,
+        select: insertSelect,
       }),
       select: jest.fn((selection?: Record<string, unknown>) => {
         if (selection === undefined) {
@@ -1708,6 +1715,18 @@ describe('persistBookTopics', () => {
     await expect(
       persistBookTopics(db, PROFILE_ID, SUBJECT_ID, BOOK_ID, sampleTopics, []),
     ).rejects.toThrow('Subject not found');
+  });
+
+  it('does not create a curriculum for a subject outside the profile', async () => {
+    const db = createPersistMockDb({
+      subjectExists: false,
+      curriculumExists: false,
+    });
+
+    await expect(ensureCurriculum(db, PROFILE_ID, SUBJECT_ID)).rejects.toThrow(
+      'Subject not found',
+    );
+    expect(db.insert).not.toHaveBeenCalled();
   });
 
   it('throws NotFoundError when book does not exist', async () => {
