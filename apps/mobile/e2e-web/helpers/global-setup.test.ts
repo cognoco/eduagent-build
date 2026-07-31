@@ -1,3 +1,7 @@
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+
 import { clerkSetup } from '@clerk/testing/playwright';
 import dotenv from 'dotenv';
 import globalSetup, { resolveClerkPublishableKey } from './global-setup';
@@ -11,8 +15,10 @@ jest.mock('dotenv', () => ({
 describe('resolveClerkPublishableKey', () => {
   const originalClerkKey = process.env.CLERK_PUBLISHABLE_KEY;
   const originalExpoKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const originalPhaseFile = process.env.PLAYWRIGHT_PRELOAD_PHASE_FILE;
+  let phaseDir: string | undefined;
 
-  afterEach(() => {
+  afterEach(async () => {
     if (originalClerkKey === undefined) {
       delete process.env.CLERK_PUBLISHABLE_KEY;
     } else {
@@ -23,7 +29,17 @@ describe('resolveClerkPublishableKey', () => {
     } else {
       process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY = originalExpoKey;
     }
+    if (originalPhaseFile === undefined) {
+      delete process.env.PLAYWRIGHT_PRELOAD_PHASE_FILE;
+    } else {
+      process.env.PLAYWRIGHT_PRELOAD_PHASE_FILE = originalPhaseFile;
+    }
+    if (phaseDir) {
+      await rm(phaseDir, { recursive: true, force: true });
+      phaseDir = undefined;
+    }
     jest.clearAllMocks();
+    jest.mocked(clerkSetup).mockReset();
     jest.mocked(dotenv.config).mockReset();
   });
 
@@ -82,5 +98,33 @@ describe('resolveClerkPublishableKey', () => {
       }),
     );
     expect(clerkSetup).toHaveBeenCalledTimes(1);
+  });
+
+  it('records the bounded global-setup completion phases', async () => {
+    phaseDir = await mkdtemp(path.join(tmpdir(), 'wi2948-global-setup-'));
+    const phaseFile = path.join(phaseDir, 'phases.txt');
+    process.env.PLAYWRIGHT_PRELOAD_PHASE_FILE = phaseFile;
+    process.env.CLERK_PUBLISHABLE_KEY = 'pk_test_dummy';
+
+    await globalSetup();
+
+    await expect(readFile(phaseFile, 'utf8')).resolves.toBe(
+      'global-setup-started\nglobal-setup-completed\n',
+    );
+  });
+
+  it('records only a fixed failure phase when Clerk setup rejects', async () => {
+    phaseDir = await mkdtemp(path.join(tmpdir(), 'wi2948-global-setup-'));
+    const phaseFile = path.join(phaseDir, 'phases.txt');
+    process.env.PLAYWRIGHT_PRELOAD_PHASE_FILE = phaseFile;
+    process.env.CLERK_PUBLISHABLE_KEY = 'pk_test_dummy';
+    jest
+      .mocked(clerkSetup)
+      .mockRejectedValueOnce(new Error('SECRET_SENTINEL_WI2948'));
+
+    await expect(globalSetup()).rejects.toBeDefined();
+    await expect(readFile(phaseFile, 'utf8')).resolves.toBe(
+      'global-setup-started\nglobal-setup-failed\n',
+    );
   });
 });

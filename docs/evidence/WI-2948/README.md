@@ -95,7 +95,37 @@ The final read-only fetch advanced `origin/main` once more to `da7a1842066765796
 
 ## Safe early-run classification
 
-The local proof harness now emits only allowlisted metadata from early failures: Playwright top-level error count, setup-scenario count, the sanitized setup-result array, and `FAILURE_CLASSES=early-run-before-setup` when the setup count is zero. It never copies top-level error messages or raw console text into the durable classification. A synthetic JSON fixture containing sentinel raw error/console material first failed because the classifier did not exist, then passed after the classifier was wired into the proof wrapper; no Playwright command or staging endpoint was used for that test.
+At that prior candidate, the local proof harness emitted only allowlisted metadata from early failures: Playwright top-level error count, setup-scenario count, the sanitized setup-result array, and `FAILURE_CLASSES=early-run-before-setup` when the setup count was zero. It did not copy top-level error messages or raw console text into the durable classification. A synthetic JSON fixture containing sentinel raw error/console material first failed because the classifier did not exist, then passed after the classifier was wired into the proof wrapper; no Playwright command or staging endpoint was used for that test. The bounded discriminator below supersedes that coarse future-run behavior without rewriting the preserved result above.
+
+## Bounded pre-load discriminator candidate
+
+No further staging invocation was made. The replacement authorization described above remains spent. This candidate instruments only lifecycle boundaries owned by the repository and reads no raw error field beyond the count of Playwright top-level errors.
+
+The installed Playwright 1.56.1 reporter contract does not expose an error kind, phase code, or stable exception name. `TestError` exposes message, stack/snippet, cause, and optional source location; the JSON report likewise stores top-level errors as text-bearing objects. Those fields are deliberately excluded. Playwright also synthesizes `onBegin` with an empty suite when an earlier task fails, so callback presence is not treated as discovery evidence. The custom reporter records `tests-discovered` only when `suite.allTests().length > 0`.
+
+The supported failure taxonomy is:
+
+| Emitted class | Fixed marker boundary | What it establishes | Deliberate limit |
+| --- | --- | --- | --- |
+| `web-server-startup-timeout` | Reporter constructed; global setup never started | Configuration loaded, then the configured pre-global-setup plugin task failed. In this config that task is the Expo web server/export plugin. | Does not distinguish export failure, bind failure, early process exit, or readiness timeout. |
+| `global-setup-failure` | Global setup started but did not complete | Failure occurred inside the repository-owned global-setup boundary. | Does not identify Clerk setup's raw exception or sub-operation. |
+| `configuration-test-discovery` | Either no reporter marker, or global setup completed without a non-empty discovered suite | Configuration/reporter construction failed before lifecycle reporting, or test collection/loading failed after global setup. The emitted marker counts distinguish those two structural shapes. | Does not persist the config/load exception or arbitrary error name. |
+| `browser-worker-or-fixture-pre-body` | A non-empty suite was discovered and at least one setup attempt began without the setup body marker (or dispatch stopped before any attempt/body) | The failure is after discovery but before repository setup-test code executes. A synthetic invalid-browser launch reaches this class. | Playwright exposes no stable structural discriminator among worker dispatch, browser launch, built-in fixture resolution, and pre-body hooks, so the label remains intentionally broad. |
+| `setup-scenario-failure` | A setup body marker exists and Playwright reports setup results | Repository setup-test code ran before failure. | Does not classify the body failure from message text. |
+| `unclassified-preload` | Missing/invalid/impossible marker shape or an unsupported sequence | Nothing narrower is safe to claim. | Raw text is never truncated or substituted into this class. |
+
+The durable failure output is limited to booleans/counts, fixed phase counts, fixed result-status counts, retry/attempt counts, and one allowlisted class. It does not emit test titles, error names, messages, stacks, commands, response bodies, environment values, credential-bearing URLs, or filesystem paths. Raw JSON and console material remain inside the wrapper's mode-`0700` temporary directory and are destroyed by its exit trap. The wrapper's separate global-teardown check continues to emit only a count from one fixed repository-owned log line.
+
+Mutation-sensitive local evidence on Node 22:
+
+- RED: the marker unit contract exited 1 while `preload-phase.ts` was absent; all five phase cases plus the unknown-shape case failed classification before the discriminator existed.
+- GREEN: the marker/global-setup suites passed 10 of 10; the evidence-transport contract passed.
+- Real local Playwright probes passed five supported cases: configuration throw, configured web-server startup failure, global-setup throw, test-discovery throw, and invalid browser executable. Removing one decisive marker from each supported case changed its classification in all five mutations. Secret and PII sentinels appeared only in destroyed raw inputs; durable-output leak count was zero. The impossible unknown sequence emitted `unclassified-preload`.
+- The exact repository `--list --project=setup` path, with dummy loopback values, discovered three setup scenarios and emitted one non-empty-suite discovery marker. List mode did not start a web server, run global setup, launch a browser, or contact staging.
+- The exact configured Expo web-export/static-server command was exercised with the production proof flags but a dummy loopback API URL. The loopback server became ready, environment-file backup residue was zero, the process was terminated, and generated `dist`/Metro temporary artifacts were removed. Port 19006 was free afterward.
+- Five prior Jest RGR JSON files stored absolute `testResults[].name` values; the two RED files also retained Jest failure messages/details. Those fields were sanitized to repo-relative paths, fixed `red-phase-expected-failure` codes, and structural counts. A normalized comparison against the original committed artifacts matched 5 of 5 files, proving all non-sensitive evidence fields were preserved.
+
+A future one-shot proof would now reveal whether the run stopped in the configured web-server task, global setup, configuration/test discovery, the broader worker/browser/fixture pre-body boundary, or setup-test code; a success would still require all three scenario results, one attempt each, retry index zero, and zero teardown failures. It would still not reveal the raw exception or the exact subcause inside any class, and it intentionally cannot distinguish browser launch from another pre-body worker/fixture failure.
 
 ## Post-refresh no-rerun verification
 
@@ -124,7 +154,7 @@ The one replacement authorization is spent. Refuse any further staging proof unl
 2. The focused Node 22 helper regression, workflow/alignment suites, TypeScript build, targeted lint, workflow-security guard, no-Gemini ratchet, and `git diff --check` pass on that exact revision without Playwright.
 3. A non-executing `playwright test --list --project=setup` configuration/collection check lists exactly the three expected setup scenarios and reports no config or load error. This check must not start web servers, run global setup, launch a browser, or call staging.
 4. The exact-flag Expo web export used by the configured web server is verified separately without calling staging, and the proof port is free before invocation. This isolates the web-server boundary that runs before test loading.
-5. `zsh -n` passes for the receipt wrapper and classifier, and the synthetic early-run classifier contract passes without leaking its raw sentinel material.
+5. `zsh -n` passes for the receipt wrapper and classifier, and the synthetic pre-load discriminator passes all supported phase cases, marker mutations, the unknown-shape fail-closed case, and the sentinel non-leak assertion.
 6. A no-startup-files boundary probe reports `CLERK_SECRET_KEY` absent after the exact Doppler `--only-secrets="TEST_SEED_SECRET,CLERK_PUBLISHABLE_KEY"` boundary.
 7. A fresh read-only `doppler run --project mentomate --config stg --no-cache --no-fallback -- node scripts/check-clerk-key-alignment.mjs` prints only `Clerk key alignment OK` under the same Doppler principal that would run the proof.
 8. No raw reporter, trace, screenshot, video, seeded address, password, token, or key is configured for durable output, and the durable evidence scan remains at zero sensitive-pattern matches.

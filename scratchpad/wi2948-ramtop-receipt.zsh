@@ -15,6 +15,9 @@ trap 'rm -rf -- "$evidence_tmp"' EXIT
 
 raw_json="$evidence_tmp/playwright.json"
 raw_console="$evidence_tmp/console.log"
+phase_events="$evidence_tmp/preload-phases.txt"
+: >"$phase_events"
+chmod 600 "$phase_events"
 started_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 run_id="wi2948-ramtop-$(date -u +%Y%m%dT%H%M%SZ)"
 machine=$(hostname)
@@ -33,12 +36,13 @@ EXPO_PUBLIC_ENABLE_MODE_NAV=true \
 EXPO_PUBLIC_ENABLE_MODE_NAV_V1=true \
 EXPO_PUBLIC_ENABLE_MODE_NAV_V2=true \
 PLAYWRIGHT_RUN_ID="$run_id" \
+PLAYWRIGHT_PRELOAD_PHASE_FILE="$phase_events" \
 PLAYWRIGHT_JSON_OUTPUT_FILE="$raw_json" \
 env -u CLERK_SECRET_KEY -u DOPPLER_TOKEN \
 mise exec node@22 -- doppler run --project mentomate --config stg \
   --no-cache --no-fallback \
   --only-secrets="TEST_SEED_SECRET,CLERK_PUBLISHABLE_KEY" -- \
-  zsh -f -c 'set -eu; if [[ -n "${CLERK_SECRET_KEY:-}" ]]; then print -u2 "Refusing setup proof: CLERK_SECRET_KEY crossed the allowlisted boundary"; exit 4; fi; export EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY="$CLERK_PUBLISHABLE_KEY"; export PLAYWRIGHT_TEST_SEED_SECRET="$TEST_SEED_SECRET"; pnpm exec playwright test -c apps/mobile/playwright.config.ts --project=setup --workers=1 --retries=0 --reporter=json' \
+  zsh -f -c 'set -eu; if [[ -n "${CLERK_SECRET_KEY:-}" ]]; then print -u2 "Refusing setup proof: CLERK_SECRET_KEY crossed the allowlisted boundary"; exit 4; fi; export EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY="$CLERK_PUBLISHABLE_KEY"; export PLAYWRIGHT_TEST_SEED_SECRET="$TEST_SEED_SECRET"; pnpm exec playwright test -c apps/mobile/playwright.config.ts --project=setup --workers=1 --retries=0 --reporter=json,./scratchpad/wi2948-preload-phase-reporter.cjs' \
   >"$raw_console" 2>&1
 run_status=$?
 set -e
@@ -50,7 +54,7 @@ teardown_failure_count=${teardown_failure_count:-0}
 if [[ "$run_status" -ne 0 || "$teardown_failure_count" != "0" ]]; then
   printf 'PLAYWRIGHT_EXIT=%s\n' "$run_status"
   printf 'GLOBAL_TEARDOWN_FAILURE_COUNT=%s\n' "$teardown_failure_count"
-  zsh "$classifier" "$raw_json" "$raw_console"
+  zsh "$classifier" "$raw_json" "$phase_events"
   exit 3
 fi
 
@@ -71,24 +75,12 @@ if ! jq -e '
 ' "$raw_json" >/dev/null
 then
   printf 'RECEIPT_VALIDATION=failed\n'
-  jq -c '
-    [.. | objects
-      | select((.tests? | type) == "array" and (.file? | type) == "string")
-      | select(any(.tests[]?; .projectName == "setup"))
-      | {
-          title,
-          expectedStatus: .tests[0].expectedStatus,
-          outcome: (.tests[0].results[-1].status // "not-run"),
-          attempts: (.tests[0].results | length),
-          retryIndexes: [.tests[0].results[].retry]
-        }
-    ]
-  ' "$raw_json"
+  zsh "$classifier" "$raw_json" "$phase_events"
   exit 5
 fi
 
 source_sha=$(shasum -a 256 "$raw_json" | cut -d ' ' -f1)
-command_shape='CI=1 PLAYWRIGHT_SKIP_LOCAL_API=1 E2E_ENV=staging PLAYWRIGHT_API_URL=https://api-stg.mentomate.com EXPO_PUBLIC_API_URL=https://api-stg.mentomate.com EXPO_PUBLIC_ENABLE_MODE_NAV=true EXPO_PUBLIC_ENABLE_MODE_NAV_V1=true EXPO_PUBLIC_ENABLE_MODE_NAV_V2=true PLAYWRIGHT_RUN_ID=<recorded-run-id> env -u CLERK_SECRET_KEY -u DOPPLER_TOKEN mise exec node@22 -- doppler run --project mentomate --config stg --no-cache --no-fallback --only-secrets="TEST_SEED_SECRET,CLERK_PUBLISHABLE_KEY" -- zsh -f -c '\''require CLERK_SECRET_KEY absent; export EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY="$CLERK_PUBLISHABLE_KEY"; export PLAYWRIGHT_TEST_SEED_SECRET="$TEST_SEED_SECRET"; pnpm exec playwright test -c apps/mobile/playwright.config.ts --project=setup --workers=1 --retries=0 --reporter=json'\'''
+command_shape='CI=1 PLAYWRIGHT_SKIP_LOCAL_API=1 E2E_ENV=staging PLAYWRIGHT_API_URL=https://api-stg.mentomate.com EXPO_PUBLIC_API_URL=https://api-stg.mentomate.com EXPO_PUBLIC_ENABLE_MODE_NAV=true EXPO_PUBLIC_ENABLE_MODE_NAV_V1=true EXPO_PUBLIC_ENABLE_MODE_NAV_V2=true PLAYWRIGHT_RUN_ID=<recorded-run-id> PLAYWRIGHT_PRELOAD_PHASE_FILE=<mode-0600-temporary-file> env -u CLERK_SECRET_KEY -u DOPPLER_TOKEN mise exec node@22 -- doppler run --project mentomate --config stg --no-cache --no-fallback --only-secrets="TEST_SEED_SECRET,CLERK_PUBLISHABLE_KEY" -- zsh -f -c '\''require CLERK_SECRET_KEY absent; export EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY="$CLERK_PUBLISHABLE_KEY"; export PLAYWRIGHT_TEST_SEED_SECRET="$TEST_SEED_SECRET"; pnpm exec playwright test -c apps/mobile/playwright.config.ts --project=setup --workers=1 --retries=0 --reporter=json,./scratchpad/wi2948-preload-phase-reporter.cjs'\'''
 
 jq \
   --arg schema 'wi-2948.ramtop-seeded-signin-receipt.v1' \

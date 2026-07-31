@@ -32,6 +32,17 @@ rg -q -F 'chmod 600 "$classification_file"' "$target" || {
   exit 1
 }
 
+rg -q -F 'chmod 600 "$phase_events"' "$target" || {
+  print -u2 'preload phase file mode is not pinned to 0600'
+  exit 1
+}
+
+rg -q -F -- '--reporter=json,./scratchpad/wi2948-preload-phase-reporter.cjs' \
+  "$target" || {
+  print -u2 'proof wrapper does not install the bounded phase reporter'
+  exit 1
+}
+
 if rg -q 'trap .*classification_file|rm .*classification_file' "$target"; then
   print -u2 'classification file appears in a cleanup path'
   exit 1
@@ -42,15 +53,23 @@ rg -q -F "printf 'RECEIPT_VALIDATION=failed\\n'" "$target" || {
   exit 1
 }
 
+rg -q -F "recordPreloadPhase('setup-test-body-entered')" \
+  apps/mobile/e2e-web/helpers/auth.setup.ts || {
+  print -u2 'setup test body has no bounded entry marker'
+  exit 1
+}
+
 fixture_tmp=$(mktemp -d "${TMPDIR:-/tmp}/wi2948-classifier-test.XXXXXX")
 trap 'rm -rf -- "$fixture_tmp"' EXIT
 fixture_json="$fixture_tmp/early-run.json"
 fixture_console="$fixture_tmp/early-run.log"
+fixture_phases="$fixture_tmp/preload-phases.txt"
 print -r -- '{"suites":[],"errors":[{"message":"SENSITIVE_ERROR_SENTINEL"}],"stats":{"unexpected":0}}' >"$fixture_json"
 print -r -- 'SENSITIVE_CONSOLE_SENTINEL' >"$fixture_console"
+print -r -- 'reporter-ready' >"$fixture_phases"
 
-classification=$(zsh "$classifier" "$fixture_json" "$fixture_console")
-expected_classification=$'PLAYWRIGHT_TOP_LEVEL_ERROR_COUNT=1\nSETUP_SCENARIO_COUNT=0\n[]\nFAILURE_CLASSES=early-run-before-setup'
+classification=$(zsh "$classifier" "$fixture_json" "$fixture_phases")
+expected_classification=$'PLAYWRIGHT_REPORTER_OUTPUT_VALID=1\nPLAYWRIGHT_TOP_LEVEL_ERROR_COUNT=1\nSETUP_SCENARIO_COUNT=0\nSETUP_PASSED_COUNT=0\nSETUP_FAILED_COUNT=0\nSETUP_SKIPPED_COUNT=0\nSETUP_OTHER_COUNT=0\nSETUP_ATTEMPT_COUNT=0\nSETUP_RETRY_COUNT=0\nPHASE_EVENTS_VALID=1\nPHASE_REPORTER_READY_COUNT=1\nPHASE_GLOBAL_SETUP_STARTED_COUNT=0\nPHASE_GLOBAL_SETUP_COMPLETED_COUNT=0\nPHASE_GLOBAL_SETUP_FAILED_COUNT=0\nPHASE_DISCOVERY_COMPLETED_COUNT=0\nPHASE_SETUP_TEST_BEGIN_COUNT=0\nPHASE_SETUP_BODY_ENTERED_COUNT=0\nFAILURE_CLASSES=web-server-startup-timeout'
 [[ "$classification" == "$expected_classification" ]] || {
   print -u2 'early-run classification did not preserve the safe allowlisted contract'
   exit 1
