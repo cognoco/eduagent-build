@@ -67,7 +67,8 @@ Delivery Batch as `Done`.
 - WI-2639 PR #2730 passed the exact-head governed gate and landed as `fee204b5`.
   Execute-complete recorded exact landed evidence; independent adversarial QA then
   verified all eight ACs, exact CI, loopback disposable-Postgres proof, governed
-  merge evidence, and origin/main ancestry. The item is Closed / Done.
+  merge evidence, and origin/main ancestry. The item is Closed / Done; both
+  batch-owned worktrees and obsolete local/remote execution branches are cleaned.
 - WI-2800 remains honestly Ready after independent review rejected the already-landed
   `fdbe36d2` artifact: the isolated dev evidence stopped on a different 68.6-second
   sign-in failure and did not attribute the original hosted 90-second exhaustion.

@@ -27,6 +27,7 @@ Last reconciled: 2026-07-31 09:13 CEST
 - WI-2639 — PR #2730 passed the governed gate and landed as `fee204b5`.
   Execute-complete and independent adversarial QA verified all eight ACs, exact CI,
   disposable-Postgres proof, merge evidence, and origin/main ancestry; Closed / Done.
+  Both batch-owned worktrees and obsolete local/remote execution branches are cleaned.
 - WI-2794 — landed code, sanctioned database-backed evidence, and corrected
   completion pointers passed independent re-review; Closed / Done.
 - WI-2790 — source repair PR #2733 passed the governed gate and landed as `70411272`.
