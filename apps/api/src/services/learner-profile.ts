@@ -2384,7 +2384,14 @@ export async function analyzeSessionTranscript(
     if (!validated.success) return null;
     return {
       analysis: filterUnsupportedResolvedTopics(validated.data, transcriptText),
-      author: { provenance: 'llm', producerVendor: result.provider },
+      // Normalised — see the same guard in learner-input.ts. `provider` is
+      // typed `string` but can arrive undefined at runtime; '' fails closed at
+      // the matrix, which is the safe degradation.
+      author: {
+        provenance: 'llm',
+        producerVendor:
+          typeof result.provider === 'string' ? result.provider : '',
+      },
     };
   } catch (err) {
     logger.warn('Failed to parse session analysis', {

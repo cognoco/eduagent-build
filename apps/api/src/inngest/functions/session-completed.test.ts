@@ -2861,14 +2861,19 @@ describe('sessionCompleted', () => {
         memoryCollectionEnabled: true,
       });
       mockAnalyzeSessionTranscript.mockResolvedValue({
-        explanationEffectiveness: null,
-        interests: ['space'],
-        strengths: null,
-        struggles: null,
-        resolvedTopics: null,
-        communicationNotes: null,
-        engagementLevel: null,
-        confidence: 'high',
+        // [WI-2952] analyzeSessionTranscript now returns the analysis WITH the
+        // vendor that produced it, so the producer survives to the safety gate.
+        analysis: {
+          explanationEffectiveness: null,
+          interests: ['space'],
+          strengths: null,
+          struggles: null,
+          resolvedTopics: null,
+          communicationNotes: null,
+          engagementLevel: null,
+          confidence: 'high',
+        },
+        author: { provenance: 'llm', producerVendor: 'anthropic' },
       });
 
       await executeSteps(createEventData({ qualityRating: 4 }));
@@ -2884,6 +2889,8 @@ describe('sessionCompleted', () => {
         null,
         'inferred',
         SUBJECT_ID,
+        // [WI-2952] the author threaded from analyzeSessionTranscript
+        { provenance: 'llm', producerVendor: 'anthropic' },
       );
     });
 
@@ -3332,14 +3339,19 @@ describe('sessionCompleted', () => {
         memoryCollectionEnabled: true,
       });
       mockAnalyzeSessionTranscript.mockResolvedValue({
-        explanationEffectiveness: null,
-        interests: null,
-        strengths: null,
-        struggles: null,
-        resolvedTopics: null,
-        communicationNotes: null,
-        engagementLevel: null,
-        confidence: 'high',
+        // [WI-2952] analyzeSessionTranscript now returns the analysis WITH the
+        // vendor that produced it, so the producer survives to the safety gate.
+        analysis: {
+          explanationEffectiveness: null,
+          interests: null,
+          strengths: null,
+          struggles: null,
+          resolvedTopics: null,
+          communicationNotes: null,
+          engagementLevel: null,
+          confidence: 'high',
+        },
+        author: { provenance: 'llm', producerVendor: 'anthropic' },
       });
 
       await executeSteps(createEventData({ qualityRating: 4 }));
@@ -3352,6 +3364,8 @@ describe('sessionCompleted', () => {
         null, // subjectName (null when DB lookup returns no name)
         'inferred',
         SUBJECT_ID, // subjectId threaded from event data
+        // [WI-2952] the author threaded from analyzeSessionTranscript
+        { provenance: 'llm', producerVendor: 'anthropic' },
       );
     });
   });
@@ -3697,14 +3711,19 @@ describe('memoized step-state PII break test [F-089]', () => {
       memoryCollectionEnabled: true,
     });
     mockAnalyzeSessionTranscript.mockResolvedValue({
-      explanationEffectiveness: null,
-      interests: null,
-      strengths: null,
-      struggles: [{ topic: 'long division', subject: 'maths' }],
-      resolvedTopics: null,
-      communicationNotes: null,
-      engagementLevel: null,
-      confidence: 'high',
+      // [WI-2952] analyzeSessionTranscript now returns the analysis WITH the
+      // vendor that produced it, so the producer survives to the safety gate.
+      analysis: {
+        explanationEffectiveness: null,
+        interests: null,
+        strengths: null,
+        struggles: [{ topic: 'long division', subject: 'maths' }],
+        resolvedTopics: null,
+        communicationNotes: null,
+        engagementLevel: null,
+        confidence: 'high',
+      },
+      author: { provenance: 'llm', producerVendor: 'anthropic' },
     });
     mockApplyAnalysis.mockResolvedValue({
       fieldsUpdated: ['struggles'],

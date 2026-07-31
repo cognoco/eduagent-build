@@ -200,7 +200,18 @@ async function parseLearnerInputToAnalysis(
       },
       // The REAL vendor from the route that produced this text. `provider`, not
       // `model` — see LearningTextAuthor.
-      author: { provenance: 'llm', producerVendor: result.provider },
+      //
+      // Normalised to a string rather than passed through: `RouteResult.provider`
+      // is typed `string`, but a stubbed or older route can hand back
+      // `undefined` at runtime, and the union's `producerVendor: string` would
+      // not catch it. An empty string is the value the matrix already fails
+      // CLOSED on, so an absent vendor degrades to the strict reading instead of
+      // reaching the judge as a live-but-unnameable producer.
+      author: {
+        provenance: 'llm',
+        producerVendor:
+          typeof result.provider === 'string' ? result.provider : '',
+      },
     };
   } catch (err) {
     // SC-7: Log at error level for prod observability. The outer parseLearnerInput
