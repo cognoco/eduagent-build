@@ -4674,7 +4674,8 @@
         "learningTime_one": "{{count}} time lært",
         "learningTime_other": "{{count}} timer lært",
         "cefrLevelUp": "Språknivå økt",
-        "topicsExplored": "{{count}} emner utforsket i {{subject}}"
+        "topicsExplored_one": "{{count}} emne utforsket i {{subject}}",
+        "topicsExplored_other": "{{count}} emner utforsket i {{subject}}"
       }
     }
   }

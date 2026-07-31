@@ -3931,7 +3931,8 @@
         "learningTime_one": "{{count}} Stunde gelernt",
         "learningTime_other": "{{count}} Stunden gelernt",
         "cefrLevelUp": "Sprachlevel erhöht",
-        "topicsExplored": "{{count}} Themen in {{subject}} erkundet"
+        "topicsExplored_one": "{{count}} Thema in {{subject}} erkundet",
+        "topicsExplored_other": "{{count}} Themen in {{subject}} erkundet"
       }
     }
   },
