@@ -13,6 +13,7 @@ const tsconfigPath = resolve(repoRoot, 'tests/integration/tsconfig.json');
 
 type JestSelection = {
   testMatch?: string[];
+  testPathIgnorePatterns?: string[];
   setupFilesAfterEnv?: string[];
 };
 
@@ -39,9 +40,25 @@ export function selectedIntegrationRoots(
   if (!Array.isArray(config.setupFilesAfterEnv)) {
     fail('Jest setupFilesAfterEnv is required');
   }
+  if (!Array.isArray(config.testPathIgnorePatterns)) {
+    fail('Jest testPathIgnorePatterns is required');
+  }
 
   const matches = globsToMatcher(config.testMatch.map(replacePathSepForGlob));
-  const suites = files.filter((file) => matches(replacePathSepForGlob(file)));
+  const escapedRoot = replacePathSepForGlob(repoRoot).replace(
+    /[.*+?^${}()|[\]\\]/g,
+    '\\$&',
+  );
+  const ignored = config.testPathIgnorePatterns.map(
+    (pattern) => new RegExp(pattern.replaceAll('<rootDir>', escapedRoot)),
+  );
+  const suites = files.filter(
+    (file) =>
+      matches(replacePathSepForGlob(file)) &&
+      !ignored.some((pattern) =>
+        pattern.test(replacePathSepForGlob(resolve(repoRoot, file))),
+      ),
+  );
   const setupRoots = config.setupFilesAfterEnv.map((file) =>
     relative(repoRoot, file).replaceAll('\\', '/'),
   );
@@ -65,7 +82,7 @@ function compilerOptionsAndFiles(roots: string[]) {
       files: [...(read.config.files ?? []), ...roots],
     },
     ts.sys,
-    repoRoot,
+    dirname(tsconfigPath),
     undefined,
     tsconfigPath,
   );
