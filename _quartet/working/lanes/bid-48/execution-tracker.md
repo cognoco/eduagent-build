@@ -74,9 +74,11 @@ Delivery Batch as `Done`.
     rework executor after WI-2802 freed capacity. Direct-URL isolation rework is
     pushed to draft PR #2746 at `b0981e8c`; the focused regression is green. A
     normal origin/main merge resolved the two WI-scoped conflicts locally, but the
-    mandatory hook formatted one unrelated current-main line. Merge `36c598a33`
-    remains unpushed pending a later operator ruling; no hook bypass or history
-    rewrite occurred. The executor renewed its same-owner claim.
+    mandatory hook formatted one unrelated current-main line. The operator authorized
+    a narrow restore-to-origin/main plus one-time `--no-verify` amend of the unpushed
+    merge (Cosmo comment `3ae8bce9-1f7c-81f8-83a7-001de03c8ec4`), with explicit
+    refspec push, no force-push, and a strictly WI-2755 final diff. The executor
+    renewed its same-owner claim and is applying that ruling.
   - WI-2790 — portable Lancre integration target; landed source repair, awaiting
     WI-2939's disposable-schema proof.
   - WI-2921 — local Playwright seed-secret alignment; strict-green PR #2718 remains
@@ -107,9 +109,10 @@ Delivery Batch as `Done`.
   or product fix is claimed.
 - Marketplace PR #166 for WI-2941 is preserved open/draft at `9652d7d`; its clean
   local worktree was removed and its local/remote proposal branch remains.
-- Same-owner claims for WI-2790, WI-2921, and WI-2939 are verified future through
-  12:07 UTC / 14:07 CEST; WI-2755's same-owner claim was freshly renewed after
-  its local merge reconciliation.
+- Direct live reconciliation at 15:20 UTC / 17:20 CEST verifies WI-2755, WI-2790,
+  WI-2921, and WI-2939 under their exact existing owners with
+  `Claim Expired=false`. WI-2755, WI-2790, and WI-2921 were sanctioned same-owner
+  renewals at that boundary; WI-2939's current heartbeat is 15:12 UTC.
 - WI-2936's worktree exception is authorized in Cosmo comment
   `3ae8bce9-1f7c-8166-8f54-001da619ca14`. FO-2080
   (`OCC-894322F2C99D`) records that mandatory `env:sync` has broader staging and

@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-07-31 11:08 CEST
+Last reconciled: 2026-07-31 17:20 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -17,7 +17,7 @@ Last reconciled: 2026-07-31 11:08 CEST
   Lifecycle Tooling with no Sprint or Delivery Batch; WI-2946 is Backlog/Active
   in Nexus / Clacks with no Sprint or Delivery Batch. WI-2942 remains Closed /
   Duplicate of WI-2941. WI-2926 remains Closed / Duplicate of WI-2925.
-- Live stage count at checkpoint: 27 Closed, 4 Executing, 10 Ready.
+- Live stage count at checkpoint: 28 Closed, 4 Executing, 9 Ready.
 
 ## Current frontier — supersedes stale per-item positions below
 
@@ -79,9 +79,13 @@ Last reconciled: 2026-07-31 11:08 CEST
   `codex:wi2755-rework:WI-2755` for bounded source-artifact rework. Direct-URL
   isolation rework is pushed to draft PR #2746 at `b0981e8c` with its focused
   regression green. A normal origin/main merge resolved the two WI-scoped conflicts
-  locally, but the mandatory hook formatted one unrelated current-main line. Merge
-  `36c598a33` remains unpushed; no hook bypass, history rewrite, or out-of-scope
-  landing occurred. The executor renewed its same-owner claim.
+  locally, but the mandatory hook formatted one unrelated current-main line. The
+  operator authorized restoring that file exactly to origin/main and amending the
+  still-unpushed merge once with `--no-verify`, solely to prevent the hook from
+  recreating the unrelated formatter delta (Cosmo comment
+  `3ae8bce9-1f7c-81f8-83a7-001de03c8ec4`). No pushed history rewrite or force-push
+  is authorized. The executor renewed its exact same-owner claim and is performing
+  the bounded restore/amend/explicit-push sequence.
 - WI-2802 — Closed/Done. Closed/Done WI-2810 supplies
   the sanitized observer but cannot retroactively classify the 2026-07-26 failure.
   The operator authorized exactly one post-instrumentation isolated hosted J-01
@@ -118,9 +122,10 @@ Last reconciled: 2026-07-31 11:08 CEST
   database, credential, hosted-reproduction, or worktree/Doppler gates remain held
   until their recorded authority is satisfied. PR #2741 remains fail-closed on the
   twice-reproduced WI-2826 dependency.
-- Claim heartbeat (11:07 CEST): same-owner sanctioned renewal verified WI-2790,
-  WI-2921, and WI-2939 Executing with `Claim Expired=false`; each expires at
-  12:07 UTC / 14:07 CEST. WI-2755 was freshly claimed at 10:01 UTC.
+- Claim heartbeat (17:20 CEST): direct live reconciliation verifies WI-2755,
+  WI-2790, WI-2921, and WI-2939 Executing under their exact existing owners with
+  `Claim Expired=false`. WI-2755, WI-2790, and WI-2921 were sanctioned same-owner
+  renewals at 15:20 UTC; WI-2939's current heartbeat is 15:12 UTC.
 
 ## Closed / Done
 
