@@ -50,6 +50,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import { CONSENT_PURPOSES } from '@eduagent/schemas';
+import { CONFIRMED_CONVERSATION_LANGUAGE_AT } from '../test-utils/conversation-language-confirmation';
 import { listSubjects } from './subject';
 import { getTierConfig } from './subscription';
 import { addMonthsClamped } from './billing/billing-shared';
@@ -828,6 +829,7 @@ async function createBaseProfile(
     displayName: opts.displayName,
     birthDate: `${opts.birthYear}-01-01`,
     residenceJurisdiction: opts.residenceJurisdiction ?? 'ROW',
+    conversationLanguageConfirmedAt: CONFIRMED_CONVERSATION_LANGUAGE_AT,
     ...(opts.defaultAppContext
       ? { defaultAppContext: opts.defaultAppContext }
       : {}),
