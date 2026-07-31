@@ -2853,45 +2853,12 @@ describe('[WI-2628] applyAnalysis / deleteMemoryItem — multilingual gate at th
 // to the projection — not an internal field's shape.
 // ---------------------------------------------------------------------------
 describe('[WI-2952] applyAnalysis threads caller provenance to the gate', () => {
-  const profileId = 'profile-wi2952-001';
-
   // The operator's own example strings. Each contains a protected clinical
   // lexeme with NO person attribution — the exact "ambiguous, refer" case.
   const EDUCATIONAL_TEXTS = [
     'ADHD can affect executive function.',
     "I'm learning about autism.",
   ] as const;
-
-  function analysisWith(interest: string): SessionAnalysisOutput {
-    return {
-      confidence: 'high',
-      interests: [interest],
-      strengths: null,
-      struggles: null,
-      resolvedTopics: null,
-      communicationNotes: null,
-      engagementLevel: null,
-      explanationEffectiveness: null,
-    };
-  }
-
-  /** A db stub that records which texts survived the gate into the write. */
-  function makeRecordingDb() {
-    const txMock = jest.fn().mockResolvedValue({
-      finalFieldsUpdated: ['interests'],
-      finalNotifications: [],
-    });
-    const db = {
-      transaction: txMock,
-      ...profileReadStub({ profileId, ...MINIMAL_LEARNING_PROFILE }),
-      query: {
-        membership: { findFirst: jest.fn().mockResolvedValue(null) },
-        consentGrant: { findFirst: jest.fn().mockResolvedValue(null) },
-        consentRequest: { findFirst: jest.fn().mockResolvedValue(null) },
-      },
-    } as unknown as Database;
-    return { db, txMock };
-  }
 
   describe.each(EDUCATIONAL_TEXTS)('operator example: %s', (text) => {
     // AC-6, boundary 1: learner-authored educational text must REACH the judge
@@ -2952,39 +2919,35 @@ describe('[WI-2952] applyAnalysis threads caller provenance to the gate', () => 
     });
   });
 
-  // AC-6, boundary 2: end-to-end through applyAnalysis itself. The learner's
-  // own typed interest must survive to the write when the caller declares the
-  // provenance it actually has.
-  it('applyAnalysis with user provenance does not drop the learner’s own interest', async () => {
-    const { db, txMock } = makeRecordingDb();
-    await applyAnalysis(
-      db,
-      profileId,
-      analysisWith('ADHD can affect executive function.'),
-      null,
-      'inferred',
-      undefined,
-      { provenance: 'user' },
-    );
-    // The transaction is entered — the gate did not blank the projection out
-    // from under it.
-    expect(txMock).toHaveBeenCalled();
-  });
-
-  // NON-TRIVIALITY CONTROL for the case above. Same text, same call, but the
-  // caller declares 'llm' with a blank vendor — the pre-fix hard-code. If this
-  // also passed, the assertion above would prove nothing about provenance.
-  it('applyAnalysis still enters the transaction under the old hard-coded shape (control)', async () => {
-    const { db, txMock } = makeRecordingDb();
-    await applyAnalysis(
-      db,
-      profileId,
-      analysisWith('ADHD can affect executive function.'),
-      null,
-      'inferred',
-      undefined,
-      { provenance: 'llm', producerVendor: '' },
-    );
-    expect(txMock).toHaveBeenCalled();
-  });
+  // AC-6, boundary 2 — NOT COVERED HERE, and saying so in the file rather than
+  // only in a report.
+  //
+  // An end-to-end assertion through `applyAnalysis` needs to observe the
+  // SANITISED projection the write persists. Two attempts failed to discriminate:
+  //
+  //   1. `expect(txMock).toHaveBeenCalled()` — measured against mutation 1
+  //      (reverting `evaluateProfileFieldTexts` to the hard-coded 'llm' + null):
+  //      275/275 still green. The transaction fires whether or not the gate
+  //      blanked the projection, so it discriminates nothing.
+  //   2. Capturing `tx.update(...).set(payload)` through a hand-built tx stub —
+  //      the stub does not satisfy enough of the real transaction body to reach
+  //      the write.
+  //
+  // The provenance contract IS covered above at the matrix layer, which is where
+  // the decision this item changes actually lives. What is missing is the
+  // end-to-end restatement, and it wants an integration test against a real
+  // database rather than a deeper unit stub.
+  //
+  // ALSO UNCOVERED — AC-4's named trap, measured not assumed. Mutating
+  // `analyzeSessionTranscript` to thread `result.model` instead of
+  // `result.provider` leaves 273/273 GREEN. Both are typed `string`, so the
+  // compiler cannot catch it and neither can any test here: a model id would sit
+  // in `producerVendor`, match no member of the judge-exclusion vocabulary, and
+  // let the producing vendor grade its own output — WITHOUT failing closed,
+  // because the matrix rejects only a BLANK vendor.
+  //
+  // The only test that can catch it asserts the producing vendor is absent from
+  // the RESOLVED judge pool, against the real resolver rather than a mock. That
+  // is a judge-layer test (judge.ts), not a boundary-layer one, and it does not
+  // exist yet at this seam.
 });
