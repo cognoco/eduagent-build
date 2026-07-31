@@ -32,12 +32,14 @@ Last reconciled: 2026-07-31 08:00 CEST
 - WI-2790 — source repair PR #2733 passed the governed gate and landed as `70411272`.
   The item remains Executing until WI-2939 supplies its separate disposable-schema
   proof.
-- WI-2939 — member 41, draft PR #2741 at exact head `2ccde359` contains the distinct
+- WI-2939 — member 41, draft PR #2741 at exact head `631355d5` contains the distinct
   revision-pinned schema-bootstrap tooling contract for WI-2790's uniquely named
   disposable non-staging target. The corrected path directly replays the pinned SQL
-  journal before guarded schema reconciliation so raw RLS policies are retained.
-  Focused/local gates are green; fresh hosted CI/review are running. No DB connection
-  occurred, and live mutation remains explicitly operator-gated.
+  journal before guarded schema reconciliation so raw RLS policies are retained; its
+  evidence now distinguishes committed migration DML/reference rows from forbidden
+  copied user data or separate seed commands. Focused/local gates are green; fresh
+  hosted CI/review are running. No DB connection occurred, and live mutation remains
+  explicitly operator-gated.
 - WI-2941 — member 42, executing the missing sanctioned expired-cross-owner claim
   recovery capability in Marketplace PR #166 at exact head `9652d7d`; two in-scope
   review considerations were repaired, and the expanded focused/full local and hosted
