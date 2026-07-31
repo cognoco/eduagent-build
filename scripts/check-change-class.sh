@@ -351,6 +351,13 @@ if hit '^apps/api/drizzle/(.*\.sql|meta/.*)$'; then
   note "db-migrations: Include Rollback section if dropping columns/tables/types"
 fi
 
+# ── Cross-package integration typecheck ───────────────────────────────────
+if hit '(^tests/integration/|^scripts/check-integration-typecheck(\.test)?\.ts$|^package\.json$|^pnpm-lock\.yaml$|^tsconfig\.base\.json$|^\.github/workflows/ci\.yml$)'; then
+  CLASSES+=("integration-typecheck")
+  add_cmd fast "pnpm typecheck:integration" "Jest-selected integration TypeScript checker"
+  add_cmd slow "pnpm test:integration" "Cross-package integration tests"
+fi
+
 # ── LLM Prompts ──────────────────────────────────────────────────────────
 # services/llm/ is matched recursively (providers/ subdirectory included) so
 # the CI eval gate that routes on this class covers provider-level prompt
