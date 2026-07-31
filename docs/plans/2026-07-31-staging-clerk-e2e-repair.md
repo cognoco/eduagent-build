@@ -31,6 +31,6 @@ Out of scope:
 
 - [x] T1: Add a Clerk key-instance invariant checker — done when `scripts/check-clerk-key-alignment.test.ts` first fails because the checker is absent, then passes for aligned keys and rejects secret/publishable/JWKS mismatches without including key material in output.
 - [x] T2: Gate E2E and staging deploy on the invariant — done when workflow contract tests prove both workflows invoke the checker before using or synchronizing Clerk credentials.
-- [ ] T3: Validate and recover the intended staging backend secret — done when an auditable GitHub run proves the recovery candidate matches the staging publishable key and JWKS, updates only Doppler `stg`, and exposes no plaintext.
+- [ ] T3: Validate and recover the intended staging backend secret — blocked after GitHub run 30616478494 rejected the backup before mutation; the correct key was absent from Ramtop, Lancre, Git history, GitHub, and the estate secret store. Done when a newly issued Clerk key for the intended staging instance is stored directly in Doppler `stg` without exposing plaintext.
 - [ ] T4: Synchronize and verify staging — done when the sanctioned staging deploy succeeds, the Worker creates users visible to the repaired Doppler key, and the Node 22 Ramtop onboarding setup passes.
 - [ ] T5: Prove repository delivery is restored — done when an unchanged-main E2E dispatch and PR #2740 pass, the recovery-only workflow code has been removed, and permanent checks remain green.
