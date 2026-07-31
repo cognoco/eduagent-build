@@ -40,6 +40,11 @@ The fast gate's API-unit refusal was a fail-closed environment guard, not a test
 - PROPORTIONAL: the combined profile-scope and profile-route API suites passed 69/69; mobile profile-refresh suites passed 47/47; API/mobile typecheck and lint targets passed with baseline warnings only.
 - DIFF HYGIENE: removed the two trailing-space lines in `root-cause-trace-and-plan.md`; the combined branch-plus-worktree `git diff --check origin/main` passed.
 
+## Merge-forward publication-gate correction
+
+- RED: after merge-forwarding current `origin/main`, the full API unit gate ran 506 suites / 10,075 tests and isolated two failures in `profile-v2.test.ts`. Its legacy chain stub did not implement the new membership lookup's `.limit(1)` call, and its sibling expectation still assumed membership enumeration rather than caller-operable filtering.
+- GREEN: the test double now models the membership and guardianship reads, and the sibling case asserts the security contract directly: a same-organization non-self Person is absent from the caller-operable profile list. The focused suite passed 9/9 with the explicit isolated local database URL.
+
 ## AC-7 authority-boundary audit
 
 - **Fresh web and native cold start:** a new QueryClient has no successful-refresh marker. A missing profile query always loads, and even a hydrated same-subject cache is revalidated on its first provider mount; `[WI-2128][BREAK] withholds cached owner capabilities until an authoritative profile refetch completes` proves that cached owner metadata cannot render through that boundary.
