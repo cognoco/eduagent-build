@@ -501,7 +501,7 @@ describe('[onFailure] dead-letter handler', () => {
     );
   });
 
-  it('[BREAK] calls safeSend with app/consent.email-revocation.failed event on terminal failure', async () => {
+  it('[BREAK] emits a privacy-minimized app/consent.email-revocation.failed event', async () => {
     jest.spyOn(sentry, 'captureMessage').mockImplementation(() => undefined);
     const safeSendSpy = jest
       .spyOn(safeNonCore, 'safeSend')
@@ -519,7 +519,10 @@ describe('[onFailure] dead-letter handler', () => {
           run_id: 'run-email-revoke-abc',
         },
       },
-      error: new Error('DB connection lost'),
+      error: Object.assign(
+        new Error('DB connection lost for learner@example.test'),
+        { name: 'DatabaseError learner@example.test' },
+      ),
     });
 
     expect(safeSendSpy).toHaveBeenCalledTimes(1);
@@ -528,15 +531,17 @@ describe('[onFailure] dead-letter handler', () => {
     expect(context).toMatchObject({ chargePersonId: 'charge-fail-001' });
     // Invoke the thunk to confirm it dispatches the correct event name.
     await expect(sendThunk()).resolves.not.toThrow();
-    expect(mockInngestSend).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: 'app/consent.email-revocation.failed',
-        data: expect.objectContaining({
-          chargePersonId: 'charge-fail-001',
-          error: 'DB connection lost',
-        }),
-      }),
-    );
+    const sentEvent = mockInngestSend.mock.calls.at(-1)?.[0];
+    expect(sentEvent).toEqual({
+      name: 'app/consent.email-revocation.failed',
+      data: {
+        chargePersonId: 'charge-fail-001',
+        runId: 'run-email-revoke-abc',
+        errorClass: 'error',
+        timestamp: expect.any(String),
+      },
+    });
+    expect(JSON.stringify(sentEvent)).not.toContain('learner@example.test');
   });
 
   it('tolerates missing original event payload (null chargePersonId)', async () => {

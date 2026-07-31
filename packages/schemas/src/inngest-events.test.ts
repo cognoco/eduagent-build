@@ -172,6 +172,70 @@ describe('[WI-2346] durable terminal-failure event schemas', () => {
   });
 });
 
+describe('[WI-2977] consent terminal-failure event schemas', () => {
+  type RuntimeSchema = {
+    safeParse: (value: unknown) => { success: boolean };
+  };
+  const schemas = inngestEventSchemas as unknown as Record<
+    string,
+    RuntimeSchema | undefined
+  >;
+  const timestamp = '2026-07-31T10:00:00.000Z';
+
+  it.each([
+    [
+      'consentRevocationFailedEventSchema',
+      {
+        childProfileId: validUuid,
+        parentProfileId: validUuid,
+        runId: 'run-consent',
+        errorClass: 'error',
+        timestamp,
+      },
+    ],
+    [
+      'consentEmailRevocationFailedEventSchema',
+      {
+        chargePersonId: validUuid,
+        runId: 'run-email-consent',
+        errorClass: 'non_error',
+        timestamp,
+      },
+    ],
+  ])('exports and accepts the bounded %s payload', (name, payload) => {
+    expect(schemas[name]).toBeDefined();
+    expect(schemas[name]?.safeParse(payload).success).toBe(true);
+  });
+
+  it.each([
+    [
+      'consentRevocationFailedEventSchema',
+      { childProfileId: validUuid, parentProfileId: validUuid },
+    ],
+    ['consentEmailRevocationFailedEventSchema', { chargePersonId: validUuid }],
+  ])('rejects free-form exception content in %s', (name, identity) => {
+    const base = {
+      ...identity,
+      runId: 'run-private',
+      timestamp,
+    };
+
+    expect(
+      schemas[name]?.safeParse({
+        ...base,
+        errorClass: 'DatabaseError learner@example.test',
+      }).success,
+    ).toBe(false);
+    expect(
+      schemas[name]?.safeParse({
+        ...base,
+        errorClass: 'error',
+        error: 'failed for learner@example.test',
+      }).success,
+    ).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // [WI-577] PII-free event payload shapes (F-073/F-083/F-084/F-095)
 // ---------------------------------------------------------------------------
