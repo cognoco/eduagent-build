@@ -34,6 +34,7 @@ import {
   isContentSafe,
   type LearningTextGateResult,
 } from './learning-text-safety/gate';
+import type { LearningTextAuthor } from './learning-text-safety/scan';
 import { cascadeDeleteFactWithAncestry } from './memory/cascade-delete';
 import {
   escapeXml,
@@ -1543,6 +1544,7 @@ function evaluatedTextSet(
  */
 function evaluateProfileFieldTexts(
   texts: readonly (string | null | undefined)[],
+  author: LearningTextAuthor,
 ): Promise<LearningTextGateResult> {
   return evaluateLearningTextByContent({
     texts,
@@ -1551,8 +1553,10 @@ function evaluateProfileFieldTexts(
     // attribution grammars and keeps the strictest verdict. Never `'en'` —
     // assuming English is the defect this Work Item removes.
     conversationLanguage: undefined,
-    provenance: 'llm',
-    producerVendor: null,
+    // [WI-2952] Spread, not two literals: the union guarantees a vendor is
+    // present iff the provenance is `'llm'`, and spreading is what carries that
+    // guarantee across the boundary into the flat scan input.
+    ...author,
   });
 }
 
@@ -1584,14 +1588,13 @@ function evaluateProfileFieldTexts(
  */
 function evaluateMemoryFactTexts(
   texts: readonly (string | null | undefined)[],
-  provenance: 'llm' | 'migration',
+  author: LearningTextAuthor,
 ): Promise<LearningTextGateResult> {
   return evaluateLearningTextByContent({
     texts,
     fieldKind: 'memory_fact',
     conversationLanguage: undefined,
-    provenance,
-    producerVendor: null,
+    ...author,
   });
 }
 
@@ -1609,6 +1612,18 @@ export async function applyAnalysis(
   /** [CR-119.3]: Prefer subjectId for urgency boost writes — name match
    *  is ambiguous when no (profileId, name) uniqueness constraint exists. */
   subjectId?: string | null,
+  /**
+   * [WI-2952] WHO authored the text this analysis carries. Was hard-coded to
+   * `{provenance:'llm', producerVendor:null}` for every caller, which under the
+   * fail-closed matrix resolves the referral to null and BLOCKS — so genuinely
+   * user-authored text never reached the judge and a learner's own
+   * self-description was silently dropped from `interests[]`.
+   *
+   * Optional with an `'llm'`-without-vendor default ONLY so the two in-repo
+   * callers migrate independently; that default is the strictest reading and
+   * blocks on anything ambiguous, never the permissive one.
+   */
+  author: LearningTextAuthor = { provenance: 'llm', producerVendor: '' },
 ): Promise<ApplyAnalysisResult> {
   if (analysis.confidence === 'low') {
     // [logging sweep] structured logger so PII fields land as JSON context
@@ -1665,7 +1680,10 @@ export async function applyAnalysis(
     const collector = createLearningTextCollector();
     sanitizeAnalysisProfileProjection(preMergedState, collector.record);
     filterSafeStruggleNotifications(preUpdates.notifications, collector.record);
-    const profileFieldGate = await evaluateProfileFieldTexts(collector.texts);
+    const profileFieldGate = await evaluateProfileFieldTexts(
+      collector.texts,
+      author,
+    );
     const evaluatedProfileFields = evaluatedTextSet(collector.texts);
 
     // The memory-fact batch is derived from the SANITISED state, not the raw
@@ -1687,7 +1705,7 @@ export async function applyAnalysis(
     );
     const memoryFactGate = await evaluateMemoryFactTexts(
       preMemoryFactTexts,
-      'llm',
+      author,
     );
     const evaluatedMemoryFacts = evaluatedTextSet(preMemoryFactTexts);
 
@@ -1938,10 +1956,9 @@ async function withMemoryFactGateRetry<
             profileId,
             preDerived.mergedState,
           );
-    const learningTextGate = await evaluateMemoryFactTexts(
-      preTexts,
-      'migration',
-    );
+    const learningTextGate = await evaluateMemoryFactTexts(preTexts, {
+      provenance: 'migration',
+    });
     const evaluated = evaluatedTextSet(preTexts);
 
     const outcome = await db.transaction(async (tx) => {
@@ -2234,6 +2251,22 @@ function hasLearnerResolutionEvidence(transcriptText: string): boolean {
   );
 }
 
+/**
+ * [WI-2952] The analysis, WITH the vendor that produced it.
+ *
+ * This function had `routeAndCall`'s result in hand and returned only
+ * `SessionAnalysisOutput`, discarding `result.provider` — which is why the gate
+ * downstream had no vendor to name and fell back to a blank one that fails
+ * closed. The vendor was never unrecoverable; it was thrown away one frame up.
+ *
+ * `provider`, never `model`: judge exclusion matches vendor names, so a model id
+ * excludes nothing.
+ */
+export type AnalyzedSessionTranscript = {
+  readonly analysis: SessionAnalysisOutput;
+  readonly author: LearningTextAuthor;
+};
+
 export async function analyzeSessionTranscript(
   transcript: Array<{ eventType: string; content: string }>,
   subjectName: string | null,
@@ -2249,7 +2282,7 @@ export async function analyzeSessionTranscript(
     knownStruggles?: Array<{ topic: string; subject: string | null }>;
     suppressedTopics?: string[];
   },
-): Promise<SessionAnalysisOutput | null> {
+): Promise<AnalyzedSessionTranscript | null> {
   const conversationEvents = transcript
     .filter(
       (entry) =>
@@ -2349,7 +2382,10 @@ export async function analyzeSessionTranscript(
     const parsed = JSON.parse(jsonText) as unknown;
     const validated = sessionAnalysisOutputSchema.safeParse(parsed);
     if (!validated.success) return null;
-    return filterUnsupportedResolvedTopics(validated.data, transcriptText);
+    return {
+      analysis: filterUnsupportedResolvedTopics(validated.data, transcriptText),
+      author: { provenance: 'llm', producerVendor: result.provider },
+    };
   } catch (err) {
     logger.warn('Failed to parse session analysis', {
       error: err instanceof Error ? err.message : String(err),

@@ -6,6 +6,7 @@ import type { Database } from '@eduagent/database';
 import { routeAndCall, extractFirstJsonObject, type ChatMessage } from './llm';
 import { escapeXml } from './llm/sanitize';
 import { applyAnalysis } from './learner-profile';
+import type { LearningTextAuthor } from './learning-text-safety/scan';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
 
@@ -42,6 +43,24 @@ export interface ParseLearnerInputResult {
   message: string;
   fieldsUpdated: string[];
 }
+
+/**
+ * [WI-2952] The parse result, with its AUTHOR surfaced.
+ *
+ * Four `return fallbackAnalysis(...)` sites and the LLM success path shared one
+ * return type, so the caller could not tell model output from the learner's own
+ * regexed words — and `applyAnalysis` therefore hard-coded `'llm'` for both.
+ * That is why this is a surfaced BRANCH and not a threaded argument: the
+ * information did not exist at the caller to thread.
+ *
+ * The fallback path regexes the learner's OWN typed words into `interests[]`
+ * and `struggles[].topic` verbatim, with no model involved — `'user'`, the one
+ * provenance the operator's 2026-07-26 ruling routes to the judge.
+ */
+type ParsedLearnerAnalysis = {
+  readonly analysis: Parameters<typeof applyAnalysis>[2];
+  readonly author: LearningTextAuthor;
+};
 
 function fallbackAnalysis(
   text: string,
@@ -102,7 +121,7 @@ function fallbackAnalysis(
 async function parseLearnerInputToAnalysis(
   text: string,
   source: MemorySource,
-): Promise<Parameters<typeof applyAnalysis>[2]> {
+): Promise<ParsedLearnerAnalysis> {
   // [PROMPT-INJECT-8] text is raw learner/parent note. Entity-encode so a
   // crafted note containing </learner_input> cannot escape the wrapping tag.
   const messages: ChatMessage[] = [
@@ -126,7 +145,10 @@ async function parseLearnerInputToAnalysis(
     // seam's single logger.warn contract. See also WI-1073 completion summary.
     const jsonStr = extractFirstJsonObject(result.response);
     if (!jsonStr) {
-      return fallbackAnalysis(text, source);
+      return {
+        analysis: fallbackAnalysis(text, source),
+        author: { provenance: 'user' },
+      };
     }
     let parsed: unknown;
     try {
@@ -140,7 +162,10 @@ async function parseLearnerInputToAnalysis(
           responseLength: result.response.length,
         },
       });
-      return fallbackAnalysis(text, source);
+      return {
+        analysis: fallbackAnalysis(text, source),
+        author: { provenance: 'user' },
+      };
     }
     const validated = sessionAnalysisOutputSchema.safeParse(parsed);
     if (!validated.success) {
@@ -153,21 +178,29 @@ async function parseLearnerInputToAnalysis(
           responseLength: result.response.length,
         },
       });
-      return fallbackAnalysis(text, source);
+      return {
+        analysis: fallbackAnalysis(text, source),
+        author: { provenance: 'user' },
+      };
     }
     return {
-      ...validated.data,
-      confidence: 'high',
-      strengths:
-        validated.data.strengths?.map((entry) => ({
-          ...entry,
-          source,
-        })) ?? null,
-      struggles:
-        validated.data.struggles?.map((entry) => ({
-          ...entry,
-          source,
-        })) ?? null,
+      analysis: {
+        ...validated.data,
+        confidence: 'high',
+        strengths:
+          validated.data.strengths?.map((entry) => ({
+            ...entry,
+            source,
+          })) ?? null,
+        struggles:
+          validated.data.struggles?.map((entry) => ({
+            ...entry,
+            source,
+          })) ?? null,
+      },
+      // The REAL vendor from the route that produced this text. `provider`, not
+      // `model` — see LearningTextAuthor.
+      author: { provenance: 'llm', producerVendor: result.provider },
     };
   } catch (err) {
     // SC-7: Log at error level for prod observability. The outer parseLearnerInput
@@ -179,7 +212,10 @@ async function parseLearnerInputToAnalysis(
       source,
       error: err instanceof Error ? err.message : String(err),
     });
-    return fallbackAnalysis(text, source);
+    return {
+      analysis: fallbackAnalysis(text, source),
+      author: { provenance: 'user' },
+    };
   }
 }
 
@@ -190,7 +226,10 @@ export async function parseLearnerInput(
   source: MemorySource,
 ): Promise<ParseLearnerInputResult> {
   try {
-    const analysis = await parseLearnerInputToAnalysis(text, source);
+    const { analysis, author } = await parseLearnerInputToAnalysis(
+      text,
+      source,
+    );
     const result = await applyAnalysis(
       db,
       profileId,
@@ -198,6 +237,7 @@ export async function parseLearnerInput(
       null,
       source,
       undefined,
+      author,
     );
     return {
       success: true,

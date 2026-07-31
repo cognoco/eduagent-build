@@ -38,6 +38,31 @@ import {
 /** Who authored the text reaching the persistence boundary. */
 export type LearningTextProvenance = 'user' | 'llm' | 'migration';
 
+/**
+ * [WI-2952] Provenance and producer vendor, INSEPARABLE in the type.
+ *
+ * `ScanLearningTextInput` carries them as two independent fields, so
+ * `{provenance:'user', producerVendor:'anthropic'}` and
+ * `{provenance:'llm', producerVendor:null}` both compile. On a path whose only
+ * job is to keep a producing vendor out of the judge pool that is the wrong
+ * shape: the first is a category error (a learner is not a vendor) and the
+ * second is the exact fail-closed hole that silently drops learner text.
+ *
+ * This union makes both unrepresentable. A caller cannot declare `'llm'`
+ * without naming who produced it, and cannot attach a vendor to text a human
+ * typed.
+ *
+ * `producerVendor` is the VENDOR (`anthropic`), never the model id
+ * (`claude-sonnet-4-6`) — judge exclusion matches vendor names, so a model id
+ * excludes nothing and lets the producing vendor grade its own output. The type
+ * cannot catch that (both are `string`); only a test asserting the vendor is
+ * absent from the RESOLVED judge pool can.
+ */
+export type LearningTextAuthor =
+  | { readonly provenance: 'llm'; readonly producerVendor: string }
+  | { readonly provenance: 'user' }
+  | { readonly provenance: 'migration' };
+
 /** The deterministic lexeme/grammar finding. */
 export type LearningTextClassification = 'block' | 'clear' | 'ambiguous';
 

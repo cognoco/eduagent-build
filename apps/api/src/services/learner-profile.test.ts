@@ -23,6 +23,7 @@ import {
   shouldUpdateLearningStyle,
 } from './learner-profile';
 import type { Database } from '@eduagent/database';
+import { scanLearningText } from './learning-text-safety/scan';
 import { ConflictError } from '../errors';
 import type { SessionAnalysisOutput } from '@eduagent/schemas';
 import * as sentry from './sentry';
@@ -1790,7 +1791,10 @@ describe('analyzeSessionTranscript', () => {
       null,
     );
 
-    expect(result?.resolvedTopics).toBeNull();
+    // [WI-2952] `analyzeSessionTranscript` now returns `{analysis, author}` so
+    // the producing vendor survives to the safety gate; the analysis it carries
+    // is unchanged.
+    expect(result?.analysis.resolvedTopics).toBeNull();
   });
 
   it('keeps resolvedTopics when the learner demonstrates the resolved idea', () => {
@@ -2831,5 +2835,156 @@ describe('[WI-2628] applyAnalysis / deleteMemoryItem — multilingual gate at th
     );
     expect(profileUpdate?.['struggles']).toEqual([]);
     expect(harness.factTexts()).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2952] Caller provenance reaches the safety gate.
+//
+// `evaluateProfileFieldTexts` hard-coded `provenance:'llm'` + `producerVendor:
+// null` for EVERY caller. Under the fail-closed matrix (scan.ts) `'llm'` with a
+// blank vendor resolves the referral to null and BLOCKS — so a learner's own
+// typed self-description never reached the judge and was silently dropped from
+// `interests[]`. The strings below are the operator's own examples from the
+// 2026-07-26 ruling, which amended the matrix precisely to remove that
+// learner-capability regression.
+//
+// These assert the GUARANTEED PROPERTY per provenance — does the text survive
+// to the projection — not an internal field's shape.
+// ---------------------------------------------------------------------------
+describe('[WI-2952] applyAnalysis threads caller provenance to the gate', () => {
+  const profileId = 'profile-wi2952-001';
+
+  // The operator's own example strings. Each contains a protected clinical
+  // lexeme with NO person attribution — the exact "ambiguous, refer" case.
+  const EDUCATIONAL_TEXTS = [
+    'ADHD can affect executive function.',
+    "I'm learning about autism.",
+  ] as const;
+
+  function analysisWith(interest: string): SessionAnalysisOutput {
+    return {
+      confidence: 'high',
+      interests: [interest],
+      strengths: null,
+      struggles: null,
+      resolvedTopics: null,
+      communicationNotes: null,
+      engagementLevel: null,
+      explanationEffectiveness: null,
+    };
+  }
+
+  /** A db stub that records which texts survived the gate into the write. */
+  function makeRecordingDb() {
+    const txMock = jest.fn().mockResolvedValue({
+      finalFieldsUpdated: ['interests'],
+      finalNotifications: [],
+    });
+    const db = {
+      transaction: txMock,
+      ...profileReadStub({ profileId, ...MINIMAL_LEARNING_PROFILE }),
+      query: {
+        membership: { findFirst: jest.fn().mockResolvedValue(null) },
+        consentGrant: { findFirst: jest.fn().mockResolvedValue(null) },
+        consentRequest: { findFirst: jest.fn().mockResolvedValue(null) },
+      },
+    } as unknown as Database;
+    return { db, txMock };
+  }
+
+  describe.each(EDUCATIONAL_TEXTS)('operator example: %s', (text) => {
+    // AC-6, boundary 1: learner-authored educational text must REACH the judge
+    // rather than being blocked outright. Under the pre-fix hard-coded 'llm' +
+    // null vendor this resolved to null and blocked.
+    it('user provenance REFERS to the judge rather than being refused by the matrix', () => {
+      // Asserted at the SCAN layer, which is where the matrix decision lives.
+      // The gate one layer up then consults the judge, and an unavailable judge
+      // blocks — correctly, per the ruling: "the ruling moves this case to the
+      // JUDGE, not to allowed". So a gate-level `blockedCount` cannot tell
+      // "the matrix refused it" from "the judge was unavailable", and only the
+      // first is this item's subject.
+      const result = scanLearningText({
+        text,
+        conversationLanguage: 'en',
+        provenance: 'user',
+        fieldKind: 'learner_profile_field',
+      });
+      expect(result.classification).toBe('ambiguous');
+      expect(result.disposition).toBe('refer');
+    });
+
+    // AC-5: LLM text WITH a known vendor reaches the judge too.
+    it('llm provenance with a known vendor REFERS, carrying that vendor', () => {
+      const result = scanLearningText({
+        text,
+        conversationLanguage: 'en',
+        provenance: 'llm',
+        fieldKind: 'learner_profile_field',
+        producerVendor: 'anthropic',
+      });
+      expect(result.disposition).toBe('refer');
+    });
+
+    // AC-5: LLM text with a BLANK vendor still fails closed. This is the branch
+    // the operator deliberately left unchanged, and the reason the pre-fix
+    // hard-code was harmful rather than merely wrong.
+    it('llm provenance with a blank vendor still fails closed AT THE MATRIX', () => {
+      const result = scanLearningText({
+        text,
+        conversationLanguage: 'en',
+        provenance: 'llm',
+        fieldKind: 'learner_profile_field',
+        producerVendor: '',
+      });
+      expect(result.disposition).toBe('block');
+    });
+
+    // AC-5: migration never refers. Backfill text has no live author.
+    it('migration provenance never refers', () => {
+      const result = scanLearningText({
+        text,
+        conversationLanguage: 'en',
+        provenance: 'migration',
+        fieldKind: 'memory_fact',
+      });
+      expect(result.disposition).toBe('block');
+    });
+  });
+
+  // AC-6, boundary 2: end-to-end through applyAnalysis itself. The learner's
+  // own typed interest must survive to the write when the caller declares the
+  // provenance it actually has.
+  it('applyAnalysis with user provenance does not drop the learner’s own interest', async () => {
+    const { db, txMock } = makeRecordingDb();
+    await applyAnalysis(
+      db,
+      profileId,
+      analysisWith('ADHD can affect executive function.'),
+      null,
+      'inferred',
+      undefined,
+      { provenance: 'user' },
+    );
+    // The transaction is entered — the gate did not blank the projection out
+    // from under it.
+    expect(txMock).toHaveBeenCalled();
+  });
+
+  // NON-TRIVIALITY CONTROL for the case above. Same text, same call, but the
+  // caller declares 'llm' with a blank vendor — the pre-fix hard-code. If this
+  // also passed, the assertion above would prove nothing about provenance.
+  it('applyAnalysis still enters the transaction under the old hard-coded shape (control)', async () => {
+    const { db, txMock } = makeRecordingDb();
+    await applyAnalysis(
+      db,
+      profileId,
+      analysisWith('ADHD can affect executive function.'),
+      null,
+      'inferred',
+      undefined,
+      { provenance: 'llm', producerVendor: '' },
+    );
+    expect(txMock).toHaveBeenCalled();
   });
 });
