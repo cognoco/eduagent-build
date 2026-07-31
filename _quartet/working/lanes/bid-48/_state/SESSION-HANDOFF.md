@@ -32,9 +32,10 @@ Last reconciled: 2026-07-31 08:00 CEST
 - WI-2790 — source repair PR #2733 passed the governed gate and landed as `70411272`.
   The item remains Executing until WI-2939 supplies its separate disposable-schema
   proof.
-- WI-2939 — member 41, executing the distinct revision-pinned schema-bootstrap tooling
-  contract for WI-2790's uniquely named disposable non-staging target. Live mutation
-  remains explicitly operator-gated.
+- WI-2939 — member 41, draft PR #2741 at exact head `3678c19d` contains the distinct
+  revision-pinned schema-bootstrap tooling contract for WI-2790's uniquely named
+  disposable non-staging target. Focused local gates are green; hosted CI and
+  automated review are running. Live mutation remains explicitly operator-gated.
 - WI-2941 — member 42, executing the missing sanctioned expired-cross-owner claim
   recovery capability. WI-2755 expired after capture, so seven stale claims remain
   untouched pending its governed landing, independent review, and deployment.

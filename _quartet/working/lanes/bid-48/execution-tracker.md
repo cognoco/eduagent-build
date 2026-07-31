@@ -74,8 +74,9 @@ Delivery Batch as `Done`.
   WI-2826 instrumentation plus the item-specific hosted-run authority remain required.
 - WI-2790 source-repair PR #2733 passed the governed gate and landed as `70411272`.
   The item remains Executing pending the independently deliverable disposable-schema
-  proof. WI-2939 is in typed execution on the landed prerequisite for the bootstrap
-  tooling only; real live bootstrap remains explicitly operator-gated.
+  proof. WI-2939 draft PR #2741 is at exact head `3678c19d`; focused local gates are
+  green and hosted CI/review are running. Real live bootstrap remains explicitly
+  operator-gated.
 - WI-2941 is in typed execution for the sanctioned race-safe Govern recovery command.
   WI-2755 expired after capture, so the post-landing recovery set is now seven
   cross-owner claims. All remain untouched pending governed landing and independent

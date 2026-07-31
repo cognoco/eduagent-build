@@ -18,7 +18,7 @@
       "target": "Every PR referenced by a non-Closed BID-48 member, currently including eduagent-build #2715/#2718/#2730/#2733 plus new WI-2939/WI-2941 Marketplace and Nexus commissioning PRs as they appear; checks, reviews, merge state, and origin/main",
       "purpose": "enforce strict-green landing and landed completion evidence",
       "command": "gh PR/check/review queries and git fetch/rev-parse",
-      "task-id": "exec-session:80444"
+      "task-id": "exec-session:70842"
     },
     {
       "target": "cosmo-reviewer-watch.service and Reviewing BID-48 members",
