@@ -34,8 +34,10 @@ now resolves before the first-Mentor language gate can render. A restored
 invitation mounts Tabs before replay, keeps its handoff pending until the
 terminal route is observed, and suppresses the language gate on that route
 through destination mount and marker consumption.
-The union includes the landed test-seed helper. The full mobile unit stage,
-full API unit stage under the
+The union includes the landed test-seed helper. On the exact code candidate
+immediately preceding the evidence-only commit, the full mobile unit stage
+passed 524 suites / 6,955 tests with zero failures; its durable local log is
+`.artifacts/full-mobile-c750.err`. The full API unit stage under the
 sanctioned development database boundary, TypeScript build, i18n ratchets,
 teen-consent claims ratchet, test-only export guard, GC1 mock-governance
 ratchet, warning-free touched-file lint, exact-file Prettier, and whitespace

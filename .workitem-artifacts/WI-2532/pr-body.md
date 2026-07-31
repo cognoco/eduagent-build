@@ -15,7 +15,9 @@
 ## Verification
 
 - merge-forward union: fourteen suites, 472 tests passed
-- full mobile unit suite: passed
+- full mobile unit suite on exact code candidate `c7504d9f`: 524 suites /
+  6,955 tests passed, zero failures (durable local log:
+  `.artifacts/full-mobile-c750.err`)
 - full API unit suite under Doppler `dev`: passed
 - TypeScript build and i18n/teen-consent/test-only-export/GC1 ratchets: passed
 - touched-file ESLint with `--max-warnings=0`: passed

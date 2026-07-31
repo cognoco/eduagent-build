@@ -39,7 +39,9 @@
 ## Repository validation
 
 - Full incremental TypeScript build: passed.
-- Full mobile unit suite through change-class validation: passed.
+- Full mobile unit suite on exact code candidate `c7504d9f`: 524 suites /
+  6,955 tests passed, zero failures in 794.937 seconds. Durable local log:
+  `.artifacts/full-mobile-c750.err`.
 - Full API unit suite under the sanctioned development database boundary:
   passed. A staging-context attempt was rejected before test execution by the
   local-database safety guard; the corrected Doppler `dev` run exited 0.
