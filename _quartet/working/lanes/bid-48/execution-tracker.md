@@ -55,7 +55,7 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-07-31 09:13 CEST
+## Live reconciliation — 2026-07-31 09:22 CEST
 
 - The live Brief and membership relation agree on 42 authoritative members.
   WI-2941 was captured from six expired cross-owner BID-48 claims, triaged and
@@ -111,6 +111,13 @@ Delivery Batch as `Done`.
 - WI-2936 remains Ready pending the requested no-Doppler worktree exception.
   WI-2922 and WI-2923 remain Ready behind their exact shared-development database and
   Clerk/Doppler mutation approvals. Staging and production remain forbidden.
+- Repeated-impasse audit: all lawful ungated execution, evidence reconciliation, claim
+  maintenance, and verified Closed-item cleanup currently available to the Shepherd
+  are complete. WI-2946 still lacks a membership disposition; WI-2939, WI-2936,
+  WI-2922, and WI-2923 still lack their item-specific operator rulings. PR #166 remains
+  fail-closed on the fifth pre-review abort and PR #2741 remains fail-closed on the
+  twice-reproduced WI-2826 dependency. The persistent goal is blocked pending those
+  rulings; no gate is bypassed and all live same-owner claims remain future.
 - Historical per-item rows below are retained as an audit trail; this reconciliation
   supersedes their stale lifecycle positions.
 

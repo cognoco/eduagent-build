@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-07-31 09:13 CEST
+Last reconciled: 2026-07-31 09:22 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -68,6 +68,13 @@ Last reconciled: 2026-07-31 09:13 CEST
 - WI-2922 and WI-2923 — Ready behind explicit development-only shared mutation gates.
 - Remaining shared-database, hosted-reproduction, and credential mutations retain
   their item-specific operator gates; no broad batch mandate silently widens them.
+- Repeated-impasse audit: every presently available ungated lifecycle action,
+  reconciliation step, claim heartbeat, and verified Closed-item cleanup is complete.
+  WI-2946 still lacks a membership disposition; WI-2939, WI-2936, WI-2922, and
+  WI-2923 still lack their item-specific operator rulings. PR #166 remains fail-closed
+  on its fifth pre-review abort and PR #2741 remains fail-closed on the
+  twice-reproduced WI-2826 dependency. The persistent goal is blocked pending those
+  rulings; no gate is bypassed and all same-owner claims are future.
 
 ## Closed / Done
 
