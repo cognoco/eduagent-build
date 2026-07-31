@@ -93,6 +93,10 @@ Last reconciled: 2026-07-31 09:13 CEST
 - WI-2822 — repair and exact evidence rework landed as `0a3000af` and `c96f6bf3`;
   independent review passed. Three batch-owned worktrees and obsolete local/remote
   branches are cleaned; the separate BID-19 integration worktree was not touched.
+- Closed Nexus-side WI-2815, WI-2819, and WI-2931 have no remaining registered
+  batch-owned execution/deployment worktrees. Their landed commits and merged PRs
+  remain authoritative; non-worktree deployment-evidence directories are retained
+  for final archive/trash disposition.
 
 ## Active typed work
 

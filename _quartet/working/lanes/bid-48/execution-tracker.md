@@ -73,6 +73,10 @@ Delivery Batch as `Done`.
   `0a3000af` and `c96f6bf3`; its three batch-owned worktrees and obsolete local/remote
   execution branches are cleaned. The separate BID-19 integration worktree is not
   batch-owned and remains untouched.
+- Closed Nexus-side WI-2815, WI-2819, and WI-2931 no longer retain registered
+  batch-owned execution/deployment worktrees. Their landed commits and merged PRs
+  remain authoritative; deployment-evidence directories outside the worktrees are
+  retained for final archive/trash disposition.
 - WI-2800 remains honestly Ready after independent review rejected the already-landed
   `fdbe36d2` artifact: the isolated dev evidence stopped on a different 68.6-second
   sign-in failure and did not attribute the original hosted 90-second exhaustion.
