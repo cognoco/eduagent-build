@@ -4,6 +4,7 @@ import {
   createDatabase,
   generateUUIDv7,
   learningSessions,
+  person,
   subjects,
   vocabulary,
   type Database,
@@ -93,5 +94,30 @@ describe('language-learner seed scenario integration', () => {
           session.subjectId === result.ids.subjectId,
       ),
     ).toBe(true);
+  });
+
+  // [WI-1556] Regression guard for the E2E auth-setup breakage. A seeded
+  // persona stands in for an EXISTING learner. Left unconfirmed, the API
+  // reports conversationLanguageConfirmed=false with isCurrentUser=true, the
+  // first-Mentor gate replaces the (app) shell, and Playwright's
+  // waitForSignedInReady never sees a landing, an app shell, or any error UI —
+  // so it burns its full 60s timeout without consuming a retry (the
+  // "0/3, 0/3" signature). Asserting the column here fails fast in CI instead
+  // of stranding every E2E lane at sign-in.
+  it('seeds an existing learner as language-confirmed so the first-Mentor gate cannot strand sign-in', async () => {
+    const result = await seedScenario(
+      db,
+      'language-learner',
+      `${EMAIL_PREFIX}confirmed@test.invalid`,
+    );
+
+    const [seededPerson] = await db
+      .select({
+        conversationLanguageConfirmedAt: person.conversationLanguageConfirmedAt,
+      })
+      .from(person)
+      .where(eq(person.id, result.profileId));
+
+    expect(seededPerson?.conversationLanguageConfirmedAt).toBeInstanceOf(Date);
   });
 });

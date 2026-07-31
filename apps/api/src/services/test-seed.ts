@@ -721,6 +721,14 @@ async function createBaseProfile(
     displayName: opts.displayName,
     birthDate: `${opts.birthYear}-01-01`,
     residenceJurisdiction: opts.residenceJurisdiction ?? 'ROW',
+    // [WI-1556] A seeded persona stands in for an EXISTING learner, so it is
+    // confirmed. Left null, the API reports conversationLanguageConfirmed
+    // false, the first-Mentor gate replaces the (app) shell, and E2E sign-in
+    // can never reach a landing — waitForSignedInReady sees no landing, no
+    // app-shell and no error UI, so it burns its full timeout without
+    // consuming a retry. Scenarios that need the unconfirmed first-run state
+    // must clear this explicitly rather than relying on the seed default.
+    conversationLanguageConfirmedAt: new Date(),
     ...(opts.defaultAppContext
       ? { defaultAppContext: opts.defaultAppContext }
       : {}),
