@@ -63,6 +63,8 @@ import { ConsentWithdrawnGate } from './_components/ConsentWithdrawnGate';
 import { ConsentPendingGate } from './_components/ConsentPendingGate';
 import { usePostApprovalLanding } from './_hooks/use-post-approval-landing';
 import { SaveWizardGate } from './_components/save-wizard/SaveWizardGate';
+import { FirstMentorLanguageGate } from './_components/FirstMentorLanguageGate';
+import { shouldRequireFirstMentorLanguageConfirmation } from '../../lib/first-mentor-language';
 
 initNotificationHandler();
 
@@ -422,6 +424,7 @@ export default function AppLayout() {
     profileWasRemoved,
     acknowledgeProfileRemoval,
     switchProfile,
+    isExplicitProxyMode,
   } = useProfile();
   useMentorLanguageSync();
   const proxyColors = getProxyChromeColors(colors);
@@ -858,6 +861,19 @@ export default function AppLayout() {
     return (
       <FeedbackProvider>
         <ConsentWithdrawnGate />
+      </FeedbackProvider>
+    );
+  }
+
+  if (
+    shouldRequireFirstMentorLanguageConfirmation({
+      activeProfile,
+      isExplicitProxyMode,
+    })
+  ) {
+    return (
+      <FeedbackProvider>
+        <FirstMentorLanguageGate />
       </FeedbackProvider>
     );
   }
