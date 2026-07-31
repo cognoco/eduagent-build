@@ -44,6 +44,9 @@ The fast gate's API-unit refusal was a fail-closed environment guard, not a test
 
 - RED: after merge-forwarding current `origin/main`, the full API unit gate ran 506 suites / 10,075 tests and isolated two failures in `profile-v2.test.ts`. Its legacy chain stub did not implement the new membership lookup's `.limit(1)` call, and its sibling expectation still assumed membership enumeration rather than caller-operable filtering.
 - GREEN: the test double now models the membership and guardianship reads, and the sibling case asserts the security contract directly: a same-organization non-self Person is absent from the caller-operable profile list. The focused suite passed 9/9 with the explicit isolated local database URL.
+- GOVERNED PUSH: the blocking pre-push hook then passed the 362-file merge-forward delta: TypeScript build; all affected schema, test-utils, retention, database, and API targets; routed LLM evaluation; and i18n checks. Commit `87463cbeaaf79d37a1b3752d2dc9aeb9b50b7aba` was published without bypass.
+- CURRENT-MAIN RECONCILIATION: refreshed `origin/main` advanced to `b6fda67c49f263374a8c56859419607158201878`. The second merge-forward auto-composed the two overlapping test files with no conflict; post-merge unit verification passed 2 suites / 137 tests, the canonical Windows API integration runner passed the supporter canary 23/23, and the mandatory learner-Person real-database suite passed 16/16.
+- PR COLLISION PREFLIGHT: open PR #2710 also touches `test-seed-v2-supporter.integration.test.ts`, but only separate shared-record artifact hunks. Its additions are compatible with and independent of the WI-2128 caller-operability assertion; current-main drift is zero and no other open PR overlaps the 46-file WI-2128 delta.
 
 ## AC-7 authority-boundary audit
 
