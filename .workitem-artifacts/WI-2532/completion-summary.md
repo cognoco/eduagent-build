@@ -60,6 +60,9 @@ WI-2950 (deploy-smoke fake-curl Bash PATH on Windows) and WI-2951
 (integration-typecheck checker pnpm.cmd resolution). Both are mechanically
 DoR-green Ready/Active and formally admitted to BID-49. Neither is patched on
 this branch.
+The following zero-overlap compliance/latest-curriculum/multilingual-safety
+merge completed its affected API unit, integration-typecheck, full TypeScript,
+and Tier-1 zero-drift eval gates successfully.
 Review-bounce coverage also verifies stale-read rejection, recovery-primary
 repair, all-mode terminal destination consumption, and a
 mounted-but-inaccessible blocked navigator. A pre-WI-1556 preview journey
@@ -76,7 +79,9 @@ first-Mentor language confirmation, WI-2820/WI-2944 test-seed batching, and
 WI-2653 profile-authority behavior. The later learner-egress filter merge was
 also zero-overlap and its focused API unit set completed successfully. The
 subsequent staging-smoke, Mistral endpoint, and integration-typecheck merge was
-zero-overlap as well; no history was rewritten.
+zero-overlap as well. The following production-purge evidence,
+latest-curriculum, and multilingual-safety merge was also zero-overlap; no
+history was rewritten.
 The Work Item remains Executing until its PR lands; lifecycle completion must
 not run while the PR is open. Final attributable E2E evidence must come from
 the published exact head.

@@ -4,7 +4,11 @@ import { learningProfiles, memoryFacts } from '@eduagent/database';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { createLogger } from '../../services/logger';
-import { buildBackfillRowsForProfile } from '../../services/memory/backfill-mapping';
+import { evaluateLearningTextByContent } from '../../services/learning-text-safety/gate';
+import {
+  buildBackfillRowsForProfile,
+  filterGatedMemoryFactRows,
+} from '../../services/memory/backfill-mapping';
 import { captureException } from '../../services/sentry';
 
 const logger = createLogger();
@@ -136,6 +140,37 @@ export const memoryFactsBackfill = inngest.createFunction(
             // silently skipped successes-with-no-marker AND swallowed
             // transaction errors with no signal at all.
             try {
+              // [WI-2628] Evaluate the candidate rows against the multilingual
+              // gate BEFORE opening the transaction. The gate may call the
+              // independent judge, and an LLM round-trip inside an open
+              // transaction pins a pooled connection for its whole duration.
+              // Requires a non-locking pre-read, because the builders are pure
+              // and synchronous and the candidate text is COMPOSED by them
+              // (`subject: topics (confidence)`), so it cannot be enumerated
+              // from the profile's raw columns.
+              const [preRead] = await db
+                .select()
+                .from(learningProfiles)
+                .where(eq(learningProfiles.profileId, profileId))
+                .limit(1);
+              // Nothing to gate and nothing to back-fill; the transaction below
+              // would take the same early return on its own read.
+              if (!preRead) continue;
+              const learningTextGate = await evaluateLearningTextByContent({
+                texts: buildBackfillRowsForProfile(preRead).rows.map(
+                  (row) => row.text,
+                ),
+                fieldKind: 'learner_profile_field',
+                // No conversation language on this path — the gate then scans
+                // all ten attribution grammars and keeps the strictest verdict.
+                // Never `'en'`: assuming English is the bug this WI fixes.
+                conversationLanguage: undefined,
+                // Backfilled text predates the gate and has no identifiable
+                // author, so it is `migration` — which per AC-4 never consults
+                // the judge and fails closed on anything ambiguous.
+                provenance: 'migration',
+              });
+
               const result = await db.transaction(async (tx) => {
                 const [profile] = await tx
                   .select()
@@ -154,12 +189,22 @@ export const memoryFactsBackfill = inngest.createFunction(
                   return null;
 
                 const built = buildBackfillRowsForProfile(profile);
+                // [WI-2628] Re-built from the LOCKED row, then filtered against
+                // the pre-evaluated batch. The keys are content hashes, so a
+                // profile edited between the pre-read and this FOR UPDATE
+                // produces text the batch never saw — it resolves unsafe and the
+                // row is skipped. "The profile moved under me" and "this text
+                // was never cleared" are deliberately the same event.
+                const safeRows = filterGatedMemoryFactRows(
+                  built.rows,
+                  learningTextGate,
+                );
 
                 await tx
                   .delete(memoryFacts)
                   .where(eq(memoryFacts.profileId, profileId));
-                if (built.rows.length > 0) {
-                  await tx.insert(memoryFacts).values(built.rows);
+                if (safeRows.length > 0) {
+                  await tx.insert(memoryFacts).values(safeRows);
                 }
                 await tx
                   .update(learningProfiles)
@@ -169,7 +214,7 @@ export const memoryFactsBackfill = inngest.createFunction(
                   })
                   .where(eq(learningProfiles.profileId, profileId));
 
-                return built;
+                return { rows: safeRows, malformed: built.malformed };
               });
               if (!result) continue;
 

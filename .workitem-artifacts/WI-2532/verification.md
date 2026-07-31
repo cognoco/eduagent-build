@@ -61,6 +61,12 @@
   integration typecheck passed across 72 Jest-selected roots, and the Tier-1
   LLM eval rewrote 528 snapshots with zero tracked drift. Full TypeScript,
   focused lint, formatting, and whitespace checks also passed.
+- After merging authoritative main `c3cb4b327`, the affected multilingual
+  learning-text-safety, latest-curriculum-read, memory, filing, progress,
+  retention, snapshot, learner-profile, and subject unit set passed 15 suites /
+  1,113 tests under Doppler `dev`. Integration typecheck remained green across
+  72 Jest-selected roots, the full TypeScript build passed, and the Tier-1 LLM
+  eval rewrote 528 snapshots with zero tracked drift.
 - Two main-identical Windows harness defects were captured without a WI-2532
   patch. WI-2950 (deploy-smoke fake-curl Bash PATH on Windows) owns the
   deploy-smoke suite's 20/24 failures: its native `C:\...` fixture path is
@@ -109,14 +115,17 @@ published exact head.
 ## Collision and flag audit
 
 - Publication merge-forward uses authoritative `origin/main`
-  `88d349973f9ede30f9dbdb145087fbe79ba77ddf`, which includes landed WI-2231
+  `c3cb4b327fab55232cc2503209f725cfee7840f4`, which includes landed WI-2231
   PR #2704, WI-2399 PR #2722, WI-1556 PR #2727, WI-2639 PR #2730, WI-2820 PR
   #2713, and WI-2790 PR #2733. The sequence then reached `09a383cf5` through
   WI-2944 (established test-seed profile confirmation) PR #2743 and WI-2653 PR
   #2739, before reaching `59906b359` through WI-2737 (learner PII egress
   filtering) PR #2745. It then reached `88d349973` through WI-2947 (staging
   smoke after deploy) PR #2747, WI-2740 (Mistral EU endpoint) PR #2742, and
-  WI-2578 (Jest integration-source typecheck) PR #2734.
+  WI-2578 (Jest integration-source typecheck) PR #2734. It then reached
+  `c3cb4b327` through WI-1194 (production transcript-purge evidence) PR #2751,
+  WI-2463 (centralized latest-curriculum reads) PR #2738, and WI-2628
+  (multilingual safety at remaining persistence boundaries) PR #2749.
 - The known create-profile overlap was reconciled without rebase or history
   rewrite. WI-2532 retains the durable non-authorizing fork and adopts WI-2231's
   current `handleCompleted` / `getPostAuthDefaultPath` completion behavior
@@ -157,6 +166,9 @@ published exact head.
   formatting, and whitespace gates. Its two main-identical Windows harness
   defects are recorded above as WI-2950 and WI-2951 rather than being patched
   on this branch.
+- The subsequent zero-direct-overlap WI-1194/WI-2463/WI-2628 docs/API merge
+  passed its 15-suite / 1,113-test affected unit set, integration typecheck,
+  full TypeScript, and Tier-1 zero-drift eval gates.
 - `scripts/run-api-integration.test.ts` remains 6/12 red on Orion because its
   fake Corepack executables are extensionless shebang files that Windows
   `spawnSync` does not resolve. The batch orchestrator dispositioned this as an

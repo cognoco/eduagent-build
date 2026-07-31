@@ -25,6 +25,9 @@
 - latest-main provider and change-class coverage: 7/7 and 56/56 passed;
   integration typecheck passed across 72 Jest-selected roots; Tier-1 LLM eval
   rewrote 528 snapshots with zero tracked drift
+- subsequent affected API unit set: 15 suites / 1,113 tests passed under
+  Doppler `dev`; integration typecheck remained green across 72 roots; full
+  TypeScript and Tier-1 zero-drift eval passed
 - main-identical metering integration on Orion's pre-repoint development
   database: 4/4 red at
   `quota_pools_subscription_id_subscriptions_id_fk`; known M-REPOINT baseline
@@ -53,7 +56,7 @@
 
 ## Collision note
 
-Publication merge-forward now incorporates authoritative main `88d349973`,
+Publication merge-forward now incorporates authoritative main `c3cb4b327`,
 including landed WI-2231 PR #2704, WI-2399 PR #2722, WI-1556 PR #2727,
 WI-2639 PR #2730, WI-2820 PR #2713, and WI-2790 PR #2733. WI-2532 retains the
 non-authorizing durable fork, no-PATCH/no-child-redirect contract, retry
@@ -78,5 +81,10 @@ The next zero-direct-overlap merge incorporates WI-2947 (staging smoke after
 deploy) PR #2747, WI-2740 (Mistral EU endpoint) PR #2742, and WI-2578 (Jest
 integration-source typecheck) PR #2734. Applicable gates passed; its
 main-identical Windows harness findings are captured as WI-2950 and WI-2951.
+The following zero-direct-overlap merge incorporates WI-1194 (production
+transcript-purge evidence) PR #2751, WI-2463 (centralized latest-curriculum
+reads) PR #2738, and WI-2628 (multilingual safety at remaining persistence
+boundaries) PR #2749. Its affected unit, integration-typecheck, full
+TypeScript, and Tier-1 zero-drift eval gates passed.
 
 Refs: WI-2532
