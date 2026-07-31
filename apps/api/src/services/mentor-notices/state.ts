@@ -151,7 +151,11 @@ export async function acceptMentorNotice(
       inngest.send({
         // orphan-allow: observability-only lifecycle marker; no in-process handler.
         name: 'app/notice.created',
-        data: { noticeId: accepted.id, profileId: input.profileId },
+        data: {
+          noticeId: accepted.id,
+          profileId: input.profileId,
+          timestamp: new Date().toISOString(),
+        },
       }),
     'notice.created',
     { profileId: input.profileId, noticeId: accepted.id },
