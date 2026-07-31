@@ -71,7 +71,12 @@ Delivery Batch as `Done`.
   remains controlling.
 - Active execution WIP:
   - WI-2755 — review-bounced source-artifact rework; freshly claimed by the typed
-    rework executor after WI-2802 freed capacity.
+    rework executor after WI-2802 freed capacity. Direct-URL isolation rework is
+    pushed to draft PR #2746 at `b0981e8c`; the focused regression is green. A
+    normal origin/main merge resolved the two WI-scoped conflicts locally, but the
+    mandatory hook formatted one unrelated current-main line. Merge `36c598a33`
+    remains unpushed pending a later operator ruling; no hook bypass or history
+    rewrite occurred. The executor renewed its same-owner claim.
   - WI-2790 — portable Lancre integration target; landed source repair, awaiting
     WI-2939's disposable-schema proof.
   - WI-2921 — local Playwright seed-secret alignment; strict-green PR #2718 remains
@@ -100,8 +105,12 @@ Delivery Batch as `Done`.
 - Marketplace PR #166 for WI-2941 is preserved open/draft at `9652d7d`; its clean
   local worktree was removed and its local/remote proposal branch remains.
 - Same-owner claims for WI-2790, WI-2921, and WI-2939 are verified future through
-  12:07 UTC / 14:07 CEST; WI-2755 was freshly claimed at 10:01 UTC.
-- Checkpoint branch `bid-48-lane-state` is pushed through `cb7a29e55`.
+  12:07 UTC / 14:07 CEST; WI-2755's same-owner claim was freshly renewed after
+  its local merge reconciliation.
+- The next operator ruling presented is WI-2936's narrow standard-worktree setup
+  exception: read development Doppler values into the normal ignored local file,
+  with no remote mutation, secret output/commit, or staging/production access.
+- Checkpoint branch `bid-48-lane-state` is pushed through `02c8ba9c8`.
 - The historical sections below are retained only as an audit trail. This section,
   Cosmo, and GitHub supersede every stale lifecycle position below.
 

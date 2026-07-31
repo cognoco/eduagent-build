@@ -76,7 +76,12 @@ Last reconciled: 2026-07-31 11:08 CEST
   `OCC-B9142581EAF8` records the completion/PR mismatch; FO-2077 /
   `OCC-42DF599F8508` records the persistent source-artifact failure. The freed WIP
   slot from WI-2802 was immediately reused: WI-2755 is now claimed by
-  `codex:wi2755-rework:WI-2755` for bounded source-artifact rework.
+  `codex:wi2755-rework:WI-2755` for bounded source-artifact rework. Direct-URL
+  isolation rework is pushed to draft PR #2746 at `b0981e8c` with its focused
+  regression green. A normal origin/main merge resolved the two WI-scoped conflicts
+  locally, but the mandatory hook formatted one unrelated current-main line. Merge
+  `36c598a33` remains unpushed; no hook bypass, history rewrite, or out-of-scope
+  landing occurred. The executor renewed its same-owner claim.
 - WI-2802 — Closed/Done. Closed/Done WI-2810 supplies
   the sanitized observer but cannot retroactively classify the 2026-07-26 failure.
   The operator authorized exactly one post-instrumentation isolated hosted J-01
@@ -99,7 +104,10 @@ Last reconciled: 2026-07-31 11:08 CEST
   remain prerequisites.
 - WI-2936 — Ready and unclaimed. Execution needs an operator ruling because the
   mandatory repo worktree script always runs Doppler `env:sync`, while the item scope
-  forbids touching Doppler.
+  forbids touching Doppler. The currently presented recommendation is a narrow
+  exception permitting read-only development sync into the normal ignored local
+  file, while forbidding remote mutation, secret output/commit, and any
+  staging/production access.
 - WI-2922 and WI-2923 — Ready behind explicit development-only shared mutation gates.
 - Remaining shared-database, hosted-reproduction, and credential mutations retain
   their item-specific operator gates; no broad batch mandate silently widens them.
