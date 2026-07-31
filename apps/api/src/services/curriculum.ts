@@ -76,6 +76,7 @@ import {
   ensureDefaultBook,
   getLatestCurricula,
   getLatestCurriculum,
+  MAX_LATEST_CURRICULUM_SUBJECTS,
 } from './curriculum-core';
 import {
   addTopicCompletion,
@@ -866,7 +867,12 @@ export async function createBooks(
 // These leaf helpers are defined in ./curriculum-core (extracted to break the
 // circular dependency with language-curriculum.ts) and re-exported from here
 // for callers that import it from this module.
-export { ensureDefaultBook, getLatestCurricula, getLatestCurriculum };
+export {
+  ensureDefaultBook,
+  getLatestCurricula,
+  getLatestCurriculum,
+  MAX_LATEST_CURRICULUM_SUBJECTS,
+};
 
 /**
  * Persists LLM-generated topics for a narrow subject.

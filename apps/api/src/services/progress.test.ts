@@ -57,6 +57,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import type { SubjectProgress } from '@eduagent/schemas';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import {
   getSubjectProgress,
   getTopicProgress,
@@ -217,7 +218,9 @@ function createMockDb({
     id: string;
     subjectId: string;
     version?: number;
+    profileId?: string;
   }>,
+  filterLatestCurriculaByPredicate = false,
   curriculumSelectRows = [] as Array<{
     id: string;
     subjectId: string;
@@ -238,7 +241,9 @@ function createMockDb({
     id: string;
     subjectId: string;
     version?: number;
+    profileId?: string;
   }>;
+  filterLatestCurriculaByPredicate?: boolean;
   curriculumSelectRows?: Array<{
     id: string;
     subjectId: string;
@@ -322,25 +327,57 @@ function createMockDb({
         : curriculumSelectRows)
   )
     .map((curriculum) => ({
-      ...curriculum,
-      version:
-        'version' in curriculum && typeof curriculum.version === 'number'
-          ? curriculum.version
-          : 1,
-    }))
-    .sort((a, b) => b.version - a.version);
-  const latestCurriculumOrderBy = jest.fn().mockResolvedValue(
-    latestCurriculumRows.map((curriculum) => ({
-      curricula: curriculum,
+      curricula: {
+        id: curriculum.id,
+        subjectId: curriculum.subjectId,
+        version:
+          'version' in curriculum && typeof curriculum.version === 'number'
+            ? curriculum.version
+            : 1,
+      },
       subjects: {
         id: curriculum.subjectId,
-        profileId,
+        profileId:
+          'profileId' in curriculum && typeof curriculum.profileId === 'string'
+            ? curriculum.profileId
+            : profileId,
       },
-    })),
-  );
-  const latestCurriculumWhere = jest.fn().mockReturnValue({
-    orderBy: latestCurriculumOrderBy,
-  });
+    }))
+    .sort((a, b) => b.curricula.version - a.curricula.version);
+  const latestCurriculumOrderBy = jest
+    .fn()
+    .mockImplementation(
+      async (selectedRows: typeof latestCurriculumRows) => selectedRows,
+    );
+  const latestCurriculumWhereQueries: Array<{
+    sql: string;
+    params: unknown[];
+  }> = [];
+  const latestCurriculumWhere = jest
+    .fn()
+    .mockImplementation((predicate: unknown) => {
+      const query = new PgDialect().sqlToQuery(
+        (
+          predicate as {
+            getSQL: () => Parameters<PgDialect['sqlToQuery']>[0];
+          }
+        ).getSQL(),
+      );
+      latestCurriculumWhereQueries.push(query);
+      const predicateValues = new Set(
+        query.params.map((value) => String(value)),
+      );
+      const selectedRows = filterLatestCurriculaByPredicate
+        ? latestCurriculumRows.filter(
+            (row) =>
+              predicateValues.has(row.curricula.subjectId) &&
+              predicateValues.has(row.subjects.profileId),
+          )
+        : latestCurriculumRows;
+      return {
+        orderBy: () => latestCurriculumOrderBy(selectedRows),
+      };
+    });
   const latestCurriculumInnerJoin = jest.fn().mockReturnValue({
     where: latestCurriculumWhere,
   });
@@ -351,6 +388,7 @@ function createMockDb({
   return {
     __allCurriculumOrderBy: orderBy,
     __latestCurriculumOrderBy: latestCurriculumOrderBy,
+    __latestCurriculumWhereQueries: latestCurriculumWhereQueries,
     select: jest.fn().mockImplementation((selection?: unknown) => ({
       from: jest.fn((table: unknown) => {
         if (table === curricula) {
@@ -2875,6 +2913,102 @@ describe('getOverallProgressBatch — cross-profile data leak (security)', () =>
     // as A's. Identity check catches any future regression where the
     // fallback again uses .values().next().value.
     expect(resultB!.practiceSummary).not.toBe(resultA!.practiceSummary);
+  });
+
+  it('[WI-2463] chunks latest-curriculum reads when a family batch exceeds the accessor limit', async () => {
+    const batchProfileIds = Array.from(
+      { length: 5 },
+      (_, index) => `batch-profile-${index}`,
+    );
+    const batchSubjects = batchProfileIds.flatMap(
+      (batchProfileId, profileIndex) =>
+        Array.from({ length: 25 }, (_, subjectIndex) => ({
+          ...mockSubjectRow({
+            id: `batch-subject-${profileIndex}-${subjectIndex}`,
+          }),
+          profileId: batchProfileId,
+        })),
+    );
+    const curriculumRows = batchSubjects.map((subject, index) => ({
+      id: `batch-curriculum-${index}`,
+      subjectId: subject.id,
+      version: 1,
+      profileId: subject.profileId,
+    }));
+    const topicRows = curriculumRows.map((curriculum, index) =>
+      mockTopicRow({
+        id: `batch-topic-${index}`,
+        curriculumId: curriculum.id,
+      }),
+    );
+    const ownedTopicRows = topicRows.map((topic, index) => ({
+      ...mockOwnedTopicRow(topic),
+      profileId: batchSubjects[index]!.profileId,
+      subjectId: batchSubjects[index]!.id,
+    }));
+
+    mockGetPracticeActivitySummaryBatch.mockResolvedValueOnce(
+      new Map(
+        batchProfileIds.map((batchProfileId) => [
+          batchProfileId,
+          emptyPracticeActivitySummary,
+        ]),
+      ),
+    );
+
+    const db = createMockDb({
+      curriculaFindMany: curriculumRows,
+      filterLatestCurriculaByPredicate: true,
+      topicsFindMany: topicRows,
+      ownedTopicRows,
+    });
+    const query = db.query as unknown as Record<
+      string,
+      { findMany: jest.Mock }
+    >;
+    query.subjects = {
+      findMany: jest.fn().mockResolvedValue(batchSubjects),
+    };
+    query.retentionCards = { findMany: jest.fn().mockResolvedValue([]) };
+    query.assessments = { findMany: jest.fn().mockResolvedValue([]) };
+    query.learningSessions = { findMany: jest.fn().mockResolvedValue([]) };
+    query.sessionSummaries = { findMany: jest.fn().mockResolvedValue([]) };
+
+    const result = await getOverallProgressBatch(db, batchProfileIds);
+
+    expect(result.size).toBe(batchProfileIds.length);
+    for (const batchProfileId of batchProfileIds) {
+      expect(result.get(batchProfileId)?.subjects).toHaveLength(25);
+    }
+    expect(result.get(batchProfileIds[0]!)?.subjects[0]?.topicsTotal).toBe(1);
+    expect(result.get(batchProfileIds.at(-1)!)?.subjects[0]?.topicsTotal).toBe(
+      1,
+    );
+    const whereQueries = (
+      db as Database & {
+        __latestCurriculumWhereQueries: Array<{ params: unknown[] }>;
+      }
+    ).__latestCurriculumWhereQueries;
+    expect(whereQueries).toHaveLength(2);
+
+    const subjectIdsByChunk = whereQueries.map((query) =>
+      query.params
+        .map(String)
+        .filter((value) => value.startsWith('batch-subject-')),
+    );
+    const profileIdsByChunk = whereQueries.map((query) =>
+      query.params
+        .map(String)
+        .filter((value) => value.startsWith('batch-profile-')),
+    );
+    expect(subjectIdsByChunk.map((ids) => ids.length)).toEqual([100, 25]);
+    expect(new Set(subjectIdsByChunk.flat())).toEqual(
+      new Set(batchSubjects.map((subject) => subject.id)),
+    );
+    expect(profileIdsByChunk.map((ids) => [...ids].sort())).toEqual([
+      batchProfileIds.slice(0, 4),
+      batchProfileIds.slice(4),
+    ]);
   });
 
   it('[WI-80] excludes mixed-parent topics from batch progress aggregation', async () => {

@@ -41,7 +41,11 @@ import {
   findOwnedCurriculumTopic,
   findOwnedCurriculumTopics,
 } from './curriculum-topic-ownership';
-import { getLatestCurriculum, getLatestCurricula } from './curriculum';
+import {
+  getLatestCurriculum,
+  getLatestCurricula,
+  MAX_LATEST_CURRICULUM_SUBJECTS,
+} from './curriculum';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -744,7 +748,7 @@ export type OverallProgressResult = Awaited<
 >;
 
 // ---------------------------------------------------------------------------
-// Batch variant — fetches overall progress for N profiles using a fixed query
+// Batch variant — fetches overall progress for N profiles using a bounded query
 // set instead of ~8 × N. Used by the parent dashboard endpoint
 // (getChildrenForParent) to collapse the per-child fan-out.
 // ---------------------------------------------------------------------------
@@ -803,13 +807,35 @@ export async function getOverallProgressBatch(
     subjectsByProfile.set(s.profileId, list);
   }
 
-  const allSubjectIds = allSubjects.map((s) => s.id);
+  const allSubjectIds = allSubjects.map((subject) => subject.id);
 
-  const curriculumBySubject = await getLatestCurricula(
-    db,
-    [...subjectsByProfile.keys()],
-    allSubjectIds,
+  // 2. Fetch latest curricula in bounded chunks. Derive each chunk's allowed
+  // profiles from the same subject rows to preserve subject/profile provenance.
+  const subjectChunks = Array.from(
+    {
+      length: Math.ceil(allSubjects.length / MAX_LATEST_CURRICULUM_SUBJECTS),
+    },
+    (_, chunkIndex) =>
+      allSubjects.slice(
+        chunkIndex * MAX_LATEST_CURRICULUM_SUBJECTS,
+        (chunkIndex + 1) * MAX_LATEST_CURRICULUM_SUBJECTS,
+      ),
   );
+  const curriculumChunks = await Promise.all(
+    subjectChunks.map((subjectChunk) =>
+      getLatestCurricula(
+        db,
+        [...new Set(subjectChunk.map((subject) => subject.profileId))],
+        subjectChunk.map((subject) => subject.id),
+      ),
+    ),
+  );
+  const curriculumBySubject = new Map<string, typeof curricula.$inferSelect>();
+  for (const chunk of curriculumChunks) {
+    for (const [chunkSubjectId, curriculum] of chunk) {
+      curriculumBySubject.set(chunkSubjectId, curriculum);
+    }
+  }
   const allCurricula = [...curriculumBySubject.values()];
   const curriculumIds = allCurricula.map((c) => c.id);
 
@@ -1887,6 +1913,9 @@ export async function getContinueSuggestion(
         !passedTopicIds.has(topic.id) && !verifiedTopicIds.has(topic.id),
     );
 
+    // Historical sessions remain resumable across curriculum upgrades. A
+    // latest-version session is reusable only when it matches the current next
+    // topic, preventing a stale topic/session pairing.
     const resumableSession = resumable.find((session) => {
       const topic = session.topicId ? topicsById.get(session.topicId) : null;
       return (

@@ -840,7 +840,8 @@ export async function getChildrenForParent(
 
   // Batch guided metrics and progress in parallel per child.
   // [PERF-BATCH] getOverallProgressBatch replaces N × getOverallProgress
-  // calls with ~8 queries (constant count regardless of N children).
+  // calls with a bounded query set; latest curricula add one query per
+  // 100 subjects (two at the supported five-child maximum).
   // countGuidedMetricsBatch is already a single GROUP BY aggregate.
   // [WI-802] v2 path: filter childProfileIds by profilesById (same validity
   // gate as the legacy validLinks filter — skip IDs with no matching profile).

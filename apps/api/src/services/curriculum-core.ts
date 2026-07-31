@@ -7,7 +7,11 @@ import {
 } from '@eduagent/database';
 import { ConflictError } from '../errors';
 
-const MAX_LATEST_CURRICULUM_SUBJECTS = 100;
+/**
+ * Maximum subjects accepted by one latest-curriculum query. Callers that
+ * aggregate multiple profiles must chunk broader batches at this boundary.
+ */
+export const MAX_LATEST_CURRICULUM_SUBJECTS = 100;
 
 export async function getLatestCurriculum(
   db: Database,

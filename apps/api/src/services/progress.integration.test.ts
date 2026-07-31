@@ -168,16 +168,19 @@ describe('progress version-sensitive reads [WI-2463]', () => {
     });
   });
 
-  it('keeps bounded latest reads profile-scoped in real PostgreSQL', async () => {
-    const ownerProfileId = await seedPerson('owner');
+  it('keeps bounded multi-profile latest reads profile-scoped in real PostgreSQL', async () => {
+    const firstOwnerProfileId = await seedPerson('owner-a');
+    const secondOwnerProfileId = await seedPerson('owner-b');
     const foreignProfileId = await seedPerson('foreign');
-    const owner = await seedSubject(ownerProfileId, 'owner');
+    const firstOwner = await seedSubject(firstOwnerProfileId, 'owner-a');
+    const secondOwner = await seedSubject(secondOwnerProfileId, 'owner-b');
     const foreign = await seedSubject(foreignProfileId, 'foreign');
     const curriculumRows = await db
       .insert(curricula)
       .values([
-        { subjectId: owner.subjectId, version: 1 },
-        { subjectId: owner.subjectId, version: 2 },
+        { subjectId: firstOwner.subjectId, version: 1 },
+        { subjectId: firstOwner.subjectId, version: 2 },
+        { subjectId: secondOwner.subjectId, version: 1 },
         { subjectId: foreign.subjectId, version: 1 },
       ])
       .returning({
@@ -185,29 +188,37 @@ describe('progress version-sensitive reads [WI-2463]', () => {
         subjectId: curricula.subjectId,
         version: curricula.version,
       });
-    const ownerV1 = curriculumRows.find(
-      (row) => row.subjectId === owner.subjectId && row.version === 1,
+    const firstOwnerV1 = curriculumRows.find(
+      (row) => row.subjectId === firstOwner.subjectId && row.version === 1,
     );
-    const ownerV2 = curriculumRows.find(
-      (row) => row.subjectId === owner.subjectId && row.version === 2,
+    const firstOwnerV2 = curriculumRows.find(
+      (row) => row.subjectId === firstOwner.subjectId && row.version === 2,
+    );
+    const secondOwnerV1 = curriculumRows.find(
+      (row) => row.subjectId === secondOwner.subjectId && row.version === 1,
     );
     const foreignV1 = curriculumRows.find(
       (row) => row.subjectId === foreign.subjectId && row.version === 1,
     );
-    if (!ownerV1 || !ownerV2 || !foreignV1) {
+    if (!firstOwnerV1 || !firstOwnerV2 || !secondOwnerV1 || !foreignV1) {
       throw new Error('Expected owner and foreign curriculum fixtures');
     }
 
-    const latest = await getLatestCurricula(db, ownerProfileId, [
-      owner.subjectId,
-      foreign.subjectId,
-    ]);
+    const latest = await getLatestCurricula(
+      db,
+      [firstOwnerProfileId, secondOwnerProfileId],
+      [firstOwner.subjectId, secondOwner.subjectId, foreign.subjectId],
+    );
 
-    expect([...latest.keys()]).toEqual([owner.subjectId]);
-    expect(latest.get(owner.subjectId)?.id).toBe(ownerV2.id);
-    expect(latest.get(owner.subjectId)?.id).not.toBe(ownerV1.id);
+    expect([...latest.keys()].sort()).toEqual(
+      [firstOwner.subjectId, secondOwner.subjectId].sort(),
+    );
+    expect(latest.get(firstOwner.subjectId)?.id).toBe(firstOwnerV2.id);
+    expect(latest.get(firstOwner.subjectId)?.id).not.toBe(firstOwnerV1.id);
+    expect(latest.get(secondOwner.subjectId)?.id).toBe(secondOwnerV1.id);
     expect([...latest.values()].map((row) => row.id)).not.toContain(
       foreignV1.id,
     );
+    expect(latest.has(foreign.subjectId)).toBe(false);
   });
 });
