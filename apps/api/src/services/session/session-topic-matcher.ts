@@ -21,6 +21,7 @@ import { escapeXml } from '../llm/sanitize';
 import { findOwnedCurriculumTopic } from '../curriculum-topic-ownership';
 import { createLogger } from '../logger';
 import { captureException } from '../sentry';
+import { assertLlmConsent } from '../identity-v2/consent-status-v2';
 
 const logger = createLogger();
 
@@ -229,6 +230,10 @@ export async function matchTopicByIntent(
     matcherEnabled: boolean;
     firstSessionStartedAt: number;
   },
+  deps: {
+    assertLlmConsent: typeof assertLlmConsent;
+    runTopicIntentMatcher: typeof runTopicIntentMatcher;
+  } = { assertLlmConsent, runTopicIntentMatcher },
 ): Promise<TopicIntentMatcherDecision> {
   const startedAt = Date.now();
 
@@ -330,8 +335,9 @@ export async function matchTopicByIntent(
     return decision;
   }
 
+  await deps.assertLlmConsent(db, profileId);
   try {
-    const match = await runTopicIntentMatcher(rawInput, topics);
+    const match = await deps.runTopicIntentMatcher(rawInput, topics);
     const matchedTopic = match?.matchTopicId
       ? topics.find((topic) => topic.id === match.matchTopicId)
       : undefined;

@@ -3872,7 +3872,6 @@
     "parentBirthDateLabel": "あなたの生年月日",
     "childBirthDateLabel": "お子様の生年月日",
     "birthDateHint": "メンターがあなたに合った話し方をするために必要です。対象年齢は{{age}}歳以上です。",
-    "parentBirthDateHint": "これはアカウントを設定する大人の情報です。次にお子様を追加できます。対象年齢は{{age}}歳以上です。",
     "childBirthDateHint": "メンターがお子様に合った話し方をするために必要です。対象年齢は{{age}}歳以上です。",
     "webDateFormatHint": "生年月日を「YYYY-MM-DD」の形式で入力してください。",
     "childWebDateFormatHint": "お子様の生年月日を「YYYY-MM-DD」の形式で入力してください。",
@@ -3885,7 +3884,6 @@
     "upgradeRequiredBody": "ご契約のサブスクリプションでは、追加のプロフィールを作成できません。ファミリープランまたはプロプランにアップグレードしてください。",
     "seePlans": "プランを見る",
     "minimumAgeError": "学習者は{{age}}歳以上である必要があります。より前の生年月日を選択してください。",
-    "parentAdultAgeError": "保護者アカウントには大人の生年月日が必要です。まずご自身の情報を入力し、その後でお子様を追加してください。",
     "a11yCloseDatePicker": "日付ピッカーを閉じる",
     "createdChildFamilyContextFailedBody": "{{name}}さんのプロフィールは準備できましたが、ファミリーモードへの自動切り替えができませんでした。",
     "createdChildFamilyContextTerminalFailedBody": "{{name}}さんのプロフィールは準備できましたが、まだファミリーモードへ切り替えられませんでした。あとで「その他」>「アカウント」からファミリーモードへ切り替えられます。",
@@ -4618,6 +4616,33 @@
     "cta": "自分でも何か学んでみる",
     "hint": "自分の学習を開始または継続しましょう。"
   },
+  "familyIntentOnboarding": {
+    "adultDetailsHint": "これはアカウントを設定する保護者の方の情報です。次に、学習する方についてお伺いします。対象年齢は{{age}}歳以上です。",
+    "adultAgeError": "ファミリー設定には大人の生年月日が必要です。まずご自身の情報を入力してから、学習する方を選択してください。",
+    "target": {
+      "title": "学習するのは誰ですか？",
+      "message": "最初に設定する方を選んでください。",
+      "me": "自分",
+      "someoneElse": "自分以外の方"
+    },
+    "login": {
+      "title": "学習者は自分のログイン情報を持っていますか？",
+      "message": "MentoMateに自分のメールアドレスでサインインする場合は、「はい」を選択してください。",
+      "yes": "はい、あります",
+      "no": "いいえ、ありません"
+    },
+    "managedUnavailable": {
+      "title": "自分のログイン情報がないプロフィールはまだ利用できません。",
+      "message": "現時点では、自分のMentoMateログイン情報を持っている学習者を招待できます。"
+    },
+    "actionError": "その選択を保存できませんでした。もう一度お試しください。",
+    "saveError": "プロフィールは作成されましたが、次の設定ステップを保存できませんでした。もう一度お試しください。",
+    "restoreError": {
+      "title": "家族設定を復元できませんでした",
+      "message": "あなたの選択は保護されています。続行する前にもう一度お試しください。",
+      "retry": "再試行"
+    }
+  },
   "sharedRecord": {
     "fact": {
       "headline_one": "{{name}}さんにはシェアできるアップデートが1件あります。",
@@ -4649,7 +4674,8 @@
         "learningTime_one": "{{count}}時間学習",
         "learningTime_other": "{{count}}時間学習",
         "cefrLevelUp": "語学レベルがアップ",
-        "topicsExplored": "{{subject}}で{{count}}個のトピックを学習"
+        "topicsExplored_one": "{{subject}}で{{count}}個のトピックを学習",
+        "topicsExplored_other": "{{subject}}で{{count}}個のトピックを学習"
       }
     }
   }

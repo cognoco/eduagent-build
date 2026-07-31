@@ -10,6 +10,7 @@
 | BUG-992 | `app/session.transcript.purged` | >2% failure rate (24 h) | >5% failure rate (24 h) | Inngest dashboard + Sentry |
 | BUG-993 | `app/session.purge.delayed` | count ≥ 1 | count ≥ 10 | Inngest dashboard + Sentry |
 | BUG-994 | `app/summary.reconciliation.requeued` | count ≥ 1 | count ≥ 10 | Inngest dashboard |
+| WI-2739 | `app/session.purge.backlog` | any event (eligible volume >100) | event on 2 consecutive daily runs | Inngest dashboard + Sentry |
 
 ---
 
@@ -47,7 +48,7 @@ A sustained rate above 0.5% means learners are accumulating sessions without sum
 The transcript purge worker (`transcript-purge-handler`) failed after exhausting all 3 Inngest retries. Failures are captured in two ways:
 
 - Per-attempt: `captureException` inside `step.run('purge-transcript')` on each retry — tagged `surface: transcript-purge`.
-- Terminal: `transcriptPurgeHandlerOnFailure` fires on `inngest/function.failed` after all retries exhausted — tagged `surface: transcript-purge-on-failure`. This is the signal used for the failure-rate SLO.
+- Terminal: `transcriptPurgeHandlerOnFailure` fires on `inngest/function.failed` after all retries exhausted — tagged `surface: transcript-purge` and `signal: function-failed`. This is the signal used for the failure-rate SLO.
 
 The failure rate is computed as: `app/session.transcript.purge` events dispatched minus `app/session.transcript.purged` success events.
 
@@ -59,10 +60,12 @@ The failure rate is computed as: `app/session.transcript.purge` events dispatche
 
 ### First responder steps
 
-1. Check Sentry for `surface: transcript-purge-on-failure` entries.
+1. Check Sentry for entries tagged `surface: transcript-purge` and `signal: function-failed`.
 2. Check Voyage AI status (API key rotation, quota exhaustion).
-3. Failed sessions remain in the purge queue — `summaryGeneratedAt` is still past the 30-day cutoff so they will be re-picked by tomorrow's `transcriptPurgeCron` (05:00 UTC).
+3. Failed sessions remain eligible for later daily purge runs because `summaryGeneratedAt` stays past the 30-day cutoff. A backlog above the 100-record dispatch cap can defer re-dispatch, so next-day pickup is not guaranteed.
 4. If Voyage AI is down for an extended period, temporarily set `RETENTION_PURGE_ENABLED=false` in Doppler to halt the queue.
+
+There is no fixed worst-case deletion latency while Voyage remains unavailable: transcript rows stay intact until summary-only embedding regeneration succeeds. Treat a continuing failure-rate alert as a retention incident, not as an implicit extension of the 30-day policy clock.
 
 ---
 
@@ -70,7 +73,7 @@ The failure rate is computed as: `app/session.transcript.purge` events dispatche
 
 ### What the alert means
 
-Sessions have crossed the 37-day threshold (day-37) but still lack `llmSummary` or `learnerRecap`. These cannot be purged because the preconditions for safe purge are missing. The `delayedCount` field in the event payload indicates how many sessions are blocked.
+Sessions have crossed the 37-day threshold (day-37) but still have a null `summaryGeneratedAt`, lack `llmSummary`, or lack `learnerRecap`. These cannot be purged because the preconditions for safe purge are missing. The `delayedCount` field combines the complete null-timestamp count with a bounded sample of other incomplete rows; `nullSummaryGeneratedAtCount` is the complete null-timestamp subset, while `sessionIds` remains a bounded responder sample.
 
 This event fires from `transcript-purge-cron.ts` daily at 05:00 UTC. `captureException` is also called so the count is queryable in Sentry.
 
@@ -79,16 +82,30 @@ A count ≥ 1 warrants investigation; ≥ 10 means the reconciliation cron (`sum
 ### Likely root causes
 
 1. `summaryReconciliationCron` failing silently — check BUG-994 for its requeue count.
-2. Sessions ended without sufficient transcript content for LLM summary (e.g., immediate close, zero exchanges).
+2. Sessions ended without sufficient transcript content for LLM summary (e.g., immediate close, zero exchanges), or summary generation never completed and left `summaryGeneratedAt` null.
 3. Reconciliation cron's 37-day window matches the delayed threshold exactly — if summary generation is consistently slow, increase the reconciliation retry window.
 
 ### First responder steps
 
 1. Check Inngest for `app/session.purge.delayed` event payload — inspect `sessionIds` field.
-2. Check Sentry for `surface: transcript-purge-delayed` entries.
-3. For each delayed session, query `session_summaries` by `sessionId` to confirm `llmSummary` / `learnerRecap` are null.
-4. If the sessions have zero `exchangeCount` in `learning_sessions`, they likely have no transcript — these are safe to manually mark `purgedAt = now()` after review.
-5. For sessions with transcript content, manually trigger `app/session.summary.regenerate` via Inngest dashboard.
+2. Check Sentry for entries tagged `surface: transcript-purge` and `signal: delayed`.
+3. For each delayed session, query `session_summaries` by `sessionId` to confirm which of `summaryGeneratedAt`, `llmSummary`, or `learnerRecap` is null.
+4. Never stamp `purgedAt` manually: that would bypass summary-only embedding regeneration and the atomic transcript delete. Null-timestamp rows within the normal reconciliation window are requeued there; after day 37 the purge cron reports the complete null-timestamp count and durably fans out `app/session.summary.regenerate` for a bounded page. That page rotates daily so persistently failing rows cannot permanently hide the remainder. Trigger the event directly only for urgent recovery.
+5. For a missing recap, trigger `app/session.learner-recap.regenerate`.
+
+---
+
+## WI-2739 — transcript purge backlog: `app/session.purge.backlog`
+
+### What the alert means
+
+The daily purge selector found at least 101 eligible records while the cron can dispatch 100. The signal reports a lower bound (`minimumEligibleCount`) rather than pretending the one-row sentinel is an exact count. It fires on every daily run that remains over capacity, so consecutive events prove a sustained backlog.
+
+### First responder steps
+
+1. Correlate with `app/session.transcript.purged` terminal failures and Voyage status; failed workers reduce effective daily capacity.
+2. Compare consecutive daily events. One event warns that at least one record was deferred; two consecutive events page because input or failures are sustaining the backlog.
+3. Do not raise `PURGE_LIMIT` blindly. Confirm Inngest concurrency, Voyage quota, and database latency first, then ship a reviewed capacity change if required.
 
 ---
 
@@ -132,9 +149,11 @@ The following alert rules must be configured manually — code instrumentation i
 | `app/session.transcript.purged` | Failure rate: purge dispatched minus purged success (24 h) | >2% | >5% |
 | `app/session.purge.delayed` | `delayedCount` field sum (24 h) | ≥1 | ≥10 |
 | `app/summary.reconciliation.requeued` | `totalRequeued` field sum (24 h) | ≥1 | ≥10 |
+| `app/session.purge.backlog` | Any event (`minimumEligibleCount` ≥101) | ≥1 event | event on 2 consecutive daily runs |
 
 ### Sentry Alert Rules
 
-- Alert on any `captureException` tagged `surface: transcript-purge-on-failure` (BUG-992 terminal failure).
-- Alert on any `captureException` tagged `surface: transcript-purge-delayed` with `delayedCount >= 10` (BUG-993 page threshold).
+- Alert on any `captureException` tagged `surface: transcript-purge` and `signal: function-failed` (BUG-992 terminal failure).
+- Alert on any `captureException` tagged `surface: transcript-purge` and `signal: delayed` with `delayedCount >= 10` (BUG-993 page threshold).
+- Alert on `captureException` tagged `surface: transcript-purge` and `signal: backlog`; page when it appears on 2 consecutive daily runs.
 - Alert on rate of `captureException` tagged `surface: session-completed` + `step: generate-llm-summary` exceeding 3% of sessions (BUG-991 page threshold).

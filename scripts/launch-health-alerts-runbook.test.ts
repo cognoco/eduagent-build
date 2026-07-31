@@ -24,3 +24,20 @@ describe('launch-health Sentry ingestion-capacity invariant', () => {
     expect(section).toContain('without copying credentials or payment details');
   });
 });
+
+describe('launch-health durable terminal-failure surface', () => {
+  it('routes every deletion-teardown and billing-alias dead letter beside consent revocation', () => {
+    const section = runbook.match(
+      /## 5\. Deletion and retention[\s\S]*?(?=\n## |$)/,
+    )?.[0];
+
+    expect(section).toBeDefined();
+    expect(section).toContain('`app/consent.revocation.failed`');
+    expect(section).toContain('`app/account.deletion_teardown.failed`');
+    expect(section).toContain(
+      '`app/billing.subscription_store_teardown.failed`',
+    );
+    expect(section).toContain('`app/billing.alias_merge.failed`');
+    expect(section).toMatch(/opaque account\/event and\s+Inngest run IDs/);
+  });
+});

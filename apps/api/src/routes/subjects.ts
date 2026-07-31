@@ -111,11 +111,6 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     const input = c.req.valid('json');
     const profileId = requireProfileId(c.get('profileId'));
     await assertNotProxyMode(c);
-    // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
-    // Gated unconditionally — createSubjectWithStructure's default path
-    // dispatches the LLM (detectSubjectType); the four_strands/focused-book
-    // paths are deterministic but share this same creation endpoint.
-    await assertLlmConsent(db, profileId);
     // [FIX-API-1] Let errors propagate to the global onError handler in index.ts
     // which converts UpstreamLlmError → 502 LLM_UNAVAILABLE and captures all
     // others to Sentry. The old try/catch was masking quota and LLM errors

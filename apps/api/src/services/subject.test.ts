@@ -19,6 +19,8 @@ import { inngest } from '../inngest/client';
 import * as sentry from './sentry';
 import * as bookGeneration from './book-generation';
 import * as identityV2Helpers from './identity-v2/helpers';
+import * as languageCurriculum from './language-curriculum';
+import { ConsentWithdrawnError } from './session';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
 const profileId = 'test-profile-id';
@@ -796,13 +798,22 @@ describe('createSubjectWithStructure focused_book prewarm', () => {
   it('fires curriculum prewarm when a new focused book is created', async () => {
     setupScopedRepo({ findManyResult: [] });
     const db = createFocusedBookDb();
+    const assertLlmConsent = jest
+      .fn()
+      .mockRejectedValue(new ConsentWithdrawnError());
 
-    const result = await createSubjectWithStructure(db, uuidProfileId, {
-      name: 'Botany',
-      rawInput: 'tea',
-    });
+    const result = await createSubjectWithStructure(
+      db,
+      uuidProfileId,
+      {
+        name: 'Botany',
+        rawInput: 'tea',
+      },
+      { deps: { assertLlmConsent } },
+    );
 
     expect(result.bookId).toBe(uuidBookId);
+    expect(assertLlmConsent).not.toHaveBeenCalled();
     expect(sendSpy).toHaveBeenCalledWith({
       name: 'app/subject.curriculum-prewarm-requested',
       data: {
@@ -1005,6 +1016,77 @@ describe('createSubjectWithStructure focused_book prewarm', () => {
   });
 });
 
+describe('[WI-2543] createSubjectWithStructure granular consent boundary', () => {
+  it('keeps explicit four-strands language setup available after consent withdrawal', async () => {
+    const subjectRow = mockSubjectRow({
+      id: uuidSubjectId,
+      profileId: uuidProfileId,
+      name: 'Norwegian',
+    });
+    setupScopedRepo({ findManyResult: [] });
+    const db = createMockDb({ insertReturning: [subjectRow] });
+    const regenerateSpy = jest
+      .spyOn(languageCurriculum, 'regenerateLanguageCurriculum')
+      .mockResolvedValue(undefined);
+    const assertLlmConsent = jest
+      .fn()
+      .mockRejectedValue(new ConsentWithdrawnError());
+
+    try {
+      await expect(
+        createSubjectWithStructure(
+          db,
+          uuidProfileId,
+          {
+            name: 'Norwegian',
+            pedagogyMode: 'four_strands',
+            languageCode: 'nb',
+          },
+          { deps: { assertLlmConsent } },
+        ),
+      ).resolves.toEqual(expect.objectContaining({ structureType: 'narrow' }));
+      expect(assertLlmConsent).not.toHaveBeenCalled();
+      expect(regenerateSpy).toHaveBeenCalled();
+    } finally {
+      regenerateSpy.mockRestore();
+    }
+  });
+
+  it.each([
+    ['default', undefined],
+    ['unknown future mode', 'future_mode'],
+  ])('fails closed on the %s LLM branch', async (_label, pedagogyMode) => {
+    setupScopedRepo({ findManyResult: [] });
+    const db = createMockDb();
+    const assertLlmConsent = jest
+      .fn()
+      .mockRejectedValue(new ConsentWithdrawnError());
+    const detectSpy = jest.spyOn(bookGeneration, 'detectSubjectType');
+    const ageSpy = jest.spyOn(identityV2Helpers, 'getPersonAge');
+
+    try {
+      await expect(
+        createSubjectWithStructure(
+          db,
+          uuidProfileId,
+          {
+            name: 'History',
+            ...(pedagogyMode ? { pedagogyMode: pedagogyMode as never } : {}),
+          },
+          { deps: { assertLlmConsent } },
+        ),
+      ).rejects.toBeInstanceOf(ConsentWithdrawnError);
+      expect(assertLlmConsent).toHaveBeenCalledWith(db, uuidProfileId);
+      expect(ageSpy).not.toHaveBeenCalled();
+      expect(detectSpy).not.toHaveBeenCalled();
+      expect(db.insert).not.toHaveBeenCalled();
+    } finally {
+      ageSpy.mockRestore();
+      detectSpy.mockRestore();
+    }
+  });
+});
+
 describe('createSubjectWithStructure deterministic fallback', () => {
   let detectSubjectTypeSpy: jest.SpiedFunction<
     typeof bookGeneration.detectSubjectType
@@ -1053,9 +1135,12 @@ describe('createSubjectWithStructure deterministic fallback', () => {
       })),
     });
 
-    const result = await createSubjectWithStructure(db, uuidProfileId, {
-      name: 'History',
-    });
+    const result = await createSubjectWithStructure(
+      db,
+      uuidProfileId,
+      { name: 'History' },
+      { deps: { assertLlmConsent: jest.fn().mockResolvedValue(undefined) } },
+    );
 
     expect(result).toEqual(
       expect.objectContaining({
@@ -1096,7 +1181,12 @@ describe('createSubjectWithStructure deterministic fallback', () => {
     } as unknown as Database;
 
     await expect(
-      createSubjectWithStructure(db, uuidProfileId, { name: 'History' }),
+      createSubjectWithStructure(
+        db,
+        uuidProfileId,
+        { name: 'History' },
+        { deps: { assertLlmConsent: jest.fn().mockResolvedValue(undefined) } },
+      ),
     ).rejects.toThrow('profile DB offline');
     expect(db.insert).not.toHaveBeenCalled();
     expect(detectSubjectTypeSpy).not.toHaveBeenCalled();
@@ -1130,9 +1220,12 @@ describe('createSubjectWithStructure deterministic fallback', () => {
       })),
     });
 
-    const result = await createSubjectWithStructure(db, uuidProfileId, {
-      name: 'History',
-    });
+    const result = await createSubjectWithStructure(
+      db,
+      uuidProfileId,
+      { name: 'History' },
+      { deps: { assertLlmConsent: jest.fn().mockResolvedValue(undefined) } },
+    );
 
     expect(result).toEqual(
       expect.objectContaining({
@@ -1292,7 +1385,12 @@ describe('[WI-855] createSubjectWithStructure hard subject-limit gate', () => {
     });
 
     await expect(
-      createSubjectWithStructure(db, uuidProfileId, { name: 'History' }),
+      createSubjectWithStructure(
+        db,
+        uuidProfileId,
+        { name: 'History' },
+        { deps: { assertLlmConsent: jest.fn().mockResolvedValue(undefined) } },
+      ),
     ).resolves.toEqual(
       expect.objectContaining({ structureType: expect.any(String) }),
     );
@@ -1333,7 +1431,12 @@ describe('[WI-855] createSubjectWithStructure hard subject-limit gate', () => {
     });
 
     await expect(
-      createSubjectWithStructure(db, uuidProfileId, { name: 'History' }),
+      createSubjectWithStructure(
+        db,
+        uuidProfileId,
+        { name: 'History' },
+        { deps: { assertLlmConsent: jest.fn().mockResolvedValue(undefined) } },
+      ),
     ).rejects.toBeInstanceOf(SubjectLimitError);
     // The pre-check + the in-lock recount were both consulted.
     expect(findMany.mock.calls.length).toBeGreaterThanOrEqual(2);
@@ -1393,7 +1496,12 @@ describe('[WI-867] createSubjectWithStructure always uses getPersonAge (v2 colla
   it('always reads learner age via v2 getPersonAge', async () => {
     const db = makeBroadFallbackDb();
 
-    await createSubjectWithStructure(db, uuidProfileId, { name: 'History' });
+    await createSubjectWithStructure(
+      db,
+      uuidProfileId,
+      { name: 'History' },
+      { deps: { assertLlmConsent: jest.fn().mockResolvedValue(undefined) } },
+    );
 
     expect(getPersonAgeSpy).toHaveBeenCalledWith(db, uuidProfileId);
   });

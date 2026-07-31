@@ -68,6 +68,7 @@ import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { createLogger } from './logger';
 import { buildFallbackBookTopics } from './book-generation-fallbacks';
 import { getPersonAge } from './identity-v2/helpers';
+import { assertLlmConsent } from './identity-v2/consent-status-v2';
 
 const logger = createLogger();
 import { regenerateLanguageCurriculum } from './language-curriculum';
@@ -1568,6 +1569,7 @@ export async function repairIncompleteBookGenerationClaim(
       error: unknown,
       context?: { profileId?: string; extra?: Record<string, unknown> },
     ) => void;
+    assertLlmConsent?: typeof assertLlmConsent;
   },
 ): Promise<IncompleteBookGenerationClaimRepairResult> {
   const activeTopicCount = existing.topics.filter(
@@ -2273,6 +2275,8 @@ export async function persistBookTopics(
  * real LLM provider or Sentry client.
  */
 export async function generateBookTopicsWithFallback(
+  db: Database,
+  profileId: string,
   bookTitle: string,
   bookDescription: string,
   learnerAge: number,
@@ -2293,8 +2297,11 @@ export async function generateBookTopicsWithFallback(
       bookDescription: string,
     ) => BookTopicGenerationResult;
     sentryContext: { profileId?: string; extra?: Record<string, unknown> };
+    assertLlmConsent?: typeof assertLlmConsent;
   },
 ): Promise<BookTopicGenerationResult> {
+  const assertConsent = deps.assertLlmConsent ?? assertLlmConsent;
+  await assertConsent(db, profileId);
   try {
     return await deps.generateBookTopics(
       bookTitle,
@@ -2347,6 +2354,7 @@ export async function expandExistingBookTopics(
       error: unknown,
       context?: { profileId?: string; extra?: Record<string, unknown> },
     ) => void;
+    assertLlmConsent?: typeof assertLlmConsent;
     expansionClaimStartedAt?: Date;
   },
 ): Promise<BookWithTopics> {
@@ -2364,6 +2372,8 @@ export async function expandExistingBookTopics(
     .join('\n');
 
   const generated = await generateBookTopicsWithFallback(
+    db,
+    profileId,
     existing.book.title,
     existing.book.description ?? '',
     deps.learnerAge,
@@ -2371,6 +2381,7 @@ export async function expandExistingBookTopics(
     {
       generateBookTopics: deps.generateBookTopics,
       captureException: deps.captureException,
+      assertLlmConsent: deps.assertLlmConsent,
       buildFallbackBookTopics,
       sentryContext: {
         profileId,

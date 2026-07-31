@@ -38,19 +38,52 @@ export interface CapturedNowRefreshPayload<Response, Payload> {
   payload: Payload;
 }
 
+export type NowRefreshPayloadReadResult<Payload> =
+  | { kind: 'parsed'; payload: Payload }
+  | { kind: 'body-read-failed'; error: unknown };
+
+export type NowRefreshCaptureResult<Response, Payload> =
+  | { kind: 'response-rejected'; error: unknown }
+  | {
+      kind: 'response-settled';
+      response: Response;
+      payloadRead: Promise<NowRefreshPayloadReadResult<Payload>>;
+    };
+
+async function readNowRefreshPayload<Payload>(
+  readPayload: () => Promise<Payload>,
+): Promise<NowRefreshPayloadReadResult<Payload>> {
+  try {
+    return { kind: 'parsed', payload: await readPayload() };
+  } catch (error) {
+    return { kind: 'body-read-failed', error };
+  }
+}
+
 /**
  * [WI-2961] Starts consuming the response body as soon as the already-armed
- * Playwright response promise settles. Call this before the navigation action:
- * Chromium may release the Network body once navigation completes, while the
- * plain `Response` handle itself remains settled and otherwise looks healthy.
+ * Playwright response promise settles. Response rejection and body-read
+ * failure remain separate results so an observer can allow the former without
+ * hiding the latter. Call this before the navigation action: Chromium may
+ * release the Network body once navigation completes, while the plain
+ * `Response` handle itself remains settled and otherwise looks healthy.
  */
 export async function captureNowRefreshPayload<Response, Payload>(
   responsePromise: Promise<Response>,
   readPayload: (response: Response) => Promise<Payload>,
-): Promise<CapturedNowRefreshPayload<Response, Payload>> {
-  const response = await responsePromise;
-  const payload = await readPayload(response);
-  return { response, payload };
+): Promise<NowRefreshCaptureResult<Response, Payload>> {
+  let response: Response;
+  try {
+    response = await responsePromise;
+  } catch (error) {
+    return { kind: 'response-rejected', error };
+  }
+
+  return {
+    kind: 'response-settled',
+    response,
+    payloadRead: readNowRefreshPayload(() => readPayload(response)),
+  };
 }
 
 /**
@@ -90,17 +123,48 @@ export async function observeExactNowRefresh<Response>(
     timer = setTimeout(() => resolve(UNSETTLED), windowMs);
   });
 
+  let result: Response | typeof UNSETTLED;
   try {
-    const result = await Promise.race([responsePromise, timeoutPromise]);
-    if (result === UNSETTLED) {
-      return { kind: 'unsettled' };
-    }
-    return { kind: 'settled', response: result as Response };
+    result = await Promise.race([responsePromise, timeoutPromise]);
   } catch (error) {
     return { kind: 'rejected', error };
   } finally {
     if (timer) clearTimeout(timer);
   }
+
+  if (result === UNSETTLED) {
+    return { kind: 'unsettled' };
+  }
+  return { kind: 'settled', response: result as Response };
+}
+
+/**
+ * Observes the discriminated capture result. Response rejection and bounded
+ * response non-settlement keep their WI-2818 meanings, but a body-read failure
+ * after response settlement propagates as a hard test failure.
+ */
+export async function observeCapturedNowRefresh<Response, Payload>(
+  capturePromise: Promise<NowRefreshCaptureResult<Response, Payload>>,
+  options: { armedAtMs: number; actionAtMs: number; windowMs?: number },
+): Promise<NowRefreshOutcome<CapturedNowRefreshPayload<Response, Payload>>> {
+  const captureOutcome = await observeExactNowRefresh(capturePromise, options);
+  if (captureOutcome.kind !== 'settled') {
+    return captureOutcome;
+  }
+
+  const capture = captureOutcome.response;
+  if (capture.kind === 'response-rejected') {
+    return { kind: 'rejected', error: capture.error };
+  }
+
+  const payloadRead = await capture.payloadRead;
+  if (payloadRead.kind === 'body-read-failed') {
+    throw payloadRead.error;
+  }
+  return {
+    kind: 'settled',
+    response: { response: capture.response, payload: payloadRead.payload },
+  };
 }
 
 /**

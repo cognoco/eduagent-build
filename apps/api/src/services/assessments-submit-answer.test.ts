@@ -4,6 +4,7 @@ import {
   submitAssessmentAnswer,
   type SubmitAssessmentAnswerDependencies,
 } from './assessments';
+import { ConsentWithdrawnError } from './session';
 
 const PROFILE_ID = 'profile-1';
 const ASSESSMENT_ID = 'assessment-1';
@@ -29,7 +30,13 @@ function makeAssessment(
 }
 
 describe('submitAssessmentAnswer', () => {
-  it('keeps status update, retention update, and XP grant in one transaction', async () => {
+  function makeHarness(
+    overrides: {
+      buildAssessmentAppHelpEvaluation?: jest.Mock;
+      shouldEndAssessmentForReview?: jest.Mock;
+      assertLlmConsent?: jest.Mock;
+    } = {},
+  ) {
     const tx = { tx: true } as unknown as Database;
     const db = {
       transaction: jest.fn(async (callback: (tx: Database) => unknown) =>
@@ -49,7 +56,9 @@ describe('submitAssessmentAnswer', () => {
     });
     const deps: SubmitAssessmentAnswerDependencies = {
       getAssessment: jest.fn().mockResolvedValue(snapshot),
-      buildAssessmentAppHelpEvaluation: jest.fn().mockReturnValue(null),
+      buildAssessmentAppHelpEvaluation:
+        overrides.buildAssessmentAppHelpEvaluation ??
+        jest.fn().mockReturnValue(null),
       loadAssessmentTopicContext: jest.fn().mockResolvedValue({
         topicTitle: 'Gravity',
         topicDescription: 'Forces',
@@ -58,8 +67,18 @@ describe('submitAssessmentAnswer', () => {
         languageCode: null,
       }),
       lockAssessmentForAnswerSubmission: jest.fn().mockResolvedValue(snapshot),
-      shouldEndAssessmentForReview: jest.fn().mockReturnValue(false),
-      buildNeedsReviewEvaluation: jest.fn(),
+      shouldEndAssessmentForReview:
+        overrides.shouldEndAssessmentForReview ??
+        jest.fn().mockReturnValue(false),
+      buildNeedsReviewEvaluation: jest.fn().mockReturnValue({
+        feedback: 'Review needed.',
+        passed: false,
+        shouldEscalateDepth: false,
+        masteryScore: 0,
+        qualityRating: 0,
+      }),
+      assertLlmConsent:
+        overrides.assertLlmConsent ?? jest.fn().mockResolvedValue(undefined),
       evaluateAssessmentAnswer: jest.fn().mockResolvedValue({
         feedback: 'Good next step.',
         passed: true,
@@ -75,11 +94,14 @@ describe('submitAssessmentAnswer', () => {
       recordAssessmentCompletionActivity: jest
         .fn()
         .mockResolvedValue(undefined),
-      logger: {
-        error: jest.fn(),
-      },
+      logger: { error: jest.fn() },
       captureException: jest.fn(),
     };
+    return { db, tx, deps, updated };
+  }
+
+  it('keeps status update, retention update, and XP grant in one transaction', async () => {
+    const { db, tx, deps, updated } = makeHarness();
 
     const result = await submitAssessmentAnswer(
       db,
@@ -120,5 +142,72 @@ describe('submitAssessmentAnswer', () => {
       'passed',
       expect.objectContaining({ masteryScore: 0.8 }),
     );
+  });
+
+  it('keeps the deterministic app-help reply available after consent withdrawal', async () => {
+    const appHelpEvaluation = {
+      feedback: 'Explorer mode lets you investigate a topic.',
+      passed: false,
+      shouldEscalateDepth: false,
+      masteryScore: 0,
+      qualityRating: 0,
+    };
+    const assertLlmConsent = jest
+      .fn()
+      .mockRejectedValue(new ConsentWithdrawnError());
+    const { db, deps } = makeHarness({
+      buildAssessmentAppHelpEvaluation: jest
+        .fn()
+        .mockReturnValue(appHelpEvaluation),
+      assertLlmConsent,
+    });
+
+    await expect(
+      submitAssessmentAnswer(db, PROFILE_ID, ASSESSMENT_ID, 'explorer mode', {
+        deps,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        kind: 'app_help',
+        evaluation: appHelpEvaluation,
+      }),
+    );
+    expect(assertLlmConsent).not.toHaveBeenCalled();
+    expect(deps.evaluateAssessmentAnswer).not.toHaveBeenCalled();
+  });
+
+  it('keeps the deterministic force-review branch available after consent withdrawal', async () => {
+    const assertLlmConsent = jest
+      .fn()
+      .mockRejectedValue(new ConsentWithdrawnError());
+    const { db, deps } = makeHarness({
+      shouldEndAssessmentForReview: jest.fn().mockReturnValue(true),
+      assertLlmConsent,
+    });
+
+    await expect(
+      submitAssessmentAnswer(db, PROFILE_ID, ASSESSMENT_ID, 'I need review', {
+        deps,
+      }),
+    ).resolves.toEqual(expect.objectContaining({ kind: 'evaluated' }));
+    expect(assertLlmConsent).not.toHaveBeenCalled();
+    expect(deps.buildNeedsReviewEvaluation).toHaveBeenCalledTimes(1);
+    expect(deps.evaluateAssessmentAnswer).not.toHaveBeenCalled();
+  });
+
+  it('fails closed before assessment evaluation when consent is withdrawn', async () => {
+    const assertLlmConsent = jest
+      .fn()
+      .mockRejectedValue(new ConsentWithdrawnError());
+    const { db, tx, deps } = makeHarness({ assertLlmConsent });
+
+    await expect(
+      submitAssessmentAnswer(db, PROFILE_ID, ASSESSMENT_ID, 'My answer', {
+        deps,
+      }),
+    ).rejects.toBeInstanceOf(ConsentWithdrawnError);
+    expect(assertLlmConsent).toHaveBeenCalledWith(tx, PROFILE_ID);
+    expect(deps.evaluateAssessmentAnswer).not.toHaveBeenCalled();
+    expect(deps.updateAssessment).not.toHaveBeenCalled();
   });
 });

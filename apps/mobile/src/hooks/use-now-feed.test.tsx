@@ -20,9 +20,18 @@ import {
 // [WI-2498] useNowFeed now reads the authenticated actor id (Clerk userId) to
 // bind the persisted Now-feed cache to actor+profile+policy. External-boundary
 // mock (bare specifier), matching the pattern in use-subscription.test.ts.
+// [WI-2933] The actor id is swappable so a test can ATTEMPT the BOUND ->
+// UNBOUND transition (sign-out / auth teardown) that the unbound suppression
+// path depends on. Swapping it alone does not achieve that — the value is read
+// through a getter, but nothing re-renders on the mutation, so a test must
+// force a re-render for the unbind to land. Default is unchanged for every
+// pre-existing test.
+let mockActorId: string | null = 'wi2498-test-actor';
 jest.mock('@clerk/expo', () => ({
   useAuth: () => ({
-    userId: 'wi2498-test-actor',
+    get userId() {
+      return mockActorId;
+    },
     getToken: jest.fn().mockResolvedValue('test-token'),
   }),
 }));
@@ -238,6 +247,11 @@ describe('useNowFeed — observed mentor-notice policy epoch', () => {
     globalThis.fetch = mockFetch as unknown as typeof globalThis.fetch;
     setActiveProfileId(CACHE_BINDING.profileId);
     await AsyncStorage.clear();
+    // [WI-2933] The mentor-notice policy store is MODULE-level, so clearing
+    // AsyncStorage alone does not isolate these tests from each other — a
+    // hydrated Entry survives into the next test and its floor is still
+    // consulted. This describe is the first here to depend on that store.
+    resetMentorNoticePolicyStoreForTests();
     jest.useFakeTimers();
   });
 
@@ -245,6 +259,111 @@ describe('useNowFeed — observed mentor-notice policy epoch', () => {
     jest.useRealTimers();
     globalThis.fetch = originalFetch;
     setActiveProfileId(undefined);
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-2933] The persisted projection must be judged against the DISABLE FLOOR
+  // of the pair it was cached for — including after that pair goes unbound.
+  //
+  // `fallbackFeed` can only be POPULATED while bound, and it survives the pair
+  // going unbound (sign-out, auth teardown) only when `query.isError` — see the
+  // RETENTION MECHANISM note below. Were it to survive, the suppression call
+  // would take the unbound branch, which has no storage key and therefore no
+  // stored floor to consult, so a projection whose pair had been told the
+  // rollout is off would paint anyway.
+  //
+  // The assertion is on what the surface EXPOSES, never on an internal field.
+  //
+  // LIMITATION — THESE TWO DO NOT DISCRIMINATE THE FIX, and saying so here
+  // rather than in a report that outlives this file. Reverting the fix to
+  // `policy.suppressed(undefined)` leaves both GREEN. The reason, measured: with
+  // a disabling floor seeded, the BOUND render already strips the notice card
+  // (`fallbackFeed` is `[]` before sign-out ever happens), so the unbound
+  // judgement is never reached; with no floor, there is nothing to suppress.
+  // They therefore lock in current behaviour but prove nothing about the unbound
+  // path.
+  //
+  // RETENTION MECHANISM, measured rather than read (WI-2933 reachability run):
+  // forcing a real re-render with `userId = null` gives
+  // `fallbackFeed = null, isError = false` — so with the query NOT in an error
+  // state the projection does NOT survive the unbind; the `if (!query.isError)`
+  // branch above clears it. Retention therefore requires `query.isError`, which
+  // is what the source reads. An earlier probe here appeared to show the feed
+  // surviving; that probe never forced a re-render, so it was sampling the still
+  // BOUND component and proved nothing.
+  //
+  // STILL UNMEASURED: the `isError: true` AND unbound combination. Once the pair
+  // is unbound the query stops fetching, so this harness could not drive it into
+  // an error state afterwards. That combination is the only surviving candidate
+  // for a reachable unbound judgement, and it remains undemonstrated.
+  // -------------------------------------------------------------------------
+  it('[WI-2933] does not paint the cached notice surface when the pair’s stored floor forbids it', async () => {
+    await seedWarmNoticeCache();
+    await AsyncStorage.setItem(OBSERVED_EPOCH_KEY, ENABLED_EPOCH);
+    // The pair's durable floor: told the rollout is OFF at revision 7.
+    await AsyncStorage.setItem(
+      `mentor-notice-policy-state::${CACHE_BINDING.actorId}::${CACHE_BINDING.profileId}`,
+      '{"revision":7,"enabled":false,"observedDisableRevision":7}',
+    );
+
+    const { result, queryClient } = await renderSlowFallback();
+    // Establish the exposure: the projection really is being served.
+    await waitFor(() => expect(result.current.fallbackFeed).not.toBeNull());
+
+    // ATTEMPTED sign-out that DOES NOT LAND, and the title no longer claims it
+    // does. `cacheBinding` derives from the auth id, so unbinding requires a
+    // re-render; mutating this module variable triggers none, and the assertion
+    // below therefore measures the still-BOUND component.
+    //
+    // The control test is the proof: had the unbind landed, the effect's
+    // early-return would have cleared `fallbackFeed` (no `query.isError`), and
+    // the control's `.toContain('mentor_notice')` on an empty list would have
+    // FAILED rather than passed. Its passing is what tells you the pair is
+    // still bound in both.
+    mockActorId = null;
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+      await Promise.resolve();
+    });
+
+    // THE CRITERION: no notice-bearing card is exposed off that projection.
+    expect(
+      result.current.fallbackFeed?.cards.map((card) => card.kind) ?? [],
+    ).not.toContain('mentor_notice');
+
+    mockActorId = 'wi2498-test-actor';
+    queryClient.clear();
+  });
+
+  // NON-TRIVIALITY CONTROL. Identical setup, identical cached projection — but
+  // the pair has NO stored floor. It must STILL paint. Without this, the
+  // assertion above passes on a remedy that blanks every observation-less
+  // payload on every pre-auth render, which is the fleet-wide harm AC-2 forbids
+  // and the reason this was not folded into WI-2911.
+  //
+  // It carries a second load, unintended when written: because it PASSES, the
+  // attempted unbind above cannot have landed in either test — an unbound pair
+  // would have cleared the projection out from under this assertion.
+  it('[WI-2933] still paints the cached notice surface when the pair has NO stored floor', async () => {
+    await seedWarmNoticeCache();
+    await AsyncStorage.setItem(OBSERVED_EPOCH_KEY, ENABLED_EPOCH);
+    // Deliberately no mentor-notice-policy-state key for this pair.
+
+    const { result, queryClient } = await renderSlowFallback();
+    await waitFor(() => expect(result.current.fallbackFeed).not.toBeNull());
+
+    mockActorId = null;
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+      await Promise.resolve();
+    });
+
+    expect(
+      result.current.fallbackFeed?.cards.map((card) => card.kind) ?? [],
+    ).toContain('mentor_notice');
+
+    mockActorId = 'wi2498-test-actor';
+    queryClient.clear();
   });
 
   it('does not paint a warm cached notice surface after the client observed flag-off', async () => {
