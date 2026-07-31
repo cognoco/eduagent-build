@@ -30,12 +30,11 @@ things clearly:
    acceptance of DPAs, SCCs, TIAs, ZDR/no-training evidence, subprocessor
    review, and DPO/counsel sign-off.
 
-One controller-owned engineering follow-up was found during this review:
-Mistral is documented as the EU secondary/vision route, but the current adapter
-uses `https://api.mistral.ai/v1/chat/completions`, not the EU endpoint
-identified in the procurement research (`https://api.eu.mistral.ai`). This is
-not a vendor signature problem; it should be fixed or explicitly ruled before
-Mistral is used as an EU-residency control.
+One controller-owned engineering follow-up was found during this review and
+resolved by WI-2740: Mistral is documented as the EU secondary/vision route,
+and the adapter now uses
+`https://api.eu.mistral.ai/v1/chat/completions`. This aligns the runtime with
+the EU endpoint identified in the procurement research.
 
 ## Reconciliation inputs
 
@@ -69,7 +68,7 @@ external dependency.
 | Discovered recipient | Runtime/evidence source | Ledger disposition |
 |---|---|---|
 | Cerebras Systems Inc. | V2 primary text path; `createCerebrasProvider`; model register active row | Live row L1 |
-| Mistral AI | V2 free vision/secondary path; `createMistralProvider`; model register active row | Live row L2; endpoint engineering follow-up |
+| Mistral AI | V2 free vision/secondary path; `createMistralProvider`; model register active row | Live row L2; EU endpoint aligned by WI-2740 |
 | OpenAI | V2 paid vision/secondary/deep reasoning; `createOpenAIProvider`; signed DPA evidence | Live row L3 |
 | Anthropic | Judge and rung 4-5 fallback; `createAnthropicProvider`; model register active row | Live row L4 |
 | Voyage AI | `VOYAGE_API_URL` embedding endpoint | Live row L5 |
@@ -160,9 +159,9 @@ engineering.
   than an undisclosed OCR processor.
 - **Embedding path:** `apps/api/src/services/embeddings.ts` directly calls the
   Voyage hosted embeddings endpoint recorded in L5.
-- **Engineering gap:** WI-2740 - Align Mistral runtime endpoint with EU-region
-  processor claim - is Ready/Active and two-way cross-linked to WI-1192. It
-  owns the endpoint correction or withdrawal of the EU-residency claim.
+- **Engineering resolution:** WI-2740 - Align Mistral runtime endpoint with
+  EU-region processor claim - routes the Mistral adapter through
+  `api.eu.mistral.ai` and protects the endpoint with a provider regression test.
 
 ## Dormant, eval-only, or excluded rows
 
@@ -198,7 +197,7 @@ For each live processor row, OPQ-110 should hold or obtain:
 
 | Finding | Why it matters | Proposed handling |
 |---|---|---|
-| Mistral adapter uses the global endpoint while compliance research says EU processing requires the EU endpoint | The model register treats Mistral as the EU secondary/vision route, but region-aware routing is not implemented. | WI-2740 must either implement the EU route and use `api.eu.mistral.ai`, require that endpoint for all currently covered Mistral traffic, or amend the register and transfer package to withdraw the EU-region claim. |
+| Mistral adapter previously used the global endpoint while compliance research requires the EU endpoint | The model register treats Mistral as the EU secondary/vision route. | Resolved by WI-2740: all Mistral adapter traffic uses `api.eu.mistral.ai`, guarded by a provider regression test. |
 
 ## Current launch posture from this ledger
 
@@ -211,6 +210,6 @@ blocker is that several external facts still need execution or acceptance:
 - Voyage opt-out/ZDR and hosted-region acceptance remain open.
 - Infrastructure vendors still need DPA/TIA evidence gathered or linked.
 
-Those external/legal items belong to OPQ-110. The separate Mistral endpoint
-engineering gap belongs to WI-2740. WI-1192 is satisfied when this ledger, the
-provider evidence index, and the OPQ-110 handoff record are review-ready.
+Those external/legal items belong to OPQ-110. The Mistral endpoint engineering
+gap is resolved by WI-2740. WI-1192 is satisfied when this ledger, the provider
+evidence index, and the OPQ-110 handoff record are review-ready.
