@@ -446,11 +446,13 @@ describe('GET /v1/assessments/:assessmentId', () => {
 describe('POST /v1/assessments/:assessmentId/answer', () => {
   const path = `/v1/assessments/${ASSESSMENT_ID}/answer`;
 
-  function validAnswerBody(answer = 'Water is H2O') {
+  function validAnswerBody(answer = 'Water is H2O', shell?: string) {
     return {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answer }),
+      body: JSON.stringify(
+        shell === undefined ? { answer } : { answer, shell },
+      ),
     };
   }
 
@@ -474,6 +476,77 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
       // passed) alongside conversationLanguage.
       { conversationLanguage: 'en', ageBracket: 'adult' },
     );
+  });
+
+  // [WI-2472] The active app shell decides which app-help destination map an
+  // app-navigation question typed as an answer is answered from. Without this
+  // pass-through a V2 learner is sent to retired V0 navigation.
+  describe('[WI-2472] active app shell pass-through', () => {
+    it('threads a reported v2 shell into the service call', async () => {
+      submitAssessmentAnswerMock.mockResolvedValue(
+        makeSubmitAnswerResult({ status: 'in_progress' }),
+      );
+
+      const res = await makeApp().request(
+        path,
+        validAnswerBody('Where are my notes?', 'v2'),
+      );
+
+      expect(res.status).toBe(200);
+      expect(submitAssessmentAnswerMock).toHaveBeenCalledWith(
+        expect.anything(),
+        PROFILE_ID,
+        ASSESSMENT_ID,
+        'Where are my notes?',
+        expect.objectContaining({ shell: 'v2' }),
+      );
+    });
+
+    it('threads a reported v0 shell into the service call', async () => {
+      submitAssessmentAnswerMock.mockResolvedValue(
+        makeSubmitAnswerResult({ status: 'in_progress' }),
+      );
+
+      const res = await makeApp().request(
+        path,
+        validAnswerBody('Where are my notes?', 'v0'),
+      );
+
+      expect(res.status).toBe(200);
+      expect(submitAssessmentAnswerMock).toHaveBeenCalledWith(
+        expect.anything(),
+        PROFILE_ID,
+        ASSESSMENT_ID,
+        'Where are my notes?',
+        expect.objectContaining({ shell: 'v0' }),
+      );
+    });
+
+    it('passes no shell when the client reported none', async () => {
+      submitAssessmentAnswerMock.mockResolvedValue(
+        makeSubmitAnswerResult({ status: 'in_progress' }),
+      );
+
+      const res = await makeApp().request(
+        path,
+        validAnswerBody('Where are my notes?'),
+      );
+
+      expect(res.status).toBe(200);
+      expect(
+        submitAssessmentAnswerMock.mock.calls[0]?.[4]?.shell,
+      ).toBeUndefined();
+    });
+
+    it('rejects an out-of-enum shell before it can reach the service', async () => {
+      const res = await makeApp().request(
+        path,
+        validAnswerBody('Where are my notes?', 'v1'),
+      );
+
+      expect(res.status).toBe(400);
+      expect(submitAssessmentAnswerMock).not.toHaveBeenCalled();
+    });
   });
 
   it('returns 404 when the assessment is not found', async () => {

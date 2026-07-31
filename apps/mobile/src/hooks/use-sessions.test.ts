@@ -305,6 +305,73 @@ describe('useSendMessage', () => {
     expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.response).toBe('AI response');
   });
+
+  // [WI-2472] Consistency with useStreamMessage (WI-2220): the non-stream turn
+  // reaches the same app-help prompt composition, so it must report the active
+  // shell too or a V2 learner is answered from the retired V0 map.
+  describe('[WI-2472] active app shell in the request body', () => {
+    async function sendMessageWithV2Flag(enabled: boolean) {
+      const flags = require('../lib/feature-flags') as {
+        FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+      };
+      const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      try {
+        flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED = enabled;
+        mockFetch.mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              response: 'AI response',
+              escalationRung: 1,
+              isUnderstandingCheck: false,
+              exchangeCount: 1,
+              expectedResponseMinutes: 0,
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+
+        const { result } = renderHook(() => useSendMessage('session-1'), {
+          wrapper: createWrapper(),
+        });
+
+        await act(async () => {
+          result.current.mutate({ message: 'Where are my notes?' });
+        });
+
+        await waitFor(() => {
+          expect(result.current.isSuccess).toBe(true);
+        });
+
+        const [input, init] = mockFetch.mock.calls[0] as [
+          Request | URL | string,
+          RequestInit | undefined,
+        ];
+        const raw =
+          typeof init?.body === 'string'
+            ? init.body
+            : input instanceof Request
+              ? await input.text()
+              : '';
+        return JSON.parse(raw) as Record<string, unknown>;
+      } finally {
+        flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED = original;
+      }
+    }
+
+    it('reports shell v2 when MODE_NAV_V2_ENABLED is on', async () => {
+      expect(await sendMessageWithV2Flag(true)).toEqual({
+        message: 'Where are my notes?',
+        shell: 'v2',
+      });
+    });
+
+    it('reports shell v0 when MODE_NAV_V2_ENABLED is off', async () => {
+      expect(await sendMessageWithV2Flag(false)).toEqual({
+        message: 'Where are my notes?',
+        shell: 'v0',
+      });
+    });
+  });
 });
 
 describe('useCloseSession', () => {

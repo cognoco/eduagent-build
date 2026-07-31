@@ -906,6 +906,43 @@ describe('buildAssessmentAppHelpEvaluation', () => {
       buildAssessmentAppHelpEvaluation('Ciao means hello in Italian.'),
     ).toBeNull();
   });
+
+  // [WI-2472] The app-help branch answered every learner from the V0 map
+  // because the active shell was never threaded this far. A V2 learner got
+  // navigation for a shell their build no longer renders.
+  it('answers a v2 learner from the V2 destination map', () => {
+    const result = buildAssessmentAppHelpEvaluation(
+      'Where are my notes?',
+      0.4,
+      'v2',
+    );
+
+    expect(result).not.toBeNull();
+    expect(result?.feedback).toContain('Journal tab, under Notes');
+    // The V0 shell's tabs must not leak into a V2 reply.
+    for (const v0Destination of ['Home', 'Library', 'More', 'Progress']) {
+      expect(result?.feedback).not.toContain(v0Destination);
+    }
+    expect(result?.masteryScore).toBe(0.4);
+  });
+
+  it('answers an explicit v0 learner from the V0 destination map', () => {
+    const result = buildAssessmentAppHelpEvaluation(
+      'Where are my notes?',
+      0.4,
+      'v0',
+    );
+
+    expect(result?.feedback).toContain('Home > My Notes > Notes');
+    expect(result?.feedback).not.toContain('Journal tab');
+  });
+
+  it('falls back to the V0 destination map when no shell is reported', () => {
+    const result = buildAssessmentAppHelpEvaluation('Where are my notes?', 0.4);
+
+    expect(result?.feedback).toContain('Home > My Notes > Notes');
+    expect(result?.feedback).not.toContain('Journal tab');
+  });
 });
 
 // ---------------------------------------------------------------------------

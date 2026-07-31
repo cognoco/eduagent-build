@@ -20,6 +20,7 @@ import {
   type ChatExchange,
   type ConversationLanguage,
   type AgeBracket,
+  type AppShell,
 } from '@eduagent/schemas';
 import { routeAndCall } from './llm';
 import type { ChatMessage } from './llm';
@@ -436,11 +437,14 @@ export async function lockAssessmentForAnswerSubmission(
 export function buildAssessmentAppHelpEvaluation(
   answer: string,
   masteryScore = 0,
+  // [WI-2472] Client-supplied active app shell. Absent (older clients, direct
+  // API callers) keeps buildAppHelpDirectReply's safe 'v0' default.
+  shell?: AppShell,
 ): AssessmentEvaluation | null {
   if (!isAppHelpQuery(answer)) return null;
 
   return {
-    feedback: buildAppHelpDirectReply(answer),
+    feedback: buildAppHelpDirectReply(answer, shell),
     passed: false,
     shouldEscalateDepth: false,
     masteryScore,
@@ -501,6 +505,8 @@ export async function submitAssessmentAnswer(
   options: {
     conversationLanguage?: ConversationLanguage;
     ageBracket?: AgeBracket;
+    /** [WI-2472] Active app nav shell, threaded from the client per answer. */
+    shell?: AppShell;
     deps?: SubmitAssessmentAnswerDependencies;
   } = {},
 ): Promise<SubmitAssessmentAnswerResult | null> {
@@ -511,6 +517,7 @@ export async function submitAssessmentAnswer(
   const appHelpEvaluation = deps.buildAssessmentAppHelpEvaluation(
     answer,
     assessment.masteryScore ?? 0,
+    options.shell,
   );
   if (appHelpEvaluation) {
     return {

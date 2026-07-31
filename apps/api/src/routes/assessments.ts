@@ -105,7 +105,7 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
       await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const assessmentId = c.req.param('assessmentId');
-      const { answer } = c.req.valid('json');
+      const { answer, shell } = c.req.valid('json');
 
       // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
       // Gated unconditionally — the app_help/forceReview branches inside
@@ -131,6 +131,10 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
             profileMeta?.birthYear != null
               ? computeAgeBracketFromDate(profileMeta.birthYear)
               : undefined,
+          // [WI-2472] Active app shell — lets the app-help branch answer from
+          // the V2 destination map for V2 clients instead of silently
+          // defaulting to the retired V0 navigation.
+          shell,
         },
       );
       if (!result) return notFound(c, 'Assessment not found');

@@ -3,6 +3,10 @@ import { chatExchangeSchema, isoDateField } from './common.ts';
 import { languageCodeSchema, pedagogyModeSchema } from './language.ts';
 // [SC-02] Import canonical retention enum instead of bare z.string().
 import { retentionStatusSchema } from './retention-status.ts';
+// [WI-2472] appShellSchema lives in the dependency-free ./session-enums.ts leaf
+// module; importing it from ./sessions.ts would close a cycle (sessions.ts
+// imports verificationTypeSchema from this file).
+import { appShellSchema } from './session-enums.ts';
 
 // Verification depth
 
@@ -102,6 +106,11 @@ export type AssessmentEvaluation = z.infer<typeof assessmentEvaluationSchema>;
 export const assessmentAnswerSchema = z
   .object({
     answer: z.string().min(1).max(10000),
+    /** [WI-2472] Active app nav shell, sourced client-side from
+     *  FEATURE_FLAGS.MODE_NAV_V2_ENABLED at send time — drives which app-help
+     *  destination map an app-navigation question submitted as an assessment
+     *  answer is answered from. Mirrors sessionMessageSchema.shell (WI-2220). */
+    shell: appShellSchema.optional(),
   })
   .strict();
 export type AssessmentAnswerInput = z.infer<typeof assessmentAnswerSchema>;
