@@ -5,15 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MentoMate — Privacy Policy</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 720px; margin: 0 auto; padding: 24px 16px; color: #1a1a1a; line-height: 1.6; }
+    :root { color-scheme: dark; --bg: #111827; --text: #f3f4f6; --muted: #d1d5db; --subtle: #9ca3af; }
+    :root[data-theme="light"] { color-scheme: light; --bg: #ffffff; --text: #1a1a1a; --muted: #444; --subtle: #6b7280; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 720px; margin: 0 auto; padding: 24px 16px; background: var(--bg); color: var(--text); line-height: 1.6; }
     h1 { font-size: 1.5rem; margin-bottom: 4px; }
     h2 { font-size: 1.1rem; margin-top: 1.5em; }
-    p { color: #444; margin: 0.5em 0; }
-    ul { color: #444; }
-    .updated { color: #888; font-size: 0.85rem; margin-bottom: 1.5em; }
+    p { color: var(--muted); margin: 0.5em 0; }
+    ul { color: var(--muted); }
+    .updated { color: var(--subtle); font-size: 0.85rem; margin-bottom: 1.5em; }
+    .theme-toggle { float: right; border: 1px solid var(--subtle); border-radius: 999px; padding: 6px 10px; background: transparent; color: var(--text); cursor: pointer; }
   </style>
 </head>
 <body>
+  <button class="theme-toggle" type="button" aria-label="Switch colour theme">Light theme</button>
   <h1>Privacy Policy</h1>
   <p class="updated">Last updated: July 2026</p>
   <p class="updated"><strong>Pre-launch draft:</strong> this notice is not approved for publication. The applicable provider contracts, transfer safeguards, DPO details, retention controls, and native-speaker legal reviews must be completed before learner data is processed in production.</p>
@@ -60,7 +64,7 @@
   <p><strong>Account deletion:</strong> when you delete your account, deletion enters a 7-day grace period during which you can cancel. After the grace period, your account and associated personal and learning data are permanently removed, except for limited records retained for legal, security, fraud-prevention, or accounting reasons.</p>
 
   <h2>9. Your Rights</h2>
-  <p>You have the right to: access your data (via the Export feature in Settings); correct inaccurate data; request deletion of your account and associated personal and learning data, subject to the limited retention exceptions described in Section 8; withdraw consent for data processing; object to processing; and request data portability.</p>
+  <p>You have the right to: access your data (via the Export feature in Settings); correct inaccurate data; request deletion of your account and associated personal and learning data, subject to the limited retention exceptions described in Section 8; withdraw consent for data processing; object to processing; and request data portability. The export includes your account and billing details and the canonical learning records we hold, including subjects and curricula, sessions and messages, summaries and semantic-memory content, assessments and retention state, concept mastery and any retained learner quotation, topic notes, mentor notices, preferences, XP and streaks, and mentor activity history. It does not duplicate short-lived caches, delivery and retry logs, or presentation reports when the underlying source records are included. Support-case communications are provided through the separate support-request process.</p>
   <p>To exercise these rights, use the in-app settings or contact us at support@mentomate.com.</p>
 
   <h2>10. Security</h2>
@@ -75,5 +79,20 @@
     - Confirm each AI provider's no-training, retention, deletion, subprocessor, and international-transfer evidence before publication.
     - Capture production evidence that RETENTION_PURGE_ENABLED remains enabled before publication.
   -->
+  <script>
+    const root = document.documentElement;
+    const toggle = document.querySelector('.theme-toggle');
+    const savedTheme = localStorage.getItem('mentomate-privacy-theme');
+    if (savedTheme === 'light') root.dataset.theme = 'light';
+    const syncToggle = () => {
+      toggle.textContent = root.dataset.theme === 'light' ? 'Dark theme' : 'Light theme';
+    };
+    toggle.addEventListener('click', () => {
+      root.dataset.theme = root.dataset.theme === 'light' ? 'dark' : 'light';
+      localStorage.setItem('mentomate-privacy-theme', root.dataset.theme);
+      syncToggle();
+    });
+    syncToggle();
+  </script>
 </body>
 </html>
