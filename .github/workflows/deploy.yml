@@ -347,6 +347,10 @@ jobs:
             fi
             echo "Production retention gate passed."
           fi
+          if [ "$SYNC_TARGET" = "stg" ]; then
+            doppler run -p mentomate -c "$SYNC_TARGET" -- \
+              node scripts/check-clerk-key-alignment.mjs
+          fi
           pnpm secrets:sync "$SYNC_TARGET"
 
       - name: Deploy to Cloudflare Workers

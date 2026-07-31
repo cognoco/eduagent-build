@@ -179,6 +179,27 @@ jobs:
           sudo tar -xzf "${DOPPLER_ARCHIVE}" -C /usr/local/bin doppler
           doppler --version
 
+      # WI-2948 one-time recovery bridge. Remove before landing: the permanent
+      # alignment guard below remains. The backup secret is never printed and
+      # is written only after it proves it belongs to the staging Clerk
+      # instance described by Doppler's publishable keys and JWKS URL.
+      - name: Recover staging Clerk secret from validated GitHub backup
+        if: github.event_name == 'pull_request' && github.head_ref == 'WI-2948'
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
+          RECOVERY_CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+        run: |
+          if [ -z "${DOPPLER_TOKEN:-}" ] || [ -z "${RECOVERY_CLERK_SECRET_KEY:-}" ]; then
+            echo "::error title=Clerk recovery unavailable::The Doppler token or GitHub Clerk backup secret is missing."
+            exit 1
+          fi
+          doppler run -p mentomate -c stg \
+            --preserve-env="RECOVERY_CLERK_SECRET_KEY" \
+            --command 'export CLERK_SECRET_KEY="$RECOVERY_CLERK_SECRET_KEY"; node scripts/check-clerk-key-alignment.mjs'
+          printf '%s' "${RECOVERY_CLERK_SECRET_KEY}" |
+            doppler secrets set CLERK_SECRET_KEY -p mentomate -c stg --no-interactive >/dev/null
+          echo "Validated GitHub backup restored to Doppler staging."
+
       - name: Verify Playwright trace reader
         run: |
           # ubuntu-latest includes unzip; keep this explicit guard so a runner
@@ -230,6 +251,7 @@ jobs:
             export CLERK_SECRET_KEY=\"\$CLERK_SECRET_KEY\"; \
             export PLAYWRIGHT_API_URL=\"${PLAYWRIGHT_API_URL}\"; \
             set -eu; \
+            node scripts/check-clerk-key-alignment.mjs; \
             pnpm exec tsx scripts/playwright-seed-scenario-guard.ts \
               --project=v2-release \
               --project=smoke-auth \
