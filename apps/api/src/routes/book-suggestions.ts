@@ -86,7 +86,11 @@ export const bookSuggestionRoutes = new Hono<BookSuggestionsEnv>()
           ageBracket:
             profileMeta == null
               ? undefined
-              : computeAgeBracketFromDate(profileMeta.birthYear),
+              : computeAgeBracketFromDate(
+                  profileMeta.birthYear,
+                  profileMeta.birthMonth ?? undefined,
+                  profileMeta.birthDay ?? undefined,
+                ),
         },
       );
       return c.json(bookSuggestionsResponseSchema.parse(result), 200);

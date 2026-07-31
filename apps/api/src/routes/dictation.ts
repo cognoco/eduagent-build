@@ -134,7 +134,11 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
         ageBracket:
           profileMeta == null
             ? undefined
-            : computeAgeBracketFromDate(profileMeta.birthYear),
+            : computeAgeBracketFromDate(
+                profileMeta.birthYear,
+                profileMeta.birthMonth ?? undefined,
+                profileMeta.birthDay ?? undefined,
+              ),
       });
       return c.json(prepareHomeworkOutputSchema.parse(result), 200);
     },
@@ -165,7 +169,11 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
     // i18n Phase 1 — forward the learner's UI locale into the dictation LLM.
     const result = await generateDictation({
       ...ctx,
-      ageBracket: computeAgeBracketFromDate(profileMeta.birthYear),
+      ageBracket: computeAgeBracketFromDate(
+        profileMeta.birthYear,
+        profileMeta.birthMonth ?? undefined,
+        profileMeta.birthDay ?? undefined,
+      ),
       conversationLanguage: parseConversationLanguage(
         profileMeta?.conversationLanguage,
       ),

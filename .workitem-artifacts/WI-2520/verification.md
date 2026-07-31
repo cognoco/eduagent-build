@@ -53,3 +53,21 @@ bash scripts/check-change-class.sh --branch --run --fast
   `pnpm test:llm:book-generation` (Doppler staging-backed) and
   `pnpm test:api:integration` (database-backed). The executor brief forbids
   touching staging/database infrastructure.
+
+## Current-main publication refresh and review follow-up
+
+- Merged `origin/main` normally without conflicts; no rebase or history rewrite.
+- CodeRabbit's exact-birth-date finding reproduced before implementation:
+  `book-suggestions.test.ts` expected `adolescent` before an eighteenth birthday
+  but received `adult` when the route discarded birth month/day.
+- The regression test passed after `ProfileMeta` retained optional birth month/day
+  and all eight WI-2520 route call sites supplied those parts to
+  `computeAgeBracketFromDate`; year-only sentinel data still falls back to the
+  existing year-only behavior.
+- Focused post-fix verification: 6 suites passed, 256 tests passed, 0 snapshots.
+  Coverage included book suggestions, curriculum, dictation, sessions, identity-v2
+  profile mapping, and the learner-facing LLM age-bracket ratchet.
+- Post-fix fast change-class gate: 6 passed, 0 failed, 2 sanctioned slow lanes
+  skipped. The API unit gate passed 506 suites / 10,100 tests (11 skipped), and
+  the TypeScript, Inngest annotation, prompt-marker, no-Gemini-runtime, and
+  test-only-export guards all passed.

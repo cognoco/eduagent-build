@@ -224,7 +224,11 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
             ageBracket:
               profileMeta == null
                 ? undefined
-                : computeAgeBracketFromDate(profileMeta.birthYear),
+                : computeAgeBracketFromDate(
+                    profileMeta.birthYear,
+                    profileMeta.birthMonth ?? undefined,
+                    profileMeta.birthDay ?? undefined,
+                  ),
           },
         );
         return c.json(curriculumTopicAddResponseSchema.parse(result));
@@ -259,7 +263,11 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
             ageBracket:
               profileMeta == null
                 ? undefined
-                : computeAgeBracketFromDate(profileMeta.birthYear),
+                : computeAgeBracketFromDate(
+                    profileMeta.birthYear,
+                    profileMeta.birthMonth ?? undefined,
+                    profileMeta.birthDay ?? undefined,
+                  ),
           },
         );
         return c.json(challengeCurriculumResponseSchema.parse({ curriculum }));
@@ -321,7 +329,11 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
           ageBracket:
             profileMeta == null
               ? undefined
-              : computeAgeBracketFromDate(profileMeta.birthYear),
+              : computeAgeBracketFromDate(
+                  profileMeta.birthYear,
+                  profileMeta.birthMonth ?? undefined,
+                  profileMeta.birthDay ?? undefined,
+                ),
         },
       );
       return c.json(explainTopicResponseSchema.parse({ explanation }));

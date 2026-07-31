@@ -1071,7 +1071,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         ageBracket:
           profileMeta == null
             ? undefined
-            : computeAgeBracketFromDate(profileMeta.birthYear),
+            : computeAgeBracketFromDate(
+                profileMeta.birthYear,
+                profileMeta.birthMonth ?? undefined,
+                profileMeta.birthDay ?? undefined,
+              ),
       });
 
       return c.json(retrySummaryFeedbackResultSchema.parse(result));
@@ -1105,7 +1109,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           ageBracket:
             summaryProfileMeta == null
               ? undefined
-              : computeAgeBracketFromDate(summaryProfileMeta.birthYear),
+              : computeAgeBracketFromDate(
+                  summaryProfileMeta.birthYear,
+                  summaryProfileMeta.birthMonth ?? undefined,
+                  summaryProfileMeta.birthDay ?? undefined,
+                ),
         },
       );
       // BD-09: Surface pipeline status so client knows if post-processing was queued.
