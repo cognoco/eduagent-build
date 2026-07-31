@@ -714,6 +714,14 @@ describe('check-change-class.sh', () => {
         'node --test packages/database/scripts/check-development-schema.test.mjs',
       flag: 'database_script_guards',
     },
+    {
+      name: 'development schema reconciliation guards',
+      file: 'packages/database/scripts/reconcile-development-schema.mjs',
+      className: 'database-script-guards',
+      command:
+        'node --test packages/database/scripts/reconcile-development-schema.test.mjs',
+      flag: 'database_script_guards',
+    },
   ])(
     'routes the narrow $name check through its bounded input surface',
     ({ file, className, command, flag }) => {
@@ -838,6 +846,9 @@ describe('check-change-class.sh', () => {
 
     expect(step?.run).toContain(
       'node --test packages/database/scripts/check-development-schema.test.mjs',
+    );
+    expect(step?.run).toContain(
+      'node --test packages/database/scripts/reconcile-development-schema.test.mjs',
     );
   });
 

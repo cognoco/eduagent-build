@@ -174,7 +174,7 @@ for (const { name, rows, expectedDrift } of [
   });
 }
 
-for (const dopplerConfig of ['stg', 'prd']) {
+for (const dopplerConfig of ['dev_integration', 'stg', 'prd', '']) {
   test(`${dopplerConfig} target fails closed without querying`, async () => {
     const result = await runChecker({
       databaseUrl: 'postgresql://example.invalid/database',
