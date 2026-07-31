@@ -1,7 +1,7 @@
 import { resolve } from 'path';
 
 import { Hono } from 'hono';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, or } from 'drizzle-orm';
 import {
   createDatabase,
   guardianship,
@@ -228,6 +228,14 @@ async function cleanup() {
     .where(inArray(subscriptionTable.organizationId, orgIds));
   await db.delete(membership).where(inArray(membership.organizationId, orgIds));
   if (personIds.length > 0) {
+    await db
+      .delete(guardianship)
+      .where(
+        or(
+          inArray(guardianship.guardianPersonId, personIds),
+          inArray(guardianship.chargePersonId, personIds),
+        ),
+      );
     await db.delete(person).where(inArray(person.id, personIds));
   }
   await db.delete(organization).where(inArray(organization.id, orgIds));
@@ -245,7 +253,7 @@ describe('meteringMiddleware per-profile v2 live path (integration)', () => {
 
   afterAll(cleanup);
 
-  it('[WI-2653][RGR] lets a credentialed non-owner meter their own LLM message exactly once', async () => {
+  it('[WI-2653][RGR] lets a credentialed non-owner meter their own LLM message exactly once and lazy-provisions quota', async () => {
     const plus = getTierConfig('plus');
     const org = await seedOrganization(0);
     const owner = await seedPerson({

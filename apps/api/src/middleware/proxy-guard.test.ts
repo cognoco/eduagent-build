@@ -144,6 +144,8 @@ describe('assertNotProxyMode — server-derived proxy mode [BUG-718]', () => {
   });
 
   it('[BREAK] rejects writes for non-owner profile EVEN when X-Proxy-Mode header is omitted', async () => {
+    // Caller and target match here; missing explicit selection is the
+    // effective rejection gate after WI-2653, not the non-owner role itself.
     const app = createAppWithProfileMeta({ isOwner: false });
     const res = await app.request('/test', { method: 'POST' });
     expect(res.status).toBe(403);
