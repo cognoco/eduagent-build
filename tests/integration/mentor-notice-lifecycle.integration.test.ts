@@ -243,6 +243,7 @@ describe('mentor notice lifecycle — real database', () => {
           noticeId,
           profileId: fixture.profileId,
           sessionId: recheckSessionId,
+          timestamp: expect.any(String),
         },
       },
     ]);
