@@ -206,16 +206,34 @@ function createMockDb(options?: {
         findFirst: jest.fn().mockResolvedValue(null),
       },
     },
-    select: jest.fn().mockReturnValue({
-      from: jest.fn().mockReturnValue({
-        innerJoin: jest.fn().mockReturnValue({
+    select: jest.fn((selection?: Record<string, unknown>) => {
+      if (selection === undefined) {
+        return {
+          from: jest.fn().mockReturnValue({
+            innerJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnValue({
+                orderBy: jest.fn().mockResolvedValue([
+                  {
+                    curricula: { id: curriculumId, subjectId, version: 1 },
+                    subjects: { id: subjectId, profileId },
+                  },
+                ]),
+              }),
+            }),
+          }),
+        };
+      }
+      return {
+        from: jest.fn().mockReturnValue({
           innerJoin: jest.fn().mockReturnValue({
             innerJoin: jest.fn().mockReturnValue({
-              where: jest.fn().mockReturnValue(ownedTopicWhereResult),
+              innerJoin: jest.fn().mockReturnValue({
+                where: jest.fn().mockReturnValue(ownedTopicWhereResult),
+              }),
             }),
           }),
         }),
-      }),
+      };
     }),
     update: jest.fn().mockReturnValue({
       set: jest.fn().mockReturnValue({
@@ -428,27 +446,32 @@ describe('getSubjectRetention', () => {
         title: 'Mixed Parent Topic',
       },
     ]);
-    db.select = jest.fn(() => ({
-      from: jest.fn(() => ({
-        innerJoin: jest.fn(() => ({
-          innerJoin: jest.fn(() => ({
-            innerJoin: jest.fn(() => ({
-              where: jest.fn().mockResolvedValue([
-                {
-                  topicId: 'owned-topic',
-                  topicTitle: 'Owned Topic',
-                  topicDescription: null,
-                  bookId: 'book-owned',
-                  bookTitle: 'Book',
-                  curriculumId,
-                  subjectId,
-                },
-              ]),
+    const baseSelect = db.select;
+    db.select = jest.fn((selection?: Record<string, unknown>) =>
+      selection === undefined
+        ? (baseSelect as jest.Mock)(selection)
+        : ({
+            from: jest.fn(() => ({
+              innerJoin: jest.fn(() => ({
+                innerJoin: jest.fn(() => ({
+                  innerJoin: jest.fn(() => ({
+                    where: jest.fn().mockResolvedValue([
+                      {
+                        topicId: 'owned-topic',
+                        topicTitle: 'Owned Topic',
+                        topicDescription: null,
+                        bookId: 'book-owned',
+                        bookTitle: 'Book',
+                        curriculumId,
+                        subjectId,
+                      },
+                    ]),
+                  })),
+                })),
+              })),
             })),
-          })),
-        })),
-      })),
-    })) as never;
+          } as never),
+    ) as never;
 
     const result = await getSubjectRetention(db, profileId, subjectId);
 
@@ -487,27 +510,32 @@ describe('getAllSubjectsRetention', () => {
         title: 'Mixed Parent Topic',
       },
     ]);
-    db.select = jest.fn(() => ({
-      from: jest.fn(() => ({
-        innerJoin: jest.fn(() => ({
-          innerJoin: jest.fn(() => ({
-            innerJoin: jest.fn(() => ({
-              where: jest.fn().mockResolvedValue([
-                {
-                  topicId: 'owned-topic',
-                  topicTitle: 'Owned Topic',
-                  topicDescription: null,
-                  bookId: 'book-owned',
-                  bookTitle: 'Book',
-                  curriculumId,
-                  subjectId,
-                },
-              ]),
+    const baseSelect = db.select;
+    db.select = jest.fn((selection?: Record<string, unknown>) =>
+      selection === undefined
+        ? (baseSelect as jest.Mock)(selection)
+        : ({
+            from: jest.fn(() => ({
+              innerJoin: jest.fn(() => ({
+                innerJoin: jest.fn(() => ({
+                  innerJoin: jest.fn(() => ({
+                    where: jest.fn().mockResolvedValue([
+                      {
+                        topicId: 'owned-topic',
+                        topicTitle: 'Owned Topic',
+                        topicDescription: null,
+                        bookId: 'book-owned',
+                        bookTitle: 'Book',
+                        curriculumId,
+                        subjectId,
+                      },
+                    ]),
+                  })),
+                })),
+              })),
             })),
-          })),
-        })),
-      })),
-    })) as never;
+          } as never),
+    ) as never;
 
     const result = await getAllSubjectsRetention(db, profileId);
 

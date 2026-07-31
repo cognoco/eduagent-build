@@ -323,6 +323,80 @@ function mockMentorActivityLedgerRow(overrides: Row = {}): Row {
   };
 }
 
+function mockConceptRow(overrides: Row = {}): Row {
+  return {
+    id: fixtureUuid(16),
+    profileId: fixtureUuid(100),
+    subjectId: fixtureUuid(1),
+    topicId: fixtureUuid(3),
+    label: 'Linear equations',
+    normalizedLabel: 'linear equations',
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+function mockConceptMasteryRow(overrides: Row = {}): Row {
+  return {
+    id: fixtureUuid(17),
+    conceptId: fixtureUuid(16),
+    profileId: fixtureUuid(100),
+    status: 'partial',
+    verifiedAt: null,
+    lastEvaluatedAt: NOW,
+    supersededAt: null,
+    sourceSessionId: fixtureUuid(4),
+    learnerQuote: 'I move the number to the other side.',
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+function mockTopicNoteRow(overrides: Row = {}): Row {
+  return {
+    id: fixtureUuid(18),
+    topicId: fixtureUuid(3),
+    profileId: fixtureUuid(100),
+    sessionId: fixtureUuid(4),
+    content: 'Remember to balance both sides.',
+    artifactSource: 'learner_authored_note',
+    artifactConceptKey: null,
+    verificationState: 'unverified',
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+function mockMentorNoticeRow(overrides: Row = {}): Row {
+  return {
+    id: fixtureUuid(19),
+    profileId: fixtureUuid(100),
+    subjectId: fixtureUuid(1),
+    topicId: fixtureUuid(3),
+    sourceSessionId: fixtureUuid(4),
+    answerEventId: fixtureUuid(5),
+    concept: 'Linear equations',
+    correctionHint: 'Apply the same operation to both sides.',
+    status: 'open',
+    lastOfferedSessionId: null,
+    lastOfferedAt: null,
+    lastDeferredAt: null,
+    offerCount: 0,
+    recheckAttemptCount: 0,
+    firstRecheckAt: null,
+    lastRecheckAt: null,
+    lastRecheckOutcome: null,
+    nudgeStatus: 'pending',
+    nudgedAt: null,
+    createdAt: NOW,
+    resolvedAt: null,
+    ...overrides,
+  };
+}
+
 function createMockDb({
   account = mockAccountRow() as ReturnType<typeof mockAccountRow> | undefined,
   profiles = [] as ReturnType<typeof mockProfileRow>[],
@@ -349,6 +423,10 @@ function createMockDb({
   topUpCredits = [] as Record<string, unknown>[],
   learningProfiles = [] as Record<string, unknown>[],
   mentorActivityLedger = [] as Record<string, unknown>[],
+  concepts = [] as Record<string, unknown>[],
+  conceptMastery = [] as Record<string, unknown>[],
+  topicNotes = [] as Record<string, unknown>[],
+  mentorNotices = [] as Record<string, unknown>[],
 } = {}): Database {
   return {
     query: {
@@ -426,6 +504,18 @@ function createMockDb({
       },
       mentorActivityLedger: {
         findMany: jest.fn().mockResolvedValue(mentorActivityLedger),
+      },
+      concepts: {
+        findMany: jest.fn().mockResolvedValue(concepts),
+      },
+      conceptMastery: {
+        findMany: jest.fn().mockResolvedValue(conceptMastery),
+      },
+      topicNotes: {
+        findMany: jest.fn().mockResolvedValue(topicNotes),
+      },
+      mentorNotices: {
+        findMany: jest.fn().mockResolvedValue(mentorNotices),
       },
     },
   } as unknown as Database;
@@ -515,6 +605,10 @@ describe('generateExport', () => {
     const modeRow = mockLearningModeRow();
     const teachRow = mockTeachingPreferenceRow();
     const parkingRow = mockParkingLotItemRow();
+    const conceptRow = mockConceptRow();
+    const conceptMasteryRow = mockConceptMasteryRow();
+    const topicNoteRow = mockTopicNoteRow();
+    const mentorNoticeRow = mockMentorNoticeRow();
 
     const db = createMockDb({
       profiles: [profileRow],
@@ -532,6 +626,10 @@ describe('generateExport', () => {
       learningModes: [modeRow],
       teachingPreferences: [teachRow],
       parkingLotItems: [parkingRow],
+      concepts: [conceptRow],
+      conceptMastery: [conceptMasteryRow],
+      topicNotes: [topicNoteRow],
+      mentorNotices: [mentorNoticeRow],
     });
 
     const result = await generateExport(db, 'account-1', {
@@ -552,6 +650,17 @@ describe('generateExport', () => {
     expect(result.learningModes).toHaveLength(1);
     expect(result.teachingPreferences).toHaveLength(1);
     expect(result.parkingLotItems).toHaveLength(1);
+    const completeResult = result as unknown as Record<string, Row[]>;
+    expect(completeResult['concepts']).toEqual([serializeDates(conceptRow)]);
+    expect(completeResult['conceptMastery']).toEqual([
+      serializeDates(conceptMasteryRow),
+    ]);
+    expect(completeResult['topicNotes']).toEqual([
+      serializeDates(topicNoteRow),
+    ]);
+    expect(completeResult['mentorNotices']).toEqual([
+      serializeDates(mentorNoticeRow),
+    ]);
   });
 
   // Break test [BUG-934] — GDPR export is user-visible. ai_response rows
@@ -854,6 +963,11 @@ describe('generateExport', () => {
     expect(result.quotaPools).toEqual([]);
     expect(result.topUpCredits).toEqual([]);
     expect(result.mentorActivityLedger).toEqual([]);
+    const completeResult = result as unknown as Record<string, Row[]>;
+    expect(completeResult['concepts']).toEqual([]);
+    expect(completeResult['conceptMastery']).toEqual([]);
+    expect(completeResult['topicNotes']).toEqual([]);
+    expect(completeResult['mentorNotices']).toEqual([]);
   });
 
   // [WI-679] GDPR Art-15 gap: mentor_activity_ledger (added by migration 0111)

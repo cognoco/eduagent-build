@@ -319,7 +319,7 @@ async function seedSubject(input: {
 async function seedCurriculum(
   subjectId: string,
   topicTitles: string[],
-): Promise<{ curriculumId: string; topicIds: string[] }> {
+): Promise<{ curriculumId: string; bookId: string; topicIds: string[] }> {
   const [curriculum] = await db
     .insert(curricula)
     .values({ subjectId, version: 1 })
@@ -352,6 +352,7 @@ async function seedCurriculum(
 
   return {
     curriculumId: curriculum!.id,
+    bookId: book!.id,
     topicIds: topics.map((topic: { id: string }) => topic.id),
   };
 }
@@ -1735,6 +1736,66 @@ describe('dashboard service integration', () => {
     );
     // Topics with 0 sessions are filtered out (parent only sees topics with activity)
     expect(animalCells).toBeUndefined();
+  });
+
+  it('[WI-2463] reads child subject topics only from the latest curriculum version', async () => {
+    const { profileId: parentProfileId, orgId: parentOrgId } =
+      await seedProfile({
+        displayName: 'Versioned Parent',
+        birthYear: 1984,
+      });
+    const { profileId: childProfileId } = await seedProfile({
+      displayName: 'Versioned Learner',
+      birthYear: 2010,
+      orgId: parentOrgId,
+    });
+    await seedFamilyLink(parentProfileId, childProfileId);
+
+    const subjectId = await seedSubject({
+      profileId: childProfileId,
+      name: 'Versioned Biology',
+    });
+    const v1 = await seedCurriculum(subjectId, ['Obsolete cells']);
+    const [v2Curriculum] = await db
+      .insert(curricula)
+      .values({ subjectId, version: 2 })
+      .returning({ id: curricula.id });
+    const [v2Topic] = await db
+      .insert(curriculumTopics)
+      .values({
+        curriculumId: v2Curriculum!.id,
+        bookId: v1.bookId,
+        title: 'Current cells',
+        description: 'Current cells description',
+        sortOrder: 0,
+        estimatedMinutes: 20,
+        skipped: false,
+      })
+      .returning({ id: curriculumTopics.id });
+
+    await seedSession({
+      profileId: childProfileId,
+      subjectId,
+      topicId: v1.topicIds[0],
+      exchangeCount: 4,
+      status: 'completed',
+    });
+    await seedSession({
+      profileId: childProfileId,
+      subjectId,
+      topicId: v2Topic!.id,
+      exchangeCount: 4,
+      status: 'completed',
+    });
+
+    const topics = await getChildSubjectTopics(
+      db,
+      parentProfileId,
+      childProfileId,
+      subjectId,
+    );
+
+    expect(topics.map((topic) => topic.topicId)).toEqual([v2Topic!.id]);
   });
 
   it('returns child sessions and a single-session detail with structured recap fields', async () => {

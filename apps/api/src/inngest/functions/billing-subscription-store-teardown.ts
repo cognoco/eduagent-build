@@ -10,7 +10,7 @@ import {
 } from '../helpers';
 import { teardownSubscriptionStoresForErasure } from '../../services/billing/store-teardown';
 import { createLogger } from '../../services/logger';
-import { captureException } from '../../services/sentry';
+import { captureException, captureMessage } from '../../services/sentry';
 
 const logger = createLogger();
 
@@ -59,7 +59,7 @@ export const billingSubscriptionStoreTeardown = inngest.createFunction(
     },
   },
   { event: 'app/billing.subscription_store_teardown_requested' },
-  async ({ event, step }) => {
+  async ({ event, runId, step }) => {
     const parsed = subscriptionStoreTeardownRequestedDataSchema.safeParse(
       event.data,
     );
@@ -95,6 +95,60 @@ export const billingSubscriptionStoreTeardown = inngest.createFunction(
           ? getStepRevenueCatRestApiKey()
           : undefined,
       });
+    });
+
+    const summarizeProvider = (
+      provider: 'stripe' | 'revenueCat',
+    ): 'done' | 'already_absent' | 'not_applicable' | 'mixed' => {
+      const statuses = new Set(
+        results.map((result) => result[provider].status),
+      );
+      return statuses.size === 1
+        ? ([...statuses][0] ?? 'not_applicable')
+        : 'mixed';
+    };
+    const stripe = summarizeProvider('stripe');
+    const revenueCat = summarizeProvider('revenueCat');
+
+    // [WI-2390] This is the final external leg of whole-account erasure. Keep
+    // its success proof outside Postgres so PITR cannot erase the evidence or
+    // make a restored account look as though provider teardown never happened.
+    await step.run('record-store-teardown-completion', async () => {
+      const completion = {
+        event: 'billing.store_teardown.completed',
+        accountId,
+        runId,
+        subscriptionsProcessed: results.length,
+        stripe,
+        revenueCat,
+      };
+      logger.info('billing.store_teardown.completed', completion);
+
+      try {
+        captureMessage('billing.store_teardown.completed', {
+          level: 'info',
+          tags: {
+            surface: 'billing.store_teardown.completed',
+            stripe,
+            revenueCat,
+          },
+          extra: {
+            accountId,
+            runId,
+            subscriptionsProcessed: results.length,
+          },
+        });
+      } catch (error) {
+        // The structured log above remains the durable proof; observability
+        // transport failure must not re-run completed provider deletions.
+        logger.warn('billing.store_teardown.completion_sentry_failed', {
+          accountId,
+          runId,
+          errorName: error instanceof Error ? error.name : typeof error,
+        });
+      }
+
+      return completion;
     });
 
     return {

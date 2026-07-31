@@ -402,6 +402,27 @@ describe('resolveFilingResult', () => {
           ]),
         },
       },
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          innerJoin: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockResolvedValue([
+                {
+                  curricula: {
+                    id: 'curriculum-1',
+                    subjectId: 'subject-1',
+                    version: 1,
+                  },
+                  subjects: {
+                    id: 'subject-1',
+                    profileId: 'profile-1',
+                  },
+                },
+              ]),
+            }),
+          }),
+        }),
+      }),
       update: jest.fn().mockReturnValue({
         set: jest.fn().mockReturnValue({
           where: jest.fn().mockReturnValue({

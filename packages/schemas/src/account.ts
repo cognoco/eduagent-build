@@ -605,6 +605,70 @@ export type DataExportMentorActivityLedgerRow = z.infer<
   typeof dataExportMentorActivityLedgerRowSchema
 >;
 
+export const dataExportConceptRowSchema = z.object({
+  id: z.string().uuid(),
+  profileId: z.string().uuid(),
+  subjectId: z.string().uuid(),
+  topicId: z.string().uuid(),
+  label: z.string(),
+  normalizedLabel: z.string(),
+  createdAt: isoDateField,
+  updatedAt: isoDateField,
+});
+
+export const dataExportConceptMasteryRowSchema = z.object({
+  id: z.string().uuid(),
+  conceptId: z.string().uuid(),
+  profileId: z.string().uuid(),
+  status: z.enum(['solid', 'partial', 'missing', 'misconception']),
+  verifiedAt: isoDateField.nullable(),
+  lastEvaluatedAt: isoDateField,
+  supersededAt: isoDateField.nullable(),
+  sourceSessionId: z.string().uuid().nullable(),
+  learnerQuote: z.string().nullable(),
+  createdAt: isoDateField,
+  updatedAt: isoDateField,
+});
+
+export const dataExportTopicNoteRowSchema = z.object({
+  id: z.string().uuid(),
+  topicId: z.string().uuid(),
+  profileId: z.string().uuid(),
+  sessionId: z.string().uuid().nullable(),
+  content: z.string(),
+  artifactSource: z.string().nullable(),
+  artifactConceptKey: z.string().nullable(),
+  verificationState: z.string(),
+  createdAt: isoDateField,
+  updatedAt: isoDateField,
+});
+
+export const dataExportMentorNoticeRowSchema = z.object({
+  id: z.string().uuid(),
+  profileId: z.string().uuid(),
+  subjectId: z.string().uuid(),
+  topicId: z.string().uuid().nullable(),
+  sourceSessionId: z.string().uuid(),
+  answerEventId: z.string().uuid().nullable(),
+  concept: z.string(),
+  correctionHint: z.string().nullable(),
+  status: z.enum(['open', 'locked_in', 'dismissed', 'faded', 'not_yet']),
+  lastOfferedSessionId: z.string().uuid().nullable(),
+  lastOfferedAt: isoDateField.nullable(),
+  lastDeferredAt: isoDateField.nullable(),
+  offerCount: z.number().int(),
+  recheckAttemptCount: z.number().int(),
+  firstRecheckAt: isoDateField.nullable(),
+  lastRecheckAt: isoDateField.nullable(),
+  lastRecheckOutcome: z
+    .enum(['locked_in', 'not_yet', 'dismissed', 'deferred'])
+    .nullable(),
+  nudgeStatus: z.enum(['pending', 'sent', 'skipped', 'suppressed']),
+  nudgedAt: isoDateField.nullable(),
+  createdAt: isoDateField,
+  resolvedAt: isoDateField.nullable(),
+});
+
 export const accountDeletionResponseSchema = z.object({
   message: z.string(),
   gracePeriodEnds: isoDateField,
@@ -749,6 +813,10 @@ export const dataExportSchema = z.object({
   mentorActivityLedger: z
     .array(dataExportMentorActivityLedgerRowSchema)
     .optional(),
+  concepts: z.array(dataExportConceptRowSchema).optional(),
+  conceptMastery: z.array(dataExportConceptMasteryRowSchema).optional(),
+  topicNotes: z.array(dataExportTopicNoteRowSchema).optional(),
+  mentorNotices: z.array(dataExportMentorNoticeRowSchema).optional(),
   exportedAt: isoDateField,
 });
 

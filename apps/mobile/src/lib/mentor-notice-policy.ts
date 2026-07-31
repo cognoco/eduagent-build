@@ -511,9 +511,35 @@ const UNBOUND_SNAPSHOT: MentorNoticePolicySnapshot = {
   state: MENTOR_NOTICE_POLICY_BOOTSTRAP,
   observed: false,
   hydrated: false,
-  // [WI-2911] An unbound pair has no key, so there is no read to have failed and
-  // nothing stored to be blind to — matching `hydrated`/`observed` below, which
-  // the hook already reports as true when unbound.
+  // [WI-2933, correcting a WI-2911 rationale] `true` is the right VALUE, and the
+  // reason given for it was wrong. `trusted` asserts "no read of this pair's
+  // stored record has failed"; an unbound pair has no key, so no read was ever
+  // attempted and none can have failed. That stands on its own.
+  //
+  // The struck justification claimed this matched `hydrated`/`observed` "which
+  // the hook already reports as true when unbound". It does not: the literal two
+  // lines above sets BOTH to `false`. The "true when unbound" belongs to the
+  // hook's RETURN (`bound ? snapshot.hydrated : true`), a different object built
+  // from this one — so the old comment justified a field of this literal by
+  // citing values this literal does not hold.
+  //
+  // Rationale corrected rather than value changed — and the FIRST correction
+  // was wrong the same way. It claimed flipping this to `false` would make
+  // `noticesSuppressedForPayload` suppress unconditionally. That consequence
+  // belongs to a DIFFERENT literal: the one built inline in
+  // `mentorNoticePolicySuppressesPayloadFor`'s unbound branch, which pairs
+  // `trusted: true` with `hydrated: true` and so does reach the `!trusted`
+  // check. Read that literal for the fleet-wide-blanking argument; it is the
+  // one that carries it.
+  //
+  // THIS field is read on no live path, on four counts: the only reference is
+  // `getSnapshot`'s `if (!key) return UNBOUND_SNAPSHOT`; the unbound branch
+  // above builds its own literal instead of using this one;
+  // `noticesSuppressedForPayload` returns at `!hydrated` before `trusted` is
+  // read, and this literal sets `hydrated: false`; and the hook's return masks
+  // it (`trusted: bound ? snapshot.trusted : true`). Flipping it changes
+  // nothing observable. `true` is the honest label for "no read was attempted",
+  // which is why it stays.
   trusted: true,
 };
 
@@ -1094,12 +1120,6 @@ export function useMentorNoticePolicy(
   trusted: boolean;
   /** Fold an observation off any surface into the shared state. */
   observe: (observation: MentorNoticePolicyObservation | undefined) => void;
-  /**
-   * Record a fail-closed `malformed` signal when the observation could not be
-   * reached at all — e.g. the whole response failed schema validation, so no
-   * observation value exists to pass to `observe`.
-   */
-  observeMalformed: () => void;
   /** Whether THIS payload's notice content must be suppressed. */
   suppressed: (
     observation: MentorNoticePolicyObservation | undefined,
@@ -1159,10 +1179,6 @@ export function useMentorNoticePolicy(
     [actorId, profileId],
   );
 
-  const observeMalformed = useCallback(() => {
-    foldMentorNoticePolicyFor(actorId, profileId, 'malformed');
-  }, [actorId, profileId]);
-
   // Reads the LIVE store rather than this render's snapshot. In render the two
   // agree (both come from the same entry, and `useSyncExternalStore` re-renders
   // on every commit). The difference matters in an imperative callback that has
@@ -1182,7 +1198,6 @@ export function useMentorNoticePolicy(
       hydrated: bound ? snapshot.hydrated : true,
       trusted: bound ? snapshot.trusted : true,
       observe,
-      observeMalformed,
       suppressed,
     }),
     [
@@ -1192,7 +1207,6 @@ export function useMentorNoticePolicy(
       snapshot.trusted,
       bound,
       observe,
-      observeMalformed,
       suppressed,
     ],
   );
