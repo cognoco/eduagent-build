@@ -386,6 +386,74 @@ describe('[WI-2228/WI-2458] e2e-web.yml gates V2 and stable legacy smoke', () =>
     expect(result.status).toBe(expected);
   });
 
+  it('runs one fail-closed Clerk instance preflight before every credential-consuming lane', () => {
+    const runSmoke = jobs['run-smoke'];
+    expect(runSmoke).toBeDefined();
+    const preflightSteps = (runSmoke.steps ?? []).filter(
+      (step) => step.name === 'Verify staging Clerk instance alignment',
+    );
+    expect(preflightSteps).toHaveLength(1);
+
+    const [preflightStep] = preflightSteps;
+    const stepNames = (runSmoke.steps ?? []).map((step) => step.name);
+    const preflightScript = String(preflightStep?.run ?? '');
+    const checkerSteps = (runSmoke.steps ?? []).filter((step) =>
+      String(step.run ?? '').includes(
+        'node scripts/check-clerk-key-alignment.mjs',
+      ),
+    );
+
+    expect(preflightStep?.id).toBe('clerk-preflight');
+    expect(preflightStep?.['continue-on-error']).not.toBe(true);
+    expect(preflightScript).toContain(
+      'node scripts/check-clerk-key-alignment.mjs',
+    );
+    expect(preflightScript).toContain(
+      '--preserve-env="EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY"',
+    );
+    expect(checkerSteps).toEqual([preflightStep]);
+    expect(
+      stepNames.indexOf('Verify staging Clerk instance alignment'),
+    ).toBeLessThan(stepNames.indexOf('Run V2 release Playwright gate'));
+  });
+
+  it.each([
+    'Run V2 release Playwright gate',
+    'Run required-stable legacy Playwright smoke',
+    'Run advisory legacy Playwright smoke',
+  ])(
+    'a Clerk instance mismatch blocks %s before it exports the backend key',
+    (stepName) => {
+      const host = 'whole-iguana-9.clerk.accounts.dev';
+      const clerkKey = (prefix: string, keyHost: string) =>
+        `${prefix}_${Buffer.from(`${keyHost}$`).toString('base64')}`;
+      const mismatch = spawnSync(
+        process.execPath,
+        [join(repoRoot, 'scripts', 'check-clerk-key-alignment.mjs')],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            CLERK_SECRET_KEY: clerkKey(
+              'sk_test',
+              'wrong-instance.clerk.accounts.dev',
+            ),
+            CLERK_PUBLISHABLE_KEY: clerkKey('pk_test', host),
+            EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: clerkKey('pk_test', host),
+            CLERK_JWKS_URL: `https://${host}/.well-known/jwks.json`,
+          },
+        },
+      );
+      expect(mismatch.status).toBe(1);
+
+      const laneStep = stepNamed(jobs['run-smoke'], stepName);
+      expect(String(laneStep?.run ?? '')).toContain('export CLERK_SECRET_KEY=');
+      expect(String(laneStep?.if ?? '').replace(/\s+/g, '')).toContain(
+        "steps.clerk-preflight.outcome=='success'",
+      );
+    },
+  );
+
   it('runs V2 first and partitions legacy smoke into required and advisory lanes', () => {
     const runSmoke = jobs['run-smoke'];
     expect(runSmoke).toBeDefined();
@@ -401,6 +469,10 @@ describe('[WI-2228/WI-2458] e2e-web.yml gates V2 and stable legacy smoke', () =>
     const advisoryStep = stepNamed(
       runSmoke,
       'Run advisory legacy Playwright smoke',
+    );
+    const probeSummaryStep = stepNamed(
+      runSmoke,
+      'Stop and summarize runner-to-edge phase probe',
     );
     const resetStep = stepNamed(
       runSmoke,
@@ -420,13 +492,12 @@ describe('[WI-2228/WI-2458] e2e-web.yml gates V2 and stable legacy smoke', () =>
 
     expect(v2Step).toBeDefined();
     expect(v2Step?.['continue-on-error']).not.toBe(true);
-    expect(v2Script).toContain('node scripts/check-clerk-key-alignment.mjs');
     expect(v2Script).toContain(
       '--preserve-env="EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY"',
     );
-    expect(
-      v2Script.indexOf('node scripts/check-clerk-key-alignment.mjs'),
-    ).toBeLessThan(v2Script.indexOf('playwright-seed-scenario-guard.ts'));
+    expect(v2Script).not.toContain(
+      'node scripts/check-clerk-key-alignment.mjs',
+    );
     expect(v2Script).toContain('pnpm run test:e2e:web:v2');
     expect(v2Script).not.toContain('pnpm run test:e2e:web:smoke');
     expect(v2Script).toContain('playwright-staging-gate.cjs --decide');
@@ -434,6 +505,9 @@ describe('[WI-2228/WI-2458] e2e-web.yml gates V2 and stable legacy smoke', () =>
     expect(classifyCommand).toContain('${PLAYWRIGHT_API_URL}');
 
     expect(resolveStep?.['continue-on-error']).not.toBe(true);
+    expect(String(resolveStep?.if).replace(/\s+/g, '')).toContain(
+      'always()&&!cancelled()',
+    );
     expect(resolveScript).toContain('run-smoke-lanes.cjs validate');
     expect(resolveScript).toContain('run-smoke-lanes.cjs core');
     expect(resolveScript).toContain('run-smoke-lanes.cjs advisory');
@@ -472,6 +546,12 @@ describe('[WI-2228/WI-2458] e2e-web.yml gates V2 and stable legacy smoke', () =>
       'PLAYWRIGHT_ARTIFACT_LANE=legacy-advisory',
     );
     expect(advisoryScript).toContain('pnpm run test:e2e:web:smoke -- advisory');
+    expect(String(probeSummaryStep?.if).replace(/\s+/g, '')).toMatch(
+      /^\$\{\{always\(\)\}\}$|^always\(\)$/,
+    );
+    expect(String(resetStep?.if).replace(/\s+/g, '')).toMatch(
+      /^\$\{\{always\(\)\}\}$|^always\(\)$/,
+    );
 
     // WI-2594: the "Upload V2/legacy Playwright artifacts" steps were
     // removed (both trees record fill-step values, e.g. seeded login

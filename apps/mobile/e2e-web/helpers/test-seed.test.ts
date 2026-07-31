@@ -1,6 +1,7 @@
 const originalEmailPrefix = process.env.PLAYWRIGHT_EMAIL_PREFIX;
 const originalApiUrl = process.env.PLAYWRIGHT_API_URL;
 const originalTestSeedSecret = process.env.PLAYWRIGHT_TEST_SEED_SECRET;
+const originalClerkSecretKey = process.env.CLERK_SECRET_KEY;
 const originalFetch = global.fetch;
 
 afterEach(() => {
@@ -18,6 +19,11 @@ afterEach(() => {
     delete process.env.PLAYWRIGHT_TEST_SEED_SECRET;
   } else {
     process.env.PLAYWRIGHT_TEST_SEED_SECRET = originalTestSeedSecret;
+  }
+  if (originalClerkSecretKey === undefined) {
+    delete process.env.CLERK_SECRET_KEY;
+  } else {
+    process.env.CLERK_SECRET_KEY = originalClerkSecretKey;
   }
   global.fetch = originalFetch;
   jest.resetModules();
@@ -77,5 +83,34 @@ describe('[WI-2820 P1] prefix cleanup batching', () => {
       method: 'POST',
       headers: { 'X-Test-Secret': 'test-secret' },
     });
+  });
+});
+
+describe('[WI-2948] server-owned Clerk seed provisioning', () => {
+  it('does not query Clerk with an ambient backend key after the seed endpoint succeeds', async () => {
+    process.env.CLERK_SECRET_KEY = 'ambient-key-must-not-be-used';
+    const seeded = {
+      scenario: 'onboarding-complete',
+      accountId: 'account-seeded',
+      profileId: 'profile-seeded',
+      email: 'seed@example.com',
+      password: 'generated-password',
+      ids: {},
+    };
+    global.fetch = jest.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === 'https://api.test.example/v1/__test/seed') {
+        return new Response(JSON.stringify(seeded), { status: 201 });
+      }
+      throw new Error(`Unexpected request to ${new URL(String(input)).host}`);
+    }) as jest.Mock;
+    const { seedScenario } = loadTestSeedHelper();
+
+    await expect(
+      seedScenario({
+        scenario: seeded.scenario,
+        email: seeded.email,
+      }),
+    ).resolves.toEqual(seeded);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 });
