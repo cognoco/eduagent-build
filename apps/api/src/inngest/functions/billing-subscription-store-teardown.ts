@@ -1,5 +1,6 @@
 // @inngest-admin: no-db (calls Stripe + RevenueCat external APIs for subscription-store erasure; no database access)
 import {
+  type BillingSubscriptionStoreTeardownFailedEvent,
   subscriptionStoreTeardownRequestedDataSchema,
   summarizeRawPayload,
 } from '@eduagent/schemas';
@@ -10,6 +11,7 @@ import {
 } from '../helpers';
 import { teardownSubscriptionStoresForErasure } from '../../services/billing/store-teardown';
 import { createLogger } from '../../services/logger';
+import { safeSend } from '../../services/safe-non-core';
 import { captureException, captureMessage } from '../../services/sentry';
 
 const logger = createLogger();
@@ -31,6 +33,8 @@ export const billingSubscriptionStoreTeardown = inngest.createFunction(
       const accountId =
         (event.data.event?.data as { accountId?: string } | undefined)
           ?.accountId ?? null;
+      const runId = event.data.run_id ?? null;
+      const errorName = error instanceof Error ? error.name : typeof error;
 
       captureException(
         error instanceof Error
@@ -44,16 +48,34 @@ export const billingSubscriptionStoreTeardown = inngest.createFunction(
           extra: {
             surface: 'billing-subscription-store-teardown.terminal_failure',
             accountId,
-            runId: event.data.run_id ?? null,
+            runId,
           },
         },
       );
 
       logger.error('billing.store_teardown.terminal_failure', {
         accountId,
-        runId: event.data.run_id ?? null,
-        errorName: error instanceof Error ? error.name : typeof error,
+        runId,
+        errorName,
       });
+
+      const failureEvent: BillingSubscriptionStoreTeardownFailedEvent = {
+        accountId,
+        runId,
+        errorName,
+        timestamp: new Date().toISOString(),
+      };
+      await safeSend(
+        () =>
+          inngest.send({
+            // orphan-allow: observability-only dead-letter signal consumed by
+            // launch-health alerting and the Inngest dashboard.
+            name: 'app/billing.subscription_store_teardown.failed',
+            data: failureEvent,
+          }),
+        'billing-subscription-store-teardown.terminal_failure',
+        { accountId, runId },
+      );
 
       return { status: 'terminal_failure' as const, accountId };
     },

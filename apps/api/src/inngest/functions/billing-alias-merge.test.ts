@@ -15,6 +15,7 @@
 const consoleErrorSpy = jest
   .spyOn(console, 'error')
   .mockImplementation(() => undefined);
+const mockInngestSend = jest.fn().mockResolvedValue({ ids: [] });
 
 // External boundary only: capture inngest.createFunction so the handler fn is
 // directly invocable (mirrors payment-failed-observe.test.ts).
@@ -31,6 +32,7 @@ jest.mock('../client', () => {
             fn,
           }),
       ),
+      send: (...args: unknown[]) => mockInngestSend(...args),
     },
   };
 });
@@ -45,6 +47,7 @@ import { billingAliasMerge } from './billing-alias-merge';
 // which already routes to mergeAliasedSubscriptionV2 unconditionally
 // (WI-867). There is no legacy call site left to assert against.
 import * as billingV2 from '../../services/billing/billing-v2';
+import * as safeNonCore from '../../services/safe-non-core';
 import * as sentry from '../../services/sentry';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
@@ -132,6 +135,49 @@ describe('billingAliasMerge worker [BUG-783]', () => {
     });
 
     captureSpy.mockRestore();
+  });
+
+  it('[BREAK WI-2346] safeSends a PII-minimized billing alias dead-letter event', async () => {
+    jest.spyOn(sentry, 'captureException').mockImplementation(() => undefined);
+    const safeSendSpy = jest
+      .spyOn(safeNonCore, 'safeSend')
+      .mockResolvedValue(undefined);
+    const opts = (billingAliasMerge as any).opts;
+
+    await opts.onFailure({
+      event: {
+        data: {
+          event: { data: { eventId: 'evt-alias-terminal' } },
+          run_id: 'run-alias-terminal',
+        },
+      },
+      error: new Error('RevenueCat response contained private context'),
+    });
+
+    expect(safeSendSpy).toHaveBeenCalledTimes(1);
+    const call = safeSendSpy.mock.calls[0];
+    expect(call).toBeDefined();
+    if (!call) return;
+    const [sendThunk, surface, context] = call;
+    expect(surface).toBe('billing-alias-merge.terminal_failure');
+    expect(context).toEqual({
+      eventId: 'evt-alias-terminal',
+      runId: 'run-alias-terminal',
+    });
+
+    await expect(sendThunk()).resolves.not.toThrow();
+    expect(mockInngestSend).toHaveBeenCalledWith({
+      name: 'app/billing.alias_merge.failed',
+      data: {
+        eventId: 'evt-alias-terminal',
+        runId: 'run-alias-terminal',
+        errorName: 'Error',
+        timestamp: expect.any(String),
+      },
+    });
+    expect(JSON.stringify(mockInngestSend.mock.calls)).not.toContain(
+      'private context',
+    );
   });
 });
 

@@ -20,6 +20,7 @@ import {
   mentorNoticeRecheckOutcomeEventSchema,
   mentorNoticeRecheckStartedEventSchema,
 } from './inngest-events.js';
+import * as inngestEventSchemas from './inngest-events.js';
 
 const validUuid = '00000000-0000-4000-8000-000000000001';
 
@@ -98,6 +99,75 @@ describe('billing alert delivery failure event schema', () => {
         timestamp: '2026-07-11T10:00:00.000Z',
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('[WI-2346] durable terminal-failure event schemas', () => {
+  type RuntimeSchema = {
+    safeParse: (value: unknown) => {
+      success: boolean;
+      data?: Record<string, unknown>;
+    };
+  };
+  const schemas = inngestEventSchemas as unknown as Record<
+    string,
+    RuntimeSchema | undefined
+  >;
+  const timestamp = '2026-07-31T10:00:00.000Z';
+
+  it.each([
+    [
+      'accountDeletionTeardownFailedEventSchema',
+      {
+        accountId: validUuid,
+        runId: 'run-account',
+        errorName: 'Error',
+        timestamp,
+      },
+    ],
+    [
+      'billingSubscriptionStoreTeardownFailedEventSchema',
+      {
+        accountId: validUuid,
+        runId: 'run-store',
+        errorName: 'Error',
+        timestamp,
+      },
+    ],
+    [
+      'billingAliasMergeFailedEventSchema',
+      {
+        eventId: 'rc-event-id',
+        runId: 'run-alias',
+        errorName: 'Error',
+        timestamp,
+      },
+    ],
+  ])('exports and accepts the PII-minimized %s payload', (name, payload) => {
+    const schema = schemas[name];
+    expect(schema).toBeDefined();
+    expect(schema?.safeParse(payload).success).toBe(true);
+  });
+
+  it.each([
+    ['accountDeletionTeardownFailedEventSchema', { accountId: validUuid }],
+    [
+      'billingSubscriptionStoreTeardownFailedEventSchema',
+      { accountId: validUuid },
+    ],
+    ['billingAliasMergeFailedEventSchema', { eventId: 'rc-event-id' }],
+  ])('strips raw error text from %s', (name, identity) => {
+    const parsed = schemas[name]?.safeParse({
+      ...identity,
+      runId: 'run-private',
+      errorName: 'Error',
+      timestamp,
+      error: 'payer@example.test provider response body',
+    });
+
+    expect(parsed?.success).toBe(true);
+    expect(parsed?.data).not.toHaveProperty('error');
+    expect(JSON.stringify(parsed?.data)).not.toContain('payer@example.test');
   });
 });
 
