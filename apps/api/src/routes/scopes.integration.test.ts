@@ -5,7 +5,9 @@ import { HTTPException } from 'hono/http-exception';
 import {
   createDatabase,
   generateUUIDv7,
+  login,
   person,
+  subjects,
   supportership,
   type Database,
 } from '@eduagent/database';
@@ -13,6 +15,7 @@ import { ERROR_CODES, ForbiddenError } from '@eduagent/schemas';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 
 import { scopesRoutes } from './scopes';
+import { acceptLink, initiateLink } from '../services/linking-ceremony';
 import {
   deleteV2IdentitiesForTest,
   ensureV2IdentityForLegacyProfileTest,
@@ -25,6 +28,7 @@ type TestEnv = {
     db: Database;
     profileId: string | undefined;
     profileMeta: undefined;
+    callerPersonId: string | undefined;
     user: unknown;
   };
 };
@@ -43,12 +47,17 @@ function createIntegrationDb(): Database {
   return createDatabase(requireDatabaseUrl());
 }
 
-function makeApp(db: Database, profileId: string) {
+function makeApp(
+  db: Database,
+  profileId: string,
+  callerPersonId: string = profileId,
+) {
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
     c.set('db', db);
     c.set('profileId', profileId);
     c.set('profileMeta', undefined);
+    c.set('callerPersonId', callerPersonId);
     await next();
   });
   app.route('/v1', scopesRoutes);
@@ -67,9 +76,18 @@ const CLERK_PREFIX = `integ-scopes-coldstart-${RUN_ID}`;
 const seededAccountIds: string[] = [];
 const seededProfileIds: string[] = [];
 const seededSupportershipIds: string[] = [];
+const seededSubjectIds: string[] = [];
 
 async function seedProfile(database: Database, label: string): Promise<string> {
-  const accountId = generateUUIDv7();
+  return seedProfileInAccount(database, label, generateUUIDv7(), true);
+}
+
+async function seedProfileInAccount(
+  database: Database,
+  label: string,
+  accountId: string,
+  isOwner: boolean,
+): Promise<string> {
   const profileId = generateUUIDv7();
   const clerkUserId = `${CLERK_PREFIX}-${label}`;
   const email = `${CLERK_PREFIX}-${label}@test.invalid`;
@@ -84,10 +102,53 @@ async function seedProfile(database: Database, label: string): Promise<string> {
     email,
     displayName: `Coldstart ${label}`,
     birthYear: 2010,
-    isOwner: true,
+    isOwner,
   });
 
+  if (!isOwner) {
+    const [loginRow] = await database
+      .insert(login)
+      .values({
+        id: generateUUIDv7(),
+        personId: profileId,
+        clerkUserId,
+        email,
+      })
+      .returning({ id: login.id });
+    if (!loginRow) throw new Error('Failed to seed credentialed non-owner');
+    await database
+      .update(person)
+      .set({ loginId: loginRow.id })
+      .where(eq(person.id, profileId));
+  }
+
   return profileId;
+}
+
+async function seedAcceptedContract(
+  database: Database,
+  supporterPersonId: string,
+  supporteePersonId: string,
+): Promise<string> {
+  const initiated = await initiateLink(database, {
+    supporterPersonId,
+    supporteePersonId,
+    relation: 'other',
+    managedTier: false,
+  });
+  seededSupportershipIds.push(initiated.supportershipId);
+  await acceptLink(database, initiated.id, {
+    actorPersonId: supporterPersonId,
+    audience: 'supporter',
+    contractVersion: initiated.contractVersion,
+  });
+  const accepted = await acceptLink(database, initiated.id, {
+    actorPersonId: supporteePersonId,
+    audience: 'supportee',
+    contractVersion: initiated.contractVersion,
+  });
+  expect(accepted.status).toBe('accepted');
+  return initiated.supportershipId;
 }
 
 async function seedSupportership(
@@ -109,6 +170,11 @@ async function seedSupportership(
 }
 
 async function cleanup(database: Database): Promise<void> {
+  if (seededSubjectIds.length > 0) {
+    await database
+      .delete(subjects)
+      .where(inArray(subjects.id, seededSubjectIds));
+  }
   if (seededSupportershipIds.length > 0) {
     await database
       .delete(supportership)
@@ -119,6 +185,7 @@ async function cleanup(database: Database): Promise<void> {
     profileIds: seededProfileIds,
   });
   seededSupportershipIds.length = 0;
+  seededSubjectIds.length = 0;
   seededAccountIds.length = 0;
   seededProfileIds.length = 0;
 }
@@ -184,5 +251,60 @@ describe('Integration: GET /scopes/coldstart', () => {
       edgeId,
     });
     expect(body.cards[0]?.staleIdleStep).toBeUndefined();
+  });
+});
+
+describe('Integration: GET /scopes/:personId/subjects read authority', () => {
+  it('[WI-2518][RGR] rejects a same-account non-owner borrowing the selected profile edge and allows the caller own accepted edge', async () => {
+    const accountId = generateUUIDv7();
+    const selectedEdgeHolderId = await seedProfileInAccount(
+      db,
+      'subjects-idor-selected-edge-holder',
+      accountId,
+      true,
+    );
+    const callerPersonId = await seedProfileInAccount(
+      db,
+      'subjects-idor-credentialed-non-owner',
+      accountId,
+      false,
+    );
+    const supporteeId = await seedProfile(db, 'subjects-idor-supportee');
+    await seedAcceptedContract(db, selectedEdgeHolderId, supporteeId);
+    const [subject] = await db
+      .insert(subjects)
+      .values({
+        profileId: supporteeId,
+        name: 'Borrowed edge must not reveal this subject',
+      })
+      .returning({ id: subjects.id });
+    if (!subject) throw new Error('Failed to seed structural subject');
+    seededSubjectIds.push(subject.id);
+
+    const borrowedRes = await makeApp(
+      db,
+      selectedEdgeHolderId,
+      callerPersonId,
+    ).request(`/v1/scopes/${supporteeId}/subjects`);
+
+    expect(borrowedRes.status).toBe(403);
+
+    await seedAcceptedContract(db, callerPersonId, supporteeId);
+    const honestRes = await makeApp(db, callerPersonId, callerPersonId).request(
+      `/v1/scopes/${supporteeId}/subjects`,
+    );
+
+    expect(honestRes.status).toBe(200);
+    const body = (await honestRes.json()) as {
+      personId: string;
+      subjects: Array<{ id: string; name: string }>;
+    };
+    expect(body.personId).toBe(supporteeId);
+    expect(body.subjects).toContainEqual({
+      id: subject.id,
+      name: 'Borrowed edge must not reveal this subject',
+      status: 'active',
+      books: [],
+    });
   });
 });

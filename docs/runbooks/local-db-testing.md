@@ -24,7 +24,9 @@ config (under the `dev` Doppler environment):
 | `DATABASE_URL` | Connection URL for the dedicated integration database |
 | `INTEGRATION_DATABASE_HOST` | Exact hostname parsed from `DATABASE_URL` |
 | `INTEGRATION_DATABASE_NAME` | Exact database name parsed from `DATABASE_URL` |
+| `INTEGRATION_DATABASE_TARGET_ID` | Unique lowercase identifier embedded in the database name |
 | `INTEGRATION_DATABASE_DISPOSABLE` | Literal `true` |
+| `DATABASE_URL_DEVELOPMENT_HOST` | Exact protected shared-development hostname |
 | `DATABASE_URL_STAGING_HOST` | Exact protected staging hostname |
 | `DATABASE_URL_PRODUCTION_HOST` | Exact protected production hostname |
 
@@ -35,6 +37,57 @@ Doppler for non-default development configs. Missing identity metadata, a protec
 endpoint match, staging/production labels, and non-disposable metadata all fail
 closed. Do not point this config at an existing dev, staging, or production
 branch. Database/config provisioning and secret changes are operator-owned.
+
+## Bootstrapping the dedicated remote schema
+
+An empty remote target must be bootstrapped before the canonical integration
+command can run. This is an operator-gated mutation: do not run it without a
+specific ruling for the exact disposable target.
+
+From a clean checkout of the revision being proved:
+
+```bash
+corepack pnpm run db:bootstrap:api-integration -- \
+  --revision "<exact 40-character git HEAD>" \
+  --operator-ruling "<durable ruling reference>" \
+  --receipt ".workitem-artifacts/WI-2939/bootstrap-receipt.json"
+```
+
+The bootstrap fails closed before schema mutation unless all of these are true:
+
+- Doppler resolves exactly `mentomate/dev_integration` in the `dev` environment.
+- The URL matches the declared host, database name, and unique target ID.
+- The endpoint differs from the declared shared-development, staging, and
+  production hosts and carries no protected-environment label.
+- The checked-out revision matches `--revision`, and its schema/bootstrap
+  sources and committed migration journal have no tracked changes.
+- The public schema is empty with no marker, or it has a ready marker whose
+  revision, migration-chain fingerprint, and full structural fingerprint still
+  match.
+
+For an empty target, the command creates an `applying` marker in a dedicated
+metadata schema, applies the exact committed migration-journal SQL directly in
+journal order (including each migration's explicit transaction boundaries), and
+then invokes the guarded package-level `drizzle-kit push` path to reconcile the
+TypeScript schema. Direct journal execution is necessary for committed SQL-only
+objects such as row-level security policies; it does not invoke the Drizzle
+migrator or write Drizzle's migration ledger. The command then records the
+resulting structural fingerprint and marks the target ready. A repeated run at
+the same revision is read-only and returns `already-compatible`. Non-empty
+unmarked targets, changed fingerprints, partial or interrupted runs, or another
+revision are incompatible and must be destroyed and recreated. The command
+never invokes `drizzle-kit migrate`, a separate application/test seed command,
+or prints/persists the database URL, host, name, or credentials.
+Revision-pinned committed migration DML, including required reference-policy
+rows, is part of the journal contract; the bootstrap never imports or copies
+user data.
+
+The receipt contains only hashed endpoint identity, target ID, revision,
+migration-chain fingerprint, operator-ruling reference, schema fingerprint,
+timestamps, result, the committed-migration-only data policy, and cleanup
+instructions. Ordinary rollback is destruction of that uniquely identified
+disposable target; never attempt an in-place repair or point the command at
+shared development, staging, or production.
 
 CI and the local Docker workflow below may invoke the guarded Nx target directly
 because their `DATABASE_URL` points to `localhost`/`127.0.0.1` and names an
