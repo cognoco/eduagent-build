@@ -255,6 +255,7 @@ describe('mentor notice lifecycle — real database', () => {
           noticeId,
           profileId: fixture.profileId,
           sessionId: recheckSessionId,
+          timestamp: expect.any(String),
         },
       },
     ]);
@@ -311,7 +312,11 @@ describe('mentor notice lifecycle — real database', () => {
       {
         name: 'app/notice.created',
         ts: expect.any(Number),
-        data: { noticeId: notice.id, profileId: fixture.profileId },
+        data: {
+          noticeId: notice.id,
+          profileId: fixture.profileId,
+          timestamp: expect.any(String),
+        },
       },
       {
         name: 'app/notice.recheck_outcome',
