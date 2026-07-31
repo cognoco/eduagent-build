@@ -17,7 +17,7 @@ Last reconciled: 2026-07-31 10:22 CEST
   Lifecycle Tooling with no Sprint or Delivery Batch; WI-2946 is Backlog/Active
   in Nexus / Clacks with no Sprint or Delivery Batch. WI-2942 remains Closed /
   Duplicate of WI-2941. WI-2926 remains Closed / Duplicate of WI-2925.
-- Live stage count at checkpoint: 27 Closed, 3 Executing, 10 Ready, 1 In Review.
+- Live stage count at checkpoint: 27 Closed, 4 Executing, 10 Ready.
 
 ## Current frontier — supersedes stale per-item positions below
 
@@ -65,14 +65,20 @@ Last reconciled: 2026-07-31 10:22 CEST
   `OCC-F968A7988008` in the authoritative Finding Occurrences database as Unlinked.
   No canonical Finding or replacement Work Item was created.
 - WI-2755 — dependency WI-2794 is Closed/Done and landed commit `37b7a4e6` is on
-  origin/main with merged PR #2630 strict green. Executor completion moved the item
-  to Reviewing, but the tool auto-created and recorded draft PR #2746 from a later
-  pre-existing branch and classified the override manifest as Operational. An
-  independent reviewer is adjudicating those integrity discrepancies; PR #2746 is
-  untouched.
-- WI-2802 — typed executor dispatched after stale-claim recovery to reconcile
-  preserved evidence against now-Closed sibling prerequisite WI-2810. No gated
-  hosted/shared-environment mutation is authorized.
+  origin/main with merged PR #2630 strict green. Independent review bounced the item
+  to Ready/Active: the exact source-artifact run still timed out on a persistent idle
+  PgBouncer backend and left the scratch database; the completion manifest also mixed
+  Operational classification, unlanded `2cff2484`, Fixed In `37b7a4e6`, and draft
+  PR #2746. Full findings are in Cosmo comment
+  `3ae8bce9-1f7c-8152-a59d-001d3034c7f3`. PR #2746 remains untouched. FO-2076 /
+  `OCC-B9142581EAF8` records the completion/PR mismatch; FO-2077 /
+  `OCC-42DF599F8508` records the persistent source-artifact failure.
+- WI-2802 — claimed by `codex:wi2802-resume:WI-2802`. Closed/Done WI-2810 supplies
+  the sanitized observer but cannot retroactively classify the 2026-07-26 failure.
+  The remaining AC evidence requires one post-instrumentation isolated hosted J-01
+  reproduction (or authoritative alternative evidence). The claimant found no
+  sanctioned self-release command, recorded the gate, and retains a live claim until
+  13:22 CEST. No hosted/shared-environment mutation is authorized yet.
 - WI-2800 — Ready/Active after review rejected its already-landed `fdbe36d2` evidence:
   the isolated run diagnosed a different 68.6-second sign-in failure and did not
   attribute the original hosted 90-second exhaustion. WI-2826 plus the hosted gate
@@ -84,8 +90,8 @@ Last reconciled: 2026-07-31 10:22 CEST
 - Remaining shared-database, hosted-reproduction, and credential mutations retain
   their item-specific operator gates; no broad batch mandate silently widens them.
 - The persistent goal is active again. Existing execution WIP is WI-2790,
-  WI-2921, and WI-2939; WI-2802 dispatch is in claim preflight. WI-2755 is
-  independently claimed In Review by the global reviewer. Ready items with explicit
+  WI-2802, WI-2921, and WI-2939. WI-2755 is Ready for source-artifact rework
+  and next in dispatch order when capacity opens. Ready items with explicit
   database, credential, hosted-reproduction, or worktree/Doppler gates remain held
   until their recorded authority is satisfied. PR #2741 remains fail-closed on the
   twice-reproduced WI-2826 dependency.
