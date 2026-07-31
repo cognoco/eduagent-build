@@ -14,6 +14,9 @@ const fixturePath = join(
   repoRoot,
   'tests/integration/wi2578-deliberate-type-error.integration.test.ts',
 );
+const preExistingFixture = existsSync(fixturePath)
+  ? readFileSync(fixturePath, 'utf8')
+  : undefined;
 const ignoredFixtureDir = join(repoRoot, 'tests/integration/.tmp');
 const ignoredFixturePath = join(
   ignoredFixtureDir,
@@ -35,7 +38,11 @@ function disposableIndex() {
 
 describe('integration typecheck contract', () => {
   afterEach(() => {
-    rmSync(fixturePath, { force: true });
+    if (preExistingFixture === undefined) {
+      rmSync(fixturePath, { force: true });
+    } else {
+      writeFileSync(fixturePath, preExistingFixture);
+    }
     rmSync(ignoredFixtureDir, { recursive: true, force: true });
     rmSync(mutantCheckerPath, { force: true });
   });
