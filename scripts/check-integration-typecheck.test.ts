@@ -158,6 +158,16 @@ describe('integration typecheck contract', () => {
 
     try {
       execFileSync('git', ['read-tree', 'HEAD'], { cwd: repoRoot, env });
+      execFileSync(
+        'git',
+        [
+          'rm',
+          '--cached',
+          '--ignore-unmatch',
+          'tests/integration/wi2578-deliberate-type-error.integration.test.ts',
+        ],
+        { cwd: repoRoot, env },
+      );
       execFileSync('git', ['add', '-f', ignoredFixturePath], {
         cwd: repoRoot,
         env,
