@@ -5,19 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MentoMate — Privacy Policy</title>
   <style>
-    :root { color-scheme: dark; --bg: #111827; --text: #f3f4f6; --muted: #d1d5db; --subtle: #9ca3af; }
-    :root[data-theme="light"] { color-scheme: light; --bg: #ffffff; --text: #1a1a1a; --muted: #444; --subtle: #6b7280; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 720px; margin: 0 auto; padding: 24px 16px; background: var(--bg); color: var(--text); line-height: 1.6; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 720px; margin: 0 auto; padding: 24px 16px; color: #1a1a1a; line-height: 1.6; }
     h1 { font-size: 1.5rem; margin-bottom: 4px; }
     h2 { font-size: 1.1rem; margin-top: 1.5em; }
-    p { color: var(--muted); margin: 0.5em 0; }
-    ul { color: var(--muted); }
-    .updated { color: var(--subtle); font-size: 0.85rem; margin-bottom: 1.5em; }
-    .theme-toggle { float: right; border: 1px solid var(--subtle); border-radius: 999px; padding: 6px 10px; background: transparent; color: var(--text); cursor: pointer; }
+    p { color: #444; margin: 0.5em 0; }
+    ul { color: #444; }
+    .updated { color: #888; font-size: 0.85rem; margin-bottom: 1.5em; }
   </style>
 </head>
 <body>
-  <button class="theme-toggle" type="button" aria-label="Switch colour theme">Light theme</button>
   <h1>Privacy Policy</h1>
   <p class="updated">Last updated: July 2026</p>
   <p class="updated"><strong>Pre-launch draft:</strong> this notice is not approved for publication. The applicable provider contracts, transfer safeguards, DPO details, retention controls, and native-speaker legal reviews must be completed before learner data is processed in production.</p>
@@ -59,7 +55,7 @@
 
   <h2>8. Data Retention</h2>
   <p><strong>Age and residence:</strong> date of birth and the current declared country of habitual residence are kept while the account is active so the correct age and consent rules can be enforced. A limited history of age/residence assertions may be retained for accountability; its final retention period must be approved before this notice is published.</p>
-  <p><strong>Chat transcripts:</strong> the full text of your learning-session messages is retained for 30 days after the learning summary is generated and then automatically deleted. If summary processing is delayed, operational safeguards flag the delay for resolution.</p>
+  <p><strong>Chat transcripts:</strong> the full text of your learning-session messages is scheduled for automatic deletion after 30 days from successful learning-summary generation. A daily deletion job first replaces the transcript-derived search embedding with one derived from the summary, then deletes the full text. When capacity and the summary and embedding services are healthy, deletion occurs on the first daily run after the 30-day threshold (normally within about 30–31 days). If summary generation, embedding regeneration, or purge capacity is unavailable, deletion is deferred, retried, and flagged through operational alerts rather than silently abandoned. A continuing provider outage or sustained backlog means there is no honest fixed maximum delay; we treat that as a retention incident until deletion succeeds.</p>
   <p><strong>Learning memory:</strong> a summary of what you have studied — your subjects, progress, mastery results, and the notes and recaps generated from your sessions — is kept for as long as your account is active, so the tutor can remember your learning over time. Some notes and recaps may include short quotations from your own session messages. MentoMate does not use this learning memory for advertising or marketing profiles. Our launch requirement is that third-party AI providers do not use customer content to train their general-purpose models; the provider controls supporting that requirement must be verified before production learner data is processed.</p>
   <p><strong>Account deletion:</strong> when you delete your account, deletion enters a 7-day grace period during which you can cancel. After the grace period, your account and associated personal and learning data are permanently removed, except for limited records retained for legal, security, fraud-prevention, or accounting reasons.</p>
 
@@ -79,20 +75,5 @@
     - Confirm each AI provider's no-training, retention, deletion, subprocessor, and international-transfer evidence before publication.
     - Capture production evidence that RETENTION_PURGE_ENABLED remains enabled before publication.
   -->
-  <script>
-    const root = document.documentElement;
-    const toggle = document.querySelector('.theme-toggle');
-    const savedTheme = localStorage.getItem('mentomate-privacy-theme');
-    if (savedTheme === 'light') root.dataset.theme = 'light';
-    const syncToggle = () => {
-      toggle.textContent = root.dataset.theme === 'light' ? 'Dark theme' : 'Light theme';
-    };
-    toggle.addEventListener('click', () => {
-      root.dataset.theme = root.dataset.theme === 'light' ? 'dark' : 'light';
-      localStorage.setItem('mentomate-privacy-theme', root.dataset.theme);
-      syncToggle();
-    });
-    syncToggle();
-  </script>
 </body>
 </html>

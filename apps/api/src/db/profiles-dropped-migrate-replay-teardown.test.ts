@@ -11,6 +11,10 @@ describe('profiles-dropped migration replay teardown [WI-2794]', () => {
     );
 
     expect(source).toContain('await closePoolAndDropScratchDatabase({');
+    expect(source).toContain('const baseUrl = requireScratchDatabaseUrl();');
+    expect(source).toContain(
+      'const url = process.env.DIRECT_URL ?? process.env.DATABASE_URL;',
+    );
     expect(source).toContain('application_name: scratchApplicationName');
     expect(source).toContain('ownedApplicationName: scratchApplicationName');
     expect(source).not.toMatch(/DROP DATABASE[^`]*WITH \(FORCE\)/s);

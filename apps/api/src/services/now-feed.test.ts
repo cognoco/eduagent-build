@@ -290,7 +290,14 @@ describe('now feed ranking', () => {
     } as unknown as Database;
 
     await expect(
-      buildNowFeed(db, 'supporter-person', { scope: 'supporter-hub' }),
+      buildNowFeed(
+        db,
+        'supporter-person',
+        { scope: 'supporter-hub' },
+        {
+          callerPersonId: 'supporter-person',
+        },
+      ),
     ).resolves.toMatchObject({
       scope: 'supporter-hub',
       cards: [],

@@ -3872,7 +3872,6 @@
     "parentBirthDateLabel": "Din fødselsdato",
     "childBirthDateLabel": "Barnets fødselsdato",
     "birthDateHint": "Slik at mentoren din snakker til deg på riktig måte. Aldersgrensen er {{age}} år.",
-    "parentBirthDateHint": "Dette er for den voksne som setter opp kontoen. Du kan legge til barnet ditt etterpå. Aldersgrensen er {{age}} år.",
     "childBirthDateHint": "Slik at barnets mentor snakker til dem på riktig måte. Aldersgrensen er {{age}} år.",
     "webDateFormatHint": "Skriv inn fødselsdatoen din som ÅÅÅÅ-MM-DD.",
     "childWebDateFormatHint": "Skriv inn barnets fødselsdato som ÅÅÅÅ-MM-DD.",
@@ -3885,7 +3884,6 @@
     "upgradeRequiredBody": "Abonnementet ditt støtter ikke flere profiler. Oppgrader til Familie eller Pro.",
     "seePlans": "Se planer",
     "minimumAgeError": "Elever må være minst {{age}} år gamle. Velg en tidligere fødselsdato.",
-    "parentAdultAgeError": "Foreldrekontoer trenger en voksen fødselsdato. Skriv inn dine egne detaljer først, og legg deretter til barnet ditt.",
     "a11yCloseDatePicker": "Lukk datovelger",
     "createdChildFamilyContextFailedBody": "{{name}}s profil er klar, men vi kunne ikke bytte deg til familiemodus automatisk.",
     "createdChildFamilyContextTerminalFailedBody": "{{name}}s profil er klar, men vi kunne fortsatt ikke bytte deg til familiemodus. Du kan bytte til familiemodus senere fra Mer > Konto.",
@@ -4618,6 +4616,33 @@
     "cta": "Lær noe selv",
     "hint": "Start eller fortsett din egen læring."
   },
+  "familyIntentOnboarding": {
+    "adultDetailsHint": "Dette er for den voksne som oppretter kontoen. Vi spør hvem som skal lære etterpå. Minimumsalder er {{age}}.",
+    "adultAgeError": "Familieoppsett krever en voksens fødselsdato. Skriv inn dine egne opplysninger først, og velg deretter hvem som skal lære.",
+    "target": {
+      "title": "Hvem skal lære?",
+      "message": "Velg hva du vil sette opp først.",
+      "me": "Meg",
+      "someoneElse": "Noen andre"
+    },
+    "login": {
+      "title": "Har eleven sin egen innlogging?",
+      "message": "Velg Ja hvis de logger på MentoMate med sin egen e-post.",
+      "yes": "Ja, det har de",
+      "no": "Nei, det har de ikke"
+    },
+    "managedUnavailable": {
+      "title": "Profiler uten egen innlogging er ikke tilgjengelige ennå",
+      "message": "Foreløpig kan du invitere en elev som har sin egen MentoMate-innlogging."
+    },
+    "actionError": "Vi kunne ikke lagre det valget. Prøv igjen.",
+    "saveError": "Profilen din ble opprettet, men vi kunne ikke lagre neste oppsettstrinn. Prøv igjen.",
+    "restoreError": {
+      "title": "Vi kunne ikke gjenopprette familieoppsettet",
+      "message": "Valget ditt er fortsatt beskyttet. Prøv igjen før du fortsetter.",
+      "retry": "Prøv igjen"
+    }
+  },
   "sharedRecord": {
     "fact": {
       "headline_one": "{{name}} har 1 oppdatering som kan deles.",
@@ -4649,7 +4674,8 @@
         "learningTime_one": "{{count}} time lært",
         "learningTime_other": "{{count}} timer lært",
         "cefrLevelUp": "Språknivå økt",
-        "topicsExplored": "{{count}} emner utforsket i {{subject}}"
+        "topicsExplored_one": "{{count}} emne utforsket i {{subject}}",
+        "topicsExplored_other": "{{count}} emner utforsket i {{subject}}"
       }
     }
   }

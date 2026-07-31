@@ -26,6 +26,7 @@
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { join, relative, resolve } from 'path';
 import {
+  GRANULAR_LLM_CONSENT_BOUNDARIES,
   LLM_CALL_SITE_FILES,
   LLM_CALL_SITE_EXEMPT,
 } from './metering.coverage.manifest';
@@ -98,6 +99,23 @@ function scanCallSites(): Set<string> {
   return matches;
 }
 
+function readRepoFile(path: string): string {
+  return readFileSync(join(REPO_ROOT, path), 'utf8');
+}
+
+function sliceBetweenTokens(
+  source: string,
+  startToken: string,
+  endToken: string,
+): string {
+  const start = source.indexOf(startToken);
+  if (start < 0) throw new Error(`Missing start token: ${startToken}`);
+  if (!endToken) return source.slice(start);
+  const end = source.indexOf(endToken, start + startToken.length);
+  if (end < 0) throw new Error(`Missing end token: ${endToken}`);
+  return source.slice(start, end);
+}
+
 describe('[WI-132] LLM call-site coverage manifest', () => {
   const discovered = scanCallSites();
   const covered = new Set(LLM_CALL_SITE_FILES);
@@ -168,4 +186,54 @@ describe('[WI-132] LLM call-site coverage manifest', () => {
     }
     expect(overlap).toEqual([]);
   });
+});
+
+describe('[WI-2543] mixed-route granular consent boundaries', () => {
+  it('classifies exactly the five refined mixed routes', () => {
+    expect(GRANULAR_LLM_CONSENT_BOUNDARIES.map(({ id }) => id).sort()).toEqual([
+      'assessments.answer',
+      'book-suggestions.topup',
+      'books.generate-topics',
+      'sessions.first-curriculum',
+      'subjects.create',
+    ]);
+  });
+
+  it.each(GRANULAR_LLM_CONSENT_BOUNDARIES)(
+    '$id delegates without an unconditional route-entry consent gate',
+    (boundary) => {
+      const routeSource = sliceBetweenTokens(
+        readRepoFile(boundary.routeFile),
+        boundary.routeStartToken,
+        boundary.routeEndToken,
+      );
+      expect(routeSource).not.toContain('assertLlmConsent(');
+      for (const callToken of boundary.routeServiceCallTokens) {
+        expect(routeSource).toContain(callToken);
+      }
+    },
+  );
+
+  it.each(
+    GRANULAR_LLM_CONSENT_BOUNDARIES.flatMap((routeBoundary) =>
+      routeBoundary.serviceBoundaries.map((serviceBoundary) => ({
+        id: routeBoundary.id,
+        ...serviceBoundary,
+      })),
+    ),
+  )(
+    '$id gates before $llmDispatchToken and stays tied to the LLM manifest',
+    (boundary) => {
+      const serviceSource = sliceBetweenTokens(
+        readRepoFile(boundary.serviceFile),
+        boundary.serviceStartToken,
+        boundary.serviceEndToken,
+      );
+      const gateIndex = serviceSource.indexOf(boundary.consentGateToken);
+      const dispatchIndex = serviceSource.indexOf(boundary.llmDispatchToken);
+      expect(gateIndex).toBeGreaterThanOrEqual(0);
+      expect(dispatchIndex).toBeGreaterThan(gateIndex);
+      expect(LLM_CALL_SITE_FILES).toContain(boundary.llmCallSiteFile);
+    },
+  );
 });

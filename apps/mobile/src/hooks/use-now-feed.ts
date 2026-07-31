@@ -29,7 +29,10 @@ import {
   stripNoticeOverflowItems,
   writeCachedNowFeed,
 } from '../lib/now-feed-cache';
-import { useMentorNoticePolicy } from '../lib/mentor-notice-policy';
+import {
+  mentorNoticePolicySuppressesPayloadFor,
+  useMentorNoticePolicy,
+} from '../lib/mentor-notice-policy';
 import { useNavigationDataScopeContract } from './use-navigation-contract';
 import { parseJson } from '../lib/parse-json';
 import { useApiQuery } from './use-api-query';
@@ -318,12 +321,62 @@ export function useNowFeed(): NowFeedQueryResult {
       : query.data;
   }, [query.data, policy]);
 
+  // [WI-2933] Judge the persisted projection against the floor of the pair it
+  // was CACHED FOR, not against whatever pair happens to be bound at render.
+  //
+  // `fallbackFeed` can only ever be populated while BOUND — the effect above
+  // returns early without a `cacheBinding`. Whether it SURVIVES the pair going
+  // unbound (sign-out, auth teardown, profile cleared) is CONDITIONAL, and that
+  // condition is the whole reachability question: the same early-return branch
+  // clears it unless `query.isError`, so retention past an unbind requires the
+  // query to be in an error state. Measured (WI-2933 reachability run): forcing
+  // a real re-render with a null user gives `fallbackFeed = null,
+  // isError = false` — with no error the projection does not survive.
+  //
+  // What the unbound branch would do if reached: `policy.suppressed(undefined)`
+  // takes the unbound branch, which has no storage key, therefore no Entry,
+  // therefore no stored disable floor — a projection for a pair whose durable
+  // floor forbids notices would be judged with nothing to judge it against.
+  // NO SUCH EXPOSURE HAS BEEN DEMONSTRATED. The `isError: true` AND unbound
+  // combination is unmeasured: once the pair is unbound the query stops
+  // fetching, so the harness could not drive it into an error state afterwards.
+  //
+  // That combination also got HARDER to reach while this branch was open:
+  // #2752 (WI-2949) removed the mentor-notice call from `useApiQuery`'s
+  // `onParseError` seam — the one route that produced `isError` and a stored
+  // disable floor in the same event. No production caller passes that option
+  // now.
+  //
+  // Remembering the populating pair is what would make the floor reachable if
+  // that combination ever occurs — hardening, not a fix for a demonstrated
+  // exposure. It is
+  // also the ONLY defensible answer to "what is the safe default when the pair
+  // is unknowable": for this payload the pair is not unknowable — the payload
+  // exists *because* a pair was bound. A device that has NEVER been bound has no
+  // cached projection to paint and no floor to consult, so it keeps today's
+  // permissive default and nothing is blanked fleet-wide (AC-2).
+  // Stores the already-memoised `cacheBinding` rather than a fresh
+  // `{actorId, profileId}` literal — matching `cacheBindingRef` above. A new
+  // literal here would change identity on every bound render, and this ref
+  // feeds `noticeSafeFallback`'s dep array, so the memo would re-run every
+  // render for a value that only changes when the binding does.
+  const fallbackPairRef = useRef<typeof cacheBinding>(null);
+  if (cacheBinding) {
+    fallbackPairRef.current = cacheBinding;
+  }
+  const fallbackPair = fallbackPairRef.current;
+
   const noticeSafeFallback = useMemo(() => {
     if (!fallbackFeed) return fallbackFeed;
-    return policy.suppressed(undefined)
-      ? stripNoticeCards(fallbackFeed)
-      : fallbackFeed;
-  }, [fallbackFeed, policy]);
+    const suppressed = fallbackPair
+      ? mentorNoticePolicySuppressesPayloadFor(
+          fallbackPair.actorId,
+          fallbackPair.profileId,
+          undefined,
+        )
+      : policy.suppressed(undefined);
+    return suppressed ? stripNoticeCards(fallbackFeed) : fallbackFeed;
+  }, [fallbackFeed, policy, fallbackPair]);
 
   // The cast is the `UseQueryResult` discriminated union, not a type escape:
   // overriding `data` on a spread widens it to `NowResponse | undefined`, which

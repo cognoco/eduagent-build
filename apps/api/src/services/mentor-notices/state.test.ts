@@ -137,7 +137,11 @@ describe('mentor notice creation state', () => {
       expect(sendSpy).toHaveBeenCalledTimes(1);
       expect(sendSpy).toHaveBeenCalledWith({
         name: 'app/notice.created',
-        data: { noticeId: accepted.id, profileId: input.profileId },
+        data: {
+          noticeId: accepted.id,
+          profileId: input.profileId,
+          timestamp: expect.any(String),
+        },
       });
     } finally {
       sendResult.resolve({ ids: [] });
@@ -163,7 +167,11 @@ describe('mentor notice creation state', () => {
       expect(sendSpy).toHaveBeenCalledTimes(1);
       expect(sendSpy).toHaveBeenCalledWith({
         name: 'app/notice.created',
-        data: { noticeId: accepted.id, profileId: input.profileId },
+        data: {
+          noticeId: accepted.id,
+          profileId: input.profileId,
+          timestamp: expect.any(String),
+        },
       });
       expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
 

@@ -112,3 +112,134 @@ export const LLM_CALL_SITE_EXEMPT: readonly string[] = [
   // helpers. If the grep ever picks it up, it would belong here.
   'apps/api/src/middleware/metering.ts',
 ];
+
+export interface GranularLlmConsentServiceBoundary {
+  serviceFile: string;
+  serviceStartToken: string;
+  serviceEndToken: string;
+  consentGateToken: string;
+  llmDispatchToken: string;
+  llmCallSiteFile: string;
+}
+
+export interface GranularLlmConsentBoundary {
+  id: string;
+  routeFile: string;
+  routeStartToken: string;
+  routeEndToken: string;
+  routeServiceCallTokens: readonly string[];
+  serviceBoundaries: readonly GranularLlmConsentServiceBoundary[];
+}
+
+/**
+ * Mixed deterministic/LLM HTTP routes whose consent gate must remain inside
+ * the service at the last branch before LLM dispatch. The companion guard
+ * rejects both regressions: restoring an unconditional route-entry gate, or
+ * moving/removing a service gate so an LLM-ready branch can bypass it.
+ */
+export const GRANULAR_LLM_CONSENT_BOUNDARIES: readonly GranularLlmConsentBoundary[] =
+  [
+    {
+      id: 'books.generate-topics',
+      routeFile: 'apps/api/src/routes/books.ts',
+      routeStartToken: "'/subjects/:subjectId/books/:bookId/generate-topics'",
+      routeEndToken: "'/subjects/:subjectId/books/:bookId/sessions'",
+      routeServiceCallTokens: [
+        'repairIncompleteBookGenerationClaim(',
+        'expandExistingBookTopics(',
+        'generateBookTopicsWithFallback(',
+      ],
+      serviceBoundaries: [
+        {
+          serviceFile: 'apps/api/src/services/curriculum.ts',
+          serviceStartToken:
+            'export async function generateBookTopicsWithFallback(',
+          serviceEndToken: 'export async function expandExistingBookTopics(',
+          consentGateToken: 'assertConsent(',
+          llmDispatchToken: 'deps.generateBookTopics(',
+          llmCallSiteFile: 'apps/api/src/services/book-generation.ts',
+        },
+      ],
+    },
+    {
+      id: 'sessions.first-curriculum',
+      routeFile: 'apps/api/src/routes/sessions.ts',
+      routeStartToken: "'/subjects/:subjectId/sessions/first-curriculum'",
+      routeEndToken: "'/subjects/:subjectId/sessions'",
+      routeServiceCallTokens: ['startFirstCurriculumSession('],
+      serviceBoundaries: [
+        {
+          serviceFile: 'apps/api/src/services/session/session-crud.ts',
+          serviceStartToken: 'async function materializeFocusedBookTopics(',
+          serviceEndToken: 'const sessionCrudDependencies =',
+          consentGateToken: 'sessionCrudDependencies.assertLlmConsent(',
+          llmDispatchToken: 'generateBookTopics(',
+          llmCallSiteFile: 'apps/api/src/services/book-generation.ts',
+        },
+        {
+          serviceFile: 'apps/api/src/services/session/session-topic-matcher.ts',
+          serviceStartToken: 'export async function matchTopicByIntent(',
+          serviceEndToken: '',
+          consentGateToken: 'deps.assertLlmConsent(',
+          llmDispatchToken: 'deps.runTopicIntentMatcher(',
+          llmCallSiteFile:
+            'apps/api/src/services/session/session-topic-matcher.ts',
+        },
+      ],
+    },
+    {
+      id: 'subjects.create',
+      routeFile: 'apps/api/src/routes/subjects.ts',
+      routeStartToken:
+        ".post('/subjects', zValidator('json', subjectCreateSchema)",
+      routeEndToken: '.put(',
+      routeServiceCallTokens: ['createSubjectWithStructure('],
+      serviceBoundaries: [
+        {
+          serviceFile: 'apps/api/src/services/subject.ts',
+          serviceStartToken:
+            'export async function createSubjectWithStructure(',
+          serviceEndToken: 'export async function getSubject(',
+          consentGateToken: 'consentGate(',
+          llmDispatchToken: 'detectSubjectType(',
+          llmCallSiteFile: 'apps/api/src/services/book-generation.ts',
+        },
+      ],
+    },
+    {
+      id: 'assessments.answer',
+      routeFile: 'apps/api/src/routes/assessments.ts',
+      routeStartToken: "'/assessments/:assessmentId/answer'",
+      routeEndToken: "'/assessments/:assessmentId/decline-refresh'",
+      routeServiceCallTokens: ['submitAssessmentAnswer('],
+      serviceBoundaries: [
+        {
+          serviceFile: 'apps/api/src/services/assessments.ts',
+          serviceStartToken: 'export async function submitAssessmentAnswer(',
+          serviceEndToken: 'export async function evaluateQuickCheckAnswer(',
+          consentGateToken: 'deps.assertLlmConsent(',
+          llmDispatchToken: 'deps.evaluateAssessmentAnswer(',
+          llmCallSiteFile: 'apps/api/src/services/assessments.ts',
+        },
+      ],
+    },
+    {
+      id: 'book-suggestions.topup',
+      routeFile: 'apps/api/src/routes/book-suggestions.ts',
+      routeStartToken: "'/subjects/:subjectId/book-suggestions/topup'",
+      routeEndToken: "'/subjects/:subjectId/book-suggestions/all'",
+      routeServiceCallTokens: ['getUnpickedBookSuggestionsWithTopup('],
+      serviceBoundaries: [
+        {
+          serviceFile: 'apps/api/src/services/suggestions.ts',
+          serviceStartToken:
+            'export async function getUnpickedBookSuggestionsWithTopup(',
+          serviceEndToken: '',
+          consentGateToken: 'consentGate(',
+          llmDispatchToken: 'generateCategorizedBookSuggestions(',
+          llmCallSiteFile:
+            'apps/api/src/services/book-suggestion-generation.ts',
+        },
+      ],
+    },
+  ];
