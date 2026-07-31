@@ -6,6 +6,7 @@ import {
   curriculumBooks,
   generateUUIDv7,
   learningSessions,
+  person,
   sessionEvents,
   sessionSummaries,
   subjects,
@@ -17,6 +18,7 @@ import {
   ensureV2IdentityForLegacyProfileTest,
 } from '../../test-utils/legacy-identity-anchors';
 import {
+  clearContinuationDepth,
   closeSession,
   flagContent,
   getSession,
@@ -115,6 +117,74 @@ async function runTaggedTransaction<T>(
     );
     return operation(tx as unknown as Database);
   });
+}
+
+async function interleaveClearAfterMetadataWriter(
+  profileId: string,
+  sessionId: string,
+  siblingMetadata: Parameters<typeof persistSessionMetadata>[3],
+): Promise<void> {
+  const tagSuffix = sessionId.slice(-12);
+  const writerTag = `wi2483-writer-${tagSuffix}`;
+  const clearTag = `wi2483-clear-${tagSuffix}`;
+
+  let signalWriterUpdated!: () => void;
+  let rejectWriterUpdated!: (error: unknown) => void;
+  const writerUpdated = new Promise<void>((resolve, reject) => {
+    signalWriterUpdated = resolve;
+    rejectWriterUpdated = reject;
+  });
+  let releaseWriter!: () => void;
+  const writerRelease = new Promise<void>((resolve) => {
+    releaseWriter = resolve;
+  });
+
+  const writerPromise = runTaggedTransaction(db, writerTag, async (tx) => {
+    const updated = await persistSessionMetadata(
+      tx,
+      profileId,
+      sessionId,
+      siblingMetadata,
+    );
+    if (!updated) throw new Error('Seeded learning session was not found');
+    signalWriterUpdated();
+    await writerRelease;
+  }).catch((error) => {
+    rejectWriterUpdated(error);
+    throw error;
+  });
+
+  let clearPromise: Promise<
+    Awaited<ReturnType<typeof clearContinuationDepth>>
+  > | null = null;
+  let barrierFailure: unknown;
+
+  try {
+    await writerUpdated;
+    clearPromise = runTaggedTransaction(db, clearTag, (tx) =>
+      clearContinuationDepth(tx, profileId, sessionId),
+    );
+    await waitForTaggedLock(db, clearTag);
+  } catch (error) {
+    barrierFailure = error;
+  } finally {
+    releaseWriter();
+  }
+
+  const [writerResult, clearResult] = await Promise.allSettled([
+    writerPromise,
+    clearPromise ?? Promise.resolve(null),
+  ]);
+
+  if (barrierFailure) throw barrierFailure;
+  if (writerResult.status === 'rejected') throw writerResult.reason;
+  if (!clearPromise) {
+    throw new Error('Clear operation must start before writer lock release');
+  }
+  if (clearResult.status === 'rejected') throw clearResult.reason;
+  if (!clearResult.value) {
+    throw new Error('Clear operation did not find the seeded learning session');
+  }
 }
 
 async function queueCloseAndSilencePrompt(
@@ -404,6 +474,103 @@ describeIfDb('persistSessionMetadata (integration IDOR breaks)', () => {
       { continuationOpenerActive: undefined },
     );
     expect(deletedKey?.metadata).not.toHaveProperty('continuationOpenerActive');
+  });
+});
+
+describeIfDb('clearContinuationDepth (integration concurrency)', () => {
+  let fixtureIds: {
+    profileId: string;
+    subjectId: string;
+    sessionId: string;
+  } | null = null;
+
+  beforeAll(async () => {
+    db = createDatabase(process.env.DATABASE_URL!);
+  });
+
+  afterEach(async () => {
+    if (!fixtureIds) return;
+    await db
+      .delete(learningSessions)
+      .where(eq(learningSessions.id, fixtureIds.sessionId));
+    await db.delete(subjects).where(eq(subjects.id, fixtureIds.subjectId));
+    await db.delete(person).where(eq(person.id, fixtureIds.profileId));
+    fixtureIds = null;
+  });
+
+  it('[WI-2483] preserves a concurrent metadata writer and challenge round while clearing continuation keys', async () => {
+    const ids = {
+      profileId: generateUUIDv7(),
+      subjectId: generateUUIDv7(),
+      sessionId: generateUUIDv7(),
+    };
+    fixtureIds = ids;
+    await db.insert(person).values({
+      id: ids.profileId,
+      displayName: 'Continuation Learner',
+      birthDate: '2012-01-01',
+      residenceJurisdiction: 'EU',
+    });
+    await db.insert(subjects).values({
+      id: ids.subjectId,
+      profileId: ids.profileId,
+      name: 'Continuation metadata',
+    });
+
+    const challengeRound = {
+      state: 'active' as const,
+      startedAt: new Date().toISOString(),
+      questionIndex: 1,
+      totalQuestions: 3,
+      offerCount: 1,
+      declinedDontAskAgain: false,
+      evaluations: [],
+      questionsAsked: 1,
+    };
+    const reviewCalibrationFiredAt = new Date().toISOString();
+    await db.insert(learningSessions).values({
+      id: ids.sessionId,
+      profileId: ids.profileId,
+      subjectId: ids.subjectId,
+      metadata: {
+        inputMode: 'text',
+        challengeRound,
+        continuationDepth: 'high',
+        continuationOpenerActive: true,
+        continuationOpenerStartedExchange: 3,
+      },
+    });
+
+    await interleaveClearAfterMetadataWriter(ids.profileId, ids.sessionId, {
+      reviewCalibrationAttempts: 4,
+      reviewCalibrationFiredAt,
+    });
+
+    // Re-read only after both transactions settle so the sibling-writer
+    // invariant is asserted from committed database state.
+    const [committed] = await db
+      .select({ metadata: learningSessions.metadata })
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.id, ids.sessionId),
+          eq(learningSessions.profileId, ids.profileId),
+        ),
+      )
+      .limit(1);
+    const metadata = committed!.metadata as Record<string, unknown>;
+
+    expect(metadata).toEqual(
+      expect.objectContaining({
+        inputMode: 'text',
+        challengeRound,
+        reviewCalibrationAttempts: 4,
+        reviewCalibrationFiredAt,
+      }),
+    );
+    expect(metadata).not.toHaveProperty('continuationDepth');
+    expect(metadata).not.toHaveProperty('continuationOpenerActive');
+    expect(metadata).not.toHaveProperty('continuationOpenerStartedExchange');
   });
 });
 
