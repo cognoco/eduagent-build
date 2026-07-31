@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-07-31 08:00 CEST
+Last reconciled: 2026-07-31 08:56 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -37,16 +37,20 @@ Last reconciled: 2026-07-31 08:00 CEST
   disposable non-staging target. The corrected path directly replays the pinned SQL
   journal before guarded schema reconciliation so raw RLS policies are retained; its
   evidence now distinguishes committed migration DML/reference rows from forbidden
-  copied user data or separate seed commands. Focused/local gates are green; fresh
-  hosted CI/review are running. No DB connection occurred, and live mutation remains
+  copied user data or separate seed commands. Focused/local gates and exact-head
+  review are green; one unrelated legacy onboarding smoke timed out and its single
+  failed-job rerun is active. No DB connection occurred, and live mutation remains
   explicitly operator-gated.
 - WI-2941 — member 42, executing the missing sanctioned expired-cross-owner claim
   recovery capability in Marketplace PR #166 at exact head `9652d7d`; two in-scope
   review considerations were repaired, and the expanded focused/full local and hosted
   functional gates are green. Four exact-head Claude attempts aborted before a
-  review turn, so the governed merge gate remains correctly closed. WI-2755 expired
-  after capture, so seven stale claims remain untouched pending governed landing,
-  independent review, and deployment.
+  review turn, so the governed merge gate remains correctly closed; one further
+  cooldown-bounded failed-job rerun is delegated. WI-2755 expired after capture, so
+  seven stale claims remain untouched pending governed landing and deployment of
+  WI-2941. WI-2755 itself is already governed-merged from PR #2630 as `37b7a4e6`;
+  after lawful claim recovery it needs execute-complete and independent review, not
+  another implementation.
 - WI-2800 — Ready/Active after review rejected its already-landed `fdbe36d2` evidence:
   the isolated run diagnosed a different 68.6-second sign-in failure and did not
   attribute the original hosted 90-second exhaustion. WI-2826 plus the hosted gate
@@ -130,8 +134,11 @@ Last reconciled: 2026-07-31 08:00 CEST
 - WI-2805 — durable branch proof distinguishes the three code outcomes, but the failed
   retry retained none of the close/route/dialog evidence needed to select one; WI-2811
   owns that repair.
-- WI-2800 is executing; no Ready member is sitting undispatched while capacity exists.
-- WI-2755 remains blocked by WI-2794; do not extend its cleanup timeout again.
+- WI-2800 is Ready but depends on WI-2826 instrumentation and its hosted-run authority
+  gate; it is not lawfully dispatchable yet.
+- WI-2755's implementation is already landed as `37b7a4e6`; its expired foreign claim
+  awaits the governed WI-2941 recovery path before execute-complete and independent
+  review.
 
 ## Operator authority gates
 
@@ -145,6 +152,14 @@ Last reconciled: 2026-07-31 08:00 CEST
   attribution.
 - WI-2805 — hosted rerun is unnecessary until WI-2811 makes the missing branch
   evidence retainable; any shared-staging reproduction still requires explicit gate.
+- WI-2939 — one uniquely named disposable non-staging database bootstrap; shared
+  development, staging, production, copied user data, and `drizzle migrate` remain
+  forbidden.
+- WI-2936 — no-Doppler worktree setup exception before local secret-identity proof.
+- WI-2922 — bounded additive/idempotent shared-development database reconciliation;
+  staging and production forbidden.
+- WI-2923 — bounded shared-development Clerk/Doppler audience binding; staging and
+  production forbidden.
 
 ## External edges
 

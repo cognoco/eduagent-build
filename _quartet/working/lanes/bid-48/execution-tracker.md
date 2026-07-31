@@ -55,7 +55,7 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-07-31 08:00 CEST
+## Live reconciliation — 2026-07-31 08:56 CEST
 
 - The live Brief and membership relation agree on 42 authoritative members.
   WI-2941 was captured from six expired cross-owner BID-48 claims, triaged and
@@ -78,15 +78,18 @@ Delivery Batch as `Done`.
   journal replay now retains the raw RLS policies omitted by schema push alone, and
   the evidence distinguishes committed migration DML/reference rows from forbidden
   copied user data or separate seed commands. Focused/local gates are green and fresh
-  hosted CI/review are running. No DB connection occurred; real live bootstrap
-  remains explicitly operator-gated.
+  hosted CI/review are green except for one unrelated legacy onboarding smoke timeout;
+  the single failed-job rerun is active. No DB connection occurred; real live
+  bootstrap remains explicitly operator-gated.
 - WI-2941 Marketplace PR #166 is at exact head `9652d7d`; two in-scope review
   considerations were repaired and the expanded focused/full local plus hosted
   functional gates are green. Four exact-head Claude attempts aborted before a
-  review turn, so the governed merge gate remains correctly closed. WI-2755 expired
-  after capture, making the post-landing recovery set seven cross-owner claims. All
-  remain untouched pending governed landing, Nexus commissioning, and independent
-  review rather than being impersonated or hand-edited.
+  review turn, so the governed merge gate remains correctly closed; one further
+  cooldown-bounded failed-job rerun is delegated. WI-2755 expired after capture,
+  making the post-landing recovery set seven cross-owner claims. WI-2755's governed
+  implementation is already landed from PR #2630 as `37b7a4e6`; all seven claims
+  remain untouched pending governed landing and Nexus commissioning of WI-2941 rather
+  than being impersonated or hand-edited.
 - WI-2936 remains Ready pending the requested no-Doppler worktree exception.
   WI-2922 and WI-2923 remain Ready behind their exact shared-development database and
   Clerk/Doppler mutation approvals. Staging and production remain forbidden.
