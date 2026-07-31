@@ -8,6 +8,7 @@ import {
   filingTimedOutEventSchema,
   orphanPersistFailedEventSchema,
   sessionSummaryFailedEventSchema,
+  sessionPurgeBacklogEventSchema,
   sessionTranscriptPurgedEventSchema,
   sessionPurgeDelayedEventSchema,
   summaryReconciliationRequeuedEventSchema,
@@ -386,14 +387,15 @@ describe('retention SLO event schemas (BUG-991 / BUG-992 / BUG-993 / BUG-994)', 
   });
 
   it('[BUG-993] accepts a valid sessionPurgeDelayedEvent payload', () => {
-    expect(() =>
+    expect(
       sessionPurgeDelayedEventSchema.parse({
         delayedCount: 3,
         sessionIds: [validUuid, validUuid],
         missingPreconditionCount: 3,
+        nullSummaryGeneratedAtCount: 2,
         timestamp: ts,
       }),
-    ).not.toThrow();
+    ).toEqual(expect.objectContaining({ nullSummaryGeneratedAtCount: 2 }));
   });
 
   it('[BUG-993] rejects sessionPurgeDelayedEvent with zero delayedCount', () => {
@@ -405,6 +407,46 @@ describe('retention SLO event schemas (BUG-991 / BUG-992 / BUG-993 / BUG-994)', 
         timestamp: ts,
       }),
     ).toThrow();
+  });
+
+  it('[WI-2739] accepts an internally consistent purge backlog lower bound', () => {
+    expect(() =>
+      sessionPurgeBacklogEventSchema.parse({
+        dailyCapacity: 100,
+        minimumEligibleCount: 101,
+        minimumDeferredCount: 1,
+        timestamp: ts,
+      }),
+    ).not.toThrow();
+  });
+
+  it('[WI-2739] rejects a backlog payload that does not exceed capacity', () => {
+    expect(() =>
+      sessionPurgeBacklogEventSchema.parse({
+        dailyCapacity: 100,
+        minimumEligibleCount: 100,
+        minimumDeferredCount: 0,
+        timestamp: ts,
+      }),
+    ).toThrow();
+  });
+
+  it('[WI-2739] rejects an inconsistent purge backlog deferred lower bound', () => {
+    const result = sessionPurgeBacklogEventSchema.safeParse({
+      dailyCapacity: 100,
+      minimumEligibleCount: 101,
+      minimumDeferredCount: 2,
+      timestamp: ts,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: ['minimumDeferredCount'] }),
+        ]),
+      );
+    }
   });
 
   it('[BUG-994] accepts a valid summaryReconciliationRequeuedEvent payload', () => {

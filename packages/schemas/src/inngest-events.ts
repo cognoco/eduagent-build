@@ -426,16 +426,54 @@ export type SessionTranscriptPurgedEvent = z.infer<
   typeof sessionTranscriptPurgedEventSchema
 >;
 
-/** BUG-993 — emitted when sessions are past day-37 without llmSummary/learnerRecap. */
+/** BUG-993 — emitted when sessions are past day-37 with incomplete purge prerequisites. */
 export const sessionPurgeDelayedEventSchema = z.object({
   delayedCount: z.number().int().positive(),
   sessionIds: z.array(z.string().uuid()),
   missingPreconditionCount: z.number().int().nonnegative(),
+  // Optional/defaulted for in-flight events emitted before WI-2739.
+  nullSummaryGeneratedAtCount: z
+    .number()
+    .int()
+    .nonnegative()
+    .optional()
+    .default(0),
   // [SC-03] isoDateField — neon-serverless may return raw Date; union handles both.
   timestamp: isoDateField,
 });
 export type SessionPurgeDelayedEvent = z.infer<
   typeof sessionPurgeDelayedEventSchema
+>;
+
+/** WI-2739 — emitted when eligible purge volume exceeds daily dispatch capacity. */
+export const sessionPurgeBacklogEventSchema = z
+  .object({
+    dailyCapacity: z.number().int().positive(),
+    minimumEligibleCount: z.number().int().positive(),
+    minimumDeferredCount: z.number().int().positive(),
+    timestamp: isoDateField,
+  })
+  .superRefine((data, context) => {
+    if (data.minimumEligibleCount <= data.dailyCapacity) {
+      context.addIssue({
+        code: 'custom',
+        path: ['minimumEligibleCount'],
+        message: 'must exceed dailyCapacity',
+      });
+    }
+    if (
+      data.minimumDeferredCount !==
+      data.minimumEligibleCount - data.dailyCapacity
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['minimumDeferredCount'],
+        message: 'must equal minimumEligibleCount minus dailyCapacity',
+      });
+    }
+  });
+export type SessionPurgeBacklogEvent = z.infer<
+  typeof sessionPurgeBacklogEventSchema
 >;
 
 /** BUG-994 — emitted when reconciliation cron requeues sessions for summary work. */
