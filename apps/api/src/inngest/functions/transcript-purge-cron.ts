@@ -159,6 +159,10 @@ export const transcriptPurgeCron = inngest.createFunction(
             .offset(offset);
 
         const firstPage = await selectPage(pageSize, pageOffset);
+        // Rows can leave the predicate between COUNT and SELECT. If that
+        // shrinks the set below one page, the wrapped page may overlap the
+        // first page; duplicate regeneration events are safe because
+        // sessionSummaryRegenerate is idempotent on event.data.sessionId.
         const wrapCount = pageSize - firstPage.length;
         const wrappedPage = wrapCount > 0 ? await selectPage(wrapCount, 0) : [];
 

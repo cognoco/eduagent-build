@@ -6,40 +6,50 @@ const mockGetStepVoyageApiKey = jest.fn();
 const mockPurgeSessionTranscript = jest.fn();
 const mockCaptureException = jest.fn();
 
-jest.mock('../helpers', () => {
-  const actual = jest.requireActual(
-    '../helpers',
-  ) as typeof import('../helpers');
-  return {
-    ...actual,
-    getStepDatabase: () => mockGetStepDatabase(),
-    getStepRetentionPurgeEnabled: () => mockGetStepRetentionPurgeEnabled(),
-    getStepVoyageApiKey: () => mockGetStepVoyageApiKey(),
-  };
-});
+jest.mock(
+  '../helpers' /* gc1-allow: cron unit test injects DB and request-scoped env values; real helpers require live bindings */,
+  () => {
+    const actual = jest.requireActual(
+      '../helpers',
+    ) as typeof import('../helpers');
+    return {
+      ...actual,
+      getStepDatabase: () => mockGetStepDatabase(),
+      getStepRetentionPurgeEnabled: () => mockGetStepRetentionPurgeEnabled(),
+      getStepVoyageApiKey: () => mockGetStepVoyageApiKey(),
+    };
+  },
+);
 
-jest.mock('../../services/transcript-purge', () => {
-  const actual = jest.requireActual(
-    '../../services/transcript-purge',
-  ) as typeof import('../../services/transcript-purge');
-  return {
-    ...actual,
-    purgeSessionTranscript: (...args: unknown[]) =>
-      mockPurgeSessionTranscript(...args),
-  };
-});
+jest.mock(
+  '../../services/transcript-purge' /* gc1-allow: handler unit test isolates destructive DB and Voyage side effects; real service requires live dependencies */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/transcript-purge',
+    ) as typeof import('../../services/transcript-purge');
+    return {
+      ...actual,
+      purgeSessionTranscript: (...args: unknown[]) =>
+        mockPurgeSessionTranscript(...args),
+    };
+  },
+);
 
-jest.mock('../../services/sentry', () => {
-  const actual = jest.requireActual(
-    '../../services/sentry',
-  ) as typeof import('../../services/sentry');
-  return {
-    ...actual,
-    captureException: (...args: unknown[]) => mockCaptureException(...args),
-  };
-});
+jest.mock(
+  '../../services/sentry' /* gc1-allow: cron unit test asserts escalation metadata; real SDK does not expose captured calls */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/sentry',
+    ) as typeof import('../../services/sentry');
+    return {
+      ...actual,
+      captureException: (...args: unknown[]) => mockCaptureException(...args),
+    };
+  },
+);
 
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+import { sessionSummaryRegenerate } from './summary-regenerate';
 import {
   computeRotatingDelayedOffset,
   transcriptPurgeCron,
@@ -69,6 +79,11 @@ describe('transcriptPurgeCron', () => {
     }
 
     expect(seen.size).toBe(totalCount);
+  });
+
+  it('[WI-2739] keeps wrap-around remediation duplicate-safe through consumer idempotency', () => {
+    const opts = (sessionSummaryRegenerate as any).opts;
+    expect(opts.idempotency).toBe('event.data.sessionId');
   });
 
   it('[WI-2739] wires the rotating offset and wrap page into null-timestamp remediation', async () => {
