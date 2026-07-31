@@ -122,7 +122,7 @@ tags:
     visible:
       id: 'message-bubble-user-.*'
       containsDescendants:
-        - text: '^Teach me why leaves are green\\.$'
+        - text: '^Teach me why leaves are green\.$'
     timeout: 30000
 - assertNotVisible:
     id: 'mentor-opener-persisted-more-than-once'

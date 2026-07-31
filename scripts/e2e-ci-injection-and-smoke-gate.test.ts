@@ -7405,7 +7405,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           visible: {
             id: 'message-bubble-user-.*',
             containsDescendants: [
-              { text: '^Teach me why leaves are green\\\\.$' },
+              { text: '^Teach me why leaves are green\\.$' },
             ],
           },
           timeout: 30000,
