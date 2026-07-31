@@ -308,6 +308,7 @@ describe('mentor notice lifecycle — real database', () => {
           noticeId: notice.id,
           profileId: fixture.profileId,
           outcome: 'locked_in',
+          timestamp: expect.any(String),
         },
       },
     ]);
