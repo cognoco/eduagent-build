@@ -1,5 +1,7 @@
 import { scheduledDeletion } from './account-deletion';
+import { inngest } from '../client';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+import * as safeNonCore from '../../services/safe-non-core';
 import * as sentry from '../../services/sentry';
 
 const mockGetStepDatabase = jest.fn();
@@ -596,6 +598,7 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
+    jest.spyOn(safeNonCore, 'safeSend').mockResolvedValue(undefined);
   });
 
   it('[BREAK] declares an onFailure handler', () => {
@@ -638,6 +641,55 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
           runId: 'run-xyz',
         }),
       }),
+    );
+  });
+
+  it('[BREAK WI-2346] safeSends a PII-minimized account deletion teardown dead-letter event', async () => {
+    jest.spyOn(sentry, 'captureException').mockImplementation(() => undefined);
+    const safeSendSpy = jest
+      .spyOn(safeNonCore, 'safeSend')
+      .mockResolvedValue(undefined);
+    const inngestSendSpy = jest
+      .spyOn(inngest, 'send')
+      .mockResolvedValue({ ids: [] });
+
+    const onFailure = (scheduledDeletion as any).opts.onFailure as (args: {
+      event: { data: { event?: { data?: unknown }; run_id?: string } };
+      error: unknown;
+    }) => Promise<unknown>;
+    await onFailure({
+      event: {
+        data: {
+          event: { data: { accountId: 'acc-terminal' } },
+          run_id: 'run-xyz',
+        },
+      },
+      error: new Error('Clerk response contained private context'),
+    });
+
+    expect(safeSendSpy).toHaveBeenCalledTimes(1);
+    const call = safeSendSpy.mock.calls[0];
+    expect(call).toBeDefined();
+    if (!call) return;
+    const [sendThunk, surface, context] = call;
+    expect(surface).toBe('account-deletion.terminal_failure');
+    expect(context).toEqual({
+      accountId: 'acc-terminal',
+      runId: 'run-xyz',
+    });
+
+    await expect(sendThunk()).resolves.not.toThrow();
+    expect(inngestSendSpy).toHaveBeenCalledWith({
+      name: 'app/account.deletion_teardown.failed',
+      data: {
+        accountId: 'acc-terminal',
+        runId: 'run-xyz',
+        errorName: 'Error',
+        timestamp: expect.any(String),
+      },
+    });
+    expect(JSON.stringify(inngestSendSpy.mock.calls)).not.toContain(
+      'private context',
     );
   });
 

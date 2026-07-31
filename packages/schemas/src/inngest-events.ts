@@ -291,6 +291,45 @@ export type BillingAliasReceivedEvent = z.infer<
 >;
 
 // ---------------------------------------------------------------------------
+// [WI-2346] Terminal deletion-teardown dead-letter events
+//
+// These events live in Inngest's third-party event store and feed the launch
+// health alert/dashboard surface. Keep them to opaque identifiers, the Inngest
+// run id, a coarse error class, and time. Raw provider responses and error
+// messages can contain payer/account PII or secrets and must never ride here.
+// Account-level events legitimately omit profileId (AGENTS.md known exception).
+// ---------------------------------------------------------------------------
+const terminalFailureEventBaseSchema = z.object({
+  runId: z.string().min(1).nullable(),
+  errorName: z.string().min(1).max(128),
+  timestamp: isoDateField,
+});
+
+export const accountDeletionTeardownFailedEventSchema =
+  terminalFailureEventBaseSchema.extend({
+    accountId: z.string().min(1).nullable(),
+  });
+export type AccountDeletionTeardownFailedEvent = z.infer<
+  typeof accountDeletionTeardownFailedEventSchema
+>;
+
+export const billingSubscriptionStoreTeardownFailedEventSchema =
+  terminalFailureEventBaseSchema.extend({
+    accountId: z.string().min(1).nullable(),
+  });
+export type BillingSubscriptionStoreTeardownFailedEvent = z.infer<
+  typeof billingSubscriptionStoreTeardownFailedEventSchema
+>;
+
+export const billingAliasMergeFailedEventSchema =
+  terminalFailureEventBaseSchema.extend({
+    eventId: z.string().min(1).nullable(),
+  });
+export type BillingAliasMergeFailedEvent = z.infer<
+  typeof billingAliasMergeFailedEventSchema
+>;
+
+// ---------------------------------------------------------------------------
 // S5 visibility contract events
 // ---------------------------------------------------------------------------
 
