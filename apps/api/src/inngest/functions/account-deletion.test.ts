@@ -464,6 +464,121 @@ describe('[R1] Clerk identity erasure on account deletion', () => {
 });
 
 // ---------------------------------------------------------------------------
+// [WI-2390] Postgres PITR can restore rows deleted by this workflow, including
+// the in-DB deletion_audit row. Completion therefore needs an out-of-band proof
+// after the DB and Clerk legs have both succeeded. The structured log and
+// Sentry message are independent of the application database and carry only
+// opaque IDs plus non-PII outcomes.
+// ---------------------------------------------------------------------------
+describe('[WI-2390] restore-independent completion audit proof', () => {
+  const mockDb = { query: {} };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+    mockGetStepDatabase.mockReturnValue(mockDb);
+    mockGetStepClerkSecretKey.mockReturnValue('sk_test_step');
+    mockOrganizationExistsV2.mockResolvedValue(true);
+    mockIsDeletionCancelledV2.mockResolvedValue(false);
+    mockExecuteDeletionV2.mockResolvedValue('deleted');
+    mockGetSubscriptionStoreTeardownTargetsV2.mockResolvedValue([]);
+    mockGetOrganizationOwnerClerkUserIdV2.mockResolvedValue('clerk_user_abc');
+    mockGetOrganizationOwnerEmailV2.mockResolvedValue('owner@example.com');
+    mockDeleteClerkUser.mockResolvedValue({ deleted: true });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('[BREAK] records completed DB + Clerk erasure outside Postgres with the Inngest run id', async () => {
+    const captureSpy = jest
+      .spyOn(sentry, 'captureMessage')
+      .mockImplementation(() => undefined);
+    const consoleSpy = jest
+      .spyOn(console, 'log')
+      .mockImplementation(() => undefined);
+    const { step, runNames } = createInngestStepRunner();
+
+    const handler = (scheduledDeletion as any).fn;
+    const result = await handler({
+      event: { data: { accountId: 'acc-audit-proof' } },
+      runId: 'run-audit-proof',
+      step,
+    });
+
+    expect(result).toEqual({
+      status: 'deleted',
+      accountId: 'acc-audit-proof',
+    });
+    expect(runNames()).toContain('record-deletion-completion');
+    expect(captureSpy).toHaveBeenCalledWith(
+      'account.deletion.completed',
+      expect.objectContaining({
+        level: 'info',
+        tags: {
+          surface: 'account.deletion.completed',
+          databaseDeletion: 'deleted',
+          clerkErasure: 'deleted',
+          subscriptionStoreTeardown: 'not_applicable',
+        },
+        extra: {
+          accountId: 'acc-audit-proof',
+          runId: 'run-audit-proof',
+        },
+      }),
+    );
+
+    const completionLog = consoleSpy.mock.calls
+      .map(([line]) => JSON.parse(String(line)) as Record<string, unknown>)
+      .find((entry) => entry.message === 'account_deletion.completed');
+    expect(completionLog).toEqual(
+      expect.objectContaining({
+        level: 'info',
+        context: expect.objectContaining({
+          event: 'account_deletion.completed',
+          accountId: 'acc-audit-proof',
+          runId: 'run-audit-proof',
+          databaseDeletion: 'deleted',
+          clerkErasure: 'deleted',
+          subscriptionStoreTeardown: 'not_applicable',
+        }),
+      }),
+    );
+  });
+
+  it('does not emit a completion proof when deletion is cancelled during grace', async () => {
+    mockIsDeletionCancelledV2.mockResolvedValue(true);
+    const captureSpy = jest
+      .spyOn(sentry, 'captureMessage')
+      .mockImplementation(() => undefined);
+    const consoleSpy = jest
+      .spyOn(console, 'log')
+      .mockImplementation(() => undefined);
+    const { step, runNames } = createInngestStepRunner();
+
+    const handler = (scheduledDeletion as any).fn;
+    const result = await handler({
+      event: { data: { accountId: 'acc-cancelled' } },
+      runId: 'run-cancelled',
+      step,
+    });
+
+    expect(result).toEqual({ status: 'cancelled' });
+    expect(runNames()).not.toContain('record-deletion-completion');
+    expect(captureSpy).not.toHaveBeenCalledWith(
+      'account.deletion.completed',
+      expect.anything(),
+    );
+    expect(
+      consoleSpy.mock.calls.some(([line]) =>
+        String(line).includes('account_deletion.completed'),
+      ),
+    ).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // [INNGEST-DELETION-ONFAILURE][BREAK] GDPR Art 17 erasure-completeness guard.
 //
 // When all `retries` of scheduledDeletion are exhausted (e.g. a sustained
