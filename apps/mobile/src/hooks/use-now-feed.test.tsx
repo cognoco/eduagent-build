@@ -270,15 +270,28 @@ describe('useNowFeed — observed mentor-notice policy epoch', () => {
   //
   // The assertion is on what the surface EXPOSES, never on an internal field.
   //
-  // LIMITATION — THESE TWO DO NOT YET DISCRIMINATE THE FIX, and saying so here
+  // LIMITATION — THESE TWO DO NOT DISCRIMINATE THE FIX, and saying so here
   // rather than in a report that outlives this file. Reverting the fix to
   // `policy.suppressed(undefined)` leaves both GREEN. The reason, measured: with
   // a disabling floor seeded, the BOUND render already strips the notice card
   // (`fallbackFeed` is `[]` before sign-out ever happens), so the unbound
   // judgement is never reached; with no floor, there is nothing to suppress.
   // They therefore lock in current behaviour but prove nothing about the unbound
-  // path. A discriminating case needs a floor that lands BETWEEN the last bound
-  // render and the unbound one — which has not been demonstrated reachable.
+  // path.
+  //
+  // RETENTION MECHANISM, measured rather than read (WI-2933 reachability run):
+  // forcing a real re-render with `userId = null` gives
+  // `fallbackFeed = null, isError = false` — so with the query NOT in an error
+  // state the projection does NOT survive the unbind; the `if (!query.isError)`
+  // branch above clears it. Retention therefore requires `query.isError`, which
+  // is what the source reads. An earlier probe here appeared to show the feed
+  // surviving; that probe never forced a re-render, so it was sampling the still
+  // BOUND component and proved nothing.
+  //
+  // STILL UNMEASURED: the `isError: true` AND unbound combination. Once the pair
+  // is unbound the query stops fetching, so this harness could not drive it into
+  // an error state afterwards. That combination is the only surviving candidate
+  // for a reachable unbound judgement, and it remains undemonstrated.
   // -------------------------------------------------------------------------
   it('[WI-2933] does not paint the cached notice surface after sign-out when the pair’s stored floor forbids it', async () => {
     await seedWarmNoticeCache();
