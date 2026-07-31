@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-07-31 08:56 CEST
+Last reconciled: 2026-07-31 09:07 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -38,15 +38,18 @@ Last reconciled: 2026-07-31 08:56 CEST
   journal before guarded schema reconciliation so raw RLS policies are retained; its
   evidence now distinguishes committed migration DML/reference rows from forbidden
   copied user data or separate seed commands. Focused/local gates and exact-head
-  review are green; one unrelated legacy onboarding smoke timed out and its single
-  failed-job rerun is active. No DB connection occurred, and live mutation remains
-  explicitly operator-gated.
+  review are green; the one bounded rerun of the legacy onboarding smoke reproduced
+  the identical two 60-second signed-in-readiness expirations. This is the admitted
+  WI-2826 dependency, not a new finding. PR #2741 remains draft and red until WI-2826
+  supplies the missing hosted discriminator and a fresh smoke reaches strict green.
+  No DB connection occurred, and live mutation remains explicitly operator-gated.
 - WI-2941 — member 42, executing the missing sanctioned expired-cross-owner claim
   recovery capability in Marketplace PR #166 at exact head `9652d7d`; two in-scope
   review considerations were repaired, and the expanded focused/full local and hosted
   functional gates are green. Four exact-head Claude attempts aborted before a
-  review turn, so the governed merge gate remains correctly closed; one further
-  cooldown-bounded failed-job rerun is delegated. WI-2755 expired after capture, so
+  review turn. A fifth cooldown-bounded attempt reproduced the same pre-review service
+  abort with no verdict or findings, so the governed merge gate remains correctly
+  closed and duplicate-search/capture triage is active. WI-2755 expired after capture, so
   seven stale claims remain untouched pending governed landing and deployment of
   WI-2941. WI-2755 itself is already governed-merged from PR #2630 as `37b7a4e6`;
   after lawful claim recovery it needs execute-complete and independent review, not
