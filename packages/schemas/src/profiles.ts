@@ -149,6 +149,9 @@ export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
 export const onboardingLanguagePatchSchema = z
   .object({
     conversationLanguage: conversationLanguageSchema,
+    // The exact-self first-Mentor choice confirms the value. Automatic
+    // UI-locale sync and parent-managed edits omit this.
+    confirm: z.literal(true).optional(),
   })
   .strict();
 export type OnboardingLanguagePatch = z.infer<
@@ -223,6 +226,10 @@ const profileSchemaShape = {
   // BKT-C.1 — default 'en' so legacy profiles parse cleanly before the backfill
   // migration runs. After 0035 migrates, every row has a real value.
   conversationLanguage: conversationLanguageSchema.default('en'),
+  // WI-1556 — launch hints derived by the API. Optional so profile responses
+  // cached before this rollout remain readable.
+  conversationLanguageConfirmed: z.boolean().optional(),
+  isCurrentUser: z.boolean().optional(),
   pronouns: pronounsSchema.nullable().default(null),
   consentStatus: consentStatusSchema.nullable(),
   linkCreatedAt: isoDateField.nullable(),

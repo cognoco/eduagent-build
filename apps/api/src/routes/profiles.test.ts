@@ -254,6 +254,7 @@ describe('GET /v1/profiles', () => {
     expect(listProfilesV2Mock).toHaveBeenCalledWith(
       expect.anything(),
       ACCOUNT_ID,
+      CALLER_PERSON_ID,
     );
   });
 
@@ -353,6 +354,7 @@ describe('GET /v1/profiles', () => {
     expect(listProfilesV2Mock).toHaveBeenCalledWith(
       expect.anything(),
       ACCOUNT_ID,
+      CALLER_PERSON_ID,
     );
   });
 
