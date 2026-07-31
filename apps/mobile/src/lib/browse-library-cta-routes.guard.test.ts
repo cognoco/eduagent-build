@@ -51,6 +51,10 @@ const BROWSE_LIBRARY_CTA_SITES: readonly { file: string; testID: string }[] = [
     file: 'apps/mobile/src/app/(app)/progress/saved.tsx',
     testID: 'saved-empty-library-cta',
   },
+  {
+    file: 'apps/mobile/src/app/(app)/vocabulary/[subjectId].tsx',
+    testID: 'vocabulary-empty-library',
+  },
 ];
 
 const LIBRARY_ROUTE = '/(app)/library';
@@ -139,7 +143,13 @@ describe('Empty-state / recovery browse-Library CTA routes [WI-2219, WI-2467]', 
     'keeps $testID ($file) present as a known browse-Library CTA',
     ({ file, testID }) => {
       const source = readFileSync(resolve(repoRoot(), file), 'utf-8');
-      expect(source).toContain(`testID="${testID}"`);
+      // Most sites set testID as a JSX attribute (`testID="foo"`); a few
+      // (e.g. ErrorFallback's primaryAction/secondaryAction props) set it as
+      // an object property (`testID: 'foo'`) instead. Both are real presence.
+      const isPresent =
+        source.includes(`testID="${testID}"`) ||
+        source.includes(`testID: '${testID}'`);
+      expect(isPresent).toBe(true);
     },
   );
 
