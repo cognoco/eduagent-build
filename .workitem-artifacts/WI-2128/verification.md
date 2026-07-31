@@ -57,6 +57,12 @@ The fast gate's API-unit refusal was a fail-closed environment guard, not a test
 - **Omitted-header bootstrap:** `useProfiles` uses `useApiClient({ profileContext: 'omit' })` so only its profile-list authority requests omit active-profile and proxy context; concurrent profile-scoped clients retain their shared context. After the authoritative response, `ProfileProvider` validates the saved selection against the caller-operable list and repairs an invalid active selection or stale proxy state. The mandatory real-database regression proves an omitted header resolves from `callerPersonId` to the learner rather than the family owner.
 - **Route remounts and failures:** the successful-refresh marker is written only after an HTTP-successful, schema-valid response. Route-driven provider remounts reuse that authoritative result, while failed refreshes remain unmarked and therefore eligible for retry at the next boundary.
 
+## Flag-on current-head CI contract correction
+
+- **RED:** exact-head PR CI and the local flag-on rerun reproduced 10 failures across `wi2516-consent-write-idor.integration.test.ts` and `profile-switch-elevation-idor.integration.test.ts`. The assertions still allowed a credentialed caller to select another same-organization Person and still treated fresh-factor proof as authority to switch into that Person.
+- **ROOT CAUSE:** WI-2128 intentionally moved that rejection earlier. Shared profile scope now permits only self or an uncredentialed managed charge; the consent route still binds its subsequent write decision to `callerPersonId`, and fresh-factor proof verifies the current login without substituting its Person. The production behavior matched WI-2128's acceptance criteria and mandatory real-database regression; the older test expectations described the superseded boundary.
+- **GREEN:** updated only the stale real-database expectations and their contract comments. With identity-v2 and repointed flags enabled, the two corrected suites plus `wi2128-family-join-identity.integration.test.ts` passed together: 3 suites, 38 tests, 0 failures. No production authorization was relaxed or changed in this correction.
+
 ## Baseline-only findings
 
 - **WI-2892 — correct headerless profile-resolution documentation to caller Person:** `docs/architecture.md` still describes omitted `X-Profile-Id` as an `account.id` fallback, contradicting the login-bound caller-Person contract. Captured and admitted to BID-49 separately; no WI-2128 documentation expansion.
