@@ -21,6 +21,7 @@ import {
   claimBookForTopicExpansion,
   addCurriculumTopic,
   deleteTopicIfSafe,
+  ensureCurriculum,
   getBookWithTopics,
   moveTopicToBook,
   persistNarrowTopics,
@@ -274,6 +275,47 @@ async function expectTopicExists(
   });
   return !!row;
 }
+
+describeIfDb('ensureCurriculum ownership (integration) [WI-2463]', () => {
+  let db: Database;
+
+  beforeAll(async () => {
+    db = createIntegrationDb();
+    await cleanupByPrefix(db);
+  });
+
+  afterAll(async () => {
+    await cleanupByPrefix(db);
+  });
+
+  it('rejects a foreign subject without creating a curriculum, then creates it for the owner', async () => {
+    const { ownerProfileId, attackerProfileId } = await seedProfiles(db);
+    const [subject] = await db
+      .insert(subjects)
+      .values({
+        profileId: ownerProfileId,
+        name: `Curriculum ownership ${RUN_ID}`,
+        status: 'active',
+        pedagogyMode: 'socratic',
+      })
+      .returning({ id: subjects.id });
+
+    await expect(
+      ensureCurriculum(db, attackerProfileId, subject!.id),
+    ).rejects.toThrow('Subject not found');
+    expect(
+      await db.query.curricula.findMany({
+        where: eq(curricula.subjectId, subject!.id),
+      }),
+    ).toEqual([]);
+
+    const created = await ensureCurriculum(db, ownerProfileId, subject!.id);
+    expect(created).toMatchObject({
+      subjectId: subject!.id,
+      version: 1,
+    });
+  });
+});
 
 describeIfDb('releaseBookGenerationClaimIfEmpty (integration)', () => {
   let db: Database;

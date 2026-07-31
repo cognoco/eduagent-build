@@ -1,9 +1,42 @@
+import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import {
   getProfileScopedTables,
   PROFILE_SCOPED_SCAN_EXCEPTIONS,
 } from './profile-scoped-tables.js';
 
 describe('getProfileScopedTables', () => {
+  it('documents the explicit public subpath instead of the eager root barrel', () => {
+    const source = readFileSync(
+      join(__dirname, 'profile-scoped-tables.ts'),
+      'utf8',
+    );
+
+    expect(source).toContain('@eduagent/database/profile-scoped-tables');
+    expect(source).not.toContain('Exported via the package barrel');
+  });
+
+  it('keeps the Node-only scanner out of the native ESM runtime barrel', () => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        'tsx',
+        '--input-type=module',
+        '--eval',
+        "await import('@eduagent/database')",
+      ],
+      { cwd: join(__dirname, '../../..'), encoding: 'utf8' },
+    );
+
+    expect(`${result.stdout}${result.stderr}`).not.toContain(
+      'ReferenceError: __dirname is not defined',
+    );
+    expect(result.status).toBe(0);
+  });
+
   it('detects real profile-column declarations across scoped table shapes', () => {
     const tables = getProfileScopedTables();
 

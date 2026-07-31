@@ -514,6 +514,34 @@ describe('check-change-class.sh', () => {
     }
   });
 
+  it('routes integration checker inputs through the checker and full suite', () => {
+    mkdirSync(join(repo, 'tests', 'integration'), { recursive: true });
+    writeFileSync(
+      join(repo, 'tests', 'integration', 'new.integration.test.ts'),
+      'export const testFixture = true;\n',
+    );
+    git(repo, ['add', '.']);
+
+    const output = runChangeClass(repo, ['--branch'], { encoding: 'utf8' });
+    expect(output).toContain('integration-typecheck');
+    expect(output).toContain('pnpm typecheck:integration');
+    expect(output).toContain('pnpm test:integration');
+    expect(runRouter(repo).integration).toBe('true');
+  });
+
+  it.each(['pnpm-lock.yaml', 'tsconfig.base.json'])(
+    'routes shared compiler input %s through the integration checker',
+    (path) => {
+      writeFileSync(join(repo, path), '{}\n');
+      git(repo, ['add', '.']);
+
+      const output = runChangeClass(repo, ['--branch'], { encoding: 'utf8' });
+      expect(output).toContain('integration-typecheck');
+      expect(output).toContain('pnpm typecheck:integration');
+      expect(runRouter(repo).integration).toBe('true');
+    },
+  );
+
   it('routes API TypeScript changes through the no-Gemini-runtime ratchet', () => {
     mkdirSync(join(repo, 'apps', 'api', 'src', 'services'), {
       recursive: true,

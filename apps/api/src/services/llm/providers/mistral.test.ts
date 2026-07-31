@@ -32,12 +32,12 @@ describe('Mistral Provider', () => {
 
   beforeEach(() => mockFetch.mockReset());
 
-  it('posts to the Mistral URL with bearer auth, max_tokens and verbatim model', async () => {
+  it('[WI-2740][RGR] posts to the Mistral EU URL with bearer auth, max_tokens and verbatim model', async () => {
     mockFetch.mockResolvedValueOnce(okResponse('hi there', 'stop'));
     await provider.chat(MESSAGES, CFG);
 
     const [url, opts] = mockFetch.mock.calls[0];
-    expect(url).toBe('https://api.mistral.ai/v1/chat/completions');
+    expect(url).toBe('https://api.eu.mistral.ai/v1/chat/completions');
     expect(opts.headers.Authorization).toBe('Bearer test-key');
     const body = JSON.parse(opts.body);
     expect(body.model).toBe('mistral-small-2603');

@@ -14,6 +14,12 @@
 // ---------------------------------------------------------------------------
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  clearFamilyIntentOnboarding,
+  discardFamilyIntentOnboardingMemory,
+  FAMILY_INTENT_ONBOARDING_KEY,
+  FAMILY_INTENT_ONBOARDING_RECOVERY_KEY,
+} from './family-intent-onboarding-state';
 import { clearMentorLanguageStateOnSignOut } from './mentor-language-coordination';
 
 import * as SecureStore from './secure-storage';
@@ -118,6 +124,9 @@ export const GLOBAL_ASYNCSTORAGE_KEYS: ReadonlyArray<string> = [
   // render time. The PER_PROFILE prefix wipe matches `add_to_my_learning.tip_seen.<id>`
   // but not the bare form — clear it explicitly so the tip resets on sign-out.
   'add_to_my_learning.tip_seen',
+  // family-intent-onboarding-state.ts — non-authorizing fallback journal for
+  // the transient account-scoped learner-target fork.
+  FAMILY_INTENT_ONBOARDING_RECOVERY_KEY,
 ];
 
 // Global keys that should reset when no one is signed in. Excludes onboarding
@@ -145,6 +154,8 @@ export const GLOBAL_KEYS: ReadonlyArray<string> = [
   'preAuthAudience.v1',
   // mentor-born-ceremony.ts — transient first-profile ceremony handoff.
   MENTOR_BORN_PENDING_KEY,
+  // family-intent-onboarding-state.ts — transient account-scoped fork state.
+  FAMILY_INTENT_ONBOARDING_KEY,
 ];
 
 // [CR-SECURESTORE-REGISTRY-11] Documented exceptions — specific callsites that
@@ -266,6 +277,12 @@ export async function clearProfileSecureStorageOnSignOut(
   profileIds: ReadonlyArray<string>,
 ): Promise<void> {
   const mentorLanguageCleanup = clearMentorLanguageStateOnSignOut(profileIds);
+  // Durable cleanup is best-effort, but an account-scoped fork must never
+  // survive sign-out through this module's in-memory fast path.
+  discardFamilyIntentOnboardingMemory();
+  const familyIntentCleanup = clearFamilyIntentOnboarding().catch(
+    () => undefined,
+  );
   const keys = new Set<string>();
 
   for (const profileId of profileIds) {
@@ -332,6 +349,7 @@ export async function clearProfileSecureStorageOnSignOut(
       : Promise.resolve(),
     prefixScanRemoval,
     mentorLanguageCleanup,
+    familyIntentCleanup,
   ]);
 
   // [CR-SIGNOUT-TIMEOUT-10] Hard cap so a stuck Keychain/Keystore can't
