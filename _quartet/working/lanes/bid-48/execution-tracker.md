@@ -77,8 +77,9 @@ Delivery Batch as `Done`.
   proof. WI-2939 is in typed execution on the landed prerequisite for the bootstrap
   tooling only; real live bootstrap remains explicitly operator-gated.
 - WI-2941 is in typed execution for the sanctioned race-safe Govern recovery command.
-  Until it lands and is independently reviewed, the six expired cross-owner claims
-  remain untouched rather than being impersonated or hand-edited.
+  WI-2755 expired after capture, so the post-landing recovery set is now seven
+  cross-owner claims. All remain untouched pending governed landing and independent
+  review rather than being impersonated or hand-edited.
 - WI-2936 remains Ready pending the requested no-Doppler worktree exception.
   WI-2922 and WI-2923 remain Ready behind their exact shared-development database and
   Clerk/Doppler mutation approvals. Staging and production remain forbidden.

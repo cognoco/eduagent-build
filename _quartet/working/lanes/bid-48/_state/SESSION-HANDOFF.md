@@ -36,8 +36,8 @@ Last reconciled: 2026-07-31 08:00 CEST
   contract for WI-2790's uniquely named disposable non-staging target. Live mutation
   remains explicitly operator-gated.
 - WI-2941 — member 42, executing the missing sanctioned expired-cross-owner claim
-  recovery capability. The six stale claims remain untouched pending its governed
-  landing, independent review, and deployment.
+  recovery capability. WI-2755 expired after capture, so seven stale claims remain
+  untouched pending its governed landing, independent review, and deployment.
 - WI-2800 — Ready/Active after review rejected its already-landed `fdbe36d2` evidence:
   the isolated run diagnosed a different 68.6-second sign-in failure and did not
   attribute the original hosted 90-second exhaustion. WI-2826 plus the hosted gate
