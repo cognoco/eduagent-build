@@ -2998,7 +2998,8 @@ describe('[WI-2952] applyAnalysis threads caller provenance to the gate', () => 
   });
 
   // AC-6, boundary 2 — NOT COVERED HERE, and saying so in the file rather than
-  // only in a report.
+  // only in a report. Tracked: WI-2971 (real-database integration test for the
+  // applyAnalysis write path, asserting the persisted projection).
   //
   // An end-to-end assertion through `applyAnalysis` needs to observe the
   // SANITISED projection the write persists. Two attempts failed to discriminate:

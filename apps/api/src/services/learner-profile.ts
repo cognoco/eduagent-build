@@ -1577,6 +1577,12 @@ function evaluateProfileFieldTexts(
  *                 That widening is deliberate (the item exists to stop dropping
  *                 learner self-disclosure), but it is a fail-closed gate getting
  *                 wider: audit here first if composed-text leaks are suspected.
+ *                 Independence caveat: provenance is per-write-batch (storage
+ *                 has no per-fragment author), so a 'user' write sweeps stored
+ *                 LLM-authored fragments into a batch judged with NO vendor
+ *                 exclusion — a vendor that produced a stored fragment embedded
+ *                 in composed row text can grade that text. Collection-level
+ *                 granularity is tracked as WI-2972.
  *     'llm' + blank vendor — the `applyAnalysis` default for callers that omit
  *                 `author`; cannot consult the judge, fails closed on `refer`.
  *   'migration' — `deleteMemoryItem` / `unsuppressInference`. Determined from the

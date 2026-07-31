@@ -16,11 +16,14 @@
 //   `disposition`    — what the CALLER must do: block | clear | refer.
 //
 // The fail-closed matrix is DETERMINISTIC and lives here, not in the judge.
-// Per §4.6, `refer` (the judge seam) is reachable ONLY for LLM-authored text
-// with a known producer vendor. User-authored ambiguity, migration/backfill
-// ambiguity, and missing producer identity all fail closed to `block` with
-// reason `unclear` — the judge never gets the chance to allow them, and the
-// protected text is never handed to another external service.
+// `refer` (the judge seam) is reachable for user-authored ambiguity (operator
+// ruling 2026-07-26, quoted at the matrix below: a learner describing
+// themselves is judged, not dropped) and for LLM-authored text with a known
+// producer vendor. Migration/backfill ambiguity and LLM text with a missing
+// producer identity fail closed to `block` with reason `unclear` — the judge
+// never gets the chance to allow them. (The pre-amendment §4.6 wording said
+// user ambiguity also blocked; the matrix at the bottom of this file is the
+// authority.)
 // ---------------------------------------------------------------------------
 
 import type { ConversationLanguage } from '@eduagent/schemas';
