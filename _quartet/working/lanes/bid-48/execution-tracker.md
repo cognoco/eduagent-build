@@ -69,6 +69,10 @@ Delivery Batch as `Done`.
   verified all eight ACs, exact CI, loopback disposable-Postgres proof, governed
   merge evidence, and origin/main ancestry. The item is Closed / Done; both
   batch-owned worktrees and obsolete local/remote execution branches are cleaned.
+- WI-2822 is Closed / Done after its repair and exact evidence rework landed as
+  `0a3000af` and `c96f6bf3`; its three batch-owned worktrees and obsolete local/remote
+  execution branches are cleaned. The separate BID-19 integration worktree is not
+  batch-owned and remains untouched.
 - WI-2800 remains honestly Ready after independent review rejected the already-landed
   `fdbe36d2` artifact: the isolated dev evidence stopped on a different 68.6-second
   sign-in failure and did not attribute the original hosted 90-second exhaustion.

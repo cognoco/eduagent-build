@@ -90,6 +90,9 @@ Last reconciled: 2026-07-31 09:13 CEST
   local/remote branch cleanup is complete.
 - WI-2818 — landed `cfeeaed7`; completion evidence passed, independent global review
   closed with zero findings, and worktree/local/remote branch cleanup is complete.
+- WI-2822 — repair and exact evidence rework landed as `0a3000af` and `c96f6bf3`;
+  independent review passed. Three batch-owned worktrees and obsolete local/remote
+  branches are cleaned; the separate BID-19 integration worktree was not touched.
 
 ## Active typed work
 
