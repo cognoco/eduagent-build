@@ -39,7 +39,8 @@ WI-2820's test-seed batching remain intact. A focused RED caught WI-1556's
 first-Mentor language gate pre-empting the unresolved durable-state probe; the
 gate now waits for family intent to resolve absent before it can render.
 Independent exact-head review then caught the same gate pre-empting a restored
-invitation replay. It now remains suppressed until Tabs mount and the
-invitation push is issued.
+invitation replay. The handoff now stays pending after the push until the
+terminal route is observed, and the terminal route itself suppresses the
+language gate through destination mount and marker consumption.
 
 Refs: WI-2532

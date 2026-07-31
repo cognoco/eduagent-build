@@ -82,9 +82,12 @@ published exact head.
   144-test layout suite pass.
 - Independent exact-head review found a second WI-1556 ordering boundary after
   a restored `opening-invitation` marker moved into layout state. Focused RED
-  observed invitation navigation while Tabs were absent. Language gating now
-  remains suppressed while invitation replay is pending; the 145-test layout
-  suite and 14-suite / 472-test semantic union pass.
+  observed invitation navigation while Tabs were absent. A strengthened
+  post-push RED then received the language gate on `/link/initiate`. The
+  handoff now stays pending until that route is observed, and the terminal
+  route itself suppresses language gating through destination mount and marker
+  consumption. The 145-test layout suite and 14-suite / 472-test semantic
+  union pass.
 - WI-2399's generation-bound create mutation, Back invalidation, retry, and
   stale-success rejection remain present and pass in the invitation-route
   suite.
@@ -106,6 +109,10 @@ published exact head.
 - Existing flags-off, V0, and V1 shell contracts are unchanged. Direct
   existing-account entry preserves the prior explicit unavailable state when
   V2 is off.
+- Current Prettier collapses main's canonical four-line teen-consent checker
+  chain during pre-commit. The final tree is restored transparently with a
+  tracked temporary `.prettierignore` entry committed and then removed through
+  normal hooks; zero-diff checks against `origin/main` cover both files.
 
 ## Review disposition
 

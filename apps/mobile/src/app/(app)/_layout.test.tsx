@@ -751,7 +751,7 @@ describe('AppLayout', () => {
         ),
     );
 
-    renderLayout();
+    const view = renderLayout();
 
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith({
@@ -760,6 +760,12 @@ describe('AppLayout', () => {
       });
     });
     expect(invitationSawMountedTabs).toBe(true);
+
+    mockUsePathname.mockReturnValue('/link/initiate');
+    view.rerender(<AppLayout />);
+
+    expect(screen.queryByTestId('first-mentor-language-gate')).toBeNull();
+    screen.getByTestId('tabs');
   });
 
   it('[WI-2532] fails closed and offers retry when the family-intent state read rejects', async () => {

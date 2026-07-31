@@ -30,8 +30,10 @@ The merge-forward union passed 472 tests across fourteen suites: durable state,
 both branches, profile creation, app-layout restoration, invitation routing,
 sign-out cleanup, session routing, consent routing, link resubmit-generation
 guards, and first-Mentor language confirmation. The durable family-intent probe
-now resolves before the first-Mentor language gate can render, and a restored
-invitation mounts Tabs before replay so that gate cannot pre-empt navigation.
+now resolves before the first-Mentor language gate can render. A restored
+invitation mounts Tabs before replay, keeps its handoff pending until the
+terminal route is observed, and suppresses the language gate on that route
+through destination mount and marker consumption.
 The union includes the landed test-seed helper. The full mobile unit stage,
 full API unit stage under the
 sanctioned development database boundary, TypeScript build, i18n ratchets,

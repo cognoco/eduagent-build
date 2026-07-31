@@ -422,6 +422,8 @@ export default function AppLayout() {
     returnTo?: string | string[];
   }>();
   const currentAppPath = toInternalAppRedirectPath(pathname);
+  const isFamilyIntentInvitationRoute =
+    currentAppPath.split(/[?#]/, 1)[0] === '/(app)/link/initiate';
   const {
     profiles,
     activeProfile,
@@ -588,12 +590,15 @@ export default function AppLayout() {
 
   React.useEffect(() => {
     if (!familyIntentInvitationRequested) return;
+    if (isFamilyIntentInvitationRoute) {
+      setFamilyIntentInvitationRequested(false);
+      return;
+    }
     router.push({
       pathname: '/(app)/link/initiate',
       params: { target: 'existingTeen' },
     });
-    setFamilyIntentInvitationRequested(false);
-  }, [familyIntentInvitationRequested, router]);
+  }, [familyIntentInvitationRequested, isFamilyIntentInvitationRoute, router]);
 
   React.useEffect(() => {
     if (!FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED) {
@@ -957,6 +962,7 @@ export default function AppLayout() {
   if (
     familyIntentState === null &&
     !familyIntentInvitationRequested &&
+    !isFamilyIntentInvitationRoute &&
     shouldRequireFirstMentorLanguageConfirmation({
       activeProfile,
       isExplicitProxyMode,

@@ -107,6 +107,15 @@ first-Mentor profile, the language gate could therefore render before the
 invitation push. The focused RED observed the push while Tabs were absent
 (`Expected: true`, `Received: false`).
 
-The language gate now also requires that no invitation replay is pending.
-GREEN proves Tabs are mounted when the restored invitation is pushed. The
-post-fix semantic union passed 472 tests across fourteen suites.
+A second exact-head review found that clearing the handoff flag immediately
+after `router.push` left another render gap before the terminal destination
+mounted and consumed its marker. The strengthened post-push RED transitioned
+the layout to `/link/initiate` and received
+`first-mentor-language-gate` instead of Tabs.
+
+The handoff now remains pending until the terminal pathname is observed, and
+the terminal route independently suppresses language gating through
+destination mount and marker consumption. GREEN proves Tabs are mounted at
+push time and remain present after the path transition; the route-level suite
+retains its marker-consumption assertion. The post-fix semantic union passed
+472 tests across fourteen suites.
