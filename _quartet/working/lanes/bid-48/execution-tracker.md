@@ -70,14 +70,19 @@ Delivery Batch as `Done`.
   Every item-specific environment, database, credential, merge, and review gate
   remains controlling.
 - Active execution WIP:
-  - WI-2755 — Reviewing after the bounded rework. The operator-authorized
+  - WI-2755 — Ready/Active after independent review bounced the bounded rework. The operator-authorized
     restore-to-origin/main plus one-time `--no-verify` amend produced normal merge
     head `02a93cd1` with a strictly two-file WI-owned diff and no force-push. All 14
     exact-head checks passed; the governed merge gate verified zero threads and a
     fresh zero-finding approval, then squash-landed PR #2746 as `cf9434df`.
-    Execute-complete validated the corrected landed evidence, settled the claim, and
-    moved the item to Reviewing. Independent adversarial review is active, including
-    adjudication of the stale displayed Pipeline value `Changes Requested`.
+    Execute-complete validated the corrected landed evidence and settled the claim,
+    but the authoritative DATABASE_URL-only source-artifact replay still selected the
+    pooled fallback, retained an owned idle backend for about 30 seconds, threw before
+    DROP DATABASE, and left its scratch DB behind. The source-text assertion is not a
+    behavioral regression proof; exact-head `main` also skipped both API integration
+    steps, so repeated-replay completion evidence was overstated. FO-2081 /
+    `OCC-85FD83133D26` records the occurrence. Redispatch is first in line when one of
+    the four current execution slots opens.
   - WI-2790 — portable Lancre integration target; landed source repair, awaiting
     WI-2939's disposable-schema proof.
   - WI-2921 — local Playwright seed-secret alignment; strict-green PR #2718 remains
@@ -118,6 +123,8 @@ Delivery Batch as `Done`.
   `3ae8bce9-1f7c-8166-8f54-001da619ca14`. FO-2080
   (`OCC-894322F2C99D`) records that mandatory `env:sync` has broader staging and
   remote-mutation effects than isolated local setup; no new Work Item was created.
+- FO-2081 (`OCC-85FD83133D26`) records WI-2755's landed direct-URL preference still
+  failing the required DATABASE_URL-only teardown replay; no new Work Item was created.
 - Checkpoint branch `bid-48-lane-state` is pushed through `02c8ba9c8`.
 - The historical sections below are retained only as an audit trail. This section,
   Cosmo, and GitHub supersede every stale lifecycle position below.

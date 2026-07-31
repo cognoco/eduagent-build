@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-07-31 17:52 CEST
+Last reconciled: 2026-07-31 18:01 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -17,7 +17,7 @@ Last reconciled: 2026-07-31 17:52 CEST
   Lifecycle Tooling with no Sprint or Delivery Batch; WI-2946 is Backlog/Active
   in Nexus / Clacks with no Sprint or Delivery Batch. WI-2942 remains Closed /
   Duplicate of WI-2941. WI-2926 remains Closed / Duplicate of WI-2925.
-- Live stage count at checkpoint: 28 Closed, 4 Executing, 1 Reviewing, 8 Ready.
+- Live stage count at checkpoint: 28 Closed, 4 Executing, 9 Ready.
 
 ## Current frontier — supersedes stale per-item positions below
 
@@ -88,8 +88,14 @@ Last reconciled: 2026-07-31 17:52 CEST
   checks. The governed merge gate verified zero unresolved threads and a fresh
   zero-finding approval, then squash-landed PR #2746 as `cf9434df`. Execute-complete
   validated the corrected artifacts, set Fixed In to that landed commit, cleared the
-  claim, and moved the item to Reviewing. Independent adversarial review is active;
-  it is also adjudicating the stale displayed Pipeline value `Changes Requested`.
+  claim, and moved the item to Reviewing. Independent adversarial review then bounced
+  it to Ready/Active: the required DATABASE_URL-only source-artifact replay still
+  selected the pooled fallback, retained one owned idle backend for about 30 seconds,
+  threw before DROP DATABASE, and left the scratch database behind. The new focused
+  test inspects source text rather than behavior, and completion overstated repeated
+  DB replay because exact-head `main` skipped both API integration steps. FO-2081 /
+  `OCC-85FD83133D26` records this landed-attempt occurrence. WI-2755 is first on the
+  executor frontier when WIP capacity opens; the lane is currently full.
 - WI-2802 — Closed/Done. Closed/Done WI-2810 supplies
   the sanitized observer but cannot retroactively classify the 2026-07-26 failure.
   The operator authorized exactly one post-instrumentation isolated hosted J-01
