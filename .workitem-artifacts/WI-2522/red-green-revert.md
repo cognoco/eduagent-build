@@ -21,11 +21,15 @@ the required slash and drive-letter conversion. The same API with
 
 ## Command
 
-The final focused command is:
+The final focused commands are:
 
 ```bash
 PATH=/home/vetinari/.local/node22/bin:$PATH \
   pnpm test:doppler-run
+
+PATH=/home/vetinari/.local/node22/bin:$PATH \
+  pnpm exec jest --config scripts/jest.config.cjs \
+  scripts/run-api-integration.test.ts --runInBand --no-coverage
 ```
 
 ## Strict TDD cycle
@@ -63,9 +67,12 @@ spawn results without a shell executable. Fake setup is centralized in
 `fakeDopplerEnv()`. Nested package scripts launch pnpm's lifecycle-provided
 `npm_execpath` directly when it is executable-shaped (including `pnpm.exe`), or
 through `process.execPath` when it is a `.js`/`.cjs` CLI. The harness does not
-spawn bare `corepack`. The fake-Doppler and package-script cases do not modify
-`PATH`; the missing-Doppler negative case intentionally replaces `PATH` with an
-empty fixture directory.
+itself spawn bare `corepack`. At the second-review head,
+`run-api-integration.mjs` still spawned bare `corepack` before reaching Doppler,
+so the earlier blanket no-Corepack claim was false; the third-review correction
+below removes those production calls. The fake-Doppler and package-script cases
+do not modify `PATH`; the missing-Doppler negative case intentionally replaces
+`PATH` with an empty fixture directory.
 
 Correction cycle:
 
@@ -120,12 +127,46 @@ RED/GREEN/revert/restore phases ran with the repository-required Node
 5. **RESTORE GREEN:** restored the suffix-based launcher selection. Result:
    17 passed, 0 failed.
 
+## API integration launcher correction after third adversarial review
+
+The canonical `pnpm test:api:integration` command enters
+`run-api-integration.mjs` before Doppler. At the third-review head, both its
+version probe and its Jest/Nx dispatch used `spawnSync('corepack', ...)`.
+Windows Node 22 supplies `corepack.cmd`, not an executable that Node can spawn
+directly without a shell, so that path could fail before exercising the fixed
+Doppler guard.
+
+The script now resolves pnpm from lifecycle-provided `npm_execpath`, uses
+`process.execPath` only for `.js`/`.cjs` CLI paths, and directly spawns native
+executable shapes such as the standalone action's `pnpm.exe`. The version probe
+returns that exact launcher for the subsequent `pnpm exec` call, preserving the
+`packageManager: pnpm@10.19.0` pin check and preventing a different PATH binary
+from handling forwarded arguments.
+
+Third-review TDD cycle under Node `v22.16.0`:
+
+1. **RED:** with production unchanged, a cross-platform preload rejected bare
+   Corepack and observed no `npm_execpath` launch. The standalone `pnpm.exe`,
+   Windows `.cjs`, POSIX `.js`, and version-mismatch cases all failed:
+   4 failed, 15 skipped.
+2. **GREEN:** switched the version probe and Jest/Nx dispatch to the lifecycle
+   launcher. Result: 4 passed, 15 skipped; the full
+   `run-api-integration.test.ts` suite then passed 19/19.
+3. **PRODUCTION-ONLY REVERT RED:** restored only the production version probe
+   and command dispatch to bare Corepack, holding tests and the preload fixed.
+   Result: 4 failed, 15 skipped with the same Corepack-before-launch failure.
+4. **RESTORE GREEN:** restored the lifecycle launcher. Result: 4 passed,
+   15 skipped; the full suite again passed 19/19.
+
 ## Package-script dispatch coverage
 
 The focused suite runs `pnpm test`, `pnpm test:api:integration`, and
-`pnpm test:integration` as real subprocesses under the Node preload. The fake
-exits before any Nx/Jest/database work, so the checks are deterministic,
-offline, and secret-free while proving each package script reached
+`pnpm test:integration` as real subprocesses under the Node preload. For the API
+script, the already-installed lifecycle pnpm first answers `--version`; the fake
+Doppler then exits before Nx, Jest, or database work. The prior blanket
+`offline` claim was false because bare Corepack could perform package-manager
+resolution. The corrected proof explicitly rejects bare Corepack, remains
+deterministic and secret-free, and proves each package script reached
 `doppler-run.mjs` and dispatched:
 
 ```text
