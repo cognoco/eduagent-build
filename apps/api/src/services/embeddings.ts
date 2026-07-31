@@ -14,6 +14,7 @@ import {
 } from '@eduagent/database';
 
 import { projectAiResponseContent } from './llm/project-response';
+import { filterLearnerAuthoredTextForEgress } from './learner-egress-filter';
 
 export interface EmbeddingResult {
   vector: number[];
@@ -112,6 +113,7 @@ export async function generateEmbedding(
   apiKey: string,
 ): Promise<EmbeddingResult> {
   const config = getEmbeddingConfig();
+  const filteredText = filterLearnerAuthoredTextForEgress(text);
 
   const response = await fetch(VOYAGE_API_URL, {
     method: 'POST',
@@ -120,7 +122,7 @@ export async function generateEmbedding(
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      input: [text],
+      input: [filteredText],
       model: config.model,
       input_type: 'document',
     }),
