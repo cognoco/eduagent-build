@@ -155,7 +155,7 @@ export const profileRoutes = new Hono<ProfileEnv>()
         });
       }
     }
-    const profiles = await listProfilesV2(db, account.id);
+    const profiles = await listProfilesV2(db, account.id, callerPersonId);
     return c.json(
       profileListResponseSchema.parse({ profiles, needsAdultConsent }),
     );
@@ -225,7 +225,12 @@ export const profileRoutes = new Hono<ProfileEnv>()
               adultOwnerGateEnabled:
                 c.env?.ADULT_OWNER_GATE_ENABLED !== 'false',
             });
-            return c.json(profileResponseSchema.parse({ profile: child }), 201);
+            return c.json(
+              profileResponseSchema.parse({
+                profile: { ...child, isCurrentUser: false },
+              }),
+              201,
+            );
           } catch (err) {
             if (err instanceof ForbiddenError) {
               return apiError(c, 403, ERROR_CODES.FORBIDDEN, err.message);
@@ -254,7 +259,15 @@ export const profileRoutes = new Hono<ProfileEnv>()
 
         if (owner) {
           // Idempotent replay of the owner bootstrap.
-          return c.json(profileResponseSchema.parse({ profile: owner }), 201);
+          return c.json(
+            profileResponseSchema.parse({
+              profile: {
+                ...owner,
+                isCurrentUser: owner.id === c.get('callerPersonId'),
+              },
+            }),
+            201,
+          );
         }
         // No owner under a resolved account is a structurally-broken graph.
         return apiError(
@@ -326,7 +339,12 @@ export const profileRoutes = new Hono<ProfileEnv>()
           'profiles.create.signup_completed',
           { profileId: graph.personId },
         );
-        return c.json(profileResponseSchema.parse({ profile }), 201);
+        return c.json(
+          profileResponseSchema.parse({
+            profile: { ...profile, isCurrentUser: true },
+          }),
+          201,
+        );
       } catch (err) {
         if (err instanceof ProfileValidationError) {
           return validationError(c, { [err.field]: [err.message] });

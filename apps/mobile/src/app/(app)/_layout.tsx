@@ -63,6 +63,8 @@ import { ConsentWithdrawnGate } from './_components/ConsentWithdrawnGate';
 import { ConsentPendingGate } from './_components/ConsentPendingGate';
 import { usePostApprovalLanding } from './_hooks/use-post-approval-landing';
 import { SaveWizardGate } from './_components/save-wizard/SaveWizardGate';
+import { FirstMentorLanguageGate } from './_components/FirstMentorLanguageGate';
+import { shouldRequireFirstMentorLanguageConfirmation } from '../../lib/first-mentor-language';
 
 initNotificationHandler();
 
@@ -422,6 +424,7 @@ export default function AppLayout() {
     profileWasRemoved,
     acknowledgeProfileRemoval,
     switchProfile,
+    isExplicitProxyMode,
   } = useProfile();
   useMentorLanguageSync();
   const proxyColors = getProxyChromeColors(colors);
@@ -862,6 +865,19 @@ export default function AppLayout() {
     );
   }
 
+  if (
+    shouldRequireFirstMentorLanguageConfirmation({
+      activeProfile,
+      isExplicitProxyMode,
+    })
+  ) {
+    return (
+      <FeedbackProvider>
+        <FirstMentorLanguageGate />
+      </FeedbackProvider>
+    );
+  }
+
   // Show celebratory landing once after consent approval
   if (showPostApproval) {
     return (
@@ -957,6 +973,9 @@ export default function AppLayout() {
            (immersive screens like session, onboarding, homework).
          ──────────────────────────────────────────────────────────── */}
           <Tabs
+            backBehavior={
+              FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? 'history' : 'firstRoute'
+            }
             screenOptions={({ route }) => {
               const isVisible = visibleTabs.has(route.name);
               const isFullScreen = FULL_SCREEN_ROUTES.has(route.name);

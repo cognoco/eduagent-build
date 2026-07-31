@@ -180,10 +180,15 @@ describe('PersonScopeStructuralSubjects', () => {
     screen.getByText('Physics');
     screen.getByText('1 mastered, 0 learning, 2 topics');
     screen.getByText('1 reviews due');
-    screen.getByText('Motion / Vectors');
+    screen.getByText('Motion');
+    expect(screen.queryByText('Motion / Vectors')).toBeNull();
     expect(screen.getAllByText('Velocity')).toHaveLength(2);
     screen.getByText('Acceleration');
     screen.getByText('Mastered');
+    fireEvent.press(screen.getByTestId(`subject-hub-topic-${REVIEW_TOPIC_ID}`));
+    expect(
+      screen.getByTestId('subject-hub-topic-description').props.children,
+    ).toContain('Emma asked: Vectors');
     screen.getByText('Study actions are private to the learner in this view.');
     screen.getByText('Subject, chapter and topic structure only.');
     expect(screen.queryByTestId('subject-hub-next-up-action')).toBeNull();

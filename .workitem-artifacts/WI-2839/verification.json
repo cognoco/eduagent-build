@@ -1,0 +1,61 @@
+{
+  "verifiedImplementationHead": "80e9aaa4987525cbd2a58eec896d09e76b6fe947",
+  "verifiedAt": "2026-07-27T00:05:30+00:00",
+  "environment": {
+    "IDENTITY_V2_ENABLED": "true",
+    "NODE_OPTIONS": "-r dotenv/config",
+    "DOTENV_CONFIG_PATH": ".env.development.local"
+  },
+  "receipts": [
+    {
+      "name": "focused-green",
+      "command": "NODE_OPTIONS=\"-r dotenv/config\" DOTENV_CONFIG_PATH=.env.development.local IDENTITY_V2_ENABLED=true pnpm exec jest --config apps/api/jest.integration.config.cjs apps/api/src/inngest/functions/weekly-progress-push.integration.test.ts --runInBand --forceExit -t \"real same-hour week-window step|memoized evaluation instant\" --json --outputFile=.workitem-artifacts/WI-2839/green-jest.json",
+      "head": "80e9aaa4987525cbd2a58eec896d09e76b6fe947",
+      "receipt": ".workitem-artifacts/WI-2839/green-jest.json",
+      "result": "2 passed, 8 skipped, 0 failed"
+    },
+    {
+      "name": "full-co-located-integration",
+      "command": "NODE_OPTIONS=\"-r dotenv/config\" DOTENV_CONFIG_PATH=.env.development.local IDENTITY_V2_ENABLED=true pnpm exec jest --config apps/api/jest.integration.config.cjs apps/api/src/inngest/functions/weekly-progress-push.integration.test.ts --runInBand --forceExit --json --outputFile=.workitem-artifacts/WI-2839/full-integration-jest.json",
+      "head": "80e9aaa4987525cbd2a58eec896d09e76b6fe947",
+      "receipt": ".workitem-artifacts/WI-2839/full-integration-jest.json",
+      "result": "10 passed, 0 skipped, 0 failed"
+    },
+    {
+      "name": "companion-unit",
+      "command": "NODE_OPTIONS=\"-r dotenv/config\" DOTENV_CONFIG_PATH=.env.development.local IDENTITY_V2_ENABLED=true pnpm exec jest --config apps/api/jest.config.cjs apps/api/src/inngest/functions/weekly-progress-push.test.ts --runInBand --forceExit --json --outputFile=.workitem-artifacts/WI-2839/unit-jest.json",
+      "head": "80e9aaa4987525cbd2a58eec896d09e76b6fe947",
+      "receipt": ".workitem-artifacts/WI-2839/unit-jest.json",
+      "result": "29 passed, 0 skipped, 0 failed"
+    }
+  ],
+  "additionalChecks": [
+    {
+      "command": "NX_SKIP_NX_CACHE=true IDENTITY_V2_ENABLED=true pnpm exec nx run api:typecheck",
+      "head": "80e9aaa4987525cbd2a58eec896d09e76b6fe947",
+      "result": "exit 0; API and five dependency typechecks executed without Nx cache"
+    },
+    {
+      "command": "NX_SKIP_NX_CACHE=true IDENTITY_V2_ENABLED=true pnpm exec nx run api:lint",
+      "head": "80e9aaa4987525cbd2a58eec896d09e76b6fe947",
+      "result": "exit 0; 0 errors and 55 pre-existing warnings outside the changed files"
+    },
+    {
+      "command": "IDENTITY_V2_ENABLED=true pnpm exec eslint apps/api/src/inngest/functions/weekly-progress-push.ts apps/api/src/inngest/functions/weekly-progress-push.integration.test.ts",
+      "head": "80e9aaa4987525cbd2a58eec896d09e76b6fe947",
+      "result": "exit 0; no output"
+    },
+    {
+      "command": "IDENTITY_V2_ENABLED=true pnpm exec prettier --check apps/api/src/inngest/functions/weekly-progress-push.ts apps/api/src/inngest/functions/weekly-progress-push.integration.test.ts",
+      "head": "80e9aaa4987525cbd2a58eec896d09e76b6fe947",
+      "result": "exit 0; all matched files use Prettier style"
+    }
+  ],
+  "originatingFailure": {
+    "run": "https://github.com/cognoco/eduagent-build/actions/runs/30224090384",
+    "job": "https://github.com/cognoco/eduagent-build/actions/runs/30224090384/job/89851383157",
+    "unrelatedGreenSuites": 151,
+    "unrelatedGreenTests": 1160
+  },
+  "prHeadStatus": "Pending exact-head GitHub CI; the evidence-only follow-up commit does not alter production or test behavior."
+}

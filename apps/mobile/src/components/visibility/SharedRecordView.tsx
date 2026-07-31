@@ -4,6 +4,10 @@ import type { AppealReport, SharedRecord } from '@eduagent/schemas';
 
 import { ErrorFallback } from '../common/ErrorFallback';
 import { StructuralFactCard } from '../learning-surface';
+import {
+  renderSharedRecordFact,
+  renderSharedRecordHeadline,
+} from '../support/shared-record-fact-copy';
 
 interface SharedRecordViewProps {
   record?: SharedRecord;
@@ -14,6 +18,7 @@ interface SharedRecordViewProps {
   appealReport?: AppealReport;
   appealError?: Error | null;
   onRetryAppeal?: () => void;
+  supporteeName?: string;
 }
 
 export function SharedRecordView({
@@ -25,8 +30,9 @@ export function SharedRecordView({
   appealReport,
   appealError,
   onRetryAppeal,
+  supporteeName,
 }: SharedRecordViewProps): React.ReactElement {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   if (error) {
     return (
@@ -72,12 +78,15 @@ export function SharedRecordView({
   return (
     <>
       <StructuralFactCard
-        headline={view?.headline ?? t('visibility.sharedRecord.emptyTitle')}
+        headline={
+          view
+            ? renderSharedRecordHeadline(view, t, supporteeName)
+            : t('visibility.sharedRecord.emptyTitle')
+        }
         structuralOnlyLabel={t('visibility.sharedRecord.structuralOnly')}
         facts={(view?.facts ?? []).map((fact) => ({
           id: fact.id,
-          title: fact.title,
-          detail: fact.detail,
+          ...renderSharedRecordFact(fact, t, i18n.language),
         }))}
         appeal={appeal}
         testID="visibility-shared-record"

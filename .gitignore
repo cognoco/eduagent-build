@@ -222,6 +222,10 @@ apps/mobile/e2e/scripts/run-logs/**/*.log
 /--workstream
 /_quartet/working/lanes/**/_state/*.jsonl
 /_quartet/working/lanes/**/_state/monitor-manifest.json
+# WI-2686: release-eng's monitor manifest is materialized at rest (truthful
+# empty-monitors placeholder) so the tracker/handoff pointer chain resolves;
+# every other lane keeps the general gitignored/live-only convention above.
+!/_quartet/working/lanes/release-eng/_state/monitor-manifest.json
 /_quartet/working/lanes/**/_state/**/*.log
 /_quartet/working/lanes/**/_state/**/state.json
 /_quartet/working/lanes/**/_state/**/launched-transitions.json
@@ -275,6 +279,7 @@ apps/api/.notion-*.json
 # fingerprints + package name and Google recommends committing this file.
 # GoogleService-Info.plist will be committed once Apple enrollment completes.
 apps/mobile/GoogleService-Info.plist
+apps/mobile/.eas-submit/
 .stash-backup/
 
 # Bug-fix coordinator scratchpad (branch-only)

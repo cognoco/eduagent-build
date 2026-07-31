@@ -1,0 +1,54 @@
+# Verify the exact active learner through Account -> Profiles, then return to
+# the exact screen and row that invoked this shared identity assertion.
+#
+# Required env vars:
+#   PROFILE_ID       — seeded active profile ID
+#   PROFILE_NAME     — exact active profile display name
+#   RETURN_SCREEN_ID — exact screen restored by Account Back
+#   RETURN_ROW_ID    — exact seeded row restored on that screen
+#   RETURN_ROW_NAME  — exact name owned by RETURN_ROW_ID
+appId: com.mentomate.app
+---
+- tapOn:
+    id: 'account-avatar-button'
+- extendedWaitUntil:
+    visible:
+      id: 'account-admin-sheet'
+    timeout: 15000
+- assertVisible:
+    id: 'account-admin-sheet'
+    containsDescendants:
+      - text: '^${PROFILE_NAME}$'
+- tapOn:
+    id: 'account-admin-profile'
+- extendedWaitUntil:
+    visible:
+      id: 'profiles-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'profile-row-${PROFILE_ID}'
+    containsDescendants:
+      - text: '^${PROFILE_NAME}$'
+      - id: 'profile-active-check'
+- tapOn:
+    id: 'profiles-close'
+- extendedWaitUntil:
+    visible:
+      id: 'account-admin-sheet'
+    timeout: 10000
+- assertVisible:
+    id: 'account-admin-sheet'
+    containsDescendants:
+      - text: '^${PROFILE_NAME}$'
+- tapOn:
+    id: 'account-back'
+- extendedWaitUntil:
+    visible:
+      id: '${RETURN_SCREEN_ID}'
+    timeout: 15000
+- assertVisible:
+    id: '${RETURN_SCREEN_ID}'
+- assertVisible:
+    id: '${RETURN_ROW_ID}'
+    containsDescendants:
+      - text: '^${RETURN_ROW_NAME}$'

@@ -34,6 +34,14 @@ on:
       - 'docs/flows/mobile-app-flow-inventory.md'
       - 'scripts/check-flow-inventory-cite-rot.ts'
       - 'scripts/check-flow-inventory-cite-rot.test.ts'
+      # teen-consent-claims: every SCANNED ROOT and every CHECKER INPUT must be
+      # listed, or the guard silently fails to run on the files it protects.
+      # docs/plans/**.md above already covers the first scan root; _wip is not
+      # covered by any other entry.
+      - '_wip/mvp-roadmap/**.md'
+      - 'scripts/check-teen-consent-claims.ts'
+      - 'scripts/check-teen-consent-claims.test.ts'
+      - 'scripts/teen-consent-claims-baseline.json'
   pull_request:
     paths:
       - 'docs/plans/**.md'
@@ -60,6 +68,14 @@ on:
       - 'docs/flows/mobile-app-flow-inventory.md'
       - 'scripts/check-flow-inventory-cite-rot.ts'
       - 'scripts/check-flow-inventory-cite-rot.test.ts'
+      # teen-consent-claims: every SCANNED ROOT and every CHECKER INPUT must be
+      # listed, or the guard silently fails to run on the files it protects.
+      # docs/plans/**.md above already covers the first scan root; _wip is not
+      # covered by any other entry.
+      - '_wip/mvp-roadmap/**.md'
+      - 'scripts/check-teen-consent-claims.ts'
+      - 'scripts/check-teen-consent-claims.test.ts'
+      - 'scripts/teen-consent-claims-baseline.json'
   workflow_dispatch:
 
 permissions:
@@ -113,6 +129,38 @@ jobs:
 
       - name: Decision→ADR link check
         run: pnpm run check:decision-adr-link
+
+  teen-consent-claims:
+    if: github.event_name != 'workflow_dispatch'
+    # WI-2535 — forward-only ratchet. A NEW blanket "13+ self-consenting" claim in
+    # the launch/roadmap markdown surface (docs/plans/2026-07-10-mvp-roadmap,
+    # _wip/mvp-roadmap) fails the check. Consent authority resolves from
+    # age x residence jurisdiction, not age alone (docs/canon/identity/ontology.md
+    # -> resolveConsentRequirement; prd.md:451-465). Baseline is currently EMPTY:
+    # the sweep in WI-2535 removed all four pre-existing violations rather than
+    # grandfathering them, so nothing is suppressed. Detection is the CONJUNCTION
+    # only (a 13+ token adjacent to a self-consent token, non-negated) — bare
+    # "self-consent" and bare "13+" are legitimate and never flagged.
+    # Cite-not-assert escape: <!-- teen-consent-allow: <reason> -->.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          package-manager-cache: false
+
+      - name: Install dependencies (root only)
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Teen self-consent claim check
+        run: pnpm run check:teen-consent-claims
 
   adr-provenance:
     if: github.event_name != 'workflow_dispatch'

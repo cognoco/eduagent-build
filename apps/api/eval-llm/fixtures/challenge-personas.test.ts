@@ -54,6 +54,26 @@ describe('CHALLENGE_SIM_SCENARIOS', () => {
     expect(outcomes).toEqual(new Set(VALID_OUTCOMES));
   });
 
+  it('keeps the CRS03 reteach learner unambiguously missing', () => {
+    const scenario = CHALLENGE_SIM_SCENARIOS.find(
+      (candidate) => candidate.id === 'CRS03-ser-estar-vague',
+    );
+
+    expect(scenario?.expectedOutcome).toBe('reteach');
+    expect(scenario?.competenceBrief).toContain(
+      'Do not choose or repeat "ser" or "estar"',
+    );
+    expect(scenario?.competenceBrief).toContain(
+      'Reply to every question with a short, explicit admission',
+    );
+    expect(scenario?.competenceBrief).toContain(
+      'Never provide an explanation or invent a rule',
+    );
+    expect(scenario?.competenceBrief).not.toMatch(
+      /just get it|makes sense to me|sounds right/i,
+    );
+  });
+
   it('spans at least 4 of the 5 eval profiles', () => {
     const usedProfiles = new Set(
       CHALLENGE_SIM_SCENARIOS.map((s) => s.profileId),

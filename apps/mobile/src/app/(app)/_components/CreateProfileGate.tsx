@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
-import { useRouter, type Href } from 'expo-router';
+import { usePathname, useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useClerk, useUser } from '@clerk/expo';
 import { useQueryClient } from '@tanstack/react-query';
@@ -9,6 +9,8 @@ import { useProfile } from '../../../lib/profile';
 import { signOutWithCleanup } from '../../../lib/sign-out';
 import { platformAlert } from '../../../lib/platform-alert';
 import { GateContent, LightBulbAnimation } from '../../../components/common';
+import { toInternalAppRedirectPath } from '../../../lib/normalize-redirect-path';
+import { getPostAuthDefaultPath } from '../_lib/auth-redirect';
 
 /**
  * Gate shown when no profile exists yet (first-time user after sign-up).
@@ -18,6 +20,7 @@ import { GateContent, LightBulbAnimation } from '../../../components/common';
 export function CreateProfileGate(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const pathname = usePathname();
   const { signOut } = useClerk();
   const { user } = useUser();
   const queryClient = useQueryClient();
@@ -45,12 +48,17 @@ export function CreateProfileGate(): React.ReactElement {
   const handleGetStarted = React.useCallback(() => {
     if (isPushingRef.current) return;
     isPushingRef.current = true;
-    router.push('/create-profile' as Href);
+    router.push({
+      pathname: '/create-profile',
+      params: {
+        returnTo: toInternalAppRedirectPath(pathname, getPostAuthDefaultPath()),
+      },
+    } as Href);
     // Reset after navigation settles to allow re-entry if user backs out
     setTimeout(() => {
       isPushingRef.current = false;
     }, 1000);
-  }, [router]);
+  }, [pathname, router]);
 
   return (
     <View

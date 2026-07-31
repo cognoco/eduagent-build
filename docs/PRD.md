@@ -83,7 +83,7 @@ Motivated learners aged 13+ who really want to learn—not casual browsers:
 - **Pricing:** €18.99/mo (Plus) | €28.99/mo (Family, up to 4 users) | €48.99/mo (Pro, up to 6 users)
 - **Family/Pro:** Shared question pools across all users
 - **Trial:** 14 days Plus access + 14 days soft landing (reverse trial)
-- **Free Tier:** 100 questions/month with first-week boost (10/day for days 1-7)
+- **Free Tier:** dual cap — 10 questions/day AND 100 questions/month, both permanent (see `MMT-ADR-0042`)
 - **Top-ups:** Plus €10/500, Family/Pro €5/500 (12-month expiry)
 
 ---
@@ -1129,7 +1129,7 @@ Mentor notices are the learner-only, low-stakes loop defined by [`MMT-ADR-0036`]
 - Rollout observations carry a monotonic server revision: lower revisions are ignored, disabled wins at the same revision, and re-enable requires a higher revision. Missing or malformed policy is fail-closed.
 - Flag-off removes all observed in-app and cached behavior without deleting notice rows; ordinary retention and deletion rules still apply. This work does not authorize production activation, percentage rollout, OTA, release, deployment, or push delivery.
 - The durable notice keeps an immutable `answerEventId` scalar after transcript purge, without a foreign key to the purged event. The server validates the event at creation; optional `learnerQuote` is transient validation input and is never stored.
-- All persisted learning text passes one shared multilingual clinical-safety gate. Person-attributed clinical inference is blocked. Ambiguous text is referred to an independent judge whoever authored it — learner, user, or model — and proceeds only when that judge strictly identifies it as an educational reference; ambiguity without a judgment fails closed.
+- All persisted learning text passes one shared multilingual clinical-safety gate. Person-attributed clinical inference is blocked. Ambiguous text is referred to an independent judge on a three-way split by who authored it: learner- or user-authored text is referred with no producing model to exclude (judge independence `not-applicable`); model-authored text is referred only when the producing model is known, so that model can be excluded from judging its own output; migrated and backfilled text is never referred. Referred text proceeds only when that judge strictly identifies it as an educational reference; model-authored text whose producing model is unknown, migrated or backfilled ambiguity, and ambiguity without a judgment all fail closed — never user-authored text, which has no producing model to be unknown.
 
 ### Learning Verification
 
@@ -1505,11 +1505,11 @@ The EVALUATE prompt template needs access to: (a) the topic's key concepts, (b) 
 | **Family** | €28.99 | €252 (26% off) | Up to 4 | 1,500 shared | €5/500 |
 | **Pro** | €48.99 | €432 (26% off) | Up to 6 | 3,000 shared | €5/500 |
 
-*\*Free tier includes first-week boost: 10 questions/day for days 1-7*
+*\*Free tier is a permanent dual cap: 10 questions/day AND 100 questions/month, applied together on every day of use — not a time-limited boost. See `MMT-ADR-0042`.*
 
 **Free Tier:**
 - Unlimited onboarding (interview + curriculum generation)
-- 100 questions/month with first-week boost (10/day for days 1-7)
+- 10 questions/day AND 100 questions/month — both caps permanent and applied together (`MMT-ADR-0042`)
 - Full feature access (no feature gating, only usage limits)
 - Progress tracking and Library (progress saved forever)
 - Top-ups not available (must upgrade)

@@ -74,7 +74,9 @@ export function useUpdateProfileName() {
       queryClient.setQueryData<Profile[]>(
         queryKeys.profiles.list(userId),
         (existing) =>
-          existing?.map((entry) => (entry.id === profile.id ? profile : entry)),
+          existing?.map((entry) =>
+            entry.id === profile.id ? { ...entry, ...profile } : entry,
+          ),
       );
       void queryClient.invalidateQueries({
         queryKey: queryKeys.profiles.list(userId),
@@ -110,7 +112,9 @@ export function useUpdateProfileAppContext() {
       queryClient.setQueryData<Profile[]>(
         queryKeys.profiles.list(userId),
         (existing) =>
-          existing?.map((entry) => (entry.id === profile.id ? profile : entry)),
+          existing?.map((entry) =>
+            entry.id === profile.id ? { ...entry, ...profile } : entry,
+          ),
       );
       void queryClient.invalidateQueries({
         queryKey: queryKeys.profiles.list(userId),

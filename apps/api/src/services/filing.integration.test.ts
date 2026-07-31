@@ -29,6 +29,7 @@ import {
   fileToLibrary,
   resolveFilingResult,
 } from './filing';
+import { assertFilingDedupBarrierPresent } from '../db/filing-dedup-barrier';
 import type { FilingLlmOutput, LibraryIndex } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
@@ -100,6 +101,16 @@ async function cleanup() {
 // ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
+
+// [WI-2639] Environment contract: resolveFilingResult's concurrent-write
+// dedup guarantees (below) depend on DB-level unique indexes that a
+// push-managed database (dev Neon) never receives — see
+// ../db/filing-dedup-barrier.ts for the full rationale. Fail the whole
+// suite fast with an actionable diagnostic here rather than letting the
+// concurrency tests race silently against an unenforced barrier.
+beforeAll(async () => {
+  await assertFilingDedupBarrierPresent(createIntegrationDb());
+});
 
 beforeEach(async () => {
   await cleanup();
@@ -501,6 +512,145 @@ describe('resolveFilingResult (integration)', () => {
         ),
       );
     expect(rows).toHaveLength(1);
+  });
+
+  it('[WI-2639] concurrent first-time shelf creation is case-insensitive', async () => {
+    const { profile } = await seedAccountAndProfile();
+    const db = createIntegrationDb();
+
+    const makePayload = (shelfName: string, topicSuffix: string) => ({
+      profileId: profile.id,
+      filingResponse: {
+        shelf: { name: shelfName },
+        book: {
+          name: `Case-insensitive book ${topicSuffix}`,
+          emoji: '📚',
+          description: 'Case-insensitive shelf regression',
+        },
+        chapter: { name: 'Case-insensitive chapter' },
+        topic: {
+          title: `Case-insensitive topic ${topicSuffix}`,
+          description: 'Concurrent case-insensitive shelf regression',
+        },
+      } satisfies FilingLlmOutput,
+      filedFrom: 'session_filing' as const,
+    });
+
+    const [upperCase, lowerCase] = await Promise.all([
+      resolveFilingResult(db, makePayload('CaseSensitiveShelf', 'upper')),
+      resolveFilingResult(db, makePayload('casesensitiveshelf', 'lower')),
+    ]);
+
+    expect(upperCase.shelfId).toBe(lowerCase.shelfId);
+    const activeRows = await db
+      .select()
+      .from(subjects)
+      .where(
+        and(
+          eq(subjects.profileId, profile.id),
+          eq(subjects.status, 'active'),
+          sql`lower(${subjects.name}) = lower(${'CaseSensitiveShelf'})`,
+        ),
+      );
+    expect(activeRows).toHaveLength(1);
+  });
+
+  it('[WI-2639] same normalized shelf name remains isolated across profiles', async () => {
+    const [{ profile: firstProfile }, { profile: secondProfile }] =
+      await Promise.all([seedAccountAndProfile(), seedAccountAndProfile()]);
+    const db = createIntegrationDb();
+
+    const makePayload = (profileId: string, shelfName: string) => ({
+      profileId,
+      filingResponse: {
+        shelf: { name: shelfName },
+        book: {
+          name: `Profile boundary book ${profileId}`,
+          emoji: '📚',
+          description: 'Profile boundary shelf regression',
+        },
+        chapter: { name: 'Profile boundary chapter' },
+        topic: {
+          title: `Profile boundary topic ${profileId}`,
+          description: 'Cross-profile shelf regression',
+        },
+      } satisfies FilingLlmOutput,
+      filedFrom: 'session_filing' as const,
+    });
+
+    const [first, second] = await Promise.all([
+      resolveFilingResult(
+        db,
+        makePayload(firstProfile.id, 'ProfileBoundaryShelf'),
+      ),
+      resolveFilingResult(
+        db,
+        makePayload(secondProfile.id, 'profileboundaryshelf'),
+      ),
+    ]);
+
+    expect(first.shelfId).not.toBe(second.shelfId);
+    const rows = await db
+      .select()
+      .from(subjects)
+      .where(sql`lower(${subjects.name}) = lower(${'ProfileBoundaryShelf'})`);
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ profileId: firstProfile.id }),
+        expect.objectContaining({ profileId: secondProfile.id }),
+      ]),
+    );
+  });
+
+  it('[WI-2639] an archived shelf does not block one new active concurrent shelf', async () => {
+    const { profile } = await seedAccountAndProfile();
+    const db = createIntegrationDb();
+    const [archived] = await db
+      .insert(subjects)
+      .values({
+        profileId: profile.id,
+        name: 'ArchivedShelf',
+        status: 'archived',
+        pedagogyMode: 'socratic',
+      })
+      .returning();
+
+    const makePayload = (shelfName: string, topicSuffix: string) => ({
+      profileId: profile.id,
+      filingResponse: {
+        shelf: { name: shelfName },
+        book: {
+          name: `Archived shelf book ${topicSuffix}`,
+          emoji: '📚',
+          description: 'Archived shelf regression',
+        },
+        chapter: { name: 'Archived shelf chapter' },
+        topic: {
+          title: `Archived shelf topic ${topicSuffix}`,
+          description: 'Archived shelf concurrent regression',
+        },
+      } satisfies FilingLlmOutput,
+      filedFrom: 'session_filing' as const,
+    });
+
+    const [first, second] = await Promise.all([
+      resolveFilingResult(db, makePayload('ArchivedShelf', 'first')),
+      resolveFilingResult(db, makePayload('archivedshelf', 'second')),
+    ]);
+
+    expect(first.shelfId).toBe(second.shelfId);
+    expect(first.shelfId).not.toBe(archived!.id);
+    const activeRows = await db
+      .select()
+      .from(subjects)
+      .where(
+        and(
+          eq(subjects.profileId, profile.id),
+          eq(subjects.status, 'active'),
+          sql`lower(${subjects.name}) = lower(${'ArchivedShelf'})`,
+        ),
+      );
+    expect(activeRows).toHaveLength(1);
   });
 
   // ---------------------------------------------------------------------------

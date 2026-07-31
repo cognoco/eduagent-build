@@ -200,6 +200,7 @@ export async function getOwnerProfileV2(
       birthDate: person.birthDate,
       residenceJurisdiction: person.residenceJurisdiction,
       conversationLanguage: person.conversationLanguage,
+      conversationLanguageConfirmedAt: person.conversationLanguageConfirmedAt,
       pronouns: person.pronouns,
       defaultAppContext: person.defaultAppContext,
       createdAt: person.createdAt,
@@ -243,6 +244,8 @@ export async function getOwnerProfileV2(
     hasFamilyLinks: false,
     conversationLanguage:
       owner.conversationLanguage as Profile['conversationLanguage'],
+    conversationLanguageConfirmed:
+      owner.conversationLanguageConfirmedAt !== null,
     pronouns: owner.pronouns ?? null,
     consentStatus,
     linkCreatedAt: null,
@@ -449,6 +452,7 @@ export async function getPersonScope(
 export async function listProfilesV2(
   db: Database,
   organizationId: string,
+  callerPersonId?: string,
 ): Promise<Profile[]> {
   // Org-scoped person read (the IDOR guard): only persons with a membership in
   // THIS org, non-archived. person.id = profiles.id; account.id = organization.id.
@@ -460,6 +464,7 @@ export async function listProfilesV2(
       birthDate: person.birthDate,
       residenceJurisdiction: person.residenceJurisdiction,
       conversationLanguage: person.conversationLanguage,
+      conversationLanguageConfirmedAt: person.conversationLanguageConfirmedAt,
       pronouns: person.pronouns,
       defaultAppContext: person.defaultAppContext,
       createdAt: person.createdAt,
@@ -551,6 +556,9 @@ export async function listProfilesV2(
       hasFamilyLinks,
       conversationLanguage:
         row.conversationLanguage as Profile['conversationLanguage'],
+      conversationLanguageConfirmed:
+        row.conversationLanguageConfirmedAt !== null,
+      isCurrentUser: row.id === callerPersonId,
       pronouns: row.pronouns ?? null,
       consentStatus: consentByPersonId.get(row.id) ?? null,
       linkCreatedAt: isOwner ? null : (chargeGrantedAt?.toISOString() ?? null),

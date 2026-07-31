@@ -118,7 +118,9 @@ export function armJ01AccountReadiness(
     try {
       const committedPath = new URL(page.url()).pathname;
       const phase = await visiblePhase(committedPath);
-      if (!disposed && phase !== 'unknown') retainedPhase = phase;
+      if (!disposed && phase !== 'unknown' && retainedPhase === null) {
+        retainedPhase = phase;
+      }
     } finally {
       phaseSampleInFlight = false;
     }
@@ -136,7 +138,9 @@ export function armJ01AccountReadiness(
       const phase =
         visibleFailurePhase === 'unknown'
           ? (retainedPhase ?? visibleFailurePhase)
-          : visibleFailurePhase;
+          : retainedPhase !== null && retainedPhase !== visibleFailurePhase
+            ? `${retainedPhase}->${visibleFailurePhase}`
+            : visibleFailurePhase;
 
       return (
         `[J-01 account-readiness:${phase}] account-avatar-shell remained absent within ${timeout}ms; ` +

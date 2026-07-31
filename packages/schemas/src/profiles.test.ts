@@ -68,6 +68,26 @@ describe('conversationLanguageSchema', () => {
   });
 });
 
+describe('onboardingLanguagePatchSchema', () => {
+  it('[WI-1556] accepts an explicit first-Mentor confirmation', () => {
+    expect(
+      onboardingLanguagePatchSchema.parse({
+        conversationLanguage: 'cs',
+        confirm: true,
+      }),
+    ).toEqual({ conversationLanguage: 'cs', confirm: true });
+  });
+
+  it('[WI-1556] rejects false confirmation values', () => {
+    expect(() =>
+      onboardingLanguagePatchSchema.parse({
+        conversationLanguage: 'cs',
+        confirm: false,
+      }),
+    ).toThrow();
+  });
+});
+
 describe('pronounsSchema', () => {
   it('[BKT-C.1] accepts common pronoun strings up to 32 chars', () => {
     expect(pronounsSchema.parse('she/her')).toBe('she/her');
@@ -157,6 +177,18 @@ describe('profileSchema forward-compat', () => {
       pronouns: 'they/them',
     });
     expect(parsed.pronouns).toBe('they/them');
+  });
+
+  it('[WI-1556] preserves server-derived first-Mentor language state', () => {
+    const parsed = profileSchema.parse({
+      ...legacyRowWithoutC1Fields,
+      isCurrentUser: true,
+      conversationLanguageConfirmed: false,
+    });
+    expect(parsed).toMatchObject({
+      isCurrentUser: true,
+      conversationLanguageConfirmed: false,
+    });
   });
 });
 
@@ -282,9 +314,10 @@ describe('[BUG-906] NEW_LEARNER_SESSION_THRESHOLD contract', () => {
 
 describe('[BUG-780] onboarding patch schemas mirror profileUpdateSchema', () => {
   // Onboarding endpoints are single-field PATCH variants of the broader
-  // profile-update path. They MUST be subsets of profileUpdateSchema —
+  // profile-update path. Persisted fields MUST be subsets of profileUpdateSchema —
   // otherwise an onboarding step could write a column that the regular
-  // profile-edit screen cannot also reach. This guards the cross-reference.
+  // profile-edit screen cannot also reach. `confirm` is request metadata, not
+  // a profile field, and is intentionally excluded.
   const updateKeys = new Set(Object.keys(profileUpdateSchema.shape));
 
   it.each([
@@ -292,6 +325,7 @@ describe('[BUG-780] onboarding patch schemas mirror profileUpdateSchema', () => 
     ['onboardingPronounsPatchSchema', onboardingPronounsPatchSchema],
   ])('every key in %s is also in profileUpdateSchema', (_name, schema) => {
     for (const key of Object.keys(schema.shape)) {
+      if (key === 'confirm') continue;
       expect(updateKeys.has(key)).toBe(true);
     }
   });

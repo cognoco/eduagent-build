@@ -2,6 +2,7 @@
 
 **Company:** ZWIZZLY AS, org.nr 811 696 072, registered in Oslo, Norway
 **Prepared:** 2026-07-26 (draft for management verification and signature)
+**DPO review:** Accepted 2026-07-30 (central conclusions confirmed, conditional on the corporate-structure facts remaining accurate); Art 77 sentence corrected per DPO wording — re-issue clean signed version.
 **Purpose:** Records the determination of the company's main establishment (GDPR Article 4(16)) and its competent/lead supervisory authority (Articles 55–56), as requested in the DPO Interim DPIA Advice Record (action 2).
 
 ## 1. Corporate structure
@@ -29,7 +30,7 @@ There is no other place of central administration and no establishment elsewhere
 - DPIA prior consultation (Art 36), if ever required, is addressed to Datatilsynet.
 - Personal-data breach notifications (Art 33) go to Datatilsynet.
 - The DPO's contact details are communicated to Datatilsynet (Art 37(7)) — **pending**: to be filed only after the formal DPO appointment is signed and the dpo@ mailbox is live, per the DPO's own instruction not to register before appointment.
-- Users anywhere may still complain to their local authority (Art 77); such cases would be coordinated toward Datatilsynet as lead where the one-stop-shop applies.
+- Data subjects may lodge a complaint with a supervisory authority in the EEA State of their habitual residence, place of work or place of the alleged infringement, where Article 77 GDPR applies. Where the one-stop-shop mechanism applies, the matter will be handled in coordination with Datatilsynet as lead supervisory authority. *(Wording per DPO correction, 2026-07-30 — replaces the earlier broader sentence.)*
 
 ## 5. Revisit triggers
 

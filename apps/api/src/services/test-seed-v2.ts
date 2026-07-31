@@ -28,6 +28,8 @@ import {
   type Database,
 } from '@eduagent/database';
 
+import { CONFIRMED_CONVERSATION_LANGUAGE_AT } from '../test-utils/conversation-language-confirmation';
+
 /** The ids a v2 identity seed produces, mirroring the legacy seed's returns. */
 export interface SeededIdentityV2 {
   /** organization.id — the legacy accountId analogue. */
@@ -72,6 +74,7 @@ export async function seedOwnerIdentityV2(
     displayName: opts.displayName,
     birthDate: `${opts.birthYear}-01-01`,
     residenceJurisdiction: opts.residenceJurisdiction ?? 'ROW',
+    conversationLanguageConfirmedAt: CONFIRMED_CONVERSATION_LANGUAGE_AT,
     ...(opts.conversationLanguage !== undefined
       ? { conversationLanguage: opts.conversationLanguage }
       : {}),
@@ -119,6 +122,7 @@ export async function seedChildIdentityV2(
     displayName: opts.displayName,
     birthDate: `${opts.birthYear}-01-01`,
     residenceJurisdiction: opts.residenceJurisdiction ?? 'ROW',
+    conversationLanguageConfirmedAt: CONFIRMED_CONVERSATION_LANGUAGE_AT,
     // login_id stays null — managed child, no credential.
   });
   await db.insert(membership).values({

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { AccordionTopicList } from './AccordionTopicList';
+import { FEATURE_FLAGS } from '../../lib/feature-flags';
 
 const mockPush = jest.fn();
 const mockUseChildSubjectTopics = jest.fn();
@@ -211,29 +212,65 @@ describe('AccordionTopicList', () => {
     screen.getByText('No topics yet');
   });
 
-  it('[UX-DE-M5] empty state shows Browse topics CTA that navigates to library', () => {
-    mockUseChildSubjectTopics.mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+  describe('empty-state Browse topics CTA destination [WI-2467]', () => {
+    let originalV2: boolean;
+
+    beforeEach(() => {
+      originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      mockUseChildSubjectTopics.mockReturnValue({
+        data: [],
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
     });
 
-    render(
-      <AccordionTopicList
-        childProfileId="child-1"
-        subjectId="subject-1"
-        subjectName="Mathematics"
-        expanded
-      />,
-    );
+    afterEach(() => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        originalV2;
+    });
 
-    screen.getByTestId('accordion-topics-empty');
-    screen.getByTestId('accordion-topics-browse');
+    it('[UX-DE-M5] navigates to library when V2 nav is off', () => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        false;
 
-    fireEvent.press(screen.getByTestId('accordion-topics-browse'));
+      render(
+        <AccordionTopicList
+          childProfileId="child-1"
+          subjectId="subject-1"
+          subjectName="Mathematics"
+          expanded
+        />,
+      );
 
-    expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+      screen.getByTestId('accordion-topics-empty');
+      screen.getByTestId('accordion-topics-browse');
+
+      fireEvent.press(screen.getByTestId('accordion-topics-browse'));
+
+      expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+    });
+
+    it('navigates to V2 Subjects when V2 nav is on', () => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        true;
+
+      render(
+        <AccordionTopicList
+          childProfileId="child-1"
+          subjectId="subject-1"
+          subjectName="Mathematics"
+          expanded
+        />,
+      );
+
+      screen.getByTestId('accordion-topics-empty');
+      screen.getByTestId('accordion-topics-browse');
+
+      fireEvent.press(screen.getByTestId('accordion-topics-browse'));
+
+      expect(mockPush).toHaveBeenCalledWith('/(app)/subjects');
+    });
   });
 
   it('[MOBILE-1 F2] pushes parent chain when rendered outside the child stack', () => {
