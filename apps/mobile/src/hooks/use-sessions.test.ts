@@ -2168,26 +2168,19 @@ describe('[WI-2627] mentor-notice policy observation reaches its consumers', () 
       expect(result.current.data?.mentorNotice).toBeUndefined();
     });
 
-    // [WI-2627 rework, finding 1] The malformed-response route on this surface,
-    // which the first pass left fail-OPEN.
-    //
-    // A bad `mentorNoticePolicy` fails the WHOLE `sessionSummaryGetResponseSchema`,
-    // so `parseJson` threw before the fold and TanStack Query went on RETAINING
-    // the prior receipt-bearing summary with policy still enabled. The assertion
-    // is therefore about what the hook exposes while the query is in an error
-    // state holding that retained summary — not that `observeMalformed` ran, and
-    // not that the schema rejects the field. Both of those pass on code that
-    // keeps rendering the retained receipt.
-    it('goes fail-closed when the summary response fails to parse, and suppresses the RETAINED receipt', async () => {
+    // [WI-2949] The DESCOPE, direction A, on the summary surface: an unparseable
+    // response body unrelated to mentor-notice policy must NOT suppress the
+    // receipt. The parse failure here is an invalid `summary.status`; the policy
+    // field alongside it is valid and unchanged.
+    it('keeps the receipt visible when the summary body fails to parse for an unrelated reason', async () => {
       mockFetch.mockResolvedValueOnce(summaryResponse(policy(7, true), true));
 
       const { result } = renderHook(() => useSessionSummary('session-1'), {
         wrapper: createWrapper(),
       });
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
-      // NON-TRIVIALITY CONTROL: with rollout ON at an acceptable revision the
-      // receipt really renders, so the suppression assertion below cannot be
-      // satisfied by an always-suppressing implementation.
+      // NON-TRIVIALITY CONTROL: the receipt really renders first, so the
+      // assertion below cannot pass on a surface that never shows one.
       expect(result.current.data?.mentorNotice?.concept).toBe('sign flip');
       await waitFor(async () =>
         expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
@@ -2195,16 +2188,26 @@ describe('[WI-2627] mentor-notice policy observation reaches its consumers', () 
         ),
       );
 
-      // A malformed observation — negative revision — so the response fails
-      // schema validation and no observation value reaches `observe`.
       mockFetch.mockResolvedValue(
-        summaryResponse(
-          {
-            rolloutRevision: -1,
-            rolloutEnabled: true,
-            projectionEpoch: 'notice-policy-v1:bad',
-          } as unknown as ReturnType<typeof policy>,
-          true,
+        new Response(
+          JSON.stringify({
+            summary: {
+              id: '880e8400-e29b-41d4-a716-446655440001',
+              sessionId: '660e8400-e29b-41d4-a716-446655440000',
+              content: 'I learned about gravity',
+              aiFeedback: 'Good summary',
+              // Unrelated to policy, and fatal to the whole schema.
+              status: 'not-a-status',
+              closingLine: null,
+              learnerRecap: null,
+              nextTopicId: null,
+              nextTopicTitle: null,
+              nextTopicReason: null,
+              mentorNotice: NOTICE,
+            },
+            mentorNoticePolicy: policy(7, true),
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
       );
 
@@ -2212,32 +2215,13 @@ describe('[WI-2627] mentor-notice policy observation reaches its consumers', () 
         await result.current.refetch();
       });
 
-      // The query IS in an error state and IS still holding the prior successful
-      // summary — establish the retention, since it is the exposure.
+      // Establish the retention, since it is what used to be blanked.
       await waitFor(() => expect(result.current.isError).toBe(true));
-      // THE CRITERION'S LAYER: the receipt off that retained summary is not
-      // exposed, while the retained body still is — so the summary was not
-      // merely dropped, the receipt was suppressed.
-      await waitFor(() =>
-        expect(result.current.data?.mentorNotice).toBeUndefined(),
-      );
+      // THE CRITERION: the unrelated failure did not suppress the receipt.
+      expect(result.current.data?.mentorNotice?.concept).toBe('sign flip');
       expect(result.current.data?.content).toBe('I learned about gravity');
-      // And the mechanism behind it: fail-closed at the held revision, never
-      // dropped to 0.
       expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
-        '{"revision":7,"enabled":false}',
-      );
-
-      // RECOVERY: fail-closed must be sticky, not permanent. Holding the
-      // revision rather than dropping it to 0 is what leaves a strictly higher
-      // revision able to lift the disable — without this, one corrupt response
-      // would blacken this surface on the device forever.
-      mockFetch.mockResolvedValue(summaryResponse(policy(8, true), true));
-      await act(async () => {
-        await result.current.refetch();
-      });
-      await waitFor(() =>
-        expect(result.current.data?.mentorNotice?.concept).toBe('sign flip'),
+        '{"revision":7,"enabled":true}',
       );
     });
 
@@ -2421,6 +2405,96 @@ describe('[WI-2627] mentor-notice policy observation reaches its consumers', () 
 
       expect(onDone).toHaveBeenCalledWith(
         expect.objectContaining({ mentorNotice: undefined }),
+      );
+    });
+
+    // [WI-2949] The DESCOPE, direction B — asserted in the SAME change as
+    // direction A, so removing the over-broad body-level call cannot be mistaken
+    // for relaxing the real fail-closed path.
+    //
+    // A genuinely unparseable POLICY FIELD must still suppress. This surface is
+    // where that is testable: `sse.ts` declares `mentorNoticePolicy` on
+    // `StreamDoneEvent` but deliberately does NOT runtime-validate it (only
+    // `mentorNotice` is parsed there), so a garbage observation reaches
+    // `observationSignal()` intact and folds as 'malformed' — disabled at the
+    // HELD revision, never dropped to 0.
+    //
+    // On the REST surfaces the same field cannot be isolated: it is declared in
+    // the response schema, so a bad value fails the whole body and there is no
+    // second read of a single-use body to tell which field failed. That
+    // inseparability IS this item's root cause, and it is why direction B lives
+    // here rather than on /now.
+    it('still fails closed when the POLICY FIELD ITSELF is unparseable', async () => {
+      await AsyncStorage.setItem(POLICY_KEY, '{"revision":7,"enabled":true}');
+      const { streamSSEViaXHR } = require('../lib/sse') as {
+        streamSSEViaXHR: jest.Mock;
+      };
+      streamSSEViaXHR.mockReturnValueOnce({
+        events: (async function* () {
+          yield doneFrame({
+            mentorNotice: NOTICE,
+            // Negative revision: present, and not trustworthy.
+            mentorNoticePolicy: {
+              rolloutRevision: -1,
+              rolloutEnabled: true,
+              projectionEpoch: 'notice-policy-v1:bad',
+            },
+          });
+        })(),
+        abort: jest.fn(),
+      });
+      const onDone = jest.fn();
+
+      const { result } = renderHook(() => useStreamMessage('session-1'), {
+        wrapper: createWrapper(),
+      });
+      await waitFor(() => expect(result.current.isStreaming).toBe(false));
+      await act(async () => {
+        await result.current.stream('Hi', jest.fn(), onDone, 'session-1');
+      });
+
+      expect(onDone).toHaveBeenCalledWith(
+        expect.objectContaining({ mentorNotice: undefined }),
+      );
+      // The mechanism: disabled AT the held revision, so a strictly higher
+      // revision can still lift it and one corrupt frame cannot blacken the
+      // surface forever.
+      await waitFor(async () =>
+        expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
+          '{"revision":7,"enabled":false}',
+        ),
+      );
+    });
+
+    // NON-TRIVIALITY CONTROL for the case above: same revision, same notice,
+    // a WELL-FORMED policy field — the notice rides through. Without this, the
+    // suppression assertion could pass on a surface that never shows a notice.
+    it('shows the notice when the same frame carries a well-formed policy field', async () => {
+      await AsyncStorage.setItem(POLICY_KEY, '{"revision":7,"enabled":true}');
+      const { streamSSEViaXHR } = require('../lib/sse') as {
+        streamSSEViaXHR: jest.Mock;
+      };
+      streamSSEViaXHR.mockReturnValueOnce({
+        events: (async function* () {
+          yield doneFrame({
+            mentorNotice: NOTICE,
+            mentorNoticePolicy: policy(7, true),
+          });
+        })(),
+        abort: jest.fn(),
+      });
+      const onDone = jest.fn();
+
+      const { result } = renderHook(() => useStreamMessage('session-1'), {
+        wrapper: createWrapper(),
+      });
+      await waitFor(() => expect(result.current.isStreaming).toBe(false));
+      await act(async () => {
+        await result.current.stream('Hi', jest.fn(), onDone, 'session-1');
+      });
+
+      expect(onDone).toHaveBeenCalledWith(
+        expect.objectContaining({ mentorNotice: NOTICE }),
       );
     });
   });

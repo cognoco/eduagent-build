@@ -307,6 +307,63 @@ describe('resolveFilingResult (integration)', () => {
     expect(result.isNew.book).toBe(false);
   });
 
+  it('[WI-2463] materializes a filed topic into the latest curriculum version', async () => {
+    const { profile } = await seedAccountAndProfile();
+    const db = createIntegrationDb();
+    const [subject] = await db
+      .insert(subjects)
+      .values({
+        profileId: profile.id,
+        name: 'Versioned Filing',
+        status: 'active',
+        pedagogyMode: 'socratic',
+      })
+      .returning();
+    const curriculumRows = await db
+      .insert(curricula)
+      .values([
+        { subjectId: subject!.id, version: 1 },
+        { subjectId: subject!.id, version: 2 },
+      ])
+      .returning({ id: curricula.id, version: curricula.version });
+    const v1 = curriculumRows.find((row) => row.version === 1);
+    const v2 = curriculumRows.find((row) => row.version === 2);
+    if (!v1 || !v2) {
+      throw new Error('Expected version 1 and version 2 curriculum fixtures');
+    }
+    const [book] = await db
+      .insert(curriculumBooks)
+      .values({
+        subjectId: subject!.id,
+        title: 'Versioned Book',
+        description: 'Versioned filing book',
+        emoji: '📚',
+        sortOrder: 0,
+        topicsGenerated: true,
+      })
+      .returning();
+
+    const result = await resolveFilingResult(db, {
+      profileId: profile.id,
+      filingResponse: {
+        shelf: { id: subject!.id },
+        book: { id: book!.id },
+        chapter: { name: 'Current chapter' },
+        topic: {
+          title: 'Current filed topic',
+          description: 'Must land in curriculum v2',
+        },
+      },
+      filedFrom: 'session_filing',
+    });
+    const topic = await db.query.curriculumTopics.findFirst({
+      where: eq(curriculumTopics.id, result.topicId),
+    });
+
+    expect(topic?.curriculumId).toBe(v2.id);
+    expect(topic?.curriculumId).not.toBe(v1.id);
+  });
+
   it('reuses existing book by ID', async () => {
     const { profile } = await seedAccountAndProfile();
     const db = createIntegrationDb();
