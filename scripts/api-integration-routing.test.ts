@@ -76,6 +76,20 @@ describe('API co-located integration routing', () => {
     expect(targets['test-integration']).toBeUndefined();
   });
 
+  it('documents targeted API integration through the pnpm lifecycle', () => {
+    const runbook = readFileSync(
+      join(repoRoot, 'docs/runbooks/local-db-testing.md'),
+      'utf8',
+    );
+
+    expect(runbook).toContain(
+      'pnpm run test:api:integration --jest apps/api/src/services/auth-scoping.integration.test.ts --runInBand --no-coverage',
+    );
+    expect(runbook).not.toContain(
+      'node scripts/run-api-integration.mjs --jest apps/api/src/services/auth-scoping.integration.test.ts',
+    );
+  });
+
   it('runs cross-package and API co-located integration suites serially under the same CI router condition', () => {
     const workflow = readWorkflow('.github/workflows/ci.yml');
     const steps = jobSteps(workflow, 'main');

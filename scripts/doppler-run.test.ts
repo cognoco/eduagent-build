@@ -12,6 +12,7 @@ const CI_WORKFLOW = join(REPO_ROOT, '.github', 'workflows', 'ci.yml');
 const FAKE_DOPPLER_PRELOAD =
   './scripts/__fixtures__/doppler-run/fake-doppler-preload.cjs';
 const EMPTY_PATH_DIR = join(REPO_ROOT, 'scripts', '__fixtures__'); // has no `doppler` executable
+const CHILD_BOUNDARY_EXIT = 23;
 
 /**
  * Run doppler-run.mjs's self-test entry point (WI-1247) with the resolver's
@@ -79,7 +80,7 @@ function packageManagerLaunch(pnpmCli: string) {
       };
 }
 
-function packageScriptTest(script: string) {
+function packageScriptTest(script: string, args: string[] = []) {
   const pnpmCli = process.env.npm_execpath;
   if (!pnpmCli) {
     throw new Error(
@@ -89,16 +90,28 @@ function packageScriptTest(script: string) {
 
   const launch = packageManagerLaunch(pnpmCli);
 
-  return spawnSync(launch.command, [...launch.args, 'run', script], {
+  return spawnSync(launch.command, [...launch.args, 'run', script, ...args], {
     cwd: REPO_ROOT,
     encoding: 'utf8',
-    env: fakeDopplerEnv(),
+    env: fakeDopplerEnv({ executeChild: true }),
   });
 }
 
-function fakeDopplerEnv(): NodeJS.ProcessEnv {
+function fakeDopplerEnv(
+  options: { executeChild?: boolean } = {},
+): NodeJS.ProcessEnv {
   return {
     ...process.env,
+    ...(options.executeChild
+      ? {
+          DATABASE_URL:
+            'postgresql://test:test@127.0.0.1:5433/eduagent_integration_test',
+          DOPPLER_CONFIG: '',
+          DOPPLER_ENVIRONMENT: '',
+          DOPPLER_PROJECT: '',
+          DOPPLER_RUN_FAKE_EXEC_CHILD: '1',
+        }
+      : {}),
     NODE_OPTIONS: [
       process.env.NODE_OPTIONS,
       `--require=${FAKE_DOPPLER_PRELOAD}`,
@@ -256,7 +269,10 @@ describe('Windows-facing package-script dispatch (WI-2522)', () => {
     const result = packageScriptTest('test');
 
     expect(result.stdout).toContain('ARGS:run -- nx run-many -t test');
-    expect(result.status).toBe(0);
+    expect(result.stdout).toContain(
+      'CHILD_STARTED:["nx","run-many","-t","test"]',
+    );
+    expect(result.status).toBe(CHILD_BOUNDARY_EXIT);
   });
 
   test('pnpm test:api:integration reaches doppler with the guarded API integration launcher', () => {
@@ -266,7 +282,10 @@ describe('Windows-facing package-script dispatch (WI-2522)', () => {
       'ARGS:run --project mentomate --config dev_integration --',
     );
     expect(result.stdout).toContain('scripts/run-api-integration.mjs --nx');
-    expect(result.status).toBe(0);
+    expect(result.stdout).toContain(
+      'CHILD_STARTED:["nx","run","api:integration-api"]',
+    );
+    expect(result.status).toBe(CHILD_BOUNDARY_EXIT);
   });
 
   test('pnpm test:integration reaches doppler with the cross-package integration command', () => {
@@ -275,7 +294,24 @@ describe('Windows-facing package-script dispatch (WI-2522)', () => {
     expect(result.stdout).toContain(
       'ARGS:run -- jest --config tests/integration/jest.config.cjs --no-coverage',
     );
-    expect(result.status).toBe(0);
+    expect(result.stdout).toContain(
+      'CHILD_STARTED:["jest","--config","tests/integration/jest.config.cjs","--no-coverage"]',
+    );
+    expect(result.status).toBe(CHILD_BOUNDARY_EXIT);
+  });
+
+  test('targeted API integration command runs through the pnpm lifecycle', () => {
+    const result = packageScriptTest('test:api:integration', [
+      '--jest',
+      'apps/api/src/services/auth-scoping.integration.test.ts',
+      '--runInBand',
+      '--no-coverage',
+    ]);
+
+    expect(result.stdout).toContain(
+      'CHILD_STARTED:["jest","--config","apps/api/jest.integration.config.cjs","--forceExit","apps/api/src/services/auth-scoping.integration.test.ts","--runInBand","--no-coverage"]',
+    );
+    expect(result.status).toBe(CHILD_BOUNDARY_EXIT);
   });
 });
 

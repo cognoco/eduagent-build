@@ -30,6 +30,10 @@ PATH=/home/vetinari/.local/node22/bin:$PATH \
 PATH=/home/vetinari/.local/node22/bin:$PATH \
   pnpm exec jest --config scripts/jest.config.cjs \
   scripts/run-api-integration.test.ts --runInBand --no-coverage
+
+PATH=/home/vetinari/.local/node22/bin:$PATH \
+  pnpm exec jest --config scripts/jest.config.cjs \
+  scripts/api-integration-routing.test.ts --runInBand --no-coverage
 ```
 
 ## Strict TDD cycle
@@ -158,21 +162,71 @@ Third-review TDD cycle under Node `v22.16.0`:
 4. **RESTORE GREEN:** restored the lifecycle launcher. Result: 4 passed,
    15 skipped; the full suite again passed 19/19.
 
+## Post-Doppler child execution after fourth adversarial review
+
+At the fourth-review head, the fake Doppler preload printed the received
+arguments and returned status `0` without starting the command after `--`.
+Consequently, the three Windows package-script checks proved only that Doppler
+was reached, not that the intended Nx/Jest boundary started.
+
+The corrected preload uses real `spawnSync(process.execPath, ...)` to start a
+cross-platform Node boundary child. Direct `nx` and `jest` commands go straight
+to that child. The API package script first starts its real guarded
+`run-api-integration.mjs --nx` re-entry; the inherited preload then substitutes
+the boundary child only at the eventual `pnpm exec nx` call. The child prints
+the exact semantic command argv and exits `23`, which propagates through the API
+launcher, Doppler wrapper, and pnpm lifecycle.
+
+The formerly documented direct targeted command also bypassed the pnpm
+lifecycle and therefore lacked `npm_execpath`. The supported command is now:
+
+```text
+pnpm run test:api:integration --jest <test-path> --runInBand --no-coverage
+```
+
+`pnpm exec node ...` was rejected as an alternative because the pinned pnpm
+does not set `npm_execpath` for that child. Adding `--` after the script name was
+also rejected because pnpm forwards it as the launcher's first argument.
+
+Fourth-review TDD cycle under Node `v22.16.0`:
+
+1. **CHILD-EXECUTION RED:** required child markers and exit `23` before changing
+   the fake Doppler seam. Result: 3 failed, 14 passed; all three package scripts
+   printed only `ARGS:...` and returned `0`.
+2. **CHILD-EXECUTION GREEN:** added the boundary child and executed the API
+   re-entry through to its Nx boundary. Result: 17 passed, 0 failed.
+3. **RUNBOOK RED:** required the pnpm-lifecycle targeted command and rejected
+   the raw-Node form. Result: 1 failed, 5 skipped.
+4. **TARGETED-COMMAND RED:** a temporary safe guard returned `97` at
+   `pnpm exec jest`; no child marker appeared. Result: 1 failed, 17 passed.
+5. **TARGETED-COMMAND GREEN:** routed that Jest boundary to the real child and
+   updated the runbook. Result: 18 passed, 0 failed; the runbook contract passed.
+6. **SEAM-ONLY REVERT RED:** disabled only post-Doppler child execution while
+   holding tests, API lifecycle handling, and the targeted-command seam fixed.
+   Result: 3 failed, 15 passed.
+7. **RESTORE GREEN:** restored post-Doppler execution. Result:
+   18 passed, 0 failed.
+
+The changed-file Prettier gate also exposed three pre-existing line-wrap
+violations in `doppler-run.mjs`. Formatting changed only those
+`resolveDopplerBinary()`/`selfTest()` lines; the approved entry-guard logic was
+unchanged.
+
 ## Package-script dispatch coverage
 
 The focused suite runs `pnpm test`, `pnpm test:api:integration`, and
 `pnpm test:integration` as real subprocesses under the Node preload. For the API
 script, the already-installed lifecycle pnpm first answers `--version`; the fake
-Doppler then exits before Nx, Jest, or database work. The prior blanket
-`offline` claim was false because bare Corepack could perform package-manager
-resolution. The corrected proof explicitly rejects bare Corepack, remains
-deterministic and secret-free, and proves each package script reached
-`doppler-run.mjs` and dispatched:
+Doppler starts the guarded re-entry and it proceeds to the Nx command boundary;
+no Nx/Jest/database workload runs. The prior blanket `offline` claim was false
+because bare Corepack could perform package-manager resolution. The corrected
+proof explicitly rejects bare Corepack, remains deterministic and secret-free,
+and observes these real child results:
 
 ```text
-ARGS:run -- nx run-many -t test
-ARGS:run --project mentomate --config dev_integration -- ... scripts/run-api-integration.mjs --nx
-ARGS:run -- jest --config tests/integration/jest.config.cjs --no-coverage
+CHILD_STARTED:["nx","run-many","-t","test"]                         -> exit 23
+CHILD_STARTED:["nx","run","api:integration-api"]                   -> exit 23
+CHILD_STARTED:["jest","--config","tests/integration/jest.config.cjs","--no-coverage"] -> exit 23
 ```
 
 The entry-guard subprocess cases separately exercise Windows `C:\...` argv
@@ -189,5 +243,6 @@ Windows result remains pending the PR run.
 
 The pre-existing real-invocation regression sends `--exit-check` to the fake
 Doppler preload, which returns exit `7`; the wrapper process also exits exactly
-`7`. That test passed in both GREEN states, both production-only revert RED
-states, and the final RESTORE GREEN state.
+`7`. It remained green throughout the fourth-review child-execution and
+revert/restore cycle; the new package-script checks independently prove exact
+propagation of the boundary child's exit `23`.
