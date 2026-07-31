@@ -169,7 +169,7 @@ export async function acceptMentorNotice(
  * with an unordered `findFirst`, so a two-gap session could surface either gap
  * depending on the query plan. Three candidate semantics were considered:
  *
- *   1. **Latest-by-createdAt — CHOSEN.** MMT-ADR-0036 clause 28 says the product
+ *   1. **Latest-by-createdAt — CHOSEN.** MMT-ADR-0036 §2.1 says the product
  *      exposes at most one actionable notice at a time while multiple durable
  *      records may exist, so a projection is required and must pick one. Newest
  *      is the defensible pick: the receipt is shown at session end, and the gap
@@ -182,7 +182,7 @@ export async function acceptMentorNotice(
  *   3. **An explicit one-notice-per-session invariant — REJECTED, contradicts
  *      landed canon.** It would revert WI-2500's two partial unique indexes
  *      (which exist precisely to allow a second, differently-evidenced notice)
- *      and contradict ADR-0036 clause 28's "multiple durable records may exist."
+ *      and contradict ADR-0036 §2.1's "multiple durable records may exist."
  *
  * The `id` tiebreaker is what makes the order TOTAL, and therefore the result
  * deterministic as the acceptance criterion words it: nothing constrains two
@@ -197,7 +197,7 @@ export async function acceptMentorNotice(
  * scoped API can express it, and profile isolation must stay in the repo layer.
  *
  * No `status` filter is added: the receipt records what happened in that session
- * (ADR-0036 clause 29 lists the session receipt alongside cards), and filtering
+ * (ADR-0036 §2.2 lists the session receipt alongside cards), and filtering
  * would also silently change the recall-bridge suppression check in
  * `routes/sessions.ts` — beyond this item's scope.
  */
