@@ -11,7 +11,7 @@ import {
 } from '../../services/identity-v2/deletion-v2';
 import { deleteClerkUser } from '../../services/clerk-user';
 import { createLogger } from '../../services/logger';
-import { captureException } from '../../services/sentry';
+import { captureException, captureMessage } from '../../services/sentry';
 
 const logger = createLogger();
 
@@ -78,7 +78,7 @@ export const scheduledDeletion = inngest.createFunction(
     },
   },
   { event: 'app/account.deletion-scheduled' },
-  async ({ event, step }) => {
+  async ({ event, runId, step }) => {
     const { accountId } = event.data;
 
     // [WI-1255] Prod is v2-only — the T1 identity migration
@@ -197,12 +197,65 @@ export const scheduledDeletion = inngest.createFunction(
     // error, non-404 HTTP error, missing secret) makes Inngest retry the step
     // and ultimately page via Sentry — we never silently leave a login alive.
     // A 404 is idempotent (the user was already gone), so a retry completes.
+    let clerkErasure: 'deleted' | 'already_absent' | 'not_applicable' =
+      'not_applicable';
     if (deletionResult === 'deleted' && clerkUserId) {
-      await step.run('delete-clerk-user', async () => {
+      const clerkResult = await step.run('delete-clerk-user', async () => {
         return deleteClerkUser({
           userId: clerkUserId,
           clerkSecretKey: getStepClerkSecretKey(),
         });
+      });
+      clerkErasure = clerkResult.deleted ? 'deleted' : 'already_absent';
+    }
+
+    if (deletionResult === 'deleted') {
+      const subscriptionStoreTeardown =
+        subscriptionStoreTeardownTargets.length > 0
+          ? 'requested'
+          : 'not_applicable';
+
+      // [WI-2390] Postgres PITR restores can resurrect erased rows and remove
+      // the in-DB deletion_audit written by executeDeletionV2. Record the
+      // committed DB + Clerk outcome in two observability systems outside that
+      // restore blast radius. This step runs only after Clerk erasure succeeds
+      // (or is inapplicable); cancelled/already-deleted runs never claim
+      // completion. Provider teardown has its own completion proof in
+      // billing-subscription-store-teardown.ts.
+      await step.run('record-deletion-completion', async () => {
+        const completion = {
+          event: 'account_deletion.completed',
+          accountId,
+          runId,
+          databaseDeletion: 'deleted' as const,
+          clerkErasure,
+          subscriptionStoreTeardown,
+        };
+        logger.info('account_deletion.completed', completion);
+
+        try {
+          captureMessage('account.deletion.completed', {
+            level: 'info',
+            tags: {
+              surface: 'account.deletion.completed',
+              databaseDeletion: completion.databaseDeletion,
+              clerkErasure,
+              subscriptionStoreTeardown,
+            },
+            extra: { accountId, runId },
+          });
+        } catch (error) {
+          // The structured log above is already the out-of-band proof. A Sentry
+          // transport failure must not retry an irreversible deletion whose DB
+          // and Clerk legs have completed.
+          logger.warn('account_deletion.completion_sentry_failed', {
+            accountId,
+            runId,
+            errorName: error instanceof Error ? error.name : typeof error,
+          });
+        }
+
+        return completion;
       });
     }
 
