@@ -247,7 +247,12 @@ export const profileRoutes = new Hono<ProfileEnv>()
               adultOwnerGateEnabled:
                 c.env?.ADULT_OWNER_GATE_ENABLED !== 'false',
             });
-            return c.json(profileResponseSchema.parse({ profile: child }), 201);
+            return c.json(
+              profileResponseSchema.parse({
+                profile: { ...child, isCurrentUser: false },
+              }),
+              201,
+            );
           } catch (err) {
             if (err instanceof ForbiddenError) {
               return apiError(c, 403, ERROR_CODES.FORBIDDEN, err.message);
@@ -276,7 +281,15 @@ export const profileRoutes = new Hono<ProfileEnv>()
 
         if (owner) {
           // Idempotent replay of the owner bootstrap.
-          return c.json(profileResponseSchema.parse({ profile: owner }), 201);
+          return c.json(
+            profileResponseSchema.parse({
+              profile: {
+                ...owner,
+                isCurrentUser: owner.id === c.get('callerPersonId'),
+              },
+            }),
+            201,
+          );
         }
         // No owner under a resolved account is a structurally-broken graph.
         return apiError(
@@ -348,7 +361,12 @@ export const profileRoutes = new Hono<ProfileEnv>()
           'profiles.create.signup_completed',
           { profileId: graph.personId },
         );
-        return c.json(profileResponseSchema.parse({ profile }), 201);
+        return c.json(
+          profileResponseSchema.parse({
+            profile: { ...profile, isCurrentUser: true },
+          }),
+          201,
+        );
       } catch (err) {
         if (err instanceof ProfileValidationError) {
           return validationError(c, { [err.field]: [err.message] });
@@ -494,9 +512,15 @@ export const profileRoutes = new Hono<ProfileEnv>()
       // but security-sensitive: it unlocks Billing, Security, Export/Delete,
       // and Add-child. A non-owner caller therefore needs fresh primary-factor
       // reverification, proven by Clerk fva, before targeting the owner profile.
-      // [WI-586 T1] v2 seam: getPersonScope verifies person ↔ org membership
-      // (no profiles table touch). Returns null when not found → same 403.
-      const found = await getPersonScope(db, profileId, account.id);
+      // [WI-586 T1 / WI-2128] v2 seam: request-time capability checks pass
+      // the authenticated caller Person so org membership alone cannot make a
+      // different Person operable. Returns null when not found → same 403.
+      const found = await getPersonScope(
+        db,
+        profileId,
+        account.id,
+        callerPersonId,
+      );
       if (!found)
         return forbidden(c, 'Profile does not belong to this account');
 

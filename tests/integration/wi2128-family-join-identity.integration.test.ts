@@ -495,7 +495,7 @@ describe('WI-2128 joined-learner credential authority', () => {
     expect(target?.defaultAppContext).toBeNull();
   });
 
-  it('does not let the learner elevate into the owner Person without fresh-factor proof', async () => {
+  it('rejects learner-to-owner switching before offering an elevation ceremony', async () => {
     const response = await requestAs({
       clerkUserId: LEARNER_CLERK_ID,
       email: LEARNER_EMAIL,
@@ -507,7 +507,24 @@ describe('WI-2128 joined-learner credential authority', () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toMatchObject({
-      code: 'OWNER_ELEVATION_REQUIRED',
+      code: 'FORBIDDEN',
+    });
+  });
+
+  it('[MANDATORY][WI-2128][BREAK] does not let fresh-factor proof substitute the learner caller for the owner Person', async () => {
+    const response = await requestAs({
+      clerkUserId: LEARNER_CLERK_ID,
+      email: LEARNER_EMAIL,
+      path: '/v1/profiles/switch',
+      profileId: fixture.learnerPersonId,
+      method: 'POST',
+      body: { profileId: fixture.ownerPersonId },
+      fva: [1, -1],
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({
+      code: 'FORBIDDEN',
     });
   });
 

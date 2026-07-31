@@ -12,6 +12,8 @@ import {
   fetchCallsMatching,
 } from '../../../test-utils/mock-api-routes';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
+import * as familyIntentOnboardingState from '../../../lib/family-intent-onboarding-state';
+import { Sentry } from '../../../lib/sentry';
 
 jest.mock(
   'react-i18next',
@@ -47,6 +49,10 @@ jest.mock('../../../lib/scope-context', () => ({
   ...jest.requireActual('../../../lib/scope-context'),
   useScopeContext: () => mockScopeContext,
 }));
+
+const clearFamilyIntentOnboardingSpy = jest
+  .spyOn(familyIntentOnboardingState, 'clearFamilyIntentOnboarding')
+  .mockResolvedValue(undefined);
 
 // `visibilityContractSchema` requires UUID-shaped person ids; the mock
 // response fixture uses fixed UUIDs independent of the non-UUID
@@ -86,6 +92,10 @@ function renderInitiateScreen(
 }
 
 describe('InitiateLinkScreen', () => {
+  afterAll(() => {
+    clearFamilyIntentOnboardingSpy.mockRestore();
+  });
+
   afterEach(() => {
     jest.clearAllMocks();
     // [WI-2188] clearAllMocks() clears call history but NOT a prior
@@ -242,6 +252,87 @@ describe('InitiateLinkScreen', () => {
     });
   });
 
+  it('ignores a stale first success after back and resubmit, then handles the second success normally', async () => {
+    let resolveFirstCreate: (value: unknown) => void = () => undefined;
+    let resolveSecondCreate: (value: unknown) => void = () => undefined;
+    const firstCreate = new Promise((resolve) => {
+      resolveFirstCreate = resolve;
+    });
+    const secondCreate = new Promise((resolve) => {
+      resolveSecondCreate = resolve;
+    });
+    let createCount = 0;
+    const secondContract = {
+      ...CONTRACT,
+      id: '00000000-0000-4000-8000-000000000005',
+    };
+    const InitiateLinkScreen = require('./initiate').default;
+    const rendered = renderScreen(<InitiateLinkScreen />, {
+      profile: NAMED_PROFILES.guardian,
+      profiles: [NAMED_PROFILES.guardian, NAMED_PROFILES.linkedChild],
+      routes: {
+        '/visibility/links': () => {
+          createCount += 1;
+          return createCount === 1 ? firstCreate : secondCreate;
+        },
+      },
+    });
+    cleanupRender = rendered.cleanup;
+    const { routedFetch } = rendered;
+    const managedPersonTestId = `visibility-link-initiate-picker-managed-${NAMED_PROFILES.linkedChild.id}`;
+
+    fireEvent.press(screen.getByTestId(managedPersonTestId));
+    fireEvent.press(screen.getByTestId('visibility-link-create'));
+    await waitFor(() =>
+      expect(fetchCallsMatching(routedFetch, '/visibility/links')).toHaveLength(
+        1,
+      ),
+    );
+
+    fireEvent.press(
+      screen.getByTestId('visibility-link-initiate-confirm-back'),
+    );
+    fireEvent.press(screen.getByTestId(managedPersonTestId));
+    fireEvent.press(screen.getByTestId('visibility-link-relation-sibling'));
+    fireEvent.press(screen.getByTestId('visibility-link-create'));
+    await waitFor(() =>
+      expect(fetchCallsMatching(routedFetch, '/visibility/links')).toHaveLength(
+        2,
+      ),
+    );
+
+    await act(async () => {
+      resolveFirstCreate(CONTRACT);
+      await firstCreate;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(
+      screen.getByTestId('visibility-link-relation-sibling').props
+        .accessibilityState.selected,
+    ).toBe(true);
+    expect(screen.getByTestId('visibility-link-create')).toBeDisabled();
+
+    await act(async () => {
+      resolveSecondCreate(secondContract);
+      await secondCreate;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(app)/link/[contractId]',
+        params: {
+          contractId: secondContract.id,
+          audience: 'supporter',
+          supporteeName: NAMED_PROFILES.linkedChild.displayName,
+        },
+      }),
+    );
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+  });
+
   it('selecting an existing family member shows a not-yet-available state instead of a fake flow', () => {
     renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });
 
@@ -310,6 +401,80 @@ describe('InitiateLinkScreen', () => {
         original;
     }
   }, 10_000);
+
+  it('[WI-2532] opens the existing-account invitation form and consumes its durable destination marker', async () => {
+    const original = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      true;
+    mockParams = { target: 'existingTeen' };
+
+    try {
+      renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });
+
+      screen.getByTestId('visibility-link-initiate-existing-teen-invite');
+      expect(
+        screen.queryByTestId('visibility-link-initiate-picker'),
+      ).toBeNull();
+      await waitFor(() => {
+        expect(clearFamilyIntentOnboardingSpy).toHaveBeenCalledTimes(1);
+      });
+      expect(
+        screen.queryByTestId(
+          'visibility-link-initiate-existing-teen-unavailable',
+        ),
+      ).toBeNull();
+    } finally {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        original;
+    }
+  });
+
+  it('[WI-2532] consumes the durable marker after the V2-off unavailable destination mounts so relaunch does not replay it', async () => {
+    const original = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      false;
+    mockParams = { target: 'existingTeen' };
+
+    try {
+      renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });
+
+      screen.getByTestId('visibility-link-initiate-existing-teen-unavailable');
+      expect(
+        screen.queryByTestId('visibility-link-initiate-picker'),
+      ).toBeNull();
+      await waitFor(() => {
+        expect(clearFamilyIntentOnboardingSpy).toHaveBeenCalledTimes(1);
+      });
+    } finally {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        original;
+    }
+  });
+
+  it('[WI-2532] reports destination-marker cleanup failure while leaving the invitation usable', async () => {
+    const error = new Error('storage unavailable');
+    clearFamilyIntentOnboardingSpy.mockRejectedValueOnce(error);
+    const captureSpy = jest
+      .spyOn(Sentry, 'captureException')
+      .mockImplementation(() => 'test-event-id');
+    const original = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      true;
+    mockParams = { target: 'existingTeen' };
+
+    try {
+      renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });
+
+      screen.getByTestId('visibility-link-initiate-existing-teen-invite');
+      await waitFor(() => {
+        expect(captureSpy).toHaveBeenCalledWith(error);
+      });
+    } finally {
+      captureSpy.mockRestore();
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        original;
+    }
+  });
 
   it('shows an empty-state message when there are zero eligible managed children', () => {
     renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });

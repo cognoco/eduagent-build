@@ -356,6 +356,44 @@ describe('useUpdateProfileName', () => {
       expect(result.current.isError).toBe(true);
     });
   });
+
+  it('preserves first-Mentor gate hints when the PATCH response omits them', async () => {
+    const cachedProfile = createPublicProfile({
+      conversationLanguageConfirmed: false,
+      isCurrentUser: true,
+    });
+    const updatedProfile = createPublicProfile({ displayName: 'New Name' });
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ profile: updatedProfile }), {
+        status: 200,
+      }),
+    );
+
+    const wrapper = createWrapper();
+    queryClient.setDefaultOptions({
+      queries: { retry: false, gcTime: Infinity },
+    });
+    queryClient.setQueryData(['profiles', 'user-1'], [cachedProfile]);
+    const { result } = renderHook(() => useUpdateProfileName(), { wrapper });
+
+    result.current.mutate({
+      profileId: OWNER_PROFILE_ID,
+      displayName: 'New Name',
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    expect(
+      queryClient.getQueryData<PublicProfile[]>(['profiles', 'user-1']),
+    ).toEqual([
+      expect.objectContaining({
+        displayName: 'New Name',
+        conversationLanguageConfirmed: false,
+        isCurrentUser: true,
+      }),
+    ]);
+  });
 });
 
 describe('useUpdateProfileAppContext', () => {
@@ -417,5 +455,48 @@ describe('useUpdateProfileAppContext', () => {
     });
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves first-Mentor gate hints when the app-context response omits them', async () => {
+    const cachedProfile = createPublicProfile({
+      conversationLanguageConfirmed: false,
+      isCurrentUser: true,
+    });
+    const updatedProfile = createPublicProfile({
+      defaultAppContext: 'family',
+      hasFamilyLinks: true,
+    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ profile: updatedProfile }), {
+        status: 200,
+      }),
+    );
+
+    const wrapper = createWrapper();
+    queryClient.setDefaultOptions({
+      queries: { retry: false, gcTime: Infinity },
+    });
+    queryClient.setQueryData(['profiles', 'user-1'], [cachedProfile]);
+    const { result } = renderHook(() => useUpdateProfileAppContext(), {
+      wrapper,
+    });
+
+    result.current.mutate({
+      profileId: OWNER_PROFILE_ID,
+      defaultAppContext: 'family',
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    expect(
+      queryClient.getQueryData<PublicProfile[]>(['profiles', 'user-1']),
+    ).toEqual([
+      expect.objectContaining({
+        defaultAppContext: 'family',
+        conversationLanguageConfirmed: false,
+        isCurrentUser: true,
+      }),
+    ]);
   });
 });

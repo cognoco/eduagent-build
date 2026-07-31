@@ -7,6 +7,7 @@ import { z } from 'zod';
 import {
   assessments,
   learningSessions,
+  person,
   sessionEvents,
   sessionSummaries,
   retentionCards,
@@ -2691,6 +2692,23 @@ export async function prepareExchangeContext(
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
     throw new NotFoundError('Session');
+  }
+
+  // [WI-1556] The mobile first-Mentor gate is UX, not authority: older
+  // installed clients can call this boundary directly. The session lookup
+  // above already binds sessionId to this exact profileId, and route-level
+  // assertNotProxyMode still proves caller write authority. Fail closed on a
+  // missing Person or confirmation before any state mutation or LLM dispatch.
+  if (session.exchangeCount === 0) {
+    const confirmedPerson = await db.query.person.findFirst({
+      columns: { conversationLanguageConfirmedAt: true },
+      where: eq(person.id, profileId),
+    });
+    if (!confirmedPerson?.conversationLanguageConfirmedAt) {
+      throw new ConflictError(
+        'Confirm your conversation language before your first Mentor exchange.',
+      );
+    }
   }
 
   const sessionMeta = ((session.metadata as

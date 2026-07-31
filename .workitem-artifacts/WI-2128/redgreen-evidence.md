@@ -67,7 +67,7 @@ The caller-bound `getPersonScope(...)` call was restored exactly and the same
 named regression, unchanged, passed against the same local database.
 
 The then-current WI-specific real-database suite passed all 13 cases in this
-historical pre-review-bounce run. The later 15-case corrective run is recorded
+historical pre-review-bounce run. The later 16-case corrective run is recorded
 in `verification.md`. This historical run covered:
 
 - learner and owner headerless self-binding;
@@ -78,6 +78,20 @@ in `verification.md`. This historical run covered:
 - fresh-factor non-elevation; and
 - preserved Person, learning history, family membership, supportership, and
   billing relationships.
+
+## RED/GREEN — fresh factor must not substitute caller authority
+
+After merge-forwarding current `main`, a signature audit found that
+`POST /v1/profiles/switch` still called `getPersonScope` without its optional
+caller-Person constraint. A new real-database case supplied fresh Clerk factor
+verification while the joined learner targeted the family owner. With the
+production route unchanged, the other 15 cases passed and this case alone
+failed: expected HTTP 403, received HTTP 200.
+
+The route now passes the authenticated `callerPersonId` into `getPersonScope`.
+The same unchanged exploit case passes with HTTP 403 and `FORBIDDEN`; the
+complete suite passes 16/16. This proves fresh-factor state cannot replace the
+caller-to-target authority predicate.
 
 ## Supporting validation
 

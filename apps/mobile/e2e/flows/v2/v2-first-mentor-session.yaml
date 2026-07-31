@@ -1,0 +1,145 @@
+# WI-2231: release-APK first-run journey.
+# A graphless adult completes the profile/legal gate, lands on V2 Mentor,
+# submits one canonical opener, proves its persisted pair, reflects, and
+# returns to a warm Mentor surface.
+# SEED_SCENARIO: "pre-profile"
+appId: com.mentomate.app
+tags:
+  - v2
+  - onboarding
+  - learning
+---
+- runFlow:
+    file: ../_setup/nav-welcome-to-sign-in.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: 'sign-in-button'
+    timeout: 120000
+- tapOn:
+    id: 'sign-in-email'
+- inputText: ${EMAIL}
+- scrollUntilVisible:
+    element:
+      id: 'sign-in-password'
+    direction: DOWN
+    timeout: 10000
+    visibilityPercentage: 50
+- tapOn:
+    id: 'sign-in-password'
+- inputText: ${PASSWORD}
+- scrollUntilVisible:
+    element:
+      id: 'sign-in-button'
+    direction: DOWN
+    timeout: 10000
+    visibilityPercentage: 50
+- tapOn:
+    id: 'sign-in-button'
+
+# The pre-profile identity has no DB graph. The gate is the only valid
+# post-auth surface until profile creation records the adult's legal facts.
+- extendedWaitUntil:
+    visible:
+      id: 'create-profile-gate'
+    timeout: 30000
+- tapOn:
+    id: 'create-profile-cta'
+- extendedWaitUntil:
+    visible:
+      id: 'create-profile-name'
+    timeout: 15000
+- tapOn:
+    id: 'create-profile-name'
+- inputText: 'Casey'
+- hideKeyboard
+- tapOn:
+    id: 'create-profile-birthdate'
+- extendedWaitUntil:
+    visible:
+      id: 'android:id/date_picker_header_year'
+    timeout: 5000
+- tapOn:
+    id: 'android:id/date_picker_header_year'
+- scrollUntilVisible:
+    element:
+      text: '2000'
+    direction: UP
+    timeout: 10000
+- tapOn:
+    text: '2000'
+- tapOn:
+    text: 'OK'
+- tapOn:
+    id: 'create-profile-submit'
+
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 30000
+- assertVisible:
+    id: 'mentor-cold-start-card'
+- extendedWaitUntil:
+    notVisible:
+      id: 'mentor-born-ceremony-overlay'
+    timeout: 10000
+
+# The exact opener is the one canonical turn WI-2099 persists. On a zero-
+# subject profile V2 silently creates the classifier's focused subject.
+- tapOn:
+    id: 'mentor-bar-input'
+- inputText: 'Teach me why leaves are green.'
+- hideKeyboard
+- tapOn:
+    id: 'mentor-bar-send'
+- extendedWaitUntil:
+    visible:
+      id: 'session-screen'
+    timeout: 60000
+- assertVisible:
+    id: 'message-bubble-user-1'
+    containsDescendants:
+      - text: '^Teach me why leaves are green\\.$'
+- extendedWaitUntil:
+    visible:
+      id: 'assistant-response-complete-2'
+    timeout: 60000
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-opener-persisted-once'
+    timeout: 30000
+- assertNotVisible:
+    id: 'mentor-opener-persisted-more-than-once'
+
+- tapOn:
+    id: 'end-session-button'
+- tapOn:
+    text: 'End Session'
+- extendedWaitUntil:
+    visible:
+      id: 'first-session-wrap-up'
+    timeout: 30000
+- tapOn:
+    id: 'first-session-reflection-input'
+- inputText: 'I learned that chlorophyll reflects green light back to our eyes.'
+- hideKeyboard
+- tapOn:
+    id: 'first-session-wrap-submit'
+- extendedWaitUntil:
+    visible:
+      id: 'first-session-wrap-receipt'
+    timeout: 30000
+- assertVisible:
+    id: 'first-session-wrap-celebration'
+
+- tapOn:
+    id: 'chat-shell-back'
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 30000
+- assertNotVisible:
+    id: 'mentor-cold-start-card'
+- assertVisible:
+    id: 'mentor-bar-input'
+    enabled: true

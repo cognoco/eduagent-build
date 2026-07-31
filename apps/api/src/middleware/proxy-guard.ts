@@ -32,11 +32,12 @@ const proxyModeBody = {
  * could omit the header to gain full write access on a child profile, or
  * send it spuriously to suppress writes on a non-proxy session.
  *
- * The authoritative signal is whether the server-derived caller Person is the
- * explicitly selected profile Person. A different caller/profile pair is a
- * guardian proxy session. `profileMeta.isOwner` cannot identify proxy mode:
- * joined learners have their own credentials and correctly operate a
- * non-owner Person as self.
+ * The authoritative signals are the verified selected `profileId` and the
+ * server-resolved `callerPersonId`. A non-owner selecting themselves is a
+ * credentialed self-session; a different caller selecting that non-owner is
+ * a proxy session regardless of any header. `profileMeta.isOwner` cannot
+ * identify proxy mode: joined learners have their own credentials and
+ * correctly operate a non-owner Person as self.
  *
  * The X-Proxy-Mode header is still honored as a belt-and-suspenders signal
  * (e.g., a parent explicitly sending it from the owner profile during a
@@ -83,9 +84,9 @@ export async function assertNotProxyMode(
 
   const callerPersonId = (c as Context<ProfileScopeEnv>).get('callerPersonId');
   const profileId = (c as Context<ProfileScopeEnv>).get('profileId');
-  // [WI-2128] Proxy is an authority relationship, not a profile shape. A
-  // credentialed learner writing their own non-owner Person is self; a
-  // guardian selecting a different Person is proxy mode. Both values are
+  // [WI-2128 / WI-2653] Proxy is an authority relationship, not a profile
+  // shape. A credentialed learner writing their own non-owner Person is self;
+  // any caller selecting a different Person is proxy mode. Both values are
   // server-derived/verified before this guard.
   if (!callerPersonId || !profileId || callerPersonId !== profileId) {
     throw new HTTPException(403, {

@@ -1,11 +1,143 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   NOW_REFRESH_OBSERVATION_WINDOW_MS,
   PRODUCTION_MENTOR_RETURN_REFRESH_BOUND_MS,
   assertArmedBeforeAction,
   assertRequestAttempted,
+  captureNowRefreshPayload,
+  observeCapturedNowRefresh,
   observeExactNowRefresh,
   observeNowRefreshRequestAttempt,
 } from './now-refresh-observation';
+
+describe('exact Now-feed payload lifetime (WI-2961)', () => {
+  it('returns settled only after the response settles and its body parses (variant c: parsed response)', async () => {
+    const payload = {
+      scope: 'self',
+      generatedAt: '2026-07-31T12:00:00.000Z',
+    };
+    const response = { json: jest.fn().mockResolvedValue(payload) };
+
+    const outcome = observeCapturedNowRefresh(
+      captureNowRefreshPayload(Promise.resolve(response), (settledResponse) =>
+        settledResponse.json(),
+      ),
+      { armedAtMs: 0, actionAtMs: 1 },
+    );
+
+    await expect(outcome).resolves.toEqual({
+      kind: 'settled',
+      response: { response, payload },
+    });
+    expect(response.json).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves rejection/abort classification when the response never arrives (variant a: response rejection)', async () => {
+    const error = new Error('net::ERR_ABORTED');
+    const readPayload = jest.fn<Promise<unknown>, [unknown]>();
+
+    const outcome = await observeCapturedNowRefresh(
+      captureNowRefreshPayload(Promise.reject(error), readPayload),
+      { armedAtMs: 0, actionAtMs: 1 },
+    );
+
+    expect(outcome).toEqual({ kind: 'rejected', error });
+    expect(readPayload).not.toHaveBeenCalled();
+  });
+
+  it('keeps a non-settling response bounded instead of hanging while capture is armed (variant b: response non-settlement)', async () => {
+    jest.useFakeTimers();
+    try {
+      const neverSettles = new Promise<never>(() => undefined);
+      const outcomePromise = observeCapturedNowRefresh(
+        captureNowRefreshPayload(neverSettles, async () => undefined),
+        { armedAtMs: 0, actionAtMs: 1 },
+      );
+      const expectation = expect(outcomePromise).resolves.toEqual({
+        kind: 'unsettled',
+      });
+
+      await jest.advanceTimersByTimeAsync(NOW_REFRESH_OBSERVATION_WINDOW_MS);
+      await expectation;
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('hard-fails with the original error when the response settles but its body cannot be read (variant d: body-read rejection)', async () => {
+    const bodyReadError = new Error(
+      'Protocol error (Network.getResponseBody): No data found for resource with given identifier',
+    );
+    const response = {};
+
+    const outcome = observeCapturedNowRefresh(
+      captureNowRefreshPayload(Promise.resolve(response), async () => {
+        throw bodyReadError;
+      }),
+      { armedAtMs: 0, actionAtMs: 1 },
+    );
+
+    await expect(outcome).rejects.toBe(bodyReadError);
+  });
+
+  it('retains the captured payload after navigation releases the Playwright response body', async () => {
+    const payload = {
+      scope: 'self',
+      generatedAt: '2026-07-31T12:00:01.000Z',
+    };
+    let bodyReleased = false;
+    const response = {};
+    const readPayload = jest.fn(async (settledResponse: typeof response) => {
+      expect(settledResponse).toBe(response);
+      if (bodyReleased) {
+        throw new Error(
+          'Protocol error (Network.getResponseBody): No data found for resource with given identifier',
+        );
+      }
+      return payload;
+    });
+
+    const capturedPromise = captureNowRefreshPayload(
+      Promise.resolve(response),
+      readPayload,
+    );
+    await Promise.resolve();
+    expect(readPayload).toHaveBeenCalledTimes(1);
+
+    bodyReleased = true;
+    await expect(readPayload(response)).rejects.toThrow(
+      /No data found for resource/,
+    );
+    await expect(
+      observeCapturedNowRefresh(capturedPromise, {
+        armedAtMs: 0,
+        actionAtMs: 1,
+      }),
+    ).resolves.toEqual({
+      kind: 'settled',
+      response: { response, payload },
+    });
+  });
+
+  it('arms payload capture before Back and never reads the retained response afterward', () => {
+    const flowSource = readFileSync(
+      join(__dirname, '..', 'flows', 'v2', 'returning-learner-resume.spec.ts'),
+      'utf8',
+    );
+    const captureIndex = flowSource.indexOf(
+      'const postBackNowCapturePromise = captureNowRefreshPayload(',
+    );
+    const backIndex = flowSource.indexOf(
+      "pressableClick(page.getByTestId('chat-shell-back'))",
+    );
+
+    expect(captureIndex).toBeGreaterThanOrEqual(0);
+    expect(backIndex).toBeGreaterThan(captureIndex);
+    expect(flowSource).not.toContain('postBackNowResponse.json()');
+  });
+});
 
 describe('exact Now-feed refresh observation (WI-2833)', () => {
   it('keeps the observation window at least as long as the WI-2818 production bound', () => {

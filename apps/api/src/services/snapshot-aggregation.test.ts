@@ -69,6 +69,7 @@ jest.mock('./logger', () => {
 
 import type { Database } from '@eduagent/database';
 import {
+  curricula,
   subjects,
   learningSessions,
   assessments,
@@ -443,6 +444,7 @@ function createSnapshotDb({
   findFirst = undefined as ReturnType<typeof makeSnapshotRow> | undefined,
   findMany = [] as ReturnType<typeof makeSnapshotRow>[],
 } = {}): Database {
+  const curriculaFindMany = jest.fn().mockResolvedValue([]);
   return {
     query: {
       progressSnapshots: {
@@ -466,7 +468,7 @@ function createSnapshotDb({
       vocabulary: { findMany: jest.fn().mockResolvedValue([]) },
       vocabularyRetentionCards: { findMany: jest.fn().mockResolvedValue([]) },
       streaks: { findFirst: jest.fn().mockResolvedValue(null) },
-      curricula: { findMany: jest.fn().mockResolvedValue([]) },
+      curricula: { findMany: curriculaFindMany },
       curriculumTopics: { findMany: jest.fn().mockResolvedValue([]) },
       profiles: {
         findFirst: jest
@@ -477,6 +479,35 @@ function createSnapshotDb({
         findFirst: jest.fn().mockResolvedValue({ struggles: [] }),
       },
     },
+    select: jest.fn().mockReturnValue({
+      from: jest.fn((table: unknown) => {
+        if (table !== curricula) {
+          throw new Error('Unexpected table in snapshot database fixture');
+        }
+        return {
+          innerJoin: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockImplementation(async () => {
+                const rows = (await curriculaFindMany()) as Array<{
+                  id: string;
+                  subjectId: string;
+                  version: number;
+                }>;
+                return [...rows]
+                  .sort((a, b) => b.version - a.version)
+                  .map((curriculum) => ({
+                    curricula: curriculum,
+                    subjects: {
+                      id: curriculum.subjectId,
+                      profileId,
+                    },
+                  }));
+              }),
+            }),
+          }),
+        };
+      }),
+    }),
     insert: jest.fn().mockReturnValue({
       values: jest.fn().mockReturnValue({
         onConflictDoUpdate: jest.fn().mockResolvedValue(undefined),

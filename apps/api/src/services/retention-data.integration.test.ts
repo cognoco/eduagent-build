@@ -23,7 +23,12 @@ import {
 } from '@eduagent/database';
 import { NotFoundError } from '@eduagent/schemas';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
-import { getProfileOverdueCount, processRecallTest } from './retention-data';
+import {
+  getAllSubjectsRetention,
+  getProfileOverdueCount,
+  getSubjectRetention,
+  processRecallTest,
+} from './retention-data';
 import { registerLlmProviderFixture } from '../test-utils/llm-provider-fixtures';
 import {
   deleteV2IdentitiesForTest,
@@ -178,6 +183,116 @@ afterAll(async () => {
 
 // ---------------------------------------------------------------------------
 // Tests
+
+describe('latest curriculum retention reads [WI-2463]', () => {
+  it('uses v2 for single-subject and bounded multi-subject retention reads', async () => {
+    const first = await seedProfileWithTopics(db, 'versioned', 1);
+    const [firstBook] = await db
+      .select({ id: curriculumBooks.id })
+      .from(curriculumBooks)
+      .where(eq(curriculumBooks.subjectId, first.subjectId))
+      .limit(1);
+    const [firstV2] = await db
+      .insert(curricula)
+      .values({ subjectId: first.subjectId, version: 2 })
+      .returning({ id: curricula.id });
+    const [firstV2Topic] = await db
+      .insert(curriculumTopics)
+      .values({
+        curriculumId: firstV2!.id,
+        bookId: firstBook!.id,
+        title: 'Current first topic',
+        description: 'Current first topic description',
+        sortOrder: 0,
+        estimatedMinutes: 30,
+      })
+      .returning({ id: curriculumTopics.id });
+
+    const [secondSubject] = await db
+      .insert(subjects)
+      .values({
+        profileId: first.profileId,
+        name: 'Second versioned subject',
+        status: 'active',
+        pedagogyMode: 'socratic',
+      })
+      .returning({ id: subjects.id });
+    const [secondBook] = await db
+      .insert(curriculumBooks)
+      .values({
+        subjectId: secondSubject!.id,
+        title: 'Second book',
+        sortOrder: 0,
+      })
+      .returning({ id: curriculumBooks.id });
+    const secondCurriculumRows = await db
+      .insert(curricula)
+      .values([
+        { subjectId: secondSubject!.id, version: 1 },
+        { subjectId: secondSubject!.id, version: 2 },
+      ])
+      .returning({ id: curricula.id, version: curricula.version });
+    const secondV1 = secondCurriculumRows.find((row) => row.version === 1);
+    const secondV2 = secondCurriculumRows.find((row) => row.version === 2);
+    if (!secondV1 || !secondV2) {
+      throw new Error('Expected version 1 and version 2 curriculum fixtures');
+    }
+    const secondTopicRows = await db
+      .insert(curriculumTopics)
+      .values([
+        {
+          curriculumId: secondV1.id,
+          bookId: secondBook!.id,
+          title: 'Obsolete second topic',
+          description: 'Obsolete second topic description',
+          sortOrder: 0,
+          estimatedMinutes: 30,
+        },
+        {
+          curriculumId: secondV2.id,
+          bookId: secondBook!.id,
+          title: 'Current second topic',
+          description: 'Current second topic description',
+          sortOrder: 0,
+          estimatedMinutes: 30,
+        },
+      ])
+      .returning({
+        id: curriculumTopics.id,
+        curriculumId: curriculumTopics.curriculumId,
+      });
+    const secondV1Topic = secondTopicRows.find(
+      (row) => row.curriculumId === secondV1.id,
+    );
+    const secondV2Topic = secondTopicRows.find(
+      (row) => row.curriculumId === secondV2.id,
+    );
+    if (!secondV1Topic || !secondV2Topic) {
+      throw new Error('Expected one topic fixture for each curriculum version');
+    }
+
+    const single = await getSubjectRetention(
+      db,
+      first.profileId,
+      first.subjectId,
+    );
+    const multi = await getAllSubjectsRetention(db, first.profileId);
+
+    expect(single.topics.map((topic) => topic.topicId)).toEqual([
+      firstV2Topic!.id,
+    ]);
+    expect(
+      multi.subjects
+        .find((subject) => subject.subjectId === secondSubject!.id)
+        ?.topics.map((topic) => topic.topicId),
+    ).toEqual([secondV2Topic!.id]);
+    expect(JSON.stringify(multi)).not.toContain(first.topicIds[0]);
+    expect(JSON.stringify(multi)).not.toContain(secondV1Topic!.id);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Existing tests
 // ---------------------------------------------------------------------------
 
 describe('getProfileOverdueCount SQL correctness (integration) [BUG-473]', () => {

@@ -28,9 +28,14 @@ const mockMutate = jest.fn(
   },
 );
 let mockIsPending = false;
-let mockActiveProfile: { id: string; conversationLanguage: string } | null = {
+let mockActiveProfile: {
+  id: string;
+  conversationLanguage: string;
+  isCurrentUser: boolean;
+} | null = {
   id: 'p1',
   conversationLanguage: 'en',
+  isCurrentUser: true,
 };
 
 jest.mock(
@@ -65,7 +70,11 @@ describe('useMentorLanguageSync', () => {
       },
     );
     mockIsPending = false;
-    mockActiveProfile = { id: 'p1', conversationLanguage: 'en' };
+    mockActiveProfile = {
+      id: 'p1',
+      conversationLanguage: 'en',
+      isCurrentUser: true,
+    };
     await i18next.changeLanguage('en');
   });
 
@@ -130,6 +139,7 @@ describe('useMentorLanguageSync', () => {
     mockActiveProfile = {
       id: 'profile-1',
       conversationLanguage: 'en',
+      isCurrentUser: true,
     };
 
     renderHook(() => useMentorLanguageSync());
@@ -147,6 +157,7 @@ describe('useMentorLanguageSync', () => {
     mockActiveProfile = {
       id: 'profile-1',
       conversationLanguage: 'en',
+      isCurrentUser: true,
     };
 
     const firstMount = renderHook(() => useMentorLanguageSync());
@@ -157,6 +168,7 @@ describe('useMentorLanguageSync', () => {
     mockActiveProfile = {
       id: 'profile-2',
       conversationLanguage: 'en',
+      isCurrentUser: true,
     };
     const secondMount = renderHook(() => useMentorLanguageSync());
 
@@ -173,6 +185,7 @@ describe('useMentorLanguageSync', () => {
     mockActiveProfile = {
       id: 'profile-1',
       conversationLanguage: 'en',
+      isCurrentUser: true,
     };
     renderHook(() => useMentorLanguageSync());
 
@@ -190,6 +203,7 @@ describe('useMentorLanguageSync', () => {
     mockActiveProfile = {
       id: 'profile-1',
       conversationLanguage: 'en',
+      isCurrentUser: true,
     };
 
     renderHook(() => useMentorLanguageSync());
@@ -208,6 +222,19 @@ describe('useMentorLanguageSync', () => {
   });
 
   it('does not patch when languages already match', async () => {
+    renderHook(() => useMentorLanguageSync());
+
+    await waitFor(() => expect(mockMutate).not.toHaveBeenCalled());
+  });
+
+  it('[WI-1556] never infers a managed child language from the parent device', async () => {
+    mockActiveProfile = {
+      id: 'managed-child',
+      conversationLanguage: 'en',
+      isCurrentUser: false,
+    };
+    await i18next.changeLanguage('cs');
+
     renderHook(() => useMentorLanguageSync());
 
     await waitFor(() => expect(mockMutate).not.toHaveBeenCalled());
@@ -270,7 +297,11 @@ describe('useMentorLanguageSync', () => {
     });
 
     await i18next.changeLanguage('nb');
-    mockActiveProfile = { id: 'p1', conversationLanguage: 'en' };
+    mockActiveProfile = {
+      id: 'p1',
+      conversationLanguage: 'en',
+      isCurrentUser: true,
+    };
 
     const { rerender } = renderHook(() => useMentorLanguageSync());
 
@@ -295,7 +326,11 @@ describe('useMentorLanguageSync', () => {
   it('[B-599] syncs newly active profile even when app language has not changed (profile-switch regression)', async () => {
     // Profile A: conversationLanguage='en', app language nb -> sync fires.
     await i18next.changeLanguage('nb');
-    mockActiveProfile = { id: 'p1', conversationLanguage: 'en' };
+    mockActiveProfile = {
+      id: 'p1',
+      conversationLanguage: 'en',
+      isCurrentUser: true,
+    };
     const { rerender } = renderHook(() => useMentorLanguageSync());
     await waitFor(() => expect(mockMutate).toHaveBeenCalledTimes(1));
 
@@ -303,7 +338,11 @@ describe('useMentorLanguageSync', () => {
     // still nb). Pre-fix code keyed lastSyncedRef by language only, so the
     // 'nb === nb' guard would suppress the second mutate. Post-fix, the key
     // is (profileId, language), so the switch must re-trigger sync for B.
-    mockActiveProfile = { id: 'p2', conversationLanguage: 'en' };
+    mockActiveProfile = {
+      id: 'p2',
+      conversationLanguage: 'en',
+      isCurrentUser: true,
+    };
     rerender(undefined);
     await waitFor(() => expect(mockMutate).toHaveBeenCalledTimes(2));
   });

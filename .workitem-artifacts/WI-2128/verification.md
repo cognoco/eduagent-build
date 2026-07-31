@@ -4,7 +4,12 @@
 
 - RED: temporarily restored the pre-fix headerless resolution in `apps/api/src/middleware/profile-scope.ts` from caller-bound `getPersonScope(...)` to `findOwnerPersonScope(...)`, leaving the regression unchanged. The named integration case `resolves a headerless learner request to the learner Person` failed with expected HTTP 200 but received HTTP 403, reproducing the owner-substitution boundary.
 - RESTORE: restored the exact production fix and reran the same named case against the local real database. It passed with HTTP 200 and the learner Person.
-- COMPLETE GREEN: `pnpm exec jest --config tests/integration/jest.config.cjs tests/integration/wi2128-family-join-identity.integration.test.ts --runInBand --no-coverage --forceExit` succeeded for all 15 cases.
+- COMPLETE GREEN: `pnpm exec jest --config tests/integration/jest.config.cjs tests/integration/wi2128-family-join-identity.integration.test.ts --runInBand --no-coverage --forceExit` succeeded for all 16 cases.
+
+## Fresh-factor authority-substitution correction
+
+- RED: added the real-database case `[MANDATORY][WI-2128][BREAK] does not let fresh-factor proof substitute the learner caller for the owner Person` while the switch route still called `getPersonScope(db, profileId, account.id)` without the authenticated caller. The other 15 cases passed; this case alone returned HTTP 200 instead of the required 403.
+- GREEN: passed `callerPersonId` as the fourth `getPersonScope` argument at the profile-switch capability boundary. Both the no-factor and fresh-factor learner-to-owner attempts now fail at caller authority with `FORBIDDEN`, before any elevation ceremony can be offered. The complete real-database suite passed 16/16.
 
 The disposable database was the repository-sanctioned `docker-compose.test.yml` instance on local port 5433. It was never a shared development or staging database.
 
@@ -31,7 +36,7 @@ The fast gate's API-unit refusal was a fail-closed environment guard, not a test
 
 - RED: middleware-level joined-learner regressions ran against the membership-only explicit-header branch. Both same-organization attacks installed the family owner or credentialed sibling context with HTTP 200, and the resolver call omitted the authenticated `callerPersonId`.
 - GREEN: the explicit-header branch again supplies `callerPersonId` to the central operation-authority resolver. `profile-scope.test.ts` passed all 15 cases, including self and active guardian-to-uncredentialed-charge preservation, with denied telemetry categorized as `not-operable`.
-- REAL DATABASE: `wi2128-family-join-identity.integration.test.ts` passed all 15 cases with identity-v2 flags enabled, including joined-learner owner/sibling denial and guardian-managed-charge preservation.
+- REAL DATABASE: `wi2128-family-join-identity.integration.test.ts` passed all 16 cases with identity-v2 flags enabled, including joined-learner owner/sibling denial, fresh-factor non-substitution, and guardian-managed-charge preservation.
 - PROPORTIONAL: the combined profile-scope and profile-route API suites passed 69/69; mobile profile-refresh suites passed 47/47; API/mobile typecheck and lint targets passed with baseline warnings only.
 - DIFF HYGIENE: removed the two trailing-space lines in `root-cause-trace-and-plan.md`; the combined branch-plus-worktree `git diff --check origin/main` passed.
 

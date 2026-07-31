@@ -19,7 +19,10 @@ export function useMentorLanguageSync(): void {
   const lastSyncedRef = useRef<SyncKey | null>(null);
 
   useEffect(() => {
-    if (!activeProfile || isPending) return;
+    // WI-1556: the device locale belongs to the authenticated person's device.
+    // Never infer a managed child's language from a parent profile switch.
+    if (!activeProfile || activeProfile.isCurrentUser !== true || isPending)
+      return;
     let cancelled = false;
 
     const sync = async () => {

@@ -225,11 +225,14 @@ jobs:
           fi
           # Keep the canary, suite, and postflight in one Doppler boundary so
           # TEST_SEED_SECRET is exactly the value the staging API accepts.
-          doppler run -p mentomate -c stg --command "\
+          doppler run -p mentomate -c stg \
+            --preserve-env="EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY" \
+            --command "\
             export PLAYWRIGHT_TEST_SEED_SECRET=\"\$TEST_SEED_SECRET\"; \
             export CLERK_SECRET_KEY=\"\$CLERK_SECRET_KEY\"; \
             export PLAYWRIGHT_API_URL=\"${PLAYWRIGHT_API_URL}\"; \
             set -eu; \
+            node scripts/check-clerk-key-alignment.mjs; \
             pnpm exec tsx scripts/playwright-seed-scenario-guard.ts \
               --project=v2-release \
               --project=smoke-auth \
@@ -367,14 +370,26 @@ jobs:
             PREFIX="pw-${PLAYWRIGHT_RUN_ID}-"
           fi
           echo "Resetting seeded accounts with prefix: ${PREFIX}"
-          # --fail-with-body so a non-2xx surfaces in logs without breaking
-          # if the endpoint is unreachable mid-incident; the nightly cleanup
-          # job will catch anything missed here.
-          curl --fail-with-body --silent --show-error \
-            -X POST \
-            -H "X-Test-Secret: ${PLAYWRIGHT_TEST_SEED_SECRET}" \
-            "${PLAYWRIGHT_API_URL}/v1/__test/reset?prefix=${PREFIX}" \
-            || echo "::warning::seed reset returned non-2xx; nightly cleanup will sweep"
+          # Keep 15 in sync with MAX_WORKER_CLERK_CLEANUP_USERS in test-seed.ts.
+          # Each Worker reset handles at most 15 Clerk users (one list plus
+          # marker/bypass/delete calls per user stays below CF's 50-request
+          # cap). Repeat full batches so V2 runs with more seeded identities
+          # are fully reclaimed. A hard cap prevents an unhealthy endpoint
+          # from looping forever; nightly cleanup remains the final safety net.
+          MAX_CLEANUP_BATCHES=20
+          for BATCH in $(seq 1 "${MAX_CLEANUP_BATCHES}"); do
+            response=$(curl --fail-with-body --silent --show-error \
+              -X POST \
+              -H "X-Test-Secret: ${PLAYWRIGHT_TEST_SEED_SECRET}" \
+              "${PLAYWRIGHT_API_URL}/v1/__test/reset?prefix=${PREFIX}") \
+              || { echo "::warning::seed reset batch ${BATCH} returned non-2xx; nightly cleanup will sweep"; exit 0; }
+            clerk_users_selected=$(node -e 'const result = JSON.parse(require("node:fs").readFileSync(0, "utf8")); const value = result.clerkUsersSelected ?? result.clerkUsersDeleted; if (!Number.isInteger(value) || value < 0) process.exit(1); console.log(value);' <<<"${response}") \
+              || { echo "::warning::seed reset batch ${BATCH} returned an invalid response; nightly cleanup will sweep"; exit 0; }
+            if [ "${clerk_users_selected}" -lt 15 ]; then
+              exit 0
+            fi
+          done
+          echo "::warning::seed reset reached ${MAX_CLEANUP_BATCHES} full Clerk batches; nightly cleanup will sweep"
 
       # WI-2594: the legacy artifact-upload steps were removed here for the
       # same reason as the V2 upload step above: Playwright report and result

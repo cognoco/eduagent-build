@@ -748,6 +748,11 @@ describe('account routes', () => {
   // -------------------------------------------------------------------------
 
   describe('GET /v1/account/export', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      restoreProfileScopeMocks();
+    });
+
     it('returns 200 with data export', async () => {
       const res = await app.request(
         '/v1/account/export',
@@ -760,6 +765,40 @@ describe('account routes', () => {
       const body = await res.json();
       expect(body.account).toEqual(expect.objectContaining({}));
       expect(typeof body.exportedAt).toBe('string');
+    });
+
+    it('[WI-2390] remains available to the owner while account deletion is scheduled', async () => {
+      const scheduleResponse = await app.request(
+        '/v1/account/delete',
+        {
+          method: 'POST',
+          headers: ownerAuthHeaders(),
+        },
+        TEST_ENV,
+      );
+      expect(scheduleResponse.status).toBe(200);
+      expect(scheduleDeletionV2).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-account-id',
+      );
+
+      const exportResponse = await app.request(
+        '/v1/account/export',
+        { headers: ownerAuthHeaders() },
+        TEST_ENV,
+      );
+
+      expect(exportResponse.status).toBe(200);
+      await expect(exportResponse.json()).resolves.toEqual(
+        expect.objectContaining({
+          account: expect.objectContaining({ email: 'test@example.com' }),
+          exportedAt: expect.any(String),
+        }),
+      );
+      expect(generateExportV2).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-account-id',
+      );
     });
 
     it('returns 401 without auth header', async () => {

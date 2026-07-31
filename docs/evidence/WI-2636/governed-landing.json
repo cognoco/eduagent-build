@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "landing": {
+    "pullRequest": {
+      "number": 2723,
+      "url": "https://github.com/cognoco/eduagent-build/pull/2723",
+      "reviewedHead": "65eacb9caf69b8ebaf757268f43f40ba2f95ead0",
+      "mergeCommit": "81e1aa43f81501fef7dde85d0541f4b29ef3f86a",
+      "mergedAt": "2026-07-30T20:45:02Z"
+    },
+    "ci": {
+      "workflowName": "CI",
+      "runId": 30579841099,
+      "runUrl": "https://github.com/cognoco/eduagent-build/actions/runs/30579841099",
+      "jobId": 90997051001,
+      "jobUrl": "https://github.com/cognoco/eduagent-build/actions/runs/30579841099/job/90997051001",
+      "jobName": "Flag-ON integration (IDENTITY_V2_ENABLED)",
+      "headSha": "65eacb9caf69b8ebaf757268f43f40ba2f95ead0",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-07-30T20:35:40Z",
+      "completedAt": "2026-07-30T20:43:11Z"
+    },
+    "claudeApproval": {
+      "sourceUrl": "https://github.com/cognoco/eduagent-build/pull/2723#issuecomment-5136012321",
+      "author": "claude[bot]",
+      "createdAt": "2026-07-30T20:37:02Z",
+      "updatedAt": "2026-07-30T20:37:02Z",
+      "verdict": "APPROVED",
+      "reviewedHead": "65eacb9caf69b8ebaf757268f43f40ba2f95ead0",
+      "reviewGreen": true,
+      "mustFixCount": 0,
+      "shouldFixCount": 0,
+      "body": "## Claude Code Review: APPROVED\n\n**No issues found.** All changes align with project conventions.\n\n<details><summary>Review metadata</summary>\n\n- Verdict: APPROVED\n- Reviewed head SHA: 65eacb9caf69b8ebaf757268f43f40ba2f95ead0\n- Review green: true\n- Must-fix count: 0\n- Should-fix count: 0\n- Consider count: 0\n- Files in diff: 2\n- Rules source: trusted base checkout AGENTS.md, docs/project_context.md\n\n</details>\n"
+    }
+  }
+}
