@@ -58,6 +58,12 @@ describe('extractVolunteeredPii', () => {
     );
   });
 
+  it('extracts a conventional lowercase volunteered street address', () => {
+    expect(extractVolunteeredPii('i live at 12 oakwood street')).toContain(
+      '12 oakwood street',
+    );
+  });
+
   it('does NOT treat a common word after "I am" as a name', () => {
     expect(extractVolunteeredPii('I am tired and confused')).toEqual([]);
   });

@@ -165,11 +165,13 @@ minors be pinned to a single "papered" (contractually vetted) endpoint for exact
 
 **Personal data sent — the important finding:** these providers receive tutor-conversation
 messages (system prompt + safety/personalization preamble + the multi-turn
-user/assistant exchange), not just metadata. Since WI-2737, every textual message
-part is passed through `learner-egress-filter.ts` at the final router boundary
-before a primary or fallback adapter receives it. The filter masks recognised
-email, phone, address, handle, school/name cues and explicit first-person
-special-category disclosures; it is not anonymisation. Evidence:
+user/assistant exchange), not just metadata. Since WI-2737, user-role text and
+named learner-derived regions in string or multipart system prompts are passed
+through `learner-egress-filter.ts` at the final router boundary before a primary
+or fallback adapter receives them. Assistant-authored turns and non-text parts
+remain unchanged. The filter masks recognised email, phone, address, handle,
+school/name cues and explicit first-person special-category disclosures; it is
+not anonymisation. Evidence:
 - Safety/personalization preamble construction: `router.ts:302-427` (`withSafetyPreamble`) —
   built once at the router layer and prepended to every provider call regardless of vendor.
 - Personalization line includes the learner's **pronouns** verbatim (sanitized, `router.ts:365-373`)

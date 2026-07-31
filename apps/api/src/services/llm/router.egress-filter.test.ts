@@ -118,4 +118,39 @@ describe('provider-bound learner egress filter [WI-2737]', () => {
     );
     expect(providerPrompt).not.toContain('other@example.com');
   });
+
+  it('filters learner-derived book metadata in the exact async provider request body', async () => {
+    const captured: ChatMessage[][] = [];
+    registerProvider(capturingProvider(captured));
+
+    await routeAndCall([
+      {
+        role: 'system',
+        content:
+          'Given a book titled <book_title>Contact other@example.com</book_title> ' +
+          '(<book_description>i live at 12 oakwood street</book_description>) ' +
+          'containing <topic_list>email topic@example.com</topic_list>. ' +
+          'Completed <completed_topic>call +1 415 555 2671</completed_topic>.',
+      },
+      {
+        role: 'assistant',
+        content: 'Prior worked example: teacher@example.com.',
+      },
+    ]);
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0]).toHaveLength(2);
+    const providerSystemContent = captured[0]?.[0]?.content;
+    expect(typeof providerSystemContent).toBe('string');
+    expect((providerSystemContent as string).split('\n\n').at(-1)).toBe(
+      'Given a book titled <book_title>Contact [personal information removed]</book_title> ' +
+        '(<book_description>i live at [personal information removed]</book_description>) ' +
+        'containing <topic_list>email [personal information removed]</topic_list>. ' +
+        'Completed <completed_topic>call [personal information removed]</completed_topic>.',
+    );
+    expect(captured[0]?.[1]).toEqual({
+      role: 'assistant',
+      content: 'Prior worked example: teacher@example.com.',
+    });
+  });
 });
