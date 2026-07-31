@@ -6,6 +6,7 @@ import {
   assertArmedBeforeAction,
   assertRequestAttempted,
   captureNowRefreshPayload,
+  observeCapturedNowRefresh,
   observeExactNowRefresh,
   observeNowRefreshRequestAttempt,
 } from './now-refresh-observation';
@@ -18,7 +19,7 @@ describe('exact Now-feed payload lifetime (WI-2961)', () => {
     };
     const response = { json: jest.fn().mockResolvedValue(payload) };
 
-    const outcome = observeExactNowRefresh(
+    const outcome = observeCapturedNowRefresh(
       captureNowRefreshPayload(Promise.resolve(response), (settledResponse) =>
         settledResponse.json(),
       ),
@@ -36,7 +37,7 @@ describe('exact Now-feed payload lifetime (WI-2961)', () => {
     const error = new Error('net::ERR_ABORTED');
     const readPayload = jest.fn<Promise<unknown>, [unknown]>();
 
-    const outcome = await observeExactNowRefresh(
+    const outcome = await observeCapturedNowRefresh(
       captureNowRefreshPayload(Promise.reject(error), readPayload),
       { armedAtMs: 0, actionAtMs: 1 },
     );
@@ -49,7 +50,7 @@ describe('exact Now-feed payload lifetime (WI-2961)', () => {
     jest.useFakeTimers();
     try {
       const neverSettles = new Promise<never>(() => undefined);
-      const outcomePromise = observeExactNowRefresh(
+      const outcomePromise = observeCapturedNowRefresh(
         captureNowRefreshPayload(neverSettles, async () => undefined),
         { armedAtMs: 0, actionAtMs: 1 },
       );
@@ -71,7 +72,7 @@ describe('exact Now-feed payload lifetime (WI-2961)', () => {
     );
     const response = {};
 
-    const outcome = observeExactNowRefresh(
+    const outcome = observeCapturedNowRefresh(
       captureNowRefreshPayload(Promise.resolve(response), async () => {
         throw bodyReadError;
       }),
@@ -110,7 +111,7 @@ describe('exact Now-feed payload lifetime (WI-2961)', () => {
       /No data found for resource/,
     );
     await expect(
-      observeExactNowRefresh(capturedPromise, {
+      observeCapturedNowRefresh(capturedPromise, {
         armedAtMs: 0,
         actionAtMs: 1,
       }),

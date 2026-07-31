@@ -3,7 +3,7 @@ import {
   NOW_REFRESH_OBSERVATION_WINDOW_MS,
   assertRequestAttempted,
   captureNowRefreshPayload,
-  observeExactNowRefresh,
+  observeCapturedNowRefresh,
   observeNowRefreshRequestAttempt,
 } from '../../helpers/now-refresh-observation';
 import { pressableClick } from '../../helpers/pressable';
@@ -155,7 +155,7 @@ test('WI-2234 returning learner: unfinished session resumes, exchanges, and retu
   // fail the spec, not be accepted as a legitimate WI-2818 outcome.
   assertRequestAttempted(postBackNowRequestOutcome);
 
-  const postBackNowOutcome = await observeExactNowRefresh(
+  const postBackNowOutcome = await observeCapturedNowRefresh(
     postBackNowCapturePromise,
     { armedAtMs: postBackNowArmedAtMs, actionAtMs: postBackNowActionAtMs },
   );

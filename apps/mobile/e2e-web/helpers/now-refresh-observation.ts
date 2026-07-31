@@ -105,27 +105,15 @@ export function assertArmedBeforeAction(
 
 /**
  * Races an already-armed response promise against `windowMs` (default
- * `NOW_REFRESH_OBSERVATION_WINDOW_MS`). A response-promise rejection or
- * bounded non-settlement remains legitimate production behavior per WI-2818.
- * Once a captured response settles, however, its body-read failure propagates
- * as a hard test failure instead of being misclassified as response absence.
+ * `NOW_REFRESH_OBSERVATION_WINDOW_MS`). Never throws for a rejected or
+ * unsettled outcome — both are legitimate production behavior per WI-2818,
+ * not test failures. Only a late arm throws, and it throws before racing
+ * anything.
  */
-export function observeExactNowRefresh<Response, Payload>(
-  responsePromise: Promise<NowRefreshCaptureResult<Response, Payload>>,
-  options: { armedAtMs: number; actionAtMs: number; windowMs?: number },
-): Promise<NowRefreshOutcome<CapturedNowRefreshPayload<Response, Payload>>>;
-// TypeScript overload signature; the base ESLint rule does not recognize it.
-// eslint-disable-next-line no-redeclare
-export function observeExactNowRefresh<Response>(
-  responsePromise: Promise<Response>,
-  options: { armedAtMs: number; actionAtMs: number; windowMs?: number },
-): Promise<NowRefreshOutcome<Response>>;
-// TypeScript overload implementation; the base ESLint rule does not recognize it.
-// eslint-disable-next-line no-redeclare
 export async function observeExactNowRefresh<Response>(
   responsePromise: Promise<Response>,
   options: { armedAtMs: number; actionAtMs: number; windowMs?: number },
-): Promise<NowRefreshOutcome<unknown>> {
+): Promise<NowRefreshOutcome<Response>> {
   assertArmedBeforeAction(options.armedAtMs, options.actionAtMs);
   const windowMs = options.windowMs ?? NOW_REFRESH_OBSERVATION_WINDOW_MS;
 
@@ -147,31 +135,36 @@ export async function observeExactNowRefresh<Response>(
   if (result === UNSETTLED) {
     return { kind: 'unsettled' };
   }
-  if (isNowRefreshCaptureResult(result)) {
-    if (result.kind === 'response-rejected') {
-      return { kind: 'rejected', error: result.error };
-    }
-
-    const payloadRead = await result.payloadRead;
-    if (payloadRead.kind === 'body-read-failed') {
-      throw payloadRead.error;
-    }
-    return {
-      kind: 'settled',
-      response: { response: result.response, payload: payloadRead.payload },
-    };
-  }
-  return { kind: 'settled', response: result };
+  return { kind: 'settled', response: result as Response };
 }
 
-function isNowRefreshCaptureResult(
-  result: unknown,
-): result is NowRefreshCaptureResult<unknown, unknown> {
-  if (typeof result !== 'object' || result === null || !('kind' in result)) {
-    return false;
+/**
+ * Observes the discriminated capture result. Response rejection and bounded
+ * response non-settlement keep their WI-2818 meanings, but a body-read failure
+ * after response settlement propagates as a hard test failure.
+ */
+export async function observeCapturedNowRefresh<Response, Payload>(
+  capturePromise: Promise<NowRefreshCaptureResult<Response, Payload>>,
+  options: { armedAtMs: number; actionAtMs: number; windowMs?: number },
+): Promise<NowRefreshOutcome<CapturedNowRefreshPayload<Response, Payload>>> {
+  const captureOutcome = await observeExactNowRefresh(capturePromise, options);
+  if (captureOutcome.kind !== 'settled') {
+    return captureOutcome;
   }
-  const kind = (result as { kind?: unknown }).kind;
-  return kind === 'response-rejected' || kind === 'response-settled';
+
+  const capture = captureOutcome.response;
+  if (capture.kind === 'response-rejected') {
+    return { kind: 'rejected', error: capture.error };
+  }
+
+  const payloadRead = await capture.payloadRead;
+  if (payloadRead.kind === 'body-read-failed') {
+    throw payloadRead.error;
+  }
+  return {
+    kind: 'settled',
+    response: { response: capture.response, payload: payloadRead.payload },
+  };
 }
 
 /**
