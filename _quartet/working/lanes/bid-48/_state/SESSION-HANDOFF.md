@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-07-31 10:22 CEST
+Last reconciled: 2026-07-31 11:08 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -53,6 +53,8 @@ Last reconciled: 2026-07-31 10:22 CEST
   retaining Cosmo Lifecycle Tooling. WI-2941 moved to that workstream, returned to
   Backlog, and left BID-48; Marketplace PR #166 is preserved only as a proposal.
   WI-2946 remains outside BID-48 and returned to Backlog in Clacks.
+  Marketplace PR #166 is open/draft at `9652d7d`; its clean local execution
+  worktree was removed while the local and remote proposal branch were preserved.
 - Operator-authorized expired-claim recovery — compare-before-write confirmed
   `Claim Expired=true` and unchanged identity/timestamp/workspace for WI-2643,
   WI-2755, WI-2795, WI-2798, WI-2802, WI-2805, and WI-2826. Each has an audit
@@ -75,10 +77,13 @@ Last reconciled: 2026-07-31 10:22 CEST
   `OCC-42DF599F8508` records the persistent source-artifact failure.
 - WI-2802 — claimed by `codex:wi2802-resume:WI-2802`. Closed/Done WI-2810 supplies
   the sanitized observer but cannot retroactively classify the 2026-07-26 failure.
-  The remaining AC evidence requires one post-instrumentation isolated hosted J-01
-  reproduction (or authoritative alternative evidence). The claimant found no
-  sanctioned self-release command, recorded the gate, and retains a live claim until
-  13:22 CEST. No hosted/shared-environment mutation is authorized yet.
+  The operator authorized exactly one post-instrumentation isolated hosted J-01
+  reproduction. Its sole invocation failed during Playwright config loading because
+  the disposable checkout lacked `@playwright/test`; no browser or hosted request
+  began, no retry occurred, and the clean checkout was removed. FO-2078 /
+  `OCC-A7536C9B0020` records the environment failure. AC1-AC3 remain unmet; the
+  same-owner claim is live through 12:03 UTC / 14:03 CEST. A properly prepared
+  retry requires a new ruling.
 - WI-2800 — Ready/Active after review rejected its already-landed `fdbe36d2` evidence:
   the isolated run diagnosed a different 68.6-second sign-in failure and did not
   attribute the original hosted 90-second exhaustion. WI-2826 plus the hosted gate
@@ -95,6 +100,9 @@ Last reconciled: 2026-07-31 10:22 CEST
   database, credential, hosted-reproduction, or worktree/Doppler gates remain held
   until their recorded authority is satisfied. PR #2741 remains fail-closed on the
   twice-reproduced WI-2826 dependency.
+- Claim heartbeat (11:07 CEST): same-owner sanctioned renewal verified WI-2790,
+  WI-2921, and WI-2939 Executing with `Claim Expired=false`; each expires at
+  12:07 UTC / 14:07 CEST. WI-2802 expires four minutes earlier.
 
 ## Closed / Done
 
