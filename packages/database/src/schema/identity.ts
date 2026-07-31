@@ -110,6 +110,11 @@ export const person = pgTable(
     // with no other home in the ratified model, moved off legacy `profiles`.
     /** LLM tutor-prose language. 10-language superset of the UI locales. */
     conversationLanguage: text('conversation_language').notNull().default('en'),
+    /** Explicit confirmation before this Person's first Mentor exchange. */
+    conversationLanguageConfirmedAt: timestamp(
+      'conversation_language_confirmed_at',
+      { withTimezone: true },
+    ),
     pronouns: text('pronouns'),
     avatarUrl: text('avatar_url'),
     /** Last-selected app context: 'study' | 'family'. */

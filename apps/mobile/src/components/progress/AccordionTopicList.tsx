@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { TopicProgress } from '@eduagent/schemas';
 import { useChildSubjectTopics } from '../../hooks/use-dashboard';
+import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { childProfileHref } from '../../lib/navigation';
 import { RetentionSignal, type RetentionStatus } from './RetentionSignal';
 import type { Translate } from '../../i18n';
@@ -150,7 +151,11 @@ export function AccordionTopicList({
           <Pressable
             onPress={(event) => {
               event?.stopPropagation?.();
-              router.push('/(app)/library' as Href);
+              router.push(
+                (FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+                  ? '/(app)/subjects'
+                  : '/(app)/library') as Href,
+              );
             }}
             accessibilityRole="button"
             accessibilityLabel={t('progress.accordion.a11yBrowseLibrary')}

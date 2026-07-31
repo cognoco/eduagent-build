@@ -464,7 +464,11 @@ export default function ProgressScreen(): React.ReactElement {
       return;
     }
 
-    router.push('/(app)/library' as Href);
+    router.push(
+      (FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+        ? '/(app)/subjects'
+        : '/(app)/library') as Href,
+    );
   };
 
   return (
