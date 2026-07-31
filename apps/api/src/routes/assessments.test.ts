@@ -99,12 +99,12 @@ jest.mock('../services/identity-v2/ownership-v2', () => ({
   verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
 }));
 
-// [WI-2396] assertLlmConsent (called by POST /assessments/:id/answer and
-// POST /sessions/:id/quick-check) runs isLlmExchangeConsentAllowed, which
+// assertLlmConsent (called at route entry by POST /sessions/:id/quick-check)
+// runs isLlmExchangeConsentAllowed, which
 // reads db.query.membership — makeStubDb() below has no `.query` property.
 // Defaults to allowed (resolves undefined = no throw); individual tests
-// override with mockRejectedValueOnce(new ConsentWithdrawnError()) to
-// exercise the refusal path.
+// override it to exercise that refusal path. The mixed assessment-answer tests
+// also use the mock as a tripwire proving the route delegates to its service.
 // gc1-allow: isLlmExchangeConsentAllowed runs real db.query.membership /
 // consentGrant reads with no real implementation available in this file's
 // stub-db environment (same class as verifyPersonOwnershipV2 above).
@@ -533,32 +533,37 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
     expect(res.status).toBe(409);
   });
 
-  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5).
-  describe('[WI-2396] consent-withdrawal gate', () => {
-    it('refuses with 403 CONSENT_WITHDRAWN and never calls submitAssessmentAnswer when consent is withdrawn', async () => {
-      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+  // [WI-2543] Mixed-route consent gate lives inside submitAssessmentAnswer.
+  describe('[WI-2543] granular consent gate', () => {
+    it('maps a service-boundary consent refusal to 403 CONSENT_WITHDRAWN', async () => {
+      submitAssessmentAnswerMock.mockRejectedValueOnce(
+        new ConsentWithdrawnError(),
+      );
 
       const res = await makeApp().request(path, validAnswerBody());
 
       expect(res.status).toBe(403);
       const body = (await res.json()) as { code?: string };
       expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
-      expect(submitAssessmentAnswerMock).not.toHaveBeenCalled();
+      expect(submitAssessmentAnswerMock).toHaveBeenCalled();
+      expect(assertLlmConsentMock).not.toHaveBeenCalled();
     });
 
-    it('proceeds (LLM dispatched) when consent is active', async () => {
+    it('delegates a deterministic app-help result after consent withdrawal', async () => {
+      assertLlmConsentMock.mockRejectedValue(new ConsentWithdrawnError());
       submitAssessmentAnswerMock.mockResolvedValue(
-        makeSubmitAnswerResult({ status: 'in_progress' }),
+        makeSubmitAnswerResult({ kind: 'app_help', status: 'in_progress' }),
       );
 
-      const res = await makeApp().request(path, validAnswerBody());
+      try {
+        const res = await makeApp().request(path, validAnswerBody());
 
-      expect(res.status).toBe(200);
-      expect(assertLlmConsentMock).toHaveBeenCalledWith(
-        expect.anything(),
-        PROFILE_ID,
-      );
-      expect(submitAssessmentAnswerMock).toHaveBeenCalled();
+        expect(res.status).toBe(200);
+        expect(assertLlmConsentMock).not.toHaveBeenCalled();
+        expect(submitAssessmentAnswerMock).toHaveBeenCalled();
+      } finally {
+        assertLlmConsentMock.mockResolvedValue(undefined);
+      }
     });
   });
 

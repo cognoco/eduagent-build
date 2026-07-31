@@ -67,6 +67,8 @@ import { deleteTopicIfSafe, persistBookTopics } from '../curriculum';
 import { generateBookTopics } from '../book-generation';
 import { buildFallbackBookTopics } from '../book-generation-fallbacks';
 import { getPersonAge } from '../identity-v2/helpers';
+import { assertLlmConsent } from '../identity-v2/consent-status-v2';
+import { ConsentWithdrawnError } from '../identity-v2/consent-errors';
 import { computeActiveSeconds } from './session-context-builders';
 import { mapSessionRow } from './session-events';
 import { clearSessionStaticContext } from './session-cache';
@@ -154,12 +156,7 @@ export class SessionExchangeLimitError extends Error {
  * been withdrawn (parental or adult self-consent) — refuses the exchange
  * before any LLM dispatch. Mapped to 403 CONSENT_WITHDRAWN in routes/sessions.ts.
  */
-export class ConsentWithdrawnError extends Error {
-  constructor() {
-    super('Consent has been withdrawn — processing is refused');
-    this.name = 'ConsentWithdrawnError';
-  }
-}
+export { ConsentWithdrawnError };
 
 export class CurriculumSessionNotReadyError extends Error {
   constructor() {
@@ -469,6 +466,7 @@ async function materializeFocusedBookTopics(
     throw new NotFoundError('Book');
   }
 
+  await sessionCrudDependencies.assertLlmConsent(db, profileId);
   const learnerAge = await getPersonAge(db, profileId);
   let result: BookTopicGenerationResult;
   try {
@@ -521,6 +519,7 @@ async function materializeFocusedBookTopics(
 }
 
 const sessionCrudDependencies = {
+  assertLlmConsent,
   findFirstAvailableTopicId,
   loadLatestCompletedDraftSignals,
   loadSubjectStructureType,

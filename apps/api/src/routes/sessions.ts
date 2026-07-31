@@ -227,12 +227,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     async (c) => {
       await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
-      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
-      // Gated unconditionally — startFirstCurriculumSession's topic-intent
-      // matcher (matchTopicByIntent) dispatches the LLM when MATCHER_ENABLED
-      // and multiple candidate topics exist; this endpoint is the only
-      // entry point.
-      await assertLlmConsent(db, profileId);
       const subjectId = c.req.param('subjectId');
       const input = c.req.valid('json');
       try {

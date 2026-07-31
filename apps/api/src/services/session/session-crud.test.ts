@@ -14,6 +14,7 @@ import {
   SubjectInactiveError,
   SessionExchangeLimitError,
   CurriculumSessionNotReadyError,
+  ConsentWithdrawnError,
   formatSessionDisplayTitle,
   parseEngagementSignal,
   getSessionMetadata,
@@ -807,6 +808,7 @@ describe('[WI-586] materializeFocusedBookTopics learner-age v2 gating', () => {
       }),
       loadLatestCompletedDraftSignals: jest.fn(async () => undefined),
       loadSubjectStructureType: jest.fn(async () => 'focused_book' as const),
+      assertLlmConsent: jest.fn(async () => undefined),
       // materializeFocusedBookTopics intentionally NOT stubbed — the real
       // function runs so its getProfileAge/getPersonAge branch is exercised.
       matchTopicByIntent: jest.fn(async () => ({
@@ -872,6 +874,29 @@ describe('[WI-586] materializeFocusedBookTopics learner-age v2 gating', () => {
     expect(getPersonAgeSpy).toHaveBeenCalledWith(expect.anything(), PROFILE_ID);
   });
 
+  it('fails closed before focused-book topic generation when consent is withdrawn', async () => {
+    const db = makeDb();
+    const assertLlmConsent = jest
+      .fn()
+      .mockRejectedValue(new ConsentWithdrawnError());
+    __sessionCrudTestHooks.setDependencies({ assertLlmConsent });
+
+    await expect(
+      startFirstCurriculumSession(
+        db,
+        PROFILE_ID,
+        SUBJECT_ID,
+        { inputMode: 'text', sessionType: 'learning', bookId: BOOK_ID },
+        { matcherEnabled: false },
+      ),
+    ).rejects.toBeInstanceOf(ConsentWithdrawnError);
+
+    expect(assertLlmConsent).toHaveBeenCalledWith(db, PROFILE_ID);
+    expect(getPersonAgeSpy).not.toHaveBeenCalled();
+    expect(generateBookTopicsSpy).not.toHaveBeenCalled();
+    expect(persistBookTopicsSpy).not.toHaveBeenCalled();
+  });
+
   // [WI-481] Silent-recovery escalation: when generateBookTopics fails, the
   // flow still completes via buildFallbackBookTopics (learner keeps moving),
   // but the failure must ALSO reach Sentry so a generation outage is queryable
@@ -924,15 +949,27 @@ describe('matchTopicByIntent — fallback paths', () => {
 
     const db = { select: jest.fn().mockReturnValue(emptySelect) } as never;
 
-    const result = await matchTopicByIntent(db, PROFILE_ID, SUBJECT_ID, {
-      fallbackTopicId: FALLBACK_TOPIC_ID,
-      matcherEnabled: false,
-      firstSessionStartedAt: Date.now(),
-    });
+    const assertLlmConsent = jest
+      .fn()
+      .mockRejectedValue(new ConsentWithdrawnError());
+    const runMatcher = jest.fn();
+    const result = await matchTopicByIntent(
+      db,
+      PROFILE_ID,
+      SUBJECT_ID,
+      {
+        fallbackTopicId: FALLBACK_TOPIC_ID,
+        matcherEnabled: false,
+        firstSessionStartedAt: Date.now(),
+      },
+      { assertLlmConsent, runTopicIntentMatcher: runMatcher },
+    );
 
     expect(result.topicId).toBe(FALLBACK_TOPIC_ID);
     expect(result.fallbackReason).toBe('flag-off');
     expect(result.confidence).toBeNull();
+    expect(assertLlmConsent).not.toHaveBeenCalled();
+    expect(runMatcher).not.toHaveBeenCalled();
   });
 
   it('returns fallbackTopicId with reason no-input when rawInput is null', async () => {
@@ -993,6 +1030,43 @@ describe('matchTopicByIntent — fallback paths', () => {
     // Raw input found, topics list empty → no-match fallback
     expect(result.fallbackReason).toBe('no-match');
     expect(result.topicId).toBe(FALLBACK_TOPIC_ID);
+  });
+
+  it('fails closed before the matcher dispatch when consent is withdrawn', async () => {
+    const proxy: any = {};
+    proxy.from = jest.fn(() => proxy);
+    proxy.innerJoin = jest.fn(() => proxy);
+    proxy.where = jest.fn(() => proxy);
+    proxy.limit = jest
+      .fn()
+      .mockResolvedValue([{ rawInput: 'learn organic chemistry' }]);
+    proxy.orderBy = jest
+      .fn()
+      .mockResolvedValue([
+        { id: FALLBACK_TOPIC_ID, title: 'Chemical Reactions' },
+      ]);
+    const db = { select: jest.fn(() => proxy) } as never;
+    const assertLlmConsent = jest
+      .fn()
+      .mockRejectedValue(new ConsentWithdrawnError());
+    const runMatcher = jest.fn();
+
+    await expect(
+      matchTopicByIntent(
+        db,
+        PROFILE_ID,
+        SUBJECT_ID,
+        {
+          fallbackTopicId: FALLBACK_TOPIC_ID,
+          matcherEnabled: true,
+          firstSessionStartedAt: Date.now(),
+        },
+        { assertLlmConsent, runTopicIntentMatcher: runMatcher },
+      ),
+    ).rejects.toBeInstanceOf(ConsentWithdrawnError);
+
+    expect(assertLlmConsent).toHaveBeenCalledWith(db, PROFILE_ID);
+    expect(runMatcher).not.toHaveBeenCalled();
   });
 });
 
