@@ -1,0 +1,168 @@
+{
+  "schemaVersion": "wi-2739-jest-phase.v1",
+  "phase": "baseline-red",
+  "command": "rtk env DATABASE_URL=postgresql://local:local@127.0.0.1:5432/mentomate_test pnpm exec jest --config apps/api/jest.config.cjs --runInBand --no-coverage apps/api/src/inngest/functions/transcript-purge-cron.test.ts apps/api/src/inngest/functions/transcript-purge-observe.test.ts apps/api/src/inngest/functions/summary-regenerate.test.ts apps/api/src/services/transcript-purge.test.ts --json --outputFile=<phase-api-output>",
+  "exitCode": 1,
+  "productionSourceCommit": "af603521d92fe03d1512a258f32aa8ffa297cf08",
+  "retainedTestsCommit": "2e84f0b6bae9958c7faeaae1f80c97744dd06c0a",
+  "rawOutputSha256": "94eb7a1dcf6790434f031b41de27433ce8977ef2ee5cfb9891125f6e6a515aa4",
+  "result": {
+    "success": false,
+    "numFailedTestSuites": 2,
+    "numPassedTestSuites": 2,
+    "numTotalTestSuites": 4,
+    "numFailedTests": 13,
+    "numPassedTests": 42,
+    "numPendingTests": 0,
+    "numTotalTests": 55,
+    "startTimeUnixMs": 1785511504275,
+    "testResults": [
+      {
+        "testFile": "apps/api/src/inngest/functions/transcript-purge-cron.test.ts",
+        "status": "failed",
+        "assertionCounts": {
+          "passed": 11,
+          "failed": 8,
+          "pending": 0
+        },
+        "failedAssertions": [
+          {
+            "ancestorTitles": [
+              "transcriptPurgeCron"
+            ],
+            "title": "[WI-2739] rotates a bounded remediation page across every stable stale-null row",
+            "fullName": "transcriptPurgeCron [WI-2739] rotates a bounded remediation page across every stable stale-null row",
+            "status": "failed"
+          },
+          {
+            "ancestorTitles": [
+              "transcriptPurgeCron"
+            ],
+            "title": "[WI-2739] wires the rotating offset and wrap page into null-timestamp remediation",
+            "fullName": "transcriptPurgeCron [WI-2739] wires the rotating offset and wrap page into null-timestamp remediation",
+            "status": "failed"
+          },
+          {
+            "ancestorTitles": [
+              "transcriptPurgeCron"
+            ],
+            "title": "[BUG-189] computes cutoff INSIDE find-purge-candidates step.run for replay stability",
+            "fullName": "transcriptPurgeCron [BUG-189] computes cutoff INSIDE find-purge-candidates step.run for replay stability",
+            "status": "failed"
+          },
+          {
+            "ancestorTitles": [
+              "transcriptPurgeCron"
+            ],
+            "title": "[WI-2739] detects null summaryGeneratedAt rows past the delayed cutoff",
+            "fullName": "transcriptPurgeCron [WI-2739] detects null summaryGeneratedAt rows past the delayed cutoff",
+            "status": "failed"
+          },
+          {
+            "ancestorTitles": [
+              "transcriptPurgeCron"
+            ],
+            "title": "queues purge workers and emits delayed alerts for blocked rows",
+            "fullName": "transcriptPurgeCron queues purge workers and emits delayed alerts for blocked rows",
+            "status": "failed"
+          },
+          {
+            "ancestorTitles": [
+              "transcriptPurgeCron"
+            ],
+            "title": "[WI-2739] remediates a stale null timestamp independently of a full delayed page",
+            "fullName": "transcriptPurgeCron [WI-2739] remediates a stale null timestamp independently of a full delayed page",
+            "status": "failed"
+          },
+          {
+            "ancestorTitles": [
+              "transcriptPurgeCron"
+            ],
+            "title": "[WI-2739] queues only daily capacity and emits an alertable over-cap backlog signal",
+            "fullName": "transcriptPurgeCron [WI-2739] queues only daily capacity and emits an alertable over-cap backlog signal",
+            "status": "failed"
+          },
+          {
+            "ancestorTitles": [
+              "transcriptPurgeCron"
+            ],
+            "title": "[WI-2739] does not signal backlog at exact daily capacity",
+            "fullName": "transcriptPurgeCron [WI-2739] does not signal backlog at exact daily capacity",
+            "status": "failed"
+          }
+        ]
+      },
+      {
+        "testFile": "apps/api/src/inngest/functions/transcript-purge-observe.test.ts",
+        "status": "failed",
+        "assertionCounts": {
+          "passed": 17,
+          "failed": 5,
+          "pending": 0
+        },
+        "failedAssertions": [
+          {
+            "ancestorTitles": [
+              "sessionPurgeDelayedObserve [BUG-369]"
+            ],
+            "title": "[BREAK] emits a structured warn log with delayed count",
+            "fullName": "sessionPurgeDelayedObserve [BUG-369] [BREAK] emits a structured warn log with delayed count",
+            "status": "failed"
+          },
+          {
+            "ancestorTitles": [
+              "sessionPurgeBacklogObserve [WI-2739]"
+            ],
+            "title": "is registered as the listener for app/session.purge.backlog",
+            "fullName": "sessionPurgeBacklogObserve [WI-2739] is registered as the listener for app/session.purge.backlog",
+            "status": "failed"
+          },
+          {
+            "ancestorTitles": [
+              "sessionPurgeBacklogObserve [WI-2739]"
+            ],
+            "title": "is included in the exported functions array",
+            "fullName": "sessionPurgeBacklogObserve [WI-2739] is included in the exported functions array",
+            "status": "failed"
+          },
+          {
+            "ancestorTitles": [
+              "sessionPurgeBacklogObserve [WI-2739]"
+            ],
+            "title": "logs the lower-bound backlog signal",
+            "fullName": "sessionPurgeBacklogObserve [WI-2739] logs the lower-bound backlog signal",
+            "status": "failed"
+          },
+          {
+            "ancestorTitles": [
+              "sessionPurgeBacklogObserve [WI-2739]"
+            ],
+            "title": "[BREAK] captures schema drift for a non-over-cap payload",
+            "fullName": "sessionPurgeBacklogObserve [WI-2739] [BREAK] captures schema drift for a non-over-cap payload",
+            "status": "failed"
+          }
+        ]
+      },
+      {
+        "testFile": "apps/api/src/inngest/functions/summary-regenerate.test.ts",
+        "status": "passed",
+        "assertionCounts": {
+          "passed": 8,
+          "failed": 0,
+          "pending": 0
+        },
+        "failedAssertions": []
+      },
+      {
+        "testFile": "apps/api/src/services/transcript-purge.test.ts",
+        "status": "passed",
+        "assertionCounts": {
+          "passed": 6,
+          "failed": 0,
+          "pending": 0
+        },
+        "failedAssertions": []
+      }
+    ]
+  }
+}
