@@ -182,6 +182,14 @@ describe('reviewDictation', () => {
     );
     // step-by-step preference included
     expect(systemContent).toContain('numbered 1');
+    expect(mockRouteAndCall).toHaveBeenCalledWith(
+      expect.any(Array),
+      2,
+      expect.objectContaining({
+        flow: 'dictation.review',
+        ageBracket: 'adolescent',
+      }),
+    );
   });
 
   it('uses child-friendly register for ageYears ≤ 13', async () => {

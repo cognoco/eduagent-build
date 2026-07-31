@@ -1,0 +1,31 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "All 11 named learner-facing routeAndCall sites now receive ageBracket; caller boundaries derive it from existing profile/person data, and dictation review converts its existing ageYears value without another fetch.",
+      "pointer": "apps/api/src/services/llm/router.age-bracket-coverage.test.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "WI_2520_DEFERRED_SITES and all 11 entries are removed; only the two guardian-consumed OPEN_SCOPE_QUESTION_FLOWS exemptions remain and are guarded against rot.",
+      "pointer": "apps/api/src/services/llm/router.age-bracket-coverage.test.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "The focused ratchet passes with zero violations, while focused runtime tests prove route/service forwarding and the ageYears-to-adolescent conversion.",
+      "pointer": ".workitem-artifacts/WI-2520/verification.md"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Genuine red, candidate green, production-revert red naming all 11 sites, and blob-hash-exact restore green are preserved with commands, exit codes, counts, and hashes.",
+      "pointer": ".workitem-artifacts/WI-2520/red-green-revert.md"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "The forward ratchet still covers every other learner-facing literal-flow caller and retains WI-2432's earlier fixes; affected suites and branch validation remain green.",
+      "pointer": ".workitem-artifacts/WI-2520/verification.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": ".workitem-artifacts/WI-2520/red-green-revert.md"
+}

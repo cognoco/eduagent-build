@@ -1,5 +1,5 @@
 /**
- * [WI-2432] Forward ratchet — every LEARNER_FACING_FLOWS `routeAndCall` /
+ * [WI-2432/WI-2520] Forward ratchet — every LEARNER_FACING_FLOWS `routeAndCall` /
  * `routeAndCallForQuiz` / `routeAndStream` site threads `ageBracket:`.
  *
  * Root cause (WI-1986/WI-1052 fixed the under-18 Gemini/Vertex vendor-exclusion
@@ -59,15 +59,11 @@
  *      threaded). Neither call site's surrounding function computes or has
  *      an `ageBracket`/`computeAgeBracketFromDate` value in scope at all.
  *
- * RED-GREEN (verified by hand 2026-07-20, per the WI's "guard demonstrated
- * red on a scratch non-threading caller, then reverted" evidence
- * requirement): added a scratch site
- *   `routeAndCall([], 1, { flow: 'book.generation' })`
- * (a LEARNER_FACING_FLOWS member, no ageBracket) to a temp file under
- * apps/api/src/services/ — `pnpm exec jest router.age-bracket-coverage` FAILED
- * with exactly one violation naming that file:line. Removed the scratch site
- * → suite returned to green (0 violations). No repo artifact retained — this
- * is a mechanism proof, not a fixture.
+ * RED-GREEN-REVERT: WI-2520 removed the 11 tracked deferred sites and exercised
+ * this ratchet against those exact production call sites: implementation red,
+ * candidate green, production-revert red naming all 11 sites, then checksum-
+ * exact restore green. Durable commands, exit codes, counts, and file hashes:
+ * `.workitem-artifacts/WI-2520/red-green-revert.md`.
  */
 
 import * as fs from 'fs';
@@ -365,7 +361,7 @@ function scanLearnerFacingSites(): ScannedSite[] {
   return results;
 }
 
-describe('routeAndCall sites must thread ageBracket for LEARNER_FACING_FLOWS (WI-2432 ratchet)', () => {
+describe('routeAndCall sites must thread ageBracket for LEARNER_FACING_FLOWS (WI-2432/WI-2520 ratchet)', () => {
   it('every call site whose flow: literal is a LEARNER_FACING_FLOWS member threads ageBracket', () => {
     const sites = scanLearnerFacingSites();
     expect(sites.length).toBeGreaterThan(0);
