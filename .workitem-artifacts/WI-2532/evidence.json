@@ -42,7 +42,7 @@
     },
     {
       "acRef": "AC-1",
-      "description": "The preview journey starts with no Person or supportership edge, creates the adult, chooses Someone else, answers the login question, and reaches the invitation form without a visibility-link write.",
+      "description": "The tracked preview journey defines a no-Person/no-supportership start, adult creation, Someone else and own-login choices, and arrival at the invitation form without a visibility-link write; its pre-WI-1556 passing run is retained only as historical diagnostic evidence, while final attribution comes from hosted exact-head checks.",
       "pointer": "apps/mobile/e2e-web/flows/v2/v2-family-intent-onboarding.spec.ts"
     }
   ],

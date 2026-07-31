@@ -12,7 +12,9 @@
   under older shells.
 - No durably shows the explicit managed-profile unavailable state and can return
   to the login question.
-- Sign-out clears both SecureStore and the in-memory pending-state cache.
+- Sign-out discards the in-memory pending state immediately; SecureStore and
+  recovery-journal cleanup are best-effort and may outlive the bounded sign-out
+  wait.
 - SecureStore write, clear, rejection, and timeout paths fail closed with
   translated retry UI; retry after adult creation does not repeat the POST.
 - Successful initial and retry persistence dismiss the pushed profile-creation

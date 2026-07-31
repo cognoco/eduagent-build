@@ -15,7 +15,8 @@ profile creation.
   relaunch. Me durably clears it before synchronous `onComplete`
   mounts/reveals the learner shell; the existing-account destination clears
   only after its real route mounts, whether that route shows the V2 invitation
-  form or the older-shell unavailable gate. Sign-out also clears it.
+  form or the older-shell unavailable gate. Sign-out discards it from memory
+  immediately and attempts durable cleanup on a best-effort basis.
 - Storage failures fail closed with retry; a failed handoff after profile
   creation retries only the durable marker and never repeats the profile POST.
 - Successful initial and retry persistence dismiss the pushed profile-creation

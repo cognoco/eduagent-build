@@ -31,9 +31,11 @@ node --max-old-space-size=6144 ./node_modules/jest/bin/jest.js \
 Coverage includes rejected writes, restore timeout/retry, terminal destination
 consumption, and duplicate-POST prevention.
 
-The preview Playwright journey also passed with one worker, no dependency
-projects, and the live preview navigation flags. It reached the existing-account
-invitation form and observed no visibility-link write before invitation.
+The preview Playwright journey historically passed with one worker, no
+dependency projects, and the live preview navigation flags. It reached the
+existing-account invitation form and observed no visibility-link write before
+invitation. Because that run predates later merge-forwards, it is diagnostic
+history rather than final-head attribution.
 
 The refreshed preview run first exposed a web navigator race: the invitation
 route existed but remained hidden because the gate pushed before Tabs mounted.
