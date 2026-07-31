@@ -7,6 +7,7 @@ import { test } from 'node:test';
 
 import {
   bootstrapDisposableApiIntegrationSchema,
+  redactDatabaseOutput,
   validateDisposableApiIntegrationTarget,
 } from './bootstrap-api-integration-schema.mjs';
 
@@ -84,11 +85,7 @@ function baseDependencies(store, overrides = {}) {
 }
 
 test('rejects shared development, staging, and production endpoints', () => {
-  for (const protectedEnvironment of [
-    'DEVELOPMENT',
-    'STAGING',
-    'PRODUCTION',
-  ]) {
+  for (const protectedEnvironment of ['DEVELOPMENT', 'STAGING', 'PRODUCTION']) {
     const env = validEnv();
     env[`DATABASE_URL_${protectedEnvironment}_HOST`] = DATABASE_HOST;
 
@@ -131,6 +128,20 @@ test('rejects non-disposable metadata and any non-dev_integration Doppler config
   );
 });
 
+test('redacts the complete connection identity from child-process output', () => {
+  const env = validEnv();
+  const raw =
+    `connection failed: ${env.DATABASE_URL}\n` +
+    `host=${DATABASE_HOST} database=${DATABASE_NAME} password=super-secret`;
+  const redacted = redactDatabaseOutput(raw, env);
+
+  assert.ok(!redacted.includes('super-secret'));
+  assert.ok(!redacted.includes(DATABASE_HOST));
+  assert.ok(!redacted.includes(DATABASE_NAME));
+  assert.ok(!redacted.includes('postgresql://'));
+  assert.match(redacted, /REDACTED/);
+});
+
 test('bootstraps an empty target exactly once with push, never migrate', async () => {
   const store = makeStore();
   const { deps, pushes } = baseDependencies(store);
@@ -145,22 +156,19 @@ test('bootstraps an empty target exactly once with push, never migrate', async (
 
   assert.equal(result.action, 'bootstrapped');
   assert.equal(pushes.length, 1);
-  assert.deepEqual(pushes[0], {
-    command: 'corepack',
-    args: ['pnpm', '--filter', '@eduagent/database', 'run', 'db:push'],
-    env: assert.match.object,
-  });
+  assert.equal(pushes[0].command, 'corepack');
+  assert.deepEqual(pushes[0].args, [
+    'pnpm',
+    '--filter',
+    '@eduagent/database',
+    'run',
+    'db:push',
+  ]);
   assert.equal(pushes[0].env.INTEGRATION_SCHEMA_BOOTSTRAP, 'WI-2939');
   assert.ok(!pushes[0].args.includes('migrate'));
   assert.deepEqual(
     store.calls.map(([name]) => name),
-    [
-      'inspect',
-      'createApplyingMarker',
-      'fingerprint',
-      'markReady',
-      'close',
-    ],
+    ['inspect', 'createApplyingMarker', 'fingerprint', 'markReady', 'close'],
   );
 });
 

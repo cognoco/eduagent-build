@@ -48,7 +48,31 @@ function runGuard(overrides = {}, spawnOpts = {}) {
   if (!Object.prototype.hasOwnProperty.call(overrides, 'DATABASE_URL')) {
     delete env.DATABASE_URL;
   }
-  return spawnSync(process.execPath, [GUARD_SCRIPT], { env, encoding: 'utf8', ...spawnOpts });
+  return spawnSync(process.execPath, [GUARD_SCRIPT], {
+    env,
+    encoding: 'utf8',
+    ...spawnOpts,
+  });
+}
+
+function disposableIntegrationEnv(overrides = {}) {
+  const targetId = 'wi2939_a1b2c3d4';
+  const host = 'ep-wi2939-a1b2c3d4.example.test';
+  const databaseName = `mentomate_api_integration_${targetId}`;
+  return {
+    DOPPLER_PROJECT: 'mentomate',
+    DOPPLER_CONFIG: 'dev_integration',
+    DOPPLER_ENVIRONMENT: 'dev',
+    DATABASE_URL: `postgresql://integration:secret@${host}/${databaseName}`,
+    INTEGRATION_DATABASE_HOST: host,
+    INTEGRATION_DATABASE_NAME: databaseName,
+    INTEGRATION_DATABASE_TARGET_ID: targetId,
+    INTEGRATION_DATABASE_DISPOSABLE: 'true',
+    DATABASE_URL_DEVELOPMENT_HOST: 'ep-shared-development.example.test',
+    DATABASE_URL_STAGING_HOST: 'ep-staging.example.test',
+    DATABASE_URL_PRODUCTION_HOST: 'ep-production.example.test',
+    ...overrides,
+  };
 }
 
 // ── Blocking cases ────────────────────────────────────────────────────────────
@@ -84,12 +108,45 @@ test('guard exits 1 for any unknown DOPPLER_CONFIG value (err on the safe side)'
   assert.equal(status, 1);
 });
 
+test('guard blocks direct dev_integration push without the WI-2939 bootstrap sentinel', () => {
+  const { status, stderr } = runGuard(disposableIntegrationEnv());
+  assert.equal(status, 1);
+  assert.match(stderr, /only through the revision-pinned WI-2939/i);
+  assert.ok(!stderr.includes('secret'));
+  assert.ok(!stderr.includes('ep-wi2939-a1b2c3d4'));
+  assert.ok(!stderr.includes('mentomate_api_integration'));
+});
+
+test('guard permits the WI-2939 sentinel only for the verified disposable target', () => {
+  const { status, stdout } = runGuard(
+    disposableIntegrationEnv({ INTEGRATION_SCHEMA_BOOTSTRAP: 'WI-2939' }),
+  );
+  assert.equal(status, 0);
+  assert.match(stdout, /guarded disposable dev_integration target confirmed/i);
+});
+
+test('guard blocks the WI-2939 sentinel when the endpoint matches shared development', () => {
+  const env = disposableIntegrationEnv({
+    INTEGRATION_SCHEMA_BOOTSTRAP: 'WI-2939',
+  });
+  env.DATABASE_URL_DEVELOPMENT_HOST = env.INTEGRATION_DATABASE_HOST;
+
+  const { status, stderr } = runGuard(env);
+  assert.equal(status, 1);
+  assert.match(stderr, /protected development/i);
+  assert.ok(!stderr.includes('secret'));
+});
+
 test('guard exits 1 when DOPPLER_CONFIG is absent and DB_PUSH_LOCAL_DEV is not set', () => {
   // Without Doppler, DATABASE_URL may already be set in the process env (a leftover
   // doppler-run shell, an exported var, or a bare packages/database/.env). Block by
   // default; require explicit opt-in.
   const { status, stderr } = runGuard({ DOPPLER_CONFIG: undefined });
-  assert.equal(status, 1, 'expected exit 1 — no Doppler without override should be blocked');
+  assert.equal(
+    status,
+    1,
+    'expected exit 1 — no Doppler without override should be blocked',
+  );
   assert.match(stderr, /drizzle-kit push is blocked/);
   assert.match(stderr, /DB_PUSH_LOCAL_DEV/);
 });
@@ -108,8 +165,15 @@ test('guard exits 1 when DB_PUSH_LOCAL_DEV=1 but DATABASE_URL is absent from the
   // Fail closed: with no DATABASE_URL in the process env, the target cannot be
   // verified as local, so the guard must BLOCK rather than print an acceptance
   // for a case it did not check.
-  const { status, stderr } = runGuard({ DOPPLER_CONFIG: undefined, DB_PUSH_LOCAL_DEV: '1' });
-  assert.equal(status, 1, 'expected exit 1 — an unset DATABASE_URL is not verifiable');
+  const { status, stderr } = runGuard({
+    DOPPLER_CONFIG: undefined,
+    DB_PUSH_LOCAL_DEV: '1',
+  });
+  assert.equal(
+    status,
+    1,
+    'expected exit 1 — an unset DATABASE_URL is not verifiable',
+  );
   assert.match(stderr, /drizzle-kit push is blocked/);
   assert.match(stderr, /DATABASE_URL is not present in the/);
 });
@@ -129,11 +193,21 @@ test('guard exits 1 under DB_PUSH_LOCAL_DEV=1 with a bare .env (neon URL) in cwd
       { DOPPLER_CONFIG: undefined, DB_PUSH_LOCAL_DEV: '1' },
       { cwd: tmpDir },
     );
-    assert.equal(status, 1, 'expected exit 1 — a bare .env in cwd must not open the escape');
+    assert.equal(
+      status,
+      1,
+      'expected exit 1 — a bare .env in cwd must not open the escape',
+    );
     assert.match(stderr, /drizzle-kit push is blocked/);
     assert.match(stderr, /DATABASE_URL is not present in the/);
-    assert.ok(!stderr.includes('stguser'), 'the guard must not have read the bare .env');
-    assert.ok(!stderr.includes('neon.tech'), 'the guard must not have read the bare .env');
+    assert.ok(
+      !stderr.includes('stguser'),
+      'the guard must not have read the bare .env',
+    );
+    assert.ok(
+      !stderr.includes('neon.tech'),
+      'the guard must not have read the bare .env',
+    );
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });
   }
@@ -151,7 +225,11 @@ test('guard exits 1 when DB_PUSH_LOCAL_DEV=1 but DATABASE_URL resolves to a stg/
     DB_PUSH_LOCAL_DEV: '1',
     DATABASE_URL: 'postgres://stguser:stgpass@ep-example-stg.neon.tech/mydb',
   });
-  assert.equal(status, 1, 'expected exit 1 — escape must not push to a neon.tech host');
+  assert.equal(
+    status,
+    1,
+    'expected exit 1 — escape must not push to a neon.tech host',
+  );
   assert.match(stderr, /drizzle-kit push is blocked/);
   assert.match(stderr, /localhost/);
   assert.ok(!stderr.includes('stguser'), 'username must not appear in output');
@@ -164,7 +242,11 @@ test('guard exits 0 when DB_PUSH_LOCAL_DEV=1 and DATABASE_URL resolves to localh
     DB_PUSH_LOCAL_DEV: '1',
     DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/mydb',
   });
-  assert.equal(status, 0, 'expected exit 0 — localhost is the intended local-dev target');
+  assert.equal(
+    status,
+    0,
+    'expected exit 0 — localhost is the intended local-dev target',
+  );
   assert.match(stdout, /DB_PUSH_LOCAL_DEV=1 override accepted/);
 });
 
@@ -174,7 +256,11 @@ test('guard exits 0 when DB_PUSH_LOCAL_DEV=1 and DATABASE_URL resolves to 127.0.
     DB_PUSH_LOCAL_DEV: '1',
     DATABASE_URL: 'postgres://postgres:postgres@127.0.0.1:5432/mydb',
   });
-  assert.equal(status, 0, 'expected exit 0 — 127.0.0.1 is the intended local-dev target');
+  assert.equal(
+    status,
+    0,
+    'expected exit 0 — 127.0.0.1 is the intended local-dev target',
+  );
   assert.match(stdout, /DB_PUSH_LOCAL_DEV=1 override accepted/);
 });
 
@@ -187,7 +273,11 @@ test('guard exits 1 when DB_PUSH_LOCAL_DEV=1 but DATABASE_URL resolves to a non-
     DB_PUSH_LOCAL_DEV: '1',
     DATABASE_URL: 'postgres://user:pass@mydb.internal.example.com/db',
   });
-  assert.equal(status, 1, 'expected exit 1 — non-local, non-neon host must still be blocked');
+  assert.equal(
+    status,
+    1,
+    'expected exit 1 — non-local, non-neon host must still be blocked',
+  );
   assert.match(stderr, /drizzle-kit push is blocked/);
   assert.match(stderr, /localhost/);
   assert.ok(!stderr.includes('user'), 'username must not appear in output');
@@ -203,7 +293,11 @@ test('guard exits 1 when DB_PUSH_LOCAL_DEV=1 and DATABASE_URL is malformed/unpar
     DB_PUSH_LOCAL_DEV: '1',
     DATABASE_URL: 'not-a-valid-url',
   });
-  assert.equal(status, 1, 'expected exit 1 — an unparseable DATABASE_URL must be blocked');
+  assert.equal(
+    status,
+    1,
+    'expected exit 1 — an unparseable DATABASE_URL must be blocked',
+  );
   assert.match(stderr, /drizzle-kit push is blocked/);
   assert.match(stderr, /\(unparseable\)/);
 });
@@ -215,9 +309,19 @@ test('guard redacts credentials in DATABASE_URL before logging (stg config)', ()
     DOPPLER_CONFIG: 'stg',
     DATABASE_URL: 'postgres://secretuser:secretpass@ep-example.neon.tech/mydb',
   });
-  assert.ok(!stderr.includes('secretuser'), 'username must not appear in output');
-  assert.ok(!stderr.includes('secretpass'), 'password must not appear in output');
-  assert.match(stderr, /ep-example\.neon\.tech/, 'host should be visible for diagnostics');
+  assert.ok(
+    !stderr.includes('secretuser'),
+    'username must not appear in output',
+  );
+  assert.ok(
+    !stderr.includes('secretpass'),
+    'password must not appear in output',
+  );
+  assert.match(
+    stderr,
+    /ep-example\.neon\.tech/,
+    'host should be visible for diagnostics',
+  );
 });
 
 test('guard redacts credentials in DATABASE_URL before logging (no Doppler)', () => {
@@ -225,9 +329,19 @@ test('guard redacts credentials in DATABASE_URL before logging (no Doppler)', ()
     DOPPLER_CONFIG: undefined,
     DATABASE_URL: 'postgres://secretuser:secretpass@ep-example.neon.tech/mydb',
   });
-  assert.ok(!stderr.includes('secretuser'), 'username must not appear in output');
-  assert.ok(!stderr.includes('secretpass'), 'password must not appear in output');
-  assert.match(stderr, /ep-example\.neon\.tech/, 'host should be visible for diagnostics');
+  assert.ok(
+    !stderr.includes('secretuser'),
+    'username must not appear in output',
+  );
+  assert.ok(
+    !stderr.includes('secretpass'),
+    'password must not appear in output',
+  );
+  assert.match(
+    stderr,
+    /ep-example\.neon\.tech/,
+    'host should be visible for diagnostics',
+  );
 });
 
 // ── Wiring checks ─────────────────────────────────────────────────────────────
@@ -259,7 +373,8 @@ test('root package.json db:push:dev does not bypass predb:push via pnpm exec', (
   );
   // Must call the package script (lifecycle hooks) — not bypass it via exec.
   const usesExecBypass =
-    pushScript.includes('exec tsx') && pushScript.includes('drizzle-kit/bin.cjs push');
+    pushScript.includes('exec tsx') &&
+    pushScript.includes('drizzle-kit/bin.cjs push');
   assert.ok(
     !usesExecBypass,
     'db:push:dev must not call drizzle-kit/bin.cjs directly (bypasses predb:push). ' +
@@ -287,8 +402,7 @@ test('root package.json db:push:dev pins Doppler to dev config (-c dev)', () => 
     'root package.json must have a "db:push:dev" script',
   );
   const pinsDevConfig =
-    pushScript.includes('-c dev') ||
-    pushScript.includes('--config dev');
+    pushScript.includes('-c dev') || pushScript.includes('--config dev');
   assert.ok(
     pinsDevConfig,
     'db:push:dev must pass `-c dev` (or `--config dev`) to doppler run so DOPPLER_CONFIG=dev is always set.',
