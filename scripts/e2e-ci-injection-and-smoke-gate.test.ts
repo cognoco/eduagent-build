@@ -421,6 +421,9 @@ describe('[WI-2228/WI-2458] e2e-web.yml gates V2 and stable legacy smoke', () =>
     expect(v2Step).toBeDefined();
     expect(v2Step?.['continue-on-error']).not.toBe(true);
     expect(v2Script).toContain('node scripts/check-clerk-key-alignment.mjs');
+    expect(v2Script).toContain(
+      '--preserve-env="EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY"',
+    );
     expect(
       v2Script.indexOf('node scripts/check-clerk-key-alignment.mjs'),
     ).toBeLessThan(v2Script.indexOf('playwright-seed-scenario-guard.ts'));

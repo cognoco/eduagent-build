@@ -39,7 +39,21 @@ function runWithMockedDomains(
 ): ReturnType<typeof spawnSync> {
   const moduleUrl = pathToFileURL(script).toString();
   const probe = `
-    globalThis.fetch = async () => {
+    const timeoutSignal = new AbortController().signal;
+    AbortSignal.timeout = (milliseconds) => {
+      if (milliseconds !== 10_000) throw new Error('unexpected-timeout');
+      return timeoutSignal;
+    };
+    globalThis.fetch = async (url, init) => {
+      if (String(url) !== 'https://api.clerk.com/v1/domains') {
+        throw new Error('unexpected-clerk-endpoint');
+      }
+      if (init?.headers?.Authorization !== 'Bearer ' + process.env.CLERK_SECRET_KEY) {
+        throw new Error('unexpected-authorization-header');
+      }
+      if (init?.signal !== timeoutSignal) {
+        throw new Error('missing-request-timeout');
+      }
       if (${JSON.stringify(response.error ?? '')}) {
         throw new Error(${JSON.stringify(response.error ?? '')});
       }
@@ -80,7 +94,7 @@ describe('check-clerk-key-alignment', () => {
 
   it('rejects a backend secret for a different Clerk instance without leaking values', () => {
     const wrongHost = 'wrong-instance.clerk.accounts.dev';
-    const wrongSecret = clerkKey('sk_live', wrongHost);
+    const wrongSecret = clerkKey('sk_test', wrongHost);
     const result = run({ CLERK_SECRET_KEY: wrongSecret });
 
     expect(result.status).toBe(1);

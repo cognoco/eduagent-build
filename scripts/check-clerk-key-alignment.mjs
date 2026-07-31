@@ -131,6 +131,7 @@ export async function checkClerkKeyAlignment(
   try {
     const response = await fetchImpl('https://api.clerk.com/v1/domains', {
       headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
+      signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) {
       return {
