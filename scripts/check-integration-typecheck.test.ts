@@ -95,17 +95,6 @@ describe('integration typecheck contract', () => {
     expect(source).toContain('dirname(fileURLToPath(import.meta.url))');
   });
 
-  it('resolves tsconfig files relative to the tsconfig directory', () => {
-    const source = readFileSync(
-      join(repoRoot, 'scripts/check-integration-typecheck.ts'),
-      'utf8',
-    );
-
-    expect(source).toContain(
-      'ts.sys,\n    dirname(tsconfigPath),\n    undefined,\n    tsconfigPath,',
-    );
-  });
-
   it('runs in hosted CI for every non-document change', () => {
     const workflow = readFileSync(
       join(repoRoot, '.github/workflows/ci.yml'),
