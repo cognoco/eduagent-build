@@ -76,14 +76,18 @@ resulting structural fingerprint and marks the target ready. A repeated run at
 the same revision is read-only and returns `already-compatible`. Non-empty
 unmarked targets, changed fingerprints, partial or interrupted runs, or another
 revision are incompatible and must be destroyed and recreated. The command
-never invokes `drizzle-kit migrate`, seeds rows, copies user data, or
-prints/persists the database URL, host, name, or credentials.
+never invokes `drizzle-kit migrate`, a separate application/test seed command,
+or prints/persists the database URL, host, name, or credentials.
+Revision-pinned committed migration DML, including required reference-policy
+rows, is part of the journal contract; the bootstrap never imports or copies
+user data.
 
 The receipt contains only hashed endpoint identity, target ID, revision,
 migration-chain fingerprint, operator-ruling reference, schema fingerprint,
-timestamps, result, and cleanup instructions. Ordinary rollback is destruction
-of that uniquely identified disposable target; never attempt an in-place repair
-or point the command at shared development, staging, or production.
+timestamps, result, the committed-migration-only data policy, and cleanup
+instructions. Ordinary rollback is destruction of that uniquely identified
+disposable target; never attempt an in-place repair or point the command at
+shared development, staging, or production.
 
 CI and the local Docker workflow below may invoke the guarded Nx target directly
 because their `DATABASE_URL` points to `localhost`/`127.0.0.1` and names an

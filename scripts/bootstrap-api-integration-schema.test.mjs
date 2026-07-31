@@ -420,6 +420,12 @@ test('writes a redacted durable receipt with cleanup evidence', async () => {
     assert.equal(receipt.revision, REVISION);
     assert.equal(receipt.action, 'bootstrapped');
     assert.match(receipt.cleanup, /destroy.*disposable target/i);
+    assert.match(
+      receipt.dataPolicy,
+      /revision-pinned committed migration SQL/i,
+    );
+    assert.match(receipt.dataPolicy, /no separate seed command/i);
+    assert.match(receipt.dataPolicy, /no.*copied user data/i);
     assert.ok(!raw.includes('super-secret'));
     assert.ok(!raw.includes(DATABASE_HOST));
     assert.ok(!raw.includes('postgresql://'));

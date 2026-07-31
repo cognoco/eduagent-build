@@ -314,6 +314,9 @@ export async function bootstrapDisposableApiIntegrationSchema(options, deps) {
       cleanup:
         'Destroy the disposable target identified by endpointFingerprint; ' +
         'never migrate, repair, or copy data into shared development, staging, or production.',
+      dataPolicy:
+        'Applied only revision-pinned committed migration SQL; no separate seed command ' +
+        'or imported/copied user data.',
     };
     await writeReceipt(options.receiptPath, receipt);
     return receipt;
