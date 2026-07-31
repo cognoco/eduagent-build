@@ -17,6 +17,7 @@ async function runReconciler(options = {}) {
   const dopplerConfig = Object.hasOwn(options, 'dopplerConfig')
     ? options.dopplerConfig
     : 'dev';
+  const expectedDopplerConfig = options.expectedDopplerConfig ?? 'dev';
   const { executeError } = options;
   const reconciler = await loadReconciler();
   assert.ok(reconciler, 'development schema reconciler module must exist');
@@ -27,6 +28,7 @@ async function runReconciler(options = {}) {
   const exitCode = await reconciler.runDevelopmentSchemaReconciliation({
     databaseUrl,
     dopplerConfig,
+    expectedDopplerConfig,
     executeStatements: async (url, statements) => {
       calls.push({ hasDatabaseUrl: Boolean(url), statements });
       if (executeError) throw executeError;
@@ -60,8 +62,32 @@ test('root reconciliation command pins Doppler to development', () => {
 
   assert.equal(
     packageJson.scripts['db:reconcile:dev-schema'],
-    'node scripts/doppler-run.mjs run -c dev -- node packages/database/scripts/reconcile-development-schema.mjs',
+    'node scripts/doppler-run.mjs run -c dev -- node packages/database/scripts/reconcile-development-schema.mjs --target=dev',
   );
+  assert.equal(
+    packageJson.scripts['db:reconcile:dev-integration-schema'],
+    'node scripts/doppler-run.mjs run -c dev_integration -- node packages/database/scripts/reconcile-development-schema.mjs --target=dev_integration',
+  );
+});
+
+test('integration target executes only under dev_integration identity', async () => {
+  const result = await runReconciler({
+    dopplerConfig: 'dev_integration',
+    expectedDopplerConfig: 'dev_integration',
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.calls.length, 1);
+});
+
+test('integration target refuses the dev identity without executing', async () => {
+  const result = await runReconciler({
+    dopplerConfig: 'dev',
+    expectedDopplerConfig: 'dev_integration',
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.equal(result.calls.length, 0);
 });
 
 test('development target executes both statements together', async () => {

@@ -14,16 +14,22 @@ ALTER TABLE subscription
 `,
 ];
 
+const SUPPORTED_DEVELOPMENT_CONFIGS = new Set(['dev', 'dev_integration']);
+
 export async function runDevelopmentSchemaReconciliation({
   databaseUrl,
   dopplerConfig,
+  expectedDopplerConfig = 'dev',
   executeStatements,
   stdout,
   stderr,
 }) {
-  if (dopplerConfig !== 'dev') {
+  if (
+    !SUPPORTED_DEVELOPMENT_CONFIGS.has(expectedDopplerConfig) ||
+    dopplerConfig !== expectedDopplerConfig
+  ) {
     stderr(
-      'development schema reconciliation unavailable: run through Doppler dev config only',
+      `development schema reconciliation unavailable: run through Doppler ${expectedDopplerConfig} config only`,
     );
     return 1;
   }
@@ -53,9 +59,15 @@ async function executeLiveStatements(databaseUrl, statements) {
 }
 
 async function main() {
+  const targetArgument = process.argv.find((argument) =>
+    argument.startsWith('--target='),
+  );
+  const expectedDopplerConfig = targetArgument?.slice('--target='.length);
+
   return runDevelopmentSchemaReconciliation({
     databaseUrl: process.env.DATABASE_URL,
     dopplerConfig: process.env.DOPPLER_CONFIG,
+    expectedDopplerConfig,
     executeStatements: executeLiveStatements,
     stdout: console.log,
     stderr: console.error,
