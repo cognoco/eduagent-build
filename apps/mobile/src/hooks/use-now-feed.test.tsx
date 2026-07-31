@@ -1301,8 +1301,9 @@ describe('[WI-2627] the fold must be reachable, and must precede publication', (
   // [WI-2949] The DESCOPE, direction A: an unparseable response body that is
   // unrelated to mentor-notice policy must NOT suppress notices.
   //
-  // WI-2627 stage 2 wired `observeMalformed()` into the whole-body parse-failure
-  // path of these surfaces. The failing field is not identifiable without a
+  // WI-2627 stage 2 wired a fail-closed policy fold into the whole-body
+  // parse-failure path of these surfaces. The failing field is not identifiable
+  // without a
   // second read of a single-use body, so that call was over-broad BY
   // CONSTRUCTION: any unparseable /now body — a bad card, a bad count, anything —
   // silently suppressed mentor notices for that pair. No WI-2627 criterion asked
