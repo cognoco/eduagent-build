@@ -3016,16 +3016,10 @@ describe('[WI-2952] applyAnalysis threads caller provenance to the gate', () => 
   // end-to-end restatement, and it wants an integration test against a real
   // database rather than a deeper unit stub.
   //
-  // ALSO UNCOVERED — AC-4's named trap, measured not assumed. Mutating
-  // `analyzeSessionTranscript` to thread `result.model` instead of
-  // `result.provider` leaves 273/273 GREEN. Both are typed `string`, so the
-  // compiler cannot catch it and neither can any test here: a model id would sit
-  // in `producerVendor`, match no member of the judge-exclusion vocabulary, and
-  // let the producing vendor grade its own output — WITHOUT failing closed,
-  // because the matrix rejects only a BLANK vendor.
-  //
-  // The only test that can catch it asserts the producing vendor is absent from
-  // the RESOLVED judge pool, against the real resolver rather than a mock. That
-  // is a judge-layer test (judge.ts), not a boundary-layer one, and it does not
-  // exist yet at this seam.
+  // AC-4's named trap (provider vs model id) IS covered — see the
+  // `analyzeSessionTranscript — judge independence (WI-2952 AC-4)` describe
+  // earlier in this file: it asserts the producing vendor is absent from the
+  // RESOLVED judge pool against the real resolver, with a model-id control
+  // proving a `result.model` mutation would leave the vendor present. The
+  // uncovered gap in this block is ONLY the AC-6 end-to-end restatement above.
 });

@@ -1507,40 +1507,34 @@ function evaluatedTextSet(
  * The gate for the profile's own free-text JSONB fields and the struggle
  * notifications derived alongside them.
  *
- * `provenance: 'llm'` with a null `producerVendor` — INTERIM, and deliberately
- * the strictest of the available readings. Null fails the scan closed on anything
- * ambiguous (AC-4), so nothing unsafe can ride through while the question below is
- * open; a confidently wrong vendor would silently defeat the judge's independence
- * guarantee instead.
+ * Provenance is a property of the CALLER, and since WI-2952 the callers declare
+ * it: `applyAnalysis` threads its `author` argument here, and every production
+ * caller passes one explicitly.
  *
- * THE OPEN QUESTION, recorded here so it is not re-derived as "vendor
- * unrecoverable". The vendor is NOT unrecoverable — it is DISCARDED one frame
- * above. `analyzeSessionTranscript` has `routeAndCall`'s result in hand (see its
- * call at the bottom of this file) and returns only `SessionAnalysisOutput`,
- * dropping `result.provider`. Worse, provenance at this boundary is not even
- * uniform: it is a property of the CALLER, and `applyAnalysis` cannot see which.
- *
- *   inngest/functions/session-completed.ts  → 'llm'; vendor available, discarded
- *   services/learner-input.ts (LLM path)    → 'llm'; vendor available, discarded
+ *   inngest/functions/session-completed.ts  → 'llm' + `result.provider` (the
+ *                                             vendor `analyzeSessionTranscript`
+ *                                             now returns alongside the analysis)
+ *   services/learner-input.ts (LLM path)    → 'llm' + `result.provider`
  *   services/learner-input.ts (fallback)    → 'user'. `fallbackAnalysis` regexes
  *                                             the learner's OWN typed words into
  *                                             `interests[]` and `struggles[].topic`
- *                                             verbatim — no model involved.
+ *                                             verbatim — no model involved, so the
+ *                                             learner's self-disclosure is JUDGED
+ *                                             rather than silently dropped.
  *
- * That third row is why this is a product/safety decision and not a cleanup:
- * `'user'` is the one provenance that REACHES the judge, and it exists precisely
- * because a learner describing themselves is a different call from a model
- * inferring a diagnosis about them. Under today's uniform fail-closed reading a
- * learner's own self-disclosure is DROPPED rather than judged. Widening it is not
- * this change-set's call to make.
+ * The `applyAnalysis` default `{provenance: 'llm', producerVendor: ''}` remains
+ * the strictest reading — a blank vendor fails the scan closed on anything
+ * ambiguous — so a caller that omits `author` can only be MORE restrictive than
+ * intended, never less.
  *
  * WHEN THREADING A VENDOR HERE, pass the VENDOR (`anthropic`), never the model id
  * (`claude-sonnet-4-6`). Judge exclusion matches vendor names, so a model id
  * matches no pool member and the producing vendor ends up grading its own output.
  * It does NOT fail closed — the guard rejects only a BLANK vendor — and both
- * fields are typed `string`, so the compiler will not catch it. The only real
- * guard is a test asserting the producing vendor is absent from the RESOLVED judge
- * pool, asserted against the real resolver rather than behind a mock.
+ * fields are typed `string`, so the compiler will not catch it. The real guard is
+ * the test asserting the producing vendor is absent from the RESOLVED judge pool
+ * against the real resolver: `analyzeSessionTranscript — judge independence
+ * (WI-2952 AC-4)` in learner-profile.test.ts.
  */
 function evaluateProfileFieldTexts(
   texts: readonly (string | null | undefined)[],
@@ -1570,9 +1564,21 @@ function evaluateProfileFieldTexts(
  *
  * `provenance` differs by path, and the two calls are NOT interchangeable:
  *
- *   'llm'       — `applyAnalysis`. Session-analysis output merged into the stored
- *                 row. See `evaluateProfileFieldTexts` above for the open question
- *                 about its vendor, which applies identically here.
+ *   via `applyAnalysis` (this call threads the caller's `author` through, so
+ *   every provenance that reaches `evaluateProfileFieldTexts` reaches here too):
+ *     'llm' + real vendor — session-completed.ts and learner-input.ts's LLM path
+ *                 thread `result.provider`. With a real vendor the judge CAN be
+ *                 consulted, so this path can now `refer`.
+ *     'user'    — learner-input.ts's fallback path. Note the asymmetry with the
+ *                 'migration' rationale below: here the mapper-composed row text
+ *                 IS built from the learner's own typed words, so 'user' is the
+ *                 honest declaration — and it makes this gate more permissive
+ *                 over composed text than the pre-WI-2952 uniform reading was.
+ *                 That widening is deliberate (the item exists to stop dropping
+ *                 learner self-disclosure), but it is a fail-closed gate getting
+ *                 wider: audit here first if composed-text leaks are suspected.
+ *     'llm' + blank vendor — the `applyAnalysis` default for callers that omit
+ *                 `author`; cannot consult the judge, fails closed on `refer`.
  *   'migration' — `deleteMemoryItem` / `unsuppressInference`. Determined from the
  *                 code, not copied from the backfill: the only text these project
  *                 is text ALREADY STORED on the row, with no identifiable author
@@ -1581,10 +1587,9 @@ function evaluateProfileFieldTexts(
  *                 so `'user'` would be a mis-declaration despite a user driving
  *                 the request.
  *
- * Both fail closed on `refer` today (`'migration'` never consults the judge;
- * `'llm'` with a null vendor cannot), so the two are currently
- * behaviour-equivalent — but only because the vendor is null. Do not read that
- * equivalence as licence to collapse them.
+ * The two calls are therefore NOT behaviour-equivalent: 'migration' never
+ * consults the judge, while the `applyAnalysis` path can refer whenever its
+ * author carries a real vendor or 'user' provenance. Do not collapse them.
  */
 function evaluateMemoryFactTexts(
   texts: readonly (string | null | undefined)[],
