@@ -73,6 +73,14 @@ tags:
 - tapOn:
     id: 'create-profile-submit'
 
+# WI-1556 requires explicit language confirmation before the first Mentor.
+- extendedWaitUntil:
+    visible:
+      id: 'first-mentor-language-confirm'
+    timeout: 30000
+- tapOn:
+    id: 'first-mentor-language-confirm'
+
 - extendedWaitUntil:
     visible:
       id: 'mentor-screen'

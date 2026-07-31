@@ -7351,6 +7351,31 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(flow.match(/retryTapIfNoChange: true/g)).toHaveLength(3);
   });
 
+  it('[WI-2231] confirms the first-Mentor language before waiting for Mentor', () => {
+    const flow = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-first-mentor-session.yaml'),
+      'utf8',
+    );
+    const commands = parseMaestroCommands(flow);
+
+    assertCommandsInOrder(commands, [
+      { tapOn: { id: 'create-profile-submit' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'first-mentor-language-confirm' },
+          timeout: 30000,
+        },
+      },
+      { tapOn: { id: 'first-mentor-language-confirm' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'mentor-screen' },
+          timeout: 30000,
+        },
+      },
+    ]);
+  });
+
   it('[WI-2238] binds exact case properties to their ID-bearing owners', () => {
     type Selector = Record<string, unknown>;
     const includesSelectorProperties = (
