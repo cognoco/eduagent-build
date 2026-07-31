@@ -18,7 +18,14 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import os from 'node:os';
@@ -47,6 +54,14 @@ function runGuard(overrides = {}, spawnOpts = {}) {
   // shell) must not leak in and flip an absence test to a set-host test.
   if (!Object.prototype.hasOwnProperty.call(overrides, 'DATABASE_URL')) {
     delete env.DATABASE_URL;
+  }
+  if (
+    !Object.prototype.hasOwnProperty.call(
+      overrides,
+      'INTEGRATION_SCHEMA_BOOTSTRAP',
+    )
+  ) {
+    delete env.INTEGRATION_SCHEMA_BOOTSTRAP;
   }
   return spawnSync(process.execPath, [GUARD_SCRIPT], {
     env,
@@ -115,6 +130,50 @@ test('guard blocks direct dev_integration push without the WI-2939 bootstrap sen
   assert.ok(!stderr.includes('secret'));
   assert.ok(!stderr.includes('ep-wi2939-a1b2c3d4'));
   assert.ok(!stderr.includes('mentomate_api_integration'));
+});
+
+test('guard ignores an ambient WI-2939 bootstrap sentinel unless the case supplies it', () => {
+  const previous = process.env.INTEGRATION_SCHEMA_BOOTSTRAP;
+  process.env.INTEGRATION_SCHEMA_BOOTSTRAP = 'WI-2939';
+  try {
+    const { status, stderr } = runGuard(disposableIntegrationEnv());
+    assert.equal(status, 1);
+    assert.match(stderr, /only through the revision-pinned WI-2939/i);
+  } finally {
+    if (previous === undefined) {
+      delete process.env.INTEGRATION_SCHEMA_BOOTSTRAP;
+    } else {
+      process.env.INTEGRATION_SCHEMA_BOOTSTRAP = previous;
+    }
+  }
+});
+
+test('guard runs from an isolated database package without root runtime dependencies', () => {
+  const tempRoot = mkdtempSync(path.join(os.tmpdir(), 'db-push-guard-'));
+  const scriptsDir = path.join(tempRoot, 'packages', 'database', 'scripts');
+  mkdirSync(scriptsDir, { recursive: true });
+  try {
+    for (const file of [
+      'check-db-push-target.mjs',
+      'verify-db-target-lib.mjs',
+      'verify-disposable-integration-target-lib.mjs',
+    ]) {
+      copyFileSync(path.join(__dirname, file), path.join(scriptsDir, file));
+    }
+    const result = spawnSync(
+      process.execPath,
+      [path.join(scriptsDir, 'check-db-push-target.mjs')],
+      {
+        cwd: tempRoot,
+        env: { DOPPLER_CONFIG: 'dev' },
+        encoding: 'utf8',
+      },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /dev Doppler config confirmed/);
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
 });
 
 test('guard permits the WI-2939 sentinel only for the verified disposable target', () => {

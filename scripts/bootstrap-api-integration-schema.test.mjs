@@ -2,13 +2,15 @@ import { strict as assert } from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, resolve, win32 } from 'node:path';
 import { test } from 'node:test';
 
 import {
   bootstrapDisposableApiIntegrationSchema,
+  isReceiptBelowAllowedRoot,
   loadRevisionSql,
   redactDatabaseOutput,
+  resolveSpawnCommand,
   validateDisposableApiIntegrationTarget,
 } from './bootstrap-api-integration-schema.mjs';
 
@@ -452,5 +454,29 @@ test('package scripts expose only the guarded bootstrap path', () => {
   );
   assert.ok(
     !rootPackage.scripts?.['db:bootstrap:api-integration'].includes('migrate'),
+  );
+});
+
+test('resolves corepack through its cmd shim on Windows without a shell', () => {
+  assert.equal(resolveSpawnCommand('corepack', 'win32'), 'corepack.cmd');
+  assert.equal(resolveSpawnCommand('corepack', 'linux'), 'corepack');
+});
+
+test('rejects a cross-drive Windows receipt path', () => {
+  assert.equal(
+    isReceiptBelowAllowedRoot(
+      'C:\\repo\\.workitem-artifacts\\WI-2939',
+      'D:\\tmp\\receipt.json',
+      win32,
+    ),
+    false,
+  );
+  assert.equal(
+    isReceiptBelowAllowedRoot(
+      'C:\\repo\\.workitem-artifacts\\WI-2939',
+      'C:\\repo\\.workitem-artifacts\\WI-2939\\receipt.json',
+      win32,
+    ),
+    true,
   );
 });

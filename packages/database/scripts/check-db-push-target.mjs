@@ -82,7 +82,7 @@ import {
   extractHost,
   hostMatchesEnvironment,
 } from './verify-db-target-lib.mjs';
-import { validateDisposableApiIntegrationTarget } from '../../../scripts/bootstrap-api-integration-schema.mjs';
+import { validateDisposableApiIntegrationTarget } from './verify-disposable-integration-target-lib.mjs';
 
 const dopplerConfig = process.env.DOPPLER_CONFIG;
 

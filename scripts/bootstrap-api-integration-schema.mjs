@@ -3,11 +3,19 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { readMigrationFiles } from 'drizzle-orm/migrator';
 import pg from 'pg';
+
+import {
+  BootstrapRefusal,
+  refuseDisposableIntegrationTarget,
+  validateDisposableApiIntegrationTarget,
+} from '../packages/database/scripts/verify-disposable-integration-target-lib.mjs';
+
+export { validateDisposableApiIntegrationTarget };
 
 const { Client } = pg;
 
@@ -16,42 +24,10 @@ const REPO_ROOT = resolve(import.meta.dirname, '..');
 const MIGRATIONS_DIR = resolve(REPO_ROOT, 'apps/api/drizzle');
 const MARKER_SCHEMA = 'zdx_integration_bootstrap';
 const MARKER_TABLE = `${MARKER_SCHEMA}.schema_state`;
-const PROTECTED_LABEL =
-  /(^|[._-])(dev|development|stg|staging|prd|prod|production)([._-]|$)/i;
-const TARGET_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{7,63}$/;
 const REVISION_PATTERN = /^[0-9a-f]{40}$/i;
 
-class BootstrapRefusal extends Error {}
-
 function refuse(reason) {
-  throw new BootstrapRefusal(
-    `Disposable API integration schema bootstrap refused: ${reason}`,
-  );
-}
-
-function requiredEnv(env, name) {
-  const value = env[name]?.trim();
-  if (!value) {
-    refuse(`${name} is required.`);
-  }
-  return value;
-}
-
-function normalizedHost(value) {
-  try {
-    const parsed = new URL(value);
-    return parsed.hostname.toLowerCase();
-  } catch {
-    return value.trim().toLowerCase().replace(/:\d+$/, '');
-  }
-}
-
-function endpointFingerprint(host, databaseName) {
-  return createHash('sha256')
-    .update(host)
-    .update('\0')
-    .update(databaseName)
-    .digest('hex');
+  refuseDisposableIntegrationTarget(reason);
 }
 
 export function redactDatabaseOutput(output, env) {
@@ -70,90 +46,6 @@ export function redactDatabaseOutput(output, env) {
     .replace(/postgres(?:ql)?:\/\/[^\s"'`]+/gi, '[REDACTED_DATABASE_URL]')
     .replace(/password\s*=\s*[^\s]+/gi, 'password=[REDACTED]');
   return redacted;
-}
-
-/**
- * Validate only operator-supplied identity metadata. It deliberately performs
- * no connection and never includes the URL or credentials in an error.
- */
-export function validateDisposableApiIntegrationTarget(env) {
-  if (requiredEnv(env, 'DOPPLER_PROJECT') !== 'mentomate') {
-    refuse('DOPPLER_PROJECT must be mentomate.');
-  }
-  if (requiredEnv(env, 'DOPPLER_CONFIG') !== 'dev_integration') {
-    refuse('DOPPLER_CONFIG must be dev_integration.');
-  }
-  if (requiredEnv(env, 'DOPPLER_ENVIRONMENT') !== 'dev') {
-    refuse('DOPPLER_ENVIRONMENT must be dev.');
-  }
-  if (requiredEnv(env, 'INTEGRATION_DATABASE_DISPOSABLE') !== 'true') {
-    refuse('INTEGRATION_DATABASE_DISPOSABLE=true is required.');
-  }
-
-  const databaseUrl = requiredEnv(env, 'DATABASE_URL');
-  let parsed;
-  try {
-    parsed = new URL(databaseUrl);
-  } catch {
-    refuse('DATABASE_URL is not a parseable URL.');
-  }
-  if (parsed.protocol !== 'postgres:' && parsed.protocol !== 'postgresql:') {
-    refuse('DATABASE_URL must use the postgres or postgresql protocol.');
-  }
-
-  const host = parsed.hostname.toLowerCase();
-  const databaseName = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
-  if (!host || !databaseName) {
-    refuse('DATABASE_URL must identify a host and database name.');
-  }
-  if (host === 'localhost' || host === '127.0.0.1' || host === '::1') {
-    refuse('this path is only for the dedicated remote disposable target.');
-  }
-
-  const expectedHost = requiredEnv(
-    env,
-    'INTEGRATION_DATABASE_HOST',
-  ).toLowerCase();
-  const expectedName = requiredEnv(env, 'INTEGRATION_DATABASE_NAME');
-  if (host !== expectedHost) {
-    refuse('DATABASE_URL does not match INTEGRATION_DATABASE_HOST.');
-  }
-  if (databaseName !== expectedName) {
-    refuse('DATABASE_URL does not match INTEGRATION_DATABASE_NAME.');
-  }
-
-  const targetId = requiredEnv(env, 'INTEGRATION_DATABASE_TARGET_ID');
-  if (!TARGET_ID_PATTERN.test(targetId)) {
-    refuse(
-      'INTEGRATION_DATABASE_TARGET_ID must be a unique 8-64 character lowercase identifier.',
-    );
-  }
-  if (!databaseName.toLowerCase().includes(targetId.toLowerCase())) {
-    refuse('database name must contain the unique integration target id.');
-  }
-
-  if (PROTECTED_LABEL.test(host) || PROTECTED_LABEL.test(databaseName)) {
-    refuse('endpoint identity contains a protected environment label.');
-  }
-
-  for (const [environment, key] of [
-    ['development', 'DATABASE_URL_DEVELOPMENT_HOST'],
-    ['staging', 'DATABASE_URL_STAGING_HOST'],
-    ['production', 'DATABASE_URL_PRODUCTION_HOST'],
-  ]) {
-    const protectedHost = normalizedHost(requiredEnv(env, key));
-    if (host === protectedHost) {
-      refuse(`endpoint matches the protected ${environment} database.`);
-    }
-  }
-
-  return {
-    databaseUrl,
-    host,
-    databaseName,
-    targetId,
-    endpointFingerprint: endpointFingerprint(host, databaseName),
-  };
 }
 
 function assertOptions(options) {
@@ -665,7 +557,7 @@ function defaultDependencies(env, target) {
         'scripts/bootstrap-api-integration-schema.mjs',
       ]) === '',
     runSchemaPush: async ({ command, args, env: childEnv }) => {
-      const result = spawnSync(command, args, {
+      const result = spawnSync(resolveSpawnCommand(command), args, {
         cwd: REPO_ROOT,
         env: childEnv,
         encoding: 'utf8',
@@ -681,6 +573,10 @@ function defaultDependencies(env, target) {
       }
     },
   };
+}
+
+export function resolveSpawnCommand(command, platform = process.platform) {
+  return platform === 'win32' ? `${command}.cmd` : command;
 }
 
 function parseArgs(argv) {
@@ -708,16 +604,24 @@ function parseArgs(argv) {
   return options;
 }
 
-function assertReceiptPath(receiptPath) {
+export function isReceiptBelowAllowedRoot(
+  allowedRoot,
+  absolute,
+  pathApi = { relative, isAbsolute },
+) {
+  const fromAllowed = pathApi.relative(allowedRoot, absolute);
+  return (
+    fromAllowed !== '' &&
+    !fromAllowed.startsWith('..') &&
+    !pathApi.isAbsolute(fromAllowed)
+  );
+}
+
+export function assertReceiptPath(receiptPath) {
   const repoRoot = resolve(import.meta.dirname, '..');
   const allowedRoot = resolve(repoRoot, '.workitem-artifacts', WORK_ITEM);
   const absolute = resolve(repoRoot, receiptPath);
-  const fromAllowed = relative(allowedRoot, absolute);
-  if (
-    fromAllowed === '' ||
-    fromAllowed.startsWith('..') ||
-    fromAllowed.startsWith('/')
-  ) {
+  if (!isReceiptBelowAllowedRoot(allowedRoot, absolute)) {
     refuse(`--receipt must be a file below .workitem-artifacts/${WORK_ITEM}/.`);
   }
   return absolute;
