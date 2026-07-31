@@ -22,6 +22,64 @@ Collision fences:
 
 The retained output therefore proves a transient total-budget exhaustion. It does **not** identify a slow UI assertion, API/query, or fixture operation.
 
+## Isolated phase reproduction
+
+The non-attributable hosted record was supplemented on 2026-07-30 with a
+credential-safe, disposable diagnostic run at exact `origin/main` revision
+`7cb7b0f68971918fb638ce4a455ac47fe513ff40`.
+
+- Target: a local Wrangler Worker (`ENVIRONMENT=development`) and local static
+  Expo export, using the non-staging Doppler development database and Clerk
+  instance. The run used a unique synthetic seed prefix and the seed reset
+  completed after each attempt. No staging or production target was contacted
+  or mutated.
+- Contract: the owner case retained its 90-second Playwright timeout, the
+  `parent-multi-child` seed, fresh owner sign-in, and the Mentor, Subjects, and
+  Journal journey. A disposable spec logged only phase name, elapsed
+  milliseconds, method, sanitized pathname, and status class. It logged no
+  headers, query values, bodies, tokens, email addresses, or credentials.
+- Compatibility shim: the development database lacks the checked-in
+  `session_summaries.language_learning_summary` column. The first seed attempt
+  therefore ended in 2.434 seconds with `POST /v1/__test/seed` returning 500
+  (`PostgreSQL 42703`). To continue without mutating the shared database, the
+  local Worker's runtime schema declaration alone temporarily omitted that
+  field. The edit was restored immediately after the run.
+
+The continued run produced these phase and request observations:
+
+| Phase/request | Elapsed | Result |
+| --- | ---: | --- |
+| `seed-and-clerk` | 3,481 ms | completed |
+| `POST /v1/__test/seed` | 3,004 ms | 2xx |
+| Clerk `GET /v1/users` | 249 ms | 2xx |
+| Clerk `PATCH /v1/email_addresses/:id` | 219 ms | 2xx |
+| `sign-in-readiness` | **65,079 ms** | helper's 60-second readiness wait expired |
+| `GET /v1/profiles` | 8 ms in browser / 4 ms at Worker | 401 |
+| Whole instrumented journey | 68,562 ms | ended before the first Account entry |
+
+At termination, the diagnostic had zero pending requests. The Worker recorded
+the exact cause of the profile response:
+`CLERK_AUDIENCE is not configured — JWT audience validation is disabled`.
+The development config supplies that binding as an empty value: retaining the
+empty binding fails environment validation, while omitting it lets public
+seed/Clerk setup run but makes authenticated routes reject the token.
+
+The consuming step in this isolated reproduction is therefore
+`signIn` → `waitForSignedInReady`, waiting after the fast failed
+`GET /v1/profiles` request. It is **not** an executing API query and it is not
+an Account-tab assertion. The request fails immediately; the readiness loop
+then consumes the time.
+
+This result does not retroactively prove that the hosted staging attempt
+received the same 401. The hosted attempt retained no request evidence, and its
+configured Clerk audience is a different environment boundary. It does,
+however, replace the previous source-budget candidate list with a directly
+observed consuming phase and request on an explicit isolated target. It also
+shows how a slow seed/Clerk prelude followed by the same 60-second readiness
+window can be preempted by the outer 90-second budget before the helper emits
+its own error; that relationship is an inference, not a claim about the
+missing hosted request record.
+
 ## Source-level budget analysis
 
 The source explains why the terminal evidence is non-attributable:
@@ -32,16 +90,39 @@ The source explains why the terminal evidence is non-attributable:
 4. `signIn` can then spend up to 60 seconds in signed-in readiness (`waitForSignedInReady`, `apps/mobile/e2e-web/helpers/auth.ts:240`), plus navigation, polling, and late post-approval waits. On the post-approval-interstitial path, `signIn` taps through the interstitial and awaits a second, independent 60-second `waitForSignedInReady` window (`auth.ts:255`) before continuing — so that path's readiness budget alone can reach up to 120 seconds, before navigation, polling, and late post-approval waits are even counted. Those phases also run before the first owner journey step.
 5. When the global 90-second budget preempts one of those asynchronous loops or a later serialized variant, the current reporter has no retained phase label to emit. The observed bare timeout is the expected failure shape of that observability gap.
 
-These bounds do not prove that Clerk, sign-in, or a particular tab was slow in this run. They prove that several independently variable phases share one terminal budget without a durable phase marker, so the existing evidence cannot select among them.
+These bounds do not prove which phase consumed the historical hosted attempt.
+The isolated reproduction does select `sign-in-readiness` and
+`GET /v1/profiles` for the reproduced non-staging failure, while preserving the
+historical-evidence boundary above.
 
 ## Classification and disposition
 
-Classification: **test orchestration / diagnostic observability**.
+Classification:
 
-- A deterministic product defect is not established: the exact case passed on its CI retry.
-- API/query latency, fixture state, Clerk/seed latency, sign-in readiness, and a later tab-return phase remain viable variants because the hosted run retained no discriminator.
+- Historical hosted attempt: **test orchestration / diagnostic observability**.
+  A deterministic product defect is not established because the exact case
+  passed on retry and retained no phase/request discriminator.
+- Isolated reproduction: **fixture/environment configuration**. The development
+  schema drift blocks the seed; after a local-only compatibility shim, the
+  missing Clerk audience makes authenticated profile readiness consume the
+  60-second helper budget. No slow API query was observed.
 - The three entry variants sharing one budget amplify elapsed-time sensitivity, but splitting them into separate 90-second tests would effectively widen the allowed budget and is not an acceptable diagnostic repair.
 
-The independently deliverable repair is captured as WI-2826 (Instrument V2 Account owner journey phase timing). It requires sanitized phase timing and allowlisted request/query state for seed, Clerk verification, sign-in readiness, and each owner tab-return phase; mutation-sensitive variant coverage; and preservation of the existing timeout, retry, worker, staging, and credential-safety contracts.
+The durable observability dependency remains WI-2826 (Instrument V2 Account
+owner journey phase timing). It owns the sanitized, mutation-sensitive
+instrumentation needed to make the reproduction command part of the normal
+test surface without colliding with this diagnostic spike.
+
+Two independently deliverable defects were captured for formal BID-48
+membership disposition:
+
+- WI-2922 (Align development database schema with current session summaries)
+  — origin: the 500 seed response at exact revision `7cb7b0f68`; dependency:
+  current Drizzle schema/migration history and the development database
+  operator; boundary: no shared schema mutation without explicit authority.
+- WI-2923 (Configure a valid Clerk JWT audience for development diagnostics)
+  — origin: the 401 profile response and 65,079 ms readiness phase; dependency:
+  the development Clerk/Doppler owner and WI-2826 instrumentation; boundary:
+  do not copy higher-environment credentials or weaken audience validation.
 
 No product or test repair is implemented under WI-2800.

@@ -29,6 +29,21 @@ import { dangerousProcedureRefusalResponse } from './dangerous-procedure-gate';
 import { setOcrProvider, resetOcrProvider, type OcrProvider } from './ocr';
 import type { OcrResult } from '@eduagent/schemas';
 
+// This suite exercises crisis-redirect paths that dispatch through safeSend.
+// Own only the external Inngest boundary so no network promise can survive
+// Jest teardown; the production exchange and safeSend implementations stay real.
+const mockInngestSend = jest.fn().mockResolvedValue(undefined);
+// gc1-allow: Own the external Inngest send boundary so network calls cannot outlive Jest teardown.
+jest.mock('../inngest/client', () => {
+  const actual = jest.requireActual(
+    '../inngest/client',
+  ) as typeof import('../inngest/client');
+  return {
+    ...actual,
+    inngest: { send: (...args: unknown[]) => mockInngestSend(...args) },
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
@@ -47,6 +62,7 @@ beforeAll(() => {
 afterEach(() => {
   registerProvider(createMockProvider('gemini'));
   registerProvider(createMockProvider('cerebras'));
+  mockInngestSend.mockReset().mockResolvedValue(undefined);
 });
 
 const currentYear = new Date().getFullYear();
@@ -108,6 +124,84 @@ describe('processExchange — safety tripwire wiring', () => {
       throw new Error('LLM must not be called when the safety tripwire fires');
     },
   };
+
+  it('[BREAK] settles a resolved crisis dispatch at the fixture-owned Inngest boundary', async () => {
+    registerProvider(throwingProvider);
+    try {
+      const result = await processExchange(baseContext, 'how do i kill myself');
+
+      expect(result.response).toBe(tripwireResponse('self_harm_method'));
+      expect(mockInngestSend).toHaveBeenCalledTimes(1);
+      expect(mockInngestSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/safety.crisis_redirect_fired',
+          data: expect.objectContaining({
+            sessionId: baseContext.sessionId,
+            profileId: baseContext.profileId,
+            flow: 'exchange.process.tripwire.self_harm_method',
+          }),
+        }),
+      );
+    } finally {
+      registerProvider(createMockProvider('cerebras'));
+    }
+  });
+
+  it('[BREAK] settles a crisis dispatch that rejects after the safeSend timeout', async () => {
+    jest.useFakeTimers();
+    const errorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    const lateFailure = new Error('controlled late crisis rejection');
+    let rejectSend: ((error: Error) => void) | undefined;
+    let sendSettled = false;
+
+    mockInngestSend.mockImplementationOnce(
+      () =>
+        new Promise<never>((_, reject) => {
+          rejectSend = reject;
+        }),
+    );
+    registerProvider(throwingProvider);
+
+    try {
+      const resultPromise = processExchange(
+        baseContext,
+        'how do i kill myself',
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(rejectSend).toEqual(expect.any(Function));
+
+      await jest.advanceTimersByTimeAsync(2001);
+      await expect(resultPromise).resolves.toEqual(
+        expect.objectContaining({
+          response: tripwireResponse('self_harm_method'),
+          provider: 'safety-tripwire',
+        }),
+      );
+
+      rejectSend!(lateFailure);
+      sendSettled = true;
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '[safe-send] non-core dispatch rejected after timeout',
+        ),
+      );
+    } finally {
+      if (!sendSettled && rejectSend) {
+        rejectSend(lateFailure);
+      }
+      await Promise.resolve();
+      await Promise.resolve();
+      registerProvider(createMockProvider('cerebras'));
+      errorSpy.mockRestore();
+      jest.useRealTimers();
+    }
+  });
 
   it('[BREAK] short-circuits the LLM and returns the safe self-harm reply', async () => {
     registerProvider(throwingProvider);

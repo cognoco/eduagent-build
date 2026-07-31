@@ -17,6 +17,8 @@ import {
   sendReservedMentorNoticeNudge,
 } from './nudge';
 
+import { inngest } from '../../inngest/client';
+
 function makeEligibilityDb(rows: unknown[]) {
   const limit = jest.fn().mockResolvedValue(rows);
   const where = jest.fn().mockReturnValue({ limit });
@@ -168,5 +170,42 @@ describe('reserved mentor notice delivery', () => {
       { skipRateLimitLog: true, skipDailyCap: true },
     );
     expect(update).toHaveBeenCalledTimes(1);
+  });
+
+  it('[WI-2953] emits notice.nudge_sent with a timestamp on a delivered nudge', async () => {
+    const sendSpy = jest
+      .spyOn(inngest, 'send')
+      .mockResolvedValue({ ids: [] } as unknown as Awaited<
+        ReturnType<typeof inngest.send>
+      >);
+    try {
+      const { db } = makeSendDb({
+        id: 'notice-1',
+        subjectId: 'subject-1',
+        subjectName: 'Algebra',
+      });
+      mockSendPushNotification.mockResolvedValue({ sent: true });
+
+      await expect(
+        sendReservedMentorNoticeNudge(db, {
+          profileId: 'profile-1',
+          noticeId: 'notice-1',
+        }),
+      ).resolves.toEqual({ sent: true });
+
+      // Precondition first: assert the send path was actually ENTERED. A payload
+      // assertion alone passes vacuously if this branch never ran.
+      expect(sendSpy).toHaveBeenCalledTimes(1);
+      expect(sendSpy).toHaveBeenCalledWith({
+        name: 'app/notice.nudge_sent',
+        data: {
+          noticeId: 'notice-1',
+          profileId: 'profile-1',
+          timestamp: expect.any(String),
+        },
+      });
+    } finally {
+      sendSpy.mockRestore();
+    }
   });
 });

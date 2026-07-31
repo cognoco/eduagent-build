@@ -12,9 +12,11 @@ import {
   type StrengthEntry,
   type FocusAreaEntry,
 } from '@eduagent/schemas';
+import type { LearningTextGateResult } from '../learning-text-safety/gate';
 import {
   buildMemoryFactRowsFromProjection,
   coerceConfidence,
+  filterGatedMemoryFactRows,
   type MemoryProjection,
 } from './backfill-mapping';
 
@@ -255,10 +257,39 @@ export function buildProjectionFromMergedState(profile: {
  * `neon-serverless` (WebSocket driver). No additional batch or lock is needed
  * here.
  */
+/**
+ * The candidate memory-fact texts a merged profile state would persist.
+ *
+ * [WI-2628] The gate is async and content-addressed while the row builders are
+ * pure and synchronous, so a caller must pre-evaluate BEFORE opening its
+ * transaction and re-derive inside it. This function is the single definition of
+ * "which strings" — the writers below build rows through the same
+ * `buildProjectionFromMergedState` → `buildMemoryFactRowsFromProjection` chain
+ * and filter on `row.text`, so the checked expression and the persisted
+ * expression are the same expression by construction rather than by convention.
+ * Do not hand-roll the equivalent list at a call site.
+ */
+export function collectMemoryFactTextsForMergedState(
+  profileId: string,
+  mergedState: Parameters<typeof buildProjectionFromMergedState>[0],
+): (string | null | undefined)[] {
+  return buildMemoryFactRowsFromProjection(
+    profileId,
+    buildProjectionFromMergedState(mergedState),
+  ).map((row) => row.text);
+}
+
 export async function replaceActiveMemoryFactsForProfile(
   db: MemoryFactsWriter,
   profileId: string,
   projection: MemoryProjection,
+  /**
+   * [WI-2628] REQUIRED, never optional or defaulted. An omittable gate lets a
+   * consumer persist unfiltered rows by omission, and nothing here can detect
+   * that from the inside — the predecessor's revert proved the point: making it
+   * required turned three invisible ungated consumers into three compile errors.
+   */
+  learningTextGate: LearningTextGateResult,
 ): Promise<void> {
   const existing = await db
     .select({
@@ -278,7 +309,13 @@ export async function replaceActiveMemoryFactsForProfile(
 
   await db.delete(memoryFacts).where(eq(memoryFacts.profileId, profileId));
 
-  const rows = buildMemoryFactRowsFromProjection(profileId, projection);
+  // [WI-2628] Drop every row the gate did not clear for THIS EXACT text. The
+  // filter reads `row.text` and the insert below writes that same `row.text` on
+  // the same object — nothing is re-derived between the check and the write.
+  const rows = filterGatedMemoryFactRows(
+    buildMemoryFactRowsFromProjection(profileId, projection),
+    learningTextGate,
+  );
   if (rows.length > 0) {
     for (const row of rows) {
       const key = `${row.category}::${row.textNormalized}`;
@@ -292,11 +329,14 @@ export async function writeMemoryFactsForAnalysis(
   db: MemoryFactsWriter,
   profileId: string,
   mergedState: Parameters<typeof buildProjectionFromMergedState>[0],
+  /** [WI-2628] REQUIRED — see `replaceActiveMemoryFactsForProfile`. */
+  learningTextGate: LearningTextGateResult,
 ): Promise<void> {
   await replaceActiveMemoryFactsForProfile(
     db,
     profileId,
     buildProjectionFromMergedState(mergedState),
+    learningTextGate,
   );
   // [BUG-365] Runtime applyAnalysis path stamps memoryFactsAnalysedAt —
   // distinct from memoryFactsBackfilledAt, which is reserved for the
@@ -313,6 +353,13 @@ export async function writeMemoryFactsForDeletion(
   db: MemoryFactsWriter,
   profileId: string,
   mergedState: Parameters<typeof buildProjectionFromMergedState>[0],
+  /** [WI-2628] REQUIRED — see `replaceActiveMemoryFactsForProfile`. */
+  learningTextGate: LearningTextGateResult,
 ): Promise<void> {
-  await writeMemoryFactsForAnalysis(db, profileId, mergedState);
+  await writeMemoryFactsForAnalysis(
+    db,
+    profileId,
+    mergedState,
+    learningTextGate,
+  );
 }

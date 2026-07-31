@@ -49,6 +49,9 @@ Scoring rubric — assign exactly ONE result per assessed concept:
   partial       — the answer shows some understanding but has notable gaps or inaccuracies.
   missing       — the answer does not address the concept at all.
   misconception — the answer reveals a demonstrably incorrect understanding.
+Misconception takes precedence over partial when a confident causal mechanism is demonstrably wrong,
+even if another aspect or conclusion of the answer is correct.
+Do not use partial for a correct conclusion supported by a confidently wrong causal explanation; use misconception.
 
 Instructions:
 1. Identify every concept that the given question assesses.

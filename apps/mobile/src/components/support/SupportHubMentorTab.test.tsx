@@ -274,6 +274,34 @@ describe('SupportHubMentorTab', () => {
     ).toHaveLength(1);
   });
 
+  it('renders structured shared-record facts instead of server-composed prose', async () => {
+    mockFetch.setRoute(`/visibility/reports/${PERSON_ID}/shared-record`, {
+      ...SHARED_RECORD,
+      supporterView: {
+        ...SHARED_RECORD.supporterView,
+        facts: [
+          {
+            ...SHARED_RECORD.supporterView.facts[0],
+            title: 'Session recap ready',
+            detail: 'A shareable learning recap was produced.',
+            metadata: {
+              templateKey: 'sessionRecap',
+              sessionDate: '2026-06-28T12:00:00.000Z',
+            },
+          },
+        ],
+      },
+    });
+    queryClient = renderWithProfile(
+      <SupportHubMentorTab personScopes={[EMMA_SCOPE]} />,
+    );
+
+    await waitFor(() => screen.getByText('Session recap ready'));
+    expect(
+      screen.queryByText('A shareable learning recap was produced.'),
+    ).toBeNull();
+  });
+
   it('shows the initial loading card while shared-record facts are pending', async () => {
     let resolveRecord: ((record: SharedRecord) => void) | undefined;
     mockFetch.setRoute(

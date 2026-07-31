@@ -47,6 +47,8 @@ Runs after Wave-0 guards exist. Two slices in parallel; **if both cannot land, t
 
 **1C. Family/supporter chain** (beta-operator first-session path): WI-1127 (coldstart route) → WI-1135 (cold-start surfaces) → WI-1137 (linking-ceremony screens; person-picker must cover the teen path) → WI-1753 (cross-account existing-teen family join).
 
+> **Chain terminates at the consent-capable teen (WI-2535, 2026-07-30).** WI-1753 delivers the cross-account **join mechanism**; it does **not** deliver a consent posture for the 13–16 band. Consent authority resolves from **age × residence jurisdiction**, so a credentialed 13+ learner is not automatically self-consenting — through 16 in several target markets they are not. **The 13–16 invitation path is therefore NOT launch-ready on this chain**, and must not be described as such until **WI-2037** (*Design 13-16 join-my-family consent posture*, Captured, fast-follow) is both **ruled and implemented**. Canon already scopes join-my-family v1 to the consent-capable teen and defers the below-consent-age variant (`prd.md:461-465`). Entry to this chain is **adult-first** — supporters arrive by invite only, never self-select at signup (**OPQ-131**, ruled 2026-07-19) — but initiating an invite grants the adult **neither consent authority nor visibility**: Guardianship is not created by this path, and Supportership is granted only by the learner, only to the recap/grades ceiling.
+
 **1D. Trust package** (WI-1497/1498/1499/1501/1502): **Zuzka design pass first**, then capacity-shaped builds.
 
 **1E. Ratified-13 loop bugs + reachability:** WI-1466 (cooldown), WI-1461 (dual push-cron), WI-1441 (push permission wiring), WI-1496 (tutor-language picker), WI-1451 (finish-or-hide the silent "keep this" CTA — ruled IN 2026-07-10).
@@ -71,6 +73,7 @@ Mostly counsel-answer consumers and pre-publish obligations; overlaps Wave 1 whe
 - **Shell:** V2 publish-readiness chain (WS-28 + WI-1307 fallback proof) — spans Waves 1–3; must conclude here.
 - **Final gates:** launch compliance closure re-run (WI-1507) · **WI-1577 FINAL GATE pre-store-submission re-run**.
 - **Dogfood prod build (WI-1503) → closed beta (WI-1506, families screened for 13+ teens; WI-1655 device-evidence batch runs with it) → store go-live → public launch.**
+  - ⚠ **Screening criterion has an open hole (WI-2535, 2026-07-30) — flagged, not rewritten.** "Screened for 13+ teens" assumes a 13+ teen can transact the family model unaided. Because consent authority resolves from age × residence jurisdiction and the 13–16 invitation path is gated on WI-2037, a recruited family whose teens are all **13–16** may be unable to exercise the family model either. Narrowing the criterion (to 17+, or to jurisdictions where 13+ self-consents) is a **product call and is not taken here** → operator/PM ruling needed.
 
 ## FILL pick-list (never scheduled; grab when a lane idles)
 

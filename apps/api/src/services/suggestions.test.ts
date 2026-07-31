@@ -5,19 +5,16 @@
 
 import { jest } from '@jest/globals';
 
-const generateMock = jest.fn<(...args: unknown[]) => Promise<void>>();
-jest.mock(
-  './book-suggestion-generation' /* gc1-allow: LLM dependency */,
-  () => ({
-    generateCategorizedBookSuggestions: (...args: unknown[]) =>
-      generateMock(...args),
-  }),
-);
-
 import {
   getUnpickedBookSuggestionsWithTopup,
   getUnpickedBookSuggestionsEnvelope,
 } from './suggestions';
+import { ConsentWithdrawnError } from './session';
+
+type AssertLlmConsent =
+  (typeof import('./identity-v2/consent-status-v2'))['assertLlmConsent'];
+type GenerateCategorizedBookSuggestions =
+  (typeof import('./book-suggestion-generation'))['generateCategorizedBookSuggestions'];
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -131,7 +128,6 @@ describe('getUnpickedBookSuggestionsEnvelope', () => {
     expect(result.suggestions).toHaveLength(2);
     expect(result.suggestions[0]).toMatchObject({ id: 's1' });
     expect(result.curriculumBookCount).toBe(5);
-    expect(generateMock).not.toHaveBeenCalled();
   });
 
   it('returns empty envelope when subject does not belong to profile', async () => {
@@ -160,8 +156,15 @@ describe('getUnpickedBookSuggestionsEnvelope', () => {
 // ---------------------------------------------------------------------------
 
 describe('getUnpickedBookSuggestionsWithTopup', () => {
+  let generateMock: jest.MockedFunction<GenerateCategorizedBookSuggestions>;
+  let assertLlmConsent: jest.MockedFunction<AssertLlmConsent>;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    generateMock = jest
+      .fn<GenerateCategorizedBookSuggestions>()
+      .mockResolvedValue('success');
+    assertLlmConsent = jest.fn<AssertLlmConsent>().mockResolvedValue(undefined);
   });
 
   it('skips generation when unpicked pool is already ≥ 4', async () => {
@@ -172,14 +175,22 @@ describe('getUnpickedBookSuggestionsWithTopup', () => {
       makeSuggestion('s4'),
     ];
     const db = makeDb({ unpickedRows: rows, bookCount: 2 });
+    assertLlmConsent.mockRejectedValue(new ConsentWithdrawnError());
 
     const result = await getUnpickedBookSuggestionsWithTopup(
       db,
       PROFILE_ID,
       SUBJECT_ID,
+      {
+        deps: {
+          assertLlmConsent,
+          generateCategorizedBookSuggestions: generateMock,
+        },
+      },
     );
 
     expect(generateMock).not.toHaveBeenCalled();
+    expect(assertLlmConsent).not.toHaveBeenCalled();
     expect(result.suggestions).toHaveLength(4);
     expect(result.curriculumBookCount).toBe(2);
   });
@@ -193,7 +204,7 @@ describe('getUnpickedBookSuggestionsWithTopup', () => {
       makeSuggestion('s4'),
       makeSuggestion('s5'),
     ];
-    generateMock.mockResolvedValue(undefined);
+    generateMock.mockResolvedValue('success');
 
     const db = makeDb({
       unpickedRows: initialRows,
@@ -205,8 +216,15 @@ describe('getUnpickedBookSuggestionsWithTopup', () => {
       db,
       PROFILE_ID,
       SUBJECT_ID,
+      {
+        deps: {
+          assertLlmConsent,
+          generateCategorizedBookSuggestions: generateMock,
+        },
+      },
     );
 
+    expect(assertLlmConsent).toHaveBeenCalledWith(db, PROFILE_ID);
     expect(generateMock).toHaveBeenCalledTimes(1);
     expect(generateMock).toHaveBeenCalledWith(db, PROFILE_ID, SUBJECT_ID, {
       conversationLanguage: undefined,
@@ -226,6 +244,12 @@ describe('getUnpickedBookSuggestionsWithTopup', () => {
       db,
       PROFILE_ID,
       SUBJECT_ID,
+      {
+        deps: {
+          assertLlmConsent,
+          generateCategorizedBookSuggestions: generateMock,
+        },
+      },
     );
 
     expect(result).toEqual({
@@ -233,6 +257,25 @@ describe('getUnpickedBookSuggestionsWithTopup', () => {
       curriculumBookCount: 0,
       topupOutcome: 'no_subject',
     });
+    expect(generateMock).not.toHaveBeenCalled();
+    expect(assertLlmConsent).not.toHaveBeenCalled();
+  });
+
+  it('fails closed before generation when the unpicked pool needs a top-up', async () => {
+    const rows = [makeSuggestion('s1'), makeSuggestion('s2')];
+    const db = makeDb({ unpickedRows: rows, bookCount: 1 });
+    assertLlmConsent.mockRejectedValue(new ConsentWithdrawnError());
+
+    await expect(
+      getUnpickedBookSuggestionsWithTopup(db, PROFILE_ID, SUBJECT_ID, {
+        deps: {
+          assertLlmConsent,
+          generateCategorizedBookSuggestions: generateMock,
+        },
+      }),
+    ).rejects.toBeInstanceOf(ConsentWithdrawnError);
+
+    expect(assertLlmConsent).toHaveBeenCalledWith(db, PROFILE_ID);
     expect(generateMock).not.toHaveBeenCalled();
   });
 });

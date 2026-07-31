@@ -317,18 +317,26 @@ export async function buildNowFeed(
   db: Database,
   profileId: string,
   query: NowScope | NowQuery = 'self',
-  options: { mentorNoticeEnabled?: boolean } = {},
+  options: {
+    callerPersonId?: string;
+    mentorNoticeEnabled?: boolean;
+  } = {},
 ): Promise<NowResponse> {
   const now = new Date();
   const request = normalizeNowQuery(query);
-  const target = await resolveNowTarget(db, profileId, request);
+  const viewerPersonId = resolveNowViewerPersonId(
+    profileId,
+    request,
+    options.callerPersonId,
+  );
+  const target = await resolveNowTarget(db, profileId, viewerPersonId, request);
   const candidates = await collectCandidatesForRequest(
     db,
     target.personId,
     request,
     now,
     target.edgeId,
-    profileId,
+    viewerPersonId,
     options.mentorNoticeEnabled === true,
   );
   const sorted =
@@ -356,18 +364,26 @@ export async function buildNowOverflow(
   db: Database,
   profileId: string,
   query: NowScope | NowQuery = 'self',
-  options: { mentorNoticeEnabled?: boolean } = {},
+  options: {
+    callerPersonId?: string;
+    mentorNoticeEnabled?: boolean;
+  } = {},
 ): Promise<NowOverflowResponse> {
   const now = new Date();
   const request = normalizeNowQuery(query);
-  const target = await resolveNowTarget(db, profileId, request);
+  const viewerPersonId = resolveNowViewerPersonId(
+    profileId,
+    request,
+    options.callerPersonId,
+  );
+  const target = await resolveNowTarget(db, profileId, viewerPersonId, request);
   const candidates = await collectCandidatesForRequest(
     db,
     target.personId,
     request,
     now,
     target.edgeId,
-    profileId,
+    viewerPersonId,
     options.mentorNoticeEnabled === true,
   );
   if (request.scope === 'supporter-hub') {
@@ -383,6 +399,18 @@ function normalizeNowQuery(query: NowScope | NowQuery): NowQuery {
   return typeof query === 'string' ? { scope: query } : query;
 }
 
+function resolveNowViewerPersonId(
+  profileId: string,
+  request: NowQuery,
+  callerPersonId: string | undefined,
+): string {
+  if (request.scope === 'self') return profileId;
+  if (!callerPersonId) {
+    throw new ForbiddenError('Authenticated caller identity is required.');
+  }
+  return callerPersonId;
+}
+
 // `person`/`supportership` reads here are S4-scoped and were shipped early
 // inside the S0 service; ruled correct, not a tier leak
 // (docs/plans/v2-plan/2026-06-10-s0-backend-primitives.md). That ruling is
@@ -394,6 +422,7 @@ function normalizeNowQuery(query: NowScope | NowQuery): NowQuery {
 async function resolveNowTarget(
   db: Database,
   profileId: string,
+  supporterPersonId: string,
   query: NowQuery,
 ): Promise<{ personId: string; edgeId?: string }> {
   if (query.scope !== 'person') {
@@ -414,7 +443,7 @@ async function resolveNowTarget(
     )
     .where(
       and(
-        eq(supportership.supporterPersonId, profileId),
+        eq(supportership.supporterPersonId, supporterPersonId),
         eq(supportership.supporteePersonId, query.personId),
         acceptedVisibilityCondition(),
       ),
@@ -446,7 +475,7 @@ export async function collectCandidatesForRequest(
   mentorNoticeEnabled = false,
 ): Promise<NowFeedCandidate[]> {
   if (request.scope === 'supporter-hub') {
-    return collectSupporterHubCandidates(db, personId, now);
+    return collectSupporterHubCandidates(db, viewerPersonId, now);
   }
 
   const candidates = await collectNowCandidates(

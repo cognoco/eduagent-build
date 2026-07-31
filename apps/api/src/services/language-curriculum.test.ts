@@ -64,7 +64,19 @@ function createMockDb({
         findFirst: jest.fn().mockResolvedValue({ id: 'book-1' }),
       },
     },
-    select: jest.fn((selection: Record<string, unknown>) => {
+    select: jest.fn((selection?: Record<string, unknown>) => {
+      if (selection === undefined) {
+        return makeSelectChain(
+          curriculumFindFirst && subjectFindFirst
+            ? [
+                {
+                  curricula: curriculumFindFirst,
+                  subjects: subjectFindFirst,
+                },
+              ]
+            : [],
+        );
+      }
       if ('milestoneId' in selection) return makeSelectChain(vocabularySelect);
       if ('languageLearningSummary' in selection) {
         return makeSelectChain(sessionSummariesSelect);

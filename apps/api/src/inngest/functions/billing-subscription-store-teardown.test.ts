@@ -1,9 +1,12 @@
 import * as sentry from '../../services/sentry';
+import * as safeNonCore from '../../services/safe-non-core';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+import { inngest } from '../client';
 import { billingSubscriptionStoreTeardown } from './billing-subscription-store-teardown';
 
 const handler = (billingSubscriptionStoreTeardown as any).fn as (args: {
   event: { data: unknown };
+  runId?: string;
   step: ReturnType<typeof createInngestStepRunner>['step'];
 }) => Promise<{
   status: string;
@@ -16,6 +19,7 @@ describe('billingSubscriptionStoreTeardown Inngest function', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
+    jest.spyOn(safeNonCore, 'safeSend').mockResolvedValue(undefined);
   });
 
   it('[WI-885] declares account-scoped idempotency and concurrency', () => {
@@ -79,6 +83,58 @@ describe('billingSubscriptionStoreTeardown Inngest function', () => {
     );
   });
 
+  it('[BREAK WI-2346] safeSends a PII-minimized subscription teardown dead-letter event', async () => {
+    jest.spyOn(sentry, 'captureException').mockImplementation(() => undefined);
+    const safeSendSpy = jest
+      .spyOn(safeNonCore, 'safeSend')
+      .mockResolvedValue(undefined);
+    const inngestSendSpy = jest
+      .spyOn(inngest, 'send')
+      .mockResolvedValue({ ids: [] });
+    const onFailure = (billingSubscriptionStoreTeardown as any).opts
+      .onFailure as (args: {
+      event: { data: { event?: { data?: unknown }; run_id?: string } };
+      error: unknown;
+    }) => Promise<unknown>;
+
+    await onFailure({
+      event: {
+        data: {
+          event: { data: { accountId: 'org-terminal' } },
+          run_id: 'run-store-teardown',
+        },
+      },
+      error: new Error('RevenueCat response contained private context'),
+    });
+
+    expect(safeSendSpy).toHaveBeenCalledTimes(1);
+    const call = safeSendSpy.mock.calls[0];
+    expect(call).toBeDefined();
+    if (!call) return;
+    const [sendThunk, surface, context] = call;
+    expect(surface).toBe(
+      'billing-subscription-store-teardown.terminal_failure',
+    );
+    expect(context).toEqual({
+      accountId: 'org-terminal',
+      runId: 'run-store-teardown',
+    });
+
+    await expect(sendThunk()).resolves.not.toThrow();
+    expect(inngestSendSpy).toHaveBeenCalledWith({
+      name: 'app/billing.subscription_store_teardown.failed',
+      data: {
+        accountId: 'org-terminal',
+        runId: 'run-store-teardown',
+        errorName: 'Error',
+        timestamp: expect.any(String),
+      },
+    });
+    expect(JSON.stringify(inngestSendSpy.mock.calls)).not.toContain(
+      'private context',
+    );
+  });
+
   it('[WI-885] orchestrates teardown for a valid payload (all-null providers → not_applicable, no provider calls)', async () => {
     // No internal mocks and no external boundaries needed: with both provider
     // identifiers null, needsStripe/needsRevenueCat are false, so the step never
@@ -127,6 +183,84 @@ describe('billingSubscriptionStoreTeardown Inngest function', () => {
         },
       ],
     });
+  });
+
+  it('[BREAK WI-2390] records completed provider teardown outside Postgres with the Inngest run id', async () => {
+    const captureSpy = jest
+      .spyOn(sentry, 'captureMessage')
+      .mockImplementation(() => undefined);
+    const consoleSpy = jest
+      .spyOn(console, 'log')
+      .mockImplementation(() => undefined);
+    const { step, runNames } = createInngestStepRunner();
+
+    const result = await handler({
+      event: {
+        data: {
+          accountId: 'org-audit-proof',
+          identityVersion: 'v2',
+          reason: 'whole_org_erasure',
+          requestedAt: '2026-07-31T00:00:00.000Z',
+          subscriptions: [
+            {
+              subscriptionId: 'subrow-audit-proof',
+              planTier: 'plus',
+              status: 'active',
+              stripe: { customerId: null, subscriptionId: null },
+              revenueCat: {
+                originalAppUserId: null,
+                storeProductId: null,
+                storePlatform: null,
+              },
+            },
+          ],
+        },
+      },
+      runId: 'run-store-audit-proof',
+      step,
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'completed',
+        accountId: 'org-audit-proof',
+        subscriptionsProcessed: 1,
+      }),
+    );
+    expect(runNames()).toContain('record-store-teardown-completion');
+    expect(captureSpy).toHaveBeenCalledWith(
+      'billing.store_teardown.completed',
+      {
+        level: 'info',
+        tags: {
+          surface: 'billing.store_teardown.completed',
+          stripe: 'not_applicable',
+          revenueCat: 'not_applicable',
+        },
+        extra: {
+          accountId: 'org-audit-proof',
+          runId: 'run-store-audit-proof',
+          subscriptionsProcessed: 1,
+        },
+      },
+    );
+
+    const completionLog = consoleSpy.mock.calls
+      .map(([line]) => JSON.parse(String(line)) as Record<string, unknown>)
+      .find((entry) => entry.message === 'billing.store_teardown.completed');
+    expect(completionLog).toEqual(
+      expect.objectContaining({
+        level: 'info',
+        context: expect.objectContaining({
+          event: 'billing.store_teardown.completed',
+          accountId: 'org-audit-proof',
+          runId: 'run-store-audit-proof',
+          subscriptionsProcessed: 1,
+          stripe: 'not_applicable',
+          revenueCat: 'not_applicable',
+        }),
+      }),
+    );
   });
 
   it('[WI-885] rejects a malformed payload with invalid_payload and never runs teardown', async () => {

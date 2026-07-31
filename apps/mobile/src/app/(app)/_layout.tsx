@@ -59,10 +59,19 @@ import { PENDING_CONSENT_STATUSES } from './_lib/consent-gate-helpers';
 import { ProxyBanner } from './_components/ProxyBanner';
 import { PostApprovalLanding } from './_components/PostApprovalLanding';
 import { CreateProfileGate } from './_components/CreateProfileGate';
+import { FamilyIntentOnboardingGate } from '../../components/onboarding/FamilyIntentOnboardingGate';
+import {
+  getFamilyIntentOnboardingPublicationRevision,
+  readFamilyIntentOnboarding,
+  subscribeFamilyIntentOnboardingPublications,
+  type FamilyIntentOnboardingState,
+} from '../../lib/family-intent-onboarding-state';
 import { ConsentWithdrawnGate } from './_components/ConsentWithdrawnGate';
 import { ConsentPendingGate } from './_components/ConsentPendingGate';
 import { usePostApprovalLanding } from './_hooks/use-post-approval-landing';
 import { SaveWizardGate } from './_components/save-wizard/SaveWizardGate';
+import { FirstMentorLanguageGate } from './_components/FirstMentorLanguageGate';
+import { shouldRequireFirstMentorLanguageConfirmation } from '../../lib/first-mentor-language';
 
 initNotificationHandler();
 
@@ -331,6 +340,7 @@ const ACCOUNT_AVATAR_HIDDEN_PATHS = [
 const PENDING_AUTH_REDIRECT_SETTLE_MS = 1_000;
 const DEFAULT_AUTH_REDIRECT_PATH = '/(app)/home';
 const PREVIEW_PROBE_TIMEOUT_MS = 2_500;
+const FAMILY_INTENT_PROBE_TIMEOUT_MS = 2_500;
 const V2_CHROME_MIN_TOP_INSET = 24;
 const V2_CHROME_CONTROL_TOP_GAP = 8;
 const V2_CHROME_CONTROL_HEIGHT = 44;
@@ -416,6 +426,8 @@ export default function AppLayout() {
     returnTo?: string | string[];
   }>();
   const currentAppPath = toInternalAppRedirectPath(pathname);
+  const isFamilyIntentInvitationRoute =
+    currentAppPath.split(/[?#]/, 1)[0] === '/(app)/link/initiate';
   const {
     profiles,
     activeProfile,
@@ -424,6 +436,7 @@ export default function AppLayout() {
     profileWasRemoved,
     acknowledgeProfileRemoval,
     switchProfile,
+    isExplicitProxyMode,
   } = useProfile();
   useMentorLanguageSync();
   const proxyColors = getProxyChromeColors(colors);
@@ -562,6 +575,39 @@ export default function AppLayout() {
   // actually started, but stale preview state must not hijack existing users
   // who already have an active profile when the layout first loads.
   const [wizardStarted, setWizardStarted] = React.useState(false);
+  const [familyIntentState, setFamilyIntentState] = React.useState<
+    FamilyIntentOnboardingState | null | undefined
+  >(undefined);
+  const [familyIntentProbeFailed, setFamilyIntentProbeFailed] =
+    React.useState(false);
+  const [familyIntentProbeAttempt, setFamilyIntentProbeAttempt] =
+    React.useState(0);
+  const familyIntentPublicationRevision = React.useSyncExternalStore(
+    subscribeFamilyIntentOnboardingPublications,
+    getFamilyIntentOnboardingPublicationRevision,
+    getFamilyIntentOnboardingPublicationRevision,
+  );
+  const [familyIntentInvitationRequested, setFamilyIntentInvitationRequested] =
+    React.useState(false);
+
+  const openFamilyIntentInvitation = React.useCallback(() => {
+    // Mount Tabs first, then navigate from the committed navigator. Pushing
+    // while this gate replaces Tabs races a torn-down navigator on web.
+    setFamilyIntentState(null);
+    setFamilyIntentInvitationRequested(true);
+  }, []);
+
+  React.useEffect(() => {
+    if (!familyIntentInvitationRequested) return;
+    if (isFamilyIntentInvitationRoute) {
+      setFamilyIntentInvitationRequested(false);
+      return;
+    }
+    router.push({
+      pathname: '/(app)/link/initiate',
+      params: { target: 'existingTeen' },
+    });
+  }, [familyIntentInvitationRequested, isFamilyIntentInvitationRoute, router]);
 
   React.useEffect(() => {
     if (!FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED) {
@@ -598,6 +644,53 @@ export default function AppLayout() {
       clearTimeout(timeout);
     };
   }, []);
+
+  React.useEffect(() => {
+    if (!isSignedIn || !activeProfile?.id) {
+      setFamilyIntentState(null);
+      setFamilyIntentProbeFailed(false);
+      return;
+    }
+
+    let cancelled = false;
+    let settled = false;
+    setFamilyIntentState(undefined);
+    setFamilyIntentProbeFailed(false);
+    const timeout = setTimeout(() => {
+      if (cancelled || settled) return;
+      settled = true;
+      Sentry.addBreadcrumb({
+        category: 'family-intent-onboarding',
+        level: 'warning',
+        message: 'family-intent SecureStore read timed out',
+      });
+      setFamilyIntentProbeFailed(true);
+    }, FAMILY_INTENT_PROBE_TIMEOUT_MS);
+    void readFamilyIntentOnboarding()
+      .then((pending) => {
+        if (cancelled || settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        setFamilyIntentState(
+          pending?.profileId === activeProfile.id ? pending : null,
+        );
+      })
+      .catch(() => {
+        if (cancelled || settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        setFamilyIntentProbeFailed(true);
+      });
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [
+    activeProfile?.id,
+    familyIntentProbeAttempt,
+    familyIntentPublicationRevision,
+    isSignedIn,
+  ]);
 
   // [CRITICAL-B2] DELIBERATELY no auto-cleanup effect here. A previous
   // iteration had:
@@ -792,8 +885,11 @@ export default function AppLayout() {
   //   5. profileLoadError fallback  (independent of preview state)
   //   6. preview-probe-loading spinner
   //   7. SaveWizardGate branch
-  //   8. !activeProfile → CreateProfileGate
-  //   9. consent gates → Tabs
+  //   8. FamilyIntentOnboardingGate branch
+  //   9. !activeProfile → CreateProfileGate
+  //  10. consent gates
+  //  11. first-Mentor language gate, after family-intent restore resolves absent
+  //  12. Tabs
   //
   // The welcome intro used to live at step 8; it moved pre-auth in
   // docs/plans/2026-05-27-pre-auth-welcome-flow.md, so this layout no longer
@@ -826,6 +922,19 @@ export default function AppLayout() {
         <SaveWizardGate
           onStart={markWizardStarted}
           onComplete={markWizardDone}
+        />
+      </FeedbackProvider>
+    );
+  }
+
+  if (activeProfile && familyIntentState) {
+    return (
+      <FeedbackProvider>
+        <FamilyIntentOnboardingGate
+          state={familyIntentState}
+          onStateChange={setFamilyIntentState}
+          onComplete={() => setFamilyIntentState(null)}
+          onOpenInvitation={openFamilyIntentInvitation}
         />
       </FeedbackProvider>
     );
@@ -864,6 +973,22 @@ export default function AppLayout() {
     );
   }
 
+  if (
+    familyIntentState === null &&
+    !familyIntentInvitationRequested &&
+    !isFamilyIntentInvitationRoute &&
+    shouldRequireFirstMentorLanguageConfirmation({
+      activeProfile,
+      isExplicitProxyMode,
+    })
+  ) {
+    return (
+      <FeedbackProvider>
+        <FirstMentorLanguageGate />
+      </FeedbackProvider>
+    );
+  }
+
   // Show celebratory landing once after consent approval
   if (showPostApproval) {
     return (
@@ -897,6 +1022,8 @@ export default function AppLayout() {
   const tabBarBottomInset = FEATURE_FLAGS.MODE_NAV_V2_ENABLED
     ? Math.max(insets.bottom, V2_TAB_BAR_MIN_BOTTOM_INSET)
     : Math.max(insets.bottom, 24);
+  const familyIntentNavigatorBlocked =
+    familyIntentProbeFailed || familyIntentState === undefined;
 
   return (
     <FeedbackProvider>
@@ -906,50 +1033,64 @@ export default function AppLayout() {
           accessibilityLanguage={i18n.language}
           testID="app-root-view"
         >
-          {proxyBanner && (
-            <ProxyBanner
-              childName={proxyBanner.childName}
-              onSwitchBack={() =>
-                void switchProfile(proxyBanner.parentProfileId)
-              }
-            />
-          )}
-          {!FEATURE_FLAGS.MODE_NAV_V2_ENABLED && <ModeSwitcher />}
-          {showScopeChip ? (
-            <View
-              className="absolute left-4 z-40"
-              style={{ top: chromeTopInset + V2_CHROME_CONTROL_TOP_GAP }}
-              testID="scope-chip-shell"
-              onLayout={(event) =>
-                setScopeChipHeight(
-                  Math.max(
-                    V2_CHROME_CONTROL_HEIGHT,
-                    Math.ceil(event.nativeEvent.layout.height),
-                  ),
-                )
-              }
-            >
-              <ScopeChip />
-            </View>
-          ) : null}
-          {showAccountAvatar ? (
-            <View
-              className="absolute right-4 z-40"
-              style={{ top: chromeTopInset + V2_CHROME_CONTROL_TOP_GAP }}
-              testID="account-avatar-shell"
-              onLayout={(event) =>
-                setAccountAvatarHeight(
-                  Math.max(
-                    V2_CHROME_CONTROL_HEIGHT,
-                    Math.ceil(event.nativeEvent.layout.height),
-                  ),
-                )
-              }
-            >
-              <AccountAvatar />
-            </View>
-          ) : null}
-          {/* ─── Whitelist tab pattern ────────────────────────────────────
+          <View
+            style={{
+              flex: 1,
+              display: familyIntentNavigatorBlocked ? 'none' : 'flex',
+              opacity: familyIntentNavigatorBlocked ? 0 : 1,
+            }}
+            pointerEvents={familyIntentNavigatorBlocked ? 'none' : 'auto'}
+            accessibilityElementsHidden={familyIntentNavigatorBlocked}
+            aria-hidden={familyIntentNavigatorBlocked}
+            importantForAccessibility={
+              familyIntentNavigatorBlocked ? 'no-hide-descendants' : 'auto'
+            }
+            testID="app-navigator-shell"
+          >
+            {proxyBanner && (
+              <ProxyBanner
+                childName={proxyBanner.childName}
+                onSwitchBack={() =>
+                  void switchProfile(proxyBanner.parentProfileId)
+                }
+              />
+            )}
+            {!FEATURE_FLAGS.MODE_NAV_V2_ENABLED && <ModeSwitcher />}
+            {showScopeChip ? (
+              <View
+                className="absolute left-4 z-40"
+                style={{ top: chromeTopInset + V2_CHROME_CONTROL_TOP_GAP }}
+                testID="scope-chip-shell"
+                onLayout={(event) =>
+                  setScopeChipHeight(
+                    Math.max(
+                      V2_CHROME_CONTROL_HEIGHT,
+                      Math.ceil(event.nativeEvent.layout.height),
+                    ),
+                  )
+                }
+              >
+                <ScopeChip />
+              </View>
+            ) : null}
+            {showAccountAvatar ? (
+              <View
+                className="absolute right-4 z-40"
+                style={{ top: chromeTopInset + V2_CHROME_CONTROL_TOP_GAP }}
+                testID="account-avatar-shell"
+                onLayout={(event) =>
+                  setAccountAvatarHeight(
+                    Math.max(
+                      V2_CHROME_CONTROL_HEIGHT,
+                      Math.ceil(event.nativeEvent.layout.height),
+                    ),
+                  )
+                }
+              >
+                <AccountAvatar />
+              </View>
+            ) : null}
+            {/* ─── Whitelist tab pattern ────────────────────────────────────
            Only routes listed in visibleTabs render a tab button.
            Everything else is auto-hidden via screenOptions defaults.
            Adding a new route file to (app)/ will NEVER create a
@@ -958,285 +1099,317 @@ export default function AppLayout() {
            Routes in FULL_SCREEN_ROUTES also hide the entire tab bar
            (immersive screens like session, onboarding, homework).
          ──────────────────────────────────────────────────────────── */}
-          <Tabs
-            backBehavior={
-              FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? 'history' : 'firstRoute'
-            }
-            screenOptions={({ route }) => {
-              const isVisible = visibleTabs.has(route.name);
-              const isFullScreen = FULL_SCREEN_ROUTES.has(route.name);
-              return {
-                headerShown: false,
-                // F-003/F-016/F-055: on web, inactive tab scenes stay in the DOM.
-                // An opaque sceneStyle prevents the previous tab from bleeding
-                // through when switching to a full-screen route (session, quiz, etc.).
-                //
-                // The floating V2 chrome (account avatar, scope chip) is absolutely
-                // positioned and reserves no layout space. Top-level tab scenes
-                // therefore start below the complete measured control band so their
-                // first interactive row cannot sit underneath the scope chip/avatar.
-                // Audited pushed scenes keep a single safe-area owner. The root
-                // normally reserves only the remaining fixed-control band because
-                // the child (or nested navigator) owns the native inset. A narrow,
-                // path-bound exception set covers screens proven not to own it.
-                // Full-screen routes and proxy chrome manage their own top spacing
-                // and opt out.
-                sceneStyle: {
-                  backgroundColor: isProxyChromeActive
-                    ? proxyColors.sceneBackground
-                    : colors.background,
-                  paddingTop:
-                    FEATURE_FLAGS.MODE_NAV_V2_ENABLED &&
-                    !isProxyChromeActive &&
-                    !isFullScreen
-                      ? isVisible
-                        ? pushedSceneTopInset
-                        : resolveV2PushedScenePaddingTop({
-                            routeName: route.name,
-                            pathname,
-                            pushedSceneTopInset,
-                            safeAreaTop: insets.top,
-                          })
-                      : 0,
-                },
-                tabBarStyle: isFullScreen
-                  ? {
-                      display: 'none',
-                      // On some Android devices and Expo web, display:'none'
-                      // alone doesn't remove the tab bar from the touch
-                      // responder chain. Fully collapse it so it can't
-                      // intercept touches or occupy layout space.
-                      height: 0,
-                      overflow: 'hidden' as const,
-                    }
-                  : {
-                      backgroundColor: isProxyChromeActive
-                        ? proxyColors.tabBackground
-                        : colors.surface,
-                      borderTopColor: isProxyChromeActive
-                        ? proxyColors.border
-                        : colors.border,
-                      borderTopWidth: isProxyChromeActive ? 2 : 1,
-                      height: 56 + tabBarBottomInset,
-                      paddingBottom: tabBarBottomInset,
-                    },
-                tabBarActiveTintColor: colors.accent,
-                tabBarInactiveTintColor: colors.textSecondary,
-                tabBarLabelStyle: { fontSize: 12 },
-                // Auto-hide any route not in the whitelist.
-                // href:null removes the link; tabBarItemStyle removes the
-                // flexbox space (Expo Router v6 + React Nav v7 regression).
-                ...(isVisible
-                  ? {}
-                  : { href: null, tabBarItemStyle: { display: 'none' } }),
-              };
-            }}
-          >
-            <Tabs.Screen
-              name="mentor"
-              options={{
-                title: t('tabs.mentor'),
-                tabBarButtonTestID: 'tab-mentor',
-                tabBarAccessibilityLabel: t('tabs.mentorLabel'),
-                tabBarIcon: ({ focused }) => (
-                  <TabIcon
-                    name="Home"
-                    focused={resolveV2TabIsActive(
-                      pathname,
-                      'mentor',
-                      FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
-                      focused,
-                      activeReturnTo,
-                    )}
-                  />
-                ),
-                tabBarLabel: ({ focused }) => (
-                  <TabLabel
-                    title={t('tabs.mentor')}
-                    focused={resolveV2TabIsActive(
-                      pathname,
-                      'mentor',
-                      FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
-                      focused,
-                      activeReturnTo,
-                    )}
-                  />
-                ),
+            <Tabs
+              backBehavior={
+                FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? 'history' : 'firstRoute'
+              }
+              screenOptions={({ route }) => {
+                const isVisible = visibleTabs.has(route.name);
+                const isFullScreen = FULL_SCREEN_ROUTES.has(route.name);
+                return {
+                  headerShown: false,
+                  // F-003/F-016/F-055: on web, inactive tab scenes stay in the DOM.
+                  // An opaque sceneStyle prevents the previous tab from bleeding
+                  // through when switching to a full-screen route (session, quiz, etc.).
+                  //
+                  // The floating V2 chrome (account avatar, scope chip) is absolutely
+                  // positioned and reserves no layout space. Top-level tab scenes
+                  // therefore start below the complete measured control band so their
+                  // first interactive row cannot sit underneath the scope chip/avatar.
+                  // Audited pushed scenes keep a single safe-area owner. The root
+                  // normally reserves only the remaining fixed-control band because
+                  // the child (or nested navigator) owns the native inset. A narrow,
+                  // path-bound exception set covers screens proven not to own it.
+                  // Full-screen routes and proxy chrome manage their own top spacing
+                  // and opt out.
+                  sceneStyle: {
+                    backgroundColor: isProxyChromeActive
+                      ? proxyColors.sceneBackground
+                      : colors.background,
+                    paddingTop:
+                      FEATURE_FLAGS.MODE_NAV_V2_ENABLED &&
+                      !isProxyChromeActive &&
+                      !isFullScreen
+                        ? isVisible
+                          ? pushedSceneTopInset
+                          : resolveV2PushedScenePaddingTop({
+                              routeName: route.name,
+                              pathname,
+                              pushedSceneTopInset,
+                              safeAreaTop: insets.top,
+                            })
+                        : 0,
+                  },
+                  tabBarStyle: isFullScreen
+                    ? {
+                        display: 'none',
+                        // On some Android devices and Expo web, display:'none'
+                        // alone doesn't remove the tab bar from the touch
+                        // responder chain. Fully collapse it so it can't
+                        // intercept touches or occupy layout space.
+                        height: 0,
+                        overflow: 'hidden' as const,
+                      }
+                    : {
+                        backgroundColor: isProxyChromeActive
+                          ? proxyColors.tabBackground
+                          : colors.surface,
+                        borderTopColor: isProxyChromeActive
+                          ? proxyColors.border
+                          : colors.border,
+                        borderTopWidth: isProxyChromeActive ? 2 : 1,
+                        height: 56 + tabBarBottomInset,
+                        paddingBottom: tabBarBottomInset,
+                      },
+                  tabBarActiveTintColor: colors.accent,
+                  tabBarInactiveTintColor: colors.textSecondary,
+                  tabBarLabelStyle: { fontSize: 12 },
+                  // Auto-hide any route not in the whitelist.
+                  // href:null removes the link; tabBarItemStyle removes the
+                  // flexbox space (Expo Router v6 + React Nav v7 regression).
+                  ...(isVisible
+                    ? {}
+                    : { href: null, tabBarItemStyle: { display: 'none' } }),
+                };
               }}
-            />
-            <Tabs.Screen
-              name="subjects"
-              options={{
-                title: t('tabs.subjects'),
-                tabBarButtonTestID: 'tab-subjects',
-                tabBarAccessibilityLabel: t('tabs.subjectsLabel'),
-                tabBarIcon: ({ focused }) => (
-                  <TabIcon
-                    name="Book"
-                    focused={resolveV2TabIsActive(
-                      pathname,
-                      'subjects',
-                      FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
-                      focused,
-                      activeReturnTo,
-                    )}
-                  />
-                ),
-                tabBarLabel: ({ focused }) => (
-                  <TabLabel
-                    title={t('tabs.subjects')}
-                    focused={resolveV2TabIsActive(
-                      pathname,
-                      'subjects',
-                      FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
-                      focused,
-                      activeReturnTo,
-                    )}
-                  />
-                ),
-              }}
-            />
-            <Tabs.Screen
-              name="journal"
-              options={{
-                title: t('tabs.journal'),
-                tabBarButtonTestID: 'tab-journal',
-                tabBarAccessibilityLabel: t('tabs.journalLabel'),
-                tabBarIcon: ({ focused }) => (
-                  <TabIcon
-                    name="Recaps"
-                    focused={resolveV2TabIsActive(
-                      pathname,
-                      'journal',
-                      FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
-                      focused,
-                      activeReturnTo,
-                    )}
-                  />
-                ),
-                tabBarLabel: ({ focused }) => (
-                  <TabLabel
-                    title={t('tabs.journal')}
-                    focused={resolveV2TabIsActive(
-                      pathname,
-                      'journal',
-                      FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
-                      focused,
-                      activeReturnTo,
-                    )}
-                  />
-                ),
-              }}
-            />
-            <Tabs.Screen
-              name="home"
-              options={{
-                title: t(homeTabPresentation.titleKey),
-                tabBarButtonTestID: 'tab-home',
-                tabBarAccessibilityLabel: t(
-                  homeTabPresentation.accessibilityLabelKey,
-                ),
-                // Lazy-load the Home tab so the initial mount only renders the
-                // visible gate screens (consent, profile creation). The trade-off
-                // is a brief spinner on the first Home tap, but it cuts ~200ms
-                // off the critical auth→gate path on low-end devices.
-                lazy: true,
-                tabBarIcon: ({ focused }) => (
-                  <TabIcon
-                    name={homeTabPresentation.iconName}
-                    focused={focused}
-                  />
-                ),
-              }}
-            />
-            <Tabs.Screen
-              name="own-learning"
-              options={{
-                title: t('tabs.myLearning'),
-                tabBarButtonTestID: 'tab-my-learning',
-                tabBarAccessibilityLabel: t('tabs.myLearningLabel'),
-                tabBarIcon: ({ focused }) => (
-                  <TabIcon name="School" focused={focused} />
-                ),
-              }}
-            />
-            <Tabs.Screen
-              name="library"
-              options={{
-                title: t('tabs.library'),
-                tabBarButtonTestID: 'tab-library',
-                tabBarAccessibilityLabel: t('tabs.libraryLabel'),
-                tabBarIcon: ({ focused }) => (
-                  <TabIcon name="Book" focused={focused} />
-                ),
-              }}
-            />
-            <Tabs.Screen
-              name="recaps"
-              options={{
-                title: t('tabs.recaps'),
-                tabBarButtonTestID: 'tab-recaps',
-                tabBarAccessibilityLabel: t('tabs.recapsLabel'),
-                tabBarIcon: ({ focused }) => (
-                  <TabIcon name="Recaps" focused={focused} />
-                ),
-              }}
-            />
-            <Tabs.Screen
-              name="progress"
-              options={{
-                title: t('tabs.progress'),
-                tabBarButtonTestID: 'tab-progress',
-                tabBarAccessibilityLabel: t('tabs.progressLabel'),
-                tabBarIcon: ({ focused }) => (
-                  <TabIcon name="Progress" focused={focused} />
-                ),
-              }}
-            />
-            <Tabs.Screen
-              name="more"
-              options={{
-                title: t('tabs.more'),
-                tabBarButtonTestID: 'tab-more',
-                tabBarAccessibilityLabel: t('tabs.moreLabel'),
-                tabBarIcon: ({ focused }) => (
-                  <TabIcon name="More" focused={focused} />
-                ),
-              }}
-            />
-            {/* Bug 763: Explicit href:null entries for non-tab routes so Expo
+            >
+              <Tabs.Screen
+                name="mentor"
+                options={{
+                  title: t('tabs.mentor'),
+                  tabBarButtonTestID: 'tab-mentor',
+                  tabBarAccessibilityLabel: t('tabs.mentorLabel'),
+                  tabBarIcon: ({ focused }) => (
+                    <TabIcon
+                      name="Home"
+                      focused={resolveV2TabIsActive(
+                        pathname,
+                        'mentor',
+                        FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+                        focused,
+                        activeReturnTo,
+                      )}
+                    />
+                  ),
+                  tabBarLabel: ({ focused }) => (
+                    <TabLabel
+                      title={t('tabs.mentor')}
+                      focused={resolveV2TabIsActive(
+                        pathname,
+                        'mentor',
+                        FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+                        focused,
+                        activeReturnTo,
+                      )}
+                    />
+                  ),
+                }}
+              />
+              <Tabs.Screen
+                name="subjects"
+                options={{
+                  title: t('tabs.subjects'),
+                  tabBarButtonTestID: 'tab-subjects',
+                  tabBarAccessibilityLabel: t('tabs.subjectsLabel'),
+                  tabBarIcon: ({ focused }) => (
+                    <TabIcon
+                      name="Book"
+                      focused={resolveV2TabIsActive(
+                        pathname,
+                        'subjects',
+                        FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+                        focused,
+                        activeReturnTo,
+                      )}
+                    />
+                  ),
+                  tabBarLabel: ({ focused }) => (
+                    <TabLabel
+                      title={t('tabs.subjects')}
+                      focused={resolveV2TabIsActive(
+                        pathname,
+                        'subjects',
+                        FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+                        focused,
+                        activeReturnTo,
+                      )}
+                    />
+                  ),
+                }}
+              />
+              <Tabs.Screen
+                name="journal"
+                options={{
+                  title: t('tabs.journal'),
+                  tabBarButtonTestID: 'tab-journal',
+                  tabBarAccessibilityLabel: t('tabs.journalLabel'),
+                  tabBarIcon: ({ focused }) => (
+                    <TabIcon
+                      name="Recaps"
+                      focused={resolveV2TabIsActive(
+                        pathname,
+                        'journal',
+                        FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+                        focused,
+                        activeReturnTo,
+                      )}
+                    />
+                  ),
+                  tabBarLabel: ({ focused }) => (
+                    <TabLabel
+                      title={t('tabs.journal')}
+                      focused={resolveV2TabIsActive(
+                        pathname,
+                        'journal',
+                        FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+                        focused,
+                        activeReturnTo,
+                      )}
+                    />
+                  ),
+                }}
+              />
+              <Tabs.Screen
+                name="home"
+                options={{
+                  title: t(homeTabPresentation.titleKey),
+                  tabBarButtonTestID: 'tab-home',
+                  tabBarAccessibilityLabel: t(
+                    homeTabPresentation.accessibilityLabelKey,
+                  ),
+                  // Lazy-load the Home tab so the initial mount only renders the
+                  // visible gate screens (consent, profile creation). The trade-off
+                  // is a brief spinner on the first Home tap, but it cuts ~200ms
+                  // off the critical auth→gate path on low-end devices.
+                  lazy: true,
+                  tabBarIcon: ({ focused }) => (
+                    <TabIcon
+                      name={homeTabPresentation.iconName}
+                      focused={focused}
+                    />
+                  ),
+                }}
+              />
+              <Tabs.Screen
+                name="own-learning"
+                options={{
+                  title: t('tabs.myLearning'),
+                  tabBarButtonTestID: 'tab-my-learning',
+                  tabBarAccessibilityLabel: t('tabs.myLearningLabel'),
+                  tabBarIcon: ({ focused }) => (
+                    <TabIcon name="School" focused={focused} />
+                  ),
+                }}
+              />
+              <Tabs.Screen
+                name="library"
+                options={{
+                  title: t('tabs.library'),
+                  tabBarButtonTestID: 'tab-library',
+                  tabBarAccessibilityLabel: t('tabs.libraryLabel'),
+                  tabBarIcon: ({ focused }) => (
+                    <TabIcon name="Book" focused={focused} />
+                  ),
+                }}
+              />
+              <Tabs.Screen
+                name="recaps"
+                options={{
+                  title: t('tabs.recaps'),
+                  tabBarButtonTestID: 'tab-recaps',
+                  tabBarAccessibilityLabel: t('tabs.recapsLabel'),
+                  tabBarIcon: ({ focused }) => (
+                    <TabIcon name="Recaps" focused={focused} />
+                  ),
+                }}
+              />
+              <Tabs.Screen
+                name="progress"
+                options={{
+                  title: t('tabs.progress'),
+                  tabBarButtonTestID: 'tab-progress',
+                  tabBarAccessibilityLabel: t('tabs.progressLabel'),
+                  tabBarIcon: ({ focused }) => (
+                    <TabIcon name="Progress" focused={focused} />
+                  ),
+                }}
+              />
+              <Tabs.Screen
+                name="more"
+                options={{
+                  title: t('tabs.more'),
+                  tabBarButtonTestID: 'tab-more',
+                  tabBarAccessibilityLabel: t('tabs.moreLabel'),
+                  tabBarIcon: ({ focused }) => (
+                    <TabIcon name="More" focused={focused} />
+                  ),
+                }}
+              />
+              {/* Bug 763: Explicit href:null entries for non-tab routes so Expo
               Router does not auto-surface them as /quiz, /shelf/undefined,
               /subject/undefined, /pick-book/undefined, /child/undefined,
               etc. in the tab bar / web link list. The dynamic screenOptions
               callback above is the primary defense; these declarations are
               the belt-and-braces backup for routes that the callback misses
               on web auto-discovery. */}
-            {HIDDEN_TAB_ROUTES.map((routeName) => (
-              <Tabs.Screen
-                key={routeName}
-                name={routeName}
-                options={{ href: null }}
-              />
-            ))}
-          </Tabs>
-          {profileWasRemoved && (
-            <Pressable
-              onPress={acknowledgeProfileRemoval}
-              className="absolute left-4 right-4 z-50"
-              style={{ top: chromeTopInset + 8 }}
-              testID="profile-switched-toast"
-              accessibilityRole="alert"
+              {HIDDEN_TAB_ROUTES.map((routeName) => (
+                <Tabs.Screen
+                  key={routeName}
+                  name={routeName}
+                  options={{ href: null }}
+                />
+              ))}
+            </Tabs>
+            {profileWasRemoved && (
+              <Pressable
+                onPress={acknowledgeProfileRemoval}
+                className="absolute left-4 right-4 z-50"
+                style={{ top: chromeTopInset + 8 }}
+                testID="profile-switched-toast"
+                accessibilityRole="alert"
+              >
+                <View className="rounded-2xl bg-surface-elevated px-5 py-4 w-full shadow-lg">
+                  <Text className="text-body font-semibold text-text-primary mb-1">
+                    {t('tabs.profileSwitchedToast.title')}
+                  </Text>
+                  <Text className="text-body-sm text-text-secondary">
+                    {t('tabs.profileSwitchedToast.message')}
+                  </Text>
+                </View>
+              </Pressable>
+            )}
+          </View>
+          {familyIntentNavigatorBlocked ? (
+            <View
+              className="absolute inset-0 z-50 bg-background"
+              testID="family-intent-blocking-overlay"
             >
-              <View className="rounded-2xl bg-surface-elevated px-5 py-4 w-full shadow-lg">
-                <Text className="text-body font-semibold text-text-primary mb-1">
-                  {t('tabs.profileSwitchedToast.title')}
-                </Text>
-                <Text className="text-body-sm text-text-secondary">
-                  {t('tabs.profileSwitchedToast.message')}
-                </Text>
-              </View>
-            </Pressable>
-          )}
+              {familyIntentProbeFailed ? (
+                <ErrorFallback
+                  variant="centered"
+                  title={t('familyIntentOnboarding.restoreError.title')}
+                  message={t('familyIntentOnboarding.restoreError.message')}
+                  primaryAction={{
+                    label: t('familyIntentOnboarding.restoreError.retry'),
+                    onPress: () =>
+                      setFamilyIntentProbeAttempt((attempt) => attempt + 1),
+                    testID: 'family-intent-restore-retry',
+                  }}
+                  testID="family-intent-restore-error"
+                />
+              ) : (
+                <View
+                  className="flex-1 items-center justify-center"
+                  testID="family-intent-state-loading"
+                >
+                  <ActivityIndicator
+                    size="large"
+                    accessibilityLabel={t('common.loading')}
+                  />
+                </View>
+              )}
+            </View>
+          ) : null}
         </View>
       </ScopeContextProvider>
     </FeedbackProvider>

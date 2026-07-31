@@ -3872,7 +3872,6 @@
     "parentBirthDateLabel": "Tu fecha de nacimiento",
     "childBirthDateLabel": "Fecha de nacimiento del niño/a",
     "birthDateHint": "Así tu mentor se dirigirá a ti correctamente. La edad mínima es {{age}} años.",
-    "parentBirthDateHint": "Esto es para el adulto que configura la cuenta. Después podrás añadir a tu hijo/a. La edad mínima es {{age}} años.",
     "childBirthDateHint": "Así el mentor de tu hijo/a se dirigirá a él/ella correctamente. La edad mínima es {{age}} años.",
     "webDateFormatHint": "Introduce tu fecha de nacimiento como AAAA-MM-DD.",
     "childWebDateFormatHint": "Introduce la fecha de nacimiento de tu hijo/a como AAAA-MM-DD.",
@@ -3885,7 +3884,6 @@
     "upgradeRequiredBody": "Tu suscripción no admite perfiles adicionales. Mejora a un plan Familiar o Pro.",
     "seePlans": "Ver planes",
     "minimumAgeError": "Los estudiantes deben tener al menos {{age}} años. Elige una fecha de nacimiento anterior.",
-    "parentAdultAgeError": "Las cuentas de padres necesitan la fecha de nacimiento de un adulto. Introduce primero tus propios datos y luego añade a tu hijo/a.",
     "a11yCloseDatePicker": "Cerrar selector de fecha",
     "createdChildFamilyContextFailedBody": "El perfil de {{name}} está listo, pero no pudimos cambiarte al modo Familia automáticamente.",
     "createdChildFamilyContextTerminalFailedBody": "El perfil de {{name}} está listo, pero todavía no pudimos cambiarte al modo Familia. Puedes cambiar al modo Familia más tarde desde Más > Cuenta.",
@@ -4479,7 +4477,8 @@
       "bookCount_other": "{{count}} libros",
       "errorTitle": "No se pudieron cargar las asignaturas",
       "errorMessage": "Inténtalo de nuevo en un momento.",
-      "addSupporterLabel": "Empezar a apoyar"
+      "addSupporterLabel": "Empezar a apoyar",
+      "learnerAsked": "{{name}} preguntó: {{question}}"
     },
     "journal": {
       "title": "Diario",
@@ -4616,5 +4615,68 @@
     "errorMessage": "Inténtalo de nuevo en un momento.",
     "cta": "Aprende algo por tu cuenta",
     "hint": "Empieza o continúa tu propio aprendizaje."
+  },
+  "familyIntentOnboarding": {
+    "adultDetailsHint": "Estos son los datos del adulto que configura la cuenta. Luego te preguntaremos quién va a aprender. La edad mínima es de {{age}} años.",
+    "adultAgeError": "La configuración familiar requiere la fecha de nacimiento de un adulto. Ingresa primero tus datos y luego elige quién va a aprender.",
+    "target": {
+      "title": "¿Quién va a aprender?",
+      "message": "Elige qué quieres configurar primero.",
+      "me": "Yo",
+      "someoneElse": "Alguien más"
+    },
+    "login": {
+      "title": "¿El estudiante tiene su propio inicio de sesión?",
+      "message": "Elige Sí si inicia sesión en MentoMate con su propio correo electrónico.",
+      "yes": "Sí, tienen",
+      "no": "No, no tienen"
+    },
+    "managedUnavailable": {
+      "title": "Los perfiles sin inicio de sesión propio aún no están disponibles",
+      "message": "Por ahora, puedes invitar a un estudiante que tenga su propio inicio de sesión en MentoMate."
+    },
+    "actionError": "No se pudo guardar esa elección. Vuelve a intentarlo.",
+    "saveError": "Tu perfil se ha creado, pero no pudimos guardar el siguiente paso de la configuración. Vuelve a intentarlo.",
+    "restoreError": {
+      "title": "No se pudo restaurar la configuración familiar",
+      "message": "Tu elección sigue protegida. Vuelve a intentarlo antes de continuar.",
+      "retry": "Reintentar"
+    }
+  },
+  "sharedRecord": {
+    "fact": {
+      "headline_one": "{{name}} tiene 1 actualización para compartir.",
+      "headline_other": "{{name}} tiene {{count}} actualizaciones para compartir.",
+      "weeklyReport": {
+        "title": "Informe semanal",
+        "topicsMastered_one": "{{count}} tema dominado",
+        "topicsMastered_other": "{{count}} temas dominados",
+        "wordsLearned_one": "{{count}} palabra aprendida",
+        "wordsLearned_other": "{{count}} palabras aprendidas",
+        "topicsExplored_one": "{{count}} tema explorado",
+        "topicsExplored_other": "{{count}} temas explorados"
+      },
+      "sessionRecap": {
+        "title": "Resumen de la sesión listo",
+        "detail": "Ya está listo un resumen de aprendizaje para compartir del {{date}}."
+      },
+      "milestone": {
+        "title": "Logro alcanzado",
+        "vocabularyCount_one": "{{count}} palabra aprendida",
+        "vocabularyCount_other": "{{count}} palabras aprendidas",
+        "topicMasteredCount_one": "{{count}} tema dominado",
+        "topicMasteredCount_other": "{{count}} temas dominados",
+        "sessionCount_one": "{{count}} sesión de aprendizaje completada",
+        "sessionCount_other": "{{count}} sesiones de aprendizaje completadas",
+        "streakLength": "Racha de {{count}} días",
+        "subjectMastered": "{{subject}} dominado",
+        "bookCompleted": "Libro completado",
+        "learningTime_one": "{{count}} hora de aprendizaje",
+        "learningTime_other": "{{count}} horas de aprendizaje",
+        "cefrLevelUp": "Nivel de idioma aumentado",
+        "topicsExplored_one": "{{count}} tema explorado en {{subject}}",
+        "topicsExplored_other": "{{count}} temas explorados en {{subject}}"
+      }
+    }
   }
 }

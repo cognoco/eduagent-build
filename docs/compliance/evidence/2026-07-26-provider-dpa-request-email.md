@@ -54,5 +54,12 @@ In addition, two points specific to your standard documentation:
 | Provider | Sent to | Date sent | Response received | Evidence filed |
 |----------|---------|-----------|-------------------|----------------|
 | Anthropic | | 2026-07-26 | | |
-| Mistral | | 2026-07-26 | | |
-| Voyage AI | | 2026-07-26 | | |
+| Mistral | | 2026-07-26 | ~2026-07-27 (Emily, support ticket) — online standard DPA only, no countersigning; ZDR confirmed active for org | |
+| Voyage AI | | 2026-07-26 | 2026-07-30 (Christeena, support) — clarifying questions only (which service / base URL / org ID), no documentation yet | |
+
+### Follow-ups
+
+| Provider | Date | What |
+|----------|------|------|
+| Mistral | 2026-07-28 | Evidence-pack follow-up sent (ticket, Emily): statements in-reply requested — DPA version + effective date for org, transfer mechanism, ZDR/training exclusions, incidental special-category data, minors conditions, DP contact. Awaiting reply. |
+| Voyage AI | 2026-07-30 | Reply to clarifying questions SENT (direct API confirmed, base URL, org ID, Opted-Out status) + same statements-in-reply list as Mistral. Awaiting reply. |

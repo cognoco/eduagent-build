@@ -65,12 +65,21 @@ describe('deploy.yml api-deploy step ordering', () => {
     const retentionCheck = run.indexOf(
       'doppler secrets get RETENTION_PURGE_ENABLED',
     );
+    const clerkAlignmentCheck = run.indexOf(
+      'node scripts/check-clerk-key-alignment.mjs',
+    );
     const workerSync = run.indexOf('pnpm secrets:sync "$SYNC_TARGET"');
 
     expect(run).toContain('if [ "$SYNC_TARGET" = "prd" ]');
+    expect(run).toContain('if [ "$SYNC_TARGET" = "stg" ]');
+    expect(run).toMatch(
+      /doppler run -p mentomate -c "\$SYNC_TARGET" -- \\\n\s+node scripts\/check-clerk-key-alignment\.mjs/,
+    );
     expect(run).toContain('RETENTION_PURGE_ENABLED must be true');
     expect(run).toContain('SKIP_DOPPLER_SYNC cannot be used for production');
     expect(retentionCheck).toBeGreaterThanOrEqual(0);
+    expect(clerkAlignmentCheck).toBeGreaterThanOrEqual(0);
+    expect(workerSync).toBeGreaterThan(clerkAlignmentCheck);
     expect(workerSync).toBeGreaterThan(retentionCheck);
   });
 });

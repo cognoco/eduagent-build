@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "wi-2739-jest-phase.v1",
+  "phase": "exact-restore",
+  "command": "rtk env DATABASE_URL=postgresql://local:local@127.0.0.1:5432/mentomate_test pnpm exec jest --config apps/api/jest.config.cjs --runInBand --no-coverage apps/api/src/inngest/functions/transcript-purge-cron.test.ts apps/api/src/inngest/functions/transcript-purge-observe.test.ts apps/api/src/inngest/functions/summary-regenerate.test.ts apps/api/src/services/transcript-purge.test.ts --json --outputFile=<phase-api-output>",
+  "exitCode": 0,
+  "productionSourceCommit": "2e84f0b6bae9958c7faeaae1f80c97744dd06c0a",
+  "retainedTestsCommit": "2e84f0b6bae9958c7faeaae1f80c97744dd06c0a",
+  "rawOutputSha256": "006aa47bd3dffd2d161959defe4dba64671c952d11408fe5172ac1791a12c23c",
+  "result": {
+    "success": true,
+    "numFailedTestSuites": 0,
+    "numPassedTestSuites": 4,
+    "numTotalTestSuites": 4,
+    "numFailedTests": 0,
+    "numPassedTests": 55,
+    "numPendingTests": 0,
+    "numTotalTests": 55,
+    "startTimeUnixMs": 1785511634337,
+    "testResults": [
+      {
+        "testFile": "apps/api/src/inngest/functions/transcript-purge-cron.test.ts",
+        "status": "passed",
+        "assertionCounts": {
+          "passed": 19,
+          "failed": 0,
+          "pending": 0
+        },
+        "failedAssertions": []
+      },
+      {
+        "testFile": "apps/api/src/inngest/functions/transcript-purge-observe.test.ts",
+        "status": "passed",
+        "assertionCounts": {
+          "passed": 22,
+          "failed": 0,
+          "pending": 0
+        },
+        "failedAssertions": []
+      },
+      {
+        "testFile": "apps/api/src/inngest/functions/summary-regenerate.test.ts",
+        "status": "passed",
+        "assertionCounts": {
+          "passed": 8,
+          "failed": 0,
+          "pending": 0
+        },
+        "failedAssertions": []
+      },
+      {
+        "testFile": "apps/api/src/services/transcript-purge.test.ts",
+        "status": "passed",
+        "assertionCounts": {
+          "passed": 6,
+          "failed": 0,
+          "pending": 0
+        },
+        "failedAssertions": []
+      }
+    ]
+  }
+}

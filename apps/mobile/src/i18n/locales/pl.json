@@ -4026,7 +4026,6 @@
     "parentBirthDateLabel": "Twoja data urodzenia",
     "childBirthDateLabel": "Data urodzenia dziecka",
     "birthDateHint": "Dzięki temu Twój mentor będzie zwracał się do Ciebie w odpowiedni sposób. Minimalny wiek to {{age}} lat.",
-    "parentBirthDateHint": "To informacje dla dorosłego, który zakłada konto. Następnie możesz dodać swoje dziecko. Minimalny wiek to {{age}} lat.",
     "childBirthDateHint": "Dzięki temu mentor Twojego dziecka będzie zwracał się do niego w odpowiedni sposób. Minimalny wiek to {{age}} lat.",
     "webDateFormatHint": "Wpisz swoją datę urodzenia w formacie RRRR-MM-DD.",
     "childWebDateFormatHint": "Wpisz datę urodzenia swojego dziecka w formacie RRRR-MM-DD.",
@@ -4039,7 +4038,6 @@
     "upgradeRequiredBody": "Twoja subskrypcja nie obsługuje dodatkowych profili. Ulepsz plan do Rodzinnego lub Pro.",
     "seePlans": "Zobacz plany",
     "minimumAgeError": "Uczący się muszą mieć co najmniej {{age}} lat. Wybierz wcześniejszą datę urodzenia.",
-    "parentAdultAgeError": "Konta rodziców wymagają daty urodzenia osoby dorosłej. Najpierw wpisz swoje dane, a potem dodaj dziecko.",
     "a11yCloseDatePicker": "Zamknij wybór daty",
     "createdChildFamilyContextFailedBody": "Profil {{name}} jest gotowy, ale nie udało nam się automatycznie przełączyć Cię na tryb rodzinny.",
     "createdChildFamilyContextTerminalFailedBody": "Profil {{name}} jest gotowy, ale nadal nie udało nam się przełączyć Cię na tryb rodzinny. Możesz przełączyć się na tryb rodzinny później z Więcej > Konto.",
@@ -4649,7 +4647,8 @@
       "bookCount_other": "{{count}} książek",
       "errorTitle": "Nie udało się wczytać przedmiotów",
       "errorMessage": "Spróbuj ponownie za chwilę.",
-      "addSupporterLabel": "Zacznij wspierać"
+      "addSupporterLabel": "Zacznij wspierać",
+      "learnerAsked": "{{name}} pyta: {{question}}"
     },
     "journal": {
       "title": "Dziennik",
@@ -4786,5 +4785,86 @@
     "errorMessage": "Spróbuj ponownie za chwilę.",
     "cta": "Naucz się czegoś samodzielnie",
     "hint": "Rozpocznij lub kontynuuj własną naukę."
+  },
+  "familyIntentOnboarding": {
+    "adultDetailsHint": "To dla osoby dorosłej zakładającej konto. Następnie zapytamy, kto będzie się uczyć. Minimalny wiek to {{age}}.",
+    "adultAgeError": "Konfiguracja rodzinna wymaga daty urodzenia osoby dorosłej. Najpierw podaj swoje dane, a potem wybierz, kto będzie się uczyć.",
+    "target": {
+      "title": "Kto będzie się uczyć?",
+      "message": "Wybierz, co chcesz najpierw skonfigurować.",
+      "me": "Ja",
+      "someoneElse": "Ktoś inny"
+    },
+    "login": {
+      "title": "Czy osoba ucząca się ma własny login?",
+      "message": "Wybierz „Tak”, jeśli loguje się do MentoMate za pomocą własnego e-maila.",
+      "yes": "Tak, mają",
+      "no": "Nie, nie mają"
+    },
+    "managedUnavailable": {
+      "title": "Profile bez własnego loginu nie są jeszcze dostępne.",
+      "message": "Na razie możesz zaprosić do nauki osobę, która ma własny login MentoMate."
+    },
+    "actionError": "Nie udało się zapisać tego wyboru. Spróbuj ponownie.",
+    "saveError": "Twój profil został utworzony, ale nie udało się zapisać kolejnego kroku konfiguracji. Spróbuj ponownie.",
+    "restoreError": {
+      "title": "Nie udało się przywrócić konfiguracji rodzinnej",
+      "message": "Twój wybór jest nadal chroniony. Spróbuj ponownie, zanim przejdziesz dalej.",
+      "retry": "Spróbuj ponownie"
+    }
+  },
+  "sharedRecord": {
+    "fact": {
+      "headline_one": "{{name}} ma 1 aktualizację do udostępnienia.",
+      "headline_few": "{{name}} ma {{count}} aktualizacje do udostępnienia.",
+      "headline_many": "{{name}} ma {{count}} aktualizacji do udostępnienia.",
+      "headline_other": "{{name}} ma {{count}} aktualizacji do udostępnienia.",
+      "weeklyReport": {
+        "title": "Raport tygodniowy",
+        "topicsMastered_one": "{{count}} opanowany temat",
+        "topicsMastered_few": "{{count}} opanowane tematy",
+        "topicsMastered_many": "{{count}} opanowanych tematów",
+        "topicsMastered_other": "{{count}} opanowanych tematów",
+        "wordsLearned_one": "{{count}} nauczone słowo",
+        "wordsLearned_few": "{{count}} nauczone słowa",
+        "wordsLearned_many": "{{count}} nauczonych słów",
+        "wordsLearned_other": "{{count}} nauczonych słów",
+        "topicsExplored_one": "{{count}} zbadany temat",
+        "topicsExplored_few": "{{count}} zbadane tematy",
+        "topicsExplored_many": "{{count}} zbadanych tematów",
+        "topicsExplored_other": "{{count}} zbadanych tematów"
+      },
+      "sessionRecap": {
+        "title": "Podsumowanie sesji gotowe",
+        "detail": "Podsumowanie nauki z {{date}} do udostępnienia jest gotowe."
+      },
+      "milestone": {
+        "title": "Kamień milowy osiągnięty",
+        "vocabularyCount_one": "{{count}} nauczone słowo",
+        "vocabularyCount_few": "{{count}} nauczone słowa",
+        "vocabularyCount_many": "{{count}} nauczonych słów",
+        "vocabularyCount_other": "{{count}} nauczonych słów",
+        "topicMasteredCount_one": "{{count}} opanowany temat",
+        "topicMasteredCount_few": "{{count}} opanowane tematy",
+        "topicMasteredCount_many": "{{count}} opanowanych tematów",
+        "topicMasteredCount_other": "{{count}} opanowanych tematów",
+        "sessionCount_one": "{{count}} ukończona sesja nauki",
+        "sessionCount_few": "{{count}} ukończone sesje nauki",
+        "sessionCount_many": "{{count}} ukończonych sesji nauki",
+        "sessionCount_other": "{{count}} ukończonych sesji nauki",
+        "streakLength": "{{count}}-dniowa seria",
+        "subjectMastered": "Opanowano {{subject}}",
+        "bookCompleted": "Ukończono książkę",
+        "learningTime_one": "{{count}} godzina nauki",
+        "learningTime_few": "{{count}} godziny nauki",
+        "learningTime_many": "{{count}} godzin nauki",
+        "learningTime_other": "{{count}} godzin nauki",
+        "cefrLevelUp": "Wyższy poziom językowy",
+        "topicsExplored_one": "{{subject}}: {{count}} zbadany temat",
+        "topicsExplored_few": "{{subject}}: {{count}} zbadane tematy",
+        "topicsExplored_many": "{{subject}}: {{count}} zbadanych tematów",
+        "topicsExplored_other": "{{subject}}: {{count}} zbadanych tematów"
+      }
+    }
   }
 }

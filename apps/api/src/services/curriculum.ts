@@ -25,6 +25,7 @@ import {
   needsDeepeningTopics,
   xpLedger,
   createScopedRepository,
+  generateUUIDv7,
   type Database,
 } from '@eduagent/database';
 import {
@@ -67,12 +68,16 @@ import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { createLogger } from './logger';
 import { buildFallbackBookTopics } from './book-generation-fallbacks';
 import { getPersonAge } from './identity-v2/helpers';
+import { assertLlmConsent } from './identity-v2/consent-status-v2';
 
 const logger = createLogger();
 import { regenerateLanguageCurriculum } from './language-curriculum';
 import {
   assertBookTopicWriteAvailable,
   ensureDefaultBook,
+  getLatestCurricula,
+  getLatestCurriculum,
+  MAX_LATEST_CURRICULUM_SUBJECTS,
 } from './curriculum-core';
 import {
   addTopicCompletion,
@@ -453,42 +458,55 @@ function dedupeBookRows(
   });
 }
 
-async function getLatestCurriculumRow(
-  db: Database,
-  subjectId: string,
-): Promise<typeof curricula.$inferSelect | undefined> {
-  return db.query.curricula.findFirst({
-    where: eq(curricula.subjectId, subjectId),
-    orderBy: desc(curricula.version),
-  });
-}
-
 export async function ensureCurriculum(
   db: Database,
+  profileId: string,
   subjectId: string,
 ): Promise<typeof curricula.$inferSelect> {
-  const existing = await getLatestCurriculumRow(db, subjectId);
+  const repo = createScopedRepository(db, profileId);
+  const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
+  if (!subject) {
+    throw new NotFoundError('Subject');
+  }
+
+  const existing = await getLatestCurriculum(db, profileId, subjectId);
   if (existing) {
     return existing;
   }
 
   // Use onConflictDoNothing to handle concurrent inserts safely.
-  // The unique index on (subjectId, version) prevents duplicates.
-  await db
+  // The INSERT ... SELECT keeps the profile ownership predicate inside the
+  // write statement; the unique index on (subjectId, version) prevents
+  // duplicate version-1 rows.
+  const curriculumId = generateUUIDv7();
+  const insertedAt = new Date();
+  const [inserted] = await db
     .insert(curricula)
-    .values({
-      subjectId,
-      version: 1,
-    })
-    .onConflictDoNothing();
+    .select(
+      db
+        .select({
+          id: sql<string>`${curriculumId}::uuid`.as('id'),
+          subjectId: subjects.id,
+          version: sql<number>`1`.as('version'),
+          generatedAt: sql<Date>`${insertedAt}::timestamptz`.as('generated_at'),
+          createdAt: sql<Date>`${insertedAt}::timestamptz`.as('created_at'),
+          updatedAt: sql<Date>`${insertedAt}::timestamptz`.as('updated_at'),
+        })
+        .from(subjects)
+        .where(
+          and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
+        ),
+    )
+    .onConflictDoNothing()
+    .returning();
+  if (inserted) {
+    return inserted;
+  }
 
   // Re-read to get the row regardless of whether we inserted or another
   // concurrent caller won the race.
-  const row = await getLatestCurriculumRow(db, subjectId);
-  if (!row)
-    throw new Error(
-      `Curriculum row not found after upsert for subjectId=${subjectId}`,
-    );
+  const row = await getLatestCurriculum(db, profileId, subjectId);
+  if (!row) throw new NotFoundError('Subject');
   return row;
 }
 
@@ -796,10 +814,7 @@ export async function getCurriculum(
   const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
   if (!subject) return null;
 
-  const curriculum = await db.query.curricula.findFirst({
-    where: eq(curricula.subjectId, subjectId),
-    orderBy: desc(curricula.version),
-  });
+  const curriculum = await getLatestCurriculum(db, profileId, subjectId);
   if (!curriculum) return null;
 
   const topics = await db.query.curriculumTopics.findMany({
@@ -850,10 +865,15 @@ export async function createBooks(
   return rows.map(mapBookRow);
 }
 
-// ensureDefaultBook is defined in ./curriculum-core (extracted to break the
+// These leaf helpers are defined in ./curriculum-core (extracted to break the
 // circular dependency with language-curriculum.ts) and re-exported from here
 // for callers that import it from this module.
-export { ensureDefaultBook };
+export {
+  ensureDefaultBook,
+  getLatestCurricula,
+  getLatestCurriculum,
+  MAX_LATEST_CURRICULUM_SUBJECTS,
+};
 
 /**
  * Persists LLM-generated topics for a narrow subject.
@@ -881,7 +901,7 @@ export async function persistNarrowTopics(
     const txDb = tx as unknown as Database;
     const bookId = await ensureDefaultBook(txDb, subjectId, subjectName);
     await assertBookTopicWriteAvailable(tx, profileId, subjectId, bookId);
-    const curriculum = await ensureCurriculum(txDb, subjectId);
+    const curriculum = await ensureCurriculum(txDb, profileId, subjectId);
     await tx
       .insert(curriculumTopics)
       .values(
@@ -1099,7 +1119,7 @@ export async function getBooks(
   // — found zero). Constrain to the latest curriculum so all three sources
   // (library aggregator, /subjects/:id/books/:id, /subjects/:id/curriculum)
   // agree.
-  const latestCurriculum = await getLatestCurriculumRow(db, subjectId);
+  const latestCurriculum = await getLatestCurriculum(db, profileId, subjectId);
   if (!latestCurriculum) {
     // No curriculum row yet — every book legitimately has zero topics.
     return rows.map((book) => ({
@@ -1357,26 +1377,10 @@ export async function getAllProfileBooks(
   // orphan rows from prior curriculum versions and disagrees with the
   // per-book detail endpoint. We take MAX(version) per subject_id and only
   // count topics whose curriculum_id is in that set.
-  const latestCurriculaRows = await db
-    .select({
-      id: curricula.id,
-      subjectId: curricula.subjectId,
-      version: curricula.version,
-    })
-    .from(curricula)
-    .where(inArray(curricula.subjectId, subjectIds));
-  // Pick max-version row per subject in JS — Drizzle's window-function
-  // surface varies by driver and the row count is bounded by `subjectIds`.
-  const latestCurriculumIdBySubject = new Map<string, string>();
-  const latestVersionBySubject = new Map<string, number>();
-  for (const row of latestCurriculaRows) {
-    const prev = latestVersionBySubject.get(row.subjectId);
-    if (prev === undefined || row.version > prev) {
-      latestVersionBySubject.set(row.subjectId, row.version);
-      latestCurriculumIdBySubject.set(row.subjectId, row.id);
-    }
-  }
-  const latestCurriculumIds = Array.from(latestCurriculumIdBySubject.values());
+  const latestCurricula = await getLatestCurricula(db, profileId, subjectIds);
+  const latestCurriculumIds = [...latestCurricula.values()].map(
+    (curriculum) => curriculum.id,
+  );
 
   // 2. All non-skipped topic IDs for those books in a single query.
   // If no curriculum exists yet for any subject, skip the query entirely —
@@ -1479,7 +1483,7 @@ export async function getBookWithTopics(
     return null;
   }
 
-  const curriculum = await getLatestCurriculumRow(db, subjectId);
+  const curriculum = await getLatestCurriculum(db, profileId, subjectId);
   const topicRows = curriculum
     ? await db.query.curriculumTopics.findMany({
         where: and(
@@ -1565,6 +1569,7 @@ export async function repairIncompleteBookGenerationClaim(
       error: unknown,
       context?: { profileId?: string; extra?: Record<string, unknown> },
     ) => void;
+    assertLlmConsent?: typeof assertLlmConsent;
   },
 ): Promise<IncompleteBookGenerationClaimRepairResult> {
   const activeTopicCount = existing.topics.filter(
@@ -1597,7 +1602,11 @@ export async function repairIncompleteBookGenerationClaim(
     // after acquiring the expansion marker so a topic filed between the route
     // read and this claim wins: filed books with any active topic are complete
     // and must not be auto-expanded by the legacy zero-topic repair path.
-    const latestCurriculum = await getLatestCurriculumRow(db, subjectId);
+    const latestCurriculum = await getLatestCurriculum(
+      db,
+      profileId,
+      subjectId,
+    );
     const activeTopic = latestCurriculum
       ? await db.query.curriculumTopics.findFirst({
           where: and(
@@ -1910,9 +1919,13 @@ export async function persistBookTopics(
   const curriculum = options.expansionClaimStartedAt
     ? await db.transaction(async (tx) => {
         await assertExpansionClaim(tx);
-        return ensureCurriculum(tx as unknown as Database, subjectId);
+        return ensureCurriculum(
+          tx as unknown as Database,
+          profileId,
+          subjectId,
+        );
       })
-    : await ensureCurriculum(db, subjectId);
+    : await ensureCurriculum(db, profileId, subjectId);
   const existingTopics = await db.query.curriculumTopics.findMany({
     where: and(
       eq(curriculumTopics.curriculumId, curriculum.id),
@@ -2262,6 +2275,8 @@ export async function persistBookTopics(
  * real LLM provider or Sentry client.
  */
 export async function generateBookTopicsWithFallback(
+  db: Database,
+  profileId: string,
   bookTitle: string,
   bookDescription: string,
   learnerAge: number,
@@ -2282,8 +2297,11 @@ export async function generateBookTopicsWithFallback(
       bookDescription: string,
     ) => BookTopicGenerationResult;
     sentryContext: { profileId?: string; extra?: Record<string, unknown> };
+    assertLlmConsent?: typeof assertLlmConsent;
   },
 ): Promise<BookTopicGenerationResult> {
+  const assertConsent = deps.assertLlmConsent ?? assertLlmConsent;
+  await assertConsent(db, profileId);
   try {
     return await deps.generateBookTopics(
       bookTitle,
@@ -2336,6 +2354,7 @@ export async function expandExistingBookTopics(
       error: unknown,
       context?: { profileId?: string; extra?: Record<string, unknown> },
     ) => void;
+    assertLlmConsent?: typeof assertLlmConsent;
     expansionClaimStartedAt?: Date;
   },
 ): Promise<BookWithTopics> {
@@ -2353,6 +2372,8 @@ export async function expandExistingBookTopics(
     .join('\n');
 
   const generated = await generateBookTopicsWithFallback(
+    db,
+    profileId,
     existing.book.title,
     existing.book.description ?? '',
     deps.learnerAge,
@@ -2360,6 +2381,7 @@ export async function expandExistingBookTopics(
     {
       generateBookTopics: deps.generateBookTopics,
       captureException: deps.captureException,
+      assertLlmConsent: deps.assertLlmConsent,
       buildFallbackBookTopics,
       sentryContext: {
         profileId,
@@ -2404,10 +2426,7 @@ export async function addCurriculumTopic(
   const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
   if (!subject) throw new NotFoundError('Subject');
 
-  const curriculum = await db.query.curricula.findFirst({
-    where: eq(curricula.subjectId, subjectId),
-    orderBy: desc(curricula.version),
-  });
+  const curriculum = await getLatestCurriculum(db, profileId, subjectId);
   if (!curriculum) throw new NotFoundError('Curriculum');
 
   if (input.mode === 'preview') {
@@ -2567,10 +2586,7 @@ export async function skipTopic(
   if (!subject) throw new NotFoundError('Subject');
 
   // Verify topic belongs to this subject's curriculum
-  const curriculum = await db.query.curricula.findFirst({
-    where: eq(curricula.subjectId, subjectId),
-    orderBy: desc(curricula.version),
-  });
+  const curriculum = await getLatestCurriculum(db, profileId, subjectId);
   if (!curriculum) throw new NotFoundError('Curriculum');
 
   const topic = await db.query.curriculumTopics.findFirst({
@@ -2623,10 +2639,7 @@ export async function unskipTopic(
   if (!subject) throw new NotFoundError('Subject');
 
   // Verify topic belongs to this subject's curriculum
-  const curriculum = await db.query.curricula.findFirst({
-    where: eq(curricula.subjectId, subjectId),
-    orderBy: desc(curricula.version),
-  });
+  const curriculum = await getLatestCurriculum(db, profileId, subjectId);
   if (!curriculum) throw new NotFoundError('Curriculum');
 
   const topic = await db.query.curriculumTopics.findFirst({
@@ -2754,10 +2767,11 @@ export async function challengeCurriculum(
   if (!subject) throw new NotFoundError('Subject');
 
   if (subject.pedagogyMode === 'four_strands' && subject.languageCode) {
-    const latestCurriculum = await db.query.curricula.findFirst({
-      where: eq(curricula.subjectId, subjectId),
-      orderBy: desc(curricula.version),
-    });
+    const latestCurriculum = await getLatestCurriculum(
+      db,
+      profileId,
+      subjectId,
+    );
     const latestTopics = latestCurriculum
       ? await db.query.curriculumTopics.findMany({
           where: eq(curriculumTopics.curriculumId, latestCurriculum.id),
@@ -2926,10 +2940,7 @@ export async function explainTopicOrdering(
   // solely on topicId, allowing a caller to pass any victim topicId and have
   // its title fed into the LLM prompt — a cross-account information disclosure.
   // [BUG-459] Pattern mirrors skipTopic / unskipTopic ownership verification.
-  const curriculum = await db.query.curricula.findFirst({
-    where: eq(curricula.subjectId, subjectId),
-    orderBy: desc(curricula.version),
-  });
+  const curriculum = await getLatestCurriculum(db, profileId, subjectId);
   if (!curriculum) throw new NotFoundError('Curriculum');
 
   const topic = await db.query.curriculumTopics.findFirst({

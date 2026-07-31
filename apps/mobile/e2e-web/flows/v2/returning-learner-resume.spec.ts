@@ -2,7 +2,8 @@ import { expect, test } from '@playwright/test';
 import {
   NOW_REFRESH_OBSERVATION_WINDOW_MS,
   assertRequestAttempted,
-  observeExactNowRefresh,
+  captureNowRefreshPayload,
+  observeCapturedNowRefresh,
   observeNowRefreshRequestAttempt,
 } from '../../helpers/now-refresh-observation';
 import { pressableClick } from '../../helpers/pressable';
@@ -120,15 +121,24 @@ test('WI-2234 returning learner: unfinished session resumes, exchanges, and retu
       postBackNowMatchesUrl(new URL(request.url())),
     { timeout: NOW_REFRESH_OBSERVATION_WINDOW_MS },
   );
-  const postBackNowResponsePromise = page.waitForResponse(
-    (response) => {
-      const request = response.request();
-      return (
-        request.method() === 'GET' &&
-        postBackNowMatchesUrl(new URL(response.url()))
-      );
-    },
-    { timeout: NOW_REFRESH_OBSERVATION_WINDOW_MS },
+  // [WI-2961] Start reading the body the instant Playwright observes the
+  // exact response. Keeping only the Response handle until after Back can
+  // outlive Chromium's Network body, making a healthy response unreadable.
+  const postBackNowCapturePromise = captureNowRefreshPayload(
+    page.waitForResponse(
+      (response) => {
+        const request = response.request();
+        return (
+          request.method() === 'GET' &&
+          postBackNowMatchesUrl(new URL(response.url()))
+        );
+      },
+      { timeout: NOW_REFRESH_OBSERVATION_WINDOW_MS },
+    ),
+    async (response) =>
+      (await response.json()) as {
+        generatedAt?: unknown;
+      },
   );
 
   await pressableClick(page.getByTestId('chat-shell-back'));
@@ -145,18 +155,16 @@ test('WI-2234 returning learner: unfinished session resumes, exchanges, and retu
   // fail the spec, not be accepted as a legitimate WI-2818 outcome.
   assertRequestAttempted(postBackNowRequestOutcome);
 
-  const postBackNowOutcome = await observeExactNowRefresh(
-    postBackNowResponsePromise,
+  const postBackNowOutcome = await observeCapturedNowRefresh(
+    postBackNowCapturePromise,
     { armedAtMs: postBackNowArmedAtMs, actionAtMs: postBackNowActionAtMs },
   );
   if (postBackNowOutcome.kind === 'settled') {
     // Evidence is strongest when the exact refresh settles inside the
     // observation window: prove it succeeded and was actually fresh.
-    const postBackNowResponse = postBackNowOutcome.response;
+    const { response: postBackNowResponse, payload: postBackNowFeed } =
+      postBackNowOutcome.response;
     expect(postBackNowResponse.ok()).toBe(true);
-    const postBackNowFeed = (await postBackNowResponse.json()) as {
-      generatedAt?: unknown;
-    };
     expect(typeof postBackNowFeed.generatedAt).toBe('string');
     expect(postBackNowFeed.generatedAt).not.toBe(initialNowFeed.generatedAt);
   }

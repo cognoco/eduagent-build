@@ -15,6 +15,7 @@ import {
 } from '../../../hooks/use-vocabulary';
 import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
 import { useSubjects } from '../../../hooks/use-subjects';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 import { formatApiError } from '../../../lib/format-api-error';
@@ -199,7 +200,12 @@ export default function VocabularyListScreen() {
           message={t('vocabulary.noSubject.message')}
           primaryAction={{
             label: t('vocabulary.noSubject.openLibrary'),
-            onPress: () => router.replace('/(app)/library' as const),
+            onPress: () =>
+              router.replace(
+                (FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+                  ? '/(app)/subjects'
+                  : '/(app)/library') as Href,
+              ),
             testID: 'vocabulary-empty-library',
           }}
           secondaryAction={{

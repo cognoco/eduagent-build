@@ -295,6 +295,33 @@ export type MentorNoticePolicyKnowledge = {
   /** Has any real signal — wire or stored — ever been folded in? */
   observed: boolean;
   hydrated: boolean;
+  /**
+   * [WI-2911] Has a storage read for this pair SUCCEEDED this session?
+   *
+   * `hydrated` says a read attempt has COMPLETED; this says one has completed
+   * successfully, and the two diverge exactly when storage is unreadable. A
+   * failed read folds 'malformed', which disables AT THE HELD REVISION — and at
+   * initial hydration the held revision is the bootstrap 0, so the very next
+   * observation above 0 is `newer`, adopted wholesale, and `state.enabled` goes
+   * true again while the disable floor on disk stays unread. Every surface that
+   * carries no observation of its own then repaints off that state: the exact
+   * in-session fail-open WI-2627 closed durably (the write is withheld while
+   * blind, and a restart re-reads the append-only floor markers) and left open
+   * for the life of the session.
+   *
+   * MONOTONIC, and deliberately: it is set on the first successful read and
+   * never cleared. A device whose hydration succeeded and whose FOREGROUND
+   * re-read later throws was still enabled from a trusted source, and
+   * re-suppressing it would strand a device that legitimately holds a
+   * server-issued enable.
+   *
+   * Consumed only by the no-observation branch of `noticesSuppressedForPayload`.
+   * A payload carrying its OWN observation is judged on that observation — the
+   * server's predicate V has already stripped notice data if the rollout is off,
+   * so a live reply is the one thing a blind device may still trust, and it is
+   * what keeps a blind device from going dark for the whole session.
+   */
+  trusted: boolean;
 };
 
 /**
@@ -322,6 +349,10 @@ export function signalIsObservation(signal: MentorNoticePolicySignal): boolean {
  *   - not hydrated: nothing may render off a projection before the stored
  *     observation is back (the cold-offline-launch case WI-2504 established);
  *   - the payload's own observation is malformed;
+ *   - [WI-2911] the payload carries NO observation and no read has SUCCEEDED
+ *     this session — the state such a payload would be judged against was
+ *     assembled blind, so it cannot stand in for the disable floor it could not
+ *     read;
  *   - the payload carries NO observation and this device HAS been told the
  *     rollout is off — the cached-resurrection case this store exists for;
  *   - the payload carries an observation, and policy is off at the revision we
@@ -346,6 +377,22 @@ export function noticesSuppressedForPayload(
   const signal = observationSignal(observation);
   if (signal === 'malformed') return true;
   if (signal === 'absent') {
+    // [WI-2911] THE IN-SESSION FLOOR. A payload with no observation is judged
+    // purely on stored policy state — so while no read has succeeded there is
+    // nothing legitimate to judge it on. Both readings of the bootstrap fail
+    // here: `observed` is true (the failed read folded 'malformed'), so this
+    // would suppress correctly for exactly as long as `state.enabled` stays
+    // false — and one stale observation above revision 0 flips it, because 0 is
+    // what a failed read leaves us holding. That is the resurrection, and it
+    // does not need a malicious payload: any pre-rollback reply in flight or in
+    // cache carries it.
+    //
+    // This is NOT gated on "an observation has arrived". A response from a
+    // worker predating the field carries none, and gating on presence would
+    // blank notices on every such response fleet-wide. It is gated on the read,
+    // so it fires only on a device whose storage is unreadable — a population
+    // that is already fail-closed by every other path in this module.
+    if (!knowledge.trusted) return true;
     return knowledge.observed ? !knowledge.state.enabled : false;
   }
   if (!knowledge.state.enabled) return true;
@@ -464,6 +511,36 @@ const UNBOUND_SNAPSHOT: MentorNoticePolicySnapshot = {
   state: MENTOR_NOTICE_POLICY_BOOTSTRAP,
   observed: false,
   hydrated: false,
+  // [WI-2933, correcting a WI-2911 rationale] `true` is the right VALUE, and the
+  // reason given for it was wrong. `trusted` asserts "no read of this pair's
+  // stored record has failed"; an unbound pair has no key, so no read was ever
+  // attempted and none can have failed. That stands on its own.
+  //
+  // The struck justification claimed this matched `hydrated`/`observed` "which
+  // the hook already reports as true when unbound". It does not: the literal two
+  // lines above sets BOTH to `false`. The "true when unbound" belongs to the
+  // hook's RETURN (`bound ? snapshot.hydrated : true`), a different object built
+  // from this one — so the old comment justified a field of this literal by
+  // citing values this literal does not hold.
+  //
+  // Rationale corrected rather than value changed — and the FIRST correction
+  // was wrong the same way. It claimed flipping this to `false` would make
+  // `noticesSuppressedForPayload` suppress unconditionally. That consequence
+  // belongs to a DIFFERENT literal: the one built inline in
+  // `mentorNoticePolicySuppressesPayloadFor`'s unbound branch, which pairs
+  // `trusted: true` with `hydrated: true` and so does reach the `!trusted`
+  // check. Read that literal for the fleet-wide-blanking argument; it is the
+  // one that carries it.
+  //
+  // THIS field is read on no live path, on four counts: the only reference is
+  // `getSnapshot`'s `if (!key) return UNBOUND_SNAPSHOT`; the unbound branch
+  // above builds its own literal instead of using this one;
+  // `noticesSuppressedForPayload` returns at `!hydrated` before `trusted` is
+  // read, and this literal sets `hydrated: false`; and the hook's return masks
+  // it (`trusted: bound ? snapshot.trusted : true`). Flipping it changes
+  // nothing observable. `true` is the honest label for "no read was attempted",
+  // which is why it stays.
+  trusted: true,
 };
 
 /**
@@ -484,6 +561,7 @@ function getEntry(key: string): Entry {
         state: MENTOR_NOTICE_POLICY_BOOTSTRAP,
         observed: false,
         hydrated: false,
+        trusted: false,
       },
       listeners: new Set(),
       hydrating: false,
@@ -503,16 +581,18 @@ function commit(
   state: MentorNoticePolicyState,
   observed: boolean,
   hydrated: boolean,
+  trusted: boolean,
 ): void {
   const previous = entry.snapshot;
   if (
     previous.state === state &&
     previous.observed === observed &&
-    previous.hydrated === hydrated
+    previous.hydrated === hydrated &&
+    previous.trusted === trusted
   ) {
     return;
   }
-  entry.snapshot = { state, observed, hydrated };
+  entry.snapshot = { state, observed, hydrated, trusted };
   for (const listener of entry.listeners) listener();
 }
 
@@ -820,15 +900,25 @@ function schedulePersist(key: string, entry: Entry): void {
  * fail-closed" per the acceptance criteria. It disables at the held revision and
  * never resurrects a lower revision.
  *
- * PRECISELY, because the stronger reading is false: at HYDRATION the held revision
- * is the bootstrap 0, so a subsequent observation above 0 does re-enable
- * IN-SESSION. Pre-existing and unchanged here — it occurs identically with the
- * rollback carried in the state record on `main`. It is not the durable class this
- * Work Item closes: the durable write is correctly withheld while blind, and a
- * restart re-reads the floor. Tracked as a follow-up rather than fixed in scope.
+ * [WI-2911] That is not sufficient ON ITS OWN, and this is where the in-session
+ * hole was. At HYDRATION the held revision is the bootstrap 0, so 'malformed'
+ * disables at 0 — and any subsequent observation above 0 is `newer` and adopted
+ * wholesale, `enabled` included. WI-2627 closed the DURABLE half (the write is
+ * withheld while blind, and a restart re-reads the append-only floor markers);
+ * what remained was the rest of the session, in which a cached or in-flight
+ * pre-rollback projection could repaint. So this function also records WHETHER
+ * THE READ SUCCEEDED, and `noticesSuppressedForPayload` refuses to judge an
+ * observation-less payload on state assembled blind. The floor markers are
+ * untouched — this is a read-side verdict, not a new durable fact.
  */
 async function readAndFold(key: string, entry: Entry): Promise<void> {
   let signal: MentorNoticePolicySignal;
+  /**
+   * [WI-2911] Whether THIS attempt got a clean look at the disk. Folded into the
+   * snapshot's monotonic `trusted` at commit, never used to clear it: a session
+   * that has already read successfully keeps that standing.
+   */
+  let readSucceeded = false;
   // [WI-2627 rework 4] The suppress-only disable floor, folded ADDITIVELY on top
   // of the state record below. 'absent' — no markers, the common case —
   // contributes nothing. Always `enabled: false` (see `disableFloorSignal`), so
@@ -862,6 +952,11 @@ async function readAndFold(key: string, entry: Entry): Promise<void> {
     // and the write path is unblocked.
     entry.durable = typeof signal === 'object' ? signal : null;
     entry.readUntrusted = false;
+    // [WI-2911] BOTH reads landed (they share this `try`, and the state record is
+    // read first), so whatever the disk holds — a record, nothing, or something
+    // unparseable — we have seen it. That is what `trusted` asserts: not that the
+    // contents were good, but that we were able to look.
+    readSucceeded = true;
   } catch (err) {
     Sentry.captureException(err, {
       tags: { feature: 'mentor_notice_policy', op: 'read' },
@@ -894,6 +989,10 @@ async function readAndFold(key: string, entry: Entry): Promise<void> {
       signalIsObservation(signal) ||
       signalIsObservation(floor),
     true,
+    // [WI-2911] Monotonic: OR against what the session already holds, so a
+    // foreground re-read that throws cannot revoke a standing established by an
+    // earlier successful read.
+    entry.snapshot.trusted || readSucceeded,
   );
 }
 
@@ -949,7 +1048,14 @@ export function foldMentorNoticePolicyFor(
     );
   }
   const next = reduceMentorNoticePolicy(entry.snapshot.state, signal);
-  commit(entry, next, true, entry.snapshot.hydrated);
+  // [WI-2911] An observation is NOT an authorizing signal for `trusted`, and this
+  // is the load-bearing negative. Every fold site here fires only after a
+  // successful parse, so "a response arrived" and "an observation arrived" are
+  // the same event — letting a response confer `trusted` would hand the standing
+  // straight to the stale enabled reply this closes, which is the whole
+  // continuation. A blind device's recovery path is the LIVE payload, judged on
+  // its own observation below, not a re-blessed cache.
+  commit(entry, next, true, entry.snapshot.hydrated, entry.snapshot.trusted);
   // [WI-2627 rework] Not `persist(key, next)`. The write must carry whatever the
   // store holds when it actually reaches the disk, not this observation's
   // snapshot — otherwise a retried older ENABLED write can land after a newer
@@ -977,6 +1083,8 @@ export function mentorNoticePolicySuppressesPayloadFor(
         state: reduceMentorNoticePolicy(MENTOR_NOTICE_POLICY_BOOTSTRAP, signal),
         observed: signalIsObservation(signal),
         hydrated: true,
+        // [WI-2911] No pair, no key, no read — nothing was assembled blind.
+        trusted: true,
       },
       observation,
     );
@@ -1008,14 +1116,10 @@ export function useMentorNoticePolicy(
   /** Whether any real signal has ever been folded in for this pair. */
   observed: boolean;
   hydrated: boolean;
+  /** [WI-2911] Whether a storage read has SUCCEEDED for this pair this session. */
+  trusted: boolean;
   /** Fold an observation off any surface into the shared state. */
   observe: (observation: MentorNoticePolicyObservation | undefined) => void;
-  /**
-   * Record a fail-closed `malformed` signal when the observation could not be
-   * reached at all — e.g. the whole response failed schema validation, so no
-   * observation value exists to pass to `observe`.
-   */
-  observeMalformed: () => void;
   /** Whether THIS payload's notice content must be suppressed. */
   suppressed: (
     observation: MentorNoticePolicyObservation | undefined,
@@ -1075,10 +1179,6 @@ export function useMentorNoticePolicy(
     [actorId, profileId],
   );
 
-  const observeMalformed = useCallback(() => {
-    foldMentorNoticePolicyFor(actorId, profileId, 'malformed');
-  }, [actorId, profileId]);
-
   // Reads the LIVE store rather than this render's snapshot. In render the two
   // agree (both come from the same entry, and `useSyncExternalStore` re-renders
   // on every commit). The difference matters in an imperative callback that has
@@ -1096,17 +1196,17 @@ export function useMentorNoticePolicy(
       state: snapshot.state,
       observed: bound ? snapshot.observed : true,
       hydrated: bound ? snapshot.hydrated : true,
+      trusted: bound ? snapshot.trusted : true,
       observe,
-      observeMalformed,
       suppressed,
     }),
     [
       snapshot.state,
       snapshot.observed,
       snapshot.hydrated,
+      snapshot.trusted,
       bound,
       observe,
-      observeMalformed,
       suppressed,
     ],
   );

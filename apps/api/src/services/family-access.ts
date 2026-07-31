@@ -37,6 +37,26 @@ type CallerOwnerSource = {
 };
 
 /**
+ * Require a self-service write to target the authenticated caller's exact
+ * Person. `callerPersonId` is resolved from login→person server-side; the
+ * target profile selection is client-influenced.
+ */
+export function assertCallerIsActivePerson(
+  callerPersonId: string | undefined,
+  targetPersonId: string,
+  resolvedVia: ProfileMeta['resolvedVia'] | undefined,
+  message = 'You can only change the conversation language for your own profile.',
+): void {
+  if (
+    !callerPersonId ||
+    callerPersonId !== targetPersonId ||
+    resolvedVia !== 'explicit-header'
+  ) {
+    throw new ForbiddenError(message);
+  }
+}
+
+/**
  * Returns true if the authenticated parent profile has authority over the
  * given child profile. Delegates to the v2 guardianship edge
  * (`revoked_at IS NULL`). The boolean form for callers that branch on access.
