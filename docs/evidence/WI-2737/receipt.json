@@ -1,7 +1,13 @@
 {
   "schemaVersion": "wi-2737-red-green-revert-restore-v1",
   "baseCommit": "7ac91146c978d1d739751f788c0a01a13c565d3f",
-  "testCommand": "node scripts/doppler-run.mjs run -- pnpm test:api:unit --runTestsByPath apps/api/src/services/minor-pii-echo-gate.test.ts apps/api/src/services/learner-egress-filter.test.ts apps/api/src/services/llm/router.egress-filter.test.ts apps/api/src/inngest/functions/post-session-suggestions.test.ts --no-coverage --json --outputFile=<phase-result>",
+  "testCommands": {
+    "red": "node scripts/doppler-run.mjs run -- pnpm test:api:unit --runTestsByPath apps/api/src/services/minor-pii-echo-gate.test.ts apps/api/src/services/learner-egress-filter.test.ts apps/api/src/services/llm/router.egress-filter.test.ts apps/api/src/inngest/functions/post-session-suggestions.test.ts --no-coverage --json --outputFile=docs/evidence/WI-2737/red.json",
+    "green": "node scripts/doppler-run.mjs run -- pnpm test:api:unit --runTestsByPath apps/api/src/services/minor-pii-echo-gate.test.ts apps/api/src/services/learner-egress-filter.test.ts apps/api/src/services/llm/router.egress-filter.test.ts apps/api/src/inngest/functions/post-session-suggestions.test.ts --no-coverage --json --outputFile=docs/evidence/WI-2737/green.json",
+    "revert": "node scripts/doppler-run.mjs run -- pnpm test:api:unit --runTestsByPath apps/api/src/services/minor-pii-echo-gate.test.ts apps/api/src/services/learner-egress-filter.test.ts apps/api/src/services/llm/router.egress-filter.test.ts apps/api/src/inngest/functions/post-session-suggestions.test.ts --no-coverage --json --outputFile=docs/evidence/WI-2737/revert-red.json",
+    "restore": "node scripts/doppler-run.mjs run -- pnpm test:api:unit --runTestsByPath apps/api/src/services/minor-pii-echo-gate.test.ts apps/api/src/services/learner-egress-filter.test.ts apps/api/src/services/llm/router.egress-filter.test.ts apps/api/src/inngest/functions/post-session-suggestions.test.ts --no-coverage --json --outputFile=docs/evidence/WI-2737/restore-green.json"
+  },
+  "artifactPathNormalization": "Absolute worktree prefixes were removed from committed Jest string fields; outcomes, assertion failures, and repository-relative locations are unchanged.",
   "productionFiles": [
     "apps/api/src/services/minor-pii-echo-gate.ts",
     "apps/api/src/services/learner-egress-filter.ts",
@@ -56,6 +62,49 @@
       "productionHashesMatchGreen": true
     }
   ],
+  "addressBoundsRework": {
+    "productionFile": "apps/api/src/services/minor-pii-echo-gate.ts",
+    "regressedProductionSha256": "3d6137342be70371e9845ad41463c49058480404074614ed7e30bbf31dc21555",
+    "fixedProductionSha256": "abfd8db157abaed98ba5cc114cb1825ef2cf7ad748c4683f2b4a98d9d3fd532e",
+    "testCommands": {
+      "red": "node scripts/doppler-run.mjs run -- pnpm test:api:unit --runTestsByPath apps/api/src/services/minor-pii-echo-gate.test.ts --no-coverage --json --outputFile=docs/evidence/WI-2737/address-bounds-red.json",
+      "green": "node scripts/doppler-run.mjs run -- pnpm test:api:unit --runTestsByPath apps/api/src/services/minor-pii-echo-gate.test.ts --no-coverage --json --outputFile=docs/evidence/WI-2737/address-bounds-green.json",
+      "revert": "node scripts/doppler-run.mjs run -- pnpm test:api:unit --runTestsByPath apps/api/src/services/minor-pii-echo-gate.test.ts --no-coverage --json --outputFile=docs/evidence/WI-2737/address-bounds-revert-red.json",
+      "restore": "node scripts/doppler-run.mjs run -- pnpm test:api:unit --runTestsByPath apps/api/src/services/minor-pii-echo-gate.test.ts --no-coverage --json --outputFile=docs/evidence/WI-2737/address-bounds-restore-green.json"
+    },
+    "phases": [
+      {
+        "phase": "red",
+        "productionState": "address regex regressed; boundary tests retained",
+        "result": "docs/evidence/WI-2737/address-bounds-red.json",
+        "exitCode": 1,
+        "tests": { "total": 21, "passed": 19, "failed": 2 }
+      },
+      {
+        "phase": "green",
+        "productionState": "address-token bounds fixed",
+        "result": "docs/evidence/WI-2737/address-bounds-green.json",
+        "exitCode": 0,
+        "tests": { "total": 21, "passed": 21, "failed": 0 }
+      },
+      {
+        "phase": "revert",
+        "productionState": "production regex only reverted; boundary tests retained",
+        "result": "docs/evidence/WI-2737/address-bounds-revert-red.json",
+        "exitCode": 1,
+        "tests": { "total": 21, "passed": 19, "failed": 2 },
+        "productionHashMatchesRegressed": true
+      },
+      {
+        "phase": "restore",
+        "productionState": "address-token bounds fix restored",
+        "result": "docs/evidence/WI-2737/address-bounds-restore-green.json",
+        "exitCode": 0,
+        "tests": { "total": 21, "passed": 21, "failed": 0 },
+        "productionHashMatchesGreen": true
+      }
+    ]
+  },
   "notes": [
     "The ambient Node version was v26.5.0 while package.json requests Node 22.x; all four behavior phases executed and Jest produced complete result files.",
     "An earlier setup-only attempt was rejected because the ambient database source was shared staging; it ran zero tests, was overwritten, and is not represented as RED evidence."

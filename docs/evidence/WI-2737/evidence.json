@@ -27,8 +27,13 @@
     },
     {
       "acRef": "AC-6",
-      "description": "The DPIA and recipient evidence now describe role-aware and multipart filtering without claiming assistant text is filtered.",
+      "description": "The DPIA distinguishes provider selection from role-aware and multipart egress filtering without claiming assistant text is filtered.",
       "pointer": "docs/compliance/dpia.md"
+    },
+    {
+      "acRef": "AC-6",
+      "description": "The recipient matrix records the same filtered-content recipients and the conditional legacy Gemini path.",
+      "pointer": "docs/compliance/evidence/2026-07-26-recipient-matrix-draft.md"
     }
   ],
   "noiseBaselineVersion": "2026-07-31",

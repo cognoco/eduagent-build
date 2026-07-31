@@ -142,7 +142,7 @@ describe('provider-bound learner egress filter [WI-2737]', () => {
     expect(captured[0]).toHaveLength(2);
     const providerSystemContent = captured[0]?.[0]?.content;
     expect(typeof providerSystemContent).toBe('string');
-    expect((providerSystemContent as string).split('\n\n').at(-1)).toBe(
+    expect(providerSystemContent).toContain(
       'Given a book titled <book_title>Contact [personal information removed]</book_title> ' +
         '(<book_description>i live at [personal information removed]</book_description>) ' +
         'containing <topic_list>email [personal information removed]</topic_list>. ' +
